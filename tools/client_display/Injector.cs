@@ -10,7 +10,24 @@ using var unity = ModuleDefMD.Load(args[1]);
 MethodDef Method(string owner, string name) => module.GetTypes().Single(t => t.FullName == owner).Methods.Single(m => m.Name == name);
 using var bridge = ModuleDefMD.Load(args[2]);
 var settings = bridge.GetTypes().Single(t => t.FullName == "HYJS.Display.DisplaySettings");
-IMethod Display(string name) => module.Import(settings.Methods.Single(m => m.Name == name));
+var settingsRef = module.Import(settings);
+IMethod Display(string name)
+{
+    // Importing a helper MethodDef can incorrectly turn its Assembly-CSharp
+    // parameter TypeRefs into ModuleRefs scoped to the helper DLL itself.
+    // These parameters belong to this main module: bind their actual TypeDefs
+    // explicitly, while keeping only the declaring helper class external.
+    MethodSig signature = name switch
+    {
+        "get_TargetFPS" => MethodSig.CreateStatic(module.CorLibTypes.Int32),
+        "StartFPS" => MethodSig.CreateStatic(module.CorLibTypes.Void,
+            new ClassSig(module.GetTypes().Single(t => t.FullName == "FPSFixer"))),
+        "Attach" => MethodSig.CreateStatic(module.CorLibTypes.Void,
+            new ClassSig(module.GetTypes().Single(t => t.FullName == "UI.QualityBar"))),
+        _ => throw new ArgumentException("Unknown display entry: " + name)
+    };
+    return new MemberRefUser(module, name, signature, settingsRef);
+}
 
 // Preserve the complete aspect classification, design dimensions and anchor path.
 // Replace the five-byte void call in-place with three balanced pops and two nops.
@@ -42,7 +59,18 @@ quality.Body.Instructions.Add(Instruction.Create(OpCodes.Ldarg_0));
 quality.Body.Instructions.Add(Instruction.Create(OpCodes.Call, Display("Attach")));
 quality.Body.Instructions.Add(Instruction.Create(OpCodes.Ret));
 
+// PlayerInfoPage.DoOpen actually invokes Refresh on every opening. Keep Start
+// as well, but do not depend on the engine's originally-empty Start callback.
+var qualityRefresh = Method("UI.QualityBar", "Refresh");
+if (qualityRefresh.Body.ExceptionHandlers.Count != 0 || qualityRefresh.Body.Instructions.Count(i => i.OpCode == OpCodes.Ret) != 1)
+    throw new Exception("Review original quality Refresh control flow");
+var qualityEnd = qualityRefresh.Body.Instructions.Last();
+if (qualityEnd.OpCode != OpCodes.Ret) throw new Exception("Expected quality Refresh terminal return");
+qualityEnd.OpCode = OpCodes.Ldarg_0;
+qualityRefresh.Body.Instructions.Add(Instruction.Create(OpCodes.Call, Display("Attach")));
+qualityRefresh.Body.Instructions.Add(Instruction.Create(OpCodes.Ret));
+
 var options = new ModuleWriterOptions(module);
 options.MetadataOptions.Flags |= MetadataFlags.PreserveAll | MetadataFlags.KeepOldMaxStack;
 module.Write(args[3], options);
-Console.WriteLine("Five display-only methods patched; native resolution and persistent 60/120 FPS options");
+Console.WriteLine("Six display-only methods patched; native resolution, main-module parameter scopes and persistent 60/120 FPS options");

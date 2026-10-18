@@ -24,6 +24,7 @@ ENTRY = "assets/bin/Data/Managed/Assembly-CSharp.dll"
 UNITY = "assets/bin/Data/Managed/UnityEngine.dll"
 TARGETS = {
     "UI.QualityBar::Start": "538b6f46d0e72d0d0c4f89319ee94e4e14f4589ad0526a750ba1f42517008b16",
+    "UI.QualityBar::Refresh": "89c7e20b6883489140853f68712a658a7a3f79e83cffe198cdc2061f78231054",
     "UIAutoSize::Awake": "270ab339f575b7304e3dd8ef9ee24f13a657262a15c0f4d1c4af35dfe4cafbe4",
     "FPSFixer::Start": "f87673b0f0c7f2df1af811b3f06b1183eaf4272a534bf929bdf4e15b1b812353",
     "FPSFixer::Update": "1d7e78dd5d71ec5c46ee0bf7cd8909b34c2f965739b9a3d74f6af248f0ff4e15",
@@ -43,6 +44,41 @@ def member(pe, token):
     row = getattr(pe.net.mdtables, table).rows[(value & 0xffffff) - 1]
     owner = row.Class.row if table == "MemberRef" else None
     return ((str(owner.TypeNamespace) + "." + str(owner.TypeName)) if owner else "", str(row.Name))
+
+
+def verify_display_call_scopes(pe):
+    """Bind helper-call parameters to real main-module types, not helper DLLs."""
+    expected = {"get_TargetFPS": None, "StartFPS": "FPSFixer", "Attach": "UI.QualityBar"}
+    found = {}
+
+    def compressed(raw):
+        if raw[0] < 0x80:
+            return raw[0], 1
+        if raw[0] < 0xc0:
+            return ((raw[0] & 0x3f) << 8) | raw[1], 2
+        return ((raw[0] & 0x1f) << 24) | (raw[1] << 16) | (raw[2] << 8) | raw[3], 4
+
+    for ref in pe.net.mdtables.MemberRef:
+        owner = ref.Class.row
+        if not hasattr(owner, "TypeName") or str(owner.TypeName) != "DisplaySettings" or str(owner.TypeNamespace) != "HYJS.Display":
+            continue
+        name = str(ref.Name)
+        require(name in expected, "Unexpected display bridge call: " + name)
+        require(owner.ResolutionScope.table.name == "AssemblyRef" and str(owner.ResolutionScope.row.Name) == "SoulFlowerDisplay",
+                "Display helper declaring scope is not its assembly")
+        sig = ref.Signature.value
+        if expected[name] is None:
+            require(sig == bytes.fromhex("000008"), "Wrong saved FPS getter signature")
+        else:
+            require(sig[:4] == bytes.fromhex("00010112"), "Wrong display initializer signature: " + name)
+            token, count = compressed(sig[4:])
+            require(len(sig) == count + 4 and token & 3 == 0, "Display parameter must bind directly to main TypeDef: " + name)
+            typedef = pe.net.mdtables.TypeDef.rows[(token >> 2) - 1]
+            actual = ((str(typedef.TypeNamespace) + ".") if str(typedef.TypeNamespace) else "") + str(typedef.TypeName)
+            require(actual == expected[name], "Display parameter bound to wrong main type: " + name)
+        found[name] = expected[name] or "System.Int32"
+    require(set(found) == set(expected), "Display helper call inventory differs")
+    return {"displayHelperCallParametersBoundToMainTypeDefs": found}
 
 
 def verify(before, after, expected_input_sha=BASE_DLL):
@@ -92,8 +128,24 @@ def verify(before, after, expected_input_sha=BASE_DLL):
         elif name == "RenderManager::get_MaxFPS":
             require([i.opcode.name for i in newbody.instructions] == ["call", "ret"]
                     and member(b, newbody.instructions[0].operand) == ("HYJS.Display.DisplaySettings", "get_TargetFPS"), "Saved quality maximum differs")
+        elif name == "UI.QualityBar::Refresh":
+            def normalized(body):
+                indexes = {i.offset: n for n, i in enumerate(body.instructions)}
+                values = []
+                for instruction in body.instructions:
+                    value = operand(instruction.operand)
+                    if instruction.opcode.name == "switch":
+                        value = tuple(indexes[v] for v in instruction.operand)
+                    elif instruction.opcode.flow_control.name in ("Branch", "Cond_Branch"):
+                        value = indexes[instruction.operand]
+                    values.append((instruction.opcode.name, value))
+                return values
+            original, updated = normalized(oldbody), normalized(newbody)
+            require(original[-1][0] == "ret" and updated[:-3] == original[:-1], "Original quality Refresh branches changed")
+            require([i.opcode.name for i in newbody.instructions[-3:]] == ["ldarg.0", "call", "ret"]
+                    and member(b, newbody.instructions[-2].operand) == ("HYJS.Display.DisplaySettings", "Attach"), "Missing real page-open display attachment")
         changes.append({"method": name, "beforeRawSHA256": sha(x), "afterRawSHA256": sha(y)})
-    require(engine == 547 and len(changes) == 5, "Engine/target inventory differs")
+    require(engine == 547 and len(changes) == 6, "Engine/target inventory differs")
     # The unchanged adaptive Refresh body is private and its only caller was
     # FPSFixer.Update. Prove no residual direct caller can reset the target rate.
     refresh = next((rid, row) for name, rid, row in left if name == "FPSFixer::Refresh")
@@ -111,7 +163,8 @@ def verify(before, after, expected_input_sha=BASE_DLL):
             "methodTokensABIAndFlagsPreserved": True, "legacyAdaptiveRefreshCallers": callers,
             "existingNGUIFitBothAndAnchorsUnchanged": True, "defaultRequestedTargetFPS": 60, "selectableRequestedTargetFPS": [60, 120],
             "nativeDisplayResolutionRetained": True, "masterTextureLimit": 0, "maximumLODLevel": 0,
-            "userGraphicsQualitySelectionPreserved": True, "antiAliasingModified": False, "changes": changes}
+            "userGraphicsQualitySelectionPreserved": True, "antiAliasingModified": False, "changes": changes,
+            **verify_display_call_scopes(b)}
 
 
 def manifest_policy(raw):

@@ -14,6 +14,12 @@ namespace HYJS.ActivitySafety
     {
         const BindingFlags Flags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
         const string EmptyName = "SoulFlowerActivityUnavailable";
+        static int lifecycleReports;
+        static void Trace(string text)
+        {
+            Debug.LogWarning("SoulFlowerActivity " + text);
+        }
+
         static object Get(object owner, string name)
         {
             if (owner == null) return null;
@@ -38,7 +44,12 @@ namespace HYJS.ActivitySafety
         static Transform Module(UIActivityPanel panel) { return Get(panel, "moduleTrans") as Transform; }
         static UIActivityTemplate Current(UIActivityPanel panel) { return Get(panel, "curActivity") as UIActivityTemplate; }
         static bool Known(ActivityType type) { return type != ActivityType.None && Enum.IsDefined(typeof(ActivityType), type); }
-        public static bool HasCurrent(UIActivityPanel panel) { return Current(panel) != null; }
+        public static bool HasCurrent(UIActivityPanel panel)
+        {
+            bool has = Current(panel) != null;
+            if (lifecycleReports++ < 4) Trace("lifecycle current=" + has);
+            return has;
+        }
 
         static void ClearPanel(UIActivityPanel panel)
         {
@@ -55,6 +66,7 @@ namespace HYJS.ActivitySafety
         }
         static void Empty(UIActivityPanel panel, string reason)
         {
+            Trace("empty " + reason);
             try
             {
                 ClearPanel(panel); RemoveEmpty(panel);
@@ -71,13 +83,25 @@ namespace HYJS.ActivitySafety
                     label.bitmapFont = fonts[0].bitmapFont; label.trueTypeFont = fonts[0].trueTypeFont;
                     label.fontStyle = fonts[0].fontStyle; label.fontSize = 24;
                     label.width = 520; label.height = 100; label.pivot = UIWidget.Pivot.Center;
-                    label.alignment = NGUIText.Alignment.Center; label.color = fonts[0].color;
+                    Color color = fonts[0].color; color.a = 1f;
+                    label.alignment = NGUIText.Alignment.Center; label.color = color;
                     label.depth = depth + 5; label.text = "暂无开放活动";
+                    Trace("empty-label created module=" + root.name + " active=" + root.gameObject.activeInHierarchy);
+                }
+                else Trace("empty-label unavailable owner=" + (owner != null) + " module=" + (root != null) + " fonts=" + fonts.Length);
+                // InitTabs initializes the navigation with alpha-zero tweeners.
+                // The successful original Show path starts these animations;
+                // the guarded empty path must reveal that same navigation too.
+                List<TweenAlpha> alphas = Get(owner, "alphas") as List<TweenAlpha>;
+                if (alphas != null && alphas.Count > 0)
+                {
+                    Set(owner, "showTimes", 0);
+                    Call(owner, "PlayTweener", new object[0]);
+                    Trace("empty navigation revealed tabs=" + alphas.Count);
                 }
                 BoxManager.CreatePopupTextBox("当前暂无开放活动", 0f);
             }
-            catch (Exception) { }
-            Debug.LogWarning("SoulFlower activity unavailable: " + reason);
+            catch (Exception error) { Trace("empty-render failure " + error.ToString()); }
         }
         static void ClearDirectory(UIActivity page, string reason)
         {
@@ -89,6 +113,7 @@ namespace HYJS.ActivitySafety
         public static bool PrepareResponse(UIActivity page, Packet packet, bool success)
         {
             SCActivityList response = packet == null ? null : packet.kBody as SCActivityList;
+            Trace("response success=" + success + " typed=" + (response != null) + " count=" + (response == null || response.activityList == null ? -1 : response.activityList.Count));
             if (!success || response == null || response.activityList == null)
             {
                 ClearDirectory(page, "missing or failed directory response"); return false;
@@ -113,6 +138,7 @@ namespace HYJS.ActivitySafety
 
         public static bool PrepareTabs(UIActivity page, List<ActivityType> tabs)
         {
+            Trace("prepare-tabs count=" + (tabs == null ? -1 : tabs.Count));
             if (tabs == null) { ClearDirectory(page, "null directory tabs"); return false; }
             Dictionary<ActivityType, bool> seen = new Dictionary<ActivityType, bool>();
             int index = 0;
@@ -131,6 +157,7 @@ namespace HYJS.ActivitySafety
         {
             if (panel == null) return;
             UIActivity owner = Owner(panel);
+            Trace("show type=" + type + " owner=" + (owner != null));
             Dictionary<ActivityType, string> ids = Get(owner, "activityIds") as Dictionary<ActivityType, string>;
             string id = null;
             bool builtin = type == ActivityType.EveryDaySign || type == ActivityType.AsunaKitchen;
@@ -151,12 +178,15 @@ namespace HYJS.ActivitySafety
             {
                 Set(panel, "activedType", type);
                 // Preserve the full original prefab mapping, setup, Init and Hide.
+                Trace("template-init begin type=" + type);
                 Call(panel, "InitActivity", new object[] { type });
                 UIActivityTemplate current = Current(panel);
                 if (current == null) throw new InvalidOperationException("Original activity prefab/component unavailable");
                 if (!String.IsNullOrEmpty(id)) Set(current, "activityId", id);
+                Trace("template-show begin type=" + type + " component=" + current.GetType().Name);
                 current.Show();
                 Call(owner, "PlayTweener", new object[0]);
+                Trace("template-show complete type=" + type);
             }
             catch (Exception error)
             {

@@ -47,3 +47,40 @@ specific confirmed null/index/duplicate/initialization risks, not every possible
 native crash or later template Update/Awake callback. Backend publication must
 still exclude unfinished/broken operational configurations. Static checks and
 compilation are not a phone pass; packaging and device checks belong to root.
+
+## Guarded empty-state rendering and phone diagnosis
+
+The first phone batch showed the original activity background with no visible
+tabs. The server returned five valid published entries for the same phone
+session; this observation does not establish an empty activity directory.
+
+The guard's failure path had a confirmed rendering omission: `InitTabs` creates
+navigation alpha tweeners, while only the successful template path invoked the
+original `PlayTweener`. The bridge now invokes that same navigation animation
+on guarded failure and forces the new empty label's alpha to 1. These changes
+fix the fallback visibility boundary; the reason a healthy template might have
+failed still requires the actual phone callback or exception.
+
+The final bridge removes temporary direct JNI logging. The original Unity
+warning path remains available for template failures.
+
+The decisive original-device exception was `TypeLoadException: Could not load
+type 'UI.UIActivity'` while invoking the patched `UIActivity.MsgCallback`.
+Direct helper calls succeeded. The caller's imported parameter TypeRefs had
+incorrect ModuleRef scopes pointing at `SoulFlowerActivity.dll`, although the
+page, packet, enum and panel types belong to the main module.
+
+`Injector.cs` now constructs explicit MemberRef signatures using the existing
+main TypeDefs and original parameter signatures. Only the helper declaring type
+uses external AssemblyRef `SoulFlowerActivity`. Existing composed output is
+repaired by `tools/client_release/repair_bindings.py`, without changing method
+bodies; fresh builds use the corrected injector directly. Source qualification
+is recorded in `activity/overlay-import-scope-r3/`. Device validation must match
+the final combined APK.
+
+Exact prefab evidence in `original-owner-prefab.json` confirms that
+`UIActivityPanel` and `UIActivity` are enabled components of the same original
+GameObject. The original Show method uses the same `GetComponent<UIActivity>`
+owner lookup. `original-prefix-enum-map.json` confirms that the 34 original
+category prefixes map to 34 distinct enums; the guard does not introduce a
+second category mapping.

@@ -5,6 +5,7 @@ import fcntl
 import hashlib
 import json
 import os
+import shutil
 from pathlib import Path
 import sys
 import tempfile
@@ -48,6 +49,8 @@ def verify_managed(before, after):
         else:
             unchanged += 1
             engine += name.startswith("Battle.Engine")
+    for ref in b.net.mdtables.TypeRef.rows:
+        require(not (ref.ResolutionScope.table.name == "ModuleRef" and str(ref.ResolutionScope.row.Name) in {"SoulFlowerDisplay.dll", "SoulFlowerActivity.dll"}), "Host type points to helper netmodule")
     require(set(changed) == allowed and engine == 547, "Expected overlay union or original engine differs")
     return {"changedMethods": changed, "originalEngineMethodsExact": engine, "otherInheritedMethodsExact": unchanged}
 
@@ -64,9 +67,10 @@ def main():
     require(common.digest(base) == BASE, "Qualified base changed")
     overlays = {
         "playability": AUDIT / "client/overlay-r3",
-        "display": AUDIT / "display/overlay-after-playability-r3-release",
-        "activity": AUDIT / "activity/overlay-combined-r1",
-        "login": AUDIT / "login-ui/overlay-final-r4",
+        "display": AUDIT / "display/overlay-scope-entry-release-r5",
+        "activity": AUDIT / "activity/overlay-import-scope-r3",
+        "login": AUDIT / "login-ui/overlay-final-r5",
+        "bindings": AUDIT / "client/host-bindings-r1",
     }
     manifests = {key: json.loads((folder / "manifest.json").read_text()) for key, folder in overlays.items()}
     pins = {}
@@ -76,7 +80,7 @@ def main():
             require(path.resolve().is_relative_to(ROOT) and common.digest(path) == digest, "Source pin changed: " + name)
             pins[path] = digest
     files = {
-        ENTRY + "Assembly-CSharp.dll": overlays["login"] / "Assembly-CSharp.dll",
+        ENTRY + "Assembly-CSharp.dll": overlays["bindings"] / "Assembly-CSharp.dll",
         ENTRY + "LocalFormationUI.dll": overlays["playability"] / "LocalFormationUI.dll",
         ENTRY + "LocalPlayability.dll": overlays["playability"] / "LocalPlayability.dll",
         ENTRY + "SoulFlowerDisplay.dll": overlays["display"] / "SoulFlowerDisplay.dll",
@@ -88,13 +92,15 @@ def main():
         files.pop("assets/login-ui/panel.png")
     payload = {name: path.read_bytes() for name, path in files.items()}
     hashes = {name: hashlib.sha256(raw).hexdigest() for name, raw in payload.items()}
-    require(hashes[common.DLL] == manifests["login"]["outputManagedSHA256"], "Final main DLL differs")
+    require(hashes[ENTRY + "SoulFlowerActivity.dll"] == manifests["activity"]["bridgeSHA256"], "Activity bridge differs")
+    require(hashes[common.DLL] == manifests["bindings"]["outputManagedSHA256"], "Final main DLL differs")
     require(hashes["classes2.dex"] == manifests["login"]["outputDexSHA256"], "Final native UI differs")
     sdk = Path.home() / "Library/Android/sdk/build-tools/33.0.0"
     jdk = Path("/opt/homebrew/opt/openjdk@21")
     env = dict(os.environ, JAVA_HOME=str(jdk), PATH=str(jdk / "bin") + os.pathsep + os.environ.get("PATH", ""))
     certificate = common._certificate(common.run([sdk / "apksigner", "verify", "--print-certs", base], env))
     inherited, compressed = {}, {}
+    require(shutil.disk_usage(ROOT).free > base.stat().st_size * 2 + 150_000_000, "Need space for two temporary APK copies plus margin")
     output.parent.mkdir(exist_ok=True)
     with (ROOT / "build/.client-build.lock").open("a") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
@@ -121,7 +127,11 @@ def main():
                     for name in set(payload) - set(incoming.namelist()):
                         target.writestr(name, payload[name], compress_type=zipfile.ZIP_DEFLATED)
             common.run([sdk / "zipalign", "-f", "-p", "4", unsigned, aligned], env)
+            # The aligned copy is complete; release the reproducible first copy
+            # before signing so APK preparation needs at most two full copies.
+            unsigned.unlink()
             common.run([sdk / "apksigner", "sign", "--ks", ROOT / ".local-signing/debug.keystore", "--ks-pass", "pass:android", "--key-pass", "pass:android", "--out", signed, aligned], env)
+            aligned.unlink()
             require(common._certificate(common.run([sdk / "apksigner", "verify", "--verbose", "--print-certs", signed], env)) == certificate, "Signer changed")
             common.run([sdk / "zipalign", "-c", "-p", "4", signed], env)
             with zipfile.ZipFile(signed) as actual, signed.open("rb") as stream:
