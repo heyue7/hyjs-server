@@ -95,6 +95,7 @@ def main():
     p.add_argument('--base-apk',type=Path,required=True);p.add_argument('--base-sha256',required=True)
     p.add_argument('--input-managed',type=Path);p.add_argument('--input-managed-sha256')
     p.add_argument('--output-directory',type=Path,required=True)
+    p.add_argument('--reuse-managed',type=Path,help='Reuse a previously emitted same-source managed prefix after a fresh strict comparison')
     args=p.parse_args();out=args.output_directory.resolve();require(not out.exists(),'Use fresh output directory')
     require(sha(args.base_apk.read_bytes())==args.base_sha256,'Base APK SHA differs')
     with zipfile.ZipFile(args.base_apk) as z:
@@ -114,9 +115,13 @@ def main():
         folder=Path(tmp);current=folder/'Assembly-CSharp.dll';current.write_bytes(before)
         shutil.copy2(injector,folder/'Program.cs');project=folder/'Patch.csproj'
         project.write_text('<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable></PropertyGroup><ItemGroup><Reference Include="dnlib"><HintPath>'+str(dnlib)+'</HintPath></Reference></ItemGroup></Project>')
-        run('compile-injector',[dotnet,'build',project,'--nologo','--verbosity','quiet','-p:NuGetAudit=false'])
-        shutil.copytree(folder/'bin/Debug/net8.0',out/'injector')
-        run('patch',[dotnet,out/'injector/Patch.dll',current,out/'Assembly-CSharp.dll'])
+        if args.reuse_managed:
+            verify_managed(before,args.reuse_managed.read_bytes())
+            shutil.copy2(args.reuse_managed,out/'Assembly-CSharp.dll')
+        else:
+            run('compile-injector',[dotnet,'build',project,'--nologo','--verbosity','quiet','-p:NuGetAudit=false'])
+            shutil.copytree(folder/'bin/Debug/net8.0',out/'injector')
+            run('patch',[dotnet,out/'injector/Patch.dll',current,out/'Assembly-CSharp.dll'])
         stubclasses=folder/'stubs';classes=folder/'classes';dex=folder/'dex'
         for d in [stubclasses,classes,dex]:d.mkdir()
         common=[jdk/'bin/javac','-encoding','UTF-8','--release','8','-classpath',str(android)]
@@ -134,7 +139,7 @@ def main():
             if member not in new_api[cls]:missing.append([cls,member])
     require(not missing,'Inherited public/protected Java ABI changed: '+repr(missing))
     new_classes=set(dex_classes(new_dex));require(all(n.startswith('Lcom/hyjs/wallet/') for n in new_classes),'Stubs/unrelated DEX class present')
-    report={'schema':'native-login-ui-overlay-v1','status':'STATIC_VERIFIED_NOT_PACKAGED','baseAPKSHA256':args.base_sha256,'inputManagedSHA256':sha(before),'outputManagedSHA256':sha(after),'inputDexSHA256':sha(before_dex),'outputDexSHA256':sha(new_dex),'originalDexEntriesMustRemainExact':original_dex,'inheritedJavaPublicProtectedABIExact':True,'inheritedPublicClasses':sorted(old_api),'newPublicClasses':sorted(set(new_api)-set(old_api)),'removedInternalClasses':sorted(set(dex_classes(before_dex))-new_classes),'newClasses':sorted(new_classes-set(dex_classes(before_dex))),'sourcePins':{str(f.relative_to(ROOT)):sha(f.read_bytes()) for f in [Path(__file__).resolve(),injector,*java,*stubs]},'assetRequired':'assets/login-ui/panel.png','artReady':(ROOT/'tools/login_ui/assets/panel.png').is_file(),'apkPackaged':False,'phoneVerified':False,**checks}
+    report={'schema':'native-login-ui-overlay-v1','status':'STATIC_VERIFIED_NOT_PACKAGED','baseAPKSHA256':args.base_sha256,'inputManagedSHA256':sha(before),'outputManagedSHA256':sha(after),'inputDexSHA256':sha(before_dex),'outputDexSHA256':sha(new_dex),'originalDexEntriesMustRemainExact':original_dex,'inheritedJavaPublicProtectedABIExact':True,'inheritedPublicClasses':sorted(old_api),'newPublicClasses':sorted(set(new_api)-set(old_api)),'removedInternalClasses':sorted(set(dex_classes(before_dex))-new_classes),'newClasses':sorted(new_classes-set(dex_classes(before_dex))),'sourcePins':{str(f.relative_to(ROOT)):sha(f.read_bytes()) for f in [Path(__file__).resolve(),injector,*java,*stubs]},'assetRequired':'assets/login-ui/panel.png','artReady':(ROOT/'tools/login_ui/assets/panel.png').is_file(),'artSHA256':sha((ROOT/'tools/login_ui/assets/panel.png').read_bytes()) if (ROOT/'tools/login_ui/assets/panel.png').is_file() else None,'managedReused':bool(args.reuse_managed),'systemAutofillExcludedForNativeLoginAndRegistrationOnAndroid26Plus':True,'apkPackaged':False,'phoneVerified':False,**checks}
     (out/'abi-before.json').write_text(json.dumps(old_api,ensure_ascii=False,indent=2)+'\n');(out/'abi-after.json').write_text(json.dumps(new_api,ensure_ascii=False,indent=2)+'\n');(out/'manifest.json').write_text(json.dumps(report,ensure_ascii=False,indent=2)+'\n')
     print(json.dumps({k:report[k] for k in ['status','outputManagedSHA256','outputDexSHA256','inheritedJavaPublicProtectedABIExact','artReady','originalEngineMethodsExact']},ensure_ascii=False))
 if __name__=='__main__':main()

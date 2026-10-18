@@ -37,6 +37,7 @@ public final class LoginStyle {
     }
     public static FrameLayout panel(Activity a,LinearLayout body){
         FrameLayout frame=new FrameLayout(a);
+        if(android.os.Build.VERSION.SDK_INT>=26)frame.setImportantForAutofill(View.IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS);
         frame.setBackground(surface(Color.rgb(240,248,250),Color.rgb(75,173,199),dp(a,10)));
         ImageView art=new ImageView(a);art.setScaleType(ImageView.ScaleType.FIT_XY);
         try(InputStream in=a.getAssets().open("login-ui/panel.png")){art.setImageDrawable(Drawable.createFromStream(in,null));}
@@ -48,7 +49,9 @@ public final class LoginStyle {
         frame.addView(scroll,new FrameLayout.LayoutParams(-1,-2));return frame;
     }
     public static EditText field(Activity a,LinearLayout body,String hint,boolean password){
-        EditText f=new EditText(a);f.setSingleLine(true);f.setTextSize(16);f.setTextColor(INK);
+        EditText f=new EditText(a);
+        if(android.os.Build.VERSION.SDK_INT>=26)f.setImportantForAutofill(View.IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS);
+        f.setSingleLine(true);f.setTextSize(16);f.setTextColor(INK);
         f.setHintTextColor(Color.rgb(94,116,127));f.setHint(hint);
         f.setInputType(android.text.InputType.TYPE_CLASS_TEXT|(password?android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD:android.text.InputType.TYPE_TEXT_VARIATION_NORMAL));
         f.setImeOptions(EditorInfo.IME_ACTION_NEXT|EditorInfo.IME_FLAG_NO_EXTRACT_UI);

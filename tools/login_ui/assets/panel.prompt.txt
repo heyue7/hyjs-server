@@ -1,0 +1,1 @@
+Game login/register panel background, no embedded words or controls. Pale frosted silver ivory center, restrained cyan-blue beveled frame, blue title strip and subtle fantasy filigree, matching the original anime RPG style. Keep editable native text and controls separate for sharp rendering and modern IME. Generated with the built-in image_gen tool on 2026-10-18.

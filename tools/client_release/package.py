@@ -66,7 +66,7 @@ def main():
         "playability": AUDIT / "client/overlay-r3",
         "display": AUDIT / "display/overlay-after-playability-r3-release",
         "activity": AUDIT / "activity/overlay-combined-r1",
-        "login": AUDIT / "login-ui/overlay-final-r3",
+        "login": AUDIT / "login-ui/overlay-final-r4",
     }
     manifests = {key: json.loads((folder / "manifest.json").read_text()) for key, folder in overlays.items()}
     pins = {}
