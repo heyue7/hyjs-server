@@ -65,6 +65,9 @@ public final class LoginStyle {
     }
     public static void fit(Activity a,Dialog dialog){
         Window w=dialog.getWindow();if(w==null)return;
+        // Let the activity's wallet handle receive its own outside-window drag
+        // while account fields keep normal focus and keyboard behavior.
+        w.addFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL);
         w.setBackgroundDrawableResource(android.R.color.transparent);
         w.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE|WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN);
         android.graphics.Rect r=new android.graphics.Rect();a.getWindow().getDecorView().getWindowVisibleDisplayFrame(r);
