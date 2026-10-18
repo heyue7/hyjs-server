@@ -24,6 +24,7 @@ declare module "@elegant-router/types" {
     "activities": "/activities";
     "activities-unavailable": "/activities-unavailable";
     "announcements": "/announcements";
+    "arena-prizes": "/arena-prizes";
     "audit": "/audit";
     "feedback": "/feedback";
     "home": "/home";
@@ -84,6 +85,7 @@ declare module "@elegant-router/types" {
     | "activities"
     | "activities-unavailable"
     | "announcements"
+    | "arena-prizes"
     | "audit"
     | "feedback"
     | "home"
@@ -121,6 +123,7 @@ declare module "@elegant-router/types" {
     | "activities-unavailable"
     | "activities"
     | "announcements"
+    | "arena-prizes"
     | "audit"
     | "feedback"
     | "home"

@@ -112,12 +112,16 @@ func (s *GameService) p4PopularityRankBuy(tx *gorm.DB, id int64, p *pb.Player, c
 func (s *GameService) p4PopularityShopItems(tx *gorm.DB, id int64, p *pb.Player, cfg db.P4CommerceRule, items []*pb.ShopItem, now time.Time) ([]*pb.ShopItem, error) {
 	if cfg.Kind == constUtil.P4PopularityRankKind {
 		normal, rules, _, state, err := s.loadP4Commerce(tx, id, "", 4, now)
-		if err != nil {
+		if err != nil && !errors.Is(err, constUtil.ErrP4CommerceNotOpen) {
 			return nil, err
 		}
-		items, _, err = s.p4Projection(tx, p, normal, rules, state)
-		if err != nil {
-			return nil, err
+		if err == nil {
+			items, _, err = s.p4Projection(tx, p, normal, rules, state)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			items = nil
 		}
 	}
 	var rows []db.P4CommerceRule
@@ -177,4 +181,20 @@ func (s *GameService) p4PopularityShopItems(tx *gorm.DB, id int64, p *pb.Player,
 		}
 	}
 	return items, nil
+}
+
+// An empty operator-owned reward tab has no original purchase target for Guide93.
+// Complete only this teaching cursor after its real shop query; no product,
+// currency, purchase witness or later level guide is created by this fallback.
+func p4PopularityEmptyGuide(p *pb.Player, items []*pb.ShopItem) bool {
+	if p.GetNoviceGuideSchedule() != constUtil.P4PopularityGuideCompleted-1 {
+		return false
+	}
+	for _, item := range items {
+		if item.GetCondition().GetType() == "rank" {
+			return false
+		}
+	}
+	p.NoviceGuideSchedule = proto.Int32(constUtil.P4PopularityGuideCompleted)
+	return true
 }

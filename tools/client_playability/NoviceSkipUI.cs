@@ -81,6 +81,7 @@ namespace HYJS.Playability
         {
             try
             {
+                ResumeEmptyPopularityReward();
                 bool visible = InitialRunning();
                 if (button == null && visible) CreateButton();
                 if (button == null) return;
@@ -113,6 +114,43 @@ namespace HYJS.Playability
                 }
             }
             catch (Exception) { if (button != null) button.SetActive(false); }
+        }
+
+        static object ReadMember(object value, string name)
+        {
+            if (value == null) return null;
+            FieldInfo field = value.GetType().GetField(name, Fields);
+            if (field != null) return field.GetValue(value);
+            PropertyInfo property = value.GetType().GetProperty(name, Fields);
+            return property == null ? null : property.GetValue(value, null);
+        }
+
+        void ResumeEmptyPopularityReward()
+        {
+            if (guide == null || StaticData.playerData == null || !(bool)Get("running") ||
+                (Get("curGuideId") as string) != "guide_pvp_shop" ||
+                StaticData.playerData.currentGuideId != "guide_pvp_shop") return;
+            object step = Get("curStep");
+            if ((ReadMember(step, "guideId") as string) != "guide_pvp_shop" ||
+                (ReadMember(step, "stepId") as string) != "93") return;
+            GameObject shop = GameObject.Find("UI Root/PageManager/ShopPage/Panel/Right/PopularityShop");
+            if (shop == null || !shop.activeInHierarchy) return;
+            Component tab = shop.GetComponent(typeof(UI.TabPopularityShop));
+            if (tab == null || (int)ReadMember(tab, "curTab") != 2) return;
+            IList products = ReadMember(tab, "productList") as IList;
+            // A non-null source list and server Guide14 distinguish a completed
+            // empty query from a slow network response or an unopened shop.
+            if (products == null) return;
+            foreach (object product in products)
+                if ((ReadMember(ReadMember(product, "condition"), "type") as string) == "rank") return;
+            string path = ReadMember(step, "path") as string;
+            if (String.IsNullOrEmpty(path) || GameObject.Find(path) != null) return;
+            MethodInfo next = typeof(GuideManager).GetMethod("NextStep", Fields, null, new Type[] { typeof(int) }, null);
+            if (next == null) return;
+            // Only the missing purchase wait is retired. Original Step94 owns
+            // the close-button instruction and later level guides stay intact.
+            guide.StopAllCoroutines();
+            next.Invoke(guide, new object[] { 1 });
         }
 
         static Rect Project(Camera camera, Bounds bounds)

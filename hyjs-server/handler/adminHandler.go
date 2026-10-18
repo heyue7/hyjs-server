@@ -43,6 +43,7 @@ func RegisterAdminRoutes(r *gin.Engine, assets string) {
 	RegisterAdminWalletRoutes(a)
 	RegisterAdminServerGameClockRoutes(a)
 	RegisterAdminShopRoutes(a)
+	RegisterAdminArenaPrizeRoutes(a)
 	RegisterAdminGameContentRoutes(a)
 	RegisterAdminFeedbackRoutes(a)
 	a.GET("/auth/me", AdminMeHandler)

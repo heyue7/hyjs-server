@@ -31,6 +31,94 @@ type p11ArenaPrizeDraw struct {
 	Total int64 `json:"total"`
 }
 
+type p11ArenaRegularCoinDraw struct {
+	Source string  `json:"source"`
+	Reason string  `json:"reason"`
+	Values []int64 `json:"values"`
+	Min    int64   `json:"min,omitempty"`
+	Max    int64   `json:"max,omitempty"`
+}
+
+// Every card uses its own unbiased crypto draw. Repeated quantities are valid;
+// the first card is the original consumer's hit and the other two are previews.
+func p11ArenaRegularCoinCards(reason string, supplied *p11ArenaRegularCoinDraw) ([]*pb.BaseResource, *p11ArenaRegularCoinDraw, error) {
+	switch reason {
+	case constUtil.P11ArenaPrizeDisabled, constUtil.P11ArenaPrizeClosed, constUtil.P11ArenaPrizeLevel, constUtil.P11ArenaPrizeDaily, constUtil.P11ArenaPrizeTotal:
+	default:
+		return nil, nil, errors.New(constUtil.P11ArenaPrizeConflict)
+	}
+	minimum, maximum := constUtil.P11ArenaPrizeRegularCoinMin, constUtil.P11ArenaPrizeRegularCoinMax
+	if supplied != nil {
+		switch supplied.Source {
+		case constUtil.P11ArenaPrizeRegularCoinSource:
+			if supplied.Min != 0 || supplied.Max != 0 {
+				return nil, nil, errors.New(constUtil.P11ArenaPrizeConflict)
+			}
+		case constUtil.P11ArenaPrizeConfiguredCoinSource:
+			minimum, maximum = supplied.Min, supplied.Max
+			if minimum < 1 || maximum < minimum || maximum > constUtil.P11ArenaPrizeCoinMaximum {
+				return nil, nil, errors.New(constUtil.P11ArenaPrizeConflict)
+			}
+		default:
+			return nil, nil, errors.New(constUtil.P11ArenaPrizeConflict)
+		}
+	}
+	width := maximum - minimum + 1
+	draw := &p11ArenaRegularCoinDraw{Source: constUtil.P11ArenaPrizeRegularCoinSource, Reason: reason}
+	if supplied == nil {
+		for card := 0; card < 3; card++ {
+			value, err := rand.Int(rand.Reader, big.NewInt(width))
+			if err != nil {
+				return nil, nil, err
+			}
+			draw.Values = append(draw.Values, value.Int64())
+		}
+	} else {
+		if supplied.Reason != reason || len(supplied.Values) != 3 {
+			return nil, nil, errors.New(constUtil.P11ArenaPrizeConflict)
+		}
+		draw.Source, draw.Min, draw.Max = supplied.Source, supplied.Min, supplied.Max
+		draw.Values = append([]int64(nil), supplied.Values...)
+	}
+	var cards []*pb.BaseResource
+	for _, value := range draw.Values {
+		if value < 0 || value >= width {
+			return nil, nil, errors.New(constUtil.P11ArenaPrizeConflict)
+		}
+		cards = append(cards, &pb.BaseResource{Id: proto.String("coin"), Num: proto.Int32(int32(minimum + value))})
+	}
+	return cards, draw, nil
+}
+
+// Existing pre-configuration Go fixtures may carry zero fields; persisted
+// schema defaults and admin saves always store the explicit configured range.
+func p11ArenaPolicyRegularCoinRange(policy *db.P11ArenaPrizePolicy) (int64, int64, error) {
+	minimum, maximum := policy.RegularCoinMin, policy.RegularCoinMax
+	if minimum == 0 && maximum == 0 {
+		return constUtil.P11ArenaPrizeRegularCoinMin, constUtil.P11ArenaPrizeRegularCoinMax, nil
+	}
+	if minimum < 1 || maximum < minimum || maximum > constUtil.P11ArenaPrizeCoinMaximum {
+		return 0, 0, errors.New(constUtil.P11ArenaPrizeConfigError)
+	}
+	return minimum, maximum, nil
+}
+
+func p11ArenaConfiguredCoinCards(reason string, policy *db.P11ArenaPrizePolicy) ([]*pb.BaseResource, *p11ArenaRegularCoinDraw, error) {
+	minimum, maximum, err := p11ArenaPolicyRegularCoinRange(policy)
+	if err != nil {
+		return nil, nil, err
+	}
+	draw := &p11ArenaRegularCoinDraw{Source: constUtil.P11ArenaPrizeConfiguredCoinSource, Reason: reason, Min: minimum, Max: maximum}
+	for card := 0; card < 3; card++ {
+		value, err := rand.Int(rand.Reader, big.NewInt(maximum-minimum+1))
+		if err != nil {
+			return nil, nil, err
+		}
+		draw.Values = append(draw.Values, value.Int64())
+	}
+	return p11ArenaRegularCoinCards(reason, draw)
+}
+
 // InitializeP11ArenaPrizes preserves published operator values. Creating the
 // schema grants nothing and leaves the explicitly local prize policy disabled.
 func (s *GameService) InitializeP11ArenaPrizes(ctx context.Context) error {
@@ -38,7 +126,7 @@ func (s *GameService) InitializeP11ArenaPrizes(ctx context.Context) error {
 	if err := tx.AutoMigrate(&db.P11ArenaPrizePolicy{}, &db.P11ArenaPrizeOffer{}, &db.P11ArenaPrizeAward{}); err != nil {
 		return err
 	}
-	policy := db.P11ArenaPrizePolicy{ID: constUtil.P11ArenaPrizePolicyID, Version: "local-arena-win-prize-v1", Source: constUtil.P11ArenaPrizeSource, PoolJSON: constUtil.P11ArenaPrizeDefaultPool, MinLevel: 10, DailyWins: 5, WindowWins: 30}
+	policy := db.P11ArenaPrizePolicy{ID: constUtil.P11ArenaPrizePolicyID, Version: "local-arena-win-prize-v1", Source: constUtil.P11ArenaPrizeSource, PoolJSON: constUtil.P11ArenaPrizeDefaultPool, MinLevel: 10, DailyWins: 5, WindowWins: 30, RegularCoinMin: constUtil.P11ArenaPrizeRegularCoinMin, RegularCoinMax: constUtil.P11ArenaPrizeRegularCoinMax}
 	return tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&policy).Error
 }
 
@@ -200,9 +288,9 @@ func (s *GameService) ApplyP11ArenaFightPrize(ctx context.Context, tx *gorm.DB, 
 	month, day := p11ArenaPrizeMonth(now)
 	award := db.P11ArenaPrizeAward{FightID: row.FightID, PlayerID: row.PlayerID, Stamp: row.Stamp, PlayerLevel: int64(player.GetLevel()), WinnerID: row.WinnerID, P6RecordID: row.P6RecordID, TerminalHash: row.TerminalHash, ScopeProof: row.ScopeProof, BaseResponseHash: row.ResponseHash, Month: month, Day: day, Status: constUtil.P11ArenaPrizeLost, DrawJSON: "[]", BoxesJSON: "[]", CreatedAt: now.UnixMilli()}
 	grant := &pb.ResultObject{}
+	var policy db.P11ArenaPrizePolicy
 	if row.WinnerID == row.PlayerID {
 		response.BoxList = []*pb.BaseResource{{Id: proto.String("coin"), Num: proto.Int32(0)}, {Id: proto.String("coin"), Num: proto.Int32(0)}, {Id: proto.String("coin"), Num: proto.Int32(0)}}
-		var policy db.P11ArenaPrizePolicy
 		if err = tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&policy, constUtil.P11ArenaPrizePolicyID).Error; err != nil {
 			return err
 		}
@@ -283,6 +371,31 @@ func (s *GameService) ApplyP11ArenaFightPrize(ctx context.Context, tx *gorm.DB, 
 			}
 		}
 	}
+	// User-confirmed regular victory coins replace only the old zero-card
+	// fallback. Valid operator awards keep their own quantities and quota facts.
+	if row.WinnerID == row.PlayerID && award.Status != constUtil.P11ArenaPrizeAwarded {
+		cards, draw, e := p11ArenaConfiguredCoinCards(award.Status, &policy)
+		if e != nil {
+			return e
+		}
+		selected := cards[0]
+		gain, e := s.GrantFixedReward(player, game, "coin,"+strconv.FormatInt(int64(selected.GetNum()), 10))
+		if e != nil {
+			return e
+		}
+		expected := &pb.ResultObject{Simps: []*pb.SimpleItem{{Id: proto.String("coin"), Num: selected.Num}}}
+		if !proto.Equal(gain, expected) {
+			return errors.New(constUtil.P11ArenaPrizeConflict)
+		}
+		encoded, e := json.Marshal(draw)
+		if e != nil {
+			return e
+		}
+		grant = gain
+		p1AppendGain(response.Result, gain)
+		response.BoxList = cards
+		award.DrawJSON, award.Status = string(encoded), constUtil.P11ArenaPrizeRegularCoin
+	}
 	if err = s.applyP11ArenaRankReward(tx, row, &award, player, game, response); err != nil {
 		return err
 	}
@@ -360,7 +473,29 @@ func ValidateP11ArenaFightPrizeReceipt(tx *gorm.DB, row *db.P11ArenaFightSettlem
 		return bad
 	}
 	expected := p11ArenaPrizeBase(response).Result
-	if award.Status == constUtil.P11ArenaPrizeAwarded {
+	if award.Status == constUtil.P11ArenaPrizeRegularCoin {
+		var draw p11ArenaRegularCoinDraw
+		if json.Unmarshal([]byte(award.DrawJSON), &draw) != nil {
+			return bad
+		}
+		cards, _, e := p11ArenaRegularCoinCards(draw.Reason, &draw)
+		if e != nil {
+			return e
+		}
+		if row.WinnerID != row.PlayerID || award.DayOrdinal != 0 || award.WindowOrdinal != 0 || len(response.BoxList) != 3 {
+			return bad
+		}
+		for i := range cards {
+			if !proto.Equal(cards[i], response.BoxList[i]) {
+				return bad
+			}
+		}
+		actual := &pb.ResultObject{Simps: []*pb.SimpleItem{{Id: proto.String("coin"), Num: cards[0].Num}}}
+		if !proto.Equal(grant, actual) {
+			return bad
+		}
+		p1AppendGain(expected, grant)
+	} else if award.Status == constUtil.P11ArenaPrizeAwarded {
 		var offer db.P11ArenaPrizeOffer
 		if err = tx.First(&offer, "month=?", month).Error; err != nil {
 			return err

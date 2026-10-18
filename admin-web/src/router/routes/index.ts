@@ -17,13 +17,14 @@ export function createStaticRoutes() {
   const authRoutes: ElegantRoute[] = [];
 
   [...customRoutes, ...generatedRoutes]
-    .map((item) => {
+    .map(item => {
       const order: Record<string, number> = {
         home: 1,
         players: 2,
         items: 3,
         activities: 4,
         'activities-unavailable': 5,
+        'arena-prizes': 5.5,
         shops: 6,
         achievements: 7,
         titles: 8,
@@ -37,8 +38,8 @@ export function createStaticRoutes() {
       if (item.meta && order[item.name]) item.meta.order = order[item.name];
       return item;
     })
-    .filter((item) => item.name !== 'iframe-page')
-    .forEach((item) => {
+    .filter(item => item.name !== 'iframe-page')
+    .forEach(item => {
       if (item.meta?.constant) {
         constantRoutes.push(item);
       } else {

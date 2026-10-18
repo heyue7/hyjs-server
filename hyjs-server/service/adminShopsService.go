@@ -21,7 +21,7 @@ import (
 func AdminShopDefinitions() []model.AdminShopDefinition {
 	base := []string{"rewards", "cost", "dailyLimit", "totalLimit", "stock", "minLevel", "minVip", "priority", "weight", "discountBps"}
 	out := []model.AdminShopDefinition{}
-	for _, v := range []struct{ id, label string }{{"ordinary", "普通商店"}, {"memory", "记忆圣坛"}, {"popularity", "声望商店"}, {"popularity-rank", "声望排名商店"}, {"point", "攻略点商店"}, {"score", "积分商店"}, {"guild", "公会商店"}, {"pet-market", "精灵商店"}, {"union-fight", "公会战商店"}, {"vip", "会员礼包"}} {
+	for _, v := range []struct{ id, label string }{{"ordinary", "普通商店"}, {"memory", "记忆圣坛"}, {"popularity", "声望商店商品"}, {"popularity-rank", "声望商店奖励"}, {"point", "攻略点商店"}, {"score", "积分商店"}, {"guild", "公会商店"}, {"pet-market", "精灵商店"}, {"union-fight", "公会战商店"}, {"vip", "会员礼包"}} {
 		d := model.AdminShopDefinition{ID: v.id, Label: v.label, Fields: append([]string{}, base...), SettingsFields: []string{"enabled", "startAt", "endAt", "claimEndAt", "source"}, CanCreate: true, Notes: "已冻结目录先复制为新一期；历史购买和限购保留。"}
 		switch v.id {
 		case "ordinary":
@@ -31,7 +31,7 @@ func AdminShopDefinitions() []model.AdminShopDefinition {
 			d.SettingsFields = append(d.SettingsFields, "slots")
 		case "popularity-rank":
 			d.Fields = append(d.Fields, "maxRank")
-			d.Notes = "消费原已发布排名资格；每日/整期各1次，保留原排名证明。"
+			d.Notes = "对应游戏声望商店的“奖励”页签。配置奖励道具、声望价格与最高排名门槛；每日/整期各1次，保留原排名证明。发布后用于后继目录，已冻结目录先复制新一期。"
 		case "guild":
 			d.Fields = append(d.Fields, "contributionCost", "guildLevel")
 		case "pet-market":

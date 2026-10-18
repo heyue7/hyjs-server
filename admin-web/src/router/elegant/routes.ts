@@ -90,6 +90,18 @@ export const generatedRoutes: GeneratedRoute[] = [
     }
   },
   {
+    name: 'arena-prizes',
+    path: '/arena-prizes',
+    component: 'layout.base$view.arena-prizes',
+    meta: {
+      title: '竞技胜利翻牌',
+      i18nKey: 'route.arena-prizes',
+      icon: 'ph:cards-three',
+      order: 6,
+      roles: ['viewer', 'operator', 'admin']
+    }
+  },
+  {
     name: 'audit',
     path: '/audit',
     component: 'layout.base$view.audit',
@@ -263,7 +275,7 @@ export const generatedRoutes: GeneratedRoute[] = [
         path: '/shops/popularity',
         component: 'view.shops_popularity',
         meta: {
-          title: '声望商店',
+          title: '声望商店商品',
           i18nKey: 'route.shops_popularity',
           icon: 'ph:treasure-chest',
           order: 3,
@@ -275,7 +287,7 @@ export const generatedRoutes: GeneratedRoute[] = [
         path: '/shops/popularity-rank',
         component: 'view.shops_popularity-rank',
         meta: {
-          title: '声望排名商店',
+          title: '声望商店奖励',
           i18nKey: 'route.shops_popularity-rank',
           icon: 'ph:treasure-chest',
           order: 4,

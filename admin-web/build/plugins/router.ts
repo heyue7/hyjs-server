@@ -47,12 +47,12 @@ export function setupElegantRouter() {
           order: 2
         },
         shops_popularity: {
-          title: '声望商店',
+          title: '声望商店商品',
           icon: 'ph:treasure-chest',
           order: 3
         },
         'shops_popularity-rank': {
-          title: '声望排名商店',
+          title: '声望商店奖励',
           icon: 'ph:treasure-chest',
           order: 4
         },
@@ -74,6 +74,7 @@ export function setupElegantRouter() {
           order: 9
         },
         shops_vip: { title: '会员礼包', icon: 'ph:treasure-chest', order: 10 },
+        'arena-prizes': { title: '竞技胜利翻牌', icon: 'ph:cards-three', order: 6 },
         shops: { title: '商店管理', icon: 'ph:treasure-chest', order: 6 },
         achievements: {
           title: '成就管理',

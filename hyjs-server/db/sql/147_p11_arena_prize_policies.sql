@@ -3,5 +3,6 @@ CREATE TABLE IF NOT EXISTS p11_arena_prize_policies (
  version VARCHAR(64) NOT NULL, source TEXT NOT NULL, pool_json LONGTEXT NOT NULL,
  published_at BIGINT NOT NULL DEFAULT 0, start_at BIGINT NOT NULL DEFAULT 0,
  end_at BIGINT NOT NULL DEFAULT 0, min_level BIGINT NOT NULL,
- daily_wins BIGINT NOT NULL, window_wins BIGINT NOT NULL
+ daily_wins BIGINT NOT NULL, window_wins BIGINT NOT NULL,
+ regular_coin_min BIGINT NOT NULL DEFAULT 3000, regular_coin_max BIGINT NOT NULL DEFAULT 6000
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

@@ -170,6 +170,7 @@ const routeMap: RouteMap = {
   "activities": "/activities",
   "activities-unavailable": "/activities-unavailable",
   "announcements": "/announcements",
+  "arena-prizes": "/arena-prizes",
   "audit": "/audit",
   "feedback": "/feedback",
   "home": "/home",

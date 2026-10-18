@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, h, onBeforeUnmount, ref, watch } from 'vue';
+import { onBeforeRouteLeave, useRouter } from 'vue-router';
 import { NButton, NSpace, NTag } from 'naive-ui';
 import type { DataTableColumns } from 'naive-ui';
-import { onBeforeRouteLeave } from 'vue-router';
 import { api, errorMessage, formatTime, json } from '@/service/operations';
 import { newShopProduct, shopLabels } from '@/service/management-operations';
 import type { ShopDefinition, ShopProduct, ShopSnapshot } from '@/service/management-operations';
@@ -13,6 +13,8 @@ import RewardList from './reward-list.vue';
 import RewardSummary from './reward-summary.vue';
 import ResourceSelect from './resource-select.vue';
 const props = defineProps<{ shopId: string }>();
+const router = useRouter();
+const isPopularityShop = computed(() => ['popularity', 'popularity-rank'].includes(props.shopId));
 const { canWrite, loading, error, run } = useOperations();
 const definition = ref<ShopDefinition>();
 const snapshot = ref<ShopSnapshot>();
@@ -57,8 +59,8 @@ const fixedCurrency = computed(
 const fixedPrice = computed(() => props.shopId === 'ordinary' && Boolean(selected.value?.id.startsWith('legacy:')));
 const petCurrencies = computed<Item[]>(() =>
   ['coinpet', 'diamond'].map(
-    (id) =>
-      currencyItems.value.find((item) => item.id === id) || {
+    id =>
+      currencyItems.value.find(item => item.id === id) || {
         id,
         name: id === 'coinpet' ? '精灵币' : '钻石',
         category: 'currency'
@@ -77,7 +79,9 @@ const sections = [
   { key: 'limits', label: '资格与限购' },
   { key: 'publish', label: '发布与来源' }
 ];
-const title = computed(() => definition.value?.label || shopLabels[props.shopId] || '商店管理');
+const title = computed(() =>
+  isPopularityShop.value ? shopLabels[props.shopId] : definition.value?.label || shopLabels[props.shopId] || '商店管理'
+);
 const fields = computed(() => definition.value?.fields || []);
 const supports = (key: string) =>
   fields.value.includes(key) &&
@@ -85,9 +89,9 @@ const supports = (key: string) =>
 const dirty = computed(() => editing.value && JSON.stringify(draft.value) !== original.value);
 const rows = computed(() =>
   (snapshot.value?.items || []).filter(
-    (row) =>
+    row =>
       (state.value === null || row.enabled === (state.value === 'enabled')) &&
-      `${row.name} ${row.id} ${row.rewards.map((r) => r.resourceId).join(' ')}`
+      `${row.name} ${row.id} ${row.rewards.map(r => r.resourceId).join(' ')}`
         .toLowerCase()
         .includes(q.value.trim().toLowerCase())
   )
@@ -107,7 +111,7 @@ async function load() {
     return { directory, data, currencies };
   });
   if (result && current === generation) {
-    definition.value = result.directory.items.find((row) => row.id === props.shopId);
+    definition.value = result.directory.items.find(row => row.id === props.shopId);
     snapshot.value = { ...result.data, items: result.data.items || [] };
     currencyItems.value = result.currencies?.items || [];
   }
@@ -119,7 +123,7 @@ function edit(row: ShopProduct | null) {
         ...newShopProduct(),
         ...JSON.parse(JSON.stringify(row)),
         cost: row.cost ? { ...row.cost } : { resourceId: '', amount: 0 },
-        rewards: (row.rewards || []).map((reward) => ({ ...reward }))
+        rewards: (row.rewards || []).map(reward => ({ ...reward }))
       }
     : newShopProduct();
   if (!row && ['pet-market', 'union-fight'].includes(props.shopId)) draft.value.stock = 1;
@@ -153,7 +157,7 @@ function discard() {
 function validate() {
   if (
     !draft.value.rewards.length ||
-    draft.value.rewards.some((r) => !r.resourceId || !Number.isInteger(r.amount) || r.amount < 1 || r.amount > 10000)
+    draft.value.rewards.some(r => !r.resourceId || !Number.isInteger(r.amount) || r.amount < 1 || r.amount > 10000)
   )
     return '请选择获得资源并填写1–10000的数量';
   if (
@@ -163,6 +167,8 @@ function validate() {
       !Number.isInteger(draft.value.cost.amount))
   )
     return '请填写完整的消耗资源和有效金额';
+  if (supports('maxRank') && (!Number.isInteger(draft.value.maxRank) || draft.value.maxRank < 1))
+    return '请填写可兑换的最末排名（正整数），排名数字越小越靠前';
   return '';
 }
 async function save() {
@@ -252,12 +258,22 @@ function remove(row: ShopProduct) {
     }
   });
 }
-const columns: DataTableColumns<ShopProduct> = [
+const columns = computed<DataTableColumns<ShopProduct>>(() => [
+  ...(props.shopId === 'popularity-rank'
+    ? [
+        {
+          title: '排名资格',
+          key: 'maxRank',
+          minWidth: 135,
+          render: (row: ShopProduct) => (row.maxRank > 0 ? `前 ${row.maxRank.toLocaleString()} 名` : '待配置')
+        }
+      ]
+    : []),
   {
     title: '商品',
     key: 'name',
     minWidth: 280,
-    render: (row) =>
+    render: row =>
       h('div', [
         h('strong', row.name || '未命名商品'),
         h(RewardSummary, {
@@ -270,7 +286,7 @@ const columns: DataTableColumns<ShopProduct> = [
     title: '消耗',
     key: 'cost',
     minWidth: 190,
-    render: (row) =>
+    render: row =>
       h('div', [
         ...(props.shopId === 'union-fight'
           ? [h('span', `公会战代币 × ${row.cost?.amount || 0}`)]
@@ -292,7 +308,7 @@ const columns: DataTableColumns<ShopProduct> = [
     title: '状态',
     key: 'enabled',
     width: 100,
-    render: (row) =>
+    render: row =>
       h(
         NTag,
         {
@@ -307,7 +323,7 @@ const columns: DataTableColumns<ShopProduct> = [
     title: '操作',
     key: 'action',
     width: 155,
-    render: (row) =>
+    render: row =>
       h(NSpace, { size: 5 }, () => [
         h(NButton, { size: 'small', secondary: true, onClick: () => edit(row) }, () =>
           productReadonly(row) ? '查看' : '编辑'
@@ -328,7 +344,7 @@ const columns: DataTableColumns<ShopProduct> = [
           : [])
       ])
   }
-];
+]);
 function beforeUnload(event: BeforeUnloadEvent) {
   if (dirty.value && canWrite.value) {
     event.preventDefault();
@@ -342,7 +358,7 @@ onBeforeUnmount(() => {
 });
 onBeforeRouteLeave(() => {
   if (!dirty.value || !canWrite.value) return true;
-  return new Promise<boolean>((resolve) =>
+  return new Promise<boolean>(resolve =>
     window.$dialog?.warning({
       title: '离开当前商品？',
       content: '未保存的修改将丢失。',
@@ -372,6 +388,7 @@ watch(
 <template>
   <div class="shop-workspace-root">
     <ManagementWorkspace
+      v-model:section="section"
       :title="editing ? `${selected ? (readonly ? '查看' : '编辑') : '新建'}商品 · ${title}` : title"
       :subtitle="definition?.notes"
       :editing="editing"
@@ -379,11 +396,10 @@ watch(
       :readonly="readonly"
       :dirty="dirty"
       :sections="sections"
-      v-model:section="section"
       @back="discard"
       @save="save"
     >
-      <template #actions v-if="!editing">
+      <template v-if="!editing" #actions>
         <NButton :loading="loading" @click="load">刷新</NButton>
         <NButton v-if="canWrite && snapshot && definition?.settingsFields?.length" @click="configure(false)">
           商店设置
@@ -406,6 +422,19 @@ watch(
         />
       </template>
       <template v-if="!editing">
+        <NCard v-if="isPopularityShop" :bordered="false" class="ops-panel">
+          <NTabs :value="shopId" type="line" @update:value="router.push(`/shops/${$event}`)">
+            <NTab name="popularity">声望商店商品</NTab>
+            <NTab name="popularity-rank">声望商店奖励</NTab>
+          </NTabs>
+          <p class="ops-muted mt-12px">
+            {{
+              shopId === 'popularity-rank'
+                ? '对应游戏内声望商店的“奖励”页签。按已发布的竞技排名资格兑换，奖励、消耗和排名门槛在此配置。'
+                : '对应游戏内声望商店的普通商品；排名资格兑换请切换到“声望商店奖励”。'
+            }}
+          </p>
+        </NCard>
         <NCard v-if="snapshot" :bordered="false" class="ops-panel">
           <NSpace align="center" justify="space-between">
             <NSpace>
@@ -573,8 +602,9 @@ watch(
                 </NFormItem>
               </NGi>
               <NGi v-if="supports('maxRank')">
-                <NFormItem label="可购买的最末排名">
+                <NFormItem label="可兑换的最末排名">
                   <NInputNumber v-model:value="draft.maxRank" :min="1" :precision="0" />
+                  <template #feedback>填写 500 表示前 500 名可兑换；消费已发布的竞技排名资格。</template>
                 </NFormItem>
               </NGi>
               <NGi v-if="supports('priority')">

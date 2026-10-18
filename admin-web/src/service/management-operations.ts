@@ -105,14 +105,14 @@ export interface FeedbackTicket {
 export const shopLabels: Record<string, string> = {
   ordinary: '普通商店',
   memory: '记忆圣坛',
-  popularity: '声望商店',
-  'popularity-rank': '声望排名商店',
+  popularity: '声望商店商品',
+  'popularity-rank': '声望商店奖励',
   point: '攻略点商店',
   score: '积分商店',
   guild: '公会商店',
   'pet-market': '精灵商店',
   'union-fight': '公会战商店',
-  vip: 'VIP 商店'
+  vip: '会员礼包'
 };
 export function newShopProduct(): ShopProduct {
   return {

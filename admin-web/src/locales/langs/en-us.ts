@@ -243,14 +243,15 @@ const local: App.I18n.Schema = {
     'feedback': '客服反馈',
     'shops_ordinary': '普通商店',
     'shops_memory': '记忆圣坛',
-    'shops_popularity': '声望商店',
-    'shops_popularity-rank': '声望排名商店',
+    'shops_popularity': '声望商店商品',
+    'shops_popularity-rank': '声望商店奖励',
     'shops_point': '攻略点商店',
     'shops_score': '积分商店',
     'shops_guild': '公会商店',
     'shops_pet-market': '精灵商店',
     'shops_union-fight': '公会战商店',
     'shops_vip': '会员礼包',
+    'arena-prizes': '竞技胜利翻牌',
     'server-clock': 'Server time'
   },
   page: {

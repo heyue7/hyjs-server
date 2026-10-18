@@ -684,6 +684,7 @@ func p4IsOrdinaryProduct(id string) bool {
 // p4Commerce 使用冻结目录、服务器总价和行锁库存交易；调用方报价只能确认已展示选项。
 func (s *GameService) p4Commerce(ctx context.Context, id int64, request proto.Message, stamp int64, now time.Time) ([]proto.Message, error) {
 	var response proto.Message
+	var guidePlayer *pb.Player
 	err := db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := ServerGameClockGuardTransaction(tx); err != nil {
 			return err
@@ -776,7 +777,7 @@ func (s *GameService) p4Commerce(ctx context.Context, id int64, request proto.Me
 		if rankPurchase {
 			// Acquire the existing ordinary directory before all rank offers, matching
 			// list/ordinary-buy lock order across different players.
-			if _, _, _, _, err = s.loadP4Commerce(tx, id, "", 4, now); err != nil {
+			if _, _, _, _, err = s.loadP4Commerce(tx, id, "", 4, now); err != nil && !errors.Is(err, constUtil.ErrP4CommerceNotOpen) {
 				return err
 			}
 			key, err = s.p4PopularityRankResolve(tx, productID, now)
@@ -826,7 +827,22 @@ func (s *GameService) p4Commerce(ctx context.Context, id int64, request proto.Me
 		cfg, rules, row, state, err := s.loadP4Commerce(tx, id, key, shopType, now)
 		if errors.Is(err, constUtil.ErrP4CommerceNotOpen) && query && key == "" {
 			if _, ok := request.(*pb.CSShopProductList); ok {
-				response = &pb.SCShopProductList{ShopType: proto.Int32(shopType)}
+				var items []*pb.ShopItem
+				if shopType == 4 {
+					// The normal merchandise period and rank-reward period are
+					// independent; a closed normal tab cannot hide published rewards.
+					items, err = s.p4PopularityShopItems(tx, id, p, db.P4CommerceRule{}, nil, now)
+					if err != nil {
+						return err
+					}
+					if p4PopularityEmptyGuide(p, items) {
+						guidePlayer = p
+					}
+				}
+				response = &pb.SCShopProductList{ShopType: proto.Int32(shopType), ShopItemList: items}
+				if guidePlayer != nil || len(items) > 0 {
+					return saveProfile(tx.WithContext(context.WithValue(tx.Statement.Context, constUtil.GameRequestContextKey, nil)), &profile, p, g)
+				}
 				return nil
 			}
 		}
@@ -964,6 +980,9 @@ func (s *GameService) p4Commerce(ctx context.Context, id int64, request proto.Me
 			if err != nil {
 				return err
 			}
+			if _, listing := request.(*pb.CSShopProductList); listing && p4PopularityEmptyGuide(p, items) {
+				guidePlayer = p
+			}
 		}
 		next := int64(0)
 		if cfg.Kind == "memory" && state.FreeLeft < rules.FreeCap {
@@ -1018,6 +1037,9 @@ func (s *GameService) p4Commerce(ctx context.Context, id int64, request proto.Me
 	})
 	if err != nil {
 		return nil, err
+	}
+	if guidePlayer != nil {
+		return []proto.Message{response, &pb.SCPlayer{Player: guidePlayer}}, nil
 	}
 	return []proto.Message{response}, nil
 }

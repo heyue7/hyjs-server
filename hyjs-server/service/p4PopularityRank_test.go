@@ -45,6 +45,10 @@ func p4PopularityFind(t *testing.T, items []*pb.ShopItem, key string) *pb.ShopIt
 func TestP4PopularityOriginalTabsEnumsAndBatchQuotaUnchanged(t *testing.T) {
 	f := p4Setup(t)
 	p4Fund(t, f)
+	// Explicit finite quota fixture; production's unconfigured catalog stays off.
+	if err := db.GetIns().Model(&db.P4CommerceRule{}).Where("kind=?", "popularity").Update("enabled", true).Error; err != nil {
+		t.Fatal(err)
+	}
 	at := time.Now()
 	query := &pb.CSShopProductList{ShopType: proto.Int32(4)}
 	out := p4Trade(t, f, query, 0, at).(*pb.SCShopProductList)

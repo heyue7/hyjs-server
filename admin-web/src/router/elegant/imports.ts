@@ -24,6 +24,7 @@ export const views: Record<LastLevelRouteKey, RouteComponent | (() => Promise<Ro
   "activities-unavailable": () => import("@/views/activities-unavailable/index.vue"),
   activities: () => import("@/views/activities/index.vue"),
   announcements: () => import("@/views/announcements/index.vue"),
+  "arena-prizes": () => import("@/views/arena-prizes/index.vue"),
   audit: () => import("@/views/audit/index.vue"),
   feedback: () => import("@/views/feedback/index.vue"),
   home: () => import("@/views/home/index.vue"),
