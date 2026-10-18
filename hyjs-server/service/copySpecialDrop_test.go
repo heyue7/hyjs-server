@@ -71,6 +71,10 @@ func TestCopySpecialFrozenCycleCapacityAndLegacy(t *testing.T) {
 	if e := f.s.InitializeCopyDrops(f.ctx); e != nil {
 		t.Fatal(e)
 	}
+	// 运营默认保持关闭；仅此隔离夹具启用四次特殊掉落以验证原容量回滚。
+	if e := db.GetIns().Model(&db.CopySpecialRule{}).Where("id=?", constUtil.CopySpecialRuleID).Update("enabled", true).Error; e != nil {
+		t.Fatal(e)
+	}
 	task := f.s.table("CopyTask", "TaskId", "20")
 	input, e := f.s.copySpecialInput(db.GetIns(), task)
 	if e != nil {

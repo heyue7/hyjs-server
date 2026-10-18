@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"math"
 	"math/big"
-	"sort"
 	"time"
 
 	"github.com/google/uuid"
@@ -21,7 +20,7 @@ import (
 	pb "hyjs-server/model/protocol"
 )
 
-// InitializeP11Arena 真实入列起点是透明有限策略；原机器人数量不生成虚构玩家。
+// InitializeP11Arena 保留实际成员，虚拟占位仅按需投影，不创建账号或成员行。
 func (s *GameService) InitializeP11Arena(ctx context.Context) error {
 	tx := db.GetIns().WithContext(ctx)
 	if err := tx.AutoMigrate(&db.P11ArenaPolicy{}, &db.P11ArenaMember{}, &db.P11ArenaMatch{}, &db.P11ArenaReceipt{}, &db.P11FriendDuel{}, &db.P11FriendFightSettlement{}); err != nil {
@@ -35,7 +34,7 @@ func (s *GameService) InitializeP11Arena(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	cfg := db.P11ArenaPolicy{ID: constUtil.P11ArenaPolicyID, NextRank: 1, MatchCount: low + high, RankShow: 50, MatchMillis: 300000, Source: constUtil.P11ArenaSource}
+	cfg := db.P11ArenaPolicy{ID: constUtil.P11ArenaPolicyID, NextRank: constUtil.P11ArenaVirtualSlots + 1, MatchCount: low + high, RankShow: 50, MatchMillis: 300000, Source: constUtil.P11ArenaSource}
 	if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&cfg).Error; err != nil {
 		return err
 	}
@@ -94,6 +93,9 @@ func (s *GameService) p11ArenaProjection(row *db.Profile, projectionTx ...*gorm.
 
 // p11SyncArenaMembers 从实际Profile同一行快照生成名册，失败候选停用且不影响其他真实角色。
 func (s *GameService) p11SyncArenaMembers(tx *gorm.DB, cfg *db.P11ArenaPolicy, now time.Time) error {
+	if err := p11ArenaReserveVirtualSlots(tx, cfg); err != nil {
+		return err
+	}
 	if _, err := s.PrepareP11ArenaDailyMutation(tx.Statement.Context, tx, now); err != nil {
 		return err
 	}
@@ -130,7 +132,7 @@ func (s *GameService) p11SyncArenaMembers(tx *gorm.DB, cfg *db.P11ArenaPolicy, n
 			if cfg.NextRank == math.MaxInt64 {
 				return errors.New("竞技名次编号溢出")
 			}
-			member = db.P11ArenaMember{PlayerID: profile.Id, Rank: cfg.NextRank, CreatedAt: now.UnixMilli()}
+			member = db.P11ArenaMember{PlayerID: profile.Id, Rank: cfg.NextRank, RankRewardBest: min(cfg.NextRank, constUtil.P11ArenaVirtualSlots+1), CreatedAt: now.UnixMilli()}
 			cfg.NextRank++
 		}
 		member.Active = true
@@ -248,47 +250,11 @@ func (s *GameService) p11ArenaQuery(ctx context.Context, id int64, request proto
 				return err
 			}
 		}
-		var candidates []db.P11ArenaMember
-		if err = tx.Where("active=?", true).Order("position").Find(&candidates).Error; err != nil {
-			return err
-		}
 		var selected []db.P11ArenaMember
-		if match {
-			if enrolled {
-				for _, candidate := range candidates {
-					if candidate.PlayerID == id {
-						continue
-					}
-					blocked, err := p10Blocked(tx, id, candidate.PlayerID)
-					if err != nil {
-						return err
-					}
-					if !blocked {
-						selected = append(selected, candidate)
-					}
-				}
-				sort.SliceStable(selected, func(i, j int) bool {
-					a := selected[i].Rank - member.Rank
-					if a < 0 {
-						a = -a
-					}
-					b := selected[j].Rank - member.Rank
-					if b < 0 {
-						b = -b
-					}
-					if a == b {
-						return selected[i].Rank < selected[j].Rank
-					}
-					return a < b
-				})
-				if len(selected) > int(cfg.MatchCount) {
-					selected = selected[:int(cfg.MatchCount)]
-				}
-			}
-		} else {
-			selected = candidates
-			if len(selected) > int(cfg.RankShow) {
-				selected = selected[:int(cfg.RankShow)]
+		if !match || enrolled {
+			selected, err = s.p11ArenaCandidates(tx, cfg, id, member, match)
+			if err != nil {
+				return err
 			}
 		}
 		list := []*pb.PvpRankPlayerInfo{}
@@ -598,7 +564,22 @@ func (s *GameService) p11ArenaChallenge(ctx context.Context, id int64, request p
 	})
 }
 func (s *GameService) DispatchP11Arena(ctx context.Context, id int64, request proto.Message, stamp int64) ([]proto.Message, bool, error) {
-	switch request.(type) {
+	switch b := request.(type) {
+	case *pb.CSFindPlayerInfo:
+		if !p11ArenaNPCID(b.GetPlayerId()) {
+			return nil, false, nil
+		}
+		if b.GetServerId() != 0 && int64(b.GetServerId()) != s.OriginalServerID() {
+			return nil, true, errors.New("竞技训练对手仅限本服")
+		}
+		info, _, err := s.p11ArenaNPCPreview(ctx, id, b.GetPlayerId(), LocalPlayNow(ctx))
+		return []proto.Message{&pb.SCFindPlayerInfo{FormationInfo: info}}, true, err
+	case *pb.CSLookPlayerFormation:
+		if !p11ArenaNPCID(b.GetOtherPid()) {
+			return nil, false, nil
+		}
+		_, slots, err := s.p11ArenaNPCPreview(ctx, id, b.GetOtherPid(), LocalPlayNow(ctx))
+		return []proto.Message{&pb.SCLookPlayerFormation{FormationList: slots}}, true, err
 	case *pb.CSPvpFindMatchGuide, *pb.CSPvpFightResultGuide:
 		result, err := s.p11ArenaGuideAt(ctx, id, request, stamp, LocalPlayNow(ctx))
 		return result, true, err

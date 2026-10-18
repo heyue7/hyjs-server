@@ -745,7 +745,7 @@ func (s *GameService) copyFightStart(ctx context.Context, id int64, b *pb.CSCopy
 
 // copyFirstDrops 恢复表中只有一个数量档位且概率明确为 1000 的首次掉落。
 // APK 只包含掉落展示和配置，Boss 多档概率、特殊装备抽取尚无服务端规则证据。
-func (s *GameService) copyFirstDrops(id int64, player *pb.Player, g *model.GameState, fight *model.CopyFight) (*pb.ResultObject, []*pb.BaseResource, error) {
+func (s *GameService) copyFirstDrops(tx *gorm.DB, id int64, player *pb.Player, g *model.GameState, fight *model.CopyFight) (*pb.ResultObject, []*pb.BaseResource, error) {
 	gain := &pb.ResultObject{}
 	if slices.Contains(g.CopyFirstPassedTasks, fight.Task) || copyMissionPassed(g, g.Run.Chapter, g.Run.Mission) {
 		return gain, nil, nil
@@ -755,7 +755,7 @@ func (s *GameService) copyFirstDrops(id int64, player *pb.Player, g *model.GameS
 		return nil, nil, errors.New("Missing first-drop task configuration")
 	}
 	var resources []*pb.BaseResource
-	for _, part := range strings.Split(task["FirstDropOdds"], "|") {
+	for partIndex, part := range strings.Split(task["FirstDropOdds"], "|") {
 		if part == "" {
 			continue
 		}
@@ -783,7 +783,17 @@ func (s *GameService) copyFirstDrops(id int64, player *pb.Player, g *model.GameS
 				return nil, nil, errors.New("Missing experience-material configuration")
 			}
 			if int64(len(g.Warriors))+num > int64(player.GetWarriorBagSize()) {
-				return nil, nil, errors.New("伙伴背包已满，请先整理经验材料")
+				awarded, err := s.grantCopyBattleReward(tx, player, g, fmt.Sprintf("%s,%d", key, num), fmt.Sprintf("legacy-first:%d", partIndex), func(fit string) (*pb.ResultObject, error) {
+					return s.openServerGain(player, g, fit)
+				})
+				if err != nil {
+					return nil, nil, err
+				}
+				p1AppendGain(gain, awarded)
+				for _, warrior := range awarded.GetWars() {
+					resources = append(resources, &pb.BaseResource{Id: warrior.Id, Guid: warrior.Guid, Num: proto.Int32(1)})
+				}
+				continue
 			}
 			for i := int64(0); i < num; i++ {
 				guid := fmt.Sprintf("%d-copy-%s-%d", id, fight.Start.GetFightId(), len(gain.GetWars()))
@@ -894,6 +904,7 @@ func (s *GameService) copyFightEnd(ctx context.Context, id int64, b *pb.CSCopyFi
 		complete := false
 		result = &pb.SCCopyFightEnd{IsCopyComplete: proto.Int32(0), Star: proto.Int32(0), FightResult: proto.Int32(b.GetResult()), Gain: &pb.ResultObject{}}
 		if b.GetResult() == 1 {
+			tx = beginCopyOverflow(tx, id, fight.Start.GetFightId())
 			gain, resources, err := s.settleCopyFirstDrops(tx, id, player, g, fight)
 			if err != nil {
 				return err
@@ -906,7 +917,7 @@ func (s *GameService) copyFightEnd(ctx context.Context, id int64, b *pb.CSCopyFi
 			resources = append(resources, extraResources...)
 			// 首通与普通掉落福利均与冻结战斗保存使用同一事务。
 			if s.P4Ready {
-				bonus, extra, err := s.ApplyP4CopyDropBonus(tx, id, player, g, "copy:"+fight.Start.GetFightId(), gain, LocalPlayAt(ctx, benefitAt))
+				bonus, extra, err := s.ApplyP4CopyDropBonus(tx, id, player, g, "copy:"+fight.Start.GetFightId(), copyOverflowBenefitBase(tx, gain), LocalPlayAt(ctx, benefitAt))
 				if err != nil {
 					return err
 				}

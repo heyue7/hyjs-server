@@ -54,6 +54,26 @@ func p11ArenaDailySetup(t *testing.T) (*p1Fixture, int64, *time.Time, time.Time)
 			t.Fatal(err)
 		}
 	}
+	// Daily original-tier coverage is exercised with a preserved legacy top rank.
+	// Fresh entrants now start after the virtual NPC slots, outside these tiers.
+	if err := db.GetIns().Model(&db.P11ArenaDailyPolicy{}).Where("id=1").Update("enabled", false).Error; err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.s.p11ArenaQuery(f.ctx, f.id, &pb.CSPvpFindMatch{}, 39099, at); err != nil {
+		t.Fatal(err)
+	}
+	var members []db.P11ArenaMember
+	if err := db.GetIns().Order("position").Find(&members).Error; err != nil {
+		t.Fatal(err)
+	}
+	for i, member := range members {
+		if err := db.GetIns().Model(&db.P11ArenaMember{}).Where("player_id=?", member.PlayerID).Update("position", i+1).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := db.GetIns().Model(&db.P11ArenaDailyPolicy{}).Where("id=1").Update("enabled", true).Error; err != nil {
+		t.Fatal(err)
+	}
 	return f, peer, &at, end
 }
 

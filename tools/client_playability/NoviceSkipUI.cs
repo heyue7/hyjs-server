@@ -92,10 +92,49 @@ namespace HYJS.Playability
                 // and system cutout-safe Android content dimensions stay aligned.
                 float scale = Screen.height / 720f;
                 Vector3 screen = camera.WorldToScreenPoint(button.transform.parent.position);
-                screen.x = Screen.width - 112f * scale; screen.y = Screen.height - 42f * scale;
+                // Keep the original top-right close controls unobstructed.
+                screen.x = Screen.width - 112f * scale; screen.y = Screen.height - 116f * scale;
                 button.transform.position = camera.ScreenToWorldPoint(screen);
+                Component mask = Get("guideMask") as Component;
+                FieldInfo targetField = mask == null ? null : mask.GetType().GetField("target", Fields);
+                GameObject target = targetField == null ? null : targetField.GetValue(mask) as GameObject;
+                // The guide owns this real target collider. Move the skip action
+                // away from it instead of stealing the step's original click.
+                if (OverlapsTarget(camera, target, scale))
+                {
+                    screen.x = Screen.width - 340f * scale;
+                    button.transform.position = camera.ScreenToWorldPoint(screen);
+                    if (OverlapsTarget(camera, target, scale))
+                    {
+                        screen.x = Screen.width * .5f;
+                        button.transform.position = camera.ScreenToWorldPoint(screen);
+                        if (OverlapsTarget(camera, target, scale)) button.SetActive(false);
+                    }
+                }
             }
             catch (Exception) { if (button != null) button.SetActive(false); }
+        }
+
+        static Rect Project(Camera camera, Bounds bounds)
+        {
+            Vector3 min = bounds.min, max = bounds.max;
+            Vector3 a = camera.WorldToScreenPoint(min), b = camera.WorldToScreenPoint(max);
+            return Rect.MinMaxRect(Math.Min(a.x, b.x), Math.Min(a.y, b.y), Math.Max(a.x, b.x), Math.Max(a.y, b.y));
+        }
+
+        bool OverlapsTarget(Camera camera, GameObject target, float scale)
+        {
+            if (target == null) return false;
+            Rect skip = Project(camera, button.GetComponent<BoxCollider>().bounds);
+            foreach (Collider hit in target.GetComponentsInChildren<Collider>(true))
+            {
+                if (!hit.enabled || !hit.gameObject.activeInHierarchy) continue;
+                Rect area = Project(camera, hit.bounds);
+                area.xMin -= 12f * scale; area.yMin -= 12f * scale;
+                area.xMax += 12f * scale; area.yMax += 12f * scale;
+                if (skip.Overlaps(area)) return true;
+            }
+            return false;
         }
 
         void Click()

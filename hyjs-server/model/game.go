@@ -22,6 +22,10 @@ type GamePacket struct {
 
 // GameState 与已经产生的 SQLite 存档兼容，协议对象使用原始字段名。
 type GameState struct {
+	// BagCapacityScale pairs the one-time capacity expansion with all three saved bag limits.
+	BagCapacityScale int32 `json:"bag_capacity_scale,omitempty"`
+	// WarriorBagCapacityScale reads the unreleased hero-only fivefold candidate without multiplying it again.
+	WarriorBagCapacityScale int32 `json:"warrior_bag_capacity_scale,omitempty"`
 	// Guild prayer attributes are recaptured from the current transaction and never persisted.
 	GuildPrayerProjection   *P5GuildPrayerProjection           `json:"-"`
 	CopySweepReceipt        *CopySweepReceipt                  `json:"copy_sweep_receipt,omitempty"`

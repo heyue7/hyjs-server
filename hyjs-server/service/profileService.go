@@ -94,6 +94,9 @@ func decodeProfile(row *db.Profile) (*pb.Player, *model.GameState, error) {
 		return nil, nil, err
 	}
 	PrepareWarriors(&game)
+	if err := prepareBagCapacity(&player, &game); err != nil {
+		return nil, nil, err
+	}
 	return &player, &game, nil
 }
 
@@ -285,6 +288,9 @@ func createPlayerLocked(tx *gorm.DB, id int64, name, heroId string) (*db.Profile
 			}
 		}
 		game := &model.GameState{Warriors: []*pb.Warrior{w.(*pb.Warrior)}, Formation: []*pb.FormationItem{f.(*pb.FormationItem)}, Copy: copyInfo.(*pb.SCCopyPassedInfo), Position: pos.(*pb.Position)}
+		if err = prepareBagCapacity(p.(*pb.Player), game); err != nil {
+			return err
+		}
 		if err = saveProfile(tx, &row, p.(*pb.Player), game); err != nil {
 			return err
 		}

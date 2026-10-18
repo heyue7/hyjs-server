@@ -1,0 +1,13 @@
+{
+  "Battle.BattleHeroItem::Init": "7f31ee5311d773ce033cec9efea86bdbb69ecd260ee3eab972ae1a812f78e7b4",
+  "AssetLoad.AssetBundleManager::LoadAssetBundle": "345d05acba3c819a6fbfef8f82b42f2e490f7cd80413192f2a3e552f20353ad0",
+  "AssetLoad.AssetBundleManager::LoadAssetBundleCoroutine": "45389ff0647d8038daf99c0a0674b53a7a726c5e806cd8f03ddda38c89a03708",
+  "AssetLoad.AssetBundleManager::UnloadAssetBundle": "3d720f60d51577fec56f1c504f7aaf840279010507ac2e9fb94dee31eceb11c6",
+  "AssetLoad.AssetBundleManager::IsLoadedAssetBundle": "fefc294da68955caabe5c75281ef3012b570343528cff8bd1e151e2c8f668136",
+  "AssetLoad.AssetBundleManager::GetAssetFromBundle": "7626df5411edd8e004a678fb6248fff697f9a2d3e9231087c34a70bf98199d29",
+  "AssetLoad.AssetBundleManager::IsAssetExist": "ecb996416852593ccfc604c494cbca438bdfbecc7c823f45a20c3f26cf7ae724",
+  "UI.AllHerosPage::SetHeroList": "a335494a2e64ad77af711ab81fddbd83721637e92a2a45a0c18a0277fdbaf5e8",
+  "AloneTextureKit::SetPath": "95bb914c357978cb1464c4d49c4facbc457c45748251acd000ee1187731d0a4d",
+  "<_LoadTexture>c__IteratorCD::MoveNext": "70ca99cd9643cf4a791a94a608faef49bd1d1a096145b272a022e98684616b3d",
+  "<SetPath>c__AnonStorey186::<>m__D8": "5deebf1eb1303fb709a89a6e0b3c13449dab6cba573520f80b4b6c657bd4e04a"
+}

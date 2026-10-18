@@ -24,6 +24,7 @@ import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewConfiguration;
 import android.view.WindowInsets;
 import android.view.Window;
 import android.view.WindowManager;
@@ -120,13 +121,54 @@ public final class WalletActivity extends UnityPlayerActivity {
     // Clip the hidden half at the usable game edge, including immersive bars
     // and cutouts. The remaining half stays inside the app's touchable area.
     private final class WalletOverlay extends FrameLayout {
+        private int pointer=-1;
+        private float downX,downY,startX,startY;
+        private boolean moved;
         WalletOverlay(){super(WalletActivity.this);}
         @Override protected void dispatchDraw(Canvas canvas){
             int saved=canvas.save();canvas.clipRect(bubbleBounds());super.dispatchDraw(canvas);canvas.restoreToCount(saved);
         }
         @Override public boolean dispatchTouchEvent(MotionEvent event){
-            if(event.getActionMasked()==MotionEvent.ACTION_DOWN && !bubbleBounds().contains((int)event.getX(),(int)event.getY()))return false;
+            int action=event.getActionMasked();
+            if(action==MotionEvent.ACTION_DOWN){
+                if(bubble==null || !bubbleTouchBounds().contains((int)event.getX(),(int)event.getY()))return false;
+                // The parent owns the sequence while the half-hidden child moves.
+                // Stable parent coordinates keep the drag independent of child
+                // translation and give the narrow edge icon a full 48dp handle.
+                pointer=event.getPointerId(0);dragging=true;moved=false;
+                if(getParent()!=null)getParent().requestDisallowInterceptTouchEvent(true);
+                revealBubble();bubble.setPressed(true);
+                downX=event.getX();downY=event.getY();startX=bubble.getX();startY=bubble.getY();
+                return true;
+            }
+            if(pointer!=-1){
+                int index=event.findPointerIndex(pointer);
+                if(action==MotionEvent.ACTION_CANCEL || index<0 || (action==MotionEvent.ACTION_POINTER_UP && event.getPointerId(event.getActionIndex())==pointer)){
+                    finish(false);return true;
+                }
+                if(action==MotionEvent.ACTION_MOVE || action==MotionEvent.ACTION_UP){
+                    float dx=event.getX(index)-downX,dy=event.getY(index)-downY;
+                    int slop=ViewConfiguration.get(WalletActivity.this).getScaledTouchSlop();
+                    if(Math.hypot(dx,dy)>slop)moved=true;
+                    if(moved){
+                        Rect bounds=bubbleBounds();
+                        bubble.setX(Math.max(bounds.left,Math.min(bounds.right-bubble.getWidth(),startX+dx)));
+                        bubble.setY(clampBubbleY(startY+dy,bounds));updateBubbleGestureExclusion();invalidate();
+                    }
+                    if(action==MotionEvent.ACTION_UP)finish(!moved);
+                    return true;
+                }
+                return true;
+            }
             return super.dispatchTouchEvent(event);
+        }
+        private void finish(boolean click){
+            pointer=-1;dragging=false;
+            if(getParent()!=null)getParent().requestDisallowInterceptTouchEvent(false);
+            bubble.setPressed(false);
+            if(click){bubble.performClick();return;}
+            Rect bounds=bubbleBounds();dockRight=bubble.getX()+bubble.getWidth()/2f>=(bounds.left+bounds.right)/2f;
+            foldBubble(true);scheduleDim();
         }
     }
 
@@ -180,26 +222,6 @@ public final class WalletActivity extends UnityPlayerActivity {
             icon.animate().setUpdateListener(new ValueAnimator.AnimatorUpdateListener(){public void onAnimationUpdate(ValueAnimator animation){updateBubbleGestureExclusion();}});
         }
         icon.setOnClickListener(new View.OnClickListener(){public void onClick(View v){revealBubble();openPanel();}});
-        icon.setOnTouchListener(new View.OnTouchListener(){
-            float rawX,rawY,startX,startY;boolean moved;
-            public boolean onTouch(View v,MotionEvent event){
-                switch(event.getActionMasked()){
-                    case MotionEvent.ACTION_DOWN:
-                        dragging=true;revealBubble();
-                        // Reveal before capturing the drag origin. Every later
-                        // move uses the same raw-pointer delta with no rebase jump.
-                        rawX=event.getRawX();rawY=event.getRawY();startX=v.getX();startY=v.getY();moved=false;return true;
-                    case MotionEvent.ACTION_MOVE:
-                        float dx=event.getRawX()-rawX,dy=event.getRawY()-rawY;if(Math.hypot(dx,dy)>dp(5))moved=true;
-                        if(moved){Rect bounds=bubbleBounds();v.setX(Math.max(bounds.left,Math.min(bounds.right-v.getWidth(),startX+dx)));v.setY(clampBubbleY(startY+dy,bounds));updateBubbleGestureExclusion();}return true;
-                    case MotionEvent.ACTION_UP:
-                        dragging=false;if(moved){Rect bounds=bubbleBounds();dockRight=v.getX()+v.getWidth()/2f>=(bounds.left+bounds.right)/2f;foldBubble(true);scheduleDim();}else v.performClick();return true;
-                    case MotionEvent.ACTION_CANCEL:
-                        dragging=false;foldBubble(true);scheduleDim();return true;
-                    default:return false;
-                }
-            }
-        });
         overlay.addOnLayoutChangeListener(new View.OnLayoutChangeListener(){public void onLayoutChange(View v,int l,int t,int r,int b,int ol,int ot,int or,int ob){
             repositionBubble();
         }});
@@ -230,12 +252,20 @@ public final class WalletActivity extends UnityPlayerActivity {
         int x=overlayPosition[0]-rootPosition[0],y=overlayPosition[1]-rootPosition[1];
         return new Rect(Math.max(0,left-x),Math.max(0,top-y),Math.min(overlay.getWidth(),decor.getWidth()-right-x),Math.min(overlay.getHeight(),decor.getHeight()-bottom-y));
     }
+    private Rect bubbleTouchBounds(){
+        Rect safe=bubbleBounds();
+        if(bubble==null || safe.isEmpty())return new Rect();
+        int size=Math.max(dp(48),bubble.getWidth()),height=Math.max(dp(48),bubble.getHeight());
+        int left=Math.max(safe.left,Math.min(safe.right-size,Math.round(bubble.getX())));
+        int top=Math.max(safe.top,Math.min(safe.bottom-height,Math.round(bubble.getY())));
+        return new Rect(left,top,Math.min(safe.right,left+size),Math.min(safe.bottom,top+height));
+    }
     private float clampBubbleY(float y,Rect bounds){return Math.max(bounds.top+dp(6),Math.min(bounds.bottom-bubble.getHeight()-dp(6),y));}
     private void updateBubbleGestureExclusion(){
-        // Only this 48dp child opts out of Back gestures; its local rectangle
-        // follows the view's layout/translation while all other edges stay native.
-        if(Build.VERSION.SDK_INT>=29 && bubble!=null && bubble.getWidth()>0 && bubble.getHeight()>0)
-            bubble.setSystemGestureExclusionRects(Collections.singletonList(new Rect(0,0,bubble.getWidth(),bubble.getHeight())));
+        // Keep the visible handle in the overlay's stable coordinate space.
+        // All remaining screen edges retain the system's normal Back gesture.
+        if(Build.VERSION.SDK_INT>=29 && overlay!=null && bubble!=null && bubble.getWidth()>0 && bubble.getHeight()>0)
+            overlay.setSystemGestureExclusionRects(Collections.singletonList(bubbleTouchBounds()));
     }
     private void repositionBubble(){
         if(bubble==null || overlay.getWidth()==0)return;bubble.setY(clampBubbleY(bubble.getY(),bubbleBounds()));

@@ -72,6 +72,8 @@ export const generatedRoutes: GeneratedRoute[] = [
       i18nKey: 'route.activities-unavailable',
       icon: 'ph:calendar-blank',
       order: 5,
+      hideInMenu: true,
+      activeMenu: 'activities',
       roles: ['viewer', 'operator', 'admin']
     }
   },
@@ -309,7 +311,7 @@ export const generatedRoutes: GeneratedRoute[] = [
         path: '/shops/vip',
         component: 'view.shops_vip',
         meta: {
-          title: 'VIP 商店',
+          title: '会员礼包',
           i18nKey: 'route.shops_vip',
           icon: 'ph:treasure-chest',
           order: 10,

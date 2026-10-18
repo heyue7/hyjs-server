@@ -21,7 +21,7 @@ import (
 func AdminShopDefinitions() []model.AdminShopDefinition {
 	base := []string{"rewards", "cost", "dailyLimit", "totalLimit", "stock", "minLevel", "minVip", "priority", "weight", "discountBps"}
 	out := []model.AdminShopDefinition{}
-	for _, v := range []struct{ id, label string }{{"ordinary", "普通商店"}, {"memory", "记忆圣坛"}, {"popularity", "声望商店"}, {"popularity-rank", "声望排名商店"}, {"point", "攻略点商店"}, {"score", "积分商店"}, {"guild", "公会商店"}, {"pet-market", "精灵商店"}, {"union-fight", "公会战商店"}, {"vip", "VIP商店"}} {
+	for _, v := range []struct{ id, label string }{{"ordinary", "普通商店"}, {"memory", "记忆圣坛"}, {"popularity", "声望商店"}, {"popularity-rank", "声望排名商店"}, {"point", "攻略点商店"}, {"score", "积分商店"}, {"guild", "公会商店"}, {"pet-market", "精灵商店"}, {"union-fight", "公会战商店"}, {"vip", "会员礼包"}} {
 		d := model.AdminShopDefinition{ID: v.id, Label: v.label, Fields: append([]string{}, base...), SettingsFields: []string{"enabled", "startAt", "endAt", "claimEndAt", "source"}, CanCreate: true, Notes: "已冻结目录先复制为新一期；历史购买和限购保留。"}
 		switch v.id {
 		case "ordinary":
@@ -45,7 +45,7 @@ func AdminShopDefinitions() []model.AdminShopDefinition {
 		case "vip":
 			d.Fields = []string{"rewards", "cost", "minVip", "enabled", "source"}
 			d.SettingsFields = []string{}
-			d.Notes = "会员商品按原日快照消费，已有当日快照保持，下次有效刷新使用新配置。"
+			d.Notes = "对应游戏商城的“会员礼包”（原VIP商店，shopType=2）。空列表表示尚无已启用商品；请自行配置奖励、价格及会员条件后启用。已有当日快照保持，下次有效刷新使用新配置。"
 		}
 		out = append(out, d)
 	}

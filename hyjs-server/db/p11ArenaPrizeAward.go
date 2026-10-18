@@ -24,6 +24,10 @@ type P11ArenaPrizeAward struct {
 	GrantPB           []byte `gorm:"column:grant_pb;type:longblob" json:"grantPB"`
 	SourceHash        string `gorm:"type:varchar(64);not null" json:"sourceHash"`
 	CreatedAt         int64  `gorm:"autoCreateTime:false;not null" json:"createdAt"`
+	RankBestBefore    int64  `gorm:"not null;default:0" json:"rankBestBefore,omitempty"`
+	RankBestAfter     int64  `gorm:"not null;default:0" json:"rankBestAfter,omitempty"`
+	RankDiamond       int64  `gorm:"not null;default:0" json:"rankDiamond,omitempty"`
+	RankSource        string `gorm:"type:varchar(128);not null;default:''" json:"rankSource,omitempty"`
 }
 
 func (P11ArenaPrizeAward) TableName() string { return "p11_arena_prize_awards" }

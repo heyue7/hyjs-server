@@ -250,7 +250,7 @@ const local: App.I18n.Schema = {
     'shops_guild': '公会商店',
     'shops_pet-market': '精灵商店',
     'shops_union-fight': '公会战商店',
-    'shops_vip': 'VIP 商店',
+    'shops_vip': '会员礼包',
     'server-clock': 'Server time'
   },
   page: {

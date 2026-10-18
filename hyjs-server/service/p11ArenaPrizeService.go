@@ -283,6 +283,9 @@ func (s *GameService) ApplyP11ArenaFightPrize(ctx context.Context, tx *gorm.DB, 
 			}
 		}
 	}
+	if err = s.applyP11ArenaRankReward(tx, row, &award, player, game, response); err != nil {
+		return err
+	}
 	boxes, err := json.Marshal(response.BoxList)
 	if err != nil {
 		return err
@@ -407,6 +410,20 @@ func ValidateP11ArenaFightPrizeReceipt(tx *gorm.DB, row *db.P11ArenaFightSettlem
 				}
 			}
 		}
+	}
+	before, after, diamond, current, e := p11ArenaRankRewardFacts(tx, row)
+	if e != nil {
+		return e
+	}
+	if current {
+		if award.RankSource != constUtil.P11ArenaRankRewardSource || award.RankBestBefore != before || award.RankBestAfter != after || award.RankDiamond != diamond {
+			return bad
+		}
+		if diamond > 0 {
+			p1AppendGain(expected, &pb.ResultObject{Simps: []*pb.SimpleItem{{Id: proto.String("diamond"), Num: proto.Int32(int32(diamond))}}})
+		}
+	} else if award.RankSource != "" || award.RankBestBefore != 0 || award.RankBestAfter != 0 || award.RankDiamond != 0 {
+		return bad
 	}
 	if !proto.Equal(response.Result, expected) {
 		return bad

@@ -9,7 +9,8 @@ import (
 	pb "hyjs-server/model/protocol"
 )
 
-// The original visible handbook defines achievable world/color title cohorts.
+// The handbook includes three locally obtainable companions restored with their own art.
+// Each world gains one orange card; existing title rewards remain unchanged.
 // A real guide recruitment supplies the last purple/ALO card; other histories
 // are finite qualification fixtures and preserve their first acquisition dates.
 func TestP5OriginalCollectionTitles(t *testing.T) {
@@ -41,7 +42,7 @@ func TestP5OriginalCollectionTitles(t *testing.T) {
 		return rows
 	}
 	before := titles()
-	expected := map[string]int32{"title_002": 21, "title_003": 19, "title_004": 22, "title_005": 10, "title_006": 13, "title_007": 26, "title_008": 16}
+	expected := map[string]int32{"title_002": 22, "title_003": 20, "title_004": 23, "title_005": 10, "title_006": 13, "title_007": 29, "title_008": 16}
 	for id, total := range expected {
 		current := total
 		state := int32(1)

@@ -3,6 +3,7 @@ package service
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"google.golang.org/protobuf/proto"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -93,7 +94,7 @@ func (s *GameService) applyCopySpecialInput(tx *gorm.DB, id int64, p *pb.Player,
 	raw, _ := json.Marshal(input)
 	hash := p6Digest(raw)
 	var resources []*pb.BaseResource
-	for _, entry := range input.Entries {
+	for entryIndex, entry := range input.Entries {
 		state := db.CopySpecialState{PlayerID: id, TaskID: input.TaskID, RewardID: entry.Reward, LastInputHash: hash}
 		e := tx.First(&state, "player_id=? AND task_id=? AND reward_id=?", id, input.TaskID, entry.Reward).Error
 		if e != nil && !errors.Is(e, gorm.ErrRecordNotFound) {
@@ -107,7 +108,9 @@ func (s *GameService) applyCopySpecialInput(tx *gorm.DB, id int64, p *pb.Player,
 		state.LastInputHash = hash
 		if state.Credit >= input.Cycle {
 			// Preserve the caller held Run/Fight pointers; its transaction rolls back all partial grants.
-			awarded, e := s.openServerGain(p, g, entry.Reward)
+			awarded, e := s.grantCopyBattleReward(tx, p, g, entry.Reward, fmt.Sprintf("special:%d", entryIndex), func(fit string) (*pb.ResultObject, error) {
+				return s.openServerGain(p, g, fit)
+			})
 			if e != nil {
 				return nil, nil, e
 			}

@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { computed, h, nextTick, onMounted, ref } from 'vue';
-import { onBeforeRouteLeave, useRouter } from 'vue-router';
-import { NButton, NDropdown, NImage, NSpace, NTag } from 'naive-ui';
-import type { DataTableColumns, SelectOption } from 'naive-ui';
+import { computed, h, nextTick, onMounted, ref, watch } from 'vue';
+import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router';
+import { NButton, NDropdown, NImage, NMenu, NSpace, NTag } from 'naive-ui';
+import type { DataTableColumns, MenuOption, SelectOption } from 'naive-ui';
 import { api, errorMessage, formatTime, json } from '@/service/operations';
 import { newActivityForm } from '@/service/activity-operations';
 import type { ActivityForm, ActivityInstance, ActivityMode } from '@/service/activity-operations';
@@ -12,9 +12,9 @@ import ActivityMilestones from '@/components/operations/activity-milestones.vue'
 import ActivityPrizes from '@/components/operations/activity-prizes.vue';
 import ActivityOptions from '@/components/operations/activity-options.vue';
 import ActivitySummary from '@/components/operations/activity-summary.vue';
-const props = withDefaults(defineProps<{ unavailableOnly?: boolean }>(), { unavailableOnly: false });
 const { canWrite, loading, error, run } = useOperations();
 const router = useRouter();
+const route = useRoute();
 const rows = ref<ActivityInstance[]>([]);
 const modes = ref<ActivityMode[]>([]);
 const q = ref('');
@@ -25,7 +25,20 @@ const modeOptions = computed(() => modes.value.map(mode => ({ label: mode.label,
 const listPage = ref(1);
 const listHeading = ref<HTMLElement | null>(null);
 const editorHeading = ref<HTMLElement | null>(null);
-const scopedRows = computed(() => rows.value.filter(row => Boolean(row.availability?.usable) !== props.unavailableOnly));
+const availabilitySection = computed(() => route.query.availability === 'unavailable' ? 'unavailable' : 'usable');
+const unavailableOnly = computed(() => availabilitySection.value === 'unavailable');
+const availabilityMenu = computed<MenuOption[]>(() => [
+  { key: 'usable', label: `可用活动（${rows.value.filter(row => row.availability?.usable).length}）` },
+  { key: 'unavailable', label: `暂不可用（${rows.value.filter(row => !row.availability?.usable).length}）` }
+]);
+const scopedRows = computed(() => rows.value.filter(row => Boolean(row.availability?.usable) !== unavailableOnly.value));
+async function selectAvailability(key: string) {
+  await router.replace({ query: { ...route.query, availability: key === 'unavailable' ? 'unavailable' : undefined } });
+}
+watch(availabilitySection, () => {
+  listPage.value = 1;
+  stateFilter.value = null;
+});
 const stateOptions = [
   { label: '已开启', value: 'on' },
   { label: '已关闭', value: 'off' },
@@ -182,8 +195,7 @@ async function save() {
     baseline.value = JSON.stringify(form.value);
     open.value = false;
     await load();
-    if (props.unavailableOnly && saved.availability?.usable) await router.push('/activities');
-    else if (!props.unavailableOnly && !saved.availability?.usable) await router.push('/activities-unavailable');
+    await selectAvailability(saved.availability?.usable ? 'usable' : 'unavailable');
   } catch (e) {
     saveError.value = errorMessage(e);
   } finally {
@@ -229,18 +241,18 @@ function selectAction(key: string, row: ActivityInstance) {
   const content = key === 'archive' ? '停用并归档，原参与和领奖记录继续保留。' : key === 'current' ? '启用此转盘供后续活动期使用，已有活动期和领奖历史保持。' : `${label}“${row.name}”？`;
   window.$dialog?.warning({ title: label, content, positiveText: '确认', negativeText: '取消', onPositiveClick: () => key === 'archive' ? remove(row) : changeState(row, key === 'current' || !row.enabled, key === 'current') });
 }
-const columns: DataTableColumns<ActivityInstance> = [
+const columns = computed<DataTableColumns<ActivityInstance>>(() => [
   { title: '活动', key: 'name', minWidth: 250, render: row => h('strong', row.name) },
   { title: '模式', key: 'mode', width: 135, render: row => modeMap.value.get(row.mode)?.label || '暂未支持' },
-  { title: props.unavailableOnly ? '不可用原因' : '状态', key: 'enabled', minWidth: props.unavailableOnly ? 230 : 150,
-    render: row => props.unavailableOnly ? h('div', [h('div', row.availability?.reason || '暂不可运营'), h('span', { class: 'ops-muted' }, row.editable ? '可补齐配置' : '仅供查看')]) : h(NSpace, { size: 6 }, () => [h(NTag, { type: row.enabled ? 'success' : 'default', size: 'small', bordered: false }, () => row.enabled ? '已开启' : '已关闭'), row.frozen ? h(NTag, { size: 'small', bordered: false }, () => '已冻结') : null]) },
+  { title: unavailableOnly.value ? '不可用原因' : '状态', key: 'enabled', minWidth: unavailableOnly.value ? 230 : 150,
+    render: row => unavailableOnly.value ? h('div', [h('div', row.availability?.reason || '暂不可运营'), h('span', { class: 'ops-muted' }, row.editable ? '可补齐配置' : '仅供查看')]) : h(NSpace, { size: 6 }, () => [h(NTag, { type: row.enabled ? 'success' : 'default', size: 'small', bordered: false }, () => row.enabled ? '已开启' : '已关闭'), row.frozen ? h(NTag, { size: 'small', bordered: false }, () => '已冻结') : null]) },
   { title: '结束时间', key: 'endAt', width: 185, render: row => formatTime(row.form.endAt) },
   { title: '操作', key: 'action', width: 245, render: row => h(NSpace, { size: 6 }, () => [
     h(NButton, { size: 'small', secondary: true, onClick: () => show(row, false, true) }, () => '查看'),
     canWrite.value && row.editable ? h(NButton, { size: 'small', onClick: () => show(row) }, () => row.availability?.usable ? '编辑' : '补齐配置') : null,
     activityActions(row).length ? h(NDropdown, { trigger: 'click', options: activityActions(row), onSelect: (key: string) => selectAction(key, row) }, { default: () => h(NButton, { size: 'small', quaternary: true }, () => '更多') }) : null
   ]) }
-];
+]);
 onBeforeRouteLeave(() => {
   if (!open.value || !dirty.value || saving.value) return true;
   return new Promise<boolean>(resolve => {
@@ -255,12 +267,13 @@ onMounted(load);
   <div class="ops-page activity-workspace">
     <div v-show="!open" class="activity-list">
       <div ref="listHeading" class="ops-toolbar mb-20px">
-        <div class="ops-page-label">{{ unavailableOnly ? '不可用活动' : '活动管理' }}<span class="ops-count">{{ scopedRows.length }}</span></div>
-        <NSpace><NButton :loading="loading" @click="load">刷新</NButton><NButton v-if="canWrite && !unavailableOnly" type="primary" :disabled="!modes.length" @click="show()">新建活动</NButton></NSpace>
+        <div class="ops-page-label">活动配置<span class="ops-count">{{ rows.length }}</span></div>
+        <NSpace><NButton :loading="loading" @click="load">刷新</NButton><NButton v-if="canWrite" type="primary" :disabled="!modes.length" @click="show()">新建活动</NButton></NSpace>
       </div>
       <NAlert v-if="error" type="error" :title="error" class="mb-18px" />
-      <NAlert v-if="unavailableOnly" type="info" title="此处单独列出缺少配置、个人活动期及暂未适配的活动。可补齐的草稿保留编辑入口。" class="mb-18px" />
       <NCard :bordered="false" class="ops-panel">
+        <NMenu mode="horizontal" :value="availabilitySection" :options="availabilityMenu" class="mb-18px" aria-label="活动可用性分类" @update:value="selectAvailability" />
+        <NAlert v-if="unavailableOnly" type="info" title="此处列出缺少配置、个人活动期及暂未适配的活动。可补齐的草稿保留编辑入口。" class="mb-18px" />
         <div class="ops-filters">
           <NInput v-model:value="q" clearable placeholder="活动名称或 ID" class="ops-search" @update:value="listPage = 1" />
           <NSelect v-model:value="modeFilter" :options="modeOptions" clearable filterable placeholder="全部活动模式" class="ops-filter-select" @update:value="listPage = 1" />

@@ -69,8 +69,16 @@ func decodeProfileForUpdate(row *db.Profile) (*pb.Player, *model.GameState, erro
 	if err != nil {
 		return nil, nil, err
 	}
+	// Keep projected capacity and its one-time version marker in the same baseline.
+	// Later reads in this transaction must never apply the expansion again.
+	gameRaw, err := json.Marshal(game)
+	if err != nil {
+		return nil, nil, err
+	}
 	baseline := string(raw)
+	gameBaseline := string(gameRaw)
 	row.Player = &baseline
+	row.Game = &gameBaseline
 	return player, game, nil
 }
 

@@ -31,12 +31,12 @@ func (s *GameService) settleCopyFirstDrops(tx *gorm.DB, id int64, player *pb.Pla
 		return &pb.ResultObject{}, nil, nil
 	}
 	if !tx.Migrator().HasTable(&db.CopyDropSnapshot{}) {
-		return s.copyFirstDrops(id, player, game, fight)
+		return s.copyFirstDrops(tx, id, player, game, fight)
 	}
 	var saved db.CopyDropSnapshot
 	err := tx.First(&saved, "player_id=? AND fight_id=?", id, fight.Start.GetFightId()).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return s.copyFirstDrops(id, player, game, fight)
+		return s.copyFirstDrops(tx, id, player, game, fight)
 	}
 	if err != nil {
 		return nil, nil, err
@@ -46,9 +46,13 @@ func (s *GameService) settleCopyFirstDrops(tx *gorm.DB, id int64, player *pb.Pla
 		return nil, nil, errors.New(constUtil.CopyDropConfigurationError)
 	}
 	if input.First == nil {
-		return s.copyFirstDrops(id, player, game, fight)
+		return s.copyFirstDrops(tx, id, player, game, fight)
 	}
-	gain, resources, err := s.applyCopyDropInput(player, game, input.First)
+	gain, resources, err := s.applyCopyDropInputWithGrant(player, game, input.First, func(content string) (*pb.ResultObject, error) {
+		return s.grantCopyBattleReward(tx, player, game, content, "first", func(fit string) (*pb.ResultObject, error) {
+			return s.openServerGain(player, game, fit)
+		})
+	})
 	if err != nil {
 		return nil, nil, err
 	}

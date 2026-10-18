@@ -35,7 +35,7 @@ export function setupElegantRouter() {
         meta.constant = true;
       }
 
-      const operations: Record<string, { title: string; icon: string; order: number }> = {
+      const operations: Record<string, Pick<RouteMeta, 'title' | 'icon' | 'order' | 'hideInMenu' | 'activeMenu'>> = {
         shops_ordinary: {
           title: '普通商店',
           icon: 'ph:treasure-chest',
@@ -73,7 +73,7 @@ export function setupElegantRouter() {
           icon: 'ph:treasure-chest',
           order: 9
         },
-        shops_vip: { title: 'VIP 商店', icon: 'ph:treasure-chest', order: 10 },
+        shops_vip: { title: '会员礼包', icon: 'ph:treasure-chest', order: 10 },
         shops: { title: '商店管理', icon: 'ph:treasure-chest', order: 6 },
         achievements: {
           title: '成就管理',
@@ -97,7 +97,9 @@ export function setupElegantRouter() {
         'activities-unavailable': {
           title: '不可用活动',
           icon: 'ph:calendar-blank',
-          order: 5
+          order: 5,
+          hideInMenu: true,
+          activeMenu: 'activities'
         },
         'server-clock': {
           title: '服务器时间',

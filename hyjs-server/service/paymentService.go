@@ -520,8 +520,8 @@ func (s *GameService) applyP3VIP(p *pb.Player, old int32) error {
 	if before == nil || after == nil {
 		return errors.New(constUtil.P3PaymentConfigError)
 	}
-	warrior := int32(tableNumber(after, "numPerk3") - tableNumber(before, "numPerk3"))
-	equipment := int32(tableNumber(after, "numPerk4") - tableNumber(before, "numPerk4"))
+	warrior := int32(tableNumber(after, "numPerk3")-tableNumber(before, "numPerk3")) * constUtil.BagCapacityScale
+	equipment := int32(tableNumber(after, "numPerk4")-tableNumber(before, "numPerk4")) * constUtil.BagCapacityScale
 	if warrior < 0 || equipment < 0 || p.GetWarriorBagSize() > math.MaxInt32-warrior || p.GetEquipBagSize() > math.MaxInt32-equipment {
 		return p3Error()
 	}

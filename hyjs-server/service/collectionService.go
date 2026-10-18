@@ -341,9 +341,10 @@ func (s *GameService) p5TitleQualification(tx *gorm.DB, p *pb.Player, g *model.G
 		var n, total int32
 		// Match the original GetAllHeros -> AllHerosPage visible card catalog.
 		// Historical ownership remains untouched; monsters, main templates, hidden
-		// cards and green training partners do not enlarge the displayed cohort.
+		// cards and green training partners do not enlarge the displayed cohort, except
+		// the three locally obtainable companions whose own original art is restored.
 		for _, hero := range s.Tables["Hero"] {
-			if !strings.HasPrefix(hero["id"], "hero") || hero["heroClass"] != "0" || hero["iconName"] == "" || tableNumber(hero, "IsShowInCard") != 0 || tableNumber(hero, "quality") <= 12 {
+			if !strings.HasPrefix(hero["id"], "hero") || hero["heroClass"] != "0" || hero["iconName"] == "" || (tableNumber(hero, "IsShowInCard") != 0 && hero["id"] != constUtil.LocalArtHeroNagi && hero["id"] != constUtil.LocalArtHeroRoa && hero["id"] != constUtil.LocalArtHeroClovis) || tableNumber(hero, "quality") <= 12 {
 				continue
 			}
 			if (space != "" && hero["space"] == space) || (quality != "" && hero["quality"] == quality) {

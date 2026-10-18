@@ -370,6 +370,7 @@ func (s *GameService) FinishP12WorldBossBattle(ctx context.Context, id int64, se
 
 func (s *GameService) finishP12WorldBossBattleAt(ctx context.Context, id int64, session []byte, fightID string, now time.Time) (*model.P12WorldBossFinishResponse, error) {
 	var response *model.P12WorldBossFinishResponse
+	var killNotice *pb.SCPublicMessage
 	expired := false
 	err := db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := ServerGameClockGuardTransaction(tx); err != nil {
@@ -451,6 +452,7 @@ func (s *GameService) finishP12WorldBossBattleAt(ctx context.Context, id int64, 
 			if instance.CurrentHP == 0 && receipt.AppliedDamage > 0 && instance.KillerID == 0 {
 				instance.KillerID = id
 				instance.KilledAt = now.UnixMilli()
+				killNotice = p12WorldBossKillNotice(player.GetName())
 			}
 			receipt.Committed = true
 			receipt.FinishHP = instance.CurrentHP
@@ -495,6 +497,10 @@ func (s *GameService) finishP12WorldBossBattleAt(ctx context.Context, id int64, 
 	})
 	if err == nil && expired {
 		return nil, errors.New("本轮首领已结束，未提交战斗已放弃且没有扣血")
+	}
+	if err == nil {
+		// 只发送本事务新产生的死亡跃迁；回滚、预计算、重复Finish及归零后的其他战斗均不广播。
+		s.publishP12WorldBossKill(context.WithoutCancel(ctx), killNotice)
 	}
 	return response, err
 }

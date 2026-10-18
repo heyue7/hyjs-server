@@ -132,6 +132,12 @@ func (s *GameService) captureCopyDrops(tx *gorm.DB, id int64, fightID string, ta
 }
 
 func (s *GameService) applyCopyDropInput(player *pb.Player, game *model.GameState, input *copyDropInput) (*pb.ResultObject, []*pb.BaseResource, error) {
+	return s.applyCopyDropInputWithGrant(player, game, input, func(content string) (*pb.ResultObject, error) {
+		return s.openServerGain(player, game, content)
+	})
+}
+
+func (s *GameService) applyCopyDropInputWithGrant(player *pb.Player, game *model.GameState, input *copyDropInput, grant func(string) (*pb.ResultObject, error)) (*pb.ResultObject, []*pb.BaseResource, error) {
 	gain := &pb.ResultObject{}
 	if input == nil || !input.Enabled {
 		return gain, nil, nil
@@ -157,7 +163,7 @@ func (s *GameService) applyCopyDropInput(player *pb.Player, game *model.GameStat
 	}
 	// 调用方持有Profile锁；直接实际构造实例，避免克隆Game导致Run指针脱离存档。
 	var err error
-	gain, err = s.openServerGain(player, game, strings.Join(content, ";"))
+	gain, err = grant(strings.Join(content, ";"))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -188,7 +194,11 @@ func (s *GameService) settleCopyDrops(tx *gorm.DB, id int64, player *pb.Player, 
 	if saved.TaskID != fight.Task || saved.InputHash != p6Digest(saved.Input) || json.Unmarshal(saved.Input, &input) != nil {
 		return nil, nil, errors.New(constUtil.CopyDropConfigurationError)
 	}
-	gain, resources, err := s.applyCopyDropInput(player, game, &input)
+	gain, resources, err := s.applyCopyDropInputWithGrant(player, game, &input, func(content string) (*pb.ResultObject, error) {
+		return s.grantCopyBattleReward(tx, player, game, content, "ordinary", func(fit string) (*pb.ResultObject, error) {
+			return s.openServerGain(player, game, fit)
+		})
+	})
 	if err != nil {
 		return nil, nil, err
 	}

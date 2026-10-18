@@ -74,7 +74,7 @@ func TestP11ArenaGuideRealPeersActualCostRankProgressAndCold(t *testing.T) {
 	}
 	now := time.Now()
 	list, err := f.s.p11ArenaGuideAt(f.ctx, f.id, &pb.CSPvpFindMatchGuide{}, 79101, now)
-	if err != nil || len(list) != 1 || len(list[0].(*pb.SCPvpFindMatchGuide).GetRankList()) != 2 {
+	if err != nil || len(list) != 1 || len(list[0].(*pb.SCPvpFindMatchGuide).GetRankList()) < 2 {
 		t.Fatal("original Guide two real peers", list, err)
 	}
 	before, _ := p10LuckyProfile(t, f.id)

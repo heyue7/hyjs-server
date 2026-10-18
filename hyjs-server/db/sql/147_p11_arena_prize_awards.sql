@@ -7,5 +7,7 @@ CREATE TABLE IF NOT EXISTS p11_arena_prize_awards (
  offer_hash VARCHAR(64) NOT NULL, day_ordinal BIGINT NOT NULL,
  window_ordinal BIGINT NOT NULL, draw_json TEXT NOT NULL, boxes_json TEXT NOT NULL,
  grant_pb LONGBLOB NULL, source_hash VARCHAR(64) NOT NULL, created_at BIGINT NOT NULL,
+ rank_best_before BIGINT NOT NULL DEFAULT 0, rank_best_after BIGINT NOT NULL DEFAULT 0,
+ rank_diamond BIGINT NOT NULL DEFAULT 0, rank_source VARCHAR(128) NOT NULL DEFAULT '',
  INDEX idx_p11_arena_prize_player_month(player_id,month)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

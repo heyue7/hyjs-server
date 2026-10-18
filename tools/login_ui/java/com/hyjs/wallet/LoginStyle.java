@@ -29,13 +29,14 @@ public final class LoginStyle {
     }
     public static LinearLayout body(Activity a,String title){
         LinearLayout b=new LinearLayout(a);b.setOrientation(LinearLayout.VERTICAL);
-        b.setPadding(dp(a,22),dp(a,10),dp(a,22),dp(a,12));
-        TextView heading=new TextView(a);heading.setText(title);heading.setTextSize(20);heading.setTextColor(INK);
+        b.setPadding(dp(a,18),dp(a,8),dp(a,18),dp(a,10));
+        TextView heading=new TextView(a);heading.setText(title);heading.setTextSize(18);heading.setTextColor(INK);
         heading.setGravity(Gravity.CENTER);heading.setTypeface(null,android.graphics.Typeface.BOLD);
-        b.addView(heading,new LinearLayout.LayoutParams(-1,dp(a,38)));
+        b.addView(heading,new LinearLayout.LayoutParams(-1,dp(a,32)));
         return b;
     }
     public static FrameLayout panel(Activity a,LinearLayout body){
+        body.setTag("hyjs.login.form");
         FrameLayout frame=new FrameLayout(a);
         frame.setBackground(surface(Color.rgb(240,248,250),Color.rgb(75,173,199),dp(a,10)));
         ImageView art=new ImageView(a);art.setScaleType(ImageView.ScaleType.FIT_XY);
@@ -69,7 +70,17 @@ public final class LoginStyle {
         android.graphics.Rect r=new android.graphics.Rect();a.getWindow().getDecorView().getWindowVisibleDisplayFrame(r);
         int width=r.width()>0?r.width():a.getResources().getDisplayMetrics().widthPixels;
         int height=r.height()>0?r.height():a.getResources().getDisplayMetrics().heightPixels;
-        w.setLayout(Math.min(dp(a,540),Math.round(width*.90f)),Math.min(dp(a,360),Math.round(height*.94f)));
+        int panelWidth=Math.min(dp(a,400),Math.round(width*(width>height?.68f:.90f)));
+        // Measure the real form instead of reserving a fixed landscape sheet.
+        // Keep native 15/16sp controls; a small window or IME uses the ScrollView.
+        View content=dialog.findViewById(android.R.id.content);
+        View form=content==null?null:content.findViewWithTag("hyjs.login.form");
+        int panelHeight=WindowManager.LayoutParams.WRAP_CONTENT;
+        if(form!=null){
+            form.measure(View.MeasureSpec.makeMeasureSpec(panelWidth,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(0,View.MeasureSpec.UNSPECIFIED));
+            panelHeight=Math.min(form.getMeasuredHeight(),Math.round(height*.88f));
+        }
+        w.setLayout(panelWidth,panelHeight);
         w.setGravity(Gravity.CENTER);
     }
 }

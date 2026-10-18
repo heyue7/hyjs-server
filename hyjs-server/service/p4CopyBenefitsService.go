@@ -222,7 +222,9 @@ func (s *GameService) ApplyP4CopyDropBonus(tx *gorm.DB, id int64, p *pb.Player, 
 		run          = g.Run
 		copyProgress = g.Copy
 	)
-	bonus, err := s.GrantFixedReward(p, g, strings.Join(content, ";"))
+	bonus, err := s.grantCopyBattleReward(tx, p, g, strings.Join(content, ";"), "bonus", func(fit string) (*pb.ResultObject, error) {
+		return s.GrantFixedReward(p, g, fit)
+	})
 	if err != nil {
 		return nil, nil, err
 	}

@@ -242,7 +242,7 @@ func TestP3PaymentDomain(t *testing.T) {
 			}
 		}
 		p, _ := profile(id)
-		if p.GetDiamond() != 330 || p.GetChargeDiamond() != 300 || p.GetChargeCount() != 1 || p.GetVip() != 2 || p.GetWarriorBagSize() != 105 || p.GetEquipBagSize() != 105 {
+		if p.GetDiamond() != 330 || p.GetChargeDiamond() != 300 || p.GetChargeCount() != 1 || p.GetVip() != 2 || p.GetWarriorBagSize() != 1050 || p.GetEquipBagSize() != 1050 || p.GetPetBagSize() != 1000 {
 			t.Fatal("frozen credit/VIP/capacity", p)
 		}
 		var facts int64

@@ -46,7 +46,12 @@ func (s *GameService) p11ArenaScopedFightAt(ctx context.Context, id int64, reque
 			return err
 		}
 
-		if _, err := p10LockProfiles(tx, id, request.GetPlayerId()); err != nil {
+		virtual := p11ArenaNPCID(request.GetPlayerId())
+		lockTarget := request.GetPlayerId()
+		if virtual {
+			lockTarget = id
+		}
+		if _, err := p10LockProfiles(tx, id, lockTarget); err != nil {
 			return err
 		}
 		if id == request.GetPlayerId() {
@@ -73,14 +78,14 @@ func (s *GameService) p11ArenaScopedFightAt(ctx context.Context, id int64, reque
 			return err
 		}
 		if s.P12WantedReady {
-			for _, pid := range []int64{id, request.GetPlayerId()} {
+			for _, pid := range slices.Compact([]int64{id, lockTarget}) {
 				if err := P12WantedRequireIdle(tx, pid, now); err != nil {
 					return err
 				}
 			}
 		}
 		if s.P12FieldPVPReady {
-			for _, pid := range []int64{id, request.GetPlayerId()} {
+			for _, pid := range slices.Compact([]int64{id, lockTarget}) {
 				if err := P12FieldPVPRequireIdle(tx, pid, now); err != nil {
 					return err
 				}
@@ -116,14 +121,21 @@ func (s *GameService) p11ArenaScopedFightAt(ctx context.Context, id int64, reque
 		if err = tx.First(&ownerProfile, id).Error; err != nil {
 			return err
 		}
-		if err = tx.First(&peerProfile, request.GetPlayerId()).Error; err != nil {
-			return err
+		if !virtual {
+			if err = tx.First(&peerProfile, request.GetPlayerId()).Error; err != nil {
+				return err
+			}
 		}
 		owner, game, err := decodeProfileForCalendarUpdate(tx, &ownerProfile)
 		if err != nil {
 			return err
 		}
-		peer, _, err := decodeProfile(&peerProfile)
+		var peer *pb.Player
+		if virtual {
+			peer, _, err = s.p11ArenaNPCState(request.GetPlayerId() - constUtil.P11ArenaNPCIDBase)
+		} else {
+			peer, _, err = decodeProfile(&peerProfile)
+		}
 		if err != nil {
 			return err
 		}
@@ -131,7 +143,7 @@ func (s *GameService) p11ArenaScopedFightAt(ctx context.Context, id int64, reque
 		if err != nil {
 			return err
 		}
-		if owner.GetLevel() < minimum || peer.GetLevel() < minimum {
+		if owner.GetLevel() < minimum || !virtual && peer.GetLevel() < minimum {
 			return errors.New(constUtil.P11ArenaFightRefreshRequired)
 		}
 		if owner.GetEnergy() < policy.Energy {
@@ -141,7 +153,17 @@ func (s *GameService) p11ArenaScopedFightAt(ctx context.Context, id int64, reque
 		if err = tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&ownMember, "player_id=? AND active=?", id, true).Error; err != nil {
 			return err
 		}
-		if err = tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&defMember, "player_id=? AND active=?", request.GetPlayerId(), true).Error; err != nil {
+		if virtual {
+			rank, e := p11ArenaNPCSlot(tx, cfg, request.GetPlayerId())
+			if e != nil {
+				return e
+			}
+			projected, e := s.p11ArenaNPCMember(rank)
+			if e != nil {
+				return e
+			}
+			defMember = *projected
+		} else if err = tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&defMember, "player_id=? AND active=?", request.GetPlayerId(), true).Error; err != nil {
 			return err
 		}
 		var match db.P11ArenaMatch
@@ -166,8 +188,13 @@ func (s *GameService) p11ArenaScopedFightAt(ctx context.Context, id int64, reque
 			return err
 		}
 		fightID := uuid.NewString()
+		rankBestBefore := p11ArenaRankRewardBoundary(ownMember)
 		policyHash := p6Digest([]byte(policy.Source))
 		input := model.FrozenBattleInput{Attacker: attacker, Defender: defender, BattleType: 2, Seed: match.Seed, MaxRound: 40, DefenderFirst: false, AppliedProperties: map[string][]string{"source": {p11ArenaGuideSourceLabel(ctx)}, "arenaMatch": {match.ID, match.SnapshotHash}, "arenaRequest": {requestHash}, "arenaPolicy": {policyHash}, "arenaBeforeRanks": {strconv.FormatInt(ownMember.Rank, 10), strconv.FormatInt(defMember.Rank, 10)}}}
+		input.AppliedProperties["arenaRankReward"] = []string{constUtil.P11ArenaRankRewardSource, strconv.FormatInt(rankBestBefore, 10)}
+		if virtual {
+			input.AppliedProperties["arenaVirtualSlot"] = []string{constUtil.P11ArenaNPCSource, strconv.FormatInt(defMember.Rank, 10), defMember.SnapshotHash}
+		}
 		recordID, err := s.CaptureBattleReplay(ctx, tx, id, constUtil.P11ArenaFightSource, fightID, input)
 		if err != nil {
 			return err
@@ -215,8 +242,10 @@ func (s *GameService) p11ArenaScopedFightAt(ctx context.Context, id int64, reque
 			if moved.RowsAffected != 1 {
 				return errors.New(constUtil.P11ArenaFightRefreshRequired)
 			}
-			if err = tx.Model(&defMember).Update("position", newDef).Error; err != nil {
-				return err
+			if !virtual {
+				if err = tx.Model(&defMember).Update("position", newDef).Error; err != nil {
+					return err
+				}
 			}
 			if err = tx.Model(&ownMember).Update("position", newOwn).Error; err != nil {
 				return err
@@ -229,7 +258,7 @@ func (s *GameService) p11ArenaScopedFightAt(ctx context.Context, id int64, reque
 			winnerID = id
 			winnerMember = &ownMember
 		}
-		if winnerMember.BestWonRank == 0 || winnerMember.Rank < winnerMember.BestWonRank {
+		if !p11ArenaNPCID(winnerID) && (winnerMember.BestWonRank == 0 || winnerMember.Rank < winnerMember.BestWonRank) {
 			if err = tx.Model(winnerMember).Update("best_won_rank", winnerMember.Rank).Error; err != nil {
 				return err
 			}
@@ -363,6 +392,11 @@ func p11ReadArenaFightReceipt(tx *gorm.DB, row *db.P11ArenaFightSettlement) (*pb
 	meta := input.AppliedProperties
 	if !slices.Equal(meta["arenaMatch"], []string{row.MatchID, row.MatchHash}) || !slices.Equal(meta["arenaRequest"], []string{row.RequestHash}) || !slices.Equal(meta["arenaPolicy"], []string{row.PolicyHash}) || !slices.Equal(meta["arenaBeforeRanks"], []string{strconv.FormatInt(row.AttackerOldRank, 10), strconv.FormatInt(row.DefenderOldRank, 10)}) {
 		return reject()
+	}
+	if p11ArenaNPCID(row.OpponentID) {
+		if row.OpponentID-constUtil.P11ArenaNPCIDBase != row.DefenderOldRank || len(meta["arenaVirtualSlot"]) != 3 || meta["arenaVirtualSlot"][0] != constUtil.P11ArenaNPCSource || meta["arenaVirtualSlot"][1] != strconv.FormatInt(row.DefenderOldRank, 10) {
+			return reject()
+		}
 	}
 	knownScope := p6KnownArenaSettlementProof(input, row.ScopeProof) || p6KnownActualArenaSettlementProof(input, row.ScopeProof) || p11KnownGenericMechanismProof(input, row.ScopeProof)
 	if !knownScope || record.PlayerID != row.PlayerID || record.Source != constUtil.P11ArenaFightSource || record.SourceFight != row.FightID || record.Status != constUtil.P6BattleComputed || !record.Authoritative || !terminal.Outcome.Authoritative || row.ScopeProof != terminal.Outcome.CapabilityHash || record.OutcomeHash != p6Digest(body) || p6Digest(record.Outcome) != record.OutcomeHash || p6Digest(operations) != p6Digest(record.Operates) || record.ReplayHash != p6Digest(append(append([]byte(nil), operations...), byte(record.ServerResult))) || record.ClientResult != record.ServerResult || record.ServerResult != p6PlaybackResult(terminal.Outcome.Winner) || terminal.CalculationSourceSHA256 != p6Digest(source) || terminal.ConfigurationHash != record.ConfigurationHash || terminal.EngineVersion != record.EngineVersion || terminal.ClientVersion != record.ClientVersion || input.Attacker.GetPlayerId() != row.PlayerID || input.Defender.GetPlayerId() != row.OpponentID || row.WinnerID != winner || row.AttackerNewRank != own || row.DefenderNewRank != def {
