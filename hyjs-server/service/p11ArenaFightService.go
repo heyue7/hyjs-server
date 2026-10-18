@@ -181,7 +181,10 @@ func (s *GameService) p11ArenaScopedFightAt(ctx context.Context, id int64, reque
 		if proto.Unmarshal(match.Attacker, attacker) != nil || proto.Unmarshal(match.Defender, defender) != nil || attacker.GetPlayerId() != id || defender.GetPlayerId() != request.GetPlayerId() {
 			return errors.New(constUtil.P11ArenaFightReceiptConflict)
 		}
-		if len(attacker.Formation) == 0 || len(defender.Formation) == 0 || attacker.Formation[0].GetGuid() != owner.GetHeroWarId() || defender.Formation[0].GetGuid() != peer.GetHeroWarId() {
+		// The original client selects a player, not the owner's avatar GUID.
+		// Any nonempty owned formation frozen by matching is valid, including
+		// a bench avatar; the accepted snapshot and P6 retain actor ownership.
+		if len(attacker.Formation) == 0 || len(defender.Formation) == 0 {
 			return errors.New(constUtil.P11ArenaFightRefreshRequired)
 		}
 		if err = p11ArenaGuidePrepare(ctx, owner, attacker, defender, false); err != nil {

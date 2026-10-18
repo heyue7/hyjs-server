@@ -124,30 +124,42 @@ public final class WalletActivity extends UnityPlayerActivity {
         private int pointer=-1;
         private float downX,downY,startX,startY;
         private boolean moved;
+        private final int[] screenPosition=new int[2];
         WalletOverlay(){super(WalletActivity.this);}
         @Override protected void dispatchDraw(Canvas canvas){
             int saved=canvas.save();canvas.clipRect(bubbleBounds());super.dispatchDraw(canvas);canvas.restoreToCount(saved);
         }
-        @Override public boolean dispatchTouchEvent(MotionEvent event){
+        boolean dispatchWalletTouch(MotionEvent event){
             int action=event.getActionMasked();
+            getLocationOnScreen(screenPosition);
+            // Window coordinates stay stable when Unity relays a gesture or the
+            // icon crosses a child hit rectangle. Keep ownership until UP/CANCEL.
+            float x=event.getRawX()-screenPosition[0],y=event.getRawY()-screenPosition[1];
             if(action==MotionEvent.ACTION_DOWN){
-                if(bubble==null || !bubbleTouchBounds().contains((int)event.getX(),(int)event.getY()))return false;
+                if(bubble==null || !bubbleTouchBounds().contains((int)x,(int)y))return false;
                 // The parent owns the sequence while the half-hidden child moves.
                 // Stable parent coordinates keep the drag independent of child
                 // translation and give the narrow edge icon a full 48dp handle.
                 pointer=event.getPointerId(0);dragging=true;moved=false;
                 if(getParent()!=null)getParent().requestDisallowInterceptTouchEvent(true);
                 revealBubble();bubble.setPressed(true);
-                downX=event.getX();downY=event.getY();startX=bubble.getX();startY=bubble.getY();
+                downX=x;downY=y;startX=bubble.getX();startY=bubble.getY();
+                requestUnbufferedDispatch(event);
                 return true;
             }
             if(pointer!=-1){
                 int index=event.findPointerIndex(pointer);
-                if(action==MotionEvent.ACTION_CANCEL || index<0 || (action==MotionEvent.ACTION_POINTER_UP && event.getPointerId(event.getActionIndex())==pointer)){
+                if(action==MotionEvent.ACTION_CANCEL || index<0){
                     finish(false);return true;
                 }
+                if(action==MotionEvent.ACTION_POINTER_UP && event.getPointerId(event.getActionIndex())==pointer){
+                    int next=event.getActionIndex()==0?1:0;
+                    pointer=event.getPointerId(next);
+                    downX=x+event.getX(next)-event.getX(0);downY=y+event.getY(next)-event.getY(0);
+                    startX=bubble.getX();startY=bubble.getY();moved=true;return true;
+                }
                 if(action==MotionEvent.ACTION_MOVE || action==MotionEvent.ACTION_UP){
-                    float dx=event.getX(index)-downX,dy=event.getY(index)-downY;
+                    float dx=x+event.getX(index)-event.getX(0)-downX,dy=y+event.getY(index)-event.getY(0)-downY;
                     int slop=ViewConfiguration.get(WalletActivity.this).getScaledTouchSlop();
                     if(Math.hypot(dx,dy)>slop)moved=true;
                     if(moved){
@@ -160,7 +172,10 @@ public final class WalletActivity extends UnityPlayerActivity {
                 }
                 return true;
             }
-            return super.dispatchTouchEvent(event);
+            return false;
+        }
+        @Override public boolean dispatchTouchEvent(MotionEvent event){
+            return dispatchWalletTouch(event);
         }
         private void finish(boolean click){
             pointer=-1;dragging=false;
@@ -170,6 +185,13 @@ public final class WalletActivity extends UnityPlayerActivity {
             Rect bounds=bubbleBounds();dockRight=bubble.getX()+bubble.getWidth()/2f>=(bounds.left+bounds.right)/2f;
             foldBubble(true);scheduleDim();
         }
+    }
+
+    @Override public boolean dispatchTouchEvent(MotionEvent event){
+        // Capture the wallet at the activity boundary before Unity/decor dispatch.
+        // Touches starting anywhere else keep their original game routing.
+        if(overlay instanceof WalletOverlay && ((WalletOverlay)overlay).dispatchWalletTouch(event))return true;
+        return super.dispatchTouchEvent(event);
     }
 
     @Override protected void onCreate(Bundle state){
@@ -294,8 +316,16 @@ public final class WalletActivity extends UnityPlayerActivity {
             if(event.getAction()==KeyEvent.ACTION_UP){if(keyboardBack){keyboardBack=false;return true;}back();return true;}
             return true;
         }});
-        panel.show();int width=Math.min(dp(480),getResources().getDisplayMetrics().widthPixels-dp(24));int height=Math.min(dp(640),getResources().getDisplayMetrics().heightPixels-dp(24));window.setLayout(width,height);window.setGravity(Gravity.CENTER);
+        panel.show();window.setGravity(Gravity.CENTER);
         render();refreshPage();
+    }
+    private void fitPanel(){
+        if(panel==null || !panel.isShowing())return;
+        android.util.DisplayMetrics metrics=getResources().getDisplayMetrics();
+        boolean home=page==HOME;
+        int width=Math.min(dp(home?392:440),metrics.widthPixels-dp(32));
+        int height=Math.min(dp(home?440:600),Math.round(metrics.heightPixels*(home?.78f:.90f)));
+        panel.getWindow().setLayout(width,height);
     }
     private void navigate(int destination){
         rememberLedgerScroll();hideKeyboard();page=destination;message="";messageError=false;render();refreshPage();
@@ -317,6 +347,7 @@ public final class WalletActivity extends UnityPlayerActivity {
     private String title(){switch(page){case ADD:return "增加余额";case BILLS:return "账单";case CASHIER:return "付款";case ORDERS:return "待支付订单";default:return "蓝绿钱包";}}
     private void render(){
         if(panel==null || !panel.isShowing())return;
+        fitPanel();
         rememberLedgerScroll();ledgerScroll=null;
         boolean wasEditing=amount!=null && amount.hasFocus();amount=null;shell.removeAllViews();
         FrameLayout nav=new FrameLayout(this);
@@ -332,9 +363,11 @@ public final class WalletActivity extends UnityPlayerActivity {
         if(wasEditing && page==ADD && amount!=null && !busy){amount.requestFocus();amount.setSelection(amount.length());}
     }
     private void renderHome(LinearLayout body){
-        body.setPadding(dp(28),0,dp(28),dp(18));space(body,.8f);
-        addFull(body,center("账户余额（元）",14,GRAY),26);
-        addFull(body,center(wallet==null?"—":money(wallet.optLong("balanceCents")),46,INK),68);
+        body.setPadding(dp(24),0,dp(24),dp(14));space(body,.8f);
+        addFull(body,center("账户余额（元）",13,GRAY),24);
+        TextView balance=center(wallet==null?"—":money(wallet.optLong("balanceCents")),36,INK);
+        balance.setSingleLine(true);if(Build.VERSION.SDK_INT>=26)balance.setAutoSizeTextTypeUniformWithConfiguration(18,36,1,android.util.TypedValue.COMPLEX_UNIT_SP);
+        addFull(body,balance,54);
         space(body,1f);
         final JSONArray orders=array(wallet,"pendingOrders");
         if(orders.length()>0){TextView entry=text("待支付订单  "+orders.length()+"  ›",14,BLUE);entry.setGravity(Gravity.CENTER_VERTICAL);addFull(body,entry,42);entry.setOnClickListener(new View.OnClickListener(){public void onClick(View v){if(orders.length()==1){selectedOrderId=orders.optJSONObject(0).optString("orderId");navigate(CASHIER);}else navigate(ORDERS);}});}
