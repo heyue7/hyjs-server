@@ -1,0 +1,1 @@
+INSERT IGNORE INTO p14_final_draw_policies(id,enabled,version,source,published_at) VALUES(1,0,'','local-complete-final32-common-hash-draw-v1; original81046-groups-A-D; real-eight-slot-slices-adjacent-pairs; no-filler-no-bye-result',0);

@@ -1,0 +1,2 @@
+-- P4 独立实例、冻结规则和回执；仅同事务保存成功业务。
+CREATE TABLE IF NOT EXISTS p4_welfare_rules (id VARBINARY(64) NOT NULL, kind VARBINARY(32) NOT NULL, enabled BOOLEAN NOT NULL, start_at BIGINT NOT NULL, end_at BIGINT NOT NULL, claim_end_at BIGINT NOT NULL, rules LONGBLOB NOT NULL, frozen LONGBLOB, source TEXT NOT NULL, PRIMARY KEY(id),KEY(kind)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

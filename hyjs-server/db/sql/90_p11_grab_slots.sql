@@ -1,0 +1,1 @@
+CREATE TABLE IF NOT EXISTS p11_grab_slots (position BIGINT PRIMARY KEY,owner_id BIGINT NULL,session_id VARCHAR(64) NOT NULL,started_at BIGINT NOT NULL,expires_at BIGINT NOT NULL,UNIQUE KEY idx_p11_grab_owner(owner_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;

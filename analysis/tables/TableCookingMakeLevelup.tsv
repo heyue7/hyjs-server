@@ -1,0 +1,11 @@
+料理制作等级	升级经验
+level	exp
+string	int
+primary	none
+level	exp
+1	600
+2	10000
+3	40000
+4	100000
+5	240000
+6	-1

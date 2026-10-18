@@ -1,0 +1,6 @@
+CREATE TABLE IF NOT EXISTS equipment_recycle_rules (
+ id BIGINT PRIMARY KEY,
+ enabled BOOLEAN NOT NULL,
+ progression_refund VARCHAR(32) NOT NULL,
+ source VARCHAR(255) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

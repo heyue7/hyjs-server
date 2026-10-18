@@ -1,0 +1,1 @@
+CREATE TABLE IF NOT EXISTS p10_social_relations (low_id BIGINT NOT NULL, high_id BIGINT NOT NULL, created_at BIGINT NOT NULL, PRIMARY KEY (low_id,high_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;

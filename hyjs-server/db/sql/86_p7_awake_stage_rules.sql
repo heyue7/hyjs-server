@@ -1,0 +1,1 @@
+CREATE TABLE IF NOT EXISTS p7_awake_stage_rules (copy_id VARCHAR(64) PRIMARY KEY, chapter_id VARCHAR(64) NOT NULL, enabled BOOLEAN NOT NULL, content_restored BOOLEAN NOT NULL, fight_power BIGINT NOT NULL, content LONGBLOB NOT NULL, source TEXT NOT NULL, INDEX(chapter_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;

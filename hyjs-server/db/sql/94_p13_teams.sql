@@ -1,0 +1,2 @@
+-- P13独立野外队伍实际管理事实。
+CREATE TABLE IF NOT EXISTS p13_teams (id VARCHAR(64) PRIMARY KEY,leader_id BIGINT NOT NULL,max_size INT NOT NULL,authority_version BIGINT NOT NULL,revision BIGINT NOT NULL,created_at BIGINT NOT NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;

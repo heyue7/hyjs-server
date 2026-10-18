@@ -1,0 +1,1 @@
+INSERT IGNORE INTO p14_final_qualification_policies (id,enabled,version,source,published_at) VALUES (1,0,'','local-complete-signed-final32-v1; originaltop32; all-frozen-peer-final-scores; frozen-rank-rule; take-min32-no-fill-no-bye-wins',0);

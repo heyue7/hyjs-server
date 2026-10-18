@@ -1,0 +1,93 @@
+特效id	资源路径	持续时间
+ParticleId	ResourcePath	Duration
+string	string	double
+primary	none	none
+ParticleId	ResourcePath	Duration
+1	01_general/monster_die	1.8
+2	01_general/bady_rush	0.45
+3	01_general/skill_sing01	0.0
+4	UI_DXP/UI_baodou01	0.0
+5	UI_DXP/UI_baodou01_xiaoshi	1.0
+6	UI_DXP/UI_baodou03	0.0
+7	UI_DXP/UI_baodou03_xiaoshi	1.0
+8	UI_DXP/changjingzhandou_guang_1	0.0
+9	UI_DXP/changjingzhandou_jian	0.0
+10	UI_DXP/changjingzhandou_dun	0.0
+11	UI_DXP/changjingzhandou_guang	0.0
+12	UI_DXP/UI_huanzhen	
+13	castle_obj_706/castle_obj_706_process	
+zhiyin_boss	01_general/zhiyin_boss	
+zhiyin_dimian	01_general/zhiyin_dimian	
+Buff_Ranshao	03_buff/Buff_Ranshao	
+Buff_Xuruo_buffb	03_buff/Buff_Xuruo_buffb	
+Buff_Mabi	03_buff/Buff_Mabi	
+xuanshang_donghua	UI_maofei/yongbingrenwu_xuanshang_donghua	
+mingrenbang_donghua	UI_maofei/mingrenbang_donghua	
+Chuansongzhen1	UI_DXP/UI_Chuansongzhen_1	
+Chuansongzhen2	UI_DXP/UI_Chuansongzhen_2	
+yinzhang	ui_tj/yinzhang	
+14	03_buff/Buff_fuhuowudi	
+15	klein_body/klein01_body_juqing	1.83
+RecoverHp	UI_TJ/bloodbag	
+16	hero01_body/hero01_body_juqing	
+17	UI_DXP/UI_baodou01_xishou	1.6
+18	UI_DXP/UI_baodou03_xishou	1.6
+SAOProj	map_battle_001/battle_paotai_pro	
+ALOProj	map_battle_001/battle_fangyuta_alo_pro	
+SAOFire	map_battle_001/battle_paotai_attack	
+ALOBeHit	map_battle_001/battle_fangyuta_alo_hit	
+SAOBeHit	map_battle_001/battle_paotai_hit	
+FactoryWork	battle_models_211/battle_models_211_make	
+ChariotRun	battle_obj_801/battle_obj_801_run	
+ChariotDie	battle_obj_801/battle_obj_801_death	
+ChariotStand	battle_obj_802/battle_obj_802_stand	
+Revived	map_battle_001/battle_fuhuodian_shengli	
+Reviving	map_battle_001/battle_fuhuodian_xiao	
+FactoryComplete	battle_obj_305b/battle_obj_305b	
+recoverSmall	map_battle_001/Buff_Zhiliao_yaocao	
+recoverBig	map_battle_001/Buff_Zhiliao_yaoji	
+bombSmallHit	map_battle_001/Buff_Boom_small_bit	
+bombSmall	map_battle_001/Buff_Boom_small_project	
+bombBigHit	map_battle_001/Buff_Boom_big	
+bombBig	map_battle_001/Buff_Boom_big_project	
+fixTool	map_battle_001/Buff_xiufugongju	
+siegeHammer	map_battle_001/Buff_gongchengzhichui	
+recoverMatrix	map_battle_001/Buff_Zhiliao_huifufazhen	
+moraleUp	map_battle_001/Buff_shiqi_shangsheng	
+recoverRain	map_battle_001/Buff_Zhiliao_huifuzhiyu	
+gate_hit	map_battle_001/battle_chengmen_hit	
+gate_destroy	map_battle_001/battle_chengmen_die	
+ChariotFire	battle_obj_801/battle_obj_801_fire_80	
+ChariotSmoke	battle_obj_801/battle_obj_801_smoke_50	
+FiveLianSheng	UI_DXP/UI_5liansheng	
+TenLianSheng	UI_DXP/UI_10liansheng	
+Jipochengmen	UI_DXP/UI_jipochengmen	
+FuChou	UI_DXP/UI_fuchou	
+CountDown	UI_DXP/UI_daojishi	
+TransferStatic	01_general/chuansong_02	
+ReviveAloFlag	battle_obj_flag/alo_battle_flag_001	
+ReviveSaoFlag	battle_obj_flag/sao_battle_flag_001	
+ReviveRange	01_general/battle_fuhuodian_daquan	
+Chuansongzhen3	UI_DXP/UI_Chuansongzhen_3	
+zhiyin_boss_01	01_general/zhiyin_boss_01	
+ChuansongzhenHuiCheng	01_general/chuansong_huicheng	
+recoverMatrixMin	map_battle_001/Buff_Zhiliao_huifufazhen_01	
+boxProcessSmall	castle_obj_802/castle_obj_802_process_small	
+boxProcessBig	castle_obj_802/castle_obj_802_process_big	
+boxStandby	awakecopy/box_standby	
+onceAwakeEffect	UI_DXP/UI_juexing_1	
+secondAwakeEffect	UI_DXP/UI_juexing_2	
+citySnowEffect	UI_DXP/UI_changjin_xuehua	
+citySnowEffect2	UI_DXP/UI_changjin_xuehua_2	
+ChristmasTree	01_general/shengdanshu	
+allSceneEffect	UI_DXP/changjing_yanhua_4	
+SpringFestival	01_general/chunjie_001	
+FireWorks_1	UI_DXP/changjing_yanhua_1	
+FireWorks_2	UI_DXP/changjing_yanhua_2	
+FireWorks_3	UI_DXP/changjing_yanhua_3	
+luckyBag_1	UI_DXP/Jinnang_1	
+luckyBag_2	UI_DXP/Jinnang_2	
+luckyBag_Model	01_general/LuckyBag	
+springEffect	UI_DXP/UI_changjin_yinghua	
+summerEffect	UI_DXP/UI_changjin_yanguang	
+autumnEffect	UI_DXP/UI_changjin_shuye	

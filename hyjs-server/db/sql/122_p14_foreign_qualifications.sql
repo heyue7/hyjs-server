@@ -1,0 +1,1 @@
+CREATE TABLE IF NOT EXISTS p14_foreign_qualifications (season_index INT NOT NULL,server_id BIGINT NOT NULL,delivery_id CHAR(64) NOT NULL UNIQUE,payload LONGBLOB NOT NULL,payload_hash CHAR(64) NOT NULL,boundary_hash CHAR(64) NOT NULL,qualification_hash CHAR(64) NOT NULL,imported_at BIGINT NOT NULL,PRIMARY KEY(season_index,server_id)) ENGINE=InnoDB;

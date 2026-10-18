@@ -1,0 +1,2 @@
+-- P4 本地兼容规则，实例冻结、交易与回执在同一事务。
+CREATE TABLE IF NOT EXISTS p4_activity_registry (id INT NOT NULL,name VARBINARY(64) NOT NULL,prefix VARBINARY(64) NOT NULL,protocols TEXT NOT NULL,owner VARCHAR(64) NOT NULL,status VARCHAR(64) NOT NULL,evidence TEXT NOT NULL,PRIMARY KEY(id),UNIQUE KEY(name)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

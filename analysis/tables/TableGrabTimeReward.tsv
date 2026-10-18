@@ -1,0 +1,8 @@
+时长（小时）	奖励
+time	reward
+int	string
+primary	none
+time	reward
+1	item_459,5;item_461,3;item_013,2;coin,100000
+2	item_459,10;item_462,3;item_013,4;coin,200000
+3	item_460,1;item_463,3;item_013,6;coin,300000

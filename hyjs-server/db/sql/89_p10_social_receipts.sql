@@ -1,0 +1,1 @@
+CREATE TABLE IF NOT EXISTS p10_social_receipts (player_id BIGINT NOT NULL, domain VARBINARY(32) NOT NULL, stamp BIGINT NOT NULL, request_hash CHAR(64) NOT NULL, response LONGBLOB NOT NULL, PRIMARY KEY (player_id,domain,stamp)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;

@@ -1,0 +1,16 @@
+{
+  "bootstrap": "LocalWalletSessionBridge.Update -> private PollFormationUI(player, session) -> reflection HYJS.LocalFormation.LocalFormationUI.Ensure",
+  "source": "tools/local_wallet_bridge/LocalWalletSessionBridge.cs",
+  "beforeSHA256": "219b32ed108e6194a8fdd5c1369e96424cae31a07622924cab2aacd841b297a1",
+  "proposal": "tools/local_formation_ui/LocalWalletSessionBridge.proposal.cs",
+  "afterSHA256": "9693a443a7da306dae467660b5981ab443191a61b0e35de904b4e692c51e7ae1",
+  "updatePosition": "after original blockedSession/player/session validation and before unchanged-session early return; original .5s throttle reused",
+  "reflectionOnly": true,
+  "newPublicABI": false,
+  "currentPlayerGreaterThan1AndExistingNativeBoundPair": true,
+  "oneAttemptPerPageEntry": true,
+  "errorDedupLimit": 16,
+  "androidTag": "HYJSFormation",
+  "logIncludesCredentialsOrGUID": false,
+  "gameActionsWithoutButtonClick": 0
+}

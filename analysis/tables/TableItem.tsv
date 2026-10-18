@@ -1,0 +1,342 @@
+物品id	名字	星级	描述	精力	体力	金币	钻石	经验/能量/潜力值等	类别:,1: 主动使用且直接增加基本属性类; ,2: 主动使用可获得其他物品类<通过TableItemUse即可直接得到>; ,4: 被动消耗类<潜力研发材料,进阶丹,经验熊猫>),5: 使用后,需要选择一种武将,选择后才能获得 ,6: 免战道具,7: 装备精炼石,8：宠物升级经验,9：亲密值,11: 具有单一特殊用途类;,12: 仅供客户端使用,服务端忽略,13: 道具合成,14：充值和免费钻石,15：学习生活技能书,17：公会战道具（公会商店购买）,18：公会战道具（战场购买）,19:觉醒系统（融合道具提供融合经验）,20：跨服战胜负押注卷轴,21：烟花（特殊处理）,22：福袋（特殊处理）,23：光盘随机箱（服务器几率随机上限）,24：阵法道具（使用增加阵法经验）,25：宠物装备觉醒,26：宠物装备升阶,27：角色技能专精,28：装备升星	属性	售卖价格	icon	获得途径	使用后弹出的文字
+itemId	name	star	intro	energy	stamina	coin	diamond	exp	category	nature	selloutPrice	icon	resource	useWord
+string	string	int	string	int	int	int	int	int	int	string	int	string	string	string
+primary	none	none	none	none	none	none	none	none	index	none	none	none	none	none
+itemId	name	star	intro	energy	stamina	coin	diamond	exp	category	nature	selloutPrice	icon	resource	
+item_001	耐力药剂	5	使用后立即恢复10点耐力	10					1		100	item_icon_001	yueqianactivity_Get,duobaojingjichang_Get,jingjishengli_Get,meirrenwu_Get,sail_Get,huiyuanlibao_Get,fubenjiangli_Get,kaifujijingactivity_Get	use_word_item_001
+item_002	体力药剂	5	使用后获得25体力		25				1		100	item_icon_002	yueqianactivity_Get,duobaojingjichang_Get,jingjishengli_Get,meirrenwu_Get,sail_Get,huiyuanlibao_Get	use_word_item_002
+item_003	灵魂水晶	5	随机获得25-35滞留之光						2		100	item_icon_003		
+item_004	通缉令	5	使用后可以增加一次悬赏任务攻击次数。						2		100	item_icon_004	meirrenwu_Get,xuanshangrenwu_Get,daojushangdian_Get	use_word_item_004
+item_005	解放之石	5	用于激活角色天赋						4		100	item_icon_005	yueqianactivity_Get,duobaojingjichang_Get,jingjishengli_Get,sail_Get,huiyuanlibao_Get,fubenjiangli_Get,gonghuishangdian_Get,huodongfuben_Get,jingjishangdian_Get,mysteryShop_Get	
+item_006	突破水晶	5	用于角色突破道具						4		100	item_icon_006	yueqianactivity_Get,duobaojingjichang_Get,jingjishengli_Get,sail_Get,huiyuanlibao_Get,xuanshangrenwu_Get,daojushangdian_Get,gonghuishangdian_Get,kaifujijingactivity_Get,jifenshangdian_Get,mysteryShop_Get	
+item_007	潜能药剂	5	用于角色训练道具						4		100	item_icon_007	yueqianactivity_Get,duobaojingjichang_Get,jingjishengli_Get,meirrenwu_Get,sail_Get,huiyuanlibao_Get,gonghuishangdian_Get,jingjichang_Get,jingjishangdian_Get,mysteryShop_Get	
+item_008	极品精炼石	5	可提升武器精炼50点经验					50	7		100	item_icon_008	duobaojingjichang_Get,jingjishengli_Get,sail_Get,huiyuanlibao_Get,SLtongguan_Get,SLShop_Get,daojushangdian_Get,SLshengmishangren_Get,huodongfuben_Get,SLzhanshengshouling_Get 	
+item_009	高级精炼石	4	可提升武器精炼25点经验					25	7		100	item_icon_009	duobaojingjichang_Get,jingjishengli_Get,sail_Get,huiyuanlibao_Get,SLtongguan_Get,SLShop_Get,SLshengmishangren_Get,jingjishangdian_Get	
+item_010	中级精炼石	3	可提升武器精炼10点经验					10	7		100	item_icon_010	yueqianactivity_Get,duobaojingjichang_Get,jingjishengli_Get,SLShop_Get,SLshengmishangren_Get,kaifujijingactivity_Get	
+item_011	低级精炼石	2	可提升武器精炼5点经验					5	7		100	item_icon_011	yueqianactivity_Get,duobaojingjichang_Get,jingjishengli_Get,meirrenwu_Get,SLtongguan_Get,SLShop_Get,SLshengmishangren_Get 	
+item_012	饰品精炼石	5	用于饰品精炼道具						4		1000	item_icon_012	yueqianactivity_Get,duobaojingjichang_Get,jingjishengli_Get,sail_Get,huiyuanlibao_Get,SLtongguan_Get,SLShop_Get,daojushangdian_Get,SLshengmishangren_Get,kaifujijingactivity_Get,huodongfuben_Get,SLzhanshengshouling_Get,jingjishangdian_Get	
+item_013	刷新券	5	回忆圣坛的刷新道具						4		100	item_icon_013	yueqianactivity_Get,duobaojingjichang_Get,jingjishengli_Get,meirrenwu_Get,huiyuanlibao_Get,daojushangdian_Get	
+item_014	高级守护石	6	使用后获得8小时免战时间					8	6		100	item_icon_014		use_word_item_014
+item_015	守护石	6	使用后获得1小时免战时间					1	6		5000	item_icon_015		use_word_item_015
+item_016	征集令	4	使用后可以进行一次普通招募						11		100	item_icon_016	duobaojingjichang_Get,jingjishengli_Get,meirrenwu_Get,fubenjiangli_Get	
+item_017	世界之种	5	用于潜能解放						11		100	item_icon_017		
+item_020	王者之魂	6	用于兑换红色角色材料，十分稀有，可在活动中兑换红色角色						11		400	item_icon_020		
+item_021	神装铸造精华	6	用于兑换红色装备的材料，十分稀有，可在试炼商店兑换红装						11			item_icon_021		
+item_022	传说饰品箱	6	可以开出红色及以下任意饰品碎片，有一定几率开出整个饰品						2			item_icon_022		
+item_023	红色角色选择箱	6	可以从红色角色箱1和红色角色箱2中选择一个获取						5			item_icon_023		
+item_024	史诗饰品箱	4	可以开出饰品碎片，有一定概率开出橙色饰品碎片						2			item_icon_024	yueqianactivity_Get,duobaojingjichang_Get,jingjishengli_Get,sail_Get,gonghuilibao_Get	
+item_025	极品史诗饰品箱	4	随机获得一件橙色饰品						2			item_icon_025		
+item_026	橙色角色箱	5	可以开出橙色及以下任意角色碎片						2			item_icon_026	meirrenwu_Get	
+item_027	史诗装备箱	5	可以开出橙色及以下任意装备碎片，有一定几率开出整个装备						2			item_icon_027	duobaojingjichang_Get,jingjishengli_Get,meirrenwu_Get,daojushangdian_Get,gonghuilibao_Get	
+item_028	传说装备碎片宝箱	6	可以开出红色及以下任意装备碎片，有一定几率开出整个装备						2			item_icon_028		
+item_029	史诗装备碎片宝箱	5	随机获得1-3个橙色装备碎片						2			item_icon_029	sail_Get,SLtongguan_Get 	
+item_030	稀有装备碎片宝箱	4	随机获得1-3个紫色装备碎片						2			item_icon_030	sail_Get,SLtongguan_Get,jingjishangdian_Get	
+item_031	精良装备碎片宝箱	3	随机获得1-3个蓝色装备碎片						2			item_icon_031	sail_Get,SLtongguan_Get 	
+item_032	稀有装备箱	6	随机获得一件紫色装备						2			item_icon_032		
+item_033	滞留之光	5	角色分解后所得物品，可以在回忆圣坛兑换物品						4			item_icon_033		
+item_034	vip0礼包	3	vip0成长礼包，vip等级达到0以上可以购买						2			item_icon_034		
+item_035	vip1礼包	3	vip1成长礼包，vip等级达到1以上可以购买						2			item_icon_035		
+item_036	vip2礼包	3	vip2成长礼包，vip等级达到2以上可以购买						2			item_icon_035		
+item_037	vip3礼包	3	vip3成长礼包，vip等级达到3以上可以购买						2			item_icon_035		
+item_038	vip4礼包	4	vip4成长礼包，vip等级达到4以上可以购买						2			item_icon_036		
+item_039	vip5礼包	4	vip5成长礼包，vip等级达到5以上可以购买						2			item_icon_036		
+item_040	vip6礼包	4	vip6成长礼包，vip等级达到6以上可以购买						2			item_icon_036		
+item_041	vip7礼包	5	vip7成长礼包，vip等级达到7以上可以购买						2			item_icon_041		
+item_042	vip8礼包	5	vip8成长礼包，vip等级达到8以上可以购买						2			item_icon_041		
+item_043	vip9礼包	5	vip9成长礼包，vip等级达到9以上可以购买						2			item_icon_041		
+item_044	vip10礼包	6	vip10成长礼包，vip等级达到10以上可以购买						2			item_icon_044		
+item_045	vip11礼包	6	vip11成长礼包，vip等级达到11以上可以购买						2			item_icon_044		
+item_046	vip12礼包	6	vip12成长礼包，vip等级达到12以上可以购买						2			item_icon_044		
+item_047	光耀水晶	6	用于激活角色分支天赋的材料，可在佣兵大厅中远征任务中获得						4			item_icon_047	sail_Get	
+item_048	强者令	5	可以抵消一次钻石招募						11			item_icon_048	huiyuanlibao_Get	
+item_049	神级令	6	可以抵消一次十连抽						11			item_icon_049		
+item_050	极品橙色角色箱	6	可以随机获得一个橙色角色						2			item_icon_050		
+item_051	极品史诗装备箱	6	随机获得一个橙色装备						2			item_icon_051		
+item_052	极品紫色角色箱	6	可以随机获得一个紫色角色						2			item_icon_052	jingjishangdian_Get	
+item_053	红色角色箱1	6	可以在双刀桐人/亚丝娜/诗乃中任意选择一个						5			item_icon_053		
+item_054	红色角色箱2	6	可以在茅场晶彦/优纪/死枪中任意选择一个						5			item_icon_054		
+item_055	铁血套装礼包	6	可以开出一套蓝色铁血套装						2			item_icon_055		
+item_056	第1名	6	刀剑神域正版超级手办						12			item_icon_041		
+item_057	第2名	6	刀剑神域正版豪华手办						12			item_icon_044		
+item_058	第3名	6	刀剑神域正版高级手办						12			item_icon_036		
+item_059	第4-5名	6	面值100元京东卡						12			item_icon_050		
+item_060	第6-10名	6	面值50元京东卡						12			item_icon_054		
+item_061	第11-50名	6	刀剑神域《黑衣剑士》价值3880钻石不删档内测超级礼包						12			item_icon_053		
+item_062	垃圾罐	6				10000			1			item_icon_062		
+item_063	7级七彩宝石技能书	6							15			item_icon_063	huiyuanlibao_Get	
+item_064	10级七彩宝石技能书	6							15			item_icon_064	huiyuanlibao_Get	
+item_065	10级料理技能书	6							15			item_icon_065	huiyuanlibao_Get	
+item_066	高级经验水晶包	6	使用后可获得5个高级经验水晶						2			item_icon_066		
+item_067	橙色角色任选箱	6	使用后可以在所有橙色角色中任选一个						5			item_icon_050		
+item_068	小型恢复药剂	5	野外使用后可恢复全队30%的血量						16			item_icon_068		
+item_069	大型恢复药剂	6	野外使用后可恢复全队50%的血量						16			item_icon_069		
+item_070	公会成员礼包	4							2			item_icon_070		
+item_071	公会官员礼包	5							2			item_icon_071		
+item_072	公会会长礼包	6							2			item_icon_072		
+item_073	金蛋	6	活动道具						2			item_icon_073		
+item_074	银蛋	5	活动道具						2			item_icon_074		
+item_075	康乃馨	4	活动道具						2			item_icon_075		
+item_076	糖果礼物盒	5	活动道具						2			item_icon_076		
+item_077	糖果	4	活动道具						2			item_icon_077		
+item_078	粽子	4	活动道具						2			item_icon_078		
+item_079	雄黄酒	4	活动道具						2			item_icon_079		
+item_080	礼物盒	6	活动道具						2			item_icon_080		
+item_081	高级礼物盒	5	活动道具						2			item_icon_081		
+item_082	黄金礼物盒	4	活动道具						2			item_icon_082		
+item_083	酸梅汤	4	活动道具						2			item_icon_083		
+item_084	绿豆汤	4	活动道具						2			item_icon_084		
+item_085	烤肉	4	活动道具						2			item_icon_085		
+item_086	中国结	5	活动道具						2			item_icon_086		
+item_087	鲜花	4	活动道具						2			item_icon_087		
+item_088	巧果	5	活动道具						2			item_icon_088		
+item_089	公会徽章	5	公会徽章						11			item_icon_089		
+item_090	啤酒	5	节日道具						2			item_icon_090		
+item_091	红包	6	节日道具						2			item_icon_091		
+item_092	金钻	6	节日道具						2			item_icon_092		
+item_093	蓝玫瑰	5	节日道具						2			item_icon_093		
+item_094	红玫瑰	5	节日道具						2			item_icon_094		
+item_095	情人节大礼包	5	节日道具						2			item_icon_095		
+item_096	同心锁	5	节日道具						2			item_icon_096		
+item_097	红水晶	5	节日道具						2			item_icon_097		
+item_098	橙水晶	5	节日道具						2			item_icon_098		
+item_099	黄水晶	5	节日道具						2			item_icon_099		
+item_100	绿水晶	5	节日道具						2			item_icon_100		
+item_101	蓝水晶	5	节日道具						2			item_icon_101		
+item_102	紫水晶	5	节日道具						2			item_icon_102		
+item_103	黑水晶	5	节日道具						2			item_icon_103		
+item_104	五仁月饼	5	节日道具						2			item_icon_104		
+item_105	芝麻	5	节日道具						2			item_icon_105		
+item_106	面粉	5	节日道具						2			item_icon_106		
+item_107	草莓酱	5	节日道具						2			item_icon_107		
+item_108	核桃	5	节日道具						2			item_icon_108		
+item_109	花生	5	节日道具						2			item_icon_109		
+item_110	砂糖	5	节日道具						2			item_icon_110		
+item_111	杏仁	5	节日道具						2			item_icon_111		
+item_112	糯米粉	5	节日道具						2			item_icon_112		
+item_113	水果月饼	5	节日道具						2			item_icon_113		
+item_114	大闸蟹	5	节日道具						2			item_icon_114		
+item_115	红色饰品随机箱	6	随机获得一件红色饰品						2			item_icon_115		
+item_116	红色饰品指环随机箱	6	随机获得一件红色指环饰品						2			item_icon_116		
+item_117	红色饰品项链随机箱	6	随机获得一件红色项链饰品						2			item_icon_117		
+item_118	红色饰品选择箱	6	使用后可以在所有红色饰品中任选一个						5			item_icon_118		
+item_119	红色装备选择箱	6	使用后可以在所有红色装备中任选一个						5			item_icon_118		
+item_120	红色角色碎片选择箱1	6	使用后可以在红色角色桐人，亚丝娜，诗乃中任选一个						5			item_icon_118		
+item_121	红色角色碎片选择箱2	6	使用后可以在红色角色希斯克利夫，有纪，死枪中任选一个						5			item_icon_118		
+item_122	红色角色碎片选择箱	6	使用后可以在选择红色角色选择箱1,2中选择一个						5			item_icon_118		
+item_123	火炬	5	节日道具						2			item_icon_123		
+item_124	绿色精灵之花	2	含有少量精灵之力的奇异花朵，守护精灵提升等级时使用					100	8			item_icon_124		
+item_125	蓝色精灵之花	3	含有中量精灵之力的奇异花朵，守护精灵提升等级时使用					300	8			item_icon_125		
+item_126	紫色精灵之花	4	含有大量精灵之力的奇异花朵，守护精灵提升等级时使用					1000	8			item_icon_126		
+item_127	橙色精灵之花	5	通体为精灵之力构成的奇异花朵，守护精灵提升等级时使用					3000	8			item_icon_127		
+item_128	风系：坚果	5	风系守护精灵的最爱，可提升亲密度					10	9	2		item_icon_128		
+item_129	火系：烤肉	5	火系守护精灵的最爱，可提升亲密度					10	9	1		item_icon_129		
+item_130	水系：小鱼干	5	水系守护精灵的最爱，可提升亲密度					10	9	3		item_icon_130		
+item_131	光系：水果	5	光系守护精灵的最爱，可提升亲密度					10	9	4		item_icon_131		
+item_132	暗系：黑巧克力	5	暗系守护精灵的最爱，可提升亲密度					10	9	5		item_icon_132		
+item_133	绿色糖果	2	有点甜有点酸，味道一般，可略微提升守护精灵亲密度					30	9	-99		item_icon_133		
+item_134	随机礼包	5	随机礼包						2			item_icon_072		
+item_135	礼包A	3	礼包A						2			item_icon_071		
+item_136	礼包B	3	礼包B						2			item_icon_071		
+item_137	五级宝石随机包	5	五级宝石随机包						2			item_icon_072		
+item_138	紫色糖果	4	高雅的外表配上经典的口味，可大幅提升守护精灵亲密度					50	9	1,2,3,4,5		item_icon_138		
+item_139	精灵的宝玉	4	可使守护精灵初步觉醒，在守护精灵突破时使用									item_icon_139		
+item_140	初级觉醒证·水	5	可使水系守护精灵中度觉醒，在守护精灵突破时使用							3		item_icon_140		
+item_141	高级觉醒证·水	6	可使水系守护精灵高度觉醒，在守护精灵突破时使用							3		item_icon_141		
+item_142	初级觉醒证·风	5	可使风系守护精灵高度觉醒，在守护精灵突破时使用							2		item_icon_142		
+item_143	高级觉醒证·风	6	可使风系守护精灵高度觉醒，在守护精灵突破时使用							2		item_icon_143		
+item_144	初级觉醒证·火	5	可使火系守护精灵中度觉醒，在守护精灵突破时使用							1		item_icon_144		
+item_145	高级觉醒证·火	6	可使火系守护精灵高度觉醒，在守护精灵突破时使用							1		item_icon_145		
+item_146	初级觉醒证·光	5	可使光系守护精灵中度觉醒，在守护精灵突破时使用							4		item_icon_146		
+item_147	高级觉醒证·光	6	可使光系守护精灵高度觉醒，在守护精灵突破时使用							4		item_icon_147		
+item_148	初级觉醒证·暗	5	可使暗系守护精灵中度觉醒，在守护精灵突破时使用							5		item_icon_148		
+item_149	高级觉醒证·暗	6	可使暗系守护精灵高度觉醒，在守护精灵突破时使用							5		item_icon_149		
+item_150	初级觉醒证随机包	5	使用后可以随机获得某个系列的中级觉醒之证						2			item_icon_150		
+item_151	高级觉醒证随机包	6	使用后可以随机获得某个系列的高级觉醒之证						2			item_icon_151		
+item_152	精灵食物随机包	5	使用后可以随机获得某个系列精灵的食物						2			item_icon_152		
+item_153	红色精灵扭蛋	6	使用后可以随机获得1个红色精灵						2			item_icon_153		
+item_154	橙色精灵扭蛋	5	使用后可以随机获得1个橙色精灵						2			item_icon_154		
+item_155	橙色精灵碎片随机包	5	使用后可以随机获得某个橙色精灵碎片5个						2			item_icon_155		
+item_156	红色角色碎片选择箱3	6	使用后可以在红色角色丝多蕾雅，亚内特，武士道桐人中任选一个						5			item_icon_118		
+item_157	红色角色箱3	6	可以在丝多蕾雅/亚内特/武士道桐人中任意选择一个						5			item_icon_053		
+item_200	金币	4	主要用于角色升级和装备强化						12			item_icon_200		
+item_201	钻石	5	闪闪发光，价值不菲，可以购买大部分道具						14			item_icon_201		
+item_202	充值钻石	5	闪闪发光，价值不菲，可以购买大部分道具						14			exp_vip		
+item_301	回复药剂	5	小型的回复道具，可回复一定量生命						18			item_icon_301		
+item_302	回复药瓶	6	大型的回复药瓶，可回复大量生命						17			item_icon_302		
+item_303	复活之种	6	集天地精华而形成的种子，有着使人起死回生的功效						17			item_icon_303		
+item_304	小型炸弹	5	少量火药制作的炸弹，是攻城车的克星，可对攻城车造成不小的伤害						18			item_icon_304		
+item_305	大型炸弹	6	大量火药提炼制作的炸弹，是攻城车最大的克星，可对攻城车造成大量伤害						18			item_icon_305		
+item_306	修复工具	5	工匠大师精心制作的工具，有着快速修复城门的奇效						18			item_icon_306		
+item_307	攻城之锤	5	工匠大师精心制作的工具，是敌方城门的克星，可对敌方城门造成伤害						18			item_icon_307		
+item_308	回复法阵	6	治愈魔法灌注而形成的法阵，有着快速治疗团队的神奇功效						17			item_icon_308		
+item_309	战鼓之歌	6	战鼓激励着成员进行战斗，在战鼓周围会大幅度提高战力						17			item_icon_309		
+item_310	加速卷轴	6	包含着风的魔法的卷轴，可以提升周围友方的移动速度						17			item_icon_310		
+item_311	荣誉徽章	6	公会战奖励，用于在公会商店兑换物品						11			item_icon_311		
+item_312	奥义秘传书	6	角色觉醒时使用					500	19			item_icon_312	juexing_Get	
+item_313	王者之证	6	角色觉醒时使用									item_icon_313	juexing_Get	
+item_314	强者之证	5	角色觉醒时使用									item_icon_314	juexing_Get	
+item_315	天使之羽	6	角色觉醒时使用									item_icon_315	juexing_Get	
+item_316	疾风之羽	6	角色觉醒时使用									item_icon_316	juexing_Get	
+item_317	剑技秘传书	5	角色觉醒时使用									item_icon_317	juexing_Get	
+item_318	枪械秘传书	5	角色觉醒时使用									item_icon_318	juexing_Get	
+item_319	魔法秘传书	5	角色觉醒时使用									item_icon_319	juexing_Get	
+item_320	风之觉醒原石	5	角色觉醒时使用									item_icon_320	juexing_Get	
+item_321	暗之觉醒原石	5	角色觉醒时使用									item_icon_321	juexing_Get	
+item_322	光之觉醒原石	5	角色觉醒时使用									item_icon_322	juexing_Get	
+item_323	火之觉醒原石	5	角色觉醒时使用									item_icon_323	juexing_Get	
+item_324	水之觉醒原石	5	角色觉醒时使用									item_icon_324	juexing_Get	
+item_325	爆竹	5	活动道具						2			item_icon_325		
+item_326	倒福	6	活动道具						2			item_icon_326		
+item_327	红灯笼	5	活动道具						2			item_icon_327		
+item_328	烤火鸡	6	活动道具						2			item_icon_328		
+item_329	南瓜馅饼	5	活动道具						2			item_icon_329		
+item_330	圣诞礼物	5	奥义秘传书*2、天使之羽*8，王者之证*8（任选）						5			item_icon_330		
+item_331	圣诞长筒袜	6	活动道具						2			item_icon_331		
+item_332	雪花	5	活动道具						2			item_icon_332		
+item_333	气球	5	活动道具						2			item_icon_333		
+item_334	烟花	5	活动道具						2			item_icon_334		
+item_335	秘传书任选	5	秘传书任选						5			item_icon_024		
+item_336	秘传书随机	5	秘传书随机						2			item_icon_025		
+item_337	觉醒石任选	5	觉醒石任选						5			item_icon_026		
+item_338	觉醒石随机	5	秘传书随机						2			item_icon_027		
+item_339	荣耀套装选择箱	6	使用后可以在荣耀套装中任选一件						5			item_icon_335		
+item_340	荣耀套装随机箱	6	使用后会随机获得荣耀套装中的一件						2			item_icon_335		
+item_341	跨服战普通押注卷	5	用于跨服战胜负押注						20			item_icon_336		
+item_342	7级宝石选择箱	5	使用后任选一个7级宝石						5			item_icon_024		
+item_343	8级宝石选择箱	6	使用后任选一个8级宝石						5			item_icon_022		
+item_344	9级宝石选择箱	6	使用后任选一个9级宝石						5			item_icon_022		
+item_345	10级宝石选择箱	6	使用后任选一个10级宝石						5			item_icon_022		
+item_346	平安夜苹果	6	奥义秘传书*2、天使之羽*8，王者之证*8（任选）						5			item_icon_337		
+item_347	红色角色箱4	6	使用后可以在红色角色露可思、亚内特、莉法中任选一个						5			item_icon_053		
+item_348	红色角色碎片选择箱4	6	使用后可以在红色角色露可思、亚内特、莉法中任选一个						5			item_icon_118		
+item_349	福袋	5	节日道具						22			item_icon_349		
+item_350	七彩烟花	5	活动道具						21			item_icon_334		
+item_351	神圣套装随机箱	6	使用后会随机获得神圣套装中的一件						2			item_icon_335		
+item_352	刀	5							2			item_icon_352		
+item_353	剑	5							2			item_icon_353		
+item_354	神	5							2			item_icon_354		
+item_355	域	5							2			item_icon_355		
+item_356	黑	5							2			item_icon_356		
+item_357	衣	5							2			item_icon_357		
+item_358	剑	5							2			item_icon_358		
+item_359	士	5							2			item_icon_359		
+item_360	失落金蛋	6							23			item_icon_073		
+item_361	刀剑神域红卡箱	6							2			item_icon_023		
+item_362	精灵神域红卡箱	6							2			item_icon_023		
+item_363	枪战神域红卡箱	6							2			item_icon_023		
+item_364	刀剑神域碎片箱	6							2			item_icon_022		
+item_365	精灵神域碎片箱	6							2			item_icon_022		
+item_366	枪战神域碎片箱	6							2			item_icon_022		
+item_367	鱼翅	6							2			item_icon_362		
+item_368	鱼丸	5							2			item_icon_363		
+item_369	粉玫瑰	6							2			item_icon_364		
+item_370	白巧克力	5							2			item_icon_365		
+item_371	高级阵法水晶	6							24			item_icon_371		
+item_372	阵法水晶	5							24			item_icon_372		
+item_373	阵法原石	4							24			item_icon_373		
+item_374	精灵金石	4	宠物装备觉醒时使用						25			item_icon_374		
+item_375	精灵奇书	5	宠物装备觉醒时使用						25			item_icon_375		
+item_376	精灵之心火	5	宠物装备觉醒时使用						25			item_icon_376		
+item_377	精灵之力火	5	宠物装备觉醒时使用						25			item_icon_377		
+item_378	奥义之证	6	宠物装备觉醒时使用						25			item_icon_378		
+item_379	绿色升阶石	2							26			item_icon_379		
+item_380	蓝色升阶石	3							26			item_icon_380		
+item_381	紫色升阶石	4							26			item_icon_381		
+item_382	橙色升阶石	5							26			item_icon_382		
+item_383	红色升阶之翼	6							26			item_icon_383		
+item_384	绿色升阶精华	2							26			item_icon_384		
+item_385	蓝色升阶精华	3							26			item_icon_385		
+item_386	紫色升阶精华	4							26			item_icon_386		
+item_387	紫色升阶灵石	4							26			item_icon_387		
+item_388	橙色升阶精华	5							26			item_icon_388		
+item_389	橙色升阶灵石	5							26			item_icon_389		
+item_390	橙色升阶幻石	5							26			item_icon_390		
+item_391	精灵之心风	5	宠物装备觉醒时使用						25			item_icon_391		
+item_392	精灵之心水	5	宠物装备觉醒时使用						25			item_icon_392		
+item_393	精灵之心光	5	宠物装备觉醒时使用						25			item_icon_393		
+item_394	精灵之心暗	5	宠物装备觉醒时使用						25			item_icon_394		
+item_395	精灵之力风	5	宠物装备觉醒时使用						25			item_icon_395		
+item_396	精灵之力水	5	宠物装备觉醒时使用						25			item_icon_396		
+item_397	精灵之力光	5	宠物装备觉醒时使用						25			item_icon_397		
+item_398	精灵之力暗	5	宠物装备觉醒时使用						25			item_icon_398		
+item_399	茶杯	5	节日道具						2			item_icon_399		
+item_400	茶壶	6	节日道具						2			item_icon_400		
+item_401	春饼	5	节日道具						2			item_icon_401		
+item_402	春卷	6	节日道具						2			item_icon_402		
+item_403	醇香的重阳糕	6	节日道具						2			item_icon_403		
+item_404	大碗元宵	6	节日道具						2			item_icon_404		
+item_405	鬼布偶	6	节日道具						2			item_icon_405		
+item_406	鬼玩偶	5	节日道具						2			item_icon_406		
+item_407	红福	5	节日道具						2			item_icon_407		
+item_408	红星	5	节日道具						2			item_icon_408		
+item_409	金福字	6	节日道具						2			item_icon_409		
+item_410	金黄色的小麦	6	节日道具						2			item_icon_410		
+item_411	菊花酒	5	节日道具						2			item_icon_411		
+item_412	腊八蒜	5	节日道具						2			item_icon_412		
+item_413	腊八粥	6	节日道具						2			item_icon_413		
+item_414	南瓜头	6	节日道具						2			item_icon_414		
+item_415	闪亮的红星	6	节日道具						2			item_icon_415		
+item_416	圣诞老人	6	节日道具						2			item_icon_416		
+item_417	圣诞帽	5	节日道具						2			item_icon_417		
+item_418	头带	6	节日道具						2			item_icon_418		
+item_419	头花	5	节日道具						2			item_icon_419		
+item_420	团圆月饼	6	节日道具						2			item_icon_420		
+item_421	鬼叉	5	节日道具						2			item_icon_421		
+item_422	小麦	5	节日道具						2			item_icon_422		
+item_423	小雪人	5	节日道具						2			item_icon_423		
+item_424	学识之光	6	节日道具						2			item_icon_424		
+item_425	学识之种	5	节日道具						2			item_icon_425		
+item_426	雪人	6	节日道具						2			item_icon_426		
+item_427	元宵	5	节日道具						2			item_icon_427		
+item_428	月饼	5	节日道具						2			item_icon_428		
+item_429	序	5							2			item_icon_429		
+item_430	列	5							2			item_icon_430		
+item_431	之	5							2			item_icon_431		
+item_432	争	5							2			item_icon_432		
+item_433	绿色蝴蝶结	2	节日道具						2			item_icon_433		
+item_434	蓝色蝴蝶结	3	节日道具						2			item_icon_434		
+item_435	紫色蝴蝶结	4	节日道具						2			item_icon_435		
+item_436	橙色蝴蝶结	5	节日道具						2			item_icon_436		
+item_437	红色蝴蝶结	6	节日道具						2			item_icon_437		
+item_438	宠物装备宝箱	6	宠物装备材料											
+item_439	新手药剂	3	技能专精道具						27			item_icon_439		
+item_440	新手技能证	3	技能专精道具						27			item_icon_440		
+item_441	新手技能专精书	3	技能专精道具						27			item_icon_441		
+item_442	新手灵魂水晶	3	技能专精道具						27			item_icon_442		
+item_443	熟练药剂	4	技能专精道具						27			item_icon_443		
+item_444	熟练技能证	4	技能专精道具						27			item_icon_444		
+item_445	熟练技能专精书	4	技能专精道具						27			item_icon_445		
+item_446	熟练灵魂水晶	4	技能专精道具						27			item_icon_446		
+item_447	专家药剂	5	技能专精道具						27			item_icon_447		
+item_448	专家技能证	5	技能专精道具						27			item_icon_448		
+item_449	专家技能专精书	5	技能专精道具						27			item_icon_449		
+item_450	专家灵魂水晶	5	技能专精道具						27			item_icon_450		
+item_451	大师药剂	6	技能专精道具						27			item_icon_451		
+item_452	大师技能证	6	技能专精道具						27			item_icon_452		
+item_453	大师技能专精书	6	技能专精道具						27			item_icon_453		
+item_454	大师灵魂水晶	6	技能专精道具						27			item_icon_454		
+item_455	黄米粽	5	节日道具						2			item_icon_455		
+item_456	糯米粽	6	节日道具						2			item_icon_456		
+item_457	美味糖果	5	节日道具						2			item_icon_457		
+item_458	七彩气球	6	节日道具						2			item_icon_458		
+item_459	升星试剂	4	装备升星道具						28			item_icon_459		
+item_460	冶炼钢	5	装备升星道具						28			item_icon_460		
+item_461	劣质升星石	4	装备升星道具						28			item_icon_461		
+item_462	优质升星石	5	装备升星道具						28			item_icon_462		
+item_463	完美升星石	6	装备升星道具						28			item_icon_463		
+item_464	冰块	5	节日道具						2			item_icon_464	冰块	
+item_465	冰淇淋	6	节日道具						2			item_icon_465	冰淇淋	
+item_466	锤子	5	节日道具						2			item_icon_466	锤子	
+item_467	镰刀	6	节日道具						2			item_icon_467	镰刀	
+item_468	刀剑神域天赋水晶	6	节日道具						2			item_icon_468	刀剑神域天赋水晶	
+item_469	精灵神域天赋水晶	6	节日道具						2			item_icon_469	精灵神域天赋水晶	
+item_470	枪战神域天赋水晶	6	节日道具						2			item_icon_470	枪战神域天赋水晶	
+item_471	小河灯	5	节日道具						2			item_icon_471	小河灯	
+item_472	大河灯	6	节日道具						2			item_icon_472	大河灯	
+item_473	祝贺花篮	5	节日道具						2			item_icon_473	祝贺花篮	
+item_474	庆典花篮	6	节日道具						2			item_icon_474	庆典花篮	
+item_475	柳叶	5	节日道具						2			item_icon_475	柳叶	
+item_476	柳枝	6	节日道具						2			item_icon_476	柳枝	
+item_477	姜饼	5	节日道具						2			item_icon_477	姜饼	
+item_478	平安果	6	节日道具						2			item_icon_478	平安果	
+item_479	茱萸	5	节日道具						2			item_icon_479	茱萸	

@@ -1,0 +1,12 @@
+CREATE TABLE IF NOT EXISTS p11_arena_daily_policies (
+ id BIGINT NOT NULL,
+ enabled BOOLEAN NOT NULL,
+ version VARCHAR(64) NOT NULL,
+ source TEXT NOT NULL,
+ published_at BIGINT NOT NULL,
+ start_at BIGINT NOT NULL,
+ end_at BIGINT NOT NULL,
+ cutoff_second BIGINT NOT NULL,
+ min_challenges BIGINT NOT NULL,
+ PRIMARY KEY(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

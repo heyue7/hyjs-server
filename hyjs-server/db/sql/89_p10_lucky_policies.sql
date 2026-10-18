@@ -1,0 +1,1 @@
+CREATE TABLE IF NOT EXISTS p10_lucky_policies (id BIGINT PRIMARY KEY, fireworks_enabled BOOLEAN NOT NULL, drop_enabled BOOLEAN NOT NULL, drop_daily_batches INT NOT NULL, fireworks_index INT NOT NULL, reward_json LONGTEXT NOT NULL, reward_hash VARCHAR(64) NOT NULL, source TEXT NOT NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;

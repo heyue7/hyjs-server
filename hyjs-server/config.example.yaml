@@ -1,0 +1,45 @@
+# Copy to config.dev.yaml or set HYJS_CONFIG_FILE to a private YAML path.
+# Process environment overrides YAML; explicit CLI arguments override environment.
+# Set HYJS_MYSQL_PASSWORD separately. Redis/storage are optional legacy adapters.
+port: 8080
+
+# log
+logConfig:
+  logFile: logs/app.log
+  gormLogFile: logs/sql.log
+  maxSize: 10
+  maxBackups: 3
+  maxAge: 7
+  compress: false
+  logLevel: info
+  gormLogLevel: warn
+  gormSlowThresholdMs: 300
+
+# JWT
+jwtKey: "" # Set HYJS_JWT_KEY when JWT authentication is used.
+
+# mysql
+mysql:
+  user: hyjs
+  pass: "" # HYJS_MYSQL_PASSWORD 从环境注入。
+  host: 127.0.0.1:3306
+  dbName: hyjs
+
+# redis
+redis:
+  host: localhost:6379
+  password: ""
+  db: 0
+
+# 游戏服默认 MySQL；--db 指定 SQLite 仅用于隔离测试。
+game:
+  serverId: 1 # 可信部署区服编号；独立区服使用独立存档。
+  enableTestPayments: false
+  enableLocalWallet: false
+  driver: mysql
+  bind: 127.0.0.1
+  advertiseHost: 127.0.0.1
+  httpPort: 18088
+  tcpPort: 19098
+  database: ../server/data/local.sqlite3
+  tables: ../analysis/tables

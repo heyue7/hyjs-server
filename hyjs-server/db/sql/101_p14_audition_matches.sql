@@ -1,0 +1,20 @@
+CREATE TABLE IF NOT EXISTS p14_audition_matches (
+ id VARCHAR(64) NOT NULL PRIMARY KEY,
+ season_index INT NOT NULL,
+ server_id BIGINT NOT NULL,
+ round_index BIGINT NOT NULL,
+ pair_index BIGINT NOT NULL,
+ attacker_id BIGINT NOT NULL,
+ defender_id BIGINT NOT NULL,
+ attacker_hash CHAR(64) NOT NULL,
+ defender_hash CHAR(64) NOT NULL,
+ seed BIGINT NOT NULL,
+ replay_id CHAR(64) NOT NULL,
+ input_hash CHAR(64) NOT NULL,
+ created_at BIGINT NOT NULL,
+ source_hash CHAR(64) NOT NULL,
+ applied TINYINT(1) NOT NULL DEFAULT 0,
+ winner_id BIGINT NOT NULL DEFAULT 0,
+ outcome_hash VARCHAR(64) NOT NULL DEFAULT '',
+ UNIQUE KEY p14_audition_pair(season_index,server_id,round_index,pair_index)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

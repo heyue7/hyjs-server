@@ -1,0 +1,85 @@
+等级	类型	数值加成	徽章消耗	金币消耗	名称	图标
+techLevel	type	prop	UnionBadge	UnionCoin	name	icon
+int	string	string	int	int	string	string
+index	index	none	none	none	none	none
+techLevel	type	prop	UnionBadge	UnionCoin	name	icon
+1	peratt	peratt,1			攻击	peratt
+2	peratt	peratt,2	10	10000000	攻击	peratt
+3	peratt	peratt,3	15	15000000	攻击	peratt
+4	peratt	peratt,4	20	20000000	攻击	peratt
+5	peratt	peratt,5	25	25000000	攻击	peratt
+6	peratt	peratt,6	30	30000000	攻击	peratt
+7	peratt	peratt,7	35	35000000	攻击	peratt
+8	peratt	peratt,8	40	40000000	攻击	peratt
+9	peratt	peratt,9	45	45000000	攻击	peratt
+10	peratt	peratt,10	50	50000000	攻击	peratt
+1	perhp	perhp,1			血量	perhp
+2	perhp	perhp,2	10	10000000	血量	perhp
+3	perhp	perhp,3	15	15000000	血量	perhp
+4	perhp	perhp,4	20	20000000	血量	perhp
+5	perhp	perhp,5	25	25000000	血量	perhp
+6	perhp	perhp,6	30	30000000	血量	perhp
+7	perhp	perhp,7	35	35000000	血量	perhp
+8	perhp	perhp,8	40	40000000	血量	perhp
+9	perhp	perhp,9	45	45000000	血量	perhp
+10	perhp	perhp,10	50	50000000	血量	perhp
+1	cri	cri,1			暴击	cri
+2	cri	cri,2	10	10000000	暴击	cri
+3	cri	cri,3	15	15000000	暴击	cri
+4	cri	cri,4	20	20000000	暴击	cri
+5	cri	cri,5	25	25000000	暴击	cri
+6	cri	cri,6	30	30000000	暴击	cri
+7	cri	cri,7	35	35000000	暴击	cri
+8	cri	cri,8	40	40000000	暴击	cri
+9	cri	cri,9	45	45000000	暴击	cri
+10	cri	cri,10	50	50000000	暴击	cri
+1	hit	hit,1			命中	hit
+2	hit	hit,2	10	10000000	命中	hit
+3	hit	hit,3	15	15000000	命中	hit
+4	hit	hit,4	20	20000000	命中	hit
+5	hit	hit,5	25	25000000	命中	hit
+6	hit	hit,6	30	30000000	命中	hit
+7	hit	hit,7	35	35000000	命中	hit
+8	hit	hit,8	40	40000000	命中	hit
+9	hit	hit,9	45	45000000	命中	hit
+10	hit	hit,10	50	50000000	命中	hit
+1	perpdef	perpdef,1			物理防御	perpdef
+2	perpdef	perpdef,2	10	10000000	物理防御	perpdef
+3	perpdef	perpdef,3	15	15000000	物理防御	perpdef
+4	perpdef	perpdef,4	20	20000000	物理防御	perpdef
+5	perpdef	perpdef,5	25	25000000	物理防御	perpdef
+6	perpdef	perpdef,6	30	30000000	物理防御	perpdef
+7	perpdef	perpdef,7	35	35000000	物理防御	perpdef
+8	perpdef	perpdef,8	40	40000000	物理防御	perpdef
+9	perpdef	perpdef,9	45	45000000	物理防御	perpdef
+10	perpdef	perpdef,10	50	50000000	物理防御	perpdef
+1	permdef	permdef,1			魔法防御	permdef
+2	permdef	permdef,2	10	10000000	魔法防御	permdef
+3	permdef	permdef,3	15	15000000	魔法防御	permdef
+4	permdef	permdef,4	20	20000000	魔法防御	permdef
+5	permdef	permdef,5	25	25000000	魔法防御	permdef
+6	permdef	permdef,6	30	30000000	魔法防御	permdef
+7	permdef	permdef,7	35	35000000	魔法防御	permdef
+8	permdef	permdef,8	40	40000000	魔法防御	permdef
+9	permdef	permdef,9	45	45000000	魔法防御	permdef
+10	permdef	permdef,10	50	50000000	魔法防御	permdef
+1	anticri	anticri,1			抗暴	antiCri
+2	anticri	anticri,2	10	10000000	抗暴	antiCri
+3	anticri	anticri,3	15	15000000	抗暴	antiCri
+4	anticri	anticri,4	20	20000000	抗暴	antiCri
+5	anticri	anticri,5	25	25000000	抗暴	antiCri
+6	anticri	anticri,6	30	30000000	抗暴	antiCri
+7	anticri	anticri,7	35	35000000	抗暴	antiCri
+8	anticri	anticri,8	40	40000000	抗暴	antiCri
+9	anticri	anticri,9	45	45000000	抗暴	antiCri
+10	anticri	anticri,10	50	50000000	抗暴	antiCri
+1	dodge	dodge,1			闪避	dodge
+2	dodge	dodge,2	10	10000000	闪避	dodge
+3	dodge	dodge,3	15	15000000	闪避	dodge
+4	dodge	dodge,4	20	20000000	闪避	dodge
+5	dodge	dodge,5	25	25000000	闪避	dodge
+6	dodge	dodge,6	30	30000000	闪避	dodge
+7	dodge	dodge,7	35	35000000	闪避	dodge
+8	dodge	dodge,8	40	40000000	闪避	dodge
+9	dodge	dodge,9	45	45000000	闪避	dodge
+10	dodge	dodge,10	50	50000000	闪避	dodge

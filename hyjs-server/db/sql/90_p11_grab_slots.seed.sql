@@ -1,0 +1,20 @@
+-- 原三档每档6位，仅建立空位置，不生成虚构玩家/机器人。
+INSERT IGNORE INTO p11_grab_slots(position,owner_id,session_id,started_at,expires_at) VALUES
+(1,NULL,'',0,0),
+(2,NULL,'',0,0),
+(3,NULL,'',0,0),
+(4,NULL,'',0,0),
+(5,NULL,'',0,0),
+(6,NULL,'',0,0),
+(7,NULL,'',0,0),
+(8,NULL,'',0,0),
+(9,NULL,'',0,0),
+(10,NULL,'',0,0),
+(11,NULL,'',0,0),
+(12,NULL,'',0,0),
+(13,NULL,'',0,0),
+(14,NULL,'',0,0),
+(15,NULL,'',0,0),
+(16,NULL,'',0,0),
+(17,NULL,'',0,0),
+(18,NULL,'',0,0);

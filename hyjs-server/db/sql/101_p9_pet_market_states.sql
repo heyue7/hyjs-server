@@ -1,0 +1,6 @@
+CREATE TABLE IF NOT EXISTS p9_pet_market_states (
+ player_id BIGINT PRIMARY KEY, week_key VARCHAR(8) NOT NULL,
+ input LONGBLOB NOT NULL, input_hash VARCHAR(64) NOT NULL,
+ selected LONGBLOB NOT NULL, selected_hash VARCHAR(64) NOT NULL,
+ bought LONGBLOB NOT NULL, generation BIGINT NOT NULL, refresh_used INT NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

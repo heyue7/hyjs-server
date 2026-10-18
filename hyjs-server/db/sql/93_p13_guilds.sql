@@ -1,0 +1,2 @@
+-- P13独立持久化事实；原协议字段由service显式映射。
+CREATE TABLE IF NOT EXISTS p13_guilds (id VARCHAR(64) PRIMARY KEY,name VARCHAR(64) NOT NULL,level INT NOT NULL,notice TEXT NOT NULL,declaration TEXT NOT NULL,flag INT NOT NULL,coin BIGINT NOT NULL,badge INT NOT NULL,exp INT NOT NULL,donate_score INT NOT NULL,active_score INT NOT NULL,hero_statue_open INT NOT NULL DEFAULT 0,guard_tree_open INT NOT NULL DEFAULT 0,created_at BIGINT NOT NULL,UNIQUE KEY idx_p13_guild_name(name)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;

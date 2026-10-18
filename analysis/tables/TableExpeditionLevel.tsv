@@ -1,0 +1,11 @@
+远征任务等级	等级名	升级所需经验	每小时获得经验数	最大派遣英雄数	难度系数	最大任务数
+level	nextLevel	exp	expPerHour	maxHeroNum	difficulty	maxMissionNum
+string	string	int	int	int	int	int
+primary	none	none	none	none	none	none
+level	nextLevel	exp	expPerHour	maxHeroNum	difficulty	maxMissionNum
+D	C	1200	10	1	0	2
+C	B	7200	20	1	10	3
+B	A	21600	30	2	30	4
+A	S	72000	40	2	55	5
+S	-1	-1	50	3	75	6
+SS	-1	-1	50	3	75	6

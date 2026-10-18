@@ -1,0 +1,2 @@
+-- Default-off local pool; operators must publish an explicit named version before real prayers.
+INSERT INTO `p13_guild_prayer_policies` (`id`,`enabled`,`version`,`source`,`pool_json`,`pool_hash`,`published_at`) VALUES (1,0,'','local-prepublished-original-prayer-v1; poolweights-and-percent-operator-defined; original100contribution-day3-duration24h; singleeffect-overwrite','[]','4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945',0) ON DUPLICATE KEY UPDATE `id`=`id`;

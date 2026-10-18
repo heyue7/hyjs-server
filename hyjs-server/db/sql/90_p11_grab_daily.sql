@@ -1,0 +1,1 @@
+CREATE TABLE IF NOT EXISTS p11_grab_daily (player_id BIGINT NOT NULL,day VARCHAR(10) NOT NULL,rewards_json TEXT NOT NULL,rewards_hash VARCHAR(64) NOT NULL,used INT NOT NULL,bought INT NOT NULL,PRIMARY KEY(player_id,day)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;

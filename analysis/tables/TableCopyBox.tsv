@@ -1,0 +1,479 @@
+副本id	所属关卡id	BoxX	BoxY	BoxZ	箱子角度	通关宝箱奖励	宝箱待机特效	开启特效	宝箱的模型资源
+BoxId	MissionId	BoxX	BoxY	BoxZ	BoxAngle	DropAward	BoxEffect0	BoxEffect1	BoxRes
+string	string	double	double	double	double	string	string	string	string
+primary	index	none	none	none	none	none	none	none	none
+BoxId	MissionId	BoxX	BoxY	BoxZ	BoxAngle	DropAward	BoxEffect0	BoxEffect1	BoxRes
+box_3	3	3.0	0.0	21.0	270.0	diamond,50;coin,80000			box
+box_6	6	7.0	1.0	28.0	90.0	equip_002,1;coin,80000			box
+box_8	8	19.0	-2.8	22.0	270.0	equip_003,2;hero_032,1;coin,80000			box
+box_10	10	27.0	-0.2	7.0	270.0	equip_004,2;frag_hero_020,5;coin,80000			box
+box_12	12	3.0	0.0	21.0	270.0	frag_equip_005,20;hero_037,1;coin,80000;frag_hero_020,10			box
+box_14	14	11.0	-0.5	21.0	90.0	frag_equip_006,20;frag_hero_025,5;coin,80000			box
+box_16	16	11.0	-0.5	21.0	90.0	frag_equip_007,20;hero_042,1;coin,80000;frag_hero_020,10			box
+box_18	18	27.0	-0.2	7.0	270.0	frag_equip_008,20;frag_hero_027,5;coin,80000;frag_hero_020,15			box
+box_20	20	27.0	-0.2	7.0	270.0	diamond,100;coin,80000			box
+box_22	22	3.0	0.0	21.0	270.0	diamond,150;coin,80000			box
+box_24	24	-8.0	0.0	22.0	270.0	diamond,200;coin,80000			box
+box_26	26	-22.0	0.0	0.0	0.0	equip_005,1;coin,80000			box
+box_28	28	9.0	0.0	34.0	180.0	equip_006,1;coin,80000			box
+box_30	30	4.0	1.0	20.0	90.0	hero_040,1;coin,80000;hero_exp_004,2			box
+box_32	32	-18.0	0.0	28.0	270.0	equip_007,1;coin,80000;hero_exp_004,2			box
+box_34	34	22.0	5.2	7.0	90.0	equip_008,1;coin,80000;hero_exp_004,2			box
+box_36	36	13.0	-0.2	33.0	180.0	hero_034,1;coin,80000;hero_exp_004,2			box
+box_38	38	-38.0	0.0	32.0	270.0	frag_hero_021,5;coin,80000;hero_exp_004,2			box
+box_40	40	7.0	-2.0	-18.0	90.0	frag_equip_013,5;frag_hero_007,5;coin,80000			box
+box_42	42	19.0	-2.8	22.0	270.0	hero_041,1;coin,80000;hero_exp_004,2			box
+box_44	44	15.0	-1.8	30.0	180.0	frag_equip_014,5;frag_hero_011,5;coin,80000			box
+box_46	46	33.0	-2.4	1.0	0.0	frag_equip_015,5;frag_hero_015,5;coin,80000			box
+box_48	48	-38.0	0.0	32.0	270.0	hero_035,1;coin,80000			box
+box_50	50	26.0	0.0	-4.0	0.0	frag_equip_016,5;frag_hero_008,5;coin,80000			box
+box_52	52	4.0	1.0	20.0	90.0	frag_equip_017,5;frag_hero_012,5;coin,80000			box
+box_54	54	13.0	-0.2	33.0	180.0	frag_hero_026,5;coin,80000			box
+box_56	56	27.0	-0.4	-4.0	180.0	frag_equip_018,5;frag_hero_016,5;coin,80000			box
+box_58	58	3.0	0.0	21.0	270.0	frag_equip_019,5;frag_hero_009,5;coin,80000			box
+box_60	60	37.0	0.2	26.0	270.0	frag_hero_028,5;coin,80000			box
+box_62	62	37.0	2.0	39.0	180.0	frag_equip_020,5;frag_hero_013,5;coin,80000			box
+box_64	64	8.0	0.0	25.0	270.0	frag_equip_025,5;frag_hero_017,5;coin,80000			box
+box_66	66	26.0	0.0	-4.0	0.0	frag_hero_022,5;coin,80000			box
+box_68	68	19.0	3.6	13.0	270.0	frag_equip_026,5;frag_hero_010,5;coin,80000			box
+box_70	70	17.0	-0.4	27.0	270.0	frag_equip_027,5;frag_hero_014,5;coin,80000			box
+box_72	72	29.0	-0.9	15.0	270.0	frag_hero_038,5;coin,80000			box
+box_74	74	10.0	0.0	18.0	0.0	frag_equip_028,5;frag_hero_018,5;coin,80000			box
+box_76	76	-34.0	-0.1	11.0	90.0	frag_equip_029,5;frag_hero_019,5;coin,80000			box
+box_78	78	19.0	-2.8	22.0	270.0	frag_hero_054,5;coin,80000			box
+box_80	80	33.0	-2.4	1.0	0.0	frag_equip_030,5;frag_hero_023,5;coin,80000			box
+box_82	82	22.0	0.0	25.0	270.0	frag_equip_031,5;frag_hero_052,5;coin,80000			box
+box_84	84	51.0	0.2	-26.0	90.0	frag_hero_031,5;coin,80000			box
+box_86	86	12.0	2.0	26.0	270.0	frag_equip_032,5;frag_hero_023,5;coin,80000			box
+box_88	88	-18.0	0.0	28.0	270.0	frag_hero_001,5;coin,80000			box
+box_90	90	-18.0	0.0	28.0	270.0	frag_hero_003,5;frag_hero_024,5;coin,80000			box
+box_92	92	-38.0	0.0	32.0	270.0	frag_hero_005,5;frag_hero_053,5;coin,80000			box
+box_94	94	59.0	1.5	-19.0	270.0	frag_hero_007,5;coin,80000			box
+box_96	96	33.0	-0.5	15.0	270.0	frag_equip_033,5;frag_hero_011,5;coin,80000			box
+box_98	98	4.0	-1.7	34.0	270.0	frag_equip_034,5;frag_hero_015,5;coin,80000			box
+box_100	100	37.0	0.0	4.0	270.0	frag_equip_035,5;frag_hero_018,5;coin,80000			box
+box_102	102	32.0	-2.0	2.0	0.0	frag_equip_036,5;frag_hero_012,5;coin,80000			box
+box_104	104	51.0	0.2	-26.0	90.0	frag_hero_016,5;coin,80000			box
+box_106	106	26.0	0.0	-4.0	0.0	frag_hero_009,5;coin,80000			box
+box_108	108	10.0	0.0	18.0	0.0	frag_hero_013,5;coin,80000			box
+box_110	110	10.0	0.0	18.0	0.0	frag_hero_017,5;coin,80000			box
+box_112	112	29.0	-0.9	15.0	270.0	frag_hero_010,5;coin,80000			box
+box_114	114	39.0	3.8	34.0	180.0	frag_hero_014,5;coin,80000			box
+box_116	116	8.0	0.0	25.0	270.0	frag_hero_018,5;coin,80000			box
+box_118	118	37.0	0.2	26.0	270.0	frag_hero_019,5;coin,80000			box
+box_120	120	-38.0	0.0	32.0	270.0	frag_hero_023,5;coin,80000			box
+box_122	122	17.0	-0.4	27.0	270.0	frag_hero_052,5;coin,80000			box
+box_124	124	26.0	0.0	-4.0	0.0	frag_hero_051,5;coin,80000			box
+box_126	126	-34.0	-0.1	11.0	90.0	frag_hero_024,5;coin,80000			box
+box_128	128	11.0	-0.5	21.0	90.0	frag_hero_035,5;frag_hero_053,5;coin,80000			box
+box_130	130	-17.0	-0.1	30.0	180.0	frag_hero_020,5;frag_hero_007,5;coin,80000			box
+box_132	132	29.0	-0.9	15.0	270.0	frag_hero_021,5;frag_hero_011,5;coin,80000			box
+box_134	134	22.0	5.2	7.0	90.0	frag_hero_015,5;frag_hero_002,5;coin,80000			box
+box_136	136	37.0	0.0	4.0	270.0	frag_hero_031,5;frag_hero_008,5;coin,80000			box
+box_138	138	17.0	-0.4	27.0	270.0	frag_hero_012,5;frag_hero_004,5;coin,80000			box
+box_140	140	12.0	2.0	26.0	270.0	frag_hero_026,5;frag_hero_018,5;coin,80000			box
+box_142	142	51.0	0.2	-26.0	90.0	frag_hero_016,5;frag_hero_006,5;coin,80000			box
+box_144	144	-8.0	0.0	22.0	270.0	frag_hero_051,5;coin,80000			box
+box_146	146	-22.0	0.0	0.0	0.0	frag_hero_053,5;coin,80000			box
+box_148	148	3.0	0.0	33.0	180.0	frag_hero_011,5;coin,80000			box
+box_150	150	33.0	-0.5	15.0	270.0	frag_hero_052,5;coin,80000			box
+box_152	152	4.0	-1.7	34.0	270.0	frag_hero_008,5;coin,80000			box
+box_154	154	37.0	0.0	4.0	270.0	frag_hero_051,5;coin,80000			box
+box_156	156	32.0	-2.0	2.0	0.0	frag_hero_011,5;coin,80000			box
+box_158	158	51.0	0.2	-26.0	90.0	frag_hero_014,5;coin,80000			box
+box_160	160	26.0	0.0	-4.0	0.0	frag_hero_052,5;coin,80000			box
+box_162	162	10.0	0.0	18.0	0.0	coin,80000			box
+box_164	164	10.0	0.0	18.0	0.0	coin,80000			box
+box_166	166	29.0	-0.9	15.0	270.0	coin,80000			box
+box_168	168	39.0	3.8	34.0	180.0	coin,80000			box
+box_170	170	8.0	0.0	25.0	270.0	coin,80000			box
+box_172	172	37.0	0.2	26.0	270.0	coin,80000			box
+box_174	174	-38.0	0.0	32.0	270.0	coin,80000			box
+box_176	176	17.0	-0.4	27.0	270.0	coin,80000			box
+box_178	178	26.0	0.0	-4.0	0.0	coin,80000			box
+box_180	180	-8.0	0.0	22.0	270.0	coin,80000			box
+box_182	182	-22.0	0.0	0.0	0.0	coin,80000			box
+box_184	184	3.0	0.0	33.0	180.0	coin,80000			box
+box_186	186	29.0	-0.9	15.0	270.0	coin,80000			box
+box_188	188	-42.0	0.0	7.0	90.0	coin,80000			box
+box_190	190	37.0	0.0	4.0	270.0	coin,80000			box
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									

@@ -1,0 +1,7 @@
+UFBId，基地表	UFId	阵营位置		阵营	UFGuardId	基地路径	特效路径（Die）	特效路径（Normal）
+UFBId	UFId	Position	Range	Camp	UFGuardId	CampUrl	DieEffectUrl	NormalEffectUrl
+int	int	string	double	int	string	string	string	string
+primary	none	none	none	none	none	none	none	none
+UFBId	UFId	position	range	camp	UFGuardId	CampUrl		
+1	1	-5,1,-1.5	3	0	baseCamp_guard_001	map_battle_001/Models/diaoxiang	battle_obj_242_die	
+2	1	78,1,0	3	1	baseCamp_guard_002	map_battle_001/Models/shuijing	battle_obj_241_die	battle_obj_241_stand

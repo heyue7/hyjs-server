@@ -1,0 +1,8 @@
+CREATE TABLE IF NOT EXISTS server_game_clocks (
+ server_id BIGINT NOT NULL PRIMARY KEY,
+ offset_days BIGINT NOT NULL DEFAULT 0,
+ revision BIGINT NOT NULL DEFAULT 0,
+ high_days BIGINT NOT NULL DEFAULT 0,
+ high_reached_at BIGINT NOT NULL DEFAULT 0,
+ updated_at_millis BIGINT NOT NULL DEFAULT 0
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;

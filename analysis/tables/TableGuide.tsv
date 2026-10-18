@@ -1,0 +1,39 @@
+大步骤	进度标志(-1是无序引导，纯客户端，无登录引导流程)	结束时前往	步骤标志	登录时前往	步骤标志	步骤标志(野外登录)	触发等级	步骤标志	步骤标志(野外登录)	触发任务	步骤标志
+guideId	order	endGuide	endTag	loginGuide	loginTag	loginTag2	levelTrigger	levelTag	levelTag2	questTrigger	questTag
+string	int	string	string	string	string	string	int	string	string	string	string
+primary	index	none	none	none	none	none	none	none	none	none	none
+guideId	order	endGuide	endTag	loginGuide	loginTag	loginTag	levelTrigger	levelTag	levelTag2	questTrigger	questTag
+guide_choose_role	-1										
+guide_recycle	-1						16	start			
+guide_rush	-1						22	start			
+guide_activity_copy	-1						26	start			
+guide_expedition	-1						32	start			
+guide_union	-1						30	start			
+guide_cook_room	-1										
+guide_smelt_room	-1										
+guide_start	0			guide_quest_1	start						
+guide_quest_1	1			guide_recruit	start						
+guide_recruit	2	guide_hero_up	start	guide_hero_up	start					quest_1	resume
+guide_hero_up	3	guide_quest_2	start	guide_quest_2	start						
+guide_quest_2	4			guide_quest_3	start						
+guide_quest_3	5			guide_talent	start					quest_2	start
+guide_talent	6	guide_level_up	resume	guide_level_up	start					quest_3	resume
+guide_level_up	7	guide_quest_4	start	guide_quest_4	start						
+guide_quest_4	8			guide_quest_5	start						
+guide_quest_5	9			guide_copy_reward	start					quest_4	start
+guide_copy_reward	10	guide_equip_up	start	guide_equip_up	start					quest_5	resume
+guide_equip_up	11	guide_equip_strengthen	resume	guide_equip_strengthen	start						
+guide_equip_strengthen	12										
+guide_pvp	13	guide_pvp_shop	resume	guide_pvp_shop	start		10	start			
+guide_pvp_shop	14										
+guide_world_tree	15						13	start			
+guide_plunder	16	guide_plunder_combine	resume	guide_plunder_combine	start		15	start			
+guide_plunder_combine	17										
+guide_field_fish	18	guide_field_mine	resume	guide_field_mine	start	field	18	start	field		
+guide_field_mine	19										
+guide_pet	20						34	start			
+guide_speed	-1						8	start	copy		
+guide_sweep	-1						14	start			
+guide_formation	-1						20	start			
+guide_skipBattle	-1						21	start	copy		
+guide_arraypos5	-1						23	start			

@@ -1,0 +1,20 @@
+CREATE TABLE IF NOT EXISTS `p14_promotion_formations` (
+ `season_index` int NOT NULL,
+ `server_id` bigint NOT NULL,
+ `player_id` bigint NOT NULL,
+ `revision` bigint NOT NULL,
+ `captured_at` bigint NOT NULL,
+ `fight_power` int NOT NULL,
+ `snapshot` longblob NOT NULL,
+ `snapshot_hash` char(64) NOT NULL,
+ `battle` longblob NOT NULL,
+ `client_version` varchar(128) NOT NULL,
+ `engine_version` varchar(128) NOT NULL,
+ `configuration_hash` char(64) NOT NULL,
+ `qualification_hash` char(64) NOT NULL,
+ `stage_start` bigint NOT NULL,
+ `stage_end` bigint NOT NULL,
+ `source` varchar(1024) NOT NULL,
+ `source_hash` char(64) NOT NULL,
+ PRIMARY KEY (`season_index`,`server_id`,`player_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

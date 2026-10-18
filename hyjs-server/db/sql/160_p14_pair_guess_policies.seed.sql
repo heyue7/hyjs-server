@@ -1,0 +1,1 @@
+INSERT IGNORE INTO p14_pair_guess_policies(id,enabled,version,source,published_at) VALUES(1,0,'','local-original-pair-guess-v1; original-state7-prefab; real-final32-pair; original10000coin; unique-joint-owner-per-pair; result-and-payback-pending',0);

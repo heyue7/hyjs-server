@@ -1,0 +1,1 @@
+CREATE TABLE IF NOT EXISTS p11_grab_sessions (id VARCHAR(64) PRIMARY KEY,player_id BIGINT NOT NULL,position BIGINT NOT NULL,started_at BIGINT NOT NULL,expires_at BIGINT NOT NULL,ended_at BIGINT NOT NULL,end_reason VARCHAR(32) NOT NULL,KEY idx_p11_grab_player(player_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;

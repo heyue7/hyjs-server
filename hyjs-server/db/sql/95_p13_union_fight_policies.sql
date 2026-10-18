@@ -1,0 +1,2 @@
+-- 原宣战报名独立事实；不生成比赛结果或奖励。
+CREATE TABLE IF NOT EXISTS p13_union_fight_policies (id BIGINT PRIMARY KEY,enrollment_enabled BOOLEAN NOT NULL DEFAULT FALSE,match_enabled BOOLEAN NOT NULL DEFAULT FALSE,source TEXT NOT NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;

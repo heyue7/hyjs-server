@@ -1,0 +1,10 @@
+等级	起始人数	名字颜色	名字颜色	名字颜色	是否送监狱	在监狱时间（分钟）
+id	killNum	colorR	colorG	colorB	jailFlag	jailTime
+int	int	int	int	int	int	int
+primary	none	none	none	none	none	none
+id	killNum	colorR	colorG	colorB	jailFlag	jailTime
+1	0	255	255	255	0	0
+2	1	255	255	0	0	0
+3	6	255	192	0	1	0
+4	11	255	90	0	1	15
+5	31	255	0	0	1	30

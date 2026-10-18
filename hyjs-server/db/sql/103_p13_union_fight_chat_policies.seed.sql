@@ -1,0 +1,1 @@
+INSERT IGNORE INTO p13_union_fight_chat_policies (id,text_enabled,talk_enabled,talk_cooldown_millis,source) VALUES (1,0,0,20000,'原UIUnionFightChatPage/type6/ChatInterval/MaxChatNumber；同场本会隔离；指挥CD20秒为本地兼容策略');

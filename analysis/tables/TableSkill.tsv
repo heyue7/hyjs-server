@@ -1,0 +1,513 @@
+技能id	技能类型	技能成长系数	是否是大招	动作名称	动作时长	技能图标	技能声音	特效0（Particle表）	挂载骨骼0（特效骨骼挂点由美术给出）	特效1	挂载骨骼1	特效2	挂载骨骼2	特效3	挂载骨骼3	特效4	挂载骨骼4	释法点选取规则(技能释放位置选取规则)	释法点选取参数	摄像机规则（近：0 远：1）	技能第一目标选取规则
+SkillId	SkillClass	LevelGrowFactor	IsUltimate	AniName	Duration	SkillIcon	SkillAudio	Effect0	EffBone0	Effect1	EffBone1	Effect2	EffBone2	Effect3	EffBone3	Effect4	EffBone4	SkillCastPointSelectRule	SCPSelectArgs	CameraRule	SkillFirstTargetSelectStrategy
+string	int	int	int	string	double	string	string	string	string	string	string	string	string	string	string	string	string	int	double	int	int
+primary	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none
+SkillId	SkillClass	LevelGrowFactor	IsUltimate	AniName	Duration	SkillIcon	SkillAudio	Effect0	EffBone0	Effect1	EffBone1	Effect2	EffBone2	Effect3	EffBone3	Effect4	EffBone4	SkillCastPointSelectRule	SCPSelectArgs		SkillFirstTargetSelectStrategy
+001_1	0	0	0	attack01	1.8	skill_icon_001	sword_swing1=0.17#sword_swing1=0.57#sword_swing1=1.244#kirito_atk01=0.149#kirito_atk02=1.207	1	root									1	1.3	0	3
+001_2	0	0	0	attack02	2.7	skill_icon_002	sword_swing3=0.323#sword_swing3=0.8#sword_swing1=1.285#sword_swing4=1.51#sword_swing4=1.644#sword_swing4=1.819#sword_swing4=1.945#evade-jump=0#evade-jump=0.476#evade-jump=0.953#evade-jump=1.43#kirito_atk02=0.2#kirito_atk02=0.672#kirito_atk03=1.051#kirito_atk04=1.43	2	root									1	1.3	0	3
+001_3	0	13	1	attack03	9.0	skill_icon_003	evade-jump=1.369#klein_04=1.5#sword_swing1=2.478#sword_swing2=3.9#sword_swing2=4#sword_swing5=4.23#sword_swing2=4.7#sword_swing2=5.121#sword_swing1=5.3#sword_swing5=5.783#sword_swing5=5.833#sword_swing5=7.6#SE_030023=7.837#SE_020004=7.602#kirito_bat32=0#kirito_bat33=5.054	4	root	5	wuqir	6	wuqil	7	wuqir			1	1.0	0	3
+001_4	0	0	0	attack01	1.8	skill_icon_001	sword_swing1=0.17#sword_swing1=0.57#sword_swing1=1.244#kirito_atk01=0.149#kirito_atk02=1.207	1	root									1	1.3	0	3
+001_5	0	0	0	attack02	2.7	skill_icon_002	sword_swing3=0.323#sword_swing3=0.8#sword_swing1=1.285#sword_swing4=1.51#sword_swing4=1.644#sword_swing4=1.819#sword_swing4=1.945#evade-jump=0#evade-jump=0.476#evade-jump=0.953#evade-jump=1.43#kirito_atk02=0.2#kirito_atk02=0.672#kirito_atk03=1.051#kirito_atk04=1.43	2	root									1	1.3	0	3
+001_6	0	13	1	attack03	9.0	skill_icon_003	evade-jump=1.369#klein_04=1.5#sword_swing1=2.478#sword_swing2=3.9#sword_swing2=4#sword_swing5=4.23#sword_swing2=4.7#sword_swing2=5.121#sword_swing1=5.3#sword_swing5=5.783#sword_swing5=5.833#sword_swing5=7.6#SE_030023=7.837#SE_020004=7.602#kirito_bat32=0#kirito_bat33=5.054	4	root	5	wuqir	6	wuqil	7	wuqir			1	1.0	0	3
+007_1	0	0	0	attack01	2.13	skill_icon_004	sword_swing6=0.109#sword_swing3=0.149#sword_swing3=0.249#sword_swing6=0.294#sword_swing3=0.32#sword_swing6=0.464#sword_swing3=0.513#sword_swing6=0.564#sword_swing3=0.681#sword_swing6=0.789#sword_swing3=0.916#sword_swing6=0.969#sword_swing3=0.988#sword_swing6=1.132#sword_swing3=1.188#sword_swing6=1.232#sword_swing7=1.514#asuna_atk01=0.072#asuna_atk02=1.554	9	root									1	1.8	0	3
+007_2	0	0	0	attack02	3.6	skill_icon_005	asuna_bat03=0#SE_050001=0.989#sword_swing3=1.092#SE_050001=1.901#sword_swing3=1.948#sword_swing3=1.951#sword_swing3=1.954#sword_swing3=1.956#sword_swing3=1.962#asuna_atk03=1.735	10	root									1	1.8	0	3
+007_3	0	12	1	attack03	12.5	skill_icon_006	evade-jump=1.8#evade-jump=2.7#evade-jump=3.1#evade-jump=3.488#sword_swing1=4.105#sword_swing1=4.505#sword_swing2=5#sword_swing1=5.7#sword_swing2=5.994#sword_swing2=6.173#sword_swing2=5.8#sword_swing1=5.978#sword_swing2=6.156#sword_swing2=5.878#sword_swing2=6.056#sword_swing1=6.234#evade-jump=6.7#sword_swing1=7.542#sword_swing1=7.971#sword_swing1=8.4#sword_swing2=10.574#kirito-alo_01=1.265#rosalia_03=2.043#sakuya_03b=8.442#shino_alo_06=10.452#SE_050001=11.7#asuna_bat36=0#asuna_bat37=8.127	12	root	13	wuqir							1	1.0	0	3
+007_4	0	0	0	attack01	2.13	skill_icon_004	sword_swing6=0.109#sword_swing3=0.149#sword_swing3=0.249#sword_swing6=0.294#sword_swing3=0.32#sword_swing6=0.464#sword_swing3=0.513#sword_swing6=0.564#sword_swing3=0.681#sword_swing6=0.789#sword_swing3=0.916#sword_swing6=0.969#sword_swing3=0.988#sword_swing6=1.132#sword_swing3=1.188#sword_swing6=1.232#sword_swing7=1.514#asuna_atk01=0.072#asuna_atk02=1.554	9	root									1	1.8	0	3
+007_5	0	0	0	attack02	3.6	skill_icon_005	asuna_bat03=0#SE_050001=0.989#sword_swing3=1.092#SE_050001=1.901#sword_swing3=1.948#sword_swing3=1.951#sword_swing3=1.954#sword_swing3=1.956#sword_swing3=1.962#asuna_atk03=1.735	10	root									1	1.8	0	3
+007_6	0	12	1	attack03	12.5	skill_icon_006	evade-jump=1.8#evade-jump=2.7#evade-jump=3.1#evade-jump=3.488#sword_swing1=4.105#sword_swing1=4.505#sword_swing2=5#sword_swing1=5.7#sword_swing2=5.994#sword_swing2=6.173#sword_swing2=5.8#sword_swing1=5.978#sword_swing2=6.156#sword_swing2=5.878#sword_swing2=6.056#sword_swing1=6.234#evade-jump=6.7#sword_swing1=7.542#sword_swing1=7.971#sword_swing1=8.4#sword_swing2=10.574#kirito-alo_01=1.265#rosalia_03=2.043#sakuya_03b=8.442#shino_alo_06=10.452#SE_050001=11.7#asuna_bat36=0#asuna_bat37=8.127	12	root	13	wuqir							1	1.0	0	3
+011_1	1	0	0	attack01	2.0	skill_icon_007	magic_prepare=0.117#leafa_magichit=0.397#leafa_magichit=0.873#leafa_atk02=0.403	19	root									4	1.0	1	3
+011_2	0	0	0	attack02	3.2	skill_icon_008	sword_swing1=0.433#evade-jump=1#leafa-wind=1.2#leafa_atk01=0.433#leafa_atk03=1.4	21	root									1	1.7	0	3
+011_3	0	12	1	attack03	14.2	skill_icon_009	mercy_wind=3.439#wind_long=7.207#wind_long=1.5#mercy_wind=5.124#mercy_wind=8.891#mercy_wind=2#mercy_wind=5.767#mercy_wind=9.535#wind_long=2.876#mercy_wind=6.5#mercy_wind=11.125#kirito-alo_01=0.465#SE_040009=11.263#evade-jump=9#kirito-alo_06=10.792#leafa_bat27=0#leafa_bat28=8.702	460	root	461	Bip001 Spine1							4	1.0	0	3
+014_1	1	0	0	attack01	2.3	skill_icon_010	evade-jump=0.032#bow_shoot=0.4#bow_shoot=0.974#bow_shoot_heavy=1.574#sinon_atk01=1.583	15	root									4	1.0	1	3
+014_2	1	0	0	attack02	1.7	skill_icon_011	evade-jump=0.007#evade-jump=0.295#evade-jump=0.374#bow_shoot=0.723#bow_shoot=0.857#bow_shoot=1.142#sinon_atk02=0.723	17	root									4	1.0	1	3
+014_3	0	12	1	attack03	13.5	skill_icon_012	shino_alo_01=0#shino_alo_02=1.502#shino_alo_03=2.496#shino_alo_04=4.681#shino_alo_05=8.404#shino_alo_06=10#shino_alo_07=11.279#sinon_bat61=0#sinon_bat60=8.435	18	root									4	1.0	1	3
+008_1	0	0	0	attack01	2.6	skill_icon_013	sword_swing1=0.057#sword_swing2=0.244#sword_swing2=0.406#sword_swing2=0.532#sword_swing2=0.862#sword_swing2=0.964#sword_swing2=1.066#sword_swing2=1.167#sword_swing4=1.467#evade-jump=1.545#klein_sys28=0.768	30	root									1	1.3	0	3
+008_2	0	0	0	attack02	2.9	skill_icon_014	sword_swing2=0.229#sword_swing1=0.705#sword_swing5=1.36#fire_barely=0.229#fire_barely=0.705#fire_barely=1.36	31	root									1	1.3	0	3
+008_3	0	6	1	attack03	9.06666666667	skill_icon_015	klein_01=0#klein_02=1.181#SE_040009=3#klein_03=3.261#klein_04=4.823#klein_05=6.548#klein_bat24=0	32	root	33	wuqir							1	1.0	0	3
+041_1	1	0	0	attack01	2.06666666667	skill_icon_016	sword_swing1=0.133#sword_swing2=0.499#sword_swing2=1.305#evade-jump=0.794#posion_pop=0.2#posion_pop=0.556#posion_pop=1.367	34	root	36	buffb							4	1.0	1	3
+041_2	1	0	0	attack02	3.0	skill_icon_017	energy_charge=0.2#klein_01=0.726#sword_swing2=1.525#flyingwave=1.5#recon_sys28=1.445	38	root	37	Bip001 R Hand							4	1.0	1	3
+041_11	1	0	0	attack01	2.06666666667	skill_icon_016	sword_swing1=0.133#sword_swing2=0.499#sword_swing2=1.305#evade-jump=0.794#posion_pop=0.2#posion_pop=0.556#posion_pop=1.367	34	root	36	buffb							4	1.0	1	3
+041_12	1	0	0	attack02	3.0	skill_icon_017	energy_charge=0.2#klein_01=0.726#sword_swing2=1.525#flyingwave=1.5#recon_sys28=1.445	38	root	37	Bip001 R Hand							4	1.0	1	3
+022_1	0	0	0	attack01	2.3	skill_icon_019	sword_swing3=0.202#sword_swing8=0.346#sword_swing3=0.49#sword_swing8=0.635#sword_swing3=0.779#sword_swing8=0.923#sword_swing3=1.067#evade-jump=1.253#sword_swing8=1.703#metalping_long=1.76#rosalia_sys28=1.62	42	root									1	1.1	0	3
+022_2	0	0	0	attack02	3.3	skill_icon_020	sword_swing8=0.3#sword_swing8=0.9#sword_swing3=1.5#evade-jump=0.862#metalping=1.564	43	root									1	1.1	0	3
+022_3	0	9	1	attack03	5.3	skill_icon_021	rosalia_01=0#rosalia_02=1#rosalia_03b=2.186#rosalia_bat22=1.896	44	root	45	wuqir							1	1.0	0	3
+022_4	0	0	0	attack01	2.3	skill_icon_019	sword_swing3=0.202#sword_swing8=0.346#sword_swing3=0.49#sword_swing8=0.635#sword_swing3=0.779#sword_swing8=0.923#sword_swing3=1.067#evade-jump=1.253#sword_swing8=1.703#metalping_long=1.76#rosalia_sys28=1.62	42	root									1	1.1	0	3
+022_5	0	0	0	attack02	3.3	skill_icon_020	sword_swing8=0.3#sword_swing8=0.9#sword_swing3=1.5#evade-jump=0.862#metalping=1.564	43	root									1	1.1	0	3
+022_11	0	0	0	attack01	2.3	skill_icon_019	sword_swing3=0.202#sword_swing8=0.346#sword_swing3=0.49#sword_swing8=0.635#sword_swing3=0.779#sword_swing8=0.923#sword_swing3=1.067#evade-jump=1.253#sword_swing8=1.703#metalping_long=1.76#rosalia_sys28=1.62	42	root									1	1.1	0	3
+022_12	0	0	0	attack02	3.3	skill_icon_020	sword_swing8=0.3#sword_swing8=0.9#sword_swing3=1.5#evade-jump=0.862#metalping=1.564	43	root									1	1.1	0	3
+022_13	0	19	1	attack03	5.3	skill_icon_021	rosalia_01=0#rosalia_02=1#rosalia_03b=2.186#rosalia_bat22=1.896	44	root	45	wuqir							1	1.0	0	3
+002_1	0	0	0	attack01	2.667	skill_icon_003	sword_swing1=0.2#sword_swing1=0.573#sword_swing4=1.651#heathcliff_sys07=1.048#energy_sword=0.2#energy_sword=0.577#shieldbash_wind=1.744#energy_charge=1.651#energy_boom=1.628#heathcliff_bat32=0.085	362	root	363	wuqir							1	1.4	0	3
+002_2	0	0	0	attack02	3.6667	skill_icon_051	sword_swing1=0.505#sword_swing1=1#sword_swing1=1.705#sword_swing1=2.4#evade-jump=1.662#heavy_impact=2.478#heathcliff_bat27=0.6	364	root	365	wuqir							1	1.4	0	3
+002_3	0	8	1	attack03	12.5	skill_icon_114	sword_swing4=2.025#sword_swing1=2.754#sword_swing1=3.2#sword_swing1=4.256#sword_swing4=4.6#rosalia_03=0.797#heathcliff_01=0.846#SE_040001=7.5#heathcliff_02=7.5#sakuya_01=7.5#sakuya_03b=8.178#stonegiant_04=7.798#yukki_04=9.339#yukki_04=10.192#yukki_04=10.888#hero_07=11.647#heathcliff_bat32=6.563#heathcliff_bat33=8.392#heathcliff_bat05=0	366	root	367	wuqir							1	1.0	0	3
+009_1	1	0	0	attack01	2.0	skill_icon_025	silica_atk01=0.7	46	root									4	1.0	1	3
+009_2	1	0	0	attack02	2.16666666667	skill_icon_026	pet_magic=0.65#pet_magic=1#pet_magic=1.6#silica_atk02=0.564	48	root	50	wuqil							4	1.0	1	3
+009_3	0	8	1	attack03	15.0	skill_icon_027	silica_bat27=1#yukki_03=3.425#klein_03=4.637#rosalia_03=5.5#pet_magic=7.9#SE_030025=7.948#SE_030032=8.805#sakuya_05=10.3	52	root	53	Bip002 Spine1	54	Bone043					4	1.0	1	3
+009_4	1	0	0	attack01	2.0	skill_icon_025	silica_atk01=0.7	46	root									4	1.0	1	3
+009_5	1	0	0	attack02	2.16666666667	skill_icon_026	pet_magic=0.65#pet_magic=1#pet_magic=1.6#silica_atk02=0.564	48	root	50	wuqil							4	1.0	1	3
+009_6	0	8	1	attack03	15.0	skill_icon_027	silica_bat27=0#yukki_03=3.425#klein_03=4.637#rosalia_03=5.5#pet_magic=7.9#SE_030025=7.948#SE_030032=8.805#sakuya_05=10.3	52	root	53	Bip002 Spine1	54	Bone043					4	1.0	1	3
+004_1	0	0	0	attack01	2.3	skill_icon_028	sword_swing3=0.367#sword_swing1=0.79#sword_swing1=0.867#sword_swing1=1.31#sword_swing1=1.9#evade-jump=1.8#yuki_atk01=0.367#yuki_atk02=1.821	55	root									1	1.0	0	3
+004_2	0	0	0	attack02	2.0	skill_icon_029	evade-jump=0.428#evade-jump=0.657#sword_swing2=0.428#sword_swing2=0.525#sword_swing2=0.657#sword_swing3=1.12#yuki_atk03=0.939	56	root									1	1.0	0	3
+004_3	0	12	1	attack03	8.0	skill_icon_030	yukki_01=0#yukki_02=2.8#yukki_03=3.8#yukki_04=4.295#yukki_05=6.085#yuki_bat27=0.165	57	root	58	wuqir							1	1.0	0	3
+004_11	0	0	0	attack01	2.3	skill_icon_028	sword_swing3=0.367#sword_swing1=0.79#sword_swing1=0.867#sword_swing1=1.31#sword_swing1=1.9#evade-jump=1.8#yuki_atk01=0.367#yuki_atk02=1.821	55	root									1	1.0	0	3
+004_12	0	0	0	attack02	2.0	skill_icon_029	evade-jump=0.428#evade-jump=0.657#sword_swing2=0.428#sword_swing2=0.525#sword_swing2=0.657#sword_swing3=1.12#yuki_atk03=0.939	56	root									1	1.0	0	3
+004_13	0	24	1	attack03	8.0	skill_icon_030	yukki_01=0#yukki_02=2.8#yukki_03=3.8#yukki_04=4.295#yukki_05=6.085#yuki_bat27=0.165	57	root	58	wuqir							1	1.0	0	3
+021_1	0	0	0	attack01	2.86666666667	skill_icon_031	sword_swing2=0.1#sword_swing2=0.5#sword_swing1=0.9#sword_swing4=1.551	65	root	66	wuqil	67	wuqir					1	1.2	0	3
+021_2	0	0	0	attack02	2.8	skill_icon_032	sword_swing2=0.137#sword_swing1=0.5#sword_swing1=1.2#sword_swing2=1.492#sword_swing2=1.248#sword_swing2=1.426#sword_swing1=1.605#sachi_sys28=1.2	68	root									1	1.2	0	3
+021_3	0	4	1	attack03	8.5	skill_icon_033	energy_charge=1.2#rush_heavy=3.301#sword_swing1=5.8#sword_swing1=6.1#sword_swing4=6.6#rosalia_03=1.843#SE_030023=6.7#SE_030034=6.7#shino_alo_05=4.05#rosalia_02=4.05#sachi_bat20=0	69	root	70	Bip001 Footsteps	71	wuqir					1	1.0	0	3
+003_1	0	0	0	attack01	2.8	skill_icon_034	sword_swing1=0.05#sword_swing1=0.344#sword_swing8=0.668#sword_swing8=0.944#sword_swing8=1.353#sword_swing6=1.752#asuna_atk01=1.528	72	root	73	wuqir							1	1.0	0	3
+003_2	0	0	0	attack02	2.6	skill_icon_035	evade-jump=0.257#sword_swing8=0.498#sword_swing8=0.921#sword_swing4=1.289#asuna_atk03=0.957	74	root	75	wuqir							1	1.0	0	3
+003_3	0	12	1	attack03	12.1	skill_icon_036	sword_swing1=2.6#sword_swing1=3#evade-jump=3.888#sword_swing1=4.856#sword_swing1=5.5#sword_swing1=6.161#sword_swing1=6.8#sword_swing1=7.069#evade-jump=7.282#rush=8.045#magicblade_wave=4.865#magicblade_wave=5.5#magicblade_wave=6.161#magicblade_wave=6.797#magicblade_wave=7.069#magicblade_wave=7.6#yukki_05=7.917#yukki_03=8.045#rosalia_03=8.382#yukki_05=10.382#klein_04=10.582#asuna_bat63=0.4#asuna_bat37=8.439	76	root	77	wuqir							1	1.0	0	3
+003_11	0	0	0	attack01	2.8	skill_icon_034	sword_swing1=0.05#sword_swing1=0.344#sword_swing8=0.668#sword_swing8=0.944#sword_swing8=1.353#sword_swing6=1.752#asuna_atk01=1.528	72	root	73	wuqir							1	1.0	0	3
+003_12	0	0	0	attack02	2.6	skill_icon_035	evade-jump=0.257#sword_swing8=0.498#sword_swing8=0.921#sword_swing4=1.289#asuna_atk03=0.957	74	root	75	wuqir							1	1.0	0	3
+003_13	0	12	1	attack03	12.1	skill_icon_036	sword_swing1=2.6#sword_swing1=3#evade-jump=3.888#sword_swing1=4.856#sword_swing1=5.5#sword_swing1=6.161#sword_swing1=6.8#sword_swing1=7.069#evade-jump=7.282#rush=8.045#magicblade_wave=4.865#magicblade_wave=5.5#magicblade_wave=6.161#magicblade_wave=6.797#magicblade_wave=7.069#magicblade_wave=7.6#yukki_05=7.917#yukki_03=8.045#rosalia_03=8.382#yukki_05=10.382#klein_04=10.582#asuna_bat63=0.4#asuna_bat37=8.439	76	root	77	wuqir							1	1.0	0	3
+013_1	0	0	0	attack01	2.236666667	skill_icon_037	magic_summon=0.222#SE_030035=0.381#SE_030029=0.677#SE_030029=1.152#SE_030029=1.349#lightning=1.974	79	wuqir									1	3.5	0	3
+013_2	0	0	0	attack02	2.6	skill_icon_038	sword_swing1=0.9#flyingwave=0.97	80	root									1	3.5	0	3
+013_3	0	2	1	attack03	9.6	skill_icon_039	oberon_01=0#oberon_02=3.779	81	root									1	1.0	0	3
+013_11	0	0	0	attack01	2.236666667	skill_icon_037	magic_summon=0.222#SE_030035=0.381#SE_030029=0.677#SE_030029=1.152#SE_030029=1.349#lightning=1.974	79	wuqir									1	3.5	0	3
+013_12	0	0	0	attack02	2.6	skill_icon_038	sword_swing1=0.9#flyingwave=0.97	80	root									1	3.5	0	3
+013_13	0	11	1	attack03	9.6	skill_icon_039	oberon_01=0#oberon_02=3.779	81	root									1	1.0	0	3
+013_21	0	0	0	attack01	2.236666667	skill_icon_037	magic_summon=0.222#SE_030035=0.381#SE_030029=0.677#SE_030029=1.152#SE_030029=1.349#lightning=1.974	79	wuqir									1	3.5	0	3
+013_22	0	0	0	attack02	2.6	skill_icon_038	sword_swing1=0.9#flyingwave=0.97	80	root									1	3.5	0	3
+013_23	0	0	1	attack03	9.6	skill_icon_039	oberon_01=0#oberon_02=3.779	81	root									1	1.0	0	3
+023_1	0	0	0	attack01	3.16	skill_icon_040	sword_swing2=0.53333#sword_swing1=0.9#sword_swing5=1.2#fire=0.5#fire=0.9#fire=1.2#heavy_impact=2.4#eugene_sys09=0.265	82	root									1	1.5	0	3
+023_2	0	0	0	attack02	5.0	skill_icon_041	fire=1.25#fire=1.3#fire=1.379#fire=1.436#evade-jump=2.5#sword_swing5=3.1#heavy_impact=3.32#fire=3.4#eugene_sys28=2.18	83	root	84	wuqir							1	1.5	0	3
+023_3	0	4	1	attack03	14.5	skill_icon_042	energy_recharge=1.012#energy_charge=2.063#sword_swing5=2.682#fire_barely=2.658#evade-jump=3.2#rush_heavy=3.093#sword_swing5=4.3#sword_swing5=5.084#sword_swing5=5.844#fire_barely=4.3#fire_barely=5.084#fire_barely=5.844#evade-jump=6.6#sword_spin=7.185#sword_spin=7.58#sword_swing5=8.7#fire=6.926#fire=7.219#fire=7.626#fire=8.134#fire=8.684#fire=9.115#fire=9.673#SE_012200=8.068#hero_05=8.068#kirito-alo_01=10.383#klein_01=9.673#explosion_fire=11.677#eugene_bat20=0#eugene_bat05=6.093	85	root	86	wuqir							1	1.0	0	3
+023_11	0	0	0	attack01	3.16	skill_icon_040	sword_swing2=0.53333#sword_swing1=0.9#sword_swing5=1.2#fire=0.5#fire=0.9#fire=1.2#heavy_impact=2.4#eugene_sys09=0.265	82	root									1	1.5	0	3
+023_12	0	0	0	attack02	5.0	skill_icon_041	fire=1.25#fire=1.3#fire=1.379#fire=1.436#evade-jump=2.5#sword_swing5=3.1#heavy_impact=3.32#fire=3.4#eugene_sys28=2.18	83	root	84	wuqir							1	1.5	0	3
+023_13	0	9	1	attack03	14.5	skill_icon_042	energy_recharge=1.012#energy_charge=2.063#sword_swing5=2.682#fire_barely=2.658#evade-jump=3.2#rush_heavy=3.093#sword_swing5=4.3#sword_swing5=5.084#sword_swing5=5.844#fire_barely=4.3#fire_barely=5.084#fire_barely=5.844#evade-jump=6.6#sword_spin=7.185#sword_spin=7.58#sword_swing5=8.7#fire=6.926#fire=7.219#fire=7.626#fire=8.134#fire=8.684#fire=9.115#fire=9.673#SE_012200=8.068#hero_05=8.068#kirito-alo_01=10.383#klein_01=9.673#explosion_fire=11.677#eugene_bat20=0#eugene_bat05=6.093	85	root	86	wuqir							1	1.0	0	3
+023_21	0	0	0	attack01	3.16	skill_icon_040	sword_swing2=0.53333#sword_swing1=0.9#sword_swing5=1.2#fire=0.5#fire=0.9#fire=1.2#heavy_impact=2.4#eugene_sys09=0.265	82	root									1	1.5	0	3
+023_22	0	0	0	attack02	5.0	skill_icon_041	fire=1.25#fire=1.3#fire=1.379#fire=1.436#evade-jump=2.5#sword_swing5=3.1#heavy_impact=3.32#fire=3.4#eugene_sys28=2.18	83	root	84	wuqir							1	1.5	0	3
+023_23	0	4	1	attack03	14.5	skill_icon_042	energy_recharge=1.012#energy_charge=2.063#sword_swing5=2.682#fire_barely=2.658#evade-jump=3.2#rush_heavy=3.093#sword_swing5=4.3#sword_swing5=5.084#sword_swing5=5.844#fire_barely=4.3#fire_barely=5.084#fire_barely=5.844#evade-jump=6.6#sword_spin=7.185#sword_spin=7.58#sword_swing5=8.7#fire=6.926#fire=7.219#fire=7.626#fire=8.134#fire=8.684#fire=9.115#fire=9.673#SE_012200=8.068#hero_05=8.068#kirito-alo_01=10.383#klein_01=9.673#explosion_fire=11.677#eugene_bat20=0#eugene_bat05=6.093	85	root	86	wuqir							1	1.0	0	3
+005_1	1	0	0	attack01	3.3333	skill_icon_043	gunshot_sniper=1.531#SE_011020=0.349	87	root									4	1.0	1	3
+005_2	1	0	0	attack02	5.63	skill_icon_044	gunshot_heavy=1.65#gunshot_heavy=2.65#ice_hit=2.7#gunshot_heavy=3.81#SE_030029=3.86#sinon_bat29=0	90	root									4	3.5	1	3
+005_3	0	12	1	attack03	15.6	skill_icon_045	sniper_reload=0.208#SE_060021=1.6#SE_060021=1.8#SE_060021=2#SE_060021=2.188#SE_060021=2.396#SE_060021=2.602#SE_060021=2.78#SE_060021=2.989#SE_060021=3.182#SE_060021=3.382#evade-jump=3.799#hero_01=0.075#shino-ggo_01=1.492#rosalia_03=1.8#sakuya_01=2.093#sinon_aimcharge=5.443#shino-ggo_02=5.718#shino-ggo_03=6.592#snipershot_sm=6.588#shino-ggo_04=7.167#boom_slow=9.614#shino-ggo_05=9.614#palerider_08=9.614#sniper_boom=10.602#explosion_hit=10.602#shino-ggo_06=10.602#sinon_bat31=0#sinon_bat30=11.554	91	root	92	Bip001 Spine1	421	Point001	422	wuqir			4	1.0	1	3
+036_1	0	0	0	attack01	2.03333333333	skill_icon_046	sword_swing6=0.405#sword_swing6=0.632#sword_swing2=1.002#asuna_atk01=0.81	93	root	94	wuqir							1	1.3	0	3
+036_2	0	0	0	attack02	2.7	skill_icon_047	sword_swing1=0.279#sword_swing2=0.572#SE_050001=0.995#SE_050001=1.545#asuna_atk03=1.236	95	root									1	1.3	0	3
+036_11	0	0	0	attack01	2.03333333333	skill_icon_046	sword_swing6=0.405#sword_swing6=0.632#sword_swing2=1.002#asuna_atk01=0.81	93	root	94	wuqir							1	1.3	0	3
+036_12	0	0	0	attack02	2.7	skill_icon_047	sword_swing1=0.279#sword_swing2=0.572#SE_050001=0.995#SE_050001=1.545#asuna_atk03=1.236	95	root									1	1.3	0	3
+032_1	0	0	0	attack01	2.0	skill_icon_049	sword_swing2=0.2#sword_swing1=0.553#sword_swing2=0.95#sword_swing1=1.353#kovats_bat01=0.2	99	root									1	1.3	0	3
+032_2	0	0	0	attack02	1.66666666667	skill_icon_050	sword_swing8=1#spear_heavyhit=1#rosalia_03=0#kovats_sys28=0	100	root									1	1.3	0	3
+024_1	0	0	0	attack01	2.5	skill_icon_052	sword_swing3=0.8#sword_swing3=0.917#sword_swing3=1.017#sword_swing3=1.117#sword_swing3=1.217#sword_swing3=1.305#sword_swing3=1.417#sword_swing3=1.517#sword_swing3=1.617#sword_swing3=1.703#sword_swing3=1.803	103	root									1	1.5	0	3
+024_2	0	0	0	attack02	3.333333	skill_icon_053	evade-jump=0.468#sword_swing3=0.771#sword_swing3=0.783#sword_swing3=0.812#sword_swing3=0.915#sakuya_sys28=0.364	104	root	105	wuqir							1	1.5	0	3
+024_3	0	6	1	attack03	10.0	skill_icon_054	sakuya_01=0#sakuya_02=2.359#sakuya_03b=3.059#sakuya_04b=6.3#sakuya_05=6.991#sakuya_bat21=2.839	106	root	107	wuqil							1	1.0	0	3
+024_4	0	0	0	attack01	2.5	skill_icon_052	sword_swing3=0.8#sword_swing3=0.917#sword_swing3=1.017#sword_swing3=1.117#sword_swing3=1.217#sword_swing3=1.305#sword_swing3=1.417#sword_swing3=1.517#sword_swing3=1.617#sword_swing3=1.703#sword_swing3=1.803	103	root									1	1.5	0	3
+024_5	0	0	0	attack02	3.333333	skill_icon_053	evade-jump=0.468#sword_swing3=0.771#sword_swing3=0.783#sword_swing3=0.812#sword_swing3=0.915#sakuya_sys28=0.364	104	root	105	wuqir							1	1.5	0	3
+024_6	0	6	1	attack03	10.0	skill_icon_054	sakuya_01=0#sakuya_02=2.359#sakuya_03b=3.059#sakuya_04b=6.3#sakuya_05=6.991#sakuya_bat21=2.839	106	root	107	wuqil							1	1.0	0	3
+024_11	0	0	0	attack01	2.5	skill_icon_052	sword_swing3=0.8#sword_swing3=0.917#sword_swing3=1.017#sword_swing3=1.117#sword_swing3=1.217#sword_swing3=1.305#sword_swing3=1.417#sword_swing3=1.517#sword_swing3=1.617#sword_swing3=1.703#sword_swing3=1.803	103	root									1	1.5	0	3
+024_12	0	0	0	attack02	3.333333	skill_icon_053	evade-jump=0.468#sword_swing3=0.771#sword_swing3=0.783#sword_swing3=0.812#sword_swing3=0.915#sakuya_sys28=0.364	104	root	105	wuqir							1	1.5	0	3
+024_13	0	13	1	attack03	10.0	skill_icon_054	sakuya_01=0#sakuya_02=2.359#sakuya_03b=3.059#sakuya_04b=6.3#sakuya_05=6.991#sakuya_bat21=2.839	106	root	107	wuqil							1	1.0	0	3
+025_1	0	0	0	attack01	4.3	skill_icon_055	evade-jump=0#sword_swing8=0.059#sword_swing8=0.6#sword_swing8=0.767#sword_swing8=0.935#sword_swing8=1.6#sword_swing8=2#evade-jump=2.37#sword_swing8=2.7#sword_swing8=2.713	108	root									1	0.7	0	3
+025_2	0	0	0	attack02	3.5	skill_icon_056	evade-jump=0#evade-jump=0.9#evade-jump=1.8#sword_swing8=0.3#sword_swing8=0.457#sword_swing8=0.542#sword_swing8=1.5#alicia_sys28=1.11	109	root	110	Bip001 Spine1							1	0.7	0	3
+025_3	0	9	1	attack03	7.9	skill_icon_057	alisa_01=0#alisa_02=1.662#alisa_03=2.987#alisa_04=4.772#alisa_05=5.105#alicia_bat21=0.2#alicia_bat22=2.802	111	root	112	Bip001 Head							1	1.0	0	3
+025_11	0	0	0	attack01	4.3	skill_icon_055	evade-jump=0#sword_swing8=0.059#sword_swing8=0.6#sword_swing8=0.767#sword_swing8=0.935#sword_swing8=1.6#sword_swing8=2#evade-jump=2.37#sword_swing8=2.7#sword_swing8=2.713	108	root									1	0.7	0	3
+025_12	0	0	0	attack02	3.5	skill_icon_056	evade-jump=0#evade-jump=0.9#evade-jump=1.8#sword_swing8=0.3#sword_swing8=0.457#sword_swing8=0.542#sword_swing8=1.5#alicia_sys28=1.11	109	root	110	Bip001 Spine1							1	0.7	0	3
+025_13	0	15	1	attack03	7.9	skill_icon_057	alisa_01=0#alisa_02=1.662#alisa_03=2.987#alisa_04=4.772#alisa_05=5.105#alicia_bat21=0.2#alicia_bat22=2.802	111	root	112	Bip001 Head							1	1.0	0	3
+026_1	1	0	0	attack01	3.667	skill_icon_055	magic_prepare=0.5#mercy_wind=0#magic_prepare=1.17#rush=2.7#rush=2.8#rush=2.9	307	root	311	wuqir							4	1.0	1	3
+026_2	1	0	0	attack02	4.5	skill_icon_056	alisa_01=0	312	root	314	wuqir							4	1.0	1	3
+026_3	0	4	1	attack03	12.667	skill_icon_057	SE_030026=3.665#SE_030028=6.335#SE_020047=1.9#mercy_wind=5.66#SE_030023=9.6#SE_030017=3.929#SE_030017=4.468#SE_030017=4.848#ice_wind=9.6#siune_bat03=0#siune_bat05=8	315	root									1	1.0	0	3
+026_11	1	0	0	attack01	3.667	skill_icon_055	magic_prepare=0.5#mercy_wind=0#magic_prepare=1.17#rush=2.7#rush=2.8#rush=2.9	307	root	311	wuqir							4	1.0	1	3
+026_12	1	0	0	attack02	4.5	skill_icon_056	alisa_01=0	312	root	314	wuqir							4	1.0	1	3
+026_13	0	15	1	attack03	12.667	skill_icon_057	SE_030026=3.665#SE_030028=6.335#SE_020047=1.9#mercy_wind=5.66#SE_030023=9.6#SE_030017=3.929#SE_030017=4.468#SE_030017=4.848#ice_wind=9.6#siune_bat03=0#siune_bat05=8	315	root									1	1.0	0	3
+017_1	0	0	0	attack01	4.4	skill_icon_058	machinegun=0.399#behemoth_sys03=0.08	113	wuqir									2	3.5	0	3
+017_2	0	0	0	attack02	4.2	skill_icon_059	heavy_impact=0.5#machinegun-short=1.568#behemoth_sys28=0.425	114	root	115	wuqir							1	1.0	0	3
+017_3	0	6	1	attack03	12.5	skill_icon_060	beast_01=2.456#beast_02=7.5#machinegun_boom=10.1#machinegun_boom=10.261#machinegun_boom=10.578#behemoth_bat27=0	116	root	117	wuqir							4	1.0	1	3
+017_4	0	0	0	attack01	4.4	skill_icon_058	machinegun=0.399#behemoth_sys03=0.08	113	wuqir									2	3.5	0	3
+017_5	0	0	0	attack02	4.2	skill_icon_059	heavy_impact=0.5#machinegun-short=1.568#behemoth_sys28=0.425	114	root	115	wuqir							1	1.0	0	3
+017_11	0	0	0	attack01	4.4	skill_icon_058	machinegun=0.399#behemoth_sys03=0.08	113	wuqir									2	3.5	0	3
+017_12	0	0	0	attack02	4.2	skill_icon_059	heavy_impact=0.5#machinegun-short=1.568#behemoth_sys28=0.425	114	root	115	wuqir							1	1.0	0	3
+017_13	0	12	1	attack03	12.5	skill_icon_060	beast_01=2.456#beast_02=7.5#machinegun_boom=10.1#machinegun_boom=10.261#machinegun_boom=10.578#behemoth_bat27=0	116	root	117	wuqir							4	1.0	1	3
+017_21	0	0	0	attack01	4.4	skill_icon_058	machinegun=0.399#behemoth_sys03=0.08	113	wuqir									2	3.5	0	3
+017_22	0	0	0	attack02	4.2	skill_icon_059	heavy_impact=0.5#machinegun-short=1.568#behemoth_sys28=0.425	114	root	115	wuqir							1	1.0	0	3
+017_23	0	0	1	attack03	12.5	skill_icon_060	beast_01=2.456#beast_02=7.5#machinegun_boom=10.1#machinegun_boom=10.261#machinegun_boom=10.578#behemoth_bat27=0	116	root	117	wuqir							4	1.0	1	3
+018_1	1	0	0	attack01	2.6	skill_icon_061	evade-jump=0.2#rifle_short=0.8#evade-jump=1.37#rifle_short=1.751	118	root	119	wuqir							1	2.3	1	3
+018_2	1	0	0	attack02	1.8	skill_icon_062	rifle_short=0.148#evade-jump=0.858#grenade_boom=1.435	120	root	121	wuqir							1	2.3	1	3
+018_3	0	2	1	attack03	13.0	skill_icon_063	zxed_01=0#zxed_02=2.978#zxed_03=4.7#zxed_04=7.615#zxed_05=9.461#xexeed_bat22=0.6	122	root	123	wuqir	124	wuqil					4	1.0	1	3
+018_11	1	0	0	attack01	2.6	skill_icon_061	evade-jump=0.2#rifle_short=0.8#evade-jump=1.37#rifle_short=1.751	118	root	119	wuqir							1	2.3	1	3
+018_12	1	0	0	attack02	1.8	skill_icon_062	rifle_short=0.148#evade-jump=0.858#grenade_boom=1.435	120	root	121	wuqir							1	2.3	1	3
+018_13	0	4	1	attack03	13.0	skill_icon_063	zxed_01=0#zxed_02=2.978#zxed_03=4.7#zxed_04=7.615#zxed_05=9.461#xexeed_bat22=0.6	122	root	123	wuqir	124	wuqir001					4	1.0	1	3
+029_1	1	0	0	attack01	2.0	skill_icon_064	evade-jump=0#grenade_boom=0.722#SE_020024=0.7	125	root									1	4.0	1	3
+029_2	1	0	0	attack02	2.5	skill_icon_065	evade-jump=0#rifle=0.8#dain_sys28=0.348	126	root	127	wuqir							1	4.0	1	3
+029_3	0	4	1	attack03	9.1	skill_icon_066	SE_020022=2.117#SE_020022=2.417#SE_020022=2.7#SE_020022=6.087#grenade_boom=3.1#grenade_boom=3.468#grenade_boom=3.668#grenade_boom=7.2#shotgun_reload=4.879#yukki_03=6.12#dain_bat22=0	128	root									4	1.0	1	3
+030_1	0	0	0	attack01	4.5667	skill_icon_067	rifle=0.1#evade-jump=3#rifle=3.5	317	root	318	wuqir							1	1.5	0	3
+030_2	1	0	0	attack02	3.4667	skill_icon_068	SE_020022=0.4#evade-jump=0.6#kakouton_sys28=0.9#SE_020022=1.2#SE_020022=1.35#SE_020022=1.55	321	wuqir									4	1.0	1	3
+030_3	0	6	1	attack03	11.1	skill_icon_069	throw_ammo=0.6#sword_swing5=3.7#sword_swing5=5.8#sword_swing5=7#fire=3.929#fire=4.057#fire=5.826#fire=6#fire=7.029#fire=7.162#fire_throw=8.626#fire_throw=9.008#grenade_boom=9.643#grenade_boom=9.903#grenade_boom=10.112#kakouton_bat22=0.6#kakouton_bat20=7.674	322	root	323	Bip001 L Finger2	324	Bip001 R Finger2					4	1.0	1	3
+042_1	1	0	0	attack01	3.5	skill_icon_067	submachine=0.556#submachine=1.796	129	wuqir									4	1.0	1	3
+042_2	1	0	0	attack02	3.0	skill_icon_068	grenade_boom=1.8	131	wuqil									4	1.0	1	3
+033_1	0	0	0	attack01	2.26666666667	skill_icon_070	sword_swing5=0.202#sword_swing5=0.7#fire=0.264#fire=0.766	135	root									1	1.3	0	3
+033_2	0	0	0	attack02	4.0	skill_icon_071	sword_swing8=0.5#sword_swing5=1.2#sword_swing5=2.252#fire=0.53#heavy_impact=2.303	136	root									1	1.3	0	3
+033_11	0	0	0	attack01	2.26666666667	skill_icon_070	sword_swing5=0.202#sword_swing5=0.7#fire=0.264#fire=0.766	135	root									1	1.3	0	3
+033_12	0	0	0	attack02	4.0	skill_icon_071	sword_swing8=0.5#sword_swing5=1.2#sword_swing5=2.252#fire=0.53#heavy_impact=2.303	136	root									1	1.3	0	3
+027_1	0	0	0	attack01	3.4	skill_icon_073	evade-jump=0#rifle_dk1=0.511	154	root	155	wuqir							1	1.0	0	3
+027_2	0	0	0	attack02	3.66666666667	skill_icon_074	rifle=0.115#rifle_dk2=1.287#yamikaze_sys28=1.347	156	root	157	wuqir							1	1.0	0	3
+027_3	0	4	1	attack03	14.3333333333	skill_icon_075	darkwind_01=2.897#darkwind_02=9.7#evade-jump=1.288#evade-jump=5.6#evade-jump=6.6#rifle=7.045#rifle=8.5#grenade_boom=10.747#grenade_boom=11.252#grenade_boom=11.622#grenade_boom=11.8#yamikaze_bat21=0.6	158	root	159	wuqir	203	wuqil					1	1.0	0	3
+031_1	0	0	0	attack01	1.8	skill_icon_076	sword_swing8=0.26#sword_swing5=0.63#sword_swing8=1.0657	160	root									1	1.0	0	3
+031_2	0	0	0	attack02	2.3	skill_icon_077	sword_swing5=0.4#sword_swing8=0.9#evade-jump=0.332#heavy_impact=0.962#kibaou_sys28=0.373	161	root									1	1.0	0	3
+031_3	0	8	1	attack03	5.6	skill_icon_078	evade-jump=0.62#evade-wind=1.085#klein_03=2.559#sword_swing8=3.733#heavy_impact=4.1#kibaou_bat20=2.5	162	root									1	1.0	0	3
+031_11	0	0	0	attack01	1.8	skill_icon_076	sword_swing8=0.26#sword_swing5=0.63#sword_swing8=1.0657	160	root									1	1.0	0	3
+031_12	0	0	0	attack02	2.3	skill_icon_077	sword_swing5=0.4#sword_swing8=0.9#evade-jump=0.332#heavy_impact=0.962#kibaou_sys28=0.373	161	root									1	1.0	0	3
+031_13	0	17	1	attack03	5.6	skill_icon_078	evade-jump=0.62#evade-wind=1.085#klein_03=2.559#sword_swing8=3.733#heavy_impact=4.1#kibaou_bat20=2.5	162	root									1	1.0	0	3
+015_1	0	0	0	attack01	2.4	skill_icon_079	laser_sword=0.3#laser_sword=0.7#laser_sword=0.8#laser_sword=1.2#laser_sword=2#lightning=2#kirico_atk01=0.456#kirico_atk02=1.052	163	root	164	wuqir							1	1.4	0	3
+015_2	0	0	0	attack02	3.6	skill_icon_080	evade-jump=0#pistol_gunshot=0.39#pistol_gunshot=0.54#pistol_gunshot=0.69#pistol_gunshot=0.84#laser_sword=1.15#laser_sword=1.6#laser_sword=2.35#kirico_atk04=1.8	165	root	166	wuqir							1	1.4	0	3
+015_3	0	12	1	attack03	9.1	skill_icon_081	kirito-ggo_01=0#kirito-ggo_02=1.456#kirito-ggo_03=3.78#kirito-ggo_04=5.25#kirito-ggo_05=7.512#kirito_bat47=0#kirito_bat53=5.517	167	root	168	wuqil	169	wuqir					1	1.0	0	3
+035_1	0	0	0	attack01	1.85	skill_icon_082	sword_swing1=0.05#sword_swing2=0.344#sword_swing3=0.7#kirito_atk01=0.755	170	root									1	1.0	0	3
+035_2	0	0	0	attack02	2.76666666667	skill_icon_083	sword_swing1=0.1#sword_swing2=0.394#sword_swing5=0.755#evade-jump=0.573#kirito_atk03=0.679	171	root									1	1.0	0	3
+035_11	0	0	0	attack01	1.85	skill_icon_082	sword_swing1=0.05#sword_swing2=0.344#sword_swing3=0.7#kirito_atk01=0.755	170	root									1	1.0	0	3
+035_12	0	0	0	attack02	2.76666666667	skill_icon_083	sword_swing1=0.1#sword_swing2=0.394#sword_swing5=0.755#evade-jump=0.573#kirito_atk03=0.679	171	root									1	1.0	0	3
+043_1	0	0	0	attack01	3.0	skill_icon_085	sword_swing1=0.252#sword_swing2=0.6#sword_swing1=0.9#sword_swing1=1.851	232	root									1	0.8	0	3
+043_2	0	0	0	attack02	3.5	skill_icon_086	sword_swing1=0.2#sword_swing4=0.805#sword_swing4=1.35#sword_swing2=1.5#evade-jump=1.35#sword_swing1=1.9	233	root									1	0.8	0	3
+043_3	0	5	1	attack03	13.33333	skill_icon_087	sword_swing1=1.482#energy_charge=9.213#klein_01=0.203#sakuya_04b=0.877#kirito-alo_01=2.477#kirito-alo_02=4.011#kirito-alo_02=4.964#kirito-alo_02=5.631#kirito-alo_02=5.831#kirito-alo_02=6.296#kirito-alo_02=6.531#kirito-alo_02=6.964#kirito-alo_02=7.164#shino_alo_05=9.213#sakuya_03b=10.2#rosalia_03=10.277#shino_alo_06=12.233#hero_04=5.261#hero_07=12.296	234	root	235	wuqir							1	1.2	0	3
+044_1	0	0	0	attack01	3.0	skill_icon_085	sword_swing1=0.252#sword_swing2=0.6#sword_swing1=0.9#sword_swing1=1.851	232	root									1	0.8	0	3
+044_2	0	0	0	attack02	3.5	skill_icon_086	sword_swing1=0.2#sword_swing4=0.805#sword_swing4=1.35#sword_swing2=1.5#evade-jump=1.35#sword_swing1=1.9	233	root									1	0.8	0	3
+044_3	0	5	1	attack03	13.33333	skill_icon_087	sword_swing1=1.482#energy_charge=9.213#klein_01=0.203#sakuya_04b=0.877#kirito-alo_01=2.477#kirito-alo_02=4.011#kirito-alo_02=4.964#kirito-alo_02=5.631#kirito-alo_02=5.831#kirito-alo_02=6.296#kirito-alo_02=6.531#kirito-alo_02=6.964#kirito-alo_02=7.164#shino_alo_05=9.213#sakuya_03b=10.2#rosalia_03=10.277#shino_alo_06=12.233#hero_04=5.261#hero_07=12.296	234	root	235	wuqir							1	1.2	0	3
+045_1	0	0	0	attack01	3.0	skill_icon_085	sword_swing1=0.252#sword_swing2=0.6#sword_swing1=0.9#sword_swing1=1.851	232	root									1	0.8	0	3
+045_2	0	0	0	attack02	3.5	skill_icon_086	sword_swing1=0.2#sword_swing4=0.805#sword_swing4=1.35#sword_swing2=1.5#evade-jump=1.35#sword_swing1=1.9	233	root									1	0.8	0	3
+045_3	0	5	1	attack03	13.33333	skill_icon_087	sword_swing1=1.482#energy_charge=9.213#klein_01=0.203#sakuya_04b=0.877#kirito-alo_01=2.477#kirito-alo_02=4.011#kirito-alo_02=4.964#kirito-alo_02=5.631#kirito-alo_02=5.831#kirito-alo_02=6.296#kirito-alo_02=6.531#kirito-alo_02=6.964#kirito-alo_02=7.164#shino_alo_05=9.213#sakuya_03b=10.2#rosalia_03=10.277#shino_alo_06=12.233#hero_04=5.261#hero_07=12.296	234	root	235	wuqir							1	1.2	0	3
+047_1	0	0	0	attack01	2.8	skill_icon_085	sword_swing1=0.252#sword_swing2=0.6#sword_swing1=0.9#sword_swing1=1.851	228	root									1	0.8	0	3
+047_2	0	0	0	attack02	3.5	skill_icon_086	sword_swing1=0.2#sword_swing4=0.805#sword_swing4=1.35#sword_swing2=1.5#evade-jump=1.35#sword_swing1=1.9	229	root									1	0.8	0	3
+047_3	0	5	1	attack03	13.3333333333	skill_icon_087	sword_swing1=1.482#energy_charge=9.213#klein_01=0.203#sakuya_04b=0.877#kirito-alo_01=2.477#kirito-alo_02=4.011#kirito-alo_02=4.964#kirito-alo_02=5.631#kirito-alo_02=5.831#kirito-alo_02=6.296#kirito-alo_02=6.531#kirito-alo_02=6.964#kirito-alo_02=7.164#shino_alo_05=9.213#sakuya_03b=10.2#rosalia_03=10.277#shino_alo_06=12.233#hero_04=5.261#hero_07=12.296	230	root	231	wuqir							1	1.2	0	3
+048_1	0	0	0	attack01	2.8	skill_icon_085	sword_swing1=0.252#sword_swing2=0.6#sword_swing1=0.9#sword_swing1=1.851	228	root									1	0.8	0	3
+048_2	0	0	0	attack02	3.5	skill_icon_086	sword_swing1=0.2#sword_swing4=0.805#sword_swing4=1.35#sword_swing2=1.5#evade-jump=1.35#sword_swing1=1.9	229	root									1	0.8	0	3
+048_3	0	5	1	attack03	13.3333333333	skill_icon_087	sword_swing1=1.482#energy_charge=9.213#klein_01=0.203#sakuya_04b=0.877#kirito-alo_01=2.477#kirito-alo_02=4.011#kirito-alo_02=4.964#kirito-alo_02=5.631#kirito-alo_02=5.831#kirito-alo_02=6.296#kirito-alo_02=6.531#kirito-alo_02=6.964#kirito-alo_02=7.164#shino_alo_05=9.213#sakuya_03b=10.2#rosalia_03=10.277#shino_alo_06=12.233#hero_04=5.261#hero_07=12.296	230	root	231	wuqir							1	1.2	0	3
+049_1	0	0	0	attack01	2.8	skill_icon_085	sword_swing1=0.252#sword_swing2=0.6#sword_swing1=0.9#sword_swing1=1.851	228	root									1	0.8	0	3
+049_2	0	0	0	attack02	3.5	skill_icon_086	sword_swing1=0.2#sword_swing4=0.805#sword_swing4=1.35#sword_swing2=1.5#evade-jump=1.35#sword_swing1=1.9	229	root									1	0.8	0	3
+049_3	0	5	1	attack03	13.3333333333	skill_icon_087	sword_swing1=1.482#energy_charge=9.213#klein_01=0.203#sakuya_04b=0.877#kirito-alo_01=2.477#kirito-alo_02=4.011#kirito-alo_02=4.964#kirito-alo_02=5.631#kirito-alo_02=5.831#kirito-alo_02=6.296#kirito-alo_02=6.531#kirito-alo_02=6.964#kirito-alo_02=7.164#shino_alo_05=9.213#sakuya_03b=10.2#rosalia_03=10.277#shino_alo_06=12.233#hero_04=5.261#hero_07=12.296	230	root	231	wuqir							1	1.2	0	3
+051_1	0	0	0	attack01	3.9	skill_icon_047	evade-jump=1.9#sword_spin=2.1#sword_spin=1.956#sword_spin=2.388#circle_swing=2.1#circle_swing=2.46#circle_swing=2.172#circle_swing=2.54#argo_bat02=0#argo_sys28=2	343	root	344	buffb							1	1.2	0	3
+051_2	0	0	0	attack02	4.3	skill_icon_053	sword_spin=1.33#sword_spin=1.186#sword_spin=1.618#circle_swing=1.33#circle_swing=1.69#circle_swing=1.402#circle_swing=1.77#evade-jump=2.766#flyingwave=3.17#rush=3.277#argo_bat21=0	345	root	346	buffb							1	1.2	0	3
+051_3	0	12	1	attack03	8.7	skill_icon_054	rush=0#rush=1.2#rush=2.509#evade-jump=3.2#rush=5.289#evade-jump=5.716#SE_ARGO2=3.8#SE_ARGO1=6.28#argo_bat20=3.82	347	root	348	Bip001 R Hand	349	Bip001 Spine1					1	1.2	0	3
+052_1	1	0	0	attack01	2.6667	skill_icon_019	gunshot_heavy=0.6#grenade_boom=0.7#miia_atk01=0.2	456	wuqir									4	1.0	1	3
+052_2	1	0	0	attack02	5.0	skill_icon_060	gunshot_heavy=0.6#gunshot_heavy=0.9#gunshot_heavy=1.217#gunshot_heavy=1.517#grenade_boom=1.283#grenade_boom=1.583#grenade_boom=1.883#grenade_boom=2.183#miia_atk02=0.3	457	wuqir									4	1.0	1	3
+052_3	0	6	1	attack03	16.8	skill_icon_043	mia_01=0#SE_011015=4.037#bodyfall=4.578#gunshot_heavy=5.2#gunshot_heavy=6#gunshot_heavy=6.551#gunshot_heavy=7#gunshot_heavy=7.343#gunshot_heavy=7.702#gunshot_heavy=7.965#gunshot_heavy=8.311#gunshot_heavy=8.769#gunshot_heavy=9.155#yukki_03=9.261#yukki_03=9.343#yukki_03=9.6#grenade_boom=10.502#grenade_boom=10.686#grenade_boom=10.872#grenade_boom=11.077#grenade_boom=11.262#grenade_boom=11.528#grenade_boom=11.653#grenade_boom=11.709#miia_bat20=0#miia_sys25=2.295#miia_sys21=4.004#miia_sys14=4.857#miia_sys23=6.964#miia_sys04=13.259	458	root	459	wuqir							4	1.0	1	3
+053_1	1	0	0	attack01	2.1	skill_icon_019	evade-jump=0#sera_atk03=0.8#sniper_shot=1	389	root									4	1.0	1	3
+053_2	1	0	0	attack02	2.3	skill_icon_060	evade-jump=0#sera_atk04=0.3#sniper_shot=0.5#sniper_shot=0.9#sniper_shot=1.3	390	root									4	1.0	1	3
+053_3	0	3	1	attack03	15.8	skill_icon_043	sakuya_01=1.5#rosalia_03=4#sinon_aimcharge=5.124#sniper_shot=7.745#klein_01=8#yukki_03=8#explosion_fire=9.371#explosion_hit=9.371#sniper_shot=10.788#klein_01=11.063#yukki_03=11.063#explosion_hit=11.5#explosion_fire=11.5#sniper_shot=12.688#klein_01=12.785#yukki_03=12.788#explosion_fire=13.172#sera_bat05=0#sera_com03=5.281	420	root									4	1.0	1	3
+054_1	0	0	0	attack01	2.533333333	skill_icon_079	87=0.2#evade-jump=1#flow_laser=1.1#flow_laser=1.33#flow_laser=1.6#submachine=1.042#sweid_bat03=0	386	wuqir	418	Point002	419	Point003					1	2.8	1	3
+054_2	0	0	0	attack02	2.9	skill_icon_036	87=1#flow_elec=1.941#flow_elec=2.286#SE_030029=2#sweid_com15=0	387	Point002	388	Point003							1	2.8	1	3
+054_3	0	3	1	attack03	11.93333333	skill_icon_048	rosalia_03=0.623#87=1.379#submachine=1.955#submachine=3.254#flow_laser=3.254#flow_laser=3.803#flow_laser=4#throw_sword=5#evade-jump=5.5#pistol_gunshot_heavy=7#pistol_gunshot_heavy=7.119#pistol_gunshot_heavy=7.22#pistol_gunshot_heavy=7.393#pistol_gunshot_heavy=7.5#pistol_gunshot_heavy=7.624#pistol_gunshot_heavy=7.78#pistol_gunshot_heavy=8.279#pistol_gunshot_heavy=8.386#pistol_gunshot_heavy=8.445#pistol_gunshot_heavy=8.606#pistol_gunshot_heavy=8.666#pistol_gunshot_heavy=8.759#pistol_gunshot_heavy=8.88#87=8#flow_laser=8.339#flow_laser=9#flow_laser=9.157#flow_laser=9.5#sweid_bat22=1#sweid_bat04=5	392	root	393	Point002	394	Point003	395	wuqil	396	wuqir	4	1.0	1	3
+055_1	1	0	0	attack01	3.2	skill_icon_067	rifle_dk2=0.836	351	wuqir									4	1.0	1	3
+055_2	1	0	0	attack02	3.6	skill_icon_068	throw_ammo=1#rifle=2#grenade_boom=2.496	353	wuqil	354	wuqir							4	1.0	1	3
+012_1	0	0	0	attack01	4.2	skill_icon_091	sword_swing2=0.3#sword_swing1=0.652#sword_swing1=1#sword_swing1=1.349#sword_swing1=2.05#sword_swing1=2.7#kirito_atk01=0.659#kirito_atk02=2.6	185	root									1	1.0	0	3
+012_2	0	0	0	attack02	2.9	skill_icon_092	sword_swing2=0.221#evade-jump=0.769#sword_swing1=1.2#sword_swing1=1.3#kirito_atk02=0.128#kirito_atk03=1.1	186	root									1	1.0	0	3
+012_3	0	12	1	attack03	10.8666666667	skill_icon_093	kirito-alo_01=0#kirito-alo_02=0.857#kirito-alo_03=2.151#kirito-alo_04=3.116#kirito-alo_05=7#kirito-alo_06=9.702#kirito_bat54=0#kirito_bat56=7.543	187	root	188	wuqil	189	wuqir					1	1.0	0	3
+006_1	0	0	0	attack01	5.4	skill_icon_094	death_bat55=1#death_bat28=2	190	root	333	wuqil							1	1.3	0	3
+006_2	1	0	0	attack02	5.2666	skill_icon_095	evade-jump=0#death_sys04=1#sniper_shot=1.85#sniper_shot=2.65#sniper_shot=3.35	191	root									4	1.0	0	3
+006_3	1	12	1	attack03	17.333	skill_icon_096	sword_swing2=2.473#sword_swing2=3#sword_swing2=3.302#sword_swing3=6.4#sword_swing3=6.466#sword_swing3=6.544#sword_swing3=6.61#sword_swing3=6.688#sword_swing3=6.754#sword_swing3=6.832#sword_swing3=6.899#sword_swing3=6.977#sword_swing3=7.043#sword_swing3=7.121#sword_swing2=8#horo_fade=0.452#hero_02=1.799#rosalia_03b=6#lotsBlood_drop=9.4#SE_blood=9.4#pistol_gunshot_heavy=13.696#headshot=13.734#ground_impact=14.806#death_bat28=0#death_sys06=4.248#death_sys05=4.589#death_bat26=7.77#death_bat04=11	298	root	299	Bip001 HeadNub	300	wuqil	301	wuqir			1	1.0	0	3
+020_1	0	0	0	attack01	3.76666666667	skill_icon_097	sword_swing5=0.266#sword_swing5=0.771#sword_swing5=1.39#sword_swing5=2.449#lisbeth_atk01=0.266#lisbeth_atk01=1.39#SE_030035=0.208#SE_030035=1.089#SE_030029=2.65#lisbeth_atk02=2.492	193	root	194	wuqir							1	0.8	0	3
+020_2	0	0	0	attack02	2.2	skill_icon_098	evade-jump=0#SE_030035=0.18#lightning=0.65#sword_swing5=0.767#heavy_impact=0.9#lisbeth_atk03=0.7	195	root	196	wuqir							1	0.8	0	3
+020_3	0	4	1	attack03	7.16666666667	skill_icon_099	throw_sword=0.707#lisbeth_1=0.69#evade-jump=2.126#lefa-SK1_01=2.126#heavy_impact=2.8#heavy_impact=3.3#heavy_impact=3.7#evade-jump=4.12#heavy_impact=4.7#shaking_ground=4.697#stonegiant_05=6.3#lisbeth_bat55=0.1	302	root									1	1.0	0	3
+016_1	1	0	0	attack01	5.4	skill_icon_100	evade-jump=0.088#shotgun=0.8#shotgun=1.4#shotgun=2.2#evade-jump=2.488#shotgun=3.4#explosion_fire=3.432	197	root	198	wuqir							6	2.5	0	3
+016_2	0	0	0	attack02	2.85	skill_icon_101	evade-jump=0#shotgun=1.2	199	wuqir	453	root							1	1.0	0	3
+016_3	1	12	1	attack03	13.0	skill_icon_102	palerider_01=0#palerider_02=0.931#palerider_03=2#palerider_04=5.5#palerider_05=7.2#palerider_06=8.361#palerider_07=9.223#palerider_08=10.579	200	root	201	buffb							1	1.0	0	3
+016_11	1	0	0	attack01	5.4	skill_icon_100	evade-jump=0.088#shotgun=0.8#shotgun=1.4#shotgun=2.2#evade-jump=2.488#shotgun=3.4#explosion_fire=3.432	197	root	198	wuqir							6	2.5	0	3
+016_12	0	0	0	attack02	2.85	skill_icon_101	evade-jump=0#shotgun=1.2	199	wuqir									1	1.0	0	3
+016_13	1	24	1	attack03	13.0	skill_icon_102	palerider_01=0#palerider_02=0.931#palerider_03=2#palerider_04=5.5#palerider_05=7.2#palerider_06=8.361#palerider_07=9.223#palerider_08=10.579	200	root	201	buffb							1	1.0	0	3
+034_1	0	0	0	attack01	2.33333333333	skill_icon_103	sword_swing1=0.2#sword_swing2=0.494#sword_swing2=0.675#sword_swing2=0.854#sword_swing1=1.2	303	root									1	1.0	0	3
+034_2	0	0	0	attack02	3.33333333333	skill_icon_104	sword_swing1=0.251#sword_swing2=0.8#sword_swing2=1.05#sword_swing2=1.253#sword_swing2=1.5#sword_swing2=1.721#sword_swing2=1.978#sword_swing2=2.2#diavel_sys28=0.5	304	root									1	1.0	0	3
+019_1	0	0	0	attack01	3.03333333333	skill_icon_106	sword_swing1=0.1#sword_swing2=0.4#sword_swing2=0.677#sword_swing1=0.872#sword_swing1=1.067#sword_swing2=1.521#sword_swing2=1.748	236	root									1	0.8	0	3
+019_2	0	0	0	attack02	3.1	skill_icon_107	sword_swing3=0#sword_swing2=0.3#sword_swing1=0.339#sword_swing2=0.4#sword_swing1=0.426#sword_swing2=0.5#sword_swing1=0.517#sword_swing2=0.6#sword_swing1=0.634#sword_swing2=0.7#sword_swing1=0.72#sword_swing1=0.778#sword_swing2=0.8#sword_swing1=0.84#sword_swing2=0.9#sword_swing1=0.928#sword_swing2=1#sword_swing1=1.033#sword_swing2=1.1#sword_swing2=1.178#sword_swing1=1.223#sword_swing2=1.273#sword_swing2=1.356#sword_swing1=1.4#sword_swing3=1.7#metalping_long=1.725#zaza_sys28=0	237	root									1	0.8	0	3
+019_3	0	9	1	attack03	18.0	skill_icon_108	sword_swing2=0.8#SE_020029=0.833#SE_030037=0.88#horro_atmosphere=1.909#klein_04=6.706#klein_04=6.952#klein_04=7.33#rosalia_03=11.906#sword_swing2=14#sword_swing1=14.7#sword_swing2=14.78#sword_swing2=14.86#sword_swing2=14.92#sword_swing1=15#sword_swing2=15.08#sword_swing2=15.16#sword_swing2=15.24#sword_swing1=15.32#sword_swing1=14.721#sword_swing2=15.016#sword_swing2=15.194#sakuya_04b=15.5#zaza_bat27=2.465#zaza_com08=6.344#zaza_bat28=15.737	265	root	266	wuqir							1	1.0	0	3
+019_4	0	0	0	attack01	3.03333333333	skill_icon_106	sword_swing1=0.1#sword_swing2=0.4#sword_swing2=0.677#sword_swing1=0.872#sword_swing1=1.067#sword_swing2=1.521#sword_swing2=1.748	236	root									1	0.8	0	3
+019_5	0	0	0	attack02	3.1	skill_icon_107	sword_swing3=0#sword_swing2=0.3#sword_swing1=0.339#sword_swing2=0.4#sword_swing1=0.426#sword_swing2=0.5#sword_swing1=0.517#sword_swing2=0.6#sword_swing1=0.634#sword_swing2=0.7#sword_swing1=0.72#sword_swing1=0.778#sword_swing2=0.8#sword_swing1=0.84#sword_swing2=0.9#sword_swing1=0.928#sword_swing2=1#sword_swing1=1.033#sword_swing2=1.1#sword_swing2=1.178#sword_swing1=1.223#sword_swing2=1.273#sword_swing2=1.356#sword_swing1=1.4#sword_swing3=1.7#metalping_long=1.725#zaza_sys28=0	237	root									1	0.8	0	3
+019_11	0	0	0	attack01	3.03333333333	skill_icon_106	sword_swing1=0.1#sword_swing2=0.4#sword_swing2=0.677#sword_swing1=0.872#sword_swing1=1.067#sword_swing2=1.521#sword_swing2=1.748	236	root									1	0.8	0	3
+019_12	0	0	0	attack02	3.1	skill_icon_107	sword_swing3=0#sword_swing2=0.3#sword_swing1=0.339#sword_swing2=0.4#sword_swing1=0.426#sword_swing2=0.5#sword_swing1=0.517#sword_swing2=0.6#sword_swing1=0.634#sword_swing2=0.7#sword_swing1=0.72#sword_swing1=0.778#sword_swing2=0.8#sword_swing1=0.84#sword_swing2=0.9#sword_swing1=0.928#sword_swing2=1#sword_swing1=1.033#sword_swing2=1.1#sword_swing2=1.178#sword_swing1=1.223#sword_swing2=1.273#sword_swing2=1.356#sword_swing1=1.4#sword_swing3=1.7#metalping_long=1.725#zaza_sys28=0	237	root									1	0.8	0	3
+019_13	0	9	1	attack03	18.0	skill_icon_108	sword_swing2=0.8#SE_020029=0.833#SE_030037=0.88#horro_atmosphere=1.909#klein_04=6.706#klein_04=6.952#klein_04=7.33#rosalia_03=11.906#sword_swing2=14#sword_swing1=14.7#sword_swing2=14.78#sword_swing2=14.86#sword_swing2=14.92#sword_swing1=15#sword_swing2=15.08#sword_swing2=15.16#sword_swing2=15.24#sword_swing1=15.32#sword_swing1=14.721#sword_swing2=15.016#sword_swing2=15.194#sakuya_04b=15.5#zaza_bat27=2.465#zaza_com08=6.344#zaza_bat28=15.737	265	root	266	wuqir							1	1.0	0	3
+028_1	1	0	0	attack01	3.7	skill_icon_109	submachine=0.2#submachine=1.503	204	wuqir									4	1.0	1	3
+028_2	1	0	0	attack02	3.0	skill_icon_110	evade-jump=0.6#evade-jump=1.45#submachine=1.5#spiegel_sys28=1.498	205	root	206	wuqir							1	2.0	0	3
+028_3	1	5	1	attack03	13.5	skill_icon_111	sniper_reload=0.818#submachine=1.561#submachine=2.669#submachine=4.507#submachine=5.631#evade-jump=7.6#throw_sword=8.274#throw_sword=8.992#grenade_boom=11.73#grenade_boom=12.03#grenade_boom=12.307#grenade_boom=12.521	207	root	208	Bip001 R Finger21	209	wuqil	210	wuqir			4	1.0	0	3
+038_1	0	0	0	attack01	3.1	skill_icon_112	sword_swing5=0.3#sword_swing5=1.3#heavy_impact=1.412	219	root									1	1.2	0	3
+038_2	0	0	0	attack02	3.0	skill_icon_113	sword_swing5=0.302#sword_swing5=0.702#sword_swing5=1.5#jun_sys28=0.3	220	root									1	1.2	0	3
+038_3	0	8	1	attack03	10.0	skill_icon_114	sword_swing5=0.2#sword_intoground=0.26#yukki_03=1.8#hero_07=2.843#hero_07=3.839#hero_07=4.444#hero_07=6.897#kirito-alo_01=7#klein_04=7.521#jun_bat28=0#jun_bat26=4.941	384	root	385	wuqir							1	1.0	0	3
+038_11	0	0	0	attack01	3.1	skill_icon_112	sword_swing5=0.3#sword_swing5=1.3#heavy_impact=1.412	219	root									1	1.2	0	3
+038_12	0	0	0	attack02	3.0	skill_icon_113	sword_swing5=0.302#sword_swing5=0.702#sword_swing5=1.5#jun_sys28=0.3	220	root									1	1.2	0	3
+038_13	0	17	1	attack03	10.0	skill_icon_114	sword_swing5=0.2#sword_intoground=0.26#yukki_03=1.8#hero_07=2.843#hero_07=3.839#hero_07=4.444#hero_07=6.897#kirito-alo_01=7#klein_04=7.521#jun_bat28=0#jun_bat26=4.941	384	root	385	wuqir							1	1.0	0	3
+039_1	0	0	0	attack01	2.63333333333	skill_icon_115	sword_swing3=0.1#sword_swing3=0.25#sword_swing3=0.4#sword_swing6=1.223#evade-jump=1	238	root									1	1.5	0	3
+039_2	0	0	0	attack02	2.76666666667	skill_icon_116	sword_spin=0.181#sword_spin=0.4#sword_swing6=1#sword_swing6=1.4#sword_swing3=1.8	239	root	240	wuqir							1	1.5	0	3
+039_3	0	8	1	attack03	10.2333333333	skill_icon_117	circle_swing=0.278#circle_swing=0.589#circle_swing=0.898#circle_swing=0.379#circle_swing=0.689#circle_swing=1#circle_swing=0.479#circle_swing=0.789#circle_swing=0.587#circle_swing=0.9#throw_sword=1.966#evade-jump=2.488#evade-jump=3.863#sword_swing3=4.8#energy_charge=4.177#klein_03=4.8#heavy_impact=7#shaking_stones=6.884#talken_bat26=2.259	221	root	222	buffb	223	wuqir					1	1.0	0	3
+039_11	0	0	0	attack01	2.63333333333	skill_icon_115	sword_swing3=0.1#sword_swing3=0.25#sword_swing3=0.4#sword_swing6=1.223#evade-jump=1	238	root									1	1.5	0	3
+039_12	0	0	0	attack02	2.76666666667	skill_icon_116	sword_spin=0.181#sword_spin=0.4#sword_swing6=1#sword_swing6=1.4#sword_swing3=1.8	239	root	240	wuqir							1	1.5	0	3
+039_13	0	17	1	attack03	10.2333333333	skill_icon_117	circle_swing=0.278#circle_swing=0.589#circle_swing=0.898#circle_swing=0.379#circle_swing=0.689#circle_swing=1#circle_swing=0.479#circle_swing=0.789#circle_swing=0.587#circle_swing=0.9#throw_sword=1.966#evade-jump=2.488#evade-jump=3.863#sword_swing3=4.8#energy_charge=4.177#klein_03=4.8#heavy_impact=7#shaking_stones=6.884#talken_bat26=2.259	221	root	222	buffb	223	wuqir					1	1.0	0	3
+010_1	0	0	0	attack01	3.2	skill_icon_118	sword_swing4=0.307#sword_swing4=1.132#sword_swing4=1.4#sword_swing4=1.68#sword_swing5=2.105#evade-jump=1.209#evade-jump=1.458#agil_sys28=0.95	224	root									1	1.0	0	3
+010_2	0	0	0	attack02	2.83333333333	skill_icon_119	sword_swing4=0.229#sword_swing5=1.002#sword_swing5=1.7#heavy_impact=1.99#agil_atk=0.968	225	root									1	1.0	0	3
+010_3	0	12	1	attack03	9.3	skill_icon_120	sword_swing5=0.654#sword_swing5=2.57#sword_swing4=3#sword_swing5=3.829#sword_swing5=7.374#heavy_impact=0.755#heavy_impact=3.931#heavy_impact_stones=3.93#heavy_impact=7.5#rush_heavy=1.293#shaking_stones=7.374#shaking_stones=7.455#shaking_stones=7.6#energy_recharge=5.6#alisa_05=7.547#agil_bat17=0#agil_bat18=5.283	226	root	227	wuqir							1	1.0	0	3
+010_4	0	0	0	attack01	3.2	skill_icon_118	sword_swing4=0.307#sword_swing4=1.132#sword_swing4=1.4#sword_swing4=1.68#sword_swing5=2.105#evade-jump=1.209#evade-jump=1.458#agil_sys28=0.95	224	root									1	1.0	0	3
+010_5	0	0	0	attack02	2.83333333333	skill_icon_119	sword_swing4=0.229#sword_swing5=1.002#sword_swing5=1.7#heavy_impact=1.99#agil_atk=0.968	225	root									1	1.0	0	3
+010_6	0	10	1	attack03	9.3	skill_icon_120	sword_swing5=0.654#sword_swing5=2.57#sword_swing4=3#sword_swing5=3.829#sword_swing5=7.374#heavy_impact=0.755#heavy_impact=3.931#heavy_impact_stones=3.93#heavy_impact=7.5#rush_heavy=1.293#shaking_stones=7.374#shaking_stones=7.455#shaking_stones=7.6#energy_recharge=5.6#alisa_05=7.547#agil_bat17=0#agil_bat18=5.283	226	root	227	wuqir							1	1.0	0	3
+037_1	0	0	0	attack01	2.93333333333	skill_icon_121	sword_bao=0#sword_swing2=0.66#sword_swing5=0.66#sword_swing1=1.614#sword_swing5=1.614#sword_swing4=1.717	268	root	269	wuqir							1	1.3	0	3
+037_2	0	0	0	attack02	3.3	skill_icon_122	sword_swing2=0.33#sword_swing5=0.33#sword_swing2=0.8#sword_swing5=0.8#sword_swing2=1.651#sword_swing5=1.651#sword_swing2=2.1#sword_swing5=2.1	270	root									1	1.3	0	3
+040_1	0	0	0	attack01	3.16666666667	skill_icon_124	sword_swing1=0.4#sword_swing1=0.8#sword_swing2=1.094#sword_swing1=1.821#sword_swing2=1.821#evade-jump=1.65#fire=0.448#fire=0.862#fire=1.13#fire=1.88	275	root									1	1.5	0	3
+040_2	0	0	0	attack02	3.5	skill_icon_125	sword_swing2=1#sword_swing2=1.3#sword_swing2=1.676#sword_swing2=2.021#wind_charge=0.136#alisa_02=0.136#alisa_02=0.456#alisa_02=0.856#alisa_02=1.2	276	root									1	1.5	0	3
+040_4	0	0	0	attack01	3.16666666667	skill_icon_124	sword_swing1=0.4#sword_swing1=0.8#sword_swing2=1.094#sword_swing1=1.821#sword_swing2=1.821#evade-jump=1.65#fire=0.448#fire=0.862#fire=1.13#fire=1.88	275	root									1	1.5	0	3
+040_5	0	0	0	attack02	3.5	skill_icon_125	sword_swing2=1#sword_swing2=1.3#sword_swing2=1.676#sword_swing2=2.021#wind_charge=0.136#alisa_02=0.136#alisa_02=0.456#alisa_02=0.856#alisa_02=1.2	276	root									1	1.5	0	3
+040_11	0	0	0	attack01	3.16666666667	skill_icon_124	sword_swing1=0.4#sword_swing1=0.8#sword_swing2=1.094#sword_swing1=1.821#sword_swing2=1.821#evade-jump=1.65#fire=0.448#fire=0.862#fire=1.13#fire=1.88	275	root									1	1.5	0	3
+040_12	0	0	0	attack02	3.5	skill_icon_125	sword_swing2=1#sword_swing2=1.3#sword_swing2=1.676#sword_swing2=2.021#wind_charge=0.136#alisa_02=0.136#alisa_02=0.456#alisa_02=0.856#alisa_02=1.2	276	root									1	1.5	0	3
+062_1	1	0	0	attack01	4.1	skill_icon_009	magic_prepare=1.36#magic_prepare=1.502#SE_012200=1.36#lightning=2#SE_030029=2#lightning=2.4#SE_030029=2.4#lightning=2.8#SE_030029=2.8#fleur_atk02=1.032	464	root	465	Bip001 R Finger1							4	1.0	1	3
+062_2	1	0	0	attack02	3.2222	skill_icon_077	thunder=1#thunder_passing_boom=0.7#thunder_passing_boom=0.8#thunder_passing_boom=1.123#thunder_passing_boom=1.25#thunder_passing_boom=1.573#thunder_passing_boom=1.762#thunder_passing_boom=2.3#thunder_passing_boom=2.5#fleur_atk03=0.225	467	wuqir									4	1.0	1	3
+062_3	0	12	1	attack03	10.0	skill_icon_119	thunder=0#thunder_heavy_004=0.39#thunder=1#thunder=2#SE_011020=3#magic_rise=3.261#thunder_heavy_004=4.747#thunder_med_007=5#thunder_heavy_002=5#thunder=5.806#thunder=8.125#thunder_passing_boom=6.158#jumphit_stones=6.181#thunder_heavy_004=6.181#thunder=6.181#thunder_passing_boom=6.532#jumphit_stones=6.532#thunder_passing_boom=6.915#jumphit_stones=6.915#thunder_passing_boom=7.241#jumphit_stones=7.241#thunder_passing_boom=7.5#jumphit_stones=7.5#thunder_passing_boom=8.03#jumphit_stones=8.03#thunder_passing_boom=8.5#jumphit_stones=8.5#thunder_passing_boom=9#jumphit_stones=9#thunder=9.258#thunder_passing_boom=9.788#jumphit_stones=9.788#fleur_atk04=3.163#fleur_com02=0	469	root									4	1.0	0	3
+063_1	0	0	0	attack01	3.4	skill_icon_004	sword_swing1=0.581#evade-jump=1.032#sword_swing1=1.48#philia_atk03=1.475	470	root									1	1.2	0	3
+063_2	0	0	0	attack02	3.333333333	skill_icon_020	sword_swing1=0.458#sword_swing1=0.972#sword_swing1=1.505#sword_swing1=1.905#sword_swing1=2.105#sword_swing1=2.505#evade-jump=0.901#evade-jump=1.369#evade-jump=1.877#sword_swing1=1.16#sword_swing5=2.505#philia_sys28=1.905	471	root	472	wuqir							1	1.2	0	3
+063_3	0	12	1	attack03	11.333	skill_icon_030	horro_atmosphere=0#rosalia_03=2.213#evade-jump=3.13#sword_swing1=4.231#evade-jump=5#sword_swing1=5.548#evade-jump=7.2#sword_swing1=5.48#sword_swing1=8.935#sword_swing1=9.948#philia_atk04=7.09#philia_bat32=0.57#philia_bat33=2.798#philia_bat36=8	473	root	474	wuqir							1	1.2	0	3
+064_1	1	0	0	attack01	3.0	skill_icon_058	lili_attack01=0.347	475	root	476	wuqir							4	1.0	1	3
+064_2	1	0	0	attack02	3.033333333	skill_icon_117	alisa_01=0	477	root									4	1.0	1	3
+064_3	0	12	1	attack03	11.1	skill_icon_094	machinegun=0.942#sword_swing4=2.548#lili_groundfire=2.902#metal_rub=3.5#metal_passing=4.5#machinegun=5.156#metal_rub=5.458#machinegun=6.639#metal_passing=6.773#shaking_ground=8.175#machinegun_boom=9.74#lili_sys28=5.73#lili_com07=1.2#lili_bat21=7	479	root	480	wuqir							1	1.2	0	3
+065_1	0	0	0	attack01	3.2	skill_icon_070	sword_swing5=1#sword_swing5=1.9#sword_swing5=2.061#energy_charge=1.492#stlea_atk01=1.781#stlea_bat02=0	487	root	488	wuqir							1	1.5	0	3
+065_2	0	0	0	attack02	4.666666667	skill_icon_069	evade-jump=0.4#sword_swing5=0.829#sword_swing5=1.5#sword_swing5=1.7#heavy_impact=1#evade-jump=1.759#sword_swing5=2.272#evade-jump=2.374#heavy_impact=2.374#heavy_impact=2.9#sword_swing5=3.23#heavy_impact=3.367#jumphit_stones=3.433#stlea_atk04=2.862#stlea_bat55=0	489	root									1	1.5	0	3
+065_3	0	12	1	attack03	11.33333333	skill_icon_071	throw_sword=0.716#rosalia_03=1.7#sword_swing5=2.9#sword_swing5=3.426#sword_swing5=4.429#sword_swing5=5.555#sword_swing5=6#sword_swing5=6.46#sword_swing5=6.9#sword_swing5=5.7#sword_swing5=6.1#sword_swing5=6.571#sword_swing5=7#sword_swing5=5.581#sword_swing5=6.217#sword_swing5=6.7#sword_swing5=5.952#sword_swing5=6.349#sword_swing5=6.8#sword_swing1=5.657#sword_swing1=6.054#sword_swing1=6.527#sword_swing1=6.968#sword_swing1=5.773#sword_swing1=6.165#sword_swing1=6.633#sword_swing1=7.07#sword_swing1=5.9#sword_swing1=6.276#sword_swing1=6.746#sword_swing1=6.005#sword_swing1=6.417#sword_swing1=6.857#sword_swing5=7.468#evade-jump=7.82#sword_swing5=8.7#heavy_impact=8.8#stonegiant_05=9.836#stlea_atk03=2.9#stlea_atk02=4.429#stlea_atk04=5.692#stlea_bat57=0#stlea_bat59=6.614	490	root	491	wuqir							1	1.2	0	3
+066_1	0	0	0	attack01	3.5	skill_icon_086	sword_swing1=0.347#sword_swing1=0.756#sword_swing2=1#sword_swing6=1.6#sword_swing6=1.642#sword_swing6=1.7#sword_swing6=1.826#sword_swing3=1.642#sword_swing3=1.7#sword_swing3=1.76#sword_swing1=2.513#sword_swing6=2.522#sword_swing6=2.531#ice_hit=2.5#annette_atk02=1.6#annette_bat04=0	492	root									1	1.2	0	3
+066_2	0	0	0	attack02	3.333333333	skill_icon_035	sword_swing1=0.3#sword_swing1=0.759#ice_PRE=1.122#sword_swing1=1.177#sword_swing1=1.521#sword_swing1=1.28#sword_swing1=1.374#sword_swing2=1.472#sword_swing2=1.221#sword_swing2=1.321#sword_swing2=1.442#sword_swing1=2.251#ice_hit=2.236#annette_atk03=2.211	493	root	494	wuqir							1	1.2	0	3
+066_3	0	12	1	attack03	11.0	skill_icon_038	mercy_wind=0.071#mercy_wind=2.349#mercy_wind=3.982#klein_01=2.6#sword_swing2=3.948#sword_swing1=4.449#sword_swing1=4.9#sword_swing2=5.253#sword_swing1=5.5#klein_01=6.152#sword_swing6=6.2#sword_swing1=6.532#sword_swing1=6.827#sword_swing2=6.2#sword_swing5=6.402#sword_swing5=6.8#sword_swing1=6.4#sword_swing1=6.7#sword_swing1=6.994#sword_swing4=6.5#sword_swing5=6.629#evade-jump=7.596#evade-jump=7.878#kirito-alo_01=7.6#sword_swing2=8.4#energy_charge=8.424#jumphit_stones=8.424#ice_hit=8.357#evade-jump=9.226#annette_atk01=3.852#annette_atk03=6.378#annette_atk04=8.108#annette_bat20=0#annette_bat12=2.812	495	root	496	wuqir							1	1.2	0	3
+067_1	0	0	0	attack01	2.833333333	skill_icon_001	sword_swing1=0.2#sword_swing1=0.663#sword_swing1=0.957#sword_swing1=1.363#sword_swing1=1.379#evade-jump=1.822#sword_swing5=1.846#sword_swing5=1.9#kirito_atk02=1.249	481	root									1	1.2	0	3
+067_2	0	0	0	attack02	2.4	skill_icon_002	sword_swing1=0.524#sword_swing1=0.761#evade-jump=1.132#sword_swing5=1.235#sword_swing5=1.357#sword_swing1=1.6#sword_swing1=1.612#kirito_atk01=0.574#kirito_atk03=1.6	482	root									1	1.2	0	3
+067_3	0	12	1	attack03	8.6	skill_icon_005	klein_01=0#sword_swing5=0.968#sword_swing1=1.768#sword_swing1=1.787#sword_swing5=2.19#evade-jump=2.34#sword_swing1=2.724#sword_swing1=2.736#sword_swing5=2.723#sword_swing1=3.486#sword_swing1=3.6#evade-jump=3.536#sword_swing1=3.983#sword_swing1=4.003#sword_swing5=4.386#rosalia_03=4.544#jumphit_stones=5.6#energy_charge=5.711#yukki_04=6.062#kirito_atk01=1.768#kirito_atk03=4.386#kirito_atk04=5.6#Kirito_com47=0#kirito_bat42=4.298	483	root	484	buffb	485	wuqil	486	wuqir			1	1.2	0	3
+068_1	0	0	0	attack01	2.166666667	skill_icon_044	sword_swing8=0.15#sword_swing8=0.672#evade-jump=1.06#sword_swing3=1.471#ice_hit=1.615#heavy_impact=1.674#sachi_sys28=1.417	502	root									1	1.2	0	3
+068_2	0	0	0	attack02	2.833333333	skill_icon_086	sword_swing8=0.466#sword_swing8=0.966#ice_hit=0.966#evade-jump=1.3#ICE_PRE=1.4#sword_swing1=1.555#sword_swing2=1.599#sword_swing1=1.657#sword_swing2=1.699#sword_swing1=1.752#sword_swing2=1.849#sword_swing1=1.899	504	root			506	wuqir					1	1.2	0	3
+068_3	0	12	1	attack03	8.833333333	skill_icon_087	rosalia_03b=0#sword_swing1=1.166#sword_swing2=1.7#sword_swing3=1.7#evade-jump=2.2#ICE_PRE=2.366#sword_swing1=2.421#sword_swing2=2.465#sword_swing1=2.524#sword_swing2=2.565#sword_swing1=2.618#sword_swing2=2.716#sword_swing1=2.765#sword_swing3=3.433#ice_hit=3.444#heavy_impact=3.5#sword_swing2=4#sword_swing3=4#evade-jump=4.466#sword_swing1=4.666#enterwatergianta=4.728#evade-jump=5.6#kirito-alo_01=6.067#sword_swing1=6.235#sword_swing2=6.279#sword_swing1=6.337#sword_swing2=6.379#sword_swing1=6.457#sword_swing2=6.53#sword_swing1=6.579#sword_swing2=6.632#waterfall_poke_3=7.071#sachi_bat26=0	507	root	508	Bip001							1	1.2	0	3
+069_1	0	0	0	attack01	2.4	skill_icon_001		497	root									1	1.2	0	3
+069_2	0	0	0	attack02	3.166666667	skill_icon_002		498	root	499	wuqir							1	1.2	0	3
+069_3	0	12	1	attack03	10.43333333	skill_icon_005		500	root	501	wuqir							1	1.2	0	3
+070_1	0	0	0	attack01	2.5	skill_icon_001		509	root	510	wuqir							1	1.2	0	3
+070_2	0	0	0	attack02	2.5	skill_icon_002		511	root	512	wuqir							1	1.2	0	3
+070_3	0	12	1	attack03	8.0	skill_icon_005		513	root	514	wuqir							1	1.2	0	3
+071_1	0	0	0	attack01	3.6	skill_icon_078	sword_swing5=0.903#sword_swing5=1.2#evade-jump=1.932#sword_swing5=2.3#heavy_impact=2.433	516	root	517	wuqir							1	1.4	0	3
+071_2	0	0	0	attack02	6.366666667	skill_icon_114	sword_swing5=0.933#evade-jump=0.933#evade-jump=1.966#rush=3.499#evade-jump=4.833#sword_swing5=4.9#mitsuki_sys28=3.091	518	root	519	wuqir							1	1.4	0	3
+071_3	0	12	1	attack03	14.6	skill_icon_099	rosalia_03=4.145#sword_swing5=5.2#sword_swing5=5.433#sword_swing5=5.633#sword_swing5=5.866#evade-jump=8.666#energy_recharge_soon=8.666#sword_swing5=9.4#heavy_impact=9.493#shino-ggo_04=9.707#sword_swing5=11.166#hitflying=11.069#mitsuki_sys19=0#mitsuki_bat22=1.66#mitsuki_bat20=9.134	520	root	521	wuqir							1	1.2	0	3
+072_1	0	0	0	attack01	2.166666667	skill_icon_110	submachine_long=0.3#sinon_atk01=0.263	524	wuqir									1	1.2	0	3
+072_2	0	0	0	attack02	3.666666667	skill_icon_048	evade-jump=1.4#heavy_impact=2#submachine_long=2.016#sinon_atk02=0.755#sinon_atk04=1.923	525	root	526	wuqir							1	1.2	1	3
+072_3	0	12	1	attack03	10.66666667	skill_icon_049	yukki_03=1.6#SE_020021=4.504#shino-ggo_04=4.504#SE_020021=5#shino-ggo_04=5#SE_020021=5.74#shino-ggo_03=5.74#evade-jump=6.666#submachine_long=7.666#gunshot_sniper=9.145#AssaultRifle_ShotLoop14=9#sinon_bat29=0.167	527	root	528	Bip001 L Toe0Nub	529	Bip001 R Toe0Nub	530	wuqir			1	1.7	0	3
+073_1	0	0	0	attack01	2.5	skill_icon_001		531	root									1	1.0	0	3
+073_2	0	0	0	attack02	4.0	skill_icon_002		532	root									4	1.0	1	3
+073_3	0	12	1	attack03	11.0	skill_icon_005		533	root									1	1.7	0	3
+074_1	0	0	0	attack01	2.26	skill_icon_007	sword_swing1=0.266#sword_swing1=0.533#sword_swing1=0.733#sword_swing1=0.966#sword_swing1=1.366#leafa_atk01=0.242#leafa_atk03=1.326	555	root	556	wuqir							1	1.3	0	3
+074_2	0	0	0	attack02	3.4	skill_icon_008	sword_swing3=0.233#sword_swing1=0.233#sword_swing3=0.7#sword_swing3=0.833#sword_swing3=1.066#sword_swing1=1.066#sword_swing1=1.8#evade-jump=2.3#sword_swing1=2.366#sword_swing3=2.366#leafa_atk03=0.641#leafa_atk01=2.342	557	root									1	1.3	0	3
+074_3	0	12	1	attack03	11.9	skill_icon_009	sword_swing1=1.566#sword_swing1=2.666#sword_swing3=2.666#sword_swing1=3#sword_swing3=3#sword_swing1=3.4#sword_swing3=3.4#sword_swing1=4#sword_swing3=4#sword_swing1=4.433#sword_swing3=4.433#evade-jump=5.122#sword_spin=5.122#sword_spin=5.55#sword_spin=5.982#sword_spin=6.411#sword_spin=6.843#sword_swing1=5.262#sword_swing1=5.622#sword_swing1=5.982#sword_swing1=6.342#sword_swing1=6.702#sword_swing3=5.364#sword_swing3=5.58#sword_swing3=5.796#sword_swing3=6.012#sword_swing3=6.228#sword_swing3=6.444#sword_swing3=6.66#sword_swing3=6.876#sword_swing1=5.475#sword_swing1=5.835#sword_swing1=6.195#sword_swing1=6.555#sakuya_03b=8.104#flyingwave=10.073#sword_swing1=10.073#sword_swing3=10.073#magicblade_wave=10.289#heathcliff_01=10.073#leafa_bat30=0#leafa_atk01=2.7#leafa_atk02=4#leafa_atk03=5.427#leafa_bat34=7.509	559	root	560	wuqir							1	1.2	0	3
+075_1	0	0	0	attack01	4.1	skill_icon_094	sword_swing1=0.133#sword_swing1=0.433#evade-jump=0.688#sword_swing1=0.75#sword_swing2=0.725#sword_swing4=1.05#swordTwirl2=1.176#sword_swing4=1.264#wind=1.34#swordTwirl2=1.383#lux_atk01=0#lux_atk02=0.558#lux_atk03=1.236	534	root									1	1.9	0	3
+075_2	0	0	0	attack02	4.4	skill_icon_032	evade-jump=0.15#sword_swing1=0.34#sword_swing1=0.644#sword_swing2=0.711#sword_swing3=0.753#sword_swing1=0.857#sword_swing2=0.908#sword_swing3=0.956#sword_swing1=1.013#sword_swing2=1.059#sword_swing3=1.086#sword_swing1=1.217#sword_swing2=1.299#sword_swing3=1.384#sword_swing1=1.675#sword_swing1=1.98#sword_swing2=2#sword_swing1=2.3#sword_swing1=2.66#sword_swing1=3.14#sword_swing3=3.157#lux_atk04=0.33#lux_atk02=1.8#lux_atk03=3.02	535	root									1	1.9	0	3
+075_3	0	12	1	attack03	12.246	skill_icon_108	rosalia_03=0#sword_swing1=1.494#sword_swing1=1.737#sword_swing1=2.16#evade-jump=2.567#sword_swing1=3.953#sword_swing4=4.286#sword_swing1=4.653#sword_swing1=5.053#sword_swing1=5.32#sword_swing2=5.94#sword_swing2=6.18#sword_swing1=6.42#sword_swing2=5.747#sword_swing4=5.987#sword_swing1=6.587#evade-jump=5.553#sword_swing1=6.129#sword_swing1=6.489#sword_swing2=5.8#sword_swing2=6.04#sword_swing2=6.28#sword_swing2=6.52#sword_swing2=6.76#sword_swing1=5.96#sword_swing4=6.32#sword_swing1=7.086#rush=7.62#energy_charge=7.868#kirito-alo_05=8.372#kirito-ggo_05=10.652#lux_bat20=0#lux_atk01=2.4#lux_atk04=5.444#lux_atk03=6.98#lux_bat03=9.097	536	root	537	buffb	538	wuqil	539	wuqir			1	1.2	0	3
+076_1	0	0	0	attack01	3.5	skill_icon_058	submachine_short=0.341#evade-jump=1.357#submachine=2.128#annette_atk02=1.972	540	wuqir									1	1.2	0	3
+076_2	0	0	0	attack02	6.8	skill_icon_104	submachine_long=0.1#submachine_short=2.266#submachine_long=2.938#evade-jump=4.824#annette_atk04=2.7#annette_atk03=4.9	541	root	542	wuqir							1	1.2	1	3
+076_3	0	12	1	attack03	11.0	skill_icon_126	evade-jump=1.5#rush=1.5#submachine_short=1.766#ice_hit=2.936#heavy_impact=3#bow_icehit=3.1#submachine_long=3.248#submachine_long=4.648#evade-jump=5.433#submachine_long=6#evade-jump=6.666#submachine_short=7.4#heavy_impact=8.351#annette_bat12=0#annette_atk04=5.536	543	root	544	wuqir							1	1.2	0	3
+1001_1	0	0	0	attack01	1.7333	skill_icon_091		139	root									1	0.9	0	18
+1001_11	0	0	0	attack01	1.7333	skill_icon_091		139	root									1	0.9	0	18
+1002_1	0	0	0	attack01	2.93	skill_icon_092		140	root									1	0.8	0	18
+1002_11	0	0	0	attack01	2.93	skill_icon_092		140	root									1	0.8	0	18
+1003_1	0	0	0	attack01	2.16666666667	skill_icon_093		182	root									1	1.7	0	18
+1003_11	0	0	0	attack01	2.16666666667	skill_icon_093		182	root									1	1.7	0	18
+1004_1	0	0	0	attack01	2.66666666667	skill_icon_094		183	root									1	0.9	0	18
+1004_11	0	0	0	attack01	2.66666666667	skill_icon_094		183	root									1	0.9	0	18
+1005_1	0	0	0	attack01	2.0	skill_icon_095	spider_web=0.7	251	root									1	3.0	0	18
+1005_2	0	0	0	attack01	1.6	skill_icon_095		251	root									1	1.0	0	18
+1005_11	0	0	0	attack01	2.0	skill_icon_095	spider_web=0.7	251	root									1	3.0	0	18
+1005_12	0	0	0	attack01	1.6	skill_icon_095		251	root									1	1.0	0	18
+1006_1	0	0	0	attack01	1.4	skill_icon_096	boar=0.2	141	root									1	1.1	0	18
+1006_11	0	0	0	attack01	1.4	skill_icon_096	boar=0.2	141	root									1	1.1	0	18
+1007_1	0	0	0	attack01	1.66666666667	skill_icon_097		142	root									1	1.0	0	18
+1007_11	0	0	0	attack01	1.66666666667	skill_icon_097		142	root									1	1.0	0	18
+1008_1	0	0	0	attack01	2.3		frog=0	262	root	263	Bone006							1	1.5	0	18
+1008_11	0	0	0	attack01	2.3		frog=0	262	root	263	Bone006							1	1.5	0	18
+1010_1	0	0	0	attack01	3.26667		boar=0.2	399	root									1	1.8	0	18
+1011_1	0	0	0	attack01	1.166666667			400	root									1	1.0	0	18
+1013_1	0	0	0	attack01	1.46666666667			252	root									1	1.1	0	18
+1013_11	0	0	0	attack01	1.46666666667			252	root									1	1.1	0	18
+1014_1	0	0	0	attack01	1.43333	skill_icon_096	dog_bark=0	325	root									1	1.2	0	18
+1014_11	0	0	0	attack01	1.43333	skill_icon_096	dog_bark=0	325	root									1	1.2	0	18
+1015_1	0	0	0	attack01	0.933		wolf_growl=0	402	root									1	0.8	0	18
+1016_1	0	0	0	attack01	1.9666			288	root									1	1.3	0	18
+1016_11	0	0	0	attack01	1.9666			288	root									1	1.3	0	18
+1016_21	0	0	0	attack01	1.9666			288	root									1	1.3	0	18
+1017_1	0	0	0	attack01	1.23333	skill_icon_096		326	root									1	1.0	0	18
+1017_11	0	0	0	attack01	1.23333	skill_icon_096		326	root									1	1.0	0	18
+1018_1	0	0	0	attack01	1.4667		heavy_impact=0.85	403	root									1	2.0	0	18
+1019_1	0	0	0	attack01	2.1			373	root									1	1.0	0	18
+1019_11	0	0	0	attack01	2.1			373	root									1	1.0	0	18
+1020_1	0	0	0	attack01	3.06666666667			448	root									1	1.0	0	18
+1020_11	0	0	0	attack01	3.06666666667			448	root									1	1.0	0	18
+1024_1	1	0	0	attack01	2.33333333333	skill_icon_100		436	Bip001 HeadNub									4	1.0	0	18
+1024_11	1	0	0	attack01	2.33333333333	skill_icon_100		436	Bip001 HeadNub									4	1.0	0	18
+1025_1	0	0	0	attack01	2.0	skill_icon_101		145	root	146	Point001							1	1.0	0	18
+1025_11	0	0	0	attack01	2.0	skill_icon_101		145	root	146	Point001							1	1.0	0	18
+1025_21	0	0	0	attack01	2.0	skill_icon_101		145	root	146	Point001							1	1.0	0	18
+1026_1	1	0	0	attack01	1.6	skill_icon_102		254	root									4	1.0	0	18
+1026_11	1	0	0	attack01	1.6	skill_icon_102		254	root									4	1.0	0	18
+1026_21	0	0	0	attack01	1.6	skill_icon_102		254	root									1	1.0	0	18
+1027_1	0	0	0	attack01	2.93		enemy_machine=0.3	296	wuqir									1	3.5	1	3
+1027_11	0	0	0	attack01	2.93		enemy_machine=0.3	296	wuqir									1	3.5	1	3
+1028_1	1	0	0	attack01	3.33333	skill_icon_096	rifle=1.25	433	wuqir									4	1.0	1	18
+1028_11	1	0	0	attack01	3.33333	skill_icon_096	rifle=1.25	433	wuqir									4	1.0	1	18
+1029_1	1	0	0	attack01	2.9	skill_icon_096	rifle=0.53#rifle=1.44	327	wuqir									4	1.0	1	18
+1029_11	1	0	0	attack01	2.9	skill_icon_096	rifle=0.53#rifle=1.44	327	wuqir									4	1.0	1	18
+1030_1	1	0	0	attack01	5.233333	skill_icon_096	rifle_dk1=1.3#rifle=3.28#rifle=4.08	434	wuqir									4	1.0	1	18
+1030_11	1	0	0	attack01	5.233333	skill_icon_096	rifle_dk1=1.3#rifle=3.28#rifle=4.08	434	wuqir									4	1.0	1	18
+1031_1	1	0	0	attack01	1.53333	skill_icon_096	submachine_short=0.7	328	wuqir									4	1.0	1	18
+1031_11	1	0	0	attack01	1.53333	skill_icon_096	submachine_short=0.7	328	wuqir									4	1.0	1	18
+1032_1	1	0	0	attack01	3.3	skill_icon_096	whistle=0#submachine=1.5	329	wuqir									4	1.0	1	18
+1032_11	1	0	0	attack01	3.3	skill_icon_096	whistle=0#submachine=1.5	329	wuqir									4	1.0	1	18
+1033_1	0	0	0	attack01	5.133333333		heavy_impact=2	404	root									1	1.5	0	18
+1034_1	0	0	0	attack01	1.866666667			405	root									1	1.0	0	18
+1035_1	0	0	0	attack01	2.633	skill_icon_103	heavy_impact=0.7	255	root									1	2.5	0	18
+1035_2	0	0	0	attack02	2.46666666667			256	root									6	2.5	0	19
+1035_11	0	0	0	attack01	2.633	skill_icon_103	heavy_impact=0.7	255	root									1	2.5	0	18
+1035_12	0	0	0	attack02	2.46666666667			256	root									6	2.5	0	19
+1036_1	0	0	0	attack01	2.66666666667			257	root									1	1.7	0	20
+1036_11	0	0	0	attack01	2.66666666667			257	root									1	1.7	0	20
+1037_1	1	0	0	attack01	2.5	skill_icon_096	dragon_01=0.5#fireflaming_wave=1	330	root									4	1.0	0	18
+1037_11	1	0	0	attack01	2.5	skill_icon_096	dragon_01=0.5#fireflaming_wave=1	330	root									4	1.0	0	18
+1039_1	1	0	0	attack01	1.333333333			442	root	443	buffa							4	1.0	0	18
+1039_2	1	0	0	attack02	2.666666667			444	root									4	1.0	0	18
+1040_1	0	0	0	attack01	5.733333333		sword_spin=0.181#sword_spin=0.4#horro_atmosphere=0	407	buffb	406	root							1	2.0	0	18
+1042_1	0	0	0	attack01	3.766666667		dragon_01=0#SE_030047=2.3	428	Bone036									1	2.0	0	18
+1042_3	0	0	1	attack03	15.16666667		dragon_03=0#SE_030047=0.434#dragon_03=1#SE_040004=1.314#dragon_01=2.874#SE_030050=3.384#dragon_02=6.678#dragon_01=8#SE_030047=8.25#SE_040004=10.384#SE_030047=8.565#ice_wind=9.144#dragon_01=11.624#SE_040004=12.144#ice_wind=12.144	429	root	430	Bip001	431	Bone036					1	1.0	0	18
+1043_1	0	0	0	attack01	1.333333333			447	root									1	1.0	0	18
+1044_1	1	0	0	attack01	1.8			439	root									4	1.0	0	18
+1044_2	0	0	0	attack02	3.0			441	root									1	3.0	0	18
+1045_1	0	0	0	attack01	2.0	skill_icon_104	sword_spin=0.1#sword_spin=0.35	184	root									1	2.0	0	19
+1045_11	0	0	0	attack01	2.0	skill_icon_104	sword_spin=0.1#sword_spin=0.35	184	root									1	2.0	0	19
+1046_1	0	0	0	attack01	5.666667	skill_icon_096		423	root									1	1.0	0	18
+1046_3	0	0	1	attack03	10.3333	skill_icon_096	SE_030018=0.449#SE_030047=1.552#SE_040020=3#SE_030050=7#SE_040004=7.354#ice_wind=7.774#ice_wind=8#ice_wind=8.197	424	root	425	Bip001 Head							1	1.0	0	18
+1046_11	0	0	0	attack01	5.666667	skill_icon_096		423	root									1	1.0	0	18
+1046_13	0	0	1	attack03	10.3333	skill_icon_096	SE_030018=0.449#SE_030047=1.552#SE_040020=3#SE_030050=7#SE_040004=7.354#ice_wind=7.774#ice_wind=8#ice_wind=8.197	424	root	425	Bip001 Head							1	1.0	0	18
+1047_1	0	0	0	attack01	5.1		chain_swing=0.5#heavy_impact=0.65#heavy_impact=1.55#heavy_impact=2.15#heavy_impact=2.35#heavy_impact=2.65#heavy_impact=2.85#heavy_impact=3.9	426	root									1	2.5	0	18
+1047_3	0	0	1	attack03	9.5		energy_recharge=0.347#heavy_impact=2.263#rosalia_03=4.519#heavy_impact=1.58#heavy_impact=2.708#yukki_03=3.788#shaking_ground=7#heavy_impact=1.806#heavy_impact=3.391#stonegiant_03=6.876#heavy_impact=2#heavy_impact=3.391#stonegiant_03=6.876#shaking_stones=1.58	427	root									1	1.0	0	18
+1047_4	0	0	0	attack01	5.1		chain_swing=0.5#heavy_impact=0.65#heavy_impact=1.55#heavy_impact=2.15#heavy_impact=2.35#heavy_impact=2.65#heavy_impact=2.85#heavy_impact=3.9	426	root									1	2.5	0	18
+1047_6	0	0	1	attack03	9.5		energy_recharge=0.347#heavy_impact=2.263#rosalia_03=4.519#heavy_impact=1.58#heavy_impact=2.708#yukki_03=3.788#shaking_ground=7#heavy_impact=1.806#heavy_impact=3.391#stonegiant_03=6.876#heavy_impact=2#heavy_impact=3.391#stonegiant_03=6.876#shaking_stones=1.58	427	root									1	1.0	0	18
+1048_1	0	0	0	attack01	4.866667	skill_icon_096		331	root									1	2.0	0	18
+1048_11	0	0	0	attack01	4.866667	skill_icon_096		331	root									1	2.0	0	18
+1049_1	1	0	0	attack01	4.0	skill_icon_096	shoot_laser=1.311#shoot_laser=1.802#shoot_laser=2.5#laser_boom=1.641#laser_boom=1.802#laser_boom=1.943#explosion_hit=1.717#explosion_hit=2.365#explosion_hit=2.783	416	root	417	Bone007							4	1.0	0	18
+1049_11	1	0	0	attack01	4.0	skill_icon_096	shoot_laser=1.311#shoot_laser=1.802#shoot_laser=2.5#laser_boom=1.641#laser_boom=1.802#laser_boom=1.943#explosion_hit=1.717#explosion_hit=2.365#explosion_hit=2.783	416	root	417	Bone007							4	1.0	0	18
+1050_1	0	0	0	attack01	2.63333333333	skill_icon_105		258	root									1	1.0	0	18
+1050_11	0	0	0	attack01	2.63333333333	skill_icon_105		258	root									1	1.0	0	18
+1051_1	0	0	0	attack01	1.7333	skill_icon_106		147	root									1	1.0	0	18
+1051_11	0	0	0	attack01	1.7333	skill_icon_106		147	root									1	1.0	0	18
+1052_1	0	0	0	attack01	1.5	skill_icon_107	palerider_02=0.5	260	root	261	Bip01 Head							1	2.0	0	18
+1052_11	0	0	0	attack01	1.5	skill_icon_107	palerider_02=0.5	260	root	261	Bip01 Head							1	2.0	0	18
+1054_1	0	0	0	attack01	2.56677	skill_icon_108		264	root									1	1.5	0	18
+1054_11	0	0	0	attack01	2.56677	skill_icon_108		264	root									1	1.5	0	18
+1055_1	0	0	0	attack01	2.73333333333			379	root	380	Bone076	381	Bone076 (mirrored)					1	3.5	0	18
+1055_2	1	0	0	attack02	1.87			383	root									4	1.0	1	3
+1055_11	0	0	0	attack01	2.7			379	root	380	Bone076	381	Bone076 (mirrored)					1	3.5	0	18
+1055_12	1	0	0	attack02	1.87			383	root									4	1.0	1	3
+1056_1	0	0	0	attack01	2.8	skill_icon_109	heavy_impact=2	338	root									1	2.0	0	21
+1056_2	1	0	0	attack02	3.4	skill_icon_110		374	root	375	Bip001 R Finger2Nub							4	2.0	0	3
+1056_3	0	10	1	attack03	8.1	skill_icon_111	wind_long=0.8#mercy_wind=1#wind_long=1.8#mercy_wind=2#wind_long=2.8#mercy_wind=3#wind_long=3.8#mercy_wind=4#wind_long=4.8#mercy_wind=5#heavy_impact=7	339	root									1	1.0	0	10
+1057_1	0	0	0	attack01	2.6	skill_icon_109		148	root									1	2.0	0	21
+1057_2	0	0	0	attack02	2.0	skill_icon_110	heavy_impact=1.5	150	root									1	3.0	0	3
+1057_3	0	10	1	attack03	6.3	skill_icon_111	shino_alo_05=0#energy_charge=1.8#rush_heavy=2.193#alisa_02=3.7#slow_circle=4.024	151	root	149	wuqir	202	Bip001 Head					1	1.0	0	21
+1057_11	0	0	0	attack01	2.6667	skill_icon_109		148	root									1	2.0	0	21
+1057_12	0	0	0	attack02	2.06667	skill_icon_110	heavy_impact=1.5	150	root									1	3.0	0	3
+1057_13	0	18	1	attack03	6.3	skill_icon_111	shino_alo_05=0#energy_charge=1.8#rush_heavy=2.193#alisa_02=3.7#slow_circle=4.024	151	root	149	wuqir	202	Bip001 Head					1	1.0	0	21
+1058_1	0	0	0	attack01	1.3333	skill_icon_109	palerider_02=0.5#palerider_01=0.5	445	root	446	Bip001 HeadNub							1	2.8	0	21
+1059_1	0	0	0	attack01	2.33333	skill_icon_096		391	root									1	1.7	0	18
+1059_11	0	0	0	attack01	2.33333	skill_icon_096		391	root									1	1.7	0	18
+1060_1	0	0	0	attack01	2.6		heavy_impact=1.95#SE_030029=0.6#SE_030029=0.9#SE_030029=1.2#SE_030029=1.9	408	root									1	1.8	0	18
+1060_3	0	0	1	attack03	8.0		monster_060_roar=0#SE_030035=0.4#monster_060_roar=1.004#SE_030035=1.404#monster_060_roar=2.099#SE_030035=2.499#sword_swing4=3.529#SE_030029=3.529#sword_swing4=5.2#heavy_impact=5.258#SE_030035=5.258#SE_030029=5.2#SE_030029=5.357	409	root									1	1.5	0	18
+1061_1	0	0	0	attack01	1.57			284	root									1	2.0	0	3
+1061_2	0	0	0	attack02	2.6			285	root									1	2.0	0	3
+1061_3	1	9	1	attack03	11.3		stonegiant_01=0#stonegiant_02=4.386#stonegiant_03=5.1#stonegiant_04=6.96#stonegiant_05=8	286	root									4	1.0	0	3
+1061_11	0	0	0	attack01	1.57			284	root									1	2.0	0	3
+1061_12	0	0	0	attack02	2.6			285	root									1	2.0	0	3
+1061_13	1	18	1	attack03	11.3		stonegiant_01=0#stonegiant_02=4.386#stonegiant_03=5.1#stonegiant_04=6.96#stonegiant_05=8	286	root									4	1.0	0	3
+1062_1	0	0	0	attack01	1.667	skill_icon_112		371	root									1	1.0	0	18
+1062_11	0	0	0	attack01	1.667	skill_icon_112		371	root									1	1.0	0	18
+1063_1	1	0	0	attack01	1.667			279	bone033	280	bone035	281	bone037					4	1.0	1	3
+1063_11	1	0	0	attack01	1.667			279	bone033	280	bone035	281	bone037					4	1.0	1	3
+1064_1	0	0	0	attack01	2.5	skill_icon_114		289	root									1	3.0	0	18
+1064_2	1	0	0	attack02	4.167	skill_icon_115												4	1.0	0	6
+1064_3	0	9	1	attack03	13.5	skill_icon_116	dragon_01=0#dragon_02=3.781#dragon_03=8.837#dragon_04=10	292	root	293	Bip001 Neck2	294	Bone022					1	1.0	0	10
+1064_11	0	0	0	attack01	2.5	skill_icon_114		289	root									1	3.0	0	18
+1064_12	1	0	0	attack02	4.167	skill_icon_115												4	1.0	0	6
+1064_13	0	12	1	attack03	13.5	skill_icon_116	dragon_01=0#dragon_02=3.781#dragon_03=8.837#dragon_04=10	292	root	293	Bip001 Neck2	294	Bone022					1	1.0	0	10
+1065_1	1	0	0	attack01	2.93333		magic_sum=0.5#fire=0.5#fire=0.1#fire=1.5#fire_throw=2	414	root	410	wuqir	411	wuqil					4	1.0	0	18
+1001_1_1	0	0	0	attack01	1.0	skill_icon_091		139	root									1	1.0	0	18
+1057_2_1	0	0	0	attack02	1.7	skill_icon_110		150	root									1	1.0	0	18
+1062_1_1	0	0	0	attack01	1.667	skill_icon_112			root									1	1.0	0	18
+1066_1	0	0	0	attack01	3.0	skill_icon_096	heavy_impact=2.05	435	root									1	1.0	0	18
+1066_11	0	0	0	attack01	3.0	skill_icon_096	heavy_impact=2.05	435	root									1	1.0	0	18
+1067_1	0	0	0	attack01	2.63333	skill_icon_096		332	root									1	1.0	0	18
+1067_2	1	0	0	attack02	1.83	skill_icon_025		46	root									4	1.0	1	3
+1067_11	0	0	0	attack01	2.63333	skill_icon_096		332	root									1	1.0	0	18
+1067_12	1	0	0	attack02	1.83	skill_icon_025		46	root									4	1.0	1	3
+1068_1	0	0	0	attack01	1.8	skill_icon_096		449	root									1	1.0	0	18
+1068_11	0	0	0	attack01	1.8	skill_icon_096		449	root									1	1.0	0	18
+1069_1	0	0	0	attack01	1.2			415	root									1	1.5	0	18
+1070_1	0	0	0	attack01	1.8	skill_icon_096		450	root									1	1.0	0	18
+1070_11	0	0	0	attack01	1.8	skill_icon_096		450	root									1	1.0	0	18
+1003_1_1	0	0	0	attack01	2.1	skill_icon_093		182	root									1	1.0	0	18
+1057_1_1	0	0	0	attack01	1.4	skill_icon_109		148	root									1	1.0	0	21
+1900_3	0	9	1	attack03	6.3	skill_icon_111		151	root	149	wuqir	202	Bip001 Head					1	1.0	0	10
+1041_1	0	0	0	attack01	1.333	skill_icon_103												1	1.0	0	20
+1041_2	0	0	0	attack01	1.333	skill_icon_103												1	1.0	0	20
+1041_3	0	2	1	attack03	7.7	skill_icon_103	monster_041_shout=0.71#monster_041_shout=2.558#monster_041_shout=6.5#stonegiant_05=5.111#monster_041_crawling=3.186#palerider_08=5.596#alisa_02=0.614#alisa_02=1.577	287	root									1	1.0	0	20
+1041_11	0	0	0	attack01	1.333	skill_icon_103												1	1.0	0	20
+1041_12	0	0	0	attack01	1.333	skill_icon_103												1	1.0	0	20
+1041_13	0	18	1	attack03	7.7	skill_icon_103	monster_041_shout=0.71#monster_041_shout=2.558#monster_041_shout=6.5#stonegiant_05=5.111#monster_041_crawling=3.186#palerider_08=5.596#alisa_02=0.614#alisa_02=1.577	287	root									1	1.0	0	20
+guard01_1	0	0	0	attack01	1.9666			288	root									1	1.3	0	18
+unionhero002_1	0	0	0	attack01	2.667	skill_icon_003	sword_swing1=0.2#sword_swing1=0.573#sword_swing4=1.651#energy_sword=0.2#energy_sword=0.577#shieldbash_wind=1.744#energy_charge=1.651#energy_boom=1.628	362	root	363	wuqir							1	1.4	0	3
+unionhero002_2	0	0	0	attack02	3.6667	skill_icon_051	sword_swing1=0.505#sword_swing1=1#sword_swing1=1.705#sword_swing1=2.4#evade-jump=1.662#heavy_impact=2.478	364	root	365	wuqir							1	1.4	0	3
+unionhero002_3	0	8	1	attack03	12.5	skill_icon_114	sword_swing4=2.025#sword_swing1=2.754#sword_swing1=3.2#sword_swing1=4.256#sword_swing4=4.6#rosalia_03=0.797#heathcliff_01=0.846#SE_040001=7.5#heathcliff_02=7.5#sakuya_01=7.5#sakuya_03b=8.178#stonegiant_04=7.798#yukki_04=9.339#yukki_04=10.192#yukki_04=10.888#hero_07=11.647	366	root	367	wuqir							1	1.0	0	3
+unionhero013_1	0	0	0	attack01	2.236666667	skill_icon_037	magic_summon=0.222#SE_030035=0.381#SE_030029=0.677#SE_030029=1.152#SE_030029=1.349#lightning=1.974	79	wuqir									1	3.5	0	3
+unionhero013_2	0	0	0	attack02	2.6	skill_icon_038	sword_swing1=0.9#flyingwave=0.97	80	root									1	3.5	0	3
+unionhero013_3	0	2	1	attack03	9.6	skill_icon_039	oberon_01=0#oberon_02=3.779	81	root									1	1.0	0	3
+unionmonster001_1	0	0	0	attack01	2.6667	skill_icon_109		148	root									1	2.0	0	21
+unionmonster001_2	0	0	0	attack02	2.06667	skill_icon_110	heavy_impact=1.5	150	root									1	3.0	0	3
+unionmonster001_3	0	10	1	attack03	6.36666666667	skill_icon_111	shino_alo_05=0#energy_charge=1.8#rush_heavy=2.193#alisa_02=3.7#slow_circle=4.024	151	root	149	wuqir	202	Bip001 Head					1	1.0	0	21
+unionmonster002_1	0	0	0	attack01	2.6667	skill_icon_109		148	root									1	2.0	0	21
+unionmonster002_2	0	0	0	attack02	2.06667	skill_icon_110	heavy_impact=1.5	150	root									1	3.0	0	3
+unionmonster002_3	0	10	1	attack03	6.36666666667	skill_icon_111	shino_alo_05=0#energy_charge=1.8#rush_heavy=2.193#alisa_02=3.7#slow_circle=4.024	151	root	149	wuqir	202	Bip001 Head					1	1.0	0	21
+0001_1	0	0	0	attackjx	3.0	skill_icon_083	sword_swing1=0.436#sword_swing1=0.449#sword_swing2=0.983#sword_swing1=1.369#evade-jump=1.728#sword_swing1=2.188#sword_swing1=2.195#kirito_atk02=0.4#kirito_atk03=2.2	545	root									1	1.0	0	3
+0003_1	0	0	0	attackjx	2.666666667	skill_icon_012	sword_swing1=0.305#sword_swing1=0.491#sword_swing1=0.817#evade-jump=1#sword_swing8=1.322#sword_swing1=1.879#asuna_atk01=1.115	548	root									1	1.0	0	3
+0006_1	1	0	0	attackjx	4.233333333	skill_icon_104	stonegiant_04=0.792#SE_020022=2.316#sniper_shot=2.316	550	root									4	3.5	1	3
+0007_1	0	0	0	attackjx	2.766666667	skill_icon_047	sword_swing3=0.4#sword_swing3=0.733#sword_swing3=1#sword_swing3=1.2#sword_swing3=1.433#sword_swing1=1.666#evade-jump=1.733#asuna_atk01=1.4	546	root									1	1.8	0	3
+0009_1	1	0	0	attackjx	2.5	skill_icon_117	evade-jump=0.494#hero_02=1#SE_010020=1.8#silica_atk01=1.056	547	root									4	1.0	1	3
+0011_1	0	0	0	attackjx	1.6	skill_icon_097	sword_swing1=0.266#sword_swing1=0.533#sword_swing1=1.1#evade-jump=0.866#leafa_atk03=1.1	554	root									1	1.0	0	3
+0014_1	1	0	0	attackjx	1.866666667	skill_icon_067	evade-jump=0.296#hero_01=0.474#shino_alo_02=1.335#sinon_atk01=2.013	552	root									4	1.0	1	3
+0015_1	0	0	0	attackjx	3.0	skill_icon_119	laser_sword=0.3#evade-jump=0.332#laser_sword=0.733#laser_sword=0.967#laser_sword=1.533#evade-jump=1.433#kirico_atk02=0.733	549	root									1	1.7	0	3
+0053_1	1	0	0	attackjx	2.766666667	skill_icon_073	klein_03=0.2#sniper_shot=1.6#sera_atk03=1.313	551	root									4	1.0	1	3
+snowbergboss1056_1	0	0	0	attack01	2.833333333	skill_icon_109	heavy_impact=2	338	root									1	2.0	0	21
+snowbergboss1056_2	1	0	0	attack02	3.4	skill_icon_110		374	root	375	Bip001 R Finger2Nub							4	2.0	0	3
+snowbergboss1056_3	0	10	1	attack03	8.133333333	skill_icon_111	wind_long=0.8#mercy_wind=1#wind_long=1.8#mercy_wind=2#wind_long=2.8#mercy_wind=3#wind_long=3.8#mercy_wind=4#wind_long=4.8#mercy_wind=5#heavy_impact=7	339	root									1	1.0	0	10
+snowbergcreeps1043_1	0	0	0	attack01	1.333333333			447	root									1	1.0	0	18
+snowbergcreeps1044_1	1	0	0	attack01	1.8			439	root									4	1.0	0	18
+Volcanoboss1060_1	0	0	0	attack01	2.666666667		heavy_impact=1.95#SE_030029=0.6#SE_030029=0.9#SE_030029=1.2#SE_030029=1.9	408	root									1	1.8	0	18
+prairieboss1057_1	0	0	0	attack01	2.6667	skill_icon_109		148	root									1	2.0	0	21
+prairieboss1057_3	0	10	1	attack03	6.36666666667	skill_icon_111	shino_alo_05=0#energy_charge=1.8#rush_heavy=2.193#alisa_02=3.7#slow_circle=4.024	151	root	149	wuqir	202	Bip001 Head					1	1.0	0	21
+desertboss1061_1	0	0	0	attack01	1.57			284	root									1	2.0	0	3
+desertboss1061_3	1	9	1	attack03	11.3		stonegiant_01=0#stonegiant_02=4.386#stonegiant_03=5.1#stonegiant_04=6.96#stonegiant_05=8	286	root									4	1.0	0	3
+desertcreeps1002_1	0	0	0	attack01	2.93	skill_icon_092		140	root									1	0.8	0	18
+desertcreeps1003_1	0	0	0	attack01	2.93	skill_icon_092		140	root									1	0.8	0	18
+desertcreeps1004_1	0	0	0	attack01	2.93	skill_icon_092		140	root									1	0.8	0	18
+forestboss1064_1	0	0	0	attack01	2.5	skill_icon_114		289	root									1	3.0	0	18
+forestboss1064_3	0	9	1	attack03	13.5	skill_icon_116	dragon_01=0#dragon_02=3.781#dragon_03=8.837#dragon_04=10	292	root	293	Bip001 Neck2	294	Bone022					1	1.0	0	10
+forestcreeps1019_1	0	0	0	attack01	2.1			373	root									1	1.0	0	18
+forestcreeps1020_1	0	0	0	attack01	2.1			373	root									1	1.0	0	18
+forestcreeps1021_1	0	0	0	attack01	2.1			373	root									1	1.0	0	18
+desertcreeps1051_1	0	0	0	attack01	1.7333	skill_icon_106		147	root									1	1.0	0	18
+desertcreeps1052_1	0	0	0	attack01	1.7333	skill_icon_106		147	root									1	1.0	0	18
+desertcreeps1053_1	0	0	0	attack01	1.7333	skill_icon_106		147	root									1	1.0	0	18
+worldboss1041_1	0	0	0	attack01	1.333	skill_icon_103												1	1.0	0	20
+worldboss1041_3	0	2	1	attack03	7.7	skill_icon_103	monster_041_shout=0.71#monster_041_shout=2.558#monster_041_shout=6.5#stonegiant_05=5.111#monster_041_crawling=3.186#palerider_08=5.596#alisa_02=0.614#alisa_02=1.577	287	root									1	1.0	0	20
+0065_1	0	0	0	attackjx	4.333333333	skill_icon_093	sword_swing5=0.726#sword_swing5=1.798#heavy_impact=1.86#sword_swing5=3.05#energy_boom=3.091#stlea_atk01=3	561	root									1	1.5	0	3
+0066_1	0	0	0	attackjx	1.733333333	skill_icon_036	sword_swing1=0.404#sword_swing1=0.66#bow_icehit=0.697#annette_atk02=0.6	562	root									1	1.2	0	3
+0067_1	0	0	0	attackjx	3.6	skill_icon_014	evade-jump=0.013#sword_swing1=1.003#sword_swing1=1.134#sword_swing1=1.496#sword_swing1=1.479#sword_swing1=2.102#sword_swing1=2.108#evade-jump=2.118#sword_swing1=2.568#sword_swing1=2.575#kirito_atk03=2	563	root									1	1.2	0	3
+077_1	0	0	0	attack01	3.0	skill_icon_127	sword_swing1=0.121#sword_swing1=0.5#sword_swing1=0.874#rush=0.962#hero_02=1.069#sword_swing1=1.305#sword_swing2=1.3#kirito_bat20=0	564	root									1	1.3	0	3
+077_2	0	0	0	attack02	2.5	skill_icon_128	evade-jump=0.1#sword_swing1=0.422#sword_swing1=0.694#evade-jump=1#kirito_atk04=0	565	root									1	1.3	0	3
+077_3	0	24	1	attack03	6.2	skill_icon_129	alisa_02=0#rosalia_03=0.384#sword_swing1=2.005#sword_swing1=2.267#evade-jump=2.324#sword_swing1=2.485#sword_swing2=2.793#evade-wind=2.972#sword_swing1=3.029#yukki_03=3.164#evade-jump=3.3#sword_swing4=3.38#sword_swing4=3.551#sword_swing1=3.435#sword_swing1=3.551#hero_07=4.156#spear_heavyhit=4.204#kirito_bat21=0#kirito_bat33=2.544	566	root	567	buffc							1	1.0	0	3
+078_1	0	0	0	attack01	3.0	skill_icon_132	sword_swing1=0.2#sword_swing1=0.5#sword_swing2=0.9#evade-jump=0.896#sword_swing1=1.445#sword_swing8=1.445#asuna_atk01=0.13#asuna_atk02=0.896	568	root									1	1.3	0	3
+078_2	0	0	0	attack02	2.5	skill_icon_131	sword_swing4=0.351#sword_swing4=0.451#sword_swing4=0.551#sword_swing1=0.351#sword_swing1=0.451#sword_swing1=0.537#sword_swing1=0.605#spear_heavyhit=1.216#asuna_bat21=0	569	root	570	buffb							1	1.3	0	3
+078_3	0	24	1	attack03	9.4	skill_icon_135	evade-jump=0.6#evade-jump=1.3#evade-jump=1.811#evade-jump=2.05#spear_quick=2.935#spear_quick=3.2#spear_quick=3.432#spear_quick=3.7#spear_quick=4#spear_quick=4.2#klein_03=2.304#klein_04=5.3#energy_recharge_soon=5.7#shino_alo_01=4.5#kirito-alo_06=6.194#asuna_bat49=0.1#asuna_bat37=3.72	571	root	572	buffb							1	1.0	0	3
+079_1	0	0	0	attack01	3.3	skill_icon_133	SE_healing=0#SE_010020=0.24#SE_Mfz=0.24#yunakuro_bat_0001=0	576	root									1	1.3	0	3
+079_2	0	0	0	attack02	3.4	skill_icon_130	sword_swing4=0.5#sword_swing4=1#yunakuro_bat_0022=0	577	root									1	1.3	0	3
+079_3	0	24	1	attack03	8.0	skill_icon_134	yuna_02=0.151#yuna_03=0#SE_healing=5.5#yunakuro_bat_0003=1.085#yunakuro_bat_0001_var03=4.743	578	root									1	1.0	0	3
+1071_1	0	0	0	attack01	3.5		sword_swing8=0.412#shino-ggo_01=0.3#sword_swing8=0.8#shino-ggo_01=0.7#sword_swing8=1.223#shino-ggo_01=1.112#alisa_02=0.724#spear_heavyhit=1.6	574	root									1	2.0	0	21
+1071_2	0	0	0	attack02	3.2		energy_recharge_soon=0#rush=0.2#shieldbash_wind=0.456#heavy_impact=0.504#shieldbash_wind=0.752#heavy_impact=0.8#shieldbash_wind=1#heavy_impact_stones=0.975	575	root									1	2.0	0	21
+0002_1	0	0	0	attackjx	3.6	skill_icon_136	sword_swing1=0.6#sword_swing2=0.6#sword_swing4=1.2#sword_swing5=1.7#evade-jump=1.7#heavy_impact_stones=2.4#heathcliff_sys28=2.1	581	root	579	wuqil	580	wuqir					1	1.0	0	3
+0075_1	0	0	0	attackjx	3.0	skill_icon_137	evade-jump=0#rush=0.291#rush=0.575#sword_swing1=0.575#sword_swing1=0.651#sword_swing2=0.711#sword_swing2=0.771#rush=0.864#sword_swing2=0.864#sword_swing2=0.935#sword_swing2=1.011#sword_swing2=1.104#sword_swing2=1.175#evade-jump=1.466#sword_swing1=1.6#sword_swing1=1.6#lux_atk02=0.195#lux_atk03=1.4	584	root									1	1.2	0	3
+0004_1	0	0	0	attackjx	4.0	skill_icon_138	evade-jump=0.224#sword_swing1=0.274#sword_swing2=0.9#sword_swing2=1.16#sword_swing1=1.34#evade-wind=1.82#klein_01=1.947#sword_swing1=2.064#evade-jump=2.424#sword_swing1=2.46#yuki_atk02=0.923#yuki_atk03=2.424	585	root									1	1.2	0	3
+0074_1	0	0	0	attackjx	6.3	skill_icon_139	hero_01=0#leafa_atk01=1.4#sword_swing3=1.514#sword_swing1=1.514#rosalia_03b=1.874#yukki_02=2.504#hero_02=3.65	582	root	583	wuqir							1	1.2	0	3
+0005_1	0	0	0	attackjx	4.0	skill_icon_140	sniper_reload=0.8#SE_020022=1.718#bow_icehit=1.8#ice_hit=1.8#bow_icehit=1.8#gunshot_sniper=2#energy_recharge_soon=2#SE_020022=2.513#SE_020024=2.513	586	root									4	1.0	0	3
+0076_1	0	0	0	attackjx	3.0	skill_icon_141	evade-jump=0.224#submachine_short=0.25#evade-jump=1#evade-jump=1.224#submachine_short=2.142	587	root									1	1.2	0	3
+0080_1	0	0	0	attack01	5.0	skill_icon_142		589	root	590	wuqir							1	0.7	0	3
+0080_2	0	0	0	attack02	4.0	skill_icon_143		591	root	597	w06_001_n_l							1	0.7	0	3
+0080_3	0	12	1	attack03	11.5	skill_icon_144		592	root	595	wuqir	593	w06_001_n_l	594	w06_001_n_r	596	w05_011_n	1	1.0	0	3
+0081_1	1	0	0	attack01	2.2	skill_icon_145		598	wuqil	599	wuqir							4	1.0	0	3
+0081_2	1	0	0	attack02	2.4	skill_icon_146		602	wuqil	603	wuqir							4	1.0	0	3
+0081_3	0	12	1	attack03	9.0	skill_icon_147		606	root	607	wuqir							4	1.0	0	3
+0082_1	0	0	0	attack01	1.6	skill_icon_148		610	wuqir									1	1.3	0	3
+0082_2	0	0	0	attack02	1.8	skill_icon_149		611	wuqir									1	1.3	0	3
+0082_3	0	13	1	attack03	11.0	skill_icon_150		612	root	613	buffc	614	wuqil	615	wuqir			1	1.0	0	3

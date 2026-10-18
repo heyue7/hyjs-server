@@ -1,0 +1,21 @@
+宝箱Id	等级		积分	奖励内容	活动奖励	次郎投放活动奖励
+boxId	startLevel	endLevel	needScore	reward	activityReward	ggoActivityReward
+string	int	int	int	string	string	string
+primary	none	none	none	none	none	none
+boxId	startLevel	endLevel	needScore	reward	activityReward	ggoActivityReward
+box_001	1	30	30	coin,20000;diamond,20	item_429:0,100;1,900	frag_hero_081:0,100;1,900
+box_002	1	30	60	coin,40000;diamond,30	item_429:0,700;1,300|item_430:0,100;1,900	frag_hero_081:1,400;2,600
+box_003	1	30	90	item_026,1;diamond,50	item_430:0,500;1,500|item_431:0,100;1,900	frag_hero_081:2,500;3,500
+box_004	1	30	120	item_026,1;diamond,100	item_431:0,500;1,500|item_432:0,200;1,800	frag_hero_081:3,600;4,400
+box_005	30	40	30	coin,25000;diamond,20	item_429:0,100;1,900	frag_hero_081:1,100;2,900
+box_006	30	40	60	coin,50000;diamond,30;item_013,1	item_429:0,700;1,300|item_430:0,100;1,900	frag_hero_081:2,400;3,600
+box_007	30	40	90	item_026,1;diamond,50;item_013,2	item_430:0,500;1,500|item_431:0,100;1,900	frag_hero_081:3,500;4,500
+box_008	30	40	120	item_026,1;diamond,100;item_013,3	item_431:0,500;1,500|item_432:0,200;1,800	frag_hero_081:4,600;5,400
+box_009	40	60	30	coin,30000;diamond,20	item_429:0,100;1,900	frag_hero_081:2,100;3,900
+box_010	40	60	60	coin,60000;diamond,30;item_013,1	item_429:0,700;1,300|item_430:0,100;1,900	frag_hero_081:3,400;4,600
+box_011	40	60	90	item_026,1;diamond,50;item_013,2	item_430:0,500;1,500|item_431:0,100;1,900	frag_hero_081:4,500;5,500
+box_012	40	60	120	item_026,1;diamond,100;item_013,3	item_431:0,500;1,500|item_432:0,200;1,800	frag_hero_081:5,600;6,400
+box_013	60	101	30	coin,50000;diamond,20	item_429:0,100;1,900	frag_hero_081:3,100;4,900
+box_014	60	101	60	coin,80000;diamond,30;item_013,1	item_429:0,700;1,300|item_430:0,100;1,900	frag_hero_081:4,400;5,600
+box_015	60	101	90	item_026,1;diamond,50;item_013,2	item_430:0,500;1,500|item_431:0,100;1,900	frag_hero_081:5,500;6,500
+box_016	60	101	120	item_026,1;diamond,100;item_013,3	item_431:0,500;1,500|item_432:0,200;1,800	frag_hero_081:6,600;7,400

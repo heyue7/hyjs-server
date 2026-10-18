@@ -1,0 +1,11 @@
+UFNId	UFId(TableUnionFight)	模型	图标	身高	NPC 名字	武器左手	武器右手	坐标	朝向	阵营	建筑物类型	开启身份	Action路径
+UFNId	UFId	ModelRes	IconRes	Height	NPCName	leftWeapon	rightWeapon	Position	Angle	Camp	Building	NeedRole	Url
+string	int	string	string	double	string	string	string	string	int	int	string	int	string
+primary	index	none	none	none	none	none	none	none	none	none	none	none	none
+ufnId	ufId	/	/	/	/	/	/	position		camp	building	/	/
+1	1	mercenary04_npc		1.75	name_battel_npc_01		w14_001_n	15,-4.02,26	180	0	field_factory	0	npcs/UIFactoryPage
+2	1	lisbet01_body	UI_yewaiditu_icon_huishouchu_b	1.75	name_battel_npc_02			-4.7,-0.12,9.98	-120	0	recycle_bin	0	npcs/UIRecycleBinPage
+3	1	shirica01_body	UI_yewaiditu_icon_junxuguan_b	1.75	name_battel_npc_04			-16,-0.12,-9	100	0	shop	0	npcs/UIShopPage
+4	1	monster_020		1.75	name_battel_npc_05			60,-3.58,-30	0	1	field_factory	0	npcs/UIFactoryPage
+5	1	lisa01_body	UI_yewaiditu_icon_huishouchu_b	1.75	name_battel_npc_06			80.22,-0.33,-13.36	85	1	recycle_bin	0	npcs/UIRecycleBinPage
+6	1	lefa02_body	UI_yewaiditu_icon_junxuguan_b	1.75	name_battel_npc_08			87.80,-0.31,-2.48	-115	1	shop	0	npcs/UIShopPage

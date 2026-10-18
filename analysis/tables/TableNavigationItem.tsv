@@ -1,0 +1,27 @@
+NavId	名称	描述	前往的NPCID	排序
+Id	Name	Desc	NpcId	Index
+int	string	string	string	int
+primary	none	none	none	none
+navId	name	desc	npcId	
+1	navName1	navDesc1	npc_002	1
+2	navName2	navDesc2	npc_007	2
+3	navName3	navDesc3	npc_007	3
+4	navName4	navDesc4	npc_001	4
+5	navName5	navDesc5	npc_008	5
+6	navName6	navDesc6	npc_008	6
+7	navName7	navDesc7	npc_008	7
+8	navName8	navDesc8	npc_008	8
+9	navName9	navDesc9	npc_008	9
+10	navName10	navDesc10	npc_012	10
+11	navName11	navDesc11		11
+12	navName12	navDesc12		12
+13	navName13	navDesc13	npc_011	13
+14	navName14	navDesc14	npc_005	14
+15	navName15	navDesc15	npc_004	15
+16	navName16	navDesc16	npc_006	16
+17	navName17	navDesc17	npc_006	17
+18	navName18	navDesc18	npc_006	18
+19	navName19	navDesc19		19
+20	navName20	navDesc20	npc_002	20
+21	navName21	navDesc21		21
+22	navName22	navDesc22	npc_310	22

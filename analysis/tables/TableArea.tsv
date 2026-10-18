@@ -1,0 +1,32 @@
+areaId	场景	出生位置X(米)	出生位置Y(米)	出生位置Z(米)	半径范围	重置位置X	重置位置Y	打开界面	打开界面参数	小地图图标	是否可以传送(1可以0不可以）	传送位置X	传送位置Y	传送位置Z	传送角度Y(0-360)	对应大地图图标	NPC名字	NPC描述
+areaId	sceneName	bornX	bornY	bornZ	range	resetX	resetZ	pageName	pageOption	miniMapIcon	canTransfer	transferX	transferY	transferZ	transferAngle	bigMapIcon	npcName	npcDes
+string	string	double	double	double	double	double	double	string	string	string	int	double	double	double	double	string	string	string
+primary	index	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none
+areaId	sceneName	bornX	bornY	bornZ	range	resetX	resetZ	pageName	pageOption		canTransfer	transferX	transferY	transferZ	transferAngle	bigMapIcon	npcName	npcDes
+area_1	town	-0.5	0.8	-0.5	1.2	0.0	0.0	UICopy		UI_ditu_chuansongmen	1	-3.9	0.12	-6.4	28.0	UI_ditu_icon_chuansongmen	传送门	传送至前线
+area_2	mission_1	31.4	3.0	32.7	7.0	0.0	0.0				0							
+area_3	mission_1	9.53	0.5	3.26	1.0	0.0	0.0				0							
+area_4	mission_11	-7.0	0.0	0.0	4.0	0.0	0.0				0							
+area_5	mission_1	14.5	0.0	-0.53	3.89	0.0	0.0				0							
+area_6	mission_35	33.5		29.0	6.0	0.0	0.0				0							
+area_7	mission_40	11.8	-1.38	-2.5	7.0	0.0	0.0				0							
+area_8	mission_41	12.18	-0.37	-0.65	7.0	0.0	0.0				0							
+area_9	mission_45	12.5	-1.2	41.8	6.0	0.0	0.0				0							
+area_10	mission_47	36.6	-3.314	19.78	7.0	0.0	0.0				0							
+area_11	mission_1	25.35	0.5	3.5	5.45	0.0	0.0				0							
+area_12	town	58.0	-2.0	10.0	8.0	0.0	0.0				0							
+area_13	mission_5	29.3	-2.0	-27.4	3.0	0.0	0.0				0							
+area_14	mission_8	6.7	-0.32	8.02	8.15	0.0	0.0				0							
+area_15	mission_10	4.7	-0.1	0.1	3.0	0.0	0.0				0							
+area_16	mission_11	12.2	-1.3	41.5	7.0	0.0	0.0				0							
+area_17	mission_22	5.4	0.0	49.11	2.5	0.0	0.0				0							
+area_18	mission_25	2.4	0.02	5.0	5.0	0.0	0.0				0							
+area_19	mission_27	-8.0	0.02	20.78	4.3	0.0	0.0				0							
+area_20	mission_28	0.49	-0.04	32.33	3.1	0.0	0.0				0							
+area_21	mission_32	-13.44	2.37	44.9	5.72	0.0	0.0				0							
+area_22	town	30.06	-2.25	-12.4	3.5	0.0	0.0				0							
+area_23	town	30.06	-2.25	-12.4	5.66	0.0	0.0				0							
+area_24	town	56.0	-2.25	-58.9	20.0	0.0	0.0	WorldMapPage			0							
+area_25	town	40.69	-2.25	-41.78	5.0	0.0	0.0			UI_ditu_chengmen	1	41.11	-2.25	-42.33	149.03	UI_ditu_icon_chengmen	城门	传送至野外
+area_26	mission_83	1.16	-0.08	0.19	6.8	0.0	0.0											
+area_27	mission_101	15.8	0.016	34.57	6.3	0.0	0.0											

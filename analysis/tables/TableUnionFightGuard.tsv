@@ -1,0 +1,15 @@
+UFGuardId	模型名	模型缩放	小地图图标		武器Id	身高	守卫名字	坐标								朝向	半径	自己方点击说话
+UFGuardId	HeroId	ModelScale	IconRes	leftWeapon	rightWeapon	Height	GuardName	Position	WanderR	WanderSpeed	WanderRestTime	AlertR	PursureR	PursureSpeed	ReturnSpeed	Angle	Range	Say
+string	string	double	string	string	string	double	string	string	double	double	double	double	double	double	double	double	double	string
+primary	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none
+UFGuardId	heroId						guardName	position	wanderR	wanderSpeed	wanderRestTime	alertR	pursureR	pursureSpeed	returnSpeed		range	
+tower_guard_001	guard01_npc	1.0			w14_001_n	1.8	name_battel_guard_01	0.13,0,-12.05	0	0	0	0	0	0	0	50.0	0.5	say_tower_guard_001
+tower_guard_002	guard01_npc	1.0			w14_001_n	1.8	name_battel_guard_02	22,0,-13	0	0	0	0	0	0	0	50.0	0.5	say_tower_guard_002
+tower_guard_003	monster_016	1.0			w01_003_n	1.8	name_battel_guard_03	75,0,9	0	0	0	0	0	0	0	120.0	0.5	say_tower_guard_003
+tower_guard_004	monster_016	1.0			w01_003_n	1.8	name_battel_guard_04	54,0,9	0	0	0	0	0	0	0	-180.0	0.5	say_tower_guard_004
+factory_guard_001	monster_016	1.0			w01_003_n	1.8	name_battel_guard_05	63,0,-29	0	0	0	0	0	0	0	-10.0	0.5	say_factory_guard_001
+factory_guard_002	guard01_npc	1.0			w14_001_n	1.8	name_battel_guard_06	17,0,25	0	0	0	0	0	0	0	180.0	0.5	say_factory_guard_002
+baseCamp_guard_001	hero_002	1.0		w03_012_n	w20_001_n	1.8	name_battel_guard_07	-9.5,0,2	0	0	0	0	0	0	0	-180.0	0.5	say_baseCamp_guard_001
+baseCamp_guard_002	hero_013	1.0			w01_024_n	1.8	name_battel_guard_08	83,0,4	0	0	0	0	0	0	0	180.0	0.5	say_baseCamp_guard_002
+tower_guard_005	guard01_npc	1.0			w14_001_n	1.8	name_battel_guard_09	35,0,-14	0	0	0	0	0	0	0	50.0	0.5	say_tower_guard_005
+tower_guard_006	monster_016	1.0			w01_003_n	1.8	name_battel_guard_10	36,0,10	0	0	0	0	0	0	0	-180.0	0.5	say_tower_guard_006

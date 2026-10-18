@@ -1,0 +1,2 @@
+-- P7原Rush协议状态与冻结记录；未通过权威/原内容门禁不消费和发奖。
+CREATE TABLE IF NOT EXISTS p7_rush_fights (id VARBINARY(64) NOT NULL,player_id BIGINT NOT NULL,kind INT NOT NULL,task_id VARCHAR(64) NOT NULL,status VARBINARY(16) NOT NULL,diagnostic BOOLEAN NOT NULL,day CHAR(10) NOT NULL,run_id BIGINT NOT NULL,rule LONGBLOB NOT NULL,rule_hash CHAR(64) NOT NULL,start LONGBLOB NOT NULL,start_hash CHAR(64) NOT NULL,result LONGBLOB,replay_id CHAR(64) NOT NULL,end_request LONGBLOB,PRIMARY KEY(id),KEY(player_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

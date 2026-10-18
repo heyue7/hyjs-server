@@ -1,0 +1,539 @@
+package service
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"go.uber.org/zap"
+	"google.golang.org/protobuf/proto"
+	"gorm.io/gorm"
+	"hyjs-server/constUtil"
+	"hyjs-server/db"
+	"hyjs-server/elog"
+	"hyjs-server/model"
+	pb "hyjs-server/model/protocol"
+	"strings"
+	"time"
+)
+
+// GameService 编排账号、主城和当前已恢复的副本协议。
+type GameService struct {
+	Host     string
+	HTTPPort int
+	TCPPort  int
+	Tables   map[string][]map[string]string
+	// P1Ready 仅在启动初始化全部成功后设置，运行中保持只读。
+	P1Ready bool
+	// P4Ready 在福利和商店规则初始化成功后启用存档事实钩子。
+	P4Ready bool
+	// P5Ready 在阵容与成长初始化完成后启用统一业务入口。
+	P5Ready bool
+	// P8GatherReady 在原采集配置和事务表初始化后启用单人资源节点。
+	P8GatherReady bool
+	// P8LifeReady 在生活技能、料理和生存事务表初始化后启用。
+	P8LifeReady bool
+	// P9PetsReady 在原精灵表和实例事务表初始化后启用。
+	P9PetsReady bool
+}
+
+func gameReply(name string, fields any) ([]proto.Message, error) {
+	m, err := model.GameMessage(name, fields)
+	return []proto.Message{m}, err
+}
+
+// GameError 使用原客户端支持的数值错误码，避免客户端整数解析异常。
+func GameError(code, text string) []proto.Message {
+	return []proto.Message{&pb.ErrorMessage{Code: proto.String(code), Msg: proto.String(text)}}
+}
+
+// Dispatch 在已验证的协议请求上执行操作，只记录消息名和角色编号。
+func (s *GameService) Dispatch(ctx context.Context, request *model.GamePacket, peer string) []proto.Message {
+	name := model.OpcodeNames[request.Opcode]
+	elog.Info("game request", zap.String("message", name), zap.Int64("playerId", request.PlayerId))
+	ctx = context.WithValue(ctx, constUtil.GameServiceContextKey, s)
+	ctx = context.WithValue(ctx, constUtil.GameRequestContextKey, request.Body)
+	result, err := s.dispatch(ctx, request, peer)
+	if err != nil {
+		elog.Warn("game request failed", zap.String("message", name), zap.Error(err))
+		return GameError(constUtil.ErrGameRequest, err.Error())
+	}
+	s.resumeRecruitGuide(ctx, result)
+	return result
+}
+
+func (s *GameService) dispatch(ctx context.Context, r *model.GamePacket, peer string) ([]proto.Message, error) {
+	switch b := r.Body.(type) {
+	case *pb.CSCheckVersion:
+		return gameReply("SCCheckVersion", map[string]any{"serverAppVersion": b.GetAppVersion(), "serverResVersion": b.GetResVersoin(), "programMethod": 0, "resMethod": 0, "entry": []any{map[string]any{"key": "needActivation", "value": "0"}}})
+	case *pb.CSGetServerList:
+		var (
+			row    db.Profile
+			recent []any
+		)
+		err := db.GetIns().WithContext(ctx).Where("uid = ?", b.GetPlatformUid()).First(&row).Error
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, err
+		}
+		if err == nil && row.Player != nil {
+			p, _, err := decodeProfile(&row)
+			if err != nil {
+				return nil, err
+			}
+			recent = append(recent, map[string]any{"serverId": 1, "platformUid": b.GetPlatformUid(), "playerId": row.Id, "playerName": p.GetName(), "level": p.GetLevel(), "state": "recommend", "globalServerKey": "local-1"})
+		}
+		return gameReply("SCGetServerList", map[string]any{"serverList": []any{map[string]any{"serverId": 1, "name": "艾恩葛朗特·本地测试", "serverIp": fmt.Sprintf("%s:%d", s.Host, s.HTTPPort), "state": "recommend", "globalServerKey": "local-1", "display": "1"}}, "playerServerList": recent})
+	case *pb.CSUserLogin:
+		row, err := LoginAccount(ctx, b.GetPlatformUid(), b.GetAuthCode())
+		if err != nil {
+			return nil, err
+		}
+		return gameReply("SCUserLogin", map[string]any{"sessionKey": row.Session, "playerId": row.Id, "serverTimeNow": time.Now().UnixMilli(), "isFirstCreated": row.Player == nil, "ip": s.Host, "port": s.TCPPort, "clientTime": b.GetClientTime(), "clientIp": peer})
+	}
+	session := r.Session
+	switch b := r.Body.(type) {
+	case *pb.CSSocketLogin:
+		session = b.GetSessionKey()
+	case *pb.CSRefreshGatewayIPAndPort:
+		session = b.GetSessionKey()
+	}
+	row, err := AuthorizeAccount(ctx, r.PlayerId, session)
+	if err != nil {
+		return GameError(constUtil.ErrGameSession, "本地会话无效，请重新登录"), nil
+	}
+	if r.ZoneId != 1 {
+		return nil, errors.New("Only local zone 1 is implemented")
+	}
+	switch b := r.Body.(type) {
+	case *pb.CSGenerateName:
+		return gameReply("SCGenerateName", map[string]any{"playerName": fmt.Sprintf("归来的剑士%d", row.Id)})
+	case *pb.CSPlayerCreate:
+		row, err = CreatePlayer(ctx, row.Id, b.GetPlayerName(), b.GetHeroId())
+		if err != nil {
+			return nil, err
+		}
+		p, _, err := decodeProfile(row)
+		if err != nil {
+			return nil, err
+		}
+		return gameReply("SCPlayerCreate", map[string]any{"player": p, "createTime": row.CreatedAt})
+	case *pb.CSSocketLogin:
+		return gameReply("SCSocketLogin", map[string]any{"result": 100})
+	case *pb.CSRefreshGatewayIPAndPort:
+		return gameReply("SCRefreshGatewayIPAndPort", map[string]any{"ip": s.Host, "port": s.TCPPort})
+	case *pb.CSPingTcp:
+		reply, err := gameReply("SCPingTcp", map[string]any{"clientTime": b.GetClientTime(), "serverTime": time.Now().UnixMilli()})
+		if err != nil {
+			return nil, err
+		}
+		if row.Player == nil || row.Game == nil {
+			return reply, nil
+		}
+		push, err := s.fieldHeartbeat(ctx, row.Id)
+		if err != nil {
+			return nil, err
+		}
+		return append(reply, push...), nil
+	case *pb.CSRefreshMovePlayerInfo:
+		if s.P9PetsReady {
+			return s.P9OwnMovePlayerInfo(ctx, row.Id)
+		}
+		return nil, nil
+	case *pb.CSPingAckTcp, *pb.CSSpeedCheck:
+		return nil, nil
+	case *pb.CSEnterBackgroud:
+		// 原 NetTickCtrl 在暂停和恢复时发送单向通知；保留会话、战斗和存档，随后由原重连流程续接。
+		return nil, nil
+	}
+	player, game, err := s.resourceProfile(ctx, row.Id)
+	if err != nil {
+		return nil, err
+	}
+	// 原请求进入新域后仍使用同一会话和事务边界，已有类型继续原分支。
+	if reply, handled, err := s.HandlePayment(ctx, row.Id, r.Body, r.Timestamp); handled {
+		return reply, err
+	}
+	if s.P9PetsReady {
+		if reply, handled, err := s.DispatchP9PetIntimacy(ctx, row.Id, r.Body, r.Timestamp); handled { return reply, err }
+		if reply, handled, err := s.DispatchP9PetRecycle(ctx, row.Id, r.Body, r.Timestamp); handled {
+			return reply, err
+		}
+		if reply, handled, err := s.DispatchP9PetEquip(ctx, row.Id, r.Body, r.Timestamp); handled {
+			return reply, err
+		}
+		if reply, handled, err := s.DispatchP9PetFollow(ctx, row.Id, r.Body); handled {
+			return reply, err
+		}
+		if reply, handled, err := s.DispatchP9PetNext(ctx, row.Id, r.Body, r.Timestamp); handled {
+			return reply, err
+		}
+		if reply, handled, err := s.DispatchP9Pets(ctx, row.Id, r.Body, r.Timestamp); handled {
+			return reply, err
+		}
+	}
+	if s.P8LifeReady {
+		if reply, handled, err := s.DispatchP8Life(ctx, row.Id, r.Body, r.Timestamp); handled {
+			return reply, err
+		}
+	}
+	if s.P8GatherReady {
+		if reply, handled, err := s.DispatchP8Gather(ctx, row.Id, r.Body, r.Timestamp); handled {
+			return reply, err
+		}
+	}
+	if s.P5Ready {
+		if reply, handled, err := s.DispatchP5Next(ctx, row.Id, r.Body, r.Timestamp); handled {
+			return reply, err
+		}
+		if reply, handled, err := s.DispatchP5(ctx, row.Id, r.Body, r.Timestamp); handled {
+			return reply, err
+		}
+	}
+	if reply, handled, err := s.DispatchP7(ctx, row.Id, r.Body, r.Timestamp); handled {
+		return reply, err
+	}
+	if reply, handled, err := s.DispatchP7Expedition(ctx, row.Id, r.Body, r.Timestamp); handled {
+		return reply, err
+	}
+	if reply, handled, err := s.DispatchP7Awake(ctx, row.Id, r.Body, r.Timestamp); handled {
+		return reply, err
+	}
+	if reply, handled, err := s.DispatchP10FriendEnergy(ctx, row.Id, r.Body, r.Timestamp); handled {
+		return reply, err
+	}
+	if reply, handled, err := s.DispatchP10Profile(ctx, row.Id, r.Body); handled {
+		return reply, err
+	}
+	if reply, handled, err := s.DispatchP10Social(ctx, row.Id, r.Body, r.Timestamp); handled {
+		return reply, err
+	}
+	if s.P4Ready {
+		if reply, handled, err := s.DispatchP4(ctx, row.Id, r.Body, r.Timestamp); handled {
+			return reply, err
+		}
+	}
+	if reply, handled, err := s.DispatchP6(ctx, row.Id, r.Body, r.Timestamp); handled {
+		return reply, err
+	}
+	if reply, handled, err := s.DispatchP2(ctx, row.Id, r.Body, r.Timestamp); handled {
+		return reply, err
+	}
+	switch b := r.Body.(type) {
+	case *pb.CSPlayer:
+		return []proto.Message{&pb.SCPlayer{Player: player}}, nil
+	case *pb.CSMailList, *pb.CSCheckNewMail, *pb.CSDeleteMail:
+		return s.Mailbox(ctx, row.Id, b)
+	case *pb.CSQueryUserReward, *pb.CSAddRewardsToPlayer:
+		return s.RewardCenter(ctx, row.Id, b)
+	case *pb.CSTaskList, *pb.CSGetTaskReward, *pb.CSGetTaskBoxReward:
+		return s.dailyTasks(ctx, row.Id, b)
+	case *pb.CSCookingLevel:
+		level, exp, err := s.GemCraftLevel(ctx, row.Id)
+		if err != nil {
+			return nil, err
+		}
+		cookingLevel, cookingExp, err := s.CookingCraftLevel(ctx, row.Id)
+		if err != nil {
+			return nil, err
+		}
+		return []proto.Message{&pb.SCCookingLevel{Level: proto.Int32(cookingLevel), Exp: proto.Int32(cookingExp), GemLevel: proto.Int32(level), GemExp: proto.Int32(exp)}}, nil
+	case *pb.CSFishCooking:
+		return s.fishCooking(ctx, row.Id, b, r.Timestamp)
+	case *pb.CSFishUsing:
+		return s.fishUsing(ctx, row.Id, b, r.Timestamp)
+	case *pb.CSCookingEffectList:
+		return s.cookingEffectList(ctx, row.Id)
+	case *pb.CSDailyCopyState, *pb.CSDailyCopyFightStart, *pb.CSDailyCopyFightEnd:
+		return s.dailyCopy(ctx, row.Id, b, r.Timestamp)
+	case *pb.CSMineRefine:
+		return s.gemRefine(ctx, row.Id, b, r.Timestamp)
+	case *pb.CSGemMake:
+		return s.gemMake(ctx, row.Id, b, r.Timestamp)
+	case *pb.CSGemCombineByThree:
+		return s.gemCombineThree(ctx, row.Id, b, r.Timestamp)
+	case *pb.CSGemCombineByTwo:
+		return s.gemCombineTwo(ctx, row.Id, b, r.Timestamp)
+	case *pb.CSGemCombineBySix:
+		return s.gemCombineSix(ctx, row.Id, b, r.Timestamp)
+	case *pb.CSGemMount:
+		return s.gemMount(ctx, row.Id, b, r.Timestamp)
+	case *pb.CSGemUnmount:
+		return s.gemUnmount(ctx, row.Id, b, r.Timestamp)
+	case *pb.CSGemMountOrChange:
+		return s.gemMountOrChange(ctx, row.Id, b, r.Timestamp)
+	case *pb.CSUpRoleSkillRefineLevel, *pb.CSStrengthRoleSkillRefineLevel:
+		return s.skillSpecialtyUpgrade(ctx, row.Id, b, r.Timestamp)
+	case *pb.CSPlayerLogin:
+		if err := s.RecordActivityLogin(ctx, row.Id); err != nil {
+			return nil, err
+		}
+		if err := s.RecordP1Login(ctx, row.Id); err != nil {
+			return nil, err
+		}
+		if err := s.RecordP4Login(ctx, row.Id); err != nil {
+			return nil, err
+		}
+		return gameReply("SCPlayerLogin", map[string]any{"player": player, "playerCreateTime": row.CreatedAt})
+	case *pb.CSWarriorRecruitGuide:
+		return s.recruitGuide(ctx, row.Id)
+	case *pb.CSWarriorAwake:
+		return s.warriorAwake(ctx, row.Id, b, r.Timestamp)
+	case *pb.CSAwakeFuse:
+		return s.warriorAwakeFuse(ctx, row.Id, b, r.Timestamp)
+	case *pb.CSWarriorTraining:
+		return s.warriorTraining(ctx, row.Id, b, r.Timestamp)
+	case *pb.CSWarriorTrainingReplace:
+		return s.warriorTrainingReplace(ctx, row.Id, b, r.Timestamp)
+	case *pb.CSWarriorBreached:
+		return s.warriorBreached(ctx, row.Id, b, r.Timestamp)
+	case *pb.CSWarriorTalent:
+		return s.warriorTalent(ctx, row.Id, b)
+	case *pb.CSWarriorStrengthen:
+		return s.warriorStrengthen(ctx, row.Id, b)
+	case *pb.CSFormationOn:
+		if strings.HasPrefix(b.GetId(), "trea_") {
+			return s.treasureFormationOn(ctx, row.Id, b)
+		}
+		return s.formationOn(ctx, row.Id, b)
+	case *pb.CSFormationOff:
+		if strings.HasPrefix(b.GetId(), "trea_") {
+			return s.treasureFormationOff(ctx, row.Id, b)
+		}
+		return s.formationOff(ctx, row.Id, b)
+	case *pb.CSFormationExChange:
+		return s.formationExchange(ctx, row.Id, b, r.Timestamp)
+	case *pb.CSFormationChange:
+		return s.formationChange(ctx, row.Id, b)
+	case *pb.CSGetTaticalFormation:
+		return s.tacticalFormationGet(ctx, row.Id, b)
+	case *pb.CSTaticalFormationList:
+		return s.tacticalFormationList(ctx, row.Id)
+	case *pb.CSTaticalFormationChange:
+		return s.tacticalFormationChange(ctx, row.Id, b)
+	case *pb.CSUseTaticalFormation:
+		return s.tacticalFormationUse(ctx, row.Id, b)
+	case *pb.CSTaticalFormationUnLock:
+		return s.tacticalFormationUnlock(ctx, row.Id, b, r.Timestamp)
+	case *pb.CSTaticalFormationLevelUp:
+		return s.tacticalFormationLevelUp(ctx, row.Id, b, r.Timestamp)
+	case *pb.CSItemUse:
+		return s.itemUse(ctx, row.Id, b, r.Timestamp)
+	case *pb.CSCombine:
+		return s.treasureCombine(ctx, row.Id, b, r.Timestamp)
+	case *pb.CSTreasureStrengthen:
+		return s.treasureStrengthen(ctx, row.Id, b)
+	case *pb.CSTreasureRefine:
+		return s.treasureRefine(ctx, row.Id, b, r.Timestamp)
+	case *pb.CSFragmentList:
+		return s.treasureFragmentList(ctx, row.Id)
+	case *pb.CSRewardMonthSignList, *pb.CSReceiveMonthSign, *pb.CSReceiveLuxurySign:
+		return s.monthSign(ctx, row.Id, b)
+	case *pb.CSOpenServerActivity, *pb.CSNewOpenSevenDayByTitle, *pb.CSGetOpenServerReward:
+		return s.openServerActivity(ctx, row.Id, b, r.Timestamp)
+	case *pb.CSOpenServerFundInfo, *pb.CSBuyOpenServerFund, *pb.CSOpenServerFundReward:
+		return s.openServerFund(ctx, row.Id, b)
+	case *pb.CSEquipmentTreasureList:
+		return s.equipmentList(ctx, row.Id)
+	case *pb.CSEquipDecompose:
+		return s.equipmentDecompose(ctx, row.Id, b, r.Timestamp)
+	case *pb.CSEquipForge:
+		return s.equipmentForge(ctx, row.Id, b, r.Timestamp)
+	case *pb.CSEquipRefine:
+		return s.equipmentRefine(ctx, row.Id, b, r.Timestamp)
+	case *pb.CSEquipStar:
+		return s.equipmentStar(ctx, row.Id, b, r.Timestamp)
+	case *pb.CSEquipStrengthen:
+		return s.equipmentStrengthen(ctx, row.Id, b)
+	case *pb.CSActivityInfo, *pb.CSActivityReward:
+		var activityID string
+		switch request := b.(type) {
+		case *pb.CSActivityInfo:
+			activityID = request.GetActivityId()
+		case *pb.CSActivityReward:
+			activityID = request.GetActivityId()
+		}
+		if s.IsP1Activity(activityID) {
+			return s.P1Activity(ctx, row.Id, b)
+		}
+		return s.loginActivity(ctx, row.Id, b)
+	case *pb.CSActivityList:
+		return s.turntableActivityList(ctx, row.Id)
+	case *pb.CSBigTurnTableInfo:
+		return s.bigTurnInfo(ctx, row.Id)
+	case *pb.CSPlayBigTurn:
+		return s.playBigTurn(ctx, row.Id, b, r.Timestamp)
+	case *pb.CSBigTurnRank:
+		return s.bigTurnRank(ctx, row.Id)
+	case *pb.CSBigTurnRecord:
+		return s.bigTurnRecord(ctx, row.Id)
+	case *pb.CSBigTurnDesc:
+		return s.bigTurnDesc(ctx, row.Id)
+	case *pb.CSWarriorRecruitGet:
+		return s.recruitInfo(ctx, row.Id, b)
+	case *pb.CSWarriorRecruit:
+		return s.warriorRecruit(ctx, row.Id, b, r.Timestamp)
+	case *pb.CSWarriorGet:
+		if err := s.skillSpecialtyPrepare(ctx, row.Id); err != nil {
+			return nil, err
+		}
+		_, game, err = s.resourceProfile(ctx, row.Id)
+		if err != nil {
+			return nil, err
+		}
+		var warriors []*pb.Warrior
+		for _, guid := range b.GetGuid() {
+			for _, w := range game.Warriors {
+				if w.GetGuid() == guid {
+					warriors = append(warriors, w)
+					break
+				}
+			}
+		}
+		return gameReply("SCWarriorGet", map[string]any{"warrior": warriors})
+	case *pb.CSWarriorList:
+		if err := s.skillSpecialtyPrepare(ctx, row.Id); err != nil {
+			return nil, err
+		}
+		_, game, err = s.resourceProfile(ctx, row.Id)
+		if err != nil {
+			return nil, err
+		}
+		warriors := make([]*pb.Warrior, 0, len(game.Warriors))
+		for _, owned := range game.Warriors {
+			encoded, err := s.P5WarriorProtocol(owned)
+			if err != nil {
+				return nil, err
+			}
+			warriors = append(warriors, encoded)
+		}
+		return gameReply("SCWarriorList", map[string]any{"warriorList": warriors})
+	case *pb.CSFormationList:
+		return s.formationList(ctx, row.Id)
+	case *pb.CSItemList:
+		// 碎片由SCFragmentList单独初始化，避免原客户端重登时叠加两次。
+		var items []*pb.SimpleItem
+		for _, item := range game.Items {
+			if !strings.HasPrefix(item.GetId(), "frag_") {
+				items = append(items, item)
+			}
+		}
+		return gameReply("SCItemList", map[string]any{"itemList": items})
+	case *pb.CSQuestList:
+		return gameReply("SCQuestList", map[string]any{"questList": game.Quests})
+	case *pb.CSKVInfo:
+		var specialty db.SkillSpecialtyRule
+		if err := db.GetIns().WithContext(ctx).Take(&specialty, "id = ?", constUtil.SkillSpecialtyRuleID).Error; err != nil {
+			return nil, err
+		}
+		specialtySwitch := "off"
+		if specialty.Enabled {
+			specialtySwitch = "on"
+		}
+		entries := make([]*pb.KeyValueEntry, 0, len(game.KV)+2)
+		for _, entry := range game.KV {
+			if entry.GetKey() != "taticalSwitch" && entry.GetKey() != "skillSpecialtySwitch" {
+				entries = append(entries, entry)
+			}
+		}
+		entries = append(entries, &pb.KeyValueEntry{Key: proto.String("taticalSwitch"), Value: proto.String("on")})
+		entries = append(entries, &pb.KeyValueEntry{Key: proto.String("skillSpecialtySwitch"), Value: proto.String(specialtySwitch)})
+		return gameReply("SCKVInfo", map[string]any{"entry": entries})
+	case *pb.CSCopyPassedInfo:
+		return s.copyPassedInfo(ctx, row.Id)
+	case *pb.CSCopyCurrentInfo:
+		return s.copyCurrentInfo(ctx, row.Id)
+	case *pb.CSGetUnionAddBaseProp:
+		return gameReply("SCGetUnionAddBaseProp", map[string]any{"unionAddBaseProp": map[string]any{}, "unionPrayProp": map[string]any{}})
+	case *pb.CSShopProductList:
+		return s.shopProducts(ctx, row.Id, b)
+	case *pb.CSShopBuy:
+		return s.shopBuy(ctx, row.Id, b, r.Timestamp)
+	case *pb.CSBigClientReward:
+		if err = updateProfile(ctx, row.Id, func(_ *pb.Player, g *model.GameState) error { g.FullClientVerified = true; return nil }); err != nil {
+			return nil, err
+		}
+		return gameReply("SCBigClientReward", nil)
+	case *pb.CSMove:
+		return nil, updateProfileWithTx(ctx, row.Id, func(tx *gorm.DB, p *pb.Player, g *model.GameState) error {
+			if s.P8LifeReady && g.Position.GetScene() == "field_001" && g.Field != nil && g.Field.Side != nil && (g.Field.Side.GetState() == 5 || g.Field.Side.GetCurHp() <= 0) {
+				return errors.New("死亡状态不能移动，请先复活")
+			}
+			if s.P8LifeReady {
+				if _, err := s.RefreshP8Survival(tx, p, g, time.Now()); err != nil {
+					return err
+				}
+			}
+			if s.P8GatherReady {
+				if err := s.P8CancelGather(tx, row.Id, g); err != nil {
+					return err
+				}
+			}
+			g.Position.Current = b.GetPointNew()
+			if s.P8LifeReady {
+				if _, err := s.RefreshP8Survival(tx, p, g, time.Now()); err != nil {
+					return err
+				}
+			}
+			return nil
+		})
+	case *pb.CSTransferScene:
+		return s.fieldTransfer(ctx, row.Id, b)
+	case *pb.CSLoginScene:
+		return s.fieldScene(ctx, row.Id, true)
+	case *pb.CSCurrentPosition:
+		return s.fieldScene(ctx, row.Id, false)
+	case *pb.CSSideMonsterCheck:
+		return s.fieldMonsterCheck(ctx, row.Id, b)
+	case *pb.CSSidePveFightStart:
+		return s.fieldFightStart(ctx, row.Id, b)
+	case *pb.CSSidePveFightEnd:
+		return s.fieldFightEnd(ctx, row.Id, b)
+	case *pb.CSCopyEnter:
+		return s.copyEnter(ctx, row.Id, b)
+	case *pb.CSCopySweep:
+		return s.copySweep(ctx, row.Id, b, r.Timestamp)
+	case *pb.CSCopyGetStarAward:
+		return s.chapterStarReward(ctx, row.Id, b)
+	case *pb.CSCopyRunMapInfo:
+		if game.Run == nil || game.Run.Chapter != b.GetChapterId() || game.Run.Mission != b.GetMissionId() {
+			return nil, errors.New("No active mission")
+		}
+		party, err := s.battlePlayer(player, game)
+		if err != nil {
+			return nil, err
+		}
+		return gameReply("SCCopyRunMapInfo", map[string]any{"passedTaskIdList": game.Run.Passed, "battlePlayer": party})
+	case *pb.CSCopyFightStart:
+		return s.copyFightStart(ctx, row.Id, b)
+	case *pb.CSCopyFightEnd:
+		return s.copyFightEnd(ctx, row.Id, b)
+	case *pb.CSCopyLeave:
+		if err = updateProfileWithTx(ctx, row.Id, func(tx *gorm.DB, _ *pb.Player, g *model.GameState) error {
+			if g.Run != nil && g.Run.Fight != nil && !g.Run.Fight.Settled {
+				if err := s.CancelOriginalCopyReplay(ctx, tx, row.Id, g.Run.Fight.Start); err != nil {
+					return err
+				}
+			}
+			g.Run = nil
+			return nil
+		}); err != nil {
+			return nil, err
+		}
+		return gameReply("SCCopyLeave", nil)
+	case *pb.CSQuestReward:
+		return s.storyQuestReward(ctx, row.Id, b.GetQuestId())
+	case *pb.CSGemAndCookingList:
+		return []proto.Message{&pb.SCGemAndCookingList{GemList: game.Gems, CookingList: game.Cooking}}, nil
+	case *pb.CSOpenStateCheck:
+		states, err := s.openServerOpenStates(ctx, row.Id)
+		if err != nil {
+			return nil, err
+		}
+		return []proto.Message{&pb.SCOpenStateCheck{States: states}}, nil
+	case *pb.CSKFOpenFrightServerInfo:
+		// 主城图标会用 currentTime 重新校准全局时钟；关闭阶段仍须返回真实 Unix 毫秒。
+		return []proto.Message{&pb.SCKFOpenFrightServerInfo{TypeStage: proto.Int32(0), CurrentTime: proto.Int64(time.Now().UnixMilli())}}, nil
+	case *pb.CSTitleList, *pb.CSPetList, *pb.CSChangeNameTimes, *pb.CSFriendList, *pb.CSGetUnionInfo, *pb.CSRedPoint, *pb.CSFriendBlackList, *pb.CSNavigationItem, *pb.CSKFLogin, *pb.CSChatCache, *pb.CSCurrentLuckyBagsInfo, *pb.CSLoginRewardInfo, *pb.CSNoticeUrl, *pb.CSUFInfoPreView, *pb.CSGetRebels:
+		return gameReply("SC"+model.OpcodeNames[r.Opcode][2:], nil)
+	}
+	return GameError(constUtil.ErrGameUnsupported, "尚未实现："+model.OpcodeNames[r.Opcode]), nil
+}

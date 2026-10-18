@@ -1,0 +1,9 @@
+package constUtil
+
+const (
+	P11GenericArenaCompatibilityProof   = "6d7b4e269509838b60155f06866251db3c4c25006500e22c041d7969572935ba"
+	P11GenericPlunderCompatibilityProof = "3de701bb22615a86e30caf617c2e5ca24b34b59cf805c1713648807a6793e293"
+	P11GenericFriendCompatibilityProof  = "2c1404d4315e031e99a058e6ad815e1b8c98c0ac53a29d672f9916688138f066"
+	P11GenericGrabCompatibilityProof    = "c30f99ab965ec88f4eaf7b1bd98930ba8ef24195d830f1536a7a6f23428b1c0a"
+	P11GenericLimitCompatibilityProof   = "142994436399e3f031a34890d68b4272717c663338754681c07bd0ec7b3ade75"
+)

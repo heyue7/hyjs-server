@@ -1,0 +1,19 @@
+UFBuffId	0:普通 1：Tick型  2：光环				
+UFBuffId	BuffClass	lastTime	buffOnEffect	buffOffEffect	buffLastEffect
+string	int	double	string	string	string
+primary	none	none	none	none	none
+UFBuffId	buffClass	lastTime	buffOnEffect	buffOffEffect	buffLastEffect
+uf_buff_001	0	0.1			
+uf_buff_002	0	0.1			
+uf_buff_003	0	0.1			
+uf_buff_004	0	0.1			
+uf_buff_005	0	0.1			
+uf_buff_006	1	60.0			
+uf_buff_007	0	0.1			
+uf_buff_008	0	5.0			
+uf_buff_009	2	5.0			recoverMatrix
+uf_buff_010	0	0.1	recoverMatrixMin		
+uf_buff_012	0	-1.0			
+uf_buff_013	0	0.1			
+uf_buff_014	0	0.1			
+uf_buff_015	0	0.1			

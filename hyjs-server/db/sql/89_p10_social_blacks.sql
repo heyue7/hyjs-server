@@ -1,0 +1,1 @@
+CREATE TABLE IF NOT EXISTS p10_social_blacks (owner_id BIGINT NOT NULL, target_id BIGINT NOT NULL, created_at BIGINT NOT NULL, PRIMARY KEY (owner_id,target_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;

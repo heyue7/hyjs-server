@@ -1,0 +1,1 @@
+CREATE TABLE IF NOT EXISTS local_play_payment_times (order_id VARCHAR(64) NOT NULL PRIMARY KEY,player_id BIGINT NOT NULL,game_at BIGINT NOT NULL,real_at BIGINT NOT NULL,offset_days BIGINT NOT NULL,KEY(player_id),KEY(game_at)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

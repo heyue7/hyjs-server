@@ -1,0 +1,36 @@
+{
+  "schema": "hyjs-green-resource-overrides-v1",
+  "version": 1,
+  "files": [
+    {
+      "path": "tabledata/tablehero",
+      "sha256": "f45ffdffbd92df69ebae0b549002a3adeb4440c716bcc9145af68b121e757076",
+      "bytes": 10169
+    },
+    {
+      "path": "tabledata/tablefrag",
+      "sha256": "f489c4f769aac38633111f7a1c4bb0ed4164f16d65df01adc03524ea07210512",
+      "bytes": 3253
+    },
+    {
+      "path": "model/lingnai01_body",
+      "sha256": "0bb4db13e9c6667b6b52d88a1a469990895a154b6c38509dbdfe64a424322d4e",
+      "bytes": 526777
+    },
+    {
+      "path": "model/sicary01_body",
+      "sha256": "1dc1308c407872e7ad009ac97abae56710026e1a3572b043389597d135483d77",
+      "bytes": 596264
+    },
+    {
+      "path": "model/nio01_body",
+      "sha256": "5aa707be0d98bf19082fb05fcac5a10029cafca95a90aa9905ddfa38eb6e647a",
+      "bytes": 503359
+    },
+    {
+      "path": "smallassetmanifest",
+      "sha256": "cfddb4d1b6ee15bfc8d51da311bfa7e6e1408c809c4ccd8b1e47049a85b45254",
+      "bytes": 563672
+    }
+  ]
+}

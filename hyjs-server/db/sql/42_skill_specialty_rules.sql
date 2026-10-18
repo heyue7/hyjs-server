@@ -1,0 +1,7 @@
+CREATE TABLE IF NOT EXISTS skill_specialty_rules (
+ id VARCHAR(32) NOT NULL PRIMARY KEY,
+ enabled BOOLEAN NOT NULL,
+ initial_types VARCHAR(64) NOT NULL,
+ unlock_policy VARCHAR(64) NOT NULL,
+ source TEXT NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

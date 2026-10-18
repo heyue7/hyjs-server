@@ -1,0 +1,37 @@
+using System;
+using System.Linq;
+using dnlib.DotNet;
+using dnlib.DotNet.Emit;
+using dnlib.DotNet.Writer;
+
+if (args.Length != 2) throw new ArgumentException("input/output DLL required");
+using var module = ModuleDefMD.Load(args[0]);
+var unity = module.GetAssemblyRefs().Single(a => a.Name == "UnityEngine");
+var javaClass = new TypeRefUser(module,"UnityEngine","AndroidJavaClass",unity);
+var javaObject = new TypeRefUser(module,"UnityEngine","AndroidJavaObject",unity);
+var constructor = new MemberRefUser(module,".ctor",MethodSig.CreateInstance(module.CorLibTypes.Void,module.CorLibTypes.String),javaClass);
+var call = new MemberRefUser(module,"CallStatic",MethodSig.CreateInstance(module.CorLibTypes.Void,module.CorLibTypes.String,new SZArraySig(module.CorLibTypes.Object)),javaObject);
+var dispose = new MemberRefUser(module,"Dispose",MethodSig.CreateInstance(module.CorLibTypes.Void),javaObject);
+var url = module.GetTypes().Single(t=>t.FullName=="ServerConfig").Methods.Single(m=>m.Name=="GetServerUrl");
+var target=module.GetTypes().Single(t=>t.FullName=="UserInput").Methods.Single(m=>m.Name=="OnRegistButtonClick");
+if (!target.HasBody || target.Body.Instructions.Count!=1 || target.Body.Instructions[0].OpCode!=OpCodes.Ret)
+ throw new InvalidOperationException("Original registration button is no longer empty");
+target.Body=new CilBody();
+var body=target.Body.Instructions;
+body.Add(Instruction.Create(OpCodes.Ldstr,"com.hyjs.wallet.GameRegistration"));
+body.Add(Instruction.Create(OpCodes.Newobj,constructor));
+body.Add(Instruction.Create(OpCodes.Dup));
+body.Add(Instruction.Create(OpCodes.Ldstr,"show"));
+body.Add(Instruction.Create(OpCodes.Ldc_I4_1));
+body.Add(Instruction.Create(OpCodes.Newarr,module.CorLibTypes.Object.TypeDefOrRef));
+body.Add(Instruction.Create(OpCodes.Dup));
+body.Add(Instruction.Create(OpCodes.Ldc_I4_0));
+body.Add(Instruction.Create(OpCodes.Call,url));
+body.Add(Instruction.Create(OpCodes.Stelem_Ref));
+body.Add(Instruction.Create(OpCodes.Callvirt,call));
+body.Add(Instruction.Create(OpCodes.Callvirt,dispose));
+body.Add(Instruction.Create(OpCodes.Ret));
+var options=new ModuleWriterOptions(module);
+options.MetadataOptions.Flags|=MetadataFlags.PreserveAll|MetadataFlags.KeepOldMaxStack;
+module.Write(args[1],options);
+Console.WriteLine("Replaced only the original empty registration button handler");

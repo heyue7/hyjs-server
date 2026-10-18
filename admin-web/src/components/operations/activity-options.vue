@@ -1,0 +1,256 @@
+<script setup lang="ts">
+import { watch } from 'vue';
+import RewardList from './reward-list.vue';
+import ResourceSelect from './resource-select.vue';
+const options = defineModel<Record<string, any>>({ required: true });
+const props = defineProps<{ mode: string; disabled?: boolean; fixedValues?: Record<string, string | number> }>();
+watch(
+  () => props.mode,
+  mode => {
+    if (mode === 'mystic-shop' && !Array.isArray(options.value.discounts)) options.value.discounts = [];
+    if (mode === 'stamina-meal' && !Array.isArray(options.value.meals)) options.value.meals = [];
+    if (mode === 'treasure-box') {
+      for (const key of ['exploreRewards', 'finalRewards', 'coinPrizes'])
+        if (!Array.isArray(options.value[key])) options.value[key] = [];
+    }
+    if (mode === 'turntable') {
+      for (const key of ['topPrize', 'advancePrize'])
+        if (!options.value[key]) options.value[key] = { resourceId: '', amount: 0 };
+    }
+  },
+  { immediate: true }
+);
+function minuteText(value: number) {
+  if (value === 1440) return '00:00';
+  return `${String(Math.floor((value || 0) / 60)).padStart(2, '0')}:${String((value || 0) % 60).padStart(2, '0')}`;
+}
+function parseMinute(value: string | null) {
+  if (!value) return 0;
+  const [hour, minute] = value.split(':').map(Number);
+  return hour * 60 + minute;
+}
+function addMeal() {
+  options.value.meals.push({ startMinute: 0, endMinute: 0, amount: 0 });
+}
+function addCoinPrize() {
+  options.value.coinPrizes.push({ coin: 0, weight: 0 });
+}
+const fixedLabels: Record<string, string> = {
+  singleDiamond: '单抽钻石',
+  tenDiamond: '十连钻石',
+  singleCost: '单抽消耗',
+  tenCost: '十连消耗',
+  coinPerDraw: '购买金币',
+  dayLimit: '每日次数'
+};
+const turntableNumbers = [
+  { key: 'scorePerDraw', label: '每次抽取积分' },
+  { key: 'advancePlaces', label: '进阶奖名次范围' },
+  { key: 'initialDiamondPool', label: '初始大奖钻石池' }
+];
+</script>
+
+<template>
+  <div>
+    <NDescriptions
+      v-if="fixedValues && Object.keys(fixedValues).length"
+      :column="3"
+      label-placement="top"
+      class="mb-24px"
+    >
+      <NDescriptionsItem
+        v-for="(value, key) in fixedValues"
+        :key="key"
+        :label="fixedLabels[String(key)] || String(key)"
+      >
+        {{ value }}
+      </NDescriptionsItem>
+    </NDescriptions>
+    <template v-if="mode === 'stamina-meal'">
+      <div class="ops-section-heading">
+        <h3>领取时段</h3>
+        <NButton v-if="options.meals.length < 2" :disabled="disabled" size="small" @click="addMeal">添加时段</NButton>
+      </div>
+      <section v-for="(meal, index) in options.meals" :key="index" class="activity-edit-section">
+        <div class="ops-section-heading">
+          <strong>时段 {{ Number(index) + 1 }}</strong>
+          <NButton quaternary size="small" :disabled="disabled" @click="options.meals.splice(index, 1)">移除</NButton>
+        </div>
+        <div class="ops-date-grid">
+          <NFormItem label="开始时间">
+            <NTimePicker
+              :formatted-value="minuteText(meal.startMinute)"
+              format="HH:mm"
+              :disabled="disabled"
+              @update:formatted-value="meal.startMinute = parseMinute($event)"
+            />
+          </NFormItem>
+          <NFormItem label="结束时间">
+            <NTimePicker
+              :formatted-value="minuteText(meal.endMinute)"
+              format="HH:mm"
+              :disabled="disabled || meal.endMinute === 1440"
+              @update:formatted-value="meal.endMinute = parseMinute($event)"
+            />
+            <NCheckbox
+              :checked="meal.endMinute === 1440"
+              :disabled="disabled"
+              class="ml-10px"
+              @update:checked="meal.endMinute = $event ? 1440 : 0"
+            >
+              当天结束
+            </NCheckbox>
+          </NFormItem>
+        </div>
+        <NFormItem label="体力数量">
+          <NInputNumber v-model:value="meal.amount" :min="0" :precision="0" :disabled="disabled" class="w-full" />
+        </NFormItem>
+      </section>
+      <div class="ops-muted">配置两个互不重叠的日内时段，时间采用北京时间。</div>
+    </template>
+    <template v-else-if="mode === 'diamond-rebate'">
+      <NFormItem label="钻石返还比例">
+        <NInputNumber
+          :value="(options.rebateBps || 0) / 100"
+          :min="0.01"
+          :max="100"
+          :precision="2"
+          :disabled="disabled"
+          class="w-full"
+          @update:value="options.rebateBps = Math.round(($event || 0) * 100)"
+        >
+          <template #suffix>%</template>
+        </NInputNumber>
+      </NFormItem>
+      <NFormItem label="返还钻石上限">
+        <NInputNumber v-model:value="options.rebateCap" :min="0" :precision="0" :disabled="disabled" class="w-full" />
+      </NFormItem>
+    </template>
+    <template v-else-if="mode === 'treasure-box'">
+      <NDescriptions :column="1" label-placement="left" class="mb-20px">
+        <NDescriptionsItem label="每日探索次数">{{ options.dayLimit }}</NDescriptionsItem>
+      </NDescriptions>
+      <NGrid :cols="2" :x-gap="16">
+        <NGi>
+          <NFormItem label="累计探索次数上限">
+            <NInputNumber
+              v-model:value="options.totalLimit"
+              :min="0"
+              :precision="0"
+              :disabled="disabled"
+              class="w-full"
+            />
+          </NFormItem>
+        </NGi>
+        <NGi>
+          <NFormItem label="探索间隔">
+            <NInputNumber
+              v-model:value="options.cooldownSeconds"
+              :min="0"
+              :precision="0"
+              :disabled="disabled"
+              class="w-full"
+            >
+              <template #suffix>秒</template>
+            </NInputNumber>
+          </NFormItem>
+        </NGi>
+      </NGrid>
+      <NFormItem label="单次探索奖励">
+        <RewardList v-model:value="options.exploreRewards" :disabled="disabled" />
+      </NFormItem>
+      <NFormItem label="最终奖励"><RewardList v-model:value="options.finalRewards" :disabled="disabled" /></NFormItem>
+      <div class="ops-section-heading">
+        <h3>金币奖项</h3>
+        <NButton size="small" :disabled="disabled" @click="addCoinPrize">添加金币奖项</NButton>
+      </div>
+      <div v-for="(prize, index) in options.coinPrizes" :key="index" class="reward-list-line mb-12px">
+        <NInputNumber v-model:value="prize.coin" :min="0" :precision="0" :disabled="disabled" placeholder="金币数量" />
+        <NInputNumber
+          v-model:value="prize.weight"
+          :min="0"
+          :precision="0"
+          :disabled="disabled"
+          placeholder="相对权重"
+        />
+        <NButton quaternary :disabled="disabled" @click="options.coinPrizes.splice(index, 1)">移除</NButton>
+      </div>
+    </template>
+    <template v-else-if="mode === 'turntable'">
+      <NGrid :cols="2" :x-gap="16">
+        <NGi v-for="field in turntableNumbers" :key="field.key">
+          <NFormItem :label="field.label">
+            <NInputNumber
+              v-model:value="options[field.key]"
+              :min="0"
+              :precision="0"
+              :disabled="disabled"
+              class="w-full"
+            />
+          </NFormItem>
+        </NGi>
+        <NGi>
+          <NFormItem label="超级大奖概率">
+            <NInputNumber
+              :value="(options.jackpotPerMillion || 0) / 10000"
+              :min="0"
+              :max="100"
+              :precision="4"
+              :disabled="disabled"
+              class="w-full"
+              @update:value="options.jackpotPerMillion = Math.round(($event || 0) * 10000)"
+            >
+              <template #suffix>%</template>
+            </NInputNumber>
+          </NFormItem>
+        </NGi>
+        <NGi>
+          <NFormItem label="消费计入大奖池比例">
+            <NInputNumber
+              :value="(options.poolContributionBps || 0) / 100"
+              :min="0"
+              :max="100"
+              :precision="2"
+              :disabled="disabled"
+              class="w-full"
+              @update:value="options.poolContributionBps = Math.round(($event || 0) * 100)"
+            >
+              <template #suffix>%</template>
+            </NInputNumber>
+          </NFormItem>
+        </NGi>
+      </NGrid>
+      <NFormItem label="榜首奖励">
+        <div class="resource-cost-line">
+          <ResourceSelect v-model:value="options.topPrize.resourceId" :disabled="disabled" />
+          <NInputNumber v-model:value="options.topPrize.amount" :min="0" :precision="0" :disabled="disabled" />
+        </div>
+      </NFormItem>
+      <NFormItem label="进阶排名奖励">
+        <div class="resource-cost-line">
+          <ResourceSelect v-model:value="options.advancePrize.resourceId" :disabled="disabled" />
+          <NInputNumber v-model:value="options.advancePrize.amount" :min="0" :precision="0" :disabled="disabled" />
+        </div>
+      </NFormItem>
+    </template>
+    <template v-if="Array.isArray(options.discounts)">
+      <div class="ops-section-heading">
+        <h3>可用折扣</h3>
+        <NButton :disabled="disabled" size="small" @click="options.discounts.push(0)">添加折扣</NButton>
+      </div>
+      <div v-for="(_, index) in options.discounts" :key="index" class="resource-cost-line mb-12px">
+        <NInputNumber
+          :value="options.discounts[index] / 100"
+          :min="0"
+          :max="100"
+          :precision="2"
+          :disabled="disabled"
+          @update:value="options.discounts[index] = Math.round(($event || 0) * 100)"
+        >
+          <template #suffix>%</template>
+        </NInputNumber>
+        <NButton quaternary :disabled="disabled" @click="options.discounts.splice(index, 1)">移除</NButton>
+      </div>
+    </template>
+  </div>
+</template>

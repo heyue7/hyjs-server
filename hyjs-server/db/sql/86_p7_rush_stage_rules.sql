@@ -1,0 +1,2 @@
+-- P7原Rush协议状态与冻结记录；未通过权威/原内容门禁不消费和发奖。
+CREATE TABLE IF NOT EXISTS p7_rush_stage_rules (id VARBINARY(64) NOT NULL,kind INT NOT NULL,task_id VARCHAR(64) NOT NULL,floor INT NOT NULL,star INT NOT NULL,condition_task_id VARCHAR(64) NOT NULL,min_level INT NOT NULL,enabled BOOLEAN NOT NULL,scene VARBINARY(64) NOT NULL,max_round INT NOT NULL,win_key INT NOT NULL,win_value INT NOT NULL,enemies LONGBLOB,first_reward TEXT NOT NULL,reward TEXT NOT NULL,recommended_power DOUBLE NOT NULL,source TEXT NOT NULL,PRIMARY KEY(id),KEY(kind)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

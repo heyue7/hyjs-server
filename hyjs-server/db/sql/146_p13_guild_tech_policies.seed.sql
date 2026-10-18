@@ -1,0 +1,2 @@
+-- Operator directory must be explicitly published; no default building grouping or free effects.
+INSERT INTO `p13_guild_tech_policies` (`id`,`enabled`,`version`,`directory_json`,`directory_hash`,`published_at`,`source`) VALUES (1,0,'','{}','44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a',0,'local-prepublished-guild-tech-directory-initial0-v1; buildinggroups-and-initiallevel-local; original80rows-cost-and-prop') ON DUPLICATE KEY UPDATE `id`=`id`;

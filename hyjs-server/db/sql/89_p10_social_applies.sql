@@ -1,0 +1,1 @@
+CREATE TABLE IF NOT EXISTS p10_social_applies (sender_id BIGINT NOT NULL, receiver_id BIGINT NOT NULL, word VARCHAR(160) NOT NULL, created_at BIGINT NOT NULL, PRIMARY KEY (sender_id,receiver_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;

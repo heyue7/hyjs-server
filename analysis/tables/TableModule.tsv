@@ -1,0 +1,30 @@
+ID	名称	说明	图标	开放等级	显示等级
+ID	modelName	desc	icon	openLev	showLev
+string	string	string	string	int	int
+primary	none	none	nono	none	none
+ID	modelName	desc	icon	openLev	showLev
+mainHeroTalentUnlock	levelUpUnlockName_1	levelUpUnlockDes_1	levelUpUnlockIcon_1	3	
+pvpUnlock	levelUpUnlockName_2	levelUpUnlockDes_2	levelUpUnlockIcon_2	10	
+heroTrainUnlock	levelUpUnlockName_3	levelUpUnlockDes_3	levelUpUnlockIcon_1	10	
+worldTreeUnlock	levelUpUnlockName_4	levelUpUnlockDes_4	levelUpUnlockIcon_4	13	
+treasurePvpUnlock	levelUpUnlockName_5	levelUpUnlockDes_5	levelUpUnlockIcon_5	15	
+recycleRoomUnlock	levelUpUnlockName_6	levelUpUnlockDes_6	levelUpUnlockIcon_6	16	
+fightTenUnlock	levelUpUnlockName_7	levelUpUnlockDes_7	levelUpUnlockIcon_7	14	
+iNCarnatingUnlock	levelUpUnlockName_8	levelUpUnlockDes_8	levelUpUnlockIcon_8	22	
+activityUnlock	levelUpUnlockName_9	levelUpUnlockDes_9	levelUpUnlockIcon_9	26	
+robFiveUnlock	levelUpUnlockName_11	levelUpUnlockDes_11	levelUpUnlockIcon_11	30	
+sailingUnlcok	levelUpUnlockName_12	levelUpUnlockDes_12	levelUpUnlockIcon_12	32	
+wantedMissionUnlock	levelUpUnlockName_13	levelUpUnlockDes_13	levelUpUnlockIcon_13	35	
+array_pos1	levelUpUnlockName_15	levelUpUnlockDes_15	levelUpUnlockIcon_15	1	
+array_pos2	levelUpUnlockName_16	levelUpUnlockDes_16	levelUpUnlockIcon_15	1	
+array_pos3	levelUpUnlockName_17	levelUpUnlockDes_17	levelUpUnlockIcon_15	5	
+array_pos4	levelUpUnlockName_18	levelUpUnlockDes_18	levelUpUnlockIcon_15	15	
+array_help_pos1	levelUpUnlockName_19	levelUpUnlockDes_19	levelUpUnlockIcon_15	25	
+array_help_pos2	levelUpUnlockName_20	levelUpUnlockDes_20	levelUpUnlockIcon_15	35	
+array_help_pos3	levelUpUnlockName_21	levelUpUnlockDes_21	levelUpUnlockIcon_15	45	
+array_help_pos4	levelUpUnlockName_22	levelUpUnlockDes_22	levelUpUnlockIcon_15	55	
+array_help_pos5	levelUpUnlockName_23	levelUpUnlockDes_23	levelUpUnlockIcon_15	60	
+array_help_pos6	levelUpUnlockName_24	levelUpUnlockDes_24	levelUpUnlockIcon_15	70	
+jinglingUnlock	levelUpUnlockName_25	levelUpUnlockDes_25	levelUpUnlockIcon_16	34	
+juexingUnlock	levelUpUnlockName_26	levelUpUnlockDes_26	levelUpUnlockIcon_17	70	
+array_pos5	levelUpUnlockName_27	levelUpUnlockDes_18	levelUpUnlockIcon_15	23	

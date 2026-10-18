@@ -1,0 +1,25 @@
+宝箱id	宝箱待机特效	开启特效	宝箱的模型资源	通关宝箱奖励
+BoxId	BoxEffect0	BoxEffect1	BoxRes	dropAward
+string	string	string	string	string
+primary	none	none	none	none
+boxId	boxEffect0	boxEffect1	boxRes	dropAward
+box1		boxProcessSmall	box	item_320:0,0;1,1000|item_317:0,900;1,100
+box2		boxProcessSmall	box	item_320:0,0;3,1000|item_317:0,750;1,250|item_316:0,800;1,200|item_314:0,800;1,200
+box3		boxProcessBig	box	item_320:0,0;5,1000|item_317:0,600;1,400|item_316:0,500;1,500|item_314:0,500;1,500
+box4	boxStandby	boxProcessBig	box	item_320:0,0;10,1000|item_317:0,0;1,1000|item_316:0,0;1,1000|item_314:0,0;1,1000|item_312:0,950;1,50
+box5		boxProcessSmall	box	item_321:0,0;1,1000|item_317:0,900;1,100[333]item_318:0,900;1,100[333]item_319:0,900;1,100[334]
+box6		boxProcessSmall	box	item_321:0,0;3,1000|item_316:0,800;1,200|item_314:0,800;1,200|item_317:0,750;1,250[333]item_318:0,750;1,250[333]item_319:0,750;1,250[334]
+box7		boxProcessBig	box	item_321:0,0;5,1000|item_316:0,500;1,500|item_314:0,500;1,500|item_315:0,650;1,350|item_317:0,600;1,400[333]item_318:0,600;1,400[333]item_319:0,600;1,400[334]
+box8	boxStandby	boxProcessBig	box	item_321:0,0;10,1000|item_316:0,0;1,1000|item_314:0,0;1,1000|item_312:0,950;1,50|item_315:0,250;1,750|item_317:0,0;1,1000[333]item_318:0,0;1,1000[333]item_319:0,0;1,1000[334]
+box9		boxProcessSmall	box	item_323:0,0;1,1000|item_319:0,900;1,100
+box10		boxProcessSmall	box	item_323:0,0;3,1000|item_319:0,750;1,250|item_316:0,800;1,200|item_314:0,800;1,200
+box11		boxProcessBig	box	item_323:0,0;5,1000|item_319:0,600;1,400|item_316:0,500;1,500|item_314:0,500;1,500
+box12	boxStandby	boxProcessBig	box	item_323:0,0;10,1000|item_319:0,0;1,1000|item_316:0,0;1,1000|item_314:0,0;1,1000|item_312:0,950;1,50
+box13		boxProcessSmall	box	item_324:0,0;1,1000|item_318:0,900;1,100
+box14		boxProcessSmall	box	item_324:0,0;3,1000|item_318:0,750;1,250|item_316:0,800;1,200|item_314:0,800;1,200
+box15		boxProcessBig	box	item_324:0,0;5,1000|item_318:0,600;1,400|item_316:0,500;1,500|item_314:0,500;1,500
+box16	boxStandby	boxProcessBig	box	item_324:0,0;10,1000|item_318:0,0;1,1000|item_316:0,0;1,1000|item_314:0,0;1,1000|item_312:0,950;1,50
+box17		boxProcessSmall	box	item_322:0,0;1,1000|item_317:0,900;1,100[333]item_318:0,900;1,100[333]item_319:0,900;1,100[334]
+box18		boxProcessSmall	box	item_322:0,0;3,1000|item_316:0,800;1,200|item_314:0,800;1,200|item_317:0,750;1,250[333]item_318:0,750;1,250[333]item_319:0,750;1,250[334]
+box19		boxProcessBig	box	item_322:0,0;5,1000|item_316:0,500;1,500|item_314:0,500;1,500|item_313:0,650;1,350|item_317:0,600;1,400[333]item_318:0,600;1,400[333]item_319:0,600;1,400[334]
+box20	boxStandby	boxProcessBig	box	item_322:0,0;10,1000|item_316:0,0;1,1000|item_314:0,0;1,1000|item_313:0,250;1,750|item_312:0,950;1,50|item_317:0,0;1,1000[333]item_318:0,0;1,1000[333]item_319:0,0;1,1000[334]

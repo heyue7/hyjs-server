@@ -1,0 +1,9 @@
+怪物id	怪群ID	名字	英雄Id	是否显示	攻击	物防	魔防	血量	命中率	闪避率	暴击率	抗暴率	暴击系数	伤害加成	伤害减免	技能1	技能2	大招	普通技能释放概率（只适用于HeroClass为Monster且有两个普通技能的数据）	天赋0	天赋1	天赋2	天赋3	天赋4	天赋5	位置	血条数量
+Id	BossId	name	HeroId	show	Attack	PhyDefend	MagicDefend	Hp	hit	dodge	cri	antiCri	criFactor	damageAdd	damageReduce	SkillId1	SkillId2	UltSkillId	SkillCastChance	Talent0	Talent1	Talent2	Talent3	Talent4	Talent5	Location	bloodNumber
+int	string	string	string	int	int	int	int	int	double	double	double	double	double	double	double	string	string	string	double	string	string	string	string	string	string	int	int
+primary	index	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none
+id	bossId	name	heroId	show	attack	phyDefend	magicDefend	hp	hit	dodge	cri	antiCri	criFactor	damageAdd	damageReduce	skillId1	skillId2	ultSkillId	skillCastChance	talent0	talent1	talent2	talent3	talent4	talent5	location	bloodNumber
+1	boss_001	name_worldboss1	monster_041	1	37200	0	0	110707242	10000.0	160.0	142.0	234.0	150.0	160.0	30.0	worldboss1041_1		worldboss1041_3		tal_3164		tal_1008				13	2
+2	boss_001	name_worldboss2	monster_015	0	32594	0	0	92256036	10000.0	160.0	142.0	234.0	150.0	160.0	30.0	1015_1				tal_1057	tal_3162	tal_1008				7	1
+3	boss_001	name_worldboss3	monster_015	0	32594	0	0	92256036	10000.0	160.0	142.0	234.0	150.0	160.0	30.0	1015_1				tal_1057	tal_3162	tal_1008				9	1
+4	boss_001	name_worldboss4	monster_015	0	32594	0	0	92256036	10000.0	160.0	142.0	234.0	150.0	160.0	30.0	1015_1				tal_1057	tal_3162	tal_1008				3	1

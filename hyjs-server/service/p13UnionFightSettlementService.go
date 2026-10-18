@@ -1,0 +1,663 @@
+package service
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"math"
+	"strings"
+	"time"
+
+	"google.golang.org/protobuf/proto"
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
+	"hyjs-server/constUtil"
+	"hyjs-server/db"
+	pb "hyjs-server/model/protocol"
+)
+
+type p13UFSettlementAward struct {
+	PlayerID int64  `json:"playerId"`
+	GuildID  string `json:"guildId"`
+	Rewards  string `json:"rewards"`
+	MVP      bool   `json:"mvp,omitempty"`
+	Tasks    bool   `json:"tasks,omitempty"`
+}
+
+func (s *GameService) InitializeP13UnionFightSettlement(ctx context.Context) error {
+	tx := db.GetIns().WithContext(ctx)
+	if err := tx.AutoMigrate(&db.P13UnionFightSettlementPolicy{}, &db.P13UnionFightSettlementOffer{}, &db.P13UnionFightSettlementResult{}, &db.P13UnionFightSettlementIntent{}, &db.P13UnionFightSettlementPrestige{}, &db.P13UnionFightGuildMissionFact{}); err != nil {
+		return err
+	}
+	for _, group := range []string{"A", "B", "C", "D"} {
+		if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&db.P13UnionFightSettlementPolicy{Group: group, Source: constUtil.P13UnionFightSettlementSource}).Error; err != nil {
+			return err
+		}
+	}
+	if err := s.InitializeP13UnionFightWeekly(ctx); err != nil {
+		return err
+	}
+	return s.InitializeP13UnionFightMonthly(ctx)
+}
+
+// p13UFSettlementFreeze requires an explicit local publication before the real match starts.
+// Archived values are never enabled or copied into the current server by initialization.
+func (s *GameService) p13UFSettlementFreeze(tx *gorm.DB, match *db.P13UnionFightMatch, now time.Time) error {
+	if err := s.p13UFWeeklyFreeze(tx, match, now); err != nil {
+		return err
+	}
+	var existing db.P13UnionFightSettlementOffer
+	if err := tx.First(&existing, "match_id=?", match.ID).Error; err == nil {
+		return nil
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return err
+	}
+	if now.UnixMilli() >= match.StartAt {
+		return nil
+	}
+	var rule db.P13UnionFightSettlementPolicy
+	if err := tx.First(&rule, "`group`=?", match.Group).Error; err != nil {
+		return err
+	}
+	if !rule.Enabled {
+		return nil
+	}
+	if rule.Version == "" || strings.TrimSpace(rule.Source) == "" || rule.PublishedAt <= 0 || rule.PublishedAt > now.UnixMilli() || rule.PublishedAt >= match.StartAt || rule.ParticipationRewards == "" || rule.VictoryRewards == "" || rule.WinPrestige < 0 || rule.LosePrestige < 0 || rule.FactoryMissionPrestige < 0 || int64(rule.WinPrestige)+int64(rule.FactoryMissionPrestige) > math.MaxInt32 || int64(rule.LosePrestige)+int64(rule.FactoryMissionPrestige) > math.MaxInt32 {
+		return errors.New("公会战本地结算奖档尚未提前完整发布")
+	}
+	original, err := s.p13UFFieldOriginal(match, tx)
+	if err != nil {
+		return err
+	}
+	if _, err := p13UFMissionCatalog(&rule); err != nil {
+		return err
+	}
+	rewardLists := []string{rule.ParticipationRewards, rule.VictoryRewards}
+	if rule.TaskRewards != "" {
+		rewardLists = append(rewardLists, rule.TaskRewards)
+	}
+	if rule.TransportMVPRewards != "" {
+		rewardLists = append(rewardLists, rule.TransportMVPRewards)
+	}
+	for _, rewards := range rewardLists {
+		ok, err := original.openServerRewardSupported(rewards)
+		if err != nil {
+			return err
+		}
+		if !ok {
+			return errors.New("公会战发布奖励资源尚未恢复")
+		}
+	}
+	raw, err := json.Marshal(rule)
+	if err != nil {
+		return err
+	}
+	return tx.Create(&db.P13UnionFightSettlementOffer{MatchID: match.ID, Rules: raw, RulesHash: p6Digest(raw), RosterHash: match.SnapshotHash, FrozenAt: now.UnixMilli(), Source: constUtil.P13UnionFightSettlementSource}).Error
+}
+
+func p13UFSettlementRules(offer *db.P13UnionFightSettlementOffer, match *db.P13UnionFightMatch) (*db.P13UnionFightSettlementPolicy, error) {
+	var rule db.P13UnionFightSettlementPolicy
+	if offer.RosterHash != match.SnapshotHash || p6Digest(offer.Rules) != offer.RulesHash || json.Unmarshal(offer.Rules, &rule) != nil || !rule.Enabled || rule.Group != match.Group || rule.Version == "" || rule.PublishedAt <= 0 || rule.PublishedAt > offer.FrozenAt || offer.FrozenAt >= match.StartAt {
+		return nil, errors.New("公会战冻结结算奖档来源无效")
+	}
+	return &rule, nil
+}
+
+// p13UFObserveFight persists the authenticated field request before the audit path can
+// reject, roll back or leave a capture pending. Any such request excludes peaceful victory.
+func (s *GameService) p13UFObserveFight(ctx context.Context, id int64, b *pb.CSUFPlayerAskFight, stamp int64, now time.Time) error {
+	return db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := ServerGameClockGuardTransaction(tx); err != nil {
+			return err
+		}
+
+		var lock db.P13GuildPolicy
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&lock, 1).Error; err != nil {
+			return err
+		}
+		var actor db.P13UnionFightFieldPlayer
+		if err := tx.Where("player_id=? AND left_at=0", id).Order("joined_at DESC").First(&actor).Error; errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil
+		} else if err != nil {
+			return err
+		}
+		var match db.P13UnionFightMatch
+		if err := tx.First(&match, "id=?", actor.MatchID).Error; err != nil {
+			return err
+		}
+		if now.UnixMilli() < match.StartAt || now.UnixMilli() >= match.EndAt {
+			return nil
+		}
+		var settled int64
+		if err := tx.Model(&db.P13UnionFightSettlementResult{}).Where("match_id=?", match.ID).Count(&settled).Error; err != nil {
+			return err
+		}
+		if settled > 0 {
+			return errors.New("公会战已经结算")
+		}
+		row := db.P13UnionFightSettlementIntent{MatchID: match.ID, PlayerID: id, TargetID: b.GetTargetGuid(), Stamp: stamp, ObservedAt: now.UnixMilli(), Source: constUtil.P13UnionFightSettlementSource}
+		return tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&row).Error
+	})
+}
+
+func p13UFSettlementNoP6(tx *gorm.DB, match *db.P13UnionFightMatch, ids []int64) (bool, error) {
+	for _, table := range []any{&db.P13UnionFightSettlementIntent{}, &db.P13UnionFightBattleAuditAttempt{}, &db.P13UnionFightGuardAuditAttempt{}} {
+		var count int64
+		if err := tx.Model(table).Where("match_id=?", match.ID).Count(&count).Error; err != nil {
+			return false, err
+		}
+		if count > 0 {
+			return false, nil
+		}
+	}
+	// The first supported terminal branch also excludes persistent item effects:
+	// healing must not erase a previous HP change, and bombs must not turn a
+	// changed battlefield into an apparently untouched zero-combat round.
+	var affected int64
+	if err := tx.Model(&db.P13UnionFightItemState{}).Where("match_id=? AND (normal_until>0 OR diamond_until>0)", match.ID).Count(&affected).Error; err != nil {
+		return false, err
+	}
+	if affected > 0 {
+		return false, nil
+	}
+	if err := tx.Model(&db.P13UnionFightGateState{}).Where("match_id=? AND frame_hash<>initial_hash", match.ID).Count(&affected).Error; err != nil {
+		return false, err
+	}
+	if affected > 0 {
+		return false, nil
+	}
+	// Match-bound AppliedProperties also find captured records whose attempt transaction
+	// never bound an ID. Other wars or unrelated P6 modes for these accounts do not count.
+	var records []db.P6BattleRecord
+	if err := tx.Where("player_id IN ? AND source IN ?", ids, []string{constUtil.P13UnionFightBattleAuditP6Source, constUtil.P13UnionFightGuardAuditP6Source}).Find(&records).Error; err != nil {
+		return false, err
+	}
+	for _, record := range records {
+		raw, err := decodeP6StoredInput(record.Input)
+		if err != nil {
+			if record.CreatedAt >= match.StartAt && record.CreatedAt <= match.EndAt {
+				return false, nil
+			}
+			continue
+		}
+		var input struct {
+			AppliedProperties map[string][]string `json:"appliedProperties"`
+		}
+		if json.Unmarshal(raw, &input) != nil {
+			return false, nil
+		}
+		for _, facts := range input.AppliedProperties {
+			for _, fact := range facts {
+				if strings.Contains(fact, ";match="+match.ID+";") {
+					return false, nil
+				}
+			}
+		}
+	}
+	return true, nil
+}
+
+func (s *GameService) p13UFSettleZeroFight(tx *gorm.DB, match *db.P13UnionFightMatch, offer *db.P13UnionFightSettlementOffer, now time.Time) (*db.P13UnionFightSettlementResult, error) {
+	if now.UnixMilli() < match.EndAt {
+		return nil, nil
+	}
+	var saved db.P13UnionFightSettlementResult
+	if err := tx.First(&saved, "match_id=?", match.ID).Error; err == nil {
+		return &saved, nil
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, err
+	}
+	rule, err := p13UFSettlementRules(offer, match)
+	if err != nil {
+		return nil, err
+	}
+	if p6Digest(match.Roster) != match.SnapshotHash {
+		return nil, errors.New("公会战真实报名名单损坏")
+	}
+	var roster p13UFMatchRoster
+	if err = json.Unmarshal(match.Roster, &roster); err != nil {
+		return nil, err
+	}
+	var left, right pb.UFInfoPreView
+	if proto.Unmarshal(match.LeftPreview, &left) != nil || proto.Unmarshal(match.RightPreview, &right) != nil || left.GetUnionId() != match.LeftGuildID || right.GetUnionId() != match.RightGuildID {
+		return nil, errors.New("公会战冻结双方资料无效")
+	}
+	ids := []int64{}
+	guildByPlayer := map[int64]string{}
+	powers := []int64{0, 0}
+	for camp, fighters := range [][]p13UFMatchFighter{roster.Left, roster.Right} {
+		if len(fighters) == 0 {
+			return nil, nil
+		}
+		guild := match.LeftGuildID
+		if camp == 1 {
+			guild = match.RightGuildID
+		}
+		for _, item := range fighters {
+			fighter, err := p13UFReadMatchFighter(tx, item)
+			if err != nil {
+				return nil, err
+			}
+			if fighter.PlayerID <= 0 || guildByPlayer[fighter.PlayerID] != "" || fighter.GuildID != guild || fighter.AppliedAt <= 0 || fighter.FightPower < 0 || powers[camp] > math.MaxInt64-fighter.FightPower {
+				return nil, errors.New("公会战冻结报名身份或总战力无效")
+			}
+			member, err := p13GuildMember(tx, fighter.PlayerID)
+			if err != nil {
+				return nil, err
+			}
+			if member.GuildID != guild {
+				return nil, nil
+			}
+			powers[camp] += fighter.FightPower
+			ids = append(ids, fighter.PlayerID)
+			guildByPlayer[fighter.PlayerID] = guild
+		}
+	}
+	if powers[0] <= 0 || powers[1] <= 0 || powers[0] != left.GetFightPower() || powers[1] != right.GetFightPower() {
+		return nil, errors.New("公会战真实冻结总战力与原预览不一致")
+	}
+	if powers[0] == powers[1] {
+		return nil, nil
+	}
+	noP6, err := p13UFSettlementNoP6(tx, match, ids)
+	if err != nil || !noP6 {
+		return nil, err
+	}
+	var actors []db.P13UnionFightFieldPlayer
+	if err = tx.Where("match_id=?", match.ID).Order("player_id").Find(&actors).Error; err != nil {
+		return nil, err
+	}
+	joined := map[string]int{}
+	awards := []p13UFSettlementAward{}
+	winner, loser := match.LeftGuildID, match.RightGuildID
+	if powers[1] < powers[0] {
+		winner, loser = loser, winner
+	}
+	for _, actor := range actors {
+		if actor.GuildID != guildByPlayer[actor.PlayerID] || actor.JoinedAt <= 0 || actor.JoinedAt >= match.EndAt || actor.LeftAt > 0 && actor.LeftAt < match.EndAt {
+			return nil, nil
+		}
+		frame, err := p13UFFieldReadActor(&actor)
+		if err != nil {
+			return nil, err
+		}
+		_, missionScore, missionComplete, err := p13UFMissionState(tx, match, &actor, rule)
+		if err != nil {
+			return nil, err
+		}
+		if frame.GetKillNum() != 0 || frame.GetDeadNum() != 0 || frame.GetOwnScore() != float64(missionScore) || frame.GetState() == 1 || frame.GetState() == 6 || frame.GetState() == 3 || frame.GetState() == 8 {
+			return nil, nil
+		}
+		fight := frame.GetFightInfo()
+		if len(fight.GetHpPos()) == 0 || len(fight.GetHpPos()) != len(fight.GetMaxHpPos()) {
+			return nil, nil
+		}
+		for i, hp := range fight.GetHpPos() {
+			if hp <= 0 || math.IsNaN(hp) || math.IsInf(hp, 0) || hp != fight.GetMaxHpPos()[i] {
+				return nil, nil
+			}
+		}
+		joined[actor.GuildID]++
+		rewards := rule.ParticipationRewards
+		if actor.GuildID == winner {
+			rewards += ";" + rule.VictoryRewards
+		}
+		tasks := rule.TaskRewards != "" && missionComplete >= 2
+		if tasks {
+			rewards += ";" + rule.TaskRewards
+		}
+		awards = append(awards, p13UFSettlementAward{PlayerID: actor.PlayerID, GuildID: actor.GuildID, Rewards: rewards, Tasks: tasks})
+	}
+	if joined[match.LeftGuildID] == 0 || joined[match.RightGuildID] == 0 {
+		return nil, nil
+	}
+	mvp, err := p13UFTransportMVP(tx, match, actors, awards, rule)
+	if err != nil {
+		return nil, err
+	}
+	winTasks, err := p13UFGuildMissionPrestige(tx, match, winner)
+	if err != nil {
+		return nil, err
+	}
+	loseTasks, err := p13UFGuildMissionPrestige(tx, match, loser)
+	if err != nil {
+		return nil, err
+	}
+	day, err := time.ParseInLocation("2006-01-02", match.Day, time.FixedZone("Asia/Shanghai", 8*3600))
+	if err != nil {
+		return nil, err
+	}
+	awardAt := day.Add(23*time.Hour + 30*time.Minute).UnixMilli()
+	if awardAt < match.EndAt {
+		return nil, nil
+	}
+	raw, err := json.Marshal(awards)
+	if err != nil {
+		return nil, err
+	}
+	saved = db.P13UnionFightSettlementResult{WinTaskPrestige: winTasks, LoseTaskPrestige: loseTasks, MatchID: match.ID, WinnerGuildID: winner, LoserGuildID: loser, LeftPower: powers[0], RightPower: powers[1], EndAt: match.EndAt, SettledAt: now.UnixMilli(), AwardAt: awardAt, OfferHash: offer.RulesHash, Awards: raw, MVP: mvp, Source: constUtil.P13UnionFightSettlementSource + "; publication=" + rule.Version + "; " + rule.Source}
+	if winTasks > 0 || loseTasks > 0 {
+		saved.Source += "; " + constUtil.P13UnionFightGuildMissionSource
+	}
+	if rule.PersonalMissions != "" {
+		saved.Source += "; " + constUtil.P13UnionFightMissionSource
+	}
+	if rule.TransportMVPRewards != "" {
+		saved.Source += "; " + constUtil.P13UnionFightTransportSource
+	}
+	if err = tx.Create(&saved).Error; err != nil {
+		return nil, err
+	}
+	for _, item := range []struct {
+		guild string
+		delta int32
+	}{{winner, rule.WinPrestige}, {loser, rule.LosePrestige}} {
+		var prestige db.P13UnionFightSettlementPrestige
+		key := p13UFWeek(day)
+		err = tx.First(&prestige, "week_start=? AND guild_id=?", key, item.guild).Error
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			prestige = db.P13UnionFightSettlementPrestige{WeekStart: key, GuildID: item.guild}
+		} else if err != nil {
+			return nil, err
+		}
+		if prestige.Score < 0 || prestige.Score > math.MaxInt32-int64(item.delta) {
+			return nil, errors.New("公会战威望溢出")
+		}
+		prestige.Score += int64(item.delta)
+		if err = tx.Save(&prestige).Error; err != nil {
+			return nil, err
+		}
+	}
+	return &saved, nil
+}
+
+// p13UFTransportMVP uses an observed full field lifecycle and actual deposited
+// ore, never current spendable balances. The published local v1 policy awards
+// only a unique positive leader; unknown tied/zero maxima have no MVP grant.
+func p13UFTransportMVP(tx *gorm.DB, match *db.P13UnionFightMatch, actors []db.P13UnionFightFieldPlayer, awards []p13UFSettlementAward, rule *db.P13UnionFightSettlementPolicy) ([]byte, error) {
+	if rule.TransportMVPRewards == "" {
+		return nil, nil
+	}
+	var scope db.P13UnionFightTransportScope
+	var field db.P13UnionFightField
+	if err := tx.First(&scope, "match_id=?", match.ID).Error; err != nil {
+		return nil, err
+	}
+	if err := tx.First(&field, "match_id=?", match.ID).Error; err != nil {
+		return nil, err
+	}
+	if scope.Source != constUtil.P13UnionFightTransportSource || scope.StartedAt <= 0 || scope.StartedAt != field.CreatedAt {
+		return nil, errors.New("公会战矿运MVP缺完整场次观察来源")
+	}
+	byID := map[int64]*db.P13UnionFightFieldPlayer{}
+	for i := range actors {
+		byID[actors[i].PlayerID] = &actors[i]
+	}
+	var stats []db.P13UnionFightTransportStat
+	if err := tx.Where("match_id=?", match.ID).Order("ore DESC,player_id").Find(&stats).Error; err != nil {
+		return nil, err
+	}
+	var winner *db.P13UnionFightTransportStat
+	for i := range stats {
+		stat := &stats[i]
+		actor := byID[stat.PlayerID]
+		if actor == nil || actor.GuildID != stat.GuildID || stat.Ore <= 0 || stat.Deposits <= 0 || stat.UpdatedAt < scope.StartedAt || stat.UpdatedAt >= match.EndAt {
+			return nil, errors.New("公会战矿运累计不属于真实本场参与者")
+		}
+		if i == 0 {
+			winner = stat
+		} else if stat.Ore == stats[0].Ore {
+			winner = nil
+		}
+	}
+	if winner == nil || winner.Ore > math.MaxInt32 {
+		return nil, nil
+	}
+	actor := byID[winner.PlayerID]
+	frame, err := p13UFFieldReadActor(actor)
+	if err != nil {
+		return nil, err
+	}
+	for i := range awards {
+		if awards[i].PlayerID == winner.PlayerID {
+			awards[i].MVP = true
+			awards[i].Rewards += ";" + rule.TransportMVPRewards
+		}
+	}
+	return proto.Marshal(&pb.UFFightResult{MvpInfos: []*pb.UFFightResultPlayer{{PlayerId: proto.Int64(winner.PlayerID), ServerId: frame.ServerId, UnionId: proto.String(winner.GuildID), NickName: frame.NickName, MainHeroId: frame.HeroId, Type: proto.Int32(constUtil.P13UnionFightTransportMVPSlot), Value: proto.Int32(int32(winner.Ore))}}})
+}
+
+func (s *GameService) p13UFSettlementDeliver(tx *gorm.DB, result *db.P13UnionFightSettlementResult, now time.Time) error {
+	if result.DeliveredAt > 0 || now.UnixMilli() < result.AwardAt {
+		return nil
+	}
+	var awards []p13UFSettlementAward
+	if err := json.Unmarshal(result.Awards, &awards); err != nil {
+		return err
+	}
+	for _, award := range awards {
+		if _, err := s.EnqueueReward(tx, award.PlayerID, "p13-war:"+result.MatchID, "公会战结算", "公会战结算奖励，按本场已发布的奖档发放。", award.Rewards, 0); err != nil {
+			return err
+		}
+	}
+	return tx.Model(result).Update("delivered_at", now.UnixMilli()).Error
+}
+
+// TickP13UnionFightSettlement shares the existing guild worker and its transaction lock.
+// A nonempty combat history or undefined tie stays unresolved and produces no resources.
+func (s *GameService) TickP13UnionFightSettlement(ctx context.Context, now time.Time) error {
+	var matches []db.P13UnionFightMatch
+	if err := db.GetIns().WithContext(ctx).Order("start_at,id").Find(&matches).Error; err != nil {
+		return err
+	}
+	for _, candidate := range matches {
+		err := db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+			if err := ServerGameClockGuardTransaction(tx); err != nil {
+				return err
+			}
+
+			var gate db.P13GuildPolicy
+			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&gate, 1).Error; err != nil {
+				return err
+			}
+			var match db.P13UnionFightMatch
+			if err := tx.First(&match, "id=?", candidate.ID).Error; err != nil {
+				return err
+			}
+			if err := s.p13UFSettlementFreeze(tx, &match, now); err != nil {
+				return err
+			}
+			var offer db.P13UnionFightSettlementOffer
+			if err := tx.First(&offer, "match_id=?", match.ID).Error; errors.Is(err, gorm.ErrRecordNotFound) {
+				return nil
+			} else if err != nil {
+				return err
+			}
+			result, err := s.p13UFSettleZeroFight(tx, &match, &offer, now)
+			if err != nil || result == nil {
+				return err
+			}
+			return s.p13UFSettlementDeliver(tx, result, now)
+		})
+		if err != nil {
+			return err
+		}
+	}
+	if err := s.TickP13UnionFightWeekly(ctx, now); err != nil {
+		return err
+	}
+	return s.TickP13UnionFightMonthly(ctx, now)
+}
+
+func p13UFSettlementFrame(result *db.P13UnionFightSettlementResult, rule *db.P13UnionFightSettlementPolicy, id int64) (*pb.SCUnionFightResult, error) {
+	var awards []p13UFSettlementAward
+	if err := json.Unmarshal(result.Awards, &awards); err != nil {
+		return nil, err
+	}
+	var own *p13UFSettlementAward
+	for i := range awards {
+		if awards[i].PlayerID == id {
+			own = &awards[i]
+			break
+		}
+	}
+	if own == nil {
+		return nil, errors.New("未实际参加这场公会战")
+	}
+	frame := &pb.UFFightResult{FightId: proto.String(result.MatchID), WinUnionId: proto.String(result.WinnerGuildID), LoseUnionId: proto.String(result.LoserGuildID), WinUnionReward: proto.Int32(rule.WinPrestige + result.WinTaskPrestige), LoseUnionReward: proto.Int32(rule.LosePrestige + result.LoseTaskPrestige)}
+	if len(result.MVP) > 0 {
+		var stored pb.UFFightResult
+		if err := proto.Unmarshal(result.MVP, &stored); err != nil {
+			return nil, err
+		}
+		frame.MvpInfos = stored.MvpInfos
+	}
+	for index, reward := range []string{rule.ParticipationRewards, rule.VictoryRewards} {
+		resources, err := p1RewardResources(reward)
+		if err != nil {
+			return nil, err
+		}
+		items := []*pb.SimpleItem{}
+		for _, item := range resources {
+			items = append(items, &pb.SimpleItem{Id: item.Id, Num: item.Num})
+		}
+		success := int32(1)
+		if index == 1 && own.GuildID != result.WinnerGuildID {
+			success = 0
+			items = nil
+		}
+		frame.SelfAchieves = append(frame.SelfAchieves, &pb.UFFightResultSelfAchieve{Type: proto.Int32(int32(index)), IsSuccess: proto.Int32(success), Rewards: items})
+	}
+	if rule.TransportMVPRewards != "" {
+		award := &pb.UFFightResultSelfAchieve{Type: proto.Int32(2), IsSuccess: proto.Int32(0)}
+		if own.MVP {
+			award.IsSuccess = proto.Int32(1)
+			resources, err := p1RewardResources(rule.TransportMVPRewards)
+			if err != nil {
+				return nil, err
+			}
+			for _, item := range resources {
+				award.Rewards = append(award.Rewards, &pb.SimpleItem{Id: item.Id, Num: item.Num})
+			}
+		}
+		frame.SelfAchieves = append(frame.SelfAchieves, award)
+	}
+	if rule.TaskRewards != "" {
+		award := &pb.UFFightResultSelfAchieve{Type: proto.Int32(3), IsSuccess: proto.Int32(0)}
+		if own.Tasks {
+			award.IsSuccess = proto.Int32(1)
+			resources, err := p1RewardResources(rule.TaskRewards)
+			if err != nil {
+				return nil, err
+			}
+			for _, item := range resources {
+				award.Rewards = append(award.Rewards, &pb.SimpleItem{Id: item.Id, Num: item.Num})
+			}
+		}
+		frame.SelfAchieves = append(frame.SelfAchieves, award)
+	}
+	return &pb.SCUnionFightResult{Result: frame}, nil
+}
+
+func (s *GameService) p13UFSettlementQuery(ctx context.Context, id int64, request proto.Message, now time.Time) ([]proto.Message, error) {
+	if err := s.TickP13UnionFightSettlement(ctx, now); err != nil {
+		return nil, err
+	}
+	var response proto.Message
+	err := db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := ServerGameClockGuardTransaction(tx); err != nil {
+			return err
+		}
+
+		var results []db.P13UnionFightSettlementResult
+		if err := tx.Order("end_at DESC,match_id").Find(&results).Error; err != nil {
+			return err
+		}
+		if _, ok := request.(*pb.CSUFFightResult); ok {
+			// The original empty request belongs to the player's latest entered
+			// match. A pending second round must not replay the first round's win.
+			var latest db.P13UnionFightFieldPlayer
+			if err := tx.Where("player_id=?", id).Order("joined_at DESC,match_id DESC").First(&latest).Error; err != nil {
+				return err
+			}
+			for _, result := range results {
+				if result.MatchID != latest.MatchID {
+					continue
+				}
+				var awards []p13UFSettlementAward
+				if json.Unmarshal(result.Awards, &awards) != nil {
+					return errors.New("公会战奖励名单损坏")
+				}
+				found := false
+				for _, award := range awards {
+					found = found || award.PlayerID == id
+				}
+				if !found {
+					continue
+				}
+				var match db.P13UnionFightMatch
+				var offer db.P13UnionFightSettlementOffer
+				if err := tx.First(&match, "id=?", result.MatchID).Error; err != nil {
+					return err
+				}
+				if err := tx.First(&offer, "match_id=?", result.MatchID).Error; err != nil {
+					return err
+				}
+				rule, err := p13UFSettlementRules(&offer, &match)
+				if err != nil {
+					return err
+				}
+				frame, err := p13UFSettlementFrame(&result, rule, id)
+				response = frame
+				return err
+			}
+			return errors.New("公会战尚无可核实的完整终局")
+		}
+		member, err := p13GuildMember(tx, id)
+		if err != nil {
+			return err
+		}
+		if member.GuildID == "" {
+			return errors.New("当前没有公会")
+		}
+		reply := &pb.SCUFUnionResultInfo{}
+		for _, result := range results {
+			var match db.P13UnionFightMatch
+			if err := tx.First(&match, "id=?", result.MatchID).Error; err != nil {
+				return err
+			}
+			if member.GuildID != match.LeftGuildID && member.GuildID != match.RightGuildID {
+				continue
+			}
+			var own, enemy pb.UFInfoPreView
+			ownRaw, enemyRaw := match.LeftPreview, match.RightPreview
+			if member.GuildID == match.RightGuildID {
+				ownRaw, enemyRaw = enemyRaw, ownRaw
+			}
+			if proto.Unmarshal(ownRaw, &own) != nil || proto.Unmarshal(enemyRaw, &enemy) != nil {
+				return errors.New("公会战原结果资料损坏")
+			}
+			var offer db.P13UnionFightSettlementOffer
+			if err := tx.First(&offer, "match_id=?", match.ID).Error; err != nil {
+				return err
+			}
+			rule, err := p13UFSettlementRules(&offer, &match)
+			if err != nil {
+				return err
+			}
+			won := int32(0)
+			a, b := rule.LosePrestige+result.LoseTaskPrestige, rule.WinPrestige+result.WinTaskPrestige
+			if member.GuildID == result.WinnerGuildID {
+				won = 1
+				a, b = b, a
+			}
+			reply.Reports = append(reply.Reports, &pb.UFFightReport{FightId: proto.String(match.ID), WeekId: proto.String(match.Day), RoundId: proto.Int32(match.Round), FightEndTime: proto.Int64(match.EndAt), Result: proto.Int32(won), UnionId1: own.UnionId, UnionId2: enemy.UnionId, UnionName1: own.UnionName, UnionName2: enemy.UnionName, ServerId1: own.ServerId, ServerId2: enemy.ServerId, KillNum1: proto.Int32(0), KillNum2: proto.Int32(0), AddPrestige1: proto.Int32(a), AddPrestige2: proto.Int32(b)})
+		}
+		response = reply
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return []proto.Message{response}, nil
+}

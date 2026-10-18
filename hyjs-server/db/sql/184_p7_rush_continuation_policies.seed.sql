@@ -1,0 +1,1 @@
+INSERT IGNORE INTO p7_rush_continuation_policies(id,enabled,version,source,first_floor,last_floor) VALUES(1,0,'local-trial-continuation-v1','local-trial-continuation-v1：原客户端普通楼层及总层数未恢复；服务端明确本地后继目录，从第4层起，原完整hero047一级NPC/全部三技能/Inst按已恢复原源保留，四基础面板乘1+(floor-3)*0.5后取整，每胜point10。首组三层完整accepted本轮来源解锁，星档按钮仍1/2/3，已购加成只折入真实新快照，重置不跨Run。首批发布4至6层，其他原内容留P15。',4,6);

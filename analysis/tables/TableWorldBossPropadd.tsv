@@ -1,0 +1,9 @@
+id	描述	获取	消耗	图标	类型
+id	desp	prop	cost	icon	type
+string	string	string	string	string	int
+primary	none	none	none	none	none
+id	desp	prop	cost	icon	type
+wordboss_1	worldseed_hit	hit,80	diamond,150	levelUpUnlockIcon_20	0
+wordboss_2	worldseed_cri	cri,80	diamond,150	levelUpUnlockIcon_19	0
+wordboss_3	worldseed_att	tal_3165	diamond,150	levelUpUnlockIcon_17	1
+wordboss_4	worldseed_hp	tal_3163	diamond,150	levelUpUnlockIcon_18	1

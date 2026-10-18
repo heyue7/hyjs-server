@@ -1,0 +1,6942 @@
+// Recovered from client metadata. Original server behavior is not included.
+syntax = "proto2";
+package hyjs;
+
+message SPoint {
+  optional int32 x = 1;
+  optional int32 y = 2;
+  optional int32 z = 3;
+}
+
+message Role {
+  optional int64 pid = 1;
+  optional int32 sid = 2;
+  optional string nickName = 3;
+  optional int32 styleId = 4;
+}
+
+message MoveRole {
+  optional int64 pid = 1;
+  optional int32 sid = 2;
+  optional string nickName = 3;
+  optional string heroId = 4;
+  optional int32 roomId = 5;
+  optional SPoint point = 6;
+  repeated SPoint targetPoints = 7;
+}
+
+message OneFighter {
+  optional int32 camp = 1;
+  optional double angerNum = 2;
+  optional double maxAngerNum = 3;
+  repeated Actor actors = 4;
+}
+
+message Room {
+  optional int32 roomId = 1;
+  optional int32 roomType = 2;
+  optional int32 mapId = 3;
+  repeated Role roles = 4;
+  optional string serviceId = 5;
+}
+
+message Fighter {
+  optional string fighterUid = 1;
+  repeated RoleActor roleActors = 2;
+  optional double angerNum = 3;
+  optional double maxAngerNum = 4;
+  optional int32 isAttack = 5;
+  optional int32 isPlayer = 6;
+}
+
+message RoleActor {
+  optional Role role = 1;
+  repeated Actor actors = 2;
+}
+
+message Actor {
+  optional string uid = 1;
+  optional string heroId = 2;
+  optional int32 level = 3;
+  optional int32 FPId = 4;
+  optional double hp = 5;
+  optional double maxhp = 6;
+  repeated ActorSkill skills = 7;
+  repeated Buffer buffers = 8;
+  optional string weaponId = 9;
+}
+
+message ActorSkill {
+  optional string HSId = 1;
+  optional int32 skillType = 2;
+  optional int32 level = 3;
+  optional int32 cd = 4;
+  optional int32 cancast = 5;
+}
+
+message Buffer {
+  optional string uid = 1;
+  optional string bufferId = 2;
+  optional string sourceUid = 3;
+  optional string targetUid = 4;
+  optional int32 roundNum = 5;
+  optional int32 spareRoundNum = 6;
+}
+
+message OnceCast {
+  optional SkillOnceCast skillOnceCasts = 1;
+  optional BuffOnceCast buffOnceCasts = 2;
+  optional TalentOnceCast talentOnceCasts = 3;
+}
+
+message SkillOnceCast {
+  optional string sourceUid = 1;
+  optional int32 skillType = 2;
+  optional string releaseId = 3;
+  optional PropExport exportMsg = 4;
+  optional ComboInfo comboInfo = 5;
+  optional int32 roundNum = 6;
+}
+
+message BuffOnceCast {
+  optional string sourceUid = 1;
+  optional string sourceBuffId = 2;
+  optional PropExport exportMsg = 3;
+  optional int32 roundNum = 4;
+}
+
+message TalentOnceCast {
+  optional string sourceUid = 1;
+  optional string talentId = 2;
+  optional PropExport exportMsg = 3;
+  optional int32 roundNum = 4;
+}
+
+message PropExport {
+  repeated HpExport hpExports = 1;
+  repeated AngerExport angerExports = 2;
+  repeated SpecialStateExport specialStateExports = 3;
+  repeated FireMagicStoneExport fireMagicStoneExport = 4;
+  repeated AngerMagicStoneExport angerMagicStoneExport = 5;
+  optional CreateMsg createMsg = 6;
+  optional DestroyObj destroyObjs = 7;
+  repeated RebornExport rebornExports = 8;
+}
+
+message RebornExport {
+  optional string targetUid = 1;
+  optional double rebornHealHpNum = 2;
+  repeated ActorSkill skills = 3;
+}
+
+message HpExport {
+  optional string targetUid = 1;
+  optional double hpExportNum = 2;
+  optional int32 specialType = 3;
+}
+
+message AngerExport {
+  optional int32 targetCamp = 1;
+  optional double angerExportNum = 2;
+}
+
+message SpecialStateExport {
+  optional string targetUid = 1;
+  optional int32 specialState = 2;
+  optional double surplusTime = 3;
+}
+
+message FireMagicStoneExport {
+  optional string sourceUid = 1;
+  optional string targetUid = 2;
+  optional int32 stoneNum = 3;
+}
+
+message AngerMagicStoneExport {
+  optional string sourceUid = 1;
+  optional int32 stoneNum = 2;
+}
+
+message CreateMsg {
+  repeated Buffer buffers = 1;
+}
+
+message DestroyObj {
+  repeated string destroyBufferUids = 1;
+  repeated string actorUids = 2;
+}
+
+message ComboInfo {
+  optional int32 comboNum = 1;
+  optional int32 camp = 2;
+}
+
+message Property {
+  optional int32 propId = 1;
+  optional double valueNum = 2;
+}
+
+message TreasureBattleInfo {
+  optional SimplePlayerInfo simplePlayerInfo = 1;
+  optional int32 isRobot = 2;
+  optional int32 getChance = 3;
+}
+
+message FriendInfo {
+  optional SimplePlayerInfo simplePlayerInfo = 1;
+  optional int32 canGive = 2;
+  optional int32 canGet = 3;
+}
+
+message FriendApplyInfo {
+  optional int64 friendId = 1;
+  optional string friendName = 2;
+  optional string word = 3;
+  optional int64 applyTime = 4;
+}
+
+message TaskInfo {
+  optional string taskId = 1;
+  optional int32 count = 2;
+  optional int32 state = 3;
+  optional int32 score = 4;
+  optional int32 type = 5;
+  optional string reward = 6;
+  optional int32 total = 7;
+}
+
+message TaskBoxInfo {
+  optional string boxId = 1;
+  optional int32 state = 2;
+  optional int32 score = 3;
+  optional string rewards = 4;
+}
+
+message TreasureFightReward {
+  optional int32 exp = 1;
+  optional int32 coin = 2;
+  optional string reward = 3;
+  optional int32 isGetFrag = 4;
+}
+
+message MonthRewardItem {
+  optional int32 day = 1;
+  optional int32 getState = 2;
+  optional string rewardId = 3;
+  optional int32 doubleNeedVipLevel = 4;
+}
+
+message OpenServer7DayItem {
+  optional int32 itemId = 1;
+  optional int32 currentNum = 2;
+  optional int32 state = 3;
+  optional int32 isVisable = 4;
+}
+
+message BattleOperate {
+  optional int32 finalRoundNum = 1;
+  optional double attackerTotalLeftHp = 2;
+  optional double defenderTotalLeftHp = 3;
+  repeated BattleSkillOperate skillOpts = 4;
+  optional BattleTransOperate attackerTransOpt = 5;
+  optional BattleTransOperate defenderTransOpt = 6;
+}
+
+message BattleSkillOperate {
+  optional int32 roundNum = 1;
+  optional double roundTime = 2;
+  optional int32 camp = 3;
+  optional string actorUid = 4;
+  optional int32 skillIndex = 5;
+}
+
+message BattleTransOperate {
+  optional int32 roundNum = 1;
+  repeated string actorUids = 2;
+  repeated int32 fpids = 3;
+}
+
+message BattleWinCondition {
+  optional int32 winKey = 1;
+  optional int32 winValue = 2;
+}
+
+message OpenState {
+  optional string type = 1;
+  optional int32 isOpen = 2;
+}
+
+message DailyCopyState {
+  optional string ChapterId = 1;
+  optional int32 isOpen = 2;
+  optional int32 LevelLimit = 3;
+  optional int32 Recommend = 4;
+  optional string Drop = 5;
+}
+
+message DailyCopyStateType {
+  optional string type = 1;
+  repeated DailyCopyState dailyCopyState = 2;
+  optional int32 isOpen = 3;
+  optional int32 lastTime = 4;
+}
+
+message AchievementInfo {
+  optional string id = 1;
+  optional int32 state = 2;
+  optional int32 currentNum = 3;
+  optional int32 totalNum = 4;
+  optional string reward = 5;
+  optional int32 type = 6;
+}
+
+message SimpleUnionInfo {
+  optional int32 level = 1;
+  optional string unionId = 2;
+  optional string unionName = 3;
+  optional string declaration = 4;
+  optional int32 currentMemberNum = 5;
+  optional int64 totalFightPower = 6;
+  optional int32 isApplied = 7;
+  optional int32 rank = 8;
+  optional int32 chairmanLevel = 9;
+  optional string chairmanName = 10;
+  optional int32 unionFlag = 11;
+}
+
+message UnionPlayerInfo {
+  optional int64 playerId = 1;
+  optional string playerName = 2;
+  optional int64 fightPower = 3;
+  optional int32 role = 4;
+  optional string heroWarId = 5;
+  optional int32 isFriend = 6;
+  optional int64 lastLoginTime = 7;
+  optional int32 level = 8;
+  optional int32 contribution = 9;
+  optional int32 todayCoin = 10;
+  optional int32 todayBadge = 11;
+}
+
+message UnionContributionBox {
+  optional string boxId = 1;
+  optional int32 score = 2;
+  optional string reward = 3;
+  optional int32 state = 4;
+}
+
+message UnionPropAddItem {
+  optional string type = 1;
+  optional int32 level = 2;
+  optional string prop = 3;
+}
+
+message KaiGongActivityItem {
+  optional string itemId = 1;
+  optional string name = 2;
+  repeated BaseResource reward = 3;
+  optional int32 state = 4;
+  optional int32 num = 5;
+  optional int32 totalNum = 6;
+  optional int32 isMultiselect = 7;
+}
+
+message LoginRewardItem {
+  optional int32 day = 1;
+  repeated BaseResource rewards = 2;
+  optional int32 state = 3;
+  optional int32 pickOneOrGetAll = 4;
+}
+
+message UFInfoPreView {
+  optional string unionId = 1;
+  optional string unionName = 2;
+  optional int32 serverId = 3;
+  optional int64 fightPower = 4;
+  optional string masterName = 5;
+  optional string unionLogo = 6;
+  optional int32 unionPrestige = 7;
+}
+
+message UFWeekRankInfo {
+  optional string unionId = 1;
+  optional string unionName = 2;
+  optional int32 score = 3;
+}
+
+message UFUnionFighterInfo {
+  optional int64 playerId = 1;
+  optional string name = 2;
+  optional int32 role = 3;
+  optional int32 isAutoFight = 4;
+  optional double fight = 5;
+}
+
+message UFUnionBattlePreView {
+  optional UFInfoPreView ourUnion = 1;
+  optional UFInfoPreView enemyUnion = 2;
+  optional int64 startFightTime = 3;
+  optional int64 endFightTime = 4;
+  optional int32 fightResult = 5;
+  optional int32 isRoundBye = 6;
+  repeated string itemIds = 7;
+}
+
+message UFStrengthBuildingInfo {
+  optional int32 type = 1;
+  optional int32 level = 2;
+  optional int32 maxLevel = 3;
+  optional InstUFResource upgradeCost = 4;
+  optional string upgradeDesc = 5;
+}
+
+message UFFightResult {
+  optional string fightId = 1;
+  optional string winUnionId = 2;
+  optional int32 winUnionReward = 3;
+  optional string loseUnionId = 4;
+  optional int32 loseUnionReward = 5;
+  repeated UFFightResultSelfAchieve selfAchieves = 6;
+  repeated UFFightResultPlayer mvpInfos = 7;
+}
+
+message UFFightResultSelfAchieve {
+  optional int32 type = 1;
+  optional int32 isSuccess = 2;
+  repeated SimpleItem rewards = 3;
+}
+
+message UFFightResultPlayer {
+  optional int64 playerId = 1;
+  optional int32 serverId = 2;
+  optional string unionId = 3;
+  optional string nickName = 4;
+  optional string mainHeroId = 5;
+  optional int32 type = 6;
+  optional int32 value = 7;
+}
+
+message UFFightRecordSideInfo {
+  optional int64 guid = 1;
+  optional int32 camp = 2;
+  optional string nickName = 3;
+  optional string mainHeroId = 4;
+  optional double fightPower = 5;
+  optional int32 type = 6;
+}
+
+message UFFightRecord {
+  optional int64 fightId = 1;
+  repeated UFFightRecordSideInfo playerInfos = 2;
+  optional int64 winId = 3;
+  optional int64 time = 4;
+}
+
+message UFFightUnionRecord {
+  optional string unionId = 1;
+  optional int32 killNum = 2;
+}
+
+message AwakeCopyChapter {
+  optional string chapterId = 1;
+  optional int32 isOpen = 2;
+  optional string openDay = 3;
+  repeated AwakeCopyTask smallCopys = 4;
+}
+
+message AwakeCopyTask {
+  optional string copyId = 1;
+  optional int64 fightPower = 3;
+  optional int32 isRunning = 4;
+  optional int64 endTime = 5;
+  optional string dropReward = 6;
+}
+
+message AwakeCopyBox {
+  optional string boxId = 1;
+  optional string guid = 2;
+  optional string pos = 3;
+  optional int32 isOpen = 4;
+  optional double angle = 5;
+}
+
+message AwakeCopyMonster {
+  optional string monId = 1;
+  optional string guid = 2;
+  optional string pos = 3;
+  optional double hpPercent = 4;
+  optional double angle = 5;
+  optional int32 monsterType = 6;
+}
+
+message AwakeCopyRefreshData {
+  optional int32 leftReviveCount = 1;
+  optional int32 reviveCost = 2;
+  optional int64 endTime = 3;
+  optional string hpPercent = 4;
+  optional int32 score = 5;
+  repeated SimpleItem items = 6;
+  optional double anger = 7;
+}
+
+message AwakeFightRecordItem {
+  optional string fightId = 1;
+  optional string attWarId = 2;
+  optional string defWarId = 3;
+  optional int32 isWin = 4;
+}
+
+message BigTurnRewardItem {
+  optional int32 id = 1;
+  optional SimpleItem item = 2;
+  optional int32 surplus = 3;
+  optional int32 allCount = 4;
+}
+
+message BigTurnRankItem {
+  optional int64 pid = 1;
+  optional int32 rank = 2;
+  optional string playerName = 3;
+  optional int32 score = 4;
+  optional string rewards = 5;
+}
+
+message ActivityDailyBoonItem {
+  optional int32 vip = 1;
+  repeated BaseResource reward = 2;
+  optional int32 status = 3;
+  optional int64 needRecharge = 4;
+}
+
+message ActivityFortuneCatData {
+  optional int32 todayLeft = 1;
+  optional int32 totalLeft = 2;
+  optional int64 lastGetTime = 3;
+  optional int32 thisTimeStatus = 4;
+  optional int32 totalStatus = 5;
+  optional int32 coinPool = 6;
+  optional int64 nextGetTime = 7;
+  optional int64 currentTime = 8;
+}
+
+message ActivityItem {
+  optional int32 index = 1;
+  optional string value = 2;
+  repeated BaseResource rewardList = 3;
+  optional int32 status = 4;
+  optional int32 left = 5;
+  optional int32 total = 6;
+  optional int32 pickOneOrGetAll = 7;
+  optional string target = 8;
+  optional string message = 9;
+  optional string param = 10;
+}
+
+message ActivityShopItem {
+  optional int32 index = 1;
+  repeated BaseResource getResource = 2;
+  repeated BaseResource costResource = 3;
+  optional int32 total = 4;
+  optional int32 left = 5;
+  optional string discount = 6;
+  optional int32 pickOneOrGetAll = 7;
+  optional int32 status = 8;
+  optional string name = 9;
+}
+
+message ActivityStaminaData {
+  optional int64 startTime = 1;
+  optional int64 endTime = 2;
+  optional int32 status = 3;
+}
+
+message ActivityTab {
+  optional string activityId = 1;
+  optional int32 status = 2;
+  optional int32 order = 3;
+  optional string name = 4;
+  optional string param = 5;
+}
+
+message Awake {
+  optional int32 stage = 1;
+  optional int32 fuseLevel = 2;
+  optional int32 fuseExp = 3;
+}
+
+message BaseProp {
+  optional double att = 1;
+  optional double hp = 2;
+  optional double pdef = 3;
+  optional double mdef = 4;
+  optional double peratt = 5;
+  optional double perhp = 6;
+  optional double perpdef = 7;
+  optional double permdef = 8;
+  optional double cri = 9;
+  optional double hit = 10;
+  optional double antiCri = 11;
+  optional double dodge = 12;
+  optional double damageAdd = 13;
+  optional double damageReduce = 14;
+  optional double criFactor = 15;
+}
+
+message BaseResource {
+  optional string id = 1;
+  optional string guid = 2;
+  optional int32 num = 3;
+}
+
+message BattleHero {
+  optional string id = 1;
+  optional string guid = 2;
+  repeated string talentList = 3;
+  optional string skillOrder = 4;
+  optional BaseProp prop = 5;
+  optional int32 level = 6;
+  optional int32 pose = 7;
+  optional BattleHeroInst inst = 8;
+  optional string weaponId = 9;
+  optional int32 breachedLevel = 10;
+  optional double SkillCastChance = 11;
+  optional int32 bloodNumber = 12;
+  optional string awakenSkill = 13;
+  optional int32 awakeStage = 14;
+}
+
+message BattleHeroInst {
+  optional double curHp = 1;
+}
+
+message BattleMonster {
+  optional int64 monsterId = 1;
+  optional int32 serverId = 2;
+  optional string taskId = 3;
+  optional int32 groupIndex = 4;
+  repeated BattleHero formation = 5;
+  optional BattleMonsterInst inst = 6;
+}
+
+message BattleMonsterInst {
+  optional double anger = 1;
+}
+
+message BattlePlayer {
+  optional int64 playerId = 1;
+  optional int32 serverId = 2;
+  optional int32 level = 3;
+  optional string nickName = 4;
+  repeated BattleHero formation = 5;
+  optional BattlePlayerInst inst = 6;
+}
+
+message BattlePlayerInst {
+  optional double anger = 1;
+  optional int32 firstOrder = 2;
+  repeated int32 extBattleAdds = 3;
+}
+
+message BattlePosHp {
+  optional int32 battlePos = 1;
+  optional double hpPercent = 2;
+}
+
+message Breached {
+  optional int32 level = 1;
+  optional int32 exp = 2;
+  optional string lastAddExpTime = 3;
+  optional string costRecord = 4;
+}
+
+message ChatInfo {
+  optional int32 chatType = 1;
+  optional string content = 2;
+  optional int64 time = 3;
+  optional SimplePlayerInfo play = 4;
+  optional string receiverName = 5;
+  optional int32 isAudio = 6;
+  optional string audioDownloadUrl = 7;
+  optional int32 audioTime = 8;
+}
+
+message ConfigPlayerServer {
+  optional int32 serverId = 1;
+  optional string platformUid = 2;
+  optional int64 playerId = 3;
+  optional string playerName = 4;
+  optional int32 level = 5;
+  optional string state = 6;
+  optional string globalServerKey = 7;
+}
+
+message ConfigServerZone {
+  optional int32 serverId = 1;
+  optional string name = 2;
+  optional string serverIp = 3;
+  optional string state = 4;
+  optional string globalServerKey = 5;
+  optional string display = 6;
+}
+
+message ContinuedEffect {
+  optional string effectId = 1;
+  optional string effectType = 2;
+  optional int64 effectTime = 3;
+  optional double effectValue = 4;
+}
+
+message Cooking {
+  optional BaseProp prop = 1;
+}
+
+message CopyBoxInfo {
+  optional string boxId = 1;
+  optional double x = 2;
+  optional double z = 3;
+  optional int32 isOpen = 4;
+  optional double y = 5;
+  optional double angle = 6;
+  optional string res = 7;
+}
+
+message CopyChapterInfo {
+  optional string chapterId = 1;
+  optional bool reward0Claimed = 2;
+  optional bool reward1Claimed = 3;
+  optional bool reward2Claimed = 4;
+  optional int32 star = 5;
+}
+
+message CopyJobInfo {
+  optional string taskId = 1;
+  optional int32 isBoss = 2;
+  optional string sceneName = 3;
+  optional string heroId = 4;
+  optional double rotateSpeed = 5;
+  optional double restTime = 6;
+  optional double bornX = 7;
+  optional double bornZ = 8;
+  optional double bornAngle = 9;
+  optional double wanderR = 10;
+  optional double wanderSpeed = 11;
+  optional double pursueR = 12;
+  optional double pursueSpeed = 13;
+  optional double viewR = 14;
+  optional string deadParticleId = 15;
+  optional string bornParticleId = 16;
+  optional double scale = 17;
+  optional int32 bornType = 18;
+}
+
+message CopySimpleInfo {
+  optional string chapterId = 1;
+  optional string missionId = 2;
+  optional int32 star = 3;
+  optional int32 challengeTimes = 4;
+  optional int32 isOpen = 5;
+}
+
+message DictRebelReward {
+  optional int32 id = 1;
+  optional int32 exploit = 2;
+  optional string desc = 3;
+  optional string reward = 4;
+}
+
+message DictWorldBossPropertyAddition {
+  optional string id = 1;
+  optional string cost = 2;
+  optional string prop = 3;
+  optional string desp = 4;
+  optional int32 type = 5;
+  optional string icon = 6;
+}
+
+message EquipStrengthenInfo {
+  optional Equipment equip = 1;
+  optional int32 costTimes = 2;
+  optional int32 criTimes = 3;
+}
+
+message Equipment {
+  optional string guid = 1;
+  optional string equipId = 2;
+  optional int32 level = 3;
+  optional int32 refineLv = 4;
+  optional int32 refineExp = 5;
+  optional int32 star = 6;
+  optional int32 starExp = 7;
+  optional string lastHeroId = 8;
+  optional int32 coinPrice = 9;
+  repeated string gems = 10;
+  optional int32 forgeLevel = 11;
+}
+
+message EquipmentSimpleInfo {
+  optional int32 pos = 1;
+  optional string equipId = 2;
+  optional int32 level = 3;
+  optional int32 refineLv = 4;
+  optional int32 star = 5;
+  repeated string gems = 6;
+  optional int32 forgeLevel = 7;
+}
+
+message ExpeditionMissionInfo {
+  optional string missionSerial = 1;
+  optional string missionId = 2;
+  optional int32 state = 3;
+  optional int64 startTime = 4;
+  optional int64 endTime = 5;
+  repeated string heroGuids = 6;
+  optional string mainHeroId = 7;
+  optional string rewards = 8;
+  optional string heroReward = 9;
+  optional int32 exp = 10;
+  optional string bigReward = 11;
+}
+
+message ExpeditionStoryEvent {
+  optional string storyId = 1;
+  optional int32 eventType = 2;
+  optional int64 eventTime = 3;
+  optional string reward = 4;
+}
+
+message FishInfo {
+  optional string fishId = 1;
+  optional int32 state = 2;
+  optional int32 num = 3;
+}
+
+message FormationItem {
+  optional int32 formatPos = 1;
+  repeated FormationThing things = 2;
+  optional int32 battlePos = 3;
+}
+
+message FormationItemSimpleInfo {
+  optional int32 formatPos = 1;
+  optional WarriorSimpleInfo warInfo = 2;
+  repeated EquipmentSimpleInfo equipInfoList = 3;
+  repeated TreasureSimpleInfo treaInfoList = 4;
+  optional PetSimpleInfo petInfo = 5;
+}
+
+message FormationPosInfo {
+  optional int32 formatPos = 1;
+  optional int32 battlePos = 2;
+}
+
+message FormationSimpleInfo {
+  optional int32 fightPower = 1;
+  repeated FormationItemSimpleInfo formationItemInfoList = 2;
+  optional string name = 3;
+}
+
+message FormationThing {
+  optional int32 pos = 1;
+  optional string guid = 2;
+  optional string id = 3;
+}
+
+message FriendsBadEventInfo {
+  optional int64 friendsId = 1;
+  optional string friendName = 2;
+  optional string missionSerial = 3;
+  optional string eventSerial = 4;
+  optional string storyId = 5;
+}
+
+message GrabPositionModel {
+  optional int64 playerId = 1;
+  optional int64 grabTime = 2;
+  optional int32 position = 3;
+  optional bool isGrab = 4;
+  optional string playerNam = 5;
+}
+
+message GuessPlayer {
+  optional int32 serverId = 1;
+  optional int64 playerId = 2;
+  optional string image = 3;
+  optional string playerName = 4;
+  optional int32 winTime = 5;
+  optional int32 fightNum = 6;
+}
+
+message GuessPlayerInfo {
+  optional int64 playerId = 1;
+  optional string name = 2;
+  optional int32 serverId = 3;
+  optional int32 frightPower = 4;
+  optional string mainHeroId = 5;
+  optional string AllguessNum = 6;
+}
+
+message InstFightable {
+  optional int64 guid = 1;
+  repeated int32 index = 2;
+  repeated double hpPos = 3;
+  repeated double maxHpPos = 4;
+  optional double anger = 5;
+  optional double fightPower = 6;
+}
+
+message InstUFBaseCamp {
+  optional int64 guid = 1;
+  optional int32 id = 2;
+  optional int32 camp = 3;
+  optional InstUFGuard guard = 4;
+}
+
+message InstUFBuff {
+  optional int64 guid = 1;
+  optional string buffId = 2;
+  optional int64 mountGuid = 3;
+}
+
+message InstUFCariot {
+  optional int64 guid = 1;
+  optional int32 cariotId = 2;
+  optional int32 camp = 3;
+  optional int64 factoryGuid = 4;
+  optional double hp = 5;
+  optional double maxHp = 6;
+  optional int32 isSlowDown = 7;
+}
+
+message InstUFCariotFactory {
+  optional int64 guid = 1;
+  optional int32 factoryId = 2;
+  optional int64 cariotGuid = 3;
+  optional int32 isOpen = 4;
+  optional int32 state = 5;
+  optional float stateLeftTime = 6;
+  optional float stateTotalTime = 7;
+  optional InstUFGuard guard = 8;
+}
+
+message InstUFCreep {
+  optional int64 guid = 1;
+  optional string heroId = 2;
+  optional string leftWeaponId = 3;
+  optional string rightWeaponId = 4;
+  optional double modelScale = 5;
+  optional int32 camp = 6;
+  optional int32 isBoss = 7;
+  optional int32 state = 8;
+  optional InstFightable fightInfo = 9;
+  optional double angle = 10;
+}
+
+message InstUFGate {
+  optional int64 guid = 1;
+  optional int32 id = 2;
+  optional int32 level = 3;
+  optional double hp = 4;
+  optional double maxHp = 5;
+  optional int32 camp = 6;
+}
+
+message InstUFGuard {
+  optional int64 guid = 1;
+  optional string UFGuardId = 2;
+  optional int32 camp = 3;
+  optional int32 type = 4;
+  optional int64 bindGuid = 5;
+  optional int32 state = 6;
+  optional PointNew initPosition = 7;
+  optional InstFightable fightInfo = 8;
+}
+
+message InstUFItem {
+  optional string id = 1;
+  optional int64 playerGuid = 2;
+  optional int32 index = 3;
+  optional int32 leftUseNum = 4;
+  optional int32 totalUseNum = 5;
+  optional int32 unionAuthority = 6;
+}
+
+message InstUFPlayer {
+  optional int64 guid = 1;
+  optional int32 serverId = 2;
+  optional string heroId = 3;
+  optional string weaponId = 4;
+  optional string nickName = 5;
+  optional int32 state = 6;
+  optional float leftTime = 7;
+  optional float totalTime = 8;
+  optional int32 camp = 9;
+  optional int32 unionAuthority = 10;
+  optional InstFightable fightInfo = 11;
+  repeated InstUFBuff buffs = 12;
+  optional int32 killNum = 13;
+  optional int32 deadNum = 14;
+  optional InstUFResource ownRes = 15;
+  repeated InstUFItem items = 16;
+  optional double ownToken = 17;
+  optional double ownScore = 18;
+  optional string titleId = 19;
+  optional int32 isAuto = 20;
+  optional string petId = 21;
+  optional double useNormalItemCD = 22;
+  optional double useDiamondItemCD = 23;
+}
+
+message InstUFPlayerMission {
+  optional int64 playerGuid = 1;
+  optional int32 missionType = 2;
+  optional int32 missionIndex = 3;
+  optional string progress = 4;
+  optional int32 isComplete = 5;
+  optional int32 rewardNum = 6;
+  optional string missionDesc = 7;
+  optional string missionIcon = 8;
+}
+
+message InstUFResource {
+  optional double resourceNum = 1;
+}
+
+message InstUFResourcePoint {
+  optional int64 guid = 1;
+  optional string resourceId = 2;
+  optional int32 state = 3;
+  optional InstUFResource rewardRes = 4;
+}
+
+message InstUFRevivePoint {
+  optional int64 guid = 1;
+  optional int32 id = 2;
+  optional int32 camp = 3;
+  optional double leftOccupyProgress = 4;
+  optional double rightOccupyProgress = 5;
+}
+
+message InstUFShopItem {
+  optional string shopItemId = 1;
+  optional string itemId = 2;
+  optional int32 num = 3;
+  optional int32 price = 4;
+  optional int32 leftBuyCount = 5;
+  optional int32 totalBuyCount = 6;
+  optional int32 priority = 7;
+  optional int32 buyCondition = 8;
+  optional int64 lastRefreshTime = 9;
+  optional int64 refreshIntervalTime = 10;
+}
+
+message InstUFTotem {
+  optional int64 guid = 1;
+  optional string totemId = 2;
+  optional string modelName = 3;
+  optional double modelScale = 4;
+  optional int64 sourcePlayerGuid = 5;
+  optional double lastTime = 6;
+  optional double range = 7;
+}
+
+message InstUFTower {
+  optional int64 guid = 1;
+  optional int32 id = 2;
+  optional int32 level = 3;
+  optional int32 state = 4;
+  optional float stateLeftTime = 5;
+  optional float stateTotalTime = 6;
+  optional InstUFGuard guard = 7;
+}
+
+message InstUFUnion {
+  optional string unionId = 1;
+  optional int32 serverId = 2;
+  optional int32 unionFlag = 3;
+  optional string unionName = 4;
+  optional InstUFResource unionResource = 5;
+  optional int32 camp = 6;
+  optional int64 unionFightPower = 7;
+  optional double unionContro = 8;
+}
+
+message InstUFUnionMission {
+  optional string unionId = 1;
+  optional int32 missionType = 2;
+  optional int32 missionIndex = 3;
+  optional int32 missionBalanceType = 4;
+  optional string progress = 5;
+  optional int32 rewardNum = 6;
+  optional int32 isComplete = 7;
+  optional string missionDesc = 8;
+  optional string missionIcon = 9;
+}
+
+message KFMatchAllRandList {
+  repeated KFMatchFightRandList kFMatchFirstList = 1;
+  repeated KFMatchFightRandList kFMatchSecondList = 2;
+  repeated KFMatchFightRandList kFMatchThirdList = 3;
+}
+
+message KFMatchFightRandList {
+  optional int32 lastGroupIndex = 1;
+  optional int32 groupIndex = 2;
+  optional int32 serverId = 3;
+  optional int64 playerId = 4;
+  optional string playerName = 5;
+  optional string image = 6;
+  optional int32 winTime = 7;
+  optional int32 fightNum = 8;
+  optional int32 promotionInfo = 9;
+  optional int32 guessType = 10;
+}
+
+message KFReplayData {
+  optional string warId = 1;
+  optional int64 randSeed = 2;
+  optional string appVersion = 3;
+  optional int64 time = 4;
+  repeated BattlePlayer playerList = 5;
+  optional int64 winPlayerId = 6;
+  optional int32 maxRoundNum = 7;
+  optional string roomId = 8;
+  optional int32 score = 9;
+}
+
+message KFReplayItem {
+  optional string warId = 1;
+  optional int64 time = 2;
+  optional int32 state = 3;
+  optional int64 winPlayerId = 4;
+  optional string appVersion = 5;
+  optional int32 attServerId = 6;
+  optional int64 attPlayerId = 7;
+  optional string attPlayerName = 8;
+  optional string attMainHeroId = 9;
+  optional int32 defServerId = 10;
+  optional int64 defPlayerId = 11;
+  optional string defPlayerName = 12;
+  optional string defMainHeroId = 13;
+  optional int32 score = 14;
+}
+
+message KFRewardItem {
+  optional int32 type = 1;
+  optional string name = 2;
+  optional string desc = 3;
+  repeated BaseResource items = 4;
+  optional string titleId = 5;
+}
+
+message KFTimeSlot {
+  optional int32 stage = 1;
+  optional int64 start = 2;
+  optional int64 end = 3;
+  optional string desc = 4;
+}
+
+message KeyValueEntry {
+  optional string key = 1;
+  optional string value = 2;
+}
+
+message KuaFuMatchResult {
+  optional GuessPlayer guessPlayer = 1;
+  optional OwnerPlayer ownerPlayer = 2;
+  optional int32 typeStage = 3;
+  optional int32 score = 4;
+  optional int32 failTimes = 5;
+  optional int32 winTimes = 6;
+  optional int32 resultRank = 7;
+}
+
+message LimitDaySignData {
+  repeated LimitSignRewardItem list = 1;
+  optional int32 signNum = 2;
+  optional int32 allNum = 3;
+}
+
+message LimitPvpRankPlayerInfo {
+  optional SimplePlayerInfo info = 1;
+  optional int64 pvpRank = 2;
+  optional int64 pvpIntegral = 3;
+}
+
+message LimitPvpRewardItem {
+  optional int32 integral = 1;
+  repeated BaseResource rewards = 2;
+  optional int32 state = 3;
+  optional int32 rewardKey = 4;
+}
+
+message LimitSignRewardItem {
+  optional int32 getState = 1;
+  optional string rewardId = 2;
+  optional int32 itemKeyId = 3;
+}
+
+message LineInfo {
+  optional string lineId = 1;
+  optional int32 line = 2;
+  optional int32 state = 3;
+}
+
+message LuckyBag {
+  optional string guid = 1;
+  optional string itemId = 2;
+  optional int64 playerId = 3;
+  optional int64 createTime = 4;
+  optional PointNew pos = 5;
+  optional string paramOne = 6;
+  optional string paramTwo = 7;
+}
+
+message MailBox {
+  optional string id = 1;
+  repeated MailItem mailList = 2;
+}
+
+message MailItem {
+  optional string title = 1;
+  optional string content = 2;
+  optional int64 time = 3;
+  optional string targetId = 4;
+  optional int32 type = 5;
+}
+
+message MovePlayer {
+  optional MovePlayerInfo info = 1;
+  optional Position position = 2;
+}
+
+message MovePlayerInfo {
+  optional int32 serverId = 1;
+  optional int64 playerId = 2;
+  optional string playerName = 3;
+  optional int32 level = 4;
+  optional string warId = 5;
+  optional string equipId = 6;
+  optional int64 power = 7;
+  optional string unionName = 8;
+  optional PlayerSide playerSide = 9;
+  optional string title = 10;
+  optional string teamId = 11;
+  optional string petId = 12;
+  optional string serverName = 13;
+  optional int32 awakeStage = 14;
+}
+
+message NavigationItem {
+  optional int32 type = 1;
+  optional int32 value = 2;
+}
+
+message OwnerPlayer {
+  optional int32 serverId = 1;
+  optional int64 playerId = 2;
+  optional string image = 3;
+  optional string playerName = 4;
+  optional int32 winTime = 5;
+  optional int32 fightNum = 6;
+}
+
+message PaymentInfo {
+  optional string paymentId = 1;
+  optional string shopId = 2;
+  optional string chargeType = 3;
+  optional string paymentType = 4;
+  optional double money = 5;
+  optional string moneyType = 6;
+  optional int64 charge = 7;
+  optional int64 free = 8;
+  optional string paymentName = 9;
+  optional string paymentDesc = 10;
+  optional int32 giftRate = 11;
+}
+
+message Pet {
+  optional string id = 1;
+  optional string guid = 2;
+  optional int32 level = 3;
+  optional int64 exp = 4;
+  optional PetBreached breached = 5;
+  optional PetEat eat = 6;
+  repeated PetTalentSkill talentList = 7;
+  optional string initProp = 8;
+  repeated string randPropList = 9;
+  repeated PetEquip petEquipList = 10;
+}
+
+message PetAddIntimacy {
+  optional string guid = 1;
+  optional int32 addExp = 2;
+  optional int32 curExp = 3;
+  optional Pet pet = 4;
+}
+
+message PetBreached {
+  optional int32 level = 1;
+}
+
+message PetEat {
+  optional int32 level = 1;
+  optional int32 exp = 2;
+  optional int32 critTrend = 3;
+  repeated int32 hdTimeList = 4;
+  optional int32 critedValue = 5;
+}
+
+message PetEquip {
+  optional string petGuid = 1;
+  optional string equipId = 2;
+  optional int32 strengthLevel = 3;
+  optional int32 advanceLevel = 4;
+  optional int32 awakeLevel = 5;
+}
+
+message PetProp {
+  optional int32 state = 1;
+  optional BaseProp prop = 2;
+}
+
+message PetRecruit {
+  optional int64 nextFree = 1;
+  optional int32 num = 2;
+  optional int32 mustTimes = 3;
+  optional string reward = 4;
+}
+
+message PetSimpleInfo {
+  optional int32 pos = 1;
+  optional string petId = 2;
+}
+
+message PetTalentSkill {
+  optional string talent = 1;
+  optional int32 talentLevel = 2;
+}
+
+message Player {
+  optional int64 playerId = 1;
+  optional string name = 2;
+  optional int32 level = 3;
+  optional int64 exp = 4;
+  optional int64 coin = 5;
+  optional int64 diamond = 6;
+  optional int64 chargeDiamond = 7;
+  optional int32 vip = 8;
+  optional int32 energy = 9;
+  optional int32 stamina = 10;
+  optional string heroWarId = 11;
+  optional int32 chargeCount = 12;
+  optional int32 score = 13;
+  optional int32 point = 14;
+  optional int32 light = 15;
+  optional int32 popularity = 16;
+  optional int64 energyLastRefreshTime = 17;
+  optional int64 staminaLastRefreshTime = 18;
+  optional int32 warriorBagSize = 19;
+  optional int32 equipBagSize = 20;
+  optional int64 monthCardEndTime = 21;
+  optional int32 permanentCardValid = 22;
+  optional int32 fightPower = 23;
+  optional int32 currentWorldSeedId = 24;
+  optional int32 noviceGuideSchedule = 25;
+  optional int32 wantedAttTimes = 26;
+  optional int64 wantedAttTime = 27;
+  optional int64 redeemTime = 28;
+  optional int32 contribution = 29;
+  optional int32 needRefreshUnionProp = 30;
+  optional string teamId = 31;
+  optional int32 petBagSize = 32;
+  optional int64 coinpet = 33;
+}
+
+message PlayerSide {
+  optional int64 playerId = 1;
+  optional int32 state = 2;
+  optional double anger = 3;
+  optional double maxHp = 4;
+  optional int32 tiredness = 5;
+  optional int32 kills = 6;
+  optional int32 killeds = 7;
+  optional double battlePos3 = 8;
+  optional double battlePos7 = 9;
+  optional double battlePos9 = 10;
+  optional double battlePos13 = 11;
+  optional double curHp = 12;
+  optional int64 hpRecoverTime = 13;
+  optional int32 maxTiredness = 14;
+  optional string tiredNessLastRefreshDate = 15;
+  repeated int32 extBattleAdds = 16;
+  repeated BattlePosHp battlePosHps = 17;
+}
+
+message PointNew {
+  optional float x = 1;
+  optional float y = 2;
+  optional float z = 3;
+}
+
+message Position {
+  optional int64 playerId = 1;
+  optional PointNew current = 2;
+  optional string scene = 3;
+}
+
+message PublicMessage {
+  optional int32 type = 1;
+  optional string msg = 2;
+  optional int32 scrollType = 3;
+}
+
+message PushState {
+  optional int64 playerId = 1;
+  optional int32 kills = 2;
+  optional int32 state = 3;
+  optional double hp = 4;
+  optional double anger = 5;
+  optional string target = 6;
+}
+
+message PvpRankPlayerInfo {
+  optional SimplePlayerInfo info = 1;
+  optional int64 pvpRank = 2;
+}
+
+message RankInfo {
+  optional int32 type = 1;
+  repeated RankRowInfo list = 2;
+}
+
+message RankRowInfo {
+  optional int64 pid = 1;
+  optional int32 rank = 2;
+  optional string name = 3;
+  optional string unionName = 4;
+  repeated int32 values = 5;
+}
+
+message RebelInfo {
+  optional string id = 1;
+  optional int64 finder = 2;
+  optional string finderName = 3;
+  optional int64 runTime = 4;
+  optional double hp = 5;
+  optional double maxHP = 6;
+  optional int32 level = 7;
+  repeated RebelMonster monsters = 8;
+  optional string wantedId = 9;
+  optional int32 difficulty = 10;
+  optional int32 state = 11;
+}
+
+message RebelMonster {
+  optional double hp = 1;
+  optional string wantedEnemyId = 2;
+}
+
+message RebelRewardInfo {
+  optional int32 rewardId = 1;
+  optional int32 state = 2;
+  optional int32 performanceTarget = 3;
+  optional int32 exploit = 4;
+  optional string performanceReward = 5;
+}
+
+message RedPoint {
+  optional string type = 1;
+  optional int32 value = 2;
+}
+
+message ResultObject {
+  repeated SimpleItem simps = 1;
+  repeated Equipment equips = 2;
+  repeated Treasure treas = 3;
+  repeated Warrior wars = 4;
+  repeated Pet pets = 5;
+}
+
+message RewardItemInfo {
+  optional int64 rewardId = 1;
+  repeated BaseResource rewardList = 2;
+  optional string rewardTitle = 3;
+  optional string rewardContent = 4;
+  optional int64 rewardTime = 5;
+}
+
+message RushEliteBossInfo {
+  optional string eliteTaskId = 1;
+  optional int32 isOpen = 2;
+  repeated BaseResource firstRewardList = 3;
+  repeated BaseResource generalRewardList = 4;
+  optional int32 isSuccess = 5;
+}
+
+message RushSweepInfo {
+  optional int32 floor = 1;
+  optional ResultObject gain = 2;
+  optional int32 isSectionEnd = 3;
+  optional ResultObject sectionGain = 4;
+  optional string sectionProp = 5;
+}
+
+message RushTaskInfo {
+  optional string taskId = 1;
+  optional bool isPassed = 2;
+  optional int32 star = 3;
+  optional double fightScore = 4;
+  optional int32 coin = 5;
+  optional int32 point = 6;
+}
+
+message ShopCondition {
+  optional string type = 1;
+  optional int64 value = 2;
+}
+
+message ShopItem {
+  optional string id = 1;
+  repeated BaseResource item = 2;
+  repeated BaseResource exchangeList = 3;
+  repeated BaseResource price = 4;
+  repeated BaseResource discount = 5;
+  optional int32 priority = 6;
+  optional int32 canBuy = 7;
+  optional int32 dayLeftTimes = 8;
+  optional int32 dayTotalTimes = 9;
+  optional ShopCondition condition = 10;
+  optional string perDiscount = 11;
+  optional int32 totalLeftTimes = 12;
+  optional int32 totalTimes = 13;
+}
+
+message SideBoss {
+  optional string uuid = 1;
+  optional string bossPosId = 2;
+  optional string bossId = 3;
+  optional PointNew currentPoint = 4;
+  optional int32 state = 5;
+  optional double curHp = 6;
+  optional string heroId = 7;
+  optional int32 nature = 8;
+}
+
+message SideMonster {
+  optional string uuid = 1;
+  optional string monsterPosId = 2;
+  optional string monId = 3;
+  optional PointNew currentPoint = 4;
+  optional int32 state = 5;
+  optional double curHp = 6;
+  optional string heroId = 7;
+}
+
+message SidePvpFightData {
+  optional string id = 1;
+  optional int64 randSeed = 2;
+  optional string appVersion = 3;
+  optional int64 time = 4;
+  optional int32 maxRoundCount = 5;
+  optional BattlePlayer attPlayer = 6;
+  optional BattlePlayer defPlayer = 7;
+  optional int64 winPlayerId = 8;
+  repeated BaseResource attGet = 9;
+  repeated BaseResource defLose = 10;
+  optional int64 attFirstPlayerId = 11;
+  optional string resVersion = 12;
+}
+
+message SidePvpMV {
+  optional string fightId = 1;
+  optional string attPlayerName = 2;
+  optional string defPlayerName = 3;
+  optional string attHeroId = 4;
+  optional string defHeroId = 5;
+  optional int64 time = 6;
+  optional string winPlayerName = 7;
+  repeated BaseResource resource = 8;
+  optional string appVersion = 9;
+  optional string resVersion = 10;
+}
+
+message SideResource {
+  optional string id = 1;
+  optional string posId = 2;
+  optional int32 refreshTime = 3;
+}
+
+message SimpleItem {
+  optional string id = 1;
+  optional int32 num = 2;
+}
+
+message SimplePlayerInfo {
+  optional int64 playerId = 1;
+  optional int32 serverId = 2;
+  optional int32 level = 3;
+  optional string playerName = 4;
+  optional string uninName = 5;
+  optional int32 fightPower = 6;
+  optional string heroWarId = 7;
+  optional string weaponId = 8;
+}
+
+message SkillRefine {
+  optional string roleGuid = 1;
+  optional int32 type = 2;
+  optional int32 level = 3;
+  optional int32 strengthLevel = 4;
+}
+
+message SuperSDKPayInfo {
+  optional string pay_amount = 1;
+  optional string server_id = 2;
+  optional string role_id = 3;
+  optional string product_id = 4;
+  optional string product_name = 5;
+  optional string pay_time = 6;
+  optional string order_id = 7;
+  optional string role_grade = 8;
+  optional string channel_id = 9;
+  optional string pay_status = 10;
+  optional string sign = 11;
+  optional string supersdk_uid = 12;
+  optional string order_amount = 13;
+  optional string product_count = 14;
+  optional string game_uid = 15;
+  optional string app_data = 16;
+  optional string currency_type = 17;
+  optional string app_id = 18;
+  optional string sdk_order_id = 19;
+  optional string role_name = 20;
+  optional string role_balance = 21;
+}
+
+message TaticalFormation {
+  optional string id = 1;
+  optional int32 level = 2;
+  repeated FormationPosInfo posInfoList = 3;
+}
+
+message Team {
+  optional string teamId = 1;
+  repeated TeamMember memberList = 2;
+  optional int32 maxSize = 3;
+}
+
+message TeamMember {
+  optional int64 playerId = 1;
+  optional int32 serverId = 2;
+  optional string heroId = 3;
+  optional int32 level = 4;
+  optional string nickName = 5;
+  optional string unionName = 6;
+  optional int32 fightPower = 7;
+  optional int32 state = 8;
+  optional double curHp = 9;
+}
+
+message TitleInfo {
+  optional string titleId = 1;
+  optional int32 state = 2;
+  optional int32 current = 3;
+  optional int32 total = 4;
+  optional int64 deadTime = 5;
+}
+
+message Training {
+  optional int32 state = 1;
+  optional int32 hp = 2;
+  optional int32 att = 3;
+  optional int32 pdef = 4;
+  optional int32 mdef = 5;
+}
+
+message TransactionData {
+  optional string orderId = 1;
+  optional int64 playerId = 2;
+  optional int32 serverId = 3;
+  optional string channelId = 4;
+  optional string paymentId = 5;
+  optional string platformOrderId = 6;
+  optional string payStatus = 7;
+  optional double price = 8;
+  optional string moneyType = 9;
+  optional double realGetMoney = 10;
+  optional int64 freeDiamond = 11;
+  optional int64 payDiamond = 12;
+  optional int64 startTime = 13;
+  optional int64 endTime = 14;
+  optional string paymentName = 15;
+}
+
+message Treasure {
+  optional string guid = 1;
+  optional string treasureId = 2;
+  optional int32 strengthLevel = 3;
+  optional int32 refineLevel = 4;
+  optional int32 currentExp = 5;
+}
+
+message TreasureSimpleInfo {
+  optional int32 pos = 1;
+  optional string treasureId = 2;
+  optional int32 strengthLevel = 3;
+  optional int32 refineLevel = 4;
+}
+
+message UFFightRecordInfo {
+  optional string fightId = 1;
+  repeated UFFightRecordItemInfo playerInfos = 2;
+  optional int64 winId = 3;
+  optional int64 time = 4;
+}
+
+message UFFightRecordItemInfo {
+  optional int64 guid = 1;
+  optional string nickName = 2;
+  optional string mainHeroId = 3;
+  optional int32 type = 4;
+}
+
+message UFFightReport {
+  optional string fightId = 1;
+  optional string weekId = 2;
+  optional int32 roundId = 3;
+  optional int64 fightEndTime = 4;
+  optional int32 result = 5;
+  optional string unionId1 = 6;
+  optional int32 killNum1 = 7;
+  optional int32 addPrestige1 = 8;
+  optional int32 unionFlag1 = 9;
+  optional int32 serverId1 = 10;
+  optional string unionName1 = 11;
+  optional string unionId2 = 12;
+  optional int32 killNum2 = 13;
+  optional int32 addPrestige2 = 14;
+  optional int32 unionFlag2 = 15;
+  optional int32 serverId2 = 16;
+  optional string unionName2 = 17;
+}
+
+message UFPveFightDataDB {
+  optional string ufFightId = 1;
+  optional int64 id = 2;
+  optional int64 randomSeed = 3;
+  optional int64 time = 4;
+  optional BattlePlayer attacker = 5;
+  optional double attackFactor = 6;
+  optional BattleMonster defender = 7;
+  optional double defendFactor = 8;
+  optional bool isAttackerWin = 9;
+  optional string attackerId = 10;
+  optional string defenderId = 11;
+}
+
+message UFPvpFightDataDB {
+  optional string ufFightId = 1;
+  optional int64 id = 2;
+  optional int64 randomSeed = 3;
+  optional int64 time = 4;
+  optional BattlePlayer attacker = 5;
+  optional double attackFactor = 6;
+  optional BattlePlayer defender = 7;
+  optional double defendFactor = 8;
+  optional bool isAttackerWin = 9;
+  optional string attackerId = 10;
+  optional string defenderId = 11;
+}
+
+message Warrior {
+  optional string id = 1;
+  optional string guid = 2;
+  optional int32 level = 3;
+  optional int64 exp = 4;
+  optional int32 talent = 5;
+  repeated string talentBranch = 6;
+  optional Training training = 7;
+  optional Training tempTraining = 8;
+  optional Breached breached = 9;
+  optional string skillOrder = 10;
+  optional Cooking cooking = 11;
+  optional Awake awake = 12;
+  optional string awakenSkill = 13;
+  repeated SkillRefine skillRefine = 14;
+}
+
+message WarriorRecruit {
+  optional int32 costType = 1;
+  optional int64 freeTime = 2;
+  optional int32 num = 3;
+  optional bool free = 4;
+  optional int32 luck = 5;
+  optional int64 changeTime = 6;
+  optional int32 on = 7;
+  optional int32 space = 8;
+  optional string reward1 = 9;
+  optional string reward2 = 10;
+  optional int32 leftTimes = 11;
+  optional string reward3 = 12;
+  repeated string rewardList = 13;
+}
+
+message WarriorSimpleInfo {
+  optional int32 pos = 1;
+  optional string heroId = 2;
+  optional int32 level = 3;
+  optional int32 breachedLevel = 4;
+  optional BaseProp baseProp = 5;
+  optional int32 talent = 6;
+  optional int32 awakeStage = 7;
+  optional int32 fuseLevel = 8;
+}
+
+message WorldBoss {
+  optional string uuid = 1;
+  optional string bossId = 2;
+  optional PointNew currentPoint = 3;
+  optional string scene = 4;
+  optional int32 state = 5;
+  optional double curHp = 6;
+  optional double totalHp = 7;
+  optional string heroId = 8;
+  optional double bornAngle = 9;
+  optional int32 level = 10;
+  optional string name = 11;
+}
+
+message WorldBossDamageInfo {
+  optional double damage = 1;
+  optional string playerName = 2;
+  optional int32 rank = 3;
+}
+
+message WorldBossRewardInfo {
+  optional int32 type = 1;
+  repeated BaseResource rewards = 2;
+}
+
+message WorldBossShowInfo {
+  optional string bossName = 1;
+  optional int32 bossLevel = 2;
+  optional string bossPicPath = 3;
+  optional int32 bossState = 4;
+  optional int64 leftRefreshTime = 5;
+  optional int32 lvChange = 6;
+  repeated string propPurchased = 7;
+  repeated DictWorldBossPropertyAddition props = 8;
+  optional string scene = 9;
+  optional string bossuuid = 10;
+  optional int64 rewardShowEndTime = 11;
+}
+
+message ErrorMessage {
+  optional string msg = 1;
+  optional string code = 2;
+}
+
+message RSReloadDict {
+}
+
+message SRReloadDict {
+  optional int32 code = 1;
+}
+
+message CSLoginTcp {
+  optional string sessionKey = 1;
+}
+
+message SCLoginTcp {
+  optional int32 errorCode = 1;
+  optional int32 loginRet = 2;
+}
+
+message GSRegisterTcp {
+  optional string gatewayFlag = 1;
+}
+
+message SGRegisterTcp {
+  optional int32 registerRet = 1;
+}
+
+message CSCheckVersion {
+  optional string appVersion = 1;
+  optional string resVersoin = 2;
+  optional string deviceId = 3;
+  optional string deviceDesc = 4;
+  optional string channelId = 5;
+  optional string channelName = 6;
+  optional int32 clientFull = 7;
+}
+
+message SCCheckVersion {
+  optional string actionMethod = 1;
+  optional string actionParam1 = 2;
+  optional string actionParam2 = 3;
+  optional string actionParam3 = 4;
+  optional string serverAppVersion = 5;
+  optional string serverResVersion = 6;
+  optional string resURL = 7;
+  optional int32 programMethod = 8;
+  optional int32 resMethod = 9;
+  optional string appURL = 10;
+  repeated KeyValueEntry entry = 100;
+}
+
+message CSGetServerList {
+  optional string platformUid = 1;
+  optional string channelId = 2;
+  optional string channelName = 3;
+  optional string appVersion = 4;
+  optional string resVersoin = 5;
+  optional string deviceId = 6;
+  optional string deviceDesc = 7;
+}
+
+message SCGetServerList {
+  repeated ConfigServerZone serverList = 1;
+  repeated ConfigPlayerServer playerServerList = 2;
+}
+
+message CSUserLogin {
+  optional string platformUid = 1;
+  optional string authCode = 2;
+  optional int32 loginType = 3;
+  optional string activeCode = 4;
+  optional int64 clientTime = 5;
+  optional string deviceId = 6;
+  optional string deviceDesc = 7;
+  optional string channelId = 8;
+  optional string channelName = 9;
+  optional string appVersion = 10;
+  optional string resVersoin = 11;
+}
+
+message SCUserLogin {
+  optional bytes sessionKey = 1;
+  optional int64 playerId = 2;
+  optional int64 serverTimeNow = 3;
+  optional bool isFirstCreated = 4;
+  optional string ip = 5;
+  optional int32 port = 6;
+  optional int64 clientTime = 7;
+  optional string clientIp = 8;
+}
+
+message CSGenerateName {
+  optional int32 gender = 1;
+}
+
+message SCGenerateName {
+  optional string playerName = 1;
+}
+
+message CSPlayerAllInfo {
+}
+
+message SCPlayerAllInfo {
+  optional Player player = 1;
+  repeated Equipment equipmentList = 2;
+  repeated Treasure treasureList = 3;
+  repeated Warrior warriorList = 4;
+  repeated SimpleItem itemList = 5;
+  repeated SimpleItem fragEquipmentList = 6;
+  repeated SimpleItem fragTreasureList = 7;
+  repeated SimpleItem fragWarriorList = 8;
+  repeated FormationItem formationList = 9;
+  repeated FormationThing helperList = 10;
+}
+
+message CSGetPaymentInfo {
+  optional string channelId = 1;
+  optional string shopId = 2;
+}
+
+message SCGetPaymentInfo {
+  repeated PaymentInfo paymentInfoList = 1;
+}
+
+message CSChangePlayerName {
+  optional string playerName = 1;
+}
+
+message SCChangePlayerName {
+  repeated BaseResource cost = 1;
+}
+
+message CSCheckOrder {
+  optional string orderId = 1;
+  optional string paymentId = 2;
+  optional SuperSDKPayInfo payInfo = 3;
+}
+
+message SCCheckOrder {
+  optional TransactionData transactionData = 1;
+}
+
+message CSFailOrder {
+  optional string orderId = 1;
+  optional string paymentId = 2;
+  optional SuperSDKPayInfo payInfo = 3;
+}
+
+message SCFailOrder {
+  optional TransactionData transactionData = 1;
+}
+
+message CSIsCardClaimed {
+}
+
+message SCIsCardClaimed {
+  optional string monthStatus = 1;
+  optional string permanentStatus = 3;
+}
+
+message CSClaimCard {
+  optional string cardType = 1;
+}
+
+message SCClaimCard {
+  optional ResultObject get = 2;
+}
+
+message CSPlayerCreate {
+  optional string playerName = 1;
+  optional string heroId = 2;
+  optional int32 gender = 3;
+}
+
+message SCPlayerCreate {
+  optional Player player = 1;
+  optional int64 createTime = 2;
+}
+
+message CSPlayerLogin {
+}
+
+message SCPlayerLogin {
+  optional Player player = 1;
+  optional int64 playerCreateTime = 2;
+}
+
+message CSSocketLogin {
+  required bytes sessionKey = 1;
+}
+
+message SCSocketLogin {
+  required int32 result = 1;
+}
+
+message SCClose {
+  required int32 reasion = 1;
+}
+
+message GSRegist {
+  required string gatewayFlag = 1;
+}
+
+message SGRegist {
+  required int32 result = 1;
+}
+
+message GSPlayerDisConnect {
+  optional string sessionKey = 1;
+}
+
+message CSRefreshGatewayIPAndPort {
+  required bytes sessionKey = 1;
+}
+
+message SCRefreshGatewayIPAndPort {
+  optional string ip = 5;
+  optional int32 port = 6;
+}
+
+message CSConfirmActivationCode {
+  optional string channelId = 1;
+  optional string deviceId = 2;
+  optional string activationCode = 10;
+}
+
+message SCConfirmActivationCode {
+  repeated KeyValueEntry entry = 100;
+}
+
+message SGRelogin {
+  optional string gatewayFlag = 1;
+  optional string sessionKey = 2;
+  optional int64 playerId = 3;
+}
+
+message CSGenerateOrder {
+  optional string paymentId = 1;
+  optional double money = 2;
+  optional string moneyType = 3;
+  optional string channelId = 4;
+  optional string shopId = 5;
+  optional string appVersion = 6;
+  optional string deviceId = 7;
+  optional string clientIp = 8;
+  optional string customStr = 9;
+}
+
+message SCGenerateOrder {
+  optional string orderId = 1;
+  optional TransactionData transactionData = 2;
+}
+
+message CSPlayer {
+}
+
+message SCPlayer {
+  optional Player player = 1;
+}
+
+message CSEquipmentTreasureList {
+}
+
+message SCEquipmentTreasureList {
+  repeated Equipment equipmentList = 1;
+  repeated Treasure treasureList = 2;
+}
+
+message CSWarriorList {
+}
+
+message SCWarriorList {
+  repeated Warrior warriorList = 1;
+}
+
+message CSItemList {
+}
+
+message SCItemList {
+  repeated SimpleItem itemList = 1;
+}
+
+message CSFragmentList {
+}
+
+message SCFragmentList {
+  repeated SimpleItem fragEquipmentList = 1;
+  repeated SimpleItem fragTreasureList = 2;
+  repeated SimpleItem fragWarriorList = 3;
+  repeated SimpleItem fragPetList = 4;
+}
+
+message CSFormationList {
+}
+
+message SCFormationList {
+  repeated FormationItem formationList = 1;
+  repeated FormationThing helperList = 2;
+  optional string tacticalSkillId = 3;
+}
+
+message CSConvertGiftCode {
+  optional string giftCode = 1;
+}
+
+message SCConvertGiftCode {
+  optional ResultObject get = 1;
+}
+
+message CSChangeNameTimes {
+}
+
+message SCChangeNameTimes {
+  optional int32 changeNameTimes = 1;
+}
+
+message CSRedPoint {
+}
+
+message SCRedPoint {
+  repeated RedPoint redPointList = 1;
+}
+
+message CSGemAndCookingList {
+}
+
+message SCGemAndCookingList {
+  repeated SimpleItem gemList = 1;
+  repeated SimpleItem cookingList = 2;
+  optional string shortCut1 = 3;
+  optional string shortCut2 = 4;
+  optional int64 nextUseTime = 5;
+}
+
+message CSKVInfo {
+}
+
+message SCKVInfo {
+  repeated KeyValueEntry entry = 1;
+}
+
+message CSDeviceTokenInfo {
+  optional string deviceToken = 1;
+  optional string deviceId = 2;
+  optional string appVersion = 3;
+  optional string resVersion = 4;
+  optional string channelId = 5;
+}
+
+message SCDeviceTokenInfo {
+}
+
+message CSNavigationItem {
+}
+
+message SCNavigationItem {
+  repeated NavigationItem navItems = 1;
+}
+
+message CSPetList {
+}
+
+message SCPetList {
+  repeated Pet petList = 1;
+}
+
+message CSGetPlayerServerList {
+  optional string platformUid = 1;
+}
+
+message SCGetPlayerServerList {
+  repeated ConfigPlayerServer playerServerList = 1;
+}
+
+message CSNoticeUrl {
+}
+
+message SCNoticeUrl {
+  optional string noticeUrl = 1;
+}
+
+message CSChatCache {
+  optional int32 chatType = 1;
+}
+
+message SCChatCache {
+  repeated ChatInfo chatList = 1;
+}
+
+message CSSceneChatCache {
+}
+
+message SCSceneChatCache {
+  repeated ChatInfo chatList = 1;
+}
+
+message CSCheckPoint {
+  optional string appVersion = 1;
+  optional string resVersoin = 2;
+  optional string deviceId = 3;
+  optional string deviceDesc = 4;
+  optional string channelId = 5;
+  optional string channelName = 6;
+  optional int32 point = 7;
+}
+
+message SCCheckPoint {
+}
+
+message CSCheckPhone {
+  repeated string infoList = 1;
+}
+
+message SCCheckPhone {
+  repeated int32 result = 1;
+  repeated KeyValueEntry entry = 2;
+}
+
+message CSBigClientReward {
+  optional int32 type = 1;
+}
+
+message SCBigClientReward {
+}
+
+message CSEquipForge {
+  optional string guid = 1;
+  repeated BaseResource cost = 2;
+}
+
+message SCEquipForge {
+  optional int32 result = 1;
+  optional Equipment equip = 2;
+  repeated BaseResource cost = 3;
+}
+
+message CSUFChatCache {
+}
+
+message SCUFChatCache {
+  repeated ChatInfo chatList = 1;
+}
+
+message CSUFTalk {
+  optional int32 talkType = 1;
+  optional string content = 2;
+}
+
+message SCUFTalk {
+  optional int32 talkType = 1;
+  optional string content = 2;
+  optional int64 time = 3;
+  optional SimplePlayerInfo play = 4;
+}
+
+message CSEquipStrengthen {
+  optional string guid = 1;
+  repeated BaseResource cost = 2;
+  optional int32 times = 3;
+}
+
+message SCEquipStrengthen {
+  optional Equipment equip = 1;
+  repeated BaseResource cost = 2;
+  optional int32 costTimes = 3;
+  optional int32 criTimes = 4;
+}
+
+message CSEquipRefine {
+  optional string guid = 1;
+  repeated BaseResource cost = 2;
+}
+
+message SCEquipRefine {
+  optional Equipment equip = 1;
+  repeated BaseResource cost = 2;
+}
+
+message CSEquipStar {
+  optional string guid = 1;
+}
+
+message SCEquipStar {
+  optional Equipment equip = 1;
+  repeated BaseResource cost = 2;
+}
+
+message CSEquipReBuild {
+  optional string guid = 1;
+}
+
+message SCEquipReBuild {
+  optional ResultObject get = 1;
+  repeated BaseResource cost = 2;
+}
+
+message CSEquipDecompose {
+  repeated string guid = 1;
+}
+
+message SCEquipDecompose {
+  optional ResultObject get = 1;
+  repeated BaseResource cost = 2;
+}
+
+message CSWarriorRecruitGet {
+  repeated int32 costType = 1;
+}
+
+message SCWarriorRecruitGet {
+  repeated WarriorRecruit recruit = 1;
+}
+
+message CSWarriorRecruit {
+  optional int32 free = 1;
+  optional int32 costType = 2;
+  optional int32 numType = 3;
+}
+
+message SCWarriorRecruit {
+  repeated BaseResource cost = 1;
+  optional ResultObject get = 2;
+}
+
+message CSWarriorGet {
+  repeated string guid = 1;
+}
+
+message SCWarriorGet {
+  repeated Warrior warrior = 1;
+}
+
+message CSWarriorSell {
+  repeated string guid = 1;
+}
+
+message SCWarriorSell {
+  repeated BaseResource cost = 1;
+  optional ResultObject get = 2;
+}
+
+message CSWarriorReset {
+  optional string guid = 1;
+}
+
+message SCWarriorReset {
+  repeated BaseResource cost = 1;
+  optional ResultObject get = 2;
+  repeated Warrior warriors = 3;
+}
+
+message CSWarriorDecompose {
+  repeated string guid = 1;
+}
+
+message SCWarriorDecompose {
+  repeated BaseResource cost = 1;
+  optional ResultObject get = 2;
+}
+
+message CSWarriorFragGet {
+  repeated string id = 1;
+}
+
+message SCWarriorFragGet {
+  repeated SimpleItem warriorFrag = 1;
+}
+
+message CSWarriorFragSell {
+  repeated BaseResource sell = 1;
+}
+
+message SCWarriorFragSell {
+  repeated BaseResource cost = 1;
+  optional ResultObject get = 2;
+}
+
+message CSWarriorStrengthen {
+  optional string guid = 1;
+  repeated BaseResource cost = 2;
+}
+
+message SCWarriorStrengthen {
+  optional Warrior guid = 1;
+  repeated BaseResource cost = 2;
+}
+
+message CSWarriorTalent {
+  optional string guid = 1;
+  optional string talent = 2;
+  repeated BaseResource cost = 3;
+}
+
+message SCWarriorTalent {
+  optional Warrior guid = 1;
+  repeated BaseResource cost = 2;
+}
+
+message CSWarriorTraining {
+  optional string guid = 1;
+  optional int32 costType = 2;
+  optional int32 numType = 3;
+}
+
+message SCWarriorTraining {
+  optional Warrior guid = 1;
+  repeated BaseResource cost = 2;
+}
+
+message CSWarriorTrainingReplace {
+  optional string guid = 1;
+  optional int32 result = 2;
+}
+
+message SCWarriorTrainingReplace {
+  optional Warrior result = 1;
+  repeated BaseResource cost = 2;
+}
+
+message CSWarriorBreached {
+  optional string guid = 1;
+  optional int32 type = 2;
+}
+
+message SCWarriorBreached {
+  optional Warrior guid = 1;
+  repeated BaseResource cost = 2;
+}
+
+message CSWarriorJueXing {
+  optional string guid = 1;
+  repeated BaseResource cost = 2;
+}
+
+message SCWarriorJueXing {
+  optional Warrior guid = 1;
+  repeated BaseResource cost = 2;
+}
+
+message CSTreasureStrengthen {
+  optional string targetId = 1;
+  repeated string guids = 2;
+}
+
+message SCTreasureStrengthen {
+  optional Treasure treasure = 1;
+  repeated BaseResource cost = 2;
+}
+
+message CSCombine {
+  optional string targetId = 1;
+}
+
+message SCCombine {
+  optional ResultObject get = 1;
+  repeated BaseResource cost = 2;
+}
+
+message CSTreasureRefine {
+  optional string targetId = 1;
+}
+
+message SCTreasureRefine {
+  optional Treasure treasure = 1;
+  repeated BaseResource cost = 2;
+}
+
+message CStreasureRebuild {
+  optional string targetId = 1;
+}
+
+message SCtreasureRebuild {
+  optional ResultObject get = 1;
+  repeated BaseResource cost = 2;
+}
+
+message CSFormationOn {
+  optional string id = 1;
+  optional string guid = 2;
+  optional int32 formatPos = 3;
+}
+
+message SCFormationOn {
+  optional int32 fightpower = 1;
+  optional FormationItem formationItem = 2;
+}
+
+message CSFormationOff {
+  optional string id = 1;
+  optional string guid = 2;
+  optional int32 formatPos = 3;
+}
+
+message SCFormationOff {
+  optional int32 fightpower = 1;
+}
+
+message CSFormationChange {
+  optional string fomationMapStr = 1;
+}
+
+message SCFormationChange {
+  repeated FormationItem formationList = 1;
+}
+
+message CSLookPlayerFormation {
+  optional int64 otherPid = 1;
+}
+
+message SCLookPlayerFormation {
+  repeated FormationItem formationList = 1;
+  optional string fomationMapStr = 2;
+}
+
+message CSTreasureBattleList {
+  optional string fragTreasId = 1;
+}
+
+message SCTreasureBattleList {
+  repeated TreasureBattleInfo infoList = 1;
+}
+
+message CSRank {
+  optional int32 type = 1;
+}
+
+message SCRank {
+  optional RankInfo rankIno = 1;
+}
+
+message CSPvpFindMatch {
+}
+
+message SCPvpFindMatch {
+  optional PvpRankPlayerInfo myrank = 1;
+  repeated PvpRankPlayerInfo rankList = 2;
+}
+
+message CSGm {
+  optional string gm = 1;
+}
+
+message SCGm {
+  optional ResultObject get = 1;
+}
+
+message CSRecommendFriendList {
+}
+
+message SCRecommendFriendList {
+  repeated SimplePlayerInfo recommendList = 1;
+}
+
+message CSSearchPlayer {
+  optional string idOrName = 1;
+}
+
+message SCSearchPlayer {
+  repeated SimplePlayerInfo player = 1;
+}
+
+message CSApplyFriend {
+  optional int64 friendId = 1;
+  optional string word = 2;
+}
+
+message SCApplyFriend {
+}
+
+message CSFriendApplyList {
+}
+
+message SCFriendApplyList {
+  repeated FriendApplyInfo applyList = 1;
+}
+
+message CSDenyApply {
+  optional int64 friendId = 1;
+}
+
+message SCDenyApply {
+}
+
+message CSAgreeApply {
+  optional int64 friendId = 1;
+}
+
+message SCAgreeApply {
+}
+
+message CSGiveEnergy {
+  optional int64 friendId = 1;
+}
+
+message SCGiveEnergy {
+}
+
+message CSGetEnergy {
+  optional int64 friendId = 1;
+}
+
+message SCGetEnergy {
+  optional int32 currentEnergy = 1;
+}
+
+message CSBatchGetFriendEnergy {
+}
+
+message SCBatchGetFriendEnergy {
+  optional ResultObject add = 1;
+  repeated int64 getIds = 2;
+}
+
+message CSSendToBlackList {
+  optional int64 friendId = 1;
+}
+
+message SCSendToBlackList {
+}
+
+message CSFriendBlackList {
+}
+
+message SCFriendBlackList {
+  repeated SimplePlayerInfo blackList = 1;
+}
+
+message CSDeleteFriend {
+  optional int64 friendId = 1;
+}
+
+message SCDeleteFriend {
+}
+
+message CSFriendFight {
+  optional int64 playerId = 1;
+  optional int32 serverId = 2;
+}
+
+message SCFriendFight {
+  optional string fightId = 1;
+  optional string roomId = 2;
+  optional int64 randSeed = 3;
+  repeated BattlePlayer playerList = 4;
+  optional int64 winPlayerId = 5;
+  optional int32 maxRoundNum = 6;
+}
+
+message CSItemUse {
+  optional BaseResource costItem = 1;
+  optional int32 getItemIndex = 2;
+}
+
+message SCItemUse {
+  optional ResultObject get = 1;
+  optional BaseResource cost = 2;
+}
+
+message CSTreasureSell {
+  repeated string guids = 1;
+}
+
+message SCTreasureSell {
+  repeated BaseResource cost = 1;
+  optional ResultObject get = 2;
+}
+
+message CSEquipmentSell {
+  repeated BaseResource cost = 1;
+}
+
+message SCEquipmentSell {
+  repeated BaseResource cost = 1;
+  optional ResultObject get = 2;
+}
+
+message CSEquipmentFragSell {
+  repeated BaseResource cost = 1;
+}
+
+message SCEquipmentFragSell {
+  repeated BaseResource cost = 1;
+  optional ResultObject get = 2;
+}
+
+message CSFriendList {
+}
+
+message SCFriendList {
+  repeated FriendInfo friendList = 1;
+  optional int32 getEnergyNum = 2;
+}
+
+message CSDeleteFromBlackList {
+  optional int64 friendId = 1;
+}
+
+message SCDeleteFromBlackList {
+}
+
+message CSBatchSendFriendEnergy {
+}
+
+message SCBatchSendFriendEnergy {
+}
+
+message CSWarriorRecruitGetPreview {
+  optional int32 costType = 1;
+}
+
+message SCWarriorRecruitGetPreview {
+  repeated string rewards = 1;
+}
+
+message CSWarriorRecruitLuckyReward {
+  optional string reward = 1;
+}
+
+message SCWarriorRecruitLuckyReward {
+  optional ResultObject get = 2;
+}
+
+message CSSetSkillOrder {
+  optional string heroGuid = 1;
+  optional string skillOrder = 2;
+}
+
+message SCSetSkillOrder {
+}
+
+message CSHelperOn {
+  optional string guid = 1;
+  optional int32 pos = 2;
+}
+
+message SCHelperOn {
+}
+
+message CSHelperOff {
+  optional int32 pos = 1;
+}
+
+message SCHelperOff {
+}
+
+message CSLightenWorldSeed {
+  optional int32 id = 1;
+}
+
+message SCLightenWorldSeed {
+  repeated BaseResource cost = 1;
+  optional ResultObject get = 2;
+  optional Warrior newWarrior = 3;
+}
+
+message CSEquipStrengthenOneKey {
+  optional string guid = 1;
+}
+
+message SCEquipStrengthenOneKey {
+  optional Equipment equip = 1;
+  repeated BaseResource cost = 2;
+  optional int32 costTimes = 3;
+  optional int32 criTimes = 4;
+}
+
+message CSOpenStateCheck {
+}
+
+message SCOpenStateCheck {
+  repeated OpenState states = 1;
+}
+
+message CSFormationExChange {
+  optional int32 fromPos = 1;
+  optional int32 toPos = 2;
+}
+
+message SCFormationExChange {
+  repeated FormationItem formationList = 1;
+}
+
+message CSEquipStrengthenMoreOneKey {
+  optional int32 formatPos = 1;
+}
+
+message SCEquipStrengthenMoreOneKey {
+  repeated EquipStrengthenInfo equips = 1;
+  repeated BaseResource cost = 2;
+}
+
+message CSPetLevelup {
+  optional string guid = 1;
+  repeated BaseResource cost = 2;
+}
+
+message SCPetLevelup {
+  optional Pet pet = 1;
+  repeated BaseResource cost = 2;
+}
+
+message CSPetBreached {
+  optional string guid = 1;
+  repeated BaseResource cost = 2;
+}
+
+message SCPetBreached {
+  optional Pet pet = 1;
+  repeated BaseResource cost = 2;
+}
+
+message CSPetEat {
+  optional string guid = 1;
+  repeated BaseResource cost = 2;
+}
+
+message SCPetEat {
+  optional Pet pet = 1;
+  repeated BaseResource cost = 2;
+}
+
+message CSPetHudong {
+  optional string guid = 1;
+  optional int32 type = 2;
+}
+
+message SCPetHudong {
+  optional Pet pet = 1;
+}
+
+message CSPetFirstRecruit {
+}
+
+message SCPetFirstRecruit {
+  optional ResultObject get = 1;
+}
+
+message CSPetHudongShow {
+  optional string guid = 1;
+}
+
+message SCPetHudongShow {
+  optional Pet pet = 1;
+}
+
+message CSPetRecruitGet {
+}
+
+message SCPetRecruitGet {
+  optional PetRecruit recruit = 1;
+}
+
+message CSPetRecruit {
+  optional int32 free = 1;
+  optional int32 numType = 2;
+}
+
+message SCPetRecruit {
+  repeated BaseResource cost = 1;
+  optional ResultObject get = 2;
+  repeated BaseResource getList = 3;
+}
+
+message CSPetDecompose {
+  repeated string guids = 1;
+}
+
+message SCPetDecompose {
+  repeated BaseResource cost = 1;
+  optional ResultObject get = 2;
+}
+
+message CSPetShopProductList {
+}
+
+message SCPetShopProductList {
+  repeated ShopItem shopItemList = 1;
+  optional int32 refreshTimes = 2;
+}
+
+message CSPetShopBuy {
+  optional string shopItemId = 1;
+  optional int32 buyCount = 2;
+}
+
+message SCPetShopBuy {
+  repeated BaseResource cost = 1;
+  optional ResultObject get = 2;
+  repeated ShopItem shopItemList = 3;
+}
+
+message CSRefreshPetShop {
+}
+
+message SCRefreshPetShop {
+}
+
+message CSPetReset {
+  optional string guid = 1;
+}
+
+message SCPetReset {
+  repeated BaseResource cost = 1;
+  optional ResultObject get = 2;
+}
+
+message CSPetSell {
+  repeated string guids = 1;
+}
+
+message SCPetSell {
+  optional ResultObject get = 1;
+  repeated BaseResource cost = 2;
+}
+
+message CSPetFragSell {
+  repeated BaseResource sells = 1;
+}
+
+message SCPetFragSell {
+  repeated BaseResource cost = 1;
+  optional ResultObject get = 2;
+}
+
+message CSCreateTeam {
+}
+
+message SCCreateTeam {
+  optional Team team = 1;
+}
+
+message CSQueryTeam {
+  optional string teamId = 1;
+}
+
+message SCQueryTeam {
+  optional Team team = 1;
+}
+
+message CSJoinTeam {
+  optional string teamId = 1;
+}
+
+message SCJoinTeam {
+  optional Team team = 1;
+  optional int64 toPlayerId = 2;
+}
+
+message CSExitTeam {
+  optional string teamId = 1;
+}
+
+message SCExitTeam {
+  optional Team team = 1;
+  optional TeamMember member = 2;
+}
+
+message CSDisbandTeam {
+  optional string teamId = 1;
+}
+
+message SCDisbandTeam {
+  optional string teamId = 1;
+}
+
+message CSTeamInvite {
+  optional string teamId = 1;
+  repeated int64 invitePlayerIdList = 2;
+  repeated int32 inviteServerIdList = 3;
+}
+
+message SCTeamInvite {
+  optional Team team = 1;
+}
+
+message CSChangeTeamLeader {
+  optional string teamId = 1;
+  optional int64 toPlayerId = 2;
+}
+
+message SCChangeTeamLeader {
+  optional Team team = 1;
+}
+
+message CSTeamKick {
+  optional string treamId = 1;
+  optional int64 toPlayerId = 2;
+}
+
+message SCTeamKick {
+  optional Team team = 1;
+  optional TeamMember member = 2;
+}
+
+message CSTeamCreateAndInvite {
+  repeated int64 invitePlayerIdList = 2;
+  repeated int32 inviteServerIdList = 3;
+}
+
+message SCTeamCreateAndInvite {
+  optional Team team = 1;
+  optional int64 invitePlayerId = 2;
+}
+
+message CSCheckTeam {
+  optional int64 toPlayerId = 1;
+  optional int32 toServerid = 2;
+}
+
+message SCCheckTeam {
+  optional int32 checkResult = 1;
+}
+
+message CSQueryTeamTick {
+}
+
+message SCQueryTeamTick {
+  optional Team team = 1;
+  optional int32 seconds = 2;
+}
+
+message CSPvpFight {
+  optional int64 playerId = 1;
+  optional int32 serverId = 2;
+}
+
+message SCPvpFight {
+  optional string fightId = 1;
+  optional string roomId = 2;
+  optional int64 randSeed = 3;
+  repeated BattlePlayer playerList = 4;
+}
+
+message CSPvpFightEnd {
+  optional string fightId = 1;
+  optional int64 winPlayerId = 2;
+}
+
+message SCPvpFightEnd {
+  optional PvpRankPlayerInfo myrank = 1;
+  optional ResultObject result = 2;
+  repeated BaseResource boxList = 3;
+}
+
+message CSShopProductList {
+  optional int32 shopType = 1;
+}
+
+message SCShopProductList {
+  optional int32 shopType = 1;
+  repeated ShopItem shopItemList = 2;
+  optional int32 contribution = 3;
+}
+
+message CSShopBuy {
+  optional int32 shopType = 1;
+  optional string shopItemId = 2;
+  optional int32 buyCount = 3;
+}
+
+message SCShopBuy {
+  optional int32 shopType = 1;
+  repeated ShopItem shopItemList = 2;
+  optional ResultObject get = 3;
+  repeated BaseResource cost = 4;
+  optional int32 contribution = 5;
+}
+
+message CSPvpRank {
+}
+
+message SCPvpRank {
+  optional PvpRankPlayerInfo myrank = 1;
+  repeated PvpRankPlayerInfo rankList = 2;
+}
+
+message CSFindPlayerInfo {
+  optional int64 playerId = 1;
+  optional int32 serverId = 2;
+}
+
+message SCFindPlayerInfo {
+  optional FormationSimpleInfo formationInfo = 1;
+}
+
+message CSPvpFindMatchGuide {
+}
+
+message SCPvpFindMatchGuide {
+  optional PvpRankPlayerInfo myrank = 1;
+  repeated PvpRankPlayerInfo rankList = 2;
+}
+
+message CSPvpFightGuide {
+  optional int64 playerId = 1;
+  optional int32 serverId = 2;
+}
+
+message SCPvpFightGuide {
+  optional string fightId = 1;
+  optional string roomId = 2;
+  optional int64 randSeed = 3;
+  repeated BattlePlayer playerList = 4;
+}
+
+message CSPvpFightEndGuide {
+  optional string fightId = 1;
+  optional int64 winPlayerId = 2;
+}
+
+message SCPvpFightEndGuide {
+  optional PvpRankPlayerInfo myrank = 1;
+  optional ResultObject result = 2;
+  repeated BaseResource boxList = 3;
+}
+
+message CSWarriorRecruitGuide {
+}
+
+message SCWarriorRecruitGuide {
+  repeated BaseResource cost = 1;
+  optional ResultObject get = 2;
+}
+
+message CSGood {
+  optional int64 playerId = 1;
+}
+
+message SCGood {
+  optional ResultObject get = 1;
+  optional int32 leftAddGood = 2;
+  repeated int64 goodList = 3;
+}
+
+message CSFamous {
+  optional int32 type = 1;
+}
+
+message SCFamous {
+  optional int32 leftAddGood = 1;
+  repeated int64 goodList = 2;
+  repeated SimplePlayerInfo playerList = 3;
+}
+
+message CSWarriorHandbook {
+}
+
+message SCWarriorHandbook {
+  repeated string idList = 1;
+}
+
+message CSPvpFightResult {
+  optional int64 playerId = 1;
+  optional int32 serverId = 2;
+}
+
+message SCPvpFightResult {
+  optional string fightId = 1;
+  optional string roomId = 2;
+  optional int64 randSeed = 3;
+  repeated BattlePlayer playerList = 4;
+  optional int64 winPlayerId = 5;
+  optional PvpRankPlayerInfo myrank = 6;
+  optional ResultObject result = 7;
+  repeated BaseResource boxList = 8;
+  optional int32 maxRoundNum = 9;
+}
+
+message CSFightResultError {
+  optional string fightId = 1;
+}
+
+message SCFightResultError {
+}
+
+message CSPvpFightResultGuide {
+  optional int64 playerId = 1;
+  optional int32 serverId = 2;
+}
+
+message SCPvpFightResultGuide {
+  optional string fightId = 1;
+  optional string roomId = 2;
+  optional int64 randSeed = 3;
+  repeated BattlePlayer playerList = 4;
+  optional int64 winPlayerId = 5;
+  optional PvpRankPlayerInfo myrank = 6;
+  optional ResultObject result = 7;
+  repeated BaseResource boxList = 8;
+  optional int32 maxRoundNum = 9;
+}
+
+message CSMailList {
+  optional string mailType = 1;
+}
+
+message SCMailList {
+  repeated MailBox mailBoxList = 1;
+}
+
+message CSCheckNewMail {
+}
+
+message SCCheckNewMail {
+  optional int32 hasNew = 1;
+}
+
+message CSSendMassageToFriend {
+  optional int64 playerId = 1;
+  optional string content = 2;
+}
+
+message SCSendMessageToFriend {
+}
+
+message CSDeleteMail {
+  optional int32 type = 1;
+  optional int64 createTime = 2;
+}
+
+message SCDeleteMail {
+}
+
+message CSTaskList {
+}
+
+message SCTaskList {
+  repeated TaskInfo taskList = 1;
+  optional int32 score = 2;
+  repeated TaskBoxInfo boxList = 3;
+}
+
+message CSGetTaskReward {
+  optional string taskId = 1;
+}
+
+message SCGetTaskReward {
+  optional ResultObject get = 1;
+}
+
+message CSGetTaskBoxReward {
+  optional string boxId = 1;
+}
+
+message SCGetTaskBoxReward {
+  optional ResultObject get = 1;
+}
+
+message CSQueryUserReward {
+}
+
+message SCQueryUserReward {
+  repeated RewardItemInfo rewardItemInfoList = 1;
+}
+
+message CSAddRewardsToPlayer {
+  repeated int64 rewardIds = 1;
+}
+
+message SCAddRewardsToPlayer {
+  optional ResultObject result = 1;
+}
+
+message CSQuestStory {
+}
+
+message SCQuestStory {
+  optional int32 storyId = 1;
+}
+
+message CSQuestReward {
+  optional string questId = 1;
+}
+
+message SCQuestReward {
+  optional ResultObject get = 2;
+}
+
+message CSQuestStorySave {
+  optional int32 storyId = 1;
+}
+
+message SCQuestStorySave {
+}
+
+message CSQuestList {
+}
+
+message SCQuestList {
+  repeated string questList = 1;
+}
+
+message CSRefreshShopRefresh {
+  optional int32 shopType = 1;
+}
+
+message SCRefreshShopRefresh {
+  repeated ShopItem shopItemList = 1;
+  optional int32 freeLeftTimes = 2;
+  optional int32 freeMaxTimes = 3;
+  optional int32 resLeftTimes = 4;
+  optional int32 resMaxTimes = 5;
+  repeated BaseResource cost = 6;
+  optional int32 shopType = 7;
+  optional int64 nextUpdateTime = 8;
+}
+
+message CSRefreshShopQuery {
+  optional int32 shopType = 1;
+}
+
+message SCRefreshShopQuery {
+  repeated ShopItem shopItemList = 1;
+  optional int32 freeLeftTimes = 2;
+  optional int32 freeMaxTimes = 3;
+  optional int32 resLeftTimes = 4;
+  optional int32 resMaxTimes = 5;
+  optional int32 shopType = 6;
+  optional int64 nextUpdateTime = 7;
+}
+
+message CSRefreshShopBuy {
+  optional int32 shopType = 1;
+  optional string shopItemId = 2;
+}
+
+message SCRefreshShopBuy {
+  repeated ShopItem shopItemList = 1;
+  optional ResultObject get = 2;
+  repeated BaseResource cost = 3;
+  optional int32 shopType = 4;
+  optional int64 nextUpdateTime = 5;
+}
+
+message CSWorldBossInfo {
+}
+
+message SCWorldBossInfo {
+  optional WorldBossShowInfo worldBossShowInfo = 1;
+}
+
+message CSWorldBossPropPurchase {
+  optional string propId = 1;
+}
+
+message SCWorldBossPropPurchase {
+  repeated string propPurchased = 1;
+  repeated BaseResource cost = 2;
+}
+
+message CSWorldBossRank {
+}
+
+message SCWorldBossRank {
+  optional double bossHpPercent = 1;
+  repeated WorldBossDamageInfo damageInfos = 2;
+  optional WorldBossDamageInfo lastDamageInfo = 3;
+  optional WorldBossDamageInfo myDamageInfo = 4;
+  optional int32 state = 5;
+}
+
+message CSWorldBossFight {
+  optional string bossId = 1;
+}
+
+message SCWorldBossFight {
+  optional string fightId = 1;
+  optional int64 randSeed = 2;
+  optional BattlePlayer battlePlayer = 3;
+  repeated BattleMonster battleMonsterList = 4;
+  optional string fightScene = 5;
+  optional int32 code = 6;
+  optional int32 maxround = 7;
+  optional int32 damange = 8;
+  optional double damageforwardPercent = 9;
+  optional double damagelaterPercent = 10;
+  optional int32 forwardRank = 11;
+  optional int32 laterRank = 12;
+  optional PlayerSide playerSide = 13;
+}
+
+message SCWorldBoss {
+  optional WorldBoss worldBoss = 1;
+}
+
+message SCWorldBossReward {
+  repeated WorldBossRewardInfo rewardInfos = 1;
+}
+
+message CSWorldBossReward {
+}
+
+message CSMineRefine {
+  optional string mineId = 1;
+  optional int32 num = 2;
+}
+
+message SCMineRefine {
+  repeated BaseResource cost = 1;
+  optional ResultObject res = 2;
+  optional int32 level = 3;
+  optional int32 exp = 4;
+  optional int32 add = 5;
+}
+
+message CSGemMake {
+  optional string gemId = 1;
+  optional int32 num = 2;
+}
+
+message SCGemMake {
+  repeated BaseResource cost = 1;
+  optional ResultObject res = 2;
+  optional int32 level = 3;
+  optional int32 exp = 4;
+  optional int32 add = 5;
+}
+
+message CSGemCombineByThree {
+  optional string gemId = 1;
+}
+
+message SCGemCombineByThree {
+  repeated BaseResource cost = 1;
+  optional ResultObject res = 2;
+}
+
+message CSGemCombineByTwo {
+  repeated string gemId = 1;
+}
+
+message SCGemCombineByTwo {
+  repeated BaseResource cost = 1;
+  optional ResultObject res = 2;
+}
+
+message CSGemMount {
+  optional string guid = 1;
+  optional int32 pos = 2;
+  optional string gemId = 3;
+}
+
+message SCGemMount {
+  optional Equipment equip = 1;
+  repeated BaseResource cost = 2;
+}
+
+message CSGemUnmount {
+  optional string guid = 1;
+  optional int32 pos = 2;
+}
+
+message SCGemUnmount {
+  optional Equipment equip = 1;
+  optional ResultObject res = 2;
+}
+
+message CSFishCooking {
+  optional BaseResource fish = 1;
+}
+
+message SCFishCooking {
+  repeated BaseResource cost = 1;
+  optional ResultObject res = 2;
+  optional int32 level = 3;
+  optional int32 exp = 4;
+  optional int32 add = 5;
+}
+
+message CSFishUsing {
+  optional BaseResource costItem = 1;
+  optional string heroGuid = 2;
+}
+
+message SCFishUsing {
+  repeated BaseResource cost = 1;
+  optional Warrior warrior = 2;
+}
+
+message CSFishList {
+}
+
+message SCFishList {
+  repeated FishInfo fishList = 1;
+}
+
+message CSCookingEffectList {
+}
+
+message SCCookingEffectList {
+  repeated ContinuedEffect effectList = 1;
+}
+
+message CSCookingLevel {
+}
+
+message SCCookingLevel {
+  optional int32 level = 1;
+  optional int32 exp = 2;
+  optional int32 gemLevel = 3;
+  optional int32 gemExp = 4;
+  repeated string skills = 5;
+}
+
+message CSHpRecover {
+  optional BaseResource costItem = 1;
+}
+
+message SCHpRecover {
+  repeated BaseResource cost = 1;
+}
+
+message CSGemMountOrChange {
+  optional string guid = 1;
+  optional string gemId = 2;
+}
+
+message SCGemMountOrChange {
+  optional Equipment equip = 1;
+  repeated BaseResource cost = 2;
+  optional ResultObject res = 3;
+}
+
+message CSMineRefineGuide {
+  optional string mineId = 1;
+  optional int32 num = 2;
+}
+
+message SCMineRefineGuide {
+  repeated BaseResource cost = 1;
+  optional ResultObject res = 2;
+}
+
+message CSGemMakeGuide {
+  optional string gemId = 1;
+  optional int32 num = 2;
+}
+
+message SCGemMakeGuide {
+  repeated BaseResource cost = 1;
+  optional ResultObject res = 2;
+  optional int32 level = 3;
+  optional int32 exp = 4;
+  optional int32 add = 5;
+}
+
+message CSFishCookingGuide {
+  optional BaseResource fish = 1;
+}
+
+message SCFishCookingGuide {
+  repeated BaseResource cost = 1;
+  optional ResultObject res = 2;
+  optional int32 level = 3;
+  optional int32 exp = 4;
+  optional int32 add = 5;
+}
+
+message CSGemCombineBySix {
+  optional string gemId = 1;
+}
+
+message SCGemCombineBySix {
+  repeated BaseResource cost = 1;
+  optional ResultObject res = 2;
+}
+
+message CSTitleList {
+}
+
+message SCTitleList {
+  optional string curTitle = 1;
+  repeated TitleInfo titleList = 2;
+}
+
+message CSChangeTitle {
+  optional string titleId = 1;
+}
+
+message SCChangeTitle {
+  optional string curTitle = 1;
+  repeated TitleInfo titleList = 2;
+}
+
+message SCAddTitle {
+  optional TitleInfo title = 1;
+}
+
+message CSKFRankInfo {
+  optional int32 type = 1;
+  optional int32 subType = 2;
+  optional int32 peakMatchIndex = 3;
+}
+
+message SCKFRankInfo {
+  optional int32 type = 1;
+  optional int32 subType = 2;
+  optional RankInfo rankIno = 3;
+}
+
+message CSKFReplayInfo {
+  optional int32 type = 1;
+  optional int32 subType = 2;
+  optional int32 pageIndex = 3;
+  optional string regId = 4;
+  optional int32 replayFlag = 5;
+}
+
+message SCKFReplayInfo {
+  optional int32 type = 1;
+  optional int32 subType = 2;
+  optional int32 pageIndex = 3;
+  optional int32 pageNum = 4;
+  repeated KFReplayItem replays = 5;
+  optional int32 flag = 6;
+}
+
+message CSKFReplay {
+  optional string warId = 1;
+  optional int32 type = 2;
+}
+
+message SCKFReplay {
+  optional KFReplayData data = 1;
+  optional int32 type = 2;
+}
+
+message CSKFPlayerInfo {
+  optional int64 playerId = 1;
+  optional int32 serverId = 2;
+  optional int32 peakMatchIndex = 3;
+  optional int32 type = 4;
+  optional int32 replayFlag = 5;
+}
+
+message SCKFPlayerInfo {
+  optional FormationSimpleInfo formationInfo = 1;
+}
+
+message CSKFRewardInfo {
+  optional int32 peakMatchIndex = 1;
+}
+
+message SCKFRewardInfo {
+  optional int32 peakMatchIndex = 1;
+  repeated KFRewardItem rewards = 2;
+}
+
+message CSKFTimeInfo {
+  optional int32 peakMatchIndex = 1;
+}
+
+message SCKFTimeInfo {
+  optional int32 peakMatchIndex = 1;
+  repeated KFTimeSlot timeList = 2;
+}
+
+message CSSceneInfoDemoTcp {
+  optional string teststr = 1;
+}
+
+message SCSceneInfoDemoTcp {
+  optional int32 errorCode = 1;
+  optional string teststr = 2;
+}
+
+message CSRoomInfoTcp {
+  optional int32 roomId = 1;
+}
+
+message SCRoomInfoTcp {
+  optional Room room = 1;
+}
+
+message CSRoleMoveTcp {
+  optional int32 roomId = 1;
+  optional SPoint point = 2;
+  repeated SPoint targetPoints = 3;
+}
+
+message SCRoleMoveTcp {
+  optional int64 playerId = 1;
+  optional int32 roomId = 2;
+  optional SPoint point = 3;
+  repeated SPoint targetPoints = 4;
+}
+
+message SCRoleAppearTcp {
+  optional MoveRole role = 1;
+}
+
+message SCRoleAppearListTcp {
+  repeated SCRoleAppearTcp roleList = 1;
+}
+
+message SCRoleDisappearTcp {
+  optional int64 playerId = 1;
+}
+
+message SCRoleDisappearListTcp {
+  repeated SCRoleDisappearTcp roleList = 1;
+}
+
+message CSRoleStopTcp {
+  optional int64 playerId = 1;
+  optional int32 roomId = 2;
+  optional SPoint point = 3;
+}
+
+message SCRoleStopTcp {
+  optional int64 playerId = 1;
+  optional int32 roomId = 2;
+  optional SPoint point = 3;
+}
+
+message SCPushEmpty {
+}
+
+message CSEnterRoomTcp {
+  optional int32 roomId = 1;
+}
+
+message SCEnterRoomTcp {
+}
+
+message CSExitRoomTcp {
+  optional int32 roomId = 1;
+}
+
+message SCExitRoomTcp {
+}
+
+message CSAudioChatCheck {
+  optional int32 chatType = 1;
+}
+
+message SCAudioChatFileName {
+  optional int32 chatType = 1;
+  optional string fileName = 2;
+  optional int64 time = 3;
+  optional int64 playerId = 4;
+}
+
+message CSChatTcp {
+  optional int32 chatType = 1;
+  optional string content = 2;
+  optional int64 playerId = 3;
+  optional int32 isAudio = 4;
+  optional string fileName = 5;
+  optional int32 audioTime = 6;
+  optional string downLoadUrl = 7;
+  optional int64 fileSize = 8;
+}
+
+message SCChatTcp {
+  optional int32 chatType = 1;
+  optional string content = 2;
+  optional int64 time = 3;
+  optional SimplePlayerInfo play = 4;
+  optional int32 isAudio = 5;
+  optional string downLoadUrl = 6;
+  optional int32 audioTime = 7;
+}
+
+message CSPingTcp {
+  optional int64 clientTime = 1;
+}
+
+message SCPingTcp {
+  optional int64 serverTime = 1;
+  optional int64 clientTime = 2;
+}
+
+message CSPingAckTcp {
+}
+
+message SCResetPosition {
+  optional SPoint point = 1;
+}
+
+message CSCurrentPosition {
+  optional int32 line = 1;
+  optional int32 showArround = 2;
+}
+
+message SCCurrentPosition {
+  optional MovePlayer self = 1;
+  optional int32 limit = 2;
+}
+
+message CSMove {
+  optional PointNew pointNew = 1;
+  optional int64 currentTime = 2;
+}
+
+message SCMovePush {
+  repeated Position position = 1;
+}
+
+message SCPlayerAppear {
+  repeated MovePlayer player = 1;
+}
+
+message SCPlayerDisappear {
+  repeated int64 playerId = 1;
+}
+
+message CSMovePlayerInfo {
+  repeated int64 playerIds = 1;
+}
+
+message SCMovePlayerInfo {
+  repeated MovePlayer playerInfos = 1;
+}
+
+message CSTransferScene {
+  optional string target = 1;
+  optional PointNew point = 2;
+}
+
+message SCTransferScene {
+  optional int32 result = 1;
+}
+
+message SGCurrentPosition {
+  optional string sceneType = 1;
+  optional string sceneFlag = 2;
+  optional string lineId = 3;
+  optional int32 scCode = 4;
+  optional int32 showArround = 5;
+}
+
+message GSCurrentPosition {
+  optional string lineId = 1;
+  optional int32 scCode = 2;
+  optional int32 showArround = 3;
+}
+
+message CSEnterBackgroud {
+  optional int32 exit = 1;
+}
+
+message CSRefreshMovePlayerInfo {
+}
+
+message CSMoveConfirm {
+}
+
+message SCFieldResourceInfo {
+  repeated SideResource resource = 1;
+}
+
+message CSFieldGetResource {
+}
+
+message SCFieldGetResource {
+  optional ResultObject res = 1;
+  repeated BaseResource cost = 2;
+  optional int32 code = 3;
+}
+
+message SCFieldPlayerState {
+  repeated PlayerSide player = 1;
+}
+
+message CSFieldResourceStartGather {
+  optional string posId = 1;
+}
+
+message SCFieldResourceStartGather {
+  optional int32 result = 1;
+  repeated BaseResource need = 2;
+}
+
+message CSSidePvpFightResult {
+  optional int64 playerId = 1;
+  optional int32 serverId = 2;
+  optional int32 fightType = 3;
+  optional string appVersion = 4;
+  optional string resVersion = 5;
+}
+
+message SCSidePvpFightResult {
+  optional string fightId = 1;
+  optional int64 attPlayerId = 2;
+  optional int64 defPlayerId = 3;
+  optional int64 winPlayerId = 4;
+  optional ResultObject result = 5;
+  repeated BaseResource looted = 6;
+  repeated BaseResource cost = 7;
+  optional int32 code = 8;
+}
+
+message CSSidePveFightStart {
+  optional string monsterId = 1;
+}
+
+message SCSidePveFightStart {
+  optional string fightId = 1;
+  optional int64 randSeed = 2;
+  optional BattlePlayer battlePlayer = 3;
+  repeated BattleMonster battleMonsterList = 4;
+  optional string fightScene = 5;
+  optional int32 code = 6;
+  optional int32 maxround = 7;
+}
+
+message CSSidePveFightEnd {
+  optional string fightId = 1;
+  optional BattlePlayer battlePlayer = 2;
+  optional int32 result = 3;
+  optional BattleOperate optRecord = 4;
+}
+
+message SCSidePveFightEnd {
+  repeated BaseResource cost = 1;
+  optional ResultObject getn = 2;
+  optional int32 fightResult = 3;
+  optional int32 code = 4;
+  optional double hp3 = 5;
+  optional double hp7 = 6;
+  optional double hp9 = 7;
+  optional double hp13 = 8;
+  optional double anger = 9;
+  optional int32 state = 10;
+  optional SideMonster monster = 11;
+  repeated int32 battlePos = 12;
+  repeated double hps = 13;
+}
+
+message SCSidePushState {
+  repeated PushState states = 1;
+}
+
+message CSLoginScene {
+}
+
+message SCLoginScene {
+  optional MovePlayer self = 1;
+  optional int32 limit = 2;
+}
+
+message CSResurrection {
+}
+
+message SCResurrenttion {
+  repeated BaseResource cost = 1;
+  optional PushState state = 2;
+}
+
+message CSTransfer2Safe {
+}
+
+message SCTransfer2Safe {
+  optional int32 result = 1;
+}
+
+message CSGetLineInfo {
+}
+
+message SCGetLineInfo {
+  optional int32 line = 1;
+  repeated LineInfo lineInfos = 2;
+}
+
+message CSTransferLine {
+  optional int32 line = 1;
+}
+
+message SCTransferLine {
+}
+
+message CSSideResourceCheck {
+  optional string posId = 1;
+}
+
+message SCSideResourceCheck {
+  optional string posId = 1;
+  optional string resourceId = 2;
+  optional int32 code = 3;
+}
+
+message CSSideGetPvpMVList {
+}
+
+message SCSideGetPvpMVList {
+  repeated SidePvpMV mvs = 1;
+}
+
+message CSSideGetPvpMV {
+  optional string fightId = 1;
+}
+
+message SCSideGetPvpMV {
+  optional SidePvpFightData data = 1;
+}
+
+message CSPlayerRequestRedeem {
+  optional int32 type = 1;
+}
+
+message SCPlayerRequestRedeem {
+  repeated BaseResource cost = 1;
+}
+
+message SCSideMonster {
+  repeated SideMonster monsters = 1;
+}
+
+message CSSideMonsterCheck {
+  optional string uuid = 1;
+}
+
+message SCSideMonsterCheck {
+  optional SideMonster monster = 1;
+  optional int32 code = 2;
+}
+
+message CSPlayerRedeem {
+  optional int32 type = 1;
+}
+
+message SCPlayerRedeem {
+  repeated BaseResource cost = 1;
+  optional int64 redeemTime = 2;
+}
+
+message CSSideSetShortCut {
+  optional int32 position = 1;
+  optional string id = 2;
+}
+
+message SCSideSetShortCut {
+}
+
+message CSGuideFish {
+}
+
+message SCGuideFish {
+  optional ResultObject get = 1;
+}
+
+message CSGuideMine {
+}
+
+message SCGuideMine {
+  optional ResultObject get = 1;
+}
+
+message SCSideBoss {
+  repeated SideBoss monsters = 1;
+}
+
+message CSSidePveBossFightStart {
+  optional string uuid = 1;
+}
+
+message SCSidePveBossFightStart {
+  optional string fightId = 1;
+  optional int64 randSeed = 2;
+  optional BattlePlayer battlePlayer = 3;
+  repeated BattleMonster battleMonsterList = 4;
+  optional string fightScene = 5;
+  optional int32 code = 6;
+  optional int32 maxround = 7;
+}
+
+message CSSidePveBossFightEnd {
+  optional string fightId = 1;
+  optional string uuid = 2;
+  optional int32 result = 3;
+  optional BattleOperate optRecord = 4;
+}
+
+message SCSidePveBossFightEnd {
+  repeated BaseResource cost = 1;
+  optional ResultObject get = 2;
+  optional int32 fightResult = 3;
+  optional int32 code = 4;
+  optional double hp3 = 5;
+  optional double hp7 = 6;
+  optional double hp9 = 7;
+  optional double hp13 = 8;
+  optional double anger = 9;
+  optional int32 state = 10;
+  optional SideBoss monster = 11;
+  optional int64 hurt = 12;
+  repeated int32 battlePos = 13;
+  repeated double hps = 14;
+}
+
+message CSSideBossCheck {
+  optional string uuid = 1;
+}
+
+message SCSideBossCheck {
+  optional SideBoss monster = 1;
+  optional int32 code = 2;
+}
+
+message CSShowArround {
+  optional int32 on = 1;
+}
+
+message SCShowArround {
+  optional int32 code = 1;
+}
+
+message SCUnionBuilding {
+  optional int32 heroStatueOpen = 1;
+  optional int32 guardTreeOpen = 2;
+}
+
+message SCSideBossCountdown {
+  optional int64 time = 1;
+  optional int32 nature = 2;
+}
+
+message CSRefreshUnionBuilding {
+}
+
+message CSRefreshSideHp {
+  optional string oldFormation = 1;
+  optional string newFormation = 2;
+}
+
+message CSGetHp {
+  optional int64 playerId = 1;
+}
+
+message SCGetHp {
+  optional double hp = 1;
+}
+
+message CSGatherCost {
+  optional string posId = 1;
+}
+
+message SCGatherCost {
+  repeated BaseResource need = 1;
+}
+
+message SCRefreshScene {
+}
+
+message CSSpeedCheck {
+  optional int64 time = 1;
+}
+
+message SGPushByServer {
+  optional int32 serverId = 1;
+  optional int32 opcode = 2;
+  optional bytes content = 3;
+}
+
+message SCPublicMessage {
+  optional PublicMessage pubmsg = 1;
+}
+
+message CSFight {
+}
+
+message SCFight {
+  optional int32 roundNum = 1;
+  optional int32 maxRoundNum = 2;
+  optional Fighter attacks = 3;
+  optional Fighter defends = 4;
+}
+
+message CSLoadOver {
+}
+
+message SCStarMove {
+}
+
+message CSMoveOver {
+}
+
+message SCRoundBegin {
+  optional int32 roundNum = 1;
+  optional Fighter attacks = 2;
+  optional Fighter defends = 3;
+  repeated OnceCast tickOnceCasts = 4;
+  optional int32 roundCD = 5;
+}
+
+message CSStartTrans {
+}
+
+message SCStartTrans {
+  optional int32 transCd = 1;
+}
+
+message CSTransPosition {
+  optional int32 direction = 1;
+}
+
+message SCTransPosition {
+  repeated string heroUids = 1;
+  repeated int32 heroFPIds = 2;
+}
+
+message CSConfirmTrans {
+  repeated string heroUids = 1;
+  repeated int32 heroFPIds = 2;
+}
+
+message SCConfirmTrans {
+  repeated string heroUids = 1;
+  repeated int32 heroFPIds = 2;
+}
+
+message CSAttack {
+  optional string releaseUid = 1;
+  optional int32 releaseSkillType = 2;
+}
+
+message SCAttackResponse {
+  optional string releaseUId = 1;
+  optional int32 releaseSkillType = 2;
+}
+
+message SCAttack {
+  optional string releaseUid = 1;
+  optional int32 releaseSkillType = 2;
+  optional int32 FPId = 3;
+  optional string fighterUid = 4;
+  optional int32 needMove = 5;
+}
+
+message SCShootProj {
+  optional string actorUid = 1;
+  optional int32 releaseSkillType = 2;
+  optional string releaseId = 3;
+  optional int32 FPId = 4;
+  optional string FPFighterUid = 5;
+  optional int32 roundNum = 6;
+}
+
+message SCExport {
+  repeated OnceCast tickOnceCasts = 1;
+  repeated string killActorUids = 2;
+}
+
+message SCUltimateAttack {
+  optional string releaseUid = 1;
+  repeated string targetUids = 2;
+}
+
+message SCMoveBack {
+}
+
+message SCShowUltiCountDown {
+}
+
+message CSNextRound {
+}
+
+message SCSetAuto {
+  repeated int64 autoRoleIds = 1;
+}
+
+message SCComboBreak {
+  optional string fighterUid = 1;
+}
+
+message SCFightStart {
+  optional int32 initRunCamp = 1;
+}
+
+message CSNewRound {
+}
+
+message SCNewRound {
+  optional int32 roundNum = 1;
+  optional int32 newRoundRunCamp = 2;
+  optional OneFighter attacker = 3;
+  optional OneFighter defender = 4;
+}
+
+message SCCanRoundOver {
+}
+
+message CSRoundOver {
+}
+
+message SCRoundOver {
+  optional int32 nextRoundRunCamp = 1;
+}
+
+message CSTransBegin {
+}
+
+message SCTransBegin {
+}
+
+message CSTransOver {
+  repeated string actorUids = 1;
+  repeated int32 actorFPIds = 2;
+}
+
+message SCTransOver {
+  repeated string actorUids = 1;
+  repeated int32 actorFPIds = 2;
+}
+
+message CSSkillCast {
+  optional string actorUid = 1;
+  optional int32 camp = 2;
+  optional int32 skillType = 3;
+}
+
+message SCSkillPress {
+  optional string actorUid = 1;
+  optional int32 camp = 2;
+  optional int32 skillType = 3;
+}
+
+message SCSkillCast {
+  optional string actorUid = 1;
+  optional int32 camp = 2;
+  optional int32 skillType = 3;
+  optional int32 FPId = 4;
+  optional int32 targetCamp = 5;
+  optional int32 needMove = 6;
+}
+
+message SCUltimateCastBegin {
+  optional string actorUid = 1;
+  optional int32 camp = 2;
+  repeated string targetUids = 3;
+}
+
+message SCTickExport {
+  optional int32 exportTimer = 1;
+  repeated OnceCast tickOnceCasts = 2;
+}
+
+message SCShoot {
+  optional string actorUid = 1;
+  optional int32 camp = 2;
+  optional int32 releaseSkillType = 3;
+  optional string releaseId = 4;
+  optional int32 FPId = 5;
+  optional int32 targetCamp = 6;
+  optional int32 roundNum = 7;
+}
+
+message CSAuto {
+  optional int64 roleId = 1;
+  optional int32 auto = 2;
+}
+
+message SCAuto {
+  optional int64 roleId = 1;
+  optional int32 auto = 2;
+}
+
+message SCAttackResult {
+  optional int32 isSuccess = 1;
+}
+
+message CSJumpUltimate {
+}
+
+message SCJumpUltimate {
+}
+
+message CSCreateRoom {
+}
+
+message SCCreateRooom {
+}
+
+message CSCopyPassedInfo {
+}
+
+message SCCopyPassedInfo {
+  optional string currentChapterId = 1;
+  optional string currentMissionId = 2;
+  repeated CopySimpleInfo passedCopyInfo = 3;
+  repeated CopyChapterInfo passedChapterInfo = 4;
+}
+
+message CSCopyCurrentInfo {
+}
+
+message SCCopyCurrentInfo {
+  optional string currentChapterId = 1;
+  optional string currentMissionId = 2;
+}
+
+message CSCopyDrop {
+}
+
+message SCCopyDrop {
+}
+
+message CSCopyGetStarAward {
+  optional string chapterId = 1;
+  optional int32 starIndex = 2;
+}
+
+message SCCopyGetStarAward {
+  optional ResultObject gain = 1;
+}
+
+message CSCopySweep {
+  optional string chapterId = 1;
+  optional string missionId = 2;
+}
+
+message SCCopySweep {
+  repeated BaseResource cost = 1;
+  optional ResultObject gain = 2;
+  optional string wantedId = 3;
+  optional int32 wantedLevel = 4;
+  repeated PetAddIntimacy petAdds = 5;
+}
+
+message CSCopyEnter {
+  optional string chapterId = 1;
+  optional string missionId = 2;
+}
+
+message SCCopyEnter {
+  optional string taskId = 1;
+  repeated BaseResource priorResource = 2;
+  repeated CopyBoxInfo boxList = 3;
+  repeated CopyJobInfo jobList = 4;
+  optional string sceneName = 5;
+}
+
+message CSCopyLeave {
+  optional string chapterId = 1;
+  optional string missionId = 2;
+  optional string taskId = 3;
+}
+
+message SCCopyLeave {
+}
+
+message CSCopyFightStart {
+  optional string chapterId = 1;
+  optional string missionId = 2;
+  optional string taskId = 3;
+}
+
+message SCCopyFightStart {
+  optional string fightId = 1;
+  optional int64 randSeed = 2;
+  optional BattlePlayer battlePlayer = 3;
+  repeated BattleMonster battleMonsterList = 4;
+  repeated BaseResource priorResource = 5;
+  optional string fightScene = 6;
+  optional int32 maxRound = 7;
+}
+
+message CSCopyFightEnd {
+  optional string fightId = 1;
+  optional BattlePlayer battlePlayer = 2;
+  optional int32 result = 3;
+  optional BattleOperate optRecord = 4;
+}
+
+message SCCopyFightEnd {
+  optional int32 isCopyComplete = 1;
+  optional int32 star = 2;
+  repeated BaseResource currentResource = 3;
+  repeated BaseResource cost = 4;
+  optional ResultObject gain = 5;
+  optional int32 fightResult = 6;
+  optional string wantedId = 7;
+  optional int32 wantedLevel = 8;
+  optional int32 dropAngerBallNum = 9;
+  optional int32 dropFireBallNum = 10;
+  optional int32 angerBallAdditionExp = 11;
+  optional int32 fireBallAdditionCoin = 12;
+  repeated PetAddIntimacy petAdds = 13;
+}
+
+message CSCopyBox {
+  optional string boxId = 1;
+}
+
+message SCCopyBox {
+  repeated BaseResource currentResource = 1;
+}
+
+message CSCopyResetChallengeCount {
+  optional string chapterId = 1;
+  optional string missionId = 2;
+  optional BaseResource cost = 3;
+}
+
+message SCCopyResetChallengeCount {
+  optional CopySimpleInfo currentSimpleInfo = 1;
+}
+
+message CSCopyRunMapInfo {
+  optional string chapterId = 1;
+  optional string missionId = 2;
+}
+
+message SCCopyRunMapInfo {
+  repeated string passedTaskIdList = 1;
+  optional BattlePlayer battlePlayer = 2;
+}
+
+message CSCopyGetResetInfo {
+  optional string chapterId = 1;
+  optional string missionId = 2;
+}
+
+message SCCopyGetResetInfo {
+  optional int32 remainResetCount = 1;
+  repeated BaseResource cost = 2;
+}
+
+message CSRushFightStart {
+  optional int32 rushType = 1;
+  optional string taskId = 2;
+  optional int32 star = 3;
+}
+
+message SCRushFightStart {
+  optional string fightId = 1;
+  optional int64 randSeed = 2;
+  optional BattlePlayer battlePlayer = 3;
+  repeated BattleMonster battleMonsterList = 4;
+  optional string fightScene = 5;
+  optional int32 maxRound = 6;
+  optional int32 winKey = 7;
+  optional int32 winValue = 8;
+  optional int32 rushType = 9;
+}
+
+message CSRushFightEnd {
+  optional string fightId = 1;
+  optional BattlePlayer battlePlayer = 2;
+  optional int32 result = 3;
+  optional BattleOperate optRecord = 4;
+}
+
+message SCRushFightEnd {
+  optional int32 result = 1;
+  optional int32 star = 2;
+  optional ResultObject resultObj = 3;
+}
+
+message CSGetRushInfo {
+}
+
+message SCGetRushInfo {
+  optional int32 curFloor = 1;
+  optional int32 curTotalStar = 2;
+  optional int32 resetLeftTime = 3;
+  optional int32 isMustReset = 4;
+  optional int32 isRewardNeedGet = 5;
+  optional int32 isAdditionNeedGet = 6;
+  optional int32 winKey = 7;
+  optional int32 winValue = 8;
+  optional int32 diamondRestLeftTime = 9;
+  optional int32 diamondRestCostNum = 10;
+  optional int32 highRecordFloor = 11;
+  optional int32 isMazeTraderValid = 12;
+  optional int32 recordTotalStar = 13;
+  optional string curFloorSceneName = 14;
+}
+
+message CSRushAddition {
+  optional string select = 1;
+  optional int32 star = 2;
+}
+
+message SCRushAddition {
+  optional BaseProp prop = 1;
+}
+
+message CSRush3Hit {
+}
+
+message SCRush3Hit {
+  repeated int32 floor = 1;
+  repeated int32 isWin = 2;
+  repeated ResultObject gain = 3;
+  optional int32 isValid = 4;
+}
+
+message CSRushToTop {
+}
+
+message SCRushToTop {
+  repeated RushSweepInfo sweepInfo = 1;
+}
+
+message CSRushMazeTrader {
+}
+
+message SCRushMazeTrader {
+  optional BaseResource result = 1;
+  optional int32 originalPrice = 2;
+  optional int32 discountPrice = 3;
+}
+
+message CSRushResetChallengeCount {
+}
+
+message SCRushResetChallengeCount {
+  repeated BaseResource cost = 1;
+}
+
+message CSRushCurrentInfo {
+}
+
+message SCRushCurrentInfo {
+  repeated RushTaskInfo taskInfoList = 1;
+}
+
+message CSRushRewardPreview {
+}
+
+message SCRushRewardPreview {
+  optional int32 sectionStar = 1;
+  optional int32 sectionFrom = 2;
+  optional int32 sectionTo = 3;
+  repeated BaseResource threeStarReward = 4;
+  repeated BaseResource sixStarReward = 5;
+  repeated BaseResource nineStarReward = 6;
+}
+
+message CSRushAdditionView {
+}
+
+message SCRushAdditionView {
+  optional BaseProp prop = 1;
+}
+
+message CSRushGetSectionReward {
+}
+
+message SCRushGetSectionReward {
+  optional ResultObject gain = 1;
+}
+
+message CSRushGetSectionAddition {
+}
+
+message SCRushGetSectionAddition {
+  optional string starResult3 = 1;
+  optional string starResult6 = 2;
+  optional string starResult9 = 3;
+  optional BaseProp prop = 4;
+  optional int32 costStar = 5;
+}
+
+message CSRushGetTopSweepInfo {
+}
+
+message SCRushGetTopSweepInfo {
+  optional int32 topFloor = 1;
+}
+
+message CSRushMazeTraderBuy {
+}
+
+message SCRushMazeTraderBuy {
+  optional ResultObject gain = 1;
+  repeated BaseResource cost = 2;
+}
+
+message CSGetRushEliteBossInfo {
+}
+
+message SCGetRushEliteBossInfo {
+  repeated RushEliteBossInfo bossInfoList = 10;
+  optional int32 leftTime = 20;
+  optional int32 totalTime = 30;
+  optional int32 diamondLeftTime = 40;
+  optional int32 diamondLeftTimeCost = 50;
+}
+
+message CSRushEliteBossBuyTime {
+}
+
+message SCRushEliteBossBuyTime {
+  repeated BaseResource cost = 1;
+}
+
+message CSGetRebels {
+}
+
+message SCGetRebels {
+  repeated RebelInfo rebels = 1;
+  optional int32 exploit = 2;
+  optional int32 exploitNum = 3;
+  optional int32 maxHurt = 4;
+  optional int32 maxHurtNum = 5;
+  optional int32 normalWantedAttTimes = 6;
+  optional int32 rageWantedAttTimes = 7;
+  optional double rage = 8;
+  optional double normalRage = 9;
+}
+
+message CSRebelFightStart {
+  optional string rebelId = 1;
+  optional int32 type = 2;
+}
+
+message SCRebelFightStart {
+  optional string fightId = 1;
+  optional int64 randSeed = 2;
+  optional BattlePlayer battlePlayer = 3;
+  repeated BattleMonster battleMonsterList = 4;
+  optional string fightRoomId = 5;
+  optional double damageFactor = 6;
+  optional int32 maxround = 7;
+}
+
+message CSShareRebel {
+  optional string rebelId = 1;
+}
+
+message SCShareRebel {
+}
+
+message CSGetRebelRewardInfo {
+}
+
+message SCGetRebelRewardInfo {
+  repeated RebelRewardInfo rebelRewardInfos = 1;
+}
+
+message CSGetRebelReward {
+  optional int32 rebelRewardId = 1;
+}
+
+message SCGetRebelReward {
+  optional ResultObject result = 1;
+}
+
+message CSRebelFightEnd {
+  optional string fightId = 1;
+  optional BattlePlayer battlePlayer = 2;
+  optional int32 result = 3;
+  optional BattleOperate optRecord = 4;
+}
+
+message SCRebelFightEnd {
+  optional ResultObject get = 1;
+  optional int32 result = 2;
+  optional double damage = 3;
+  optional int64 recordAdd = 4;
+  optional int32 scoreAdd = 5;
+  optional int32 rankBefore = 6;
+  optional int32 rankNow = 7;
+  repeated BaseResource cost = 8;
+}
+
+message CSFightTreasureStart {
+  optional int64 fightPlayerId = 1;
+  optional string targetFlagId = 2;
+}
+
+message SCFightTreasureStart {
+  optional string fightId = 1;
+  optional string roomId = 2;
+  optional int64 randSeed = 3;
+  repeated BattlePlayer playerList = 4;
+}
+
+message CSFightTreasureEnd {
+  optional int64 fightPlayerId = 1;
+  optional string fragId = 2;
+  optional int32 isWin = 3;
+}
+
+message SCFightTreasureEnd {
+  optional Player player = 1;
+  optional ResultObject get = 2;
+  optional string reward = 3;
+  optional string rewardFake1 = 4;
+  optional string rewardFake2 = 5;
+  optional int32 isLevelUp = 6;
+  optional BaseResource cost = 7;
+  optional int32 isGetFrag = 8;
+  optional int32 isServerWin = 9;
+}
+
+message CSRefreshTreasFrag {
+}
+
+message SCRefreshTreasFrag {
+  repeated SimpleItem frags = 1;
+  optional int32 energy = 2;
+  optional int64 avoidWarTime = 3;
+  optional int32 maxEnergy = 4;
+}
+
+message CSUseAvoidPlunder {
+  optional string usedItem = 1;
+}
+
+message SCUseAvoidPlunder {
+  optional BaseResource cost = 1;
+  optional int64 avoidSurplusTime = 2;
+}
+
+message CSSweepTreasureFight {
+  optional string fragId = 1;
+  optional int32 sweepNumber = 2;
+  optional int32 autoAddEnergy = 3;
+}
+
+message SCSweepTreasureFight {
+  optional Player player = 1;
+  optional int32 isLevelUp = 2;
+  optional ResultObject get = 3;
+  repeated BaseResource cost = 4;
+  repeated TreasureFightReward rewardList = 5;
+}
+
+message CSFightTreasureStartResult {
+  optional int64 fightPlayerId = 1;
+  optional string targetFlagId = 2;
+}
+
+message SCFightTreasureStartResult {
+  optional string fightId = 1;
+  optional string roomId = 2;
+  optional int64 randSeed = 3;
+  repeated BattlePlayer playerList = 4;
+  optional int32 isWin = 5;
+  optional int32 maxRoundNum = 6;
+  optional ResultObject get = 7;
+  optional string reward = 8;
+  optional string rewardFake1 = 9;
+  optional string rewardFake2 = 10;
+  repeated BaseResource cost = 11;
+  optional int32 isGetFrag = 12;
+}
+
+message CSDailyCopyState {
+}
+
+message SCDailyCopyState {
+  repeated DailyCopyStateType items = 1;
+}
+
+message CSDailyCopyFightStart {
+  optional string ChapterId = 1;
+}
+
+message SCDailyCopyFightStart {
+  optional string roomId = 1;
+  optional int64 randSeed = 2;
+  optional BattlePlayer battlePlayer = 3;
+  optional BattleMonster monster = 4;
+  optional int32 maxRoundNum = 5;
+  optional string fightId = 6;
+}
+
+message CSDailyCopyFightEnd {
+  optional string ChapterId = 1;
+  optional int32 isWin = 2;
+  optional BattleOperate optRecord = 3;
+  optional string fightId = 4;
+}
+
+message SCDailyCopyFightEnd {
+  optional int32 isWin = 1;
+  optional ResultObject get = 2;
+  repeated BaseResource cost = 3;
+  optional int32 lastTime = 4;
+  optional int32 starNum = 5;
+}
+
+message CSRewardMonthSignList {
+}
+
+message SCRewardMonthSignList {
+  repeated MonthRewardItem list = 1;
+  optional string luxuryReward = 2;
+  optional int32 luxuryState = 3;
+  optional int32 currentDay = 4;
+  optional string luxuryNeedPay = 5;
+}
+
+message CSReceiveMonthSign {
+}
+
+message SCReceiveMonthSign {
+  optional ResultObject get = 1;
+}
+
+message CSActivityList {
+  optional string activityId = 1;
+}
+
+message SCActivityList {
+  repeated ActivityTab activityList = 1;
+  optional string information = 2;
+}
+
+message CSActivityInfo {
+  optional string activityId = 1;
+}
+
+message SCActivityInfo {
+  optional string activityId = 1;
+  repeated ActivityItem itemList = 2;
+  optional int64 startTime = 3;
+  optional int64 endTime = 4;
+  optional string param = 5;
+  optional int64 rewardEndTime = 6;
+  optional string information = 7;
+}
+
+message CSActivityReward {
+  optional string activityId = 1;
+  optional int32 index = 2;
+  repeated BaseResource getResources = 3;
+}
+
+message SCActivityReward {
+  optional string activityId = 1;
+  repeated ActivityItem itemList = 2;
+  optional ResultObject get = 3;
+}
+
+message CSStaminaRefill {
+}
+
+message SCStaminaRefill {
+  repeated ActivityStaminaData dataList = 1;
+}
+
+message CSStaminaGet {
+}
+
+message SCStaminaGet {
+  optional ResultObject get = 1;
+  repeated ActivityStaminaData dataList = 2;
+}
+
+message CSReceiveLuxurySign {
+}
+
+message SCReceiveLuxurySign {
+  optional ResultObject get = 1;
+}
+
+message CSOpenServerActivity {
+  optional int32 dayType = 1;
+}
+
+message SCOpenServerActivity {
+  optional int64 activityEndTime = 1;
+  optional int64 getRewardEndTime = 2;
+  optional int32 currentDay = 3;
+  repeated int32 days = 4;
+}
+
+message CSGetOpenServerReward {
+  optional int32 itemId = 1;
+  optional string heroId = 2;
+}
+
+message SCGetOpenServerReward {
+  optional ResultObject get = 1;
+  optional int32 newItemState = 2;
+}
+
+message CSNewOpenSevenDayByTitle {
+  optional int32 day = 1;
+  optional int32 tap = 2;
+}
+
+message SCNewOpenSevenDayByTitle {
+  repeated OpenServer7DayItem itemList = 1;
+  repeated int32 redTap = 2;
+}
+
+message CSInterExpedition {
+}
+
+message SCInterExpedition {
+  optional string level = 1;
+  optional int32 exp = 2;
+  optional int32 freeRefreshTime = 3;
+}
+
+message CSGetAcceptedMissions {
+}
+
+message SCGetAcceptedMissions {
+  repeated ExpeditionMissionInfo acceptedMissions = 1;
+}
+
+message CSGetRefreshedMissions {
+}
+
+message SCGetRefreshedMissions {
+  repeated ExpeditionMissionInfo refreshedMissions = 1;
+}
+
+message CSAcceptMission {
+  optional string missionSerial = 1;
+  repeated string heroGuids = 2;
+}
+
+message SCAcceptMission {
+}
+
+message CSExpeditionMissionDetail {
+  optional string missionSerial = 1;
+}
+
+message SCExpeditionMissionDetail {
+  repeated ExpeditionStoryEvent events = 1;
+  optional int32 failExp = 2;
+}
+
+message CSRefreshMissionList {
+}
+
+message SCRefreshMissionList {
+  optional int32 freeRefreshTime = 1;
+  optional BaseResource cost = 2;
+  repeated ExpeditionMissionInfo refreshedMissions = 3;
+}
+
+message CSFriendBadEvents {
+}
+
+message SCFriendBadEvents {
+  optional int32 todayHelpTime = 1;
+  repeated FriendsBadEventInfo eventList = 2;
+}
+
+message CSHelpFriendEvent {
+  optional int64 friendId = 1;
+  optional string missionSerial = 2;
+  optional string eventSerial = 3;
+}
+
+message SCHelpFriendEvent {
+}
+
+message CSGetFinalReward {
+  optional string missionSerial = 1;
+}
+
+message SCGetFinalReward {
+  optional ResultObject get = 1;
+  optional string level = 2;
+  optional int32 exp = 3;
+}
+
+message CSGetExpeditionIdleHeros {
+  optional string missionSerial = 1;
+}
+
+message SCGetExpeditionIdleHeros {
+  repeated string canSendGuids = 1;
+  repeated string sendGuids = 2;
+  optional string possibleReward = 3;
+  optional string bigReward = 4;
+}
+
+message CSGetVipBoonInfo {
+}
+
+message SCGetVipBoonInfo {
+  repeated ActivityDailyBoonItem daily = 1;
+  repeated ActivityShopItem week = 2;
+}
+
+message CSGetVipDailyBoonReward {
+}
+
+message SCGetVipDailyBoonReward {
+  repeated ActivityDailyBoonItem daily = 1;
+  optional ResultObject get = 2;
+}
+
+message CSGetVipWeekBoonReward {
+  optional int32 index = 1;
+  repeated BaseResource costResources = 2;
+  repeated BaseResource getResources = 3;
+}
+
+message SCGetVipWeekBoonReward {
+  repeated ActivityShopItem week = 1;
+  optional ResultObject get = 2;
+  repeated BaseResource costResources = 3;
+}
+
+message CSActivityShopInfo {
+  optional string activityId = 1;
+}
+
+message SCActivityShopInfo {
+  optional string activityId = 1;
+  repeated ActivityShopItem shopItemList = 2;
+  optional int64 startTime = 3;
+  optional int64 endTime = 4;
+  optional string param = 5;
+}
+
+message CSGetActivityShopReward {
+  optional int32 index = 1;
+  optional string activityId = 2;
+  repeated BaseResource costResources = 3;
+  repeated BaseResource getResources = 4;
+}
+
+message SCGetActivityShopReward {
+  optional ResultObject get = 1;
+  repeated ActivityShopItem shopItemList = 2;
+  repeated BaseResource costResources = 3;
+}
+
+message CSCopyBoonInfo {
+  optional string activityId = 1;
+}
+
+message SCCopyBoonInfo {
+  optional string activityId = 1;
+  optional string information = 2;
+}
+
+message CSOpenServerFundInfo {
+}
+
+message SCOpenServerFundInfo {
+  optional int32 buyStatus = 1;
+  optional int32 buyCount = 2;
+  repeated ActivityItem openServerFundList = 3;
+  repeated ActivityItem everyoneBenefitList = 4;
+}
+
+message CSOpenServerFundReward {
+  optional string rewardType = 1;
+  optional int32 index = 2;
+}
+
+message SCOpenServerFundReward {
+  optional ResultObject get = 1;
+  repeated ActivityItem refreshList = 2;
+}
+
+message CSBuyOpenServerFund {
+}
+
+message SCBuyOpenServerFund {
+  optional int32 buyStatus = 1;
+  optional int32 buyCount = 2;
+  repeated BaseResource cost = 3;
+  repeated ActivityItem openServerFundList = 4;
+  repeated ActivityItem everyoneBenefitList = 5;
+}
+
+message CSAchievementList {
+}
+
+message SCAchievementList {
+  repeated AchievementInfo list = 1;
+}
+
+message CSGetAchievementReward {
+  optional string id = 1;
+}
+
+message SCGetAchievementReward {
+  optional ResultObject get = 1;
+}
+
+message CSFortuneCatInfo {
+}
+
+message SCFortuneCatInfo {
+  optional ActivityFortuneCatData info = 1;
+}
+
+message CSFortuneCatReward {
+  optional int32 type = 1;
+}
+
+message SCFortuneCatReward {
+  optional ResultObject get = 1;
+  optional ActivityFortuneCatData info = 2;
+}
+
+message CSGetUnionInfo {
+}
+
+message SCGetUnionInfo {
+  optional int32 hasUnion = 1;
+  optional SimpleUnionInfo unionInfo = 2;
+  optional string notice = 3;
+  optional int32 canGetStamina = 4;
+  optional int32 activeScore = 5;
+  optional int32 myRole = 6;
+  optional int64 coinNum = 7;
+  optional int32 badgeNum = 8;
+  optional int32 currentExp = 9;
+  optional int32 heroStatueOpen = 10;
+  optional int32 guardTreeOpen = 11;
+  optional int32 hasAppliers = 12;
+}
+
+message CSUnionSearch {
+  optional string name = 1;
+  optional int32 page = 2;
+}
+
+message SCUnionSearch {
+  repeated SimpleUnionInfo unions = 1;
+}
+
+message CSUnionCreate {
+  optional string name = 1;
+}
+
+message SCUnionCreate {
+  repeated BaseResource cost = 1;
+}
+
+message CSUnionNoticeChange {
+  optional string content = 1;
+}
+
+message SCUnionNoticeChange {
+}
+
+message CSUnionDeclarationChange {
+  optional string content = 1;
+}
+
+message SCUnionDeclarationChange {
+}
+
+message CSUnionApply {
+  optional string unionId = 1;
+}
+
+message SCUnionApply {
+}
+
+message CSUnionUnApply {
+  optional string unionId = 1;
+}
+
+message SCUnionUnApply {
+}
+
+message CSUnionMembers {
+}
+
+message SCUnionMembers {
+  repeated UnionPlayerInfo list = 1;
+}
+
+message CSUnionAgreeApply {
+  optional int64 playerId = 1;
+}
+
+message SCUnionAgreeApply {
+}
+
+message CSUnionRefuseApply {
+  optional int64 playerId = 1;
+}
+
+message SCUnionRefuseApply {
+}
+
+message CSPromotionViceChairman {
+  optional int64 playerId = 1;
+}
+
+message SCPromotionViceChairman {
+}
+
+message CSDismissViceChairman {
+  optional int64 playerId = 1;
+}
+
+message SCDismissViceChairman {
+}
+
+message CSRemoveUnionPlayer {
+  optional int64 playerId = 1;
+}
+
+message SCRemoveUnionPlayer {
+}
+
+message CSQuitUnion {
+}
+
+message SCQuitUnion {
+}
+
+message CSDissolveUnion {
+}
+
+message SCDissolveUnion {
+}
+
+message CSTransferChairman {
+  optional int64 playerId = 1;
+}
+
+message SCTransferChairman {
+}
+
+message CSUnionApplyList {
+}
+
+message SCUnionApplyList {
+  repeated UnionPlayerInfo list = 1;
+}
+
+message CSGetUnionStamina {
+}
+
+message SCGetUnionStamina {
+  optional ResultObject get = 1;
+}
+
+message CSOpenLuxuryEquipment {
+  optional int32 chapter = 1;
+  optional int32 mission = 2;
+}
+
+message SCOpenLuxuryEquipment {
+  optional int32 openOrNot = 1;
+}
+
+message CSLuxuryEquipmentInfo {
+}
+
+message SCLuxuryEquipmentInfo {
+  optional int32 id = 1;
+  optional int64 currentTime = 2;
+  optional int64 endTime = 3;
+  optional int32 rewardState = 4;
+}
+
+message CSLuxuryEquipmentReward {
+}
+
+message SCLuxuryEquipmentReward {
+  optional ResultObject get = 1;
+}
+
+message CSUnionStore {
+}
+
+message SCUnionStore {
+  optional int64 coinNum = 1;
+  optional int32 badgeNum = 2;
+  optional int32 currentScore = 3;
+  optional int32 currentPerson = 4;
+  repeated UnionContributionBox boxes = 5;
+  optional int64 donateCoin = 6;
+  optional int32 donateBadge = 7;
+  optional int32 maxPerson = 8;
+}
+
+message CSUnionDonate {
+  optional string donateType = 1;
+}
+
+message SCUnionDonate {
+  optional int32 contributionAdd = 1;
+  optional int32 score = 2;
+  optional int32 donateScoreAdd = 3;
+}
+
+message CSUnionHeroStatueInfo {
+}
+
+message SCUnionHeroStatueInfo {
+  repeated UnionPropAddItem unionPropAddAtt = 1;
+  optional int64 coinNum = 2;
+  optional int32 badgeNum = 3;
+}
+
+message CSUnionGuardTreeInfo {
+}
+
+message SCUnionGuardTreeInfo {
+  repeated UnionPropAddItem unionPropAddDef = 1;
+  optional int64 coinNum = 2;
+  optional int32 badgeNum = 3;
+}
+
+message CSUnionHeroStatueUpgrade {
+  optional string type = 1;
+}
+
+message SCUnionHeroStatueUpgrade {
+}
+
+message CSUnionGuardTreeUpgrade {
+  optional string type = 1;
+}
+
+message SCUnionGuardTreeUpgrade {
+}
+
+message CSUnionLightChurchInfo {
+}
+
+message SCUnionLightChurchInfo {
+  optional int32 prayTimes = 1;
+  optional int32 contribution = 2;
+  optional BaseProp addProp = 3;
+  optional int64 invalidTime = 4;
+}
+
+message CSUnionOpenDonateBox {
+  optional string boxId = 1;
+}
+
+message SCUnionOpenDonateBox {
+  optional ResultObject get = 1;
+}
+
+message CSUnionOpenBuilder {
+  optional string type = 1;
+}
+
+message SCUnionOpenBuilder {
+}
+
+message CSUnionUpgrade {
+}
+
+message SCUnionUpgrade {
+}
+
+message CSUnionPray {
+}
+
+message SCUnionPray {
+}
+
+message CSGetUnionAddBaseProp {
+}
+
+message SCGetUnionAddBaseProp {
+  optional BaseProp unionAddBaseProp = 1;
+  optional BaseProp unionPrayProp = 2;
+}
+
+message CSContinuedRechargeInfo {
+  optional string activityId = 1;
+}
+
+message SCContinuedRechargeInfo {
+  optional string activityId = 1;
+  repeated ActivityItem itemList = 2;
+  optional int64 startTime = 3;
+  optional int64 endTime = 4;
+  optional string param = 5;
+  optional int64 rewardEndTime = 6;
+  optional string information = 7;
+  repeated BaseResource bigReward = 8;
+  optional int32 status = 9;
+  optional int32 level = 10;
+  optional int32 currentIndex = 11;
+}
+
+message CSContinuedRechargeReward {
+  optional string activityId = 1;
+  optional int32 index = 2;
+  repeated BaseResource getResources = 3;
+  optional int32 type = 4;
+}
+
+message SCContinuedRechargeReward {
+  optional string activityId = 1;
+  repeated ActivityItem itemList = 2;
+  optional ResultObject get = 3;
+  optional int32 status = 4;
+}
+
+message CSKaiGongActivityList {
+  optional string activityId = 1;
+}
+
+message SCKaiGongActivityList {
+  optional string activityId = 1;
+  optional string name = 2;
+  optional string content = 3;
+  optional int64 startTime = 4;
+  optional int64 endTime = 5;
+  repeated KaiGongActivityItem items = 6;
+}
+
+message CSKaiGongGetReward {
+  optional string activityId = 1;
+  optional string itemId = 2;
+  optional string rewardId = 3;
+}
+
+message SCKaiGongGetReward {
+  optional ResultObject get = 1;
+}
+
+message CSLoginRewardInfo {
+}
+
+message SCLoginRewardInfo {
+  optional int32 hasReward = 1;
+  repeated LoginRewardItem items = 2;
+  optional int32 isShow = 3;
+}
+
+message CSGetLoginReward {
+  optional string itemId = 1;
+}
+
+message SCGetLoginReward {
+  optional ResultObject get = 1;
+}
+
+message CSChangeUnionFlag {
+  optional int32 unionFlag = 1;
+}
+
+message SCChangeUnionFlag {
+  optional int32 unionFlag = 1;
+}
+
+message CSBenefitGiftList {
+}
+
+message SCBenefitGiftList {
+  repeated ActivityTab itemList = 1;
+}
+
+message CSBenefitGiftInfo {
+}
+
+message SCBenefitGiftInfo {
+  optional string targetId = 1;
+  optional string giftTitle = 2;
+  optional string buyType = 3;
+  optional int64 openTime = 4;
+  optional int64 closeTime = 5;
+  optional int32 current = 6;
+  optional int32 price = 7;
+  optional int32 discountPrice = 8;
+  repeated BaseResource reward = 9;
+  optional int32 rewardState = 10;
+}
+
+message CSBenefitGiftReward {
+}
+
+message SCBenefitGiftReward {
+  optional ResultObject get = 1;
+  repeated BaseResource cost = 2;
+  optional int32 rewardState = 3;
+}
+
+message CSFightPlayback {
+  optional string fightId = 1;
+  optional int32 serverId = 2;
+}
+
+message SCFightPlayback {
+  optional string fightid = 1;
+  optional int64 randSeed = 2;
+  optional int32 battleType = 3;
+  optional BattlePlayer attacker = 4;
+  optional BattlePlayer defender1 = 5;
+  optional BattleMonster defender2 = 6;
+  repeated BattleWinCondition winConditions = 7;
+  optional BattleOperate optRecord = 8;
+  optional int32 serverResult = 9;
+  optional int32 clientResult = 10;
+  optional double attackerFactor = 11;
+  optional double defenderFactor = 12;
+  optional int32 maxRound = 13;
+}
+
+message CSUFCurrentStageInfo {
+}
+
+message SCUFCurrentStageInfo {
+  optional int32 round = 1;
+  optional int32 isUnionApplied = 2;
+  optional int32 stage = 3;
+  optional int64 nextStageTime = 4;
+  optional int32 adjustTimes = 5;
+  optional int32 isAutoApply = 6;
+  optional string group = 7;
+  optional int32 isAutoFight = 8;
+  optional int32 isPlayerApplied = 9;
+  optional UFUnionBattlePreView firstFightInfo = 10;
+  optional UFUnionBattlePreView secondFightInfo = 11;
+  optional int32 appliedNum = 12;
+  optional int32 isIn25 = 13;
+  optional int64 fightPower = 14;
+  optional int32 battleArrayAdjustTime = 15;
+  repeated string itemIds = 16;
+  repeated int64 fightTimeShow = 17;
+  optional int64 serverTimeNow = 18;
+}
+
+message CSUFUnionApply {
+}
+
+message SCUFUnionApply {
+}
+
+message CSUFAutoApplySet {
+  optional int32 isAuto = 1;
+}
+
+message SCUFAutoApplySet {
+}
+
+message CSUFPlayerApply {
+}
+
+message SCUFPlayerApply {
+  optional int32 isFirst = 1;
+}
+
+message CSUFAppliedPlayer {
+}
+
+message SCUFAppliedPlayer {
+  repeated UFUnionFighterInfo firsts = 1;
+  repeated UFUnionFighterInfo backUps = 2;
+  optional int32 adjustTimes = 3;
+}
+
+message CSUFAdjustFirstOn {
+  optional int64 optPlayerId = 1;
+  optional int32 optType = 2;
+}
+
+message SCUFAdjustFirstOn {
+  optional int32 adjustTimes = 1;
+}
+
+message CSUFSetAutoFight {
+  optional int32 isAuto = 1;
+}
+
+message SCUFSetAutoFight {
+}
+
+message CSUFUpdateBattlePlayer {
+}
+
+message SCUFUpdateBattlePlayer {
+  optional int32 battleArrayAdjustTime = 1;
+}
+
+message CSUFRankInfo {
+  optional int32 rankType = 1;
+  optional int32 subType = 2;
+}
+
+message SCUFRankInfo {
+  optional int32 rankType = 1;
+  optional int32 subType = 2;
+  optional RankInfo rankIno = 3;
+}
+
+message CSUFUnionResultInfo {
+}
+
+message SCUFUnionResultInfo {
+  repeated UFFightReport reports = 1;
+}
+
+message CSUFInfoPreView {
+}
+
+message SCUFInfoPreView {
+  optional int32 isUnionApplied = 1;
+  optional UFUnionBattlePreView firstFightInfo = 2;
+  optional UFUnionBattlePreView secondFightInfo = 3;
+}
+
+message CSUFSetFightItems {
+  optional int32 fightIndex = 1;
+  repeated string itemIds = 2;
+}
+
+message SCUFSetFightItems {
+  repeated string itemIds = 1;
+}
+
+message SCUnionFightTransfer {
+  optional string unionFightId = 1;
+  optional int32 state = 2;
+  optional int64 leftTime = 3;
+  optional int64 totalTime = 4;
+  optional InstUFPlayer player = 5;
+  optional PointNew playerPos = 6;
+  repeated InstUFBaseCamp baseCampInfos = 7;
+  repeated InstUFCariotFactory factoryInfos = 8;
+  repeated InstUFGate gateInfos = 9;
+  repeated InstUFTower towerInfos = 10;
+  repeated InstUFRevivePoint revivePointInfos = 11;
+  repeated InstUFUnion unionInfos = 12;
+}
+
+message SCUnionFightUpdateState {
+  optional string unionFightId = 1;
+  optional int32 state = 2;
+  optional int64 leftTime = 3;
+  optional int64 totalTime = 4;
+}
+
+message SCUnionFightResult {
+  optional UFFightResult result = 1;
+}
+
+message SCUFPlayer {
+  repeated InstUFPlayer player = 1;
+  repeated PointNew local = 2;
+}
+
+message SCUFCreep {
+  repeated InstUFCreep creep = 1;
+  repeated PointNew local = 2;
+  repeated float angle = 3;
+}
+
+message SCUFCaropt {
+  repeated InstUFCariot cariot = 1;
+  repeated PointNew local = 2;
+}
+
+message SCUFResourcePoint {
+  repeated InstUFResourcePoint point = 1;
+  repeated PointNew local = 2;
+}
+
+message SCUFRevivePoint {
+  repeated InstUFRevivePoint point = 1;
+}
+
+message SCUFTower {
+  repeated InstUFTower tower = 1;
+}
+
+message SCUFGate {
+  repeated InstUFGate gate = 1;
+}
+
+message SCUFBaseCamp {
+  repeated InstUFBaseCamp baseCamp = 1;
+}
+
+message CSUFRefreshElement {
+  optional int64 guid = 1;
+}
+
+message SCUFElementMove {
+  repeated int64 guid = 1;
+  repeated PointNew pos = 2;
+  repeated float speed = 3;
+}
+
+message SCUFElementBuffOn {
+  repeated int64 targetGuid = 1;
+  repeated InstUFBuff buff = 2;
+}
+
+message SCUFElementBuffOff {
+  repeated int64 buffGuid = 1;
+}
+
+message SCUFElementTickExport {
+  repeated int64 targetGuid = 1;
+  repeated double hpDelta = 2;
+  repeated int64 sourceGuid = 3;
+}
+
+message SCUFFightBegin {
+  repeated int64 fightId = 1;
+  repeated int64 leftSideGuid = 2;
+  repeated int64 rightSideGuid = 3;
+}
+
+message SCUFFightEnd {
+  repeated int64 fightId = 1;
+  repeated InstFightable playerSide = 2;
+}
+
+message SCUFPlayerAppear {
+  repeated InstUFPlayer player = 1;
+  repeated PointNew local = 2;
+}
+
+message SCUFPlayerDisappear {
+  repeated int64 guid = 1;
+}
+
+message SCUFPlayerDead {
+  repeated int64 guid = 1;
+  repeated double reviveTime = 2;
+  repeated string reviveItemId = 3;
+}
+
+message SCUFPlayerCollect {
+  repeated int64 playerGuid = 1;
+  repeated int64 resGuid = 2;
+  repeated double collectTime = 3;
+}
+
+message SCUFPlayerCollectEnd {
+  repeated int64 playerGuid = 1;
+  repeated int64 resGuid = 2;
+  repeated int32 isResExhausted = 3;
+}
+
+message SCUFPlayerCollectEndDetail {
+  optional InstUFPlayer player = 1;
+  optional int64 resGuid = 2;
+  optional int32 isResExhausted = 3;
+  optional int32 addResourceNum = 4;
+}
+
+message SCUFPlayerUseItem {
+  optional int64 guid = 1;
+  optional string itemId = 2;
+}
+
+message SCUFPlayerUseItemDetail {
+  optional InstUFPlayer player = 1;
+  optional string itemId = 2;
+}
+
+message SCUFCariotAttackGate {
+  optional int64 guid = 1;
+  optional int64 gateGuid = 2;
+}
+
+message SCUFCariotCrash {
+  optional int64 guid = 1;
+}
+
+message SCUFCariotFactoryBuilding {
+  optional int64 factoryGuid = 1;
+  optional float needTime = 2;
+}
+
+message SCUFCariotFactoryBuildComplete {
+  optional int64 factoryGuid = 1;
+  optional InstUFCariot cariot = 2;
+  optional PointNew pos = 3;
+}
+
+message SCUFCariotFactoryOpen {
+  optional InstUFCariotFactory factory = 1;
+}
+
+message SCUFCariotFactoryClose {
+  optional int64 factoryGuid = 1;
+  optional double recoverTime = 2;
+}
+
+message SCUFCreepSpawn {
+  repeated InstUFCreep creep = 1;
+  repeated PointNew pos = 2;
+  repeated float angle = 3;
+}
+
+message SCUFResourcePointSpawn {
+  repeated InstUFResourcePoint point = 1;
+  repeated PointNew pos = 2;
+}
+
+message SCUFTowerAttackCariot {
+  optional int64 towerGuid = 1;
+  optional int64 targetGuid = 2;
+  optional float releaseTime = 3;
+}
+
+message SCUFTowerAttackPlayer {
+  optional int64 towerGuid = 1;
+  optional int64 targetGuid = 2;
+  optional float releaseTime = 3;
+}
+
+message SCUFTowerCrash {
+  optional int64 towerGuid = 1;
+}
+
+message SCUFGateCrash {
+  optional int64 gateId = 1;
+}
+
+message SCUFRevivePointOccupy {
+  optional int64 id = 1;
+  optional int32 camp = 2;
+}
+
+message CSUFPlayerCollect {
+  optional int64 resGuid = 1;
+}
+
+message CSUFPlayerUpResource {
+  optional string npcId = 1;
+}
+
+message CSUFInit {
+}
+
+message SCUFPlayerRevive {
+  repeated int64 guid = 1;
+  repeated PointNew pos = 2;
+}
+
+message SCUFCampResourceUpdate {
+  optional int32 camp = 1;
+  optional InstUFResource resource = 2;
+}
+
+message CSUFFieldCariotFactoryOpen {
+  optional int64 factoryGuid = 1;
+  optional string npcId = 2;
+}
+
+message SCUFBuildingRefresh {
+  repeated InstUFBaseCamp baseCampInfos = 1;
+  repeated InstUFGate gateInfos = 2;
+  repeated InstUFCariotFactory factoryInfos = 3;
+  repeated InstUFTower towerInfos = 4;
+  repeated InstUFRevivePoint pointInfos = 5;
+  repeated InstUFUnion unionInfos = 6;
+}
+
+message SCUFRevivePointUpdate {
+  optional InstUFRevivePoint point = 1;
+  optional int32 redPlayerCount = 2;
+  optional int32 bluePlayercount = 3;
+}
+
+message CSUFPlayerBuyItem {
+  optional string shopItemId = 1;
+  optional string npcId = 2;
+}
+
+message SCUFPlayerBuyItem {
+  optional int64 playerGuid = 1;
+  optional string shopItemId = 2;
+}
+
+message SCUFPlayerBuyItemDetail {
+  optional InstUFPlayer player = 1;
+}
+
+message CSUFPlayerUseItem {
+  optional string itemId = 1;
+}
+
+message CSUFShopList {
+  optional string npcId = 1;
+}
+
+message SCUFShopList {
+  repeated InstUFShopItem items = 1;
+}
+
+message SCUFMonsterFightBegin {
+  optional int64 guid = 1;
+}
+
+message SCUFMonsterFightEnd {
+  optional int64 guid = 1;
+  optional InstFightable fightSide = 2;
+}
+
+message SCUFGuardFightBegin {
+  optional int64 guid = 1;
+}
+
+message SCUFGuardFightEnd {
+  optional int64 guid = 1;
+  optional InstFightable fightSide = 2;
+}
+
+message SCUFMonsterDead {
+  optional int64 guid = 1;
+}
+
+message SCUFGuardDead {
+  optional int64 guid = 1;
+}
+
+message CSUFStrengthBuildingInfo {
+  optional string npcId = 1;
+}
+
+message SCUFStrengthBuildingInfo {
+  repeated UFStrengthBuildingInfo infos = 1;
+  optional float optCD = 2;
+}
+
+message CSUFStrengthBuilding {
+  optional int32 type = 1;
+  optional string npcId = 2;
+}
+
+message SCUFStrengthBuilding {
+  optional int32 type = 1;
+  optional int32 level = 2;
+  optional int32 camp = 3;
+}
+
+message CSUFPlayerAskFight {
+  optional int64 targetGuid = 1;
+}
+
+message SCUFCariotSlowDown {
+  optional int64 guid = 1;
+}
+
+message SCUFCariotFastForward {
+  optional int64 guid = 1;
+}
+
+message CSUFPlayerMissionList {
+}
+
+message SCUFPlayerMissionList {
+  repeated InstUFPlayerMission missionInfos = 1;
+}
+
+message CSUFUnionMissionList {
+}
+
+message SCUFUnionMissionList {
+  repeated InstUFUnionMission missionInfos = 2;
+}
+
+message SCUFMissionPush {
+  optional double playerFightScore = 1;
+}
+
+message SCUFBuffTick {
+  optional int64 targetGuid = 1;
+  optional int64 sourceBuffGuid = 2;
+  optional double hpDelta = 3;
+}
+
+message SCUFPlayerFightBegin {
+  optional int64 guid = 1;
+  optional int64 targetGuid = 2;
+}
+
+message SCUFPlayerFightEnd {
+  optional int64 guid = 1;
+}
+
+message SCUFPlayerFightEndDetail {
+  optional InstUFPlayer player = 1;
+}
+
+message SCUFPlayerUpResource {
+  optional InstUFPlayer player = 1;
+  optional int32 resourceNum = 2;
+  optional int32 playerReward = 3;
+}
+
+message SCUFTotemCreate {
+  optional InstUFTotem totem = 1;
+  optional PointNew pos = 2;
+}
+
+message SCUFTotemDestroy {
+  optional int64 guid = 1;
+}
+
+message SCUFMainPlayerSpeedChange {
+  optional double speed = 1;
+}
+
+message SCUFKickPlayer {
+}
+
+message CSUFFightResult {
+}
+
+message CSUFFightRecord {
+}
+
+message SCUFFightRecord {
+  repeated UFFightUnionRecord unionInfos = 1;
+  repeated UFFightRecord records = 2;
+  optional string appVersion = 3;
+  optional string resVersion = 4;
+}
+
+message CSUFLeaderFocus {
+  optional PointNew pos = 1;
+}
+
+message CSUFLeaderFocusInfo {
+}
+
+message SCUFLeaderFocus {
+  repeated PointNew pos = 1;
+  optional int64 lastTime = 2;
+}
+
+message SCUFFocusPointInfo {
+  repeated PointNew pos = 1;
+}
+
+message CSUFFocusPointInfo {
+}
+
+message SCUFPlayerCcmpleteAchieve {
+  optional int32 type = 1;
+}
+
+message CSUFOnHook {
+  optional int32 onHook = 1;
+}
+
+message SCUFOnHook {
+  optional int32 onHook = 1;
+}
+
+message CSUFEndTransfer {
+  optional PointNew target = 1;
+}
+
+message SCUFEndTransfer {
+  optional PointNew target = 1;
+  optional int64 guid = 2;
+  optional double costTime = 3;
+}
+
+message SCUFCariotFactory {
+  optional InstUFCariotFactory factory = 1;
+}
+
+message CSUFFightRecordReplay {
+  optional int64 fightId = 1;
+}
+
+message SCUFFightRecordReplay {
+  optional string fightId = 1;
+  optional string roomId = 2;
+  optional int64 randomSeed = 3;
+  repeated BattlePlayer playerList = 4;
+  optional int64 winPlayerId = 5;
+  optional int32 maxRound = 6;
+  optional double attackerDamageFactor = 7;
+  optional double defenderDamageFactor = 8;
+}
+
+message CSUFBeginTransfer {
+  optional PointNew target = 1;
+  optional string transferId = 2;
+}
+
+message SCUFBeginTransfer {
+  optional PointNew target = 1;
+  optional int64 guid = 2;
+  optional double costTime = 3;
+}
+
+message SCUFTowerRecovery {
+  optional InstUFTower tower = 1;
+}
+
+message SCUFBuildUpgradeTip {
+}
+
+message SCUFAbandenList {
+  repeated int64 list = 1;
+}
+
+message CSUFOpenFactoryCost {
+  optional int64 factoryId = 1;
+}
+
+message SCUFOpenFactoryCost {
+  optional InstUFResource cost = 1;
+}
+
+message SCUFCariotComplete {
+  optional int64 guid = 1;
+}
+
+message SCUFCariotFactoryComplete {
+  optional int64 guid = 1;
+}
+
+message SCUFPveFightRecordReplay {
+  optional string fightId = 1;
+  optional string roomId = 2;
+  optional int64 randomSeed = 3;
+  optional BattlePlayer player = 4;
+  optional BattleMonster monster = 5;
+  optional int32 isPlayerWin = 6;
+  optional int32 maxRound = 7;
+  optional double attackerDamageFactor = 8;
+  optional double defenderDamageFactor = 9;
+}
+
+message SCUFFactoryBuildPlay {
+  optional int64 guid = 1;
+}
+
+message SCUFMessage {
+  optional string msg = 1;
+}
+
+message CSUFPvpFightRecordReplayDebug {
+  optional string fightId = 1;
+  optional int64 recordId = 2;
+}
+
+message SCUFPvpFightRecordReplayDebug {
+  optional UFPvpFightDataDB record = 1;
+}
+
+message CSUFPveFightRecordReplayDebug {
+  optional string fightId = 1;
+  optional int64 recordId = 2;
+}
+
+message SCUFPveFightRecordReplayDebug {
+  optional UFPveFightDataDB record = 1;
+}
+
+message CSUFRefreshElementArray {
+  repeated int64 guid = 1;
+}
+
+message SCUFPlayerDiamondItemCost {
+  repeated BaseResource cost = 1;
+}
+
+message CSWarriorAwake {
+  optional string guid = 1;
+}
+
+message SCWarriorAwake {
+  optional Warrior newWarrior = 1;
+  repeated BaseResource cost = 2;
+}
+
+message CSAwakeFuse {
+  optional string guid = 1;
+  repeated BaseResource cost = 2;
+}
+
+message SCAwakeFuse {
+  optional Warrior newWarrior = 1;
+  repeated BaseResource cost = 2;
+}
+
+message CSAwakeCopyData {
+}
+
+message SCAwakeCopyData {
+  optional int32 lastNum = 1;
+  repeated AwakeCopyChapter copys = 2;
+  optional int32 isAutoSettled = 3;
+}
+
+message CSEnterAwakeCopy {
+  optional string copyId = 1;
+  repeated SimpleItem items = 2;
+}
+
+message SCEnterAwakeCopy {
+  repeated AwakeCopyBox boxes = 1;
+  repeated AwakeCopyMonster monsters = 2;
+  optional AwakeCopyRefreshData refreshData = 3;
+  repeated BaseResource rewards = 4;
+  optional int32 isOver = 5;
+}
+
+message CSAwakeCopyFightBegin {
+  optional string monGuid = 1;
+}
+
+message SCAwakeCopyFightBegin {
+  optional string fightId = 1;
+  optional int64 randomSeed = 2;
+  optional BattlePlayer battlePlayer = 3;
+  optional BattleMonster battleMonser = 4;
+  optional int32 maxRoundNum = 5;
+  optional string roomId = 6;
+}
+
+message CSAwakeCopyFightEnd {
+  optional int32 isWinClient = 1;
+  optional string fightId = 2;
+  optional BattleOperate optRecord = 3;
+}
+
+message SCAwakeCopyFightEnd {
+  optional int32 isWinServer = 1;
+  repeated BaseResource rewards = 2;
+  optional AwakeCopyRefreshData refreshData = 3;
+  optional AwakeCopyMonster fightMonster = 4;
+  optional int32 dropAngerBallNum = 5;
+  optional int32 dropFireBallNum = 6;
+  optional int32 angerBallAdditionExp = 7;
+  optional int32 fireBallAdditionCoin = 8;
+}
+
+message CSAwakeCopyOpenBox {
+  optional string boxGuid = 1;
+}
+
+message SCAwakeCopyOpenBox {
+  repeated BaseResource rewards = 1;
+  optional AwakeCopyRefreshData refreshData = 2;
+}
+
+message CSAwakeCopySettle {
+}
+
+message SCAwakeCopySettle {
+  repeated BaseResource boxRewards = 1;
+  repeated BaseResource ScoreRewards = 2;
+  optional int32 coinRewards = 3;
+  optional int32 exp = 4;
+  optional ResultObject totalRewards = 5;
+  optional int32 score = 6;
+}
+
+message CSAwakeUseItem {
+  optional string itemId = 1;
+}
+
+message SCAwakeUseItem {
+  optional string hpPercent = 1;
+  repeated SimpleItem items = 2;
+}
+
+message CSAwakeRevice {
+}
+
+message SCAwakeRevice {
+  optional AwakeCopyRefreshData refreshData = 1;
+}
+
+message CSFightRecord {
+  optional int32 index = 1;
+  optional int32 type = 2;
+  optional int32 round = 3;
+}
+
+message SCFightRecord {
+  repeated UFFightRecordInfo records = 1;
+  optional string appVersion = 2;
+  optional string resVersion = 3;
+  optional int32 totalIndex = 4;
+}
+
+message CSAwakeFightRecords {
+}
+
+message SCAwakeFightRecords {
+  repeated AwakeFightRecordItem item = 1;
+}
+
+message CSAwakeFightRecordReplay {
+  optional string fightId = 1;
+}
+
+message SCAwakeFightRecordReplay {
+  optional int32 isWin = 1;
+  optional string fightId = 2;
+  optional BattleOperate optRecord = 3;
+  optional BattlePlayer battlePlayer = 4;
+  optional BattleMonster battleMonser = 5;
+  optional int64 randomSeed = 6;
+  optional int32 maxRoundNum = 7;
+  optional string roomId = 8;
+  optional int32 dropAngerBallNum = 9;
+  optional int32 dropFireBallNum = 10;
+  optional int32 angerBallAdditionExp = 11;
+  optional int32 fireBallAdditionCoin = 12;
+}
+
+message CSFightRecordReplay {
+  optional int32 type = 1;
+  optional string fightId = 2;
+}
+
+message CSKFOpenFrightServerInfo {
+}
+
+message SCKFOpenFrightServerInfo {
+  optional int32 typeStage = 1;
+  optional int64 endTime = 2;
+  optional int64 currentTime = 3;
+  optional int32 isEnterCurStage = 4;
+  optional int32 isNeedPoped = 5;
+  optional int32 mateTime = 6;
+}
+
+message CSKFEnterFrightGame {
+}
+
+message SCKFEnterFrightGame {
+  optional int32 lastFightPower = 1;
+}
+
+message CSKFEnterGame {
+}
+
+message SCKFEnterGame {
+}
+
+message CSKFLogin {
+}
+
+message SCKFLogin {
+  optional int32 isEnter = 1;
+  optional int32 typeStage = 2;
+  optional int32 kfOrder = 3;
+  optional int32 lastFightPower = 4;
+}
+
+message CSKuafuFightRecord {
+  optional string fightId = 1;
+  optional int32 serverType = 2;
+}
+
+message SCKuafuFightRecord {
+  optional string fightId = 1;
+  optional int64 winPlayerId = 2;
+  repeated BattlePlayer playerList = 3;
+  optional int64 randomSeed = 4;
+  optional int32 maxRoundNum = 5;
+  optional string roomId = 6;
+  optional int32 changeScore = 7;
+}
+
+message CSKuafuMatchPlayer {
+}
+
+message SCKuafuMatchPlayer {
+  optional int32 state = 1;
+  optional string fightId = 2;
+  optional int64 winPlayerId = 3;
+  repeated BattlePlayer playerList = 4;
+  optional int64 randomSeed = 5;
+  optional int32 maxRoundNum = 6;
+  optional string roomId = 7;
+  optional int32 lastMatchNum = 8;
+  optional int32 changeScore = 9;
+}
+
+message CSKFGuess {
+  optional string frightId = 1;
+  optional OwnerPlayer ownerPlayer = 2;
+  optional GuessPlayer guessPlayer = 3;
+  optional int32 guessType = 4;
+  optional int32 battleType = 5;
+  optional string itemId = 6;
+}
+
+message SCKFGuess {
+  optional int32 guessType = 1;
+  optional int32 isSuccess = 2;
+}
+
+message CSKFLastSessionResult {
+}
+
+message SCKFLastSessionResult {
+  repeated SimplePlayerInfo playerList = 1;
+}
+
+message CSKFGuessList {
+}
+
+message SCKFGuessList {
+  repeated GuessPlayerInfo infoList = 1;
+  optional int64 guessPlayerId = 2;
+}
+
+message CSKFMatchFrightList {
+  optional string groupId = 1;
+  optional int32 replayFlag = 2;
+}
+
+message SCKFMatchFrightList {
+  optional KFMatchAllRandList kfMatchAllRandList = 1;
+  optional int64 endTime = 2;
+  optional int64 currentTime = 3;
+  optional int32 stageType = 4;
+}
+
+message CSBigTurnTableInfo {
+}
+
+message SCBigTurnTableInfo {
+  optional int64 boughtCoins = 1;
+  optional int64 diamondPool = 2;
+  repeated BigTurnRewardItem rewardItems = 3;
+  optional int32 isFree = 4;
+  optional int64 endTime = 5;
+  optional int64 nextFreeTime = 6;
+  optional int32 score = 7;
+  repeated string otherPlayerRewards = 8;
+  optional int64 rewardEndTime = 9;
+  optional int64 serverTime = 10;
+}
+
+message CSPlayBigTurn {
+  optional int32 count = 1;
+}
+
+message SCPlayBigTurn {
+  optional ResultObject rewards = 1;
+  repeated BaseResource cost = 2;
+  optional int32 rewardItemId = 3;
+  optional int32 isDiamondPool = 4;
+  optional int32 count = 5;
+  repeated string idNumStr = 6;
+}
+
+message CSKuaFuMatchResult {
+}
+
+message SCKuaFuMatchResult {
+  optional KuaFuMatchResult matchResult = 1;
+  optional int32 result = 2;
+}
+
+message CSBigTurnRank {
+}
+
+message SCBigTurnRank {
+  repeated BigTurnRankItem ranks = 1;
+}
+
+message CSBigTurnRecord {
+}
+
+message SCBigTurnRecord {
+  repeated string otherPlayerRewards = 1;
+}
+
+message CSBigTurnDesc {
+}
+
+message SCBigTurnDesc {
+  optional string descriStr = 1;
+  optional string topPrizeId = 2;
+  optional string advancePrizeId = 3;
+}
+
+message CSThrowLuckyBags {
+  optional int32 num = 1;
+  repeated PointNew posArray = 2;
+}
+
+message SCThrowLuckyBags {
+  repeated BaseResource costResource = 1;
+}
+
+message CSSnatchOneLuckyBag {
+  optional string guid = 1;
+}
+
+message SCSnatchOneLuckyBag {
+  optional ResultObject get = 1;
+  optional string throwPlayerName = 2;
+}
+
+message CSCurrentLuckyBagsInfo {
+}
+
+message SCCurrentLuckyBagsInfo {
+  repeated LuckyBag luckyBags = 1;
+  optional int64 throwPlayerId = 2;
+}
+
+message SCRemoveOneLuckyBag {
+  optional string guid = 1;
+}
+
+message SCSpecialEfficiency {
+  optional int32 index = 1;
+  optional int64 playerId = 2;
+}
+
+message CSCheckCondition {
+  optional int32 type = 1;
+  optional string content = 2;
+}
+
+message SCCheckCondition {
+  optional int32 result = 1;
+}
+
+message CSGetTaticalFormation {
+  optional string id = 1;
+}
+
+message SCGetTaticalFormation {
+  optional TaticalFormation formation = 1;
+}
+
+message CSTaticalFormationChange {
+  optional string id = 1;
+  optional string formation = 2;
+}
+
+message SCTaticalFormationChange {
+  optional TaticalFormation formation = 1;
+}
+
+message CSUseTaticalFormation {
+  optional string id = 1;
+}
+
+message SCUseTaticalFormation {
+  optional string id = 1;
+}
+
+message CSTaticalFormationList {
+}
+
+message SCTaticalFormationList {
+  repeated string unlockTacticalList = 1;
+  repeated int32 tacticalLevelList = 2;
+}
+
+message CSTaticalFormationLevelUp {
+  optional string tacticalId = 1;
+}
+
+message SCTaticalFormationLevelUp {
+  optional string tacticalId = 1;
+  optional int32 currLevel = 2;
+  repeated BaseResource cost = 3;
+}
+
+message CSTaticalFormationUnLock {
+  optional string tacticalId = 1;
+}
+
+message SCTaticalFormationUnLock {
+  optional string tacticalId = 1;
+  optional int32 currLevel = 2;
+  repeated BaseResource cost = 3;
+}
+
+message CSConsumeReturnReward {
+  optional string activityId = 1;
+}
+
+message CSMysticDiscount {
+  optional string activityId = 1;
+}
+
+message SCMysticDiscount {
+  optional double discount = 1;
+}
+
+message CSMysticDiscountInfo {
+}
+
+message SCMysticDiscountInfo {
+  optional string activityId = 1;
+  optional int64 startTime = 2;
+  optional int64 endTime = 3;
+  optional string msg = 4;
+}
+
+message CSBuyActivityShop {
+  optional int32 index = 1;
+  optional string activityId = 2;
+  optional int32 num = 3;
+  repeated BaseResource costResources = 4;
+  repeated BaseResource getResources = 5;
+}
+
+message CSPetEquipStrengthOne {
+  optional string petGuid = 1;
+  optional string equipId = 2;
+  optional int32 num = 3;
+}
+
+message SCPetEquipStrengthOne {
+  optional PetEquip petEquip = 1;
+  repeated BaseResource cost = 2;
+}
+
+message CSPetEquipStrengthAll {
+  optional string petGuid = 1;
+}
+
+message SCPetEquipStrengthAll {
+  repeated PetEquip petEquip = 1;
+  repeated BaseResource cost = 2;
+}
+
+message CSPetEquipAdvance {
+  optional string petGuid = 1;
+  optional string equipId = 2;
+}
+
+message SCPetEquipAdvance {
+  optional PetEquip petEquip = 1;
+  repeated BaseResource cost = 2;
+}
+
+message CSPetEquipAwake {
+  optional string petGuid = 1;
+  optional string equipId = 2;
+}
+
+message SCPetEquipAwake {
+  optional PetEquip petEquip = 1;
+  repeated BaseResource cost = 2;
+}
+
+message CSGetPetEquipInfo {
+  repeated string petGuid = 1;
+}
+
+message SCGetPetEquipInfo {
+  repeated PetEquip petEquip = 1;
+}
+
+message CSUpRoleSkillRefineLevel {
+  required string roleGuid = 1;
+  required int32 type = 2;
+}
+
+message SCUpRoleSkillRefineLevel {
+  repeated SkillRefine skillRefine = 1;
+  repeated BaseResource cost = 2;
+}
+
+message CSStrengthRoleSkillRefineLevel {
+  required string roleGuid = 1;
+  required int32 type = 2;
+}
+
+message SCStrengthRoleSkillRefineLevel {
+  repeated SkillRefine skillRefine = 1;
+  repeated BaseResource cost = 2;
+}
+
+message CSGetGrabData {
+}
+
+message SCGetGrabData {
+  repeated GrabPositionModel grabData = 1;
+  optional int32 grabTimes = 2;
+  optional int32 lastCount = 3;
+}
+
+message CSGrab {
+  optional int32 index = 1;
+}
+
+message SCGrab {
+  optional GrabPositionModel grabData = 1;
+  optional int32 currEnergy = 2;
+  optional int32 grabTimes = 3;
+  optional int64 randSeed = 4;
+  optional int64 winPlayerId = 5;
+  optional int32 maxRoundNum = 6;
+  optional BattlePlayer attPlayer = 7;
+  optional BattlePlayer defPlayer = 8;
+  optional string fightId = 9;
+}
+
+message CSBuyGrab {
+  optional int32 count = 1;
+}
+
+message SCBuyGrab {
+  optional int32 lastCount = 1;
+  repeated BaseResource cost = 2;
+  optional int32 currCount = 3;
+}
+
+message CSGiveUpGrab {
+  optional int32 index = 1;
+}
+
+message SCGiveUpGrab {
+  optional GrabPositionModel grabData = 1;
+}
+
+message CSGetTimeRewardInfo {
+}
+
+message SCGetTimeRewardInfo {
+  repeated int32 rewardTime = 1;
+  optional int32 myGrabMinutes = 2;
+}
+
+message CSGetTimeReward {
+  optional int32 time = 1;
+}
+
+message SCGetTimeReward {
+  optional int32 time = 1;
+  optional ResultObject add = 2;
+}
+
+message CSGetRandReward {
+}
+
+message SCGetRandReward {
+  optional ResultObject add = 1;
+}
+
+message CSLimitPvpFindMatch {
+}
+
+message SCLimitPvpFindMatch {
+  optional LimitPvpRankPlayerInfo myrank = 1;
+  repeated LimitPvpRankPlayerInfo rankList = 2;
+  optional int32 fightTimes = 4;
+  optional int32 allTimes = 5;
+  optional int32 firstRewardScore = 6;
+}
+
+message CSLimitPvpFightResult {
+  optional int64 playerId = 1;
+  optional int32 serverId = 2;
+}
+
+message SCLimitPvpFightResult {
+  optional string fightId = 1;
+  optional string roomId = 2;
+  optional int64 randSeed = 3;
+  repeated BattlePlayer playerList = 4;
+  optional int64 winPlayerId = 5;
+  optional LimitPvpRankPlayerInfo myrank = 6;
+  optional int32 intergral = 7;
+  optional int32 maxRoundNum = 8;
+}
+
+message CSLimitPvpRank {
+}
+
+message SCLimitPvpRank {
+  optional LimitPvpRankPlayerInfo myrank = 1;
+  repeated LimitPvpRankPlayerInfo rankList = 2;
+}
+
+message CSLimitPvpRewardInfo {
+}
+
+message SCLimitPvpRewardInfo {
+  optional int32 myRank = 1;
+  repeated LimitPvpRewardItem items = 2;
+}
+
+message CSGetLimitPvpRewardInfo {
+  optional string itemId = 1;
+}
+
+message SCGetLimitPvpRewardInfo {
+  optional ResultObject get = 1;
+}
+
+message CSRewardLimitSignList {
+}
+
+message SCRewardLimitSignList {
+  optional LimitDaySignData limitDaySignDatas = 1;
+}
+
+message CSReceiveLimitMonthSign {
+}
+
+message SCReceiveLimitMonthSign {
+  optional ResultObject get = 1;
+}
+
+message CSBuyLimitPvpTimes {
+  optional int32 num = 1;
+}
+
+message SCBuyLimitPvpTimes {
+  repeated BaseResource cost = 1;
+  optional int32 fightTimes = 2;
+  optional int32 allTimes = 3;
+}

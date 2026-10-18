@@ -1,0 +1,6 @@
+CREATE TABLE IF NOT EXISTS p8_life_states (
+  player_id BIGINT NOT NULL PRIMARY KEY, food_ready_at BIGINT NOT NULL, safe_recovery_at BIGINT NOT NULL,
+  in_safe BOOLEAN NOT NULL, death_at BIGINT NOT NULL, invincible_until BIGINT NOT NULL,
+  last_fight_id VARCHAR(64) NOT NULL, shortcut1 VARCHAR(64) NOT NULL DEFAULT '',
+  shortcut2 VARCHAR(64) NOT NULL DEFAULT '', source LONGTEXT NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

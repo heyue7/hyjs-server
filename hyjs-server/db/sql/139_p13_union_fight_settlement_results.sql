@@ -1,0 +1,18 @@
+CREATE TABLE IF NOT EXISTS `p13_union_fight_settlement_results` (
+  `win_task_prestige` INT NOT NULL DEFAULT 0,
+  `lose_task_prestige` INT NOT NULL DEFAULT 0,
+  `match_id` CHAR(64) NOT NULL,
+  `winner_guild_id` CHAR(64) NOT NULL,
+  `loser_guild_id` CHAR(64) NOT NULL,
+  `left_power` BIGINT NOT NULL,
+  `right_power` BIGINT NOT NULL,
+  `end_at` BIGINT NOT NULL,
+  `settled_at` BIGINT NOT NULL,
+  `award_at` BIGINT NOT NULL,
+  `delivered_at` BIGINT NOT NULL DEFAULT 0,
+  `offer_hash` CHAR(64) NOT NULL,
+  `awards` LONGBLOB NOT NULL,
+  `mvp` BLOB NULL,
+  `source` TEXT NOT NULL,
+  PRIMARY KEY (`match_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

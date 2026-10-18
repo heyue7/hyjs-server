@@ -1,0 +1,57 @@
+ID	饰品ID	饰品精炼等级	名字	描述	talentID	属性加成
+id	treaId	refineLevel	name	describe	buffId	bonus
+string	string	int	string	string	string	string
+primary	index	index	none	none	none	none
+id	treaId	refineLevel	name	describe	talentId	bonus
+1	trea_015	5	treasure_skill_name_1	treasure_skill_desc_1		att,730
+2	trea_015	8	treasure_skill_name_2	treasure_skill_desc_2		att,730
+3	trea_015	10	treasure_skill_name_3	treasure_skill_desc_3		att,730
+4	trea_015	12	treasure_skill_name_4	treasure_skill_desc_4		att,730
+5	trea_015	14	treasure_skill_name_5	treasure_skill_desc_5		att,730
+6	trea_015	16	treasure_skill_name_6	treasure_skill_desc_6		att,730
+7	trea_015	18	treasure_skill_name_7	treasure_skill_desc_7		att,730
+8	trea_015	20	treasure_skill_name_8	treasure_skill_desc_8		att,730
+9	trea_016	5	treasure_skill_name_9	treasure_skill_desc_9		att,730
+10	trea_016	8	treasure_skill_name_10	treasure_skill_desc_10		att,730
+11	trea_016	10	treasure_skill_name_11	treasure_skill_desc_11		att,730
+12	trea_016	12	treasure_skill_name_12	treasure_skill_desc_12		att,730
+13	trea_016	14	treasure_skill_name_13	treasure_skill_desc_13		att,730
+14	trea_016	16	treasure_skill_name_14	treasure_skill_desc_14		att,730
+15	trea_016	18	treasure_skill_name_15	treasure_skill_desc_15		att,730
+16	trea_016	20	treasure_skill_name_16	treasure_skill_desc_16		att,730
+17	trea_017	5	treasure_skill_name_17	treasure_skill_desc_17		hp,14600
+18	trea_017	8	treasure_skill_name_18	treasure_skill_desc_18		hp,14600
+19	trea_017	10	treasure_skill_name_19	treasure_skill_desc_19		hp,14600
+20	trea_017	12	treasure_skill_name_20	treasure_skill_desc_20		hp,14600
+21	trea_017	14	treasure_skill_name_21	treasure_skill_desc_21		hp,14600
+22	trea_017	16	treasure_skill_name_22	treasure_skill_desc_22		hp,14600
+23	trea_017	18	treasure_skill_name_23	treasure_skill_desc_23		hp,14600
+24	trea_017	20	treasure_skill_name_24	treasure_skill_desc_24		hp,14600
+25	trea_018	5	treasure_skill_name_25	treasure_skill_desc_25		hp,14600
+26	trea_018	8	treasure_skill_name_26	treasure_skill_desc_26		hp,14600
+27	trea_018	10	treasure_skill_name_27	treasure_skill_desc_27		hp,14600
+28	trea_018	12	treasure_skill_name_28	treasure_skill_desc_28		hp,14600
+29	trea_018	14	treasure_skill_name_29	treasure_skill_desc_29		hp,14600
+30	trea_018	16	treasure_skill_name_30	treasure_skill_desc_30		hp,14600
+31	trea_018	18	treasure_skill_name_31	treasure_skill_desc_31		hp,14600
+32	trea_018	20	treasure_skill_name_32	treasure_skill_desc_32		hp,14600
+33	trea_015	22	treasure_skill_name_33	treasure_skill_desc_33		att,730
+34	trea_015	25	treasure_skill_name_34	treasure_skill_desc_34		att,730
+35	trea_015	27	treasure_skill_name_41	treasure_skill_desc_41		att,730
+36	trea_015	29	treasure_skill_name_42	treasure_skill_desc_42		att,730
+37	trea_015	30	treasure_skill_name_43	treasure_skill_desc_43		att,730
+38	trea_016	22	treasure_skill_name_35	treasure_skill_desc_35		att,730
+39	trea_016	25	treasure_skill_name_36	treasure_skill_desc_36		att,730
+40	trea_016	27	treasure_skill_name_44	treasure_skill_desc_44		att,730
+41	trea_016	29	treasure_skill_name_45	treasure_skill_desc_45		att,730
+42	trea_016	30	treasure_skill_name_46	treasure_skill_desc_46		att,730
+43	trea_017	22	treasure_skill_name_37	treasure_skill_desc_37		hp,14600
+44	trea_017	25	treasure_skill_name_38	treasure_skill_desc_38		hp,14600
+45	trea_017	27	treasure_skill_name_47	treasure_skill_desc_47		hp,14600
+46	trea_017	29	treasure_skill_name_48	treasure_skill_desc_48		hp,14600
+47	trea_017	30	treasure_skill_name_49	treasure_skill_desc_49		hp,14600
+48	trea_018	22	treasure_skill_name_39	treasure_skill_desc_39		hp,14600
+49	trea_018	25	treasure_skill_name_40	treasure_skill_desc_40		hp,14600
+50	trea_018	27	treasure_skill_name_50	treasure_skill_desc_50		hp,14600
+51	trea_018	29	treasure_skill_name_51	treasure_skill_desc_51		hp,14600
+52	trea_018	30	treasure_skill_name_52	treasure_skill_desc_52		hp,14600

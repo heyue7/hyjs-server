@@ -1,0 +1,2 @@
+-- 有限远征冻结原时长/耐力/经验与明确本地常规奖，默认关闭，派遣与领奖沿角色行锁。
+CREATE TABLE IF NOT EXISTS p7_expedition_missions (serial VARBINARY(64) NOT NULL,player_id BIGINT NOT NULL,mission_id VARCHAR(64) NOT NULL,main_hero_id VARCHAR(64) NOT NULL,state INT NOT NULL,start_at BIGINT NOT NULL,end_at BIGINT NOT NULL,quote LONGBLOB NOT NULL,quote_hash CHAR(64) NOT NULL,heroes LONGBLOB,result LONGBLOB,PRIMARY KEY(serial),KEY(player_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

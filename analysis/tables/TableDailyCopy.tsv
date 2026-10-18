@@ -1,0 +1,21 @@
+类型	开启时间	消耗体力	每日次数	名字		
+Type	OpenDay	Stamina	Count	Name	LogoBlack	LogoChosed
+string	string	int	int	string	string	string
+primary	none	none	none	none	none	none
+Type	OpenDay	Stamina	Count			
+HeroExp	1,3,5,7	10	1	ACName_HeroExp	UI_item_tab_30_a	UI_item_tab_30_b
+TreasureExp	2,4,6,7	10	1	ACName_TreasureExp	UI_item_tab_21_a	UI_item_tab_21_b
+Coin	1,3,5,7	20	1	ACName_Coin	UI_item_13	UI_item_tab_26_b
+EquipRefineExp	2,4,6,7	20	1	ACName_EquipRefineExp	UI_item_tab_22_a	UI_item_tab_22_b
+Advance	1,3,5,7	30	1	ACName_Advance	UI_item_tab_31_a	UI_item_tab_31_b
+TreasureRefineExp	2,4,6,7	30	1	ACName_TreasureRefineExp	UI_item_tab_21_a	UI_item_tab_21_b
+PetFlower	1,3,5,7	30	1	ACName_PetFlower	UI_item_tab_alo_a	UI_item_tab_alo_b
+PetBreak	2,4,6,7	30	1	ACName_PetBreak	UI_item_tab_alo_a	UI_item_tab_alo_b
+PetFood_light	1,6	30	1	ACName_PetFood_light	UI_item_tab_alo_a	UI_item_tab_alo_b
+PetFood_dark	2,6	30	1	ACName_PetFood_dark	UI_item_tab_alo_a	UI_item_tab_alo_b
+PetFood_wind	3,6	30	1	ACName_PetFood_wind	UI_item_tab_alo_a	UI_item_tab_alo_b
+PetFood_fire	4,6	30	1	ACName_PetFood_fire	UI_item_tab_alo_a	UI_item_tab_alo_b
+PetFood_water	5,6	30	1	ACName_PetFood_water	UI_item_tab_alo_a	UI_item_tab_alo_b
+GreatTrea	2,4,6,7	100	3	ACName_GreatTrea	UI_item_tab_21_a	UI_item_tab_21_b
+PetEquip	1,3,5,7	30	3	ACName_PetEquip	UI_item_tab_alo_a	UI_item_tab_alo_b
+Theatric	1,3,5,7	30	3	ACName_Theatric	UI_item_tab_alo_a	UI_item_tab_alo_b

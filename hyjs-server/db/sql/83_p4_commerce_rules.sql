@@ -1,0 +1,2 @@
+-- P4 本地兼容规则，实例冻结、交易与回执在同一事务。
+CREATE TABLE IF NOT EXISTS p4_commerce_rules (id VARBINARY(64) NOT NULL,shop_type INT NOT NULL,kind VARBINARY(32) NOT NULL,enabled BOOLEAN NOT NULL,start_at BIGINT NOT NULL,end_at BIGINT NOT NULL,claim_end_at BIGINT NOT NULL,rules LONGBLOB NOT NULL,frozen LONGBLOB,source TEXT NOT NULL,PRIMARY KEY(id),KEY(shop_type)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

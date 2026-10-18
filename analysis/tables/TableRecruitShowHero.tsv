@@ -1,0 +1,26 @@
+id	属于的招募ID	英雄Id	阵营（0：攻击方 1：防守方）	站位	等级	攻击	物防	魔防	血量	命中率	闪避率	暴击率	抗暴率	暴击系数	伤害加成	伤害减免	技能1	技能2	大招	天赋0	天赋1	天赋2	天赋3	天赋4	天赋5
+id	recruitSpace	HeroId	Camp	Position	Level	Attack	PhyDefend	MagicDefend	Hp	hit	dodge	cri	antiCri	criFactor	damageAdd	damageReduce	SkillId1	SkillId2	UltSkillId	Talent0	Talent1	Talent2	Talent3	Talent4	Talent5
+string	int	string	int	int	int	int	int	int	int	double	double	double	double	double	double	double	string	string	string	string	string	string	string	string	string
+primary	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none
+id	recruitSpace	HeroId	Camp	Position	Level	Attack	PhyDefend	MagicDefend	Hp	hit	dodge	cri	antiCri	criFactor	damageAdd	damageReduce	SkillId1	SkillId2	UltSkillId	Talent0	Talent1	Talent2	Talent3	Talent4	Talent5
+1	1	hero_001	0	13	100	180000	50000	50000	1000000	100.0	0.0	0.0	0.0	0.0	0.0	0.0	001_1	001_2	001_3						
+2	1	hero_002	0	9	100	180000	50000	50000	1000000	100.0	0.0	0.0	0.0	0.0	0.0	0.0	002_1	002_2	002_3						
+3	1	hero_065	0	7	100	180000	50000	50000	1000000	100.0	0.0	0.0	0.0	0.0	0.0	0.0	065_1	065_2	065_3						
+4	1	monster_001	1	3	100	90000	500	500	500000	100.0	0.0	0.0	0.0	0.0	0.0	0.0	1001_1			tal_1027					
+5	1	monster_001	1	7	100	90000	400	500	500000	100.0	0.0	0.0	0.0	0.0	0.0	0.0	1001_1			tal_1027					
+6	1	monster_001	1	9	100	90000	400	500	500000	100.0	0.0	0.0	0.0	0.0	0.0	0.0	1001_1			tal_1027					
+7	1	monster_057	1	13	100	90000	500	500	500000	100.0	0.0	0.0	0.0	0.0	0.0	0.0	1057_1	1057_2_1	1057_3						
+8	2	hero_003	0	13	100	180000	50000	50000	1000000	100.0	0.0	0.0	0.0	0.0	0.0	0.0	003_1	003_2	003_3						
+9	2	hero_004	0	9	100	180000	50000	50000	1000000	100.0	0.0	0.0	0.0	0.0	0.0	0.0	004_1	004_2	004_3						
+10	2	hero_066	0	7	100	180000	50000	50000	1000000	100.0	0.0	0.0	0.0	0.0	0.0	0.0	066_1	066_2	066_3						
+11	2	monster_025	1	3	100	90000	500	500	500000	100.0	0.0	0.0	0.0	0.0	0.0	0.0	1025_1								
+12	2	monster_025	1	7	100	90000	400	500	500000	100.0	0.0	0.0	0.0	0.0	0.0	0.0	1025_1								
+13	2	monster_025	1	9	100	90000	400	500	500000	100.0	0.0	0.0	0.0	0.0	0.0	0.0	1025_1								
+14	2	hero_013	1	13	100	90000	500	500	500000	100.0	0.0	0.0	0.0	0.0	0.0	0.0	013_1	013_2	013_3						
+15	3	hero_005	0	13	100	180000	50000	50000	1000000	100.0	0.0	0.0	0.0	0.0	0.0	0.0	005_1	005_2	005_3						
+16	3	hero_006	0	9	100	180000	50000	50000	1000000	100.0	0.0	0.0	0.0	0.0	0.0	0.0	006_1	006_2	006_3						
+17	3	hero_067	0	7	100	180000	50000	50000	1000000	100.0	0.0	0.0	0.0	0.0	0.0	0.0	067_1	067_2	067_3						
+18	3	hero_030	1	3	100	90000	500	500	500000	100.0	0.0	0.0	0.0	0.0	0.0	0.0	030_1	030_2	030_3						
+19	3	hero_018	1	7	100	90000	400	500	500000	100.0	0.0	0.0	0.0	0.0	0.0	0.0	018_1	018_2	018_3						
+20	3	hero_027	1	9	100	90000	400	500	500000	100.0	0.0	0.0	0.0	0.0	0.0	0.0	027_1	027_2	027_3						
+21	3	hero_017	1	13	100	90000	500	500	500000	100.0	0.0	0.0	0.0	0.0	0.0	0.0	017_1	017_2	017_3						

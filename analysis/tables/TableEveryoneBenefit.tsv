@@ -1,0 +1,17 @@
+参与人数	奖励
+count	reward
+int	string
+primary	none
+count	reward
+10	hero_exp_004,1
+30	coin,100000
+50	coin,200000
+100	item_001,10
+200	item_010,100
+300	item_012,100
+500	item_006,100
+1000	equip_034,1
+1500	diamond,1500
+2000	diamond,2000
+3000	diamond,3000
+5000	diamond,5000

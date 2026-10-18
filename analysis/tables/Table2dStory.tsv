@@ -1,0 +1,9 @@
+剧情ID	剧情资源名	剧情持续时间（秒）	剧情背景音乐	剧情音效	剧情字幕
+Story2dId	StoryResourceName	StoryDuration	StoryMusic	StorySound	StorySubtitle
+string	string	double	string	string	string
+primary	none	none	none	none	none
+StoryId	StoryResourceName	StoryDuration	StoryMusic	StoryMusic	StorySubtitle
+story2d_1	story2d_1	13.5	BGM_MAIN_THEME		
+story2d_2	story2d_2	10.0			
+story2d_3	story2d_3	10.0			
+story2d_4	story2d_4	10.0			

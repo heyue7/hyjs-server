@@ -1,0 +1,1 @@
+INSERT IGNORE INTO p14_final_result_policies(id,enabled,version,source,published_at,scope_proof) VALUES(1,0,'','local-signed-canonical-KF-terminal-v1; only-source0-realm; real-joint-winner; independently-certified-terminal; peer-series-only-no-foreign-P6-owner',0,'9f5790abc2a1a51e69225c11c4e8bc70be028d60e468f20ce94f0acf9b899b35');

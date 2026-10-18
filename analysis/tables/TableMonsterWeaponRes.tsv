@@ -1,0 +1,91 @@
+英雄id	模型名称0（左手）	模型名称1（右手）
+heroId	modelRes0	modelRes1
+string	string	string
+primary	none	none
+heroId	modelRes0	modelRes1
+monster_001		w25_001_n
+monster_002	w03_016_n	w01_032_n
+monster_003		
+monster_004		
+monster_005		
+monster_006		
+monster_007		w01_034_n
+monster_008		
+monster_009		
+monster_010		
+monster_011		
+monster_012		
+monster_013	w03_021_n	w28_008_n
+monster_014		
+monster_015		
+monster_016	w03_029_n	w14_001_n
+monster_017		w01_040_n
+monster_018		w25_002_n
+monster_019		
+monster_020		w09_012_n
+monster_021		
+monster_022		
+monster_023		
+monster_024		
+monster_025		
+monster_026		w06_003_n
+monster_027		w15_003_n
+monster_028		w16_009_n
+monster_029		w16_005_n
+monster_030		w16_009_n
+monster_031		w21_002_n
+monster_032		w16_010_n
+monster_033		w03_031_n
+monster_034		
+monster_035		
+monster_036		
+monster_037		
+monster_038		
+monster_039		
+monster_040		w29_001_n
+monster_041		
+monster_042		
+monster_043		
+monster_044		w27_003_n
+monster_045		w14_011_n
+monster_046		
+monster_047	w12_009_n	w12_009_n
+monster_048		
+monster_049		
+monster_050		
+monster_051		w10_015_n
+monster_052		
+monster_053		
+monster_054		
+monster_055		
+monster_056		w27_002_n
+monster_057	w03_017_n	w27_001_n
+monster_058		
+monster_059		w09_013_n
+monster_060		w12_008_n
+monster_061		
+monster_062		
+monster_063		
+monster_064		
+monster_065		w13_007_n
+monster_066	w03_030_n	w12_007_n
+monster_067	w03_027_n	w01_037_n
+monster_068		w28_009_n
+monster_069		w01_041_n
+monster_070		w02_020_n
+hero_017		w15_001_n
+hero_019		w02_013_n
+hero_022		w14_003_n
+hero_024	w28_001_n	
+hero_027		w16_002_n
+hero_028		w21_002_n
+hero_040	w03_011_n	w14_010_n
+guard01_npc	w03_008_n	w14_001_n
+guard02_npc		w14_001_n
+mercenary01_npc	w03_008_n	w02_020_n
+mercenary02_npc	w03_008_n	w02_020_n
+mercenary03_npc		w10_009_n
+mercenary04_npc		w09_004_n
+mercenary05_npc		w14_001_n
+mercenary06_npc	w01_012_n	w01_013_n
+clerk02_npc		w01_004_n

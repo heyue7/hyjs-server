@@ -1,0 +1,1 @@
+CREATE TABLE IF NOT EXISTS p10_scene_presence (player_id BIGINT PRIMARY KEY, scene VARCHAR(64) NOT NULL, line INT NOT NULL, session_hash CHAR(64) NOT NULL, frame LONGBLOB NOT NULL, updated_at BIGINT NOT NULL, INDEX(scene),INDEX(line)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;

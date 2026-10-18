@@ -1,0 +1,25 @@
+ID	装备类型	资质	攻击成长	暴击率成长（万分比）	法防成长	闪避成长（万分比）	生命成长	命中率成长（万分比）	物防成长	抗暴击成长（万分比）
+id	type	quality	attGrow	criGrow	mdefGrow	perevadeGrow	hpGrow	perhitGrow	pdefGrow	anticriGrow
+string	int	int	double	double	double	double	double	double	double	double
+primary	index	index	none	none	none	none	none	none	none	none
+id	type	quality	attGrow	criGrow	mdefGrow	perevadeGrow	hpGrow	perhitGrow	pdefGrow	anticriGrow
+1	1	12	7.5	1.0						
+2	2	12			4.0	0.8				
+3	3	12					160.0	0.8		
+4	4	12							4.0	1.0
+5	1	13	13.0	1.0						
+6	2	13			8.0	0.8				
+7	3	13					320.0	0.8		
+8	4	13							8.0	1.0
+9	1	18	16.5	1.0						
+10	2	18			10.0	0.8				
+11	3	18					400.0	0.8		
+12	4	18							10.0	1.0
+13	1	20	23.0	1.0						
+14	2	20			14.0	0.8				
+15	3	20					560.0	0.8		
+16	4	20							14.0	1.0
+17	1	23	26.0	1.0						
+18	2	23			16.0	0.8				
+19	3	23					640.0	0.8		
+20	4	23							16.0	1.0

@@ -1,0 +1,4 @@
+CREATE TABLE IF NOT EXISTS daily_task_box_rules (
+ id VARCHAR(64) NOT NULL PRIMARY KEY, start_level INT NOT NULL, end_level INT NOT NULL,
+ score INT NOT NULL, reward TEXT NOT NULL, enabled BOOLEAN NOT NULL, source TEXT NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

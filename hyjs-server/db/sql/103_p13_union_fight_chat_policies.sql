@@ -1,0 +1,7 @@
+CREATE TABLE IF NOT EXISTS p13_union_fight_chat_policies (
+ id BIGINT PRIMARY KEY,
+ text_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+ talk_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+ talk_cooldown_millis BIGINT NOT NULL DEFAULT 20000,
+ source TEXT NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

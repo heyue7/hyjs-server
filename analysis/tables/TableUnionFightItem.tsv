@@ -1,0 +1,15 @@
+UFItemId	道具名	道具类型 0：普通道具 1：钻石道具	道具使用选取规则 0:玩家自己  1：最近的车辆 2：最近的城门 3：全体玩家 4：距离内的玩家	道具效果	道具使用条件	携带最大数量	物品描述	对应背包道具ID	物品Icon
+UFItemId	ItemName	ItemType	ItemSelector	ItemEffect	ItemUseCondition	ItemCatchMaxNum	itemInfo	MainItemId	Icon
+string	string	int	string	string	string	int	string	string	string
+primary	none	none	none	none	none	none	none	none	none
+UFItemId	itemName	itemType	itemSelector	itemEffect	itemUseCondition	itemCatchMaxNum		mainItemId	
+ufitem_011	name_ufitem_011	1	0	buff,uf_buff_001	0	5	desc_ufitem_011	item_302	item_icon_302
+ufitem_012	name_ufitem_012	1	0	buff,uf_buff_007	0	5	desc_ufitem_012	item_303	item_icon_303
+ufitem_013	name_ufitem_013	1	0	buff,uf_buff_009	2	5	desc_ufitem_013	item_308	item_icon_308
+ufitem_014	name_ufitem_014	1	0	totem,1	2	5	desc_ufitem_014	item_309	item_icon_309
+ufitem_015	name_ufitem_015	1	4,0,3	buff,uf_buff_008	1	5	desc_ufitem_015	item_310	item_icon_310
+ufitem_016	name_ufitem_016	0	0	buff,uf_buff_015	0	5	desc_ufitem_016		item_icon_301
+ufitem_017	name_ufitem_017	0	1,1,5	buff,uf_buff_013	0	5	desc_ufitem_017		item_icon_304
+ufitem_018	name_ufitem_018	0	1,1,5	buff,uf_buff_014	0	5	desc_ufitem_018		item_icon_305
+ufitem_019	name_ufitem_019	0	2,0,5	buff,uf_buff_005	0	5	desc_ufitem_019		item_icon_306
+ufitem_020	name_ufitem_020	0	2,1,5	buff,uf_buff_004	0	5	desc_ufitem_020		item_icon_307

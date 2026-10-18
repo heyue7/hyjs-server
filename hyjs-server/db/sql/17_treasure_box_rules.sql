@@ -1,0 +1,7 @@
+CREATE TABLE IF NOT EXISTS treasure_box_rules (
+ item_id VARCHAR(64) PRIMARY KEY,
+ enabled BOOLEAN NOT NULL,
+ mode VARCHAR(64) NOT NULL,
+ max_batch INTEGER NOT NULL,
+ source VARCHAR(255) NOT NULL
+);

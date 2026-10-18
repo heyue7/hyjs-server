@@ -1,0 +1,889 @@
+BuffId	BuffGroup	buff回合延迟	buff类型	是否为减益buff	相同group的buff只留值最大的	能否被清除	持续时间	持续回合	回合间隔	同个人身上可以累加的总个数	攻击生效次数	防御生效次数	Buff因子	Buff因子参数1	Buff因子参数2	Buff因子参数3	Buff因子参数4	上BUFF特效	上BUFF特效绑定骨骼	BUFF ICON	下BUFF特效	下BUFF特效绑定骨骼	BUFF目标输出特效	BUFF目标输出特效绑定骨骼	BUFF被击特效	BUFF被击特效绑定骨骼	BUFF持续特效	BUFF持续特效绑定骨骼
+Id	Group	Name	BuffClass	IsDebuff	ShouldCover	CanBeCleared	TotalTime	TotalRound	SpaceRound	TotalCount	AttCount	DefCount	Factor	Args1	Args2	Args3	Param	EffectOn	EffectOnBone	BuffIconName	EffectOff	EffectOffBone	EffectExport	EffectExportBone	HitEffect	HitEffectBone	LastEffect	LastEffectBone
+string	string	string	int	int	int	int	double	int	int	int	int	int	string	double	double	double	string	string	string	string	string	string	string	string	string	string	string	string
+primary	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none
+id	group	name	buffClass	isDebuff	shouldCover	canBeCleared	totalTime	totalRound	spaceRound	totalCount	attCount	defCount	factor	args1	args2	args3	param	effectOn	effectOnBone	buffIconName	effectOff	effectBone	effectExport	effectExportBone	HitEffect	HitEffectBone	LastEffect	LastEffectBone
+buff_mstone		炎魔石Buff时间延迟	5										delayCreateBuffs	2.0			buff_mstone1											
+buff_delay		Buff回合延迟	5										delayCreateBuffs		1.0		buff_mstone1,buff_mstone2											
+buff_mstone1		炎魔石加成1	0			1		1					peratt	5.0						buff_icon_gongjitisheng								
+buff_mstone2		炎魔石加成2	0			1		2					perdef	5.0						buff_icon_fangyutisheng								
+test_buff_4		测试4	3	1		1							clearBuff															
+test_buff_5		测试5	3			1					2		clearDebuff															
+test_buff_6		测试6	4	1		1							randomBuff				buff_2,buff_3,buff_4											
+buff_1		加攻击	0										att	50.0														
+buff_2		加攻击	0										att	300.0														
+buff_3		加攻击	0										att	525.0														
+buff_4		加攻击	0										att	750.0														
+buff_5		加攻击	0										att	1000.0														
+buff_6		加攻击	0										att	1250.0														
+buff_7		加攻击	0										att	1600.0														
+buff_8		加生命	0										hp	500.0														
+buff_9		加生命	0										hp	8400.0														
+buff_10		加生命	0										hp	13000.0														
+buff_11		加生命	0										hp	20000.0														
+buff_12		加生命	0										hp	26000.0														
+buff_13		加生命	0										hp	38000.0														
+buff_14		加防御	0										def	230.0														
+buff_15		加防御	0										def	430.0														
+buff_16		加防御	0										def	530.0														
+buff_17		加抗暴率	0										antiCri	10.0														
+buff_18		加抗暴率	0										antiCri	17.0														
+buff_19		加抗暴率	0										antiCri	20.0														
+buff_20		加抗暴率	0										antiCri	26.0														
+buff_21		加命中率	0										hit	10.0														
+buff_22		加命中率	0										hit	11.0														
+buff_23		加命中率	0										hit	13.0														
+buff_24		加命中率	0										hit	17.0														
+buff_25		加命中率	0										hit	20.0														
+buff_26		加闪避率	0										dodge	10.0														
+buff_27		加闪避率	0										dodge	11.0														
+buff_28		加闪避率	0										dodge	13.0														
+buff_29		加闪避率	0										dodge	17.0														
+buff_30		加闪避率	0										dodge	20.0														
+buff_31		加暴击率	0										cri	10.0														
+buff_32		加暴击率	0										cri	13.0														
+buff_33		加暴击率	0										cri	17.0														
+buff_34		加暴击率	0										cri	20.0														
+buff_35		加暴击率	0										cri	23.0														
+buff_36		增加伤害%	0										damageAdd	12.0														
+buff_37		增加伤害%	0										damageAdd	16.0														
+buff_38		增加伤害%	0										damageAdd	18.0														
+buff_39		增加伤害%	0										damageAdd	20.0														
+buff_40		增加伤害%	0										damageAdd	26.0														
+buff_41		增加伤害%	0										damageAdd	33.0														
+buff_42		增加伤害%	0										damageAdd	40.0														
+buff_43		增加防御%	0										perdef	14.0														
+buff_44		增加防御%	0										perdef	20.0														
+buff_45		增加防御%	0										perdef	25.0														
+buff_46		增加防御%	0										perdef	32.0														
+buff_47		增加防御%	0										perdef	40.0														
+buff_48		增加防御%	0										perdef	48.0														
+buff_49		增加攻击%	0										peratt	10.0														
+buff_50		增加攻击%	0										peratt	11.0														
+buff_51		增加攻击%	0										peratt	12.0														
+buff_52		增加攻击%	0										peratt	14.0														
+buff_53		增加攻击%	0										peratt	17.0														
+buff_54		增加攻击%	0										peratt	19.0														
+buff_55		增加攻击%	0										peratt	22.0														
+buff_56		伤害减免%	0										damageReduce	12.0														
+buff_57		伤害减免%	0										damageReduce	16.0														
+buff_58		伤害减免%	0										damageReduce	18.0														
+buff_59		伤害减免%	0										damageReduce	20.0														
+buff_60		伤害减免%	0										damageReduce	26.0														
+buff_61		伤害减免%	0										damageReduce	33.0														
+buff_62		伤害减免%	0										damageReduce	40.0														
+buff_63		增加生命%	0										perhp	12.0														
+buff_64		增加生命%	0										perhp	16.0														
+buff_65		增加生命%	0										perhp	18.0														
+buff_66		增加生命%	0										perhp	20.0														
+buff_67		增加生命%	0										perhp	26.0														
+buff_68		增加生命%	0										perhp	33.0														
+buff_69		增加生命%	0										perhp	40.0														
+buff_70		加攻击	0										att	260.0														
+buff_71		加攻击	0										att	365.0														
+buff_72		加攻击	0										att	500.0														
+buff_73		加命中率	0										hit	6.0														
+buff_74		加命中率	0										hit	8.0														
+buff_75		加命中率	0										hit	12.0														
+buff_76		加闪避率	0										dodge	6.0														
+buff_77		加闪避率	0										dodge	8.0														
+buff_78		加闪避率	0										dodge	12.0														
+buff_79		增加攻击%	0										peratt	6.0														
+buff_80		增加攻击%	0										peratt	7.0														
+buff_81		增加攻击%	0										peratt	8.0														
+buff_82		增加攻击%	0										peratt	9.0														
+buff_83		增加伤害%	0										damageAdd	6.0														
+buff_84		增加伤害%	0										damageAdd	8.0														
+buff_85		增加伤害%	0										damageAdd	10.0														
+buff_86		增加伤害%	0										damageAdd	14.0														
+buff_87		伤害减免%	0										damageReduce	6.0														
+buff_88		伤害减免%	0										damageReduce	8.0														
+buff_89		伤害减免%	0										damageReduce	10.0														
+buff_90		增加生命%	0										perhp	6.0														
+buff_91		增加生命%	0										perhp	8.0														
+buff_92		增加生命%	0										perhp	10.0														
+buff_93		加暴击率	0										cri	6.0														
+buff_94		加暴击率	0										cri	8.0														
+buff_95		加抗暴率	0										antiCri	6.0														
+buff_96		加抗暴率	0										antiCri	8.0														
+buff_97		加抗暴率	0										antiCri	12.0														
+buff_98		加抗暴率	0										antiCri	16.0														
+buff_99		加攻击	0										att	385.0														
+buff_100		加攻击	0										att	530.0														
+buff_101		加攻击	0										att	730.0														
+buff_102		加生命	0										hp	10000.0														
+buff_103		加生命	0										hp	14650.0														
+buff_104		增加怒气获得%	0										peranger	20.0														
+buff_105		增加怒气获得%	0										peranger	15.0														
+buff_106		增加怒气获得%	0										peranger	25.0														
+buff_107		增加怒气获得%	0										peranger	10.0														
+buff_108		增加怒气获得%	0										peranger	12.0														
+buff_109		受伤害增加%	0	1		1		10					damageReduce	-10.0						buff_icon_pojia								
+buff_110		吸血	0										lifestealHp	30.0	0.0													
+buff_111	group_poisonDam	中毒	2	1		1		2					poisonDam					173	buffb	buff_icon_zhongdu								
+buff_112		法术伤害减免（百分比）	0			1		1					mdamageReduce	50.0						buff_icon_fangyutisheng								
+buff_113		物理伤害减免（百分比）	0			1		1					pdamageReduce	50.0						buff_icon_fangyutisheng								
+buff_114		物理伤害减免（百分比）	0			1		1					pdamageReduce	30.0						buff_icon_fangyutisheng								
+buff_115		生命降低伤害增加	1										perhpTodamageAdd	-10.0	5.0													
+buff_116		生命降低伤害增加	1										perhpTodamageAdd	-10.0	15.0													
+buff_117		降低闪避率	0	1			2.0						dodge	-10.0						buff_icon_shanbixiajiang								
+buff_118		降低攻击力	0	1		1		2					peratt	-50.0						buff_icon_xuruo								
+buff_119		加闪避率	0			1		2					dodge	20.0						buff_icon_shanbitisheng								
+buff_120	group_forbidUltimateSkill	封印	2	1				2					forbidUltimateSkill					243	buffa	buff_icon_fengyin								
+buff_121		破防	0	1		1	5.0						perdef	-50.0						buff_icon_pojia								
+buff_122	group_forbidFirstSkill	麻痹	2	1	1			2					forbidFirstSkill					177	buffc	buff_icon_mabi								
+buff_123		加暴击率	0			1							cri	40.0														
+buff_124	group_damageReduce	虚弱	0	1	1	1		4					damageAdd	-50.0						buff_icon_xuruo								
+buff_125		物理免伤	0			1		2					pdamageReduce	-50.0						buff_icon_fangyutisheng								
+buff_126		进攻驱散	3	1									clearOneBuff															
+buff_127	group_bleeding	流血	0	1	1			1					bleeding	4.0				178	buffb	buff_icon_liuxue								
+buff_128		无视防御值与命中有关	1										sourceNhitToperdef	-0.4														
+buff_129		怒气增加	0										peranger	30.0														
+buff_130		增加伤害	0										damageAdd	30.0														
+buff_131		防御驱散	3										clearOneDebuff															
+buff_132		吸血	0										lifestealHp	20.0	110.0													
+buff_133		降攻	0	1		1		2					peratt	-10.0						buff_icon_gongjixiajiang								
+buff_134	group_dizzy	晕一回合	2	1				2		1			dizzy					175	buffa	buff_icon_xuanyun								
+buff_135		额外伤害	0										additionAttDam	200.0														
+buff_136		额外伤害	0										additionAttDam	50.0														
+buff_137		增加伤害	0					2					damageAdd	20.0						buff_icon_gongjitisheng								
+buff_138		格挡	0			1		2					blockDam	20.0	-50.0					buff_icon_gedang								
+buff_139		加命中率	0			1	10.0						hit	10.0						buff_icon_mingzhongtisheng								
+buff_140		手加减	2										canNotKill															
+buff_141		加暴击率	0			1							cri	30.0														
+buff_142		加闪避率	0			1		2					dodge	15.0						buff_icon_shanbitisheng								
+buff_143		必中	2										mustHit															
+buff_144		能量转暴	1										angerTocri	10.0	3.0													
+buff_145		恢复	0			1		5					recoverBySelfRound	20.0				174	buffb	buff_icon_huifu								
+buff_146		治疗	0										recover	40.0				174	buffb									
+buff_147		加命中率	0	1		1		2					hit	-10.0						buff_icon_mingzhongxiajiang								
+buff_148		增加伤害	0										damageAdd	50.0														
+buff_149	group_fire	灼烧	2	1		1		2					fireDam							buff_icon_zhuoshao							176	root
+buff_150		精神盾	0					2					minusDebuffperOdds	-50.0				246	buffc	buff_icon_jingshendun								
+buff_151		必闪	0			1		2				4	dodge	100.0						buff_icon_shanbi								
+buff_152	group_ice	冰	2	1		1		2					ice	-20.0	-20.0			180	buffb	buff_icon_bingdong								
+buff_153		增加伤害	0					1					damageAdd	80.0						buff_icon_gongjitisheng								
+buff_154		必暴	2										mustCri															
+buff_155		大爆头	0										minusMaxHpPercent	-25.0	400.0			181	buffa									
+buff_156		小爆头	0										minusMaxHpPercent	-15.0	200.0			181	buffa									
+buff_157	group_shield	血盾	1		1	1		10					sourceperattToshield	80.0				247	buffc	buff_icon_xuedun					248	buffc		
+buff_158		真实伤害	2										immuneDef															
+buff_159		减抗暴率	0	1				1					antiCri	-10.0						buff_icon_kangbaoxiajiang								
+buff_160		增加伤害	0			1		3					damageAdd	100.0						buff_icon_gongjitisheng								
+buff_161		增加伤害	0			1		1					damageAdd	-100.0						buff_icon_gongjitisheng								
+buff_162	group_poisonDam	毒	2	1		1		2					poisonDam					173	buffb	buff_icon_zhongdu								
+buff_163		伤害减免%	0			1							damageReduce	15.0														
+buff_164		增加生命%	0										perhp	18.0														
+buff_165		加抗暴率	0			1							antiCri	12.0														
+buff_166		增加防御%	0			1							perdef	35.0														
+buff_167		加攻击	0										att	600.0														
+buff_168		增加生命%	0										perhp	27.0														
+buff_169		暴击增加格挡	0			1		2					blockDam	15.0	-50.0			179	buffb	buff_icon_gedang								
+buff_170	group_shield	血盾	1		1			10					sourceperattToshield	150.0				247	buffc	buff_icon_xuedun					248	buffc		
+buff_171		加攻击	0										att	230.0														
+buff_172		加生命	0										hp	5000.0														
+buff_173		增加伤害%	0										damageAdd	5.0														
+buff_174		增加攻击%	0					1					peratt	5.0						buff_icon_gongjitisheng								
+buff_175		加生命	0										hp	5600.0														
+buff_176		加生命	0										hp	8000.0														
+buff_177		加防御	0										def	400.0														
+buff_178		加攻击	0										att	550.0														
+buff_179		增加防御%	0										perdef	24.0														
+buff_180		加生命	0										hp	32000.0														
+buff_181		加攻击	0										att	5260.0														
+buff_182		增加能量	0										anger	25.0														
+buff_183		加暴击率	0										cri	12.0														
+buff_184		加武器攻击力%	0										WeaponPerAtt	5.0														
+buff_185		血量越低闪避越高	1										perhpTododge	-10.0	4.0													
+buff_186		连击数越高暴击越高	1										comboNumTocri	5.0	3.0	50.0												
+buff_187	group_damageAdd	增加伤害	0		1			100					damageAdd	50.0						buff_icon_gongjitisheng								
+buff_188	group_mshield	攻击百分比转血盾(吸收魔法伤害)	1		1			100					sourceperattTomshield	80.0														
+buff_189		能量越高攻击越高	1										angerToperatt	10.0	2.0													
+buff_190		能量越高暴击越高	1										angerTocri	10.0	1.0													
+buff_191		吸血	0										lifestealHp	15.0														
+buff_192		增加能量	0										anger	50.0														
+buff_193	group_asunatalent2	降低CD	0		1			1		1			minusSkillCoolDown	2.0						buff_icon_qusan								
+buff_194		增加生命%	0										perhp	5.0														
+buff_195		增加防御%	0					2					perdef	5.0						buff_icon_fangyutisheng								
+buff_196		不败，自己回合结束时死亡	2					2					dieAfterLastAttack							buff_icon_wudi								
+buff_197		能量增长系数	0										angerRate	100.0														
+buff_198		增加伤害	0										damageAdd	30.0														
+buff_199		额外真实伤害（百分比）	0										additionAttRealDam	20.0														
+buff_200		反伤伤害（百分比）	0										counterStrikeDam	38.0	2.0													
+buff_201		增加伤害%	0			1		2					damageAdd	10.0						buff_icon_gongjitisheng								
+buff_202		每两点怒气能够抵1%的最大血量	1										MangerToNperhp	2.0	1.0													
+buff_203		每降低10%的血量怒气增加10点	1					100					MperhpreduceToNanger	-10.0	10.0													
+buff_204		无视对方buff加成	2										uneffectBuffOnce															
+buff_205		治疗受伤的15%，并增加治疗值的10%的攻击力	0										treatHurtAndAddperAtt	15.0	10.0													
+buff_206		50%伤害由血量最高的队友承担	0										damShareByMaxHpTeammate	50.0														
+buff_207		复活回血最大血量的5%	0										reboundPerMaxhp	5.0														
+buff_208		回合开始时对敌人进行2次随机攻击	0					100					additionAttBySelfRound	100.0	6.0	2.0												
+buff_209		增加伤害30%，1回合	0										damageAdd	30.0														
+buff_210		伤害减免20%	0					100					damageReduce	20.0														
+buff_211		不会浮空倒地	2					100					immuneFloatBreak							buff_icon_bati								
+buff_212		不会眩晕	2					100					immuneDizzy															
+buff_213		魔防提高100%	0					2					permdef	100.0						buff_icon_fangyutisheng								
+buff_214	group_fire	灼烧	2	1		1		2					fireDam							buff_icon_zhuoshao							176	root
+buff_215		增加伤害100%,1回合	0					2					damageAdd	100.0						buff_icon_gongjitisheng								
+buff_216		增加治疗量100%,1回合	0					2					treatAdd	100.0						buff_icon_zhiliaoxishuzengjia								
+buff_217		增加伤害24%，1回合	0			1							damageAdd	24.0														
+buff_218		加暴击率20	0			1							cri	20.0						buff_icon_baojitisheng								
+buff_219		加暴击伤害	0			1		2					criFactor	50.0						buff_icon_baojitisheng								
+buff_220		增加伤害20%	0			1							damageAdd	20.0														
+buff_221		减少伤害20%，1回合	0					2					damageAdd	-20.0						buff_icon_shanghaijianmian								
+buff_222		加暴击率30	0					2					cri	30.0						buff_icon_baojitisheng								
+buff_223		伤害减免20%	0										damageReduce	20.0														
+buff_224		治疗	0										recover	100.0														
+buff_225		增加防御100%	0										perdef	100.0														
+buff_226		加暴击率30	0			1	10.0						cri	30.0						buff_icon_baojitisheng								
+buff_227		加暴击伤害	0			1		1					criFactor	6.0						buff_icon_baojitisheng								
+buff_228		伤害减免20%	0					2					damageReduce	20.0						buff_icon_shanghaijianmian								
+buff_229		增加伤害10%，3回合	0			1		3					damageAdd	10.0						buff_icon_gongjitisheng								
+buff_230		增加伤害15%	0					100					damageAdd	15.0						buff_icon_gongjitisheng								
+buff_231		伤害减免20%	0					100					damageReduce	20.0						buff_icon_shanghaijianmian								
+buff_232		治疗	0										recover	35.0														
+buff_233	group_mshield	攻击百分比转血盾(吸收魔法伤害)	1		1			100					sourceperattTomshield	50.0														
+buff_234		伤害减免10%	0					2					damageReduce	10.0						buff_icon_shanghaijianmian								
+buff_235		治疗	0										recover	10.0														
+buff_236		增加攻击40%（不叠加）	0										peratt	40.0														
+buff_237		加暴击率25（不叠加）	0										cri	25.0														
+buff_238		加暴击率20（不叠加）	0										cri	20.0														
+buff_239		增加伤害100%	0										damageAdd	100.0														
+buff_240		吸血	0										lifestealHp	10.0														
+buff_241		增加伤害8%	0					1					damageAdd	8.0						buff_icon_gongjitisheng								
+buff_242		法术伤害减免（百分比）	0					100					mdamageReduce	25.0						buff_icon_fangyutisheng								
+buff_243		恢复	0			1		5					recoverBySelfRound	30.0				174	buffb	buff_icon_huifu								
+buff_244		增加伤害30%	0										damageAdd	30.0														
+buff_245		增加能量	0										anger	30.0														
+buff_246		恢复	0					100					recoverBySelfRound	50.0				174	buffb	buff_icon_huifu								
+buff_247		增加能量	0										anger	10.0														
+buff_248	group_anger	降低能量	0										anger	-3.0														
+buff_249		增加能量	0										anger	3.0														
+buff_250		加暴击率40	0			1	3.0						cri	40.0						buff_icon_baojitisheng								
+buff_251		加暴击率70%	0										cri	70.0						buff_icon_baojitisheng								
+buff_252		生命降低伤害增加	1										perhpTodamageAdd	-10.0	2.0													
+buff_253		额外真实伤害（百分比）	0										additionAttRealDam	34.0														
+buff_254		额外伤害最大血量百分比	0										additionSourcepermaxHp	10.0														
+buff_255		额外伤害	0										additionAttDam	50.0														
+buff_256		加暴击伤害	0										criFactor	50.0						buff_icon_baojitisheng								
+buff_257		吸血	0										lifestealHp	30.0	0.0													
+buff_258		魔防提高30%	0										permdef	30.0														
+buff_259		反伤伤害（百分比）	0					100					counterStrikeDam	20.0	2.0					buff_icon_fanshang								
+buff_260		吸血	0										lifestealHp	20.0	2.0													
+buff_261		减少防御20%	0										perdef	-20.0														
+buff_262		每点暴击增加5爆伤	1										criTocriFactor	1.0	5.0													
+buff_263		加闪避率	0										dodge	7.0														
+buff_264		加闪避率	0										dodge	30.0														
+buff_265		加暴击率15（不叠加）	0										cri	15.0														
+buff_266	group_deathgun	增加伤害20%，2回合	0		1			2					damageAdd	20.0						buff_icon_gongjitisheng								
+buff_267	group_permaxHpBySelfRound	回合开始时减少5%最大血量	0		1			40					permaxHpBySelfRound	-5.0						buff_icon_zhongshang								
+buff_268		治疗	0										recover	60.0														
+buff_269		增加伤害8%	0										damageAdd	8.0														
+buff_270		加暴击率50%	0										cri	50.0														
+buff_271		增加降低15%	0										damageAdd	-15.0														
+buff_272		增加伤害15%	0										damageAdd	15.0														
+buff_273		加闪避率	0					100					dodge	15.0						buff_icon_shanbitisheng								
+buff_274		加暴击率20（不叠加）	0					100					cri	20.0						buff_icon_baojitisheng								
+buff_275		加命中率	0					2					hit	20.0						buff_icon_mingzhongtisheng								
+buff_276		加抗暴率	0										antiCri	15.0														
+buff_277		死亡回血10并隐身	0					1					reliveAndinvisible	10.0						buff_icon_yinshen								
+buff_278		闪避率减少	0										dodge	-10.0														
+buff_279		加暴击率	0										cri	30.0														
+buff_280		免疫浮空倒地	2					100					immuneFloatBreak							buff_icon_bati								
+buff_281	group_permaxHpBySelfRound	回合开始时增加10%最大血量	0		1			100					permaxHpBySelfRound	10.0						buff_icon_huifu								
+buff_282		增加攻击30%（不叠加）	0										peratt	30.0														
+buff_283	group_shield	血盾	1		1			10					sourceperattToshield	80.0				247	buffc	buff_icon_xuedun					248	buffc		
+buff_284		增加伤害15%	0										damageAdd	15.0														
+buff_285		增加伤害15%	0					1					damageAdd	15.0						buff_icon_gongjitisheng								
+buff_286		血量越低闪避越高	1					100					perhpTododge	-10.0	3.0													
+buff_287	group_damageAdd	增加伤害8%	0		1								damageAdd	60.0														
+buff_288		加暴击率	0										cri	200.0														
+buff_289		加暴击伤害	0				15.0						criFactor	20.0						buff_icon_baojitisheng								
+buff_290		加闪避率	0					100		4			dodge	5.0						buff_icon_shanbitisheng								
+buff_291		增加伤害35%	0										damageAdd	35.0														
+buff_292	group_recover	治疗	0		1			1					recover	30.0				174	buffb									
+buff_293		魔防提高80%	0					2					permdef	80.0						buff_icon_fangyutisheng								
+buff_294		增加伤害100%,2回合	0					4					damageAdd	100.0						buff_icon_gongjitisheng								
+buff_295		增加治疗量100%,4回合	0					4					treatAdd	100.0						buff_icon_zuzhou								
+buff_296		伤害减免10%	0					4					damageReduce	10.0						buff_icon_shanghaijianmian								
+buff_297		增加防御20%	0					4					perdef	20.0						buff_icon_fangyutisheng								
+buff_298		每降低10%血量护甲提高8%	1										perhpToperdef	-10.0	8.0													
+buff_299		加闪避率	0					8		4			dodge	5.0						buff_icon_shanbitisheng								
+buff_300		增加攻击%	0					100		5			peratt	5.0						buff_icon_gongjitisheng								
+buff_301		增加伤害25%，瞬时	0										damageAdd	25.0														
+buff_302	group_poisonDam	中毒	2	1		1		2					poisonDam					173	buffb	buff_icon_zhongdu								
+buff_303	group_poisonDam	中毒	2	1		1		8					poisonDam					173	buffb	buff_icon_zhongdu								
+buff_304		增加伤害15%，1回合	0			1		1					damageAdd	15.0						buff_icon_gongjitisheng								
+buff_305		加暴击率30	0					4					cri	30.0						buff_icon_baojitisheng								
+buff_306		伤害减免30%	0										damageReduce	30.0														
+buff_307		加暴击伤害	0			1		1					criFactor	5.0						buff_icon_baojitisheng								
+buff_308		增加伤害10%，2回合	0			1		2					damageAdd	10.0						buff_icon_gongjitisheng								
+buff_309	group_shield	血盾	1		1			10					sourceperattToshield	50.0				247	buffc	buff_icon_xuedun					248	buffc		
+buff_310		生命降低伤害增加	1					100					perhpTodamageAdd	-10.0	2.5													
+buff_311		给敌方另一个目标造成等量伤害	0										sameDamForRandom	75.0														
+buff_312		清除debuff	3										clearDebuff															
+buff_313		增加伤害25%，持续4回合	0					4					damageAdd	25.0						buff_icon_gongjitisheng								
+buff_314		能量增长系数	0										angerRate	20.0														
+buff_315		治疗	0										recover	20.0														
+buff_316		增加防御10%	0					2					perdef	10.0						buff_icon_fangyutisheng								
+buff_317		额外伤害最大血量百分比	0										additionSourcepermaxHp	3.0														
+buff_318		增加伤害50%，瞬时	0										damageAdd	50.0														
+buff_319	group_angerChange	偷取3点能量	0										angerChange	3.0														
+buff_320		加闪避率	0										dodge	15.0														
+buff_321		额外伤害最大血量百分比	0										additionSourcepermaxHp	10.0														
+buff_322		隐身	2							1			invisible															
+buff_323		每点能量回复血量最少的队友2%血量	0										angerChangeAndAddHp	3.0	116.0	2.0												
+buff_324		加暴击伤害	0										criFactor	80.0						buff_icon_baojitisheng								
+buff_325		治疗	0										recover	50.0														
+buff_326		增加能量	0										anger	5.0														
+buff_327		加闪避率	0					2					dodge	15.0						buff_icon_shanbitisheng								
+buff_328		吸血	0										lifestealHp	50.0	0.0													
+buff_329		物理伤害减免（百分比）	0										pdamageReduce	25.0														
+buff_330		增加能量	0										anger	100.0														
+buff_331		加暴击伤害	0				5.0						criFactor	40.0						buff_icon_baojitisheng								
+buff_332		增加伤害	0					3					damageAdd	20.0						buff_icon_gongjitisheng								
+buff_333		额外伤害	0										additionAttDam	80.0														
+buff_334		额外伤害	0										additionAttDam	400.0														
+buff_335		随机一个buff	4	1		1							randomBuff				buff_152,buff_152,buff_111,buff_111,buff_111,buff_111,buff_149,buff_149,buff_149,buff_149,buff_122,buff_122,buff_120,buff_120,buff_134,buff_134											
+buff_336		无视50%防御	0	1									perdef	-50.0														
+buff_337		加闪避率	0					2					dodge	5.0						buff_icon_shanbi								
+buff_338	group_fire	灼烧	2	1		1		4					fireDam							buff_icon_zhuoshao							176	root
+buff_339	group_bleeding	流血	0	1	1			4					bleeding	5.0				178	buffb	buff_icon_liuxue								
+buff_340		加闪避率	0					2					dodge	10.0						buff_icon_shanbitisheng								
+buff_341		加攻击	0					1					att	50.0						buff_icon_gongjitisheng								
+buff_342		格挡	0										blockDam	30.0	-50.0					buff_icon_gedang								
+buff_343		增加防御50%	0					4					perdef	50.0						buff_icon_fangyutisheng								
+buff_344		吸血	0										lifestealHp	50.0	0.0													
+buff_345		伤害加深	0	1		1							damageReduce	-15.0														
+buff_346		生命降低伤害增加	1			1		100					perhpTodamageAdd	-10.0	10.0													
+buff_347		加暴击率15	0			1	3.0						cri	15.0						buff_icon_baojitisheng								
+buff_348		减少防御25%	0	1									perdef	-25.0														
+buff_349		吸血	0										lifestealHp	35.0	0.0													
+buff_350		减少防御30%	0	1									perdef	-30.0														
+buff_351		闪避率减少	0										dodge	-10.0														
+buff_352		魔防提高30%	0					2					permdef	30.0						buff_icon_fangyutisheng								
+buff_353	group_eugene	增加防御10%	0		1			2					perdef	10.0						buff_icon_fangyutisheng								
+buff_354		格挡	0					2					blockDam	10.0	-50.0					buff_icon_gedang								
+buff_355		减少伤害20%，1回合	0	1				1					damageAdd	-20.0														
+buff_356		闪避率减少	0	1				2					dodge	-10.0						buff_icon_shanbixiajiang								
+buff_357		增加攻击50%	0										peratt	50.0														
+buff_358		防御增加50%，持续2回合	0					2					perdef	50.0						buff_icon_fangyutisheng								
+buff_359		反伤伤害（百分比）	0					2					counterStrikeDam	40.0	2.0					buff_icon_fanshang								
+buff_360	group_fire	灼烧	2	1		1		4					fireDam							buff_icon_zhuoshao							176	root
+buff_361	group_debuffheal	恢复抑制	0	1		1		2					minusAddperhp	-25.0						buff_icon_huifuyizhi								
+buff_362		加闪避率	0			1		2					dodge	10.0						buff_icon_shanbitisheng								
+buff_363		攻击力减少	0	1		1		2					peratt	-15.0						buff_icon_gongjixiajiang								
+buff_364		防御力减少	0	1		1		2					perdef	5.0						buff_icon_fangyuxiajiang								
+buff_365		增加伤害	0			1		2					damageAdd	20.0						buff_icon_gongjitisheng								
+buff_366		魔防提高75%	0			1		1					permdef	75.0						buff_icon_fangyutisheng								
+buff_367	group_ice	冰	2	1		1		4					ice	-20.0	-20.0			180	buffb	buff_icon_bingdong								
+buff_368		防御力减少	0	1		1		2					perdef	10.0						buff_icon_fangyuxiajiang								
+buff_369		攻击力增加	0	1		1		2					peratt	15.0						buff_icon_gongjitisheng								
+buff_370		暴击伤害增加	0										criFactor	150.0						buff_icon_baojitisheng								
+buff_371		伤害免疫减少	0	1		1		2					damageReduce	-8.0						buff_icon_fangyuxiajiang								
+buff_372	group_damageReduce	虚弱	0	1	1	1		2					damageAdd	-50.0						buff_icon_xuruo								
+buff_373		无视75%防御	0										perdef	-75.0														
+buff_374		抗暴率减少	0	1		1		2					antiCri	-10.0						buff_icon_kangbaoxiajiang								
+buff_375	group_debuffheal	恢复抑制	0	1		1		2					minusAddperhp	-40.0						buff_icon_huifuyizhi								
+buff_376		暴击伤害增加	0										criFactor	75.0						buff_icon_baojitisheng								
+buff_377		防御力减少	0	1		1		2					perdef	-15.0						buff_icon_fangyuxiajiang								
+buff_378	group_shield	血盾	1		1			10					sourceperattToshield	260.0				247	buffc	buff_icon_xuedun					248	buffc		
+buff_379	group_shield	血盾	1		1			10					sourceperattToshield	60.0				247	buffc	buff_icon_xuedun					248	buffc		
+buff_380		增加伤害	0					1					damageAdd	10.0						buff_icon_gongjitisheng								
+buff_381		额外真实伤害（百分比）	0										additionAttRealDam	30.0														
+buff_382		格挡	0			1		2					blockDam	6.0	-50.0					buff_icon_gedang								
+buff_383		治疗	0										recover	150.0				174	buffb									
+buff_384		伤害减免20%	0					4					damageReduce	20.0						buff_icon_shanghaijianmian								
+buff_385	group_angerRate	能量抑制	0					2					angerRate	-100.0						buff_icon_nengliangyizhi								
+buff_386		吸血	0										lifestealHp	60.0	0.0													
+buff_387		增加防御	0					100					perdef	40.0						buff_icon_fangyutisheng								
+buff_388		加暴击率45	0				3.0						cri	45.0						buff_icon_baojitisheng								
+buff_389		法术伤害减免（百分比）	0										mdamageReduce	25.0														
+buff_390		无视25%防御	0										perdef	-25.0														
+buff_391		伤害加深10%	0	1				2					damageReduce	-10.0						buff_icon_shanghaijiashen								
+buff_392		伤害加深30%	0	1									damageReduce	-30.0						buff_icon_fangyuxiajiang								
+buff_393	group_shield	血盾	1		1			10					sourceperattToshield	100.0				247	buffc	buff_icon_xuedun					248	buffc		
+buff_394		防御增加30%	0					2					perdef	30.0						buff_icon_fangyutisheng								
+buff_395		加闪避率	0			1		2					dodge	7.0						buff_icon_shanbitisheng								
+buff_396		回最大血量7%	0										permaxHp	7.0														
+buff_397		伤害减免40%	0					4					damageReduce	40.0						buff_icon_shanghaijianmian								
+buff_398		伤害加深40%	0										damageReduce	-40.0						buff_icon_fangyuxiajiang								
+buff_399		隐身	2			1		2		1			invisible							buff_icon_yinshen								
+buff_400		加暴击率3	0				2.0						cri	3.0						buff_icon_baojitisheng								
+buff_401		伤害加深35%	0	1									damageReduce	-35.0														
+buff_402		加命中率	0	1		1		2					hit	-6.0						buff_icon_mingzhongxiajiang								
+buff_403		额外伤害	0										additionAttDam	30.0														
+buff_404		增加防御	0			1		100					perdef	10.0						buff_icon_fangyutisheng								
+buff_405		加闪避率	0			1		1					dodge	40.0						buff_icon_shanbitisheng								
+buff_406		加闪避率	0					2					dodge	8.0						buff_icon_shanbitisheng								
+buff_407		反伤伤害（百分比）	0										counterStrikeDam	25.0	2.0													
+buff_408		不会浮空倒地	2										immuneFloatBreak															
+buff_409		伤害减免50%	0										damageReduce	50.0														
+buff_410		增加怒气获得%	0					1					peranger	20.0						buff_icon_wudi								
+buff_411		加暴击伤害	0										criFactor	40.0						buff_icon_baojitisheng								
+buff_412		伤害减免25%	0					4					damageReduce	25.0						buff_icon_shanghaijianmian								
+buff_413		回最大血量20%	0										permaxHp	20.0														
+buff_414		闪避率减少	0					2					dodge	-7.0						buff_icon_shanbixiajiang								
+buff_415		无视防御	0										perdef	-70.0														
+buff_416		攻击力增加	0			1		2					peratt	10.0						buff_icon_gongjitisheng								
+buff_417		增加伤害15%	0					100		1			damageAdd	15.0						buff_icon_gongjitisheng								
+buff_418	group_recoverxilika	治疗	0		1			1					recover	70.0						buff_icon_jinghua								
+buff_419		额外伤害最大血量百分比	0										additionSourcepermaxHp	11.0														
+buff_420		生命降低伤害增加	1										perhpTodamageAdd	-10.0	10.0													
+buff_421		反伤伤害（百分比）	0										counterStrikeDam	20.0	2.0													
+buff_422		格挡	0										blockDam	50.0	-50.0					buff_icon_gedang								
+buff_423		攻击力增加	0			1		100		1			peratt	50.0						buff_icon_gongjitisheng								
+buff_424		回最大血量5%	0										permaxHp	5.0														
+buff_425	group_permaxHpBySelfRound	回合开始时减少2%最大血量	0		1			40					permaxHpBySelfRound	-2.0						buff_icon_huifu								
+buff_426		增加攻击	0										peratt	20.0														
+buff_427		防御力减少	0			1		4					perdef	-50.0						buff_icon_fangyuxiajiang								
+buff_428		格挡	0										blockDam	20.0	-50.0					buff_icon_gedang								
+buff_429		吸血	0										lifestealHp	10.0	0.0													
+buff_430		加命中率	0	1		1		2					hit	-5.0						buff_icon_mingzhongxiajiang								
+buff_431		物理伤害减免（百分比）	0										pdamageReduce	20.0														
+buff_432		格挡	0										blockDam	30.0	-50.0					buff_icon_gedang								
+buff_433		回最大血量10%	0										permaxHp	10.0														
+buff_434	group_anger	降低能量	0	1									anger	-10.0														
+buff_435		伤害加深50%	0					2					damageReduce	-50.0						buff_icon_fangyuxiajiang								
+buff_436	group_poisonDam	毒	2	1		1		4					poisonDam					173	buffb	buff_icon_zhongdu								
+buff_437		无视100%防御	0	1									perdef	-100.0														
+buff_438		伤害减免20%	0					1					damageReduce	20.0						buff_icon_shanghaijianmian								
+buff_439		增加攻击	0					2					peratt	20.0						buff_icon_gongjitisheng								
+buff_440		防御增加20%	0					2					perdef	20.0						buff_icon_fangyutisheng								
+buff_441		格挡	0										blockDam	40.0	-50.0					buff_icon_gedang								
+buff_442		伤害加深20%	0										damageReduce	-20.0						buff_icon_fangyuxiajiang								
+buff_443	group_shiricatalent101	增加伤害100%,2回合	0		1			4					damageAdd	100.0						buff_icon_gongjitisheng								
+buff_444	group_shiricatalent102	增加治疗量100%,2回合	0		1			4					treatAdd	100.0						buff_icon_zhiliaoxishuzengjia								
+buff_445		伤害加深50%	0	1									damageReduce	-50.0														
+buff_446		加闪避率	0			1		2					dodge	7.0						buff_icon_shanbitisheng								
+buff_447		防御增加20%	0					100					perdef	20.0						buff_icon_fangyutisheng								
+buff_448		伤害加深25%	0	1									damageReduce	-25.0														
+buff_449		加暴击率	0					1					cri	5.0						buff_icon_baojitisheng								
+buff_450		加闪避率	0					1					dodge	5.0						buff_icon_shanbitisheng								
+buff_451	group_angerRate	能量抑制	0					2					angerRate	-25.0														
+buff_452		增加能量	0										anger	17.0														
+buff_453		加闪避率	0										dodge	4.0														
+buff_454		加暴击伤害	0					1					criFactor	5.0						buff_icon_baojitisheng								
+buff_455	group_eugenetanlent81	法力燃烧	0		1								angerAndhp	-2.0	-1.0	-20.0												
+buff_456		增加伤害40%，持续1回合	0			1		1					damageAdd	40.0						buff_icon_gongjitisheng								
+buff_457		复活回血最大血量的1%	0										reboundPerMaxhp	1.0			buff_456											
+buff_458		魔防提高	1					2					sourcepermdefTomdef	80.0						buff_icon_fafangtisheng								
+buff_459		增加伤害20%，2回合	0		1			2					damageAdd	20.0						buff_icon_gongjitisheng								
+buff_460		增加治疗量50%	0										treatAdd	50.0						buff_icon_zhiliaoxishuzengjia								
+buff_461		增加伤害	0					100		5			damageAdd	20.0						buff_icon_gongjitisheng								
+buff_462		格挡	0										blockDam	50.0	-50.0													
+buff_463		减魔法防御方免伤为我当前命中的n倍	1										sourceNhitToperdef	-0.15														
+buff_464		能量抑制	0										angerRate	-25.0														
+buff_465		加闪避率	0										dodge	3.0														
+buff_466		加闪避率	0										dodge	4.0														
+buff_467		加闪避率	0										dodge	5.0														
+buff_468		加闪避率	0										dodge	6.0														
+buff_469		加命中率	0					2					hit	10.0						buff_icon_mingzhongtisheng								
+buff_470		增加伤害25%，持续1回合	0					2					damageAdd	25.0						buff_icon_gongjitisheng								
+buff_471		额外伤害	0										additionAttDam	150.0														
+buff_472	group_shield	血盾	1		1			10					sourceperattToshield	300.0				247	buffc	buff_icon_xuedun					248	buffc		
+buff_473		加暴击率40	0					3					cri	40.0						buff_icon_baojitisheng								
+buff_474		血量越低暴击越高	1										perhpTocri	-10.0	3.0													
+buff_475		物理伤害减免（百分比）	0										pdamageReduce	50.0						buff_icon_fangyutisheng								
+buff_476	group_damageAddkirito	增加伤害%	0		1			100		1			damageAdd	40.0						buff_icon_gongjitisheng								
+buff_477		增加能量	0										anger	6.0														
+buff_478		回最大血量6%	0										permaxHp	6.0														
+buff_479		加暴击率15（不叠加）	0					100					cri	15.0						buff_icon_baojitisheng								
+buff_480		加攻击	0										att	632.0														
+buff_481		加闪避率	0										dodge	30.0														
+buff_482		额外伤害最大血量20百分比	0										additionSourcepermaxHp	2.5														
+buff_483		回最大血量15%	0										permaxHp	1.0														
+buff_484		额外伤害	0										additionAttDam	45.0														
+buff_485		加暴击伤害	0										criFactor	30.0														
+buff_486	group_shinai	加暴击率20（不叠加）	0		1								cri	20.0														
+buff_487	group_shinai	加暴击率15（不叠加）	0		1								cri	15.0														
+buff_488		吸血	0										lifestealHp	100.0														
+buff_489		魔防降低75%	0			1		1					permdef	-75.0						buff_icon_fangyuxiajiang								
+buff_490		闪避率减少	0	1				2					dodge	-6.0						buff_icon_shanbixiajiang								
+buff_491		反伤伤害（百分比）	0					2					counterStrikeDam	100.0	2.0					buff_icon_fanshang								
+buff_492		加暴击率	0			1		100		10			cri	5.0						buff_icon_baojitisheng								
+buff_493		格挡	0			1		2					blockDam	8.0	-50.0					buff_icon_gedang								
+buff_494	group_shield	血盾	1		1	1		10					sourceperattToshield	90.0				247	buffc	buff_icon_xuedun					248	buffc		
+buff_495		生命降低伤害增加	1										perhpTodamageAdd	-10.0	3.0													
+buff_496	group_permaxHpBySelfRound	回合开始时减少10%最大血量	0	1	1			40					permaxHpBySelfRound	-10.0	200.0					buff_icon_zuzhou								
+buff_497		加攻击	0										att	2630.0														
+buff_498		加防御	0										def	260.0														
+buff_499		增加攻击%	0										peratt	13.0														
+buff_500		加暴击率	0										cri	7.0														
+buff_501		加暴击率	0										cri	14.0														
+buff_502	group_deathguntalent31	隐身	2		1			1		1			invisible							buff_icon_yinshen								
+buff_503	group_deathguntalent32	隐身	2		1			1		1			invisible							buff_icon_yinshen								
+buff_504		伤害加深10%	0	1				100					damageReduce	-10.0						buff_icon_shanghaijiashen								
+buff_505		伤害减免%	0										damageReduce	25.0														
+buff_506		额外伤害最大血量百分比	0										additionSourcepermaxHp	1.0														
+buff_507		伤害减免%	0					1		100			damageReduce	20.0						buff_icon_shanghaijianmian								
+buff_508		额外伤害	0										additionAttDam	20.0														
+buff_509		回最大血量7.5%	0										permaxHp	7.5														
+buff_510		治疗	0										recover	200.0				174	buffb									
+buff_511		伤害减免20%	0			1		2					damageReduce	20.0						buff_icon_shanghaijianmian								
+buff_512	group_lisbet	减少伤害20%，1回合	0		1			2					damageAdd	-20.0						buff_icon_gongjixiajiang								
+buff_513		加闪避率	0					2					dodge	1.0						buff_icon_shanbitisheng								
+buff_514		增加防御50%	0					100					perdef	50.0						buff_icon_fangyutisheng								
+buff_515		增加伤害30%	0					100					damageAdd	30.0						buff_icon_gongjitisheng								
+buff_516		加闪避率	0					100					dodge	10.0						buff_icon_shanbitisheng								
+buff_517		伤害减免	0										damageReduce	35.0														
+buff_518	group_argotalent41	加闪避率	0		1			4					dodge	25.0						buff_icon_shanbitisheng								
+buff_519	group_argotalent4	增加伤害30%	0		1			5					damageAdd	30.0						buff_icon_gongjitisheng								
+buff_520		恢复	0					6					recoverBySelfRound	50.0				174	buffb	buff_icon_huifu								
+buff_521		加命中率	0					100					hit	12.0						buff_icon_mingzhongtisheng								
+buff_522		加闪避率	0					100					dodge	12.0						buff_icon_shanbitisheng								
+buff_523		30%伤害由血量最高的队友承担	0										damShareByMaxHpTeammate	30.0														
+buff_524		增加伤害%	0										damageAdd	100.0														
+buff_525		增加伤害%	0										damageAdd	66.0														
+buff_526	group_argotalent42	伤害下降30%	0		1			1					damageAdd	-30.0						buff_icon_gongjitisheng								
+buff_527	group_miatalent4	增加伤害150%	0		1			3					damageAdd	175.0						buff_icon_gongjitisheng								
+buff_528	group_miatalent41	伤害下降150%	0		1			1					damageAdd	-175.0						buff_icon_gongjitisheng								
+buff_529	group_argoskill2	增加伤害5%	0					100		10			damageAdd	5.0						buff_icon_gongjitisheng								
+buff_530	group_argoskill2	加命中率5	0					100		10			hit	5.0						buff_icon_mingzhongtisheng								
+buff_531		闪避率减少	0	1				2					dodge	-1.0						buff_icon_shanbixiajiang								
+buff_532		减命中率	0	1				2					hit	-50.0						buff_icon_mingzhongxiajiang								
+buff_533		防御力减少	0	1				2					perdef	-20.0						buff_icon_fangyuxiajiang								
+buff_534		伤害减免12%	0					2					damageReduce	12.0						buff_icon_shanghaijianmian								
+buff_535		爆头	0										minusMaxHpPercent	-10.0	200.0			181	buffa									
+buff_536		加闪避率	0					100					dodge	10.0						buff_icon_shanbitisheng								
+buff_537		加命中率	0					100					hit	10.0						buff_icon_mingzhongtisheng								
+buff_538		治疗	0										recover	18.0														
+buff_539		增加伤害50%,永久，怪物	0					100					damageAdd	50.0						buff_icon_gongjitisheng								
+buff_540		减少伤害50%，1回合，怪物	0			1		2					damageAdd	-50.0														
+buff_541		加攻击	0					100					att	99999000.0						buff_icon_gongjitisheng								
+buff_542	group_angerChange	偷取50点能量	0										angerChange	50.0														
+buff_543		加暴击率	0			1		100		10			cri	5.0						buff_icon_baojitisheng								
+buff_544		增加伤害5%	0			1		100		10			damageAdd	5.0						buff_icon_gongjitisheng								
+buff_545	group_fleurshield1	血盾	1		1	1		4					sourceperattToshield	70.0				247	buffc	buff_icon_xuedun					248	buffc		
+buff_546	group_fleurshield2	血盾	1		1	1		4					sourceperattToshield	150.0				247	buffc	buff_icon_xuedun					248	buffc		
+buff_547	group_fleurshield	血盾	1		1	1		4					sourceperattToshield	50.0				247	buffc	buff_icon_xuedun					248	buffc		
+buff_548	group_fleurhuifu	恢复	0			1		4		1			recoverBySelfRound	30.0				174	buffb	buff_icon_huifu								
+buff_549		无视防御	0										perdef	-100.0														
+buff_550		破防	0	1		1		1					perdef	-15.0						buff_icon_pojia								
+buff_551		减命中率	0	1		1		2					hit	-35.0						buff_icon_mingzhongxiajiang								
+buff_552	group_fire	灼烧	2	1		1		2					fireDam							buff_icon_zhuoshao							176	root
+buff_553		加闪避率	0			1		2					dodge	15.0						buff_icon_shanbitisheng								
+buff_554		增加伤害	0			1		4					damageAdd	40.0						buff_icon_gongjitisheng								
+buff_555		加闪避率	0			1		4					dodge	20.0						buff_icon_shanbitisheng								
+buff_556		增加能量	0										anger	7.0														
+buff_557		加暴击率20	0			1		2					cri	20.0						buff_icon_baojitisheng								
+buff_558		治疗	0										recover	50.0														
+buff_559	group_shaxuetal01	增加伤害30%	0		1	1		2		1			damageAdd	30.0						buff_icon_gongjitisheng								
+buff_560	group_shaxuetal02	伤害减免10%	0		1	1		2		1			damageReduce	10.0						buff_icon_shanghaijianmian								
+buff_561		增加防御15%	0					100					perdef	15.0						buff_icon_fangyutisheng								
+buff_562		增加伤害	0		1			100					damageAdd	10.0						buff_icon_gongjitisheng								
+buff_563	group_annettetal41	加闪避率	0			1		100		10			dodge	3.0						buff_icon_shanbitisheng								
+buff_564	group_annettetal811	伤害减免50%	0		1	1		4		1			damageReduce	50.0						buff_icon_shanghaijianmian								
+buff_565	group_annettetal812	加暴击率20	0		1	1		4		1			cri	30.0						buff_icon_baojitisheng								
+buff_566		增加防御20%	0										perdef	20.0														
+buff_567		恢复加成	0					100					minusAddperhp	50.0														
+buff_568		替换技能buff	0										changeSkillBuff				065_2,buff_403,buff_135											
+buff_569		额外伤害	0										additionAttDam	100.0														
+buff_570		受到负面状态免伤15%伤害15%	0					100		5			damageAddAndReduce	15.0	15.0													
+buff_571	group_lilital1011	加暴击率	0		1	1		2					cri	15.0						buff_icon_baojitisheng								
+buff_572	group_lilital1012	加暴击伤害	0			1		2					criFactor	15.0						buff_icon_baojitisheng								
+buff_573		冰亚内特	2			1		4					iceYNT	-20.0	-20.0	-20.0	damageAdd:-50,treatAdd:-50			buff_icon_bingdong								
+buff_574		额外伤害	0										additionAttDam	350.0														
+buff_575		破防	0	1		1		2					perdef	-50.0						buff_icon_pojia								
+buff_576		加闪避率	0			1		2					dodge	12.0						buff_icon_shanbitisheng								
+buff_577		加命中率	0			1		2					hit	12.0						buff_icon_mingzhongtisheng								
+buff_578	group_clearAllDebuff	清除全部debuff	3		1			100					clearAllDebuff															
+buff_579		替换技能buff	0										changeSkillBuff				066_1,buff_583,buff_573											
+buff_580		清除特定buff	3										clearSomeBuffs				buff_578											
+buff_581		伤害加深100%	0	1									damageReduce	-100.0														
+buff_582		减抗暴率	0										antiCri	-300.0														
+buff_583	group_ice	冰	2	1		1		4					ice	-20.0	-20.0			180	buffb	buff_icon_bingdong								
+buff_584		增加伤害%	10					4					damageAdd	2.0														
+buff_585		加暴击率	10					1					cri	3.0														
+buff_586		加抗暴率	0					100					antiCri	1.0														
+buff_587	group_shield	血盾	1		1	1		1					sourceperattToshield	5.0				247	buffc	buff_icon_xuedun								
+buff_588		加暴击率	10					1					cri	6.0														
+buff_589		增加能量	10					6					anger	5.0														
+buff_590		增加能量	10					1					anger	10.0														
+buff_591		增加伤害%	10					1					damageAdd	7.0														
+buff_592		减命中率	0	1		1		2					hit	-25.0						buff_icon_mingzhongxiajiang								
+buff_593	group_fleurtal41	防御力减少	0	1	1	1		2					perdef	-10.0						buff_icon_fangyuxiajiang								
+buff_594		增加伤害%	10					1					damageAdd	0.5														
+buff_595		增加伤害%	10					1					damageAdd	1.0														
+buff_596		增加伤害%	10					1					damageAdd	3.0														
+buff_597		增加伤害%	10					1					damageAdd	7.5														
+buff_598		增加伤害%	10					4					damageAdd	4.0														
+buff_599		增加伤害%	10					6					damageAdd	3.0														
+buff_600		增加伤害%	10					6					damageAdd	1.0														
+buff_601		增加伤害%	0					100					damageAdd	2.0														
+buff_602		增加伤害%	0					100					damageAdd	1.0														
+buff_603		增加伤害%	0					100					damageAdd	0.5														
+buff_604		加暴击率	10					1					cri	6.0														
+buff_605		加暴击率	10					4					cri	4.0														
+buff_606		加暴击率	10					4					cri	2.0														
+buff_607		加暴击率	10					4					cri	1.0														
+buff_608		加暴击率	10					6					cri	3.0														
+buff_609		加暴击率	0					100					cri	2.0														
+buff_610		加暴击率	0					100					cri	1.0														
+buff_611		加暴击率	0					100					cri	0.5														
+buff_612		加命中率	10					1					hit	6.0														
+buff_613		加命中率	10					1					hit	3.0														
+buff_614		加命中率	10					4					hit	4.0														
+buff_615		加命中率	10					4					hit	2.0														
+buff_616		加命中率	10					6					hit	3.0														
+buff_617		加命中率	10					6					hit	1.0														
+buff_618		加命中率	10					6					hit	0.5														
+buff_619		加命中率	0					100					hit	2.0														
+buff_620		加命中率	0					100					hit	1.0														
+buff_621		加命中率	0					100					hit	0.5														
+buff_622		伤害减免%	10					1					damageReduce	6.0														
+buff_623		伤害减免%	10					1					damageReduce	3.0														
+buff_624		伤害减免%	10					1					damageReduce	1.0														
+buff_625		伤害减免%	10					4					damageReduce	4.0														
+buff_626		伤害减免%	10					4					damageReduce	2.0														
+buff_627		伤害减免%	10					6					damageReduce	3.0														
+buff_628		伤害减免%	10					6					damageReduce	1.0														
+buff_629		伤害减免%	10					6					damageReduce	0.5														
+buff_630		伤害减免%	0					100					damageReduce	2.0														
+buff_631		伤害减免%	0					100					damageReduce	1.0														
+buff_632		伤害减免%	0					100					damageReduce	0.5														
+buff_633		加抗暴率	10					1					antiCri	6.0														
+buff_634		加抗暴率	10					1					antiCri	3.0														
+buff_635		加抗暴率	10					1					antiCri	1.0														
+buff_636		加抗暴率	10					4					antiCri	4.0														
+buff_637		加抗暴率	10					6					antiCri	3.0														
+buff_638		加抗暴率	10					6					antiCri	1.0														
+buff_639		加抗暴率	10					6					antiCri	0.5														
+buff_640		加抗暴率	0					100					antiCri	2.0														
+buff_641		加抗暴率	0					100					antiCri	1.0														
+buff_642		加抗暴率	0					100					antiCri	0.5														
+buff_643		加闪避率	10					1					dodge	6.0														
+buff_644		加闪避率	10					1					dodge	1.0														
+buff_645		加闪避率	10					4					dodge	4.0														
+buff_646		加闪避率	10					4					dodge	2.0														
+buff_647		加闪避率	10					6					dodge	3.0														
+buff_648		加闪避率	10					6					dodge	1.0														
+buff_649		加闪避率	10					6					dodge	0.5														
+buff_650		加闪避率	0					100					dodge	2.0														
+buff_651		加闪避率	0					100					dodge	1.0														
+buff_652		加闪避率	0					100					dodge	0.5														
+buff_653		回最大血量	10			1		3					recoverBySelfRound	5.0				174	buffb	buff_icon_huifu								
+buff_654		回最大血量	10			1		3					recoverBySelfRound	3.0				174	buffb	buff_icon_huifu								
+buff_655		回最大血量	10			1		3					recoverBySelfRound	1.0				174	buffb	buff_icon_huifu								
+buff_656		增加能量	10					1					anger	5.0														
+buff_657		恢复加成	0					100					minusAddperhp	10.0														
+buff_658		恢复加成	0					100					minusAddperhp	15.0														
+buff_659		吸血	0										lifestealHp	1.0														
+buff_660		吸血	0										lifestealHp	7.5														
+buff_661	group_shield	血盾	11		1	1		1					sourceperattToshield	10.0				247	buffc	buff_icon_xuedun								
+buff_662		回最大血量	10								5		permaxHp	1.0														
+buff_663	group_bleeding	流血	0	1	1			2					bleeding	5.0				178	buffb	buff_icon_liuxue								
+buff_664		反伤伤害（百分比）	0										counterStrikeDam	5.0	2.0													
+buff_665		反伤伤害（百分比）	0										counterStrikeDam	3.0	2.0													
+buff_666		反伤伤害（百分比）	0										counterStrikeDam	1.0	2.0													
+buff_667		增加伤害%	0					100					damageAdd	6.0														
+buff_668		加命中率	0					100					hit	6.0														
+buff_669		加暴击率	0					100					cri	6.0														
+buff_670		增加伤害%	10					1					damageAdd	3.5														
+buff_671		加暴击率	10					1					cri	1.0														
+buff_672		伤害6%	0										damageAdd	6.0														
+buff_673		伤害3%	0										damageAdd	3.0														
+buff_674		伤害1%	0										damageAdd	1.0														
+buff_675		加暴击率	0										cri	6.0														
+buff_676		加暴击率	0										cri	3.0														
+buff_677		加暴击率	0										cri	1.0														
+buff_678		加命中率	0										hit	6.0														
+buff_679		加命中率	0										hit	3.0														
+buff_680		加命中率	0										hit	1.0														
+buff_681		增加伤害%	0					100					damageAdd	1.2														
+buff_682		伤害减免%	0					100					damageReduce	1.2														
+buff_683		加抗暴率	10					4					antiCri	2.0														
+buff_684		伤害8%	0										damageAdd	8.0														
+buff_685		增加伤害%	0					100					damageAdd	4.0														
+buff_686		伤害8%	10					1					damageAdd	8.0														
+buff_687		反伤伤害（百分比）	0										counterStrikeDam	6.5	2.0													
+buff_688	group_shield	血盾	11		1	1		1					sourceperattToshield	12.0				247	buffc	buff_icon_xuedun								
+buff_689		伤害减免%	10					4					damageReduce	2.5														
+buff_690		增加伤害%	10					4					damageAdd	2.5														
+buff_691		加闪避率	10					4					dodge	2.5														
+buff_692	group_fire	灼烧	2	1		1		3					fireDam							buff_icon_zhuoshao							176	root
+buff_693	group_philiatalatt	攻击力增加	0		1	1		4					peratt	30.0						buff_icon_gongjitisheng								
+buff_694	group_shaxuetal02	伤害减免20%	0		1	1		2		1			damageReduce	25.0						buff_icon_shanghaijianmian								
+buff_695		加暴击伤害	0										criFactor	20.0														
+buff_696	group_annettetal411	加闪避率	0			1		100		20			dodge	1.0						buff_icon_shanbitisheng								
+buff_697	group_annettetal412	增加伤害2%	0			1		100		5			damageAdd	2.0						buff_icon_gongjitisheng								
+buff_698	group_shield	血盾	11		1			10					sourceperattToshield	200.0				247	buffc	buff_icon_xuedun					248	buffc		
+buff_699		额外伤害	0										additionAttDam	999999.0														
+buff_700		增加能量	0										anger	300.0														
+buff_701	group_unionboss	降低CD	0										minusSkillCoolDown	4.0														
+buff_702		回最大血量20%	10										permaxHp	20.0														
+buff_703		反伤伤害（百分比）	0										counterStrikeDam	30.0	2.0													
+buff_704		增加伤害%	0					100					damageAdd	1.6														
+buff_705		伤害减免%	0					100					damageReduce	1.6														
+buff_706		增加伤害%	10					4					damageAdd	2.5														
+buff_707	group_shield	血盾	1		1	1		1					sourceperattToshield	6.5				247	buffc	buff_icon_xuedun								
+buff_708		反伤伤害（百分比）	0										counterStrikeDam	6.5	2.0													
+buff_709		额外伤害最大血量2百分比	0										additionSourcepermaxHp	2.0														
+buff_710		加暴击率	0										cri	50.0														
+buff_711		恢复加成	0					2					minusAddperhp	10.0														
+buff_712		无视防御	0										perdef	-10.0														
+buff_713		加命中率	0	1		1		2					hit	-8.0						buff_icon_mingzhongxiajiang								
+buff_714		偷取免伤	0					2					damageReduceChange	2.0						buff_icon_shanghaijianmian								
+buff_715		增加攻击	0					100		6			peratt	10.0						buff_icon_gongjitisheng								
+buff_716		回最大血量5%	0										permaxHp	5.0														
+buff_717		增加伤害%	0					100					damageAdd	120000.0						buff_icon_gongjitisheng								
+buff_718		回最大血量30%	0										permaxHp	30.0														
+buff_719	group_permaxHpBySelfRound	回合开始时减少20%最大血量	0					10					permaxHpBySelfRound	-20.0						buff_icon_zhongshang								
+buff_720		增加攻击	0					2		10			peratt	10.0						buff_icon_gongjitisheng								
+buff_721		加闪避率	10					2					dodge	30.0						buff_icon_shanbitisheng								
+buff_722	group_shield	血盾	0					1		1			sourceperattToshield	1000.0				247	buffc	buff_icon_xuedun								
+buff_723		回最大血量30%	10										permaxHp	30.0														
+buff_724		增加攻击	0					1		1			peratt	10000.0						buff_icon_gongjitisheng								
+buff_725		反伤伤害（百分比）	0					2		1			counterStrikeDam	40.0	2.0					buff_icon_fanshang								
+buff_726		物理伤害减免（百分比）	0					100					pdamageReduce	70.0						buff_icon_fangyutisheng								
+buff_727		法术伤害减免（百分比）	0					100					mdamageReduce	70.0						buff_icon_fangyutisheng								
+buff_728		加暴击率30	0					100					cri	40.0						buff_icon_baojitisheng								
+buff_729		攻击力减少	0	1		1		4					peratt	-90.0						buff_icon_gongjixiajiang								
+buff_730		防御力减少	0	1		1		4					perdef	-90.0						buff_icon_fangyuxiajiang								
+buff_731		减最大血量80%	0										permaxHp	-80.0														
+buff_732		能量增长系数	0							1			angerRate	100.0														
+buff_733		吸血	0							1			lifestealHp	100.0	0.0													
+buff_734		增加攻击	0					100		3			peratt	10.0						buff_icon_gongjitisheng								
+buff_735		增加治疗量10%	0										treatAdd	10.0														
+buff_736		增加攻击	0					1		1			peratt	50.0						buff_icon_gongjitisheng								
+buff_737		闪避率减少	0	1				2					dodge	-8.0						buff_icon_shanbixiajiang								
+buff_738		增加攻击	0					1		3			peratt	100.0						buff_icon_gongjitisheng								
+buff_739		增加攻击	0					1		1			peratt	50.0						buff_icon_gongjitisheng								
+buff_740		加命中率	0										hit	15.0														
+buff_741		偷取免伤	0					4					damageReduceChange	15.0						buff_icon_shanghaijianmian								
+buff_742		偷取免伤	0					4					damageReduceChange	30.0						buff_icon_shanghaijianmian								
+buff_743		给敌方另一个目标造成等量伤害	0										sameDamForRandom	80.0														
+buff_744		增加攻击	10					2		1			peratt	15.0						buff_icon_gongjitisheng								
+buff_745	group_anger	降低能量	0										anger	-1.0														
+buff_746		替换技能buff	0										changeSkillBuff				068_3,buff_741,buff_742											
+buff_747		增加攻击	10					2		1			peratt	15.0						buff_icon_gongjitisheng								
+buff_748		增加攻击	10					2		1			peratt	15.0						buff_icon_gongjitisheng								
+buff_749		增加伤害%	0										damageAdd	25.0														
+buff_750		加暴击率	0										cri	25.0														
+buff_751		增加伤害%	0										damageAdd	10.0														
+buff_752		增加伤害%	0										damageAdd	10.0														
+buff_753		增加伤害%	0										damageAdd	10.0														
+buff_754	group_shield	血盾	1		1	1		10					sourceperattToshield	100.0				247	buffc	buff_icon_xuedun					248	buffc		
+buff_755		生命值减少10%	0										perhp	-10.0														
+buff_756	group_debuffpermaxHp	减最大血量20%	0										permaxHp	-20.0														
+buff_757		加闪避率	0					2					dodge	15.0						buff_icon_shanbitisheng								
+buff_758		替换技能buff	0										changeSkillBuff				071_3,buff_755,buff_759											
+buff_759		生命值减少20%	0										perhp	-20.0														
+buff_760	group_debuffpermaxHp	减最大血量30%	0										permaxHp	-30.0														
+buff_761		替换技能buff	0										changeSkillBuff				071_3,buff_756,buff_760											
+buff_762		加闪避率	0										dodge	40.0														
+buff_763		增加攻击	0					1		1			peratt	15.0						buff_icon_gongjitisheng								
+buff_764		加暴击率	0										cri	20.0														
+buff_765		增加伤害%	0										damageAdd	20.0														
+buff_766		吸血	0										lifestealHp	100.0	0.0													
+buff_767		增加伤害%	0										damageAdd	30.0														
+buff_768		血量越低暴击越高	1										perhpTocri	-10.0	2.0													
+buff_769		血量越低攻击越高	1										perhpToPeratt	-10.0	2.0													
+buff_770		血量越低闪避越高	1					100					perhpTododge	-10.0	1.0													
+buff_771		吸血	0										lifestealHp	20.0	0.0													
+buff_772	group_bleeding	流血	0	1	1			1					bleeding	6.0				178	buffb	buff_icon_liuxue								
+buff_773		防御力减少	0	1		1		2					perdef	-1.0						buff_icon_fangyuxiajiang								
+buff_774		吸血	0										lifestealHp	100.0	0.0													
+buff_775		伤害减免80%	0					2					damageReduce	80.0						buff_icon_shanghaijianmian								
+buff_776		额外伤害	0										additionAttDam	50.0														
+buff_777		增加防御40%	0			1		4					perdef	40.0														
+buff_778		攻击力增加	0			1		4					peratt	40.0														
+buff_779		增加防御20%	0			1		100					perdef	20.0						buff_icon_fangyutisheng								
+buff_780		攻击力增加20%	0			1		100					peratt	20.0						buff_icon_gongjitisheng								
+buff_781		攻击力增加	0										peratt	50.0														
+buff_782		攻击力增加	0										peratt	80.0														
+buff_783		增加伤害%	0			1		100					damageAdd	15.0						buff_icon_gongjitisheng								
+buff_784		治疗	0										recover	200.0														
+buff_785		增加攻击	0					1		1			peratt	10.0						buff_icon_gongjitisheng								
+buff_786		减最大血量1%	10										permaxHp	-1.0														
+buff_787		伤害加深30%	0	1				2					damageReduce	-30.0						buff_icon_shanghaijiashen								
+buff_788		伤害减免30%	0					2					damageReduce	30.0						buff_icon_shanghaijianmian								
+buff_789		物理伤害减免（百分比）	10			1		1					pdamageReduce	200.0						buff_icon_fangyutisheng								
+buff_790		增加伤害%	10			1		1		7			damageAdd	15.0						buff_icon_gongjitisheng								
+buff_791		加闪避率	0					2					dodge	20.0						buff_icon_shanbitisheng								
+buff_792		按对方cast行动减最大百分比	0					2					cripple	-1.0						buff_icon_baotou								
+buff_793		防御力减少	0	1		1		2					perdef	-10.0						buff_icon_fangyuxiajiang								
+buff_794	group_debuffheal	恢复抑制	0	1		1		2					minusAddperhp	-100.0						buff_icon_huifuyizhi								
+buff_795		攻击力减少	0	1		1		2					peratt	-10.0						buff_icon_gongjixiajiang								
+buff_796		加命中率	0					2					hit	10.0						buff_icon_mingzhongtisheng								
+buff_797	group_forbidUltimateSkill	封印	2	1	1			2					forbidUltimateSkill					243	buffa	buff_icon_fengyin								
+buff_798		格挡	0					100					blockDam	20.0	-50.0					buff_icon_gedang								
+buff_799		增加防御20%	0					100					perdef	20.0						buff_icon_fangyutisheng								
+buff_800		回最大血量5%	0										permaxHp	5.0														
+buff_801	group_permaxHpBySelfRound	回合开始时减少10%最大血量	0					100					permaxHpBySelfRound	-10.0						buff_icon_zhongshang								
+buff_802	group_asunatalent2	降低CD	0					100					minusSkillCoolDown	2.0						buff_icon_qusan								
+buff_803		增加伤害%	0										damageAdd	15.0														
+buff_804		增加伤害%	0					100					damageAdd	5.0														
+buff_805		加暴击率	0					100					cri	2.0														
+buff_806		伤害减免%	0					100					damageReduce	5.0														
+buff_807		加闪避率	0					100					dodge	5.0														
+buff_808		加抗暴率	0					100					antiCri	5.0														
+buff_809		恢复加成	0					100					minusAddperhp	20.0														
+buff_810		加命中率	0			1		2					hit	20.0						buff_icon_mingzhongtisheng								
+buff_811		加暴击率10	0			1		2					cri	10.0						buff_icon_baojitisheng								
+buff_812		真实伤害	2										immuneDef															
+buff_813	group_dizzy	晕一回合	2	1				2		1			dizzy					175	buffa	buff_icon_xuanyun								
+buff_814		加闪避率	0			1		2					dodge	10.0						buff_icon_shanbitisheng								
+buff_815	group_forbidFirstSkill	麻痹	2	1	1			2					forbidFirstSkill					177	buffc	buff_icon_mabi								
+buff_816		额外伤害	0										additionAttDam	30.0														
+buff_817	group_ice	冰	2	1		1		2					ice	-20.0	-20.0			180	buffb	buff_icon_bingdong								
+buff_818		加闪避率	0			1		2					dodge	20.0						buff_icon_shanbitisheng								
+buff_819		破防	0	1		1		1					perdef	-15.0						buff_icon_pojia								
+buff_820		攻击力增加	0	1		1		2					peratt	25.0						buff_icon_gongjitisheng								
+buff_821		清除debuff	3										clearDebuff															
+buff_822	group_bleeding	流血	0	1	1			1					bleeding	6.0				178	buffb	buff_icon_liuxue								
+buff_823		加攻击	0										att	3630.0														
+buff_824		生命降低伤害增加	1										perhpTodamageAdd	-10.0	6.0													
+buff_825		吸血	0										lifestealHp	50.0	0.0													
+buff_826		伤害减免50%	0										damageReduce	50.0														
+buff_827		加命中率	0										hit	20.0														
+buff_828		增加生命%	0										perhp	20.0														
+buff_829	group_recoverxilika	治疗	0		1			1					recover	90.0						buff_icon_jinghua								
+buff_830		加闪避率	0										dodge	15.0														
+buff_831		加抗暴率	0										antiCri	15.0														
+buff_832	group_dizzy	晕一回合	2	1				2		1			dizzy					175	buffa	buff_icon_xuanyun								
+buff_833		伤害减免%	0					100					damageReduce	10.0														
+buff_834		增加伤害100%	0										damageAdd	100.0														
+buff_835		加暴击伤害	0					1					criFactor	20.0						buff_icon_baojitisheng								
+buff_836		加命中率	0			1		2					hit	10.0						buff_icon_mingzhongtisheng								
+buff_837		加命中率	0			1		2					hit	20.0						buff_icon_mingzhongtisheng								
+buff_838		加抗暴率	0										antiCri	30.0														
+buff_839		无视防御	0					2					perdef	-20.0														
+buff_840		防御力减少	0	1		1		2					perdef	-25.0						buff_icon_fangyuxiajiang								
+buff_841	group_bleeding	流血	0	1	1			2					bleeding	6.0				178	buffb	buff_icon_liuxue								
+buff_842		加暴击率	0					2					cri	20.0						buff_icon_baojitisheng								
+buff_843		加命中率	0										hit	10.0						buff_icon_mingzhongxiajiang								
+buff_844	group_forbidUltimateSkill	封印	2	1				2					forbidUltimateSkill					243	buffa	buff_icon_fengyin								
+buff_845	group_fire	灼烧	2	1		1		2					fireDam							buff_icon_zhuoshao							176	root
+buff_846	group_ice	冰	2	1		1		2					ice	-20.0	-20.0			180	buffb	buff_icon_bingdong								
+buff_847		伤害减免%	0					2					damageReduce	15.0						buff_icon_shanghaijianmian								
+buff_848		小爆头	0										minusMaxHpPercent	-15.0	200.0			181	buffa									
+buff_849		增加伤害	0										damageAdd	15.0														
+buff_850	group_dizzy	晕一回合	2	1				2		1			dizzy					175	buffa	buff_icon_xuanyun								
+buff_851		加闪避率	0					2					dodge	10.0						buff_icon_shanbitisheng								
+buff_852		加命中率	0			1		2					hit	8.0						buff_icon_mingzhongtisheng								
+buff_853	group_damageReduce	虚弱	0	1	1	1		2					damageAdd	-50.0						buff_icon_xuruo								
+buff_854		增加能量	0										anger	20.0														
+buff_855		物理免伤	0			1		2					pdamageReduce	-20.0						buff_icon_fangyutisheng								
+buff_856		加暴击率10%	0										cri	10.0						buff_icon_baojitisheng								
+buff_857		加命中率	0										hit	8.0						buff_icon_mingzhongxiajiang								
+buff_858		加抗暴率	0										antiCri	10.0														
+buff_859		加攻击	0										att	230.0														
+buff_860		加命中率	0										hit	10.0						buff_icon_mingzhongxiajiang								
+buff_861		增加伤害25%	0					100		1			damageAdd	25.0						buff_icon_gongjitisheng								
+buff_862		加抗暴率	0					100					antiCri	6.0														
+buff_863		加暴击率17（不叠加）	0										cri	17.0						buff_icon_baojitisheng								
+buff_864		加暴击伤害	0										criFactor	30.0														
+buff_865		伤害减免30%	0										damageReduce	30.0														
+buff_866		血量越低闪避越高	1										perhpTododge	-10.0	5.0													
+buff_867		血量越低暴击越高	1										perhpTocri	-10.0	2.0													
+buff_868		伤害减免%	0										damageReduce	15.0														
+buff_869		增加伤害30%，瞬时	0										damageAdd	30.0														
+buff_870		加暴击率30%	0										cri	30.0						buff_icon_baojitisheng								
+buff_871		减少敌方闪避	0	1				4					dodge	-15.0						buff_icon_shanbixiajiang								
+buff_872		伤害减免30%	0					2					damageReduce	30.0						buff_icon_shanghaijianmian								
+buff_873		减少命中率	0	1		1		4					hit	-15.0						buff_icon_mingzhongxiajiang								
+buff_874	group_damageReduce	虚弱	0	1	1	1		2					damageAdd	-50.0						buff_icon_xuruo								
+buff_875	group_bleeding	流血	0	1	1			1					bleeding	4.0				178	buffb	buff_icon_liuxue								
+buff_876		加抗暴率	0					100					antiCri	15.0														
+buff_877		加暴击率55%	0										cri	55.0						buff_icon_baojitisheng								

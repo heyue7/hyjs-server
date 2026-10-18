@@ -1,0 +1,1 @@
+INSERT IGNORE INTO p13_guild_donation_badge_policies(id,enabled,version,source,coin_cost,badge_amount,daily_limit,published_at) VALUES (1,0,'local-guild-coin-donation-badge-mail-v1','本地运营来源：原金币捐献每笔100000/每日1500000限制保留；每笔实际新扣费同事务投递P1奖励中心item_089,2，每人北京时间自然日最多15笔，徽章捐献不返徽章；不追认开启前历史，不使用GameConfigure335至338已弃用旧战场奖励。',100000,2,15,0);

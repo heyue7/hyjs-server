@@ -1,0 +1,170 @@
+id(id不能改变）	宠物天赋id	属性加成	突破等级	属性成长	突破常量
+id	petTalentId	talent	talentLevel	talentGrow	talentConstGrow
+string	string	string	int	string	string
+primary	index	none	none	none	none
+id	petTalentId	talent	talentLevel	talentGrow	talentConstGrow
+1	PetTalent_1	att,21	0	att,20	
+2	PetTalent_2	hp,474	0	hp,350	
+3	PetTalent_3	pdef,11	0	pdef,6	
+4	PetTalent_4	mdef,11	0	mdef,6	
+5	PetTalent_5	cri,0.18	0	cri,0.017	
+6	PetTalent_6	antiCri,0.17	0	antiCri,0.016	
+7	PetTalent_7	damageReduce,0.05	0	damageReduce,0.007	
+8	PetTalent_8	damageAdd,0.05	0	damageAdd,0.008	
+9	PetTalent_9	hit,0.2	0	hit,0.016	
+10	PetTalent_10	dodge,0.11	0	dodge,0.01	
+11	PetTalent_11	att,15	0	att,15	
+12	PetTalent_12	hp,332	0	hp,205	
+13	PetTalent_13	pdef,8	0	pdef,4	
+14	PetTalent_14	mdef,8	0	mdef,4	
+15	PetTalent_15	cri,0.11	0	cri,0.013	
+16	PetTalent_16	antiCri,0.1	0	antiCri,0.013	
+17	PetTalent_17	damageReduce,0.03	0	damageReduce,0.004	
+18	PetTalent_18	damageAdd,0.03	0	damageAdd,0.004	
+19	PetTalent_19	hit,0.12	0	hit,0.013	
+20	PetTalent_20	dodge,0.07	0	dodge,0.007	
+21	PetTalent_21	att,9	0	att,8	
+22	PetTalent_22	hp,190	0	hp,120	
+23	PetTalent_23	pdef,5	0	pdef,2	
+24	PetTalent_24	mdef,5	0	mdef,2	
+25	PetTalent_25	cri,0.05	0	cri,0.007	
+26	PetTalent_26	antiCri,0.05	0	antiCri,0.007	
+27	PetTalent_27	damageReduce,0.02	0	damageReduce,0.002	
+28	PetTalent_28	damageAdd,0.02	0	damageAdd,0.002	
+29	PetTalent_29	hit,0.08	0	hit,0.007	
+30	PetTalent_30	dodge,0.04	0	dodge,0.003	
+31	PetTalent_1	att,21	1	att,20	att,356
+32	PetTalent_2	hp,474	1	hp,350	hp,3138
+33	PetTalent_3	pdef,11	1	pdef,6	pdef,89
+34	PetTalent_4	mdef,11	1	mdef,6	mdef,89
+35	PetTalent_5	cri,0.18	1	cri,0.017	cri,0.72
+36	PetTalent_6	antiCri,0.17	1	antiCri,0.016	antiCri,0.71
+37	PetTalent_7	damageReduce,0.05	1	damageReduce,0.007	damageReduce,0.19
+38	PetTalent_8	damageAdd,0.05	1	damageAdd,0.008	damageAdd,0.19
+39	PetTalent_9	hit,0.2	1	hit,0.016	hit,1.01
+40	PetTalent_10	dodge,0.11	1	dodge,0.01	dodge,0.41
+41	PetTalent_11	att,15	1	att,15	att,223
+42	PetTalent_12	hp,332	1	hp,205	hp,3070
+43	PetTalent_13	pdef,8	1	pdef,4	pdef,67
+44	PetTalent_14	mdef,8	1	mdef,4	mdef,67
+45	PetTalent_15	cri,0.11	1	cri,0.013	cri,0.31
+46	PetTalent_16	antiCri,0.1	1	antiCri,0.013	antiCri,0.31
+47	PetTalent_17	damageReduce,0.03	1	damageReduce,0.004	damageReduce,0.083
+48	PetTalent_18	damageAdd,0.03	1	damageAdd,0.004	damageAdd,0.083
+49	PetTalent_19	hit,0.12	1	hit,0.013	hit,0.41
+50	PetTalent_20	dodge,0.07	1	dodge,0.007	dodge,0.26
+51	PetTalent_21	att,9	1	att,8	att,134
+52	PetTalent_22	hp,190	1	hp,120	hp,1713
+53	PetTalent_23	pdef,5	1	pdef,2	pdef,45
+54	PetTalent_24	mdef,5	1	mdef,2	mdef,45
+55	PetTalent_25	cri,0.05	1	cri,0.007	cri,0.31
+56	PetTalent_26	antiCri,0.05	1	antiCri,0.007	antiCri,0.21
+57	PetTalent_27	damageReduce,0.02	1	damageReduce,0.002	damageReduce,0.082
+58	PetTalent_28	damageAdd,0.02	1	damageAdd,0.002	damageAdd,0.082
+59	PetTalent_29	hit,0.08	1	hit,0.007	hit,0.31
+60	PetTalent_30	dodge,0.04	1	dodge,0.003	dodge,0.2
+61	PetTalent_1	att,21	2	att,20	att,712
+62	PetTalent_2	hp,474	2	hp,350	hp,6276
+63	PetTalent_3	pdef,11	2	pdef,6	pdef,178
+64	PetTalent_4	mdef,11	2	mdef,6	mdef,178
+65	PetTalent_5	cri,0.18	2	cri,0.017	cri,1.23
+66	PetTalent_6	antiCri,0.17	2	antiCri,0.016	antiCri,1.12
+67	PetTalent_7	damageReduce,0.05	2	damageReduce,0.007	damageReduce,0.29
+68	PetTalent_8	damageAdd,0.05	2	damageAdd,0.008	damageAdd,0.29
+69	PetTalent_9	hit,0.2	2	hit,0.016	hit,1.52
+70	PetTalent_10	dodge,0.11	2	dodge,0.01	dodge,0.71
+71	PetTalent_11	att,15	2	att,15	att,446
+72	PetTalent_12	hp,332	2	hp,205	hp,6140
+73	PetTalent_13	pdef,8	2	pdef,4	pdef,134
+74	PetTalent_14	mdef,8	2	mdef,4	mdef,134
+75	PetTalent_15	cri,0.11	2	cri,0.013	cri,0.57
+76	PetTalent_16	antiCri,0.1	2	antiCri,0.013	antiCri,0.52
+77	PetTalent_17	damageReduce,0.03	2	damageReduce,0.004	damageReduce,0.135
+78	PetTalent_18	damageAdd,0.03	2	damageAdd,0.004	damageAdd,0.135
+79	PetTalent_19	hit,0.12	2	hit,0.013	hit,0.72
+80	PetTalent_20	dodge,0.07	2	dodge,0.007	dodge,0.36
+81	PetTalent_21	att,9	2	att,8	att,268
+82	PetTalent_22	hp,190	2	hp,120	hp,3426
+83	PetTalent_23	pdef,5	2	pdef,2	pdef,90
+84	PetTalent_24	mdef,5	2	mdef,2	mdef,90
+85	PetTalent_25	cri,0.05	2	cri,0.007	cri,0.51
+86	PetTalent_26	antiCri,0.05	2	antiCri,0.007	antiCri,0.36
+87	PetTalent_27	damageReduce,0.02	2	damageReduce,0.002	damageReduce,0.133
+88	PetTalent_28	damageAdd,0.02	2	damageAdd,0.002	damageAdd,0.133
+89	PetTalent_29	hit,0.08	2	hit,0.007	hit,0.51
+90	PetTalent_30	dodge,0.04	2	dodge,0.003	dodge,0.3
+91	PetTalent_1	att,21	3	att,20	att,1068
+92	PetTalent_2	hp,474	3	hp,350	hp,9414
+93	PetTalent_3	pdef,11	3	pdef,6	pdef,267
+94	PetTalent_4	mdef,11	3	mdef,6	mdef,267
+95	PetTalent_5	cri,0.18	3	cri,0.017	cri,1.74
+96	PetTalent_6	antiCri,0.17	3	antiCri,0.016	antiCri,1.53
+97	PetTalent_7	damageReduce,0.05	3	damageReduce,0.007	damageReduce,0.39
+98	PetTalent_8	damageAdd,0.05	3	damageAdd,0.008	damageAdd,0.39
+99	PetTalent_9	hit,0.2	3	hit,0.016	hit,2.03
+100	PetTalent_10	dodge,0.11	3	dodge,0.01	dodge,1.01
+101	PetTalent_11	att,15	3	att,15	att,669
+102	PetTalent_12	hp,332	3	hp,205	hp,9210
+103	PetTalent_13	pdef,8	3	pdef,4	pdef,201
+104	PetTalent_14	mdef,8	3	mdef,4	mdef,201
+105	PetTalent_15	cri,0.11	3	cri,0.013	cri,0.84
+106	PetTalent_16	antiCri,0.1	3	antiCri,0.013	antiCri,0.74
+107	PetTalent_17	damageReduce,0.03	3	damageReduce,0.004	damageReduce,0.185
+108	PetTalent_18	damageAdd,0.03	3	damageAdd,0.004	damageAdd,0.185
+109	PetTalent_19	hit,0.12	3	hit,0.013	hit,1.04
+110	PetTalent_20	dodge,0.07	3	dodge,0.007	dodge,0.47
+111	PetTalent_21	att,9	3	att,8	att,402
+112	PetTalent_22	hp,190	3	hp,120	hp,5139
+113	PetTalent_23	pdef,5	3	pdef,2	pdef,135
+114	PetTalent_24	mdef,5	3	mdef,2	mdef,135
+115	PetTalent_25	cri,0.05	3	cri,0.007	cri,0.71
+116	PetTalent_26	antiCri,0.05	3	antiCri,0.007	antiCri,0.51
+117	PetTalent_27	damageReduce,0.02	3	damageReduce,0.002	damageReduce,0.184
+118	PetTalent_28	damageAdd,0.02	3	damageAdd,0.002	damageAdd,0.184
+119	PetTalent_29	hit,0.08	3	hit,0.007	hit,0.71
+120	PetTalent_30	dodge,0.04	3	dodge,0.003	dodge,0.4
+121	PetTalent_1	att,21	4	att,20	att,1424
+122	PetTalent_2	hp,474	4	hp,350	hp,12552
+123	PetTalent_3	pdef,11	4	pdef,6	pdef,356
+124	PetTalent_4	mdef,11	4	mdef,6	mdef,356
+125	PetTalent_5	cri,0.18	4	cri,0.017	cri,2.79
+126	PetTalent_6	antiCri,0.17	4	antiCri,0.016	antiCri,2.63
+127	PetTalent_7	damageReduce,0.05	4	damageReduce,0.007	damageReduce,0.6
+128	PetTalent_8	damageAdd,0.05	4	damageAdd,0.008	damageAdd,0.6
+129	PetTalent_9	hit,0.2	4	hit,0.016	hit,3.24
+130	PetTalent_10	dodge,0.11	4	dodge,0.01	dodge,1.65
+131	PetTalent_11	att,15	4	att,15	att,892
+132	PetTalent_12	hp,332	4	hp,205	hp,12280
+133	PetTalent_13	pdef,8	4	pdef,4	pdef,268
+134	PetTalent_14	mdef,8	4	mdef,4	mdef,268
+135	PetTalent_15	cri,0.11	4	cri,0.013	cri,1.29
+136	PetTalent_16	antiCri,0.1	4	antiCri,0.013	antiCri,1.16
+137	PetTalent_17	damageReduce,0.03	4	damageReduce,0.004	damageReduce,0.354
+138	PetTalent_18	damageAdd,0.03	4	damageAdd,0.004	damageAdd,0.354
+139	PetTalent_19	hit,0.12	4	hit,0.013	hit,1.62
+140	PetTalent_20	dodge,0.07	4	dodge,0.007	dodge,0.9
+141	PetTalent_21	att,9	4	att,8	att,536
+142	PetTalent_22	hp,190	4	hp,120	hp,6852
+143	PetTalent_23	pdef,5	4	pdef,2	pdef,180
+144	PetTalent_24	mdef,5	4	mdef,2	mdef,180
+145	PetTalent_25	cri,0.05	4	cri,0.007	cri,1.05
+146	PetTalent_26	antiCri,0.05	4	antiCri,0.007	antiCri,0.96
+147	PetTalent_27	damageReduce,0.02	4	damageReduce,0.002	damageReduce,0.29
+148	PetTalent_28	damageAdd,0.02	4	damageAdd,0.002	damageAdd,0.29
+149	PetTalent_29	hit,0.08	4	hit,0.007	hit,1.24
+150	PetTalent_30	dodge,0.04	4	dodge,0.003	dodge,0.76
+151	PetTalent_31	hp,1000	0	hp,700	
+152	PetTalent_31	hp,1000	1	hp,700	hp,10000
+153	PetTalent_31	hp,1000	2	hp,700	hp,15000
+154	PetTalent_31	hp,1000	3	hp,700	hp,20000
+155	PetTalent_31	hp,1000	4	hp,700	hp,25000
+156	PetTalent_32	att,50	0	att,40	
+157	PetTalent_32	att,50	1	att,40	att,800
+158	PetTalent_32	att,50	2	att,40	att,1000
+159	PetTalent_32	att,50	3	att,40	att,1500
+160	PetTalent_32	att,50	4	att,40	att,2000
+161	PetTalent_33	pdef,50	0	pdef,20	
+162	PetTalent_33	pdef,50	1	pdef,20	pdef,400
+163	PetTalent_33	pdef,50	2	pdef,20	pdef,800
+164	PetTalent_33	pdef,50	3	pdef,20	pdef,1200
+165	PetTalent_33	pdef,50	4	pdef,20	pdef,1600

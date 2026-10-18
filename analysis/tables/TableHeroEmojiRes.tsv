@@ -1,0 +1,555 @@
+表情Id	模型资源名称	表情类型	资源名
+EmojiId	ModelName	ExpressType	FaceName
+string	string	int	string
+primary	index	none	none
+EmojiId	ModelName	ExppressType	FaceName
+1	klein01_body	0	klein01_face_n
+2	klein01_body	1	klein01_face_blink
+3	klein01_body	2	klein01_face_anger
+4	klein01_body	3	klein01_face_hit
+5	dane01_body	0	dane01_face_n
+6	dane01_body	4	dane01_face_s1
+7	lisbet01_body	0	lisa01_face_n
+8	lisbet01_body	4	lisa01_face_s1
+9	sakuya01_body	0	sakuya01_face_n
+10	sakuya01_body	1	sakuya01_face_blink
+11	sakuya01_body	4	sakuya01_face_s1
+12	shirica01_body	0	shirica01_face_n
+13	shirica01_body	1	shirica01_face_blink
+14	argo01_body	0	argo01_face_n
+15	argo01_body	4	argo01_face_s1
+16	asuna01_body	0	asuna01_face_n
+17	asuna01_body	4	asuna01_face_s1
+18	asuna01_body	4	asuna01_face_s2
+19	spiegel01_body	0	spiegel01_face_n
+20	spiegel01_body	4	spiegel01_face_s1
+21	mercy01_body	0	mercy01_face_n
+22	mercy01_body	1	mercy01_face_blink
+23	mercy01_body	4	mercy01_face_s1
+24	raghan01_body	0	raghan01_face_n
+25	raghan01_body	2	raghan01_face_anger
+26	asuna02_body	0	asuna02_face_n
+27	asuna02_body	2	asuna02_face_anger
+28	baillieu01_body	0	baillieu01_face_n
+29	baillieu01_body	4	baillieu01_face_s1
+30	jun01_body	0	jun01_face_n
+31	jun01_body	2	jun01_face_anger
+32	kirito01_body	0	kirito01_face_n
+33	kirito01_body	2	kirito01_face_anger
+34	kirito01_body	4	kirito01_face_s1
+35	asuna03_body	0	asuna03_face_n
+36	asuna03_body	4	asuna03_face_s1
+37	asuna03_body	4	asuna03_face_s2
+38	caroline01_body	0	caroline01_face_n
+39	caroline01_body	4	caroline01_face_s1
+40	kirito02_body	0	kirito02_face_n
+41	kirito02_body	2	kirito02_face_anger
+42	lefa02_body	0	lefa02_face_n
+43	lefa02_body	1	lefa02_face_blink
+44	lefa02_body	4	lefa02_face_s1
+45	serra01_body	0	serra01_face_n
+46	serra01_body	1	serra01_face_blink
+47	sachi01_body	0	sachi01_face_n
+48	sachi01_body	1	sachi01_face_blink
+49	shino01_body	0	shino01_face_n
+50	shino01_body	4	shino01_face_s1
+51	yuuki01_body	0	yuuki01_face_n
+52	yuuki01_body	1	yuuki01_face_blink
+53	yuuki01_body	2	yuuki01_face_anger
+54	hero02_body	0	hero02_face_n
+55	hero02_body	2	hero02_face_anger
+56	heroine02_body	0	heroine02_face_n
+57	heroine02_body	2	heroine02_face_anger
+58	mia01_body	0	mia01_face_n
+59	mia01_body	1	mia01_face_blink
+60	mia01_body	4	mia01_face_s1
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			

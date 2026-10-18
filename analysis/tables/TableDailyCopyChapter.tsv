@@ -1,0 +1,53 @@
+章节id	解锁等级	推荐战力	掉落	类型	概率
+ChapterId	LevelLimit	Recommend	Drop	Type	Drop1
+string	int	int	string	string	string
+primary	none	none	none	none	none
+ChapterId	LevelLimit	Recommend	Drop	Type	Drop1
+1	26	4875	hero_exp_004,4	HeroExp	
+2	50	50825	hero_exp_004,8	HeroExp	
+3	75	146500	hero_exp_004,12	HeroExp	
+5	26	4875	trea_010,4	TreasureExp	
+6	50	50825	trea_010,8	TreasureExp	
+7	75	146500	trea_010,12	TreasureExp	
+9	35	19160	coin,630000	Coin	
+10	55	106000	coin,1250000	Coin	
+11	80	225000	coin,1880000	Coin	
+13	35	19160	item_008,30	EquipRefineExp	
+14	55	106000	item_008,60	EquipRefineExp	
+15	80	225000	item_008,90	EquipRefineExp	
+17	50	44756	item_005,200	Advance	
+18	70	200000	item_005,400	Advance	
+19	85	326000	item_005,600	Advance	
+21	50	44756	item_012,200	TreasureRefineExp	
+22	70	200000	item_012,400	TreasureRefineExp	
+23	85	326000	item_012,600	TreasureRefineExp	
+25	34	18160	item_131,6	PetFood_light	
+26	55	106000	item_131,8	PetFood_light	
+27	80	225000	item_131,12	PetFood_light	
+28	34	18160	item_132,6	PetFood_dark	
+29	55	106000	item_132,8	PetFood_dark	
+30	80	225000	item_132,12	PetFood_dark	
+31	34	18160	item_128,6	PetFood_wind	
+32	55	106000	item_128,8	PetFood_wind	
+33	80	225000	item_128,12	PetFood_wind	
+34	34	18160	item_129,6	PetFood_fire	
+35	55	106000	item_129,8	PetFood_fire	
+36	80	225000	item_129,12	PetFood_fire	
+37	34	18160	item_130,6	PetFood_water	
+38	55	106000	item_130,8	PetFood_water	
+39	80	225000	item_130,12	PetFood_water	
+40	34	18160	item_126,5	PetFlower	
+41	55	106000	item_126,10	PetFlower	
+42	80	225000	item_126,15	PetFlower	
+43	34	18160	item_150,1;item_139,5	PetBreak	
+44	55	106000	item_150,2;item_139,10	PetBreak	
+45	80	225000	item_151,1;item_139,15;item_150,3	PetBreak	
+46	40	44756	frag_trea_006_1,1	GreatTrea	frag_trea_006_1:1,1000|frag_trea_007_1:1,600;0,400|frag_trea_008_1:1,600;0,400|frag_trea_009_1:1,600;0,400
+47	60	200000	frag_trea_012_1,1	GreatTrea	frag_trea_006_1:1,300;0,700|frag_trea_007_1:1,1000|frag_trea_008_1:1,300;0,700|frag_trea_009_1:1,300;0,700|frag_trea_011_1:1,200;0,800|frag_trea_012_1:1,200;0,800|frag_trea_013_1:1,200;0,800|frag_trea_014_1:1,200;0,800
+48	80	326000	frag_trea_017_1,1	GreatTrea	frag_trea_006_1:1,300;0,700|frag_trea_007_1:1,300;0,700|frag_trea_008_1:1,1000|frag_trea_009_1:1,300;0,700|frag_trea_011_1:1,200;0,800|frag_trea_012_1:1,200;0,800|frag_trea_013_1:1,200;0,800|frag_trea_014_1:1,200;0,800|frag_trea_015_1:1,100;0,900|frag_trea_016_1:1,100;0,900|frag_trea_017_1:1,100;0,900|frag_trea_018_1:1,100;0,900
+49	35	18160	item_380,15	PetEquip	item_380:15,1000|item_385:6,400;4,400;2,200|item_379:10,500;5,400;0,100|item_384:5,500;3,300;0,200
+50	55	106000	item_381,30	PetEquip	item_381:30,1000|item_387:30,300;20,300;10,300;0,100|item_386:6,300;4,300;2,300;0,100|item_380:5,300;0,700|item_385:2,300;0,700|item_379:5,300;0,700|item_384:2,300;0,700
+51	80	225000	item_382,45	PetEquip	item_382:45,1000|item_389:45,300;30,300;15,300;0,100|item_390:45,300;30,300;15,300;0,100|item_388:6,300;4,300;2,300;0,100|item_381:10,300;0,700|item_387:10,300;0,700|item_386:2,300;0,700|item_380:5,300;0,700|item_385:2,300;0,700|item_379:5,300;0,700|item_384:2,300;0,700
+52	35	18160	item_433,15	Theatric	item_433:15,1000
+53	55	106000	item_435,30	Theatric	item_435:30,1000|item_434:6,300;4,300;2,300;0,100
+54	80	225000	item_436,45	Theatric	item_436:45,1000|item_437:6,300;4,300;2,300;0,100

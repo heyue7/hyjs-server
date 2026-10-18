@@ -1,0 +1,870 @@
+id	组id	说话的人	名字	内容	背景	声音	同时出现的人物0	人物位置0	人物表情0	同时出现的人物1	人物位置1	人物表情1	同时出现的人物2	人物位置2	人物表情2	同时出现的人物3	人物位置3	人物表情3
+id	groupId	talker	name	content	background	sound	heroIds0	heroPos0	faces0	heroIds1	heroPos1	faces1	heroIds2	heroPos2	faces2	heroIds3	heroPos3	faces3
+string	string	string	string	string	string	string	string	double	string	string	double	string	string	double	string	string	double	string
+primary	index	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none
+id	groupId	talker	name	content	background	sound	heroIds0	heroPos0	faces0	heroIds1	heroPos1	faces1	heroIds2	heroPos2	faces2	heroIds3	heroPos3	faces3
+battle_1	dialog_998	0	艾基尔	什么？居然又站起来了！			hero_010	0.92	angry	hero_001	0.1	angry	hero_003	0.35	angry	hero_009	0.65	angry
+battle_2	dialog_998	1	桐人	小心，它和刚才有些不一样！			hero_010	0.92	angry	hero_001	0.1	angry	hero_003	0.35	angry	hero_009	0.65	angry
+battle_3	dialog_998	2	亚丝娜	这狂暴的气息…			hero_010	0.92	angry	hero_001	0.1	angry	hero_003	0.35	angry	hero_009	0.65	angry
+battle_4	dialog_998	3	西莉卡	毕娜,准备支援！			hero_010	0.92	angry	hero_001	0.1	angry	hero_003	0.35	angry	hero_009	0.65	angry
+battle_5	dialog_999	0	艾基尔	喂，桐人，要不要试试那个？			hero_010	0.65	angry	hero_001	0.35	angry						
+battle_6	dialog_999	1	桐人	恩！总算派上用场了，新的必杀技！			hero_010	0.65	angry	hero_001	0.35	angry						
+battle_7	dialog_1000	1	桐人	……	UI_juqing_bg_09		hero_010	0.92	smile	hero_001	0.1	worry	hero_003	0.35	smile	hero_009	0.65	smile
+battle_8	dialog_1000	2	亚丝娜	怎么了桐人？	UI_juqing_bg_09		hero_010	0.92	smile	hero_001	0.1	smile	hero_003	0.35	worry	hero_009	0.65	smile
+battle_9	dialog_1000	1	桐人	想起那时候的战斗，14人死于那场战斗……	UI_juqing_bg_09		hero_010	0.92	smile	hero_001	0.1	worry	hero_003	0.35	smile	hero_009	0.65	smile
+battle_10	dialog_1000	0	艾基尔	那时，桐人为了保护大家，牺牲自己解放了SAO世界……	UI_juqing_bg_09		hero_010	0.92	smile	hero_001	0.1	smile	hero_003	0.35	smile	hero_009	0.65	smile
+battle_11	dialog_1000	0	艾基尔	当时的一切就好像发生在昨天一样！	UI_juqing_bg_09		hero_010	0.92	smile	hero_001	0.1	smile	hero_003	0.35	smile	hero_009	0.65	smile
+battle_12	dialog_1000	3	西莉卡	可惜我没有参加那场战斗，这次一定要和大家在一起！	UI_juqing_bg_09		hero_010	0.92	smile	hero_001	0.1	smile	hero_003	0.35	smile	hero_009	0.65	smile
+battle_13	dialog_1000	2	亚丝娜	嗯，今后一起挑战更强的BOSS！	UI_juqing_bg_09		hero_010	0.92	smile	hero_001	0.1	smile	hero_003	0.35	smile	hero_009	0.65	smile
+1	dialog_8	0	结衣	您好，我是您的导航精灵结衣!	UI_juqing_bg_16		actor_001	0.5	smile									
+2	dialog_8	0	结衣	欢迎来到SGPβ，在这款游戏里，可以自由地来往3个世界在不同的世界里进行探险。这三个世界分别是：刀剑的世界『Sword Art Online』、精灵的世界『ALfheim Online』、枪械的世界『GunGale online』。	UI_juqing_bg_16		actor_001	0.5	smile									
+3	dialog_8	0	结衣	我们现在所在的地方就是玩家的主城！玩家在这里可以招募同伴，领取任务，打造武器。并且传送到任意的游戏世界。	UI_juqing_bg_16		actor_001	0.5	smile									
+4	dialog_8	0	结衣	一个人在陌生的世界冒险比较危险，我们先去招募一个同伴吧！	UI_juqing_bg_16		actor_001	0.5	smile									
+5	dialog_13	2	亚丝娜	结衣！	UI_juqing_bg_20		actor_001	0.2	smile	hero_001	0.55	smile	hero_003	0.8	smile		0.35	smile
+6	dialog_13	1	桐人	结衣？	UI_juqing_bg_20		actor_001	0.2	smile	hero_001	0.55	smile	hero_003	0.8	smile		0.35	smile
+7	dialog_13	0	结衣	咦？	UI_juqing_bg_20		actor_001	0.2	normal	hero_001	0.55	smile	hero_003	0.8	smile		0.35	smile
+8	dialog_13	2	亚丝娜	哈哈，没想到居然在这里又见面了。	UI_juqing_bg_20		actor_001	0.2	normal	hero_001	0.55	smile	hero_003	0.8	smile		0.35	smile
+9	dialog_13	0	结衣	抱歉，其实……	UI_juqing_bg_20		actor_001	0.2	worry	hero_001	0.55	smile	hero_003	0.8	smile		0.35	smile
+10	dialog_13	1	桐人	等会再聊,当心！	UI_juqing_bg_20		actor_001	0.2	worry	hero_001	0.55	angry	hero_003	0.8	smile		0.35	smile
+11	dialog_14	3	亚丝娜	原来如此，这个世界的结衣只是稀有的导航精灵啊。	UI_juqing_bg_20		actor_001	0.2	smile		0.35	smile	hero_001	0.8	smile	hero_003	0.55	smile
+12	dialog_14	0	结衣	抱歉，两位，不过很高兴见到你们。	UI_juqing_bg_20		actor_001	0.2	smile		0.35	smile	hero_001	0.8	smile	hero_003	0.55	smile
+13	dialog_14	2	桐人	没关系，结衣。说起来你在寻找的那个同样带着导航精灵的玩家，或许我们有些线索。	UI_juqing_bg_20		actor_001	0.2	smile		0.35	smile	hero_001	0.8	smile	hero_003	0.55	smile
+14	dialog_14	1	self	！！能详细说明一下吗？	UI_juqing_bg_20		actor_001	0.2	normal		0.35	smile	hero_001	0.8	smile	hero_003	0.55	smile
+15	dialog_14	2	桐人	前段时间，在艾恩葛朗特和其他人组队的时候，听队友说碰上了一个非常强的家伙，在陷入围攻的情况下瞬间解决了所有怪物。	UI_juqing_bg_20		actor_001	0.2	normal		0.35	smile	hero_001	0.8	smile	hero_003	0.55	smile
+16	dialog_14	3	亚丝娜	啊，我也想起来了，他还说那个人也带着一个导航精灵！是你吗结衣？	UI_juqing_bg_20		actor_001	0.2	normal		0.35	smile	hero_001	0.8	smile	hero_003	0.55	smile
+17	dialog_14	0	结衣	不是我，导航精灵虽然稀少，然而还是有一部分玩家通过抽奖或其他活动得到了。	UI_juqing_bg_20		actor_001	0.2	normal		0.35	smile	hero_001	0.8	smile	hero_003	0.55	smile
+18	dialog_14	1	self	请问还有更多的信息吗？	UI_juqing_bg_20		actor_001	0.2	normal		0.35	smile	hero_001	0.8	smile	hero_003	0.55	smile
+19	dialog_14	3	亚丝娜	不好意思，我们只听说了这些。不过那么强的人，我想应该会参加BOSS攻略战吧。	UI_juqing_bg_20		actor_001	0.2	normal		0.35	smile	hero_001	0.8	smile	hero_003	0.55	worry
+20	dialog_14	1	self	BOSS攻略战？	UI_juqing_bg_20		actor_001	0.2	normal		0.35	smile	hero_001	0.8	smile	hero_003	0.55	smile
+21	dialog_14	3	亚丝娜	实力受到认可的玩家会被邀请参与BOSS攻略战，你如果努力提升实力的话，说不定能在那碰到他哦。	UI_juqing_bg_20		actor_001	0.2	normal		0.35	smile	hero_001	0.8	smile	hero_003	0.55	smile
+22	dialog_14	1	self	……	UI_juqing_bg_20		actor_001	0.2	normal		0.35	worry	hero_001	0.8	smile	hero_003	0.55	smile
+23	dialog_14	2	桐人	那我们先告辞了，两位再见。	UI_juqing_bg_20		actor_001	0.2	normal		0.35	smile	hero_001	0.8	smile	hero_003	0.55	smile
+24	dialog_14	1	self	再见，今天谢谢你们了。	UI_juqing_bg_20		actor_001	0.2	normal		0.35	smile	hero_001	0.8	smile	hero_003	0.55	smile
+25	dialog_14	3	亚丝娜	结衣，下次再见哦！	UI_juqing_bg_20		actor_001	0.2	normal		0.35	smile	hero_001	0.8	smile	hero_003	0.55	smile
+26	dialog_14	0	结衣	好！	UI_juqing_bg_20		actor_001	0.2	smile		0.35	smile	hero_001	0.8	smile	hero_003	0.55	smile
+27	dialog_15	0	中年男性	我们居住的地方最近忽然出现了很多野猪和地精,村民们接二连三的遭到袭击！请帮我们赶走这些怪物吧！	UI_juqing_bg_09		actor_008	0.5	worry									
+28	dialog_18	0	中年男性	感谢你帮我们除掉了这些怪物！想要情报的话，我听说赫伦卡那边好像不太平静，你应该能从那边打听到些什么。	UI_juqing_bg_09		actor_008	0.5	smile									
+29	dialog_20	0	self	结衣我们出发吧，去赫伦卡。	UI_juqing_bg_09			0.65	smile	actor_003	2.0	smile	actor_001	0.5	normal			
+30	dialog_20	1	妮露	等一等！	UI_juqing_bg_09			0.45	smile	actor_003	0.65	smile	actor_001	0.35	normal			
+31	dialog_20	0	self	？	UI_juqing_bg_09			0.45	worry	actor_003	0.65	smile	actor_001	0.35	normal			
+32	dialog_20	1	妮露	你好，我叫妮露，你是打算去赫伦卡村吗？	UI_juqing_bg_09			0.45	smile	actor_003	0.65	smile	actor_001	0.35	normal			
+33	dialog_20	0	self	是的。	UI_juqing_bg_09			0.45	smile	actor_003	0.65	smile	actor_001	0.35	normal			
+34	dialog_20	1	妮露	我也正想去那边，不过我的方向感很弱的说，能带我一起吗？	UI_juqing_bg_09			0.45	smile	actor_003	0.65	worry	actor_001	0.35	normal			
+35	dialog_20	0	self	其实我们也不太熟悉，如果你愿意的话那就一起去吧。	UI_juqing_bg_09			0.45	smile	actor_003	0.65	smile	actor_001	0.35	normal			
+36	dialog_20	1	妮露	太好了！……诶！这个小东西是什么？	UI_juqing_bg_09			0.45	smile	actor_003	0.65	smile	actor_001	0.35	normal			
+37	dialog_20	2	结衣	你好！我是导航精灵结衣！	UI_juqing_bg_09			0.45	smile	actor_003	0.65	smile	actor_001	0.35	smile			
+38	dialog_20	1	妮露	哇，好可爱的说！	UI_juqing_bg_09			0.45	smile	actor_003	0.65	smile	actor_001	0.35	normal			
+39	dialog_20	0	self	妮露，你有没有见过其他带着导航精灵的玩家？	UI_juqing_bg_09			0.45	worry	actor_003	0.65	smile	actor_001	0.35	normal			
+40	dialog_20	1	妮露	没有哦，第一次见到的说。怎么了？	UI_juqing_bg_09			0.45	smile	actor_003	0.65	worry	actor_001	0.35	normal			
+41	dialog_20	0	self	没什么，我们走吧。	UI_juqing_bg_09			0.45	smile	actor_003	0.65	smile	actor_001	0.35	normal			
+42	dialog_21	1	结衣	哇！看到赫伦卡了！	UI_juqing_bg_03			0.45	smile	actor_001	0.35	smile	actor_003	0.65	smile			
+43	dialog_21	2	妮露	哦！新武器新武器！我先去武器屋了，两位回头见！	UI_juqing_bg_03			0.45	smile	actor_001	0.35	normal	actor_003	0.65	smile			
+44	dialog_21	0	self	跑的好快。	UI_juqing_bg_03			0.65	worry	actor_001	0.5	normal	actor_003	2.0	smile			
+45	dialog_21	1	结衣	天色不早了，我们也去打听一下附近的消息吧。	UI_juqing_bg_03			0.65	smile	actor_001	0.5	normal	actor_003	2.0	smile			
+46	dialog_22	0	中年女性	听说你最近常去赫伦卡是吗。我女儿得了一种怪病，只有赫伦卡附近森林里的巨型食人花胚珠可以做成有效的草药，请帮我取一些胚珠来吧！	UI_juqing_bg_09		actor_009	0.5	worry									
+47	dialog_24	1	妮露	你是要去做胚珠的任务吗？	UI_juqing_bg_09			0.2	smile	actor_003	0.5	smile						
+48	dialog_24	0	self	嗯。	UI_juqing_bg_09			0.2	smile	actor_003	0.5	smile						
+49	dialog_24	1	妮露	呀!听说这个任务能得到退火之剑，我也要参加。	UI_juqing_bg_09			0.2	worry	actor_003	0.5	smile						
+50	dialog_24	1	妮露	我对怪物也很了解的说，一起合作吧。	UI_juqing_bg_09			0.2	smile	actor_003	0.5	smile						
+51	dialog_24	0	self	好吧……	UI_juqing_bg_09			0.2	smile	actor_003	0.5	smile						
+52	dialog_25	1	妮露	这只也不是目标怪的说。	UI_juqing_bg_04			0.2	smile	actor_003	0.5	angry						
+53	dialog_25	0	self	天已经黑了，明天再来吧。	UI_juqing_bg_04			0.2	smile	actor_003	0.5	angry						
+54	dialog_26	0	结衣	咦，那边好像有个玩家！	UI_juqing_bg_04		actor_001	0.35	normal		0.45	smile	hero_008	2.0	smile	actor_003	0.65	smile
+55	dialog_26	2	克莱因	我的天！居然在这森林里能碰到活人。我迷路了，请问你们认识去托尔巴纳的方向吗？	UI_juqing_bg_04		actor_001	0.15	normal		0.33	smile	hero_008	0.85	smile	actor_003	0.45	smile
+56	dialog_26	0	结衣	从这里往东南走就到了。	UI_juqing_bg_04		actor_001	0.15	normal		0.33	smile	hero_008	0.85	smile	actor_003	0.45	smile
+57	dialog_26	2	克莱因	喔！感谢感谢。明天赶不到就错过BOSS攻略会议了。	UI_juqing_bg_04		actor_001	0.15	normal		0.33	smile	hero_008	0.85	smile	actor_003	0.45	smile
+58	dialog_26	1	self	你要去参加BOSS攻略？	UI_juqing_bg_04		actor_001	0.15	normal		0.33	worry	hero_008	0.85	smile	actor_003	0.45	smile
+59	dialog_26	2	克莱因	是啊，你们小心一些，最近这块地方出现了狂暴化的怪物，发现情况不对就赶紧逃吧。我先走了。	UI_juqing_bg_04		actor_001	0.15	normal		0.33	smile	hero_008	0.85	smile	actor_003	0.45	smile
+60	dialog_26	1	self	怪物狂暴化？结衣你了解么？	UI_juqing_bg_04		actor_001	0.35	normal		0.45	worry	hero_008	2.0	smile	actor_003	0.65	smile
+61	dialog_26	0	结衣	没有这方面的资料呢。	UI_juqing_bg_04		actor_001	0.35	worry		0.45	smile	hero_008	2.0	smile	actor_003	0.65	smile
+62	dialog_26	3	妮露	我听说过相关传闻，前段时间开始各地忽然出现了一些狂暴化的怪物，强的异常的说。	UI_juqing_bg_04		actor_001	0.35	normal		0.45	smile	hero_008	2.0	smile	actor_003	0.65	worry
+63	dialog_26	1	self	……总之谨慎行动吧。	UI_juqing_bg_04		actor_001	0.35	normal		0.45	smile	hero_008	2.0	smile	actor_003	0.65	smile
+64	dialog_27	2	妮露	就是它的说，拿到胚珠了！可是还缺一个任务道具的说。	UI_juqing_bg_04		actor_001	0.35	smile		0.5	smile	actor_003	0.65	smile			
+65	dialog_27	0	结衣	胚珠让给你吧。这里的情况我已经了解的差不多了，接下来打算先回主城。	UI_juqing_bg_04		actor_001	0.35	smile		0.5	smile	actor_003	0.65	smile			
+66	dialog_27	2	妮露	哇，太感谢了！有机会一定会报答你的！	UI_juqing_bg_04		actor_001	0.35	normal		0.5	smile	actor_003	0.65	smile			
+68	dialog_30	2	克莱因	哈！	UI_juqing_bg_04			0.15	smile	actor_003	0.35	smile	hero_008	0.65	smile			
+69	dialog_30	1	妮露	哇，只用了一刀。	UI_juqing_bg_04			0.15	smile	actor_003	0.35	smile	hero_008	0.65	smile			
+70	dialog_30	2	克莱因	怎么样？我的技术不错吧。	UI_juqing_bg_04			0.15	smile	actor_003	0.35	smile	hero_008	0.65	smile			
+71	dialog_30	0	self	好华丽的剑技，对了，感谢你的帮助。	UI_juqing_bg_04			0.15	smile	actor_003	0.35	smile	hero_008	0.65	smile			
+72	dialog_30	2	克莱因	小意思小意思！不过我要先走了。再遇到危险可帮不了你们了，多加小心。	UI_juqing_bg_04			0.15	smile	actor_003	0.35	smile	hero_008	0.65	smile			
+73	dialog_30	0	self	他说得对，先离开这里吧。	UI_juqing_bg_04			0.65	smile	actor_003	0.5	smile	hero_008	2.0	smile			
+74	dialog_30	1	妮露	可是还缺一个任务道具的说。	UI_juqing_bg_04			0.65	smile	actor_003	0.5	worry	hero_008	2.0	smile			
+75	dialog_30	0	self	胚珠让给你吧。这里的情况我已经了解的差不多了，接下来打算先回主城。	UI_juqing_bg_04			0.65	smile	actor_003	0.5	smile	hero_008	2.0	smile			
+76	dialog_30	1	妮露	哇，太感谢了！有机会一定会报答你的！	UI_juqing_bg_04			0.65	smile	actor_003	0.5	smile	hero_008	2.0	smile			
+77	dialog_35	0	结衣	哇，小心！	UI_juqing_bg_05		actor_001	0.5	normal		0.65	smile						
+78	dialog_35	1	self	疼……	UI_juqing_bg_05		actor_001	0.5	normal		0.65	worry						
+79	dialog_35	0	结衣	居然用头着地……	UI_juqing_bg_05		actor_001	0.5	worry		0.65	smile						
+80	dialog_35	1	self	嗯？我们在什么地方？	UI_juqing_bg_05		actor_001	0.5	normal		0.65	worry						
+81	dialog_35	0	结衣	这里就是『ALfheim Online』的世界，在这里居住着风精灵，水精灵，火精灵等9个种族，他们各自有自己的种族领地。	UI_juqing_bg_05		actor_001	0.5	smile		0.65	smile						
+82	dialog_35	1	self	这个世界没有主城吗？	UI_juqing_bg_05		actor_001	0.5	normal		0.65	worry						
+83	dialog_35	0	结衣	对不起，传送好像出了问题，我们现在的所在位置是风精灵领地的森林附近，穿过前面的森林能到达翡翠之都。	UI_juqing_bg_05		actor_001	0.5	normal		0.65	smile						
+84	dialog_35	1	self	总之先离开这里吧，这片森林看起来不是安全的区域！	UI_juqing_bg_05		actor_001	0.5	normal		0.65	smile						
+85	dialog_40	0	结衣	还差一点，再加把劲吧！	UI_juqing_bg_05		actor_001	0.5	smile		0.65	smile						
+86	dialog_40	1	self	恩，先找到翡翠之都。	UI_juqing_bg_05		actor_001	0.5	smile		0.65	smile						
+87	dialog_45	0	结衣	咦，那边好像有个风精灵，追上去打听些情报吧。	UI_juqing_bg_05		actor_001	0.5	normal		0.65	smile						
+88	dialog_45	1	self	恩！	UI_juqing_bg_05		actor_001	0.5	normal		0.65	smile						
+89	dialog_50	0	结衣	好快啊，一不小心就跟丢了！	UI_juqing_bg_23		actor_001	0.5	worry		0.65	smile						
+90	dialog_50	1	self	应该就在这附近。	UI_juqing_bg_23		actor_001	0.5	worry		0.65	smile						
+91	dialog_55	1	self	这些人是？	UI_juqing_bg_23		actor_001	0.5	normal		0.65	smile						
+92	dialog_55	0	结衣	他们是火精灵，但是很奇怪，火精灵不应该出现在这里的。	UI_juqing_bg_23		actor_001	0.5	normal		0.65	smile						
+93	dialog_55	1	self	……小心的调查一下附近吧	UI_juqing_bg_23		actor_001	0.5	normal		0.65	smile						
+94	dialog_60	0	结衣	我先探测一下这片区域	UI_juqing_bg_23		actor_001	0.5	angry									
+95	dialog_60	0	结衣	探测到那边还有火精灵。	UI_juqing_bg_23		actor_001	0.5	angry									
+96	dialog_65	0	self	还要打么？	UI_juqing_bg_23			0.2	angry	actor_005	0.5	smile						
+97	dialog_65	1	火精灵士兵	我们投降，没打算招惹你们的！	UI_juqing_bg_23			0.2	smile	actor_005	0.5	smile						
+98	dialog_65	0	self	在森林中你有见过带着导航精灵的玩家吗？	UI_juqing_bg_23			0.2	angry	actor_005	0.5	smile						
+99	dialog_65	1	火精灵士兵	没有，没有，我们这就离开！	UI_juqing_bg_23			0.2	smile	actor_005	0.5	smile						
+100	dialog_65	0	self	鬼鬼祟祟的。	UI_juqing_bg_23			0.2	angry	actor_005	0.5	smile						
+101	dialog_70	0	结衣	是她！刚才的那个风精灵。	UI_juqing_bg_05		actor_001	0.5	angry		0.65	smile	hero_011	2.0	smile			
+102	dialog_70	2	莉法	哇？吓到我了，还以为又是火精灵。你们是谁？	UI_juqing_bg_05		actor_001	0.35	normal		0.45	smile	hero_011	0.65	smile			
+103	dialog_70	1	self	抱歉，我们想去翡翠之都，结果被传送到了这，能带我们走出森林吗？	UI_juqing_bg_05		actor_001	0.35	normal		0.45	smile	hero_011	0.65	smile			
+104	dialog_70	2	莉法	这样啊，没问题！对了，自我介绍一下，我叫莉法，是风精灵。	UI_juqing_bg_05		actor_001	0.35	normal		0.45	smile	hero_011	0.65	smile			
+105	dialog_70	0	结衣	太好了，谢谢你莉法。	UI_juqing_bg_05		actor_001	0.35	smile		0.45	smile	hero_011	0.65	smile			
+106	dialog_80	0	结衣	对了，莉法来森林里做什么呢？	UI_juqing_bg_05		actor_001	0.35	normal	hero_011	0.65	smile		0.45	smile			
+107	dialog_80	1	莉法	我是来采集食材的！	UI_juqing_bg_05		actor_001	0.35	normal	hero_011	0.65	smile		0.45	smile			
+108	dialog_80	1	莉法	啊，就在那边，离出口不远了。	UI_juqing_bg_05		actor_001	0.35	normal	hero_011	0.65	smile		0.45	smile			
+109	dialog_85	2	莉法	很快就要到森林的出口了。	UI_juqing_bg_05		actor_001	0.35	normal		0.45	smile	hero_011	0.65	smile			
+110	dialog_85	1	self	谢谢你，帮了大忙。	UI_juqing_bg_05		actor_001	0.35	normal		0.45	smile	hero_011	0.65	smile			
+111	dialog_85	2	莉法	不客气，举手之劳而已。	UI_juqing_bg_05		actor_001	0.35	normal		0.45	smile	hero_011	0.65	smile			
+112	dialog_85	0	结衣	小心，侦测到一支火精灵的小部队在附近。	UI_juqing_bg_05		actor_001	0.35	angry		0.45	smile	hero_011	0.65	smile			
+113	dialog_85	2	莉法	哈？火精灵？	UI_juqing_bg_05		actor_001	0.35	normal		0.45	smile	hero_011	0.65	angry			
+114	dialog_90	1	景宗	什么人！	UI_juqing_bg_05		actor_001	-1.0	normal	hero_040	0.5	angry		-1.0	smile			
+115	dialog_90	0	结衣	坏了，我们被发现了……	UI_juqing_bg_05		actor_001	0.35	normal	hero_040	0.65	angry		0.43	smile			
+116	dialog_90	1	景宗	抱歉，被发现了就不能让你们回去。	UI_juqing_bg_05		actor_001	0.35	smile	hero_040	0.65	angry		0.43	smile			
+117	dialog_95	1	self	大家都没事吧！	UI_juqing_bg_05		actor_001	0.35	normal		0.45	smile	hero_011	0.65	smile			
+118	dialog_95	0	结衣	没事，不过为什么火精灵会出现在这里？莉法知道吗？	UI_juqing_bg_05		actor_001	0.35	normal		0.45	smile	hero_011	0.65	smile			
+119	dialog_95	2	莉法	不清楚，但肯定不会是好事，具体需要和领主讨论一下。	UI_juqing_bg_05		actor_001	0.35	normal		0.45	smile	hero_011	0.65	angry			
+120	dialog_95	2	莉法	累死我了，今天先到这里了。	UI_juqing_bg_05		actor_001	0.35	normal		0.45	smile	hero_011	0.65	worry			
+121	dialog_95	1	self	恩，感谢你的帮助！	UI_juqing_bg_05		actor_001	0.35	normal		0.45	smile	hero_011	0.65	smile			
+122	dialog_95	2	莉法	你蛮强的嘛，下次再一起玩啊。	UI_juqing_bg_05		actor_001	0.35	normal		0.45	smile	hero_011	0.65	smile			
+123	dialog_100	1	self	结衣，这些人在干什么。	UI_juqing_bg_09		actor_001	0.5	normal		0.65	smile	hero_031	2.0	smile			
+124	dialog_100	0	结衣	他们好像在召集低等级boss攻略耶。	UI_juqing_bg_09		actor_001	0.5	normal		0.65	smile	hero_031	2.0	smile			
+125	dialog_100	1	self	低等级BOSS也有攻略战吗？	UI_juqing_bg_09		actor_001	0.5	normal		0.65	worry	hero_031	2.0	smile			
+126	dialog_100	0	结衣	随着玩家人数的增加，看来这已经不是高等级玩家的专属了。我们也去试试看吧！	UI_juqing_bg_09		actor_001	0.5	normal		0.65	smile	hero_031	2.0	smile			
+127	dialog_100	1	self	嗯！	UI_juqing_bg_09		actor_001	0.5	normal		0.65	smile	hero_031	2.0	smile			
+128	dialog_100	2	牙王	哟！生面孔！来参加BOSS攻略的吗？	UI_juqing_bg_09		actor_001	0.35	smile		0.45	smile	hero_031	0.65	smile			
+129	dialog_100	1	self	是的。	UI_juqing_bg_09		actor_001	0.35	smile		0.45	smile	hero_031	0.65	smile			
+130	dialog_100	2	牙王	我叫牙王，这次攻略的带头人，新人的话就打前锋展示一下实力吧！	UI_juqing_bg_09		actor_001	0.35	smile		0.45	smile	hero_031	0.65	smile			
+131	dialog_110	0	结衣	厉害厉害！	UI_juqing_bg_02		actor_001	0.5	smile		0.8	smile						
+132	dialog_110	1	self	好像没有想象中那么困难。	UI_juqing_bg_02		actor_001	0.5	smile		0.8	smile						
+133	dialog_115	1	牙王	干的不错嘛新人。不过别得意的太早，越接近BOSS怪物会越来越强大。	UI_juqing_bg_02			0.2	smile	hero_031	0.5	smile						
+134	dialog_115	0	self	知道了。	UI_juqing_bg_02			0.2	smile	hero_031	0.5	smile						
+135	dialog_120	0	结衣	漂亮！就这样一口气冲到BOSS门口吧。	UI_juqing_bg_02		actor_001	0.5	smile		0.8	smile						
+136	dialog_120	1	self	好！	UI_juqing_bg_02		actor_001	0.5	smile		0.8	smile						
+137	dialog_125	2	牙王	慢着慢着！别冲那么快！	UI_juqing_bg_02		actor_001	0.35	normal		0.45	smile	hero_031	0.65	angry			
+138	dialog_125	1	self	？？	UI_juqing_bg_02		actor_001	0.35	normal		0.45	worry	hero_031	0.65	smile			
+139	dialog_125	2	牙王	没看到这边有麻烦吗，还不过来帮忙！	UI_juqing_bg_02		actor_001	0.35	normal		0.45	smile	hero_031	0.65	angry			
+140	dialog_125	1	self	……	UI_juqing_bg_02		actor_001	0.5	normal		0.65	worry	hero_031	2.0	smile			
+141	dialog_125	0	结衣	真令人不愉快！	UI_juqing_bg_02		actor_001	0.5	angry		0.65	smile	hero_031	2.0	smile			
+142	dialog_125	1	self	算了，没关系。	UI_juqing_bg_02		actor_001	0.5	normal		0.65	smile	hero_031	2.0	smile			
+143	dialog_130	2	牙王	今天就到这里了！解散。。	UI_juqing_bg_02		actor_001	0.35	normal		0.45	smile	hero_031	0.65	smile			
+144	dialog_130	2	牙王	……喂！新人。	UI_juqing_bg_02		actor_001	0.35	normal		0.45	smile	hero_031	0.65	smile			
+145	dialog_130	1	self	？	UI_juqing_bg_02		actor_001	0.35	normal		0.45	worry	hero_031	0.65	smile			
+146	dialog_130	2	牙王	明天记得按时集合。	UI_juqing_bg_02		actor_001	0.35	normal		0.45	smile	hero_031	0.65	smile			
+147	dialog_130	1	self	恩，我会来的。	UI_juqing_bg_02		actor_001	0.35	normal		0.45	smile	hero_031	0.65	smile			
+148	dialog_130	0	结衣	太好了，看来他们已经肯定你的实力了。	UI_juqing_bg_02		actor_001	0.5	smile		0.65	smile	hero_031	2.0	smile			
+149	dialog_135	1	牙王	喂！新人。别慢吞吞的，赶紧来集合。	UI_juqing_bg_06		actor_001	0.35	normal	hero_031	0.65	angry		0.45	normal			
+150	dialog_135	0	结衣	明明还没到集合时间！	UI_juqing_bg_06		actor_001	0.35	angry	hero_031	0.65	angry		0.45	normal			
+151	dialog_140	2	牙王	好的，大家干的不错！BOSS巢穴就在眼前了。	UI_juqing_bg_06		actor_001	0.35	normal		0.45	smile	hero_031	0.65	smile			
+152	dialog_140	0	结衣	太好了！	UI_juqing_bg_06		actor_001	0.35	smile		0.45	smile	hero_031	0.65	smile			
+153	dialog_140	2	牙王	咦？新人！你怎么回事？	UI_juqing_bg_06		actor_001	0.35	normal		0.45	smile	hero_031	0.65	worry			
+154	dialog_140	1	self	？	UI_juqing_bg_06		actor_001	0.35	normal		0.45	worry	hero_031	0.65	smile			
+155	dialog_140	2	牙王	这个BOSS攻略是有等级限制的，你现在还没达到要求，没发现吗！	UI_juqing_bg_06		actor_001	0.35	normal		0.45	smile	hero_031	0.65	worry			
+156	dialog_140	0	结衣	什么？这种事怎么不早说？	UI_juqing_bg_06		actor_001	0.35	worry		0.45	smile	hero_031	0.65	smile			
+157	dialog_140	2	牙王	听好了！明天之前你如果你还达不到条件我们就放弃你了，就这样，解散！	UI_juqing_bg_06		actor_001	0.35	normal		0.45	smile	hero_031	0.65	angry			
+158	dialog_140	0	结衣	太欺负人了！	UI_juqing_bg_06		actor_001	0.5	worry		0.65	smile	hero_031	2.0	smile			
+159	dialog_140	1	self	抓紧时间或许还有希望。	UI_juqing_bg_06		actor_001	0.5	normal		0.65	smile	hero_031	2.0	smile			
+160	dialog_145	0	结衣	加油！加油！	UI_juqing_bg_02		actor_001	0.5	angry		0.8	smile						
+161	dialog_145	1	self	一定能赶上！	UI_juqing_bg_02		actor_001	0.5	angry		0.8	smile						
+162	dialog_150	0	结衣	成功了！可以参加BOSS攻略了！呀，别在这里就睡着了，至少回城啊！	UI_juqing_bg_02		actor_001	0.5	worry		0.8	smile						
+163	dialog_150	1	self	哥哥……	UI_juqing_bg_02		actor_001	0.5	worry		0.8	worry						
+164	dialog_155	0	牙王	今天就是最终的BOSS战了。一定要打倒BOSS！	UI_juqing_bg_06		hero_031	0.5	smile	hero_003	2.0	smile	actor_001	-1.0	smile	hero_001	2.0	smile
+165	dialog_155	1	众人	喔！！！！	UI_juqing_bg_06		hero_031	0.5	smile	hero_003	2.0	smile	actor_001	-1.0	smile	hero_001	2.0	smile
+166	dialog_155	2	结衣	看那边，桐人，亚丝娜！	UI_juqing_bg_06			0.65	smile	hero_003	2.0	smile	actor_001	0.5	smile	hero_001	2.0	smile
+167	dialog_155	3	桐人	hi，又见面了。	UI_juqing_bg_06			0.35	smile	hero_003	0.55	smile	actor_001	0.2	smile	hero_001	0.8	smile
+168	dialog_155	1	亚丝娜	结衣！好想你，给我抱一下。	UI_juqing_bg_06			0.35	smile	hero_003	0.55	smile	actor_001	0.2	smile	hero_001	0.8	smile
+169	dialog_155	2	结衣	没想到你们也来了。	UI_juqing_bg_06			0.35	smile	hero_003	0.55	smile	actor_001	0.2	smile	hero_001	0.8	smile
+170	dialog_155	3	桐人	亚丝娜说很感兴趣，就拉着我来了。一起加油吧。	UI_juqing_bg_06			0.35	smile	hero_003	0.55	smile	actor_001	0.2	smile	hero_001	0.8	smile
+171	dialog_155	2	结衣	嗯！	UI_juqing_bg_06			0.35	smile	hero_003	0.55	smile	actor_001	0.2	smile	hero_001	0.8	smile
+172	dialog_160	1	牙王	大！胜！利！哈哈！	UI_juqing_bg_26			-1.0	smile	hero_031	0.5	smile	hero_003	2.0	smile			
+173	dialog_160	2	众人	喔！	UI_juqing_bg_26			-1.0	smile	hero_031	0.5	smile	hero_003	2.0	smile			
+174	dialog_160	1	牙王	哟！新人，今天也干的不错！	UI_juqing_bg_26			0.2	smile	hero_031	0.5	smile	hero_003	2.0	smile			
+175	dialog_160	0	self	……	UI_juqing_bg_26			0.2	worry	hero_031	0.5	smile	hero_003	2.0	smile			
+176	dialog_160	1	牙王	怎么了新人，闷闷不乐的。	UI_juqing_bg_26			0.2	worry	hero_031	0.5	smile	hero_003	2.0	smile			
+177	dialog_160	0	self	……我想请各位回忆一下，有没有见到过和我一样带着导航精灵的玩家。	UI_juqing_bg_26			0.2	worry	hero_031	0.5	smile	hero_003	2.0	smile			
+178	dialog_160	2	众人	……	UI_juqing_bg_26			0.2	worry	hero_031	0.5	smile	hero_003	2.0	smile			
+179	dialog_160	1	牙王	都没有吗？以后都睁大点眼睛，遇到带导航精灵的玩家赶紧通知新人，听到了没有！	UI_juqing_bg_26			0.2	worry	hero_031	0.5	angry	hero_003	2.0	smile			
+180	dialog_160	2	众人	喔！	UI_juqing_bg_26			0.2	worry	hero_031	0.5	smile	hero_003	2.0	smile			
+181	dialog_160	0	self	谢谢各位！	UI_juqing_bg_26			0.2	worry	hero_031	0.5	smile	hero_003	2.0	smile			
+182	dialog_165	1	self	早上好。	UI_juqing_bg_04		actor_001	0.35	smile		0.45	smile	hero_011	0.65	smile			
+183	dialog_165	2	莉法	早！结衣也是！	UI_juqing_bg_04		actor_001	0.35	smile		0.45	smile	hero_011	0.65	smile			
+184	dialog_165	0	结衣	嘿嘿嘿，我们还准备去找你……	UI_juqing_bg_04		actor_001	0.35	smile		0.45	smile	hero_011	0.65	smile			
+185	dialog_165	2	莉法	那么我们就向神秘洞窟前进！	UI_juqing_bg_04		actor_001	0.35	smile		0.45	smile	hero_011	0.65	smile			
+186	dialog_170	0	莉法	小心周围……	UI_juqing_bg_05		hero_011	0.5	angry									
+187	dialog_175	1	莉法	我们到了！先在这附近收集些食材吧。	UI_juqing_bg_05		actor_001	0.35	smile	hero_011	0.65	smile		0.45	normal			
+188	dialog_175	0	结衣	需要收集什么食材呢。	UI_juqing_bg_05		actor_001	0.35	normal	hero_011	0.65	smile		0.45	normal			
+189	dialog_175	1	莉法	哼哼，一样一样来，首先是这里的地下水特产，青花鱼	UI_juqing_bg_05		actor_001	0.35	normal	hero_011	0.65	smile		0.45	normal			
+190	dialog_180	2	莉法	接下来，我们去找一些鲜果，前方的野兽巢穴应该储存了很多。	UI_juqing_bg_05		actor_001	0.35	smile		0.45	smile	hero_011	0.65	smile			
+191	dialog_180	0	结衣	野兽巢穴！你不害怕吗……	UI_juqing_bg_05		actor_001	0.35	normal		0.45	smile	hero_011	0.65	smile			
+192	dialog_180	2	莉法	因为有你们在嘛，嘿嘿嘿。	UI_juqing_bg_05		actor_001	0.35	normal		0.45	smile	hero_011	0.65	smile			
+193	dialog_180	1	self	……	UI_juqing_bg_05		actor_001	0.35	normal		0.45	worry	hero_011	0.65	smile			
+194	dialog_185	1	莉法	再往里面走就是野兽巢穴了，你们要小心哦。	UI_juqing_bg_19			0.45	smile	hero_011	0.65	smile	actor_001	0.35	normal			
+195	dialog_185	0	self	你呢？	UI_juqing_bg_19			0.45	smile	hero_011	0.65	smile	actor_001	0.35	normal			
+196	dialog_185	1	莉法	不用担心我啦~	UI_juqing_bg_19			0.45	smile	hero_011	0.65	smile	actor_001	0.35	normal			
+197	dialog_190	1	莉法	干得好，采集完毕，可以离开这里了。	UI_juqing_bg_19			0.45	smile	hero_011	0.65	smile	actor_001	0.35	normal			
+198	dialog_190	0	self	刚才你在哪？	UI_juqing_bg_19			0.45	angry	hero_011	0.65	smile	actor_001	0.35	normal			
+199	dialog_190	1	莉法	在空中看你战斗啊！	UI_juqing_bg_19			0.45	angry	hero_011	0.65	smile	actor_001	0.35	normal			
+200	dialog_190	0	self	……	UI_juqing_bg_19			0.45	angry	hero_011	0.65	smile	actor_001	0.35	normal			
+201	dialog_195	2	莉法	呀！	UI_juqing_bg_19		actor_001	0.35	normal		0.45	smile	hero_011	0.65	worry			
+202	dialog_195	0	结衣	怎么了莉法？	UI_juqing_bg_19		actor_001	0.35	normal		0.45	smile	hero_011	0.65	worry			
+203	dialog_195	2	莉法	不好意思，我忽然想起一件事情。	UI_juqing_bg_19		actor_001	0.35	normal		0.45	smile	hero_011	0.65	smile			
+204	dialog_195	1	self	？	UI_juqing_bg_19		actor_001	0.35	normal		0.45	worry	hero_011	0.65	smile			
+205	dialog_195	2	莉法	我们刚才跳下来的路，我一般是飞回去的，但你貌似还没学会飞行。	UI_juqing_bg_19		actor_001	0.35	normal		0.45	smile	hero_011	0.65	smile			
+206	dialog_195	1	self	……	UI_juqing_bg_19		actor_001	0.35	normal		0.45	worry	hero_011	0.65	smile			
+207	dialog_195	2	莉法	不要担心，我不会丢下你们的。也许前面就有出洞的路了。	UI_juqing_bg_19		actor_001	0.35	normal		0.45	smile	hero_011	0.65	smile			
+208	dialog_195	0	结衣	只能走一步看一步了。 	UI_juqing_bg_19		actor_001	0.35	worry		0.45	smile	hero_011	0.65	smile			
+209	dialog_200	1	莉法	我闻到了！	UI_juqing_bg_19		actor_001	0.35	normal	hero_011	0.65	smile		0.45	normal			
+210	dialog_200	0	结衣	什么？我怎么什么也闻不到。	UI_juqing_bg_19		actor_001	0.35	normal	hero_011	0.65	smile		0.45	normal			
+211	dialog_200	1	莉法	风的味道！附近一定有出口。	UI_juqing_bg_19		actor_001	0.35	normal	hero_011	0.65	smile		0.45	normal			
+212	dialog_205	2	莉法	哇，居然解决了这么大的怪物，吓到我了。	UI_juqing_bg_19		actor_001	0.35	normal		0.45	smile	hero_011	0.65	worry			
+213	dialog_205	1	self	差点就被干掉了……	UI_juqing_bg_19		actor_001	0.35	normal		0.45	worry	hero_011	0.65	worry			
+214	dialog_205	2	莉法	游戏刚开没多久嘛。	UI_juqing_bg_19		actor_001	0.35	normal		0.45	smile	hero_011	0.65	worry			
+215	dialog_205	0	结衣	快看，从怪物身上掉落了魔石！	UI_juqing_bg_19		actor_001	0.35	normal		0.45	smile	hero_011	0.65	smile			
+216	dialog_205	1	self	魔石？	UI_juqing_bg_19		actor_001	0.35	normal		0.45	worry	hero_011	0.65	smile			
+217	dialog_205	0	结衣	可以做成镶嵌在装备上面的宝石，能大幅强化自生属性。	UI_juqing_bg_19		actor_001	0.35	normal		0.45	smile	hero_011	0.65	smile			
+218	dialog_205	2	莉法	哦！赚到了赚到了。	UI_juqing_bg_19		actor_001	0.35	normal		0.45	smile	hero_011	0.65	smile			
+219	dialog_205	0	结衣	洞口也在那边，总算可以出去了。	UI_juqing_bg_19		actor_001	0.35	smile		0.45	smile	hero_011	0.65	smile			
+220	dialog_205	2	莉法	那么这次辛苦两位了，收集到的材料别忘了加工哦，下次我们在翡翠之都见面吧。拜拜！	UI_juqing_bg_19		actor_001	0.35	smile		0.45	smile	hero_011	0.65	smile			
+221	dialog_210	0	结衣	发现桐人！今天是单独行动呢。	UI_juqing_bg_10		actor_001	0.35	normal		0.45	smile	hero_001	0.65	smile			
+222	dialog_210	2	桐人	亚丝娜今天家里有事，我正打算自己去调查些事情。	UI_juqing_bg_10		actor_001	0.35	smile		0.45	smile	hero_001	0.65	smile			
+223	dialog_210	1	self	调查？需要帮忙吗？	UI_juqing_bg_10		actor_001	0.35	smile		0.45	worry	hero_001	0.65	smile			
+224	dialog_210	2	桐人	好啊，我很乐意，那我们出发吧。	UI_juqing_bg_10		actor_001	0.35	smile		0.45	smile	hero_001	0.65	smile			
+225	dialog_211	0	结衣	跟桐人一起执行任务，感觉真好！	UI_juqing_bg_04		actor_002	0.5	smile									
+226	dialog_215	0	结衣	怎么了？桐人，忽然停了下来。	UI_juqing_bg_18		actor_001	0.35	normal	hero_001	0.65	smile		0.45	normal			
+227	dialog_215	1	桐人	来到这里，不禁想起了那些过去在这发生的事情，有些感怀……	UI_juqing_bg_18		actor_001	0.35	normal	hero_001	0.65	worry		0.45	normal			
+228	dialog_215	0	结衣	好想听一下桐人过去的经历啊，怎么认识结衣的呢？	UI_juqing_bg_18		actor_001	0.35	normal	hero_001	0.65	smile		0.45	normal			
+229	dialog_215	1	桐人	以后有时间慢慢讲给你们听吧。	UI_juqing_bg_18		actor_001	0.35	normal	hero_001	0.65	smile		0.45	normal			
+230	dialog_215	0	结衣	恩！	UI_juqing_bg_18		actor_001	0.35	smile	hero_001	0.65	smile		0.45	normal			
+231	dialog_220	2	桐人	……暂时还没有发现异常	UI_juqing_bg_18		actor_001	0.35	normal		0.45	smile	hero_001	0.65	angry			
+232	dialog_220	1	self	这附近有什么可疑的东西吗？	UI_juqing_bg_18		actor_001	0.35	normal		0.45	worry	hero_001	0.65	smile			
+233	dialog_220	2	桐人	是这样的，最近各个地方都出现了狂暴化的怪物，我想弄清楚这里面的原因。	UI_juqing_bg_18		actor_001	0.35	normal		0.45	smile	hero_001	0.65	smile			
+234	dialog_220	0	结衣	所以先到熟悉的地方调查吗？	UI_juqing_bg_18		actor_001	0.35	normal		0.45	smile	hero_001	0.65	smile			
+235	dialog_220	2	桐人	没错，我们继续向前吧。	UI_juqing_bg_18		actor_001	0.35	normal		0.45	smile	hero_001	0.65	smile			
+236	dialog_225	0	桐人	沿着这个方向走，很快就会到达顶峰了。	UI_juqing_bg_18		hero_001	0.5	smile									
+237	dialog_230	0	结衣	那边的山脚下好像有一群玩家。	UI_juqing_bg_18		actor_001	0.35	normal	hero_001	0.65	smile		0.45	normal			
+238	dialog_230	1	桐人	恩？这里怎么会聚集这么多人。	UI_juqing_bg_18		actor_001	0.35	normal	hero_001	0.65	worry		0.45	normal			
+239	dialog_230	0	结衣	一定是发生了什么事件，过去打听一下吧。	UI_juqing_bg_18		actor_001	0.35	normal	hero_001	0.65	smile		0.45	normal			
+240	dialog_235	0	桐人	请问发生了什么事？	UI_juqing_bg_18		hero_001	0.2	angry	actor_008	0.8	worry						
+241	dialog_235	1	中年男性	你们刚才没看到吗？一个巨人袭击了这个村子。我们很多人合力才把他击退了。	UI_juqing_bg_18		hero_001	0.2	smile	actor_008	0.8	worry						
+242	dialog_235	0	桐人	什么？这里不是安全区吗？	UI_juqing_bg_18		hero_001	0.2	angry	actor_008	0.8	worry						
+243	dialog_235	1	中年男性	至少现在已经不安全了，你们也要小心。	UI_juqing_bg_18		hero_001	0.2	smile	actor_008	0.8	worry						
+244	dialog_240	0	结衣	看，那边好像有一个落单的村民。去找他了解下巨人的线索吧。	UI_juqing_bg_18		actor_001	0.5	normal									
+245	dialog_245	0	中年女性	麻烦你们，这片地方忽然出现了魔物，我不敢回家找我的家人，请你们带我回去吧。	UI_juqing_bg_18		actor_009	0.5	worry									
+246	dialog_250	1	中年女性	感谢你们救了我。	UI_juqing_bg_18		hero_001	0.2	smile	actor_009	0.8	smile						
+247	dialog_250	0	桐人	是什么东西袭击了你们？	UI_juqing_bg_18		hero_001	0.2	worry	actor_009	0.8	smile						
+248	dialog_250	1	中年女性	那个怪物叫叛教者尼古拉斯。	UI_juqing_bg_18		hero_001	0.2	smile	actor_009	0.8	angry						
+249	dialog_250	0	桐人	那个家伙吗，向哪边去了？	UI_juqing_bg_18		hero_001	0.2	angry	actor_009	0.8	smile						
+250	dialog_250	1	中年女性	向着东边的山脚去了。	UI_juqing_bg_18		hero_001	0.2	smile	actor_009	0.8	angry						
+251	dialog_250	0	桐人	我了解了，不能放任那个家伙。	UI_juqing_bg_18		hero_001	0.2	angry	actor_009	0.8	smile						
+252	dialog_255	1	self	叛教者尼古拉斯是谁？	UI_juqing_bg_18		actor_001	0.35	normal		0.45	worry	hero_001	0.65	smile			
+253	dialog_255	2	桐人	一个喜欢装扮成圣诞老人袭击玩家的巨人。	UI_juqing_bg_18		actor_001	0.35	normal		0.45	smile	hero_001	0.65	angry			
+254	dialog_255	0	结衣	很难想象出来。	UI_juqing_bg_18		actor_001	0.35	worry		0.45	smile	hero_001	0.65	smile			
+255	dialog_255	2	桐人	一会你看到就明白了。	UI_juqing_bg_18		actor_001	0.35	normal		0.45	smile	hero_001	0.65	smile			
+256	dialog_260	0	结衣	哇，好丑的怪物，和想象中完全不一样。	UI_juqing_bg_18		actor_001	0.35	normal		0.45	smile	hero_001	0.65	smile			
+257	dialog_260	2	桐人	刚才怪物死前好像狂暴化了。	UI_juqing_bg_18		actor_001	0.35	normal		0.45	smile	hero_001	0.65	angry			
+258	dialog_260	1	self	是的，攻击力猛的提升了，差点没有抗住。	UI_juqing_bg_18		actor_001	0.35	normal		0.45	angry	hero_001	0.65	smile			
+259	dialog_260	2	桐人	真是让人摸不着头脑，还需要更多的调查才行。今天谢谢你们了，需要帮助的时候记得找我们帮忙。	UI_juqing_bg_18		actor_001	0.35	normal		0.45	smile	hero_001	0.65	smile			
+260	dialog_260	1	self	恩，那下次见。	UI_juqing_bg_18		actor_001	0.35	smile		0.45	smile	hero_001	0.65	smile			
+261	dialog_265	0	结衣	我们已经开启了GGO世界，快去瞧瞧吧！	UI_juqing_bg_10		actor_001	0.5	smile									
+262	dialog_270	0	结衣	欢迎来到“GunGale Online”的世界,简称“GGO”，这里的角色大多不用刀剑和魔法系武器，而是用枪械来战斗的世界。	UI_juqing_bg_15		actor_001	0.5	smile		0.65	smile						
+263	dialog_270	1	self	要和枪械对战吗？	UI_juqing_bg_15		actor_001	0.5	smile		0.65	worry						
+264	dialog_270	0	结衣	是的，总之来到了新的环境，我们先四处转转收集一些情报吧。	UI_juqing_bg_15		actor_001	0.5	smile		0.65	smile						
+265	dialog_275	0	结衣	同时驾驭多种武器的感觉不错吧。	UI_juqing_bg_15		actor_001	0.5	smile		0.8	smile						
+266	dialog_275	1	self	恩，不过感觉还是有些微妙	UI_juqing_bg_15		actor_001	0.5	smile		0.8	worry						
+267	dialog_275	0	结衣	不用着急，还有很多时间可以慢慢体验。	UI_juqing_bg_15		actor_001	0.5	smile		0.8	smile						
+268	dialog_280	0	结衣	这里的BOB大赛快要开始了。	UI_juqing_bg_15		actor_001	0.5	normal		0.8	smile						
+269	dialog_280	1	self	BOB？	UI_juqing_bg_15		actor_001	0.5	normal		0.8	smile						
+270	dialog_280	0	结衣	为了角逐“GGO”最强的神枪手而召开的活动，“Bullet Of Bullets”大赛，统称BOB。也是这个世界最备受瞩目的活动。	UI_juqing_bg_15		actor_001	0.5	normal		0.8	smile						
+271	dialog_280	1	self	我们也有资格参加这个比赛吗？	UI_juqing_bg_15		actor_001	0.5	normal		0.8	worry						
+272	dialog_280	0	结衣	既然能来到这个世界，当然是有资格的，SGB已经完美的对三个世界进行了兼容处理，所以不用担心对战的问题。	UI_juqing_bg_15		actor_001	0.5	normal		0.8	smile						
+273	dialog_280	1	self	恩。（…或许能在那里遇到哥哥。）	UI_juqing_bg_15		actor_001	0.5	normal		0.8	smile						
+274	dialog_280	0	结衣	那么先回城了解一下比赛的详细情况吧。	UI_juqing_bg_15		actor_001	0.5	normal		0.8	smile						
+275	dialog_285	0	结衣	回到城里了。	UI_juqing_bg_17		actor_001	0.5	smile		0.8	smile						
+276	dialog_285	1	self	这里好喧闹啊。	UI_juqing_bg_17		actor_001	0.5	smile		0.8	smile						
+277	dialog_285	0	结衣	那边有个单独行动的女生，去向他了解些比赛情报吧。	UI_juqing_bg_17		actor_001	0.5	smile		0.8	smile						
+278	dialog_290	1	self	打扰了，想问一下……	UI_juqing_bg_15		actor_001	0.35	smile		0.45	smile	hero_005	0.65	smile			
+279	dialog_290	2	诗乃	吓，走开！	UI_juqing_bg_15		actor_001	0.35	smile		0.45	worry	hero_005	0.65	angry			
+280	dialog_290	0	结衣	好凶的女生。	UI_juqing_bg_15		actor_001	0.35	worry		0.45	worry	hero_005	0.65	smile			
+281	dialog_290	2	诗乃	你这人怎么回事，忽然出现在被人背后！	UI_juqing_bg_15		actor_001	0.35	worry		0.45	worry	hero_005	0.65	angry			
+282	dialog_290	1	self	抱歉，是你看大屏幕太投入了。你也要参加BOB吗？	UI_juqing_bg_15		actor_001	0.35	worry		0.45	worry	hero_005	0.65	smile			
+283	dialog_290	2	诗乃	哼，和你有什么关系。	UI_juqing_bg_15		actor_001	0.35	worry		0.45	worry	hero_005	0.65	angry			
+284	dialog_290	1	self	我们刚来到这个世界，也希望能参加这个比赛，但是不太了解比赛的详细情况……	UI_juqing_bg_15		actor_001	0.35	normal		0.45	smile	hero_005	0.65	smile			
+285	dialog_290	2	诗乃	哇，真给人找麻烦，你们在什么都不了解的情况下就打算参赛吗？	UI_juqing_bg_15		actor_001	0.35	normal		0.45	smile	hero_005	0.65	worry			
+286	dialog_290	1	self	是的，有不得不参加的理由。	UI_juqing_bg_15		actor_001	0.35	normal		0.45	smile	hero_005	0.65	worry			
+287	dialog_290	2	诗乃	哦？这么自信，那先让我见识一下你们的实力吧。	UI_juqing_bg_15		actor_001	0.35	normal		0.45	smile	hero_005	0.65	smile			
+288	dialog_295	0	self	呼，真不容易，这里的战斗难度明显提高了。	UI_juqing_bg_25			0.2	smile	hero_005	0.5	worry						
+289	dialog_295	1	诗乃	嗯，总的来讲嘛还算不错，但是还是欠缺实战经验。需要更多的模拟战。	UI_juqing_bg_25			0.2	smile	hero_005	0.5	smile						
+290	dialog_300	2	诗乃	说起来你们为什么一定要参加BOB呢？	UI_juqing_bg_15		actor_001	0.35	normal		0.45	smile	hero_005	0.65	smile			
+291	dialog_300	1	self	我在寻找我的哥哥，一个和我一样带着导航精灵的人。你见到过吗？	UI_juqing_bg_15		actor_001	0.35	normal		0.45	worry	hero_005	0.65	smile			
+292	dialog_300	2	诗乃	嗯？……没印象。他很强吗？	UI_juqing_bg_15		actor_001	0.35	normal		0.45	smile	hero_005	0.65	smile			
+293	dialog_300	1	self	是的，所以想在这里有可能遇得上。	UI_juqing_bg_15		actor_001	0.35	normal		0.45	smile	hero_005	0.65	smile			
+294	dialog_300	2	诗乃	啊，这样的话就努力拿到冠军，就算没遇上他，也能让他注意到你吧。	UI_juqing_bg_15		actor_001	0.35	normal		0.45	smile	hero_005	0.65	smile			
+295	dialog_300	0	结衣	对啊！说不定他会主动联系你呢。	UI_juqing_bg_15		actor_001	0.35	normal		0.45	smile	hero_005	0.65	smile			
+296	dialog_300	1	self	原来如此！我要一定要拼尽全力！	UI_juqing_bg_15		actor_001	0.35	normal		0.45	angry	hero_005	0.65	smile			
+297	dialog_305	2	诗乃	提高的很快呢，搞不好以后能成为我的搭档。	UI_juqing_bg_15		actor_001	0.35	smile		0.45	smile	hero_005	0.65	smile			
+298	dialog_305	1	self	是吗？	UI_juqing_bg_15		actor_001	0.35	smile		0.45	smile	hero_005	0.65	smile			
+299	dialog_305	2	诗乃	恩恩，要不要试着和我对战呢。	UI_juqing_bg_15		actor_001	0.35	smile		0.45	smile	hero_005	0.65	smile			
+300	dialog_305	1	self	这……	UI_juqing_bg_15		actor_001	0.35	smile		0.45	worry	hero_005	0.65	smile			
+301	dialog_305	2	诗乃	一定会很有趣，我先去找掩护了，你们一会再追过来啊！	UI_juqing_bg_15		actor_001	0.35	smile		0.45	worry	hero_005	0.65	smile			
+302	dialog_305	1	self	等……	UI_juqing_bg_15		actor_001	0.5	smile		0.65	worry	hero_005	2.0	smile			
+303	dialog_305	0	结衣	非常自我的女生呢。	UI_juqing_bg_15		actor_001	0.5	worry		0.65	worry	hero_005	2.0	smile			
+304	dialog_305	1	self	哎……	UI_juqing_bg_15		actor_001	0.5	smile		0.65	worry	hero_005	2.0	smile			
+305	dialog_310	1	诗乃	哎呀,输了输了，你真的很有天赋呢，让我想起了一个朋友。	UI_juqing_bg_15			0.2	worry	hero_005	0.5	smile						
+306	dialog_310	0	self	（几乎靠一己之力能和我们打成这样，可怕的实力。）	UI_juqing_bg_15			0.2	smile	hero_005	0.5	smile						
+307	dialog_315	1	诗乃	今天真是玩的尽兴。	UI_juqing_bg_15			0.2	smile	hero_005	0.5	smile						
+308	dialog_315	0	self	哈…哈…(喘气),累的快抬不起胳膊了。	UI_juqing_bg_15			0.2	smile	hero_005	0.5	smile						
+309	dialog_315	1	诗乃	先回城，我带你们去报名吧。	UI_juqing_bg_15			0.2	smile	hero_005	0.5	smile						
+310	dialog_320	1	夏侯惇	我看了你的战斗。你很快！我想和你比一比！	UI_juqing_bg_15			0.2	worry	hero_030	0.5	smile						
+311	dialog_320	0	self	……	UI_juqing_bg_15			0.2	worry	hero_030	0.5	smile						
+312	dialog_320	1	夏侯惇	让你们见识一下我的力量，接招吧！	UI_juqing_bg_15			0.2	worry	hero_030	0.5	angry						
+313	dialog_320	0	self	等……	UI_juqing_bg_15			0.2	worry	hero_030	0.5	angry						
+314	dialog_325	2	诗乃	哈哈，找麻烦的家伙被打跑了。	UI_juqing_bg_15		actor_001	0.35	smile		0.45	smile	hero_005	0.65	smile			
+315	dialog_325	0	结衣	你已经很强了呢！	UI_juqing_bg_15		actor_001	0.35	smile		0.45	smile	hero_005	0.65	smile			
+316	dialog_325	2	诗乃	BOB里比他强的人多的是，千万别自满，如果想拿到冠军的话。	UI_juqing_bg_15		actor_001	0.35	smile		0.45	smile	hero_005	0.65	smile			
+317	dialog_325	1	self	恩，报名成功了，那么下次见。	UI_juqing_bg_15		actor_001	0.35	smile		0.45	smile	hero_005	0.65	smile			
+318	dialog_330	0	结衣	今天辛苦了，真是相当高强度的训练呢。	UI_juqing_bg_20		actor_001	0.5	normal		0.65	smile						
+319	dialog_330	1	self	恩，不过也有不少收获。	UI_juqing_bg_20		actor_001	0.5	normal		0.65	smile						
+320	dialog_330	0	结衣	食物消耗量很大呢，回城补给吧。	UI_juqing_bg_20		actor_001	0.5	normal		0.65	smile						
+321	dialog_330	1	self	嗯，很好的提议。	UI_juqing_bg_20		actor_001	0.5	normal		0.65	smile						
+322	dialog_335	0	结衣	对了，在乌尔巴斯附近，有一座名叫马罗梅的村庄，好像那里的奶油蛋糕非常有名，想去试试吗？	UI_juqing_bg_20		actor_001	0.5	normal		0.65	smile						
+323	dialog_335	1	self	马罗梅？没听说过的地方，我想去看看。	UI_juqing_bg_20		actor_001	0.5	normal		0.65	worry						
+324	dialog_340	0	结衣	这就是马罗梅吗？好像比赫伦卡还小。	UI_juqing_bg_17		actor_001	0.5	normal		0.65	smile	actor_002	2.0	smile	actor_009	2.0	smile
+325	dialog_340	1	self	你看那边，好长的队。一定就是蛋糕店了。	UI_juqing_bg_17		actor_001	0.5	normal		0.65	smile	actor_002	2.0	smile	actor_009	2.0	smile
+326	dialog_340	3	中年女性	抱歉各位，今天的蛋糕已经卖完了。	UI_juqing_bg_17		actor_001	0.35	normal		0.45	smile	actor_002	2.0	smile	actor_009	0.65	smile
+327	dialog_340	0	结衣	什么……	UI_juqing_bg_17		actor_001	0.35	worry		0.45	smile	actor_002	2.0	smile	actor_009	0.65	smile
+328	dialog_340	2	玲奈	什么？难得来一趟	UI_juqing_bg_17		actor_001	0.2	normal		0.35	smile	actor_002	0.5	angry	actor_009	0.8	smile
+329	dialog_340	2	玲奈	我听说只要自己带材料来也能做好蛋糕对吧。	UI_juqing_bg_17		actor_001	0.2	normal		0.35	smile	actor_002	0.5	smile	actor_009	0.8	smile
+330	dialog_340	3	中年女性	恩，是的，这位客人。	UI_juqing_bg_17		actor_001	0.2	normal		0.35	smile	actor_002	0.5	smile	actor_009	0.8	smile
+331	dialog_340	2	玲奈	好，我一定要吃到奶油蛋糕。	UI_juqing_bg_17		actor_001	0.2	normal		0.35	smile	actor_002	0.5	smile	actor_009	0.8	smile
+332	dialog_340	1	self	。。。。。。	UI_juqing_bg_17		actor_001	0.5	normal		0.65	worry	actor_002	2.0	smile	actor_009	2.0	smile
+333	dialog_340	0	结衣	我们跟过去看看吧。	UI_juqing_bg_17		actor_001	0.5	normal		0.65	smile	actor_002	2.0	smile	actor_009	2.0	smile
+334	dialog_345	2	玲奈	哇！救命。	UI_juqing_bg_20		actor_001	-1.0	normal		-1.0	smile	actor_002	0.5	worry			
+335	dialog_345	1	self	。。。。。。	UI_juqing_bg_20		actor_001	0.35	normal		0.45	worry	actor_002	0.65	smile			
+336	dialog_345	2	玲奈	救命！救命！救命！救命！救命！救命！	UI_juqing_bg_20		actor_001	0.35	normal		0.45	smile	actor_002	0.65	worry			
+337	dialog_345	1	self	没有东西在追你。	UI_juqing_bg_20		actor_001	0.35	normal		0.45	worry	actor_002	0.65	worry			
+338	dialog_345	2	玲奈	啊？哎…哎哟，是这样吗？	UI_juqing_bg_20		actor_001	0.35	normal		0.45	smile	actor_002	0.65	worry			
+339	dialog_345	0	结衣	被吓坏了呢。	UI_juqing_bg_20		actor_001	0.35	worry		0.45	smile	actor_002	0.65	worry			
+340	dialog_345	2	玲奈	我…来找…牛奶…一只狼…	UI_juqing_bg_20		actor_001	0.35	normal		0.45	smile	actor_002	0.65	angry			
+341	dialog_345	0	结衣	你能找到牛奶吗？那和我们一起行动吧，我们也想做奶油蛋糕。	UI_juqing_bg_20		actor_001	0.35	smile		0.45	smile	actor_002	0.65	angry			
+342	dialog_345	2	玲奈	咦？真的吗？太好了，我不实在太擅长战斗。	UI_juqing_bg_20		actor_001	0.35	normal		0.45	smile	actor_002	0.65	smile			
+343	dialog_350	1	玲奈	成功了！获得牛奶了！	UI_juqing_bg_20		actor_001	0.35	smile	actor_002	0.65	smile		0.45	smile			
+344	dialog_350	0	结衣	只要有了它，就能吃到美味的奶油蛋糕了对吗？	UI_juqing_bg_20		actor_001	0.35	smile	actor_002	0.65	smile		0.45	smile			
+345	dialog_350	1	玲奈	没错！来，赶快返回乌尔巴斯吧。	UI_juqing_bg_20		actor_001	0.35	smile	actor_002	0.65	smile		0.45	smile			
+346	dialog_350	0	结衣	玲奈好像对美食情有独钟啊。	UI_juqing_bg_20		actor_001	0.35	smile	actor_002	0.65	smile		0.45	smile			
+347	dialog_350	1	玲奈	当然！我不像那些攻略型玩家一样对战斗乐此不疲，我可是一名专业的游戏美食家！	UI_juqing_bg_20		actor_001	0.35	smile	actor_002	0.65	smile		0.45	smile			
+348	dialog_350	0	结衣	游戏美食家？	UI_juqing_bg_20		actor_001	0.35	smile	actor_002	0.65	smile		0.45	smile			
+349	dialog_350	1	玲奈	哼哼，几乎所有游戏的美味可都收品尝过哦。嘛……因为现实里吃不起。	UI_juqing_bg_20		actor_001	0.35	smile	actor_002	0.65	smile		0.45	smile			
+350	dialog_350	0	结衣	很现实的理由呢…… 	UI_juqing_bg_20		actor_001	0.35	worry	actor_002	0.65	smile		0.45	smile			
+351	dialog_355	1	玲奈	快呀快呀，就要到城里了。	UI_juqing_bg_25		actor_001	0.35	smile	actor_002	0.65	smile		0.45	smile			
+352	dialog_355	0	结衣	玲奈，不用跑那么快吧……	UI_juqing_bg_25		actor_001	0.35	worry	actor_002	0.65	smile		0.45	smile			
+353	dialog_355	1	玲奈	辛辛苦苦打倒怪物得到的，当然很急拉	UI_juqing_bg_25		actor_001	0.35	smile	actor_002	0.65	smile		0.45	smile			
+354	dialog_355	0	结衣	辛苦打怪的好像不是玲奈……	UI_juqing_bg_25		actor_001	0.35	worry	actor_002	0.65	smile		0.45	smile			
+356	dialog_360	1	玲奈	到了到了，这是新鲜的牛奶，麻烦帮我们做奶油蛋糕。	UI_juqing_bg_17		actor_001	0.15	smile	actor_002	0.85	smile	actor_009	2.0	smile	self	0.45	normal
+357	dialog_360	2	中年女性	抱歉，糕点师已经回赫伦卡了，实在很想吃的话可以去那里找他。	UI_juqing_bg_17		actor_001	0.2	smile	actor_002	0.45	smile	actor_009	0.8	smile	self	0.35	normal
+358	dialog_360	1	玲奈	哈？我们这么辛苦弄来的牛奶……	UI_juqing_bg_17		actor_001	0.2	smile	actor_002	0.45	worry	actor_009	0.8	smile	self	0.35	normal
+359	dialog_360	2	中年女性	抱歉，因为时间太晚了	UI_juqing_bg_17		actor_001	0.2	smile	actor_002	0.45	worry	actor_009	0.8	smile	self	0.35	normal
+360	dialog_360	1	玲奈	哼，我玲奈绝不会这么就放弃，走，现在就去赫伦卡。	UI_juqing_bg_17		actor_001	0.35	smile	actor_002	0.65	angry	actor_009	2.0	smile	self	0.45	normal
+361	dialog_360	0	结衣	真是执着呢…… 	UI_juqing_bg_17		actor_001	0.35	worry	actor_002	0.65	angry	actor_009	2.0	smile	self	0.45	normal
+362	dialog_365	0	玲奈	糕点师在吗，糕点师快出来！	UI_juqing_bg_25		actor_002	0.5	angry	actor_008	2.0	angry						
+363	dialog_365	1	中年男性	喂，你们再找糕点师吗。刚才我看到糕点师被几个玩家堵在了路上了，你们可以去那边找他。	UI_juqing_bg_25		actor_002	0.35	angry	actor_008	0.65	angry						
+364	dialog_365	0	玲奈	什么？可恶！不能放过他们。	UI_juqing_bg_25		actor_002	0.35	angry	actor_008	0.65	angry						
+365	dialog_370	1	self	为什么玩家会堵截NPC？	UI_juqing_bg_04		actor_001	0.35	normal		0.45	worry	actor_002	0.65	smile			
+366	dialog_370	0	结衣	有些人会利用偷窃技能去偷NPC的物品。	UI_juqing_bg_04		actor_001	0.35	normal		0.45	smile	actor_002	0.65	smile			
+367	dialog_370	2	玲奈	可恶，我的奶油蛋糕！	UI_juqing_bg_04		actor_001	0.35	normal		0.45	smile	actor_002	0.65	angry			
+368	dialog_375	2	玲奈	啊，在那里！几个人鬼鬼祟祟的。	UI_juqing_bg_04		actor_001	0.35	normal		0.45	smile	actor_002	0.65	angry			
+369	dialog_375	0	结衣	我们去救出蛋糕师吧。	UI_juqing_bg_04		actor_001	0.35	normal		0.45	smile	actor_002	0.65	smile			
+370	dialog_375	1	self	恩。	UI_juqing_bg_04		actor_001	0.35	normal		0.45	smile	actor_002	0.65	smile			
+371	dialog_380	2	玲奈	哈~这么大的蛋糕……吃得好过瘾。	UI_juqing_bg_17		actor_001	0.35	smile		0.45	smile	actor_002	0.65	smile			
+372	dialog_380	0	结衣	比我整个人还大呢！	UI_juqing_bg_17		actor_001	0.35	smile		0.45	smile	actor_002	0.65	smile			
+373	dialog_380	1	self	恩…… 恩…… (咀嚼）	UI_juqing_bg_17		actor_001	0.35	smile		0.45	smile	actor_002	0.65	smile			
+374	dialog_380	2	玲奈	啊~感觉马上就会死掉也没有遗憾呢。	UI_juqing_bg_17		actor_001	0.35	smile		0.45	smile	actor_002	0.65	smile			
+375	dialog_385	3	罗莎莉雅	站住！你们这几个家伙……	UI_juqing_bg_04		actor_001	0.2	normal		0.35	smile	actor_002	0.45	smile	hero_022	0.8	angry
+376	dialog_385	1	self	？？	UI_juqing_bg_04		actor_001	0.2	normal		0.35	worry	actor_002	0.45	smile	hero_022	0.8	angry
+377	dialog_385	3	罗莎莉雅	是你们刚才对我们泰坦之手的人出手的吧……	UI_juqing_bg_04		actor_001	0.2	normal		0.35	worry	actor_002	0.45	smile	hero_022	0.8	angry
+378	dialog_385	1	self	泰坦之手？？不是已经被送到监狱区了么？	UI_juqing_bg_04		actor_001	0.2	normal		0.35	worry	actor_002	0.45	smile	hero_022	0.8	angry
+	dialog_385	0	结衣	嗯，一定是有人将他们的幽灵数据具现化了。	UI_juqing_bg_04		actor_001	0.2	normal		0.35	smile	actor_002	0.45	smile	hero_022	0.8	angry
+	dialog_385	1	self	原来是这样！	UI_juqing_bg_04		actor_001	0.2	normal		0.35	smile	actor_002	0.45	smile	hero_022	0.8	angry
+379	dialog_385	2	玲奈	呀!	UI_juqing_bg_04		actor_001	0.2	angry		0.35	smile	actor_002	0.45	worry	hero_022	0.8	angry
+380	dialog_385	1	self	怎么？	UI_juqing_bg_04		actor_001	0.2	angry		0.35	worry	actor_002	0.45	worry	hero_022	0.8	angry
+381	dialog_385	2	玲奈	那个专门杀人越货的公会……呜呜呜，我不想死。	UI_juqing_bg_04		actor_001	0.2	angry		0.35	smile	actor_002	0.45	worry	hero_022	0.8	angry
+382	dialog_385	0	结衣	刚才还说没有遗憾的……	UI_juqing_bg_04		actor_001	0.2	worry		0.35	smile	actor_002	0.45	worry	hero_022	0.8	angry
+383	dialog_390	1	self	玲奈，这些人经常到处伤害其他玩家吗？	UI_juqing_bg_04		actor_001	0.35	normal		0.45	worry	actor_002	0.65	smile			
+384	dialog_390	2	玲奈	嗯，吓死我了，还好你们靠得住。	UI_juqing_bg_04		actor_001	0.35	normal		0.45	worry	actor_002	0.65	smile			
+385	dialog_390	1	self	不应该放他们跑的！	UI_juqing_bg_04		actor_001	0.35	normal		0.45	angry	actor_002	0.65	smile			
+386	dialog_390	2	玲奈	哎哟，腿都软了，好难站起来。	UI_juqing_bg_04		actor_001	0.35	normal		0.45	smile	actor_002	0.65	worry			
+387	dialog_390	0	结衣	玲奈你还好吧？	UI_juqing_bg_04		actor_001	0.35	worry		0.45	smile	actor_002	0.65	worry			
+388	dialog_390	2	玲奈	没事……今天，先告辞了。	UI_juqing_bg_04		actor_001	0.35	normal		0.45	smile	actor_002	0.65	smile			
+389	dialog_390	1	self	真是不太平的一天。	UI_juqing_bg_04		actor_001	0.5	normal		0.65	smile	actor_002	2.0	smile			
+390	dialog_395	2	莉法	呀~真是极品美味啊。	UI_juqing_bg_07		actor_001	0.35	smile		0.45	smile	hero_011	0.65	smile			
+391	dialog_395	0	结衣	是的是的。	UI_juqing_bg_07		actor_001	0.35	smile		0.45	smile	hero_011	0.65	smile			
+392	dialog_395	1	self	……	UI_juqing_bg_07		actor_001	0.35	smile		0.45	worry	hero_011	0.65	smile			
+393	dialog_395	1	self	我记得上次不是说在翡翠之城碰面么	UI_juqing_bg_07		actor_001	0.35	smile		0.45	worry	hero_011	0.65	smile			
+394	dialog_395	2	莉法	哈？居然有人对这么美好的野餐提出了异议？	UI_juqing_bg_07		actor_001	0.35	smile		0.45	smile	hero_011	0.65	worry			
+395	dialog_395	0	结衣	啊~吃得好饱。	UI_juqing_bg_07		actor_001	0.35	smile		0.45	smile	hero_011	0.65	smile			
+396	dialog_395	1	self	随你们便了。	UI_juqing_bg_07		actor_001	0.35	smile		0.45	worry	hero_011	0.65	smile			
+397	dialog_400	1	莉法	午餐后的运动也让人感到愉快呢。	UI_juqing_bg_23			0.35	normal	hero_011	0.5	smile						
+398	dialog_400	0	self	你只是飞在天上观战而已。	UI_juqing_bg_23			0.35	worry	hero_011	0.5	smile						
+399	dialog_405	0	结衣	说起来，莉法是自己一个人玩这个游戏吗？	UI_juqing_bg_23		actor_001	0.35	normal		0.45	smile	hero_011	0.65	smile			
+400	dialog_405	2	莉法	我和哥哥一起玩的，不过因为很喜欢这边，所以经常一个人过来。	UI_juqing_bg_23		actor_001	0.35	normal		0.45	smile	hero_011	0.65	smile			
+401	dialog_405	1	self	你哥哥……是个怎样的人？	UI_juqing_bg_23		actor_001	0.35	normal		0.45	worry	hero_011	0.65	smile			
+402	dialog_405	2	莉法	恩？	UI_juqing_bg_23		actor_001	0.35	normal		0.45	smile	hero_011	0.65	worry			
+403	dialog_405	1	self	算了，没什么。先去翡翠之都吧。	UI_juqing_bg_23		actor_001	0.35	normal		0.45	smile	hero_011	0.65	smile			
+404	dialog_405	2	莉法	啊，我明白了。别担心，我们领主消息很灵通的，你想找的人一定会有线索。	UI_juqing_bg_23		actor_001	0.35	normal		0.45	smile	hero_011	0.65	smile			
+405	dialog_410	0	self	这就是翡翠之都吗，感觉和想象中不太一样。	UI_juqing_bg_11			0.35	smile	hero_011	0.5	smile	actor_006	2.0	smile			
+406	dialog_410	1	莉法	当然没有主城那么华丽啦，这是ALO的风格嘛。	UI_juqing_bg_11			0.35	smile	hero_011	0.5	smile	actor_006	2.0	smile			
+407	dialog_410	1	莉法	朔夜，我们来了！	UI_juqing_bg_11			0.35	smile	hero_011	0.5	smile	actor_006	2.0	smile			
+408	dialog_410	1	莉法	咦，人呢。	UI_juqing_bg_11			0.35	smile	hero_011	0.5	worry	actor_006	2.0	smile			
+409	dialog_410	2	青年女性精灵	莉法大人，领主出去巡逻了。	UI_juqing_bg_11			0.15	smile	hero_011	0.35	smile	actor_006	0.65	angry			
+410	dialog_410	1	莉法	啊。这样啊，那你们先四处转转吧，一会领主回来了我去找你们。我在天上一眼就能看到你们，所以不用担心。	UI_juqing_bg_11			0.15	smile	hero_011	0.35	smile	actor_006	0.65	angry			
+411	dialog_415	0	结衣	城市太小了，一不小心就走远了呢。	UI_juqing_bg_05		actor_001	0.5	worry		0.65	smile						
+412	dialog_415	1	self	赶紧回去吧，莉法可能看不到这么远。	UI_juqing_bg_05		actor_001	0.5	worry		0.65	smile						
+413	dialog_420	1	朔夜	站住！你们是谁！	UI_juqing_bg_05			0.45	smile	hero_024	0.65	angry	actor_001	0.35	normal			
+414	dialog_420	0	self	我们？我们是……	UI_juqing_bg_05			0.45	worry	hero_024	0.65	angry	actor_001	0.35	normal			
+415	dialog_420	1	朔夜	火精灵的人吗？别想跑！	UI_juqing_bg_05			0.45	worry	hero_024	0.65	angry	actor_001	0.35	normal			
+416	dialog_425	1	莉法	呀！停手！	UI_juqing_bg_05		actor_001	-1.0	normal	hero_011	0.5	worry	hero_024	2.0	worry		-1.0	normal
+417	dialog_425	2	朔夜	莉法？	UI_juqing_bg_05		actor_001	0.15	normal	hero_011	0.5	smile	hero_024	0.85	worry		0.35	normal
+418	dialog_425	0	结衣	终于来了，莉法。	UI_juqing_bg_05		actor_001	0.15	normal	hero_011	0.5	smile	hero_024	0.85	worry		0.35	normal
+419	dialog_425	2	朔夜	莉法，为什么阻止我？	UI_juqing_bg_05		actor_001	0.15	normal	hero_011	0.5	smile	hero_024	0.85	worry		0.35	normal
+420	dialog_425	1	莉法	他们是我朋友！是客人啊！	UI_juqing_bg_05		actor_001	0.15	normal	hero_011	0.5	worry	hero_024	0.85	worry		0.35	normal
+421	dialog_425	2	朔夜	什么！是他们？	UI_juqing_bg_05		actor_001	0.15	normal	hero_011	0.5	worry	hero_024	0.85	worry		0.35	normal
+422	dialog_430	2	朔夜	各位，关于刚才的事情真的很抱歉，最近这里不太平，我冲动了些。	UI_juqing_bg_11			0.2	normal	hero_011	0.35	smile	hero_024	0.65	smile	actor_006	2.0	smile
+423	dialog_430	1	莉法	原谅她把，因为你们的情报，我们发现最近火精灵那边有些蠢蠢欲动，所以朔夜变得比较神经质。	UI_juqing_bg_11			0.2	normal	hero_011	0.35	smile	hero_024	0.65	smile	actor_006	2.0	smile
+424	dialog_430	2	朔夜	你这家伙，还不是因为你让客人自己随处走。	UI_juqing_bg_11			0.2	normal	hero_011	0.35	smile	hero_024	0.65	angry	actor_006	2.0	smile
+425	dialog_430	2	朔夜	那么为了感谢各位，开始准备宴会吧。	UI_juqing_bg_11			0.2	normal	hero_011	0.35	smile	hero_024	0.65	smile	actor_006	2.0	smile
+426	dialog_430	3	青年女性精灵	首领！城外有骚乱，好像有怪物失去控制了！	UI_juqing_bg_11			0.1	normal	hero_011	0.15	smile	hero_024	0.45	smile	actor_006	0.85	angry
+427	dialog_430	2	朔夜	什么！	UI_juqing_bg_11			0.2	normal	hero_011	0.35	smile	hero_024	0.65	angry	actor_006	2.0	angry
+428	dialog_430	2	朔夜	可恶，怎么在这个时候……	UI_juqing_bg_11			0.2	normal	hero_011	0.35	smile	hero_024	0.65	angry	actor_006	2.0	angry
+429	dialog_430	0	self	没关系，我们也去帮忙	UI_juqing_bg_11			0.2	normal	hero_011	0.35	smile	hero_024	0.65	smile	actor_006	2.0	angry
+430	dialog_435	1	莉法	朔夜让我来问一下，这边的情况怎样了。	UI_juqing_bg_23			0.35	normal	hero_011	0.5	smile						
+431	dialog_435	0	self	还没有完全控制住，不知为何怪物忽然狂暴化了。	UI_juqing_bg_23			0.35	normal	hero_011	0.5	smile						
+432	dialog_435	1	莉法	那我们立刻过来支援。	UI_juqing_bg_23			0.35	normal	hero_011	0.5	smile						
+433	dialog_440	0	结衣	那边好像又出现了骚动。	UI_juqing_bg_23		actor_001	0.5	normal		0.65	normal						
+434	dialog_440	1	self	恩，现在就过去。	UI_juqing_bg_23		actor_001	0.5	normal		0.65	normal						
+435	dialog_445	1	self	这是？	UI_juqing_bg_23		actor_001	0.5	normal		0.65	worry						
+436	dialog_445	0	结衣	火龙！相当高级的生物，小心啊！	UI_juqing_bg_23		actor_001	0.5	normal		0.65	smile						
+437	dialog_445	1	self	哼，本来应该是宴会的烤肉师吧，抱歉了。	UI_juqing_bg_23		actor_001	0.5	normal		0.65	smile						
+438	dialog_450	2	朔夜	什么，来晚了吗，你们没事吧。	UI_juqing_bg_23			-1.0	normal	hero_011	-1.0	smile	hero_024	0.5	smile			
+439	dialog_450	0	self	没有大碍。	UI_juqing_bg_23			0.15	normal	hero_011	0.35	smile	hero_024	0.65	smile			
+440	dialog_450	1	莉法	火龙！我们之前已经驯服了的，为什么会忽然暴走。	UI_juqing_bg_23			0.15	normal	hero_011	0.35	worry	hero_024	0.65	smile			
+441	dialog_450	2	朔夜	事后要仔细调查清楚。总之本人对各位的感谢无以言表，晚上会举行盛大的宴会，请务必参加。	UI_juqing_bg_23			0.15	normal	hero_011	0.35	smile	hero_024	0.65	smile			
+442	dialog_455	1	莉法	喂，喂，我们领主好像很喜欢你耶。（小声）	UI_juqing_bg_11			0.35	smile	hero_011	0.5	smile	hero_024	2.0	smile			
+443	dialog_455	2	朔夜	莉法，在说什么？	UI_juqing_bg_11			0.15	smile	hero_011	0.35	smile	hero_024	0.65	smile			
+444	dialog_455	1	莉法	啊啊啊啊？没什么。	UI_juqing_bg_11			0.15	smile	hero_011	0.35	worry	hero_024	0.65	smile			
+445	dialog_455	2	朔夜	对了，听说你在寻找一个带着导航精灵的玩家。	UI_juqing_bg_11			0.15	smile	hero_011	0.35	smile	hero_024	0.65	smile			
+446	dialog_455	0	self	是的，您有见到过吗？	UI_juqing_bg_11			0.15	worry	hero_011	0.35	smile	hero_024	0.65	smile			
+447	dialog_455	2	朔夜	我帮你调查了一下，亚伦的雷根似乎看到过这样的人，他应该能给你们更详细的情报。	UI_juqing_bg_11			0.15	smile	hero_011	0.35	smile	hero_024	0.65	smile			
+448	dialog_455	0	self	真的吗！十分感谢！	UI_juqing_bg_11			0.15	smile	hero_011	0.35	smile	hero_024	0.65	smile			
+449	dialog_455	2	朔夜	没关系，帮了我们这么多次。如果准备好了随时来找我，我会让莉法带你们去的。	UI_juqing_bg_11			0.15	smile	hero_011	0.35	smile	hero_024	0.65	smile			
+450	dialog_460	1	诗乃	BOB快开始了，所以今天找你们来参加集训。	UI_juqing_bg_06		actor_001	0.35	smile	hero_005	0.65	smile	hero_029	2.0	smile		0.4	
+451	dialog_460	0	结衣	集训？	UI_juqing_bg_06		actor_001	0.35	normal	hero_005	0.65	smile	hero_029	2.0	smile		0.4	
+452	dialog_460	1	诗乃	战队的集训活动拉，今天破例让外人加入。	UI_juqing_bg_06		actor_001	0.35	normal	hero_005	0.65	smile	hero_029	2.0	smile		0.4	
+453	dialog_460	2	戴恩	诗乃，出发了，让你的朋友小心别掉队。	UI_juqing_bg_06		actor_001	0.15	normal	hero_005	0.5	smile	hero_029	0.85	smile		0.35	
+454	dialog_460	1	诗乃	不用担心，他们比你想的强很多。	UI_juqing_bg_06		actor_001	0.15	normal	hero_005	0.5	smile	hero_029	0.85	smile		0.35	
+455	dialog_465	2	戴恩	先向新来的几位介绍一下，这里是我们的集训场地。接下来先进行模拟战。	UI_juqing_bg_21			0.2	smile	hero_005	0.3	smile	hero_029	0.7	smile			
+456	dialog_465	1	诗乃	那我来做裁判。	UI_juqing_bg_21			0.2	smile	hero_005	0.3	smile	hero_029	0.7	smile			
+457	dialog_465	2	戴恩	嗯，既然如此，就让我见识一下各位的实力吧。	UI_juqing_bg_21			0.2	smile	hero_005	0.3	smile	hero_029	0.7	smile			
+458	dialog_465	0	self	请多多指教。	UI_juqing_bg_21			0.2	smile	hero_005	0.3	smile	hero_029	0.7	smile			
+459	dialog_470	1	戴恩	恩！果然不凡！	UI_juqing_bg_21		hero_005	0.5	smile	hero_029	0.85	smile		0.35	smile	actor_001	0.15	smile
+460	dialog_470	0	诗乃	对吧，对吧，拉他们加入战队吧。	UI_juqing_bg_21		hero_005	0.5	smile	hero_029	0.85	smile		0.35	smile	actor_001	0.15	smile
+461	dialog_470	1	戴恩	我当然欢迎，不过是否加入是他们的自由。下面开始准备实战训练。	UI_juqing_bg_21		hero_005	0.5	smile	hero_029	0.85	smile		0.35	smile	actor_001	0.15	smile
+462	dialog_475	1	self	结衣	UI_juqing_bg_21		actor_001	0.5	normal		0.65	normal						
+463	dialog_475	0	结衣	恩？	UI_juqing_bg_21		actor_001	0.5	normal		0.65	normal						
+464	dialog_475	1	self	你注意到没有，他们在战斗的时候，非常注重阵型	UI_juqing_bg_21		actor_001	0.5	normal		0.65	normal						
+465	dialog_475	0	结衣	是这样的，在GGO世界里，角色特点就取决于站位和进攻配合。在SAO和ALO的世界里也分别有不同的战术特点哦。	UI_juqing_bg_21		actor_001	0.5	normal		0.65	normal						
+466	dialog_475	1	self	原来如此。	UI_juqing_bg_21		actor_001	0.5	normal		0.65	normal						
+467	dialog_480	1	戴恩	停止作战！	UI_juqing_bg_21		hero_005	0.5	smile	hero_029	0.85	smile		0.35	smile	actor_001	0.15	smile
+468	dialog_480	0	诗乃	怎么了，戴恩？	UI_juqing_bg_21		hero_005	0.5	worry	hero_029	0.85	smile		0.35	smile	actor_001	0.15	smile
+469	dialog_480	1	戴恩	接到了特殊任务。诗乃和我去探查一下地形。其他人立刻整备。	UI_juqing_bg_21		hero_005	0.5	smile	hero_029	0.85	smile		0.35	smile	actor_001	0.15	smile
+470	dialog_480	0	诗乃	OK	UI_juqing_bg_21		hero_005	0.5	smile	hero_029	0.85	smile		0.35	smile	actor_001	0.15	smile
+471	dialog_485	1	self	现在做什么好呢？	UI_juqing_bg_25		actor_001	0.5	normal		0.65	worry						
+472	dialog_485	0	结衣	侦察到前方有不少障碍。总之先打通前方的路吧。	UI_juqing_bg_25		actor_001	0.5	normal		0.65	worry						
+473	dialog_485	1	self	嗯，总比呆在这浪费时间强。	UI_juqing_bg_25		actor_001	0.5	normal		0.65	smile						
+474	dialog_490	0	诗乃	咦，你们已经到这里了？	UI_juqing_bg_25		hero_005	0.55	worry	hero_029	0.85	smile		0.35	smile	actor_001	0.15	smile
+475	dialog_490	1	戴恩	既然如此，开始布置作战吧。	UI_juqing_bg_25		hero_005	0.55	smile	hero_029	0.85	smile		0.35	smile	actor_001	0.15	smile
+476	dialog_495	2	戴恩	一会有支战队要从城外经过，分成了先头侦查部队和主力部队，大家觉得应该如何进攻。	UI_juqing_bg_15			0.2	normal	hero_005	0.3	smile	hero_029	0.7	smile			
+477	dialog_495	1	诗乃	等先头部队经过以后突袭主力怎么样？	UI_juqing_bg_15			0.2	normal	hero_005	0.3	worry	hero_029	0.7	smile			
+478	dialog_495	2	戴恩	嗯……新来的各位有什么建议？	UI_juqing_bg_15			0.2	normal	hero_005	0.3	smile	hero_029	0.7	smile			
+479	dialog_495	0	self	如果突袭失败，可能会被敌人两支部队夹击。	UI_juqing_bg_15			0.2	normal	hero_005	0.3	smile	hero_029	0.7	smile			
+480	dialog_495	2	戴恩	是的，我也担心这点。这次敌人的主力部队中据说有强力的雇佣兵。我们最好还是选择各个击破。	UI_juqing_bg_15			0.2	normal	hero_005	0.3	smile	hero_029	0.7	smile			
+481	dialog_495	1	诗乃	嗯，虽然很刺激，不过确实冒险了些。	UI_juqing_bg_15			0.2	normal	hero_005	0.3	worry	hero_029	0.7	smile			
+482	dialog_495	2	戴恩	就这样决定了，先扫清敌人的侦察队。	UI_juqing_bg_15			0.2	normal	hero_005	0.3	smile	hero_029	0.7	smile			
+483	dialog_500	1	戴恩	就在这里准备伏击敌人的主力吧	UI_juqing_bg_15		hero_005	0.5	smile	hero_029	0.85	smile		0.35	smile	actor_001	0.15	smile
+484	dialog_500	0	诗乃	我狙击点支援，各位加油！	UI_juqing_bg_15		hero_005	0.5	smile	hero_029	0.85	smile		0.35	smile	actor_001	0.15	smile
+485	dialog_505	1	戴恩	注意，敌人来了，各就各位。	UI_juqing_bg_15			0.3	normal	hero_029	0.5	smile						
+486	dialog_505	0	self	戴恩，敌人的主力可以交给我吗？	UI_juqing_bg_15			0.3	normal	hero_029	0.5	smile						
+487	dialog_505	1	戴恩	你？	UI_juqing_bg_15			0.3	normal	hero_029	0.5	worry						
+488	dialog_505	1	戴恩	既然你这么自信就上吧，但是别把敌人当成菜鸟，对面是专业的护卫队！	UI_juqing_bg_15			0.3	normal	hero_029	0.5	smile						
+489	dialog_505	0	self	知道了。	UI_juqing_bg_15			0.3	normal	hero_029	0.5	smile						
+490	dialog_515	1	诗乃	哇，你们居然自己就把那家伙干掉了！	UI_juqing_bg_15			0.35	smile	hero_005	0.5	smile	hero_029	0.85	smile	actor_001	0.15	smile
+491	dialog_515	0	self	你们认识吗？刚才的家伙。	UI_juqing_bg_15			0.35	worry	hero_005	0.5	smile	hero_029	0.85	smile	actor_001	0.15	smile
+492	dialog_515	2	戴恩	哼，以前差点被他灭团的疯子，那次多亏了诗乃。	UI_juqing_bg_15			0.35	normal	hero_005	0.5	smile	hero_029	0.85	angry	actor_001	0.15	smile
+493	dialog_515	1	诗乃	我只是运气好而已啦。说起来你们真是越来越厉害了。	UI_juqing_bg_15			0.35	normal	hero_005	0.5	smile	hero_029	0.85	smile	actor_001	0.15	smile
+494	dialog_515	2	戴恩	嗯，以这种实力BOB想夺冠不是没可能。继续努力吧。	UI_juqing_bg_15			0.35	normal	hero_005	0.5	smile	hero_029	0.85	smile	actor_001	0.15	smile
+495	dialog_515	0	self	……恩	UI_juqing_bg_15			0.35	normal	hero_005	0.5	smile	hero_029	0.85	smile	actor_001	0.15	smile
+496	dialog_520	3	亚丝娜	我说，你们没事吧！	UI_juqing_bg_10		actor_001	-1.0	normal		-1.0	normal	hero_001	0.35	smile	hero_003	0.65	smile
+497	dialog_520	0	结衣	啊，亚丝娜，还有桐人。	UI_juqing_bg_10		actor_001	0.15	normal		0.35	normal	hero_001	0.6	smile	hero_003	0.85	smile
+498	dialog_520	2	桐人	听说你们上次被泰坦之手的人袭击了，一直在担心你们。	UI_juqing_bg_10		actor_001	0.15	normal		0.35	smile	hero_001	0.6	worry	hero_003	0.85	smile
+499	dialog_520	1	self	谢谢，不过我们没事。	UI_juqing_bg_10		actor_001	0.15	normal		0.35	smile	hero_001	0.6	smile	hero_003	0.85	smile
+500	dialog_520	2	桐人	最近这伙人和微笑棺木又跑来这个游戏开始胡作非为了。	UI_juqing_bg_10		actor_001	0.15	normal		0.35	smile	hero_001	0.6	angry	hero_003	0.85	smile
+501	dialog_520	3	亚丝娜	决不能再让这些家伙如此猖獗！	UI_juqing_bg_10		actor_001	0.15	normal		0.35	smile	hero_001	0.6	smile	hero_003	0.85	angry
+502	dialog_520	2	桐人	我们打算明天去清理这些家伙，你们来吗？	UI_juqing_bg_10		actor_001	0.15	normal		0.35	smile	hero_001	0.6	smile	hero_003	0.85	smile
+503	dialog_520	1	self	好的，我正好也想找他们。	UI_juqing_bg_10		actor_001	0.15	normal		0.35	smile	hero_001	0.6	smile	hero_003	0.85	smile
+504	dialog_520	2	桐人	恩，那明天见	UI_juqing_bg_10		actor_001	0.15	normal		0.35	smile	hero_001	0.6	smile	hero_003	0.85	smile
+505	dialog_525	1	桐人	准备好了吗	UI_juqing_bg_23			0.2	smile	hero_001	0.35	smile	hero_003	0.65	smile			
+506	dialog_525	0	self	恩	UI_juqing_bg_23			0.2	smile	hero_001	0.35	smile	hero_003	0.65	smile			
+507	dialog_525	2	亚丝娜	微笑棺木那些家伙今天一个都不能放跑！	UI_juqing_bg_23			0.2	smile	hero_001	0.35	smile	hero_003	0.65	angry			
+508	dialog_530	2	亚丝娜	这些家伙今天居然没有出现。是害怕我们了吗？	UI_juqing_bg_23			0.2	smile	hero_001	0.35	smile	hero_003	0.65	angry			
+509	dialog_530	1	桐人	谨慎为好，这些人非常狡猾。	UI_juqing_bg_23			0.2	smile	hero_001	0.35	angry	hero_003	0.65	smile			
+510	dialog_530	0	self	恩，如果打草惊蛇，说不定会被他们埋伏。	UI_juqing_bg_23			0.2	normal	hero_001	0.35	smile	hero_003	0.65	smile			
+511	dialog_535	0	结衣	大家小心，前面有人	UI_juqing_bg_23		actor_001	0.15	angry		0.35	normal	hero_001	0.6	smile	hero_003	0.85	angry
+512	dialog_535	2	桐人	黑色披风！	UI_juqing_bg_23		actor_001	0.15	normal		0.35	normal	hero_001	0.6	angry	hero_003	0.85	angry
+513	dialog_535	3	亚丝娜	是他们！我们追上去！	UI_juqing_bg_23		actor_001	0.15	normal		0.35	normal	hero_001	0.6	angry	hero_003	0.85	angry
+514	dialog_535	0	结衣	小心啊，桐人亚丝娜	UI_juqing_bg_23		actor_001	0.5	normal		0.65	normal	hero_001	2.0	smile	hero_003	2.0	smile
+515	dialog_535	1	self	我们也跟上去	UI_juqing_bg_23		actor_001	0.5	normal		0.65	normal	hero_001	2.0	smile	hero_003	2.0	smile
+516	dialog_540	0	结衣	亚丝娜，桐人！	UI_juqing_bg_23		actor_001	0.5	worry		0.65	normal						
+517	dialog_540	1	self	跟丢了，结衣，不要喊了，可能会引来那些家伙	UI_juqing_bg_23		actor_001	0.5	worry		0.65	normal						
+518	dialog_545	1	self	结衣，能侦测到附近的玩家吗？	UI_juqing_bg_04		actor_001	0.5	normal		0.65	normal						
+519	dialog_545	0	结衣	我试试。	UI_juqing_bg_04		actor_001	0.5	angry		0.65	normal						
+520	dialog_545	0	结衣	不行，信号干扰很厉害。只能发现前方有一些建筑物。	UI_juqing_bg_04		actor_001	0.5	worry		0.65	normal						
+521	dialog_545	1	self	建筑物？是敌人的巢穴吗。小心的过去看看吧。	UI_juqing_bg_04		actor_001	0.5	worry		0.65	worry						
+522	dialog_550	1	self	是座废墟。	UI_juqing_bg_14		actor_001	0.5	normal		0.65	normal						
+523	dialog_550	0	结衣	哇，看起来真的是敌人的巢穴，小心啊。	UI_juqing_bg_14		actor_001	0.5	normal		0.65	normal						
+524	dialog_550	1	self	墙上的标志，是微笑棺木吗？	UI_juqing_bg_14		actor_001	0.5	normal		0.65	worry						
+525	dialog_550	0	结衣	嗯，以前在sao就很出名的非法玩家公会。	UI_juqing_bg_14		actor_001	0.5	normal		0.65	normal						
+526	dialog_550	1	self	趁他们不在看看能找到些什么吧。	UI_juqing_bg_14		actor_001	0.5	normal		0.65	normal						
+527	dialog_550	0	结衣	这边的桌上有一本手册。	UI_juqing_bg_14		actor_001	0.5	normal		0.65	normal						
+528	dialog_550	1	self	这是……	UI_juqing_bg_14		actor_001	0.5	normal		0.65	normal						
+529	dialog_550	0	结衣	这全都是他们袭击过的目标，居然还做了记录。	UI_juqing_bg_14		actor_001	0.5	angry		0.65	normal						
+530	dialog_550	1	self	这是！	UI_juqing_bg_14		actor_001	0.5	normal		0.65	worry						
+531	dialog_550	0	结衣	怎么了？	UI_juqing_bg_14		actor_001	0.5	normal		0.65	normal						
+532	dialog_550	1	self	哥哥……曾今是他们的目标。	UI_juqing_bg_14		actor_001	0.5	normal		0.65	worry						
+533	dialog_550	0	结衣	这……就是你哥哥吗，那他现在怎么样了，被这些人盯上过的玩家……	UI_juqing_bg_14		actor_001	0.5	normal		0.65	normal						
+534	dialog_550	1	self	不，这个记录里显示行动失败了。我一定要找他们的人问清楚。	UI_juqing_bg_14		actor_001	0.5	normal		0.65	normal						
+535	dialog_555	1	微笑棺木	谁！	UI_juqing_bg_24			-1.0	smile	actor_010	0.5	angry	actor_001	-1.0	normal			
+536	dialog_555	0	self	糟了，被发现了！	UI_juqing_bg_24			0.45	worry	actor_010	0.65	angry	actor_001	0.35	normal			
+537	dialog_555	1	微笑棺木	敢闯到这来，就不要想活着回去了。	UI_juqing_bg_24			0.45	smile	actor_010	0.65	angry	actor_001	0.35	normal			
+538	dialog_560	1	self	可恶，来的人越来越多了！	UI_juqing_bg_24		actor_001	0.5	normal		0.65	angry						
+539	dialog_560	0	结衣	不要泄气，一口气突围出去！	UI_juqing_bg_24		actor_001	0.5	normal		0.65	normal						
+540	dialog_560	1	self	好！	UI_juqing_bg_24		actor_001	0.5	normal		0.65	angry						
+541	dialog_565	3	微笑棺木	哼哼，还打算继续反抗吗？	UI_juqing_bg_24			0.3	normal	hero_010	-1.0	smile	hero_009	-1.0	smile	actor_010	0.5	smile
+542	dialog_565	0	self	有件事情要问你们，这个人后来怎么样了？	UI_juqing_bg_24			0.3	angry	hero_010	-1.0	smile	hero_009	-1.0	smile	actor_010	0.5	smile
+543	dialog_565	3	微笑棺木	怎么？你认识他？	UI_juqing_bg_24			0.3	angry	hero_010	-1.0	smile	hero_009	-1.0	smile	actor_010	0.5	angry
+544	dialog_565	0	self	是的，请务必告诉我。	UI_juqing_bg_24			0.3	angry	hero_010	-1.0	smile	hero_009	-1.0	smile	actor_010	0.5	angry
+545	dialog_565	3	微笑棺木	那你就不得不去死了！	UI_juqing_bg_24			0.3	normal	hero_010	-1.0	smile	hero_009	-1.0	smile	actor_010	0.5	angry
+546	dialog_565	1	艾基尔	吃我一斧头！败类！	UI_juqing_bg_24			0.1	normal	hero_010	0.45	angry	hero_009	0.1	smile	actor_010	0.9	angry
+547	dialog_565	3	微笑棺木	啊！	UI_juqing_bg_24			0.1	normal	hero_010	0.45	angry	hero_009	0.1	smile	actor_010	0.9	angry
+548	dialog_565	2	西莉卡	你没事吧，收到桐人的消息以后立刻赶来了，说起来桐人和亚丝娜呢？	UI_juqing_bg_24			0.15	normal	hero_010	0.7	smile	hero_009	0.3	smile	actor_010	2.0	smile
+549	dialog_565	0	self	追敌人的时候分散了。	UI_juqing_bg_24			0.15	normal	hero_010	0.7	smile	hero_009	0.3	smile	actor_010	2.0	smile
+550	dialog_565	2	西莉卡	总之先一起突围出去吧，这里不是说话的地方。	UI_juqing_bg_24			0.15	normal	hero_010	0.7	smile	hero_009	0.3	smile	actor_010	2.0	smile
+551	dialog_565	0	self	好的。	UI_juqing_bg_24			0.15	normal	hero_010	0.7	smile	hero_009	0.3	smile	actor_010	2.0	smile
+552	dialog_570	0	结衣	呼，总算出来了，太惊险了，那么多敌人。	UI_juqing_bg_24		actor_001	0.15	worry		0.35	smile	hero_010	0.85	smile	hero_009	0.55	smile
+553	dialog_570	2	艾基尔	收到桐人和亚丝娜的消息了，在赶来集合的路上。	UI_juqing_bg_24		actor_001	0.15	normal		0.35	smile	hero_010	0.85	smile	hero_009	0.55	smile
+554	dialog_570	1	self	多亏你们及时赶来。	UI_juqing_bg_24		actor_001	0.15	normal		0.35	smile	hero_010	0.85	smile	hero_009	0.55	smile
+555	dialog_570	3	西莉卡	不要说了，让毕娜先给你们治疗伤口吧。	UI_juqing_bg_24		actor_001	0.15	normal		0.35	smile	hero_010	0.85	smile	hero_009	0.55	smile
+556	dialog_575	0	结衣	有人来了	UI_juqing_bg_04		actor_001	0.15	normal		0.35	smile	hero_010	0.85	smile	hero_009	0.55	smile
+557	dialog_575	3	西莉卡	是桐人和亚丝娜吗。	UI_juqing_bg_04		actor_001	0.15	normal		0.35	smile	hero_010	0.85	smile	hero_009	0.55	worry
+558	dialog_575	2	艾基尔	不对！小心，是敌人，被追上了！	UI_juqing_bg_04		actor_001	0.15	normal		0.35	smile	hero_010	0.85	angry	hero_009	0.55	smile
+559	dialog_575	1	self	这样下去又会被包围的！先下手为强！	UI_juqing_bg_04		actor_001	0.15	normal		0.35	normal	hero_010	0.85	angry	hero_009	0.55	smile
+560	dialog_580	1	桐人	刚才那个是！	UI_juqing_bg_04			0.35	normal	hero_001	0.6	angry	hero_003	0.85	angry	actor_001	0.15	smile
+561	dialog_580	2	亚丝娜	莎萨？	UI_juqing_bg_04			0.35	normal	hero_001	0.6	smile	hero_003	0.85	worry	actor_001	0.15	smile
+562	dialog_580	0	self	你们认识吗？	UI_juqing_bg_04			0.35	worry	hero_001	0.6	smile	hero_003	0.85	smile	actor_001	0.15	smile
+563	dialog_580	1	桐人	恩，没想到这人还能在游戏里出现。难道……	UI_juqing_bg_04			0.35	normal	hero_001	0.6	angry	hero_003	0.85	smile	actor_001	0.15	smile
+564	dialog_580	3	结衣	也许也是幽灵数据……	UI_juqing_bg_04			0.35	normal	hero_001	0.6	smile	hero_003	0.85	smile	actor_001	0.15	normal
+565	dialog_580	0	self	对了，我在他们的名单里看到我哥哥了。	UI_juqing_bg_04			0.35	worry	hero_001	0.6	smile	hero_003	0.85	smile	actor_001	0.15	smile
+566	dialog_580	1	桐人	!!	UI_juqing_bg_04			0.35	normal	hero_001	0.6	angry	hero_003	0.85	smile	actor_001	0.15	smile
+567	dialog_580	0	self	他们曾经把他设为目标，但是被摆脱了，没有找到其他信息。	UI_juqing_bg_04			0.35	worry	hero_001	0.6	smile	hero_003	0.85	smile	actor_001	0.15	smile
+568	dialog_580	2	亚丝娜	一定是你哥哥太强了，微笑棺木也拿他没办法。	UI_juqing_bg_04			0.35	normal	hero_001	0.6	smile	hero_003	0.85	smile	actor_001	0.15	smile
+569	dialog_580	0	self	也许……	UI_juqing_bg_04			0.35	worry	hero_001	0.6	smile	hero_003	0.85	smile	actor_001	0.15	smile
+570	dialog_580	1	桐人	别放弃……至少知道他还在这里。	UI_juqing_bg_04			0.35	normal	hero_001	0.6	smile	hero_003	0.85	smile	actor_001	0.15	smile
+571	dialog_580	0	self	哥哥，我一定会找到你的！	UI_juqing_bg_04			0.35	angry	hero_001	0.6	smile	hero_003	0.85	smile	actor_001	0.15	smile
+572	dialog_585	1	self	说起来，好像忘记了什么事情。	UI_juqing_bg_05		actor_001	0.5	smile		0.65	worry	hero_011	2.0	smile			
+573	dialog_585	0	结衣	恩……？	UI_juqing_bg_05		actor_001	0.5	worry		0.65	smile	hero_011	2.0	smile			
+574	dialog_585	1	self	恩……	UI_juqing_bg_05		actor_001	0.5	smile		0.65	worry	hero_011	2.0	smile			
+575	dialog_585	2	莉法	你们把我忘了拉！怎么自己就走了这么远！害我找了好久。	UI_juqing_bg_05		actor_001	0.35	smile		0.45	smile	hero_011	0.65	angry			
+576	dialog_585	1	self	吓，莉法	UI_juqing_bg_05		actor_001	0.35	smile		0.45	worry	hero_011	0.65	smile			
+577	dialog_585	2	莉法	明明是个导航精灵，怎么也会忘这忘那的！还有你，是不是用不着我带你去亚伦了？	UI_juqing_bg_05		actor_001	0.35	smile		0.45	smile	hero_011	0.65	angry			
+578	dialog_585	0	结衣	对不起。	UI_juqing_bg_05		actor_001	0.35	angry		0.45	smile	hero_011	0.65	smile			
+579	dialog_585	1	self	抱歉，遇上好心玩家指路，不自觉得就开始赶路了。	UI_juqing_bg_05		actor_001	0.35	smile		0.45	smile	hero_011	0.65	smile			
+580	dialog_585	2	莉法	哼，要不是朔夜拜托的我才懒得管你们。	UI_juqing_bg_05		actor_001	0.35	smile		0.45	smile	hero_011	0.65	angry			
+581	dialog_590	0	结衣	莉法你应该去过亚伦吧。	UI_juqing_bg_12		actor_001	0.35	smile		0.45	smile	hero_011	0.65	smile			
+582	dialog_590	2	莉法	嗯，和哥哥一起去过。	UI_juqing_bg_12		actor_001	0.35	smile		0.45	smile	hero_011	0.65	smile			
+583	dialog_590	2	莉法	那时候还在快要进入高山地带的地方好像还和一群邪眼变色龙有过战斗的样子。	UI_juqing_bg_12		actor_001	0.35	smile		0.45	smile	hero_011	0.65	smile			
+584	dialog_590	2	莉法	多亏了哥哥，几乎一个人把它们解决了。	UI_juqing_bg_12		actor_001	0.35	smile		0.45	smile	hero_011	0.65	smile			
+585	dialog_590	0	结衣	莉法的哥哥是个游戏高手呢。	UI_juqing_bg_12		actor_001	0.35	smile		0.45	smile	hero_011	0.65	smile			
+586	dialog_590	2	莉法	对啊，他超厉害的。	UI_juqing_bg_12		actor_001	0.35	smile		0.45	smile	hero_011	0.65	smile			
+587	dialog_590	2	莉法	剑速非常的快，有可能是这个游戏里最快的人呢。	UI_juqing_bg_12		actor_001	0.35	smile		0.45	smile	hero_011	0.65	smile			
+588	dialog_590	2	莉法	而且虽然平时总是一副不正经的样子，在关键的时候却中是很靠得住这一点也很帅呢。	UI_juqing_bg_12		actor_001	0.35	smile		0.45	smile	hero_011	0.65	smile			
+589	dialog_590	1	self	哦……	UI_juqing_bg_12		actor_001	0.35	smile		0.45	smile	hero_011	0.65	smile			
+590	dialog_590	2	莉法	呀！真是的,你们都在让我说些什么呀！	UI_juqing_bg_12		actor_001	0.35	smile		0.45	smile	hero_011	0.65	worry			
+591	dialog_590	1	self	害羞的跑走了……	UI_juqing_bg_12		actor_001	0.5	smile		0.65	smile	hero_011	2.0	smile			
+592	dialog_595	0	结衣	前面有个洞穴。	UI_juqing_bg_24		actor_001	0.35	normal		0.45	smile	hero_011	0.65	smile			
+593	dialog_595	2	莉法	恩，穿过这里就是露格鲁回廊了。	UI_juqing_bg_24		actor_001	0.35	smile		0.45	smile	hero_011	0.65	smile			
+594	dialog_595	1	self	露格鲁回廊？	UI_juqing_bg_24		actor_001	0.35	smile		0.45	worry	hero_011	0.65	smile			
+595	dialog_595	2	莉法	在洞窟深处有一个矿山都市，市名就叫做露格鲁呢。	UI_juqing_bg_24		actor_001	0.35	smile		0.45	smile	hero_011	0.65	smile			
+596	dialog_595	2	莉法	从风精灵族的领地出发到亚伦，这已经是最近的路了。	UI_juqing_bg_24		actor_001	0.35	smile		0.45	smile	hero_011	0.65	smile			
+597	dialog_595	0	结衣	莉法真的好了解呢。	UI_juqing_bg_24		actor_001	0.35	smile		0.45	smile	hero_011	0.65	smile			
+598	dialog_595	2	莉法	我和哥哥之前来过这里，所以很熟悉啦！	UI_juqing_bg_24		actor_001	0.35	smile		0.45	smile	hero_011	0.65	smile			
+599	dialog_595	2	莉法	呀，怎么又提到哥哥了。	UI_juqing_bg_24		actor_001	0.35	smile		0.45	smile	hero_011	0.65	worry			
+600	dialog_595	1	self	又跑走了……	UI_juqing_bg_24		actor_001	0.5	smile		0.65	smile	hero_011	2.0	smile			
+601	dialog_600	0	结衣	哇！好大的湖泊！	UI_juqing_bg_24		actor_001	0.35	normal		0.45	smile	hero_011	0.65	smile			
+602	dialog_600	2	莉法	到达了地底湖，那矿山都市就不远了。	UI_juqing_bg_24		actor_001	0.35	smile		0.45	smile	hero_011	0.65	smile			
+603	dialog_600	2	莉法	看到远处湖上面有一座桥架着吧？过了那里就是露格鲁的城门了。	UI_juqing_bg_24		actor_001	0.35	smile		0.45	smile	hero_011	0.65	smile			
+604	dialog_600	1	self	为什么到了这里忽然变的安静了。	UI_juqing_bg_24		actor_001	0.35	smile		0.45	worry	hero_011	0.65	smile			
+605	dialog_600	2	莉法	啊，对了。听说这附近有很凶猛的水龙，通过的人都不希望招惹到它，所以都静悄悄的过桥。	UI_juqing_bg_24		actor_001	0.35	smile		0.45	smile	hero_011	0.65	smile			
+606	dialog_600	1	self	原来如此，那我们也小心为好。	UI_juqing_bg_24		actor_001	0.35	smile		0.45	smile	hero_011	0.65	smile			
+607	dialog_605	1	self	这就是传说中的水龙吗？	UI_juqing_bg_24		actor_001	0.35	smile		0.45	worry	hero_011	0.65	smile			
+608	dialog_605	2	莉法	别……别问我啊，都说了传说中的，我也是第一次看见。	UI_juqing_bg_24		actor_001	0.35	smile		0.45	smile	hero_011	0.65	worry			
+609	dialog_605	2	莉法	差一点就玩完了。还好你和哥哥一样靠得住。	UI_juqing_bg_24		actor_001	0.35	smile		0.45	smile	hero_011	0.65	worry			
+610	dialog_605	1	self	……谢谢。	UI_juqing_bg_24		actor_001	0.35	smile		0.45	smile	hero_011	0.65	smile			
+611	dialog_605	2	莉法	哎，今天真是筋疲力尽。明天再继续吧，我先闪了。	UI_juqing_bg_24		actor_001	0.35	smile		0.45	smile	hero_011	0.65	worry			
+612	dialog_605	1	self	好，谢谢了莉法。	UI_juqing_bg_24		actor_001	0.35	smile		0.45	smile	hero_011	0.65	smile			
+613	dialog_605	0	结衣	今天还有些时间，我们去找诗乃吧。	UI_juqing_bg_24		actor_001	0.5	smile		0.65	smile	hero_011	2.0	smile			
+614	dialog_605	1	self	恩。今天好像又是他们战队集合行动的日子。	UI_juqing_bg_24		actor_001	0.5	smile		0.65	smile	hero_011	2.0	smile			
+615	dialog_610	1	self	诗乃。	UI_juqing_bg_21		actor_001	0.35	smile		0.45	smile	hero_005	0.65	smile			
+616	dialog_610	2	诗乃	……	UI_juqing_bg_21		actor_001	0.35	smile		0.45	smile	hero_005	0.65	smile			
+617	dialog_610	0	结衣	诗乃？	UI_juqing_bg_21		actor_001	0.35	normal		0.45	smile	hero_005	0.65	smile			
+618	dialog_610	2	诗乃	啊！是你们。	UI_juqing_bg_21		actor_001	0.35	smile		0.45	smile	hero_005	0.65	smile			
+619	dialog_610	0	结衣	诗乃看起来有点恍惚呢？发生什么事了吗？	UI_juqing_bg_21		actor_001	0.35	worry		0.45	smile	hero_005	0.65	smile			
+620	dialog_610	2	诗乃	没什么，我们去集合吧。	UI_juqing_bg_21		actor_001	0.35	smile		0.45	smile	hero_005	0.65	smile			
+621	dialog_615	3	戴恩	哟！诗乃。还有各位。	UI_juqing_bg_21		actor_001	0.15	smile		0.35	smile	hero_005	0.55	smile	hero_029	0.85	smile
+622	dialog_615	2	诗乃	戴恩，我决定了，这次我们以那些家伙为目标。	UI_juqing_bg_21		actor_001	0.15	smile		0.35	smile	hero_005	0.55	worry	hero_029	0.85	worry
+623	dialog_615	3	戴恩	喂喂！饶了我吧，真要搞那么大吗？	UI_juqing_bg_21		actor_001	0.15	smile		0.35	smile	hero_005	0.55	smile	hero_029	0.85	worry
+624	dialog_615	2	诗乃	我不能忍受一直欺凌弱者了！如果你不同意的话我就离开战队。	UI_juqing_bg_21		actor_001	0.15	smile		0.35	smile	hero_005	0.55	angry	hero_029	0.85	worry
+625	dialog_615	3	戴恩	喂！冷静一点诗乃。	UI_juqing_bg_21		actor_001	0.15	smile		0.35	smile	hero_005	0.55	smile	hero_029	0.85	worry
+626	dialog_615	2	诗乃	那就当做你答应了！	UI_juqing_bg_21		actor_001	0.15	smile		0.35	smile	hero_005	0.55	smile	hero_029	0.85	worry
+627	dialog_615	3	戴恩	啊……真是拿你没办法。	UI_juqing_bg_21		actor_001	0.15	smile		0.35	smile	hero_005	0.55	smile	hero_029	0.85	worry
+628	dialog_615	2	诗乃	就这么说定了，出发。	UI_juqing_bg_21		actor_001	0.15	smile		0.35	smile	hero_005	0.55	smile	hero_029	0.85	smile
+629	dialog_620	1	self	那些家伙指的是？	UI_juqing_bg_15		actor_001	0.15	smile		0.35	worry	hero_005	0.55	smile	hero_029	0.85	smile
+630	dialog_620	2	诗乃	一支叫做软脚虾，战队里有参加BOB正选赛的选手。	UI_juqing_bg_15		actor_001	0.15	smile		0.35	smile	hero_005	0.55	smile	hero_029	0.85	smile
+631	dialog_620	3	戴恩	而且战队的整体配合都非常默契，这块骨头可不好啃。	UI_juqing_bg_15		actor_001	0.15	smile		0.35	smile	hero_005	0.55	smile	hero_029	0.85	worry
+632	dialog_620	2	诗乃	我们也很强！	UI_juqing_bg_15		actor_001	0.15	smile		0.35	smile	hero_005	0.55	smile	hero_029	0.85	smile
+633	dialog_620	0	结衣	诗乃真是有干劲呢。	UI_juqing_bg_15		actor_001	0.15	smile		0.35	smile	hero_005	0.55	smile	hero_029	0.85	smile
+634	dialog_625	2	诗乃	到了，我们就在这里准备应战。	UI_juqing_bg_14		actor_001	0.15	smile		0.35	smile	hero_005	0.55	smile	hero_029	0.85	smile
+635	dialog_625	3	戴恩	选这么强的敌人，可别后悔哦。	UI_juqing_bg_14		actor_001	0.15	smile		0.35	smile	hero_005	0.55	smile	hero_029	0.85	smile
+636	dialog_625	2	诗乃	你不要害怕的开不了枪就行了。	UI_juqing_bg_14		actor_001	0.15	smile		0.35	smile	hero_005	0.55	smile	hero_029	0.85	smile
+637	dialog_625	3	戴恩	哼，男人在关键时刻是不会掉链子的。	UI_juqing_bg_14		actor_001	0.15	smile		0.35	smile	hero_005	0.55	smile	hero_029	0.85	angry
+638	dialog_630	2	诗乃	哈~好爽的战斗。	UI_juqing_bg_14		actor_001	0.15	smile		0.35	smile	hero_005	0.55	smile	hero_029	0.85	smile
+639	dialog_630	1	self	好强，比上次和我们练习的时候更厉害了。	UI_juqing_bg_14		actor_001	0.15	smile		0.35	smile	hero_005	0.55	smile	hero_029	0.85	smile
+640	dialog_630	2	诗乃	因为一直在练习嘛，你们不也更强了吗。	UI_juqing_bg_14		actor_001	0.15	smile		0.35	smile	hero_005	0.55	smile	hero_029	0.85	smile
+641	dialog_630	3	戴恩	哎，真实损失惨重，宝贵的武器涂装磨损了。	UI_juqing_bg_14		actor_001	0.15	smile		0.35	smile	hero_005	0.55	smile	hero_029	0.85	worry
+642	dialog_630	2	诗乃	好了好了，赢了就好别在意那些了。	UI_juqing_bg_14		actor_001	0.15	smile		0.35	smile	hero_005	0.55	smile	hero_029	0.85	smile
+643	dialog_635	3	亚丝娜	喂，等等！结衣。	UI_juqing_bg_04		actor_001	0.1	smile	self	0.35	smile	hero_001	0.65	smile	hero_003	0.9	smile
+644	dialog_635	0	结衣	亚丝娜！	UI_juqing_bg_04		actor_001	0.1	smile	self	0.35	smile	hero_001	0.65	smile	hero_003	0.9	smile
+645	dialog_635	2	桐人	找了你们一圈，果然在这。	UI_juqing_bg_04		actor_001	0.1	smile	self	0.35	smile	hero_001	0.65	smile	hero_003	0.9	smile
+646	dialog_635	1	self	诶，有事吗？	UI_juqing_bg_04		actor_001	0.1	smile	self	0.35	worry	hero_001	0.65	smile	hero_003	0.9	smile
+647	dialog_635	2	桐人	牙王那边在组织第二次副本攻略，来一起参加吧	UI_juqing_bg_04		actor_001	0.1	smile	self	0.35	smile	hero_001	0.65	smile	hero_003	0.9	smile
+648	dialog_635	1	self	牙王？上次那个……	UI_juqing_bg_04		actor_001	0.1	smile	self	0.35	worry	hero_001	0.65	smile	hero_003	0.9	smile
+649	dialog_635	2	桐人	恩，听说他们都很期待你参加呢。	UI_juqing_bg_04		actor_001	0.1	smile	self	0.35	smile	hero_001	0.65	smile	hero_003	0.9	smile
+650	dialog_635	0	结衣	太好了，受到关注了呢，那我们快过去吧。	UI_juqing_bg_04		actor_001	0.1	smile	self	0.35	smile	hero_001	0.65	smile	hero_003	0.9	smile
+651	dialog_640	1	self	麻烦，我报名参加攻略战。	UI_juqing_bg_04		actor_001	0.1	smile	self	0.35	smile	hero_031	0.85	smile			
+652	dialog_640	2	牙王	我看看……哈，这不是上次的新人勇者吗。这次也提起精神给我们打先锋吧！	UI_juqing_bg_04		actor_001	0.1	smile	self	0.35	smile	hero_031	0.85	smile			
+653	dialog_640	1	self	好的。	UI_juqing_bg_04		actor_001	0.1	smile	self	0.35	smile	hero_031	0.85	smile			
+654	dialog_645	0	牙王	距离boss区域很近了，大家别松懈，这次一口气拿下！	UI_juqing_bg_22		hero_031	0.5	smile	hero_003	2.0	smile						
+655	dialog_645	1	众人	吼！	UI_juqing_bg_22		hero_031	0.5	smile	hero_003	2.0	smile						
+656	dialog_650	2	亚丝娜	啊……累死我了。	UI_juqing_bg_22		self	0.25	smile	hero_001	0.55	smile	hero_003	0.75	worry	hero_031	2.0	smile
+657	dialog_650	1	桐人	亚丝娜打了最高的输出呢。	UI_juqing_bg_22		self	0.25	smile	hero_001	0.55	smile	hero_003	0.75	smile	hero_031	2.0	smile
+658	dialog_650	2	亚丝娜	还不是因为桐人在后面划水。	UI_juqing_bg_22		self	0.25	smile	hero_001	0.55	smile	hero_003	0.75	smile	hero_031	2.0	smile
+659	dialog_650	3	牙王	你们在这里啊。	UI_juqing_bg_22		self	0.1	smile	hero_001	0.35	smile	hero_003	0.6	smile	hero_031	0.9	smile
+660	dialog_650	0	self	啊，你好，攻略战辛苦了。	UI_juqing_bg_22		self	0.1	smile	hero_001	0.35	smile	hero_003	0.6	smile	hero_031	0.9	smile
+661	dialog_650	3	牙王	这次也多亏你们才能轻松拿下。	UI_juqing_bg_22		self	0.1	smile	hero_001	0.35	smile	hero_003	0.6	smile	hero_031	0.9	smile
+662	dialog_650	3	牙王	对了，我帮你打听到了点消息。	UI_juqing_bg_22		self	0.1	smile	hero_001	0.35	smile	hero_003	0.6	smile	hero_031	0.9	smile
+663	dialog_650	0	self	！！	UI_juqing_bg_22		self	0.1	smile	hero_001	0.35	smile	hero_003	0.6	smile	hero_031	0.9	smile
+664	dialog_650	3	牙王	我的朋友是这个游戏的初次内测玩家。他说当时在顶上攻略战的时候经常能看见你哥哥。但是他说这个人从来不进行游戏以外的交流，也不加任何人好友，所以没有其他的消息，抱歉……	UI_juqing_bg_22		self	0.1	smile	hero_001	0.35	smile	hero_003	0.6	smile	hero_031	0.9	smile
+665	dialog_650	0	self	不，很感谢你，顶上攻略战吗。我知道了……	UI_juqing_bg_22		self	0.1	smile	hero_001	0.35	smile	hero_003	0.6	smile	hero_031	0.9	smile
+666	dialog_655	2	莉法	啊。抱歉抱歉！来晚了。	UI_juqing_bg_11		actor_001	0.15	smile	self	0.45	smile	hero_011	0.85	smile			
+667	dialog_655	0	结衣	莉法也会迟到，相当少见呢。	UI_juqing_bg_11		actor_001	0.15	angry	self	0.45	smile	hero_011	0.85	smile			
+668	dialog_655	2	莉法	昨天玩到太累，今天坐电车回家的时候一不小心睡过头了。	UI_juqing_bg_11		actor_001	0.15	smile	self	0.45	smile	hero_011	0.85	smile			
+669	dialog_655	1	self	……	UI_juqing_bg_11		actor_001	0.15	smile	self	0.45	worry	hero_011	0.85	smile			
+670	dialog_655	0	结衣	真辛苦啊……	UI_juqing_bg_11		actor_001	0.15	worry	self	0.45	smile	hero_011	0.85	smile			
+671	dialog_660	2	莉法	我们到了，这里就是亚伦。我们要找的家伙呢……	UI_juqing_bg_23		actor_001	0.15	smile	self	0.45	smile	hero_011	0.85	smile	hero_041	2.0	smile
+672	dialog_660	3	雷根	莉法！	UI_juqing_bg_23		actor_001	0.1	smile	self	0.35	smile	hero_011	0.6	smile	hero_041	0.9	smile
+673	dialog_660	2	莉法	出现了！	UI_juqing_bg_23		actor_001	0.1	smile	self	0.35	smile	hero_011	0.6	smile	hero_041	0.9	smile
+674	dialog_660	3	雷根	好久不见了莉法，来看我的吗？这几位是？	UI_juqing_bg_23		actor_001	0.1	smile	self	0.35	smile	hero_011	0.6	smile	hero_041	0.9	smile
+675	dialog_660	1	self	你好，朔夜领主说，你之前看到过带有导航精灵的玩家，是真的吗？	UI_juqing_bg_23		actor_001	0.1	smile	self	0.35	smile	hero_011	0.6	smile	hero_041	0.9	smile
+676	dialog_660	3	雷根	嗯?......	UI_juqing_bg_23		actor_001	0.1	smile	self	0.35	smile	hero_011	0.6	smile	hero_041	0.9	worry
+677	dialog_660	3	雷根	啊！想起来了，你说的是那个暗精灵玩家吧。	UI_juqing_bg_23		actor_001	0.1	smile	self	0.35	smile	hero_011	0.6	smile	hero_041	0.9	angry
+678	dialog_660	1	self	真的见到了吗？他在哪！	UI_juqing_bg_23		actor_001	0.1	smile	self	0.35	worry	hero_011	0.6	smile	hero_041	0.9	smile
+679	dialog_660	3	雷根	嗯……前几天听他和同行的人说要去风精灵领地。	UI_juqing_bg_23		actor_001	0.1	smile	self	0.35	smile	hero_011	0.6	smile	hero_041	0.9	smile
+680	dialog_660	1	self	又要回去吗？那我们立刻出发吧。	UI_juqing_bg_23		actor_001	0.1	smile	self	0.35	worry	hero_011	0.6	smile	hero_041	0.9	smile
+681	dialog_660	3	雷根	啊，你们这就要走了？莉法不陪我聊聊天吗？	UI_juqing_bg_23		actor_001	0.1	smile	self	0.35	smile	hero_011	0.6	smile	hero_041	0.9	angry
+682	dialog_660	2	莉法	不好意思啊雷根，下次吧，现在有事在身。诶……等等我，别走那么快啊。	UI_juqing_bg_23		actor_001	0.1	smile	self	0.35	smile	hero_011	0.6	smile	hero_041	0.9	smile
+683	dialog_665	2	莉法	走了这么快了还是追不上啊。	UI_juqing_bg_23		actor_001	0.15	smile	self	0.45	smile	hero_011	0.85	worry			
+684	dialog_665	0	结衣	仔细想想，我们来时的路上，没有看见暗精灵族队伍。他们会不会是是飞行移动的……	UI_juqing_bg_23		actor_001	0.15	worry	self	0.45	smile	hero_011	0.85	smile			
+685	dialog_665	2	莉法	不过，也就是说，回廊那段路是追上他们的好机会。	UI_juqing_bg_23		actor_001	0.15	smile	self	0.45	smile	hero_011	0.85	smile			
+686	dialog_665	0	结衣	为什么呢？	UI_juqing_bg_23		actor_001	0.15	worry	self	0.45	smile	hero_011	0.85	smile			
+687	dialog_665	2	莉法	精灵的翅膀，在没有日光和月光的情况下飞翔力是无法恢复的。	UI_juqing_bg_23		actor_001	0.15	smile	self	0.45	smile	hero_011	0.85	smile			
+688	dialog_665	0	结衣	原来如此。那说不定可以一口气赶上……	UI_juqing_bg_23		actor_001	0.15	normal	self	0.45	smile	hero_011	0.85	smile			
+689	dialog_670	2	莉法	刚刚听玩家说他们昨天有一伙暗精灵从洞口那一侧的出口走了。	UI_juqing_bg_24		actor_001	0.15	smile	self	0.45	smile	hero_011	0.85	smile			
+690	dialog_670	1	self	昨天，应该没走太远。	UI_juqing_bg_24		actor_001	0.15	smile	self	0.45	smile	hero_011	0.85	smile			
+691	dialog_670	2	莉法	但是还听说那队暗精灵族离开城镇以后没多久，又有一群火精灵也紧跟着离开了。	UI_juqing_bg_24		actor_001	0.15	smile	self	0.45	smile	hero_011	0.85	smile			
+692	dialog_670	1	self	火精灵？	UI_juqing_bg_24		actor_001	0.15	smile	self	0.45	worry	hero_011	0.85	smile			
+693	dialog_670	2	莉法	要小心这些家伙，一直以来就对我们风精灵抱有恶意。	UI_juqing_bg_24		actor_001	0.15	smile	self	0.45	smile	hero_011	0.85	smile			
+694	dialog_675	0	结衣	天空中好像有动静……	UI_juqing_bg_24		actor_001	0.15	normal	self	0.45	smile	hero_011	0.85	smile			
+695	dialog_675	0	结衣	天哪！快看那边！	UI_juqing_bg_24		actor_001	0.15	normal	self	0.45	smile	hero_011	0.85	smile			
+696	dialog_675	2	莉法	有战斗。火精灵和暗精灵在战斗？	UI_juqing_bg_24		actor_001	0.15	normal	self	0.45	smile	hero_011	0.85	angry			
+697	dialog_675	2	结衣	呀，有个人掉下去了。	UI_juqing_bg_24		actor_001	0.15	normal	self	0.45	smile	hero_011	0.85	smile			
+698	dialog_675	1	self	得立即赶过去！	UI_juqing_bg_24		actor_001	0.15	normal	self	0.45	worry	hero_011	0.85	smile			
+699	dialog_680	1	self	火精灵都被我们解决了，暗精灵呢？	UI_juqing_bg_24		actor_001	0.15	smile	self	0.45	worry	hero_011	0.85	smile			
+700	dialog_680	2	莉法	在附近搜搜吧。	UI_juqing_bg_24		actor_001	0.15	smile	self	0.45	smile	hero_011	0.85	smile			
+701	dialog_685	2	莉法	什么？火龙！	UI_juqing_bg_24		actor_001	0.15	smile	self	0.45	smile	hero_011	0.85	angry			
+702	dialog_685	1	self	！	UI_juqing_bg_24		actor_001	0.15	smile	self	0.45	worry	hero_011	0.85	smile			
+703	dialog_685	0	结衣	大家小心啊，这火龙失去了主人，现在很暴躁。	UI_juqing_bg_24		actor_001	0.15	normal	self	0.45	smile	hero_011	0.85	smile			
+704	dialog_690	0	结衣	快来看，这边有个幸存者。	UI_juqing_bg_24		actor_001	0.15	normal	self	0.45	smile	hero_011	0.85	smile	actor_007	2.0	smile
+705	dialog_690	3	西卡里	……	UI_juqing_bg_24		actor_001	0.1	normal	self	0.35	smile	hero_011	0.6	smile	actor_007	0.9	worry
+706	dialog_690	2	莉法	啊，是个暗精灵。	UI_juqing_bg_24		actor_001	0.1	normal	self	0.35	smile	hero_011	0.6	worry	actor_007	0.9	worry
+707	dialog_690	1	self	还有和你一起的暗精灵呢？	UI_juqing_bg_24		actor_001	0.1	normal	self	0.35	worry	hero_011	0.6	smile	actor_007	0.9	worry
+708	dialog_690	3	西卡里	……	UI_juqing_bg_24		actor_001	0.1	normal	self	0.35	smile	hero_011	0.6	smile	actor_007	0.9	worry
+709	dialog_690	2	莉法	她吓坏了，这样吧，我先把他带回翡翠之都吧，你们继续搜索	UI_juqing_bg_24		actor_001	0.1	normal	self	0.35	smile	hero_011	0.6	smile	actor_007	0.9	worry
+710	dialog_690	1	self	好的，麻烦你了，我们继续搜索。	UI_juqing_bg_24		actor_001	0.1	normal	self	0.35	smile	hero_011	0.6	smile	actor_007	0.9	worry
+711	dialog_695	0	结衣	今天去找莉法吗？现在看来只有那个女孩幸存了。	UI_juqing_bg_21		actor_001	0.35	worry	self	0.65	smile						
+712	dialog_695	1	self	恩，不知道她们怎么样了。	UI_juqing_bg_21		actor_001	0.35	smile	self	0.65	smile						
+713	dialog_695	1	self	呀，收到了诗乃的消息……	UI_juqing_bg_21		actor_001	0.35	smile	self	0.65	worry						
+714	dialog_695	1	self	让我们立即支援。	UI_juqing_bg_21		actor_001	0.35	smile	self	0.65	worry						
+715	dialog_700	0	结衣	找到了，诗乃在那边，还有战队的人。	UI_juqing_bg_21		actor_001	0.35	normal	self	0.65	smile	hero_005	2.0	smile	hero_029	2.0	smile
+716	dialog_700	1	self	诗乃，怎么了？	UI_juqing_bg_21		actor_001	0.1	smile	self	0.35	worry	hero_005	0.6	smile	hero_029	0.9	smile
+717	dialog_700	2	诗乃	你看远处那边。	UI_juqing_bg_21		actor_001	0.1	smile	self	0.35	smile	hero_005	0.6	smile	hero_029	0.9	smile
+718	dialog_700	3	戴恩	玩家和怪物的战斗。	UI_juqing_bg_21		actor_001	0.1	smile	self	0.35	smile	hero_005	0.6	smile	hero_029	0.9	worry
+719	dialog_700	2	诗乃	好像玩家完全不是对手，在这里居然刷出了硬的出奇的近战怪物，需要你这种肉盾扛在前面才行。	UI_juqing_bg_21		actor_001	0.1	smile	self	0.35	smile	hero_005	0.6	smile	hero_029	0.9	smile
+720	dialog_700	1	self	我知道了，那么赶紧支援那些玩家吧，他们快全灭了。	UI_juqing_bg_21		actor_001	0.1	smile	self	0.35	worry	hero_005	0.6	smile	hero_029	0.9	smile
+721	dialog_705	0	诗乃	哇，好像已经全灭了。	UI_juqing_bg_25		hero_005	0.42	smile	hero_029	0.85	smile	actor_004	2.0	smile	self	0.15	smile
+722	dialog_705	2	卡罗琳	喂，这里。	UI_juqing_bg_25		hero_005	0.42	smile	hero_029	0.85	angry	actor_004	2.0	smile	self	0.15	smile
+723	dialog_705	1	戴恩	还有幸存者！	UI_juqing_bg_25		hero_005	0.42	smile	hero_029	0.85	angry	actor_004	2.0	smile	self	0.15	smile
+724	dialog_705	1	戴恩	只剩下你一个人了吗？	UI_juqing_bg_25		hero_005	0.35	smile	hero_029	0.61	smile	actor_004	0.93	smile	self	0.08	smile
+725	dialog_705	2	卡罗琳	是的，那个怪物太强了，我勉强才逃出来的，你们还要去招惹它吗？	UI_juqing_bg_25		hero_005	0.35	smile	hero_029	0.61	smile	actor_004	0.93	worry	self	0.08	smile
+726	dialog_705	0	诗乃	当然，不然我们来做什么。	UI_juqing_bg_25		hero_005	0.35	smile	hero_029	0.61	smile	actor_004	0.93	smile	self	0.08	smile
+727	dialog_705	1	戴恩	很抱歉没帮到你。	UI_juqing_bg_25		hero_005	0.35	smile	hero_029	0.61	worry	actor_004	0.93	smile	self	0.08	smile
+728	dialog_705	2	卡罗琳	没关系，真是个温柔的男人呢。	UI_juqing_bg_25		hero_005	0.35	smile	hero_029	0.61	smile	actor_004	0.93	smile	self	0.08	smile
+729	dialog_710	2	卡罗琳	天呐，你们太强了。	UI_juqing_bg_25		hero_005	0.35	smile	hero_029	0.61	smile	actor_004	0.93	smile	self	0.08	smile
+730	dialog_710	0	诗乃	哼哼，厉害吧。	UI_juqing_bg_25		hero_005	0.35	smile	hero_029	0.61	smile	actor_004	0.93	smile	self	0.08	smile
+731	dialog_710	2	卡罗琳	我知道你呢，诗乃，数一数二的狙击手。	UI_juqing_bg_25		hero_005	0.35	smile	hero_029	0.61	smile	actor_004	0.93	smile	self	0.08	smile
+732	dialog_710	0	诗乃	啊？哪…哪有	UI_juqing_bg_25		hero_005	0.35	worry	hero_029	0.61	smile	actor_004	0.93	smile	self	0.08	smile
+733	dialog_710	2	卡罗琳	我能加入你们战队吗？	UI_juqing_bg_25		hero_005	0.35	smile	hero_029	0.61	smile	actor_004	0.93	smile	self	0.08	smile
+734	dialog_710	1	戴恩	当然，十分欢迎。	UI_juqing_bg_25		hero_005	0.35	smile	hero_029	0.61	smile	actor_004	0.93	smile	self	0.08	smile
+735	dialog_710	0	诗乃	喂，你决定的太快了吧。	UI_juqing_bg_25		hero_005	0.35	smile	hero_029	0.61	smile	actor_004	0.93	smile	self	0.08	smile
+736	dialog_710	1	戴恩	没什么问题的吧。	UI_juqing_bg_25		hero_005	0.35	smile	hero_029	0.61	worry	actor_004	0.93	smile	self	0.08	smile
+737	dialog_710	0	诗乃	哎…真是个毫无定力的男人。	UI_juqing_bg_25		hero_005	0.35	worry	hero_029	0.61	smile	actor_004	0.93	smile	self	0.08	smile
+738	dialog_715	1	亚丝娜	咦，好巧啊，你怎么在这里？	UI_juqing_bg_23		self	0.35	smile	hero_003	0.65	smile						
+739	dialog_715	0	self	啊，你好，我现在在修行中。	UI_juqing_bg_23		self	0.35	smile	hero_003	0.65	smile						
+740	dialog_715	1	亚丝娜	修行？	UI_juqing_bg_23		self	0.35	smile	hero_003	0.65	worry						
+741	dialog_715	0	self	嗯，为了早日参加顶上攻略战。	UI_juqing_bg_23		self	0.35	smile	hero_003	0.65	smile						
+742	dialog_715	1	亚丝娜	原来如此，难怪你进步这么迅速。	UI_juqing_bg_23		self	0.35	smile	hero_003	0.65	smile						
+743	dialog_715	0	self	亚丝娜知到能够变得更强的办法吗？我听说你和桐人在之前的游戏里实力都是顶级。	UI_juqing_bg_23		self	0.35	smile	hero_003	0.65	smile						
+744	dialog_715	1	亚丝娜	嗯……正好我要去塔兰村，一边走，一边说吧。	UI_juqing_bg_23		self	0.35	smile	hero_003	0.65	smile						
+745	dialog_720	1	亚丝娜	说到提升呢，不懈的努力锻炼是必不可少的。	UI_juqing_bg_23		self	0.35	smile	hero_003	0.65	smile						
+746	dialog_720	0	self	恩……	UI_juqing_bg_23		self	0.35	smile	hero_003	0.65	smile						
+747	dialog_720	1	亚丝娜	在这一点上你可不要动歪脑筋哦，没有那种轻松的捷径可走的。	UI_juqing_bg_23		self	0.35	smile	hero_003	0.65	smile						
+748	dialog_720	0	self	铭记在心	UI_juqing_bg_23		self	0.35	smile	hero_003	0.65	smile						
+749	dialog_725	1	亚丝娜	我看你练习的蛮用心的，不过呢，这毕竟是个游戏，装备还是很重要的。	UI_juqing_bg_23		self	0.35	smile	hero_003	0.65	smile						
+750	dialog_725	0	self	装备吗。	UI_juqing_bg_23		self	0.35	worry	hero_003	0.65	smile						
+751	dialog_725	1	亚丝娜	恩，装备和属性是相辅相成的。如果装备不够强，你的基础属性再高也无法得到质的提升。	UI_juqing_bg_23		self	0.35	smile	hero_003	0.65	smile						
+752	dialog_725	0	self	是该去莉兹贝特那逛逛了。	UI_juqing_bg_23		self	0.35	smile	hero_003	0.65	smile						
+753	dialog_730	1	亚丝娜	嗯……	UI_juqing_bg_02		self	0.35	smile	hero_003	0.65	worry						
+754	dialog_730	0	self	怎么了？我脸上有什么脏东西吗？	UI_juqing_bg_02		self	0.35	worry	hero_003	0.65	smile						
+755	dialog_730	1	亚丝娜	不，我在想，你对这个游戏到底理解了多少呢。	UI_juqing_bg_02		self	0.35	smile	hero_003	0.65	smile						
+756	dialog_730	0	self	对游戏的理解？	UI_juqing_bg_02		self	0.35	worry	hero_003	0.65	smile						
+757	dialog_730	1	亚丝娜	是啊，一味的蛮干可达不到好效果。要了解怪物的技能和弱点，利用自己的优势，在此基础上利用游戏系统形成对策才能最大化自己的实力。	UI_juqing_bg_02		self	0.35	smile	hero_003	0.65	smile						
+758	dialog_730	0	self	原来如此，我会好好研究的。	UI_juqing_bg_02		self	0.35	smile	hero_003	0.65	smile						
+759	dialog_735	1	亚丝娜	对了，你有过战胜不了的对手吗？	UI_juqing_bg_02		self	0.35	smile	hero_003	0.65	smile						
+760	dialog_735	0	self	恩，之前有个大家伙。	UI_juqing_bg_02		self	0.35	smile	hero_003	0.65	smile						
+761	dialog_735	1	亚丝娜	然后呢？	UI_juqing_bg_02		self	0.35	smile	hero_003	0.65	smile						
+762	dialog_735	0	self	打了很多次都没有打过。	UI_juqing_bg_02		self	0.35	smile	hero_003	0.65	smile						
+763	dialog_735	1	亚丝娜	你过于勇猛了，但是要记住，实力相差很大的情况下，先提升自己才能获得更好的成长空间哦。	UI_juqing_bg_02		self	0.35	smile	hero_003	0.65	smile						
+764	dialog_735	0	self	恩，那次过后我也有过这种想法。	UI_juqing_bg_02		self	0.35	smile	hero_003	0.65	smile						
+765	dialog_740	1	亚丝娜	啊，到这里了！	UI_juqing_bg_26		self	0.35	smile	hero_003	0.65	smile						
+766	dialog_740	0	self	这里？怎么了？	UI_juqing_bg_26		self	0.35	worry	hero_003	0.65	smile						
+767	dialog_740	1	亚丝娜	你跟我来。	UI_juqing_bg_26		self	0.35	smile	hero_003	0.65	smile						
+768	dialog_740	0	self	……	UI_juqing_bg_26		self	0.35	worry	hero_003	0.65	smile						
+769	dialog_745	1	亚丝娜	恩，不错不错。	UI_juqing_bg_26		self	0.35	smile	hero_003	0.65	smile						
+770	dialog_745	0	self	……啊，好强的怪物，难以置信居然赢了。	UI_juqing_bg_26		self	0.35	smile	hero_003	0.65	smile						
+771	dialog_745	1	亚丝娜	你一定会变很强的，因为你有信念再支持着你，我早就看出来了。	UI_juqing_bg_26		self	0.35	smile	hero_003	0.65	smile						
+772	dialog_745	0	self	……哥哥	UI_juqing_bg_26		self	0.35	smile	hero_003	0.65	smile						
+773	dialog_745	1	亚丝娜	桐人当时也是为了我们奋不顾身的时候，突破了自己的界限。	UI_juqing_bg_26		self	0.35	smile	hero_003	0.65	smile						
+774	dialog_745	0	self	二刀流吗？	UI_juqing_bg_26		self	0.35	worry	hero_003	0.65	smile						
+775	dialog_745	1	亚丝娜	对，所以只要坚持下去，你一定会变得很强的哦。	UI_juqing_bg_26		self	0.35	smile	hero_003	0.65	smile						
+776	dialog_745	0	self	谢谢，我一定会……	UI_juqing_bg_26		self	0.35	smile	hero_003	0.65	smile						
+777	dialog_750	1	self	莉法，你找我吗。	UI_juqing_bg_11		actor_001	0.15	smile	self	0.45	smile	hero_011	0.85	smile			
+778	dialog_750	2	莉法	啊，嗯……	UI_juqing_bg_11		actor_001	0.15	smile	self	0.45	smile	hero_011	0.85	smile			
+779	dialog_750	0	结衣	莉法怎么闷闷不乐的样子？	UI_juqing_bg_11		actor_001	0.15	normal	self	0.45	smile	hero_011	0.85	smile			
+780	dialog_750	1	self	对了，上次的暗精灵怎么样了？	UI_juqing_bg_11		actor_001	0.15	smile	self	0.45	worry	hero_011	0.85	smile			
+781	dialog_750	2	莉法	嗯，她没事，不过最近火精灵在我们的领地越来越嚣张了	UI_juqing_bg_11		actor_001	0.15	smile	self	0.45	smile	hero_011	0.85	smile			
+782	dialog_750	2	莉法	而且很奇怪的是，他们居然摸透了我们的行动，风精灵最近接连遭遇偷袭	UI_juqing_bg_11		actor_001	0.15	smile	self	0.45	smile	hero_011	0.85	angry			
+783	dialog_750	0	结衣	这些家伙，真是可恶	UI_juqing_bg_11		actor_001	0.15	angry	self	0.45	smile	hero_011	0.85	smile			
+784	dialog_750	1	self	虽然不知道他们有什么打算，但是不能放任他们这样胡作非为	UI_juqing_bg_11		actor_001	0.15	smile	self	0.45	smile	hero_011	0.85	smile			
+785	dialog_750	2	莉法	但是朔夜不希望外人插手这件事情	UI_juqing_bg_11		actor_001	0.15	smile	self	0.45	smile	hero_011	0.85	angry			
+786	dialog_750	1	self	不是插手，单纯的想干掉他们而已	UI_juqing_bg_11		actor_001	0.15	smile	self	0.45	smile	hero_011	0.85	smile			
+787	dialog_750	2	莉法	你……耍什么帅，和哥哥一样，哼	UI_juqing_bg_11		actor_001	0.15	smile	self	0.45	smile	hero_011	0.85	worry			
+788	dialog_750	0	结衣	莉法，等等我们啊。	UI_juqing_bg_11		actor_001	0.35	worry	self	0.65	smile	hero_011	2.0	smile			
+789	dialog_755	0	self	哼，这些家伙还是没什么长进	UI_juqing_bg_05		self	0.35	angry	hero_011	0.65	smile						
+790	dialog_755	1	莉法	他们的目标是风精灵，想不到你会来打他们个措手不及	UI_juqing_bg_05		self	0.35	smile	hero_011	0.65	smile						
+791	dialog_755	0	self	就这样一口气把他们都扫出森林	UI_juqing_bg_05		self	0.35	smile	hero_011	0.65	smile						
+792	dialog_760	0	莉法	希格路德！你怎么会在这。	UI_juqing_bg_05		hero_011	0.45	angry	hero_037	0.85	smile	self	0.15	smile			
+793	dialog_760	1	希格路德	啧，可恶，是你们在这捣乱吗。	UI_juqing_bg_05		hero_011	0.45	angry	hero_037	0.85	angry	self	0.15	smile			
+794	dialog_760	0	莉法	原来如此，是你背叛了我们，这些火精灵才会在这随心所欲	UI_juqing_bg_05		hero_011	0.45	angry	hero_037	0.85	smile	self	0.15	smile			
+795	dialog_760	1	希格路德	去死吧！我要把你们都干掉！	UI_juqing_bg_05		hero_011	0.45	angry	hero_037	0.85	angry	self	0.15	smile			
+796	dialog_765	3	希格路德	可恶……！火精灵族们都答应我了……！只要抢到暗精灵族手里的戒指我就……！可恶啊！	UI_juqing_bg_27		actor_001	0.1	smile	self	0.35	smile	hero_011	0.6	smile	hero_037	0.9	angry
+797	dialog_765	0	结衣	他逃了！	UI_juqing_bg_27		actor_001	0.15	normal	self	0.45	smile	hero_011	0.85	smile	hero_037	2.0	smile
+798	dialog_765	1	self	我们追，他跑不了的。	UI_juqing_bg_27		actor_001	0.15	smile	self	0.45	smile	hero_011	0.85	smile	hero_037	2.0	smile
+799	dialog_765	2	莉法	不用，让他去吧。追上了也无济于事。	UI_juqing_bg_27		actor_001	0.15	smile	self	0.45	smile	hero_011	0.85	smile	hero_037	2.0	smile
+800	dialog_765	1	self	他刚才有提到戒指，指的是什么呢？	UI_juqing_bg_27		actor_001	0.15	smile	self	0.45	worry	hero_011	0.85	smile	hero_037	2.0	smile
+801	dialog_765	2	莉法	我也很在意，先回去问问朔夜吧。	UI_juqing_bg_27		actor_001	0.15	smile	self	0.45	smile	hero_011	0.85	smile	hero_037	2.0	smile
+802	dialog_765	1	self	嗯，回去吧，这里已经没有火精灵了	UI_juqing_bg_27		actor_001	0.15	smile	self	0.45	smile	hero_011	0.85	smile	hero_037	2.0	smile
+803	dialog_770	1	戴恩	根据卡罗琳的情报，敌人将在这一带出现。	UI_juqing_bg_14		hero_005	0.45	smile	hero_029	0.85	smile	self	0.15	smile			
+804	dialog_770	1	戴恩	大家各就各位，按原定计划埋伏。	UI_juqing_bg_14		hero_005	0.45	smile	hero_029	0.85	smile	self	0.15	smile			
+805	dialog_770	0	诗乃	喂，戴恩，卡罗琳怎么不见了。	UI_juqing_bg_14		hero_005	0.45	angry	hero_029	0.85	smile	self	0.15	smile			
+806	dialog_770	1	戴恩	什么？刚才还……	UI_juqing_bg_14		hero_005	0.45	smile	hero_029	0.85	angry	self	0.15	smile			
+807	dialog_770	0	诗乃	算了，先做好应战准备吧	UI_juqing_bg_14		hero_005	0.45	smile	hero_029	0.85	smile	self	0.15	smile			
+808	dialog_775	2	卡罗琳	我回来了，好像已经解决了呢。	UI_juqing_bg_14		hero_005	0.35	smile	hero_029	0.65	smile	actor_004	0.93	smile	self	0.1	smile
+809	dialog_775	0	诗乃	喂，你刚才忽然不见去哪了？	UI_juqing_bg_14		hero_005	0.35	angry	hero_029	0.65	smile	actor_004	0.93	smile	self	0.1	smile
+810	dialog_775	1	戴恩	诗乃，别这么激动，反正也赢了。	UI_juqing_bg_14		hero_005	0.35	smile	hero_029	0.65	worry	actor_004	0.93	smile	self	0.1	smile
+811	dialog_775	2	卡罗琳	抱歉，刚才在高地观察的时候，发现了另一支战队，所以多观望了一会。	UI_juqing_bg_14		hero_005	0.35	smile	hero_029	0.65	smile	actor_004	0.93	worry	self	0.1	smile
+812	dialog_775	1	戴恩	另一支战队。	UI_juqing_bg_14		hero_005	0.35	smile	hero_029	0.65	angry	actor_004	0.93	smile	self	0.1	smile
+813	dialog_775	2	卡罗琳	嗯，我看到他们停在哪了，跟我来。	UI_juqing_bg_14		hero_005	0.35	smile	hero_029	0.65	smile	actor_004	0.93	smile	self	0.1	smile
+814	dialog_775	1	戴恩	好，那我们再干一票。	UI_juqing_bg_14		hero_005	0.35	smile	hero_029	0.65	smile	actor_004	0.93	smile	self	0.1	smile
+815	dialog_775	0	诗乃	……	UI_juqing_bg_14		hero_005	0.35	worry	hero_029	0.65	smile	actor_004	0.93	smile	self	0.1	smile
+816	dialog_780	1	戴恩	等诗乃找到狙击位我们就开始行动，暂时先……	UI_juqing_bg_14		self	0.15	smile	hero_029	0.5	smile	actor_004	0.85	smile			
+817	dialog_780	0	self	危险！	UI_juqing_bg_14		self	0.15	angry	hero_029	0.5	smile	actor_004	0.85	smile			
+818	dialog_780	1	戴恩	枪声！？怎么回事？	UI_juqing_bg_14		self	0.15	smile	hero_029	0.5	angry	actor_004	0.85	smile			
+819	dialog_780	0	self	子弹从那边飞过来的！	UI_juqing_bg_14		self	0.15	angry	hero_029	0.5	smile	actor_004	0.85	smile			
+820	dialog_780	1	戴恩	糟糕，难道我们被其他战队盯上了，我们先撤。	UI_juqing_bg_14		self	0.15	smile	hero_029	0.5	angry	actor_004	0.85	smile			
+821	dialog_780	0	self	诗乃怎么办。	UI_juqing_bg_14		self	0.15	angry	hero_029	0.5	smile	actor_004	0.85	smile			
+822	dialog_780	1	戴恩	没收到消息她会随机应变的。	UI_juqing_bg_14		self	0.15	smile	hero_029	0.5	angry	actor_004	0.85	smile			
+823	dialog_780	2	卡罗琳	西边是对方的盲区，我们先过去！	UI_juqing_bg_14		self	0.15	smile	hero_029	0.5	smile	actor_004	0.85	angry			
+824	dialog_785	1	戴恩	什么？桥对面也有埋伏。	UI_juqing_bg_21		self	0.15	smile	hero_029	0.5	angry	actor_004	0.85	smile			
+825	dialog_785	0	self	被前后夹击了！	UI_juqing_bg_21		self	0.15	angry	hero_029	0.5	smile	actor_004	0.85	smile			
+826	dialog_785	2	卡罗琳	这边还有条路，大家快来！	UI_juqing_bg_21		self	0.15	smile	hero_029	0.5	smile	actor_004	0.85	angry			
+827	dialog_785	1	戴恩	谢天谢地，都跟上来。	UI_juqing_bg_21		self	0.15	smile	hero_029	0.5	angry	actor_004	0.85	smile			
+828	dialog_790	1	戴恩	加把劲，再往前一点就安全了	UI_juqing_bg_21		hero_005	2.0	worry	hero_029	0.5	smile	actor_004	0.85	smile	self	0.15	smile
+829	dialog_790	2	卡罗琳	小心，前面有人！	UI_juqing_bg_21		hero_005	2.0	smile	hero_029	0.5	smile	actor_004	0.85	smile	self	0.15	smile
+830	dialog_790	1	戴恩	什么？	UI_juqing_bg_21		hero_005	2.0	smile	hero_029	0.5	smile	actor_004	0.85	smile	self	0.15	smile
+831	dialog_790	2	卡罗琳	现在路边找掩体！	UI_juqing_bg_21		hero_005	2.0	smile	hero_029	0.5	smile	actor_004	0.85	smile	self	0.15	smile
+832	dialog_790	1	戴恩	可是如果这时候停下，后面会……	UI_juqing_bg_21		hero_005	2.0	smile	hero_029	0.5	smile	actor_004	0.85	smile	self	0.15	smile
+833	dialog_790	0	诗乃	戴恩，别停下！我在有利地势支援你们。	UI_juqing_bg_21		hero_005	2.0	smile	hero_029	0.5	smile	actor_004	0.85	smile	self	0.15	smile
+834	dialog_790	1	戴恩	诗乃吗？太好了，大家上！	UI_juqing_bg_21		hero_005	2.0	smile	hero_029	0.5	smile	actor_004	0.85	smile	self	0.15	smile
+835	dialog_790	2	卡罗琳	……	UI_juqing_bg_21		hero_005	2.0	smile	hero_029	0.5	smile	actor_004	0.85	smile	self	0.15	smile
+836	dialog_795	2	戴恩	啊，总算脱离危险了	UI_juqing_bg_21		self	0.1	smile	hero_005	0.35	smile	hero_029	0.65	smile	actor_004	0.93	smile
+837	dialog_795	1	诗乃	戴恩小心！	UI_juqing_bg_21		self	0.1	smile	hero_005	0.35	angry	hero_029	0.65	smile	actor_004	0.93	smile
+838	dialog_795	3	卡罗琳	可恶！	UI_juqing_bg_21		self	0.1	smile	hero_005	0.35	smile	hero_029	0.65	smile	actor_004	0.93	angry
+839	dialog_795	2	戴恩	卡罗琳？你要去哪。	UI_juqing_bg_21		self	0.15	smile	hero_005	0.5	smile	hero_029	0.85	angry	actor_004	2.0	smile
+840	dialog_795	1	诗乃	戴恩，这家伙是内鬼！他刚才想攻击你。	UI_juqing_bg_21		self	0.15	smile	hero_005	0.5	angry	hero_029	0.85	smile	actor_004	2.0	smile
+841	dialog_795	2	戴恩	怎么可能？	UI_juqing_bg_21		self	0.15	smile	hero_005	0.5	smile	hero_029	0.85	worry	actor_004	2.0	smile
+842	dialog_795	0	self	别放她跑了！	UI_juqing_bg_21		self	0.15	angry	hero_005	0.5	smile	hero_029	0.85	smile	actor_004	2.0	smile
+843	dialog_800	2	戴恩	卡罗琳，为什么陷害我们。	UI_juqing_bg_21		self	0.1	smile	hero_005	0.35	smile	hero_029	0.63	angry	actor_004	0.93	smile
+844	dialog_800	3	卡罗琳	哼，有人想干掉你们，在BOB之前。	UI_juqing_bg_21		self	0.1	smile	hero_005	0.35	smile	hero_029	0.63	smile	actor_004	0.93	angry
+845	dialog_800	1	诗乃	什么？这有什么意义。	UI_juqing_bg_21		self	0.1	smile	hero_005	0.35	angry	hero_029	0.63	smile	actor_004	0.93	smile
+846	dialog_800	3	卡罗琳	抢劫，暗杀，破坏，进一切可能组织玩家提升能力，就是我的工作。	UI_juqing_bg_21		self	0.1	smile	hero_005	0.35	smile	hero_029	0.63	smile	actor_004	0.93	angry
+847	dialog_800	2	戴恩	谁雇你做这种事！	UI_juqing_bg_21		self	0.1	smile	hero_005	0.35	smile	hero_029	0.63	angry	actor_004	0.93	smile
+848	dialog_800	3	卡罗琳	抱歉啊戴恩，虽然很想告诉你，但是我还是有职业操守的，再见。	UI_juqing_bg_21		self	0.1	smile	hero_005	0.35	smile	hero_029	0.63	smile	actor_004	0.93	angry
+849	dialog_800	2	戴恩	喂！	UI_juqing_bg_21		self	0.15	smile	hero_005	0.5	smile	hero_029	0.85	worry	actor_004	2.0	smile
+850	dialog_800	0	self	跳下去了，这么高的大桥……	UI_juqing_bg_21		self	0.15	worry	hero_005	0.5	smile	hero_029	0.85	smile	actor_004	2.0	smile
+851	dialog_800	2	戴恩	我一定要查出幕后黑手，可恶！可恶！	UI_juqing_bg_21		self	0.15	smile	hero_005	0.5	smile	hero_029	0.85	angry	actor_004	2.0	smile
+852	dialog_800	1	诗乃	戴恩……	UI_juqing_bg_21		self	0.15	smile	hero_005	0.5	worry	hero_029	0.85	smile	actor_004	2.0	smile

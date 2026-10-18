@@ -1,0 +1,1 @@
+CREATE TABLE IF NOT EXISTS p10_friend_energy_daily (player_id BIGINT NOT NULL, day CHAR(10) NOT NULL, claimed INT NOT NULL, PRIMARY KEY(player_id,day)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;

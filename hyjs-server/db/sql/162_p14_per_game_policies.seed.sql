@@ -1,0 +1,1 @@
+INSERT IGNORE INTO p14_per_game_policies(id,enabled,version,source,published_at) VALUES(1,0,'','local-original-81030-per-game-v1; server-inferred-slot2to5; actual-current-profile; five-minute-lock; complete-origin-seals; no-Game1-reuse-no-result',0);

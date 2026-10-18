@@ -1,0 +1,2 @@
+-- 原跨服联合身份、精确回执与持久投递；无胜负和奖励。
+CREATE TABLE IF NOT EXISTS p14_deliveries (id CHAR(64) PRIMARY KEY,destination_server_id BIGINT NOT NULL,payload LONGBLOB NOT NULL,confirmed BOOLEAN NOT NULL DEFAULT FALSE,attempt_count BIGINT NOT NULL DEFAULT 0,created_at BIGINT NOT NULL,confirmed_at BIGINT NOT NULL DEFAULT 0,INDEX idx_p14_destination(destination_server_id),INDEX idx_p14_confirmed(confirmed)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;

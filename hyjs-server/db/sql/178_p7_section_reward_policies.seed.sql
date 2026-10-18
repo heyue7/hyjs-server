@@ -1,0 +1,3 @@
+-- Finite named local highest-tier rule; original private-server rewards unknown.
+INSERT IGNORE INTO p7_section_reward_policies(id,enabled,version,source,published_at,start_at,end_at,section_from,section_to,three_reward,six_reward,nine_reward) VALUES(1,0,'local-first-section-v1','trial-section-reward-local-v1：原54519三档奖励列表及3/6/9星、54523空领取gain与自动奖励页已核。原私服分段长度/奖品/累计或最高档规则未知。本地预发布前三层、只取最高已达星档为具名有限策略，默认关闭；实际本轮首层paidStart冻结，三个不同楼层完整accepted胜利后才领奖，不回补历史星数/旧战斗。',0,0,0,1,3,'item_001,1','item_001,2','item_001,3');
+-- The nine disabled StageRules are inserted by InitializeP7SectionRewards from the pinned original NPC bytes. No existing row is overwritten.

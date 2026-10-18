@@ -1,0 +1,7 @@
+DemoHeroId	对应TaskId	英雄Id	权重	等级	攻击	物防	魔防	血量	命中率	闪避率	暴击率	抗暴率	暴击系数	伤害加成	伤害减免	技能1	技能2	大招	天赋0	天赋1	天赋2	天赋3	天赋4	天赋5
+DemoHeroId	TaskId	HeroId	Weight	Level	Attack	PhyDefend	MagicDefend	Hp	hit	dodge	cri	antiCri	criFactor	damageAdd	damageReduce	SkillId1	SkillId2	UltSkillId	Talent0	Talent1	Talent2	Talent3	Talent4	Talent5
+string	string	string	int	int	int	int	int	int	double	double	double	double	double	double	double	string	string	string	string	string	string	string	string	string
+primary	index	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none
+DemoHeroId	TaskId	HeroId	Weight	Level	Attack	PhyDefend	MagicDefend	Hp	hit	dodge	cri	antiCri	criFactor	damageAdd	damageReduce	SkillId1	SkillId2	UltSkillId	Talent0	Talent1	Talent2	Talent3	Talent4	Talent5
+1	4	hero_001	3	1	150	100	100	3500	100.0	0.0	20.0	0.0	50.0	0.0	0.0	001_1	001_2	001_3						
+3	4	hero_007	7	1	130	80	60	1719	100.0	0.0	20.0	0.0	50.0	0.0	0.0	007_1	007_2	007_3						

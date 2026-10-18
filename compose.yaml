@@ -1,0 +1,47 @@
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: hyjs-mysql
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:33068:3306"
+    environment:
+      MYSQL_DATABASE: hyjs
+      MYSQL_USER: hyjs
+      MYSQL_PASSWORD: ${HYJS_MYSQL_PASSWORD:?Set HYJS_MYSQL_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${HYJS_MYSQL_ROOT_PASSWORD:?Set HYJS_MYSQL_ROOT_PASSWORD}
+    volumes:
+      - hyjs-mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+  hyjs:
+    build:
+      context: .
+      dockerfile: hyjs-server/Dockerfile
+    ports:
+      - "127.0.0.1:18088:18088"
+      - "127.0.0.1:19098:19098"
+    environment:
+      HYJS_MYSQL_HOST: mysql:3306
+      HYJS_MYSQL_USER: hyjs
+      HYJS_MYSQL_DATABASE: hyjs
+      HYJS_MYSQL_PASSWORD: ${HYJS_MYSQL_PASSWORD:?Set HYJS_MYSQL_PASSWORD}
+    depends_on:
+      mysql:
+        condition: service_healthy
+    command:
+      - --bind
+      - 0.0.0.0
+      - --advertise-host
+      - ${HYJS_ADVERTISE_HOST:-127.0.0.1}
+      - --http-port
+      - "18088"
+      - --tcp-port
+      - "19098"
+      - --tables
+      - /app/tables
+volumes:
+  hyjs-mysql-data:

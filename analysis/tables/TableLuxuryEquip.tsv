@@ -1,0 +1,6 @@
+Id	奖励物品	触发章节	触发关卡	需要充值金额	价值钻石数	限时	物品图片
+id	prize	chapter	stage	money	diamond	limitHours	picture
+int	string	int	int	int	int	int	string
+primary	none	none	none	none	none	none	none
+id	prize	chapter	stage	money	diamond	limitHours	picture
+2	equip_033,1;equip_034,1;equip_035,1;equip_036,1	6	1	288	5888	12	equip_png_033,equip_png_034,equip_png_035,equip_png_036

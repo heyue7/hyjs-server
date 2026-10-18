@@ -1,0 +1,2 @@
+-- 原跨服联合身份、精确回执与持久投递；无胜负和奖励。
+CREATE TABLE IF NOT EXISTS p14_season_policies (id BIGINT PRIMARY KEY,enabled BOOLEAN NOT NULL DEFAULT FALSE,season_index INT NOT NULL DEFAULT 0,register_start BIGINT NOT NULL DEFAULT 0,register_end BIGINT NOT NULL DEFAULT 0,source TEXT NOT NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;

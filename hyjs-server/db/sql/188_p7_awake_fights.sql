@@ -1,0 +1,21 @@
+CREATE TABLE IF NOT EXISTS p7_awake_fights (
+ id VARBINARY(64) PRIMARY KEY,
+ player_id BIGINT NOT NULL,
+ run_id VARBINARY(64) NOT NULL,
+ monster_guid VARBINARY(64) NOT NULL,
+ status VARCHAR(16) NOT NULL,
+ replay_id VARCHAR(64) NOT NULL,
+ scope_proof CHAR(64) NOT NULL,
+ start LONGBLOB NOT NULL,
+ start_hash CHAR(64) NOT NULL,
+ input_hash CHAR(64) NOT NULL,
+ terminal LONGBLOB NULL,
+ terminal_hash CHAR(64) NOT NULL,
+ end_request LONGBLOB NULL,
+ end_hash CHAR(64) NOT NULL,
+ reply LONGBLOB NULL,
+ reply_hash CHAR(64) NOT NULL,
+ created_at BIGINT NOT NULL,
+ accepted_at BIGINT NOT NULL,
+ INDEX(player_id), INDEX(run_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;

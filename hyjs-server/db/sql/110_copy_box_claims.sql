@@ -1,0 +1,1 @@
+CREATE TABLE IF NOT EXISTS copy_box_claims (player_id BIGINT NOT NULL,box_id VARBINARY(64) NOT NULL,input LONGBLOB NOT NULL,input_hash CHAR(64) NOT NULL,claimed BOOLEAN NOT NULL,PRIMARY KEY(player_id,box_id)) ENGINE=InnoDB;

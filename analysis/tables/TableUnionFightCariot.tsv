@@ -1,0 +1,9 @@
+UFCId	UFFId(TableUnionFightFactory)	车模型	车的体积	攻击CD	攻击时长	攻击Release点	移动特效	被击特效	站立特效
+UFCId	UFFId	ModelName	Range	AttackCountDown	AttackDuration	AttackRelease	MoveEffect	HitEffect	StandEffect
+int	int	string	double	double	double	double	string	string	string
+primary	index	none	none	none	none	none	none	none	none
+UFCId	UFFId	ModelName	range	attackCountDown	attackDuration	attackRelease			
+1	1	battle_obj_802	1.4	3.5	1.0	0.6			
+2	2	battle_obj_801	1.4	3.5	1.0	0.6			
+3	3	battle_obj_802	1.4	3.5	1.0	0.6			
+4	4	battle_obj_801	1.4	3.5	1.0	0.6			

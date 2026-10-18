@@ -1,0 +1,15 @@
+CREATE TABLE IF NOT EXISTS p7_maze_trader_policies (
+ id BIGINT NOT NULL PRIMARY KEY,
+ enabled BOOLEAN NOT NULL DEFAULT FALSE,
+ version VARCHAR(64) NOT NULL,
+ source TEXT NOT NULL,
+ published_at BIGINT NOT NULL DEFAULT 0,
+ start_at BIGINT NOT NULL DEFAULT 0,
+ end_at BIGINT NOT NULL DEFAULT 0,
+ min_floor INT NOT NULL DEFAULT 1,
+ appear_ppm INT NOT NULL DEFAULT 1000000,
+ resource_id VARCHAR(64) NOT NULL,
+ quantity INT NOT NULL,
+ original_price INT NOT NULL,
+ discount_price INT NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

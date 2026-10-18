@@ -1,0 +1,9 @@
+CREATE TABLE IF NOT EXISTS p12_world_boss_battle_policies (
+  id BIGINT NOT NULL PRIMARY KEY,
+  enabled BOOLEAN NOT NULL DEFAULT FALSE,
+  economy_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+  rewards_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+  economy_source TEXT NULL,
+  policy_name VARCHAR(96) NOT NULL,
+  source TEXT NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

@@ -1,0 +1,20 @@
+CREATE TABLE IF NOT EXISTS `p14_pair_guess_offers` (
+  `season_index` INT NOT NULL,
+  `pair_hash` CHAR(64) NOT NULL,
+  `battle_type` INT NOT NULL,
+  `pair` LONGBLOB NOT NULL,
+  `draw_hash` CHAR(64) NOT NULL,
+  `qualification_hash` CHAR(64) NOT NULL,
+  `version` VARCHAR(128) NOT NULL,
+  `source` VARCHAR(1024) NOT NULL,
+  `published_at` BIGINT NOT NULL,
+  `open_at` BIGINT NOT NULL,
+  `close_at` BIGINT NOT NULL,
+  `cost_coin` BIGINT NOT NULL,
+  `revert_coin` BIGINT NOT NULL,
+  `success_coin` BIGINT NOT NULL,
+  `extra_diamond` BIGINT NOT NULL,
+  `settlement` VARCHAR(512) NOT NULL,
+  `source_hash` CHAR(64) NOT NULL,
+  PRIMARY KEY (`season_index`, `pair_hash`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;

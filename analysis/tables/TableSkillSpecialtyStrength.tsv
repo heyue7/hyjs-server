@@ -1,0 +1,55 @@
+id	专精类型	强化等级	可以开启类型	强化消耗	属性加成
+id	type	strengthLevel	canOpen	strengthCost	propAdd
+int	int	int	string	string	string
+primary	index	none	none	none	none
+id	type	strengthLevel	canOpen	strengthCost	propAdd
+1	1	1		item_441,10;item_442,10	hp,0
+2	1	2		item_441,90;item_442,10	hp,1500
+3	1	3		item_444,40;item_445,150;item_446,10	hp,4500
+4	1	4		item_444,45;item_445,150;item_446,10	hp,7500
+5	1	5	2,5:4	item_447,70;item_448,50;item_449,80;item_450,10	hp,12500
+6	1	6		item_447,75;item_448,55;item_449,100;item_450,10	hp,17500
+7	1	7		item_447,80;item_448,60;item_449,120;item_450,10	hp,22500
+8	1	8		item_451,85;item_452,60;item_453,100;item_454,10	hp,28500
+9	1	9		item_451,90;item_452,65;item_453,120;item_454,10	hp,34500
+10	1	10		item_451,100;item_452,70;item_453,140;item_454,10	hp,40500
+11	2	1		item_441,10;item_442,10	mdef,0
+12	2	2		item_441,90;item_442,10	mdef,70
+13	2	3		item_444,40;item_445,150;item_446,10	mdef,170
+14	2	4		item_444,45;item_445,150;item_446,10	mdef,270
+15	2	5	1,5:4;3,5:5	item_447,70;item_448,50;item_449,80;item_450,10	mdef,460
+16	2	6		item_447,75;item_448,55;item_449,100;item_450,10	mdef,650
+17	2	7		item_447,80;item_448,60;item_449,120;item_450,10	mdef,840
+18	2	8		item_451,85;item_452,60;item_453,100;item_454,10	mdef,1340
+19	2	9		item_451,90;item_452,65;item_453,120;item_454,10	mdef,1840
+20	2	10		item_451,100;item_452,70;item_453,140;item_454,10	mdef,2340
+21	3	1		item_441,10;item_442,10	pdef,0
+22	3	2		item_441,90;item_442,10	pdef,70
+23	3	3		item_444,40;item_445,150;item_446,10	pdef,170
+24	3	4		item_444,45;item_445,150;item_446,10	pdef,270
+25	3	5	2,5:5	item_447,70;item_448,50;item_449,80;item_450,10	pdef,460
+26	3	6		item_447,75;item_448,55;item_449,100;item_450,10	pdef,650
+27	3	7		item_447,80;item_448,60;item_449,120;item_450,10	pdef,840
+28	3	8		item_451,85;item_452,60;item_453,100;item_454,10	pdef,1340
+29	3	9		item_451,90;item_452,65;item_453,120;item_454,10	pdef,1840
+30	3	10		item_451,100;item_452,70;item_453,140;item_454,10	pdef,2340
+31	4	1		item_441,10;item_442,10	att,0
+32	4	2		item_441,90;item_442,10	att,150
+33	4	3		item_444,40;item_445,150;item_446,10	att,450
+34	4	4		item_444,45;item_445,150;item_446,10	att,750
+35	4	5		item_447,70;item_448,50;item_449,80;item_450,10	att,1250
+36	4	6		item_447,75;item_448,55;item_449,100;item_450,10	att,1750
+37	4	7		item_447,80;item_448,60;item_449,120;item_450,10	att,2250
+38	4	8		item_451,85;item_452,60;item_453,100;item_454,10	att,2850
+39	4	9		item_451,90;item_452,65;item_453,120;item_454,10	att,3450
+40	4	10		item_451,100;item_452,70;item_453,140;item_454,10	att,4050
+41	5	1		item_441,10;item_442,10	cri,0;antiCri,0;hit,0;dodge,0
+42	5	2		item_441,90;item_442,10	cri,0.5;antiCri,0.5;hit,0.5;dodge,0.5
+43	5	3		item_444,40;item_445,150;item_446,10	cri,1;antiCri,1;hit,1;dodge,1
+44	5	4		item_444,45;item_445,150;item_446,10	cri,1.5;antiCri,1.5;hit,1.5;dodge,1.5
+45	5	5		item_447,70;item_448,50;item_449,80;item_450,10	cri,2;antiCri,2;hit,2;dodge,2
+46	5	6		item_447,75;item_448,55;item_449,100;item_450,10	cri,2.5;antiCri,2.5;hit,2.5;dodge,2.5
+47	5	7		item_447,80;item_448,60;item_449,120;item_450,10	cri,3;antiCri,3;hit,3;dodge,3
+48	5	8		item_451,85;item_452,60;item_453,100;item_454,10	cri,3.5;antiCri,3.5;hit,3.5;dodge,3.5
+49	5	9		item_451,90;item_452,65;item_453,120;item_454,10	cri,4;antiCri,4;hit,4;dodge,4
+50	5	10		item_451,100;item_452,70;item_453,140;item_454,10	cri,4.5;antiCri,4.5;hit,4.5;dodge,4.5

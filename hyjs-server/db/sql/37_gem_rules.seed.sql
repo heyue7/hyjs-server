@@ -1,0 +1,1 @@
+INSERT IGNORE INTO gem_rules(id,enabled,crystal_per_batch,source) VALUES(1,TRUE,1,'APK TableMineSkill lacks ordinary crystal extraction distribution; local rule: one uniform six-color crystal per five ores; colorful auto-mount: first empty compatible hole then first hole');

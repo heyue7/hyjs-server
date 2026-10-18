@@ -1,0 +1,21 @@
+CREATE TABLE IF NOT EXISTS `p14_final_series` (
+  `id` CHAR(64) NOT NULL,
+  `season_index` INT NOT NULL,
+  `round_stage` INT NOT NULL,
+  `group_id` CHAR(1) NOT NULL,
+  `pair_index` INT NOT NULL,
+  `pair_hash` CHAR(64) NOT NULL,
+  `game_one_id` CHAR(64) NOT NULL,
+  `manifest` LONGBLOB NOT NULL,
+  `manifest_hash` CHAR(64) NOT NULL,
+  `state` INT NOT NULL,
+  `current_game` INT NOT NULL,
+  `left_wins` INT NOT NULL,
+  `right_wins` INT NOT NULL,
+  `winner_server_id` BIGINT NOT NULL,
+  `winner_player_id` BIGINT NOT NULL,
+  `created_at` BIGINT NOT NULL,
+  `updated_at` BIGINT NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `idx_p14_series_pair` (`season_index`,`round_stage`,`group_id`,`pair_index`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;

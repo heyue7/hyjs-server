@@ -1,0 +1,7 @@
+CREATE TABLE IF NOT EXISTS p7_expedition_event_policies (
+ id BIGINT NOT NULL PRIMARY KEY,
+ enabled TINYINT(1) NOT NULL DEFAULT 0,
+ risk_percent INT NOT NULL,
+ help_reward TEXT NOT NULL,
+ source TEXT NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

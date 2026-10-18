@@ -1,0 +1,9 @@
+UFFId	UFId（TableUnionFight）	车厂坐标	阵营	范围	是否是野外车厂	野外车厂开启消耗资源	造车时间	车厂重建时间	造出的车Id	图标	车的出生角度	车的出生坐标	车的目标城门	车的移动寻路		模型路径	绑定的NPC	
+UFFId	UFId	Position	Camp	Range	IsField	NeedResource	CraftTime	RebuildTime	CariotId	IconRes	CariotAngle	CariotBornPos	CariotTargetGateId	CariotMoveNavInfo	UFGuardId	ModelUrl	NPCID	factoryBuildAnimationTime
+int	int	string	int	double	int	string	double	double	int	string	double	string	int	string	string	string	string	double
+primary	none	nonoe	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none
+UFFId	UFId	position	camp	range	isField	needResource	craftTime	rebuildTime	cariotId		CariotAngle	cariotBornPosition	targetGateId	cariotMoveNavInfo	UFGuardId	ModelUrl		factoryBuildAnimationTime
+1	1	-20,1,-4	0	2	0		120	300	1		0	-5,0,6	6	8,0,7;35,0,8.23;64,0,7;69.71,0,6.71;78,0,6;86,0,0		map_battle_001/Models/chechang/sao_battle_factory_001		0
+2	1	93,1,-1	1	2	0		120	300	2		0	76,0,-6	2	70,0,-9;55,0,-13;40,0,-12;25.09,0,-11.58;19.63,0,-12.98;16.95,0,-10.25;10,0,-11;-5,0,-9;-12,0,-2		map_battle_001/Models/chechang/alo_battle_factory_001		0
+3	1	14,-4,32	0	2	1	400	120	300	3		0	18.72,-3.8,22.91	5	30,0,20;58,0,20;66,0,25;75,0,23;80,0,17;80,0,9;86,0,0	factory_guard_002	map_battle_001/Models/chechang/alo_battle_factory_002	1	8.67
+4	1	61,-4,-33	1	2	1	400	120	300	4		0	57.26278,-3.59,-25.31519	1	33,0,-21;16,0,-24;7,0,-26;0,0,-24;-7,0,-16;-12,0,-2	factory_guard_001	map_battle_001/Models/chechang/sao_battle_factory_002	4	8.67

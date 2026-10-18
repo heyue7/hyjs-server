@@ -1,0 +1,41 @@
+ID	资质	装备类型	套装ID	图标	大图	攻击基础	法防基础	生命基础	物防基础	攻击成长	法防成长	生命成长	物防成长	价值	孔1	孔2	孔3	孔4
+id	quality	type	outfitId	icon	pictrue	attBase	mdefBase	hpBase	pdefBase	attGrow	mdefGrow	hpGrow	pdefGrow	sellPrice	hole1	hole2	hole3	hole4
+string	int	int	string	string	string	double	double	double	double	double	double	double	double	int	int	int	int	int
+primary	index	index	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none
+id	quality	type	outfitId			attBase	mdefBase	hpBase	pdefBase	attGrow	mdefGrow	hpGrow	pdefGrow	sellPrice	hole1	hole2	hole3	hole4
+equip_001	12	1	outfit_1	equip_icon_001	equip_png_001	33.0				1.5				1000				
+equip_002	12	2	outfit_1	equip_icon_002	equip_png_002		20.0				1.0			1000				
+equip_003	12	3	outfit_1	equip_icon_003	equip_png_003			800.0				40.0		1000				
+equip_004	12	4	outfit_1	equip_icon_004	equip_png_004				20.0				1.0	1000				
+equip_005	13	1	outfit_2	equip_icon_005	equip_png_005	58.0				3.0				1000	1			
+equip_006	13	2	outfit_2	equip_icon_006	equip_png_006		35.0				2.0			1000	2			
+equip_007	13	3	outfit_2	equip_icon_007	equip_png_007			1400.0				70.0		1000	3			
+equip_008	13	4	outfit_2	equip_icon_008	equip_png_008				35.0				2.0	1000	4			
+equip_013	18	1	outfit_4	equip_icon_013	equip_png_013	99.0				5.0				1000	1	5		
+equip_014	18	2	outfit_4	equip_icon_014	equip_png_014		60.0				3.0			1000	2	6		
+equip_015	18	3	outfit_4	equip_icon_015	equip_png_015			2400.0				120.0		1000	3	5		
+equip_016	18	4	outfit_4	equip_icon_016	equip_png_016				60.0				3.0	1000	4	1		
+equip_017	18	1	outfit_5	equip_icon_017	equip_png_017	99.0				5.0				1000	1	5		
+equip_018	18	2	outfit_5	equip_icon_018	equip_png_018		60.0				3.0			1000	2	6		
+equip_019	18	3	outfit_5	equip_icon_019	equip_png_019			2400.0				120.0		1000	3	2		
+equip_020	18	4	outfit_5	equip_icon_020	equip_png_020				60.0				3.0	1000	4	6		
+equip_025	20	1	outfit_7	equip_icon_025	equip_png_025	123.0				6.0				1000	1	5	4	
+equip_026	20	2	outfit_7	equip_icon_026	equip_png_026		75.0				4.0			1000	2	6	3	
+equip_027	20	3	outfit_7	equip_icon_027	equip_png_027			3000.0				150.0		1000	3	1	6	
+equip_028	20	4	outfit_7	equip_icon_028	equip_png_028				75.0				4.0	1000	4	2	5	
+equip_029	20	1	outfit_8	equip_icon_029	equip_png_029	130.0				6.5				1000	1	5	4	
+equip_030	20	2	outfit_8	equip_icon_030	equip_png_030		80.0				4.2			1000	2	6	3	
+equip_031	20	3	outfit_8	equip_icon_031	equip_png_031			3200.0				160.0		1000	3	1	6	
+equip_032	20	4	outfit_8	equip_icon_032	equip_png_032				80.0				4.2	1000	4	2	5	
+equip_033	20	1	outfit_9	equip_icon_033	equip_png_033	123.0				6.0				1000	1	5	4	
+equip_034	20	2	outfit_9	equip_icon_034	equip_png_034		75.0				4.0			1000	2	6	3	
+equip_035	20	3	outfit_9	equip_icon_035	equip_png_035			3000.0				150.0		1000	3	1	6	
+equip_036	20	4	outfit_9	equip_icon_036	equip_png_036				75.0				4.0	1000	4	2	5	
+equip_037	23	1	outfit_10	equip_icon_037	equip_png_037	149.0				7.5				1000	1	5	3	2
+equip_038	23	2	outfit_10	equip_icon_038	equip_png_038		90.0				4.5			1000	2	6	4	1
+equip_039	23	3	outfit_10	equip_icon_039	equip_png_039			3600.0				180.0		1000	3	1	5	4
+equip_040	23	4	outfit_10	equip_icon_040	equip_png_040				90.0				4.5	1000	4	2	6	3
+equip_041	23	1	outfit_11	equip_icon_041	equip_png_041	224.0				12.0				1000	1	5	3	2
+equip_042	23	2	outfit_11	equip_icon_042	equip_png_042		135.0				7.0			1000	2	6	4	1
+equip_043	23	3	outfit_11	equip_icon_043	equip_png_043			5400.0				270.0		1000	3	1	5	4
+equip_044	23	4	outfit_11	equip_icon_044	equip_png_044				135.0				7.0	1000	4	2	6	3

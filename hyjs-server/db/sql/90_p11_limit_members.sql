@@ -1,0 +1,1 @@
+CREATE TABLE IF NOT EXISTS p11_limit_members (period_id VARCHAR(64) NOT NULL,player_id BIGINT NOT NULL,score BIGINT NOT NULL,created_at BIGINT NOT NULL,updated_at BIGINT NOT NULL,PRIMARY KEY(period_id,player_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;

@@ -1,0 +1,66 @@
+--- tools/local_wallet_bridge/LocalWalletSessionBridge.cs
++++ tools/local_wallet_bridge/LocalWalletSessionBridge.cs
+@@ -64,10 +64,63 @@
+             player = 0;
+             session = "";
+         }
++        PollFormationUI(player, session);
+         if (lastPlayer == player && lastSession == session) return;
+         lastPlayer = player;
+         lastSession = session;
+         Bind(player, session);
++    }
++
++    // Optional UI bootstrap: reflection isolates a missing/invalid module from
++    // original ArrayPage JIT, wallet binding and all original business methods.
++    private object formationPage;
++    private readonly string[] formationDiagnostics = new string[16];
++    private int formationDiagnosticCount;
++
++    private void FormationLog(string stage, string reason)
++    {
++        string line = stage + " " + reason;
++        for (int i = 0; i < formationDiagnosticCount; ++i)
++            if (formationDiagnostics[i] == line) return;
++        if (formationDiagnosticCount >= formationDiagnostics.Length) return;
++        formationDiagnostics[formationDiagnosticCount++] = line;
++        try
++        {
++            using (AndroidJavaClass log = new AndroidJavaClass("android.util.Log"))
++                log.CallStatic<int>("w", "HYJSFormation", line);
++        }
++        catch (Exception) { } // Optional diagnostics never interrupt binding.
++    }
++
++    private void PollFormationUI(long player, string session)
++    {
++        try
++        {
++            // Update already checked blockedSession/current StaticData and its
++            // original .5s timer. Require the native wallet's actual bound pair.
++            if (player <= 1 || player != lastPlayer || session != lastSession || session == blockedSession)
++            { formationPage = null; return; }
++            object page = UI.PageManager.Instance == null ? null : UI.PageManager.Instance.currentPage;
++            if (page == null || page.GetType().FullName != "UI.ArrayPage")
++            { formationPage = null; return; }
++            if (System.Object.ReferenceEquals(page, formationPage)) return;
++            formationPage = page; // One attempt per page entry, including failure.
++            FormationLog("probe", "current ArrayPage reflection bootstrap");
++            Type owner = Type.GetType("HYJS.LocalFormation.LocalFormationUI, LocalFormationUI", true);
++            System.Reflection.MethodInfo method = owner.GetMethod("Ensure",
++                System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static,
++                null, new Type[] { page.GetType() }, null);
++            if (method == null) throw new MissingMethodException("Formation Ensure");
++            object result = method.Invoke(null, new object[] { page });
++            FormationLog("result", result is bool && (bool)result ? "attached" : "declined");
++        }
++        catch (Exception error)
++        {
++            Exception cause = error;
++            while (cause is System.Reflection.TargetInvocationException && cause.InnerException != null)
++                cause = cause.InnerException;
++            FormationLog("failure", cause.GetType().FullName); // No message, GUID or session.
++        }
+     }
+ 
+     // Java calls this on Unity's normal message queue only after the server has

@@ -1,0 +1,3 @@
+CREATE TABLE IF NOT EXISTS p13_union_fight_guard_audit_sources (
+ day CHAR(10) NOT NULL,guard_id VARCHAR(64) NOT NULL,enabled TINYINT(1) NOT NULL DEFAULT 0,monster LONGBLOB NOT NULL,published_at BIGINT NOT NULL,source TEXT NOT NULL,PRIMARY KEY(day,guard_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

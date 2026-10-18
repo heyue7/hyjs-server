@@ -1,0 +1,8 @@
+CREATE TABLE IF NOT EXISTS p12_world_boss_battle_instances (
+  id VARCHAR(64) NOT NULL PRIMARY KEY,
+  total_hp BIGINT NOT NULL,
+  current_hp BIGINT NOT NULL,
+  killer_id BIGINT NOT NULL DEFAULT 0,
+  killed_at BIGINT NOT NULL DEFAULT 0,
+  policy_name VARCHAR(96) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

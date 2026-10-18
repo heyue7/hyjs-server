@@ -1,0 +1,8 @@
+{
+  "project": "Soybean Admin",
+  "repository": "https://github.com/soybeanjs/soybean-admin",
+  "tag": "v2.0.2",
+  "commit": "5e40b850180804aa51573590eb2e058d1fd8eb06",
+  "license": "MIT",
+  "adaptation": "HYJS operations UI; retain upstream Vue layout, Pinia, Elegant Router, NaiveUI, theme, UnoCSS; replace demo business pages and bearer/mock auth with same-origin Go cookie session."
+}

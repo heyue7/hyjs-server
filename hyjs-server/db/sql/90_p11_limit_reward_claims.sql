@@ -1,0 +1,1 @@
+CREATE TABLE IF NOT EXISTS p11_limit_reward_claims (period_id VARCHAR(64) NOT NULL,player_id BIGINT NOT NULL,reward_key BIGINT NOT NULL,score BIGINT NOT NULL,reward TEXT NOT NULL,rules_hash VARCHAR(64) NOT NULL,response LONGBLOB NOT NULL,claimed_at BIGINT NOT NULL,PRIMARY KEY(period_id,player_id,reward_key)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;

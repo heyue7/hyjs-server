@@ -1,0 +1,10 @@
+	场景	开启日期	场景名	玩家出生位置	玩家角度	战斗地图
+chapterId	mapId	openDay	sceneId	bornPos	bornAngle	BattleMap
+string	string	string	string	string	int	string
+primary	none	none	none	none	none	none
+chapterId	mapId	openDay				roomId
+5	1	5,6,7	map_forestfield_001	0,0,1	0	map_forest_003
+2	2	2,6,7	map_snowfield_001	59,15,77	0	map_ice_001
+3	3	3,6,7	map_volcanofield_001	93,5,85	0	map_volcano_001
+1	4	1,6,7	map_nightforestfield_001	36,1,56	0	map_nightforest_001
+4	5	4,6,7	map_desertfield_001	-7,0,-6	0	map_desert_001

@@ -1,0 +1,6 @@
+CREATE TABLE IF NOT EXISTS p9_pet_hudong_states(
+ guid VARCHAR(64) PRIMARY KEY, player_id BIGINT NOT NULL, window_at BIGINT NOT NULL,
+ last_at BIGINT NOT NULL, input LONGBLOB NOT NULL, input_hash CHAR(64) NOT NULL,
+ favorite INT NOT NULL, counts LONGBLOB NOT NULL, earned BIGINT NOT NULL, applied BIGINT NOT NULL,
+ capped BIGINT NOT NULL, KEY(player_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

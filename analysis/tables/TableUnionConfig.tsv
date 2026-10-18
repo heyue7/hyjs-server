@@ -1,0 +1,15 @@
+公会等级	公会人数上限	活跃度目标值	成员获得奖励	副会长获得奖励	会长获得奖励	升级所需公会积分	升级所需公会徽章	升级所需金币
+Level	MaxMemberNum	ActiveScore	CommonReward	ViceReward	ChairmanReward	UnionExpScore	UnionBadge	UnionCoin
+int	int	int	string	string	string	int	int	int
+primary	none	none	none	none	none	none	none	none
+Level	MaxMemberNum	ActiveScore	CommonReward	ViceReward	ChairmanReward	UnionExpScore	UnionBadge	UnionCoin
+1	35	7000	item_070,1	item_071,1	item_072,1	2000	10	10000000
+2	38	7500	item_070,1	item_071,1	item_072,1	5000	20	20000000
+3	41	8000	item_070,1	item_071,1	item_072,1	10000	30	40000000
+4	44	8500	item_070,1	item_071,1	item_072,1	15000	40	80000000
+5	47	9000	item_070,1	item_071,1	item_072,1	25000	50	120000000
+6	50	9500	item_070,1	item_071,1	item_072,1	40000	60	160000000
+7	53	10000	item_070,1	item_071,1	item_072,1	65000	70	200000000
+8	56	10500	item_070,1	item_071,1	item_072,1	100000	80	240000000
+9	59	11000	item_070,1	item_071,1	item_072,1	200000	90	280000000
+10	62	11500	item_070,1	item_071,1	item_072,1	-1		

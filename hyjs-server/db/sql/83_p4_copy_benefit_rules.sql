@@ -1,0 +1,2 @@
+-- 副本福利默认关闭，联动patch及客户端入口验收后才按运营窗口启用。
+CREATE TABLE IF NOT EXISTS p4_copy_benefit_rules (id VARBINARY(64) NOT NULL,enabled BOOLEAN NOT NULL,start_at BIGINT NOT NULL,end_at BIGINT NOT NULL,weekday_mask INT NOT NULL,start_minute INT NOT NULL,end_minute INT NOT NULL,currency_factor INT NOT NULL,drop_factor INT NOT NULL,frozen LONGBLOB,source TEXT NOT NULL,PRIMARY KEY(id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

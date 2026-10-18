@@ -1,0 +1,7 @@
+CREATE TABLE IF NOT EXISTS copy_reset_daily (
+ player_id BIGINT NOT NULL,
+ day VARBINARY(16) NOT NULL,
+ payload LONGBLOB NOT NULL,
+ input_hash CHAR(64) NOT NULL,
+ PRIMARY KEY(player_id,day)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

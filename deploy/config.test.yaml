@@ -1,0 +1,28 @@
+port: ${HYJS_HTTP_PORT}
+logConfig:
+  logFile: logs/app.log
+  gormLogFile: logs/sql.log
+  maxSize: 10
+  maxBackups: 3
+  maxAge: 7
+  compress: true
+  logLevel: info
+  gormLogLevel: warn
+  gormSlowThresholdMs: 200
+# Game/admin authentication uses its own persisted credential/session contracts.
+jwtKey: ""
+mysql:
+  user: hyjs
+  pass: ""
+  host: mysql:3306
+  dbName: hyjs
+game:
+  serverId: 1
+  driver: mysql
+  bind: 0.0.0.0
+  advertiseHost: "${HYJS_PUBLIC_HOST}"
+  httpPort: ${HYJS_HTTP_PORT}
+  tcpPort: ${HYJS_TCP_PORT}
+  tables: /app/tables
+  enableTestPayments: true
+  enableLocalWallet: true

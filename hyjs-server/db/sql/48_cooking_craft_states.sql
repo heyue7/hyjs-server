@@ -1,0 +1,5 @@
+CREATE TABLE IF NOT EXISTS cooking_craft_states (
+ player_id BIGINT NOT NULL PRIMARY KEY,
+ level INT NOT NULL,
+ exp INT NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

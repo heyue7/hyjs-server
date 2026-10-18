@@ -1,0 +1,18 @@
+阵法id	阵法名字	阵法描述	阵法站位（这里是战斗站位）	图标	阵法品质(0优先级最高)
+id	name	desc	posInfo	icon	quality
+string	string	string	string	string	int
+primary	none	none	none	none	none
+id			posInfo		quality
+1	name_Formation_001	desc_Formation_001	3,7,9,13	UI_zhenrong_buzhen_icon_13	3
+2	name_Formation_002	desc_Formation_002	3,7,8,9,13	UI_zhenrong_buzhen_icon_12	2
+3	name_Formation_003	desc_Formation_003	4,7,8,9,14	UI_zhenrong_buzhen_icon_01	1
+4	name_Formation_004	desc_Formation_004	2,7,12,13,14	UI_zhenrong_buzhen_icon_02	1
+5	name_Formation_005	desc_Formation_005	3,7,8,9,12	UI_zhenrong_buzhen_icon_03	1
+6	name_Formation_006	desc_Formation_006	2,3,4,8,13	UI_zhenrong_buzhen_icon_04	1
+7	name_Formation_007	desc_Formation_007	3,7,12,13,14	UI_zhenrong_buzhen_icon_05	1
+8	name_Formation_008	desc_Formation_008	2,3,4,8,12	UI_zhenrong_buzhen_icon_14	1
+9	name_Formation_009	desc_Formation_009	3,4,8,12,13	UI_zhenrong_buzhen_icon_19	1
+10	name_Formation_010	desc_Formation_010	3,4,7,8,12	UI_zhenrong_buzhen_icon_15	1
+11	name_Formation_011	desc_Formation_011	3,4,7,13,14	UI_zhenrong_buzhen_icon_18	0
+12	name_Formation_012	desc_Formation_012	3,4,7,12,14	UI_zhenrong_buzhen_icon_17	0
+13	name_Formation_013	desc_Formation_013	4,7,8,12,14	UI_zhenrong_buzhen_icon_16	0

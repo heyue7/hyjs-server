@@ -1,0 +1,11 @@
+UFTId	UFId(TableUnionFight)	坐标	身高	防御塔名字	阵营	范围	攻击CD					模型路径	塔的开火点	炮塔炮弹	开火特效
+UFTId	UFId	Position	Height	Name	Camp	Range	AttackCountDown	AttackDuration	AttackRelease	RecoveryTime	UFGuardId	ModelUrl	FirePoint	Projectile	FireEffect
+int	int	string	double	string	int	double	double	double	double	double	string	string	string	string	string
+primary	index	none	none	none	none	none	none	none	none	none	none	none	none	none	none
+UFTId	UFId	position			camp	range	attackCountDown	attackDuration	attackRelease	recoveryTime	UFGuardId				
+1	1	-1.5,0,-15	4	name_battel_tower_01	0	1.4	5	1	0.6	120	tower_guard_001	map_battle_001/Models/paota/sao_battle_tower_001	-1.59,4.99,-15	SAOProj	SAOFire
+2	1	19.5,0,-17.5	4	name_battel_tower_02	0	1.4	5	1	0.6	120	tower_guard_002	map_battle_001/Models/paota/sao_battle_tower_002	19.61,2.0,-17.50	SAOProj	SAOFire
+3	1	73.5,0,11.5	4	name_battel_tower_03	1	1.4	5	1	0.6	120	tower_guard_003	map_battle_001/Models/paota/alo_battle_tower_001	73.38,5.275,11.62	ALOProj	
+4	1	53,0,13	4	name_battel_tower_04	1	1.4	5	1	0.6	120	tower_guard_004	map_battle_001/Models/paota/alo_battle_tower_002	53.06,2.37,13.02	ALOProj	
+5	1	35.38,0,-16.4	4	name_battel_tower_05	0	1.4	5	1	0.6	120	tower_guard_005	map_battle_001/Models/paota/sao_battle_tower_003	35.38,-0.28,-16.4	SAOProj	
+6	1	37.2,0,12.849	4	name_battel_tower_06	1	1.4	5	1	0.6	120	tower_guard_006	map_battle_001/Models/paota/alo_battle_tower_003	37.2,0.52,12.849	ALOProj	

@@ -1,0 +1,13 @@
+UFGId	UFId(TableUnionFight)	坐标	阵营	范围	模型路径	模型Y方向角度	状态
+UFGId	UFId	Position	Camp	Range	GateModel	GateRotation	GateState
+int	int	string	int	double	string	double	string
+primary	index	none	none	none	none	none	none
+UFGId	UFId	position	camp	range	GateModel		
+1	1	-1.73,-0.22,-22.92	0	2.1	map_battle_001/Models/men/sao_battle_door_001	125.48	door_001_n001;door_001_d001;door_001_d002;door_001_d003
+2	1	5.55,-0.22,-9.91	0	2.1	map_battle_001/Models/men/sao_battle_door_002	107.82	door_002_n001;door_002_d001;door_002_d002;door_002_d003
+3	1	4.96,-0.22,5.67	0	2.1	map_battle_001/Models/men/sao_battle_door_003		
+4	1	-4.734,-0.22,18.193	0	2.1	map_battle_001/Models/men/sao_battle_door_004		
+5	1	76.25,-0.342,19.47	1	2.1	map_battle_001/Models/men/alo_battle_door_001	-42.1	door_001_n001;door_001_d001;door_001_d002;door_001_d003
+6	1	67.65,-0.342,6.33	1	2.1	map_battle_001/Models/men/alo_battle_door_002	-76.49	door_002_n001;door_002_d001;door_002_d002;door_002_d003
+7	1	68.44,-0.342,-8.88	1	2.1	map_battle_001/Models/men/alo_battle_door_003		
+8	1	77.34,-0.342,-21.99	1	2.1	map_battle_001/Models/men/alo_battle_door_004		

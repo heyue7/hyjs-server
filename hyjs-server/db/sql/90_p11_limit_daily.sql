@@ -1,0 +1,1 @@
+CREATE TABLE IF NOT EXISTS p11_limit_daily (period_id VARCHAR(64) NOT NULL,player_id BIGINT NOT NULL,day VARCHAR(10) NOT NULL,used INT NOT NULL,bought INT NOT NULL,login_score INT NOT NULL,created_at BIGINT NOT NULL,PRIMARY KEY(period_id,player_id,day)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;

@@ -1,0 +1,1 @@
+CREATE TABLE IF NOT EXISTS p11_arena_receipts (player_id BIGINT NOT NULL,operation VARCHAR(32) NOT NULL,stamp BIGINT NOT NULL,request_hash VARCHAR(64) NOT NULL,response LONGBLOB NOT NULL,batch_id VARCHAR(64) NOT NULL,created_at BIGINT NOT NULL,PRIMARY KEY(player_id,operation,stamp)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;

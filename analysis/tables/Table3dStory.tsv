@@ -1,0 +1,6 @@
+剧情ID	剧情资源名	剧情涉及的人	剧情持续时间（秒）	剧情背景音乐	剧情音效	剧情换脸  id:starttime,stoptime=faceid#starttime,stoptime=faceid#...;id:start,stop=faceid#..	剧情字幕
+StoryId	StoryResourceName	StoryActor	StoryDuration	StoryMusic	StorySound	StoryChangeFace	StorySubtitle
+string	string	string	double	string	string	string	string
+primary	none	none	none	none	none	none	none
+StoryId	StoryResourceName	StoryActor	StoryDuration	StoryMusic	StoryMusic	StoryChangeFace	StorySubtitle
+story_1	guochang01	kirito_sao,asuna_sao,shirica_sao,agil_sao	45.5		sword_swing1=0#sword_swing8=0.257#sword_swing5=0.9#sword_swing2=0.055#sword_swing5=0.302#sword_swing5=1.135#kirito-alo_02=0#alisa_03=0.1#rosalia_03b=0.815#monster_041_crawling=1.532#monster_041_crawling=3.838#monster_041_shout=4#impact_cg=7.27#sword_sheath=13.4#put_ground=26#monster_041_crawling=34.6#monster_041_crawling=39.762#klein_03=40.4#monster_041_shout=40.4#monster_041_shout=40.829#monster_041_shout=42.352#rosalia_03=44.2		14,17.7=subtitle_story_1_1#20,22=subtitle_story_1_2#22.3,24.3=subtitle_story_1_3#25.2,29.5=subtitle_story_1_4#30,32=subtitle_story_1_5#33,35=subtitle_story_1_6

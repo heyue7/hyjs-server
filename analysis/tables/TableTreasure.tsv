@@ -1,0 +1,23 @@
+宝物Id	 品阶（蓝紫橙红1234）	可转换的经验	需要的碎片数	类型(戒指为1，项链为0，-1为经验)	是否必须显示	最大强化等级	最大精炼等级	基础攻击	基础生命	暴击率(万分比)	命中率(万分比)	抗暴击(万分比)	闪避(万分比)	图标	大图	价值
+id	quality	exp	needChipNum	type	alwaysShow	maxStrengthen	maxRefine	att	hp	cri	perhit	anticri	perevade	icon	png	sellPrice
+string	int	int	int	int	int	int	int	int	int	double	double	double	double	string	string	int
+none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none
+id	quality	exp	needChipNum	type	alwaysShow	maxStrengthen	maxRefine	att	hp	cri	perhit	anticri	perevade			sellPrice
+trea_001	13	1200	3	1	1	100	30	10	0	0.2	0.0	0.0	0.0	trea_icon_001	trea_png_001	1000
+trea_002	13	1200	3	1	1	100	30	10	0	0.0	0.2	0.0	0.0	trea_icon_002	trea_png_002	1000
+trea_003	13	1200	3	0	1	100	30	0	200	0.0	0.0	0.2	0.0	trea_icon_003	trea_png_003	1000
+trea_004	13	1200	3	0	1	100	30	0	200	0.0	0.0	0.0	0.2	trea_icon_004	trea_png_004	1000
+trea_005	13	2500	3	-1	0	0	0	0	0	0.0	0.0	0.0	0.0	trea_icon_005	trea_png_005	1000
+trea_006	18	10000	4	1	0	100	30	20	0	0.4	0.0	0.0	0.0	trea_icon_006	trea_png_006	1000
+trea_007	18	10000	4	1	0	100	30	20	0	0.0	0.4	0.0	0.0	trea_icon_007	trea_png_007	1000
+trea_008	18	10000	4	0	0	100	30	0	400	0.0	0.0	0.4	0.0	trea_icon_008	trea_png_008	1000
+trea_009	18	10000	4	0	0	100	30	0	400	0.0	0.0	0.0	0.4	trea_icon_009	trea_png_009	1000
+trea_010	18	10000	4	-1	0	0	0	0	0	0.0	0.0	0.0	0.0	trea_icon_010	trea_png_010	1000
+trea_011	20	20000	5	1	0	100	30	30	0	0.6	0.0	0.0	0.0	trea_icon_011	trea_png_011	1000
+trea_012	20	20000	5	1	0	100	30	30	0	0.0	0.6	0.0	0.0	trea_icon_012	trea_png_012	1000
+trea_013	20	20000	5	0	0	100	30	0	600	0.0	0.0	0.6	0.0	trea_icon_013	trea_png_013	1000
+trea_014	20	20000	5	0	0	100	30	0	600	0.0	0.0	0.0	0.6	trea_icon_014	trea_png_014	1000
+trea_015	23	50000	6	1	0	100	30	200	0	0.8	0.0	0.0	0.0	trea_icon_015	trea_png_015	1000
+trea_016	23	50000	6	1	0	100	30	200	0	0.0	0.8	0.0	0.0	trea_icon_016	trea_png_016	1000
+trea_017	23	50000	6	0	0	100	30		4000	0.0	0.0	0.8	0.0	trea_icon_017	trea_png_017	1000
+trea_018	23	50000	6	0	0	100	30		4000	0.0	0.0	0.0	0.8	trea_icon_018	trea_png_018	1000

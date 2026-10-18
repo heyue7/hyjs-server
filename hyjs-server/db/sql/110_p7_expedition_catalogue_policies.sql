@@ -1,0 +1,5 @@
+CREATE TABLE IF NOT EXISTS p7_expedition_catalogue_policies (
+ id BIGINT NOT NULL PRIMARY KEY,
+ enabled BOOLEAN NOT NULL,
+ source TEXT NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

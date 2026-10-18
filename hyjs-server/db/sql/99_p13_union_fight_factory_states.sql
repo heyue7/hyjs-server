@@ -1,0 +1,21 @@
+CREATE TABLE IF NOT EXISTS p13_union_fight_factory_states (
+ match_id VARCHAR(64) NOT NULL,
+ guid BIGINT NOT NULL,
+ factory_id BIGINT NOT NULL,
+ camp BIGINT NOT NULL,
+ chariot_hp DOUBLE NOT NULL,
+ source TEXT NOT NULL,
+ source_hash CHAR(64) NOT NULL,
+ frame LONGBLOB NOT NULL,
+ frame_hash CHAR(64) NOT NULL,
+ state_hash CHAR(64) NOT NULL,
+ opened_at BIGINT NOT NULL DEFAULT 0,
+ started_at BIGINT NOT NULL DEFAULT 0,
+ animation_at BIGINT NOT NULL DEFAULT 0,
+ due_at BIGINT NOT NULL DEFAULT 0,
+ completed_at BIGINT NOT NULL DEFAULT 0,
+ car_frame LONGBLOB NULL,
+ car_hash CHAR(64) NOT NULL DEFAULT '',
+ PRIMARY KEY(match_id,guid),
+ KEY p13_factory_pending(completed_at,due_at,animation_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

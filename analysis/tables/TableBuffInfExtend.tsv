@@ -1,0 +1,5 @@
+buff因子拓展id	所属buff	buffer因子（影响的因素类型）	参数值	数值类型（百分比还是绝对值）	衰变值	递减值
+BuffInfExId	BufferId	InfFactor	InfValue	ValueType	Decay	accum
+string	string	string	double	int	double	double
+primary	index	none	none	none	none	none
+BuffInfExId	BufferId	InfFactor	InfValue	ValueType	ValueType	accum

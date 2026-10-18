@@ -1,0 +1,11 @@
+玩家等级	奖励
+level	reward
+int	string
+primary	none
+level	reward
+10	diamond,500
+25	diamond,1000
+35	diamond,1500
+45	diamond,2000
+55	diamond,2500
+60	diamond,2500

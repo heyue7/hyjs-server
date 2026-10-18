@@ -1,0 +1,109 @@
+生活技能物品ID	名称	描述	类型	资质	颜色	等级	属性	解锁等级	需要习得技能	是否可用于合成高级宝石	可由低等级魔石合成	制作获得经验	产出	提取产出-七彩宝石	提取产出-魔石	提取产出-粉尘	制作所需材料	是否可冶炼
+MineItemID	Name	Desc	Type	Quality	Color	Level	Value	LevelLimit	SkillNeeded	composeMeterial	Compound	MakingExp	Product	ExtractGem	ExtractMagicStone	ExtractPowder	Material	IsMagicGem
+string	string	string	string	int	int	int	string	int	string	int	int	int	string	string	string	string	string	int
+primary	none	none	index	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none
+mineItemID	name	desc	type	quality	color	level	value	levelLimit	skillNeeded	composeMeterial	compound	makeExp	product	extractGem	extractMagicStone	extractPowder	material	isMagicGem
+MineItem_001			mine	1				1					MineItem_007:1,30;2,30;3,30					0
+MineItem_002			mine	2				2					MineItem_008:1,30;2,30;3,30					0
+MineItem_003			mine	3				3					MineItem_009:1,30;2,30;3,30					0
+MineItem_004			mine	4				4					MineItem_010:1,30;2,30;3,30					0
+MineItem_005			mine	5				5					MineItem_011:1,30;2,30;3,30					0
+MineItem_006			mine	6				6					MineItem_012:1,30;2,30;3,30					0
+MineItem_007			stone	1				1				50			0.9,MineItem_081;0.1,MineItem_082	MineItem_084:1,50;2,50		0
+MineItem_008			stone	2				2				100			0.8,MineItem_081;0.2,MineItem_082	MineItem_084:1,50;2,50		0
+MineItem_009			stone	3				3				150			0.7,MineItem_081;0.3,MineItem_082	MineItem_084:1,50;2,50		0
+MineItem_010			stone	4				4				200			0.6,MineItem_081;0.4,MineItem_082	MineItem_084:1,50;2,50		0
+MineItem_011			stone	5				5				300		MineItem_087:0,98;1,2	0.5,MineItem_081;0.4,MineItem_082;0.1,MineItem_083	MineItem_084:1,50;2,50		0
+MineItem_012			stone	6				6				600		MineItem_087:0,90;1,10	0.3,MineItem_081;0.45,MineItem_082;0.25,MineItem_083	MineItem_084:1,50;2,50		0
+MineItem_013			gem		1													0
+MineItem_014			gem		2													0
+MineItem_015			gem		3													0
+MineItem_016			gem		4													0
+MineItem_017			gem		5													0
+MineItem_018			gem		6													0
+MineItem_019			magicGem	18	1	1	att,200	1		1	0	50					MineItem_081,10;MineItem_013,2;MineItem_084,10;coin,10000	1
+MineItem_020			magicGem	18	1	2	att,400	2		1	1	100					MineItem_081,20;MineItem_013,4;MineItem_084,20;coin,20000	1
+MineItem_021			magicGem	20	1	3	att,800	3		1	1	150					MineItem_081,30;MineItem_013,6;MineItem_084,40;coin,30000	1
+MineItem_022			magicGem	20	1	4	att,1000	4		1	1	200					MineItem_082,10;MineItem_013,10;MineItem_084,80;coin,100000	1
+MineItem_023			magicGem	20	1	5	att,1200	5		1	1	300					MineItem_082,20;MineItem_013,15;MineItem_084,100;coin,200000	1
+MineItem_024			magicGem	20	1	6	att,1500	6		1	1	600					MineItem_082,30;MineItem_013,20;MineItem_084,120;coin,300000	1
+MineItem_025			magicGem	20	1	7	att,2000	7		1	1	700					MineItem_083,5;MineItem_013,25;MineItem_084,150;coin,700000	1
+MineItem_026			magicGem	23	1	8	att,2500	8		1	1	800					MineItem_083,10;MineItem_013,30;MineItem_084,200;coin,800000	1
+MineItem_027			magicGem	23	1	9	att,3000	9		1	1	900					MineItem_083,20;MineItem_013,40;MineItem_084,250;coin,900000	1
+MineItem_028			magicGem	23	1	10	att,4000	10		1	1	1000					MineItem_083,30;MineItem_013,60;MineItem_084,300;coin,1000000	1
+MineItem_029			magicGem	18	2	1	hp,760	1		1	1	50					MineItem_081,10;MineItem_014,2;MineItem_084,10;coin,10000	1
+MineItem_030			magicGem	18	2	2	hp,1520	2		1	1	100					MineItem_081,20;MineItem_014,4;MineItem_084,20;coin,20000	1
+MineItem_031			magicGem	20	2	3	hp,3040	3		1	1	150					MineItem_081,30;MineItem_014,6;MineItem_084,40;coin,30000	1
+MineItem_032			magicGem	20	2	4	hp,3800	4		1	1	200					MineItem_082,10;MineItem_014,10;MineItem_084,80;coin,100000	1
+MineItem_033			magicGem	20	2	5	hp,4560	5		1	1	300					MineItem_082,20;MineItem_014,15;MineItem_084,100;coin,200000	1
+MineItem_034			magicGem	20	2	6	hp,5700	6		1	1	600					MineItem_082,30;MineItem_014,20;MineItem_084,120;coin,300000	1
+MineItem_035			magicGem	20	2	7	hp,7600	7		1	1	700					MineItem_083,5;MineItem_014,25;MineItem_084,150;coin,700000	1
+MineItem_036			magicGem	23	2	8	hp,9500	8		1	1	800					MineItem_083,10;MineItem_014,30;MineItem_084,200;coin,800000	1
+MineItem_037			magicGem	23	2	9	hp,11400	9		1	1	900					MineItem_083,20;MineItem_014,40;MineItem_084,250;coin,900000	1
+MineItem_038			magicGem	23	2	10	hp,15200	10		1	1	1000					MineItem_083,30;MineItem_014,60;MineItem_084,300;coin,1000000	1
+MineItem_039			magicGem	18	3	1	pdef,60	1		1	1	50					MineItem_081,10;MineItem_015,2;MineItem_084,10;coin,10000	1
+MineItem_040			magicGem	18	3	2	pdef,120	2		1	1	100					MineItem_081,20;MineItem_015,4;MineItem_084,20;coin,20000	1
+MineItem_041			magicGem	20	3	3	pdef,240	3		1	1	150					MineItem_081,30;MineItem_015,6;MineItem_084,40;coin,30000	1
+MineItem_042			magicGem	20	3	4	pdef,300	4		1	1	200					MineItem_082,10;MineItem_015,10;MineItem_084,80;coin,100000	1
+MineItem_043			magicGem	20	3	5	pdef,360	5		1	1	300					MineItem_082,20;MineItem_015,15;MineItem_084,100;coin,200000	1
+MineItem_044			magicGem	20	3	6	pdef,450	6		1	1	600					MineItem_082,30;MineItem_015,20;MineItem_084,120;coin,300000	1
+MineItem_045			magicGem	20	3	7	pdef,600	7		1	1	700					MineItem_083,5;MineItem_015,25;MineItem_084,150;coin,700000	1
+MineItem_046			magicGem	23	3	8	pdef,750	8		1	1	800					MineItem_083,10;MineItem_015,30;MineItem_084,200;coin,800000	1
+MineItem_047			magicGem	23	3	9	pdef,900	9		1	1	900					MineItem_083,20;MineItem_015,40;MineItem_084,250;coin,900000	1
+MineItem_048			magicGem	23	3	10	pdef,1200	10		1	1	1000					MineItem_083,30;MineItem_015,60;MineItem_084,300;coin,1000000	1
+MineItem_049			magicGem	18	4	1	mdef,60	1		1	1	50					MineItem_081,10;MineItem_016,2;MineItem_084,10;coin,10000	1
+MineItem_050			magicGem	18	4	2	mdef,120	2		1	1	100					MineItem_081,20;MineItem_016,4;MineItem_084,20;coin,20000	1
+MineItem_051			magicGem	20	4	3	mdef,240	3		1	1	150					MineItem_081,30;MineItem_016,6;MineItem_084,40;coin,30000	1
+MineItem_052			magicGem	20	4	4	mdef,300	4		1	1	200					MineItem_082,10;MineItem_016,10;MineItem_084,80;coin,100000	1
+MineItem_053			magicGem	20	4	5	mdef,360	5		1	1	300					MineItem_082,20;MineItem_016,15;MineItem_084,100;coin,200000	1
+MineItem_054			magicGem	20	4	6	mdef,450	6		1	1	600					MineItem_082,30;MineItem_016,20;MineItem_084,120;coin,300000	1
+MineItem_055			magicGem	20	4	7	mdef,600	7		1	1	700					MineItem_083,5;MineItem_016,25;MineItem_084,150;coin,700000	1
+MineItem_056			magicGem	23	4	8	mdef,750	8		1	1	800					MineItem_083,10;MineItem_016,30;MineItem_084,200;coin,800000	1
+MineItem_057			magicGem	23	4	9	mdef,900	9		1	1	900					MineItem_083,20;MineItem_016,40;MineItem_084,250;coin,900000	1
+MineItem_058			magicGem	23	4	10	mdef,1200	10		1	1	1000					MineItem_083,30;MineItem_016,60;MineItem_084,300;coin,1000000	1
+MineItem_059			magicGem	18	5	1	cri,0.6	1		1	1	50					MineItem_081,10;MineItem_017,2;MineItem_084,10;coin,10000	1
+MineItem_060			magicGem	18	5	2	cri,1.2	2		1	1	100					MineItem_081,20;MineItem_017,4;MineItem_084,20;coin,20000	1
+MineItem_061			magicGem	20	5	3	cri,1.8	3		1	1	150					MineItem_081,30;MineItem_017,6;MineItem_084,40;coin,30000	1
+MineItem_062			magicGem	20	5	4	cri,2.4	4		1	1	200					MineItem_082,10;MineItem_017,10;MineItem_084,80;coin,100000	1
+MineItem_063			magicGem	20	5	5	cri,3	5		1	1	300					MineItem_082,20;MineItem_017,15;MineItem_084,100;coin,200000	1
+MineItem_064			magicGem	20	5	6	cri,3.6	6		1	1	600					MineItem_082,30;MineItem_017,20;MineItem_084,120;coin,300000	1
+MineItem_065			magicGem	20	5	7	cri,4.2	7		1	1	700					MineItem_083,5;MineItem_017,25;MineItem_084,150;coin,700000	1
+MineItem_066			magicGem	23	5	8	cri,4.8	8		1	1	800					MineItem_083,10;MineItem_017,30;MineItem_084,200;coin,800000	1
+MineItem_067			magicGem	23	5	9	cri,5.4	9		1	1	900					MineItem_083,20;MineItem_017,40;MineItem_084,250;coin,900000	1
+MineItem_068			magicGem	23	5	10	cri,6	10		1	1	1000					MineItem_083,30;MineItem_017,60;MineItem_084,300;coin,1000000	1
+MineItem_069			magicGem	18	6	1	antiCri,0.6	1		1	1	50					MineItem_081,10;MineItem_018,2;MineItem_084,10;coin,10000	1
+MineItem_070			magicGem	18	6	2	antiCri,1.2	2		1	1	100					MineItem_081,20;MineItem_018,4;MineItem_084,20;coin,20000	1
+MineItem_071			magicGem	20	6	3	antiCri,1.8	3		1	1	150					MineItem_081,30;MineItem_018,6;MineItem_084,40;coin,30000	1
+MineItem_072			magicGem	20	6	4	antiCri,2.4	4		1	1	200					MineItem_082,10;MineItem_018,10;MineItem_084,80;coin,100000	1
+MineItem_073			magicGem	20	6	5	antiCri,3	5		1	1	300					MineItem_082,20;MineItem_018,15;MineItem_084,100;coin,200000	1
+MineItem_074			magicGem	20	6	6	antiCri,3.6	6		1	1	600					MineItem_082,30;MineItem_018,20;MineItem_084,120;coin,300000	1
+MineItem_075			magicGem	20	6	7	antiCri,4.2	7		1	1	700					MineItem_083,5;MineItem_018,25;MineItem_084,150;coin,700000	1
+MineItem_076			magicGem	23	6	8	antiCri,4.8	8		1	1	800					MineItem_083,10;MineItem_018,30;MineItem_084,200;coin,800000	1
+MineItem_077			magicGem	23	6	9	antiCri,5.4	9		1	1	900					MineItem_083,20;MineItem_018,40;MineItem_084,250;coin,900000	1
+MineItem_078			magicGem	23	6	10	antiCri,6	10		1	1	1000					MineItem_083,30;MineItem_018,60;MineItem_084,300;coin,1000000	1
+MineItem_079			magicGem	20	7	7	att,840;hp,3192;pdef,252;mdef,252;cri,1.26;antiCri,1.26	7	LifeSkill_085	1	1	1000					MineItem_083,30;MineItem_087,10;MineItem_084,240;coin,1000000	1
+MineItem_080			magicGem	23	7	10	att,1200;hp,4560;pdef,360;mdef,360;cri,1.8;antiCri,1.8	10	LifeSkill_086	1	1	2000					MineItem_083,100;MineItem_087,30;MineItem_084,500;coin,3000000	1
+MineItem_081			magicStone	1														0
+MineItem_082			magicStone	2														0
+MineItem_083			magicStone	3														0
+MineItem_084			powder															0
+MineItem_087			gem		7													0
+MineItem_088			magicGem	23	1	11	att,5000	10		1	1							0
+MineItem_089			magicGem	23	2	11	hp,19000	10		1	1							0
+MineItem_090			magicGem	23	3	11	pdef,1500	10		1	1							0
+MineItem_091			magicGem	23	4	11	mdef,1500	10		1	1							0
+MineItem_092			magicGem	23	5	11	cri,6.6	10		1	1							0
+MineItem_093			magicGem	23	6	11	antiCri,6.6	10		1	1							0
+MineItem_094			magicGem	23	1	12	att,6000	10		1	1							0
+MineItem_095			magicGem	23	2	12	hp,22800	10		1	1							0
+MineItem_096			magicGem	23	3	12	pdef,1800	10		1	1							0
+MineItem_097			magicGem	23	4	12	mdef,1800	10		1	1							0
+MineItem_098			magicGem	23	5	12	cri,7.2	10		1	1							0
+MineItem_099			magicGem	23	6	12	antiCri,7.2	10		1	1							0
+MineItem_100			magicGem	23	1	13	att,7000	10		0	1							0
+MineItem_101			magicGem	23	2	13	hp,26600	10		0	1							0
+MineItem_102			magicGem	23	3	13	pdef,2100	10		0	1							0
+MineItem_103			magicGem	23	4	13	mdef,2100	10		0	1							0
+MineItem_104			magicGem	23	5	13	cri,7.8	10		0	1							0
+MineItem_105			magicGem	23	6	13	antiCri,7.8	10		0	1							0
+MineItem_106			magicGem	23	7	13	att,3600;hp,13680;pdef,1080;mdef,1080;cri,5.4;antiCri,5.4	10		0	1							0

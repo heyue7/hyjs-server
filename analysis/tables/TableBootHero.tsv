@@ -1,0 +1,10 @@
+id	英雄Id	阵营（0：攻击方 1：防守方）	站位	等级	攻击	物防	魔防	血量	命中率	闪避率	暴击率	抗暴率	暴击系数	伤害加成	伤害减免	技能1	技能2	大招	天赋0	天赋1	天赋2	天赋3	天赋4	天赋5
+id	HeroId	Camp	Position	Level	Attack	PhyDefend	MagicDefend	Hp	hit	dodge	cri	antiCri	criFactor	damageAdd	damageReduce	SkillId1	SkillId2	UltSkillId	Talent0	Talent1	Talent2	Talent3	Talent4	Talent5
+string	string	int	int	int	int	int	int	int	double	double	double	double	double	double	double	string	string	string	string	string	string	string	string	string
+primary	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none
+id	HeroId	Camp	Position	Level	Attack	PhyDefend	MagicDefend	Hp	hit	dodge	cri	antiCri	criFactor	damageAdd	damageReduce	SkillId1	SkillId2	UltSkillId	Talent0	Talent1	Talent2	Talent3	Talent4	Talent5
+1	hero_010	0	3	30	1200	500	500	3000	100.0	0.0	0.0	0.0	0.0	0.0	0.0	010_4	010_5	010_6						
+2	hero_009	0	13	30	1300	400	500	3000	100.0	0.0	0.0	0.0	0.0	0.0	0.0	009_4	009_5	009_6						
+3	hero_001	0	9	30	1500	500	500	3000	100.0	0.0	0.0	0.0	0.0	0.0	0.0	001_4	001_5	001_6						
+4	hero_007	0	7	30	1400	400	500	3000	100.0	0.0	0.0	0.0	0.0	0.0	0.0	007_4	007_5	007_6						
+5	monster_047	1	13	40	1500	500	500	23000	100.0	0.0	0.0	0.0	0.0	0.0	0.0	1047_4		1047_6						

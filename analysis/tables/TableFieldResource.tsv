@@ -1,0 +1,17 @@
+资源ID	资源等级	资源模型	采集时间（单位毫秒）	冷却时间（单位毫秒）	每冷却一次可采集几次	消耗	获得
+id	level	model	gatherTime	cdTime	times	cost	rewardProbId
+string	int	string	int	int	int	string	string
+primary	none	none	none	none	none	none	none
+id	level	model	gatherTime	cdTime	times	cost	rewardGroupId
+group_fish_001	1	fish_ani	5000	60000	5	tiredness,2	FishItem_007:0,25;1,75|FishItem_013:0,35;1,65|FishItem_019:0,35;1,65
+group_fish_002	2	fish_ani	5000	60000	5	tiredness,2	FishItem_008:0,25;1,75|FishItem_014:0,35;1,65|FishItem_020:0,40;1,60
+group_fish_003	3	fish_ani	5000	60000	5	tiredness,2	FishItem_009:0,25;1,75|FishItem_015:0,50;1,50|FishItem_021:0,50;1,50
+group_fish_004	4	fish_ani	5000	60000	5	tiredness,2	FishItem_010:0,25;1,75|FishItem_016:0,60;1,40|FishItem_022:0,60;1,40
+group_fish_005	5	fish_ani	5000	60000	5	tiredness,2	FishItem_011:0,25;1,75|FishItem_017:0,80;1,20|FishItem_023:0,80;1,20
+group_fish_006	6	fish_ani	5000	60000	5	tiredness,2	FishItem_012:0,25;1,75|FishItem_018:0,90;1,10|FishItem_024:0,90;1,10|FishItem_025:0,99;1,1
+group_mine_001	1	mineral01	3200	60000	5	tiredness,2	MineItem_007:1,30;2,30;3,30
+group_mine_002	2	mineral02	3200	60000	5	tiredness,2	MineItem_008:1,30;2,30;3,30
+group_mine_003	3	mineral04	3200	60000	5	tiredness,2	MineItem_009:1,30;2,30;3,30
+group_mine_004	4	mineral03	3200	60000	5	tiredness,2	MineItem_010:1,30;2,30;3,30
+group_mine_005	5	mineral05	3200	30000	5	tiredness,2	MineItem_011:1,30;2,30;3,30
+group_mine_006	6	mineral06	3200	30000	5	tiredness,2	MineItem_012:1,30;2,30;3,30

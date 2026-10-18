@@ -1,0 +1,16 @@
+id	积分点数	奖励
+id	score	reward
+int	int	string
+primary	none	none
+id	score	reward
+1	10	frag_hero_082,10
+2	30	frag_hero_082,5;item_002,2
+3	50	frag_hero_082,5;item_013,3
+4	100	frag_hero_082,10;diamond,20
+5	200	frag_hero_082,20;item_006,20
+6	300	frag_hero_082,30;item_007,20
+7	400	frag_hero_082,50;diamond,30
+8	500	frag_hero_082,30;item_008,30
+9	600	frag_hero_082,40;item_012,30
+10	700	frag_hero_082,50;item_047,20
+11	800	hero_082,1

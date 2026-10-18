@@ -1,0 +1,23 @@
+传输ID	小地图图标	传输类型(0=固定传输，1=自由传输)	传输起点位置	起点半径	传输终点位置	落点半径	传输时间	阵营	权限	关联城门	目标传送点
+UFTransferId	IconRes	TransferType	TransferStart	StartR	TransferEnd	EndR	TransferTime	Camp	PassRole	Gate	Target
+string	string	int	string	double	string	double	double	int	int	int	string
+primary	none	none	none	none	none	none	none	none	none	none	none
+ufTransferId		transferType	transferStart	startR	transferEnd	endR	transferTime	camp	passRole	gate	target
+transfer_1		0	-3.5,0,-21.5	1.0	0,0,-24	0.5	1.0	0	0	1	transfer_2
+transfer_2		0	0,0,-24	1.0	-3.5,0,-21.5	0.5	1.0	0	0	1	transfer_1
+transfer_3		0	3,0,-9	1.0	9.5,0,-11	0.5	1.0	0	0	2	transfer_4
+transfer_4		0	9.5,0,-11	1.0	3,0,-9	0.5	1.0	0	0	2	transfer_3
+transfer_5		0	2.5,0,4.5	1.0	7.5,0,6.5	0.5	1.0	0	0	3	transfer_6
+transfer_6		0	7.5,0,6.5	1.0	2.5,0,4.5	0.5	1.0	0	0	3	transfer_5
+transfer_7		0	-7.5,0,16	1.0	-3,0,21	0.5	1.0	0	0	4	transfer_8
+transfer_8		0	-3,0,21	1.0	-7.5,0,16	0.5	1.0	0	0	4	transfer_7
+transfer_9		0	78.5,0,18	1.0	75.5,0,22.5	0.5	1.0	1	0	5	transfer_10
+transfer_10		0	75.5,0,22.5	1.0	78.5,0,18	0.5	1.0	1	0	5	transfer_9
+transfer_11		0	70,0,5.5	1.0	65.5,0,6.5	0.5	1.0	1	0	6	transfer_12
+transfer_12		0	65.5,0,6.5	1.0	70,0,5.5	0.5	1.0	1	0	6	transfer_11
+transfer_13		0	71,0,-8	1.0	65.5,0,-10	0.5	1.0	1	0	7	transfer_14
+transfer_14		0	65.5,0,-10	1.0	71,0,-8	0.5	1.0	1	0	7	transfer_13
+transfer_15		0	80,0,-20	1.0	75.5,0,-24	0.5	1.0	1	0	8	transfer_16
+transfer_16		0	75.5,0,-24	1.0	80,0,-20	0.5	1.0	1	0	8	transfer_15
+transfer_17		1			-12,0,-2	0.5	5.0	0	0	0	transfer_17
+transfer_18		1			86,0,0	0.5	5.0	1	0	0	transfer_18

@@ -1,0 +1,1 @@
+CREATE TABLE IF NOT EXISTS p14_qualification_federation_policies (id BIGINT PRIMARY KEY,enabled BOOLEAN NOT NULL DEFAULT FALSE,source TEXT NOT NULL) ENGINE=InnoDB;

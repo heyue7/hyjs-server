@@ -1,0 +1,2 @@
+-- 原跨服联合身份、精确回执与持久投递；无胜负和奖励。
+CREATE TABLE IF NOT EXISTS p14_trusted_peers (server_id BIGINT PRIMARY KEY,enabled BOOLEAN NOT NULL DEFAULT FALSE,endpoint VARCHAR(512) NOT NULL,signing_key VARBINARY(64) NOT NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;

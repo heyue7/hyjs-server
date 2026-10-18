@@ -1,0 +1,20 @@
+CREATE TABLE IF NOT EXISTS p7_rush_manual_calculations (
+ fight_id VARBINARY(64) NOT NULL PRIMARY KEY,
+ player_id BIGINT NOT NULL,
+ p6_record_id CHAR(64) NOT NULL,
+ driver_policy VARCHAR(255) NOT NULL,
+ scope_proof CHAR(64) NOT NULL,
+ status BIGINT NOT NULL DEFAULT 0,
+ series LONGBLOB NOT NULL,
+ series_hash CHAR(64) NOT NULL,
+ start_hash CHAR(64) NOT NULL,
+ preview LONGBLOB NOT NULL,
+ preview_hash CHAR(64) NOT NULL,
+ terminal LONGBLOB,
+ terminal_hash CHAR(64) NOT NULL DEFAULT '',
+ derived_calculation_source_sha256 CHAR(64) NOT NULL DEFAULT '',
+ end_request_hash CHAR(64) NOT NULL DEFAULT '',
+ created_at BIGINT NOT NULL,
+ accepted_at BIGINT NOT NULL DEFAULT 0,
+ KEY idx_p7_rush_manual_player(player_id)
+) ENGINE=InnoDB;

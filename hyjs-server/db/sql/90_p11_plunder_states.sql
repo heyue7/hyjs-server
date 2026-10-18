@@ -1,0 +1,1 @@
+CREATE TABLE IF NOT EXISTS p11_plunder_states(player_id BIGINT PRIMARY KEY,avoid_until BIGINT NOT NULL,last_use_at BIGINT NOT NULL,last_item VARCHAR(64) NOT NULL,updated_at BIGINT NOT NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;

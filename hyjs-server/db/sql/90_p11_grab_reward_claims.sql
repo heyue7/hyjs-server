@@ -1,0 +1,1 @@
+CREATE TABLE IF NOT EXISTS p11_grab_reward_claims (player_id BIGINT NOT NULL,day VARCHAR(10) NOT NULL,hours BIGINT NOT NULL,millis BIGINT NOT NULL,reward TEXT NOT NULL,reward_hash VARCHAR(64) NOT NULL,response LONGBLOB NOT NULL,claimed_at BIGINT NOT NULL,PRIMARY KEY(player_id,day,hours)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;

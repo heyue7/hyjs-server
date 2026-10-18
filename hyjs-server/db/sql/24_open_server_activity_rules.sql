@@ -1,0 +1,3 @@
+CREATE TABLE IF NOT EXISTS open_server_activity_rules (
+ id VARCHAR(64) NOT NULL PRIMARY KEY, enabled BOOLEAN NOT NULL, start_at BIGINT NOT NULL, end_at BIGINT NOT NULL, reward_end_at BIGINT NOT NULL, source TEXT NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

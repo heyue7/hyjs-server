@@ -1,0 +1,2 @@
+-- P13独立野外队伍实际管理事实。
+CREATE TABLE IF NOT EXISTS p13_team_policies (id BIGINT PRIMARY KEY,enabled BOOLEAN NOT NULL DEFAULT 0,max_size INT NOT NULL,invite_ttl_millis BIGINT NOT NULL,source TEXT NOT NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;

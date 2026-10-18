@@ -1,0 +1,4 @@
+CREATE TABLE IF NOT EXISTS p11_arena_prize_offers (
+ month VARCHAR(6) NOT NULL PRIMARY KEY, snapshot LONGTEXT NOT NULL,
+ source_hash VARCHAR(64) NOT NULL, captured_at BIGINT NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

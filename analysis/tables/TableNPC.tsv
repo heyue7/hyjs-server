@@ -1,0 +1,62 @@
+npcId	场景	类型	英雄Id	武器Id	出生位置X(米)	出生位置Y(米)	出生位置Z(米)	出生角度Y(0-360)	名字id	动画名	打开界面名	打开界面参数	打开界面等级	气泡文字 	对应小地图图标	是否可以传送(1可以0不可以）	传送位置X	传送位置Y	传送位置Z	传送角度Y(0-360)	低画质是否显示	对应大地图图标	NPC描述
+npcId	sceneName	type	heroId	weaponId	bornX	bornY	bornZ	bornAngle	nameId	animName	pageName	pageOption	pageLevel	bubbleText	miniMapIcon	canTransfer	transferX	transferY	transferZ	transferAngle	necessary	bigMapIcon	npcDes
+string	string	int	string	string	double	double	double	double	string	string	string	string	int	string	string	int	double	double	double	double	int	string	string
+primary	index	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none
+npcId	sceneName	int	heroId	weaponId	bornX	bornY	bornZ	bornAngle	nameId	animName	pageName	pageOption	pageLevel	bubbleText	miniMapIcon	canTransfer	transferX	transferY	transferZ	transferAngle	necessary	bigMapIcon	npcDes
+npc_002	town	0	hero_023		-15.0	1.243024	13.0	137.0	town_npc_arena	stand1	ArenaPage	type=0	10	jingjichangText	UI_ditu_jingjichang	1	-13.05	1.0	11.98	-60.95	1	UI_ditu_icon_jingjichang	挑战天梯排行；夺取饰品碎片
+npc_012	town	0	hero_009		-30.3	8.125	34.18	-176.4	town_npc_qianneng	stand	UIYggdrasil		13	qiannengText	UI_ditu_qiannengjiefang	1	-30.51	8.13	32.2	11.496	1	UI_ditu_icon_qiannengjiefang	提升主角；获得团队加成
+npc_003	town	0	hero_010		2.0	0.0	16.0	-135.0	town_recycle	stand	RecyclePage		16	recycleText	UI_ditu_huishouwu	1	0.5	0.12	14.36	52.5	1	UI_ditu_icon_huishouwu	回收培养资源
+npc_004	town	0	hero_007		15.0	2.921	22.0	140.0	town_restaurant	stand	CookRoomPage		18	restaurantText	UI_ditu_liaoliwu	1	16.67	3.06	20.24	-48.36	1	UI_ditu_icon_liaoliwu	在料理屋制作料理
+npc_005	town	0	hero_020		32.9	3.07	31.55	-135.0	town_yelianwu	stand	SmeltRoomPage		18	yelianwujianzhuText	UI_ditu_yelianpu	1	31.84	3.07	30.28	43.26	1	UI_ditu_icon_yelianwu	在冶炼屋制作宝石
+npc_007	town	0	hero_024		-3.0	9.858	44.0	175.0	town_chuangguan	stand	RushPage		22	aienjianzhuText	UI_ditu_aiengelangte	1	-3.04	10.5	41.72	14.04	1	UI_ditu_icon_shilianzhidi	层层挑战，赢取奖励
+npc_011	town	0	hero_051		16.63	4.52	59.27	176.99	town_mijing	stand	ActivityCopyPage	type=0	26	mijingText	UI_ditu_mijing	1	16.35	4.52	56.26	1.36	1	UI_ditu_icon_mijing	活动副本，可获得大量资源
+npc_008	town	0	hero_032		38.0	-0.4285813	-4.5	-135.0	town_missionLobby	stand	MercenaryTaskPage		32	missionLobbyText	UI_ditu_yongbingdating	1	38.48	-0.55	-6.78	-22.62	1	UI_ditu_icon_yongbingdating	接受佣兵任务
+npc_001	town	0	hero_026		15.58	0.0	2.28	-135.0	shop	stand	ShopPage		0		UI_ditu_shangdian	1	13.76	0.12	0.32	29.27	1	UI_ditu_icon_shangdian	招募伙伴；购买道具
+npc_006	town	0	hero_034		-10.0	10.84	38.0	130.0	town_gonghui	stand	UnionPage		30	gonghuijianzhuText	UI_ditu_gonghui	1	-8.6	10.08	36.54	-45.64	1	UI_ditu_icon_gonghui	进入公会
+npc_010	town	1	hero_019		52.0	-2.304052	7.0	-140.0	town_prison	stand			0	prisonText	UI_ditu_jianyu	1	52.45	-2.25	4.51	47.08	1	UI_ditu_icon_jianyu	红名玩家的关押地
+npc_101	town	1	midmen01		-15.43	0.12	-1.08	138.3	town_npc_man	stand			0	npc_023	UI_zhujiemian_ditu_07	0	-15.43	0.12	-1.08	138.3	1		中年男性
+npc_102	town	1	midwomen01		1.55	0.12	-16.64	-20.3	town_npc_woman	stand			0	npc_024	UI_zhujiemian_ditu_07	0	1.55	0.12	-16.64	-20.3	1		中年女性
+npc_103	town	1	hero_031		30.06	-2.32	-12.39	-135.0	name_hero_031	stand			0	npc_031	UI_zhujiemian_ditu_07	0	30.06	-2.32	-12.39	-135.0	1		牙王
+npc_104	town	1	hero_001		4.4	0.56	8.65	-135.0	name_hero_001	stand			0	npc_001	UI_zhujiemian_ditu_07	0	4.4	0.56	8.65	-135.0	1		桐人
+npc_105	town	1	hero_011		25.4	3.66	35.0	135.0	name_hero_011	stand			0	npc_011	UI_zhujiemian_ditu_07	0	25.4	3.66	35.0	135.0	1		莉法
+npc_201		2	hero_001		34.8	0.0	32.9	-40.0	name_hero_001	stand			0							-40.0			
+npc_202		2	hero_007		33.4	0.0	31.66	-21.0	name_hero_007	stand			0							-21.0			
+npc_203		2	monster_010		26.0	0.0	36.0	-20.0	name_monster_006	stand			0							-20.0			
+npc_204		2	hero_008		20.76	-2.04	-35.0	70.6	name_hero_008	stand			0							70.6			
+npc_205		2	hero_011		35.2	2.6	12.1	176.4	name_hero_011	stand			0							176.4			
+npc_206		2	hero_011		3.0	-0.28	9.21	25.1	name_hero_011	stand			0							25.1			
+npc_207		2	monster_016		31.1	-3.2	36.1	-102.0	name_monster_016	stand			0							-102.0			
+npc_208		2	hero_011		4.7	-0.1	0.1	90.0	name_hero_011	stand			0							90.0			
+npc_209		2	hero_040		12.2	-1.3	41.5	73.0	name_hero_040	stand			0							73.0			
+npc_210		2	monster_016		11.0	-1.3	39.9	73.0	name_monster_016	stand			0							73.0			
+npc_211		2	monster_016		11.0	-1.3	42.8	73.0	name_monster_016	stand			0							73.0			
+npc_212		2	hero_011		5.4	0.0	49.11	-151.0	name_hero_011	stand			0							-151.0			
+npc_213		2	hero_001		1.4	0.02	5.2	36.0	name_hero_001	stand			0							36.0			
+npc_214		2	midmen01		-8.0	0.02	20.78	161.8	town_npc_man	stand			0							161.8			
+npc_215		2	midwomen01		0.49	0.04	32.33	-44.4	town_npc_woman	juqing01			0							-82.8			
+npc_216		2	hero_005		-13.44	2.37	44.9	-101.0	name_hero_005	stand			0							-101.0			
+npc_217		2	hero_011		-0.5	-1.45	37.47	37.5	name_hero_011	stand			0							86.2			
+npc_218		2	monster_066		27.38	-2.25	-12.11	71.0	name_monster_066	stand			0							93.6			
+npc_219		2	monster_067		26.15	-2.25	-13.35	51.1	name_monster_067	stand			0							62.5			
+npc_220		2	hero_041		27.67	-2.25	-13.6	49.6	name_hero_041	stand			0							38.0			
+npc_221		2	hero_038		29.4	-2.25	-14.87	31.7	name_hero_038	stand			0							31.7			
+npc_222		2	hero_039		28.65	-2.25	-14.44	21.01	name_hero_039	stand			0							-1.7			
+npc_223		2	monster_068		31.38	-2.25	-15.01	0.3	name_monster_068	stand			0							-37.2			
+npc_224		2	monster_070		28.31	-2.25	-15.92	13.3	name_monster_070	stand			0							-37.2			
+npc_225		2	monster_050		12.7	-0.38	-1.53	-74.0	name_monster_050	stand			0										
+npc_226		2	monster_050		10.94	-0.3	-4.36	-23.9	name_monster_050	stand			0										
+npc_227		2	monster_050		8.4	-0.38	-2.12	34.7	name_monster_050	stand			0										
+npc_228		2	hero_008		4.11	-0.38	1.84	117.8	name_hero_008	stand			0										
+npc_106	town	1	mercenary04_npc		43.376	-2.2	-40.629	177.3		stand			0	text_npc_106							0		
+npc_107	town	1	mercenary05_npc		39.443	-2.249465	-44.225	112.2		stand			0	text_npc_107							0		
+npc_301	town	3	guard01_npc																				
+npc_302	town	3	guard02_npc																				
+npc_303	town	3	mercenary07_npc																				
+npc_304	union	4	mercenary07_npc		22.85771	1.192649	22.85441	-138.14	name_npc_304	stand	UnionPage	tabIndex=0	30		UI_ditu_icon_yishidating						1		公会大厅
+npc_305	union	4	manager01_npc		43.313	-4.689	-19.546	-148.448	name_npc_305	stand	UnionPage	tabIndex=3	30		UI_ditu_icon_cangku						1		公会仓库
+npc_306	union	4	clerk01_npc		35.101	-4.689	-16.417	138.78	name_npc_306	stand	UnionPage	tabIndex=4	30		UI_ditu_shangdian						1		公会商店
+npc_307	union	4	mercenary04_npc		-11.31	0.1434	-11.4	-138.7	name_npc_307	stand	UnionPage	tabIndex=5	30	union_hero_need_buy	UI_ditu_icon_herodiaoxiang						1		英雄雕像
+npc_308	union	4	mercenary05_npc		-21.651	3.543	18.216	-139.398	name_npc_308	stand	UnionPage	tabIndex=6	30	union_tree_need_buy	UI_ditu_icon_shouhuzhishu						1		守护之树
+npc_309	union	4	hero_026		-37.594	3.2101	11.159	144.462	name_npc_309	stand	UnionPage	tabIndex=7	30		UI_ditu_icon_jiaotang						1		圣光教堂
+npc_310	town	0	hero_062		23.613	4.517202	63.535	138.0865	town_Awake	stand	ChallengeActivityCopyPage	type=0	70	AwakeText	UI_ditu_juexingzhidi	1	24.47388	4.309	62.70156	-47.89972	1	UI_ditu_juexingzhidi	获取觉醒材料
+npc_311	town	0	hero_067		42.024	1.88	45.111	-133.6379	ServerBattle	stand	UIServerBattlePage	type=0	70	ServerBattleLevelLimit	UI_ditu_icon_kuafuzhan_b	1	41.138	1.845	44.152	25.0	1	UI_ditu_icon_kuafuzhan_a	跨服战入口

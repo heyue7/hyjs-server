@@ -1,0 +1,456 @@
+id	缘分名	刀剑heroId	类型(见类型表)	英雄0	英雄1	英雄2	英雄3	装备0	组件0	生命加成(百分比)	攻击加成(百分比)	防御加成(百分比)
+id	yuanName	heroId	type	hero0	hero1	hero2	hero3	equip0	treaId0	perhp	peratt	perdef
+string	string	string	int	string	string	string	string	string	string	double	double	double
+primary	none	index	none	none	none	none	none	none	none	none	none	none
+id	yuanName	heroId	type	hero0	hero1	hero2	hero3	equip0	treaId0	perhp	peratt	perdef
+yuan_1	name_yuan_1	hero_001	1	hero_007						22.0		
+yuan_2	name_yuan_2	hero_001	3	hero_008	hero_009	hero_010				22.0	22.0	
+yuan_3	name_yuan_3	hero_001	1	hero_002							24.0	
+yuan_4	name_yuan_4	hero_001	1	hero_020						20.0		
+yuan_5	name_yuan_5	hero_002	2	hero_001	hero_007					22.0	22.0	
+yuan_6	name_yuan_6	hero_002	2	hero_008	hero_033						22.0	
+yuan_7	name_yuan_7	hero_002	1	hero_013						22.0		
+yuan_8	name_yuan_8	hero_002	1	hero_051							22.0	
+yuan_9	name_yuan_9	hero_007	1	hero_001							20.0	
+yuan_10	name_yuan_10	hero_007	1	hero_009						18.0		
+yuan_11	name_yuan_11	hero_007	1	hero_020							17.0	
+yuan_12	name_yuan_12	hero_007	1	hero_051						18.0		
+yuan_13	name_yuan_13	hero_009	1	hero_001							20.0	
+yuan_14	name_yuan_14	hero_009	1	hero_022						17.0		
+yuan_15	name_yuan_15	hero_009	1	hero_007						18.0		
+yuan_16	name_yuan_16	hero_009	1	hero_002							20.0	
+yuan_17	name_yuan_17	hero_008	1	hero_001							20.0	
+yuan_18	name_yuan_18	hero_008	1	hero_010						18.0		
+yuan_19	name_yuan_19	hero_008	1	hero_007						18.0		
+yuan_20	name_yuan_20	hero_008	1	hero_031							17.0	
+yuan_21	name_yuan_21	hero_010	2	hero_034	hero_031						17.0	
+yuan_22	name_yuan_22	hero_010	1	hero_007							18.0	
+yuan_23	name_yuan_23	hero_010	1	hero_001						20.0		
+yuan_24	name_yuan_24	hero_010	1	hero_009						18.0		
+yuan_25	name_yuan_25	hero_019	1	hero_002						20.0		
+yuan_26	name_yuan_26	hero_019	1	hero_051							18.0	
+yuan_27	name_yuan_27	hero_019	1	hero_033							15.0	
+yuan_28	name_yuan_28	hero_019	1	hero_022						17.0		
+yuan_29	name_yuan_29	hero_020	1	hero_035						12.0		
+yuan_30	name_yuan_30	hero_020	1	hero_007							16.0	
+yuan_31	name_yuan_31	hero_020	1	hero_032						12.0		
+yuan_32	name_yuan_32	hero_020	1	hero_021							14.0	
+yuan_33	name_yuan_33	hero_021	1	hero_035						12.0		
+yuan_34	name_yuan_34	hero_021	1	hero_034						12.0		
+yuan_35	name_yuan_35	hero_021	1	hero_020							14.0	
+yuan_36	name_yuan_36	hero_021	1	hero_022							14.0	
+yuan_37	name_yuan_37	hero_022	1	hero_009						16.0		
+yuan_38	name_yuan_38	hero_022	1	hero_035						12.0		
+yuan_39	name_yuan_39	hero_022	1	hero_019							16.0	
+yuan_40	name_yuan_40	hero_022	1	hero_039						14.0		
+yuan_41	name_yuan_41	hero_003	3	hero_026	hero_038	hero_039				24.0		
+yuan_42	name_yuan_42	hero_003	1	hero_004							24.0	
+yuan_43	name_yuan_43	hero_003	2	hero_012	hero_011					22.0	22.0	
+yuan_44	name_yuan_44	hero_003	1	hero_013							22.0	
+yuan_45	name_yuan_45	hero_004	1	hero_003						24.0		
+yuan_46	name_yuan_46	hero_004	3	hero_026	hero_038	hero_039					24.0	
+yuan_47	name_yuan_47	hero_004	1	hero_012							22.0	
+yuan_48	name_yuan_48	hero_004	2	hero_023	hero_024					22.0	22.0	
+yuan_49	name_yuan_49	hero_011	1	hero_003						20.0		
+yuan_50	name_yuan_50	hero_011	1	hero_012							18.0	
+yuan_51	name_yuan_51	hero_011	1	hero_024						18.0		
+yuan_52	name_yuan_52	hero_011	1	hero_023							18.0	
+yuan_53	name_yuan_53	hero_012	1	hero_003						20.0		
+yuan_54	name_yuan_54	hero_012	1	hero_014							18.0	
+yuan_55	name_yuan_55	hero_012	1	hero_013						18.0		
+yuan_56	name_yuan_56	hero_012	1	hero_011						18.0		
+yuan_57	name_yuan_57	hero_014	1	hero_012							18.0	
+yuan_58	name_yuan_58	hero_014	1	hero_003							20.0	
+yuan_59	name_yuan_59	hero_014	1	hero_024						18.0		
+yuan_60	name_yuan_60	hero_014	1	hero_029							17.0	
+yuan_61	name_yuan_61	hero_023	1	hero_024							10.0	10.0
+yuan_62	name_yuan_62	hero_023	1	hero_025							17.0	
+yuan_63	name_yuan_63	hero_023	1	hero_012						18.0		
+yuan_64	name_yuan_64	hero_023	1	hero_040							15.0	
+yuan_65	name_yuan_65	hero_013	1	hero_003							20.0	
+yuan_66	name_yuan_66	hero_013	1	hero_037							15.0	
+yuan_67	name_yuan_67	hero_013	1	hero_012						18.0		
+yuan_68	name_yuan_68	hero_013	1	hero_024							18.0	
+yuan_69	name_yuan_69	hero_024	1	hero_011						18.0		
+yuan_70	name_yuan_70	hero_024	1	hero_025						17.0		
+yuan_71	name_yuan_71	hero_024	1	hero_012							18.0	
+yuan_72	name_yuan_72	hero_024	1	hero_023						18.0		
+yuan_73	name_yuan_73	hero_025	1	hero_024							16.0	
+yuan_74	name_yuan_74	hero_025	1	hero_012							16.0	
+yuan_75	name_yuan_75	hero_025	1	hero_011						16.0		
+yuan_76	name_yuan_76	hero_025	1	hero_039							14.0	
+yuan_77	name_yuan_77	hero_026	1	hero_038						14.0		
+yuan_78	name_yuan_78	hero_026	1	hero_039							14.0	
+yuan_79	name_yuan_79	hero_026	1	hero_004							18.0	
+yuan_80	name_yuan_80	hero_026	1	hero_012							16.0	
+yuan_81	name_yuan_81	hero_005	2	hero_015	hero_029					24.0		
+yuan_82	name_yuan_82	hero_005	2	hero_006	hero_017					22.0	22.0	
+yuan_83	name_yuan_83	hero_005	1	hero_028							20.0	
+yuan_84	name_yuan_84	hero_005	1	hero_053							22.0	
+yuan_85	name_yuan_85	hero_006	1	hero_005							24.0	
+yuan_86	name_yuan_86	hero_006	2	hero_028	hero_019						22.0	
+yuan_87	name_yuan_87	hero_006	1	hero_015						22.0		
+yuan_88	name_yuan_88	hero_006	2	hero_018	hero_052					22.0	22.0	
+yuan_89	name_yuan_89	hero_015	1	hero_005							20.0	
+yuan_90	name_yuan_90	hero_015	1	hero_006						20.0		
+yuan_91	name_yuan_91	hero_015	1	hero_052							18.0	
+yuan_92	name_yuan_92	hero_015	1	hero_028						17.0		
+yuan_93	name_yuan_93	hero_016	1	hero_006							20.0	
+yuan_94	name_yuan_94	hero_016	1	hero_018							18.0	
+yuan_95	name_yuan_95	hero_016	1	hero_029						17.0		
+yuan_96	name_yuan_96	hero_016	1	hero_027						17.0		
+yuan_97	name_yuan_97	hero_017	1	hero_005							20.0	
+yuan_98	name_yuan_98	hero_017	1	hero_015						18.0		
+yuan_99	name_yuan_99	hero_017	1	hero_029							17.0	
+yuan_100	name_yuan_100	hero_017	2	hero_030	hero_054					20.0		
+yuan_101	name_yuan_101	hero_018	1	hero_015						18.0		
+yuan_102	name_yuan_102	hero_018	1	hero_016							18.0	
+yuan_103	name_yuan_103	hero_018	1	hero_006							20.0	
+yuan_104	name_yuan_104	hero_018	2	hero_028	hero_055					17.0		
+yuan_105	name_yuan_105	hero_027	1	hero_005						18.0		
+yuan_106	name_yuan_106	hero_027	1	hero_015							16.0	
+yuan_107	name_yuan_107	hero_027	1	hero_018						16.0		
+yuan_108	name_yuan_108	hero_027	1	hero_042							12.0	
+yuan_109	name_yuan_109	hero_028	1	hero_005						18.0		
+yuan_110	name_yuan_110	hero_028	1	hero_042						12.0		
+yuan_111	name_yuan_111	hero_028	1	hero_006							18.0	
+yuan_112	name_yuan_112	hero_028	1	hero_029						14.0		
+yuan_113	name_yuan_113	hero_029	1	hero_005							18.0	
+yuan_114	name_yuan_114	hero_029	1	hero_015						16.0		
+yuan_115	name_yuan_115	hero_029	1	hero_027							14.0	
+yuan_116	name_yuan_116	hero_029	1	hero_042							12.0	
+yuan_117	name_yuan_117	hero_030	1	hero_015						16.0		
+yuan_118	name_yuan_118	hero_030	1	hero_005							18.0	
+yuan_119	name_yuan_119	hero_030	1	hero_042						12.0		
+yuan_120	name_yuan_120	hero_030	1	hero_029							14.0	
+yuan_121	name_yuan_121	hero_031	1	hero_032							12.0	
+yuan_122	name_yuan_122	hero_032	1	hero_035						10.0		
+yuan_123	name_yuan_123	hero_033	1	hero_036							10.0	
+yuan_124	name_yuan_124	hero_034	1	hero_031						12.0		
+yuan_125	name_yuan_125	hero_035	1	hero_036							10.0	
+yuan_126	name_yuan_126	hero_036	1	hero_035						10.0		
+yuan_127	name_yuan_127	hero_037	1	hero_024							14.0	
+yuan_128	name_yuan_128	hero_038	1	hero_039						14.0		
+yuan_129	name_yuan_129	hero_039	1	hero_038							14.0	
+yuan_130	name_yuan_130	hero_040	1	hero_023							14.0	
+yuan_131	name_yuan_131	hero_041	1	hero_011							14.0	
+yuan_132	name_yuan_132	hero_042	1	hero_029							12.0	
+yuan_133	name_yuan_133	hero_001	5					equip_040			15.0	
+yuan_134	name_yuan_134	hero_002	5					equip_038		15.0		
+yuan_135	name_yuan_135	hero_007	5					equip_032			14.0	
+yuan_136	name_yuan_136	hero_007	5					equip_040			15.0	
+yuan_137	name_yuan_137	hero_009	5					equip_034		14.0		
+yuan_138	name_yuan_138	hero_009	5					equip_038		15.0		
+yuan_139	name_yuan_139	hero_008	5					equip_028			14.0	
+yuan_140	name_yuan_140	hero_008	5					equip_040			15.0	
+yuan_141	name_yuan_141	hero_010	5					equip_035		14.0		
+yuan_142	name_yuan_142	hero_010	5					equip_039		15.0		
+yuan_143	name_yuan_143	hero_019	5					equip_036			14.0	
+yuan_144	name_yuan_144	hero_020	5					equip_020			12.0	
+yuan_145	name_yuan_145	hero_021	5					equip_014		12.0		
+yuan_146	name_yuan_146	hero_022	5					equip_020			12.0	
+yuan_147	name_yuan_147	hero_031	5					equip_015		12.0		
+yuan_148	name_yuan_148	hero_032	5					equip_006		10.0		
+yuan_149	name_yuan_149	hero_033	5					equip_008			10.0	
+yuan_150	name_yuan_150	hero_034	5					equip_008		10.0		
+yuan_151	name_yuan_151	hero_035	5					equip_008			10.0	
+yuan_152	name_yuan_152	hero_036	5					equip_007		10.0		
+yuan_153	name_yuan_153	hero_003	5					equip_040			15.0	
+yuan_154	name_yuan_154	hero_004	5					equip_040			15.0	
+yuan_155	name_yuan_155	hero_011	5					equip_032			14.0	
+yuan_156	name_yuan_156	hero_011	5					equip_038		15.0		
+yuan_157	name_yuan_157	hero_012	5					equip_031		14.0		
+yuan_158	name_yuan_158	hero_012	5					equip_039		15.0		
+yuan_159	name_yuan_159	hero_014	5					equip_036			14.0	
+yuan_160	name_yuan_160	hero_014	5					equip_040			15.0	
+yuan_161	name_yuan_161	hero_023	5					equip_034		14.0		
+yuan_162	name_yuan_162	hero_023	5					equip_038		15.0		
+yuan_163	name_yuan_163	hero_013	5					equip_028			14.0	
+yuan_164	name_yuan_164	hero_024	5					equip_036			14.0	
+yuan_165	name_yuan_165	hero_025	5					equip_016			12.0	
+yuan_166	name_yuan_166	hero_026	5					equip_015		12.0		
+yuan_167	name_yuan_167	hero_037	5					equip_006		10.0		
+yuan_168	name_yuan_168	hero_038	5					equip_020		12.0		
+yuan_169	name_yuan_169	hero_039	5					equip_020		12.0		
+yuan_170	name_yuan_170	hero_040	5					equip_006		10.0		
+yuan_171	name_yuan_171	hero_041	5					equip_007		10.0		
+yuan_172	name_yuan_172	hero_005	5					equip_040			15.0	
+yuan_173	name_yuan_173	hero_006	5					equip_039		15.0		
+yuan_174	name_yuan_174	hero_015	5					equip_030		14.0		
+yuan_175	name_yuan_175	hero_015	5					equip_038		15.0		
+yuan_176	name_yuan_176	hero_016	5					equip_036			14.0	
+yuan_177	name_yuan_177	hero_016	5					equip_040			15.0	
+yuan_178	name_yuan_178	hero_017	5					equip_028			14.0	
+yuan_179	name_yuan_179	hero_017	5					equip_040			15.0	
+yuan_180	name_yuan_180	hero_018	5					equip_035		14.0		
+yuan_181	name_yuan_181	hero_018	5					equip_039		15.0		
+yuan_182	name_yuan_182	hero_027	5					equip_016			12.0	
+yuan_183	name_yuan_183	hero_028	5					equip_015		12.0		
+yuan_184	name_yuan_184	hero_029	5					equip_020			12.0	
+yuan_185	name_yuan_185	hero_030	5					equip_018		12.0		
+yuan_186	name_yuan_186	hero_042	5					equip_008			10.0	
+yuan_187	name_yuan_187	hero_001	6						trea_015		15.0	
+yuan_188	name_yuan_188	hero_002	6						trea_018	15.0		
+yuan_189	name_yuan_189	hero_007	6						trea_011		14.0	
+yuan_190	name_yuan_190	hero_007	6						trea_016		15.0	
+yuan_191	name_yuan_191	hero_009	6						trea_012		14.0	
+yuan_192	name_yuan_192	hero_009	6						trea_015		15.0	
+yuan_193	name_yuan_193	hero_008	6						trea_013	14.0		
+yuan_194	name_yuan_194	hero_008	6						trea_017	15.0		
+yuan_195	name_yuan_195	hero_010	6						trea_014	14.0		
+yuan_196	name_yuan_196	hero_010	6						trea_018	15.0		
+yuan_197	name_yuan_197	hero_019	6						trea_011		14.0	
+yuan_198	name_yuan_198	hero_020	6						trea_008	12.0		
+yuan_199	name_yuan_199	hero_021	6						trea_009	12.0		
+yuan_200	name_yuan_200	hero_022	6						trea_007		12.0	
+yuan_201	name_yuan_201	hero_031	6						trea_006		12.0	
+yuan_202	name_yuan_202	hero_032	6						trea_002		10.0	
+yuan_203	name_yuan_203	hero_033	6						trea_003	10.0		
+yuan_204	name_yuan_204	hero_034	6						trea_004	10.0		
+yuan_205	name_yuan_205	hero_035	6						trea_001		10.0	
+yuan_206	name_yuan_206	hero_036	6						trea_003	10.0		
+yuan_207	name_yuan_207	hero_003	6						trea_017	15.0		
+yuan_208	name_yuan_208	hero_004	6						trea_016	15.0		
+yuan_209	name_yuan_209	hero_011	6						trea_012		14.0	
+yuan_210	name_yuan_210	hero_011	6						trea_016		15.0	
+yuan_211	name_yuan_211	hero_012	6						trea_014	14.0		
+yuan_212	name_yuan_212	hero_012	6						trea_018	15.0		
+yuan_213	name_yuan_213	hero_014	6						trea_011		14.0	
+yuan_214	name_yuan_214	hero_014	6						trea_015		15.0	
+yuan_215	name_yuan_215	hero_023	6						trea_012		14.0	
+yuan_216	name_yuan_216	hero_023	6						trea_015		15.0	
+yuan_217	name_yuan_217	hero_013	6						trea_013	14.0		
+yuan_218	name_yuan_218	hero_024	6						trea_011		14.0	
+yuan_219	name_yuan_219	hero_025	6						trea_007		12.0	
+yuan_220	name_yuan_220	hero_026	6						trea_006		12.0	
+yuan_221	name_yuan_221	hero_037	6						trea_003	10.0		
+yuan_222	name_yuan_222	hero_038	6						trea_007		12.0	
+yuan_223	name_yuan_223	hero_039	6						trea_009	12.0		
+yuan_224	name_yuan_224	hero_040	6						trea_001		10.0	
+yuan_225	name_yuan_225	hero_041	6						trea_002		10.0	
+yuan_226	name_yuan_226	hero_005	6						trea_015	15.0		
+yuan_227	name_yuan_227	hero_006	6						trea_016		15.0	
+yuan_228	name_yuan_228	hero_015	6						trea_014	14.0		
+yuan_229	name_yuan_229	hero_015	6						trea_018	15.0		
+yuan_230	name_yuan_230	hero_016	6						trea_012		14.0	
+yuan_231	name_yuan_231	hero_016	6						trea_016		15.0	
+yuan_232	name_yuan_232	hero_017	6						trea_011		14.0	
+yuan_233	name_yuan_233	hero_017	6						trea_015		15.0	
+yuan_234	name_yuan_234	hero_018	6						trea_012		14.0	
+yuan_235	name_yuan_235	hero_018	6						trea_016		15.0	
+yuan_236	name_yuan_236	hero_027	6						trea_006		12.0	
+yuan_237	name_yuan_237	hero_028	6						trea_007		12.0	
+yuan_238	name_yuan_238	hero_029	6						trea_006		12.0	
+yuan_239	name_yuan_239	hero_030	6						trea_007		12.0	
+yuan_240	name_yuan_240	hero_042	6						trea_001		10.0	
+yuan_241	name_yuan_241	hero_043	5					equip_013			12.0	
+yuan_242	name_yuan_242	hero_043	5					equip_014				12.0
+yuan_243	name_yuan_243	hero_043	5					equip_015		12.0		
+yuan_244	name_yuan_244	hero_043	5					equip_016		12.0		
+yuan_245	name_yuan_245	hero_043	6						trea_006		12.0	
+yuan_246	name_yuan_246	hero_043	6						trea_008	12.0		
+yuan_247	name_yuan_247	hero_044	5					equip_013			12.0	
+yuan_248	name_yuan_248	hero_044	5					equip_014				12.0
+yuan_249	name_yuan_249	hero_044	5					equip_015		12.0		
+yuan_250	name_yuan_250	hero_044	5					equip_016		12.0		
+yuan_251	name_yuan_251	hero_044	6						trea_006		12.0	
+yuan_252	name_yuan_252	hero_044	6						trea_008	12.0		
+yuan_253	name_yuan_253	hero_045	5					equip_013			12.0	
+yuan_254	name_yuan_254	hero_045	5					equip_014				12.0
+yuan_255	name_yuan_255	hero_045	5					equip_015		12.0		
+yuan_256	name_yuan_256	hero_045	5					equip_016		12.0		
+yuan_257	name_yuan_257	hero_045	6						trea_006		12.0	
+yuan_258	name_yuan_258	hero_045	6						trea_008	12.0		
+yuan_259	name_yuan_259	hero_045	5					equip_029			14.0	
+yuan_260	name_yuan_260	hero_045	5					equip_030				14.0
+yuan_261	name_yuan_261	hero_045	5					equip_031		14.0		
+yuan_262	name_yuan_262	hero_045	5					equip_032		14.0		
+yuan_263	name_yuan_263	hero_045	6						trea_011		14.0	
+yuan_264	name_yuan_264	hero_045	6						trea_013	14.0		
+yuan_265	name_yuan_265	hero_047	5					equip_013			12.0	
+yuan_266	name_yuan_266	hero_047	5					equip_014				12.0
+yuan_267	name_yuan_267	hero_047	5					equip_015		12.0		
+yuan_268	name_yuan_268	hero_047	5					equip_016		12.0		
+yuan_269	name_yuan_269	hero_047	6						trea_006		12.0	
+yuan_270	name_yuan_270	hero_047	6						trea_008	12.0		
+yuan_271	name_yuan_271	hero_048	5					equip_013			12.0	
+yuan_272	name_yuan_272	hero_048	5					equip_014				12.0
+yuan_273	name_yuan_273	hero_048	5					equip_015		12.0		
+yuan_274	name_yuan_274	hero_048	5					equip_016		12.0		
+yuan_275	name_yuan_275	hero_048	6						trea_006		12.0	
+yuan_276	name_yuan_276	hero_048	6						trea_008	12.0		
+yuan_277	name_yuan_277	hero_049	5					equip_013			12.0	
+yuan_278	name_yuan_278	hero_049	5					equip_014				12.0
+yuan_279	name_yuan_279	hero_049	5					equip_015		12.0		
+yuan_280	name_yuan_280	hero_049	5					equip_016		12.0		
+yuan_281	name_yuan_281	hero_049	6						trea_006		12.0	
+yuan_282	name_yuan_282	hero_049	6						trea_008	12.0		
+yuan_283	name_yuan_283	hero_049	5					equip_029			14.0	
+yuan_284	name_yuan_284	hero_049	5					equip_030				14.0
+yuan_285	name_yuan_285	hero_049	5					equip_031		14.0		
+yuan_286	name_yuan_286	hero_049	5					equip_032		14.0		
+yuan_287	name_yuan_287	hero_049	6						trea_011		14.0	
+yuan_288	name_yuan_288	hero_049	6						trea_013	14.0		
+yuan_289	name_yuan_289	hero_051	1	hero_001							20.0	
+yuan_290	name_yuan_290	hero_051	1	hero_007						18.0		
+yuan_291	name_yuan_291	hero_051	1	hero_022						18.0		
+yuan_292	name_yuan_292	hero_051	1	hero_020							17.0	
+yuan_293	name_yuan_293	hero_031	1	hero_035							12.0	
+yuan_294	name_yuan_294	hero_031	1	hero_022						14.0		
+yuan_295	name_yuan_295	hero_031	1	hero_010						16.0		
+yuan_296	name_yuan_296	hero_038	1	hero_026						14.0		
+yuan_297	name_yuan_297	hero_038	1	hero_003							18.0	
+yuan_298	name_yuan_298	hero_038	1	hero_004							18.0	
+yuan_299	name_yuan_299	hero_039	1	hero_026						14.0		
+yuan_300	name_yuan_300	hero_039	1	hero_003							18.0	
+yuan_301	name_yuan_301	hero_039	1	hero_004							18.0	
+yuan_302	name_yuan_302	hero_052	1	hero_006							20.0	
+yuan_303	name_yuan_303	hero_052	1	hero_015						18.0		
+yuan_304	name_yuan_304	hero_052	1	hero_054						17.0		
+yuan_305	name_yuan_305	hero_052	1	hero_053							18.0	
+yuan_306	name_yuan_306	hero_053	1	hero_005							20.0	
+yuan_307	name_yuan_307	hero_053	2	hero_016	hero_042					18.0		
+yuan_308	name_yuan_308	hero_053	1	hero_015						18.0		
+yuan_309	name_yuan_309	hero_053	1	hero_052							18.0	
+yuan_310	name_yuan_310	hero_054	1	hero_055							12.0	
+yuan_311	name_yuan_311	hero_054	1	hero_012						16.0		
+yuan_312	name_yuan_312	hero_054	1	hero_018						16.0		
+yuan_313	name_yuan_313	hero_054	1	hero_029							14.0	
+yuan_314	name_yuan_314	hero_055	1	hero_005							16.0	
+yuan_315	name_yuan_315	hero_055	1	hero_028						12.0		
+yuan_316	name_yuan_316	hero_055	1	hero_029						12.0		
+yuan_317	name_yuan_317	hero_055	1	hero_042							10.0	
+yuan_318	name_yuan_318	hero_019	5					equip_040			15.0	
+yuan_319	name_yuan_319	hero_019	6						trea_015		15.0	
+yuan_320	name_yuan_320	hero_013	5					equip_040			15.0	
+yuan_321	name_yuan_321	hero_013	6						trea_017	15.0		
+yuan_322	name_yuan_322	hero_024	5					equip_040			15.0	
+yuan_323	name_yuan_323	hero_024	6						trea_016		15.0	
+yuan_324	name_yuan_324	hero_051	5					equip_032			14.0	
+yuan_325	name_yuan_325	hero_051	6						trea_013	14.0		
+yuan_326	name_yuan_326	hero_051	5					equip_040			15.0	
+yuan_327	name_yuan_327	hero_051	6						trea_017	15.0		
+yuan_328	name_yuan_328	hero_052	5					equip_032			14.0	
+yuan_329	name_yuan_329	hero_052	6						trea_012		14.0	
+yuan_330	name_yuan_330	hero_052	5					equip_040			15.0	
+yuan_331	name_yuan_331	hero_052	6						trea_015		15.0	
+yuan_332	name_yuan_332	hero_053	5					equip_028			14.0	
+yuan_333	name_yuan_333	hero_053	6						trea_011		14.0	
+yuan_334	name_yuan_334	hero_053	5					equip_040			15.0	
+yuan_335	name_yuan_335	hero_053	6						trea_016		15.0	
+yuan_336	name_yuan_336	hero_054	5					equip_015		12.0		
+yuan_337	name_yuan_337	hero_054	6						trea_006		12.0	
+yuan_338	name_yuan_338	hero_055	5					equip_006		10.0		
+yuan_339	name_yuan_339	hero_055	6						trea_002		10.0	
+yuan_340	name_yuan_340	hero_062	2	hero_003	hero_004						17.0	
+yuan_341	name_yuan_341	hero_062	1	hero_023						20.0		
+yuan_342	name_yuan_342	hero_062	1	hero_012						18.0		
+yuan_343	name_yuan_343	hero_062	2	hero_024	hero_011						20.0	
+yuan_344	name_yuan_344	hero_062	5					equip_039			15.0	
+yuan_345	name_yuan_345	hero_062	6						trea_015	15.0		
+yuan_346	name_yuan_346	hero_063	2	hero_001	hero_002						22.0	
+yuan_347	name_yuan_347	hero_063	1	hero_010						20.0		
+yuan_348	name_yuan_348	hero_063	1	hero_007						18.0		
+yuan_349	name_yuan_349	hero_063	2	hero_051	hero_009						20.0	
+yuan_350	name_yuan_350	hero_063	5					equip_038			15.0	
+yuan_351	name_yuan_351	hero_063	6						trea_016	15.0		
+yuan_352	name_yuan_352	hero_064	2	hero_005	hero_006						17.0	
+yuan_353	name_yuan_353	hero_064	1	hero_017						20.0		
+yuan_354	name_yuan_354	hero_064	1	hero_015							20.0	
+yuan_355	name_yuan_355	hero_064	2	hero_018	hero_052					22.0		
+yuan_356	name_yuan_356	hero_064	5					equip_040		15.0		
+yuan_357	name_yuan_357	hero_064	6						trea_015		15.0	
+yuan_358	name_yuan_358	hero_065	1	hero_001							24.0	
+yuan_359	name_yuan_359	hero_065	1	hero_002						24.0		
+yuan_360	name_yuan_360	hero_065	2	hero_007	hero_009					24.0		24.0
+yuan_361	name_yuan_361	hero_065	1	hero_051							20.0	
+yuan_362	name_yuan_362	hero_065	5					equip_037		15.0		
+yuan_363	name_yuan_363	hero_065	6						trea_017		15.0	
+yuan_364	name_yuan_364	hero_066	1	hero_003							24.0	
+yuan_365	name_yuan_365	hero_066	1	hero_004							24.0	
+yuan_366	name_yuan_366	hero_066	1	hero_011						22.0		
+yuan_367	name_yuan_367	hero_066	2	hero_012	hero_023					24.0	24.0	
+yuan_368	name_yuan_368	hero_066	5					equip_038		15.0		
+yuan_369	name_yuan_369	hero_066	6						trea_018		15.0	
+yuan_370	name_yuan_370	hero_067	1	hero_005							24.0	
+yuan_371	name_yuan_371	hero_067	1	hero_006							24.0	
+yuan_372	name_yuan_372	hero_067	1	hero_052						22.0		
+yuan_373	name_yuan_373	hero_067	2	hero_015	hero_053					22.0	24.0	
+yuan_374	name_yuan_374	hero_067	5					equip_038			15.0	
+yuan_375	name_yuan_375	hero_067	6						trea_018	15.0		
+yuan_376	name_yuan_376	hero_071	2	hero_003	hero_004						18.0	
+yuan_377	name_yuan_377	hero_071	1	hero_023						21.0		
+yuan_378	name_yuan_378	hero_071	1	hero_012						19.0		
+yuan_379	name_yuan_379	hero_071	2	hero_024	hero_011						21.0	
+yuan_380	name_yuan_380	hero_071	5					equip_039			15.0	
+yuan_381	name_yuan_381	hero_071	6						trea_015	15.0		
+yuan_382	name_yuan_382	hero_068	2	hero_001	hero_002						23.0	
+yuan_383	name_yuan_383	hero_068	1	hero_010						21.0		
+yuan_384	name_yuan_384	hero_068	1	hero_007						19.0		
+yuan_385	name_yuan_385	hero_068	2	hero_051	hero_009						21.0	
+yuan_386	name_yuan_386	hero_068	5					equip_038			15.0	
+yuan_387	name_yuan_387	hero_068	6						trea_016	15.0		
+yuan_388	name_yuan_388	hero_072	2	hero_005	hero_006						18.0	
+yuan_389	name_yuan_389	hero_072	1	hero_017						21.0		
+yuan_390	name_yuan_390	hero_072	1	hero_015							21.0	
+yuan_391	name_yuan_391	hero_072	2	hero_018	hero_052					23.0		
+yuan_392	name_yuan_392	hero_072	5					equip_040		15.0		
+yuan_393	name_yuan_393	hero_072	6						trea_015		15.0	
+yuan_394	name_yuan_394	hero_074	1	hero_003							24.0	
+yuan_395	name_yuan_395	hero_074	1	hero_004							24.0	
+yuan_396	name_yuan_396	hero_074	1	hero_066						24.0		
+yuan_397	name_yuan_397	hero_074	2	hero_024	hero_012						21.0	24.0
+yuan_398	name_yuan_398	hero_074	5					equip_039		15.0		
+yuan_399	name_yuan_399	hero_074	6						trea_015		15.0	
+yuan_400	name_yuan_400	hero_075	1	hero_001							25.0	
+yuan_401	name_yuan_401	hero_075	1	hero_002							25.0	
+yuan_402	name_yuan_402	hero_075	1	hero_065						25.0		
+yuan_403	name_yuan_403	hero_075	2	hero_007	hero_008						22.0	25.0
+yuan_404	name_yuan_404	hero_075	5					equip_039		15.0		
+yuan_405	name_yuan_405	hero_075	6						trea_016		15.0	
+yuan_406	name_yuan_406	hero_076	1	hero_005							25.0	
+yuan_407	name_yuan_407	hero_076	1	hero_006							24.0	
+yuan_408	name_yuan_408	hero_076	1	hero_067						24.0		
+yuan_409	name_yuan_409	hero_076	2	hero_052	hero_053						21.0	24.0
+yuan_410	name_yuan_410	hero_076	5					equip_037		15.0		
+yuan_411	name_yuan_411	hero_076	6						trea_017		15.0	
+yuan_412	name_yuan_412	hero_077	1	hero_078							25.0	
+yuan_413	name_yuan_413	hero_077	1	hero_079							25.0	
+yuan_414	name_yuan_414	hero_077	1	hero_008						25.0		
+yuan_415	name_yuan_415	hero_077	2	hero_001	hero_007					25.0	25.0	
+yuan_416	name_yuan_416	hero_077	5					equip_041			20.0	
+yuan_417	name_yuan_417	hero_077	6						trea_016	20.0		
+yuan_418	name_yuan_418	hero_078	1	hero_077						25.0		
+yuan_419	name_yuan_419	hero_078	1	hero_079							25.0	
+yuan_420	name_yuan_420	hero_078	1	hero_011							25.0	
+yuan_421	name_yuan_421	hero_078	3	hero_001	hero_024	hero_023				30.0	30.0	
+yuan_422	name_yuan_422	hero_078	5					equip_042			20.0	
+yuan_423	name_yuan_423	hero_078	6						trea_017	20.0		
+yuan_424	name_yuan_424	hero_079	2	hero_077	hero_078					30.0	30.0	
+yuan_425	name_yuan_425	hero_079	1	hero_002							25.0	
+yuan_426	name_yuan_426	hero_079	1	hero_021						25.0		
+yuan_427	name_yuan_427	hero_079	2	hero_024	hero_023					25.0		
+yuan_428	name_yuan_428	hero_079	5					equip_043		20.0		
+yuan_429	name_yuan_429	hero_079	6						trea_015		20.0	
+yuan_430	name_yuan_430	hero_080	1	hero_082						24.0		
+yuan_431	name_yuan_431	hero_080	2	hero_082	hero_081						20.0	
+yuan_432	name_yuan_432	hero_080	5					equip_041			19.0	
+yuan_433	name_yuan_433	hero_080	6						trea_017	17.0		
+yuan_434	name_yuan_434	hero_080	5					equip_025			16.0	
+yuan_435	name_yuan_435	hero_080	6						trea_012		16.0	
+yuan_436	name_yuan_436	hero_080	5					equip_037			17.0	
+yuan_437	name_yuan_437	hero_080	6						trea_016		17.0	
+yuan_438	name_yuan_438	hero_081	1	hero_082						24.0		
+yuan_439	name_yuan_439	hero_081	2	hero_082	hero_080						20.0	
+yuan_440	name_yuan_440	hero_081	5					equip_042		19.0		
+yuan_441	name_yuan_441	hero_081	6						trea_015		17.0	
+yuan_442	name_yuan_442	hero_081	5					equip_030		16.0		
+yuan_443	name_yuan_443	hero_081	6						trea_014		16.0	
+yuan_444	name_yuan_444	hero_081	5					equip_038		17.0		
+yuan_445	name_yuan_445	hero_081	6						trea_018		17.0	
+yuan_446	name_yuan_446	hero_082	1	hero_080						25.0		
+yuan_447	name_yuan_447	hero_082	1	hero_081							25.0	
+yuan_448	name_yuan_448	hero_082	5					equip_044			20.0	
+yuan_449	name_yuan_449	hero_082	6						trea_018			17.0
+yuan_450	name_yuan_450	hero_082	5					equip_040			17.0	
+yuan_451	name_yuan_451	hero_082	6						trea_016	17.0		

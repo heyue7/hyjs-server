@@ -1,0 +1,10 @@
+ID	武器资质	返还资源
+id	quality	retRes
+string	int	string
+primary	none	none
+id	quality	retRes
+1	12	point,80;coin,1000
+2	13	point,700;coin,1000
+3	18	point,3500;coin,1000
+4	20	point,15000;coin,1000
+5	23	point,30000;coin,1000

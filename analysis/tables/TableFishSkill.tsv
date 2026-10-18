@@ -1,0 +1,67 @@
+生活技能物品ID	名称	描述	类型	资质	属性类型	属性	解锁等级	需要习得技能	制作获得经验	产出	制作所需材料	是否可烹饪
+FishItemID	Name	Desc	Type	Quality	ValueType	Value	LevelLimit	SkillNeeded	MakingExp	Product	Material	IsDish
+string	string	string	string	int	string	string	int	string	int	string	string	int
+primary	none	none	index	none	none	none	none	none	none	none	none	none
+fishItemID	name	desc	type	quality	valueType	value	levelLimit	skillNeeded	makeExp	product	material	isDish
+FishItem_001			dock	1			1			FishItem_007:0,25;1,75|FishItem_013:0,50;1,50|FishItem_019:0,50;1,50		0
+FishItem_002			dock	2			2			FishItem_008:0,25;1,75|FishItem_014:0,50;1,50|FishItem_020:0,50;1,50		0
+FishItem_003			dock	3			3			FishItem_009:0,25;1,75|FishItem_015:0,50;1,50|FishItem_021:0,50;1,50		0
+FishItem_004			dock	4			4			FishItem_010:0,25;1,75|FishItem_016:0,50;1,50|FishItem_022:0,50;1,50		0
+FishItem_005			dock	5			5			FishItem_011:0,25;1,75|FishItem_017:0,50;1,50|FishItem_023:0,50;1,50		0
+FishItem_006			dock	6			6			FishItem_012:0,25;1,75|FishItem_018:0,50;1,50|FishItem_024:0,50;1,50|FishItem_025:0,98;1,2		0
+FishItem_007			fish									0
+FishItem_008			fish									0
+FishItem_009			fish									0
+FishItem_010			fish									0
+FishItem_011			fish									0
+FishItem_012			fish									0
+FishItem_013			fish									0
+FishItem_014			fish									0
+FishItem_015			fish									0
+FishItem_016			fish									0
+FishItem_017			fish									0
+FishItem_018			fish									0
+FishItem_019			fish									0
+FishItem_020			fish									0
+FishItem_021			fish									0
+FishItem_022			fish									0
+FishItem_023			fish									0
+FishItem_024			fish									0
+FishItem_025			fish									0
+FishItem_026			dish	1	onetimeRecover	5	1		25		FishItem_007,5;coin,5000	1
+FishItem_027			dish	1	permanent4	pdef	1		25		FishItem_007,5;FishItem_013,5;coin,10000	1
+FishItem_028			dish	1	permanent4	cri	1		25		FishItem_013,5;FishItem_019,5;coin,15000	1
+FishItem_029			dish	1	permanent4	att	1		25		FishItem_007,5;FishItem_013,5;FishItem_019,5;coin,20000	1
+FishItem_030			dish	2	onetimeRecover	10	2		60		FishItem_008,5;coin,10000	1
+FishItem_031			dish	2	permanent4	mdef	2		60		FishItem_008,5;FishItem_014,5;coin,20000	1
+FishItem_032			dish	2	permanent4	antiCri	2		60		FishItem_014,5;FishItem_020,5;coin,30000	1
+FishItem_033			dish	2	permanent4	hp	2		60		FishItem_008,5;FishItem_014,5;FishItem_020,5;coin,40000	1
+FishItem_034			dish	3	onetimeRecover	15	3		80		FishItem_009,5;coin,20000	1
+FishItem_035			dish	3	extraCoin	30;5	3		80		FishItem_009,5;FishItem_015,5;coin,40000	1
+FishItem_036			dish	3	extraExp	30;5	3		80		FishItem_015,5;FishItem_021,5;coin,60000	1
+FishItem_037			dish	3	extraCoinExp	30;7.5	3		80		FishItem_009,5;FishItem_015,5;FishItem_021,5;coin,80000	1
+FishItem_038			dish	4	onetimeRecover	20	4		200		FishItem_010,5;coin,40000	1
+FishItem_039			dish	4	permanent1	pdef;mdef	4		200		FishItem_010,5;FishItem_016,5;coin,80000	1
+FishItem_040			dish	4	permanent1	cri;antiCri	4		200		FishItem_016,5;FishItem_022,5;coin,120000	1
+FishItem_041			dish	4	permanent1	att;hp	4		200		FishItem_010,5;FishItem_022,5;coin,160000	1
+FishItem_042			dish	5	onetimeRecover	25	5		500		FishItem_011,5;coin,80000	1
+FishItem_043			dish	5	extraCoin	30;10	5		500		FishItem_017,5;FishItem_023,5;coin,160000	1
+FishItem_044			dish	5	extraExp	30;10	5		500		FishItem_011,5;FishItem_017,5;coin,240000	1
+FishItem_045			dish	5	extraCoinExp	30;15	5		500		FishItem_011,5;FishItem_017,5;FishItem_023,5;coin,320000	1
+FishItem_046			dish	6	onetimeRecover	30	6		500		FishItem_012,5;coin,160000	1
+FishItem_047			dish	6	permanent2	pdef;mdef	6		500		FishItem_012,5;FishItem_018,5;coin,320000	1
+FishItem_048			dish	6	permanent2	cri;antiCri	6		500		FishItem_018,5;FishItem_024,5;coin,480000	1
+FishItem_049			dish	6	permanent2	att;hp	6		500		FishItem_012,5;FishItem_024,5;coin,640000	1
+FishItem_050			dish	7	permanent3	att;hp;mdef;pdef;cri;antiCri	6	SkillFishItem_051	500		FishItem_012,5;FishItem_018,5;FishItem_025,1;coin,1000000	1
+FishItem_051			dish	6	extraExp	1440;300						0
+												
+												
+												
+												
+												
+												
+												
+												
+												
+												
+												

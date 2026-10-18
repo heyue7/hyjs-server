@@ -1,0 +1,117 @@
+大招对应的技能id	对应的特效资源名称	立绘资源路径	大招结算被击特效	特效绑定骨骼	大招结算我方被击特效	我方特效绑定骨骼	是否有结算摄像机动画（0：没有1：有）	更换的左手武器ID	更换右手武器ID	换脸信息（startTime,stopTime=faceId#startTime,stopTime=faceId#...）	坐标特殊处理[heroid]:scale:offsetx,offsety,offsetz#	大招起手式语音	大招收手音效
+SkillId	EffectResourceName	PaintResUrl	FinalBeHitEffect	FinalBeHitEffectBone	FinalBeHitOwnEffect	FinalBeHitOwnEffectBone	IsFinalCameraRun	ChangeLeftWeaponResName	ChangeRightWeaponResName	ChangeFaceInfo	PositionSpecialDeal	UltiAudio	UltiHitAudio
+string	string	string	string	string	string	string	int	string	string	string	string	string	string
+primary	none	none	none	none	none	none	none	none	none	none	none	none	none
+SkillId	EffectResourceName	PaintResUrl	FinalBeHitEffect	FinalBeHitEffectBone	FinalBeHitEffect	FinalBeHitEffectBone	IsFinalCameraRun	ChangeLeftWeaponResName	ChangeRightWeaponResName	ChangeFaceInfo	PositionSpecialDeal	UltiAudio	UltiHitAudio
+001_3	kirito_sao_ulti	particles/kirito_body/attack03_UI_MainCamera	26	buffb			1			0,1.3333=32#1.3333,3.16667=33#3.16667,4=34#4,6=33#6,6.6667=32#6.6667,8=33#8,9=32	monster_35:1:0,0,-2#monster_057:1:0,0,-2#monster_061:1:0,0,-2#monster_063:1:0,0,-2#monster_064:1:0,0,-2	kirito_bat60	hit_03
+007_3	asuna_sao_ulti	particles/asuna01_body/attack03_UI_MainCamera	26	buffb			1			0,7.6=17#7.6,12.333=18#12.333,12.5=16		asuna_bat04	hit_03
+011_3	lefa_alo_ulti	particles/lefa_body/attack03_UI_MainCamera	462	root			1			0,0.6667=42#0.6667,0.8=43#0.8,7.4667=42#7.4667,9.3333=44#9.3333,11.5=42		leafa_bat33	hit_03
+014_3	shino_alo_ulti	particles/shino01_body/attack03_UI_MainCamera	27	root			1			0,8.6=49#8.6,10.6667=50#10.6667,13.5=49		sinon_bat63	bow_icehit
+008_3	klein_sao_ulti	particles/klein_body/attack03_UI_MainCamera	11	buffb			1			0,4=3#4,6.33=4#6.33,7.33=3#7.33,7.433=2#7.433,7.933=3#7.933,9=1		klein_bat21	hit_fire
+022_3	rosalia_sao_ulti	particles/rosalia01_body/attack03_UI_MainCamera	26	buffb			1					rosalia_bat20	hit_03
+022_13	rosalia_sao_ulti	particles/rosalia01_body/attack03_UI_MainCamera	26	buffb			1					rosalia_bat20	hit_03
+022_9	rosalia_sao_ulti	particles/rosalia01_body/attack03_UI_MainCamera	26	buffb			1					rosalia_bat20	hit_03
+002_3	heathcliff_sao_ulti	particles/heathcliff_body/attack03_UI_MainCamera	11	buffb			1					heathcliff_com08	hit_03
+009_3	shirica_sao_ulti	particles/shirica01_bady/attack03_UI_MainCamera	29	buffb	47	root	2			0,2=12#2,2.1667=13#2.1667,15=12		silica_bat03	hit_pop
+004_3	yukki_alo_ulti	particles/yukki_body/attack03_UI_MainCamera	335	buffb			1			0,0.5667=51#0.5667,6.8667=53#6.8667,7=52#7,8=51		yuki_bat28	hit_03
+004_13	yukki_alo_ulti	particles/yukki_body/attack03_UI_MainCamera	26	buffb			1			0,0.5667=51#0.5667,6.8667=53#6.8667,7=52#7,8=51		yuki_bat28	hit_03
+021_3	sachi_sao_ulti	particles/sachi01_body/attack03_UI_MainCamera	26	buffb			1			0,0.3=47#0.3,0.4333=48#0.4333,1=47#1,1.1333=48$1.1333,8.5=47		sachi_bat04	hit_03
+003_3	asuna_alo_ulti	particles/asuna02_body/attack03_UI_MainCamera	29	buffb			1			0,6.6667=27#6.6667,7.5=26		asuna_bat49	hit_03
+003_13	asuna_alo_ulti	particles/asuna02_body/attack03_UI_MainCamera	29	buffb			1			0,6.6667=27#6.6667,7.5=26		asuna_bat49	hit_03
+013_3	oberon_alo_ulti	particles/oberon01_body/attack03_UI_MainCamera	212	root			1					oberon_com002	heavy_impact
+013_13	oberon_alo_ulti	particles/oberon01_body/attack03_UI_MainCamera	212	root			1					oberon_com002	heavy_impact
+013_23	oberon_alo_ulti	particles/oberon01_body/attack03_UI_MainCamera	212	root			1					oberon_com002	heavy_impact
+023_3	eugene_alo_ulti	particles/eugene01_body/attack03_UI_MainCamera	11	buffb			1					eugene_bat22	hit_fire
+023_6	eugene_alo_ulti	particles/eugene01_body/attack03_UI_MainCamera	11	buffb			1					eugene_bat22	hit_fire
+023_13	eugene_alo_ulti	particles/eugene01_body/attack03_UI_MainCamera	11	buffb			1					eugene_bat22	hit_fire
+023_23	eugene_alo_ulti	particles/eugene01_body/attack03_UI_MainCamera	11	buffb			1					eugene_bat22	hit_fire
+026_3	mercy_alo_ulti	particles/mercy01_body/attack03_UI_MainCamera	27	root			1			0,0.56667=21#0.56667,2.6667=22#2.6667,6.3=21#6.3,6.4333=22#6.4333,8.6=21#8.6,11.333=23#11.333,12.667=21		siune_bat26	bow_icehit
+026_13	mercy_alo_ulti	particles/mercy01_body/attack03_UI_MainCamera	27	root			1			0,0.56667=21#0.56667,2.6667=22#2.6667,6.3=21#6.3,6.4333=22#6.4333,8.6=21#8.6,11.333=23#11.333,12.667=21		siune_bat26	bow_icehit
+005_3	shino_ggo_ulti	particles/shino02_body/attack03_UI_MainCamera	215	buffb			1					sinon_bat27	explosion_hit
+024_3	sakuya_alo_ulti	particles/sakuya01_body/attack03_UI_MainCamera	213	buffb			1			0,2.333=11#2.333,6=9#6,7.833=10#7.833,10=9		sakuya_bat22	hit_03
+024_13	sakuya_alo_ulti	particles/sakuya01_body/attack03_UI_MainCamera	213	buffb			1			0,2.333=11#2.333,6=9#6,7.833=10#7.833,10=9		sakuya_bat22	hit_03
+025_3	lisa_alo_ulti	particles/lisa01_body/attack03_UI_MainCamera	26	buffb			1			0,0.833=7#0.833,1.333=8#1.333,7.8=7		alicia_bat05	hit_03
+025_13	lisa_alo_ulti	particles/lisa01_body/attack03_UI_MainCamera	26	buffb			1			0,0.833=7#0.833,1.333=8#1.333,7.8=7		alicia_bat05	hit_03
+017_3	beast_ggo_ulti	particles/beast01_body/attack03_UI_MainCamera	192	buffb			1					behemoth_bat01	explosion_hit
+017_13	beast_ggo_ulti	particles/beast01_body/attack03_UI_MainCamera	192	buffb			1					behemoth_bat01	explosion_hit
+017_23	beast_ggo_ulti	particles/beast01_body/attack03_UI_MainCamera	192	buffb			1					behemoth_bat01	explosion_hit
+018_3	zxed_ggo_ulti	particles/zxed01_body/attack03_UI_MainCamera			247	buffc	0					xexeed_bat05	
+018_13	zxed_ggo_ulti	particles/zxed01_body/attack03_UI_MainCamera			247	buffc	0					xexeed_bat05	
+029_3	dane_ggo_ulti	particles/dane01_body/attack03_UI_MainCamera	214	root			1			0,1.33=5#1.33,5.33=6#5.33,6.667=6#6.667,9=6#9,9.1=5		dain_bat04	explosion_hit
+030_3	xhy_ggo_ulti	particles/xhy01_body/attack03_UI_MainCamera	214	root			1					kakouton_bat21	explosion_hit
+1056_3	monster_056_ulti		22	buffb			1						hit_03
+1057_3	monster_057_ulti		22	buffb			1		w28_007_n				hit_04
+027_3	darkwind_ggo_ulti	particles/darkwind01_body/attack03_UI_MainCamera	214	root			1					yamikaze_bat20	explosion_hit
+031_3	tooth_sao_ulti	particles/tooth01_body/attack03_UI_MainCamera	29	buffb			1					kibaou_bat22	hit_03
+031_13	tooth_sao_ulti	particles/tooth01_body/attack03_UI_MainCamera	29	buffb			1					kibaou_bat22	hit_03
+015_3	kirito_ggo_ulti	particles/kirito02_body/attack03_UI_MainCamera	26	buffb			1			0,0.6667=40#0.6667,7.3333=41#7.3333,9.1=40		kirito_bat51	hit_laser
+012_3	kirito_alo_ulti	particles/kirito04_body/attack03_UI_MainCamera	334	buffb			1					kirito_bat55	hit_03
+006_3	death_ggo_ulti	particles/death01_body/attack03_UI_MainCamera	316	buffb			1	w06_002_n	w02_019_n			death_com22	pistol_gunshot
+020_3	lisbet_sao_ulti	particles/lisbet01_body/attack03_UI_MainCamera	29	buffb			1					lisbeth_bat05	rock_hit
+016_3	palerider_ggo_ulti	particles/palerider01_body/attack03_UI_MainCamera	215	buffb			1						explosion_hit
+016_13	palerider_ggo_ulti	particles/palerider01_body/attack03_UI_MainCamera	215	buffb			1						explosion_hit
+019_3	shasa_sao_ulti	particles/shasa01_body/attack03_UI_MainCamera	316	buffb			1					zaza_bat12	hit_03
+019_13	shasa_sao_ulti	particles/shasa01_body/attack03_UI_MainCamera	316	buffb			1					zaza_bat12	hit_03
+028_3	spiegel_ggo_ulti	particles/spiegel01_body/attack03_UI_MainCamera	215	buffb			1			0,1.46667=19#1.46667,7.16667=20#7.16667,13.5=19		spiegel_bat26	explosion_hit
+038_3	jun_alo_ulti	particles/jun01_body/attack03_UI_MainCamera	22	buffb			1			0,1=30#1,8=31#8,10=30		jun_bat05	hit_03
+038_13	jun_alo_ulti	particles/jun01_body/attack03_UI_MainCamera	22	buffb			1			0,1=30#1,8=31#8,10=30		jun_bat05	hit_03
+039_3	darken_alo_ulti	particles/darken01_body/attack03_UI_MainCamera	11	buffb			1					talken_bat28	hit_03
+039_13	darken_alo_ulti	particles/darken01_body/attack03_UI_MainCamera	11	buffb			1					talken_bat28	hit_03
+010_3	agil_sao_ulti	particles/agil01_body/attack03_UI_MainCamera	216	root			1					agil_bat27	rock_hit
+1900_3	monster_057_ulti		22	buffb			1		w28_007_n				hit_04
+043_3	hero02_ulti	particles/hero02_body/attack03_UI_MainCamera	26	buffb			1			0,0.6667=54#0.6667,13=55#13,13.3333=54			hit_03
+044_3	hero02_ulti	particles/hero02_body/attack03_UI_MainCamera	26	buffb			1			0,0.6667=54#0.6667,13=55#13,13.3333=54			hit_03
+045_3	hero02_ulti	particles/hero02_body/attack03_UI_MainCamera	26	buffb			1			0,0.6667=54#0.6667,13=55#13,13.3333=54			hit_03
+047_3	heroine02_ulti	particles/heroine02_body/attack03_UI_MainCamera	26	buffb			1			0,0.6667=56#0.6667,13=57#13,13.3333=56			hit_03
+048_3	heroine02_ulti	particles/heroine02_body/attack03_UI_MainCamera	26	buffb			1			0,0.6667=56#0.6667,13=57#13,13.3333=56			hit_03
+049_3	heroine02_ulti	particles/heroine02_body/attack03_UI_MainCamera	26	buffb			1			0,0.6667=56#0.6667,13=57#13,13.3333=56			hit_03
+051_3	argo_sao_ulti	particles/argo01_body/attack03_UI_MainCamera	22	buffb			1			0,5.6667=14#5.6667,8=15#8,9.2=14		argo_bat22	hit_03
+052_3	mia_ggo_ulti	particles/mia01_body/attack03_UI_MainCamera	454	root			1			0,0.7667=58#0.7667,0.9=59#0.9,2.5667=58#2.5667,6.6667=60#6.6667,15.4=58#15.4,15.533=59#15.533,16.8=58		miia_bat05	explosion_hit
+053_3	serra01_ggo_ulti	particles/serra01_body/attack03_UI_MainCamera	215	buffb			1			0,1.6333=45#1.6333,1.7667=46#1.7667,15.8=45		sera_bat20	explosion_hit
+054_3	wade_ggo_ulti	particles/wade01_body/attack03_UI_MainCamera	297	buffb			1					sweid_com05	pistol_gunshot
+031_13	tooth_sao_ulti	particles/tooth01_body/attack03_UI_MainCamera	29	buffb			1					kibaou_bat22	hit_03
+001_6	kirito_sao_ulti	particles/kirito_body/attack03_UI_MainCamera	26	buffb			1			0,1.3333=32#1.3333,3.16667=33#3.16667,4=34#4,6=33#6,6.6667=32#6.6667,8=33#8,9=32		kirito_bat60	hit_03
+007_6	asuna_sao_ulti	particles/asuna01_body/attack03_UI_MainCamera	26	buffb			1			0,7.6=17#7.6,12.333=18#12.333,12.5=16		asuna_bat04	hit_03
+009_6	shirica_sao_ulti	particles/shirica01_bady/attack03_UI_MainCamera	29	buffb			2			0,2=12#2,2.1667=13#2.1667,15=12		silica_bat03	hit_pop
+010_6	agil_sao_ulti	particles/agil01_body/attack03_UI_MainCamera	216	root			1					agil_bat27	rock_hit
+062_3	fleur_alo_ulti	particles/fleur01_body/attack03_UI_MainCamera	29	buffb			1					fleur_bat03	thunder_hit
+063_3	philia_sao_ulti	particles/philia01_body/attack03_UI_MainCamera	26	buffb			1					philia_com04	hit_04
+064_3	lili_ggo_ulti	particles/lili01_body/attack03_UI_MainCamera	215	buffb			1					lili_com04	explosion_hit
+065_3	strea_sao_ulti	particles/strea01_body/attack03_UI_MainCamera	29	buffb			1					stlea_bat58	hit_04
+066_3	annette_alo_ulti	particles/annette02_body/attack03_UI_MainCamera	212	root			1					annette_com07	bow_icehit
+067_3	kirito05_ggo_ulti	particles/kirito05_body/attack03_UI_MainCamera	26	buffb			1					kirito_com201	hit_04
+1041_3	monster_041_ulti		29	buffb			1						hit_04
+1042_3	monster_042_ulti		432	root			1						bow_icehit
+1046_3	monster_046_ulti		29	buffb			1						bow_icehit
+1046_13	monster_046_ulti		29	buffb			1						bow_icehit
+1047_3	monster_047_ulti		29	buffb			1						rock_hit
+1047_6	monster_047_ulti		29	buffb			1						rock_hit
+1060_3	monster_060_ulti		29	buffb			1						heavy_impact
+1061_3	monster_061_ulti		29	buffb			1						rock_hit
+1061_13	monster_061_ulti		29	buffb			1						rock_hit
+1064_3	monster_064_ulti		452	buffb			1						explosion_hit
+1064_13	monster_064_ulti		29	buffb			1						explosion_hit
+unionhero002_3	heathcliff_sao_ulti	particles/heathcliff_body/attack03_UI_MainCamera	11	buffb			1						hit_03
+unionhero013_3	oberon_alo_ulti	particles/oberon01_body/attack03_UI_MainCamera	212	root			1						heavy_impact
+unionmonster001_3	monster_057_ulti		22	buffb			1		w28_007_n				hit_04
+unionmonster002_3	monster_057_ulti		22	buffb			1		w28_007_n				hit_04
+073_3	kuroe_ggo_ulti	particles/kuroe01_body/attack03_UI_MainCamera	215	buffb			1						
+076_3	annette_ggo_ulti	particles/annette01_body/attack03_UI_MainCamera	215	buffb			1					annette_com07	explosion_hit
+068_3	sachi02_sao_ulti	particles/sachi02_body/attack03_UI_MainCamera	26	buffb			1					sachi_com07	hit_03
+069_3	nagi_sao_ulti	particles/nagi01_body/attack03_UI_MainCamera	29	buffb			1						
+070_3	roa_alo_ulti	particles/roa01_body/attack03_UI_MainCamera	26	buffb			1						
+071_3	mitsuki_alo_ulti	particles/mitsuki01_body/attack03_UI_MainCamera	29	buffb			1					mitsuki_bat21	heavy_impact
+074_3	lefa02_alo_ulti	particles/lefa03_body/attack03_UI_MainCamera	29	buffb			1					leafa_bat26	hit_04
+075_3	lux_sao_ulti	particles/lux01_body/attack03_UI_MainCamera	26	buffb			1					lux_bat21	hit_04
+072_3	shino03_ggo_ulti	particles/shino03_body/attack03_UI_MainCamera	215	buffb			1					sinon_bat31	explosion_hit
+snowbergboss1056_3	monster_056_ulti		22	buffb			1						hit_03
+prairieboss1057_3	monster_057_ulti		22	buffb			1		w28_007_n				hit_04
+desertboss1061_3	monster_061_ulti		29	buffb			1						rock_hit
+forestboss1064_3	monster_064_ulti		452	buffb			1						explosion_hit
+worldboss1041_3	monster_041_ulti		29	buffb			1						hit_04
+077_3	kirito06_ulti	particles/kirito06_body/attack03_UI_MainCamera	26	buffc			1					kirito_bat_0022	hit_03
+078_3	asuna04_ulti	particles/asuna04_body/attack03_UI_MainCamera	26	buffb			1					asuna_bat_0022	hit_03
+079_3	yuna01_ulti	particles/yuna01_body/attack03_UI_MainCamera	26	root			0					yunakuro_bat_0004	heal_active
+0080_3	pitohui_01_ulti	particles/pitohui_01_body/attack03_UI_MainCamera	297	buffb			1						
+0081_3	fuka_01_ulti	particles/fuka_01_body/attack03_UI_MainCamera	152	buffb			1						
+0082_3	lotus_01_ulti	particles/lotus_01_body/attack03_UI_MainCamera	152	buffb			1						

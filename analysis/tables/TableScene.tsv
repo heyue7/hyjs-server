@@ -1,0 +1,83 @@
+场景	背景音乐	场景类型	小地图的资源	小地图缩放	小地图偏移X	小地图偏移Y
+SceneId	sceneMusic	sceneType	minimapRes	miniMapScale	miniMapOffsetX	miniMapOffsetY
+string	string	int	string	double	double	double
+primary	none	index	none	none	none	none
+SceneId	sceneMusic	sceneType	minimapRes			
+map_select_001	BGM_MAIN_THEME					
+map_city_001	BGM_ADV_SCENE4		UI_funben_map_01	3.7	-20.45	23.44
+map_forestrun_001	BGM_MYPAGE		UI_funben_map_06	4.016666667	16.7	-13.4
+map_forestrun_002	BGM_MYPAGE		UI_funben_map_04	3.716666667	16.7	22.6
+map_forestrun_003	BGM_MYPAGE		map_forestrun_003	4.266666667	16.7	20.5
+map_forestrun_004	BGM_MYPAGE		map_forestrun_004	4.266666667	15.0	22.2
+map_forest_001	BGM_QUEST_ALO1			3.7	-20.45	23.44
+map_forest_002	BGM_QUEST_ALO1			3.7	-20.45	23.44
+map_forest_003	BGM_QUEST_ALO1			3.7	-20.45	23.44
+map_forestfield_001	BGM_LOOP01		map_forestfield_001;map_forestfield_002	4.096	32.1	39.2
+map_grassrun_001	BGM_MYPAGE		UI_funben_map_01	3.6056	-20.45	25.44
+map_grassrun_002	BGM_MYPAGE		UI_funben_map_01	3.7	-20.45	23.44
+map_grassrun_003	BGM_MYPAGE		UI_funben_map_01	4.266666667	18.9	21.6
+map_grassrun_004	BGM_MYPAGE		map_grassrun_004	4.266666667	16.1	19.3
+map_grass_001	BGM_QUEST_ALO1			3.7	-20.45	23.44
+map_grass_002	BGM_QUEST_ALO1			3.7	-20.45	23.44
+map_grass_003	BGM_QUEST_ALO1			3.7	-20.45	23.44
+map_grasslandrun_001	BGM_MYPAGE		map_grasslandrun_001	4.266666667	18.3	21.6
+map_grasslandrun_002	BGM_MYPAGE		map_grasslandrun_001	4.266666667	18.3	21.6
+map_grasslandrun_003	BGM_MYPAGE		map_grasslandrun_003	4.266666667	18.9	21.6
+map_arena_001	BGM_MAP_0001			3.7	-20.45	23.44
+map_bridge_001	BGM_BOSS_GGO1			3.7	-20.45	23.44
+map_bridge_002	BGM_BOSS_ALO1			3.7	-20.45	23.44
+map_cave_001	BGM_QUEST_SAO1			3.7	-20.45	23.44
+map_cave_002	BGM_MAP_0001			3.7	-20.45	23.44
+map_cave_003	BGM_QUEST_SAO1			3.7	-20.45	23.44
+map_cave_004	BGM_ETC04			3.7	-20.45	23.44
+map_caverun_001	BGM_ETC02		UI_funben_map_08	2.9	0.4	26.5
+map_caverun_002	BGM_ETC02		map_caverun_002	2.960398655	-4.3	28.2
+map_desert_001	BGM_QUEST_GGO1			3.7	-20.45	23.44
+map_desertfield_001	BGM_ETC03		map_desertfield_001;map_desertfield_002	4.096	30.4	35.5
+map_desertrun_001	BGM_MAP_0003		map_desertrun_001	4.0	15.0	13.2
+map_desertrun_002	BGM_MAP_0003		UI_funben_map_11	4.166666667	18.72	15.82
+map_ice_001	BGM_QUEST_ALO1			3.7	-20.45	23.44
+map_maze_001	BGM_ETC04			3.7	-20.45	23.44
+map_maze_002	BGM_ETC04			3.7	-20.45	23.44
+map_maze_003	BGM_QUEST_SAO1			3.7	-20.45	23.44
+map_maze_004	BGM_BOSS_SAO1			3.7	-20.45	23.44
+map_mazerun_001	BGM_LOOP02		UI_funben_map_12	3.877192982	5.5	16.1
+map_mazerun_002	BGM_MAP_0002		UI_funben_map_09	2.14095238059	5.3	19.3
+map_mazerun_003	BGM_MAP_0002		map_mazerun_003	3.261927697	-28.1	14.6
+map_mazerun_004	BGM_LOOP03		map_mazerun_004	2.03378789	29.5	-12.0
+map_nightforest_001	BGM_QUEST_ALO1			3.7	-20.45	23.44
+map_nightforestfield_001	BGM_MYPAGE		map_nightforestfield_001;map_nightforestfield_002	4.096	28.3	37.8
+map_nightforestrun_001	BGM_MYPAGE		UI_funben_map_05	3.816666667	18.8	19.1
+map_nightforestrun_002	BGM_MYPAGE		map_nightforestrun_002	4.266666667	17.4	21.0
+map_snowfield_001	BGM_ETC01		map_snowfield_001;map_snowfield_002	4.096	32.6	39.5
+map_snowforest_001	BGM_QUEST_ALO1			3.7	-20.45	23.44
+map_snowforestrun_001	BGM_ETC01		UI_funben_map_07	3.816666667	-5.7	23.0
+map_snowforestrun_002	BGM_ETC01		map_snowforestrun_002	4.266666667	0.3	22.9
+map_stonerelics_001	BGM_QUEST_ALO1			3.7	-20.45	23.44
+map_stonerelics_002	BGM_ETC05			3.7	-20.45	23.44
+map_stonerelicsrun_001	BGM_MYPAGE		map_stonerelicsrun_001	4.266666667	19.7	21.2
+map_stonerelicsrun_002	BGM_MYPAGE		UI_funben_map_03	3.866666667	19.4	21.0
+map_stonerelicsrun_003	BGM_MYPAGE		map_stonerelicsrun_003	4.266666667	-15.3	20.8
+map_street_001	BGM_QUEST_GGO1			1.95	40.6	-14.3
+map_streetrun_001	BGM_ETC03		UI_funben_map_02	1.95	40.7	-12.0
+map_streetrun_002	BGM_MAP_0003			3.7	-20.45	23.44
+map_valley_001	BGM_ETC05			3.7	-20.45	23.44
+map_valleyrun_001	BGM_MYPAGE		map_valleyrun_001	3.657142857	23.5	18.2
+map_valleyrun_002	BGM_MYPAGE		map_valleyrun_002	1.74261448	18.3	25.6
+map_volcano_001	BGM_BOSS_SAO1			5.12	49.9	50.2
+map_volcanofield_001	BGM_LOOP03		map_volcanofield_001;map_volcanofield_002	3.81307	50.3	51.6
+map_wasteland_001	BGM_QUEST_GGO1			3.7	-20.45	23.44
+map_wastelandrun_001	BGM_MAP_0003		map_wastelandrun_001	5.102	10.2	15.7
+map_wastelandrun_002	BGM_ADV_SCENE2		map_wastelandrun_002	5.102	17.7	21.3
+map_wood_001	BGM_QUEST_ALO1			3.7	-20.45	23.44
+map_woodsrun_001	BGM_MYPAGE		map_woodsrun_001	3.657142857	15.0	24.1
+map_portal_001	BGM_ETC02#BGM_ETC04					
+map_portal_002	BGM_ETC02#BGM_ETC04					
+map_portal_003	BGM_ETC02#BGM_ETC04					
+map_portal_004	BGM_ETC02#BGM_ETC04					
+map_portal_005	BGM_ETC02#BGM_ETC04					
+map_guild_001	BGM_GUILDTOP		UI_ditu_gonghui	4.88	2.14	-4.6
+map_startscenes_001	BGM_QUEST_SAO1					
+map_battle_001	BGM_MAP_GUILD_BATTLE		Ui_ditu_gonghuizhanchang	3.812	39.62	0.5
+map_valleyfield_001	BGM_OUTERFIELD		map_jingling_001	3.2	19.2	31.2
+map_bossscene_001	BGM_QUEST_ALO1					

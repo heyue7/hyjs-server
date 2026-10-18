@@ -1,0 +1,1 @@
+CREATE TABLE IF NOT EXISTS p11_plunder_policies(id BIGINT PRIMARY KEY,avoid_enabled BOOLEAN NOT NULL,item_hours_json TEXT NOT NULL,item_hours_hash VARCHAR(64) NOT NULL,source TEXT NOT NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;

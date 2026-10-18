@@ -1,0 +1,21 @@
+CREATE TABLE IF NOT EXISTS `p11_limit_fight_matches` (
+ `id` VARCHAR(64) NOT NULL,
+ `period_id` VARCHAR(64) NOT NULL,
+ `player_id` BIGINT NOT NULL,
+ `opponent_id` BIGINT NOT NULL,
+ `own_score` BIGINT NOT NULL,
+ `peer_score` BIGINT NOT NULL,
+ `offer_version` VARCHAR(64) NOT NULL,
+ `offer_hash` VARCHAR(64) NOT NULL,
+ `period_hash` VARCHAR(64) NOT NULL,
+ `attacker` LONGBLOB NOT NULL,
+ `defender` LONGBLOB NOT NULL,
+ `seed` BIGINT NOT NULL,
+ `configuration_hash` VARCHAR(64) NOT NULL,
+ `capability_hash` VARCHAR(64) NOT NULL,
+ `created_at` BIGINT NOT NULL,
+ `expires_at` BIGINT NOT NULL,
+ `source_hash` VARCHAR(64) NOT NULL,
+ PRIMARY KEY (`id`),
+ KEY `p11_limit_match_lookup` (`player_id`,`opponent_id`,`expires_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;

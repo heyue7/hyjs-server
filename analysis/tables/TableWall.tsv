@@ -1,0 +1,482 @@
+关卡ID	地图ID	开启ID
+MissionID	MapId	OpenStr
+string	string	string
+primary	index	none
+MissionID	MapId	OpenStr
+1	map_grasslandrun_001	2,3
+2	map_forestrun_002	1,3
+3	map_caverun_001	
+4	map_forestrun_001	2,3
+5	map_forestrun_001	1,4
+6	map_nightforestrun_001	
+7	map_nightforestrun_001	
+8	map_stonerelicsrun_002	1,4,5
+9	map_stonerelicsrun_002	1,4,5
+10	map_forestrun_002	1,3
+11	map_forestrun_002	1,3
+12	map_caverun_001	
+13	map_caverun_001	
+14	map_mazerun_001	
+15	map_mazerun_001	
+16	map_mazerun_001	
+17	map_mazerun_002	
+18	map_forestrun_002	1,3
+19	map_forestrun_002	1,3
+20	map_forestrun_002	1,3
+21	map_caverun_001	
+22	map_caverun_001	
+23	map_caverun_001	
+24	map_snowforestrun_001	2,3,5,7
+25	map_snowforestrun_001	2,3,5,7
+26	map_snowforestrun_001	1,4,7
+27	map_snowforestrun_001	1,4,7
+28	map_snowforestrun_001	2,4,6
+29	map_snowforestrun_001	2,4,6
+30	map_desertrun_002	1,4
+31	map_desertrun_002	1,4
+32	map_grassrun_002	3,4,6
+33	map_grassrun_002	3,4,6
+34	map_desertrun_002	2,3
+35	map_desertrun_002	2,3
+36	map_grasslandrun_001	1,4
+37	map_grasslandrun_001	1,4
+38	map_grassrun_002	1,4,5
+39	map_grassrun_002	1,4,5
+40	map_forestrun_001	2,3
+41	map_forestrun_001	2,3
+42	map_stonerelicsrun_002	1,3,5
+43	map_stonerelicsrun_002	1,3,5
+44	map_forestrun_002	2,4
+45	map_forestrun_002	2,4
+46	map_stonerelicsrun_002	2,3,4
+47	map_stonerelicsrun_002	2,3,4
+48	map_grassrun_002	1,4,5
+49	map_streetrun_001	1,2,4
+50	map_streetrun_001	1,2,4
+51	map_grassrun_002	1,4,5
+52	map_desertrun_002	1,4
+53	map_desertrun_002	1,4
+54	map_grasslandrun_001	1,4
+55	map_grasslandrun_001	1,4
+56	map_forestrun_001	1,4
+57	map_caverun_001	
+58	map_caverun_001	
+59	map_forestrun_001	1,4
+60	map_forestrun_003	
+61	map_stonerelicsrun_001	1,2
+62	map_stonerelicsrun_001	1,3
+63	map_caverun_002	1,2,4,6,7,8
+64	map_caverun_002	1,2,4,6,7,8
+65	map_caverun_002	1,4,7
+66	map_streetrun_001	1,2,4
+67	map_streetrun_001	1,2,4
+68	map_desertrun_001	
+69	map_desertrun_001	
+70	map_wastelandrun_001	
+71	map_wastelandrun_001	
+72	map_forestrun_004	2,3
+73	map_forestrun_004	2,3
+74	map_grasslandrun_003	1,3,5,6,7
+75	map_grasslandrun_003	4,5,6,7
+76	map_stonerelicsrun_003	1,3,4
+77	map_stonerelicsrun_003	2,3,4
+78	map_stonerelicsrun_002	1,4,5
+79	map_stonerelicsrun_002	1,3,5
+80	map_stonerelicsrun_002	2,3,4
+81	map_caverun_002	1,4,7
+82	map_caverun_002	1,3,6,8
+83	map_caverun_002	1,3,6,8
+84	map_streetrun_001	2,5
+85	map_streetrun_001	2,5
+86	map_wastelandrun_002	2,6
+87	map_wastelandrun_002	2,6
+88	map_grassrun_002	3,4,6
+89	map_grassrun_002	3,4,6
+90	map_grassrun_001	2,3,5
+91	map_grassrun_001	2,3,5
+92	map_grassrun_001	1,2,4
+93	map_mazerun_004	1
+94	map_mazerun_004	
+95	map_mazerun_002	
+96	map_grassrun_004	2,5,6
+97	map_grassrun_004	5,4
+98	map_forestrun_004	1,4
+99	map_forestrun_004	1,4
+100	map_valleyrun_001	2,6,7
+101	map_valleyrun_001	4,5,8
+102	map_wastelandrun_002	1,5
+103	map_wastelandrun_002	1,5
+104	map_streetrun_001	2,5
+105	map_streetrun_001	2,5
+106	map_streetrun_001	1,2,4
+107	map_streetrun_001	1,2,4
+108	map_grasslandrun_003	1,3,5,6,7
+109	map_grasslandrun_003	4,5,6,7
+110	map_grasslandrun_003	4,5,6,7
+111	map_mazerun_003	1
+112	map_forestrun_004	2,3
+113	map_snowforestrun_001	1,4,7
+114	map_valleyrun_002	2,8
+115	map_valleyrun_002	3,8
+116	map_caverun_002	1,2,4,6,7,8
+117	map_caverun_002	1,2,4,6,7,8
+118	map_forestrun_003	
+119	map_forestrun_003	
+120	map_grassrun_002	1,4,5
+121	map_grassrun_002	1,4,5
+122	map_wastelandrun_001	
+123	map_wastelandrun_001	
+124	map_streetrun_001	1,2,4
+125	map_streetrun_001	1,2,4
+126	map_stonerelicsrun_003	1,3,4
+127	map_stonerelicsrun_003	2,3,4
+128	map_mazerun_001	
+129	map_mazerun_001	
+130	map_mazerun_003	1
+131	map_mazerun_003	2
+132	map_forestrun_004	2,3
+133	map_forestrun_004	2,3
+134	map_desertrun_002	2,3
+135	map_grassrun_001	1,2,4
+136	map_valleyrun_001	2,6,7
+137	map_valleyrun_001	4,5,8
+138	map_wastelandrun_001	
+139	map_wastelandrun_002	2,6
+140	map_wastelandrun_002	2,6
+141	map_wastelandrun_002	1,5
+142	map_streetrun_001	2,5
+143	map_streetrun_001	2,5
+144	map_snowforestrun_001	2,3,5,7
+145	map_snowforestrun_001	2,3,5,7
+146	map_snowforestrun_001	1,4,7
+147	map_snowforestrun_001	1,4,7
+148	map_snowforestrun_001	2,4,6
+149	map_snowforestrun_001	2,3,5,7
+150	map_grassrun_004	2,5,6
+151	map_grassrun_004	5,4
+152	map_forestrun_004	1,4
+153	map_forestrun_004	1,4
+154	map_valleyrun_001	2,6,7
+155	map_valleyrun_001	4,5,8
+156	map_wastelandrun_002	1,5
+157	map_wastelandrun_002	1,5
+158	map_streetrun_001	2,5
+159	map_streetrun_001	2,5
+160	map_streetrun_001	1,2,4
+161	map_streetrun_001	1,2,4
+162	map_grasslandrun_003	1,3,5,6,7
+163	map_grasslandrun_003	4,5,6,7
+164	map_grasslandrun_003	4,5,6,7
+165	map_forestrun_004	2,3
+166	map_forestrun_004	1,4
+167	map_forestrun_004	2,3
+168	map_valleyrun_002	2,8
+169	map_valleyrun_002	3,8
+170	map_caverun_002	1,2,4,6,7,8
+171	map_caverun_002	1,2,4,6,7,8
+172	map_forestrun_003	
+173	map_forestrun_003	
+174	map_grassrun_002	1,4,5
+175	map_grassrun_002	1,4,5
+176	map_wastelandrun_001	
+177	map_wastelandrun_001	
+178	map_streetrun_001	1,2,4
+179	map_streetrun_001	1,2,4
+180	map_snowforestrun_001	2,3,5,7
+181	map_snowforestrun_001	2,3,5,7
+182	map_snowforestrun_001	1,4,7
+183	map_snowforestrun_001	1,4,7
+184	map_snowforestrun_001	2,4,6
+185	map_snowforestrun_001	2,4,6
+186	map_forestrun_004	2,3
+187	map_forestrun_004	2,3
+188	map_grassrun_001	1,2,4
+189	map_grassrun_001	2,3,5
+190	map_valleyrun_001	2,6,7
+191	map_valleyrun_001	4,5,8
+192	map_wastelandrun_001	
+193	map_wastelandrun_002	2,6
+194	map_wastelandrun_002	2,6
+195	map_wastelandrun_002	1,5
+196	map_streetrun_001	2,5
+197	map_streetrun_001	2,5
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		

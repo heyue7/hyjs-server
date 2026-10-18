@@ -1,0 +1,1 @@
+INSERT IGNORE INTO p14_final_formation_policies(id,enabled,version,source,published_at) VALUES(1,0,'','local-original-final16-formation-v1; original81030-type3; true-final32-common-source; five-minutes-before-original-stage8; no-series-result',0);

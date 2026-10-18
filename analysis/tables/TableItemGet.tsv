@@ -1,0 +1,9 @@
+物品ID	获取途径
+itemId	ItemGet
+string	string
+primary	none
+itemId	ItemGet
+item_001	sail_Get,chouka_Get,activity_Get
+item_002	sail_Get,chouka_Get,activity_Get,shangdian_Get
+item_003	sail_Get,chouka_Get,activity_Get,mysteryShop_Get
+item_012	sail_Get,chouka_Get,activity_Get,mysteryShop_Get

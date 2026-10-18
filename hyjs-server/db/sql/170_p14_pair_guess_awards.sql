@@ -1,0 +1,23 @@
+CREATE TABLE IF NOT EXISTS `p14_pair_guess_awards` (
+ `season_index` INT NOT NULL,
+ `pair_hash` CHAR(64) NOT NULL,
+ `owner_server_id` BIGINT NOT NULL,
+ `owner_player_id` BIGINT NOT NULL,
+ `guess_hash` CHAR(64) NOT NULL,
+ `offer_hash` CHAR(64) NOT NULL,
+ `series_id` CHAR(64) NOT NULL,
+ `series_manifest_hash` CHAR(64) NOT NULL,
+ `series_closure_hash` CHAR(64) NOT NULL,
+ `winner_server_id` BIGINT NOT NULL,
+ `winner_player_id` BIGINT NOT NULL,
+ `selected_won` BOOLEAN NOT NULL,
+ `coin` BIGINT NOT NULL,
+ `diamond` BIGINT NOT NULL,
+ `reward_id` BIGINT NOT NULL,
+ `reward_hash` CHAR(64) NOT NULL,
+ `source` TEXT NOT NULL,
+ `created_at` BIGINT NOT NULL,
+ `source_hash` CHAR(64) NOT NULL,
+ PRIMARY KEY (`season_index`,`pair_hash`,`owner_server_id`,`owner_player_id`),
+ UNIQUE KEY `uq_reward_id` (`reward_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;

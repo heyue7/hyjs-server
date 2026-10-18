@@ -1,0 +1,785 @@
+ 	TalentGroup	名称	描述	免疫天赋	免疫buff	Buff0触发时机	Buff0触发条件	Buff0条件参数	Buff0	Buff0选择策略	Buff0概率	Buff1触发时机	Buff1触发条件	Buff1条件参数	Buff1	Buff1选择策略	Buff1概率	Buff2触发时机	Buff2触发条件	Buff2条件参数	Buff2	Buff2选择策略	Buff2概率	Buff3触发时机	Buff3触发条件	Buff3条件参数	Buff3	Buff3选择策略	Buff3概率
+Id	Group	Name	Desc	ImmuneTalentGroup	ImmuneBuffGroup	Buff0TriggerTimer	Buff0TriggerCondition	Buff0ConditionArgs	Buff0	Buff0Select	Buff0Percent	Buff1TriggerTimer	Buff1TriggerCondition	Buff1ConditionArgs	Buff1	Buff1Select	Buff1Percent	Buff2TriggerTimer	Buff2TriggerCondition	Buff2ConditionArgs	Buff2	Buff2Select	Buff2Percent	Buff3TriggerTimer	Buff3TriggerCondition	Buff3ConditionArgs	Buff3	Buff3Select	Buff3Percent
+string	string	string	string	string	string	int	int	string	string	int	double	int	int	string	string	int	double	int	int	string	string	int	double	int	int	string	string	int	double
+primary	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none	none
+talentId	group	Name	Desc	immuneTalentGroup	immuneBuffGroup	buff0TriggerTimer	buff0TriggerCondition	buff0ConditionArgs	buff0	buff0Select	buff0Percent	buff1TriggerTimer	buff1TriggerCondition	buff1ConditionArgs	buff1	buff1Select	buff1Percent	buff2TriggerTimer	buff2TriggerCondition	buff2ConditionArgs	buff2	buff2Select	buff2Percent	buff3TriggerTimer	buff3TriggerCondition	buff3ConditionArgs	buff3	buff3Select	buff3Percent
+tal_1		name_tal_1	desc_tal_1			0			buff_1	0	100.0																		
+tal_2		name_tal_2	desc_tal_2			0			buff_2	0	100.0																		
+tal_3		name_tal_3	desc_tal_3			0			buff_3	0	100.0																		
+tal_4		name_tal_4	desc_tal_4			0			buff_4	0	100.0																		
+tal_5		name_tal_5	desc_tal_5			0			buff_5	0	100.0																		
+tal_6		name_tal_6	desc_tal_6			0			buff_6	0	100.0																		
+tal_7		name_tal_7	desc_tal_7			0			buff_7	0	100.0																		
+tal_8		name_tal_8	desc_tal_8			0			buff_8	0	100.0																		
+tal_9		name_tal_9	desc_tal_9			0			buff_9	0	100.0																		
+tal_10		name_tal_10	desc_tal_10			0			buff_10	0	100.0																		
+tal_11		name_tal_11	desc_tal_11			0			buff_11	0	100.0																		
+tal_12		name_tal_12	desc_tal_12			0			buff_12	0	100.0																		
+tal_13		name_tal_13	desc_tal_13			0			buff_13	0	100.0																		
+tal_14		name_tal_14	desc_tal_14			0			buff_14	0	100.0																		
+tal_15		name_tal_15	desc_tal_15			0			buff_15	0	100.0																		
+tal_16		name_tal_16	desc_tal_16			0			buff_16	0	100.0																		
+tal_17		name_tal_17	desc_tal_17			0			buff_17	0	100.0																		
+tal_18		name_tal_18	desc_tal_18			0			buff_18	0	100.0																		
+tal_19		name_tal_19	desc_tal_19			0			buff_19	0	100.0																		
+tal_20		name_tal_20	desc_tal_20			0			buff_20	0	100.0																		
+tal_21		name_tal_21	desc_tal_21			0			buff_21	0	100.0																		
+tal_22		name_tal_22	desc_tal_22			0			buff_22	0	100.0																		
+tal_23		name_tal_23	desc_tal_23			0			buff_23	0	100.0																		
+tal_24		name_tal_24	desc_tal_24			0			buff_24	0	100.0																		
+tal_25		name_tal_25	desc_tal_25			0			buff_25	0	100.0																		
+tal_26		name_tal_26	desc_tal_26			0			buff_26	0	100.0																		
+tal_27		name_tal_27	desc_tal_27			0			buff_27	0	100.0																		
+tal_28		name_tal_28	desc_tal_28			0			buff_28	0	100.0																		
+tal_29		name_tal_29	desc_tal_29			0			buff_29	0	100.0																		
+tal_30		name_tal_30	desc_tal_30			0			buff_30	0	100.0																		
+tal_31		name_tal_31	desc_tal_31			0			buff_31	0	100.0																		
+tal_32		name_tal_32	desc_tal_32			0			buff_32	0	100.0																		
+tal_33		name_tal_33	desc_tal_33			0			buff_33	0	100.0																		
+tal_34		name_tal_34	desc_tal_34			0			buff_34	0	100.0																		
+tal_35		name_tal_35	desc_tal_35			0			buff_35	0	100.0																		
+tal_36		name_tal_36	desc_tal_36			0			buff_36	0	100.0																		
+tal_37		name_tal_37	desc_tal_37			0			buff_37	0	100.0																		
+tal_38		name_tal_38	desc_tal_38			0			buff_38	0	100.0																		
+tal_39		name_tal_39	desc_tal_39			0			buff_39	0	100.0																		
+tal_40		name_tal_40	desc_tal_40			0			buff_40	0	100.0																		
+tal_41		name_tal_41	desc_tal_41			0			buff_41	0	100.0																		
+tal_42		name_tal_42	desc_tal_42			0			buff_42	0	100.0																		
+tal_43		name_tal_43	desc_tal_43			0			buff_43	0	100.0																		
+tal_44		name_tal_44	desc_tal_44			0			buff_44	0	100.0																		
+tal_45		name_tal_45	desc_tal_45			0			buff_45	0	100.0																		
+tal_46		name_tal_46	desc_tal_46			0			buff_46	0	100.0																		
+tal_47		name_tal_47	desc_tal_47			0			buff_47	0	100.0																		
+tal_48		name_tal_48	desc_tal_48			0			buff_48	0	100.0																		
+tal_49		name_tal_49	desc_tal_49			0			buff_49	0	100.0																		
+tal_50		name_tal_50	desc_tal_50			0			buff_50	0	100.0																		
+tal_51		name_tal_51	desc_tal_51			0			buff_51	0	100.0																		
+tal_52		name_tal_52	desc_tal_52			0			buff_52	0	100.0																		
+tal_53		name_tal_53	desc_tal_53			0			buff_53	0	100.0																		
+tal_54		name_tal_54	desc_tal_54			0			buff_54	0	100.0																		
+tal_55		name_tal_55	desc_tal_55			0			buff_55	0	100.0																		
+tal_56		name_tal_56	desc_tal_56			0			buff_56	0	100.0																		
+tal_57		name_tal_57	desc_tal_57			0			buff_57	0	100.0																		
+tal_58		name_tal_58	desc_tal_58			0			buff_58	0	100.0																		
+tal_59		name_tal_59	desc_tal_59			0			buff_59	0	100.0																		
+tal_60		name_tal_60	desc_tal_60			0			buff_60	0	100.0																		
+tal_61		name_tal_61	desc_tal_61			0			buff_61	0	100.0																		
+tal_62		name_tal_62	desc_tal_62			0			buff_62	0	100.0																		
+tal_63		name_tal_63	desc_tal_63			0			buff_63	0	100.0																		
+tal_64		name_tal_64	desc_tal_64			0			buff_64	0	100.0																		
+tal_65		name_tal_65	desc_tal_65			0			buff_65	0	100.0																		
+tal_66		name_tal_66	desc_tal_66			0			buff_66	0	100.0																		
+tal_67		name_tal_67	desc_tal_67			0			buff_67	0	100.0																		
+tal_68		name_tal_68	desc_tal_68			0			buff_68	0	100.0																		
+tal_69		name_tal_69	desc_tal_69			0			buff_69	0	100.0																		
+tal_70		name_tal_70	desc_tal_70			0			buff_70	110	100.0																		
+tal_71		name_tal_71	desc_tal_71			0			buff_71	110	100.0																		
+tal_72		name_tal_72	desc_tal_72			0			buff_72	110	100.0																		
+tal_73		name_tal_73	desc_tal_73			0			buff_73	110	100.0																		
+tal_74		name_tal_74	desc_tal_74			0			buff_74	110	100.0																		
+tal_75		name_tal_75	desc_tal_75			0			buff_21	110	100.0																		
+tal_76		name_tal_76	desc_tal_76			0			buff_75	110	100.0																		
+tal_77		name_tal_77	desc_tal_77			0			buff_465	110	100.0																		
+tal_78		name_tal_78	desc_tal_78			0			buff_466	110	100.0																		
+tal_79		name_tal_79	desc_tal_79			0			buff_467	110	100.0																		
+tal_80		name_tal_80	desc_tal_80			0			buff_468	110	100.0																		
+tal_81		name_tal_81	desc_tal_81			0			buff_79	110	100.0																		
+tal_82		name_tal_82	desc_tal_82			0			buff_80	110	100.0																		
+tal_83		name_tal_83	desc_tal_83			0			buff_81	110	100.0																		
+tal_84		name_tal_84	desc_tal_84			0			buff_82	110	100.0																		
+tal_85		name_tal_85	desc_tal_85			0			buff_83	110	100.0																		
+tal_86		name_tal_86	desc_tal_86			0			buff_84	110	100.0																		
+tal_87		name_tal_87	desc_tal_87			0			buff_85	110	100.0																		
+tal_88		name_tal_88	desc_tal_88			0			buff_86	110	100.0																		
+tal_89		name_tal_89	desc_tal_89			0			buff_87	110	100.0																		
+tal_90		name_tal_90	desc_tal_90			0			buff_88	110	100.0																		
+tal_91		name_tal_91	desc_tal_91			0			buff_89	110	100.0																		
+tal_92		name_tal_92	desc_tal_92			0			buff_90	110	100.0																		
+tal_93		name_tal_93	desc_tal_93			0			buff_91	110	100.0																		
+tal_94		name_tal_94	desc_tal_94			0			buff_92	110	100.0																		
+tal_95		name_tal_95	desc_tal_95			0			buff_93	110	100.0																		
+tal_96		name_tal_96	desc_tal_96			0			buff_94	110	100.0																		
+tal_97		name_tal_97	desc_tal_97			0			buff_31	110	100.0																		
+tal_98		name_tal_98	desc_tal_98			0			buff_95	110	100.0																		
+tal_99		name_tal_99	desc_tal_99			0			buff_96	110	100.0																		
+tal_100		name_tal_100	desc_tal_100			0			buff_17	110	100.0																		
+tal_101		name_tal_101	desc_tal_101			0	1	type:space,src1:2,op:3,src2:1,src2_val:1	buff_31	110	100.0																		
+tal_102		name_tal_102	desc_tal_102			0	1	type:space,src1:2,op:3,src2:1,src2_val:2	buff_31	110	100.0																		
+tal_103		name_tal_103	desc_tal_103			0	1	type:space,src1:2,op:3,src2:1,src2_val:3	buff_31	110	100.0																		
+tal_104		name_tal_104	desc_tal_104			0	1	type:space,src1:2,op:3,src2:1,src2_val:1	buff_17	110	100.0																		
+tal_105		name_tal_105	desc_tal_105			0	1	type:space,src1:2,op:3,src2:1,src2_val:1	buff_97	110	100.0																		
+tal_106		name_tal_106	desc_tal_106			0	1	type:space,src1:2,op:3,src2:1,src2_val:1	buff_98	110	100.0																		
+tal_107		name_tal_107	desc_tal_107			0	1	type:space,src1:2,op:3,src2:1,src2_val:2	buff_17	110	100.0																		
+tal_108		name_tal_108	desc_tal_108			0	1	type:space,src1:2,op:3,src2:1,src2_val:2	buff_97	110	100.0																		
+tal_109		name_tal_109	desc_tal_109			0	1	type:space,src1:2,op:3,src2:1,src2_val:2	buff_98	110	100.0																		
+tal_110		name_tal_110	desc_tal_110			0	1	type:space,src1:2,op:3,src2:1,src2_val:3	buff_17	110	100.0																		
+tal_111		name_tal_111	desc_tal_111			0	1	type:space,src1:2,op:3,src2:1,src2_val:3	buff_97	110	100.0																		
+tal_112		name_tal_112	desc_tal_112			0	1	type:space,src1:2,op:3,src2:1,src2_val:3	buff_98	110	100.0																		
+tal_113		name_tal_113	desc_tal_113			0	1	type:space,src1:2,op:3,src2:1,src2_val:1	buff_85	110	100.0																		
+tal_114		name_tal_114	desc_tal_114			0	1	type:space,src1:2,op:3,src2:1,src2_val:1	buff_36	110	100.0																		
+tal_115		name_tal_115	desc_tal_115			0	1	type:space,src1:2,op:3,src2:1,src2_val:1	buff_37	110	100.0																		
+tal_116		name_tal_116	desc_tal_116			0	1	type:space,src1:2,op:3,src2:1,src2_val:2	buff_85	110	100.0																		
+tal_117		name_tal_117	desc_tal_117			0	1	type:space,src1:2,op:3,src2:1,src2_val:2	buff_36	110	100.0																		
+tal_118		name_tal_118	desc_tal_118			0	1	type:space,src1:2,op:3,src2:1,src2_val:2	buff_37	110	100.0																		
+tal_119		name_tal_119	desc_tal_119			0	1	type:space,src1:2,op:3,src2:1,src2_val:3	buff_85	110	100.0																		
+tal_120		name_tal_120	desc_tal_120			0	1	type:space,src1:2,op:3,src2:1,src2_val:3	buff_36	110	100.0																		
+tal_121		name_tal_121	desc_tal_121			0	1	type:space,src1:2,op:3,src2:1,src2_val:3	buff_37	110	100.0																		
+tal_122		name_tal_122	desc_tal_122			0	1	type:space,src1:2,op:3,src2:1,src2_val:1	buff_89	110	100.0																		
+tal_123		name_tal_123	desc_tal_123			0	1	type:space,src1:2,op:3,src2:1,src2_val:1	buff_56	110	100.0																		
+tal_124		name_tal_124	desc_tal_124			0	1	type:space,src1:2,op:3,src2:1,src2_val:1	buff_57	110	100.0																		
+tal_125		name_tal_125	desc_tal_125			0	1	type:space,src1:2,op:3,src2:1,src2_val:2	buff_89	110	100.0																		
+tal_126		name_tal_126	desc_tal_126			0	1	type:space,src1:2,op:3,src2:1,src2_val:2	buff_56	110	100.0																		
+tal_127		name_tal_127	desc_tal_127			0	1	type:space,src1:2,op:3,src2:1,src2_val:2	buff_57	110	100.0																		
+tal_128		name_tal_128	desc_tal_128			0	1	type:space,src1:2,op:3,src2:1,src2_val:3	buff_89	110	100.0																		
+tal_129		name_tal_129	desc_tal_129			0	1	type:space,src1:2,op:3,src2:1,src2_val:3	buff_56	110	100.0																		
+tal_130		name_tal_130	desc_tal_130			0	1	type:space,src1:2,op:3,src2:1,src2_val:3	buff_57	110	100.0																		
+tal_131		name_tal_131	desc_tal_131			0	1	type:space,src1:2,op:3,src2:1,src2_val:1	buff_74	110	100.0																		
+tal_132		name_tal_132	desc_tal_132			0	1	type:space,src1:2,op:3,src2:1,src2_val:1	buff_22	110	100.0																		
+tal_133		name_tal_133	desc_tal_133			0	1	type:space,src1:2,op:3,src2:1,src2_val:1	buff_23	110	100.0																		
+tal_134		name_tal_134	desc_tal_134			0	1	type:space,src1:2,op:3,src2:1,src2_val:1	buff_24	110	100.0																		
+tal_135		name_tal_135	desc_tal_135			0	1	type:space,src1:2,op:3,src2:1,src2_val:2	buff_74	110	100.0																		
+tal_136		name_tal_136	desc_tal_136			0	1	type:space,src1:2,op:3,src2:1,src2_val:2	buff_22	110	100.0																		
+tal_137		name_tal_137	desc_tal_137			0	1	type:space,src1:2,op:3,src2:1,src2_val:2	buff_23	110	100.0																		
+tal_138		name_tal_138	desc_tal_138			0	1	type:space,src1:2,op:3,src2:1,src2_val:2	buff_24	110	100.0																		
+tal_139		name_tal_139	desc_tal_139			0	1	type:space,src1:2,op:3,src2:1,src2_val:3	buff_74	110	100.0																		
+tal_140		name_tal_140	desc_tal_140			0	1	type:space,src1:2,op:3,src2:1,src2_val:3	buff_22	110	100.0																		
+tal_141		name_tal_141	desc_tal_141			0	1	type:space,src1:2,op:3,src2:1,src2_val:3	buff_23	110	100.0																		
+tal_142		name_tal_142	desc_tal_142			0	1	type:space,src1:2,op:3,src2:1,src2_val:3	buff_24	110	100.0																		
+tal_143		name_tal_143	desc_tal_143			0	1	type:space,src1:2,op:3,src2:1,src2_val:1	buff_82	110	100.0																		
+tal_144		name_tal_144	desc_tal_144			0	1	type:space,src1:2,op:3,src2:1,src2_val:1	buff_50	110	100.0																		
+tal_145		name_tal_145	desc_tal_145			0	1	type:space,src1:2,op:3,src2:1,src2_val:1	buff_52	110	100.0																		
+tal_146		name_tal_146	desc_tal_146			0	1	type:space,src1:2,op:3,src2:1,src2_val:2	buff_82	110	100.0																		
+tal_147		name_tal_147	desc_tal_147			0	1	type:space,src1:2,op:3,src2:1,src2_val:2	buff_50	110	100.0																		
+tal_148		name_tal_148	desc_tal_148			0	1	type:space,src1:2,op:3,src2:1,src2_val:2	buff_52	110	100.0																		
+tal_149		name_tal_149	desc_tal_149			0	1	type:space,src1:2,op:3,src2:1,src2_val:3	buff_82	110	100.0																		
+tal_150		name_tal_150	desc_tal_150			0	1	type:space,src1:2,op:3,src2:1,src2_val:3	buff_50	110	100.0																		
+tal_151		name_tal_151	desc_tal_151			0	1	type:space,src1:2,op:3,src2:1,src2_val:3	buff_52	110	100.0																		
+tal_152		name_tal_152	desc_tal_152			0	1	type:space,src1:2,op:3,src2:1,src2_val:1	buff_99	110	100.0																		
+tal_153		name_tal_153	desc_tal_153			0	1	type:space,src1:2,op:3,src2:1,src2_val:1	buff_100	110	100.0																		
+tal_154		name_tal_154	desc_tal_154			0	1	type:space,src1:2,op:3,src2:1,src2_val:1	buff_101	110	100.0																		
+tal_155		name_tal_155	desc_tal_155			0	1	type:space,src1:2,op:3,src2:1,src2_val:2	buff_99	110	100.0																		
+tal_156		name_tal_156	desc_tal_156			0	1	type:space,src1:2,op:3,src2:1,src2_val:2	buff_100	110	100.0																		
+tal_157		name_tal_157	desc_tal_157			0	1	type:space,src1:2,op:3,src2:1,src2_val:2	buff_101	110	100.0																		
+tal_158		name_tal_158	desc_tal_158			0	1	type:space,src1:2,op:3,src2:1,src2_val:3	buff_99	110	100.0																		
+tal_159		name_tal_159	desc_tal_159			0	1	type:space,src1:2,op:3,src2:1,src2_val:3	buff_100	110	100.0																		
+tal_160		name_tal_160	desc_tal_160			0	1	type:space,src1:2,op:3,src2:1,src2_val:3	buff_101	110	100.0																		
+tal_161		name_tal_161	desc_tal_161			0	1	type:space,src1:2,op:3,src2:1,src2_val:1	buff_453	110	100.0																		
+tal_162		name_tal_162	desc_tal_162			0	1	type:space,src1:2,op:3,src2:1,src2_val:1	buff_76	110	100.0																		
+tal_163		name_tal_163	desc_tal_163			0	1	type:space,src1:2,op:3,src2:1,src2_val:1	buff_263	110	100.0																		
+tal_164		name_tal_164	desc_tal_164			0	1	type:space,src1:2,op:3,src2:1,src2_val:1	buff_26	110	100.0																		
+tal_165		name_tal_165	desc_tal_165			0	1	type:space,src1:2,op:3,src2:1,src2_val:2	buff_453	110	100.0																		
+tal_166		name_tal_166	desc_tal_166			0	1	type:space,src1:2,op:3,src2:1,src2_val:2	buff_76	110	100.0																		
+tal_167		name_tal_167	desc_tal_167			0	1	type:space,src1:2,op:3,src2:1,src2_val:2	buff_263	110	100.0																		
+tal_168		name_tal_168	desc_tal_168			0	1	type:space,src1:2,op:3,src2:1,src2_val:2	buff_26	110	100.0																		
+tal_169		name_tal_169	desc_tal_169			0	1	type:space,src1:2,op:3,src2:1,src2_val:3	buff_453	110	100.0																		
+tal_170		name_tal_170	desc_tal_170			0	1	type:space,src1:2,op:3,src2:1,src2_val:3	buff_76	110	100.0																		
+tal_171		name_tal_171	desc_tal_171			0	1	type:space,src1:2,op:3,src2:1,src2_val:3	buff_263	110	100.0																		
+tal_172		name_tal_172	desc_tal_172			0	1	type:space,src1:2,op:3,src2:1,src2_val:3	buff_26	110	100.0																		
+tal_173		name_tal_173	desc_tal_173			0	1	type:space,src1:2,op:3,src2:1,src2_val:1	buff_102	110	100.0																		
+tal_174		name_tal_174	desc_tal_174			0	1	type:space,src1:2,op:3,src2:1,src2_val:1	buff_103	110	100.0																		
+tal_175		name_tal_175	desc_tal_175			0	1	type:space,src1:2,op:3,src2:1,src2_val:2	buff_102	110	100.0																		
+tal_176		name_tal_176	desc_tal_176			0	1	type:space,src1:2,op:3,src2:1,src2_val:2	buff_103	110	100.0																		
+tal_177		name_tal_177	desc_tal_177			0	1	type:space,src1:2,op:3,src2:1,src2_val:3	buff_102	110	100.0																		
+tal_178		name_tal_178	desc_tal_178			0	1	type:space,src1:2,op:3,src2:1,src2_val:3	buff_103	110	100.0																		
+tal_179		name_tal_179	desc_tal_179			4			buff_104	0	100.0																		
+tal_180		name_tal_180	desc_tal_180			7			buff_104	0	100.0																		
+tal_181		name_tal_181	desc_tal_181			4			buff_105	0	100.0																		
+tal_182		name_tal_182	desc_tal_182			7			buff_105	0	100.0																		
+tal_183		name_tal_183	desc_tal_183			4			buff_106	0	100.0																		
+tal_184		name_tal_184	desc_tal_184			7			buff_106	0	100.0																		
+tal_185		name_tal_185	desc_tal_185			4			buff_107	0	100.0	7			buff_107	0	100.0												
+tal_186		name_tal_186	desc_tal_186			4			buff_108	0	100.0	7			buff_108	0	100.0												
+tal_187		name_tal_187	desc_tal_187			4			buff_105	0	100.0	7			buff_105	0	100.0												
+tal_188		name_tal_188	desc_tal_188			12			buff_110	0	100.0																		
+tal_189		name_tal_189	desc_tal_189			3	1	type:selfRoundNum,src1:2,op:6,src2:1,src2_val:2,op_val:1	buff_112	0	100.0	3	1	type:selfRoundNum,src1:2,op:6,src2:1,src2_val:2,op_val:0	buff_113	0	100.0												
+tal_190		name_tal_190	desc_tal_190			0			buff_114	0	100.0																		
+tal_191		name_tal_191	desc_tal_191			4			buff_115	0	100.0																		
+tal_192		name_tal_192	desc_tal_192			4			buff_346	0	100.0																		
+tal_193		name_tal_193	desc_tal_193			0			buff_163	0	100.0																		
+tal_194		name_tal_194	desc_tal_194			0			buff_164	110	100.0																		
+tal_195		name_tal_195	desc_tal_195			0			buff_165	110	100.0																		
+tal_196		name_tal_196	desc_tal_196			0			buff_166	0	100.0																		
+tal_197		name_tal_197	desc_tal_197			0			buff_167	0	100.0																		
+tal_198		name_tal_198	desc_tal_198			0			buff_168	0	100.0																		
+tal_199		name_tal_199	desc_tal_199			0			buff_171	0	100.0																		
+tal_200		name_tal_200	desc_tal_200			0			buff_172	0	100.0																		
+tal_201		name_tal_201	desc_tal_201			0			buff_31	0	100.0																		
+tal_202		name_tal_202	desc_tal_202			0			buff_21	0	100.0																		
+tal_203		name_tal_203	desc_tal_203			0			buff_36	0	100.0																		
+tal_204		name_tal_204	desc_tal_204			0			buff_37	0	100.0																		
+tal_205		name_tal_205	desc_tal_205			0			buff_38	0	100.0																		
+tal_206		name_tal_206	desc_tal_206			0			buff_43	0	100.0																		
+tal_207		name_tal_207	desc_tal_207			0			buff_49	0	100.0																		
+tal_208		name_tal_208	desc_tal_208			0			buff_51	0	100.0																		
+tal_209		name_tal_209	desc_tal_209			0			buff_56	0	100.0																		
+tal_210		name_tal_210	desc_tal_210			0			buff_57	0	100.0																		
+tal_211		name_tal_211	desc_tal_211			0			buff_83	110	100.0																		
+tal_212		name_tal_212	desc_tal_212			0			buff_85	110	100.0																		
+tal_213		name_tal_213	desc_tal_213			0			buff_272	110	100.0																		
+tal_214		name_tal_214	desc_tal_214			0			buff_79	110	100.0																		
+tal_215		name_tal_215	desc_tal_215			0			buff_80	110	100.0																		
+tal_216		name_tal_216	desc_tal_216			0			buff_82	110	100.0																		
+tal_217		name_tal_217	desc_tal_217			0			buff_49	110	100.0																		
+tal_218		name_tal_218	desc_tal_218			0			buff_499	110	100.0																		
+tal_219		name_tal_219	desc_tal_219			0			buff_92	110	100.0																		
+tal_220		name_tal_220	desc_tal_220			0			buff_63	110	100.0																		
+tal_221		name_tal_221	desc_tal_221			0			buff_175	110	100.0																		
+tal_222		name_tal_222	desc_tal_222			0			buff_176	110	100.0																		
+tal_223		name_tal_223	desc_tal_223			0			buff_500	110	100.0	7																	
+tal_224		name_tal_224	desc_tal_224			0			buff_31	110	100.0	10																	
+tal_225		name_tal_225	desc_tal_225			0			buff_501	110	100.0	14																	
+tal_226		name_tal_226	desc_tal_226			0			buff_498	110	100.0																		
+tal_227		name_tal_227	desc_tal_227			0			buff_178	110	100.0																		
+tal_228		name_tal_228	desc_tal_228			0			buff_44	110	100.0																		
+tal_229		name_tal_229	desc_tal_229			0			buff_179	110	100.0																		
+tal_230		name_tal_230	desc_tal_230			0			buff_34	0	100.0																		
+tal_231		name_tal_231	desc_tal_231			0			buff_35	0	100.0																		
+tal_232		name_tal_232	desc_tal_232			0			buff_180	0	100.0																		
+tal_233		name_tal_233	desc_tal_233			0			buff_497	0	100.0																		
+tal_234		name_tal_234	desc_tal_234			2			buff_182	0	100.0																		
+tal_235		name_tal_235	desc_tal_235			0	1	type:space,src1:2,op:3,src2:1,src2_val:2	buff_183	110	100.0																		
+tal_236		name_tal_236	desc_tal_236			4			buff_284	0	100.0	18			buff_285	0	100.0												
+tal_237		name_tal_237	desc_tal_237			26			buff_185	0	100.0	4			buff_474	0	100.0												
+tal_238		name_tal_238	desc_tal_238			5			buff_508	2	100.0	1			buff_507	110	100.0												
+tal_239		name_tal_239	desc_tal_239			17			buff_476	0	100.0	16			buff_277	0	100.0												
+tal_240		name_tal_240	desc_tal_240			3			buff_309	103	100.0	3			buff_234	103	100.0												
+tal_241		name_tal_241	desc_tal_241			22			buff_193	0	100.0	22			buff_477	0	100.0												
+tal_242		name_tal_242	desc_tal_242			2			buff_509	107	100.0	1			buff_507	110	100.0												
+tal_243		name_tal_243	desc_tal_243			12	2	type:totalLeftHp,src1:2,op:5,src2:1,src2_val:50	buff_282	0	100.0	12	2	type:totalLeftHp,src1:2,op:5,src2:1,src2_val:50	buff_279	0	100.0												
+tal_244		name_tal_244	desc_tal_244			4			buff_495	0	100.0																		
+tal_245		name_tal_245	desc_tal_245			24			buff_196	0	100.0																		
+tal_246		name_tal_246	desc_tal_246			4			buff_158	0	100.0	4			buff_31	0	100.0	1			buff_507	110	100.0						
+tal_247		name_tal_247	desc_tal_247			5			buff_311	0	100.0																		
+tal_248		name_tal_248	desc_tal_248			3			buff_290	0	100.0																		
+tal_249		name_tal_249	desc_tal_249			5	1	type:comboNum,src1:2,op:6,src2:1,src2_val:4,op_val:0	buff_154	0	100.0																		
+tal_250		name_tal_250	desc_tal_250			13			buff_454	0	100.0																		
+tal_251		name_tal_251	desc_tal_251			4			buff_204	0	100.0	4			buff_198	0	100.0												
+tal_252		name_tal_252	desc_tal_252			4	1	type:fireDam,src1:3,op:1,src2:1,src2_val:0	buff_291	0	100.0																		
+tal_253		name_tal_253	desc_tal_253			4	2	type:hp,src1:2,op:1,src2:3	buff_398	2	100.0																		
+tal_254		name_tal_254	desc_tal_254			8			buff_692	2	10.0	9			buff_692	2	7.0												
+tal_255		name_tal_255	desc_tal_255		group_dizzy	7			buff_59	0	100.0	1			buff_211	0	100.0												
+tal_256		name_tal_256	desc_tal_256			19			buff_418	2	100.0																		
+tal_257		name_tal_257	desc_tal_257			5			buff_149	2	60.0																		
+tal_258		name_tal_258	desc_tal_258			5	1	type:curSkillType,src1:2,op:3,src2:1,src2_val:3	buff_458	2	100.0																		
+tal_259		name_tal_259	desc_tal_259			6			buff_443	0	100.0	6			buff_444	0	100.0												
+tal_260		name_tal_260	desc_tal_260			1			buff_296	0	100.0	1			buff_297	0	100.0												
+tal_261		name_tal_261	desc_tal_261			7	2	type:hp,src1:2,op:1,src2:1,src2_val:50	buff_408	0	100.0	7	2	type:hp,src1:2,op:1,src2:1,src2_val:50	buff_407	0	100.0												
+tal_262		name_tal_262	desc_tal_262			7			buff_298	0	100.0																		
+tal_263		name_tal_263	desc_tal_263			2			buff_224	0	100.0	2			buff_300	0	100.0	7			buff_306	0	100.0						
+tal_264		name_tal_264	desc_tal_264			2			buff_325	0	100.0	2			buff_247	0	100.0												
+tal_265		name_tal_265	desc_tal_265			4	2	type:hp,src1:3,op:1,src2:2	buff_398	2	100.0																		
+tal_266		name_tal_266	desc_tal_266			1			buff_412	0	100.0	7			buff_314	0	100.0												
+tal_267		name_tal_267	desc_tal_267			7			buff_306	0	100.0	22			buff_483	0	100.0												
+tal_268		name_tal_268	desc_tal_268			4			buff_252	0	100.0																		
+tal_269		name_tal_269	desc_tal_269			5			buff_199	2	100.0																		
+tal_270		name_tal_270	desc_tal_270			4	1	type:debuffNum,src1:3,op:1,src2:1,src2_val:0	buff_442	2	100.0																		
+tal_271		name_tal_271	desc_tal_271			5			buff_21	0	100.0	5			buff_284	0	100.0												
+tal_272		name_tal_272	desc_tal_272			26	1	type:curSkillType,src1:3,op:3,src2:1,src2_val:2	buff_29	0	100.0	4	1	type:curSkillType,src1:3,op:3,src2:1,src2_val:2	buff_442	2	100.0												
+tal_273		name_tal_273	desc_tal_273			4			buff_319	2	100.0																		
+tal_274		name_tal_274	desc_tal_274			12	1	type:row,src1:3,op:3,src2:1,src2_val:2	buff_141	0	100.0	12	1	type:row,src1:3,op:3,src2:1,src2_val:3	buff_270	0	100.0												
+tal_275		name_tal_275	desc_tal_275			13			buff_386	0	100.0																		
+tal_276		name_tal_276	desc_tal_276			4	1	type:doskillNum,src1:2,op:3,src2:1,src2_val:1	buff_74	0	100.0	4	1	type:doskillNum,src1:2,op:1,src2:1,src2_val:1	buff_75	0	100.0	4			buff_36	0	100.0						
+tal_277		name_tal_277	desc_tal_277			7			buff_475	0	50.0	26	1	type:curSkillType,src1:3,op:3,src2:1,src2_val:2	buff_320	0	100.0												
+tal_278		name_tal_278	desc_tal_278			12	2	type:hp,src1:2,op:5,src2:1,src2_val:60	buff_485	0	100.0	7			buff_306	0	100.0												
+tal_279		name_tal_279	desc_tal_279			7	1	type:speState,src1:2,op:3,src2:1,src2_val:2	buff_163	0	100.0	4	1	type:speState,src1:3,op:3,src2:1,src2_val:2	buff_345	2	100.0												
+tal_280		name_tal_280	desc_tal_280			1	1	type:row,src1:2,op:3,src2:1,src2_val:1	buff_273	0	100.0	1	1	type:row,src1:2,op:3,src2:1,src2_val:2	buff_479	0	100.0												
+tal_281		name_tal_281	desc_tal_281			16			buff_470	110	100.0	4			buff_220	0	100.0												
+tal_282		name_tal_282	desc_tal_282			7			buff_276	0	100.0	16			buff_277	0	100.0												
+tal_283		name_tal_283	desc_tal_283			0			buff_47	0	100.0	0			buff_278	0	100.0												
+tal_284		name_tal_284	desc_tal_284			4	1	type:doskillNum,src1:2,op:3,src2:1,src2_val:1	buff_34	0	100.0	4	1	type:doskillNum,src1:2,op:1,src2:1,src2_val:1	buff_265	0	100.0												
+tal_285		name_tal_285	desc_tal_285			1			buff_280	0	100.0	2			buff_478	0	100.0												
+tal_286		name_tal_286	desc_tal_286			4	1	type:aliveNum,src1:2,op:3,src2:1,src2_val:4	buff_282	0	100.0																		
+tal_287		name_tal_287	desc_tal_287			1	1	type:row,src1:2,op:3,src2:1,src2_val:2	buff_516	0	100.0	1	1	type:row,src1:2,op:3,src2:1,src2_val:3	buff_274	0	100.0												
+tal_288		name_tal_288	desc_tal_288			2	2	type:hp,src1:2,op:1,src2:1,src2_val:50	buff_449	110	100.0	3	2	type:hp,src1:2,op:5,src2:1,src2_val:50	buff_450	110	100.0												
+tal_289		name_tal_289	desc_tal_289			12			buff_323	2	20.0																		
+tal_290		name_tal_290	desc_tal_290			5			buff_156	2	10.0	6			buff_460	0	100.0												
+tal_291		name_tal_291	desc_tal_291			5	1	type:comboNum,src1:2,op:6,src2:1,src2_val:7,op_val:0	buff_111	2	30.0																		
+tal_292		name_tal_292	desc_tal_292			4	1	type:hp,src1:3,op:1,src2:2	buff_401	2	100.0																		
+tal_293		name_tal_293	desc_tal_293			16			buff_436	10	100.0	16			buff_471	10	100.0												
+tal_294		name_tal_294	desc_tal_294			2			buff_304	106	100.0																		
+tal_295		name_tal_295	desc_tal_295			5			buff_512	2	100.0																		
+tal_296		name_tal_296	desc_tal_296			22			buff_305	0	100.0																		
+tal_297		name_tal_297	desc_tal_297			4	1	type:comboNum,src1:2,op:6,src2:1,src2_val:5,op_val:0	buff_349	0	100.0																		
+tal_298		name_tal_298	desc_tal_298			7	1	type:hp,src1:3,op:1,src2:2	buff_306	0	100.0																		
+tal_299		name_tal_299	desc_tal_299			16			buff_224	110	100.0																		
+tal_300		name_tal_300	desc_tal_300			21			buff_226	0	20.0																		
+tal_301		name_tal_301	desc_tal_301			7			buff_206	0	100.0																		
+tal_302		name_tal_302	desc_tal_302			12			buff_307	0	100.0																		
+tal_303		name_tal_303	desc_tal_303			5	1	type:curSkillType,src1:2,op:3,src2:1,src2_val:1	buff_353	110	100.0																		
+tal_304		name_tal_304	desc_tal_304			4			buff_115	0	100.0																		
+tal_305		name_tal_305	desc_tal_305			5	1	type:fireDam,src1:3,op:1,src2:1,src2_val:0	buff_455	2	100.0																		
+tal_306		name_tal_306	desc_tal_306		group_fire	4	1	type:fireDam,src1:3,op:1,src2:1,src2_val:0	buff_143	0	100.0	4	1	type:fireDam,src1:3,op:1,src2:1,src2_val:0	buff_445	2	100.0												
+tal_307		name_tal_307	desc_tal_307			4			buff_400	0	100.0																		
+tal_308		name_tal_308	desc_tal_308			26	1	type:curSkillType,src1:3,op:3,src2:1,src2_val:2	buff_26	0	100.0	26	1	type:curSkillType,src1:3,op:3,src2:1,src2_val:1	buff_30	0	100.0												
+tal_309		name_tal_309	desc_tal_309			12	2	type:hp,src1:3,op:5,src2:1,src2_val:30	buff_251	0	100.0																		
+tal_310		name_tal_310	desc_tal_310			7			buff_26	0	100.0	11			buff_255	2	100.0												
+tal_311		name_tal_311	desc_tal_311			4	2	type:hp,src1:2,op:3,src2:1,src2_val:100	buff_256	0	100.0	4	2	type:hp,src1:2,op:1,src2:1,src2_val:50	buff_238	0	100.0												
+tal_312		name_tal_312	desc_tal_312			5	2	type:hp,src1:3,op:1,src2:1,src2_val:50	buff_244	0	100.0	5	2	type:hp,src1:3,op:1,src2:1,src2_val:50	buff_257	0	100.0												
+tal_313		name_tal_313	desc_tal_313			4	1	type:curSkillType,src1:2,op:3,src2:1,src2_val:3	buff_131	2	100.0	4	1	type:curSkillType,src1:2,op:3,src2:1,src2_val:3	buff_352	0	100.0												
+tal_314		name_tal_314	desc_tal_314			4			buff_152	2	25.0																		
+tal_315		name_tal_315	desc_tal_315			4	1	type:anger,src1:2,op:1,src2:1,src2_val:50	buff_236	0	100.0																		
+tal_316		name_tal_316	desc_tal_316			7			buff_26	0	100.0	11			buff_255	2	100.0												
+tal_317		name_tal_317	desc_tal_317			13			buff_326	0	100.0																		
+tal_318		name_tal_318	desc_tal_318			26	1	type:speState,src1:2,op:3,src2:1,src2_val:2	buff_320	0	100.0	4	1	type:speState,src1:3,op:3,src2:1,src2_val:2	buff_272	0	100.0												
+tal_319		name_tal_319	desc_tal_319			2			buff_325	116	100.0																		
+tal_320		name_tal_320	desc_tal_320			6			buff_39	0	100.0	22			buff_513	0	100.0												
+tal_321		name_tal_321	desc_tal_321			4	1	type:doskillNum,src1:2,op:3,src2:1,src2_val:1	buff_31	0	100.0	4	1	type:doskillNum,src1:2,op:3,src2:1,src2_val:2	buff_34	0	100.0	4			buff_485	0	100.0						
+tal_322		name_tal_322	desc_tal_322			4	1	type:doskillNum,src1:2,op:3,src2:1,src2_val:2	buff_328	0	100.0																		
+tal_323		name_tal_323	desc_tal_323		group_dizzy	7			buff_329	0	100.0																		
+tal_324		name_tal_324	desc_tal_324			16			buff_330	0	100.0																		
+tal_325		name_tal_325	desc_tal_325			2			buff_331	0	100.0																		
+tal_326		name_tal_326	desc_tal_326			5			buff_39	0	100.0	5			buff_25	0	100.0												
+tal_327		name_tal_327	desc_tal_327			1	1	type:row,src1:2,op:3,src2:1,src2_val:1	buff_514	0	100.0	1	1	type:row,src1:2,op:3,src2:1,src2_val:3	buff_515	0	100.0												
+tal_328		name_tal_328	desc_tal_328			4			buff_341	0	100.0																		
+tal_329		name_tal_329	desc_tal_329			7			buff_342	0	100.0																		
+tal_330		name_tal_330	desc_tal_330			1			buff_343	0	100.0																		
+tal_331		name_tal_331	desc_tal_331			2			buff_207	130	100.0																		
+tal_332		name_tal_332	desc_tal_332			16			buff_208	0	100.0																		
+tal_333		name_tal_333	desc_tal_333			12	1	type:bleeding,src1:3,op:1,src2:1,src2_val:0	buff_218	0	100.0	12	1	type:poisonDam,src1:3,op:1,src2:1,src2_val:0	buff_411	0	100.0												
+tal_334		name_tal_334	desc_tal_334			1			buff_228	0	100.0																		
+tal_335		name_tal_335	desc_tal_335			1			buff_229	110	100.0																		
+tal_336		name_tal_336	desc_tal_336			16			buff_308	110	100.0	16			buff_228	110	100.0												
+tal_337		name_tal_337	desc_tal_337			3			buff_534	111	100.0																		
+tal_338		name_tal_338	desc_tal_338			2			buff_380	110	100.0																		
+tal_339		name_tal_339	desc_tal_339			2			buff_312	131	100.0	2			buff_520	131	100.0												
+tal_340		name_tal_340	desc_tal_340			6			buff_318	0	100.0	18			buff_433	110	100.0												
+tal_341		name_tal_341	desc_tal_341			26	1	type:skillClass,src1:3,op:3,src2:1,src2_val:1	buff_264	0	100.0	26	1	type:skillClass,src1:3,op:3,src2:1,src2_val:0	buff_26	0	100.0												
+tal_342		name_tal_342	desc_tal_342			4	1	type:doskillNum,src1:2,op:3,src2:1,src2_val:2	buff_486	0	100.0	4			buff_487	0	100.0	4			buff_485	0	100.0						
+tal_343		name_tal_343	desc_tal_343		group_damageReduce,group_forbidUltimateSkill,group_forbidFirstSkill,group_ice	4			buff_143	0	100.0	1			buff_507	110	100.0												
+tal_344		name_tal_344	desc_tal_344			7	1	type:aliveEnemyNum,src1:2,op:4,src2:1,src2_val:2	buff_505	0	100.0	4	1	type:aliveEnemyNum,src1:2,op:4,src2:1,src2_val:2	buff_237	0	100.0	12	1	type:aliveEnemyNum,src1:2,op:1,src2:1,src2_val:2	buff_318	0	100.0						
+tal_345		name_tal_345	desc_tal_345			2			buff_457	130	100.0																		
+tal_346		name_tal_346	desc_tal_346			6			buff_506	2	100.0																		
+tal_347		name_tal_347	desc_tal_347			5	1	type:speState,src1:3,op:3,src2:1,src2_val:3	buff_199	2	100.0																		
+tal_348		name_tal_348	desc_tal_348			5			buff_493	0	100.0	1			buff_211	0	100.0												
+tal_349		name_tal_349	desc_tal_349		group_forbidUltimateSkill	22			buff_482	2	100.0	1			buff_507	110	100.0												
+tal_350		name_tal_350	desc_tal_350			16			buff_511	110	100.0	16			buff_510	110	100.0	7			buff_306	0	100.0	7			buff_703	0	100.0
+tal_352		name_tal_352	desc_tal_352			7			buff_389	0	100.0																		
+tal_353		name_tal_353	desc_tal_353			7			buff_421	0	100.0																		
+tal_354		name_tal_354	desc_tal_354			6			buff_240	0	100.0																		
+tal_355		name_tal_355	desc_tal_355			4			buff_390	2	100.0																		
+tal_356		name_tal_356	desc_tal_356			0			buff_17	0	100.0																		
+tal_357		name_tal_357	desc_tal_357			4			buff_262	0	100.0																		
+tal_358		name_tal_358	desc_tal_358			18			buff_192	0	100.0	4			buff_272	0	100.0												
+tal_359		name_tal_359	desc_tal_359			5			buff_122	2	7.0																		
+tal_360		name_tal_360	desc_tal_360			7	2	type:hp,src1:2,op:5,src2:1,src2_val:66	buff_502	0	100.0	5			buff_156	2	5.0	1			buff_507	110	100.0						
+tal_361		name_tal_361	desc_tal_361			4			buff_496	2	100.0	7	2	type:hp,src1:2,op:5,src2:1,src2_val:66	buff_702	0	100.0												
+tal_362		name_tal_362	desc_tal_362			17			buff_417	0	100.0																		
+tal_363		name_tal_363	desc_tal_363			7			buff_464	0	100.0	5			buff_464	0	100.0	22			buff_452	0	100.0						
+tal_364		name_tal_364	desc_tal_364			4			buff_143	0	100.0	12			buff_463	2	100.0												
+tal_365		name_tal_365	desc_tal_365			2			buff_461	0	100.0																		
+tal_366		name_tal_366	desc_tal_366			0			buff_480	110	100.0																		
+tal_367		name_tal_367	desc_tal_367			0			buff_481	0	100.0																		
+tal_368		name_tal_368	desc_tal_368	            		9			buff_517	0	100.0																		
+tal_369		name_tal_369	desc_tal_369			1			buff_391	10	100.0																		
+tal_370		name_tal_370	desc_tal_370			4			buff_265	0	100.0	13	1	type:curSkillType,src1:2,op:3,src2:1,src2_val:2	buff_483	116	100.0												
+tal_371		name_tal_371	desc_tal_371			6			buff_518	0	100.0	6			buff_519	0	100.0	6			buff_526	0	100.0						
+tal_372		name_tal_372	desc_tal_372			9			buff_523	0	100.0	7			buff_89	0	100.0												
+tal_373		name_tal_373	desc_tal_373			1			buff_536	111	100.0	1			buff_537	112	100.0	1			buff_537	113	100.0						
+tal_374		name_tal_374	desc_tal_374			4	2	type:totalLeftHp,src1:3,op:5,src2:1,src2_val:66	buff_41	0	100.0	4	2	type:totalLeftHp,src1:3,op:5,src2:1,src2_val:33	buff_525	0	100.0	6			buff_538	110	100.0						
+tal_375		name_tal_375	desc_tal_375		group_forbidFirstSkill	6			buff_527	0	100.0	6			buff_528	0	100.0												
+tal_376		name_tal_376	desc_tal_376			12	1	type:bleeding,src1:3,op:1,src2:1,src2_val:0	buff_220	0	100.0																		
+tal_377		name_tal_377	desc_tal_377			7	1	type:bleeding,src1:3,op:1,src2:1,src2_val:0	buff_422	0	100.0																		
+tal_378		name_tal_378	desc_tal_378			22			buff_542	2	20.0																		
+tal_379		name_tal_379	desc_tal_379			7			buff_505	0	20.0	7			buff_104	0	100.0												
+tal_380		name_tal_380	desc_tal_380			2			buff_543	110	100.0	2			buff_544	110	100.0												
+tal_381		name_tal_381	desc_tal_381			3			buff_545	131	100.0																		
+tal_382		name_tal_382	desc_tal_382			7	2	type:hp,src1:2,op:5,src2:1,src2_val:50	buff_546	0	100.0	7	2	type:hp,src1:2,op:5,src2:1,src2_val:50	buff_578	0	100.0	3	2	type:hp,src1:2,op:1,src2:1,src2_val:50	buff_580	0	100.0	2	2	type:hp,src1:2,op:1,src2:1,src2_val:50	buff_580	0	100.0
+tal_383		name_tal_383	desc_tal_383			7	2	type:hp,src1:2,op:5,src2:1,src2_val:50	buff_547	0	100.0	3			buff_547	131	100.0	7	2	type:hp,src1:2,op:5,src2:1,src2_val:50	buff_548	0	100.0	3			buff_548	131	100.0
+tal_384		name_tal_384	desc_tal_384			5			buff_127	2	100.0																		
+tal_385		name_tal_385	desc_tal_385			1			buff_554	0	100.0	1			buff_555	0	100.0												
+tal_386		name_tal_386	desc_tal_386			6			buff_556	0	100.0	6			buff_693	0	100.0												
+tal_387		name_tal_387	desc_tal_387			12	2	type:hp,src1:3,op:5,src2:1,src2_val:50	buff_237	0	100.0	4	2	type:hp,src1:3,op:5,src2:1,src2_val:50	buff_301	0	100.0	5	2	type:hp,src1:3,op:5,src2:1,src2_val:50	buff_437	0	100.0						
+tal_388		name_tal_388	desc_tal_388			1	1	type:row,src1:2,op:3,src2:1,src2_val:1	buff_561	0	100.0	1	1	type:row,src1:2,op:3,src2:1,src2_val:2	buff_562	0	100.0												
+tal_389		name_tal_389	desc_tal_389			5	1	type:curSkillType,src1:2,op:3,src2:1,src2_val:3	buff_558	110	100.0																		
+tal_390		name_tal_390	desc_tal_390			22			buff_559	0	100.0	22			buff_560	110	100.0	22			buff_694	0	100.0						
+tal_391		name_tal_391	desc_tal_391			28			buff_571	0	100.0	28			buff_572	0	100.0												
+tal_392		name_tal_392	desc_tal_392			4	2	type:hp,src1:2,op:1,src2:1,src2_val:50	buff_41	0	100.0	4	2	type:hp,src1:2,op:4,src2:1,src2_val:50	buff_301	0	100.0												
+tal_393		name_tal_393	desc_tal_393			2			buff_433	0	100.0																		
+tal_394		name_tal_394	desc_tal_394			1			buff_568	0	100.0	1			buff_507	110	100.0												
+tal_395		name_tal_395	desc_tal_395			13			buff_158	0	100.0																		
+tal_396		name_tal_396	desc_tal_396			7			buff_696	0	100.0	13			buff_697	0	100.0												
+tal_397		name_tal_397	desc_tal_397			12	1	type:speState,src1:3,op:1,src2:1,src2_val:1	buff_318	0	100.0	6			buff_34	0	100.0												
+tal_398		name_tal_398	desc_tal_398			7	2	type:hp,src1:2,op:5,src2:1,src2_val:50	buff_564	0	100.0	4	2	type:hp,src1:2,op:5,src2:1,src2_val:50	buff_565	0	100.0	1			buff_507	110	100.0						
+tal_399		name_tal_399	desc_tal_399			1			buff_579	0	100.0																		
+tal_400		name_tal_400	desc_tal_400			1			buff_798	0	100.0	1			buff_799	0	100.0												
+tal_401		name_tal_401	desc_tal_401			7	2	type:hp,src1:2,op:1,src2:1,src2_val:50	buff_306	0	100.0	4	2	type:hp,src1:2,op:1,src2:1,src2_val:50	buff_284	0	100.0	7	2	type:hp,src1:2,op:5,src2:1,src2_val:50	buff_698	0	100.0						
+tal_402		name_tal_402	desc_tal_402			1			buff_567	0	100.0	5			buff_110	0	100.0	1			buff_507	110	100.0						
+tal_403		name_tal_403	desc_tal_403			7			buff_570	0	100.0	4			buff_570	0	100.0												
+tal_404		name_tal_404	desc_tal_404			1			buff_746	0	100.0																		
+tal_405		name_tal_405	desc_tal_405			5			buff_743	0	100.0																		
+tal_406		name_tal_406	desc_tal_406			7	2	type:hp,src1:2,op:5,src2:1,src2_val:70	buff_744	110	100.0	7	2	type:hp,src1:2,op:5,src2:1,src2_val:40	buff_747	110	100.0	7	2	type:hp,src1:2,op:5,src2:1,src2_val:10	buff_748	110	100.0						
+tal_407		name_tal_407	desc_tal_407			4	1	type:damageReduce,src1:2,op:1,src2:3	buff_749	0	100.0	4	1	type:damageReduce,src1:2,op:1,src2:3	buff_750	0	100.0	4	1	type:damageReduce,src1:2,op:1,src2:3	buff_745	2	100.0						
+tal_408		name_tal_408	desc_tal_408			3			buff_757	0	100.0																		
+tal_409		name_tal_409	desc_tal_409			4			buff_134	2	4.0																		
+tal_410		name_tal_410	desc_tal_410			22			buff_134	2	30.0	1			buff_758	0	100.0	1			buff_761	0	100.0						
+tal_411		name_tal_411	desc_tal_411			4			buff_768	0	100.0	4			buff_769	0	100.0	4			buff_770	0	100.0						
+tal_412		name_tal_412	desc_tal_412			26	1	type:skillClass,src1:3,op:3,src2:1,src2_val:1	buff_762	0	100.0																		
+tal_413		name_tal_413	desc_tal_413			6			buff_763	110	100.0																		
+tal_414		name_tal_414	desc_tal_414			22			buff_193	0	100.0	22			buff_155	2	100.0												
+tal_415		name_tal_415	desc_tal_415			4	1	type:aliveEnemyNum,src1:2,op:1,src2:1,src2_val:2	buff_764	0	100.0	4	1	type:aliveEnemyNum,src1:2,op:1,src2:1,src2_val:2	buff_765	0	100.0	4	1	type:aliveEnemyNum,src1:2,op:4,src2:1,src2_val:2	buff_766	0	100.0	4	1	type:aliveEnemyNum,src1:2,op:4,src2:1,src2_val:2	buff_767	0	100.0
+tal_416		name_tal_416	desc_tal_416			8			buff_797	2	5.0																		
+tal_417		name_tal_417	desc_tal_417			4	1	type:forbidUltimateSkill,src1:3,op:1,src2:1,src2_val:0	buff_786	2	100.0																		
+tal_418		name_tal_418	desc_tal_418			2			buff_787	16	100.0	3			buff_788	111	100.0												
+tal_419		name_tal_419	desc_tal_419			7	2	type:hp,src1:2,op:5,src2:1,src2_val:30	buff_789	0	100.0	4	2	type:hp,src1:2,op:5,src2:1,src2_val:30	buff_790	0	100.0												
+tal_420		name_tal_420	desc_tal_420			4			buff_773	2	100.0																		
+tal_421		name_tal_421	desc_tal_421			8			buff_776	2	30.0	7			buff_773	2	30.0												
+tal_422		name_tal_422	desc_tal_422			1			buff_777	0	100.0	1			buff_778	0	100.0	1			buff_779	0	100.0	1			buff_780	0	100.0
+tal_423		name_tal_423	desc_tal_423			4	2	type:hp,src1:2,op:5,src2:1,src2_val:50	buff_781	0	100.0	4	2	type:hp,src1:2,op:5,src2:1,src2_val:50	buff_782	0	100.0	4			buff_143	0	100.0						
+tal_424		name_tal_424	desc_tal_424			22			buff_193	0	100.0																		
+tal_425		name_tal_425	desc_tal_425			4	2	type:totalLeftHp,src1:3,op:5,src2:1,src2_val:66	buff_41	0	100.0	4	2	type:totalLeftHp,src1:3,op:5,src2:1,src2_val:33	buff_525	0	100.0												
+tal_426		name_tal_426	desc_tal_426			28			buff_783	0	100.0	17			buff_783	0	100.0												
+tal_427		name_tal_427	desc_tal_427			2			buff_784	110	100.0	2			buff_785	110	100.0												
+tal_1001		name_tal_1001	desc_tal_1001			5			buff_152	2	25.0																		
+tal_1002		name_tal_1002	desc_tal_1002			6			buff_338	2	100.0																		
+tal_1003		name_tal_1003	desc_tal_1003			4			buff_339	2	100.0																		
+tal_1004		name_tal_1004	desc_tal_1004			2			buff_224	116	100.0																		
+tal_1005		name_tal_1005	desc_tal_1005			5			buff_340	0	100.0																		
+tal_1006		name_tal_1006	desc_tal_1006			5			buff_111	2	100.0																		
+tal_1007		name_tal_1007	desc_tal_1007			5			buff_260	0	100.0																		
+tal_1008		name_tal_1008	desc_tal_1008		group_forbidFirstSkill,group_ice,group_dizzy,group_forbidUltimateSkill,group_angerreduction,group_angerChange,group_anger,group_angerRate,group_eugenetanlent81,group_debuffpermaxHp	7			buff_1	0	100.0																		
+tal_1009		name_tal_1009	desc_tal_1009			6			buff_158	0	100.0																		
+tal_1010		name_tal_1010	desc_tal_1010																										
+tal_1011		name_tal_1011	desc_tal_1011			7			buff_340	0	100.0																		
+tal_1012		name_tal_1012	desc_tal_1012			5			buff_419	2	100.0																		
+tal_1013		name_tal_1013	desc_tal_1013			7			buff_420	0	100.0																		
+tal_1014		name_tal_1014	desc_tal_1014																										
+tal_1015		name_tal_1015	desc_tal_1015			7			buff_421	0	100.0																		
+tal_1016		name_tal_1016	desc_tal_1016			7	2	type:hp,src1:2,op:5,src2:1,src2_val:50	buff_422	0	100.0																		
+tal_1017		name_tal_1017	desc_tal_1017			4			buff_338	0	50.0																		
+tal_1018		name_tal_1018	desc_tal_1018			17			buff_423	0	100.0																		
+tal_1019		name_tal_1019	desc_tal_1019		group_forbidFirstSkill,group_ice,group_dizzy,group_forbidUltimateSkill,group_angerreduction,group_fire,group_poisonDam	7			buff_1	0	100.0																		
+tal_1020		name_tal_1020	desc_tal_1020			2			buff_424	0	100.0																		
+tal_1021		name_tal_1021	desc_tal_1021			4			buff_425	2	100.0																		
+tal_1022		name_tal_1022	desc_tal_1022			4			buff_120	2	5.0																		
+tal_1023		name_tal_1023	desc_tal_1023			4			buff_122	2	20.0																		
+tal_1024		name_tal_1024	desc_tal_1024			7			buff_421	0	100.0																		
+tal_1025		name_tal_1025	desc_tal_1025			7			buff_342	0	100.0																		
+tal_1026		name_tal_1026	desc_tal_1026			4	2	type:hp,src1:2,op:5,src2:1,src2_val:50	buff_426	0	100.0																		
+tal_1027		name_tal_1027	desc_tal_1027			4			buff_427	2	50.0																		
+tal_1028		name_tal_1028	desc_tal_1028			1			buff_211	0	100.0																		
+tal_1029		name_tal_1029	desc_tal_1029			7	2	type:hp,src1:2,op:5,src2:1,src2_val:50	buff_428	0	100.0																		
+tal_1030		name_tal_1030	desc_tal_1030		group_forbidFirstSkill,group_ice,group_dizzy,group_forbidUltimateSkill,group_angerreduction,group_fire,group_poisonDam	7			buff_1	0	100.0																		
+tal_1031		name_tal_1031	desc_tal_1031			4			buff_122	2	20.0																		
+tal_1032		name_tal_1032	desc_tal_1032			1			buff_393	0	100.0																		
+tal_1033		name_tal_1033	desc_tal_1033			4			buff_156	2	20.0																		
+tal_1034		name_tal_1034	desc_tal_1034			4			buff_120	2	20.0																		
+tal_1035		name_tal_1035	desc_tal_1035			1			buff_416	110	100.0																		
+tal_1036		name_tal_1036	desc_tal_1036			4			buff_124	2	5.0																		
+tal_1037		name_tal_1037	desc_tal_1037			4			buff_430	2	5.0																		
+tal_1038		name_tal_1038	desc_tal_1038			4			buff_127	2	8.0																		
+tal_1039		name_tal_1039	desc_tal_1039			4			buff_31	0	100.0																		
+tal_1040		name_tal_1040	desc_tal_1040			4			buff_429	0	100.0																		
+tal_1041		name_tal_1041	desc_tal_1041			7			buff_431	0	100.0																		
+tal_1042		name_tal_1042	desc_tal_1042			2			buff_433	0	100.0																		
+tal_1043		name_tal_1043	desc_tal_1043			7			buff_428	0	100.0																		
+tal_1044		name_tal_1044	desc_tal_1044			7			buff_432	0	100.0																		
+tal_1045		name_tal_1045	desc_tal_1045			4			buff_149	2	16.0																		
+tal_1046		name_tal_1046	desc_tal_1046			4			buff_111	2	5.0																		
+tal_1047		name_tal_1047	desc_tal_1047			17			buff_433	0	100.0																		
+tal_1048		name_tal_1048	desc_tal_1048			4			buff_434	2	100.0																		
+tal_1049		name_tal_1049	desc_tal_1049			2			buff_435	6	100.0																		
+tal_1050		name_tal_1050	desc_tal_1050			2			buff_201	110	100.0																		
+tal_1051		name_tal_1051	desc_tal_1051			2			buff_424	0	100.0																		
+tal_1052		name_tal_1052	desc_tal_1052			4			buff_297	2	7.0																		
+tal_1053		name_tal_1053	desc_tal_1053			4			buff_436	2	20.0																		
+tal_1054		name_tal_1054	desc_tal_1054			2			buff_416	106	100.0																		
+tal_1055		name_tal_1055	desc_tal_1055			4			buff_437	2	10.0																		
+tal_1056		name_tal_1056	desc_tal_1056			7			buff_59	0	100.0																		
+tal_1057		name_tal_1057	desc_tal_1057			4			buff_127	2	50.0																		
+tal_1058		name_tal_1058	desc_tal_1058			4			buff_34	0	100.0																		
+tal_1059		name_tal_1059	desc_tal_1059			5			buff_134	2	50.0																		
+tal_1060		name_tal_1060	desc_tal_1060			1			buff_394	110	100.0																		
+tal_1061		name_tal_1061	desc_tal_1061			4			buff_437	2	100.0																		
+tal_1062		name_tal_1062	desc_tal_1062			7			buff_298	0	100.0																		
+tal_1063		name_tal_1063	desc_tal_1063			4			buff_111	2	100.0																		
+tal_1064		name_tal_1064	desc_tal_1064			6			buff_124	2	20.0																		
+tal_1065		name_tal_1065	desc_tal_1065			12	1	type:poisonDam,src1:3,op:1,src2:1,src2_val:0	buff_154	0	100.0																		
+tal_1066		name_tal_1066	desc_tal_1066			1			buff_439	110	100.0																		
+tal_1067		name_tal_1067	desc_tal_1067			1			buff_440	110	100.0																		
+tal_1068		name_tal_1068	desc_tal_1068			4			buff_127	2	10.0																		
+tal_1069		name_tal_1069	desc_tal_1069			4			buff_134	2	6.0																		
+tal_1070		name_tal_1070	desc_tal_1070			4			buff_127	2	10.0																		
+tal_1071		name_tal_1071	desc_tal_1071			4			buff_134	2	10.0																		
+tal_1072		name_tal_1072	desc_tal_1072			4			buff_122	2	40.0																		
+tal_1073		name_tal_1073	desc_tal_1073			4			buff_127	2	16.0																		
+tal_1074		name_tal_1074	desc_tal_1074			4			buff_141	0	100.0																		
+tal_1075		name_tal_1075	desc_tal_1075			4			buff_260	0	100.0																		
+tal_1076		name_tal_1076	desc_tal_1076			7			buff_223	0	100.0																		
+tal_1077		name_tal_1077	desc_tal_1077			2			buff_433	0	100.0	2			buff_131	0	100.0												
+tal_1078		name_tal_1078	desc_tal_1078			7			buff_441	0	100.0																		
+tal_1079		name_tal_1079	desc_tal_1079			4			buff_134	2	15.0																		
+tal_1080		name_tal_1080	desc_tal_1080			4			buff_149	2	50.0																		
+tal_1081		name_tal_1081	desc_tal_1081			16			buff_135	6	100.0																		
+tal_1082		name_tal_1082	desc_tal_1082			4			buff_411	0	100.0																		
+tal_2000		name_tal_2000	desc_tal_2000			7			buff_104	0	100.0	1			buff_438	0	100.0												
+tal_1083		name_tal_1083	desc_tal_1083			0			buff_172	0	100.0																		
+tal_1084		name_tal_1084	desc_tal_1084			1			buff_539	0	100.0	1			buff_540	0	100.0												
+tal_1085		name_tal_1085	desc_tal_1085			22			buff_701	0	100.0																		
+tal_1086		name_tal_1086	desc_tal_1086			7			buff_700	0	100.0																		
+tal_1087		name_tal_1087	desc_tal_1087			0			buff_265	0	100.0	0			buff_320	0	100.0												
+tal_1088		name_tal_1088	desc_tal_1088			0			buff_740	0	100.0	0			buff_320	0	100.0												
+tal_1089		name_tal_1089	desc_tal_1089			0			buff_265	0	100.0	0			buff_320	0	100.0												
+tal_1090		name_tal_1090	desc_tal_1090			0			buff_44	0	100.0	4			buff_735	0	100.0												
+tal_1091		name_tal_1091	desc_tal_1091			0			buff_31	0	100.0	0			buff_26	0	100.0												
+tal_1092		name_tal_1092	desc_tal_1092			0			buff_31	0	100.0	0			buff_21	0	100.0												
+tal_1093		name_tal_1093	desc_tal_1093			0			buff_26	0	100.0	0			buff_21	0	100.0												
+tal_1094		name_tal_1094	desc_tal_1094			0			buff_276	0	100.0	0			buff_44	0	100.0												
+tal_1095		name_tal_1095	desc_tal_1095			0			buff_276	0	100.0	0			buff_26	0	100.0												
+tal_2001		name_tal_2001	desc_tal_2001			2			buff_715	0	100.0																		
+tal_2002		name_tal_2002	desc_tal_2002			16			buff_717	110	100.0																		
+tal_2003		name_tal_2003	desc_tal_2003			16			buff_718	110	100.0																		
+tal_2004		name_tal_2004	desc_tal_2004			28			buff_717	0	100.0																		
+tal_2005		name_tal_2005	desc_tal_2005			11			buff_720	0	100.0																		
+tal_2006		name_tal_2006	desc_tal_2006			18			buff_721	0	100.0	18	2	type:hp,src1:2,op:5,src2:1,src2_val:25	buff_723	0	100.0												
+tal_2007		name_tal_2007	desc_tal_2007			9			buff_722	0	100.0																		
+tal_2008		name_tal_2008	desc_tal_2008			6			buff_724	0	100.0																		
+tal_2009		name_tal_2009	desc_tal_2009			6			buff_725	0	100.0																		
+tal_2010		name_tal_2010	desc_tal_2010			1			buff_726	0	100.0	16			buff_726	110	100.0												
+tal_2011		name_tal_2011	desc_tal_2011			1			buff_727	0	100.0	16			buff_727	110	100.0												
+tal_2012		name_tal_2012	desc_tal_2012			1			buff_728	0	100.0	16			buff_728	110	100.0												
+tal_2013		name_tal_2013	desc_tal_2013			16			buff_729	26	100.0	16			buff_734	110	100.0												
+tal_2014		name_tal_2014	desc_tal_2014			16			buff_730	27	100.0	16			buff_734	110	100.0												
+tal_2015		name_tal_2015	desc_tal_2015			16			buff_731	17	100.0	16			buff_734	110	100.0												
+tal_2016		name_tal_2016	desc_tal_2016			7	2	type:hp,src1:2,op:5,src2:1,src2_val:40	buff_732	0	100.0	12	2	type:hp,src1:2,op:5,src2:1,src2_val:15	buff_733	0	100.0	22	2	type:hp,src1:2,op:5,src2:1,src2_val:40	buff_193	0	100.0	4	2	type:hp,src1:2,op:5,src2:1,src2_val:50	buff_738	0	100.0
+tal_2017		name_tal_2017	desc_tal_2017			4	2	type:hp,src1:2,op:5,src2:1,src2_val:50	buff_736	0	100.0	4	2	type:hp,src1:2,op:5,src2:1,src2_val:25	buff_739	0	100.0	7	2	type:hp,src1:2,op:5,src2:1,src2_val:25	buff_723	0	100.0						
+tal_2018		name_tal_2018	desc_tal_2018			7	2	type:hp,src1:2,op:5,src2:1,src2_val:40	buff_732	0	100.0	22	2	type:hp,src1:2,op:5,src2:1,src2_val:40	buff_193	0	100.0						100.0						
+tal_3000		name_tal_3000	desc_tal_3000			4			buff_584	0	100.0																		
+tal_3001		name_tal_3001	desc_tal_3001			4			buff_585	0	100.0																		
+tal_3002		name_tal_3002	desc_tal_3002			1			buff_586	0	100.0																		
+tal_3003		name_tal_3003	desc_tal_3003			1			buff_587	0	100.0																		
+tal_3004		name_tal_3004	desc_tal_3004			4			buff_588	0	100.0																		
+tal_3005		name_tal_3005	desc_tal_3005			1			buff_656	0	100.0																		
+tal_3006		name_tal_3006	desc_tal_3006			1			buff_590	0	100.0																		
+tal_3007		name_tal_3007	desc_tal_3007			1			buff_591	0	100.0																		
+tal_3008		name_tal_3008	desc_tal_3008			1			buff_595	0	100.0																		
+tal_3009		name_tal_3009	desc_tal_3009			1			buff_596	0	100.0																		
+tal_3010		name_tal_3010	desc_tal_3010			1			buff_597	0	100.0																		
+tal_3011		name_tal_3011	desc_tal_3011			1			buff_598	0	100.0																		
+tal_3012		name_tal_3012	desc_tal_3012			1			buff_599	0	100.0																		
+tal_3013		name_tal_3013	desc_tal_3013			1			buff_600	0	100.0																		
+tal_3014		name_tal_3014	desc_tal_3014			1			buff_601	0	100.0																		
+tal_3015		name_tal_3015	desc_tal_3015			1			buff_602	0	100.0																		
+tal_3016		name_tal_3016	desc_tal_3016			1			buff_603	0	100.0																		
+tal_3017		name_tal_3017	desc_tal_3017			1			buff_604	0	100.0																		
+tal_3018		name_tal_3018	desc_tal_3018			1			buff_605	0	100.0																		
+tal_3019		name_tal_3019	desc_tal_3019			1			buff_606	0	100.0																		
+tal_3020		name_tal_3020	desc_tal_3020			1			buff_607	0	100.0																		
+tal_3021		name_tal_3021	desc_tal_3021			1			buff_608	0	100.0																		
+tal_3022		name_tal_3022	desc_tal_3022			1			buff_609	0	100.0																		
+tal_3023		name_tal_3023	desc_tal_3023			1			buff_610	0	100.0																		
+tal_3024		name_tal_3024	desc_tal_3024			1			buff_611	0	100.0																		
+tal_3025		name_tal_3025	desc_tal_3025			1			buff_612	0	100.0																		
+tal_3026		name_tal_3026	desc_tal_3026			1			buff_613	0	100.0																		
+tal_3027		name_tal_3027	desc_tal_3027			1			buff_614	0	100.0																		
+tal_3028		name_tal_3028	desc_tal_3028			1			buff_615	0	100.0																		
+tal_3029		name_tal_3029	desc_tal_3029			1			buff_616	0	100.0																		
+tal_3030		name_tal_3030	desc_tal_3030			1			buff_617	0	100.0																		
+tal_3031		name_tal_3031	desc_tal_3031			1			buff_618	0	100.0																		
+tal_3032		name_tal_3032	desc_tal_3032			1			buff_619	0	100.0																		
+tal_3033		name_tal_3033	desc_tal_3033			1			buff_620	0	100.0																		
+tal_3034		name_tal_3034	desc_tal_3034			1			buff_621	0	100.0																		
+tal_3035		name_tal_3035	desc_tal_3035			1			buff_622	0	100.0																		
+tal_3036		name_tal_3036	desc_tal_3036			1			buff_623	0	100.0																		
+tal_3037		name_tal_3037	desc_tal_3037			1			buff_624	0	100.0																		
+tal_3038		name_tal_3038	desc_tal_3038			1			buff_625	0	100.0																		
+tal_3039		name_tal_3039	desc_tal_3039			1			buff_626	0	100.0																		
+tal_3040		name_tal_3040	desc_tal_3040			1			buff_627	0	100.0																		
+tal_3041		name_tal_3041	desc_tal_3041			1			buff_628	0	100.0																		
+tal_3042		name_tal_3042	desc_tal_3042			1			buff_629	0	100.0																		
+tal_3043		name_tal_3043	desc_tal_3043			1			buff_630	0	100.0																		
+tal_3044		name_tal_3044	desc_tal_3044			1			buff_631	0	100.0																		
+tal_3045		name_tal_3045	desc_tal_3045			1			buff_632	0	100.0																		
+tal_3046		name_tal_3046	desc_tal_3046			1			buff_633	0	100.0																		
+tal_3047		name_tal_3047	desc_tal_3047			1			buff_634	0	100.0																		
+tal_3048		name_tal_3048	desc_tal_3048			1			buff_635	0	100.0																		
+tal_3049		name_tal_3049	desc_tal_3049			1			buff_636	0	100.0																		
+tal_3050		name_tal_3050	desc_tal_3050			1			buff_637	0	100.0																		
+tal_3051		name_tal_3051	desc_tal_3051			1			buff_638	0	100.0																		
+tal_3052		name_tal_3052	desc_tal_3052			1			buff_639	0	100.0																		
+tal_3053		name_tal_3053	desc_tal_3053			1			buff_640	0	100.0																		
+tal_3054		name_tal_3054	desc_tal_3054			1			buff_641	0	100.0																		
+tal_3055		name_tal_3055	desc_tal_3055			1			buff_642	0	100.0																		
+tal_3056		name_tal_3056	desc_tal_3056			1			buff_643	0	100.0																		
+tal_3057		name_tal_3057	desc_tal_3057			1			buff_644	0	100.0																		
+tal_3058		name_tal_3058	desc_tal_3058			1			buff_645	0	100.0																		
+tal_3059		name_tal_3059	desc_tal_3059			1			buff_646	0	100.0																		
+tal_3060		name_tal_3060	desc_tal_3060			1			buff_647	0	100.0																		
+tal_3061		name_tal_3061	desc_tal_3061			1			buff_648	0	100.0																		
+tal_3062		name_tal_3062	desc_tal_3062			1			buff_649	0	100.0																		
+tal_3063		name_tal_3063	desc_tal_3063			1			buff_650	0	100.0																		
+tal_3064		name_tal_3064	desc_tal_3064			1			buff_651	0	100.0																		
+tal_3065		name_tal_3065	desc_tal_3065			1			buff_652	0	100.0																		
+tal_3066		name_tal_3066	desc_tal_3066			1			buff_653	0	100.0																		
+tal_3067		name_tal_3067	desc_tal_3067			1			buff_654	0	100.0																		
+tal_3068		name_tal_3068	desc_tal_3068			1			buff_655	0	100.0																		
+tal_3069		name_tal_3069	desc_tal_3069			1			buff_656	0	100.0																		
+tal_3070		name_tal_3070	desc_tal_3070			1			buff_657	0	100.0																		
+tal_3071		name_tal_3071	desc_tal_3071			1			buff_658	0	100.0																		
+tal_3072		name_tal_3072	desc_tal_3072			2	2	type:hp,src1:3,op:5,src2:1,src2_val:50	buff_653	0	100.0																		
+tal_3073		name_tal_3073	desc_tal_3073			2	2	type:hp,src1:3,op:5,src2:1,src2_val:50	buff_654	0	100.0																		
+tal_3074		name_tal_3074	desc_tal_3074			2	2	type:hp,src1:3,op:5,src2:1,src2_val:50	buff_655	0	100.0																		
+tal_3075		name_tal_3075	desc_tal_3075			6			buff_590	0	100.0																		
+tal_3076		name_tal_3076	desc_tal_3076			4			buff_660	0	100.0																		
+tal_3077		name_tal_3077	desc_tal_3077			1			buff_661	0	100.0																		
+tal_3078		name_tal_3078	desc_tal_3078			1			buff_134	2	3.0																		
+tal_3079		name_tal_3079	desc_tal_3079			5			buff_122	2	3.0																		
+tal_3080		name_tal_3080	desc_tal_3080			5			buff_149	2	3.0																		
+tal_3081		name_tal_3081	desc_tal_3081			5			buff_152	2	3.0																		
+tal_3082		name_tal_3082	desc_tal_3082			5			buff_663	2	3.0																		
+tal_3083		name_tal_3083	desc_tal_3083			5			buff_111	2	3.0																		
+tal_3084		name_tal_3084	desc_tal_3084			5			buff_134	2	2.0																		
+tal_3085		name_tal_3085	desc_tal_3085			5			buff_122	2	2.0																		
+tal_3086		name_tal_3086	desc_tal_3086			5			buff_149	2	2.0																		
+tal_3087		name_tal_3087	desc_tal_3087			5			buff_152	2	2.0																		
+tal_3088		name_tal_3088	desc_tal_3088			5			buff_663	2	2.0																		
+tal_3089		name_tal_3089	desc_tal_3089			5			buff_111	2	2.0																		
+tal_3090		name_tal_3090	desc_tal_3090			5			buff_134	2	1.0																		
+tal_3091		name_tal_3091	desc_tal_3091			5			buff_122	2	1.0																		
+tal_3092		name_tal_3092	desc_tal_3092			5			buff_149	2	1.0																		
+tal_3093		name_tal_3093	desc_tal_3093			5			buff_152	2	1.0																		
+tal_3094		name_tal_3094	desc_tal_3094			5			buff_663	2	1.0																		
+tal_3095		name_tal_3095	desc_tal_3095			5			buff_111	2	1.0																		
+tal_3096		name_tal_3096	desc_tal_3096			6			buff_134	2	3.0																		
+tal_3097		name_tal_3097	desc_tal_3097			6			buff_122	2	3.0																		
+tal_3098		name_tal_3098	desc_tal_3098			6			buff_149	2	3.0																		
+tal_3099		name_tal_3099	desc_tal_3099			6			buff_152	2	3.0																		
+tal_3100		name_tal_3100	desc_tal_3100			6			buff_663	2	3.0																		
+tal_3101		name_tal_3101	desc_tal_3101			6			buff_111	2	3.0																		
+tal_3102		name_tal_3102	desc_tal_3102			6			buff_134	2	2.0																		
+tal_3103		name_tal_3103	desc_tal_3103			6			buff_122	2	2.0																		
+tal_3104		name_tal_3104	desc_tal_3104			6			buff_149	2	2.0																		
+tal_3105		name_tal_3105	desc_tal_3105			6			buff_152	2	2.0																		
+tal_3106		name_tal_3106	desc_tal_3106			6			buff_663	2	2.0																		
+tal_3107		name_tal_3107	desc_tal_3107			6			buff_111	2	2.0																		
+tal_3108		name_tal_3108	desc_tal_3108			6			buff_134	2	1.0																		
+tal_3109		name_tal_3109	desc_tal_3109			6			buff_122	2	1.0																		
+tal_3110		name_tal_3110	desc_tal_3110			6			buff_149	2	1.0																		
+tal_3111		name_tal_3111	desc_tal_3111			6			buff_152	2	1.0																		
+tal_3112		name_tal_3112	desc_tal_3112			6			buff_663	2	1.0																		
+tal_3113		name_tal_3113	desc_tal_3113			6			buff_111	2	1.0																		
+tal_3114		name_tal_3114	desc_tal_3114			7			buff_664	0	100.0																		
+tal_3115		name_tal_3115	desc_tal_3115			7			buff_665	0	100.0																		
+tal_3116		name_tal_3116	desc_tal_3116			7			buff_666	0	100.0																		
+tal_3117		name_tal_3117	desc_tal_3117			23			buff_664	0	100.0																		
+tal_3118		name_tal_3118	desc_tal_3118			23			buff_665	0	100.0																		
+tal_3119		name_tal_3119	desc_tal_3119			23			buff_666	0	100.0																		
+tal_3120		name_tal_3120	desc_tal_3120			14			buff_664	0	100.0																		
+tal_3121		name_tal_3121	desc_tal_3121			14			buff_665	0	100.0																		
+tal_3122		name_tal_3122	desc_tal_3122			14			buff_666	0	100.0																		
+tal_3123		name_tal_3123	desc_tal_3123			4	1	type:debuffNum,src1:3,op:1,src2:1,src2_val:0	buff_672	0	100.0																		
+tal_3124		name_tal_3124	desc_tal_3124			4	1	type:debuffNum,src1:3,op:1,src2:1,src2_val:0	buff_673	0	100.0																		
+tal_3125		name_tal_3125	desc_tal_3125			4	1	type:debuffNum,src1:3,op:1,src2:1,src2_val:0	buff_674	0	100.0																		
+tal_3126		name_tal_3126	desc_tal_3126			4	1	type:speState,src1:3,op:3,src2:1,src2_val:2	buff_672	0	100.0																		
+tal_3127		name_tal_3127	desc_tal_3127			4	1	type:speState,src1:3,op:3,src2:1,src2_val:2	buff_673	0	100.0																		
+tal_3128		name_tal_3128	desc_tal_3128			4	1	type:speState,src1:3,op:3,src2:1,src2_val:2	buff_674	0	100.0																		
+tal_3129		name_tal_3129	desc_tal_3129			4	1	type:speState,src1:3,op:3,src2:1,src2_val:2	buff_675	0	100.0																		
+tal_3130		name_tal_3130	desc_tal_3130			4	1	type:speState,src1:3,op:3,src2:1,src2_val:2	buff_676	0	100.0																		
+tal_3131		name_tal_3131	desc_tal_3131			4	1	type:speState,src1:3,op:3,src2:1,src2_val:2	buff_677	0	100.0																		
+tal_3132		name_tal_3132	desc_tal_3132			4	1	type:speState,src1:3,op:3,src2:1,src2_val:2	buff_678	0	100.0																		
+tal_3133		name_tal_3133	desc_tal_3133			4	1	type:speState,src1:3,op:3,src2:1,src2_val:2	buff_679	0	100.0																		
+tal_3134		name_tal_3134	desc_tal_3134			4	1	type:speState,src1:3,op:3,src2:1,src2_val:2	buff_680	0	100.0																		
+tal_3135		name_tal_3135	desc_tal_3135			4	1	type:speState,src1:3,op:3,src2:1,src2_val:3	buff_672	0	100.0																		
+tal_3136		name_tal_3136	desc_tal_3136			4	1	type:speState,src1:3,op:3,src2:1,src2_val:3	buff_673	0	100.0																		
+tal_3137		name_tal_3137	desc_tal_3137			4	1	type:speState,src1:3,op:3,src2:1,src2_val:3	buff_674	0	100.0																		
+tal_3138		name_tal_3138	desc_tal_3138			4	1	type:speState,src1:3,op:3,src2:1,src2_val:3	buff_675	0	100.0																		
+tal_3139		name_tal_3139	desc_tal_3139			4	1	type:speState,src1:3,op:3,src2:1,src2_val:3	buff_676	0	100.0																		
+tal_3140		name_tal_3140	desc_tal_3140			4	1	type:speState,src1:3,op:3,src2:1,src2_val:3	buff_677	0	100.0																		
+tal_3141		name_tal_3141	desc_tal_3141			4	1	type:speState,src1:3,op:3,src2:1,src2_val:3	buff_678	0	100.0																		
+tal_3142		name_tal_3142	desc_tal_3142			4	1	type:speState,src1:3,op:3,src2:1,src2_val:3	buff_679	0	100.0																		
+tal_3143		name_tal_3143	desc_tal_3143			4	1	type:speState,src1:3,op:3,src2:1,src2_val:3	buff_680	0	100.0																		
+tal_3144		name_tal_3144	desc_tal_3144			1			buff_670	0	100.0																		
+tal_3145		name_tal_3145	desc_tal_3145			1			buff_681	0	100.0																		
+tal_3146		name_tal_3146	desc_tal_3146			1			buff_682	0	100.0																		
+tal_3147		name_tal_3147	desc_tal_3147			1			buff_683	0	100.0																		
+tal_3148		name_tal_3148	desc_tal_3148			13			buff_662	0	100.0																		
+tal_3149		name_tal_3149	desc_tal_3149			4	1	type:speState,src1:3,op:3,src2:1,src2_val:2	buff_684	0	100.0																		
+tal_3150		name_tal_3150	desc_tal_3150			1			buff_685	0	100.0																		
+tal_3151		name_tal_3151	desc_tal_3151			1			buff_686	0	100.0																		
+tal_3152		name_tal_3152	desc_tal_3152			7			buff_687	0	100.0																		
+tal_3153		name_tal_3153	desc_tal_3153			1			buff_688	0	100.0																		
+tal_3154		name_tal_3154	desc_tal_3154			1			buff_689	0	100.0																		
+tal_3155		name_tal_3155	desc_tal_3155			1			buff_690	0	100.0																		
+tal_3156		name_tal_3156	desc_tal_3156			1			buff_691	0	100.0																		
+tal_3157		name_tal_3157	desc_tal_3157			1			buff_704	0	100.0																		
+tal_3158		name_tal_3158	desc_tal_3158			1			buff_705	0	100.0																		
+tal_3159		name_tal_3159	desc_tal_3159			4			buff_706	0	100.0																		
+tal_3160		name_tal_3160	desc_tal_3160			1			buff_707	0	100.0																		
+tal_3161		name_tal_3161	desc_tal_3161			7			buff_708	0	100.0																		
+tal_3162		name_tal_3162	desc_tal_3162		group_debuffpermaxHp	7			buff_1	0	100.0																		
+tal_3163		name_tal_3163	desc_tal_3163			2			buff_800	0	100.0																		
+tal_3164		name_tal_3164	desc_tal_3164			22			buff_802	0	100.0																		
+tal_3165		name_tal_3165	desc_tal_3165			1			buff_803	0	100.0																		
+tal_3166		name_tal_3166	desc_tal_3166			1			buff_804	0	100.0																		
+tal_3167		name_tal_3167	desc_tal_3167			1			buff_805	0	100.0																		
+tal_3168		name_tal_3168	desc_tal_3168			1			buff_806	0	100.0																		
+tal_3169		name_tal_3169	desc_tal_3169			1			buff_807	0	100.0																		
+tal_3170		name_tal_3170	desc_tal_3170			1			buff_808	0	100.0																		
+tal_3171		name_tal_3171	desc_tal_3171			1			buff_809	0	100.0																		
+tal_3172		name_tal_3172	desc_tal_3172			0			buff_2	0	100.0																		
+tal_3173		name_tal_3173	desc_tal_3173			0			buff_25	0	100.0																		
+tal_3174		name_tal_3174	desc_tal_3174			7			buff_104	0	100.0																		
+tal_3175		name_tal_3175	desc_tal_3175			0			buff_39	0	100.0																		
+tal_3176		name_tal_3176	desc_tal_3176			0			buff_49	110	100.0																		
+tal_3177		name_tal_3177	desc_tal_3177			0			buff_85	110	100.0																		
+tal_3178		name_tal_3178	desc_tal_3178			0			buff_34	110	100.0																		
+tal_3179		name_tal_3179	desc_tal_3179			0			buff_54	110	100.0																		
+tal_3180		name_tal_3180	desc_tal_3180			0			buff_42	0	100.0																		
+tal_3181		name_tal_3181	desc_tal_3181			0			buff_823	0	100.0																		
+tal_3182		name_tal_3182	desc_tal_3182			4			buff_824	0	100.0																		
+tal_3183		name_tal_3183	desc_tal_3183			8			buff_776	2	50.0	7			buff_773	2	30.0												
+tal_3184		name_tal_3184	desc_tal_3184			5			buff_825	0	100.0																		
+tal_3185		name_tal_3185	desc_tal_3185			12	2	type:hp,src1:2,op:5,src2:1,src2_val:30	buff_485	0	100.0	7			buff_306	0	100.0												
+tal_3186		name_tal_3186	desc_tal_3186			0			buff_827	110	100.0																		
+tal_3187		name_tal_3187	desc_tal_3187			1			buff_567	0	100.0	5			buff_110	0	100.0												
+tal_3188		name_tal_3188	desc_tal_3188			22			buff_818	0	100.0	22			buff_477	0	100.0												
+tal_3189		name_tal_3189	desc_tal_3189			5			buff_23	0	100.0	5			buff_284	0	100.0												
+tal_3190		name_tal_3190	desc_tal_3190			0			buff_828	110	100.0																		
+tal_3191		name_tal_3191	desc_tal_3191			19			buff_829	2	100.0																		
+tal_3192		name_tal_3192	desc_tal_3192			5			buff_122	2	70.0																		
+tal_3193		name_tal_3193	desc_tal_3193			0			buff_831	0	100.0	0			buff_830	0	100.0												
+tal_3194		name_tal_3194	desc_tal_3194			0			buff_265	0	100.0	0			buff_320	0	100.0												
+tal_3195		name_tal_3195	desc_tal_3195			0			buff_740	0	100.0	0			buff_320	0	100.0												
+tal_3196		name_tal_3196	desc_tal_3196			0			buff_740	0	100.0	0			buff_831	0	100.0												
+tal_3197		name_tal_3197	desc_tal_3197			0			buff_265	0	100.0	0			buff_831	0	100.0												
+tal_3198		name_tal_3198	desc_tal_3198			0			buff_1	0	100.0																		
+tal_3199		name_tal_3199	desc_tal_3199			0			buff_31	0	100.0																		
+tal_3200		name_tal_3200	desc_tal_3200			7			buff_104	0	100.0	1			buff_438	0	100.0												
+tal_3201		name_tal_3201	desc_tal_3201			0			buff_36	0	100.0																		
+tal_3202		name_tal_3202	desc_tal_3202			0			buff_64	0	100.0																		
+tal_3203		name_tal_3203	desc_tal_3203			0			buff_50	0	100.0																		
+tal_3204		name_tal_3204	desc_tal_3204			0			buff_83	110	100.0																		
+tal_3205		name_tal_3205	desc_tal_3205			0			buff_31	110	100.0																		
+tal_3206		name_tal_3206	desc_tal_3206			0			buff_74	110	100.0																		
+tal_3207		name_tal_3207	desc_tal_3207			0			buff_42	0	100.0																		
+tal_3208		name_tal_3208	desc_tal_3208			0			buff_8	0	100.0																		
+tal_3209		name_tal_3209	desc_tal_3209			0			buff_17	0	100.0																		
+tal_3210		name_tal_3210	desc_tal_3210			7			buff_104	0	100.0	1			buff_438	0	100.0												
+tal_3211		name_tal_3211	desc_tal_3211			0			buff_43	0	100.0																		
+tal_3212		name_tal_3212	desc_tal_3212			0			buff_37	0	100.0																		
+tal_3213		name_tal_3213	desc_tal_3213			0			buff_92	110	100.0																		
+tal_3214		name_tal_3214	desc_tal_3214			0	1	type:space,src1:2,op:3,src2:1,src2_val:3	buff_76	110	100.0																		
+tal_3215		name_tal_3215	desc_tal_3215			0	1	type:space,src1:2,op:3,src2:1,src2_val:3	buff_24	110	100.0																		
+tal_3216		name_tal_3216	desc_tal_3216			0			buff_89	110	100.0																		
+tal_3217		name_tal_3217	desc_tal_3217			0			buff_55	0	100.0																		
+tal_3218		name_tal_3218	desc_tal_3218			0			buff_171	0	100.0																		
+tal_3219		name_tal_3219	desc_tal_3219			0			buff_31	0	100.0																		
+tal_3220		name_tal_3220	desc_tal_3220			7			buff_104	0	100.0	1			buff_438	0	100.0												
+tal_3221		name_tal_3221	desc_tal_3221			0			buff_49	0	100.0																		
+tal_3222		name_tal_3222	desc_tal_3222			0			buff_83	110	100.0																		
+tal_3223		name_tal_3223	desc_tal_3223			0			buff_38	0	100.0																		
+tal_3224		name_tal_3224	desc_tal_3224			0			buff_21	110	100.0																		
+tal_3225		name_tal_3225	desc_tal_3225			0			buff_68	0	100.0																		
+tal_3226		name_tal_3226	desc_tal_3226			0			buff_49	110	100.0																		
+tal_3227		name_tal_3227	desc_tal_3227			0			buff_497	0	100.0																		
+tal_3228		name_tal_3228	desc_tal_3228			13			buff_386	0	100.0																		
+tal_3229		name_tal_3229	desc_tal_3229			17			buff_861	0	100.0																		
+tal_3230		name_tal_3230	desc_tal_3230			4			buff_863	0	100.0	13	1	type:curSkillType,src1:2,op:3,src2:1,src2_val:2	buff_483	116	100.0												
+tal_3231		name_tal_3231	desc_tal_3231			12	2	type:hp,src1:2,op:5,src2:1,src2_val:50	buff_864	0	100.0	7			buff_865	0	100.0												
+tal_3232		name_tal_3232	desc_tal_3232			9			buff_517	0	100.0																		
+tal_3233		name_tal_3233	desc_tal_3233			1			buff_876	111	100.0	1			buff_537	112	100.0	1			buff_537	113	100.0						
+tal_3234		name_tal_3234	desc_tal_3234			12	2	type:hp,src1:3,op:5,src2:1,src2_val:40	buff_877	0	100.0																		
+tal_3235		name_tal_3235	desc_tal_3235			4	1	type:aliveNum,src1:2,op:3,src2:1,src2_val:4	buff_282	0	100.0																		
+tal_3236		name_tal_3236	desc_tal_3236			4			buff_495	0	100.0																		
+tal_3237		name_tal_3237	desc_tal_3237			26			buff_866	0	100.0	4			buff_867	0	100.0												
+tal_3238		name_tal_3238	desc_tal_3238			1			buff_777	0	100.0	1			buff_778	0	100.0	1			buff_779	0	100.0	1			buff_780	0	100.0
+tal_3239		name_tal_3239	desc_tal_3239			7	1	type:aliveEnemyNum,src1:2,op:4,src2:1,src2_val:2	buff_868	0	100.0	4	1	type:aliveEnemyNum,src1:2,op:4,src2:1,src2_val:2	buff_766	0	100.0	12	1	type:aliveEnemyNum,src1:2,op:1,src2:1,src2_val:2	buff_869	0	100.0	4	1	type:aliveEnemyNum,src1:2,op:1,src2:1,src2_val:2	buff_870	0	100.0

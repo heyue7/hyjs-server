@@ -1,0 +1,1 @@
+INSERT IGNORE INTO copy_box_rules(id,enabled,source) VALUES (1,1,'copy-box-original-once-after-run-v1; original server claim cadence/prerequisite/history unknown; one original reward per player after completed current run; no sweep or historic-star credit');

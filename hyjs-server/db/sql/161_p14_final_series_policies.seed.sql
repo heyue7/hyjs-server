@@ -1,0 +1,1 @@
+INSERT IGNORE INTO p14_final_series_policies(id,enabled,version,source,published_at) VALUES(1,0,'','local-original-first-round-series-v1; original-five-games-best-of-five; hourly-offsets-from-frozen-fightstart; per-game-five-minute-lock; independent-KF-certificate-required',0);

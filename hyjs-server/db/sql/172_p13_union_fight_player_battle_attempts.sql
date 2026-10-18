@@ -1,0 +1,20 @@
+CREATE TABLE IF NOT EXISTS `p13_union_fight_player_battle_attempts` (
+ `id` CHAR(64) NOT NULL, `match_id` CHAR(64) NOT NULL,
+ `player_id` BIGINT NOT NULL, `target_id` BIGINT NOT NULL, `stamp` BIGINT NOT NULL, `client_stamp` BIGINT NOT NULL,
+ `status` VARCHAR(16) NOT NULL, `fight_id` VARCHAR(128) NOT NULL,
+ `request_hash` CHAR(64) NOT NULL, `offer_hash` CHAR(64) NOT NULL,
+ `p6_record_id` CHAR(64) NOT NULL, `input_hash` CHAR(64) NOT NULL,
+ `start_pb` LONGBLOB NOT NULL, `start_hash` CHAR(64) NOT NULL,
+ `applied_properties` LONGBLOB NOT NULL, `before` LONGBLOB NOT NULL, `after` LONGBLOB,
+ `terminal` LONGBLOB NOT NULL, `terminal_hash` CHAR(64) NOT NULL, `scope_proof` CHAR(64) NOT NULL,
+ `dead_player_id` BIGINT NOT NULL DEFAULT 0, `reward_player_id` BIGINT NOT NULL DEFAULT 0,
+ `revive_seconds` BIGINT NOT NULL DEFAULT 0,
+ `created_at` BIGINT NOT NULL, `due_at` BIGINT NOT NULL, `settled_at` BIGINT NOT NULL DEFAULT 0,
+ `source_hash` CHAR(64) NOT NULL,
+ PRIMARY KEY (`id`), UNIQUE KEY `p13_uf_player_battle_stamp` (`player_id`,`stamp`),
+ UNIQUE KEY `p13_uf_player_battle_fight_id` (`fight_id`), UNIQUE KEY `p13_uf_player_battle_p6` (`p6_record_id`),
+ KEY `idx_p13_union_fight_player_battle_attempts_player_id` (`player_id`),
+ KEY `p13_uf_player_battle_client` (`player_id`,`client_stamp`),
+ KEY `p13_uf_player_battle_match` (`match_id`), KEY `p13_uf_player_battle_target` (`target_id`),
+ KEY `p13_uf_player_battle_due` (`status`,`due_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;

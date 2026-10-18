@@ -1,0 +1,4 @@
+CREATE TABLE IF NOT EXISTS daily_task_states (
+ player_id BIGINT NOT NULL, day VARCHAR(10) NOT NULL, snapshot LONGTEXT NOT NULL,
+ PRIMARY KEY(player_id, day)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

@@ -1,0 +1,20 @@
+CREATE TABLE IF NOT EXISTS `p14_final_continuation_receipts` (
+  `series_id` CHAR(64) NOT NULL,
+  `game_index` INT NOT NULL,
+  `delivery_id` CHAR(64) NOT NULL,
+  `source_server_id` BIGINT NOT NULL,
+  `payload_hash` CHAR(64) NOT NULL,
+  `source_result` LONGBLOB NOT NULL,
+  `source_result_hash` CHAR(64) NOT NULL,
+  `input` LONGBLOB NOT NULL,
+  `input_hash` CHAR(64) NOT NULL,
+  `terminal` LONGBLOB NOT NULL,
+  `terminal_hash` CHAR(64) NOT NULL,
+  `offer_hash` CHAR(64) NOT NULL,
+  `winner_server_id` BIGINT NOT NULL,
+  `winner_player_id` BIGINT NOT NULL,
+  `received_at` BIGINT NOT NULL,
+  `source_hash` CHAR(64) NOT NULL,
+  PRIMARY KEY (`series_id`,`game_index`),
+  UNIQUE KEY `idx_p14_final_continuation_receipt_delivery` (`delivery_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;

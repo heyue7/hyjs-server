@@ -1,0 +1,13 @@
+怪点ID	出生位置	可能出现的怪及概率	Boss向性
+BoxxPosId	BornPos	bossIdProbs	nature
+string	string	string	int
+primary	none	none	none
+bossPosId	bossPos	bossIdProbs	nature
+boss_pos_001	64,0,66	boss_001,10	
+boss_pos_002	-3,0,-2	boss_002,10	
+boss_pos_003	44,0,64	boss_003,10	
+boss_pos_004	1,0,-1	boss_004,10	
+boss_pos_005	52,0,35	boss_005,10	
+boss_pos_006_1	-13,0,63	boss_006_1,10	1
+boss_pos_006_2	55,0,8	boss_006_2,10	2
+boss_pos_006_3	-13,0,8	boss_006_3,10	3

@@ -1,0 +1,76 @@
+称号ID	称号类别	称号名称	称号图标	称号简述	参数	开启效果	持续时间（不填就是永久）	客户端决定是否显示(1不显示)
+titleId	type	titleName	titleIcon	titleSimpDesc	param	effects	effectTime	isNeedShow
+string	string	string	string	string	int	string	int	int
+primary	none	none	none	none	none	none	none	none
+titleId	type	titleName	titleIcon	titleSimpDesc	param	effects	effectTime	
+title_001	1	攻略者		1-上齐4个角色	4	hp,50		
+title_002	2	圣剑继承者		2-收集所有SAO角色		att,300		
+title_003	3	灵域守护者		3-收集所有ALO角色		att,300		
+title_004	4	战争之王		4-收集所有GGO角色		att,300		
+title_005	5	后备力量		5-收集齐所有蓝色角色		hp,100		
+title_006	6	中坚力量		6-收集齐所有紫色角色		att,100		
+title_007	7	攻略精英		7-收集齐所有橙色角色		hp,1000		
+title_008	8	极限挑战者		8-收集齐所有红色角色		damageAdd,2		
+title_009	9	挑战者		1- 角色等级达到25级	25	pdef,10;mdef,10		
+title_010	9	勇者		2- 角色等级达到50级	50	pdef,50;mdef,50		
+title_011	9	征服者		3- 角色等级达到75级	75	att,50		
+title_012	9	霸者		4- 角色等级达到100级	100	damageReduce,1		
+title_013	10	旅行家		2- 突破第10章节	10	hp,500		
+title_014	10	探索者		3- 突破第20章节	20	hp,1500		
+title_015	11	精巧工匠		1- 珠宝等级达到5级	5	pdef,50;mdef,50		
+title_016	11	炼金术师		2- 珠宝等级达到10级	10	pdef,100;mdef,100		
+title_017	12	美食家		3- 料理等级达到3级	3	att,50		
+title_018	12	料理达人		5- 料理等级达到6级	6	att,100		
+title_019	13	勇气之证		1- 试炼之地达到30层	30	att,50		
+title_020	13	智慧之证		2- 试炼之地达到 60层	60	pdef,100;mdef,100		
+title_021	13	信念之证		3- 试炼之地达到100层	100	damageAdd,2		
+title_022	14	格斗家		1-达到竞技场前3000名	3000	hit,2		
+title_023	14	战斗专家		2-达到竞技场前500名	500	dodge,2		
+title_024	14	荣耀之剑		3-达到竞技场前100名	100	antiCri,2		
+title_025	14	英雄		4-达到竞技场前10名	10	cri,2		
+title_026	14	战神		5-达到竞技场第1名	1	damageReduce,3		
+title_027	16	封弊者			1			
+title_028	17	最强工会		17-公会战月排行榜前二十公会全员	1	att,100	672	
+title_029	18	天下制霸		18-公会战月排行榜前五公会会长	1	att,150;hp,1000	672	
+title_030	19	百人斩		19-公会战累计击败100人	100	hp,50		
+title_031	19	千人斩		19-公会战累计击败1000人	1000	hp,100		
+title_032	19	万人斩		19-公会战累计击败10000人	10000	hp,1000		
+title_033	20	闪光亚丝娜			1	hp,50		
+title_034	22	超新星		17-跨服巅峰赛32强	1	damageAdd,2	336	
+title_035	21	巅峰王者		17-跨服巅峰赛冠军	1	damageAdd,5	336	
+title_036	23	荣耀之光		17-公会战1月排行榜前五公会全员	1	cri,3		
+title_037	24	弑神者		17-公会战2月排行榜前五公会全员	1	cri,3		
+title_038	25	终结之剑		17-公会战3月排行榜前五公会全员	1	cri,3		
+title_039	26	苍穹挑战者		17-公会战4月排行榜前五公会全员	1	cri,3		
+title_040	27	黑与白的剑舞		17-公会战5月排行榜前五公会全员	1	cri,3		
+title_041	28	亿万长者			1	hp,50		
+title_042	29	心灵之光		17-公会战6月排行榜前五公会全员	1	cri,3		
+title_043	30	意志继承者		17-公会战7月排行榜前五公会全员	1	cri,3		
+title_044	31	传说的勇者		17-公会战8月排行榜前五公会全员	1	cri,3		
+title_045	32	地狱修罗		17-公会战9月排行榜前五公会全员	1	cri,3		
+title_046	33	疾风剑舞		17-公会战10月排行榜前五公会全员	1	cri,3		
+title_047	34	梦魇		17-公会战11月排行榜前五公会全员	1	cri,3		
+title_048	35	星耀剑神		17-公会战12月排行榜前五公会全员	1	cri,3		
+title_049	36	旅行家						
+title_050	37	你的微笑		情人节运营活动称号520	1	damageAdd,1		
+title_051	38	我来守护		情人节运营活动称号520	1	damageAdd,1		
+title_052	39	一生一世		情人节运营活动称号1314	1	damageAdd,2		
+title_053	40	绝剑		绝剑：人气角色“优纪”的专属称号	1	att,350		
+title_054	41	黑衣剑士		黑衣剑士：人气角色“桐人”的专属称号	1	cri,3		
+title_055	42	天赋之才		周年庆活动限定称号 	1	damageAdd,2		
+title_056	43	整合骑士		周年庆活动限定称号 	1	damageAdd,2		
+title_057	44	至死不渝		2018年1月公会战月底前五会员称号	1	cri,3		
+title_058	45	急星闪耀		2018年2月公会战月底前五会员称号	1	cri,3		
+title_059	46	神圣之光		2018年3月公会战月底前五会员称号	1	cri,3		
+title_060	47	荣耀意志		2018年4月公会战月底前五会员称号	1	cri,3		
+title_061	48	仲裁守护		2018年5月公会战月底前五会员称号	1	cri,3		
+title_062	49	血盟骑士		2018年6月公会战月底前五会员称号	1	cri,3		
+title_063	50	无畏勇者		2018年7月公会战月底前五会员称号	1	cri,3		
+title_064	51	急速闪光		2018年8月公会战月底前五会员称号	1	cri,3		
+title_065	52	拯救者		2018年9月公会战月底前五会员称号	1	cri,3		
+title_066	53	极夜曙光		2018年10月公会战月底前五会员称号	1	cri,3		
+title_067	54	万人敬仰		2018年11月公会战月底前五会员称号	1	cri,3		
+title_068	55	永不言弃		2018年12月公会战月底前五会员称号	1	cri,3		
+title_069	56	勇者无敌		2019年1月公会战月底前五会员称号	1	cri,3		
+title_070	57	守护之光		2019年2月公会战月底前五会员称号	1	cri,3		
+title_071	58	冰之狙击手		两周年庆活动限定称号	1	cri,3		

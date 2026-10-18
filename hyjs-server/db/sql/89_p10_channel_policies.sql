@@ -1,0 +1,1 @@
+CREATE TABLE IF NOT EXISTS p10_channel_policies (id BIGINT PRIMARY KEY, world_enabled BOOLEAN NOT NULL, field_enabled BOOLEAN NOT NULL, source TEXT NOT NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;

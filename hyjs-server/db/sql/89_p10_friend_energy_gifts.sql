@@ -1,0 +1,1 @@
+CREATE TABLE IF NOT EXISTS p10_friend_energy_gifts (sender_id BIGINT NOT NULL, receiver_id BIGINT NOT NULL, day CHAR(10) NOT NULL, amount INT NOT NULL, friend_since BIGINT NOT NULL, invalidated BOOLEAN NOT NULL, claimed BOOLEAN NOT NULL, created_at BIGINT NOT NULL, PRIMARY KEY(sender_id,receiver_id,day)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;

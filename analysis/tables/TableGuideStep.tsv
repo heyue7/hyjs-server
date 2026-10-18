@@ -1,0 +1,223 @@
+小步骤	大步骤	类型	标签	位置	text	param	hand(1、2左右)	dialogType	posX	posY
+stepId	guideId	type	tag	path	text	param	hand	dialogType	posX	posY
+string	string	string	string	string	string	string	int	int	double	double
+primary	index	none	none	none	none	none	none	none	none	none
+stepId	groupId	type	tag	path	string	param	hand	dialogType	posX	posY
+1	guide_choose_role	ClickAny	start		您好，我是您的导航精灵结衣!欢迎来到沧海神域测试版，在这款游戏里，可以自由地来往3个世界，在不同的世界里进行探险。		0	1	199.0	-2.0
+2	guide_choose_role	ClickAny			这三个世界分别是：刀剑的世界、精灵的世界、枪械的世界。		0	1	199.0	-2.0
+3	guide_choose_role	ClickAny			现在请创建您在游戏世界里的角色吧！		0	1	199.0	-2.0
+4	guide_quest_1	Click	start	UI Root/PageManager/TownPage/LeftUp/MainTask/ClickRange	让我们开始第一场冒险吧！		2	1	-111.0	-38.0
+5	guide_quest_1	PathFinding				area_1	0	0	0.0	0.0
+6	guide_quest_1	WaitObject		UI Root/PageManager/UICopy/Panel/body/offset/Right/Bottom/Bottom/ChallengeBtn	 		2	0	0.0	0.0
+7	guide_quest_1	Click		UI Root/PageManager/UICopy/Panel/body/offset/Right/Bottom/Bottom/ChallengeBtn	请点击挑战		2	2	48.0	-225.0
+8	guide_quest_1	GuideMove			点击屏幕拖动可以控制角色在地图上移动，请先前往指定区域。	area_3	0	1	228.0	-205.0
+9	guide_quest_1	GuideLookMonster					0	0	0.0	0.0
+10	guide_quest_1	ClickAny			地图上游荡的怪物都有自己的巡逻范围，一旦进入就会触发战斗，让我们开始第一场战斗吧！		0	2	-250.0	-2.0
+11	guide_recruit	Click	Resume	UI Root/PlayerLevelUp(Clone)/Panel/TotalMask	 		0	0	0.0	0.0
+12	guide_recruit	ClickAny			一个人冒险是很危险的，现在让我们去招募一个伙伴吧		0	1	199.0	-2.0
+13	guide_recruit	Return					2	0	0.0	0.0
+14	guide_recruit	Click	start	UI Root/PageManager/TownPage/RightBottm/BottmMenu/Scroll View/GameObject/Grid/ShopBtn	请点击商店		2	1	199.0	-149.0
+15	guide_recruit	Click		UI Root/PageManager/ShopPage/Panel/Right/Recruit/HighRecruit/Buttons/RecruitOne	请点击招募	OnGuideOne	2	1	199.0	-124.0
+16	guide_recruit	Wait				7.6	2	0	0.0	0.0
+17	guide_hero_up	ClickAny	start		接下来让我们刚刚招募到的伙伴加入队伍！		0	1	199.0	-2.0
+18	guide_hero_up	Return					2	0	0.0	0.0
+19	guide_hero_up	Click		UI Root/PageManager/TownPage/RightBottm/BottmMenu/Scroll View/GameObject/Grid/HeroFomationBtn	请点击队伍		2	2	317.0	-139.0
+20	guide_hero_up	Click		UI Root/PageManager/ArrayPage/ArrayHeros/HeroIcons/HeroScroll/Pos2/Positon2	请点击上阵		2	1	-57.0	94.0
+21	guide_hero_up	Click		UI Root/PageManager/HeroReplacePage/Frame/HeroScrollView/SimpleGrid/0/Button	请点击出战		2	1	178.0	-2.0
+22	guide_hero_up	Click		UI Root/PageManager/ArrayPage/BtnClose	有新的任务，让我们去看看吧。		1	1	199.0	-2.0
+23	guide_quest_2	Click	start	UI Root/PageManager/TownPage/LeftUp/MainTask/ClickRange	 		2	0	199.0	-2.0
+24	guide_quest_2	PathFinding				npc_101	0	0	0.0	0.0
+25	guide_quest_2	WaitObject		UI Root/PageManager/QuestCompletePage/Di/ConfirmBtn	 		0	0	0.0	
+26	guide_quest_2	Click		UI Root/PageManager/QuestCompletePage/Di/ConfirmBtn	 		2	0	199.0	-2.0
+27	guide_quest_3	Click	start	UI Root/PageManager/TownPage/LeftUp/MainTask/ClickRange	继续攻略前线吧！		2	1	-111.0	-38.0
+28	guide_quest_3	PathFinding				area_1	0	0	0.0	0.0
+29	guide_quest_3	WaitObject		UI Root/PageManager/UICopy/Panel/body/offset/Right/Bottom/Bottom/ChallengeBtn			0	0	0.0	0.0
+30	guide_quest_3	Click		UI Root/PageManager/UICopy/Panel/body/offset/Right/Bottom/Bottom/ChallengeBtn	请点击挑战		2	2	48.0	-225.0
+31	guide_talent	Click	resume	UI Root/PlayerLevelUp(Clone)/Panel/TotalMask			0	0	0.0	0.0
+32	guide_talent	ClickAny	start		恭喜！升到3级了！现在我们去学习激活天赋和升级角色。		0	1	199.0	-2.0
+33	guide_talent	Return					0	0	0.0	0.0
+34	guide_talent	Click		UI Root/PageManager/TownPage/RightBottm/BottmMenu/Scroll View/GameObject/Grid/HeroFomationBtn	请点击队伍		2	2	317.0	-139.0
+35	guide_talent	Click		UI Root/PageManager/ArrayPage/BtnUpgrade	请点击角色提升按钮		2	1	199.0	-184.0
+36	guide_talent	Click		UI Root/PageManager/characterRemotePage/TalentPage/right/btnActive	激活角色天赋不仅可以提升角色属性，还可以使角色获得特殊的天赋属性，能够大幅提升实战能力。请点击激活。		2	2	-39.0	-208.0
+37	guide_talent	Wait				2	0	0	0.0	0.0
+38	guide_talent	Click		UI Root/PageManager/characterRemotePage/close	请点击关闭按钮		1	1	199.0	-2.0
+39	guide_level_up	Click	start	UI Root/PageManager/TownPage/RightBottm/BottmMenu/Scroll View/GameObject/Grid/HeroFomationBtn	请点击队伍		2	2	317.0	-139.0
+40	guide_level_up	Click	resume	UI Root/PageManager/ArrayPage/ArrayHeros/HeroIcons/HeroScroll/Pos2/Positon2	接下来提升伙伴的角色等级。请点击伙伴头像。		2	1	-62.0	91.0
+41	guide_level_up	Click		UI Root/PageManager/ArrayPage/BtnUpgrade	请点击角色提升按钮		2	1	199.0	-184.0
+42	guide_level_up	Click		UI Root/PageManager/characterRemotePage/LevelUpPage/rightBg/autoAdd	通过消耗多余的角色，可以提升伙伴的等级。“自动添加”会自动选择合适的材料，请点击自动添加。		2	2	-212.0	-209.0
+43	guide_level_up	Click		UI Root/PageManager/characterRemotePage/LevelUpPage/rightBg/levelUp	添加了材料之后就可以升级了，请点击升级。		2	2	6.0	-210.0
+44	guide_level_up	Wait				3	0	0	0.0	0.0
+45	guide_level_up	ClickAny			接下来让我们继续执行主线任务。		0	1	199.0	-2.0
+46	guide_level_up	Return					2	0	199.0	-2.0
+47	guide_quest_4	Click	start	UI Root/PageManager/TownPage/LeftUp/MainTask/ClickRange	 		2	0	199.0	-2.0
+48	guide_quest_4	PathFinding				npc_101	0	0	0.0	0.0
+49	guide_quest_4	WaitObject		UI Root/PageManager/QuestCompletePage/Di/ConfirmBtn	 		0	0	0.0	0.0
+50	guide_quest_4	Click		UI Root/PageManager/QuestCompletePage/Di/ConfirmBtn	 		2	0	0.0	0.0
+51	guide_quest_5	Click	start	UI Root/PageManager/TownPage/LeftUp/MainTask/ClickRange	 		2	0	48.0	-225.0
+52	guide_quest_5	PathFinding				area_1	0	0	0.0	0.0
+53	guide_quest_5	WaitObject		UI Root/PageManager/UICopy/Panel/body/offset/Right/Bottom/Bottom/ChallengeBtn	 		0	0	0.0	0.0
+54	guide_quest_5	Click		UI Root/PageManager/UICopy/Panel/body/offset/Right/Bottom/Bottom/ChallengeBtn	请点击挑战		2	2	0.0	0.0
+55	guide_copy_reward	Click	start	UI Root/PageManager/TownPage/RightBottm/BottmMenu/Scroll View/GameObject/Grid/FrontBtn	 		2	0	0.0	0.0
+56	guide_copy_reward	Jump				2	2	0	199.0	92.0
+57	guide_copy_reward	Click	resume	UI Root/PlayerLevelUp(Clone)/Panel/TotalMask			0	0	223.0	-23.0
+58	guide_copy_reward	Click		UI Root/PageManager/UICopy/Panel/head/award_btn	副本通关星数达到指定数量，即可领取对应奖励。请点击奖励。		2	1	199.0	-2.0
+59	guide_copy_reward	Click		UI Root/PageManager/UICopyAward/Panel/body/Scroll View/Grid/0/can	请点击领取。		2	1	199.0	-2.0
+60	guide_equip_up	ClickAny	start		恭喜获得新武器，现在我们就去装备上。		0	1	317.0	-139.0
+61	guide_equip_up	Return					2	0	199.0	-2.0
+62	guide_equip_up	Click		UI Root/PageManager/TownPage/RightBottm/BottmMenu/Scroll View/GameObject/Grid/HeroFomationBtn	请点击队伍		2	2	138.0	-56.0
+63	guide_equip_up	ClickEquip		UI Root/PageManager/ArrayPage/RightTab/Content/TabEquip/EquipPanel/SimpleGrid/1	请点击装备图标		2	1	223.0	-72.0
+64	guide_equip_up	Click		UI Root/PageManager/EquipSimplePage/Frame/ButtonEquip	请点击装备		2	1	317.0	-139.0
+65	guide_equip_up	Click		UI Root/PageManager/EquipRemodelPage/Frame/BtnConfirm	不同的角色使用不同类型的武器，当武器与角色的职业类型不符时，会提示重塑，该过程不消耗任何资源。请点击确定。		2	1	97.0	123.0
+66	guide_equip_up	Wait				4.5	0	0	0.0	0.0
+67	guide_equip_up	RotateHero		UI Root/PageManager/ArrayPage/HeroAniPos	角色更换武器后，外观会随之改变。橙色以上的武器带有光辉效果，会让角色看起来更酷，请努力收集！		0	1	199.0	-2.0
+68	guide_equip_strengthen	Click	start	UI Root/PageManager/TownPage/RightBottm/BottmMenu/Scroll View/GameObject/Grid/HeroFomationBtn	请点击队伍		2	2	0.0	0.0
+69	guide_equip_strengthen	Click	resume	UI Root/PageManager/ArrayPage/Equips/Weapon	装备要经过强化才能发挥最大效果。请点击装备图标。		2	1	199.0	-76.0
+70	guide_equip_strengthen	Click		UI Root/PageManager/EquipmentUIPage/center/bottomLeft/twoBtn/qianghua	 		2	0	0.0	0.0
+71	guide_equip_strengthen	Click		UI Root/PageManager/EquipPromotePage/Panel/Root/RightPart/TabStrengthen/Buttons/BtnStrengthenFive	强化消耗金币，强化有概率暴击，请点击一键强化。		2	1	199.0	-2.0
+72	guide_equip_strengthen	Wait				1	0	0	199.0	-2.0
+73	guide_equip_strengthen	ClickAny			有了新武器，执行任务会更加顺利，让我们去看看还有什么任务吧！		0	1	199.0	-2.0
+74	guide_equip_strengthen	Return					2	1	199.0	-2.0
+75	guide_equip_strengthen	ShowWindow					0	0	0.0	0.0
+76	guide_pvp	ClickAny	start		恭喜！升到10级了！现在可以去天梯竞技场挑战其他玩家了！		0	1	199.0	-2.0
+77	guide_pvp	Return					2	1	199.0	-2.0
+78	guide_pvp	Click		UI Root/RoomUIManager/MiniMap(Clone)/small/ForegroundPanel/foreground2/frame	点击小地图可以打开主城地图，通过主城地图可以传送到主城的任意位置。请点击小地图。		1	1	199.0	-2.0
+79	guide_pvp	Click		UI Root/PageManager/TownMapPage/right/background/scrollView/Grid/UI_ditu_icon_jingjichang/bg	请点击竞技场。		2	1	-102.0	-80.0
+80	guide_pvp	WaitSelfCreated					0	0	0.0	0.0
+81	guide_pvp	Wait				3	0	0	0.0	0.0
+82	guide_pvp	ClickNPC				npc_002	2	1	-145.0	-34.0
+83	guide_pvp	WaitObject		UI Root/PageManager/ArenaPage/MainPage/RankPvpPanel/Center/CenterDi/SelectEnemyList/ScrollView/Grid/1	 		0	0	0.0	0.0
+84	guide_pvp	Click		UI Root/PageManager/ArenaPage/MainPage/RankPvpPanel/Center/CenterDi/SelectEnemyList/ScrollView/Grid/2	竞技场强者林立，需要不断地战胜其他玩家，才能提高自己的排名。现在让我们来挑战第一个对手吧！		2	2	199.0	-130.0
+85	guide_pvp	Click		UI Root/PageManager/ArenaPage/MainPage/RankPvpPanel/Center/CenterDi/EnemyCharacter/EnemyOpt/EnemyOpt/ArenaFightBtn	请点击挑战	OnEnemyFightButtonClickGuide	2	1	199.0	-2.0
+86	guide_pvp	WaitArenaPage					2	1	199.0	-2.0
+87	guide_pvp_shop	ClickAny	start		前往竞技场		0	1	199.0	-2.0
+88	guide_pvp_shop	ClickNPC				npc_002	0	1	252.0	130.0
+89	guide_pvp_shop	WaitObject		UI Root/PageManager/ArenaPage/MainPage/RankPvpPanel/Top/PVEShopBtn	 		0	0	0.0	0.0
+90	guide_pvp_shop	Click	resume	UI Root/PageManager/ArenaPage/MainPage/RankPvpPanel/Top/PVEShopBtn	每次在竞技场战胜对手都会获得声望，声望可以在声望商店中购买物品。请点声望商店。		2	2	-49.0	62.0
+91	guide_pvp_shop	ClickAny			声望商店可以购买橙色角色、解放之石和潜能药剂。在奖励一栏，还有一次性的超值奖励，达到指定名次即可购买。		0	1	-43.0	-78.0
+92	guide_pvp_shop	Click		UI Root/PageManager/ShopPage/Panel/Right/PopularityShop/Tabs/tabAwards	请点击奖励		2	1	252.0	130.0
+93	guide_pvp_shop	Click		UI Root/PageManager/ShopPage/Panel/Right/PopularityShop/ScrollView/SimpleGrid/0/BtnBuy	请点击购买		2	1	199.0	-2.0
+94	guide_pvp_shop	Click		UI Root/PageManager/ShopPage/Panel/BtnClose	接下来请再接再厉，提升自己实力，努力登顶竞技场吧！		2	2	199.0	-2.0
+95	guide_world_tree	ClickAny	start		恭喜！升到13级了！现在可以升级潜能解放系统了！		0	1	304.0	-155.0
+96	guide_world_tree	Return					0	0	0.0	0.0
+97	guide_world_tree	Transfer				-30.5,8.1,32.2	0	0	0.0	0.0
+98	guide_world_tree	ClickNPC				npc_012	0	0	0.0	0.0
+99	guide_world_tree	WaitObject		UI Root/PageManager/UIYggdrasil/Panel/btn_bk/uplevelbtn	 		0	0	0.0	0.0
+100	guide_world_tree	Click		UI Root/PageManager/UIYggdrasil/Panel/btn_bk/uplevelbtn	在潜能解放系统中，可以使用世界之种进行升级，升级后会获得全队属性加成。请点击升级。		2	1	199.0	-2.0
+101	guide_world_tree	ClickAny			攻略前线每通关一章即可获得世界之种，请多多攻略前线！		0	1	199.0	-2.0
+102	guide_world_tree	Return					2	1	199.0	-2.0
+103	guide_plunder	ClickAny	start		恭喜！升到15级了！现在可以参与夺宝竞技场收集饰品了！		0	1	199.0	-2.0
+104	guide_plunder	Return					2	1	-241.0	-3.0
+105	guide_plunder	Transfer				-13.05,1,11.98	0	0	0.0	0.0
+106	guide_plunder	ClickNPC			前往竞技场	npc_002	2	1	199.0	-2.0
+107	guide_plunder	Click		UI Root/PageManager/ArenaPage/MainPage/Left/LeftTween/LeftMain/PVPRaidBtn	请点击夺宝竞技场		2	1	199.0	-2.0
+108	guide_plunder	FindPlunderItem		UI Root/PageManager/ArenaPage/MainPage/PlunderPVPPanel/Center/top/Scroll View/Grid/87_trea_001	 		2	1	-213.0	-107.0
+109	guide_plunder	ClickEquip		UI Root/PageManager/ArenaPage/MainPage/PlunderPVPPanel/Center/Frags/NeedItem2/frag_trea_001_3	饰品包括戒指和项链，分别提升角色的攻击和生命。点击缺失的碎片即可夺取饰品碎片。		2	1	199.0	-2.0
+110	guide_plunder	Click		UI Root/PageManager/PlunderSelect/Center/Grid/OnePercent/robotBtn/plunder	请点击获取		2	1	199.0	-2.0
+111	guide_plunder	WaitArenaPage					2	1	199.0	-2.0
+112	guide_plunder_combine	ClickNPC	start		前往竞技场	npc_002	0	1	199.0	-83.0
+113	guide_plunder_combine	Click		UI Root/PageManager/ArenaPage/MainPage/Left/LeftTween/LeftMain/PVPRaidBtn	请点击夺宝竞技场		2	1	199.0	-2.0
+114	guide_plunder_combine	FindPlunderItem		UI Root/PageManager/ArenaPage/MainPage/PlunderPVPPanel/Center/top/Scroll View/Grid/87_trea_001	 		2	1	-213.0	-107.0
+115	guide_plunder_combine	Click	resume	UI Root/PageManager/ArenaPage/MainPage/PlunderPVPPanel/Center/CombinBtn	集齐饰品的所有碎片即可合成该饰品。请点击合成。		2	1	0.0	0.0
+116	guide_plunder_combine	WaitObject		UI Root/PageManager/TreasureGotPage/Di/ConfirmButton			0	0	0.0	0.0
+117	guide_plunder_combine	Click		UI Root/PageManager/TreasureGotPage/Di/ConfirmButton			2	0	0.0	0.0
+118	guide_plunder_combine	ClickAny			获得的饰品要佩戴到身上才会起效果。现在就去佩戴上吧！		0	1	317.0	-139.0
+119	guide_plunder_combine	Return					0	0	199.0	-2.0
+120	guide_plunder_combine	Click		UI Root/PageManager/TownPage/RightBottm/BottmMenu/Scroll View/GameObject/Grid/HeroFomationBtn	请点击队伍		2	2	199.0	-2.0
+121	guide_plunder_combine	Click		UI Root/PageManager/ArrayPage/Equips/Ring	请点击戒指		2	1	11.0	-37.0
+122	guide_plunder_combine	ClickEquip		UI Root/PageManager/ArrayPage/RightTab/Content/TabEquip/EquipPanel/SimpleGrid/1	 		2	0	0.0	0.0
+123	guide_plunder_combine	Click		UI Root/PageManager/EquipSimplePage/Frame/ButtonEquip	请点击装备		2	1	199.0	-2.0
+124	guide_plunder_combine	ClickAny			您现在可以上阵[FF0000]第四位角色[-]以保证夺宝成功		0	1	0.0	0.0
+125	guide_recycle	ClickAny	start		恭喜！升到16级了！现在可以去回收屋回收资源了！		0	1	199.0	-2.0
+126	guide_recycle	Return					0	0	0.0	0.0
+127	guide_recycle	Transfer				0.5,0.1,14.4	0	0	0.0	0.0
+128	guide_recycle	ClickNPC				npc_003	0	0	0.0	0.0
+129	guide_recycle	WaitObject		UI Root/PageManager/RecyclePage			0	0	0.0	0.0
+130	guide_recycle	ClickAny			回收屋可以分解多余的角色和装备，也可以把角色和装备重置为初始状态。		0	1	199.0	-2.0
+131	guide_recycle	Click		UI Root/PageManager/RecyclePage/MainPage/Top/Top/MemoryBtn	分解角色可以得到滞留之光，滞留之光可以在回忆圣坛兑换角色，请点击回忆圣坛。		2	1	199.0	-2.0
+132	guide_recycle	ClickAny			回忆圣坛每隔一段时间便可免费刷新一次，可以刷出稀有角色碎片。合理利用回忆圣坛，是获取角色的重要途径。		0	1	199.0	-2.0
+133	guide_rush	ClickAny	start		恭喜！升到22级了！现在可以挑战试炼之地了！		0	1	199.0	-2.0
+134	guide_rush	Return					0	0	0.0	0.0
+135	guide_rush	Transfer				-3,10,41.7	0	0	0.0	0.0
+136	guide_rush	ClickNPC				npc_007	0	0	0.0	0.0
+137	guide_rush	WaitObject		UI Root/PageManager/RushPage/BottomCenter/Container/FightBtn	 		0	0	0.0	0.0
+138	guide_rush	ClickAny			挑战试炼之地可获得攻略点数，可用于在试炼商店兑换装备。挑战层数越高，获得的奖励越多。		0	1	199.0	-2.0
+139	guide_rush	Click		UI Root/PageManager/RushPage/BottomCenter/Container/FightBtn	每一层试炼都有特殊的通关条件，需要注意阵容的搭配。现在让我们挑战第一层吧！		2	1	199.0	-2.0
+140	guide_activity_copy	ClickAny	start		恭喜！升到26级了！现在可以挑战活动副本了！		0	1	199.0	-2.0
+141	guide_activity_copy	Return					0	1	199.0	-2.0
+142	guide_activity_copy	Transfer				16.35,4.52,56.26	0	0	0.0	0.0
+143	guide_activity_copy	ClickNPC				npc_011	0	0	0.0	0.0
+144	guide_activity_copy	WaitObject		UI Root/PageManager/ActivityCopyPage			0	0	0.0	0.0
+145	guide_activity_copy	ClickAny			活动副本可以获取大量培养资源，每天均开启不同的活动副本，随着等级的提升，可以解锁更高难度的活动副本。		0	1	199.0	-2.0
+146	guide_activity_copy	ClickAny			记得每天都要来挑战哦！		0	1	199.0	-2.0
+147	guide_expedition	ClickAny	start		恭喜！升到32级了！现在可以执行远征任务了！		0	1	199.0	-2.0
+148	guide_expedition	Return					0	0	0.0	0.0
+149	guide_expedition	Transfer				38.5,-0.5,-6.8	0	0	0.0	0.0
+150	guide_expedition	ClickNPC				npc_008	0	0	0.0	0.0
+151	guide_expedition	WaitObject		UI Root/PageManager/MercenaryTaskPage			0	0	0.0	0.0
+152	guide_expedition	ClickAny			远征可以获得报酬，不同的远征任务获得的报酬也不相同。随着佣兵等级的提升，您可以同时接受更多更高等级的任务，		0	1	199.0	-2.0
+153	guide_expedition	ClickAny			现在请挑选一个任务开始远征吧！		0	1	199.0	-2.0
+154	guide_field_fish	ClickAny	start		恭喜！升到18级了！现在可以前往野外进行钓鱼和挖矿了！		0	1	199.0	-2.0
+155	guide_field_fish	Return					0	0	0.0	0.0
+156	guide_field_fish	Transfer				41.1,-2.2,-42.3	0	0	0.0	0.0
+157	guide_field_fish	Move				43.6,-2.2,-45.4	0	0	0.0	0.0
+158	guide_field_fish	WaitObject		UI Root/PageManager/WorldMapPage/bg/map/caoyuan/0	 		0	0	0.0	0.0
+159	guide_field_fish	Click		UI Root/PageManager/WorldMapPage/bg/map/caoyuan/0	 		2	0	0.0	0.0
+160	guide_field_fish	WaitSelfCreated	field				0	0	0.0	0.0
+161	guide_field_fish	ClickAny			野外可以进行钓鱼和挖矿，可以分别获得食材和矿石。现在我们就去钓鱼吧！		0	1	199.0	-2.0
+162	guide_field_fish	GuideFish					0	0	0.0	0.0
+163	guide_field_fish	Click		UI Root/RoomUIManager/group_fish_001@fish_pos_0/_UIInnerButton(Clone)/btn	点击开始钓鱼。		2	1	199.0	-2.0
+164	guide_field_fish	WaitObject		UI Root/PageManager/ShowGet(Clone)/Panel/Di/ConfirmBtn	 		0	0	0.0	0.0
+165	guide_field_fish	Click		UI Root/PageManager/ShowGet(Clone)/Panel/Di/ConfirmBtn	 		2	0	0.0	0.0
+166	guide_field_mine	ClickAny	start		恭喜！升到18级了！现在可以前往野外进行钓鱼和挖矿了！		0	1	199.0	-2.0
+167	guide_field_mine	Return					0	0	0.0	0.0
+168	guide_field_mine	Transfer				41.1,-2.2,-42.3	0	0	0.0	0.0
+169	guide_field_mine	Move				43.6,-2.2,-45.4	0	0	0.0	0.0
+170	guide_field_mine	WaitObject		UI Root/PageManager/WorldMapPage/bg/map/caoyuan/0	 		0	0	0.0	0.0
+171	guide_field_mine	Click		UI Root/PageManager/WorldMapPage/bg/map/caoyuan/0	 		2	0	0.0	0.0
+172	guide_field_mine	WaitSelfCreated	field							
+173	guide_field_mine	ClickAny	resume		接下来让我们去挖矿吧！		0	1	199.0	-2.0
+174	guide_field_mine	GuideMine					0	0	0.0	0.0
+175	guide_field_mine	Click		UI Root/RoomUIManager/group_mine_001@mine_pos_0/_UIInnerButton(Clone)/btn	点击开始挖矿。		2	0	0.0	0.0
+176	guide_field_mine	WaitObject		UI Root/PageManager/ShowGet(Clone)/Panel/Di/ConfirmBtn	 		0	0	0.0	0.0
+177	guide_field_mine	Click		UI Root/PageManager/ShowGet(Clone)/Panel/Di/ConfirmBtn	 		2	0	0.0	0.0
+178	guide_field_mine	ClickAny			有了食材和矿石，我们就可以制作料理和宝石了。以后我们再学习具体操作，现在随便在野区逛逛吧！		0	1	199.0	-2.0
+179	guide_cook_room	ClickAny	start		野外钓到的食材可以在料理屋进行烹饪，不同的料理有不同的功能，可以根据需要制作想要的料理。		0	1	199.0	-2.0
+180	guide_smelt_room	ClickAny	start		野外挖到的矿石可以在冶炼屋进行提炼，提炼可获得制作宝石的原材料。矿石需要集齐5个才能提炼。		0	1	199.0	-2.0
+181	guide_smelt_room	ClickAny			材料充足便可制作宝石。制作宝石可以获得冶炼经验，提升冶炼等级。随着冶炼等级的提高，可以制作更高等级的宝石。		0	1	199.0	-2.0
+182	guide_union	ClickAny	start		恭喜！升到30级了！现在可以加入公会，与其他玩家一起冒险了！		0	1	199.0	-2.0
+183	guide_union	Return					0	0	0.0	0.0
+184	guide_union	Transfer				-8.6,10.08,36.54	0	0	0.0	0.0
+185	guide_union	ClickNPC				npc_006	0	0	0.0	0.0
+186	guide_union	WaitObject		UI Root/PageManager/UnionPage			0	0	0.0	0.0
+187	guide_union	ClickAny			请选择要加入的公会。加入公会后，只要公会活跃度达到要求，每月月底便可领取公会礼包。		0	1	199.0	-2.0
+188	guide_pet	ClickAny	start		恭喜升到34级，现在可以召唤守护精灵了！		0	1	199.0	-2.0
+189	guide_pet	Return					0	0	0.0	0.0
+190	guide_pet	Click		UI Root/PageManager/TownPage/RightBottm/BottmMenu/Scroll View/GameObject/Grid/ShopBtn	请点击商店		2	1	199.0	-149.0
+191	guide_pet	Click		UI Root/PageManager/ShopPage/Panel/LeftTabs/TabBg/layer_scroll/ScrollView/SimpleGrid/PetRecruit	请点击精灵扭蛋。		2	1	199.0	-2.0
+192	guide_pet	Click		UI Root/PageManager/ShopPage/Panel/Right/PetRecruit/Center/leftInfo/OneBtn	现在让我们抽取第一个守护精灵吧！	OnRecruitGuide	2	1	199.0	-2.0
+193	guide_pet	Wait				5	0	0	0.0	0.0
+194	guide_pet	Click		UI Root/PageManager/PetRecruitResultPageOne/Panel/ContainerGet/Mask (1)			0	0	0.0	0.0
+195	guide_pet	ClickAny			有了新的精灵，现在就携带它一起出战吧！		0	1	199.0	-2.0
+196	guide_pet	Return					0	0	0.0	0.0
+197	guide_pet	Click		UI Root/PageManager/TownPage/RightBottm/BottmMenu/Scroll View/GameObject/Grid/HeroFomationBtn	请点击队伍		2	2	138.0	-56.0
+198	guide_pet	Click		UI Root/PageManager/ArrayPage/BtnPET	请点击“精灵”。		2	1	199.0	-2.0
+199	guide_pet	Click		UI Root/PageManager/HeroReplacePage/Frame/HeroScrollView/SimpleGrid/0/Button	请点击“出战”，即可携带精灵一起战斗！		2	1	199.0	-2.0
+200	guide_pet	ClickAny			携带精灵一起出战，可以提升精灵的亲密度，快快去攻略前线吧！		0	1	199.0	-2.0
+201	guide_speed	Click	start	UI Root/BattlePanel/Top/right/speedBtn	战斗中点击可以开启二倍速，让战斗更加快速		1	2	216.0	-32.0
+202	guide_sweep	ClickAny	start		想要快速升级，可以尝试点击扫荡哦！		0	1	199.0	-95.0
+202	guide_sweep	ReturnPage				UICopy	0	0	0.0	0.0
+202	guide_sweep	Click		UI Root/PageManager/UICopy/Panel/body/offset/Right/Bottom/Bottom/SweepBtn	点击扫荡		1	1	199.0	-95.0
+203	guide_arraypos5	ClickAny	start		可以点击上阵第五个英雄参战啦！！		0	2	216.0	-103.0
+204	guide_arraypos5	Return					0	0	0.0	0.0
+205	guide_arraypos5	Click		UI Root/PageManager/TownPage/RightBottm/BottmMenu/Scroll View/GameObject/Grid/HeroFomationBtn	请点击队伍		2	2	138.0	-56.0
+206	guide_arraypos5	Click		UI Root/PageManager/ArrayPage/ArrayHeros/HeroIcons/HeroScroll/Pos5/Positon5	新的小伙伴在这里添加		2	1	-331.0	-38.0
+207	guide_skipBattle	Click	start	UI Root/BattlePanel/Top/right/jumpBtn	点击可以快速跳过战斗啦！！		1	2	216.0	-32.0
+208	guide_formation	ClickAny	start		可以编辑新的阵法啦！		0	1	199.0	-2.0
+209	guide_formation	Return					0	0	0.0	0.0
+210	guide_formation	Click		UI Root/PageManager/TownPage/RightBottm/BottmMenu/Scroll View/GameObject/Grid/HeroFomationBtn	请点击队伍		2	2	138.0	-56.0
+211	guide_formation	Click		UI Root/PageManager/ArrayPage/ArrayHeros/HeroIcons/HeroScroll/Buzhen	请点击布阵，进行阵法编辑		2	2	138.0	-56.0
+212	guide_formation	Click		UI Root/PageManager/FormationPopupPage/Panel/TabsBk/ScrollView/SimpleGrid/2	请点击阵法		2	2	-115.0	-56.0
+213	guide_formation	Click		UI Root/PageManager/FormationPopupPage/Panel/body/Bottom/BtnOpen	请点击开启当前阵法		2	2	91.0	-180.0
+214	guide_formation	Click		UI Root/PageManager/FormationPopupPage/Panel/UnLockFormation/Di/Main/Button	请点击解锁按钮		1	2	328.0	-167.0
+215	guide_formation	Click		UI Root/PageManager/FormationPopupPage/Panel/body/Bottom/BtnSetBattle	请点击出战按钮		2	2	138.0	-56.0
+216	guide_formation	ClickAny			阵法已出战，马上到前线去试试吧		0	1	-310.0	80.0

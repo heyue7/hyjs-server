@@ -1,0 +1,31 @@
+# Local app-only entry point. Do not combine with compose.yaml, whose database
+# service remains a deployment template for independently managed environments.
+services:
+  hyjs:
+    build:
+      context: .
+      dockerfile: hyjs-server/Dockerfile
+    ports:
+      - "127.0.0.1:18088:18088"
+      - "127.0.0.1:19098:19098"
+    environment:
+      HYJS_MYSQL_HOST: codex-local-mysql:3306
+      HYJS_MYSQL_USER: ${MYSQL_USER:?Use the allocated hyjs project env file}
+      HYJS_MYSQL_DATABASE: ${MYSQL_DATABASE:?Use the allocated hyjs project env file}
+      HYJS_MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Use the allocated hyjs project env file}
+    networks:
+      - codex-local-services
+    command:
+      - --bind
+      - 0.0.0.0
+      - --advertise-host
+      - ${HYJS_ADVERTISE_HOST:-127.0.0.1}
+      - --http-port
+      - "18088"
+      - --tcp-port
+      - "19098"
+      - --tables
+      - /app/tables
+networks:
+  codex-local-services:
+    external: true
