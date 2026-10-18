@@ -57,11 +57,14 @@ def verify_managed(before, after):
 
 def main():
     p = argparse.ArgumentParser(description=__doc__)
+    p.add_argument("--base-apk", type=Path, help="Explicit qualified b982 baseline; promotion normally moves it to the rollback path")
     p.add_argument("--output", type=Path, required=True)
     p.add_argument("--record", type=Path, required=True)
     p.add_argument("--preview-without-art", action="store_true", help="Temporary UI verification only; never a final deliverable")
     args = p.parse_args()
-    base = ROOT / "apks/build/hyjs-local.apk"
+    base = args.base_apk.resolve() if args.base_apk else ROOT / "apks/build/hyjs-local.apk"
+    if not args.base_apk and common.digest(base) != BASE:
+        base = ROOT / "apks/build/hyjs-rollback.apk"
     output, record = args.output.resolve(), args.record.resolve()
     require(output.parent == ROOT / "apks/build" and not output.exists() and not record.exists(), "Use fresh owned output and record")
     require(common.digest(base) == BASE, "Qualified base changed")
