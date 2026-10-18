@@ -1,0 +1,423 @@
+[
+  {
+    "seed": 3691244412681484629,
+    "attacker": {
+      "formation": [
+        {
+          "id": "hero_062",
+          "guid": "arena-feedback-attacker-0",
+          "skillOrder": "062_2,062_1,062_3",
+          "prop": {
+            "att": 209.0,
+            "hp": 5919.599999999999,
+            "pdef": 104.0,
+            "mdef": 126.0,
+            "cri": 10.0,
+            "hit": 95.0,
+            "antiCri": 0.0,
+            "dodge": 5.0,
+            "damageAdd": 4.0,
+            "damageReduce": 4.0,
+            "criFactor": 50.0
+          },
+          "level": 7,
+          "pose": 3,
+          "inst": {
+            "curHp": 5919.599999999999
+          },
+          "breachedLevel": 1,
+          "SkillCastChance": 100.0,
+          "bloodNumber": 1,
+          "awakenSkill": "",
+          "awakeStage": 0
+        },
+        {
+          "id": "hero_047",
+          "guid": "arena-feedback-attacker-1",
+          "skillOrder": "047_2,047_1,047_3",
+          "prop": {
+            "att": 118.0,
+            "hp": 2334.0,
+            "pdef": 61.0,
+            "mdef": 71.0,
+            "cri": 10.0,
+            "hit": 95.0,
+            "antiCri": 0.0,
+            "dodge": 5.0,
+            "damageAdd": 0.0,
+            "damageReduce": 0.0,
+            "criFactor": 50.0
+          },
+          "level": 10,
+          "pose": 7,
+          "inst": {
+            "curHp": 2334.0
+          },
+          "breachedLevel": 1,
+          "SkillCastChance": 100.0,
+          "bloodNumber": 1,
+          "awakenSkill": "",
+          "awakeStage": 0
+        },
+        {
+          "id": "hero_023",
+          "guid": "arena-feedback-attacker-2",
+          "skillOrder": "023_1,023_2,023_3",
+          "prop": {
+            "att": 127.0,
+            "hp": 2933.0,
+            "pdef": 69.0,
+            "mdef": 71.0,
+            "cri": 10.0,
+            "hit": 95.0,
+            "antiCri": 0.0,
+            "dodge": 5.0,
+            "damageAdd": 0.0,
+            "damageReduce": 0.0,
+            "criFactor": 50.0
+          },
+          "level": 7,
+          "pose": 9,
+          "inst": {
+            "curHp": 2933.0
+          },
+          "breachedLevel": 1,
+          "SkillCastChance": 100.0,
+          "bloodNumber": 1,
+          "awakenSkill": "",
+          "awakeStage": 0
+        }
+      ],
+      "inst": {
+        "anger": 0.0,
+        "firstOrder": 1
+      }
+    },
+    "defender": {
+      "formation": [
+        {
+          "id": "hero_001",
+          "guid": "arena-feedback-defender-0",
+          "skillOrder": "001_1,001_2,001_3",
+          "prop": {
+            "att": 688.0,
+            "hp": 13834.0,
+            "pdef": 320.0,
+            "mdef": 303.0,
+            "cri": 10.0,
+            "hit": 95.0,
+            "antiCri": 0.0,
+            "dodge": 5.0,
+            "damageAdd": 0.0,
+            "damageReduce": 0.0,
+            "criFactor": 50.0
+          },
+          "level": 75,
+          "pose": 3,
+          "inst": {
+            "curHp": 13834.0
+          },
+          "breachedLevel": 1,
+          "SkillCastChance": 100.0,
+          "bloodNumber": 1,
+          "awakenSkill": "",
+          "awakeStage": 0
+        },
+        {
+          "id": "hero_003",
+          "guid": "arena-feedback-defender-1",
+          "skillOrder": "003_1,003_2,003_3",
+          "prop": {
+            "att": 166.0,
+            "hp": 3760.0,
+            "pdef": 95.0,
+            "mdef": 91.0,
+            "cri": 10.0,
+            "hit": 95.0,
+            "antiCri": 0.0,
+            "dodge": 5.0,
+            "damageAdd": 0.0,
+            "damageReduce": 0.0,
+            "criFactor": 50.0
+          },
+          "level": 3,
+          "pose": 7,
+          "inst": {
+            "curHp": 3760.0
+          },
+          "breachedLevel": 1,
+          "SkillCastChance": 100.0,
+          "bloodNumber": 1,
+          "awakenSkill": "",
+          "awakeStage": 0
+        }
+      ],
+      "inst": {
+        "anger": 0.0,
+        "firstOrder": 0
+      }
+    }
+  },
+  {
+    "seed": 5893244788243419404,
+    "attacker": {
+      "formation": [
+        {
+          "id": "hero_062",
+          "guid": "arena-feedback-attacker-0",
+          "skillOrder": "062_2,062_1,062_3",
+          "prop": {
+            "att": 209.0,
+            "hp": 5919.599999999999,
+            "pdef": 104.0,
+            "mdef": 126.0,
+            "cri": 10.0,
+            "hit": 95.0,
+            "antiCri": 0.0,
+            "dodge": 5.0,
+            "damageAdd": 4.0,
+            "damageReduce": 4.0,
+            "criFactor": 50.0
+          },
+          "level": 7,
+          "pose": 3,
+          "inst": {
+            "curHp": 5919.599999999999
+          },
+          "breachedLevel": 1,
+          "SkillCastChance": 100.0,
+          "bloodNumber": 1,
+          "awakenSkill": "",
+          "awakeStage": 0
+        },
+        {
+          "id": "hero_047",
+          "guid": "arena-feedback-attacker-1",
+          "skillOrder": "047_2,047_1,047_3",
+          "prop": {
+            "att": 118.0,
+            "hp": 2334.0,
+            "pdef": 61.0,
+            "mdef": 71.0,
+            "cri": 10.0,
+            "hit": 95.0,
+            "antiCri": 0.0,
+            "dodge": 5.0,
+            "damageAdd": 0.0,
+            "damageReduce": 0.0,
+            "criFactor": 50.0
+          },
+          "level": 10,
+          "pose": 7,
+          "inst": {
+            "curHp": 2334.0
+          },
+          "breachedLevel": 1,
+          "SkillCastChance": 100.0,
+          "bloodNumber": 1,
+          "awakenSkill": "",
+          "awakeStage": 0
+        },
+        {
+          "id": "hero_023",
+          "guid": "arena-feedback-attacker-2",
+          "skillOrder": "023_1,023_2,023_3",
+          "prop": {
+            "att": 127.0,
+            "hp": 2933.0,
+            "pdef": 69.0,
+            "mdef": 71.0,
+            "cri": 10.0,
+            "hit": 95.0,
+            "antiCri": 0.0,
+            "dodge": 5.0,
+            "damageAdd": 0.0,
+            "damageReduce": 0.0,
+            "criFactor": 50.0
+          },
+          "level": 7,
+          "pose": 9,
+          "inst": {
+            "curHp": 2933.0
+          },
+          "breachedLevel": 1,
+          "SkillCastChance": 100.0,
+          "bloodNumber": 1,
+          "awakenSkill": "",
+          "awakeStage": 0
+        }
+      ],
+      "inst": {
+        "anger": 0.0,
+        "firstOrder": 1
+      }
+    },
+    "defender": {
+      "formation": [
+        {
+          "id": "hero_047",
+          "guid": "arena-feedback-defender-0",
+          "skillOrder": "047_1,047_2,047_3",
+          "prop": {
+            "att": 58.0,
+            "hp": 1300.0,
+            "pdef": 33.0,
+            "mdef": 33.0,
+            "cri": 10.0,
+            "hit": 95.0,
+            "antiCri": 0.0,
+            "dodge": 5.0,
+            "damageAdd": 0.0,
+            "damageReduce": 0.0,
+            "criFactor": 50.0
+          },
+          "level": 1,
+          "pose": 3,
+          "inst": {
+            "curHp": 1300.0
+          },
+          "breachedLevel": 1,
+          "SkillCastChance": 100.0,
+          "bloodNumber": 1,
+          "awakenSkill": "",
+          "awakeStage": 0
+        }
+      ],
+      "inst": {
+        "anger": 0.0,
+        "firstOrder": 0
+      }
+    }
+  },
+  {
+    "seed": 7486954510546029870,
+    "attacker": {
+      "formation": [
+        {
+          "id": "hero_062",
+          "guid": "arena-feedback-attacker-0",
+          "skillOrder": "062_2,062_1,062_3",
+          "prop": {
+            "att": 209.0,
+            "hp": 5919.599999999999,
+            "pdef": 104.0,
+            "mdef": 126.0,
+            "cri": 10.0,
+            "hit": 95.0,
+            "antiCri": 0.0,
+            "dodge": 5.0,
+            "damageAdd": 4.0,
+            "damageReduce": 4.0,
+            "criFactor": 50.0
+          },
+          "level": 7,
+          "pose": 3,
+          "inst": {
+            "curHp": 5919.599999999999
+          },
+          "breachedLevel": 1,
+          "SkillCastChance": 100.0,
+          "bloodNumber": 1,
+          "awakenSkill": "",
+          "awakeStage": 0
+        },
+        {
+          "id": "hero_047",
+          "guid": "arena-feedback-attacker-1",
+          "skillOrder": "047_2,047_1,047_3",
+          "prop": {
+            "att": 118.0,
+            "hp": 2334.0,
+            "pdef": 61.0,
+            "mdef": 71.0,
+            "cri": 10.0,
+            "hit": 95.0,
+            "antiCri": 0.0,
+            "dodge": 5.0,
+            "damageAdd": 0.0,
+            "damageReduce": 0.0,
+            "criFactor": 50.0
+          },
+          "level": 10,
+          "pose": 7,
+          "inst": {
+            "curHp": 2334.0
+          },
+          "breachedLevel": 1,
+          "SkillCastChance": 100.0,
+          "bloodNumber": 1,
+          "awakenSkill": "",
+          "awakeStage": 0
+        },
+        {
+          "id": "hero_023",
+          "guid": "arena-feedback-attacker-2",
+          "skillOrder": "023_1,023_2,023_3",
+          "prop": {
+            "att": 127.0,
+            "hp": 2933.0,
+            "pdef": 69.0,
+            "mdef": 71.0,
+            "cri": 10.0,
+            "hit": 95.0,
+            "antiCri": 0.0,
+            "dodge": 5.0,
+            "damageAdd": 0.0,
+            "damageReduce": 0.0,
+            "criFactor": 50.0
+          },
+          "level": 7,
+          "pose": 9,
+          "inst": {
+            "curHp": 2933.0
+          },
+          "breachedLevel": 1,
+          "SkillCastChance": 100.0,
+          "bloodNumber": 1,
+          "awakenSkill": "",
+          "awakeStage": 0
+        }
+      ],
+      "inst": {
+        "anger": 0.0,
+        "firstOrder": 1
+      }
+    },
+    "defender": {
+      "formation": [
+        {
+          "id": "hero_047",
+          "guid": "arena-feedback-defender-0",
+          "skillOrder": "047_1,047_2,047_3",
+          "prop": {
+            "att": 58.0,
+            "hp": 1300.0,
+            "pdef": 33.0,
+            "mdef": 33.0,
+            "cri": 10.0,
+            "hit": 95.0,
+            "antiCri": 0.0,
+            "dodge": 5.0,
+            "damageAdd": 0.0,
+            "damageReduce": 0.0,
+            "criFactor": 50.0
+          },
+          "level": 1,
+          "pose": 3,
+          "inst": {
+            "curHp": 1300.0
+          },
+          "breachedLevel": 1,
+          "SkillCastChance": 100.0,
+          "bloodNumber": 1,
+          "awakenSkill": "",
+          "awakeStage": 0
+        }
+      ],
+      "inst": {
+        "anger": 0.0,
+        "firstOrder": 0
+      }
+    }
+  }
+]

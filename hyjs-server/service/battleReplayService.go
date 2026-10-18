@@ -159,6 +159,8 @@ func (s *GameService) FreezeBattleInput(input model.FrozenBattleInput) (*model.F
 			return nil, fmt.Errorf("%s: %s", constUtil.CombatInvalid, name)
 		}
 	}
+	// Preserve the original combat source when catalog-only green rows are unused.
+	p15NormalizeUnusedGreenCombatRows(&out, input.ConfigurationHash)
 	out.AppliedProperties = map[string][]string{}
 	for key, ids := range input.AppliedProperties {
 		out.AppliedProperties[key] = append([]string(nil), ids...)

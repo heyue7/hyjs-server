@@ -13,7 +13,7 @@ import (
 // pending proofs keep this draft closed; no Rush/old actor proof is borrowed.
 func p11GenericMechanismProof(input *model.FrozenBattleInput) (string, error) {
 	reject := func() (string, error) { return "", errors.New(constUtil.CombatUnsupported) }
-	if input == nil || input.Attacker == nil || input.Defender == nil || input.Monster != nil || input.Attacker.Inst == nil || input.Defender.Inst == nil || input.KFReplay != nil || input.KFReplayViewer != nil || input.IsAttToDef || len(input.WinConditions) != 0 || input.PVECompatibilityRule != "" || input.DiagnosticAIDriverPolicy != "" || input.DiagnosticManualAutoStartRoundTime != nil || input.EngineVersion != constUtil.P6EngineVersion || input.ClientVersion != constUtil.P6OriginalClientHash || input.ConfigurationHash != constUtil.P6LinearPhysicalTables {
+	if input == nil || input.Attacker == nil || input.Defender == nil || input.Monster != nil || input.Attacker.Inst == nil || input.Defender.Inst == nil || input.KFReplay != nil || input.KFReplayViewer != nil || input.IsAttToDef || len(input.WinConditions) != 0 || input.PVECompatibilityRule != "" || input.DiagnosticAIDriverPolicy != "" || input.DiagnosticManualAutoStartRoundTime != nil || input.EngineVersion != constUtil.P6EngineVersion || input.ClientVersion != constUtil.P6OriginalClientHash || (input.ConfigurationHash != constUtil.P6LinearPhysicalTables && !p15GreenCombatSourceCompatible(input)) {
 		return reject()
 	}
 	maximum := int32(40)
