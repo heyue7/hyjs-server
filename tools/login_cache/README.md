@@ -4,12 +4,13 @@
 `build/hyjs-login-cache-final-candidate.apk`; it never promotes current or rollback.
 The original registration, modern IME, announcement, tutorial and wallet remain.
 
-The original login panel gains two small native checkbox labels, initially off:
-`记住密码` and `自动登录`. Auto implies remember. Unchecking remember immediately
-clears the encrypted cache and auto option. Only an accepted successful original
-`SCUserLogin` response commits credentials. Registration success, old prefs,
-draft input and failed logins cannot seed automatic login. The original character
-creation path runs after original login as before.
+The current login panel shows `记住密码` only. Automatic login is hidden and
+disabled, including legacy encrypted preferences whose `auto` field was true.
+`boot` and `ready` preserve the managed bridge ABI but never submit login;
+showing the form always waits for the user's login button or IME action.
+Remembered credentials still prefill. Android system autofill remains enabled.
+Only an accepted successful original `SCUserLogin` response commits credentials;
+unchecking remember clears that encrypted cache.
 
 Storage uses Android Keystore AES/GCM (`hyjs.remember-login.v1`) and the private
 `hyjs-encrypted-login-v1` SharedPreferences file, containing only `ciphertext` and
@@ -18,11 +19,6 @@ No session is persisted. The original `userName` / `passWord` PlayerPrefs keys
 are deleted individually on login initialization; their four original accessors
 now use Java process-memory strings. No old plaintext credentials are imported.
 The existing stripped original authCode log remains stripped.
-
-Cold start consumes auto at most once. Explicit account switching or returning
-to login suppresses automatic login for the running process while preserving an
-explicitly remembered encrypted credential for the next cold start. Failures and
-20-second timeout return to the original manual input and reset `isLogining`.
 
 Each original network delegate is bound to a fresh `MemberwiseClone` snapshot
 of the original login state with an immutable RuntimeHelpers identity. Java rejects zero and every identity already seen in the process, so collisions and GC identity reuse cannot authenticate a later request. The network delegate retains its snapshot while pending. The original callback's

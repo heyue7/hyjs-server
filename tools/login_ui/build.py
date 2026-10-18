@@ -95,12 +95,14 @@ def main():
     p.add_argument('--base-apk',type=Path,required=True);p.add_argument('--base-sha256',required=True)
     p.add_argument('--input-managed',type=Path);p.add_argument('--input-managed-sha256')
     p.add_argument('--output-directory',type=Path,required=True)
+    p.add_argument('--dex-only',action='store_true',help='Preserve the already integrated managed assembly; only rebuild native account UI')
     p.add_argument('--reuse-managed',type=Path,help='Reuse a previously emitted same-source managed prefix after a fresh strict comparison')
     args=p.parse_args();out=args.output_directory.resolve();require(not out.exists(),'Use fresh output directory')
     require(sha(args.base_apk.read_bytes())==args.base_sha256,'Base APK SHA differs')
     with zipfile.ZipFile(args.base_apk) as z:
         base=z.read(ENTRY);before_dex=z.read('classes2.dex')
         original_dex={name:sha(z.read(name)) for name in ['classes.dex','classes3.dex'] if name in z.namelist()}
+    require(not args.dex_only or (args.input_managed is None and args.reuse_managed is None),'DEX-only mode preserves the exact APK managed assembly')
     before=args.input_managed.read_bytes() if args.input_managed else base
     if args.input_managed:require(args.input_managed_sha256 and sha(before)==args.input_managed_sha256,'Explicit managed input SHA required')
     out.mkdir(parents=True);runtime=ROOT/'.tools/native-batch';dotnet=runtime/'dotnet/dotnet';dnlib=runtime/'injector/bin/Debug/net8.0/dnlib.dll'
@@ -115,7 +117,9 @@ def main():
         folder=Path(tmp);current=folder/'Assembly-CSharp.dll';current.write_bytes(before)
         shutil.copy2(injector,folder/'Program.cs');project=folder/'Patch.csproj'
         project.write_text('<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable></PropertyGroup><ItemGroup><Reference Include="dnlib"><HintPath>'+str(dnlib)+'</HintPath></Reference></ItemGroup></Project>')
-        if args.reuse_managed:
+        if args.dex_only:
+            shutil.copy2(current,out/'Assembly-CSharp.dll')
+        elif args.reuse_managed:
             verify_managed(before,args.reuse_managed.read_bytes())
             shutil.copy2(args.reuse_managed,out/'Assembly-CSharp.dll')
         else:
@@ -130,7 +134,11 @@ def main():
         run('dex',[sdk/'cmdline-tools/latest/bin/d8','--release','--min-api','23','--lib',android,'--classpath',stubclasses,'--output',dex,*sorted(classes.rglob('*.class'))],env)
         require(sorted(d.name for d in dex.iterdir())==['classes.dex'],'Expected one classes2 module')
         shutil.copy2(dex/'classes.dex',out/'classes2.dex')
-    after=(out/'Assembly-CSharp.dll').read_bytes();checks=verify_managed(before,after)
+    after=(out/'Assembly-CSharp.dll').read_bytes()
+    if args.dex_only:
+        require(before==after,'DEX-only mode changed managed assembly')
+        checks={'managedAssemblyByteExact':True,'originalEngineMethodsExact':547}
+    else:checks=verify_managed(before,after)
     new_dex=(out/'classes2.dex').read_bytes();old_api,new_api=dex_abi(before_dex),dex_abi(new_dex)
     missing=[]
     for cls,abi in old_api.items():

@@ -43,7 +43,7 @@ public final class LoginCache {
     private static LinearLayout row;
     private static boolean formVisible;
     private static String formUser="",formPass="",returnUser="",returnPass="";
-    private static CheckBox rememberBox,autoBox;
+    private static CheckBox rememberBox;
     private static Activity activity()throws Exception{return (Activity)Class.forName("com.unity3d.player.UnityPlayer").getField("currentActivity").get(null);}
     private static void send(String object,String method){try{Class.forName("com.unity3d.player.UnityPlayer").getMethod("UnitySendMessage",String.class,String.class,String.class).invoke(null,object,method,"");}catch(Exception ignored){}}
     private static SecretKey key()throws Exception{
@@ -62,14 +62,14 @@ public final class LoginCache {
             if(data==null||iv==null)return;
             Cipher cipher=Cipher.getInstance("AES/GCM/NoPadding");cipher.init(Cipher.DECRYPT_MODE,key(),new GCMParameterSpec(128,Base64.decode(iv,Base64.NO_WRAP)));
             JSONObject value=new JSONObject(new String(cipher.doFinal(Base64.decode(data,Base64.NO_WRAP)),"UTF-8"));
-            savedUser=value.getString("username");savedPassword=value.getString("password");remember=!savedUser.isEmpty()&&!savedPassword.isEmpty();automatic=remember&&value.optBoolean("auto");
+            savedUser=value.getString("username");savedPassword=value.getString("password");remember=!savedUser.isEmpty()&&!savedPassword.isEmpty();automatic=false;
         }catch(Exception unusable){clear();}
     }
     private static void clear(){savedUser="";savedPassword="";try{prefs().edit().clear().commit();}catch(Exception ignored){}}
     private static void save(){
         if(!remember){clear();return;}
         try{
-            JSONObject value=new JSONObject().put("username",savedUser).put("password",savedPassword).put("auto",automatic);
+            JSONObject value=new JSONObject().put("username",savedUser).put("password",savedPassword).put("auto",false);
             Cipher cipher=Cipher.getInstance("AES/GCM/NoPadding");cipher.init(Cipher.ENCRYPT_MODE,key());
             byte[] encrypted=cipher.doFinal(value.toString().getBytes("UTF-8"));
             if(!prefs().edit().putString("ciphertext",Base64.encodeToString(encrypted,Base64.NO_WRAP)).putString("iv",Base64.encodeToString(cipher.getIV(),Base64.NO_WRAP)).commit())throw new Exception();
@@ -81,7 +81,7 @@ public final class LoginCache {
     public static synchronized String transientPassWord(){return transientPassword;}
     public static synchronized void setTransientUserName(String value){transientUser=value==null?"":value;}
     public static synchronized void setTransientPassWord(String value){transientPassword=value==null?"":value;}
-    public static synchronized void boot(String object){load();loginOwner=object;if(automatic&&!suppressed&&!autoConsumed&&!bootQueued){bootQueued=true;UI.postDelayed(()->{synchronized(LoginCache.class){if(!suppressed&&!autoConsumed)send(loginOwner,"OnPressLogin");}},350);}}
+    public static synchronized void boot(String object){load();loginOwner=object;automatic=false;autoAttempt=false;suppressed=true;}
     public static synchronized boolean hasForm(){return formVisible;}
     public static synchronized String formUserName(){return formUser;}
     public static synchronized String formPassWord(){return formPass;}
@@ -93,8 +93,7 @@ public final class LoginCache {
     public static void registered(String username,String password){synchronized(LoginCache.class){returnUser=username;returnPass=password;}reopen();}
     public static synchronized void show(String object){
         load();owner=object;final String target=object;
-        final boolean shouldAuto=automatic&&!suppressed&&!autoConsumed;
-        if(shouldAuto){autoConsumed=true;autoAttempt=true;UI.postDelayed(()->{synchronized(LoginCache.class){if(autoAttempt&&active==0)fail();}},20000);}
+        automatic=false;autoAttempt=false;
         UI.post(()->{
             hideNow();try{
                 Activity a=activity();if(a==null||a.isFinishing())return;
@@ -115,13 +114,11 @@ public final class LoginCache {
                 };
                 username.addTextChangedListener(watcher);password.addTextChangedListener(watcher);
                 row=new LinearLayout(a);row.setOrientation(LinearLayout.HORIZONTAL);row.setGravity(android.view.Gravity.CENTER_VERTICAL);
-                rememberBox=box(a,"记住密码");autoBox=box(a,"自动登录");
-                rememberBox.setChecked(remember);autoBox.setChecked(automatic);
+                rememberBox=box(a,"记住密码");
+                rememberBox.setChecked(remember);
                 row.addView(rememberBox,new LinearLayout.LayoutParams(0,LoginStyle.dp(a,46),1f));
-                row.addView(autoBox,new LinearLayout.LayoutParams(0,LoginStyle.dp(a,46),1f));
                 body.addView(row,new LinearLayout.LayoutParams(-1,LoginStyle.dp(a,48)));
-                rememberBox.setOnCheckedChangeListener((button,checked)->{synchronized(LoginCache.class){remember=checked;if(!checked){automatic=false;autoBox.setChecked(false);clear();}}});
-                autoBox.setOnCheckedChangeListener((button,checked)->{synchronized(LoginCache.class){automatic=checked;if(checked){remember=true;rememberBox.setChecked(true);}else if(autoAttempt){autoAttempt=false;suppressed=true;}if(!savedUser.isEmpty())save();}});
+                rememberBox.setOnCheckedChangeListener((button,checked)->{synchronized(LoginCache.class){remember=checked;if(!checked){automatic=false;clear();}}});
                 Button login=LoginStyle.button(a,"登 录",true);
                 LinearLayout.LayoutParams loginLayout=new LinearLayout.LayoutParams(-1,LoginStyle.dp(a,44));loginLayout.topMargin=LoginStyle.dp(a,4);body.addView(login,loginLayout);
                 LinearLayout actions=new LinearLayout(a);actions.setOrientation(LinearLayout.HORIZONTAL);
@@ -135,17 +132,16 @@ public final class LoginCache {
                 close.setOnClickListener(view->{manual();send(target,"OnCloseButtonClick");});
                 opened.setContentView(LoginStyle.panel(a,body));opened.setCanceledOnTouchOutside(false);
                 opened.setOnCancelListener(ignored->{manual();send(target,"OnCloseButtonClick");});
-                opened.setOnDismissListener(ignored->{synchronized(LoginCache.class){if(dialog==opened){dialog=null;formVisible=false;formUser="";formPass="";row=null;rememberBox=null;autoBox=null;}}username.setText("");password.setText("");});
+                opened.setOnDismissListener(ignored->{synchronized(LoginCache.class){if(dialog==opened){dialog=null;formVisible=false;formUser="";formPass="";row=null;rememberBox=null;}}username.setText("");password.setText("");});
                 synchronized(LoginCache.class){dialog=opened;formVisible=true;}
                 opened.show();LoginStyle.fit(a,opened);body.setFocusableInTouchMode(true);body.requestFocus();
-                if(shouldAuto)UI.postDelayed(()->{synchronized(LoginCache.class){if(!suppressed&&autoAttempt&&dialog==opened&&formVisible)send(target,"OnLoginButton");}},500);
             }catch(Exception unavailable){fail();}
         });
     }
     private static CheckBox box(Activity a,String title){CheckBox result=new CheckBox(a);result.setText(title);result.setTextColor(LoginStyle.INK);result.setTextSize(15);result.setPadding(LoginStyle.dp(a,2),0,LoginStyle.dp(a,8),0);result.setButtonTintList(android.content.res.ColorStateList.valueOf(LoginStyle.BLUE));return result;}
-    private static void hideNow(){Dialog previous;synchronized(LoginCache.class){previous=dialog;dialog=null;formVisible=false;formUser="";formPass="";row=null;rememberBox=null;autoBox=null;}if(previous!=null)previous.dismiss();}
+    private static void hideNow(){Dialog previous;synchronized(LoginCache.class){previous=dialog;dialog=null;formVisible=false;formUser="";formPass="";row=null;rememberBox=null;}if(previous!=null)previous.dismiss();}
     public static void hide(){UI.post(()->hideNow());}
-    public static synchronized void ready(){if(autoAttempt&&!suppressed)UI.postDelayed(()->{synchronized(LoginCache.class){if(autoAttempt&&!suppressed)send(loginOwner,"OnPressLogin");}},100);}
+    public static synchronized void ready(){/* Login always waits for an explicit user action. */}
     public static synchronized boolean begin(int identity,String username,String password){
         if(active!=0)return false;
         if(identity==0||!used.add(identity)){fail();return false;}
