@@ -546,8 +546,8 @@ func (s *GameService) AvailableActivities(ctx context.Context, id int64) ([]*pb.
 			if cfg.ID != key || !cfg.Enabled || now < cfg.StartAt || now >= cfg.RewardEndAt {
 				continue
 			}
-			if cfg.StartAt >= cfg.EndAt || cfg.EndAt > cfg.RewardEndAt {
-				return nil, errors.New("活动展示周期无效")
+			if cfg.StartAt <= 0 || cfg.StartAt >= cfg.EndAt || cfg.EndAt > cfg.RewardEndAt {
+				continue
 			}
 			name, entry, order := "开服基金", "openServerFund_local_20261011", int32(2)
 			if key == "totalLogin_local_20261011" {
@@ -557,6 +557,24 @@ func (s *GameService) AvailableActivities(ctx context.Context, id int64) ([]*pb.
 				name = "累计登录"
 				entry = key
 				order = 3
+			}
+			var rewards []db.ActivityReward
+			if err := db.GetIns().WithContext(ctx).Where("activity_id=?", cfg.ID).Find(&rewards).Error; err != nil {
+				return nil, err
+			}
+			valid := len(rewards) > 0
+			if key == "open_server_fund" && (cfg.MinVIP < 0 || cfg.DiamondCost <= 0) {
+				valid = false
+			}
+			for _, reward := range rewards {
+				supported, err := s.openServerRewardSupported(reward.Reward)
+				if err != nil || !supported || reward.Threshold <= 0 || (key == "open_server_fund" && reward.RewardType != "openServerFund" && reward.RewardType != "everyoneBenefit") || (key != "open_server_fund" && reward.RewardType != "totalLogin") {
+					valid = false
+					break
+				}
+			}
+			if !valid {
+				continue
 			}
 			result = append(result, &pb.ActivityTab{ActivityId: proto.String(entry), Name: proto.String(name), Order: proto.Int32(order), Status: proto.Int32(0), Param: proto.String("本地服活动")})
 		}

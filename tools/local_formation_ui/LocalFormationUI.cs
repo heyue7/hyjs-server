@@ -27,6 +27,14 @@ namespace HYJS.LocalFormation
             return true;
         }
 
+        internal static int OccupiedCount(UIInstPlayerData inst)
+        {
+            int count = 0;
+            foreach (KeyValuePair<int, UIHeroFormation> entry in inst.BattleCamps)
+                if (entry.Key >= 1 && entry.Key <= 5 && entry.Value != null && entry.Value.hero != null) ++count;
+            return count;
+        }
+
         internal static bool SameBytes(byte[] first, byte[] second)
         {
             if (first == null || second == null || first.Length != 16 || second.Length != 16) return false;
@@ -110,7 +118,7 @@ namespace HYJS.LocalFormation
             bool SameSlot()
             {
                 UIHeroFormation current;
-                return SameSession() && playerID > 1 && guid != player.heroWarUID &&
+                return SameSession() && playerID > 1 && OccupiedCount(inst) > 1 &&
                     inst.BattleCamps.TryGetValue(position, out current) && System.Object.ReferenceEquals(current, camp) &&
                     System.Object.ReferenceEquals(current.hero, hero) && System.Object.ReferenceEquals(hero.owner, camp) &&
                     hero.guid == guid && hero.heroId == heroID && System.Object.ReferenceEquals(inst.GetUIHero(guid), hero);
@@ -139,7 +147,6 @@ namespace HYJS.LocalFormation
                 if (busy || !SameSession()) return;
                 if (committed) { Fetch(); return; }
                 if (!SameSlot()) { Notice("角色阵容已变化，请重新打开阵容"); return; }
-                if (!Bare(camp)) { Notice("请先卸下该角色的装备、宝物与精灵，再下阵"); return; }
                 if (array == null || PageManager.Instance.currentPage != array) return;
                 Block(true);
                 try
@@ -189,7 +196,6 @@ namespace HYJS.LocalFormation
                 // cached hero/owner. No client-side candidate winning state.
                 var positions = new Dictionary<int, bool>();
                 var guids = new Dictionary<string, bool>();
-                bool foundMain = false;
                 foreach (ProtoBuf.Message.FormationItem item in reply.formationList)
                 {
                     if (item == null || item.formatPos < 1 || item.formatPos > 5 || positions.ContainsKey(item.formatPos)) throw new InvalidOperationException();
@@ -203,7 +209,6 @@ namespace HYJS.LocalFormation
                             UIHero owned = inst.GetUIHero(thing.guid);
                             if (actor != null || owned == null || owned.heroId != thing.id || guids.ContainsKey(thing.guid) || thing.guid == guid) throw new InvalidOperationException();
                             actor = thing; guids.Add(thing.guid, true);
-                            if (thing.guid == player.heroWarUID) foundMain = true;
                         }
                         else if (thing.pos >= 1 && thing.pos <= 4) { if (inst.GetUIEquipment(thing.guid) == null) throw new InvalidOperationException(); }
                         else if (thing.pos >= 5 && thing.pos <= 6) { if (inst.GetUITreasure(thing.guid) == null) throw new InvalidOperationException(); }
@@ -214,9 +219,7 @@ namespace HYJS.LocalFormation
                     // RefreshLuckData; root must omit them in 20111 output.
                     if (actor == null) throw new InvalidOperationException();
                 }
-                if (!foundMain || array == null || PageManager.Instance.currentPage != array || !SameSlot()) throw new InvalidOperationException();
-                foreach (KeyValuePair<int, UIHeroFormation> entry in inst.BattleCamps)
-                    if (!positions.ContainsKey(entry.Key) && entry.Value.hero != null && !Bare(entry.Value)) throw new InvalidOperationException();
+                if (guids.Count < 1 || array == null || PageManager.Instance.currentPage != array || !SameSlot()) throw new InvalidOperationException();
                 MethodInfo unload = typeof(FormationResourceCache).GetMethod("UnloadHero", Fields, null, new Type[] { typeof(string) }, null);
                 if (unload == null) throw new InvalidOperationException();
 
@@ -231,6 +234,13 @@ namespace HYJS.LocalFormation
                     UIHeroFormation previous = inst.BattleCamps[key];
                     UIHero removed = previous.hero;
                     removed.owner = null;
+                    // Server 21049 clears this complete slot while retaining all
+                    // owned inventory. Match that authoritative detach locally.
+                    foreach (UIEquipment equipment in previous.equipments)
+                        if (equipment != null) { equipment.owner = null; equipment.lastHeroId = ""; }
+                    foreach (UITreasure treasure in previous.treasures)
+                        if (treasure != null) treasure.owner = null;
+                    if (previous.pet != null) previous.pet.owner = null;
                     unload.Invoke(ManagerController.Instance.formationResourceCache, new object[] { removed.heroId });
                     inst.BattleCamps[key] = new UIHeroFormation(key, previous.battlePos, inst);
                 }
@@ -242,7 +252,7 @@ namespace HYJS.LocalFormation
                 if (StaticData.funcNavKit != null) StaticData.funcNavKit.OnFormationChange();
                 int selected = 0;
                 foreach (KeyValuePair<int, UIHeroFormation> entry in inst.BattleCamps)
-                    if (entry.Value.hero != null && entry.Value.hero.guid == player.heroWarUID) selected = entry.Key;
+                    if (entry.Value.hero != null && (selected == 0 || entry.Key < selected)) selected = entry.Key;
                 controls.Complete();
                 if (selected > 0) PageManager.Instance.OpenPage("ArrayPage", "pos=" + selected);
                 Notice("角色已下阵，仍保留在背包中");
@@ -317,7 +327,7 @@ namespace HYJS.LocalFormation
             UIInstPlayerData inst = player.InstPlayerData;
             UIHero hero = String.IsNullOrEmpty(guid) ? null : inst.GetUIHero(guid);
             if (hero == null || hero.owner == null) { LocalFormationUI.Notice("请先选择已上阵角色"); return; }
-            if (guid == player.heroWarUID) { LocalFormationUI.Notice("主角不能下阵"); return; }
+            if (LocalFormationUI.OccupiedCount(inst) <= 1) { LocalFormationUI.Notice("阵容中至少需要保留一名角色"); return; }
             UIHeroFormation camp = hero.owner, current;
             if (camp.campPos < 1 || camp.campPos > 5 || !inst.BattleCamps.TryGetValue(camp.campPos, out current) ||
                 !System.Object.ReferenceEquals(camp, current) || !System.Object.ReferenceEquals(camp.hero, hero)) return;

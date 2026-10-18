@@ -14,7 +14,7 @@ import (
 	pb "hyjs-server/model/protocol"
 )
 
-// TestP5FormationNext 验证原12级换主角消息，并保持旧主角和同ID红卡独立实例。
+// TestP5FormationNext 验证任意角色替换主战位，并保持旧主角和同ID红卡独立实例。
 func TestP5FormationNext(t *testing.T) {
 	ctx := context.Background()
 	path := filepath.Join(t.TempDir(), "p5-next.db")
@@ -108,13 +108,8 @@ func TestP5FormationNext(t *testing.T) {
 		t.Fatal(err)
 	}
 	request := &pb.CSFormationOn{Id: proto.String(selected.GetId()), Guid: proto.String(selected.GetGuid()), FormatPos: proto.Int32(1)}
-	_, _, before := state()
-	if _, handled, err := s.DispatchP5Next(ctx, playerID, request, 101); !handled || err == nil {
-		t.Fatal("11 level main replacement accepted")
-	}
-	_, _, after := state()
-	if *before.Player != *after.Player || *before.Game != *after.Game {
-		t.Fatal("failed main replacement changed save")
+	if _, handled, err := s.DispatchP5Next(ctx, playerID, request, 101); !handled || err != nil {
+		t.Fatal("valid single-member replacement denied", err)
 	}
 	if err := updateProfile(ctx, playerID, func(p *pb.Player, _ *model.GameState) error { p.Level = proto.Int32(12); return nil }); err != nil {
 		t.Fatal(err)
@@ -204,8 +199,17 @@ func TestP5FormationNext(t *testing.T) {
 		t.Fatal("investment rejected after formation owner change", err)
 	}
 	p, g, _ = state()
-	ownedEquip, err = s.equipmentRecord(g, equip.GetGuid())
-	if err != nil || ownedEquip.GetLevel() != 1 || p.GetCoin() != 1000000 || p.GetDiamond() != 50 {
+	// 当前重置合同把装备退为原合成碎片，并退还投入，不保留原装备GUID。
+	if _, err = s.equipmentRecord(g, equip.GetGuid()); err == nil || p.GetCoin() != 1000000 || p.GetDiamond() != 50 {
 		t.Fatal("investment refund lost after native main replacement", err, p)
+	}
+	fragments, err := s.p5WarriorFragmentReward(equip.GetEquipId(), 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, fragment := range fragments {
+		if simpleOwned(p, g, fragment.GetId()) < int64(fragment.GetNum()) {
+			t.Fatal("original equipment fragments missing")
+		}
 	}
 }

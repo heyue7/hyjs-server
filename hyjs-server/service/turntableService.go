@@ -533,7 +533,10 @@ func (s *GameService) turntableActivityList(ctx context.Context, id int64) ([]pr
 		}
 
 		var cfg db.GameplayPool
-		if err := tx.Where("id = ?", s.p2TurntablePoolID(tx)).First(&cfg).Error; err != nil {
+		if err := tx.Where("id = ?", s.p2TurntablePoolID(tx)).First(&cfg).Error; errors.Is(err, gorm.ErrRecordNotFound) {
+			// 未配置转盘是合法运营状态，其余活动仍继续组装。
+			return nil
+		} else if err != nil {
 			return err
 		}
 		now := LocalPlayNow(ctx).UnixMilli()
@@ -551,9 +554,35 @@ func (s *GameService) turntableActivityList(ctx context.Context, id int64) ([]pr
 		if player.GetLevel() < cfg.MinLevel {
 			return nil
 		}
-		_, _, rules, err := s.turntableConfig(tx)
-		if err != nil {
+		// 展示只读实际奖位和规则，缺少或损坏的单个活动不曝光，也不补造奖励。
+		var rewards []db.GameplayPoolReward
+		if err := tx.Where("pool_id=?", cfg.ID).Order("id").Find(&rewards).Error; err != nil {
 			return err
+		}
+		var rules db.TurntableRules
+		if err := tx.First(&rules, "pool_id=?", cfg.ID).Error; errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil
+		} else if err != nil {
+			return err
+		}
+		if err := s.validateTurntableConfiguration(&cfg, rewards, &rules); err != nil {
+			elog.Warn("activity omitted from directory", zap.String("activity", cfg.ID), zap.Error(err))
+			return nil
+		}
+		var global db.TurntableGlobal
+		if err := tx.First(&global, "pool_id=?", cfg.ID).Error; errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil
+		} else if err != nil {
+			return err
+		}
+		stock := map[int32]int32{}
+		if global.DiamondPool < 0 || json.Unmarshal(global.UsedStock, &stock) != nil || stock == nil {
+			return nil
+		}
+		for _, used := range stock {
+			if used < 0 {
+				return nil
+			}
 		}
 		result.ActivityList = []*pb.ActivityTab{{ActivityId: proto.String("bigTurnTable_20261011"), Status: proto.Int32(0), Order: proto.Int32(1), Name: proto.String(cfg.Name), Param: proto.String("")}}
 		result.Information = proto.String(rules.Description)

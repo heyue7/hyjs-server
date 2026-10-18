@@ -178,6 +178,7 @@ func (s *GameService) storyQuestRewardAt(ctx context.Context, id int64, questId 
 		if player.GetNoviceGuideSchedule() < guideSchedule {
 			player.NoviceGuideSchedule = proto.Int32(guideSchedule)
 		}
+		ReconcileChapterRewardGuide(player, g)
 		s.refreshCopyProgress(g)
 		if stamp > 0 {
 			encoded, err := proto.Marshal(result)

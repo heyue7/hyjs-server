@@ -12,7 +12,6 @@ import (
 	"hyjs-server/model"
 	pb "hyjs-server/model/protocol"
 	"math"
-	"slices"
 	"strconv"
 	"strings"
 )
@@ -120,7 +119,7 @@ func (s *GameService) CaptureCopyBoxes(tx *gorm.DB, id int64, chapter, mission s
 	return boxes, nil
 }
 
-// copyBoxOpen grants the frozen original fixed contents only after the current server run completed.
+// copyBoxOpen 在实际入场的原场景中开启冻结宝箱，奖励和领取状态同事务提交。
 func (s *GameService) copyBoxOpen(ctx context.Context, id int64, b *pb.CSCopyBox, stamp int64) ([]proto.Message, error) {
 	out := &pb.SCCopyBox{}
 	return s.p5Mutation(ctx, id, "copy-box", stamp, b, out, func(tx *gorm.DB, p *pb.Player, g *model.GameState) error {
@@ -140,13 +139,10 @@ func (s *GameService) copyBoxOpen(ctx context.Context, id int64, b *pb.CSCopyBox
 			return e
 		}
 		run := g.Run
-		if row.Claimed || run == nil || !run.Complete || run.Chapter != input.Chapter || run.Mission != input.Mission || run.Fight == nil || !run.Fight.Settled || run.Fight.Result.GetFightResult() != 1 {
+		// 原RCUIBox在地图触摸时直接请求开箱，地图箱子无需等到整关结算。
+		// 仅接受当前已入场且未处于战斗中的同关卡，不接受历史星数或扫荡记录。
+		if row.Claimed || run == nil || run.Chapter != input.Chapter || run.Mission != input.Mission || run.Fight != nil && !run.Fight.Settled {
 			return errors.New(constUtil.CopyBoxError)
-		}
-		for _, task := range s.tasks(run.Mission) {
-			if !slices.Contains(run.Passed, task["TaskId"]) {
-				return errors.New(constUtil.CopyBoxError)
-			}
 		}
 		gain, e := s.openServerGain(p, g, input.Reward)
 		if e != nil {

@@ -18,7 +18,7 @@ import (
 
 // recruitGuidePlayer 将未领取伙伴的客户端断点指向原招募入口，保留持久化任务进度。
 func (s *GameService) recruitGuidePlayer(player *pb.Player, game *model.GameState) *pb.Player {
-	if player == nil || game == nil || player.GetNoviceGuideSchedule() <= 1 || game.GuideRecruit != nil || !slices.Contains(game.Quests, "quest_1") {
+	if player == nil || game == nil || NoviceGuideSkipped(game) || player.GetNoviceGuideSchedule() <= 1 || game.GuideRecruit != nil || !slices.Contains(game.Quests, "quest_1") {
 		return player
 	}
 	heroID := s.table("GameConfigure", "StaticName", "GuideWarriorRecruitCostType2")["NameValue"]
@@ -42,11 +42,11 @@ func (s *GameService) resumeRecruitGuide(ctx context.Context, messages []proto.M
 	for _, message := range messages {
 		switch response := message.(type) {
 		case *pb.SCPlayer:
-			if response.GetPlayer().GetNoviceGuideSchedule() > 1 {
+			if response.GetPlayer().GetPlayerId() > 0 {
 				playerID = response.GetPlayer().GetPlayerId()
 			}
 		case *pb.SCPlayerLogin:
-			if response.GetPlayer().GetNoviceGuideSchedule() > 1 {
+			if response.GetPlayer().GetPlayerId() > 0 {
 				playerID = response.GetPlayer().GetPlayerId()
 			}
 		}
@@ -58,15 +58,42 @@ func (s *GameService) resumeRecruitGuide(ctx context.Context, messages []proto.M
 	if err := db.GetIns().WithContext(ctx).First(&row, playerID).Error; err != nil {
 		return
 	}
-	_, game, err := decodeProfile(&row)
+	storedPlayer, game, err := decodeProfile(&row)
 	if err != nil {
 		return
+	}
+	// 旧存档已先领首章宝箱时，只续接精确断点并保存；不补发任何奖励。
+	if ReconcileChapterRewardGuide(storedPlayer, game) {
+		if err := updateProfile(ctx, playerID, func(current *pb.Player, currentGame *model.GameState) error {
+			ReconcileChapterRewardGuide(current, currentGame)
+			storedPlayer = proto.Clone(current).(*pb.Player)
+			game = currentGame
+			return nil
+		}); err != nil {
+			return
+		}
 	}
 	for _, message := range messages {
 		switch response := message.(type) {
 		case *pb.SCPlayer:
+			if NoviceGuideSkipped(game) && response.Player.GetNoviceGuideSchedule() < constUtil.NoviceGuideInitialCompleted {
+				response.Player = proto.Clone(response.Player).(*pb.Player)
+				response.Player.NoviceGuideSchedule = proto.Int32(constUtil.NoviceGuideInitialCompleted)
+			}
+			if response.Player.GetNoviceGuideSchedule() == constUtil.ChapterRewardGuidePending && storedPlayer.GetNoviceGuideSchedule() == constUtil.ChapterRewardGuideCompleted {
+				response.Player = proto.Clone(response.Player).(*pb.Player)
+				response.Player.NoviceGuideSchedule = proto.Int32(constUtil.ChapterRewardGuideCompleted)
+			}
 			response.Player = s.recruitGuidePlayer(response.Player, game)
 		case *pb.SCPlayerLogin:
+			if NoviceGuideSkipped(game) && response.Player.GetNoviceGuideSchedule() < constUtil.NoviceGuideInitialCompleted {
+				response.Player = proto.Clone(response.Player).(*pb.Player)
+				response.Player.NoviceGuideSchedule = proto.Int32(constUtil.NoviceGuideInitialCompleted)
+			}
+			if response.Player.GetNoviceGuideSchedule() == constUtil.ChapterRewardGuidePending && storedPlayer.GetNoviceGuideSchedule() == constUtil.ChapterRewardGuideCompleted {
+				response.Player = proto.Clone(response.Player).(*pb.Player)
+				response.Player.NoviceGuideSchedule = proto.Int32(constUtil.ChapterRewardGuideCompleted)
+			}
 			response.Player = s.recruitGuidePlayer(response.Player, game)
 		}
 	}

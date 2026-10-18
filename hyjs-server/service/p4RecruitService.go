@@ -114,13 +114,27 @@ func (s *GameService) loadP4Rotation(tx *gorm.DB, kind int32, now time.Time) ([]
 	if cfg.ID == "" {
 		return nil, 0, gorm.ErrRecordNotFound
 	}
+	rewards, raw, err := s.p4RotationSnapshot(cfg, kind)
+	if err != nil {
+		return nil, 0, err
+	}
+	if len(cfg.Frozen) == 0 {
+		if err := tx.Model(&cfg).Update("frozen", raw).Error; err != nil {
+			return nil, 0, err
+		}
+	}
+	return rewards, cfg.EndAt, nil
+}
+
+// p4RotationSnapshot 纯解析校验运营轮换，目录读取不创建或冻结奖池。
+func (s *GameService) p4RotationSnapshot(cfg db.P4RecruitRotation, kind int32) ([]db.GameplayPoolReward, []byte, error) {
 	raw := cfg.Frozen
 	if len(raw) == 0 {
 		raw = cfg.Rewards
 	}
 	var rewards []db.GameplayPoolReward
 	if json.Unmarshal(raw, &rewards) != nil || len(rewards) == 0 {
-		return nil, 0, errors.New("轮换冻结奖池无效")
+		return nil, nil, errors.New("轮换冻结奖池无效")
 	}
 	seen := map[string]bool{}
 	guaranteed := false
@@ -130,18 +144,13 @@ func (s *GameService) loadP4Rotation(tx *gorm.DB, kind int32, now time.Time) ([]
 		allowed := kind == 1 && (quality == "12" || quality == "13" || quality == "18") || kind == 2 && (quality == "13" || quality == "18" || quality == "20")
 		isGuarantee := kind == 1 && quality == "18" || kind == 2 && quality == "20"
 		if p.PoolID != fmt.Sprintf("recruit_%d", kind) || p.Amount != 1 || p.Weight < 1 || p.Weight > 1000000000000 || seen[p.ResourceID] || hero["heroClass"] != "0" || !allowed || p.Guaranteed != isGuarantee {
-			return nil, 0, errors.New("轮换概率或英雄配置无效")
+			return nil, nil, errors.New("轮换概率或英雄配置无效")
 		}
 		seen[p.ResourceID] = true
 		guaranteed = guaranteed || p.Guaranteed
 	}
 	if !guaranteed {
-		return nil, 0, errors.New("轮换缺少原保底组")
+		return nil, nil, errors.New("轮换缺少原保底组")
 	}
-	if len(cfg.Frozen) == 0 {
-		if err := tx.Model(&cfg).Update("frozen", raw).Error; err != nil {
-			return nil, 0, err
-		}
-	}
-	return rewards, cfg.EndAt, nil
+	return rewards, raw, nil
 }

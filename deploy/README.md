@@ -33,6 +33,8 @@ Docker、Nginx；首次 provision 可安装 Compose 插件。
 
 ```bash
 bash deploy_test.sh --revision master
+# 只更新已审核的本项目 Nginx 客户端路由，不重做首次基础设施
+bash deploy_test.sh --revision master --update-ingress
 # 首次创建独立目录、MySQL 与 Nginx ingress，并导入私有迁移快照
 bash deploy_test.sh --revision master --provision --initial-dump /private/path/initial.sql.gz
 # 可指定另一份本机配置
@@ -47,7 +49,7 @@ bash deploy_test.sh --env-file /private/path/deployment.env --revision test
 并构建同一 Git 提交的管理前端。Compose 使用专属 MySQL 8.4 与游戏容器。
 Nginx 管理入口为 `/admin/`，API ingress 仅开放客户端协议，保留私有运维路径隔离。
 数据库、日志、私有环境与备份位于应用目录之外，不依赖 Redis。
-更改 ingress 配置需显式使用 `--provision`。
+已有环境更改 ingress 配置需显式使用 `--update-ingress`；首次配置使用 `--provision`。
 
 ## 回退与证据
 

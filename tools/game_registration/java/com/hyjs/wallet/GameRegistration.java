@@ -1,7 +1,8 @@
 package com.hyjs.wallet;
 
 import android.app.Activity;
-import android.app.AlertDialog;
+import android.app.Dialog;
+import android.widget.Button;
 import android.content.DialogInterface;
 import android.graphics.Color;
 import android.text.InputType;
@@ -23,10 +24,12 @@ import org.json.JSONObject;
 
 /** Explicit registration, opened only by the original login registration button. */
 public final class GameRegistration {
-    private static AlertDialog current;
+    private static Dialog current;
     private GameRegistration() { }
 
     public static void show(final String serverBase) {
+        // An explicit registration entry cancels queued automatic attempts.
+        LoginCache.pause();
         try {
             final Activity activity = (Activity) Class.forName("com.unity3d.player.UnityPlayer")
                     .getField("currentActivity").get(null);
@@ -35,81 +38,59 @@ public final class GameRegistration {
         } catch (Exception unavailable) { /* No credentials or exception details are logged. */ }
     }
 
-    private static int dp(Activity activity, int value) {
-        return Math.round(value * activity.getResources().getDisplayMetrics().density);
-    }
-
-    private static EditText field(Activity activity, LinearLayout body, String hint, boolean password) {
-        EditText field = new EditText(activity);
-        field.setSingleLine(true);
-        field.setHint(hint);
-        field.setTextSize(16);
-        field.setInputType(InputType.TYPE_CLASS_TEXT | (password ? InputType.TYPE_TEXT_VARIATION_PASSWORD : InputType.TYPE_TEXT_VARIATION_NORMAL));
-        field.setImeOptions(EditorInfo.IME_ACTION_NEXT | EditorInfo.IME_FLAG_NO_EXTRACT_UI);
-        body.addView(field, new LinearLayout.LayoutParams(-1, dp(activity, 52)));
-        return field;
-    }
-
     private static void open(final Activity activity, final String serverBase) {
         if (activity.isFinishing() || current != null && current.isShowing()) return;
-        LinearLayout body = new LinearLayout(activity);
-        body.setOrientation(LinearLayout.VERTICAL);
-        body.setPadding(dp(activity,24), dp(activity,4), dp(activity,24), dp(activity,8));
-        final EditText username = field(activity, body, "账号：3–32位字母、数字、_ 或 -", false);
-        final EditText password = field(activity, body, "密码：至少6个字符，最多72字节", true);
-        final EditText confirmation = field(activity, body, "确认密码", true);
-        confirmation.setImeOptions(EditorInfo.IME_ACTION_DONE | EditorInfo.IME_FLAG_NO_EXTRACT_UI);
-        final TextView message = new TextView(activity);
-        message.setTextColor(Color.rgb(183,40,40));
-        message.setTextSize(14);
-        body.addView(message, new LinearLayout.LayoutParams(-1,-2));
-        ScrollView scroll = new ScrollView(activity);
-        scroll.addView(body);
-        final AlertDialog dialog = new AlertDialog.Builder(activity).setTitle("注册账号")
-                .setView(scroll).setNegativeButton("返回登录", null).setPositiveButton("注册", null).create();
-        current = dialog;
+        final LinearLayout body=LoginStyle.body(activity,"注册账号");
+        final EditText username=LoginStyle.field(activity,body,"账号：3–32位字母、数字、_ 或 -",false);
+        final EditText password=LoginStyle.field(activity,body,"密码：至少6个字符，最多72字节",true);
+        final EditText confirmation=LoginStyle.field(activity,body,"确认密码",true);
+        confirmation.setImeOptions(EditorInfo.IME_ACTION_DONE|EditorInfo.IME_FLAG_NO_EXTRACT_UI);
+        final TextView message=new TextView(activity);message.setTextColor(Color.rgb(183,40,40));message.setTextSize(14);
+        LinearLayout.LayoutParams messageLayout=new LinearLayout.LayoutParams(-1,-2);messageLayout.topMargin=LoginStyle.dp(activity,4);body.addView(message,messageLayout);
+        final Button submit=LoginStyle.button(activity,"注 册",true),back=LoginStyle.button(activity,"返回登录",false);
+        LinearLayout.LayoutParams submitLayout=new LinearLayout.LayoutParams(-1,LoginStyle.dp(activity,44));submitLayout.topMargin=LoginStyle.dp(activity,8);body.addView(submit,submitLayout);
+        LinearLayout.LayoutParams backLayout=new LinearLayout.LayoutParams(-1,LoginStyle.dp(activity,36));backLayout.topMargin=LoginStyle.dp(activity,8);body.addView(back,backLayout);
+        final Dialog dialog=new Dialog(activity);dialog.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE);
+        dialog.setContentView(LoginStyle.panel(activity,body));current=dialog;
+        final String[] successful=new String[]{"",""};
         dialog.setCanceledOnTouchOutside(false);
-        dialog.setOnDismissListener(new DialogInterface.OnDismissListener() { public void onDismiss(DialogInterface ignored) {
-            username.setText(""); password.setText(""); confirmation.setText("");
-            if (current == dialog) current = null;
-        } });
-        dialog.setOnShowListener(new DialogInterface.OnShowListener() { public void onShow(DialogInterface ignored) {
-            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(new View.OnClickListener() { public void onClick(View view) {
-                final String name = username.getText().toString();
-                final String secret = password.getText().toString();
-                final String confirm = confirmation.getText().toString();
-                if (!name.matches("[A-Za-z0-9_-]{3,32}")) { message.setText("账号需为3–32位字母、数字、下划线或短横线"); return; }
-                try {
-                    if (secret.codePointCount(0,secret.length()) < 6 || secret.getBytes("UTF-8").length > 72) {
-                        message.setText("密码至少6个字符，最多72字节"); return;
+        dialog.setOnDismissListener(ignored->{
+            username.setText("");password.setText("");confirmation.setText("");
+            if(current==dialog)current=null;
+            if(!successful[0].isEmpty())LoginCache.registered(successful[0],successful[1]);else LoginCache.reopen();
+            successful[0]="";successful[1]="";
+        });
+        back.setOnClickListener(view->dialog.dismiss());
+        submit.setOnClickListener(view->{
+            if(!submit.isEnabled())return;
+            // Capture fields on Android's UI thread; the network worker receives
+            // immutable values and never reads EditText objects in the background.
+            final String name=username.getText().toString();
+            final String secret=password.getText().toString();
+            final String confirm=confirmation.getText().toString();
+            if(!name.matches("[A-Za-z0-9_-]{3,32}")){message.setText("账号需为3–32位字母、数字、下划线或短横线");return;}
+            try{
+                if(secret.codePointCount(0,secret.length())<6||secret.getBytes("UTF-8").length>72){message.setText("密码至少6个字符，最多72字节");return;}
+            }catch(Exception invalid){message.setText("密码格式无效");return;}
+            if(!secret.equals(confirm)){message.setText("两次输入的密码不一样");return;}
+            message.setText("正在注册…");dialog.setCancelable(false);submit.setEnabled(false);back.setEnabled(false);
+            username.setEnabled(false);password.setEnabled(false);confirmation.setEnabled(false);
+            new Thread(()->{
+                final Result result=register(serverBase,name,secret,confirm);
+                activity.runOnUiThread(()->{
+                    if(activity.isFinishing()||!dialog.isShowing())return;
+                    if(result.success){
+                        successful[0]=name;successful[1]=secret;dialog.dismiss();
+                        Toast.makeText(activity,"注册成功，请登录",Toast.LENGTH_LONG).show();
+                    }else{
+                        dialog.setCancelable(true);submit.setEnabled(true);back.setEnabled(true);
+                        username.setEnabled(true);password.setEnabled(true);confirmation.setEnabled(true);message.setText(result.message);
                     }
-                } catch (Exception invalid) { message.setText("密码格式无效"); return; }
-                if (!secret.equals(confirm)) { message.setText("两次输入的密码不一样"); return; }
-                message.setText("正在注册…");
-                dialog.setCancelable(false);
-                dialog.getButton(AlertDialog.BUTTON_POSITIVE).setEnabled(false);
-                dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setEnabled(false);
-                username.setEnabled(false); password.setEnabled(false); confirmation.setEnabled(false);
-                new Thread(new Runnable() { public void run() {
-                    final Result result = register(serverBase, name, secret, confirm);
-                    activity.runOnUiThread(new Runnable() { public void run() {
-                        if (activity.isFinishing() || !dialog.isShowing()) return;
-                        if (result.success) {
-                            dialog.dismiss();
-                            Toast.makeText(activity,"注册成功，请使用刚才的账号和密码登录",Toast.LENGTH_LONG).show();
-                        } else {
-                            dialog.setCancelable(true);
-                            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setEnabled(true);
-                            dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setEnabled(true);
-                            username.setEnabled(true); password.setEnabled(true); confirmation.setEnabled(true);
-                            message.setText(result.message);
-                        }
-                    } });
-                } },"hyjs-register").start();
-            } });
-        } });
-        dialog.show();
-        dialog.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
+                });
+            },"hyjs-register").start();
+        });
+        confirmation.setOnEditorActionListener((text,action,event)->{if(action==EditorInfo.IME_ACTION_DONE){submit.performClick();return true;}return false;});
+        dialog.show();LoginStyle.fit(activity,dialog);body.setFocusableInTouchMode(true);body.requestFocus();
     }
 
     private static final class Result {

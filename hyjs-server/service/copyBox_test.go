@@ -75,11 +75,18 @@ func TestCopyBoxFrozenRollbackConcurrentClaimAndCold(t *testing.T) {
 	if box.GetBoxId() != "box_6" || box.GetX() != 7 || box.GetY() != 1 || box.GetZ() != 28 || box.GetAngle() != 90 {
 		t.Fatal("original scene projection", box)
 	}
+	// 场景宝箱可以在完整通关前交互；进行中的战斗仍不可开箱。
+	if e := updateProfile(f.ctx, f.id, func(_ *pb.Player, g *model.GameState) error {
+		g.Run.Fight = &model.CopyFight{Settled: false}
+		return nil
+	}); e != nil {
+		t.Fatal(e)
+	}
 	if _, e := f.s.copyBoxOpen(f.ctx, f.id, request, 1); e == nil {
-		t.Fatal("incomplete source")
+		t.Fatal("active battle opened scene chest")
 	}
 	if e := updateProfile(f.ctx, f.id, func(p *pb.Player, g *model.GameState) error {
-		g.Run.Complete = true
+		g.Run.Complete = false
 		for _, task := range f.s.tasks("6") {
 			g.Run.Passed = append(g.Run.Passed, task["TaskId"])
 		}
@@ -165,5 +172,5 @@ func TestCopyBoxFrozenRollbackConcurrentClaimAndCold(t *testing.T) {
 	if rule.Enabled {
 		t.Fatal("operator off reenabled")
 	}
-	t.Log("entry frozen coordinates/reward, incomplete/history rejection, capacity rollback,8once,one lifetime claim,open scene,cold old receipt/off")
+	t.Log("entry frozen coordinates/reward, active-battle/history rejection, precompletion opening, capacity rollback,8once,one lifetime claim,open scene,cold old receipt/off")
 }

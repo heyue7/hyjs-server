@@ -5,7 +5,9 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
+	"hyjs-server/constUtil"
 	"math"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -13,6 +15,21 @@ import (
 	"hyjs-server/model"
 	pb "hyjs-server/model/protocol"
 )
+
+// ReconcileChapterRewardGuide 续接已提前完成的首章领奖步骤，保留真实领奖和前置任务条件。
+// 调用方持有存档事务；这里只推进精确断点，不发奖或跳过后续装备引导。
+func ReconcileChapterRewardGuide(player *pb.Player, game *model.GameState) bool {
+	if player.GetNoviceGuideSchedule() != constUtil.ChapterRewardGuidePending || !slices.Contains(game.Quests, constUtil.ChapterRewardGuideQuest) {
+		return false
+	}
+	for _, chapter := range game.Copy.GetPassedChapterInfo() {
+		if chapter.GetChapterId() == constUtil.ChapterRewardGuideChapter && chapter.GetReward0Claimed() {
+			player.NoviceGuideSchedule = proto.Int32(constUtil.ChapterRewardGuideCompleted)
+			return true
+		}
+	}
+	return false
+}
 
 // chapterStarReward 按原表领取原各章星宝箱，在同一存档事务内保存奖励和领取标记。
 func (s *GameService) chapterStarReward(ctx context.Context, id int64, request *pb.CSCopyGetStarAward) ([]proto.Message, error) {
@@ -85,6 +102,7 @@ func (s *GameService) chapterStarReward(ctx context.Context, id int64, request *
 		case 2:
 			chapter.Reward2Claimed = proto.Bool(true)
 		}
+		ReconcileChapterRewardGuide(player, g)
 		result = &pb.SCCopyGetStarAward{Gain: gain}
 		return nil
 	})

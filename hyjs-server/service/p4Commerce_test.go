@@ -151,6 +151,11 @@ func TestP4ActivitySharedStockFrozenQuotesAndMystic(t *testing.T) {
 	now := time.Now()
 	month := now.In(time.FixedZone("UTC+8", 8*3600)).Format("200601")
 	key := "limitSale_p4_" + month
+	// 本例显式开放独立测试库中的限时特卖和神秘小屋，生产模板继续默认关闭。
+	opened := db.GetIns().Model(&db.P4CommerceRule{}).Where("id IN ?", []string{key, "mysticDiscount_p4_" + month}).Update("enabled", true)
+	if opened.Error != nil || opened.RowsAffected != 2 {
+		t.Fatal("fixture activities were not both enabled", opened.Error, opened.RowsAffected)
+	}
 	var cfg db.P4CommerceRule
 	db.GetIns().Where("id=?", key).First(&cfg)
 	var rules p4CommerceRules

@@ -15,6 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 parser = argparse.ArgumentParser()
 parser.add_argument('--revision', default='master', help='Exact clean checked-out revision; defaults to master')
 parser.add_argument('--provision', action='store_true', help='Explicit first-time infrastructure and ingress setup')
+parser.add_argument('--update-ingress', action='store_true', help='Apply the reviewed project Nginx template without first-time infrastructure setup')
 parser.add_argument('--initial-dump', type=Path, help='One-time private SQL gzip; sibling initial-verification.json required')
 parser.add_argument('--env-file', type=Path, default=ROOT / 'deploy/.env', help='Ignored private deployment settings')
 parser.add_argument('--check-config', action='store_true', help='Validate and render templates without build, SSH or Docker')
@@ -114,7 +115,7 @@ if args.initial_dump:
     run('scp', '-q', str(verification), HOST + ':' + REMOTE + '/.incoming/initial-verification.json')
     remote('chmod 600 ' + shlex.quote(REMOTE + '/.incoming/initial.sql.gz') + ' ' + shlex.quote(REMOTE + '/.incoming/initial-verification.json'))
 command = 'sudo -n python3 ' + shlex.quote(remote_stage + '/activate.py') + ' ' + shlex.quote(remote_stage)
-if args.provision:
+if args.provision or args.update_ingress:
     command += ' --provision-ingress'
 if args.initial_dump:
     command += ' --initial-db'

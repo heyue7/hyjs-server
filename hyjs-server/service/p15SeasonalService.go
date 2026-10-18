@@ -128,16 +128,62 @@ func (s *GameService) p15SeasonalTabs(tx *gorm.DB, now time.Time) ([]*pb.Activit
 		if !allowed {
 			continue
 		}
-		cfg, _, err := p15SeasonalSnapshot(live)
+		cfg, children, err := p15SeasonalSnapshot(live)
 		if err != nil {
-			return nil, err
+			// 尚未配置完整的节日父目录不曝光，其他独立活动仍可进入。
+			continue
 		}
 		if now.UnixMilli() < cfg.StartAt || now.UnixMilli() >= cfg.RewardEndAt {
+			continue
+		}
+		visible := false
+		for _, child := range children {
+			available, err := s.p15SeasonalChildVisible(tx, cfg, child, now)
+			if err != nil {
+				return nil, err
+			}
+			visible = visible || available
+		}
+		if !visible {
 			continue
 		}
 		tabs = append(tabs, &pb.ActivityTab{ActivityId: proto.String(cfg.ID), Name: proto.String(cfg.Title), Order: proto.Int32(int32(45 + len(tabs))), Status: proto.Int32(0), Param: proto.String(cfg.Source)})
 	}
 	return tabs, nil
+}
+
+// p15SeasonalChildVisible 只读子活动完整性，缺失或损坏的单条目录不阻塞合法同级。
+func (s *GameService) p15SeasonalChildVisible(tx *gorm.DB, cfg db.P15SeasonalBundle, child p15SeasonalChild, now time.Time) (bool, error) {
+	if child.Domain == "period" {
+		var rule db.PeriodInstance
+		if err := tx.First(&rule, "id=?", child.ID).Error; errors.Is(err, gorm.ErrRecordNotFound) {
+			return false, nil
+		} else if err != nil {
+			return false, err
+		}
+		if !rule.Enabled {
+			return false, nil
+		}
+		frozen, err := s.freezeP1Period(tx, rule, false)
+		if err != nil {
+			return false, nil
+		}
+		return frozen.StartAt == cfg.StartAt && frozen.EndAt == cfg.EndAt && frozen.RewardEndAt == cfg.RewardEndAt && now.UnixMilli() >= frozen.StartAt && now.UnixMilli() < frozen.RewardEndAt, nil
+	}
+	var rule db.P4CommerceRule
+	if err := tx.First(&rule, "id=?", child.ID).Error; errors.Is(err, gorm.ErrRecordNotFound) {
+		return false, nil
+	} else if err != nil {
+		return false, err
+	}
+	if !rule.Enabled {
+		return false, nil
+	}
+	frozen, _, err := s.p4CommerceSnapshot(rule)
+	if err != nil {
+		return false, nil
+	}
+	return frozen.StartAt == cfg.StartAt && frozen.EndAt == cfg.EndAt && frozen.ClaimEndAt <= cfg.RewardEndAt && now.UnixMilli() >= frozen.StartAt && now.UnixMilli() < frozen.EndAt, nil
 }
 
 // p15SeasonalList freezes the exact native child directory and underlying rules together.
@@ -169,6 +215,13 @@ func (s *GameService) p15SeasonalList(ctx context.Context, id int64, request *pb
 			return errors.New("季节活动未开放或领奖截止")
 		}
 		for i, child := range children {
+			available, err := s.p15SeasonalChildVisible(tx, cfg, child, now)
+			if err != nil {
+				return err
+			}
+			if !available {
+				continue
+			}
 			visible := false
 			if child.Domain == "period" {
 				var rule db.PeriodInstance

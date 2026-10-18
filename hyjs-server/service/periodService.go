@@ -121,7 +121,8 @@ func (s *GameService) P1ActivityTabs(ctx context.Context, id int64) ([]*pb.Activ
 
 		cfg, err := s.freezeP1Period(db.GetIns().WithContext(ctx), live, false)
 		if err != nil {
-			return nil, err
+			// false只解析/校验快照；无效单条不影响其余活动，领取入口仍严格拒绝。
+			continue
 		}
 		if now < cfg.StartAt || now >= cfg.RewardEndAt || !s.IsP1Activity(cfg.ID) || isP15SeasonalChild(cfg.ID) {
 			continue
@@ -452,7 +453,7 @@ func p1LegacyLoginVisible(tx *gorm.DB, now int64) (bool, error) {
 		return false, nil
 	}
 	if cfg.StartAt >= cfg.EndAt || cfg.EndAt > cfg.RewardEndAt {
-		return false, errors.New("登录活动周期无效")
+		return false, nil
 	}
 	return true, nil
 }

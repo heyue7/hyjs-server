@@ -234,7 +234,8 @@ func (s *GameService) P4ActivityTabs(ctx context.Context, now time.Time) ([]*pb.
 			}
 			cfg, _, err := s.p4CommerceSnapshot(r)
 			if err != nil {
-				return err
+				// 缺商品或损坏冻结只隐藏这一入口，交易接点继续使用完整校验。
+				continue
 			}
 			if now.UnixMilli() < cfg.StartAt || now.UnixMilli() >= cfg.EndAt {
 				continue
@@ -308,18 +309,24 @@ func (s *GameService) P4ActivityTabs(ctx context.Context, now time.Time) ([]*pb.
 		if doubleOpen {
 			returnTabs = append(returnTabs, &pb.ActivityTab{ActivityId: proto.String("RechangeDouble"), Name: proto.String("首笔充值双倍"), Order: proto.Int32(38), Status: proto.Int32(0)})
 		}
-		// 原31页使用57053说明接口；投放实际强者轮换的同一份冻结奖池。
-		if tx.Migrator().HasTable(&db.GameplayPoolReward{}) {
-			var pools int64
-			if err := tx.Model(&db.GameplayPoolReward{}).Where("pool_id=?", "recruit_2").Count(&pools).Error; err != nil {
+		// 原31页只展示实际开放且完整的强者轮换；常驻招募池存在不代表限时轮换开放。
+		var rotations []db.P4RecruitRotation
+		if err := tx.Where("kind=? AND enabled=? AND start_at<=? AND end_at>?", 2, true, now.UnixMilli(), now.UnixMilli()).Order("start_at DESC,id DESC").Find(&rotations).Error; err != nil {
+			return err
+		}
+		for _, rotation := range rotations {
+			allowed, err := localPlayActivityVisible(tx, rotation.ID)
+			if err != nil {
 				return err
 			}
-			if pools > 0 {
-				if _, _, err := s.loadP4Rotation(tx, 2, now); err != nil {
-					return err
-				}
-				returnTabs = append(returnTabs, &pb.ActivityTab{ActivityId: proto.String("warriorWeightImprove"), Name: proto.String("强者招募轮换"), Order: proto.Int32(39), Status: proto.Int32(0)})
+			if !allowed {
+				continue
 			}
+			if _, _, err := s.p4RotationSnapshot(rotation, 2); err != nil {
+				continue
+			}
+			returnTabs = append(returnTabs, &pb.ActivityTab{ActivityId: proto.String("warriorWeightImprove"), Name: proto.String("强者招募轮换"), Order: proto.Int32(39), Status: proto.Int32(0)})
+			break
 		}
 		return nil
 	})

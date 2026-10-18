@@ -1,6 +1,15 @@
 package com.hyjs.wallet;
 
 import android.app.Activity;
+import android.app.Dialog;
+import android.content.DialogInterface;
+import android.text.Editable;
+import android.text.TextWatcher;
+import android.view.View;
+import android.view.inputmethod.EditorInfo;
+import android.widget.Button;
+import android.widget.EditText;
+import android.widget.TextView;
 import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.os.Handler;
@@ -30,7 +39,10 @@ public final class LoginCache {
     private static int serial,active;
     private static final HashSet<Integer> used=new HashSet<Integer>();
     private static String transientUser="",transientPassword="";
+    private static Dialog dialog;
     private static LinearLayout row;
+    private static boolean formVisible;
+    private static String formUser="",formPass="",returnUser="",returnPass="";
     private static CheckBox rememberBox,autoBox;
     private static Activity activity()throws Exception{return (Activity)Class.forName("com.unity3d.player.UnityPlayer").getField("currentActivity").get(null);}
     private static void send(String object,String method){try{Class.forName("com.unity3d.player.UnityPlayer").getMethod("UnitySendMessage",String.class,String.class,String.class).invoke(null,object,method,"");}catch(Exception ignored){}}
@@ -70,23 +82,68 @@ public final class LoginCache {
     public static synchronized void setTransientUserName(String value){transientUser=value==null?"":value;}
     public static synchronized void setTransientPassWord(String value){transientPassword=value==null?"":value;}
     public static synchronized void boot(String object){load();loginOwner=object;if(automatic&&!suppressed&&!autoConsumed&&!bootQueued){bootQueued=true;UI.postDelayed(()->{synchronized(LoginCache.class){if(!suppressed&&!autoConsumed)send(loginOwner,"OnPressLogin");}},350);}}
+    public static synchronized boolean hasForm(){return formVisible;}
+    public static synchronized String formUserName(){return formUser;}
+    public static synchronized String formPassWord(){return formPass;}
+    private static synchronized void updateForm(EditText username,EditText password){
+        formUser=username.getText().toString();formPass=password.getText().toString();
+    }
+    private static synchronized void manual(){autoAttempt=false;suppressed=true;}
+    public static void reopen(){String target;synchronized(LoginCache.class){target=owner;}if(target!=null&&!target.isEmpty())show(target);}
+    public static void registered(String username,String password){synchronized(LoginCache.class){returnUser=username;returnPass=password;}reopen();}
     public static synchronized void show(String object){
-        load();owner=object;final boolean shouldAuto=automatic&&!suppressed&&!autoConsumed;
+        load();owner=object;final String target=object;
+        final boolean shouldAuto=automatic&&!suppressed&&!autoConsumed;
         if(shouldAuto){autoConsumed=true;autoAttempt=true;UI.postDelayed(()->{synchronized(LoginCache.class){if(autoAttempt&&active==0)fail();}},20000);}
         UI.post(()->{
             hideNow();try{
-                Activity a=activity();FrameLayout host=(FrameLayout)a.findViewById(android.R.id.content);
-                row=new LinearLayout(a);row.setOrientation(LinearLayout.HORIZONTAL);row.setGravity(android.view.Gravity.CENTER);
-                rememberBox=box(a,"记住密码");autoBox=box(a,"自动登录");rememberBox.setChecked(remember);autoBox.setChecked(automatic);row.addView(rememberBox);row.addView(autoBox);
-                FrameLayout.LayoutParams layout=new FrameLayout.LayoutParams(Math.round(host.getWidth()*.34f),Math.round(host.getHeight()*.075f));layout.leftMargin=Math.round(host.getWidth()*.35f);layout.topMargin=Math.round(host.getHeight()*.43f);host.addView(row,layout);
+                Activity a=activity();if(a==null||a.isFinishing())return;
+                final Dialog opened=new Dialog(a);opened.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE);
+                final LinearLayout body=LoginStyle.body(a,"账号登录");
+                final EditText username=LoginStyle.field(a,body,"请输入账号",false);
+                final EditText password=LoginStyle.field(a,body,"请输入密码",true);
+                password.setImeOptions(EditorInfo.IME_ACTION_DONE|EditorInfo.IME_FLAG_NO_EXTRACT_UI);
+                synchronized(LoginCache.class){
+                    username.setText(!returnUser.isEmpty()?returnUser:(remember?savedUser:""));
+                    password.setText(!returnUser.isEmpty()?returnPass:(remember?savedPassword:""));
+                    returnUser="";returnPass="";updateForm(username,password);
+                }
+                TextWatcher watcher=new TextWatcher(){
+                    public void beforeTextChanged(CharSequence text,int start,int count,int after){}
+                    public void onTextChanged(CharSequence text,int start,int before,int count){synchronized(LoginCache.class){if(dialog==opened)updateForm(username,password);}}
+                    public void afterTextChanged(Editable text){}
+                };
+                username.addTextChangedListener(watcher);password.addTextChangedListener(watcher);
+                row=new LinearLayout(a);row.setOrientation(LinearLayout.HORIZONTAL);row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+                rememberBox=box(a,"记住密码");autoBox=box(a,"自动登录");
+                rememberBox.setChecked(remember);autoBox.setChecked(automatic);
+                row.addView(rememberBox,new LinearLayout.LayoutParams(0,LoginStyle.dp(a,46),1f));
+                row.addView(autoBox,new LinearLayout.LayoutParams(0,LoginStyle.dp(a,46),1f));
+                body.addView(row,new LinearLayout.LayoutParams(-1,LoginStyle.dp(a,48)));
                 rememberBox.setOnCheckedChangeListener((button,checked)->{synchronized(LoginCache.class){remember=checked;if(!checked){automatic=false;autoBox.setChecked(false);clear();}}});
                 autoBox.setOnCheckedChangeListener((button,checked)->{synchronized(LoginCache.class){automatic=checked;if(checked){remember=true;rememberBox.setChecked(true);}else if(autoAttempt){autoAttempt=false;suppressed=true;}if(!savedUser.isEmpty())save();}});
-                if(shouldAuto)UI.postDelayed(()->{synchronized(LoginCache.class){if(!suppressed&&autoAttempt)send(owner,"OnLoginButton");}},500);
+                Button login=LoginStyle.button(a,"登 录",true);
+                LinearLayout.LayoutParams loginLayout=new LinearLayout.LayoutParams(-1,LoginStyle.dp(a,44));loginLayout.topMargin=LoginStyle.dp(a,4);body.addView(login,loginLayout);
+                LinearLayout actions=new LinearLayout(a);actions.setOrientation(LinearLayout.HORIZONTAL);
+                Button close=LoginStyle.button(a,"返回",false),register=LoginStyle.button(a,"注册账号",false);
+                LinearLayout.LayoutParams actionLayout=new LinearLayout.LayoutParams(0,LoginStyle.dp(a,38),1f);actionLayout.topMargin=LoginStyle.dp(a,8);
+                actions.addView(close,actionLayout);LinearLayout.LayoutParams registerLayout=new LinearLayout.LayoutParams(0,LoginStyle.dp(a,38),1f);registerLayout.topMargin=LoginStyle.dp(a,8);registerLayout.leftMargin=LoginStyle.dp(a,12);actions.addView(register,registerLayout);
+                body.addView(actions,new LinearLayout.LayoutParams(-1,-2));
+                login.setOnClickListener(view->{manual();send(target,"OnLoginButton");});
+                password.setOnEditorActionListener((text,action,event)->{if(action==EditorInfo.IME_ACTION_DONE){manual();send(target,"OnLoginButton");return true;}return false;});
+                register.setOnClickListener(view->{manual();send(target,"OnRegistButtonClick");});
+                close.setOnClickListener(view->{manual();send(target,"OnCloseButtonClick");});
+                opened.setContentView(LoginStyle.panel(a,body));opened.setCanceledOnTouchOutside(false);
+                opened.setOnCancelListener(ignored->{manual();send(target,"OnCloseButtonClick");});
+                opened.setOnDismissListener(ignored->{synchronized(LoginCache.class){if(dialog==opened){dialog=null;formVisible=false;formUser="";formPass="";row=null;rememberBox=null;autoBox=null;}}username.setText("");password.setText("");});
+                synchronized(LoginCache.class){dialog=opened;formVisible=true;}
+                opened.show();LoginStyle.fit(a,opened);body.setFocusableInTouchMode(true);body.requestFocus();
+                if(shouldAuto)UI.postDelayed(()->{synchronized(LoginCache.class){if(!suppressed&&autoAttempt&&dialog==opened&&formVisible)send(target,"OnLoginButton");}},500);
             }catch(Exception unavailable){fail();}
         });
     }
-    private static CheckBox box(Activity a,String title){CheckBox result=new CheckBox(a);result.setText(title);result.setTextColor(Color.rgb(53,79,90));result.setTextSize(14);result.setScaleX(.70f);result.setScaleY(.70f);result.setButtonTintList(android.content.res.ColorStateList.valueOf(Color.rgb(28,123,163)));return result;}
-    private static void hideNow(){if(row!=null&&row.getParent() instanceof ViewGroup)((ViewGroup)row.getParent()).removeView(row);row=null;}
+    private static CheckBox box(Activity a,String title){CheckBox result=new CheckBox(a);result.setText(title);result.setTextColor(LoginStyle.INK);result.setTextSize(15);result.setPadding(LoginStyle.dp(a,2),0,LoginStyle.dp(a,8),0);result.setButtonTintList(android.content.res.ColorStateList.valueOf(LoginStyle.BLUE));return result;}
+    private static void hideNow(){Dialog previous;synchronized(LoginCache.class){previous=dialog;dialog=null;formVisible=false;formUser="";formPass="";row=null;rememberBox=null;autoBox=null;}if(previous!=null)previous.dismiss();}
     public static void hide(){UI.post(()->hideNow());}
     public static synchronized void ready(){if(autoAttempt&&!suppressed)UI.postDelayed(()->{synchronized(LoginCache.class){if(autoAttempt&&!suppressed)send(loginOwner,"OnPressLogin");}},100);}
     public static synchronized boolean begin(int identity,String username,String password){

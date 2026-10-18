@@ -16,7 +16,7 @@ import (
 )
 
 // DispatchP5Next 单独暴露下一组候选接点，当前已发布P5入口保持原行为。
-// 原ArrayPage在12级开放更换主角阵容位，HeroReplacePage发送CSFormationOn。
+// HeroReplacePage发送CSFormationOn，替换任意主战位均保留至少一名角色。
 func (s *GameService) DispatchP5Next(ctx context.Context, id int64, request proto.Message, stamp int64) ([]proto.Message, bool, error) {
 	switch b := request.(type) {
 	case *pb.CSWarriorStrengthen:
@@ -134,12 +134,6 @@ func (s *GameService) p5FormationOnNative(ctx context.Context, id int64, b *pb.C
 			}
 			if hero := formationHero(slot); hero != nil && slot.GetFormatPos() != b.GetFormatPos() && (hero.GetGuid() == b.GetGuid() || hero.GetId() == b.GetId()) {
 				return errors.New("该角色已经在其他位置上阵")
-			}
-		}
-		if old := formationHero(target); old != nil && old.GetGuid() == p.GetHeroWarId() && old.GetGuid() != b.GetGuid() {
-			gate := int32(tableNumber(s.table("GameConfigure", "StaticName", "SwapMainHeroLevel"), "NameValue"))
-			if gate <= 0 || p.GetLevel() < gate {
-				return errors.New("玩家等级尚未达到主角更换要求")
 			}
 		}
 		if target == nil {

@@ -1,3 +1,9 @@
+# 下阵桥当前版本
+
+2026-10-18 游玩修复：当前源码允许主角下阵，只要求阵容至少保留一名角色；无需先卸装备、饰品和精灵。服务端原21049成功后清空该阵位引用并保留库存，桥在20111权威确认后清除对应本地owner、建空阵位、重新打开任一剩余角色。主角身份字段保持原样。当前构建入口与充值、引导合批在 `../client_playability/build.py`。
+
+下面保留历史r3失败与bootstrap来源说明；旧构建命令和裸装/主角禁下阵说明仅对应历史基线。
+
 # Isolated original formation UI bootstrap (r3)
 
 The small module adds an explicit “下阵” control to an already initialized original ArrayPage. Automatic polling attaches UI only. The user must click the control to send original21049; no background business request is added. No Go, SQL, device, APK packaging or installation is performed by this builder.

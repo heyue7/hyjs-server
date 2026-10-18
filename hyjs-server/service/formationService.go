@@ -12,6 +12,7 @@ import (
 
 	"google.golang.org/protobuf/proto"
 	"gorm.io/gorm"
+	"hyjs-server/constUtil"
 	"hyjs-server/model"
 	pb "hyjs-server/model/protocol"
 )
@@ -260,9 +261,6 @@ func (s *GameService) formationOn(ctx context.Context, id int64, b *pb.CSFormati
 				return errors.New("该角色已经在其他位置上阵")
 			}
 		}
-		if old := formationHero(target); old != nil && old.GetGuid() == player.GetHeroWarId() && old.GetGuid() != b.GetGuid() {
-			return errors.New("主角不能被替换下阵")
-		}
 		if target == nil {
 			target = &pb.FormationItem{FormatPos: proto.Int32(b.GetFormatPos())}
 			g.Formation = append(g.Formation, target)
@@ -307,9 +305,6 @@ func (s *GameService) formationOff(ctx context.Context, id int64, b *pb.CSFormat
 		if _, err := s.formationWarrior(g, b.GetGuid(), b.GetId()); err != nil {
 			return err
 		}
-		if b.GetGuid() == player.GetHeroWarId() {
-			return errors.New("主角不能下阵")
-		}
 		if err := s.PrepareFormation(g); err != nil {
 			return err
 		}
@@ -324,13 +319,29 @@ func (s *GameService) formationOff(ctx context.Context, id int64, b *pb.CSFormat
 			if hero != nil && (hero.GetGuid() != b.GetGuid() || hero.GetId() != b.GetId()) {
 				return errors.New("指定英雄已不在该阵位")
 			}
-			var remaining []*pb.FormationThing
-			for _, thing := range slot.GetThings() {
-				if thing.GetPos() != 0 {
-					remaining = append(remaining, thing)
+			// 只有实际卸下英雄时才核对剩余人数，空位重试保持幂等。
+			if hero != nil {
+				members := 0
+				for _, member := range g.Formation {
+					if formationHero(member) != nil {
+						members++
+					}
+				}
+				if members <= 1 {
+					return errors.New(constUtil.FormationRequiresHero)
 				}
 			}
-			slot.Things = remaining
+			// 下阵同时解除该槽穿戴，库存实例及其培养仍保留，冷登不会产生隐藏穿戴。
+			for _, thing := range slot.GetThings() {
+				if thing.GetPos() >= 1 && thing.GetPos() <= 4 {
+					equip, err := s.equipmentRecord(g, thing.GetGuid())
+					if err != nil {
+						return err
+					}
+					equip.LastHeroId = proto.String("")
+				}
+			}
+			slot.Things = nil
 		}
 		if err := s.syncEquipmentOwners(g); err != nil {
 			return err
