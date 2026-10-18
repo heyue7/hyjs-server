@@ -154,7 +154,11 @@ func (s *GameService) p8SpawnNode(id int64, scene, posID string, generation int6
 	if !strings.HasPrefix(group, "group_"+kind+"_") {
 		return nil, p8GatherError()
 	}
-	cfg := p8GatherConfig{ResourceID: group, Kind: kind, Level: int32(level), GatherMS: duration, CooldownMS: cooldown, Times: int32(times), Fatigue: costs[0].GetNum(), Reward: row["rewardProbId"], Point: point, Radius: radius, Source: constUtil.P8GatherPolicySource}
+	resourceID := group
+	if row["adminOriginalID"] != "" {
+		resourceID = row["adminOriginalID"]
+	}
+	cfg := p8GatherConfig{ResourceID: resourceID, Kind: kind, Level: int32(level), GatherMS: duration, CooldownMS: cooldown, Times: int32(times), Fatigue: costs[0].GetNum(), Reward: row["rewardProbId"], Point: point, Radius: radius, Source: constUtil.P8GatherPolicySource + field["adminRevision"]}
 	raw, err := json.Marshal(cfg)
 	if err != nil {
 		return nil, err
@@ -162,12 +166,13 @@ func (s *GameService) p8SpawnNode(id int64, scene, posID string, generation int6
 	if _, err = p8DecodeConfig(string(raw)); err != nil {
 		return nil, err
 	}
-	return &db.P8ResourceNode{PlayerID: id, Scene: scene, PosID: posID, ResourceID: group, Remaining: int32(times), Generation: generation, Snapshot: string(raw)}, nil
+	return &db.P8ResourceNode{PlayerID: id, Scene: scene, PosID: posID, ResourceID: resourceID, Remaining: int32(times), Generation: generation, Snapshot: string(raw)}, nil
 }
 
-func (s *GameService) p8GatherOpen(id int64, p *pb.Player, g *model.GameState) error {
+func (s *GameService) p8GatherOpen(id int64, p *pb.Player, g *model.GameState, accepted ...bool) error {
 	row := s.p8GatherMap(g.Position.GetScene())
-	if row == nil || !s.P8FieldSceneAvailable(g.Position.GetScene()) || p.GetLevel() < int32(tableNumber(row, "levelLimit")) {
+	frozenClaim := len(accepted) > 0 && accepted[0]
+	if row == nil || !constUtil.P8PackagedFieldScene(g.Position.GetScene()) || !frozenClaim && (!s.P8FieldSceneAvailable(g.Position.GetScene()) || p.GetLevel() < int32(tableNumber(row, "levelLimit"))) {
 		return p8GatherError()
 	}
 	if err := s.refreshField(id, g); err != nil {
@@ -190,11 +195,42 @@ func (s *GameService) p8Nodes(tx *gorm.DB, id int64, scene string, now int64) ([
 		return nil, false, err
 	}
 	changed := false
+	// Preserve a live attempt's frozen node. Once it finishes, replace stale map
+	// projections in the same player transaction so count/point edits take effect.
+	if row["adminRevision"] != "" && len(nodes) > 0 {
+		expected := constUtil.P8GatherPolicySource + row["adminRevision"]
+		stale := false
+		for _, node := range nodes {
+			cfg, e := p8DecodeConfig(node.Snapshot)
+			if e != nil {
+				return nil, false, e
+			}
+			stale = stale || cfg.Source != expected
+		}
+		if stale {
+			var active int64
+			if tx.Migrator().HasTable(&db.P8GatherAttempt{}) {
+				if err := tx.Model(&db.P8GatherAttempt{}).Where("player_id=? AND active=?", id, true).Count(&active).Error; err != nil {
+					return nil, false, err
+				}
+			}
+			if active == 0 {
+				if err := tx.Where("player_id=? AND scene=?", id, scene).Delete(&db.P8ResourceNode{}).Error; err != nil {
+					return nil, false, err
+				}
+				nodes = nil
+				changed = true
+			}
+		}
+	}
 	if len(nodes) == 0 {
 		for _, spec := range []struct{ points, maximum string }{{"MinePoints", "MineMax"}, {"FishPoints", "FishGroupMax"}} {
 			points := strings.Split(row[spec.points], ";")
+			if row[spec.points] == "" {
+				points = nil
+			}
 			limit, err := strconv.ParseInt(row[spec.maximum], 10, 32)
-			if err != nil || limit < 1 || limit > int64(len(points)) {
+			if err != nil || limit < 0 || limit > int64(len(points)) {
 				return nil, false, p8GatherError()
 			}
 			seen := map[string]bool{}
@@ -370,6 +406,11 @@ func (s *GameService) p8RollGather(cfg *p8GatherConfig) (string, error) {
 }
 
 func (s *GameService) p8GrantGather(p *pb.Player, g *model.GameState, rewards string) (*pb.ResultObject, error) {
+	// A valid weighted mine can yield no resources; the accepted attempt still
+	// consumes its original node use and fatigue exactly once.
+	if rewards == "" {
+		return &pb.ResultObject{}, nil
+	}
 	mine, fish := map[string]int64{}, map[string]int64{}
 	var other []string
 	for _, spec := range strings.Split(rewards, ";") {
@@ -450,7 +491,20 @@ func (s *GameService) p8GatherMutation(ctx context.Context, id int64, op string,
 			}
 		}
 		now := time.Now().UnixMilli()
-		if err = s.p8GatherOpen(id, p, g); err != nil {
+		// A new deployment cannot revoke a previously accepted gather. Only the
+		// new-open gates are bypassed; the original claim still verifies scene,
+		// distance, remaining node, fatigue, death and mutually exclusive fights.
+		acceptedClaim := false
+		if op == constUtil.P8GatherClaimOperation {
+			var active db.P8GatherAttempt
+			e := tx.First(&active, "player_id=? AND active=?", id, true).Error
+			if e == nil {
+				acceptedClaim = active.Scene == g.Position.GetScene()
+			} else if !errors.Is(e, gorm.ErrRecordNotFound) {
+				return e
+			}
+		}
+		if err = s.p8GatherOpen(id, p, g, acceptedClaim); err != nil {
 			return err
 		}
 		if err = apply(tx, p, g, now); err != nil {

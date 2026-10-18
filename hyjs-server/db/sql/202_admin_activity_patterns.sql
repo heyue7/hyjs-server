@@ -1,0 +1,5 @@
+CREATE TABLE IF NOT EXISTS admin_activity_patterns (
+ id VARCHAR(64) NOT NULL PRIMARY KEY, name VARCHAR(160) NOT NULL, cycle_days BIGINT NOT NULL,
+ entries_json LONGBLOB NOT NULL, revision BIGINT NOT NULL, updated_at_millis BIGINT NOT NULL,
+ archived BOOLEAN NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

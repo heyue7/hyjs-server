@@ -169,16 +169,19 @@ const routeMap: RouteMap = {
   "achievements": "/achievements",
   "activities": "/activities",
   "activities-unavailable": "/activities-unavailable",
+  "activity-schedules": "/activity-schedules",
   "announcements": "/announcements",
   "arena-prizes": "/arena-prizes",
   "audit": "/audit",
   "feedback": "/feedback",
+  "fields": "/fields",
   "home": "/home",
   "iframe-page": "/iframe-page/:url",
   "items": "/items",
   "login": "/login/:module(pwd-login|code-login|register|reset-pwd|bind-wechat)?",
   "players": "/players",
   "server-clock": "/server-clock",
+  "servers": "/servers",
   "shops": "/shops",
   "shops_guild": "/shops/guild",
   "shops_memory": "/shops/memory",
@@ -192,6 +195,7 @@ const routeMap: RouteMap = {
   "shops_vip": "/shops/vip",
   "titles": "/titles",
   "users": "/users",
+  "wallet-reasons": "/wallet-reasons",
   "wallets": "/wallets"
 };
 

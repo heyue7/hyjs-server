@@ -41,6 +41,9 @@ func OpenGameMySQL(ctx context.Context, cfg MySQLConfig, applySchema bool) (*gor
 	if err = sqlDB.PingContext(ctx); err == nil && applySchema {
 		err = d.WithContext(ctx).Exec(mysqlProfileSchema).Error
 	}
+	if err == nil && applySchema && !d.Migrator().HasColumn(&Profile{}, "server_id") {
+		err = d.WithContext(ctx).Migrator().AddColumn(&Profile{}, "ServerID")
+	}
 	if err == nil {
 		err = validateMySQLProfiles(ctx, d)
 	}

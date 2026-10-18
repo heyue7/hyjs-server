@@ -4,6 +4,7 @@ const (
 	P12FieldPVPPolicyName   = "local-field002-pk-transaction-v1"
 	P12FieldPVPSource       = "original30045/type5/max40/factors1/3s-countdown+3s-play; local10m/current-TCP/same-line/non-safe; atomic-server-terminal; ordinary-white-target-2percent-coin-cap; judicial-send-keeps-jailFlag; ordinary-red-death-minus1; original-town-prison-after-busy; jail=max(TableKiller-minutes,kills*180s); paid-first10000-then-kills8334; defaultoff"
 	P12FieldPVPRecordSource = "p12-field-pvp"
+	P12FieldPVPMapClosed    = "当前区服的该野外地图未发布PK许可或已关闭"
 	P12FieldPVPClosed       = "当前野外PK本地策略未开放"
 	P12FieldPVPBusy         = "当前野外PK演出尚未结束"
 	P12FieldPVPJailed       = "当前角色仍在监狱刑期内"

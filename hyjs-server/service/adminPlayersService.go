@@ -27,7 +27,7 @@ func adminPlayerProjection(row db.Profile, details bool) (model.AdminGamePlayerD
 	if err != nil {
 		return model.AdminGamePlayerDTO{}, err
 	}
-	out := model.AdminGamePlayerDTO{ID: row.Id, Name: p.GetName(), Level: int64(p.GetLevel()), Vip: int64(p.GetVip()), Chapter: g.Copy.GetCurrentChapterId(), Mission: g.Copy.GetCurrentMissionId(), Scene: g.Position.GetScene(), Version: adminPlayerVersion(row), Balances: map[string]int64{"coin": p.GetCoin(), "diamond": int64(p.GetDiamond()), "energy": int64(p.GetEnergy()), "stamina": int64(p.GetStamina()), "light": int64(p.GetLight()), "point": int64(p.GetPoint()), "popularity": int64(p.GetPopularity()), "score": int64(p.GetScore())}, Counts: map[string]int64{"characters": int64(len(g.Warriors)), "equipment": int64(len(g.Equipment)), "accessories": int64(len(g.Treasures)), "items": int64(len(g.Items)), "gems": int64(len(g.Gems)), "cooking": int64(len(g.Cooking))}}
+	out := model.AdminGamePlayerDTO{ID: row.Id, ServerID: AdminProfileServerID(row), Name: p.GetName(), Level: int64(p.GetLevel()), Vip: int64(p.GetVip()), Chapter: g.Copy.GetCurrentChapterId(), Mission: g.Copy.GetCurrentMissionId(), Scene: g.Position.GetScene(), Version: adminPlayerVersion(row), Balances: map[string]int64{"coin": p.GetCoin(), "diamond": int64(p.GetDiamond()), "energy": int64(p.GetEnergy()), "stamina": int64(p.GetStamina()), "light": int64(p.GetLight()), "point": int64(p.GetPoint()), "popularity": int64(p.GetPopularity()), "score": int64(p.GetScore())}, Counts: map[string]int64{"characters": int64(len(g.Warriors)), "equipment": int64(len(g.Equipment)), "accessories": int64(len(g.Treasures)), "items": int64(len(g.Items)), "gems": int64(len(g.Gems)), "cooking": int64(len(g.Cooking))}}
 	if row.CreatedAt != nil {
 		out.CreatedAt = *row.CreatedAt
 	}
@@ -63,6 +63,9 @@ func adminPlayerProjection(row db.Profile, details bool) (model.AdminGamePlayerD
 // AdminGamePlayers 分页查询昵称及ID，只选择业务存档和版本所需列。
 func AdminGamePlayers(ctx context.Context, q string, page, size int64) (*model.AdminGamePlayersResponse, error) {
 	query := db.GetIns().WithContext(ctx).Model(&db.Profile{}).Where("player IS NOT NULL AND game IS NOT NULL")
+	if serverID := AdminSelectedServerID(ctx); serverID > 0 {
+		query = query.Where("server_id=?", serverID)
+	}
 	if q != "" {
 		expression := "json_extract(player, '$.name')"
 		if query.Dialector.Name() == "mysql" {
@@ -76,7 +79,7 @@ func AdminGamePlayers(ctx context.Context, q string, page, size int64) (*model.A
 		return nil, err
 	}
 	var rows []db.Profile
-	if err := query.Select("id", "player", "game", "session", "created_at").Order("id DESC").Offset(int((page - 1) * size)).Limit(int(size)).Find(&rows).Error; err != nil {
+	if err := query.Select("id", "server_id", "player", "game", "session", "created_at").Order("id DESC").Offset(int((page - 1) * size)).Limit(int(size)).Find(&rows).Error; err != nil {
 		return nil, err
 	}
 	out := &model.AdminGamePlayersResponse{Items: []model.AdminGamePlayerDTO{}, Total: total}
@@ -93,7 +96,10 @@ func AdminGamePlayers(ctx context.Context, q string, page, size int64) (*model.A
 // AdminGamePlayer 读取一名游戏角色的有限运营详情。
 func AdminGamePlayer(ctx context.Context, id int64) (*model.AdminGamePlayerDTO, error) {
 	var row db.Profile
-	if err := db.GetIns().WithContext(ctx).Select("id", "player", "game", "session", "created_at").First(&row, id).Error; err != nil {
+	if err := db.GetIns().WithContext(ctx).Select("id", "server_id", "player", "game", "session", "created_at").First(&row, id).Error; err != nil {
+		return nil, err
+	}
+	if err := AdminCheckProfileScope(ctx, row); err != nil {
 		return nil, err
 	}
 	dto, err := adminPlayerProjection(row, true)
@@ -118,6 +124,9 @@ func AdminRenameGamePlayer(ctx context.Context, p *model.AdminPrincipal, id int6
 		}
 		var row db.Profile
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&row, id).Error; err != nil {
+			return err
+		}
+		if err := AdminCheckProfileScope(ctx, row); err != nil {
 			return err
 		}
 		if adminPlayerVersion(row) != req.Version {
@@ -175,6 +184,9 @@ func AdminKickGamePlayer(ctx context.Context, p *model.AdminPrincipal, id int64,
 		}
 		var row db.Profile
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&row, id).Error; err != nil {
+			return err
+		}
+		if err := AdminCheckProfileScope(ctx, row); err != nil {
 			return err
 		}
 		if adminPlayerVersion(row) != req.Version {

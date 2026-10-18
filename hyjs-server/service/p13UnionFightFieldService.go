@@ -1065,7 +1065,7 @@ func (s *GameService) p13UFFieldLeaveExpected(ctx context.Context, id int64, req
 }
 
 func (s *GameService) p13UFFieldLive(tx *gorm.DB, actor db.P13UnionFightFieldPlayer) (*pb.InstUFPlayer, bool) {
-	value, ok := p10ClientSinks.Load(p10ClientKey{s, actor.PlayerID})
+	value, ok := p10ClientSinks.Load(p10ClientKey{s.p10ClientOwner(), actor.PlayerID})
 	if !ok || actor.LeftAt != 0 || actor.SessionHash == "" {
 		return nil, false
 	}
@@ -1115,7 +1115,7 @@ func (s *GameService) p13UFFieldPeers(tx *gorm.DB, scope string, exclude int64) 
 	var frames []*pb.InstUFPlayer
 	now := p13UFNow(tx.Statement.Context)
 	for _, row := range rows {
-		value, ok := p10ClientSinks.Load(p10ClientKey{s, row.PlayerID})
+		value, ok := p10ClientSinks.Load(p10ClientKey{s.p10ClientOwner(), row.PlayerID})
 		if !ok || row.CurrentGuildID != row.GuildID || row.ActualScene != constUtil.P13UnionFightFieldTarget || row.SessionHash != p6Digest(row.ProfileSession) || !bytes.Equal(row.ProfileSession, value.(*p10ClientSink).session) {
 			continue
 		}
@@ -1159,7 +1159,7 @@ func (s *GameService) SyncP13UnionFightField(ctx context.Context, id int64, move
 	if game.Position.GetScene() != constUtil.P13UnionFightFieldTarget {
 		return false, nil
 	}
-	value, ok := p10ClientSinks.Load(p10ClientKey{s, id})
+	value, ok := p10ClientSinks.Load(p10ClientKey{s.p10ClientOwner(), id})
 	if !ok {
 		return true, nil
 	}

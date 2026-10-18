@@ -36,6 +36,12 @@ func (s *GameService) benefitGiftOffer(tx *gorm.DB, p *pb.Player, now time.Time)
 	}
 	if cycle != nil {
 		key = "limitSale_p4_" + cycle.ID
+	} else {
+		// Native limited-offer entry follows the same realm occurrence as the activity catalogue.
+		key, err = AdminCurrentCommerceRuleKey(tx, "sale", now.UnixMilli(), key)
+		if err != nil {
+			return nil, nil, nil, nil, err
+		}
 	}
 	var live db.P4CommerceRule
 	err = tx.First(&live, "id=? AND enabled=?", key, true).Error

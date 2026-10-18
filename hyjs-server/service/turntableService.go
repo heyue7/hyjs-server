@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math"
 	"math/big"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -28,7 +29,7 @@ func (s *GameService) InitializeTurntable(ctx context.Context) error {
 	if err := db.InitGameplayPoolSchema(ctx, db.GetIns()); err != nil {
 		return err
 	}
-	if err := db.GetIns().WithContext(ctx).AutoMigrate(&db.TurntableGlobal{}, &db.TurntableState{}, &db.TurntableRules{}, &db.TurntableRecord{}); err != nil {
+	if err := db.GetIns().WithContext(ctx).AutoMigrate(&db.TurntableGlobal{}, &db.TurntableState{}, &db.TurntableRules{}, &db.TurntableRecord{}, &db.TurntablePersonal{}, &db.TurntableDrawReceipt{}); err != nil {
 		return err
 	}
 	err := db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
@@ -347,6 +348,9 @@ func (s *GameService) turntableGain(tx *gorm.DB, player *pb.Player, game *model.
 
 // turntableRanks 只纳入发生过抽奖且仍有真实角色的参与者，同积分按玩家ID稳定排序。
 func (s *GameService) turntableRanks(tx *gorm.DB, global *db.TurntableGlobal, rules *db.TurntableRules) ([]*pb.BigTurnRankItem, error) {
+	if turntablePersonalOwner(tx) > 0 {
+		return []*pb.BigTurnRankItem{}, nil
+	}
 	if global.Settled {
 		var ranks []*pb.BigTurnRankItem
 		if err := json.Unmarshal(global.FinalRanks, &ranks); err != nil {
@@ -358,8 +362,29 @@ func (s *GameService) turntableRanks(tx *gorm.DB, global *db.TurntableGlobal, ru
 	if err := tx.Where("pool_id = ? AND score > 0", global.PoolID).Order("score DESC, player_id ASC").Find(&states).Error; err != nil {
 		return nil, err
 	}
+	// Frozen legacy scores prevent subsequent private draws from entering the retired shared contest.
+	if tx.Migrator().HasTable(&db.TurntablePersonal{}) {
+		for i := range states {
+			var personal db.TurntablePersonal
+			err := tx.First(&personal, "pool_id=? AND player_id=?", global.PoolID, states[i].PlayerID).Error
+			if err == nil {
+				states[i].Score = personal.LegacyScore
+			} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+				return nil, err
+			}
+		}
+	}
+	sort.SliceStable(states, func(i, j int) bool {
+		if states[i].Score == states[j].Score {
+			return states[i].PlayerID < states[j].PlayerID
+		}
+		return states[i].Score > states[j].Score
+	})
 	ranks := []*pb.BigTurnRankItem{}
 	for _, st := range states {
+		if st.Score <= 0 {
+			continue
+		}
 		var row db.Profile
 		if err := tx.First(&row, st.PlayerID).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -390,6 +415,10 @@ func (s *GameService) turntableRanks(tx *gorm.DB, global *db.TurntableGlobal, ru
 func (s *GameService) settleTurntable(tx *gorm.DB, global *db.TurntableGlobal, cfg *db.GameplayPool, rules *db.TurntableRules, now int64) error {
 	if global.Settled || now < cfg.EndAt {
 		return nil
+	}
+	if turntablePersonalOwner(tx) > 0 {
+		global.Settled = true
+		return saveTurntableRuntimeGlobal(tx, global)
 	}
 	ranks, err := s.turntableRanks(tx, global, rules)
 	if err != nil {
@@ -424,6 +453,7 @@ func (s *GameService) settleTurntable(tx *gorm.DB, global *db.TurntableGlobal, c
 
 // turntableRead 使用统一全局→玩家锁序；结束后的任意查询也会完成唯一一次真实排名发奖。
 func (s *GameService) turntableRead(ctx context.Context, id int64, kind string) ([]proto.Message, error) {
+	ctx = context.WithValue(ctx, constUtil.PersonalTurntableOwnerKey, id)
 	var result proto.Message
 	var synced *pb.Player
 	var items []*pb.SimpleItem
@@ -432,20 +462,22 @@ func (s *GameService) turntableRead(ctx context.Context, id int64, kind string) 
 			return err
 		}
 
-		var global db.TurntableGlobal
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("pool_id = ?", s.p2TurntablePoolID(tx)).First(&global).Error; err != nil {
+		var row db.Profile
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&row, id).Error; err != nil {
 			return err
 		}
+		runtime, err := s.turntableRuntimeGlobal(tx, s.p2TurntablePoolID(tx))
+		if err != nil {
+			return err
+		}
+		global := *runtime
+
 		cfg, rewards, rules, err := s.turntableConfig(tx)
 		if err != nil {
 			return err
 		}
 		now := LocalPlayNow(ctx).UnixMilli()
 		if err = s.settleTurntable(tx, &global, cfg, rules, now); err != nil {
-			return err
-		}
-		var row db.Profile
-		if err = tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&row, id).Error; err != nil {
 			return err
 		}
 		player, g, err := decodeProfileForCalendarUpdate(tx, &row)
@@ -498,7 +530,7 @@ func (s *GameService) turntableRead(ctx context.Context, id int64, kind string) 
 			}
 			result = &pb.SCBigTurnRecord{OtherPlayerRewards: records}
 		case "desc":
-			result = &pb.SCBigTurnDesc{DescriStr: proto.String(rules.Description), TopPrizeId: proto.String(rules.TopPrize), AdvancePrizeId: proto.String(rules.AdvancePrize)}
+			result = &pb.SCBigTurnDesc{DescriStr: proto.String("个人幸运转盘：每人独立拥有奖品库存、钻石大奖池和抽奖记录。单抽50钻、十抽488钻，每抽赠送10000金币；免费机会以界面倒计时为准。付费返入本人大奖池，中奖领取本人池中钻石。库存售罄的奖品退出本人奖池；不参与全服排名，也不发放排名奖。"), TopPrizeId: proto.String(""), AdvancePrizeId: proto.String("")}
 		default:
 			return errors.New("未知转盘查询")
 		}
@@ -526,12 +558,17 @@ func (s *GameService) bigTurnDesc(ctx context.Context, id int64) ([]proto.Messag
 
 // turntableActivityList 按有效窗口公布转盘、基金与累计登录入口。
 func (s *GameService) turntableActivityList(ctx context.Context, id int64) ([]proto.Message, error) {
+	ctx = context.WithValue(ctx, constUtil.PersonalTurntableOwnerKey, id)
 	result := &pb.SCActivityList{}
 	err := db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := ServerGameClockGuardTransaction(tx); err != nil {
 			return err
 		}
 
+		var row db.Profile
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&row, id).Error; err != nil {
+			return err
+		}
 		var cfg db.GameplayPool
 		if err := tx.Where("id = ?", s.p2TurntablePoolID(tx)).First(&cfg).Error; errors.Is(err, gorm.ErrRecordNotFound) {
 			// 未配置转盘是合法运营状态，其余活动仍继续组装。
@@ -542,10 +579,6 @@ func (s *GameService) turntableActivityList(ctx context.Context, id int64) ([]pr
 		now := LocalPlayNow(ctx).UnixMilli()
 		if !cfg.Enabled || now < cfg.StartAt || now >= cfg.RewardEndAt {
 			return nil
-		}
-		var row db.Profile
-		if err := tx.First(&row, id).Error; err != nil {
-			return err
 		}
 		player, _, err := decodeProfileForCalendarUpdate(tx, &row)
 		if err != nil {
@@ -569,12 +602,13 @@ func (s *GameService) turntableActivityList(ctx context.Context, id int64) ([]pr
 			elog.Warn("activity omitted from directory", zap.String("activity", cfg.ID), zap.Error(err))
 			return nil
 		}
-		var global db.TurntableGlobal
-		if err := tx.First(&global, "pool_id=?", cfg.ID).Error; errors.Is(err, gorm.ErrRecordNotFound) {
+		runtime, err := s.turntableRuntimeGlobal(tx, cfg.ID)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil
 		} else if err != nil {
 			return err
 		}
+		global := *runtime
 		stock := map[int32]int32{}
 		if global.DiamondPool < 0 || json.Unmarshal(global.UsedStock, &stock) != nil || stock == nil {
 			return nil
@@ -623,7 +657,11 @@ func turntableFree(cfg *db.GameplayPool, st *db.TurntableState, now time.Time) b
 
 func turntableRecords(tx *gorm.DB, key string) ([]string, error) {
 	var records []db.TurntableRecord
-	if err := tx.Where("pool_id = ?", key).Order("id DESC").Limit(100).Find(&records).Error; err != nil {
+	query := tx.Where("pool_id = ?", key)
+	if owner := turntablePersonalOwner(tx); owner > 0 {
+		query = query.Where("player_id=?", owner)
+	}
+	if err := query.Order("id DESC").Limit(100).Find(&records).Error; err != nil {
 		return nil, err
 	}
 	result := []string{}
@@ -642,17 +680,14 @@ func turntableRecords(tx *gorm.DB, key string) ([]string, error) {
 }
 
 // playBigTurn 将扣费、奖池返还、有限库存、奖励实例、积分和防重回执放在同一 SQL 事务。
-func (s *GameService) playBigTurn(ctx context.Context, id int64, b *pb.CSPlayBigTurn, stamp int64) ([]proto.Message, error) {
+func (s *GameService) playBigTurnOnce(ctx context.Context, id int64, b *pb.CSPlayBigTurn, stamp int64) ([]proto.Message, error) {
+	ctx = context.WithValue(ctx, constUtil.PersonalTurntableOwnerKey, id)
 	var result *pb.SCPlayBigTurn
 	err := db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := ServerGameClockGuardTransaction(tx); err != nil {
 			return err
 		}
 
-		var global db.TurntableGlobal
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("pool_id = ?", s.p2TurntablePoolID(tx)).First(&global).Error; err != nil {
-			return err
-		}
 		var row db.Profile
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&row, id).Error; err != nil {
 			return err
@@ -661,7 +696,7 @@ func (s *GameService) playBigTurn(ctx context.Context, id int64, b *pb.CSPlayBig
 		if err != nil {
 			return err
 		}
-		prior, err := localPlayTurntableReplay(tx, id, b, stamp)
+		prior, err := turntableReplayFrozen(tx, id, b, stamp)
 		if err != nil {
 			return err
 		}
@@ -672,6 +707,11 @@ func (s *GameService) playBigTurn(ctx context.Context, id int64, b *pb.CSPlayBig
 			result = prior
 			return nil
 		}
+		runtime, err := s.turntableRuntimeGlobal(tx, s.p2TurntablePoolID(tx))
+		if err != nil {
+			return err
+		}
+		global := *runtime
 		st := db.TurntableState{PoolID: global.PoolID, PlayerID: id}
 		if err = tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&st).Error; err != nil {
 			return err
@@ -849,6 +889,9 @@ func (s *GameService) playBigTurn(ctx context.Context, id int64, b *pb.CSPlayBig
 		if err = localPlayTurntableSaveReceipt(tx, id, b, stamp, result); err != nil {
 			return err
 		}
+		if err = tx.Create(&db.TurntableDrawReceipt{PlayerID: id, Stamp: stamp, PoolID: cfg.ID, Count: count, Response: st.Response}).Error; err != nil {
+			return err
+		}
 		// 记录回执中的实际钻石费用；同次大奖返钻不能缩减消费事实。
 		if len(result.Cost) > 0 && tx.Migrator().HasTable(&db.EventFact{}) {
 			if err = s.RecordP1Cost(tx, id, fmt.Sprintf("p2:wheel:%s:%d", cfg.ID, stamp), result.Cost, now); err != nil {
@@ -865,7 +908,7 @@ func (s *GameService) playBigTurn(ctx context.Context, id int64, b *pb.CSPlayBig
 		if err = tx.Save(&st).Error; err != nil {
 			return err
 		}
-		return tx.Save(&global).Error
+		return saveTurntableRuntimeGlobal(tx, &global)
 	})
 	if err != nil {
 		return nil, err

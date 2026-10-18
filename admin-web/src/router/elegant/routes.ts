@@ -56,7 +56,7 @@ export const generatedRoutes: GeneratedRoute[] = [
     path: '/activities',
     component: 'layout.base$view.activities',
     meta: {
-      title: '活动配置',
+      title: '活动设置',
       i18nKey: 'route.activities',
       icon: 'ph:calendar-blank',
       order: 3,
@@ -75,6 +75,18 @@ export const generatedRoutes: GeneratedRoute[] = [
       hideInMenu: true,
       activeMenu: 'activities',
       roles: ['viewer', 'operator', 'admin']
+    }
+  },
+  {
+    name: 'activity-schedules',
+    path: '/activity-schedules',
+    component: 'layout.base$view.activity-schedules',
+    meta: {
+      title: '活动排期',
+      i18nKey: 'route.activity-schedules',
+      icon: 'ph:sliders-horizontal',
+      roles: ['viewer', 'operator', 'admin'],
+      order: 3
     }
   },
   {
@@ -123,6 +135,18 @@ export const generatedRoutes: GeneratedRoute[] = [
       icon: 'ph:megaphone',
       order: 9,
       roles: ['viewer', 'operator', 'admin']
+    }
+  },
+  {
+    name: 'fields',
+    path: '/fields',
+    component: 'layout.base$view.fields',
+    meta: {
+      title: '野外地图与部署',
+      i18nKey: 'route.fields',
+      icon: 'ph:sliders-horizontal',
+      roles: ['viewer', 'operator', 'admin'],
+      order: 4
     }
   },
   {
@@ -196,6 +220,18 @@ export const generatedRoutes: GeneratedRoute[] = [
       icon: 'ph:clock-counter-clockwise',
       order: 6,
       roles: ['viewer', 'operator', 'admin']
+    }
+  },
+  {
+    name: 'servers',
+    path: '/servers',
+    component: 'layout.base$view.servers',
+    meta: {
+      title: '区服管理',
+      i18nKey: 'route.servers',
+      icon: 'ph:sliders-horizontal',
+      roles: ['viewer', 'operator', 'admin'],
+      order: 2
     }
   },
   {
@@ -354,6 +390,18 @@ export const generatedRoutes: GeneratedRoute[] = [
       icon: 'ph:users',
       order: 6,
       roles: ['admin']
+    }
+  },
+  {
+    name: 'wallet-reasons',
+    path: '/wallet-reasons',
+    component: 'layout.base$view.wallet-reasons',
+    meta: {
+      title: '钱包入账规则',
+      i18nKey: 'route.wallet-reasons',
+      icon: 'ph:sliders-horizontal',
+      roles: ['viewer', 'operator', 'admin'],
+      order: 7
     }
   },
   {

@@ -82,6 +82,11 @@ func p12WorldBossConfig(tx *gorm.DB) (*db.P12WorldBossPolicy, *p12WorldBossDefin
 	if err := json.Unmarshal([]byte(cfg.DefinitionJSON), &def); err != nil {
 		return nil, nil, err
 	}
+	if s, ok := tx.Statement.Context.Value(constUtil.GameServiceContextKey).(*GameService); ok {
+		if err := s.adminFieldBossConfiguration(&cfg, &def); err != nil {
+			return nil, nil, err
+		}
+	}
 	return &cfg, &def, nil
 }
 

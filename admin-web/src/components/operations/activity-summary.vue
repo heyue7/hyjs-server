@@ -3,7 +3,7 @@ import { computed } from 'vue';
 import type { ActivityForm, ActivityMode } from '@/service/activity-operations';
 import { formatTime } from '@/service/operations';
 import RewardSummary from './reward-summary.vue';
-const props = defineProps<{ form: ActivityForm; mode?: ActivityMode }>();
+const props = defineProps<{ form: ActivityForm; mode?: ActivityMode; hideSchedule?: boolean }>();
 const options = computed(() => props.form.options || {});
 const rows = computed(() => props.form.products || []);
 const milestones = computed(() => props.form.milestones || []);
@@ -24,9 +24,9 @@ function minuteText(value: number) { return value === 1440 ? '24:00' : `${String
       <NDescriptions :column="2" label-placement="top">
         <NDescriptionsItem label="模式">{{ mode?.label || '暂未支持此模式' }}</NDescriptionsItem>
         <NDescriptionsItem label="游戏模板">{{ mode?.templates.find(template => template.id === form.templateId)?.name || '无可用模板' }}</NDescriptionsItem>
-        <NDescriptionsItem label="开始">{{ formatTime(form.startAt) }}</NDescriptionsItem>
-        <NDescriptionsItem label="结束">{{ formatTime(form.endAt) }}</NDescriptionsItem>
-        <NDescriptionsItem label="领奖截止">{{ formatTime(form.claimEndAt) }}</NDescriptionsItem>
+        <NDescriptionsItem v-if="!hideSchedule" label="开始">{{ formatTime(form.startAt) }}</NDescriptionsItem>
+        <NDescriptionsItem v-if="!hideSchedule" label="结束">{{ formatTime(form.endAt) }}</NDescriptionsItem>
+        <NDescriptionsItem v-if="!hideSchedule" label="领奖截止">{{ formatTime(form.claimEndAt) }}</NDescriptionsItem>
         <NDescriptionsItem label="运营备注">{{ form.source || '—' }}</NDescriptionsItem>
       </NDescriptions>
     </section>

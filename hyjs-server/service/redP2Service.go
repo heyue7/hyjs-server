@@ -197,13 +197,18 @@ func (s *GameService) p2TurntablePoolID(tx *gorm.DB) string {
 	if scoped := localPlayTurntablePoolID(tx); scoped != "" {
 		return scoped
 	}
+	fallback := "turntable_20261011"
 	if tx.Migrator().HasTable(&db.KingRecruitRules{}) {
 		var cfg db.KingRecruitRules
 		if tx.First(&cfg, 1).Error == nil && (cfg.WheelPool == constUtil.P2RedWheelPool || cfg.WheelPool == constUtil.TurntableScreenshotPool) {
-			return cfg.WheelPool
+			fallback = cfg.WheelPool
 		}
 	}
-	return "turntable_20261011"
+	key, err := s.AdminScheduledTurntablePool(tx, LocalPlayNow(tx.Statement.Context).UnixMilli(), fallback)
+	if err != nil {
+		return "invalid-admin-scheduled-wheel"
+	}
+	return key
 }
 
 func (s *GameService) kingConfiguration(tx *gorm.DB, now time.Time) (*db.KingRecruitRules, int32, int64, error) {

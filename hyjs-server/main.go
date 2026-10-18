@@ -310,6 +310,9 @@ func run() error {
 	if err = s.InitializeP5(ctx); err != nil {
 		return err
 	}
+	if err = s.InitializeAdminGameServers(ctx); err != nil {
+		return err
+	}
 	if err = service.InitializeAdminGameContent(ctx); err != nil {
 		return err
 	}
@@ -384,6 +387,12 @@ func run() error {
 		return err
 	}
 	if err = service.InitializeAdminOperations(ctx); err != nil {
+		return err
+	}
+	if err = s.InitializeAdminActivitySchedules(ctx); err != nil {
+		return err
+	}
+	if err = s.InitializeAdminFields(ctx); err != nil {
 		return err
 	}
 	httpListener, err := net.Listen("tcp", net.JoinHostPort(cfg.Bind, strconv.Itoa(cfg.HTTPPort)))

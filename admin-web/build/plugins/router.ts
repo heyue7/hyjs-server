@@ -74,6 +74,10 @@ export function setupElegantRouter() {
           order: 9
         },
         shops_vip: { title: '会员礼包', icon: 'ph:treasure-chest', order: 10 },
+        servers: { title: '区服管理', icon: 'ph:flag', order: 2 },
+        'activity-schedules': { title: '活动排期', icon: 'ph:calendar-blank', order: 3 },
+        fields: { title: '野外地图与部署', icon: 'ph:mountains', order: 4 },
+        'wallet-reasons': { title: '钱包入账规则', icon: 'ph:wallet', order: 7 },
         'arena-prizes': { title: '竞技胜利翻牌', icon: 'ph:cards-three', order: 6 },
         shops: { title: '商店管理', icon: 'ph:treasure-chest', order: 6 },
         achievements: {
@@ -85,7 +89,7 @@ export function setupElegantRouter() {
         feedback: { title: '客服反馈', icon: 'ph:megaphone', order: 9 },
         home: { title: '运营概览', icon: 'ph:squares-four', order: 1 },
         items: { title: '道具目录', icon: 'ph:treasure-chest', order: 2 },
-        activities: { title: '活动配置', icon: 'ph:calendar-blank', order: 3 },
+        activities: { title: '活动设置', icon: 'ph:calendar-blank', order: 3 },
         announcements: { title: '公告管理', icon: 'ph:megaphone', order: 4 },
         audit: {
           title: '操作审计',

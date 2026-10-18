@@ -7,8 +7,9 @@ import { api } from '@/service/operations';
 import { money } from '@/service/wallet-operations';
 import type { WalletAccount } from '@/service/wallet-operations';
 import { useOperations } from '@/composables/useOperations';
+import { useServerScopeStore } from '@/store/modules/server-scope';
+const scope = useServerScopeStore();
 import WalletLedger from '@/components/operations/wallet-ledger.vue';
-import WalletReasons from '@/components/operations/wallet-reasons.vue';
 const route = useRoute();
 const { loading, error, run } = useOperations();
 const rows = ref<WalletAccount[]>([]);
@@ -17,12 +18,11 @@ const page = ref(1);
 const pageSize = ref(25);
 const total = ref(0);
 const ledgerOpen = ref(false);
-const reasonsOpen = ref(false);
 const selected = ref<WalletAccount | null>(null);
 async function load() {
   const data = await run(() =>
     api<{ items: WalletAccount[]; total: number }>(
-      `/wallets?${new URLSearchParams({ q: q.value, page: String(page.value), pageSize: String(pageSize.value) })}`
+      scope.serverQuery(`/wallets?${new URLSearchParams({ q: q.value, page: String(page.value), pageSize: String(pageSize.value) })}`)
     )
   );
   if (data) {
@@ -77,7 +77,6 @@ watch(() => route.query.playerId, openRequestedPlayer);
     <div class="ops-toolbar">
       <div class="ops-page-label">蓝绿钱包</div>
       <NSpace>
-        <NButton @click="reasonsOpen = true">入账理由</NButton>
         <NButton :loading="loading" @click="load">刷新</NButton>
       </NSpace>
     </div>
@@ -114,9 +113,6 @@ watch(() => route.query.playerId, openRequestedPlayer);
       >
         <WalletLedger v-if="selected" :key="selected.playerId" :player-id="selected.playerId" />
       </NDrawerContent>
-    </NDrawer>
-    <NDrawer v-model:show="reasonsOpen" :width="980" class="ops-editor-drawer">
-      <NDrawerContent title="入账理由" closable><WalletReasons v-if="reasonsOpen" /></NDrawerContent>
     </NDrawer>
   </div>
 </template>

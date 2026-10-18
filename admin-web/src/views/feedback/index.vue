@@ -6,6 +6,8 @@ import { onBeforeRouteLeave } from 'vue-router';
 import { ApiError, api, errorMessage, formatTime, json } from '@/service/operations';
 import type { FeedbackTicket } from '@/service/management-operations';
 import { useOperations } from '@/composables/useOperations';
+import { useServerScopeStore } from '@/store/modules/server-scope';
+const scope = useServerScopeStore();
 const { canWrite, loading, error, run } = useOperations();
 const q = ref('');
 const state = ref<string | null>(null);
@@ -52,7 +54,7 @@ async function load() {
     pageSize: String(pageSize.value)
   });
   if (state.value) params.set('state', state.value);
-  const data = await run(() => api<{ items: FeedbackTicket[]; total: number }>(`/feedback?${params}`));
+  const data = await run(() => api<{ items: FeedbackTicket[]; total: number }>(scope.serverQuery(`/feedback?${params}`)));
   if (data) {
     rows.value = data.items;
     total.value = data.total;
@@ -67,7 +69,7 @@ async function fetchDetail(row: FeedbackTicket) {
   detailLoading.value = true;
   detailError.value = '';
   try {
-    const result = await api<FeedbackTicket>(`/feedback/${encodeURIComponent(row.id)}`);
+    const result = await api<FeedbackTicket>(scope.serverQuery(`/feedback/${encodeURIComponent(row.id)}`));
     if (current === detailGeneration) {
       detail.value = result;
       newState.value = result.state;
@@ -109,7 +111,7 @@ async function sendReply() {
   if (!replyRequestId.value) replyRequestId.value = crypto.randomUUID();
   try {
     await api(
-      `/feedback/${encodeURIComponent(detail.value.id)}/replies`,
+      scope.serverQuery(`/feedback/${encodeURIComponent(detail.value.id)}/replies`),
       json('POST', {
         version: detail.value.version,
         content: reply.value.trim(),
@@ -136,7 +138,7 @@ async function changeState() {
   actionError.value = '';
   try {
     await api(
-      `/feedback/${encodeURIComponent(detail.value.id)}/state`,
+      scope.serverQuery(`/feedback/${encodeURIComponent(detail.value.id)}/state`),
       json('PUT', { version: detail.value.version, state: newState.value })
     );
     await fetchDetail(detail.value);
@@ -209,6 +211,7 @@ function leaveGuard() {
   );
 }
 onBeforeRouteLeave(leaveGuard);
+const removeSwitchGuard = scope.addSwitchGuard(() => busy.value ? false : leaveGuard());
 function beforeUnload(event: BeforeUnloadEvent) {
   if (reply.value.trim()) {
     event.preventDefault();
@@ -217,6 +220,7 @@ function beforeUnload(event: BeforeUnloadEvent) {
 }
 window.addEventListener('beforeunload', beforeUnload);
 onBeforeUnmount(() => {
+  removeSwitchGuard();
   detailGeneration += 1;
   window.removeEventListener('beforeunload', beforeUnload);
 });

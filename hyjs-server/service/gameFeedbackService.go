@@ -47,6 +47,9 @@ func GameFeedbackList(ctx context.Context, owner int64, page, size int) (*model.
 }
 func feedbackList(ctx context.Context, owner int64, state, q string, page, size int) (*model.FeedbackListResponse, error) {
 	tx := db.GetIns().WithContext(ctx).Model(&db.GameFeedback{})
+	if selected := AdminSelectedServerID(ctx); selected > 0 {
+		tx = tx.Where("player_id IN (?)", db.GetIns().WithContext(ctx).Model(&db.Profile{}).Select("id").Where("server_id=?", selected))
+	}
 	if owner > 0 {
 		tx = tx.Where("player_id=?", owner)
 	}
@@ -220,6 +223,9 @@ func AdminFeedbackDetail(ctx context.Context, p *model.AdminPrincipal, id string
 	if err := tx.First(&row, "id=?", id).Error; err != nil {
 		return nil, err
 	}
+	if err := adminFeedbackScope(tx, row.PlayerID); err != nil {
+		return nil, err
+	}
 	return feedbackDetail(tx, row)
 }
 
@@ -232,6 +238,9 @@ func AdminFeedbackReply(ctx context.Context, p *model.AdminPrincipal, id string,
 		}
 		var row db.GameFeedback
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&row, "id=?", id).Error; err != nil {
+			return err
+		}
+		if err := adminFeedbackScope(tx, row.PlayerID); err != nil {
 			return err
 		}
 		var existing db.GameFeedbackMessage
@@ -266,6 +275,9 @@ func AdminFeedbackState(ctx context.Context, p *model.AdminPrincipal, id string,
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&row, "id=?", id).Error; err != nil {
 			return err
 		}
+		if err := adminFeedbackScope(tx, row.PlayerID); err != nil {
+			return err
+		}
 		if adminVersion(row) != req.Version {
 			return constUtil.ErrAdminConfigConflict
 		}
@@ -282,4 +294,16 @@ func AdminFeedbackState(ctx context.Context, p *model.AdminPrincipal, id string,
 		return err
 	})
 	return out, err
+}
+
+// adminFeedbackScope checks immutable role ownership for support deep links.
+func adminFeedbackScope(tx *gorm.DB, id int64) error {
+	if AdminSelectedServerID(tx.Statement.Context) == 0 {
+		return nil
+	}
+	var p db.Profile
+	if err := tx.Select("id,server_id").First(&p, id).Error; err != nil {
+		return err
+	}
+	return AdminCheckProfileScope(tx.Statement.Context, p)
 }

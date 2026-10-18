@@ -1,0 +1,1 @@
+CREATE TABLE IF NOT EXISTS admin_field_battle_snapshots (fight_id VARCHAR(64) PRIMARY KEY,player_id BIGINT NOT NULL,scene VARCHAR(64) NOT NULL,reward LONGTEXT NOT NULL,cooldown_ms BIGINT NOT NULL,KEY(player_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

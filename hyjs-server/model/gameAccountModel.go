@@ -16,6 +16,7 @@ type GameAccountRegisterResponse struct {
 
 // AdminGamePlayerCreateRequest creates a normal account and its original starter character.
 type AdminGamePlayerCreateRequest struct {
+	ServerID int64  `json:"serverId"`                    // ServerID selects a bound running realm; zero preserves legacy single-runtime callers.
 	Username string `json:"username" binding:"required"` // Username is the new unique login identity.
 	Password string `json:"password" binding:"required"` // Password is required and stored only as the original scrypt digest.
 	Name     string `json:"name" binding:"required"`     // Name is the initial character display name.

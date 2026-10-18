@@ -20,6 +20,8 @@ import (
 
 // GameService 编排账号、主城和当前已恢复的副本协议。
 type GameService struct {
+	// RuntimeBase preserves live socket ownership across request-local table overlays.
+	RuntimeBase *GameService
 	// ServerID 由启动配置注入；同一数据库中的本地ID归属该区服。
 	ServerID int64
 	Host     string
@@ -123,30 +125,49 @@ func (s *GameService) Dispatch(ctx context.Context, request *model.GamePacket, p
 }
 
 func (s *GameService) dispatch(ctx context.Context, r *model.GamePacket, peer string) ([]proto.Message, error) {
+	// Internal original protocol consumers share the same trusted deployment identity as Dispatch.
+	ctx = context.WithValue(ctx, constUtil.GameServiceContextKey, s)
 	switch b := r.Body.(type) {
 	case *pb.CSCheckVersion:
 		return gameReply("SCCheckVersion", map[string]any{"serverAppVersion": b.GetAppVersion(), "serverResVersion": b.GetResVersoin(), "programMethod": 0, "resMethod": 0, "entry": []any{map[string]any{"key": "needActivation", "value": "0"}}})
 	case *pb.CSGetServerList:
 		serverID := s.OriginalServerID()
+		realm, err := s.runtimeGameServer(ctx)
+		if err != nil {
+			return nil, err
+		}
 		var (
 			row    db.Profile
 			recent []any
 		)
-		err := db.GetIns().WithContext(ctx).Where("uid = ?", b.GetPlatformUid()).First(&row).Error
+		err = db.GetIns().WithContext(ctx).Where("uid = ?", b.GetPlatformUid()).First(&row).Error
 		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, err
 		}
-		if err == nil && row.Player != nil {
+		if err == nil && row.Player != nil && AdminProfileServerID(row) == serverID {
 			p, _, err := decodeProfile(&row)
 			if err != nil {
 				return nil, err
 			}
 			recent = append(recent, map[string]any{"serverId": serverID, "platformUid": b.GetPlatformUid(), "playerId": row.Id, "playerName": p.GetName(), "level": p.GetLevel(), "state": "recommend", "globalServerKey": fmt.Sprintf("local-%d", serverID)})
 		}
-		return gameReply("SCGetServerList", map[string]any{"serverList": []any{map[string]any{"serverId": serverID, "name": "艾恩葛朗特·本地测试", "serverIp": fmt.Sprintf("%s:%d", s.Host, s.HTTPPort), "state": "recommend", "globalServerKey": fmt.Sprintf("local-%d", serverID), "display": "1"}}, "playerServerList": recent})
+		state := "recommend"
+		display := "1"
+		if !realm.Enabled {
+			state = "maintenance"
+			display = "0"
+		}
+		return gameReply("SCGetServerList", map[string]any{"serverList": []any{map[string]any{"serverId": serverID, "name": realm.Name, "serverIp": fmt.Sprintf("%s:%d", s.Host, s.HTTPPort), "state": state, "globalServerKey": fmt.Sprintf("local-%d", serverID), "display": display}}, "playerServerList": recent})
 	case *pb.CSUserLogin:
 		if int64(r.ZoneId) != s.OriginalServerID() {
 			return nil, errors.New("请求区服与当前部署不一致")
+		}
+		realm, err := s.runtimeGameServer(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if !realm.Enabled {
+			return nil, errors.New("当前区服维护中")
 		}
 		row, err := LoginAccount(ctx, b.GetPlatformUid(), b.GetAuthCode())
 		if err != nil {
@@ -169,13 +190,19 @@ func (s *GameService) dispatch(ctx context.Context, r *model.GamePacket, peer st
 	if err != nil {
 		return GameError(constUtil.ErrGameSession, "本地会话无效，请重新登录"), nil
 	}
-	if int64(r.ZoneId) != s.OriginalServerID() {
+	if int64(r.ZoneId) != s.OriginalServerID() || AdminProfileServerID(*row) != s.OriginalServerID() {
 		return nil, errors.New("请求区服与当前部署不一致")
 	}
 	ctx, err = s.BindLocalPlayContext(ctx, row)
 	if err != nil {
 		return nil, err
 	}
+	runtime, err := s.fieldRuntimeForRequest(ctx, r)
+	if err != nil {
+		return nil, err
+	}
+	s = runtime
+	ctx = bindFieldRuntime(ctx, s)
 	switch b := r.Body.(type) {
 	case *pb.CSGenerateName:
 		return gameReply("SCGenerateName", map[string]any{"playerName": fmt.Sprintf("归来的剑士%d", row.Id)})

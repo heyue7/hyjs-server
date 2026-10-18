@@ -71,5 +71,8 @@ func loadPlayerOpenServerRule(tx *gorm.DB, id int64) (*db.OpenServerActivityRule
 	cfg.StartAt = anchor.StartAt
 	cfg.EndAt = anchor.StartAt + duration
 	cfg.RewardEndAt = cfg.EndAt + grace
+	if err := AdminScheduledOpeningRule(tx, cfg, LocalPlayNow(tx.Statement.Context).UnixMilli()); err != nil {
+		return nil, err
+	}
 	return cfg, nil
 }

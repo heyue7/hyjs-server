@@ -1,0 +1,1 @@
+CREATE TABLE IF NOT EXISTS admin_field_deployments (server_id BIGINT NOT NULL, scene VARCHAR(64) NOT NULL, template_id VARCHAR(64) NOT NULL, enabled BOOLEAN NOT NULL, configuration LONGTEXT NOT NULL, revision BIGINT NOT NULL, updated_at BIGINT NOT NULL, PRIMARY KEY(server_id,scene)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

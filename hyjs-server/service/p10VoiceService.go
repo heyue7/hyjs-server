@@ -656,7 +656,7 @@ func (s *GameService) p10VoicePush(ctx context.Context, asset *db.P10VoiceAsset,
 	} else {
 		p10ClientSinks.Range(func(key, _ any) bool {
 			who := key.(p10ClientKey)
-			if who.service == s && who.playerID != asset.OwnerID {
+			if who.service == s.p10ClientOwner() && who.playerID != asset.OwnerID {
 				recipients = append(recipients, who.playerID)
 			}
 			return true

@@ -251,6 +251,10 @@ const local: App.I18n.Schema = {
     'shops_pet-market': '精灵商店',
     'shops_union-fight': '公会战商店',
     'shops_vip': '会员礼包',
+    servers: '区服管理',
+    'activity-schedules': '活动排期',
+    fields: '野外地图与部署',
+    'wallet-reasons': '钱包入账规则',
     'arena-prizes': '竞技胜利翻牌',
     'server-clock': 'Server time'
   },

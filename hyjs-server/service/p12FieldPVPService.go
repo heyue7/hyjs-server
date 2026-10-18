@@ -35,17 +35,61 @@ func (s *GameService) InitializeP12FieldPVP(ctx context.Context) error {
 
 // Missing tables are a closed fast path; initialization never opts users in.
 func p12FieldPVPPolicy(tx *gorm.DB) (*db.P12FieldPVPPolicy, error) {
+	policy, err := p12FieldPVPIdentityPolicy(tx)
+	if err != nil {
+		return nil, err
+	}
+	if !policy.Enabled {
+		return nil, errors.New(constUtil.P12FieldPVPClosed)
+	}
+	return policy, nil
+}
+
+// p12FieldPVPIdentityPolicy retains the original rule identity independently
+// from its legacy global switch. An operational map cannot replace these rules.
+func p12FieldPVPIdentityPolicy(tx *gorm.DB) (*db.P12FieldPVPPolicy, error) {
 	if !tx.Migrator().HasTable(&db.P12FieldPVPPolicy{}) {
 		return nil, errors.New(constUtil.P12FieldPVPClosed)
 	}
-	var p db.P12FieldPVPPolicy
-	if err := tx.First(&p, 1).Error; err != nil {
+	var policy db.P12FieldPVPPolicy
+	if err := tx.First(&policy, 1).Error; err != nil {
 		return nil, err
 	}
-	if !p.Enabled || p.PolicyName != constUtil.P12FieldPVPPolicyName || p.Source != constUtil.P12FieldPVPSource {
+	if policy.PolicyName != constUtil.P12FieldPVPPolicyName || policy.Source != constUtil.P12FieldPVPSource {
+		return nil, errors.New(constUtil.P12FieldPVPConflict)
+	}
+	return &policy, nil
+}
+
+// p12FieldPVPMapPolicy reads the actual realm publication in the same profile
+// transaction. Only an enabled, explicitly published map may permit PK while
+// the legacy global switch stays off. Other maps retain their original gate.
+func (s *GameService) p12FieldPVPMapPolicy(tx *gorm.DB, scene string) (*db.P12FieldPVPPolicy, error) {
+	policy, err := p12FieldPVPIdentityPolicy(tx)
+	if err != nil {
+		return nil, err
+	}
+	if tx.Migrator().HasTable(&db.AdminFieldDeployment{}) {
+		var deployment db.AdminFieldDeployment
+		err = tx.Clauses(clause.Locking{Strength: "SHARE"}).First(&deployment, "server_id=? AND scene=?", s.OriginalServerID(), scene).Error
+		if err == nil {
+			var cfg model.AdminFieldConfiguration
+			if json.Unmarshal([]byte(deployment.Configuration), &cfg) != nil || cfg.Scene != scene {
+				return nil, errors.New(constUtil.P12FieldPVPConflict)
+			}
+			if !deployment.Enabled || !cfg.AllowPK || !constUtil.P8PackagedFieldScene(scene) {
+				return nil, errors.New(constUtil.P12FieldPVPMapClosed)
+			}
+			return policy, nil
+		}
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, err
+		}
+	}
+	if !policy.Enabled {
 		return nil, errors.New(constUtil.P12FieldPVPClosed)
 	}
-	return &p, nil
+	return policy, nil
 }
 func p12FieldPVPState(tx *gorm.DB, p *pb.Player, g *model.GameState, now time.Time) (*db.P12FieldPVPState, error) {
 	var row db.P12FieldPVPState
@@ -352,10 +396,10 @@ func p12FieldPVPApplyTerminal(party *pb.BattlePlayer, side *pb.PlayerSide, out *
 }
 
 func (s *GameService) p12FieldPVPQualify(tx *gorm.DB, p *pb.Player, g *model.GameState, now time.Time) (int32, error) {
-	if g.Position.GetScene() == "field_001" || s.table("Field", "FieldId", g.Position.GetScene())["allSafe"] == "1" {
+	if s.table("Field", "FieldId", g.Position.GetScene())["allSafe"] == "1" {
 		return 2007, nil
 	}
-	if g.PositionLoading || g.Position.GetScene() != "field_002" || g.Field == nil || g.Field.Scene != "field_002" || g.Field.Side == nil || p.GetLevel() < 25 {
+	if g.PositionLoading || !s.P8FieldSceneAvailable(g.Position.GetScene()) || g.Field == nil || g.Field.Scene != g.Position.GetScene() || g.Field.Side == nil || p.GetLevel() < 25 {
 		return 2002, nil
 	}
 	if g.Position.GetCurrent() == nil || !combatFinite(float64(g.Position.GetCurrent().GetX())) || !combatFinite(float64(g.Position.GetCurrent().GetY())) || !combatFinite(float64(g.Position.GetCurrent().GetZ())) {
@@ -445,7 +489,10 @@ func (s *GameService) p12FieldPVPFightAt(ctx context.Context, id int64, session 
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return err
 		}
-		if _, err = p12FieldPVPPolicy(tx); err != nil {
+		if field := s.fieldSceneRow(g.Position.GetScene()); field != nil && (field["adminEnabled"] == "false" || field["adminPK"] == "false") {
+			return errors.New("该野外地图禁止PK")
+		}
+		if _, err = s.p12FieldPVPMapPolicy(tx, g.Position.GetScene()); err != nil {
 			return err
 		}
 		cfg, err := p10SceneConfig(tx)

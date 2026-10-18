@@ -12,6 +12,7 @@ SOURCE = Path(__file__).with_name('HeroArt.cs')
 STUBS = r'''
 namespace UnityEngine {
  public struct Rect { public float x,y,width,height; public Rect(float x,float y,float w,float h){this.x=x;this.y=y;width=w;height=h;} }
+ public struct Vector4 { public float x,y,z,w; public Vector4(float x,float y,float z,float w){this.x=x;this.y=y;this.z=z;this.w=w;} }
  public class Texture { public string name; public Texture(string n){name=n;} }
  public class GameObject {
   System.Collections.Generic.Dictionary<System.Type,Component> parts=new System.Collections.Generic.Dictionary<System.Type,Component>();
@@ -22,7 +23,13 @@ namespace UnityEngine {
  public class MonoBehaviour:Component {}
 }
 namespace Dict.DataModel { public class TableHero { public string id;public int IsShowInCard;} }
-public class UITexture:UnityEngine.Component { public UnityEngine.Texture mainTexture;public UnityEngine.Rect uvRect=new UnityEngine.Rect(.1f,.2f,.7f,.8f); }
+public class UITexture:UnityEngine.Component {
+ public UnityEngine.Texture mainTexture;
+ public UnityEngine.Rect uvRect=new UnityEngine.Rect(.1f,.2f,.7f,.8f);
+ public UnityEngine.Vector4 drawRegion=new UnityEngine.Vector4(0,0,1,1);
+ public int width=128,height=128,pixelPerfectCalls;
+ public void MakePixelPerfect(){pixelPerfectCalls++;width=height=1024;}
+}
 public class AloneTextureKit:UnityEngine.Component {}
 '''
 PROGRAM = r'''
@@ -51,13 +58,31 @@ static class Program {
    HeroArtFallback.AssignHead(tex,art);Rect face=tex.uvRect;
    Check(tex.mainTexture==art && face.width>.2f && face.width<.3f,"face crop");
    Check(face.x>=0&&face.y>=0&&face.x+face.width<=1&&face.y+face.height<=1,"bounded UV");
+   Check(tex.width==128&&tex.height==128&&tex.drawRegion.x>0&&tex.drawRegion.z<1,"head stays inside original frame");
    HeroArtFallback.AssignHead(tex,new Texture("hero_icon_071"));Check(Eq(tex.uvRect,original),"pooled normal restores UV");
+   Check(Eq(tex.drawRegion.x,0)&&Eq(tex.drawRegion.z,1),"pooled normal restores draw region");
    HeroArtFallback.AssignHead(tex,art);HeroArtFallback.AssignHead(tex,null);Check(Eq(tex.uvRect,original),"clear restores UV");
    HeroArtFallback.PrepareCard(kit,"hero2d/hero_2d_"+id);HeroArtFallback.AssignCard(tex,art);
    Check(Eq(tex.uvRect.width,560f/1024f)&&tex.mainTexture==art,"card crop");
    HeroArtFallback.PrepareCard(kit,painting);HeroArtFallback.AssignCard(tex,art);Check(Eq(tex.uvRect,original),"detail keeps original full painting");
    HeroArtFallback.PrepareCard(kit,"hero2d/hero_2d_"+id);HeroArtFallback.AssignCard(tex,art);
    HeroArtFallback.PrepareCard(kit,"hero2d/hero_2d_071");HeroArtFallback.AssignCard(tex,new Texture("hero_2d_071"));Check(Eq(tex.uvRect,original),"pooled normal card restores");
+   HeroArtFallback.AssignRequested(tex,art,"HeroHeader/hero_icon_"+id);
+   HeroArtFallback.MakeRequestedPixelPerfect(tex);
+   Check(Eq(tex.uvRect,face)&&tex.width==128&&tex.height==128&&tex.pixelPerfectCalls==0,"async head preserves prefab dimensions");
+   HeroArtFallback.AssignRequested(tex,art,"hero2d/hero_2d_"+id);
+   Check(Eq(tex.uvRect.width,560f/1024f)&&Eq(tex.drawRegion.x,0),"async recruit card crop has original region");
+   HeroArtFallback.AssignRequested(tex,art,painting);
+   Check(Eq(tex.uvRect,original)&&Eq(tex.drawRegion.x,0),"async full detail restores original UV and region");
+   HeroArtFallback.MakeRequestedPixelPerfect(tex);
+   Check(tex.width==1024&&tex.height==1024&&tex.pixelPerfectCalls==1,"full painting retains original pixel-perfect behavior");
+   tex.width=160;tex.height=112;
+   HeroArtFallback.AssignRequested(tex,art,"HeroHeader/hero_icon_"+id);
+   HeroArtFallback.MakeRequestedPixelPerfect(tex);
+   Check(tex.width==160&&tex.height==112&&tex.pixelPerfectCalls==1,"non-square original layout retained");
+   HeroArtFallback.AssignRequested(tex,new Texture("hero_icon_071"),"HeroHeader/hero_icon_071");
+   HeroArtFallback.MakeRequestedPixelPerfect(tex);
+   Check(Eq(tex.uvRect,original)&&Eq(tex.drawRegion.x,0)&&tex.pixelPerfectCalls==2,"unrelated async image still runs original behavior");
   }
   foreach(string path in new[]{"heroheader/hero_icon_071","hero2d/hero_2d_007","model/roa01_body","heropainter/hero_card_070","heroheader/hero_icon_069_extra","",null})
    Check(HeroArtFallback.MapBundle(path)==path,"other path unchanged");

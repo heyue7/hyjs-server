@@ -2,6 +2,7 @@ package model
 
 // AdminGamePlayerDTO 仅包含游戏运营需要的角色摘要，不包含登录凭据或完整存档。
 type AdminGamePlayerDTO struct {
+	ServerID  int64                      `json:"serverId"`            // ServerID is immutable role ownership.
 	ID        int64                      `json:"id"`                  // ID 是游戏角色ID。
 	Name      string                     `json:"name"`                // Name 是游戏昵称。
 	Level     int64                      `json:"level"`               // Level 是当前等级。

@@ -30,8 +30,17 @@ func benefitGiftBalance(t *testing.T, f *p1Fixture, diamond int64) {
 	}
 }
 
-func TestBenefitGiftOriginalPageSharedQuotaConcurrentReceiptAndCold(t *testing.T) {
+// This fixture opts in only its finite legacy sale; production seed defaults remain closed.
+func benefitGiftEnabledFixture(t *testing.T) *p1Fixture {
 	f := p4Setup(t)
+	if err := db.GetIns().Model(&db.P4CommerceRule{}).Where("kind=?", "sale").Update("enabled", true).Error; err != nil {
+		t.Fatal(err)
+	}
+	return f
+}
+
+func TestBenefitGiftOriginalPageSharedQuotaConcurrentReceiptAndCold(t *testing.T) {
+	f := benefitGiftEnabledFixture(t)
 	at := time.Now()
 	before, bg := f.profile(t)
 	info := benefitGiftInfo(t, f, at)
@@ -125,7 +134,7 @@ func TestBenefitGiftOriginalPageSharedQuotaConcurrentReceiptAndCold(t *testing.T
 }
 
 func TestBenefitGiftNoOfferPolicyMissingQuoteAndGenericPurchase(t *testing.T) {
-	f := p4Setup(t)
+	f := benefitGiftEnabledFixture(t)
 	at := time.Now()
 	if _, err := f.s.benefitGiftAt(f.ctx, f.id, &pb.CSBenefitGiftReward{}, 8001, at); err == nil {
 		t.Fatal("purchase without shown quote")
@@ -156,6 +165,10 @@ func TestBenefitGiftNoOfferPolicyMissingQuoteAndGenericPurchase(t *testing.T) {
 
 func TestBenefitGiftPrivateRefreshStaleQuoteAndOldReceipt(t *testing.T) {
 	f, id := localPlayActivitiesFixture(t)
+	// The obsolete wallet tool is exercised only with an explicitly enabled finite source.
+	if err := db.GetIns().Model(&db.P4CommerceRule{}).Where("kind=?", "sale").Update("enabled", true).Error; err != nil {
+		t.Fatal(err)
+	}
 	benefitGiftBalance(t, f, 60)
 	if _, err := f.s.LocalPlayActivitiesApply(f.ctx, id, "open", "TimeLimitSail", "a2000000-0000-4000-8000-000000000001"); err != nil {
 		t.Fatal(err)

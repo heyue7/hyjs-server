@@ -35,10 +35,17 @@ func LoginAccount(ctx context.Context, uid, password string) (*db.Profile, error
 			if found != nil && !errors.Is(found, gorm.ErrRecordNotFound) {
 				return found
 			}
+			if game, ok := ctx.Value(constUtil.GameServiceContextKey).(*GameService); ok && found == nil && AdminProfileServerID(row) != game.OriginalServerID() {
+				return errors.New("账号不属于当前区服")
+			}
 			if found == nil && len(row.PasswordHash) == 0 {
 				return errors.New("此账号属于早期无密码测试数据，请使用新的本地账号")
 			}
 			if found != nil {
+				row.ServerID = constUtil.GameDefaultServerID
+				if game, ok := ctx.Value(constUtil.GameServiceContextKey).(*GameService); ok {
+					row.ServerID = game.OriginalServerID()
+				}
 				row.Uid = uid
 				row.PasswordSalt = make([]byte, 16)
 				if _, err := rand.Read(row.PasswordSalt); err != nil {

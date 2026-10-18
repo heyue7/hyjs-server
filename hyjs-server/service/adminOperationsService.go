@@ -48,7 +48,7 @@ func (s *GameService) AdminCatalogue(q, category string, page, size int64) model
 // AdminPlayers 返回有限玩家索引，不含账号凭据或完整存档。
 func AdminPlayers(ctx context.Context, q string) ([]map[string]any, error) {
 	var rows []db.Profile
-	query := db.GetIns().WithContext(ctx).Select("id", "player")
+	query := db.GetIns().WithContext(ctx).Select("id", "server_id", "player")
 	if id, err := strconv.ParseInt(q, 10, 64); err == nil && id > 0 {
 		query = query.Where("id=?", id)
 	}
@@ -475,7 +475,10 @@ func (s *GameService) AdminGrant(ctx context.Context, p *model.AdminPrincipal, r
 			return constUtil.ErrAdminInput
 		}
 		var profile db.Profile
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Select("id").First(&profile, req.PlayerID).Error; err != nil {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Select("id", "server_id").First(&profile, req.PlayerID).Error; err != nil {
+			return err
+		}
+		if err := AdminCheckProfileScope(ctx, profile); err != nil {
 			return err
 		}
 		hash := adminVersion(req)

@@ -5,6 +5,8 @@ import { api, errorMessage, json } from '@/service/operations';
 import type { Item, ItemsResponse } from '@/service/operations';
 import type { GamePlayerCreate, GamePlayerDetail } from '@/service/player-operations';
 import ResourceImage from './resource-image.vue';
+import { useServerScopeStore } from '@/store/modules/server-scope';
+const scope = useServerScopeStore();
 const props = defineProps<{ show: boolean }>();
 const emit = defineEmits<{ 'update:show': [value: boolean]; created: [player: GamePlayerDetail] }>();
 const draft = reactive<GamePlayerCreate & { confirmPassword: string }>({ username: '', password: '', confirmPassword: '', name: '', heroId: 'hero_043', reason: '' });
@@ -38,11 +40,12 @@ function validate() {
 }
 async function save() {
   if (saving.value) return;
+  if (!scope.currentServer?.runtimeBound || !scope.currentServer.enabled) { error.value = '请选择已部署并开放的区服'; return; }
   error.value = validate();
   if (error.value) return;
   saving.value = true;
   try {
-    const result = await api<GamePlayerDetail>('/game-players', json('POST', { username: draft.username, password: draft.password, name: draft.name, heroId: draft.heroId, reason: draft.reason.trim() }));
+    const result = await api<GamePlayerDetail>(scope.serverQuery('/game-players'), json('POST', { serverId: scope.serverId, username: draft.username, password: draft.password, name: draft.name, heroId: draft.heroId, reason: draft.reason.trim() }));
     reset();
     emit('update:show', false);
     emit('created', result);

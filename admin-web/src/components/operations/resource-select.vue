@@ -11,6 +11,7 @@ const props = defineProps<{
   category?: string;
   placeholder?: string;
   resources?: Item[];
+  commerceCost?: boolean;
 }>();
 const emit = defineEmits<{ 'update:value': [value: string] }>();
 interface Option extends SelectOption {
@@ -21,16 +22,18 @@ interface Option extends SelectOption {
 const options = ref<Option[]>([]);
 const known = new Map<string, Item>();
 const loading = ref(false);
+const loadError = ref('');
+const searchText = ref('');
 let timer: ReturnType<typeof setTimeout>;
 let generation = 0;
 function keepSelected(items: Item[]) {
   for (const item of items) known.set(item.id, item);
-  const rows: Option[] = items.map((item) => ({
+  const rows: Option[] = items.map(item => ({
     value: item.id,
     label: item.name || item.id,
     item
   }));
-  if (props.value && !rows.some((option) => option.value === props.value)) {
+  if (props.value && !rows.some(option => option.value === props.value)) {
     const item = known.get(props.value);
     rows.unshift({
       value: props.value,
@@ -40,20 +43,26 @@ function keepSelected(items: Item[]) {
   }
   options.value = rows;
 }
-async function load(q = '') {
+async function load(q = searchText.value) {
   generation += 1;
   const current = generation;
   loading.value = true;
+  loadError.value = '';
   try {
     if (props.resources !== undefined) {
       const keyword = q.toLowerCase().trim();
-      keepSelected(props.resources.filter((item) => `${item.name} ${item.id}`.toLowerCase().includes(keyword)));
+      keepSelected(props.resources.filter(item => `${item.name} ${item.id}`.toLowerCase().includes(keyword)));
       return;
     }
-    const result = await api<ItemsResponse>(
-      `/items?${new URLSearchParams({ q, category: props.category || '', page: '1', pageSize: '40' })}`
+    const path = props.commerceCost ? '/activity-cost-resources' : '/items';
+    const result = await api<Pick<ItemsResponse, 'items'>>(
+      `${path}?${new URLSearchParams({ q, category: props.category || '', page: '1', pageSize: '40' })}`
     );
     if (current === generation) keepSelected(result.items);
+  } catch (error) {
+    if (current === generation) {
+      loadError.value = error instanceof Error ? error.message : '资源加载失败，请重新打开重试';
+    }
   } finally {
     if (current === generation) loading.value = false;
   }
@@ -66,6 +75,7 @@ watch(
   { immediate: true }
 );
 function search(q: string) {
+  searchText.value = q;
   clearTimeout(timer);
   timer = setTimeout(() => load(q).catch(() => {}), 250);
 }
@@ -84,10 +94,17 @@ function renderLabel(raw: SelectOption) {
 }
 watch(
   () => props.value,
-  (value) => {
-    if (!value) return;
-    keepSelected([...known.values()]);
-    if (!known.has(value)) load(value).catch(() => {});
+  async value => {
+    if (!value || known.has(value)) return;
+    try {
+      const result = await api<ItemsResponse>(
+        `/items?${new URLSearchParams({ ids: value, page: '1', pageSize: '1' })}`
+      );
+      for (const item of result.items) known.set(item.id, item);
+      keepSelected(options.value.flatMap(option => (option.item ? [option.item] : [])));
+    } catch {
+      // A missing display label does not replace the current search result or its selected ID.
+    }
   },
   { immediate: true }
 );
@@ -111,5 +128,7 @@ onBeforeUnmount(() => {
     @search="search"
     @focus="load().catch(() => {})"
     @update:value="emit('update:value', $event || '')"
-  />
+  >
+    <template #empty>{{ loadError || (searchText ? '没有匹配的资源，可尝试名称或ID' : '暂无可用资源') }}</template>
+  </NSelect>
 </template>

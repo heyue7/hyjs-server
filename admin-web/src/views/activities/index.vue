@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import ActivityWorkspace from '@/components/operations/activity-workspace.vue';
+import ActivityTemplateWorkspace from '@/components/operations/activity-template-workspace.vue';
 </script>
 
-<template><ActivityWorkspace /></template>
+<template><ActivityTemplateWorkspace /></template>

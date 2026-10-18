@@ -19,9 +19,17 @@ type p10ClientSink struct {
 
 var p10ClientSinks sync.Map
 
+// p10ClientOwner keeps connection identity stable while resource tables vary per request.
+func (s *GameService) p10ClientOwner() *GameService {
+	if s.RuntimeBase != nil {
+		return s.RuntimeBase
+	}
+	return s
+}
+
 // RegisterP10Client 必须在原CSSocketLogin成功后调用；旧连接注销不会删除新会话。
 func (s *GameService) RegisterP10Client(ctx context.Context, id int64, session []byte, send func(proto.Message) error) func() {
-	key := p10ClientKey{s, id}
+	key := p10ClientKey{s.p10ClientOwner(), id}
 	sink := &p10ClientSink{session: append([]byte(nil), session...), send: send}
 	p10ClientSinks.Store(key, sink)
 	_ = s.SyncP10Scene(ctx, id, false)
@@ -34,7 +42,7 @@ func (s *GameService) RegisterP10Client(ctx context.Context, id int64, session [
 	}
 }
 func (s *GameService) publishP10Private(ctx context.Context, id int64, message proto.Message) {
-	key := p10ClientKey{s, id}
+	key := p10ClientKey{s.p10ClientOwner(), id}
 	value, ok := p10ClientSinks.Load(key)
 	if !ok {
 		return

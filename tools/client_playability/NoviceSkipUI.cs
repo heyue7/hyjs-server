@@ -33,6 +33,7 @@ namespace HYJS.Playability
         GameObject button;
         UILabel caption;
         bool busy;
+        float nextWheelCheck;
 
         internal void Initialize(GuideManager value) { guide = value; }
         object Get(string name) { return typeof(GuideManager).GetField(name, Fields).GetValue(guide); }
@@ -77,8 +78,20 @@ namespace HYJS.Playability
             UIEventListener.Get(button).onClick = delegate(GameObject ignored) { Click(); };
         }
 
+        // The personal wheel has no shared contest; leave the original prizes and draw controls intact.
+        void HidePersonalWheelRanking()
+        {
+            if (Time.realtimeSinceStartup < nextWheelCheck) return;
+            nextWheelCheck = Time.realtimeSinceStartup + .5f;
+            UIActivityBigTurn wheel = UnityEngine.Object.FindObjectOfType(typeof(UIActivityBigTurn)) as UIActivityBigTurn;
+            if (wheel == null) return;
+            Transform rank = wheel.transform.Find("frame/content/content/BtnRank");
+            if (rank != null && rank.gameObject.activeSelf) rank.gameObject.SetActive(false);
+        }
+
         void LateUpdate()
         {
+            HidePersonalWheelRanking();
             try
             {
                 ResumeEmptyPopularityReward();

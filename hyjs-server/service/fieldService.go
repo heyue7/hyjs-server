@@ -134,13 +134,14 @@ func (s *GameService) fieldSceneRow(scene string) map[string]string {
 }
 
 func (s *GameService) P8FieldSceneAvailable(scene string) bool {
-	return constUtil.P8PackagedFieldScene(scene) && s.fieldSceneRow(scene) != nil
+	row := s.fieldSceneRow(scene)
+	return constUtil.P8PackagedFieldScene(scene) && row != nil && row["adminEnabled"] != "false"
 }
 
 // fieldSelectScene archives only area-local objects. Changing maps preserves
 // the player's HP, fatigue and shared daily reward counter.
 func (s *GameService) fieldSelectScene(g *model.GameState, scene string) error {
-	if s.fieldSceneRow(scene) == nil {
+	if s.fieldSceneRow(scene) == nil || !s.P8FieldSceneAvailable(scene) {
 		return errors.New(constUtil.P8FieldSceneUnavailable)
 	}
 	if g.Field == nil {
@@ -215,8 +216,18 @@ func (s *GameService) refreshField(id int64, g *model.GameState) error {
 	if row == nil {
 		return errors.New("Missing field map configuration")
 	}
+	if revision := row["adminRevision"]; revision != "" && (f.Fight == nil || f.Fight.Settled) {
+		version, _ := strconv.ParseInt(revision[:15], 16, 64)
+		if f.RespawnAt["__admin_revision"] != version {
+			f.Monsters = nil
+			f.RespawnAt = map[string]int64{"__admin_revision": version}
+		}
+	}
 	if len(f.Monsters) == 0 {
 		for _, pos := range strings.Split(row["MonsterPoints"], ";") {
+			if pos == "" {
+				continue
+			}
 			monster, err := s.fieldSpawn(pos)
 			if err != nil {
 				return err
@@ -466,7 +477,7 @@ func fieldFind(g *model.GameState, uuid string) *pb.SideMonster {
 func (s *GameService) fieldMonsterCheck(ctx context.Context, id int64, b *pb.CSSideMonsterCheck) ([]proto.Message, error) {
 	var result *pb.SCSideMonsterCheck
 	err := updateProfile(ctx, id, func(_ *pb.Player, g *model.GameState) error {
-		if s.fieldSceneRow(g.Position.GetScene()) == nil {
+		if s.fieldSceneRow(g.Position.GetScene()) == nil || !s.P8FieldSceneAvailable(g.Position.GetScene()) {
 			return errors.New(constUtil.P8FieldSceneUnavailable)
 		}
 		if err := s.refreshField(id, g); err != nil {
@@ -534,7 +545,7 @@ func (s *GameService) fieldHeartbeat(ctx context.Context, id int64) ([]proto.Mes
 func (s *GameService) fieldFightStart(ctx context.Context, id int64, b *pb.CSSidePveFightStart) ([]proto.Message, error) {
 	var result *pb.SCSidePveFightStart
 	err := updateProfileWithTx(ctx, id, func(tx *gorm.DB, player *pb.Player, g *model.GameState) error {
-		if s.fieldSceneRow(g.Position.GetScene()) == nil || g.Run != nil && !g.Run.Complete {
+		if !s.P8FieldSceneAvailable(g.Position.GetScene()) || g.Run != nil && !g.Run.Complete {
 			return errors.New("Enter the field before starting a battle")
 		}
 		if s.fieldSceneRow(g.Position.GetScene())["BattleMap"] != "map_forest_003" {
@@ -619,6 +630,9 @@ func (s *GameService) fieldFightStart(ctx context.Context, id int64, b *pb.CSSid
 			return errors.New("Missing field battle map")
 		}
 		result = &pb.SCSidePveFightStart{FightId: proto.String(token), RandSeed: proto.Int64(seed.Int64()), BattlePlayer: party, BattleMonsterList: monsters, FightScene: proto.String(""), Code: proto.Int32(1), Maxround: proto.Int32(int32(rounds))}
+		if err := s.adminFieldFreezeBattle(tx, id, f.Scene, token, monster.GetMonId()); err != nil {
+			return err
+		}
 		f.Fight = &model.FieldFight{MonsterUUID: monster.GetUuid(), Start: result, StartedAt: time.Now().UnixMilli()}
 		monster.State = proto.Int32(2)
 		f.Side.State = proto.Int32(6)
@@ -670,7 +684,7 @@ func (s *GameService) fieldReward(id int64, player *pb.Player, g *model.GameStat
 				return nil, errors.New("伙伴背包已满")
 			}
 			for i := int64(0); i < num; i++ {
-				warrior := &pb.Warrior{Id: proto.String(key), Guid: proto.String(fmt.Sprintf("%d-field-%s-%d", id, g.Field.Fight.Start.GetFightId(), i)), Level: proto.Int32(1), Exp: proto.Int64(0), Talent: proto.Int32(0), Breached: &pb.Breached{Level: proto.Int32(1)}, Training: &pb.Training{}, TempTraining: &pb.Training{}, Awake: &pb.Awake{}}
+				warrior := &pb.Warrior{Id: proto.String(key), Guid: proto.String(fmt.Sprintf("%d-field-%s-%s-%d", id, g.Field.Fight.Start.GetFightId(), key, i)), Level: proto.Int32(1), Exp: proto.Int64(0), Talent: proto.Int32(0), Breached: &pb.Breached{Level: proto.Int32(1)}, Training: &pb.Training{}, TempTraining: &pb.Training{}, Awake: &pb.Awake{}}
 				g.Warriors = append(g.Warriors, warrior)
 				gain.Wars = append(gain.Wars, warrior)
 			}
@@ -783,13 +797,34 @@ func (s *GameService) fieldFightEnd(ctx context.Context, id int64, b *pb.CSSideP
 		}
 		result = &pb.SCSidePveFightEnd{Getn: &pb.ResultObject{}, FightResult: proto.Int32(b.GetResult()), Code: proto.Int32(1), Anger: proto.Float64(anger), State: proto.Int32(0), Monster: monster}
 		if b.GetResult() == 1 {
-			gain, err := s.fieldReward(id, player, g, monster)
+			reward, cooldown, err := s.adminFieldBattleReward(tx, id, f.Scene, fight.Start.GetFightId(), monster.GetMonId())
+			if err != nil {
+				return err
+			}
+			frozenTables := make(map[string][]map[string]string, len(s.Tables))
+			for k, v := range s.Tables {
+				frozenTables[k] = v
+			}
+			frozenRows := []map[string]string{}
+			for _, r := range s.Tables["FieldMonster"] {
+				clone := map[string]string{}
+				for k, v := range r {
+					clone[k] = v
+				}
+				if r["MonId"] == monster.GetMonId() {
+					clone["rewardGroupId"] = reward
+				}
+				frozenRows = append(frozenRows, clone)
+			}
+			frozenTables["FieldMonster"] = frozenRows
+			rewardService := &GameService{Tables: frozenTables}
+			gain, err := rewardService.fieldReward(id, player, g, monster)
 			if err != nil {
 				return err
 			}
 			result.Getn = gain
 			monster.State, monster.CurHp = proto.Int32(3), proto.Float64(0)
-			cooldown := int64(tableNumber(s.fieldLeader(monster.GetMonId()), "RebornTime"))
+
 			if cooldown <= 0 {
 				return errors.New("Missing field respawn configuration")
 			}

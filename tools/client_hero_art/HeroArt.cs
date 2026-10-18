@@ -8,6 +8,7 @@ namespace HYJS.HeroArt
     public sealed class OriginalHeroCrop : MonoBehaviour
     {
         public Rect Original;
+        public Vector4 OriginalRegion;
         public bool Applied;
         public string CardId;
     }
@@ -83,16 +84,24 @@ namespace HYJS.HeroArt
             if (state != null && state.Applied)
             {
                 texture.uvRect = state.Original;
+                texture.drawRegion = state.OriginalRegion;
                 state.Applied = false;
             }
         }
 
-        static void Apply(UITexture texture, Rect crop)
+        static void Apply(UITexture texture, Rect crop, bool head)
         {
             OriginalHeroCrop state = texture.GetComponent<OriginalHeroCrop>();
             if (state == null) state = texture.gameObject.AddComponent<OriginalHeroCrop>();
-            if (!state.Applied) state.Original = texture.uvRect;
+            if (!state.Applied)
+            {
+                state.Original = texture.uvRect;
+                state.OriginalRegion = texture.drawRegion;
+            }
             texture.uvRect = crop;
+            // Original icons include a transparent rim under the frame. A crop
+            // from a full painting has no such rim; leave it inside that frame.
+            texture.drawRegion = head ? new Vector4(.06f, .06f, .94f, .94f) : state.OriginalRegion;
             state.Applied = true;
         }
 
@@ -102,7 +111,7 @@ namespace HYJS.HeroArt
             texture.mainTexture = asset;
             string id = PortraitId(asset);
             if (id == null) Restore(texture);
-            else Apply(texture, Face(id));
+            else Apply(texture, Face(id), true);
         }
 
         // AloneTextureKit also serves full detail paintings. Remember the original
@@ -124,8 +133,36 @@ namespace HYJS.HeroArt
             texture.mainTexture = asset;
             OriginalHeroCrop state = texture.GetComponent<OriginalHeroCrop>();
             string id = PortraitId(asset);
-            if (state != null && id != null && state.CardId == id) Apply(texture, Card(id));
+            if (state != null && id != null && state.CardId == id) Apply(texture, Card(id), false);
             else Restore(texture);
+        }
+
+        // AssetLoadHelper is also used by full detail paintings and map images.
+        // Inspect its unaliased request; a shared hero_card texture alone does
+        // not distinguish those uses from an avatar or a recruit-card fallback.
+        public static void AssignRequested(UITexture texture, Texture asset, string requestedPath)
+        {
+            string id = AliasId(requestedPath);
+            if (id != null && PortraitId(asset) == id)
+            {
+                texture.mainTexture = asset;
+                bool head = Same(requestedPath, "heroheader/hero_icon_" + id);
+                Apply(texture, head ? Face(id) : Card(id), head);
+            }
+            else
+            {
+                Restore(texture);
+                texture.mainTexture = asset;
+            }
+        }
+
+        public static void MakeRequestedPixelPerfect(UITexture texture)
+        {
+            OriginalHeroCrop state = texture.GetComponent<OriginalHeroCrop>();
+            // The aliased painting is 1024px square; retaining the prefab's
+            // widget size prevents MakePixelPerfect from expanding an avatar.
+            if (state != null && state.Applied && PortraitId(texture.mainTexture) != null) return;
+            texture.MakePixelPerfect();
         }
     }
 }

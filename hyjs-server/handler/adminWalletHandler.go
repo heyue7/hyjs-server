@@ -124,6 +124,10 @@ func AdminWalletLedgerHandler(c *gin.Context) {
 		adminError(c, constUtil.ErrAdminInput)
 		return
 	}
+	if err := service.AdminCheckPlayerIDScope(c.Request.Context(), id); err != nil {
+		adminError(c, err)
+		return
+	}
 	result, err := service.AdminWalletLedger(c.Request.Context(), adminPrincipal(c), id, start, end, kind, page, size)
 	if err != nil {
 		adminError(c, err)

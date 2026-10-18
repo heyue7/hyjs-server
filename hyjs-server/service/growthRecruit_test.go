@@ -44,6 +44,13 @@ func TestGrowthRecruitAll74PartnerChannels(t *testing.T) {
 		at := time.Date(2026, 10, day, 12, 0, 0, 0, time.FixedZone("UTC+8", 8*3600))
 		for _, kind := range []int32{1, 2} {
 			if err := db.GetIns().Transaction(func(tx *gorm.DB) error {
+				// Explicitly publish this finite positive-case fixture; production rotations stay default-off.
+				if err := f.s.seedP4Rotations(tx, at); err != nil {
+					return err
+				}
+				if err := tx.Model(&db.P4RecruitRotation{}).Where("kind=? AND start_at<=? AND end_at>?", kind, at.UnixMilli(), at.UnixMilli()).Update("enabled", true).Error; err != nil {
+					return err
+				}
 				rewards, _, err := f.s.loadP4Rotation(tx, kind, at)
 				for _, reward := range rewards {
 					covered[reward.ResourceID] = true
@@ -130,8 +137,8 @@ func TestGrowthRecruitPolicyMonthlyStopAndColdPreservation(t *testing.T) {
 		t.Fatal(err)
 	}
 	var future db.P4CommerceRule
-	if err = db.GetIns().First(&future, "id=?", constUtil.P15RedOSSupplyPrefix+next.In(time.FixedZone("UTC+8", 8*3600)).Format("200601")).Error; err != nil || !future.Enabled {
-		t.Fatal("next month inherits published policy", err)
+	if err = db.GetIns().First(&future, "id=?", constUtil.P15RedOSSupplyPrefix+next.In(time.FixedZone("UTC+8", 8*3600)).Format("200601")).Error; err != nil || future.Enabled {
+		t.Fatal("unpublished next month must remain closed despite current publication", err)
 	}
 	f.restart(t)
 	if err = f.s.InitializeGrowthRecruit(f.ctx); err != nil {
@@ -249,6 +256,12 @@ func TestGrowthRecruitOSPrivateRefreshKeepsOldBytesAndMonthlyQuota(t *testing.T)
 		t.Fatal(err)
 	}
 	now := LocalPlayNow(f.ctx)
+	// Publish only this test's current base exchange source before exercising its private refresh.
+	baseExchange := "limitExchange_p4_" + now.In(time.FixedZone("UTC+8", 8*3600)).Format("200601")
+	published := db.GetIns().Model(&db.P4CommerceRule{}).Where("id=?", baseExchange).Update("enabled", true)
+	if published.Error != nil || published.RowsAffected != 1 {
+		t.Fatal("finite base exchange fixture missing", published.RowsAffected, published.Error)
+	}
 	if _, err := f.s.LocalPlayActivitiesApply(f.ctx, id, "open", "TimeLimitExchange", "00000000-0000-4000-8000-000000008301"); err != nil {
 		t.Fatal(err)
 	}

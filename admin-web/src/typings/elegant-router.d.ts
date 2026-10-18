@@ -23,16 +23,19 @@ declare module "@elegant-router/types" {
     "achievements": "/achievements";
     "activities": "/activities";
     "activities-unavailable": "/activities-unavailable";
+    "activity-schedules": "/activity-schedules";
     "announcements": "/announcements";
     "arena-prizes": "/arena-prizes";
     "audit": "/audit";
     "feedback": "/feedback";
+    "fields": "/fields";
     "home": "/home";
     "iframe-page": "/iframe-page/:url";
     "items": "/items";
     "login": "/login/:module(pwd-login|code-login|register|reset-pwd|bind-wechat)?";
     "players": "/players";
     "server-clock": "/server-clock";
+    "servers": "/servers";
     "shops": "/shops";
     "shops_guild": "/shops/guild";
     "shops_memory": "/shops/memory";
@@ -46,6 +49,7 @@ declare module "@elegant-router/types" {
     "shops_vip": "/shops/vip";
     "titles": "/titles";
     "users": "/users";
+    "wallet-reasons": "/wallet-reasons";
     "wallets": "/wallets";
   };
 
@@ -84,19 +88,23 @@ declare module "@elegant-router/types" {
     | "achievements"
     | "activities"
     | "activities-unavailable"
+    | "activity-schedules"
     | "announcements"
     | "arena-prizes"
     | "audit"
     | "feedback"
+    | "fields"
     | "home"
     | "iframe-page"
     | "items"
     | "login"
     | "players"
     | "server-clock"
+    | "servers"
     | "shops"
     | "titles"
     | "users"
+    | "wallet-reasons"
     | "wallets"
   >;
 
@@ -122,14 +130,17 @@ declare module "@elegant-router/types" {
     | "achievements"
     | "activities-unavailable"
     | "activities"
+    | "activity-schedules"
     | "announcements"
     | "arena-prizes"
     | "audit"
     | "feedback"
+    | "fields"
     | "home"
     | "items"
     | "players"
     | "server-clock"
+    | "servers"
     | "shops_guild"
     | "shops_memory"
     | "shops_ordinary"
@@ -142,6 +153,7 @@ declare module "@elegant-router/types" {
     | "shops_vip"
     | "titles"
     | "users"
+    | "wallet-reasons"
     | "wallets"
   >;
 

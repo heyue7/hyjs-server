@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import { computed, h, onMounted, ref, watch } from 'vue';
+import { computed, h, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { NButton, NSpace } from 'naive-ui';
 import type { DataTableColumns } from 'naive-ui';
 import { api, errorMessage, formatTime, json } from '@/service/operations';
 import type { Item, ItemsResponse } from '@/service/operations';
 import type { GamePlayer, GamePlayerDetail, InventoryItem } from '@/service/player-operations';
 import { useOperations } from '@/composables/useOperations';
+import { useServerScopeStore } from '@/store/modules/server-scope';
+const scope = useServerScopeStore();
 import ResourceImage from '@/components/operations/resource-image.vue';
 import WalletLedger from '@/components/operations/wallet-ledger.vue';
 import GamePlayerCreate from '@/components/operations/game-player-create.vue';
@@ -20,7 +22,7 @@ const rows = ref<GamePlayer[]>([]);
 async function load() {
   const data = await run(() =>
     api<{ items: GamePlayer[]; total: number }>(
-      `/game-players?${new URLSearchParams({ q: q.value, page: String(page.value), pageSize: String(pageSize.value) })}`
+      scope.serverQuery(`/game-players?${new URLSearchParams({ q: q.value, page: String(page.value), pageSize: String(pageSize.value) })}`)
     )
   );
   if (data) {
@@ -99,7 +101,7 @@ async function loadDetail(id: number) {
   detailLoading.value = true;
   detailError.value = '';
   try {
-    const result = await api<GamePlayerDetail>(`/game-players/${id}`);
+    const result = await api<GamePlayerDetail>(scope.serverQuery(`/game-players/${id}`));
     if (seq !== detailRequest) return;
     detail.value = result;
   } catch (e) {
@@ -133,7 +135,7 @@ async function submitAction() {
     const target = actionTarget.value;
     const path = `/game-players/${target.id}/${action.value}`;
     const result = await api<GamePlayerDetail>(
-      path,
+      scope.serverQuery(path),
       json(action.value === 'name' ? 'PUT' : 'POST', {
         version: target.version,
         name: newName.value.trim(),
@@ -186,6 +188,16 @@ const columns: DataTableColumns<GamePlayer> = [
     render: row => h(NButton, { size: 'small', secondary: true, onClick: () => show(row) }, () => '查看与管理')
   }
 ];
+const removeSwitchGuard = scope.addSwitchGuard(() => {
+  if (acting.value) return false;
+  if (!createOpen.value && !action.value) return true;
+  return new Promise<boolean>(resolve => window.$dialog?.warning({
+    title: '切换运营区服？', content: '当前打开的用户编辑将关闭，请先确认填写内容已保存。',
+    positiveText: '切换区服', negativeText: '继续编辑', onPositiveClick: () => resolve(true),
+    onNegativeClick: () => resolve(false), onClose: () => resolve(false), onMaskClick: () => resolve(false)
+  }));
+});
+onBeforeUnmount(removeSwitchGuard);
 watch(activeTab, value => {
   if (value === 'inventory' && detail.value)
     loadCatalogue(detail.value.inventory).catch(e => {
@@ -199,11 +211,12 @@ onMounted(load);
   <div class="ops-page">
     <div class="ops-toolbar">
       <div class="ops-page-label">
-        游戏玩家
+        用户与角色
         <span class="ops-count">{{ total.toLocaleString() }}</span>
       </div>
-      <NSpace><NButton :loading="loading" @click="load">刷新</NButton><NButton v-if="canWrite" type="primary" @click="createOpen = true">新增游戏用户</NButton></NSpace>
+      <NSpace><NButton :loading="loading" @click="load">刷新</NButton><NButton v-if="canWrite" type="primary" :disabled="!scope.currentServer?.runtimeBound || !scope.currentServer?.enabled" @click="createOpen = true">新增用户</NButton></NSpace>
     </div>
+    <NAlert v-if="!scope.currentServer?.runtimeBound" type="info" title="该区服待部署，可先安排活动；绑定游戏服务后可新增游戏用户。" />
     <NAlert v-if="error" type="error" :title="error" />
     <NCard :bordered="false" class="ops-panel">
       <div class="ops-filters">

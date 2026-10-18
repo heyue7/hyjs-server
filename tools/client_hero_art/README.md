@@ -31,3 +31,14 @@ rtk proxy .analysis-venv/bin/python tools/client_hero_art/verify_representatives
 The bounded harness executes the actual helper source with Unity UI stubs: aliases, unrelated paths, the three atlas exceptions, UV bounds, widget reuse, clearing, normal cards and full detail paintings. It does not instantiate Unity, load AssetBundles on a phone or claim actual rendering success. Face and card boxes were chosen after decoding and visually reading the original 1024×1024 paintings. A short existing-character/profile/preview check remains required after integration.
 
 The reported 3D model blank has no proven root cause from static evidence; this overlay intentionally leaves its loading path unchanged. Existing model bundles, meshes and dependency closures were verified present. Observe the actual bundle/pool/callback/visibility state before choosing a model fix. The old `UI.ActorItem` uses the separate legacy `ResourceManager`/`Resources.Load` path; this patch does not claim to repair that obsolete formation UI path.
+
+## Current APK incremental size fix
+
+`build_helper_overlay.py` composes over the fixed r5 APK `0a5e7206…` / managed `d00e52f6…`. It updates the helper and extends only `AssetLoadHelper.<_SetTextureAsync>c__Iterator2A.MoveNext`, retaining all other 26945 original raw method bodies and all 547 engine methods. Use a fresh analysis output directory:
+
+```sh
+rtk proxy .analysis-venv/bin/python tools/client_hero_art/build_helper_overlay.py \
+  --output-directory analysis/<batch>/hero-size-overlay
+```
+
+The original asynchronous loader bypassed the previous crop setter, and its optional `MakePixelPerfect` uses the full 1024px painting dimensions. The new hook passes the original requested path so only the six exact aliases are cropped; full detail paintings and map images retain their original behavior. Aliased images keep their prefab widget dimensions when pixel-perfect is requested. Avatar draws also leave a 6% inner rim beneath the original frame, while pooled reuse restores both the original UVs and draw region. Full paintings and recruit cards have no added avatar rim. This is a bounded correction, and the observed device overflow still requires a short check on the integrated APK.

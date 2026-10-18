@@ -4,6 +4,7 @@ import type { RouteKey } from '@elegant-router/types';
 import { useThemeStore } from '@/store/modules/theme';
 import { useRouteStore } from '@/store/modules/route';
 import { useRouterPush } from '@/hooks/common/router';
+import { findOperationsMenu } from '@/store/modules/route/operations-navigation';
 
 defineOptions({
   name: 'GlobalBreadcrumb'
@@ -20,7 +21,7 @@ interface BreadcrumbContentProps {
 const [DefineBreadcrumbContent, BreadcrumbContent] = createReusableTemplate<BreadcrumbContentProps>();
 
 function handleClickMenu(key: RouteKey) {
-  routerPushByKey(key);
+  routerPushByKey(findOperationsMenu(routeStore.menus, key)?.routeKey || key);
 }
 </script>
 

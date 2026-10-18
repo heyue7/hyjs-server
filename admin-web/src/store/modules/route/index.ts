@@ -11,6 +11,7 @@ import { ROOT_ROUTE } from '@/router/routes/builtin';
 import { getRouteName, getRoutePath } from '@/router/elegant/transform';
 import { useAuthStore } from '../auth';
 import { useTabStore } from '../tab';
+import { organizeOperationsMenus } from './operations-navigation';
 import {
   filterAuthRoutesByRoles,
   getBreadcrumbsByRoute,
@@ -84,7 +85,7 @@ export const useRouteStore = defineStore(SetupStoreId.Route, () => {
 
   /** Get global menus */
   function getGlobalMenus(routes: ElegantConstRoute[]) {
-    menus.value = getGlobalMenusByAuthRoutes(routes);
+    menus.value = organizeOperationsMenus(getGlobalMenusByAuthRoutes(routes));
   }
 
   /** Update global menus by locale */

@@ -3,8 +3,10 @@ import { computed, h, ref, watch } from 'vue';
 import { NTag } from 'naive-ui';
 import type { DataTableColumns } from 'naive-ui';
 import { api, errorMessage, formatTime } from '@/service/operations';
+import { useServerScopeStore } from '@/store/modules/server-scope';
 import { money } from '@/service/wallet-operations';
 import type { WalletLedger, WalletLedgerItem } from '@/service/wallet-operations';
+const scope = useServerScopeStore();
 const props = defineProps<{ playerId: number }>();
 const loading = ref(false);
 const error = ref('');
@@ -36,7 +38,7 @@ async function load() {
     params.set('endAt', String(range.value[1]));
   }
   try {
-    const result = await api<WalletLedger>(`/wallets/${props.playerId}/ledger?${params}`);
+    const result = await api<WalletLedger>(scope.serverQuery(`/wallets/${props.playerId}/ledger?${params}`));
     if (seq === generation) data.value = result;
   } catch (e) {
     if (seq === generation) error.value = errorMessage(e);

@@ -17,6 +17,10 @@ func TestCopySpecialAllOriginalCadenceAndConservation(t *testing.T) {
 	if e := f.s.InitializeCopyDrops(f.ctx); e != nil {
 		t.Fatal(e)
 	}
+	// Enable only this finite cadence fixture; deployed special-drop policy remains closed.
+	if e := db.GetIns().Model(&db.CopySpecialRule{}).Where("id=?", constUtil.CopySpecialRuleID).Update("enabled", true).Error; e != nil {
+		t.Fatal(e)
+	}
 	tasks, entries, gear := 0, 0, 0
 	for _, task := range f.s.Tables["CopyTask"] {
 		input, e := f.s.copySpecialInput(db.GetIns(), task)

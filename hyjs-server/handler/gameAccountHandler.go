@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"errors"
 	"net"
 	"net/http"
@@ -54,7 +55,11 @@ func GameAccountRegisterHandler(c *gin.Context) error {
 		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "msg": "账号需3–32位字母、数字、下划线或短横线；密码需至少6个字符、最多72字节且两次一致", "data": nil})
 		return nil
 	}
-	out, err := service.RegisterGameAccount(c.Request.Context(), req.Username, req.Password)
+	ctx := c.Request.Context()
+	if gameService != nil {
+		ctx = context.WithValue(ctx, constUtil.GameServiceContextKey, gameService)
+	}
+	out, err := service.RegisterGameAccount(ctx, req.Username, req.Password)
 	if err != nil {
 		if errors.Is(err, constUtil.ErrGameAccountExists) {
 			c.JSON(http.StatusConflict, gin.H{"code": 409, "msg": err.Error(), "data": nil})
@@ -102,6 +107,10 @@ func AdminGamePlayerCreateHandler(c *gin.Context) {
 	switch req.HeroID {
 	case "hero_001", "hero_043", "hero_044", "hero_045", "hero_046", "hero_047", "hero_048", "hero_049", "hero_050":
 	default:
+		adminError(c, constUtil.ErrAdminInput)
+		return
+	}
+	if req.ServerID < 0 || (service.AdminSelectedServerID(c.Request.Context()) > 0 && req.ServerID > 0 && req.ServerID != service.AdminSelectedServerID(c.Request.Context())) {
 		adminError(c, constUtil.ErrAdminInput)
 		return
 	}

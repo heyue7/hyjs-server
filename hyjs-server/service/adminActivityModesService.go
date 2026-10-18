@@ -822,7 +822,7 @@ func (s *GameService) AdminDeleteTypedActivity(ctx context.Context, p *model.Adm
 // 调用方应先保留既有localPlayWelfareRuleID结果；当前个人期继续使用自己的冻结规则。
 func AdminCurrentWelfareRuleKey(tx *gorm.DB, kind string, now int64, fallback string) (string, error) {
 	if !tx.Migrator().HasTable(&db.AdminActivityPresentation{}) {
-		return fallback, nil
+		return adminActivityScheduleFallback(tx, fallback)
 	}
 	var meta []db.AdminActivityPresentation
 	if err := tx.Where("archived=?", false).Find(&meta).Error; err != nil {
@@ -837,23 +837,28 @@ func AdminCurrentWelfareRuleKey(tx *gorm.DB, kind string, now int64, fallback st
 		}
 	}
 	if len(keys) == 0 {
-		return fallback, nil
+		return adminActivityScheduleFallback(tx, fallback)
 	}
-	var row db.P4WelfareRule
-	err := tx.Where("id IN ? AND kind=? AND enabled=? AND start_at<=? AND claim_end_at>?", keys, kind, true, now, now).Order("start_at DESC,id DESC").Take(&row).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return fallback, nil
-	}
-	if err != nil {
+	var rows []db.P4WelfareRule
+	if err := tx.Where("id IN ? AND kind=? AND enabled=? AND start_at<=? AND claim_end_at>?", keys, kind, true, now, now).Order("start_at DESC,id DESC").Find(&rows).Error; err != nil {
 		return "", err
 	}
-	return row.ID, nil
+	for _, row := range rows {
+		allowed, err := localPlayActivityVisible(tx, row.ID)
+		if err != nil {
+			return "", err
+		}
+		if allowed {
+			return row.ID, nil
+		}
+	}
+	return adminActivityScheduleFallback(tx, fallback)
 }
 
 // AdminCurrentCommerceRuleKey 让原神秘小屋等无实例查询选择已启用运营期，保持个人期优先。
 func AdminCurrentCommerceRuleKey(tx *gorm.DB, kind string, now int64, fallback string) (string, error) {
 	if !tx.Migrator().HasTable(&db.AdminActivityPresentation{}) {
-		return fallback, nil
+		return adminActivityScheduleFallback(tx, fallback)
 	}
 	var meta []db.AdminActivityPresentation
 	if err := tx.Where("archived=?", false).Find(&meta).Error; err != nil {
@@ -868,17 +873,22 @@ func AdminCurrentCommerceRuleKey(tx *gorm.DB, kind string, now int64, fallback s
 		}
 	}
 	if len(keys) == 0 {
-		return fallback, nil
+		return adminActivityScheduleFallback(tx, fallback)
 	}
-	var row db.P4CommerceRule
-	err := tx.Where("id IN ? AND kind=? AND enabled=? AND start_at<=? AND end_at>?", keys, kind, true, now, now).Order("start_at DESC,id DESC").Take(&row).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return fallback, nil
-	}
-	if err != nil {
+	var rows []db.P4CommerceRule
+	if err := tx.Where("id IN ? AND kind=? AND enabled=? AND start_at<=? AND end_at>?", keys, kind, true, now, now).Order("start_at DESC,id DESC").Find(&rows).Error; err != nil {
 		return "", err
 	}
-	return row.ID, nil
+	for _, row := range rows {
+		allowed, err := localPlayActivityVisible(tx, row.ID)
+		if err != nil {
+			return "", err
+		}
+		if allowed {
+			return row.ID, nil
+		}
+	}
+	return adminActivityScheduleFallback(tx, fallback)
 }
 
 // AdminActivityDisplayName 只覆盖运营新实例标题，不更换原UI prefab或原协议ID。

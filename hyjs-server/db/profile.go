@@ -15,6 +15,7 @@ var profileSchema string
 
 // Profile 保留 Python 原型中的表和列，保证现有账号、密码摘要和存档可直接读取。
 type Profile struct {
+	ServerID     int64   `gorm:"column:server_id;not null;default:1;index" json:"serverId"`
 	Id           int64   `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
 	Uid          string  `gorm:"column:uid;not null;uniqueIndex" json:"uid"`
 	Session      []byte  `gorm:"column:session;not null" json:"-"`
@@ -55,6 +56,7 @@ func InitGame(ctx context.Context, path string) error {
 			existing[column.Name] = true
 		}
 		for _, column := range []struct{ name, definition string }{
+			{"server_id", "INTEGER NOT NULL DEFAULT 1"},
 			{"password_salt", "BLOB"},
 			{"password_hash", "BLOB"},
 			{"game", "TEXT"},

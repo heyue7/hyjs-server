@@ -108,7 +108,7 @@ func (s *GameService) p10SceneMovePlayer(p *pb.Player, g *model.GameState, proje
 	return &pb.MovePlayer{Position: proto.Clone(g.Position).(*pb.Position), Info: &pb.MovePlayerInfo{ServerId: proto.Int32(int32(s.OriginalServerID())), PlayerId: p.PlayerId, PlayerName: p.Name, Level: p.Level, WarId: proto.String(heroID), EquipId: proto.String(weaponID), Power: proto.Int64(int64(power)), PlayerSide: side, ServerName: proto.String("本地测试"), AwakeStage: proto.Int32(awake), PetId: proto.String(pet.GetPetId())}}, nil
 }
 func (s *GameService) p10SceneLive(tx *gorm.DB, row db.P10ScenePresence) (*pb.MovePlayer, bool) {
-	value, ok := p10ClientSinks.Load(p10ClientKey{s, row.PlayerID})
+	value, ok := p10ClientSinks.Load(p10ClientKey{s.p10ClientOwner(), row.PlayerID})
 	if !ok || row.SessionHash == "" {
 		return nil, false
 	}
@@ -172,7 +172,7 @@ func (s *GameService) SyncP10Scene(ctx context.Context, id int64, movement bool)
 	if err != nil || cfg == nil {
 		return err
 	}
-	value, ok := p10ClientSinks.Load(p10ClientKey{s, id})
+	value, ok := p10ClientSinks.Load(p10ClientKey{s.p10ClientOwner(), id})
 	if !ok {
 		return nil
 	}

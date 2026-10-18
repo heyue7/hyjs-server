@@ -68,6 +68,9 @@ func localPlayCycleNow(tx *gorm.DB, key string, real time.Time) (time.Time, erro
 // Direct claims may read an owned retired cycle; list/fact paths request only
 // the current binding. Foreign private IDs are rejected even when guessed.
 func localPlayActivityAccess(tx *gorm.DB, key string, currentOnly bool) (bool, error) {
+	if allowed, err := adminActivityScheduleAccess(tx, key); err != nil || !allowed {
+		return allowed, err
+	}
 	cycleID := localPlayPrivateCycleID(key)
 	if cycleID == "" {
 		return true, nil
@@ -166,6 +169,9 @@ func localPlayActivityIDForConfig(key string) string {
 // Suppress the legacy global counterpart only for an authenticated owner who
 // explicitly opened this activity. Other accounts keep the original catalogue.
 func localPlayActivityVisible(tx *gorm.DB, key string) (bool, error) {
+	if allowed, err := adminActivityScheduleAccess(tx, key); err != nil || !allowed {
+		return allowed, err
+	}
 	if localPlayPrivateCycleID(key) != "" {
 		return localPlayActivityAccess(tx, key, true)
 	}

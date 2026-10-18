@@ -74,7 +74,14 @@ func gameAccountNewProfile(ctx context.Context, username, password string) (*db.
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	}
-	row := &db.Profile{Uid: username, PasswordSalt: make([]byte, 16), Session: make([]byte, 16)}
+	serverID := constUtil.GameDefaultServerID
+	if game, ok := ctx.Value(constUtil.GameServiceContextKey).(*GameService); ok {
+		serverID = game.OriginalServerID()
+	}
+	if selected := AdminSelectedServerID(ctx); selected > 0 {
+		serverID = selected
+	}
+	row := &db.Profile{ServerID: serverID, Uid: username, PasswordSalt: make([]byte, 16), Session: make([]byte, 16)}
 	if _, err := rand.Read(row.PasswordSalt); err != nil {
 		return nil, err
 	}
@@ -113,6 +120,17 @@ func RegisterGameAccount(ctx context.Context, username, password string) (*model
 
 // AdminCreateGamePlayer creates account, original starter state and audit in one transaction.
 func (s *GameService) AdminCreateGamePlayer(ctx context.Context, p *model.AdminPrincipal, req model.AdminGamePlayerCreateRequest) (*model.AdminGamePlayerDTO, error) {
+	selected := req.ServerID
+	if selected == 0 {
+		selected = AdminSelectedServerID(ctx)
+	}
+	if selected == 0 {
+		selected = s.OriginalServerID()
+	}
+	if selected != s.OriginalServerID() {
+		return nil, constUtil.ErrAdminPermission
+	}
+	ctx = context.WithValue(ctx, constUtil.AdminServerScopeContextKey, selected)
 	if err := adminOperationUser(db.GetIns().WithContext(ctx), p, true); err != nil {
 		return nil, err
 	}

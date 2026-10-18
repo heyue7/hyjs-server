@@ -140,7 +140,7 @@ func (s *GameService) SyncP13GuildRoom(ctx context.Context, id int64, movement b
 	p10SceneMutation.Lock()
 	defer p10SceneMutation.Unlock()
 	// 加锁后重新读取当前会话/位置，避免前面的轻量路由观察变成权限快照。
-	value, ok := p10ClientSinks.Load(p10ClientKey{s, id})
+	value, ok := p10ClientSinks.Load(p10ClientKey{s.p10ClientOwner(), id})
 	if !ok {
 		return game.Position.GetScene() == constUtil.P13GuildRoomTarget, nil
 	}

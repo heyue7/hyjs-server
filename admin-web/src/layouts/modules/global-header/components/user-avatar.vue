@@ -71,12 +71,16 @@ function handleDropdown(key: DropdownKey) {
   </NButton>
   <NDropdown v-else placement="bottom" trigger="click" :options="options" @select="handleDropdown">
     <div>
-      <ButtonIcon>
+      <ButtonIcon :aria-label="`账户 ${authStore.userInfo.userName}`">
         <SvgIcon icon="ph:user-circle" class="text-icon-large" />
-        <span class="text-16px font-medium">{{ authStore.userInfo.userName }}</span>
+        <span class="user-avatar-name text-16px font-medium">{{ authStore.userInfo.userName }}</span>
       </ButtonIcon>
     </div>
   </NDropdown>
 </template>
 
-<style scoped></style>
+<style scoped>
+@media (max-width: 740px) {
+  .user-avatar-name { display: none; }
+}
+</style>

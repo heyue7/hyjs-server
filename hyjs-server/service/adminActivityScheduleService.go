@@ -1,0 +1,780 @@
+package service
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"strings"
+	"time"
+
+	"github.com/google/uuid"
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
+	"hyjs-server/constUtil"
+	"hyjs-server/db"
+	"hyjs-server/model"
+)
+
+// InitializeAdminActivitySchedules imports legacy forms once as global reusable definitions.
+// It never enables a draft or alters an issued gameplay instance.
+func (s *GameService) InitializeAdminActivitySchedules(ctx context.Context) error {
+	tx := db.GetIns().WithContext(ctx)
+	if err := tx.AutoMigrate(&db.AdminActivityDefinition{}, &db.AdminActivityOccurrence{}, &db.AdminActivityPattern{}, &db.AdminActivityScheduleRevision{}); err != nil {
+		return err
+	}
+	rows, err := s.AdminActivityInstances(ctx)
+	if err != nil {
+		return err
+	}
+	for _, row := range rows {
+		if strings.Contains(row.ID, "_schedule_") {
+			continue
+		}
+		id := "import_" + p6Digest([]byte(row.ID))[:24]
+		days := (row.Form.EndAt - row.Form.StartAt + 86399999) / 86400000
+		if days < 1 || days > 366 {
+			days = 14
+		}
+		grace := (row.Form.ClaimEndAt - row.Form.EndAt + 86399999) / 86400000
+		if grace < 0 || grace > 90 {
+			grace = 0
+		}
+		form := row.Form
+		form.StartAt = 0
+		form.EndAt = 0
+		form.ClaimEndAt = 0
+		value := db.AdminActivityDefinition{ID: id, Name: row.Name, Mode: row.Mode, FormJSON: adminJSON(form), DefaultDays: days, ClaimDays: grace, Enabled: row.Availability.Usable, Usable: row.Availability.Usable, UnavailableReason: row.Availability.Reason, SourceActivityID: row.ID, Revision: 1, UpdatedAtMillis: time.Now().UnixMilli()}
+		if err = tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&value).Error; err != nil {
+			return err
+		}
+	}
+	opening := db.AdminActivityDefinition{ID: "original_opening_14", Name: "开服14天原版任务", Mode: "opening-14", FormJSON: adminJSON(model.AdminActivityForm{Mode: "opening-14", TemplateID: "opening-14-original", Name: "开服14天原版任务", Source: "APK原249项开服任务；每角色第1天锚点与原领取记录保持"}), DefaultDays: 14, ClaimDays: 1, Enabled: true, Usable: true, Revision: 1, UpdatedAtMillis: time.Now().UnixMilli()}
+	if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&opening).Error; err != nil {
+		return err
+	}
+	pattern := db.AdminActivityPattern{ID: "original_opening_14", Name: "开服14天 · 原版开服任务", CycleDays: 14, EntriesJSON: adminJSON([]model.AdminActivityPatternEntry{{TemplateID: opening.ID, StartDay: 0, DurationDays: 14, ClaimDays: 1, Lane: 0}}), Revision: 1, UpdatedAtMillis: time.Now().UnixMilli()}
+	return tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&pattern).Error
+}
+
+func adminActivityDefinitionDTO(row db.AdminActivityDefinition) (model.AdminActivityDefinitionDTO, error) {
+	var form model.AdminActivityForm
+	if json.Unmarshal(row.FormJSON, &form) != nil {
+		return model.AdminActivityDefinitionDTO{}, constUtil.ErrAdminConfiguration
+	}
+	return model.AdminActivityDefinitionDTO{ID: row.ID, Name: row.Name, Mode: row.Mode, Form: form, DefaultDays: row.DefaultDays, ClaimDays: row.ClaimDays, Enabled: row.Enabled, Version: adminVersion(row), Availability: model.AdminActivityAvailability{Usable: row.Usable, Reason: row.UnavailableReason, Missing: []string{}}, SourceActivityID: row.SourceActivityID}, nil
+}
+
+// AdminActivityDefinitions reads globally reusable forms. No original consumer is switched by a GET.
+func (s *GameService) AdminActivityDefinitions(ctx context.Context, p *model.AdminPrincipal) ([]model.AdminActivityDefinitionDTO, error) {
+	tx := db.GetIns().WithContext(ctx)
+	if err := adminOperationUser(tx, p, false); err != nil {
+		return nil, err
+	}
+	var rows []db.AdminActivityDefinition
+	if err := tx.Where("archived=?", false).Order("name,id").Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	out := []model.AdminActivityDefinitionDTO{}
+	for _, row := range rows {
+		dto, err := adminActivityDefinitionDTO(row)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, dto)
+	}
+	return out, nil
+}
+
+// adminValidateDefinition reuses the real original adapters in a rolled-back savepoint.
+// Resource validation stays identical to gameplay while global templates issue no live instance.
+func (s *GameService) adminValidateDefinition(tx *gorm.DB, f model.AdminActivityForm, complete bool) error {
+	if f.Mode == "opening-14" {
+		return nil
+	}
+	definition, ok := adminActivityDefinitionFor(f.Mode)
+	if !ok || f.TemplateID != definition.mode+"-original" {
+		return constUtil.ErrAdminInput
+	}
+	f.StartAt = 946684800000
+	f.EndAt = f.StartAt + 14*86400000
+	f.ClaimEndAt = f.EndAt + 86400000
+	if err := tx.SavePoint("activity_definition_validate").Error; err != nil {
+		return err
+	}
+	key := definition.prefix + "check_" + strings.ReplaceAll(uuid.NewString(), "-", "")[:12]
+	result := s.adminPersistTypedActivity(tx, definition, key, f, complete, false)
+	if err := tx.RollbackTo("activity_definition_validate").Error; err != nil {
+		return err
+	}
+	return result
+}
+
+// AdminSaveActivityDefinition changes future scheduling input and leaves occurrence snapshots intact.
+func (s *GameService) AdminSaveActivityDefinition(ctx context.Context, p *model.AdminPrincipal, id string, req model.AdminActivityDefinitionSaveRequest) (*model.AdminActivityDefinitionDTO, error) {
+	var out model.AdminActivityDefinitionDTO
+	err := db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := adminOperationUser(tx, p, true); err != nil {
+			return err
+		}
+		var row db.AdminActivityDefinition
+		if id != "" {
+			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&row, "id=? AND archived=?", id, false).Error; err != nil {
+				return err
+			}
+			if req.Version != adminVersion(row) {
+				return constUtil.ErrAdminConfigConflict
+			}
+		}
+		if id == "" {
+			row.ID = "template_" + strings.ReplaceAll(uuid.NewString(), "-", "")[:24]
+		}
+		form := req.Form
+		form.Name = req.Name
+		form.StartAt = 0
+		form.EndAt = 0
+		form.ClaimEndAt = 0
+		if err := s.adminValidateDefinition(tx, form, false); err != nil {
+			return err
+		}
+		validation := s.adminValidateDefinition(tx, form, true)
+		if req.Enabled && validation != nil {
+			return validation
+		}
+		row.Name = req.Name
+		row.Mode = form.Mode
+		row.FormJSON = adminJSON(form)
+		row.DefaultDays = req.DefaultDays
+		row.ClaimDays = req.ClaimDays
+		row.Enabled = req.Enabled
+		row.Usable = validation == nil
+		row.UnavailableReason = ""
+		if validation != nil {
+			row.UnavailableReason = "配置未齐全，请补齐奖励或当前模式规则"
+		}
+		row.Revision++
+		row.UpdatedAtMillis = time.Now().UnixMilli()
+		if err := tx.Save(&row).Error; err != nil {
+			return err
+		}
+		var err error
+		out, err = adminActivityDefinitionDTO(row)
+		if err != nil {
+			return err
+		}
+		return adminAudit(tx, p, "activity.template.save", row.ID, "global template revision="+fmt.Sprint(row.Revision))
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// adminActivityScheduleAccess enforces the trusted serving realm before any issued consumer loads.
+// Legacy and personal-cycle identifiers retain their existing access rules.
+func adminActivityCalendarManaged(tx *gorm.DB) (bool, error) {
+	service, ok := tx.Statement.Context.Value(constUtil.GameServiceContextKey).(*GameService)
+	if !ok || !tx.Migrator().HasTable(&db.AdminActivityScheduleRevision{}) {
+		return false, nil
+	}
+	var revision db.AdminActivityScheduleRevision
+	err := tx.First(&revision, "server_id=?", service.OriginalServerID()).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return false, nil
+	}
+	return revision.Revision > 0, err
+}
+
+func adminActivityScheduledLegacyMode(key string) string {
+	for _, entry := range []struct{ prefix, mode string }{
+		{"p4:login:", "login-rewards"}, {"p4:limit:", "limited-sign"}, {"p4:meal:", "stamina-meal"}, {"p4:rebate:", "diamond-rebate"}, {"p4:cat:", "treasure-box"},
+		{"halfDiscountSale_", "half-price"}, {"discountSale_", "discount-shop"}, {"limitExchange_", "exchange"}, {"limitSale_", "limited-shop"}, {"mysticDiscount_", "mystic-shop"},
+		{"rechargeTotal_", "recharge-total"}, {"costTotal_", "diamond-spent"}, {"warriorRescruitTimes_", "recruit-count"}, {"mainCopyWinTimes_", "copy-win"}, {"totalLogin_", "login-total"},
+	} {
+		if strings.HasPrefix(key, entry.prefix) {
+			return entry.mode
+		}
+	}
+	return ""
+}
+
+func adminActivityScheduleAccess(tx *gorm.DB, key string) (bool, error) {
+	if localPlayPrivateCycleID(key) != "" {
+		return true, nil
+	}
+	if !strings.Contains(key, "_schedule_") {
+		if adminActivityScheduledLegacyMode(key) == "" {
+			return true, nil
+		}
+		managed, err := adminActivityCalendarManaged(tx)
+		return !managed, err
+	}
+	if !tx.Migrator().HasTable(&db.AdminActivityOccurrence{}) {
+		return false, nil
+	}
+	var row db.AdminActivityOccurrence
+	if err := tx.Where("consumer_key=?", key).Take(&row).Error; err != nil {
+		return false, err
+	}
+	service, ok := tx.Statement.Context.Value(constUtil.GameServiceContextKey).(*GameService)
+	if !ok {
+		return false, nil
+	}
+	return row.ServerID == service.OriginalServerID() && !row.Archived && row.Enabled, nil
+}
+
+// AdminScheduledTurntablePool selects only this trusted realm's active pool.
+// A player's already-created personal wheel remains frozen by the caller.
+func (s *GameService) AdminScheduledTurntablePool(tx *gorm.DB, now int64, fallback string) (string, error) {
+	if !tx.Migrator().HasTable(&db.AdminActivityOccurrence{}) {
+		return fallback, nil
+	}
+	var rows []db.AdminActivityOccurrence
+	if err := tx.Where("server_id=? AND mode=? AND archived=? AND enabled=? AND start_at<=? AND end_at>?", s.OriginalServerID(), "turntable", false, true, now, now).Order("start_at DESC,id").Limit(2).Find(&rows).Error; err != nil {
+		return "", err
+	}
+	if len(rows) == 0 {
+		contextTx := tx.WithContext(context.WithValue(tx.Statement.Context, constUtil.GameServiceContextKey, s))
+		managed, err := adminActivityCalendarManaged(contextTx)
+		if err != nil {
+			return "", err
+		}
+		if managed {
+			return "", nil
+		}
+		return fallback, nil
+	}
+	if len(rows) > 1 {
+		return "", constUtil.ErrAdminConfiguration
+	}
+	return rows[0].ConsumerKey, nil
+}
+
+// AdminScheduledOpeningRule gates only the realm opening entrance; per-character day one and receipts stay intact.
+func AdminScheduledOpeningRule(tx *gorm.DB, cfg *db.OpenServerActivityRule, now int64) error {
+	if !tx.Migrator().HasTable(&db.AdminActivityOccurrence{}) {
+		return nil
+	}
+	service, ok := tx.Statement.Context.Value(constUtil.GameServiceContextKey).(*GameService)
+	if !ok {
+		return nil
+	}
+	var rows []db.AdminActivityOccurrence
+	if err := tx.Where("server_id=? AND mode=? AND archived=?", service.OriginalServerID(), "opening-14", false).Find(&rows).Error; err != nil {
+		return err
+	}
+	if len(rows) == 0 {
+		managed, err := adminActivityCalendarManaged(tx)
+		if err != nil {
+			return err
+		}
+		if managed {
+			cfg.Enabled = false
+		}
+		return nil
+	}
+	open := false
+	for _, row := range rows {
+		if row.Enabled && row.StartAt <= now && row.ClaimEndAt > now {
+			open = true
+		}
+	}
+	cfg.Enabled = cfg.Enabled && open
+	return nil
+}
+
+func (s *GameService) adminActivityOccurrenceFrozen(tx *gorm.DB, row db.AdminActivityOccurrence) (bool, error) {
+	if row.Mode == "opening-14" {
+		now, err := s.adminArenaPrizeNow(tx, false)
+		if err != nil {
+			return false, err
+		}
+		return row.StartAt <= now.UnixMilli(), nil
+	}
+	// Use a current read after consumer locking. A prior permission SELECT may already
+	// have established an older InnoDB repeatable-read snapshot in this transaction.
+	_, frozen, err := adminActivityRaw(tx.Clauses(clause.Locking{Strength: "SHARE"}), row.ConsumerID)
+	if err == nil && row.Mode == "turntable" && !frozen && tx.Migrator().HasTable(&db.TurntableState{}) {
+		var state []db.TurntableState
+		if err = tx.Clauses(clause.Locking{Strength: "SHARE"}).Select("pool_id", "player_id").Where("pool_id=?", row.ConsumerKey).Limit(1).Find(&state).Error; err == nil {
+			frozen = len(state) > 0
+		}
+	}
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return false, constUtil.ErrAdminConfiguration
+	}
+	return frozen, err
+}
+func (s *GameService) adminActivityOccurrenceDTO(tx *gorm.DB, row db.AdminActivityOccurrence) (model.AdminActivityOccurrenceDTO, error) {
+	frozen, err := s.adminActivityOccurrenceFrozen(tx, row)
+	return model.AdminActivityOccurrenceDTO{ID: row.ID, TemplateID: row.TemplateID, TemplateVersion: row.TemplateVersion, Name: row.Name, Mode: row.Mode, StartAt: row.StartAt, EndAt: row.EndAt, ClaimEndAt: row.ClaimEndAt, Lane: row.Lane, Enabled: row.Enabled, Frozen: frozen, Version: adminVersion(row), ConsumerID: row.ConsumerID}, err
+}
+func adminRequireActivityServer(tx *gorm.DB, id int64) error {
+	if !tx.Migrator().HasTable("admin_game_servers") {
+		return constUtil.ErrAdminConfiguration
+	}
+	var count int64
+	if err := tx.Table("admin_game_servers").Where("id=?", id).Count(&count).Error; err != nil {
+		return err
+	}
+	if count != 1 {
+		return constUtil.ErrAdminInput
+	}
+	return nil
+}
+func adminActivityScheduleVersion(row db.AdminActivityScheduleRevision) string {
+	return adminVersion(row)
+}
+func adminActivityScheduleRevision(tx *gorm.DB, serverID int64, lock bool) (db.AdminActivityScheduleRevision, error) {
+	var row db.AdminActivityScheduleRevision
+	query := tx.Session(&gorm.Session{})
+	if lock {
+		query = query.Clauses(clause.Locking{Strength: "UPDATE"})
+	}
+	err := query.First(&row, "server_id=?", serverID).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return db.AdminActivityScheduleRevision{ServerID: serverID}, nil
+	}
+	return row, err
+}
+
+// AdminActivitySchedule returns the full calendar, including dates outside the visible viewport.
+func (s *GameService) AdminActivitySchedule(ctx context.Context, p *model.AdminPrincipal, serverID int64) (*model.AdminActivityScheduleResponse, error) {
+	tx := db.GetIns().WithContext(ctx)
+	if err := adminOperationUser(tx, p, false); err != nil {
+		return nil, err
+	}
+	if err := adminRequireActivityServer(tx, serverID); err != nil {
+		return nil, err
+	}
+	revision, err := adminActivityScheduleRevision(tx, serverID, false)
+	if err != nil {
+		return nil, err
+	}
+	var rows []db.AdminActivityOccurrence
+	if err = tx.Where("server_id=? AND archived=?", serverID, false).Order("start_at,lane,id").Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	now, err := s.adminArenaPrizeNow(tx, false)
+	if err != nil {
+		return nil, err
+	}
+	out := &model.AdminActivityScheduleResponse{GameTimeMs: now.UnixMilli(), ServerID: serverID, Managed: revision.Revision > 0, Version: adminActivityScheduleVersion(revision), Items: []model.AdminActivityOccurrenceDTO{}, Warnings: []string{"已产生规则快照的活动保留原规则与时间；修改全局模板只影响之后新增的排期。", "同一无实例福利模式、转盘和开服任务同时只允许一个生效窗口；不同模式可并行。"}}
+	for _, row := range rows {
+		dto, err := s.adminActivityOccurrenceDTO(tx, row)
+		if err != nil {
+			return nil, err
+		}
+		out.Items = append(out.Items, dto)
+	}
+	return out, nil
+}
+
+func adminActivityModeSingleton(mode string) bool {
+	return mode == "opening-14" || mode == "turntable" || mode == "login-rewards" || mode == "limited-sign" || mode == "stamina-meal" || mode == "diamond-rebate" || mode == "treasure-box" || mode == "mystic-shop"
+}
+
+func (s *GameService) adminActivityScheduleCheck(tx *gorm.DB, serverID int64, version string, items []model.AdminActivityOccurrenceDTO) (*model.AdminActivitySchedulePreviewResponse, map[string]db.AdminActivityOccurrence, error) {
+	if err := adminRequireActivityServer(tx, serverID); err != nil {
+		return nil, nil, err
+	}
+	revision, err := adminActivityScheduleRevision(tx, serverID, false)
+	if err != nil {
+		return nil, nil, err
+	}
+	if version != adminActivityScheduleVersion(revision) {
+		return nil, nil, constUtil.ErrAdminConfigConflict
+	}
+	var rows []db.AdminActivityOccurrence
+	if err = tx.Where("server_id=? AND archived=?", serverID, false).Order("id").Find(&rows).Error; err != nil {
+		return nil, nil, err
+	}
+	existing := map[string]db.AdminActivityOccurrence{}
+	for _, row := range rows {
+		existing[row.ID] = row
+	}
+	out := &model.AdminActivitySchedulePreviewResponse{Valid: true, Conflicts: []model.AdminActivityScheduleConflict{}, Warnings: []string{}}
+	add := func(i, j int, msg string) {
+		out.Valid = false
+		out.Conflicts = append(out.Conflicts, model.AdminActivityScheduleConflict{Index: int64(i), OtherIndex: int64(j), Message: msg})
+	}
+	seen := map[string]bool{}
+	modes := make([]string, len(items))
+	for i, item := range items {
+		var definition db.AdminActivityDefinition
+		if err = tx.First(&definition, "id=? AND archived=?", item.TemplateID, false).Error; err != nil {
+			return nil, nil, err
+		}
+		modes[i] = definition.Mode
+		if item.ID == "" && item.TemplateVersion != adminVersion(definition) {
+			return nil, nil, constUtil.ErrAdminConfigConflict
+		}
+		if item.ID == "" && (!definition.Usable || !definition.Enabled) {
+			add(i, -1, "此全局活动模板未齐全或已停用，不能发布排期")
+		}
+		if item.ID != "" {
+			row, ok := existing[item.ID]
+			if !ok || seen[item.ID] {
+				return nil, nil, constUtil.ErrAdminInput
+			}
+			seen[item.ID] = true
+			if item.Version != adminVersion(row) {
+				return nil, nil, constUtil.ErrAdminConfigConflict
+			}
+			modes[i] = row.Mode
+			if item.TemplateID != row.TemplateID {
+				add(i, -1, "已有排期不能切换模板，请另建一期")
+			}
+			frozen, e := s.adminActivityOccurrenceFrozen(tx, row)
+			if e != nil {
+				return nil, nil, e
+			}
+			if frozen && (item.StartAt != row.StartAt || item.EndAt != row.EndAt || item.ClaimEndAt != row.ClaimEndAt) {
+				add(i, -1, "活动规则已冻结，保留时间；可复制为新一期")
+			}
+		}
+	}
+	for id, row := range existing {
+		if !seen[id] {
+			frozen, e := s.adminActivityOccurrenceFrozen(tx, row)
+			if e != nil {
+				return nil, nil, e
+			}
+			if frozen {
+				add(-1, -1, "已冻结活动“"+row.Name+"”不能移除，请保留历史或停用")
+			}
+		}
+	}
+	for i, a := range items {
+		if !a.Enabled || !adminActivityModeSingleton(modes[i]) {
+			continue
+		}
+		for j := 0; j < i; j++ {
+			b := items[j]
+			if b.Enabled && modes[j] == modes[i] && a.StartAt < b.ClaimEndAt && b.StartAt < a.ClaimEndAt {
+				add(i, j, "此模式原客户端没有独立实例入口，活动及领奖窗口不能重叠")
+			}
+		}
+	}
+	return out, existing, nil
+}
+
+// AdminPreviewActivitySchedule checks frozen state and original UI overlap limitations without changing rows.
+func (s *GameService) AdminPreviewActivitySchedule(ctx context.Context, p *model.AdminPrincipal, serverID int64, req model.AdminActivitySchedulePreviewRequest) (*model.AdminActivitySchedulePreviewResponse, error) {
+	tx := db.GetIns().WithContext(ctx)
+	if err := adminOperationUser(tx, p, false); err != nil {
+		return nil, err
+	}
+	out, _, err := s.adminActivityScheduleCheck(tx, serverID, req.Version, req.Items)
+	return out, err
+}
+
+// AdminSaveActivitySchedule publishes one realm's changes and original consumers in a single transaction.
+func (s *GameService) AdminSaveActivitySchedule(ctx context.Context, p *model.AdminPrincipal, serverID int64, req model.AdminActivityScheduleSaveRequest) (*model.AdminActivityScheduleResponse, error) {
+	err := db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := ServerGameClockGuardTransaction(tx); err != nil {
+			return err
+		}
+		if err := adminOperationUser(tx, p, true); err != nil {
+			return err
+		}
+		// Creating the guard before locking serializes two first-time publishers on MySQL too.
+		guard := db.AdminActivityScheduleRevision{ServerID: serverID}
+		if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&guard).Error; err != nil {
+			return err
+		}
+		revision, err := adminActivityScheduleRevision(tx, serverID, true)
+		if err != nil {
+			return err
+		}
+		// Compare against the locked current row before any ordinary snapshot read.
+		// InnoDB may retain a pre-lock snapshot from the permission lookup; that old
+		// view cannot authorize a second publisher after the first commits.
+		if req.Version != adminActivityScheduleVersion(revision) {
+			return constUtil.ErrAdminConfigConflict
+		}
+		// Lock original consumer rows before inspecting Frozen; gameplay freezes acquire these same rows.
+		// Period windows keep their pre-existing ascending-primary lock order.
+		if s.P1Ready {
+			if _, e := p1LockPeriods(tx); e != nil {
+				return e
+			}
+		}
+		var lockedRows []db.AdminActivityOccurrence
+		if e := tx.Where("server_id=? AND archived=?", serverID, false).Order("consumer_id").Find(&lockedRows).Error; e != nil {
+			return e
+		}
+		for _, row := range lockedRows {
+			if row.Mode != "opening-14" {
+				if _, _, e := adminActivityRaw(tx.Clauses(clause.Locking{Strength: "UPDATE"}), row.ConsumerID); e != nil {
+					return e
+				}
+			}
+		}
+		check, existing, err := s.adminActivityScheduleCheck(tx, serverID, req.Version, req.Items)
+		if err != nil {
+			return err
+		}
+		if !check.Valid {
+			return fmt.Errorf("%w: %s", constUtil.ErrAdminConfigConflict, check.Conflicts[0].Message)
+		}
+		seen := map[string]bool{}
+		for _, item := range req.Items {
+			row, exists := existing[item.ID]
+			if exists {
+				seen[row.ID] = true
+				row.Lane = item.Lane
+				unchanged := row.StartAt == item.StartAt && row.EndAt == item.EndAt && row.ClaimEndAt == item.ClaimEndAt
+				frozen, e := s.adminActivityOccurrenceFrozen(tx, row)
+				if e != nil {
+					return e
+				}
+				if frozen && !unchanged {
+					return constUtil.ErrAdminConfigConflict
+				}
+				if !unchanged && !frozen {
+					var form model.AdminActivityForm
+					if json.Unmarshal(row.FormJSON, &form) != nil {
+						return constUtil.ErrAdminConfiguration
+					}
+					form.StartAt = item.StartAt
+					form.EndAt = item.EndAt
+					form.ClaimEndAt = item.ClaimEndAt
+					if row.Mode != "opening-14" {
+						d, _ := adminActivityDefinitionFor(row.Mode)
+						if err := s.adminPersistTypedActivity(tx, d, row.ConsumerKey, form, item.Enabled, true); err != nil {
+							return err
+						}
+					}
+					row.FormJSON = adminJSON(form)
+				} else if row.Enabled != item.Enabled && row.Mode != "opening-14" {
+					if err := adminEnableActivityConsumer(tx, row.ConsumerID, item.Enabled); err != nil {
+						return err
+					}
+				}
+				row.StartAt = item.StartAt
+				row.EndAt = item.EndAt
+				row.ClaimEndAt = item.ClaimEndAt
+				row.Enabled = item.Enabled
+				row.Revision++
+			} else {
+				var definition db.AdminActivityDefinition
+				if err := tx.Clauses(clause.Locking{Strength: "SHARE"}).First(&definition, "id=? AND archived=?", item.TemplateID, false).Error; err != nil {
+					return err
+				}
+				if item.TemplateVersion != adminVersion(definition) {
+					return constUtil.ErrAdminConfigConflict
+				}
+				var form model.AdminActivityForm
+				if json.Unmarshal(definition.FormJSON, &form) != nil {
+					return constUtil.ErrAdminConfiguration
+				}
+				form.StartAt = item.StartAt
+				form.EndAt = item.EndAt
+				form.ClaimEndAt = item.ClaimEndAt
+				row = db.AdminActivityOccurrence{ID: "occ_" + strings.ReplaceAll(uuid.NewString(), "-", "")[:24], ServerID: serverID, TemplateID: definition.ID, TemplateVersion: adminVersion(definition), Name: definition.Name, Mode: definition.Mode, StartAt: item.StartAt, EndAt: item.EndAt, ClaimEndAt: item.ClaimEndAt, Lane: item.Lane, Enabled: item.Enabled, FormJSON: adminJSON(form), Revision: 1}
+				if definition.Mode == "opening-14" {
+					row.ConsumerKey = "opening_schedule_" + strings.TrimPrefix(row.ID, "occ_")
+					row.ConsumerID = "opening:" + row.ConsumerKey
+				} else {
+					d, ok := adminActivityDefinitionFor(definition.Mode)
+					if !ok {
+						return constUtil.ErrAdminInput
+					}
+					row.ConsumerKey = d.prefix + "schedule_" + strings.TrimPrefix(row.ID, "occ_")[:16]
+					row.ConsumerID = d.domain + ":" + row.ConsumerKey
+					if err := s.adminPersistTypedActivity(tx, d, row.ConsumerKey, form, item.Enabled, false); err != nil {
+						return err
+					}
+					presentation := db.AdminActivityPresentation{ActivityID: row.ConsumerID, Mode: row.Mode, TemplateID: form.TemplateID, Name: row.Name, UpdatedAtMillis: time.Now().UnixMilli()}
+					if err := tx.Create(&presentation).Error; err != nil {
+						return err
+					}
+				}
+			}
+			if err := tx.Save(&row).Error; err != nil {
+				return err
+			}
+		}
+		for id, row := range existing {
+			if !seen[id] {
+				if row.Mode != "opening-14" {
+					if err := adminEnableActivityConsumer(tx, row.ConsumerID, false); err != nil {
+						return err
+					}
+				}
+				if err := tx.Model(&row).Updates(map[string]any{"archived": true, "enabled": false, "revision": row.Revision + 1}).Error; err != nil {
+					return err
+				}
+			}
+		}
+		revision.Revision++
+		if err := tx.Save(&revision).Error; err != nil {
+			return err
+		}
+		return adminAudit(tx, p, "activity.schedule.save", fmt.Sprint(serverID), fmt.Sprintf("realm=%d revision=%d slots=%d", serverID, revision.Revision, len(req.Items)))
+	})
+	if err != nil {
+		return nil, err
+	}
+	return s.AdminActivitySchedule(ctx, p, serverID)
+}
+
+func adminEnableActivityConsumer(tx *gorm.DB, id string, enabled bool) error {
+	domain, key, ok := strings.Cut(id, ":")
+	if !ok {
+		return constUtil.ErrAdminConfiguration
+	}
+	var table any
+	switch domain {
+	case "commerce":
+		table = &db.P4CommerceRule{}
+	case "welfare":
+		table = &db.P4WelfareRule{}
+	case "period":
+		table = &db.PeriodInstance{}
+	case "pool":
+		table = &db.GameplayPool{}
+	default:
+		return constUtil.ErrAdminConfiguration
+	}
+	return tx.Model(table).Where("id=?", key).Update("enabled", enabled).Error
+}
+
+func adminActivityPatternDTO(row db.AdminActivityPattern) (model.AdminActivityPatternDTO, error) {
+	entries := []model.AdminActivityPatternEntry{}
+	if json.Unmarshal(row.EntriesJSON, &entries) != nil {
+		return model.AdminActivityPatternDTO{}, constUtil.ErrAdminConfiguration
+	}
+	return model.AdminActivityPatternDTO{ID: row.ID, Name: row.Name, CycleDays: row.CycleDays, Entries: entries, Version: adminVersion(row)}, nil
+}
+
+// AdminActivityPatterns lists global reusable relative-day rotations.
+func (s *GameService) AdminActivityPatterns(ctx context.Context, p *model.AdminPrincipal) ([]model.AdminActivityPatternDTO, error) {
+	tx := db.GetIns().WithContext(ctx)
+	if err := adminOperationUser(tx, p, false); err != nil {
+		return nil, err
+	}
+	var rows []db.AdminActivityPattern
+	if err := tx.Where("archived=?", false).Order("name,id").Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	out := []model.AdminActivityPatternDTO{}
+	for _, row := range rows {
+		dto, err := adminActivityPatternDTO(row)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, dto)
+	}
+	return out, nil
+}
+
+// AdminSaveActivityPattern saves a reusable rotation without changing any published realm calendar.
+func (s *GameService) AdminSaveActivityPattern(ctx context.Context, p *model.AdminPrincipal, id string, req model.AdminActivityPatternSaveRequest) (*model.AdminActivityPatternDTO, error) {
+	var out model.AdminActivityPatternDTO
+	err := db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := adminOperationUser(tx, p, true); err != nil {
+			return err
+		}
+		var row db.AdminActivityPattern
+		if id != "" {
+			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&row, "id=? AND archived=?", id, false).Error; err != nil {
+				return err
+			}
+			if req.Version != adminVersion(row) {
+				return constUtil.ErrAdminConfigConflict
+			}
+		}
+		if id == "" {
+			row.ID = "pattern_" + strings.ReplaceAll(uuid.NewString(), "-", "")[:24]
+		}
+		for _, entry := range req.Entries {
+			var definition db.AdminActivityDefinition
+			if err := tx.First(&definition, "id=? AND archived=?", entry.TemplateID, false).Error; err != nil {
+				return err
+			}
+			if !definition.Usable {
+				return constUtil.ErrAdminInput
+			}
+		}
+		row.Name = req.Name
+		row.CycleDays = req.CycleDays
+		row.EntriesJSON = adminJSON(req.Entries)
+		row.Revision++
+		row.UpdatedAtMillis = time.Now().UnixMilli()
+		if err := tx.Save(&row).Error; err != nil {
+			return err
+		}
+		var err error
+		out, err = adminActivityPatternDTO(row)
+		if err != nil {
+			return err
+		}
+		return adminAudit(tx, p, "activity.pattern.save", row.ID, fmt.Sprintf("cycleDays=%d slots=%d", row.CycleDays, len(req.Entries)))
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// AdminDeleteActivityPattern archives a rotation while preserving all existing copied occurrences.
+func (s *GameService) AdminDeleteActivityPattern(ctx context.Context, p *model.AdminPrincipal, id, version string) error {
+	return db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := adminOperationUser(tx, p, true); err != nil {
+			return err
+		}
+		var row db.AdminActivityPattern
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&row, "id=? AND archived=?", id, false).Error; err != nil {
+			return err
+		}
+		if version != adminVersion(row) {
+			return constUtil.ErrAdminConfigConflict
+		}
+		row.Archived = true
+		row.Revision++
+		if err := tx.Save(&row).Error; err != nil {
+			return err
+		}
+		return adminAudit(tx, p, "activity.pattern.archive", id, "existing realm schedules preserved")
+	})
+}
+
+// adminActivityScheduleFallback hides unscheduled legacy entries after this realm adopts its calendar.
+func adminActivityScheduleFallback(tx *gorm.DB, key string) (string, error) {
+	allowed, err := adminActivityScheduleAccess(tx, key)
+	if err != nil {
+		return "", err
+	}
+	if allowed {
+		return key, nil
+	}
+	return "inactive_schedule_" + p6Digest([]byte(key))[:16], nil
+}
+
+// AdminActivityCostResources filters the original display catalogue through the actual commerce parser.
+// It does not create currencies, prices or a new acquisition channel.
+func (s *GameService) AdminActivityCostResources(ctx context.Context, p *model.AdminPrincipal, q string) (*model.AdminActivityCostResourcesResponse, error) {
+	if err := adminOperationUser(db.GetIns().WithContext(ctx), p, false); err != nil {
+		return nil, err
+	}
+	catalogue := s.AdminCatalogueFiltered(model.AdminItemsRequest{Q: q, Page: 1, PageSize: 100000})
+	out := &model.AdminActivityCostResourcesResponse{Items: []model.AdminItemDTO{}}
+	// Keep real currencies visible before the larger item catalogue when no nickname is entered.
+	for _, currency := range []bool{true, false} {
+		for _, item := range catalogue.Items {
+			if (item.Category == "currency") != currency {
+				continue
+			}
+			if _, err := s.p4ParseCost(item.ID + ",1"); err != nil {
+				continue
+			}
+			out.Items = append(out.Items, item)
+			if len(out.Items) >= 100 {
+				return out, nil
+			}
+		}
+	}
+	return out, nil
+}
