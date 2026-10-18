@@ -1,4 +1,4 @@
-# 黑衣剑士 Go 兼容服务器
+# 灵魂之花 Go 兼容服务器
 
 入口为 `main.go`，使用 Gin、Gorm 与原 HTTP/TCP Protobuf 协议。
 完整安装与部署步骤见 [项目 README](../README.md)。
