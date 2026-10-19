@@ -282,7 +282,7 @@ func TestP5Domain(t *testing.T) {
 		mainGUID := p.GetHeroWarId()
 		deny(id, &pb.CSLightenWorldSeed{Id: proto.Int32(5)})
 		for next := int32(2); next <= 10; next++ {
-			call(id, &pb.CSLightenWorldSeed{Id: proto.Int32(next)})
+			call(id, &pb.CSLightenWorldSeed{Id: proto.Int32(next - 1)})
 		}
 		p, g := state(id)
 		main, err := p5Warrior(g, mainGUID)
@@ -292,7 +292,7 @@ func TestP5Domain(t *testing.T) {
 		if formationHero(g.Formation[0]).GetId() != "hero_044" {
 			t.Fatal("formation identity stale")
 		}
-		deny(id, &pb.CSLightenWorldSeed{Id: proto.Int32(10)})
+		deny(id, &pb.CSLightenWorldSeed{Id: proto.Int32(9)})
 		swapped, err := s.SwapP5MainHero(ctx, id, 101, 8001)
 		if err != nil || swapped[0].(*pb.SCWarriorGet).GetWarrior()[0].GetId() != "hero_048" {
 			t.Fatal("bounded swap API", err)

@@ -9,7 +9,7 @@ type AdminCDKDTO struct {
 	Unlimited  bool                  `json:"unlimited"`  // Unlimited removes the date window when true.
 	StartAt    int64                 `json:"startAt"`    // StartAt is the inclusive game-time millisecond boundary.
 	EndAt      int64                 `json:"endAt"`      // EndAt is the exclusive game-time boundary.
-	TotalLimit int64                 `json:"totalLimit"` // TotalLimit is the shared code redemption quota.
+	TotalLimit int64                 `json:"totalLimit"` // TotalLimit is the shared redemption quota; 0=unlimited, positive=maximum claims.
 	Used       int64                 `json:"used"`       // Used counts committed original claims.
 	Rewards    []AdminResourceAmount `json:"rewards"`    // Rewards are fixed original resources.
 	Version    string                `json:"version"`    // Version protects concurrent operator edits.
@@ -24,30 +24,30 @@ type AdminCDKListResponse struct {
 
 // AdminCDKCreateRequest explicitly generates codes with operator-selected rewards.
 type AdminCDKCreateRequest struct {
-	Name       string                `json:"name" binding:"required"`       // Name identifies the allocation.
-	Rewards    []AdminResourceAmount `json:"rewards" binding:"required"`    // Rewards must be grantable original resources.
-	Count      int64                 `json:"count" binding:"required"`      // Count is 1..500.
-	Prefix     string                `json:"prefix"`                        // Prefix is optional uppercase ASCII, at most 12 characters.
-	Code       string                `json:"code"`                          // Code optionally supplies exactly one manual code.
-	TotalLimit int64                 `json:"totalLimit" binding:"required"` // TotalLimit is 1..1000000 per code.
-	Unlimited  bool                  `json:"unlimited"`                     // Unlimited=true omits both date boundaries.
-	StartAt    int64                 `json:"startAt"`                       // StartAt is required when limited.
-	EndAt      int64                 `json:"endAt"`                         // EndAt must follow StartAt when limited.
-	Enabled    bool                  `json:"enabled"`                       // Enabled=true opens redemption.
-	Reason     string                `json:"reason" binding:"required"`     // Reason records the operator's purpose.
+	Name       string                `json:"name" binding:"required"`    // Name identifies the allocation.
+	Rewards    []AdminResourceAmount `json:"rewards" binding:"required"` // Rewards must be grantable original resources.
+	Count      int64                 `json:"count" binding:"required"`   // Count is 1..500.
+	Prefix     string                `json:"prefix"`                     // Prefix is optional uppercase ASCII, at most 12 characters.
+	Code       string                `json:"code"`                       // Code optionally supplies exactly one manual code.
+	TotalLimit int64                 `json:"totalLimit"`                 // TotalLimit: 0=unlimited, 1..1000000=shared claim quota.
+	Unlimited  bool                  `json:"unlimited"`                  // Unlimited=true omits both date boundaries.
+	StartAt    int64                 `json:"startAt"`                    // StartAt is required when limited.
+	EndAt      int64                 `json:"endAt"`                      // EndAt must follow StartAt when limited.
+	Enabled    bool                  `json:"enabled"`                    // Enabled=true opens redemption.
+	Reason     string                `json:"reason" binding:"required"`  // Reason records the operator's purpose.
 }
 
 // AdminCDKUpdateRequest keeps used rewards immutable while allowing policy edits.
 type AdminCDKUpdateRequest struct {
-	Name       string                `json:"name" binding:"required"`       // Name is the display label.
-	Rewards    []AdminResourceAmount `json:"rewards" binding:"required"`    // Rewards cannot change after a successful claim.
-	TotalLimit int64                 `json:"totalLimit" binding:"required"` // TotalLimit cannot be below committed usage.
-	Unlimited  bool                  `json:"unlimited"`                     // Unlimited=true removes the date restriction.
-	StartAt    int64                 `json:"startAt"`                       // StartAt is inclusive when limited.
-	EndAt      int64                 `json:"endAt"`                         // EndAt is exclusive when limited.
-	Enabled    bool                  `json:"enabled"`                       // Enabled permits or stops future claims.
-	Version    string                `json:"version" binding:"required"`    // Version is the loaded snapshot token.
-	Reason     string                `json:"reason" binding:"required"`     // Reason is included in audit history.
+	Name       string                `json:"name" binding:"required"`    // Name is the display label.
+	Rewards    []AdminResourceAmount `json:"rewards" binding:"required"` // Rewards cannot change after a successful claim.
+	TotalLimit int64                 `json:"totalLimit"`                 // TotalLimit: 0=unlimited; a positive quota cannot be below usage.
+	Unlimited  bool                  `json:"unlimited"`                  // Unlimited=true removes the date restriction.
+	StartAt    int64                 `json:"startAt"`                    // StartAt is inclusive when limited.
+	EndAt      int64                 `json:"endAt"`                      // EndAt is exclusive when limited.
+	Enabled    bool                  `json:"enabled"`                    // Enabled permits or stops future claims.
+	Version    string                `json:"version" binding:"required"` // Version is the loaded snapshot token.
+	Reason     string                `json:"reason" binding:"required"`  // Reason is included in audit history.
 }
 
 // AdminCDKCreateResponse contains the only plaintext delivery of newly generated codes.

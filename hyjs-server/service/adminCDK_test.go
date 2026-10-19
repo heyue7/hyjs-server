@@ -155,3 +155,138 @@ func TestAdminCDKOriginalRedemptionConcurrencyAndCold(t *testing.T) {
 		t.Fatal("short code leaked through its persistent hint", e)
 	}
 }
+
+// Unlimited shared quota keeps original per-role claims, date gates and saved rewards.
+func TestAdminCDKUnlimitedQuotaKeepsRoleClaims(t *testing.T) {
+	f, actor := adminModesFixture(t)
+	f.ctx = context.WithValue(f.ctx, constUtil.GameServiceContextKey, f.s)
+	if err := f.s.LoadPaymentTables("../../analysis/tables"); err != nil {
+		t.Fatal(err)
+	}
+	for _, init := range []func(context.Context) error{f.s.InitializePayments, f.s.InitializeAdminGameServers, f.s.InitializeAdminCDK} {
+		if err := init(f.ctx); err != nil {
+			t.Fatal(err)
+		}
+	}
+	f.ctx = context.WithValue(f.ctx, constUtil.AdminServerScopeContextKey, f.s.OriginalServerID())
+	ids := []int64{f.id}
+	for _, suffix := range []string{"a", "b", "c"} {
+		account, err := LoginAccount(f.ctx, "cdku-"+p6Digest([]byte(t.Name()))[:20]+suffix, "fixture-password")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err = CreatePlayer(f.ctx, account.Id, "兑换测试"+suffix, "hero_043"); err != nil {
+			t.Fatal(err)
+		}
+		ids = append(ids, account.Id)
+	}
+	generated, err := f.s.AdminCreateCDK(f.ctx, actor, model.AdminCDKCreateRequest{Name: "不限总次数", Rewards: []model.AdminResourceAmount{{ResourceID: "coin", Amount: 7}}, Count: 1, TotalLimit: 0, Unlimited: true, Enabled: true, Reason: "isolated quota conversion verification"})
+	if err != nil || len(generated.Items) != 1 || generated.Items[0].TotalLimit != 0 {
+		t.Fatal(err, generated)
+	}
+	redeem := func(id int64) error {
+		_, e := f.s.paymentOffer(f.ctx, id, &pb.CSConvertGiftCode{GiftCode: proto.String(generated.Codes[0])}, time.Now())
+		return e
+	}
+	var wg sync.WaitGroup
+	results := make(chan error, 2)
+	for _, id := range ids[:2] {
+		wg.Add(1)
+		go func(id int64) { defer wg.Done(); results <- redeem(id) }(id)
+	}
+	wg.Wait()
+	close(results)
+	for e := range results {
+		if e != nil {
+			t.Fatal("unlimited code rejected another role", e)
+		}
+	}
+	after, _ := f.profile(t)
+	if err = redeem(f.id); err == nil {
+		t.Fatal("unlimited quota granted same role twice")
+	}
+	current, _ := f.profile(t)
+	if current.GetCoin() != after.GetCoin() {
+		t.Fatal("duplicate changed reward")
+	}
+	page, err := f.s.AdminCDKList(f.ctx, actor, "不限总次数", 1, 20)
+	if err != nil || page.Total != 1 || page.Items[0].Used != 2 {
+		t.Fatal(err, page)
+	}
+	row := page.Items[0]
+	update := model.AdminCDKUpdateRequest{Name: row.Name, Rewards: row.Rewards, TotalLimit: 1, Unlimited: true, Enabled: true, Version: row.Version, Reason: "quota conversion"}
+	if _, err = f.s.AdminUpdateCDK(f.ctx, actor, row.ID, update); err == nil {
+		t.Fatal("limited quota below committed usage accepted")
+	}
+	update.TotalLimit = 2
+	changed, err := f.s.AdminUpdateCDK(f.ctx, actor, row.ID, update)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = redeem(ids[2]); err == nil {
+		t.Fatal("finite quota failed to stop new role")
+	}
+	update.Version = changed.Version
+	update.TotalLimit = 0
+	changed, err = f.s.AdminUpdateCDK(f.ctx, actor, row.ID, update)
+	if err != nil || changed.Used != 2 || changed.TotalLimit != 0 {
+		t.Fatal("unlimited conversion reset history", err, changed)
+	}
+	if err = redeem(ids[2]); err != nil {
+		t.Fatal("unlimited conversion did not reopen", err)
+	}
+	page, err = f.s.AdminCDKList(f.ctx, actor, "不限总次数", 1, 20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	update.Version = page.Items[0].Version
+	update.Unlimited = false
+	update.StartAt = time.Now().Add(time.Hour).UnixMilli()
+	update.EndAt = time.Now().Add(2 * time.Hour).UnixMilli()
+	changed, err = f.s.AdminUpdateCDK(f.ctx, actor, row.ID, update)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = redeem(ids[3]); err == nil {
+		t.Fatal("unlimited quota bypassed date window")
+	}
+	update.Version = changed.Version
+	update.Unlimited = true
+	update.StartAt = 0
+	update.EndAt = 0
+	update.Enabled = false
+	changed, err = f.s.AdminUpdateCDK(f.ctx, actor, row.ID, update)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = redeem(ids[3]); err == nil {
+		t.Fatal("unlimited quota bypassed stop")
+	}
+	update.Version = changed.Version
+	update.Enabled = true
+	if _, err = f.s.AdminUpdateCDK(f.ctx, actor, row.ID, update); err != nil {
+		t.Fatal(err)
+	}
+	f.restart(t)
+	if err = redeem(f.id); err == nil {
+		t.Fatal("cold recovery lost per-role claim")
+	}
+	if err = redeem(ids[3]); err != nil {
+		t.Fatal("cold unlimited code rejected fresh role", err)
+	}
+	page, err = f.s.AdminCDKList(f.ctx, actor, "不限总次数", 1, 20)
+	if err != nil || page.Items[0].TotalLimit != 0 || page.Items[0].Used != 4 {
+		t.Fatal(err, page)
+	}
+	claims, err := f.s.AdminCDKClaims(f.ctx, actor, row.ID, 1, 20)
+	if err != nil || claims.Total != 4 {
+		t.Fatal("original claim ledger mismatch", err, claims)
+	}
+	legacy := "legacy-zero-" + p6Digest([]byte(t.Name()))[:12]
+	if err = db.GetIns().Create(&db.PaymentGiftCode{Hash: p3Hash([]byte(legacy)), Reward: "coin:7", Limit: 0, Source: "legacy-fixture", ExpiresAt: time.Now().Add(time.Hour).UnixMilli()}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if _, err = f.s.paymentOffer(f.ctx, f.id, &pb.CSConvertGiftCode{GiftCode: proto.String(legacy)}, time.Now()); err == nil {
+		t.Fatal("legacy zero quota unexpectedly opened")
+	}
+}

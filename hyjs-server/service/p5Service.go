@@ -127,7 +127,7 @@ func (s *GameService) p5Mutation(ctx context.Context, id int64, op string, stamp
 			}
 			// Original LightUp increments the local seed level on every successful
 			// callback. Only replay the current node, never an earlier committed step.
-			if seed, ok := request.(*pb.CSLightenWorldSeed); ok && p.GetCurrentWorldSeedId() != seed.GetId() {
+			if seed, ok := request.(*pb.CSLightenWorldSeed); ok && p.GetCurrentWorldSeedId() != seed.GetId()+1 {
 				return errors.New(constUtil.P5GrowthReceiptChanged)
 			}
 			if err := proto.Unmarshal(receipt.Response, response); err != nil {

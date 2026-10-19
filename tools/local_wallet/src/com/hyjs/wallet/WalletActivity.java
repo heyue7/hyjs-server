@@ -127,11 +127,19 @@ public final class WalletActivity extends UnityPlayerActivity {
     private final class WalletOverlay extends FrameLayout {
         private int pointer=-1;
         private float downX,downY,startX,startY;
-        private boolean moved;
+        private boolean moved, longDragTraced;
         private final int[] screenPosition=new int[2];
         WalletOverlay(){super(WalletActivity.this);}
         @Override protected void dispatchDraw(Canvas canvas){
-            int saved=canvas.save();canvas.clipRect(bubbleBounds());super.dispatchDraw(canvas);canvas.restoreToCount(saved);
+            if(bubble==null || bubble.getWidth()==0 || bubble.getHeight()==0)return;
+            // The full-screen host owns drawing and clipping. Do not replay a
+            // translated child RenderNode whose cached local clip can hide an
+            // icon midway through a long drag above Unity's SurfaceView.
+            int saved=canvas.save();canvas.clipRect(bubbleBounds());
+            float x=bubble.getX(),y=bubble.getY();
+            int alpha=Math.max(0,Math.min(255,Math.round(bubble.getAlpha()*255)));
+            if(alpha<255)canvas.saveLayerAlpha(x,y,x+bubble.getWidth(),y+bubble.getHeight(),alpha);
+            canvas.translate(x,y);bubble.draw(canvas);canvas.restoreToCount(saved);
         }
         boolean dispatchWalletTouch(MotionEvent event){
             int action=event.getActionMasked();
@@ -144,11 +152,11 @@ public final class WalletActivity extends UnityPlayerActivity {
                 // The parent owns the sequence while the half-hidden child moves.
                 // Stable parent coordinates keep the drag independent of child
                 // translation and give the narrow edge icon a full 48dp handle.
-                pointer=event.getPointerId(0);dragging=true;moved=false;
+                pointer=event.getPointerId(0);dragging=true;moved=false;longDragTraced=false;
                 if(getParent()!=null)getParent().requestDisallowInterceptTouchEvent(true);
                 revealBubble();bubble.setPressed(true);
                 downX=x;downY=y;startX=bubble.getX();startY=bubble.getY();
-                requestUnbufferedDispatch(event);
+                traceBubbleGeometry("down");requestUnbufferedDispatch(event);
                 return true;
             }
             if(pointer!=-1){
@@ -170,6 +178,7 @@ public final class WalletActivity extends UnityPlayerActivity {
                         Rect bounds=bubbleBounds();
                         bubble.setX(Math.max(bounds.left,Math.min(bounds.right-bubble.getWidth(),startX+dx)));
                         bubble.setY(clampBubbleY(startY+dy,bounds));updateBubbleGestureExclusion();invalidate();
+                        if(!longDragTraced && Math.hypot(dx,dy)>dp(160)){longDragTraced=true;traceBubbleGeometry("long-move");}
                     }
                     if(action==MotionEvent.ACTION_UP)finish(!moved);
                     return true;
@@ -184,7 +193,7 @@ public final class WalletActivity extends UnityPlayerActivity {
         private void finish(boolean click){
             pointer=-1;dragging=false;
             if(getParent()!=null)getParent().requestDisallowInterceptTouchEvent(false);
-            bubble.setPressed(false);
+            bubble.setPressed(false);traceBubbleGeometry(click?"click":"finish");
             if(click){bubble.performClick();return;}
             Rect bounds=bubbleBounds();dockRight=bubble.getX()+bubble.getWidth()/2f>=(bounds.left+bounds.right)/2f;
             foldBubble(true);scheduleDim();
@@ -238,15 +247,15 @@ public final class WalletActivity extends UnityPlayerActivity {
         if(destroyed || overlay!=null)return;
         ViewGroup decor=(ViewGroup)getWindow().getDecorView();decor.setClipChildren(false);decor.setClipToPadding(false);
         overlay=new WalletOverlay();overlay.setClipChildren(false);overlay.setClipToPadding(false);overlay.setClickable(false);
-        decor.addView(overlay,new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.MATCH_PARENT));
+        decor.addView(overlay,new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.MATCH_PARENT,Gravity.FILL));
         ImageView icon=new CircularWalletIcon(this);icon.setContentDescription("蓝绿钱包，点击展开，拖动位置");icon.setScaleType(ImageView.ScaleType.CENTER_CROP);
         try{InputStream in=getAssets().open("local-wallet/icon.png");BitmapFactory.Options options=new BitmapFactory.Options();options.inSampleSize=4;Bitmap bitmap=BitmapFactory.decodeStream(in,null,options);in.close();if(bitmap!=null)icon.setImageBitmap(bitmap);}catch(Exception unavailable){icon.setImageResource(android.R.drawable.ic_menu_save);icon.setColorFilter(BLUE);}
         bubble=icon;bubble.setAlpha(.40f);
         FrameLayout.LayoutParams lp=new FrameLayout.LayoutParams(dp(48),dp(48));lp.gravity=Gravity.TOP|Gravity.LEFT;lp.topMargin=dp(70);overlay.addView(icon,lp);
-        if(Build.VERSION.SDK_INT>=29){
-            icon.addOnLayoutChangeListener(new View.OnLayoutChangeListener(){public void onLayoutChange(View v,int l,int t,int r,int b,int ol,int ot,int or,int ob){updateBubbleGestureExclusion();}});
-            icon.animate().setUpdateListener(new ValueAnimator.AnimatorUpdateListener(){public void onAnimationUpdate(ValueAnimator animation){updateBubbleGestureExclusion();}});
-        }
+        icon.addOnLayoutChangeListener(new View.OnLayoutChangeListener(){public void onLayoutChange(View v,int l,int t,int r,int b,int ol,int ot,int or,int ob){updateBubbleGestureExclusion();overlay.invalidate();}});
+        // Parent-drawn alpha and docking must redraw throughout the animation,
+        // including Android23–28 where gesture exclusion is unavailable.
+        icon.animate().setUpdateListener(new ValueAnimator.AnimatorUpdateListener(){public void onAnimationUpdate(ValueAnimator animation){updateBubbleGestureExclusion();overlay.invalidate();}});
         icon.setOnClickListener(new View.OnClickListener(){public void onClick(View v){revealBubble();openPanel();}});
         overlay.addOnLayoutChangeListener(new View.OnLayoutChangeListener(){public void onLayoutChange(View v,int l,int t,int r,int b,int ol,int ot,int or,int ob){
             repositionBubble();
@@ -277,6 +286,12 @@ public final class WalletActivity extends UnityPlayerActivity {
         int[] rootPosition=new int[2],overlayPosition=new int[2];decor.getLocationInWindow(rootPosition);overlay.getLocationInWindow(overlayPosition);
         int x=overlayPosition[0]-rootPosition[0],y=overlayPosition[1]-rootPosition[1];
         return new Rect(Math.max(0,left-x),Math.max(0,top-y),Math.min(overlay.getWidth(),decor.getWidth()-right-x),Math.min(overlay.getHeight(),decor.getHeight()-bottom-y));
+    }
+    private void traceBubbleGeometry(String stage){
+        if(overlay==null || bubble==null || !android.util.Log.isLoggable("HYJSWalletDrag",android.util.Log.DEBUG))return;
+        Rect visible=new Rect();overlay.getGlobalVisibleRect(visible);
+        // Opt-in geometry only: disabled by default; never include login, wallet or session data.
+        android.util.Log.d("HYJSWalletDrag",stage+" host="+overlay.getWidth()+"x"+overlay.getHeight()+" visible="+visible+" safe="+bubbleBounds()+" icon="+bubble.getX()+","+bubble.getY());
     }
     private Rect bubbleTouchBounds(){
         Rect safe=bubbleBounds();

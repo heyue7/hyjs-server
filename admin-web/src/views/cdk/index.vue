@@ -29,13 +29,27 @@ const editorOpen = ref(false); const selected = ref<CDK | null>(null); const sav
 const inputMode = ref('batch');
 const draft = reactive<CDKDraft>({ name: '', rewards: [], count: 1, prefix: '', code: '', totalLimit: 1, unlimited: true, startAt: 0, endAt: 0, enabled: true, reason: '' });
 const rewardsFrozen = computed(() => Boolean(selected.value?.used));
+const minimumTotalLimit = computed(() => Math.max(1, selected.value?.used || 0));
+const limitedTotalLimit = ref(1);
+const noTotalLimit = computed({
+  get: () => draft.totalLimit === 0,
+  set: (checked: boolean) => {
+    if (checked) {
+      if (draft.totalLimit > 0) limitedTotalLimit.value = draft.totalLimit;
+      draft.totalLimit = 0;
+    } else {
+      draft.totalLimit = Math.max(minimumTotalLimit.value, limitedTotalLimit.value);
+    }
+  }
+});
 const baseline = ref('');
 const dirty = computed(() => editorOpen.value && baseline.value !== JSON.stringify({ draft, inputMode: inputMode.value }));
 function edit(row: CDK | null = null) {
   if (!writable.value) return;
   selected.value = row ? { ...row, rewards: row.rewards.map(value => ({ ...value })) } : null;
   inputMode.value = 'batch'; saveError.value = '';
-  Object.assign(draft, { name: row?.name || '', rewards: row?.rewards.map(value => ({ ...value })) || [], count: 1, prefix: '', code: '', totalLimit: row?.totalLimit || 1, unlimited: row?.unlimited ?? true, startAt: row?.startAt || 0, endAt: row?.endAt || 0, enabled: row?.enabled ?? true, reason: '' });
+  Object.assign(draft, { name: row?.name || '', rewards: row?.rewards.map(value => ({ ...value })) || [], count: 1, prefix: '', code: '', totalLimit: row?.totalLimit ?? 1, unlimited: row?.unlimited ?? true, startAt: row?.startAt || 0, endAt: row?.endAt || 0, enabled: row?.enabled ?? true, reason: '' });
+  limitedTotalLimit.value = Math.max(minimumTotalLimit.value, draft.totalLimit);
   editorOpen.value = true; baseline.value = JSON.stringify({ draft, inputMode: inputMode.value });
 }
 function confirmAction(title: string, content: string, positiveText: string) {
@@ -52,7 +66,8 @@ async function closeEditor() {
 function validate() {
   if (!draft.name.trim()) return '请填写兑换码名称';
   if (!draft.rewards.length || draft.rewards.some(row => !row.resourceId || !Number.isSafeInteger(row.amount) || row.amount < 1)) return '请配置完整的奖励与正整数数量';
-  if (!Number.isSafeInteger(draft.totalLimit) || draft.totalLimit < Math.max(1, selected.value?.used || 0)) return '每码总兑换次数不能少于已兑换次数，且至少为1';
+  if (!Number.isSafeInteger(draft.totalLimit) || draft.totalLimit < 0) return '请选择不限总次数，或填写正整数上限';
+  if (draft.totalLimit > 0 && draft.totalLimit < minimumTotalLimit.value) return `总次数不能少于已兑换的 ${selected.value?.used || 0} 次`;
   if (!selected.value && inputMode.value === 'batch' && (!Number.isSafeInteger(draft.count) || draft.count < 1 || draft.count > 500)) return '每批可生成1–500枚兑换码';
   if (!selected.value && inputMode.value === 'batch' && !/^[A-Za-z0-9]{0,12}$/.test(draft.prefix || '')) return '前缀可用最多12位字母或数字';
   if (!selected.value && inputMode.value === 'custom' && !draft.code?.trim()) return '请填写自定义兑换码';
@@ -100,9 +115,9 @@ async function loadClaims() {
 }
 function viewClaims(row: CDK) { claimsTarget.value = row; claims.value = []; claimsTotal.value = 0; claimsPage.value = 1; claimsOpen.value = true; loadClaims(); }
 const columns: DataTableColumns<CDK> = [
-  { title: '兑换码', key: 'name', minWidth: 200, render: row => h('div', [h('strong', row.name), h('div', { class: 'ops-mono ops-muted' }, row.codeHint)]) },
+  { title: '兑换码', key: 'name', minWidth: 200, render: row => h('div', { class: 'cdk-name' }, [h('strong', row.name), h('div', { class: 'ops-mono ops-muted' }, row.codeHint)]) },
   { title: '奖励', key: 'rewards', minWidth: 260, render: row => h(RewardSummary, { rewards: row.rewards }) },
-  { title: '兑换进度', key: 'used', width: 130, render: row => `${row.used} / ${row.totalLimit}` },
+  { title: '兑换次数', key: 'used', width: 170, render: row => h('div', { class: 'cdk-usage' }, [h('span', `已兑换 ${row.used.toLocaleString()} 次`), h('span', { class: 'ops-muted' }, row.totalLimit === 0 ? '不限总次数' : `上限 ${row.totalLimit.toLocaleString()} 次`)]) },
   { title: '有效期', key: 'startAt', minWidth: 230, render: row => row.unlimited ? '不限有效期' : `${formatTime(row.startAt)} 至 ${formatTime(row.endAt)}` },
   { title: '状态', key: 'enabled', width: 110, render: row => h(NTag, { size: 'small', bordered: false, type: row.enabled ? 'success' : 'default' }, () => row.enabled ? '已启用' : '已停用') },
   { title: '操作', key: 'actions', width: 190, render: row => h(NSpace, { size: 6 }, () => [h(NButton, { size: 'small', onClick: () => viewClaims(row) }, () => '兑换记录'), ...(canWrite.value ? [h(NButton, { size: 'small', secondary: true, disabled: !writable.value, onClick: () => edit(row) }, () => '编辑')] : [])]) }
@@ -126,42 +141,118 @@ onBeforeUnmount(() => { removeGuard(); listGeneration += 1; claimsGeneration += 
 </script>
 
 <template>
-  <div class="ops-page">
-    <div class="ops-toolbar"><div class="ops-page-label">兑换码管理 <span class="ops-count">{{ total.toLocaleString() }}</span></div><NSpace><NButton :loading="loading" @click="load">刷新</NButton><NButton v-if="canWrite" type="primary" :disabled="!writable" @click="edit()">生成兑换码</NButton></NSpace></div>
-    <p class="ops-inline-note">当前区服：{{ scope.currentServer?.name }}。每个角色对同一枚兑换码只能领取一次，奖励进入原游戏兑换入口。</p>
-    <p v-if="!scope.currentServer?.runtimeBound" class="ops-inline-note">本区服尚未部署，部署后可生成和使用兑换码。</p>
+  <div class="ops-page cdk-page">
+    <div class="ops-toolbar">
+      <div class="ops-page-label">兑换码 <span class="ops-count">{{ total.toLocaleString() }}</span></div>
+      <NSpace :size="8">
+        <NButton :loading="loading" @click="load">刷新</NButton>
+        <NButton v-if="canWrite" type="primary" :disabled="!writable" @click="edit()">生成兑换码</NButton>
+      </NSpace>
+    </div>
+    <p class="ops-inline-note cdk-note">同一码每个角色限兑一次。</p>
+    <p v-if="!scope.currentServer?.runtimeBound" class="ops-inline-note cdk-note">本区服尚未部署，部署后可生成和使用兑换码。</p>
     <NAlert v-if="error" type="error" :title="error" />
-    <NCard :bordered="false"><div class="ops-filters"><NInput v-model:value="q" class="ops-search" clearable placeholder="搜索兑换码名称或尾号" :maxlength="128" @keydown.enter="search" /><NButton type="primary" @click="search">搜索</NButton></div><NDataTable :columns="columns" :data="rows" :loading="loading" :row-key="(row: CDK) => row.id" :bordered="false" :scroll-x="1150" /><div class="ops-pagination"><NPagination v-model:page="page" v-model:page-size="pageSize" :page-sizes="[25,50,100]" :item-count="total" show-size-picker @update:page="load" @update:page-size="search" /></div></NCard>
+    <NCard :bordered="false" class="cdk-list">
+      <div class="ops-filters">
+        <NInput v-model:value="q" class="ops-search" clearable placeholder="搜索名称或尾号" :maxlength="128" @keydown.enter="search" />
+        <NButton @click="search">搜索</NButton>
+      </div>
+      <NDataTable :columns="columns" :data="rows" :loading="loading" :row-key="(row: CDK) => row.id" size="small" :bordered="false" :scroll-x="1190" />
+      <div class="ops-pagination">
+        <NPagination v-model:page="page" v-model:page-size="pageSize" :page-sizes="[25,50,100]" :item-count="total" show-size-picker @update:page="load" @update:page-size="search" />
+      </div>
+    </NCard>
+
     <NModal :show="editorOpen" preset="card" :title="selected ? '编辑兑换码 · ' + selected.codeHint : '生成兑换码'" class="cdk-editor" :mask-closable="!saving" :closable="!saving" @update:show="!$event && closeEditor()">
       <NAlert v-if="saveError" type="error" :title="saveError" class="mb-16px" />
-      <NForm label-placement="top" :disabled="saving">
+      <NForm label-placement="top" :disabled="saving" :show-feedback="false" class="cdk-form">
         <NFormItem label="名称" required><NInput v-model:value="draft.name" placeholder="例如：开服感谢礼" :maxlength="80" /></NFormItem>
         <template v-if="!selected">
-          <NFormItem label="生成方式"><NRadioGroup v-model:value="inputMode"><NSpace><NRadio value="batch">随机生成</NRadio><NRadio value="custom">自定义一枚</NRadio></NSpace></NRadioGroup></NFormItem>
-          <div v-if="inputMode === 'batch'" class="cdk-pair"><NFormItem label="生成数量" required><NInputNumber v-model:value="draft.count" :min="1" :max="500" :precision="0" /></NFormItem><NFormItem label="可选前缀"><NInput v-model:value="draft.prefix" placeholder="最多12位字母或数字" :maxlength="12" /></NFormItem></div>
-          <NFormItem v-else label="自定义兑换码" required><NInput v-model:value="draft.code" placeholder="填写准备发给玩家的兑换码" autocomplete="off" /></NFormItem>
+          <NFormItem label="生成方式">
+            <NRadioGroup v-model:value="inputMode"><NSpace :size="20"><NRadio value="batch">随机生成</NRadio><NRadio value="custom">自定义一枚</NRadio></NSpace></NRadioGroup>
+          </NFormItem>
+          <div v-if="inputMode === 'batch'" class="cdk-pair">
+            <NFormItem label="生成数量" required><NInputNumber v-model:value="draft.count" :min="1" :max="500" :precision="0" /></NFormItem>
+            <NFormItem label="前缀（可选）"><NInput v-model:value="draft.prefix" placeholder="最多12位字母或数字" :maxlength="12" /></NFormItem>
+          </div>
+          <NFormItem v-else label="自定义兑换码" required><NInput v-model:value="draft.code" placeholder="填写发给玩家的兑换码" autocomplete="off" /></NFormItem>
         </template>
-        <NFormItem label="兑换奖励" required><div class="cdk-rewards"><RewardList v-model:value="draft.rewards" :disabled="saving || rewardsFrozen" /><p v-if="rewardsFrozen" class="ops-inline-note">已有兑换记录，奖励保持创建时配置。</p></div></NFormItem>
-        <div class="cdk-pair"><NFormItem label="每码总兑换次数" required><NInputNumber v-model:value="draft.totalLimit" :min="Math.max(1, selected?.used || 0)" :precision="0" /><template #feedback>每枚码最多可被多少个角色领取。</template></NFormItem><NFormItem label="允许兑换"><NSwitch v-model:value="draft.enabled" /></NFormItem></div>
+        <NFormItem label="兑换奖励" required>
+          <div class="cdk-rewards">
+            <RewardList v-model:value="draft.rewards" :disabled="saving || rewardsFrozen" />
+            <p v-if="rewardsFrozen" class="ops-inline-note cdk-field-note">已有兑换记录，奖励不可更改。</p>
+          </div>
+        </NFormItem>
+        <div class="cdk-pair">
+          <NFormItem label="兑换次数" required>
+            <div class="cdk-limit">
+              <NCheckbox v-model:checked="noTotalLimit">不限总次数</NCheckbox>
+              <div v-if="!noTotalLimit" class="cdk-limit-input">
+                <NInputNumber v-model:value="draft.totalLimit" :min="minimumTotalLimit" :precision="0" aria-label="每码总兑换次数" />
+                <span>次 / 码</span>
+              </div>
+              <p class="ops-inline-note cdk-field-note">同一码每个角色限兑一次。</p>
+            </div>
+          </NFormItem>
+          <NFormItem label="允许兑换"><NSwitch v-model:value="draft.enabled" /></NFormItem>
+        </div>
         <NFormItem label="有效期"><NCheckbox v-model:checked="draft.unlimited">不限有效期</NCheckbox></NFormItem>
-        <div v-if="!draft.unlimited" class="cdk-pair"><NFormItem label="开始时间（北京）" required><NDatePicker :value="draft.startAt || null" type="datetime" clearable @update:value="draft.startAt = $event || 0" /></NFormItem><NFormItem label="结束时间（北京）" required><NDatePicker :value="draft.endAt || null" type="datetime" clearable @update:value="draft.endAt = $event || 0" /></NFormItem></div>
-        <NFormItem label="操作原因" required><NInput v-model:value="draft.reason" type="textarea" :maxlength="300" placeholder="记录本次发放或调整用途" /></NFormItem>
+        <div v-if="!draft.unlimited" class="cdk-pair">
+          <NFormItem label="开始时间（北京）" required><NDatePicker :value="draft.startAt || null" type="datetime" clearable @update:value="draft.startAt = $event || 0" /></NFormItem>
+          <NFormItem label="结束时间（北京）" required><NDatePicker :value="draft.endAt || null" type="datetime" clearable @update:value="draft.endAt = $event || 0" /></NFormItem>
+        </div>
+        <NFormItem label="操作原因" required><NInput v-model:value="draft.reason" type="textarea" :autosize="{ minRows: 2, maxRows: 4 }" :maxlength="300" placeholder="填写发放用途或调整原因" /></NFormItem>
       </NForm>
-      <template #footer><div class="ops-drawer-actions"><NButton :disabled="saving" @click="closeEditor">取消</NButton><NButton type="primary" :loading="saving" @click="save">{{ selected ? '保存设置' : '生成并显示兑换码' }}</NButton></div></template>
+      <template #footer>
+        <div class="ops-drawer-actions"><NButton :disabled="saving" @click="closeEditor">取消</NButton><NButton type="primary" :loading="saving" @click="save">{{ selected ? '保存设置' : '生成兑换码' }}</NButton></div>
+      </template>
     </NModal>
-    <NModal :show="codesOpen" preset="card" title="兑换码已生成，请立即保存" class="cdk-codes" :mask-closable="false" :closable="false">
-      <p class="ops-inline-note">{{ codesServerName }} · 共 {{ generatedCodes.length }} 枚。完整兑换码仅在这里展示一次，关闭后无法恢复。</p>
-      <NSpace class="mb-16px"><NButton @click="copyCodes">复制全部</NButton><NButton @click="downloadCodes">下载文本</NButton></NSpace>
-      <NInput :value="generatedCodes.join('\n')" type="textarea" readonly :autosize="{ minRows: 6, maxRows: 14 }" aria-label="本次生成的完整兑换码" />
-      <NCheckbox v-model:checked="codesSaved" class="mt-16px">我已保存本次兑换码</NCheckbox>
+
+    <NModal :show="codesOpen" preset="card" title="保存兑换码" class="cdk-codes" :mask-closable="false" :closable="false">
+      <div class="cdk-result-meta"><span>{{ codesServerName }}</span><span>已生成 {{ generatedCodes.length }} 枚</span></div>
+      <p class="ops-inline-note cdk-result-warning">完整码仅显示这一次，关闭后无法再查看。</p>
+      <NSpace :size="8" class="mb-12px"><NButton @click="copyCodes">复制全部</NButton><NButton @click="downloadCodes">下载文本</NButton></NSpace>
+      <NInput :value="generatedCodes.join('\n')" class="cdk-code-input" type="textarea" readonly :autosize="{ minRows: 3, maxRows: 12 }" aria-label="本次生成的完整兑换码" />
+      <NCheckbox v-model:checked="codesSaved" class="mt-16px">我已保存这些兑换码</NCheckbox>
       <template #footer><div class="ops-drawer-actions"><NButton type="primary" @click="closeCodes">完成</NButton></div></template>
     </NModal>
-    <NDrawer v-model:show="claimsOpen" :width="760"><NDrawerContent :title="(claimsTarget?.name || '') + ' · 兑换记录'" closable><NAlert v-if="claimsError" type="error" :title="claimsError" /><NDataTable :columns="claimColumns" :data="claims" :loading="claimsLoading" :bordered="false" :scroll-x="500" /><div class="ops-pagination"><NPagination v-model:page="claimsPage" :item-count="claimsTotal" :page-size="25" @update:page="loadClaims" /></div><template #footer><NButton @click="claimsOpen = false">关闭</NButton></template></NDrawerContent></NDrawer>
+
+    <NDrawer v-model:show="claimsOpen" :width="760" class="cdk-claims">
+      <NDrawerContent :title="(claimsTarget?.name || '') + ' · 兑换记录'" closable>
+        <NAlert v-if="claimsError" type="error" :title="claimsError" class="mb-16px" />
+        <NDataTable :columns="claimColumns" :data="claims" :loading="claimsLoading" size="small" :bordered="false" :scroll-x="500" />
+        <div class="ops-pagination"><NPagination v-model:page="claimsPage" :item-count="claimsTotal" :page-size="25" @update:page="loadClaims" /></div>
+        <template #footer><NButton @click="claimsOpen = false">关闭</NButton></template>
+      </NDrawerContent>
+    </NDrawer>
   </div>
 </template>
 
 <style scoped>
-:global(.n-card.cdk-editor),:global(.n-card.cdk-codes){width:760px;max-width:calc(100vw - 32px)}
-.cdk-pair{display:grid;grid-template-columns:1fr 1fr;gap:20px}.cdk-pair :deep(.n-input-number),.cdk-pair :deep(.n-date-picker){width:100%}.cdk-rewards{width:100%}
-@media(max-width:600px){.cdk-pair{grid-template-columns:1fr;gap:0}}
+:global(.n-card.cdk-editor), :global(.n-card.cdk-codes) { width: 760px; max-width: calc(100vw - 32px); }
+:global(.n-drawer.cdk-claims) { max-width: 100vw; }
+.cdk-page { gap: 14px; }
+.cdk-note { margin: -6px 0 0; }
+.cdk-list :deep(.n-card__content) { padding: 20px; }
+.cdk-list :deep(.ops-filters) { margin-bottom: 16px; gap: 8px; }
+.cdk-list :deep(.ops-pagination) { margin-top: 18px; }
+:deep(.cdk-name), :deep(.cdk-usage) { display: flex; flex-direction: column; gap: 3px; line-height: 1.5; }
+:deep(.cdk-name strong) { font-weight: 600; }
+:deep(.cdk-usage) { font-variant-numeric: tabular-nums; }
+.cdk-form { display: flex; flex-direction: column; gap: 18px; }
+.cdk-pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+.cdk-pair :deep(.n-input-number), .cdk-pair :deep(.n-date-picker), .cdk-rewards, .cdk-limit { width: 100%; }
+.cdk-limit { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
+.cdk-limit-input { display: flex; align-items: center; gap: 8px; width: 100%; }
+.cdk-limit-input > span { white-space: nowrap; color: rgb(var(--base-text-color) / .65); font-size: 13px; }
+.cdk-field-note { margin: 0; font-size: 12px; }
+.cdk-rewards .cdk-field-note { margin-top: 8px; }
+.cdk-result-meta { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; font-size: 13px; color: rgb(var(--base-text-color) / .65); }
+.cdk-result-warning { margin-bottom: 16px; color: rgb(var(--base-text-color) / .85); }
+.cdk-code-input :deep(textarea) { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; line-height: 1.7; }
+@media (max-width: 600px) {
+  .cdk-pair { grid-template-columns: minmax(0, 1fr); gap: 18px; }
+  .cdk-page .ops-toolbar { flex-wrap: wrap; }
+  .cdk-list :deep(.n-card__content) { padding: 16px; }
+}
 </style>

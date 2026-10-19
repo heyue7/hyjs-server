@@ -15,7 +15,6 @@ import (
 // InitializeAdminGameServers attaches existing records to the trusted configured runtime.
 func (s *GameService) InitializeAdminGameServers(ctx context.Context) error {
 	d := db.GetIns().WithContext(ctx)
-	newRegistry := !d.Migrator().HasTable(&db.AdminGameServer{})
 	if err := d.AutoMigrate(&db.AdminGameServer{}); err != nil {
 		return err
 	}
@@ -28,17 +27,37 @@ func (s *GameService) InitializeAdminGameServers(ctx context.Context) error {
 	}
 	return d.Transaction(func(tx *gorm.DB) error {
 		id := s.OriginalServerID()
-		row := db.AdminGameServer{ID: id, Name: fmt.Sprintf("%d区·灵魂之花", id), Enabled: true, OpenAt: time.Now().UnixMilli(), RuntimeBound: true, Revision: 1}
+		// A legacy database without realm ownership belongs to its trusted
+		// serving process. Existing explicit realm ownership remains unchanged.
+		owners := tx.Model(&db.Profile{})
+		if !fresh {
+			owners = owners.Where("server_id IS NULL OR server_id=0")
+		} else {
+			owners = owners.Where("1=1")
+		}
+		if err := owners.Update("server_id", id).Error; err != nil {
+			return err
+		}
+		// First registration of an already serving realm keeps its earliest
+		// persisted character date. Empty realms begin at the real current time.
+		// The conflict insert never rewrites a previously configured OpenAt.
+		opened := time.Now().UnixMilli()
+		var first db.Profile
+		err := tx.Select("id", "created_at").Where("server_id=? AND player IS NOT NULL AND created_at>0", id).Order("created_at,id").First(&first).Error
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+		if err == nil && first.CreatedAt != nil {
+			opened = *first.CreatedAt
+		}
+		row := db.AdminGameServer{ID: id, Name: fmt.Sprintf("%d区·灵魂之花", id), Enabled: true, OpenAt: opened, RuntimeBound: true, Revision: 1}
 		if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&row).Error; err != nil {
 			return err
 		}
 		if err := tx.Model(&db.AdminGameServer{}).Where("id=?", id).Update("runtime_bound", true).Error; err != nil {
 			return err
 		}
-		if fresh || newRegistry {
-			return tx.Model(&db.Profile{}).Where("1=1").Update("server_id", id).Error
-		}
-		return tx.Model(&db.Profile{}).Where("server_id IS NULL OR server_id=0").Update("server_id", id).Error
+		return nil
 	})
 }
 func adminGameServerDTO(r db.AdminGameServer) model.AdminGameServerDTO {
@@ -108,8 +127,12 @@ func AdminCreateGameServer(ctx context.Context, p *model.AdminPrincipal, req mod
 		if err := tx.Create(&row).Error; err != nil {
 			return err
 		}
- // A newly planned realm starts with an explicit empty calendar; legacy running realms retain migration compatibility.
- if tx.Migrator().HasTable(&db.AdminActivityScheduleRevision{}){if err:=tx.Create(&db.AdminActivityScheduleRevision{ServerID:row.ID,Revision:1}).Error;err!=nil{return err}}
+		// A newly planned realm starts with an explicit empty calendar; legacy running realms retain migration compatibility.
+		if tx.Migrator().HasTable(&db.AdminActivityScheduleRevision{}) {
+			if err := tx.Create(&db.AdminActivityScheduleRevision{ServerID: row.ID, Revision: 1}).Error; err != nil {
+				return err
+			}
+		}
 		return adminAudit(tx, p, "server.create", fmt.Sprint(row.ID), req.Name)
 	})
 	if err != nil {

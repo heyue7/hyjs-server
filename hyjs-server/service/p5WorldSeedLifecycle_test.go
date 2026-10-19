@@ -117,7 +117,7 @@ func TestP5OriginalWorldSeedFullLifecycle(t *testing.T) {
 					continue
 				}
 				stamp++
-				request := &pb.CSLightenWorldSeed{Id: proto.Int32(nodeID)}
+				request := &pb.CSLightenWorldSeed{Id: proto.Int32(nodeID - 1)}
 				out, err := s.lightenWorldSeed(requestContext(request), account.Id, request, stamp)
 				if err != nil {
 					t.Fatal("original worldseed node", nodeID, err)
@@ -144,7 +144,7 @@ func TestP5OriginalWorldSeedFullLifecycle(t *testing.T) {
 			if g.Equipment[0].GetGuid() != equip.GetGuid() || g.Equipment[0].GetLastHeroId() != w.GetId() {
 				t.Fatal("equipment ownership lost during original quality transitions")
 			}
-			if _, err = s.lightenWorldSeed(ctx, account.Id, &pb.CSLightenWorldSeed{Id: proto.Int32(86)}, stamp+1); err == nil {
+			if _, err = s.lightenWorldSeed(ctx, account.Id, &pb.CSLightenWorldSeed{Id: proto.Int32(85)}, stamp+1); err == nil {
 				t.Fatal("past original worldseed85 accepted")
 			}
 			training := &pb.CSWarriorTraining{Guid: w.Guid, CostType: proto.Int32(3), NumType: proto.Int32(1)}

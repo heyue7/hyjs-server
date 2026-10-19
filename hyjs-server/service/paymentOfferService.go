@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"math"
 	"sort"
 	"strconv"
 	"strings"
@@ -42,7 +43,9 @@ func (s *GameService) paymentOffer(ctx context.Context, id int64, request proto.
 			if err := s.adminCDKEligible(tx, code, now); err != nil {
 				return err
 			}
-			if code.Source == "" || code.Limit < 1 || code.Used < 0 || code.Used >= code.Limit || now.UnixMilli() >= code.ExpiresAt || (code.DemoOnly && (!strings.HasPrefix(row.Uid, "demo-") || row.Id == 1)) {
+			// Only operator CDKs opt into the zero-quota policy; existing legacy zero-limit codes remain closed.
+			unlimitedClaims := code.Limit == 0 && strings.HasPrefix(code.Source, "admin-cdk:")
+			if code.Source == "" || code.Limit < 0 || code.Limit == 0 && !unlimitedClaims || code.Used < 0 || code.Used == math.MaxInt64 || !unlimitedClaims && code.Used >= code.Limit || now.UnixMilli() >= code.ExpiresAt || (code.DemoOnly && (!strings.HasPrefix(row.Uid, "demo-") || row.Id == 1)) {
 				return errors.New(constUtil.P3PaymentUnavailable)
 			}
 			gain, err := s.p3Claim(tx, p, g, "gift:"+code.Hash, "lifetime", code.Reward, now)

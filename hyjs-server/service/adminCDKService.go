@@ -162,7 +162,7 @@ func (s *GameService) AdminUpdateCDK(ctx context.Context, actor *model.AdminPrin
 		if adminCDKProjection(meta, code).Version != req.Version {
 			return constUtil.ErrAdminConfigConflict
 		}
-		if req.TotalLimit < code.Used || code.Used > 0 && reward != code.Reward {
+		if req.TotalLimit > 0 && req.TotalLimit < code.Used || code.Used > 0 && reward != code.Reward {
 			return constUtil.ErrAdminConfigConflict
 		}
 		code.Reward = reward

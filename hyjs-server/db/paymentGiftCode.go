@@ -5,7 +5,7 @@ type PaymentGiftCode struct {
 	Hash      string `gorm:"primaryKey;size:64" json:"-"`
 	Reward    string `gorm:"type:text;not null" json:"reward"`
 	ExpiresAt int64  `gorm:"not null" json:"expires_at"`
-	Limit     int64  `gorm:"not null" json:"limit"`
+	Limit     int64  `gorm:"not null" json:"limit"` // Operator CDKs: 0=unlimited; legacy codes require positive quota.
 	Used      int64  `gorm:"not null" json:"used"`
 	DemoOnly  bool   `gorm:"not null" json:"demo_only"`
 	Source    string `gorm:"type:text;not null" json:"source"`

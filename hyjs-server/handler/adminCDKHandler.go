@@ -69,7 +69,7 @@ func AdminCDKCreateHandler(c *gin.Context) {
 		}
 		return true
 	}
-	if req.Name == "" || utf8.RuneCountInString(req.Name) > 80 || req.Reason == "" || len(req.Reason) > 1000 || req.Count < 1 || req.Count > 500 || req.TotalLimit < 1 || req.TotalLimit > 1000000 || len(req.Prefix) > 12 || !validASCII(req.Prefix) || req.Code != "" && (req.Count != 1 || len(req.Code) < 4 || len(req.Code) > 128 || !validASCII(req.Code)) || !req.Unlimited && (req.StartAt <= 0 || req.EndAt <= req.StartAt) || len(req.Rewards) < 1 || len(req.Rewards) > 100 {
+	if req.Name == "" || utf8.RuneCountInString(req.Name) > 80 || req.Reason == "" || len(req.Reason) > 1000 || req.Count < 1 || req.Count > 500 || req.TotalLimit < 0 || req.TotalLimit > 1000000 || len(req.Prefix) > 12 || !validASCII(req.Prefix) || req.Code != "" && (req.Count != 1 || len(req.Code) < 4 || len(req.Code) > 128 || !validASCII(req.Code)) || !req.Unlimited && (req.StartAt <= 0 || req.EndAt <= req.StartAt) || len(req.Rewards) < 1 || len(req.Rewards) > 100 {
 		adminError(c, constUtil.ErrAdminInput)
 		return
 	}
@@ -111,7 +111,7 @@ func AdminCDKUpdateHandler(c *gin.Context) {
 	}
 	req.Name = strings.TrimSpace(req.Name)
 	req.Reason = strings.TrimSpace(req.Reason)
-	if req.Name == "" || utf8.RuneCountInString(req.Name) > 80 || req.Reason == "" || len(req.Reason) > 1000 || len(req.Version) != 64 || req.TotalLimit < 1 || req.TotalLimit > 1000000 || !req.Unlimited && (req.StartAt <= 0 || req.EndAt <= req.StartAt) || len(req.Rewards) < 1 || len(req.Rewards) > 100 {
+	if req.Name == "" || utf8.RuneCountInString(req.Name) > 80 || req.Reason == "" || len(req.Reason) > 1000 || len(req.Version) != 64 || req.TotalLimit < 0 || req.TotalLimit > 1000000 || !req.Unlimited && (req.StartAt <= 0 || req.EndAt <= req.StartAt) || len(req.Rewards) < 1 || len(req.Rewards) > 100 {
 		adminError(c, constUtil.ErrAdminInput)
 		return
 	}

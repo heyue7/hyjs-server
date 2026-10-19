@@ -13,12 +13,14 @@ import (
 func (s *GameService) lightenWorldSeed(ctx context.Context, id int64, b *pb.CSLightenWorldSeed, stamp int64) ([]proto.Message, error) {
 	response := &pb.SCLightenWorldSeed{}
 	return s.p5Mutation(ctx, id, "world-seed", stamp, b, response, func(_ *gorm.DB, p *pb.Player, g *model.GameState) error {
-		if b.GetId() != p.GetCurrentWorldSeedId()+1 {
+		// 原入口发送已解锁层数，成功回调再递增；目标节点由服务端推进一层。
+		if b.GetId() != p.GetCurrentWorldSeedId() {
 			return p5Error()
 		}
+		targetID := p.GetCurrentWorldSeedId() + 1
 		var row map[string]string
 		for _, r := range s.Tables["WorldSeed"] {
-			if p5SeedID(r) == b.GetId() {
+			if p5SeedID(r) == targetID {
 				row = r
 				break
 			}
@@ -86,7 +88,7 @@ func (s *GameService) lightenWorldSeed(ctx context.Context, id int64, b *pb.CSLi
 		default:
 			return p5Error()
 		}
-		p.CurrentWorldSeedId = proto.Int32(b.GetId())
+		p.CurrentWorldSeedId = proto.Int32(targetID)
 		response.Cost = costs
 		return nil
 	})

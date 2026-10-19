@@ -2,6 +2,7 @@ import { api, json } from './operations';
 import type { ResourceAmount } from './operations';
 export interface CDK {
   id: string; name: string; codeHint: string; enabled: boolean; unlimited: boolean;
+  // totalLimit=0: 不限总兑换次数；unlimited 仅表示不限有效期。
   startAt: number; endAt: number; totalLimit: number; used: number;
   rewards: ResourceAmount[]; version: string; createdAt: number | string;
 }

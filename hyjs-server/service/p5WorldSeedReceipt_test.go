@@ -39,7 +39,7 @@ func TestP5WorldSeedReceiptCurrentNodeIdentityGrowthAndCold(t *testing.T) {
 	}
 	call := func(node int32) (proto.Message, *pb.CSLightenWorldSeed) {
 		t.Helper()
-		r := &pb.CSLightenWorldSeed{Id: proto.Int32(node)}
+		r := &pb.CSLightenWorldSeed{Id: proto.Int32(node - 1)}
 		out, e := f.s.lightenWorldSeed(ctx(r), f.id, r, int64(node)+810000)
 		if e != nil {
 			t.Fatal("actual original seed node", node, e)
@@ -97,7 +97,7 @@ func TestP5WorldSeedReceiptCurrentNodeIdentityGrowthAndCold(t *testing.T) {
 		t.Helper()
 		beforeP, beforeG := f.profile(t)
 		before, _ := json.Marshal(beforeG)
-		if _, e := f.s.lightenWorldSeed(ctx(req), f.id, req, int64(req.GetId())+810000); e == nil {
+		if _, e := f.s.lightenWorldSeed(ctx(req), f.id, req, int64(req.GetId())+810001); e == nil {
 			t.Fatal("stale original seed callback accepted", req)
 		}
 		afterP, afterG := f.profile(t)

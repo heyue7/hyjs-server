@@ -110,7 +110,7 @@ func TestP5WorldSeedSupplyActualPurchaseNodeCostsFrozenAndCold(t *testing.T) {
 		t.Fatal(err)
 	}
 	for node := int32(2); node <= 4; node++ {
-		out, e := f.s.lightenWorldSeed(f.ctx, f.id, &pb.CSLightenWorldSeed{Id: proto.Int32(node)}, int64(29200+node))
+		out, e := f.s.lightenWorldSeed(f.ctx, f.id, &pb.CSLightenWorldSeed{Id: proto.Int32(node - 1)}, int64(29200+node))
 		if e != nil {
 			t.Fatal(e)
 		}
