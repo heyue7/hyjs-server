@@ -6,6 +6,13 @@ namespace HYJS.WelfareFeedback
 {
  public static class FeedbackBridge
  {
+  // The guide uses a pale native title strip. Keep its original font and size.
+  public static void GuideTitle(AcRechargeSingleItem item)
+  {
+   if(item!=null&&(int)item.type==32&&item.labTitle!=null)
+    item.labTitle.color=new Color(0.22f,0.22f,0.22f,1f);
+  }
+
   // Move a newly claimed item into the claimed bucket without resetting scroll.
   public static void AchievementClaimed(AchievementItem item)
   {

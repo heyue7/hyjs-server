@@ -58,6 +58,13 @@ func TestP5FormationOriginalWireDispatchAndCold(t *testing.T) {
 	if !ok || view.GetFormation() == nil {
 		t.Fatal("original 82000 selected template", selected)
 	}
+	if len(view.Formation.PosInfoList) != 2 {
+		t.Fatal("original popup must reserve remaining coordinates for empty models", view)
+	}
+	_, saved := f.profile(t)
+	if len(saved.TacticalFormations[0].PosInfoList) != len(f.s.tacticalPositions("1")) {
+		t.Fatal("native view removed saved empty-position mappings")
+	}
 	positions := map[int32]int32{}
 	for _, position := range view.GetFormation().GetPosInfoList() {
 		positions[position.GetFormatPos()] = position.GetBattlePos()
@@ -81,6 +88,9 @@ func TestP5FormationOriginalWireDispatchAndCold(t *testing.T) {
 	changed, ok := replies[0].(*pb.SCTaticalFormationChange)
 	if !ok || changed.GetFormation() == nil {
 		t.Fatal("original drag 82002 must return 82003", replies)
+	}
+	if len(changed.Formation.PosInfoList) != 2 {
+		t.Fatal("original drag reply included empty camps", changed)
 	}
 	// The original success callback then sends one-way TCP 30094. Its legacy
 	// old/new strings must never be trusted to revive the dead camp or replay HP.

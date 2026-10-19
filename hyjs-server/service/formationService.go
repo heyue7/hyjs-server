@@ -471,7 +471,7 @@ func (s *GameService) tacticalFormationGet(ctx context.Context, id int64, b *pb.
 				formation = proto.Clone(existing).(*pb.TaticalFormation)
 			}
 		}
-		result = &pb.SCGetTaticalFormation{Formation: formation}
+		result = &pb.SCGetTaticalFormation{Formation: tacticalFormationView(g, formation)}
 		return nil
 	})
 	return []proto.Message{result}, err
@@ -776,7 +776,7 @@ func (s *GameService) tacticalFormationChangeApply(player *pb.Player, g *model.G
 			if err := s.changeTacticalPositions(player, g, tactical, b.GetFormation()); err != nil {
 				return err
 			}
-			result.Formation = proto.Clone(tactical).(*pb.TaticalFormation)
+			result.Formation = tacticalFormationView(g, tactical)
 			return nil
 		}
 	}
