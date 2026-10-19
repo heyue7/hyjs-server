@@ -18,7 +18,7 @@ func TestPlayerDisplaySystemOnly(t *testing.T) {
 	if tabs.GetActivityList()[0].GetName() != "开工挑战" || tabs.GetActivityList()[0].GetActivityId() != "ReID" || strings.Contains(info.GetInformation(), "Re") || player.GetName() != "Re小白" {
 		t.Fatal("display scope", tabs, info, player)
 	}
-	if PlayerDisplayName("Reina") != "Reina" || PlayerDisplayName("Re · 招财猫") != "招财猫" {
+	if PlayerDisplayName("Reina") != "Reina" || PlayerDisplayName("Re · 招财猫") != "招财猫" || PlayerDisplayName("月光餐厅 · Re规则") != "月光餐厅" || playerDisplayText("月光餐厅 · Re规则") != "月光餐厅" {
 		t.Fatal("name cleanup boundary")
 	}
 }

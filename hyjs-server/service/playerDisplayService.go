@@ -11,6 +11,8 @@ import (
 
 // PlayerDisplayName 清理旧导入内容的展示前缀，原ID、来源和冻结配置保持不变。
 func PlayerDisplayName(value string) string {
+	value = strings.TrimSuffix(value, " · Re规则")
+	value = strings.TrimSuffix(value, "·Re规则")
 	if !strings.HasPrefix(value, "Re") {
 		return value
 	}
@@ -63,6 +65,7 @@ func SanitizePlayerDisplay(messages []proto.Message) {
 
 // playerDisplayText 仅供上方系统文案白名单处理嵌入的旧活动名。
 func playerDisplayText(value string) string {
+	value = PlayerDisplayName(value)
 	runes := []rune(value)
 	out := make([]rune, 0, len(runes))
 	for i := 0; i < len(runes); i++ {
