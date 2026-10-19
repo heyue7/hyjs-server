@@ -307,7 +307,7 @@ function qualificationLines(row: ShopProduct) {
 const columns = computed<DataTableColumns<ShopProduct>>(() => [
   {
     title: '图片', key: 'image', width: 72,
-    render: row => h('div', { class: 'shop-cell-stack' }, row.rewards.map(reward => h(ResourceImage, { item: catalogue.value[reward.resourceId], size: 34 })))
+    render: row => h('div', { class: 'shop-cell-stack' }, row.rewards.map(reward => h(ResourceImage, { item: catalogue.value[reward.resourceId], size: 34, lazy: props.shopId !== 'vip' })))
   },
   {
     title: '商品名称', key: 'name', minWidth: 225,

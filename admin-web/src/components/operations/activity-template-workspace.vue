@@ -3,7 +3,7 @@ import ContextHelp from './context-help.vue';
 import { computed, h, onMounted, onUnmounted, ref } from 'vue';
 import { onBeforeRouteLeave } from 'vue-router';
 import { NButton, NSpace, NTag } from 'naive-ui';
-import type { DataTableColumns } from 'naive-ui';
+import type { DataTableColumns, DialogReactive } from 'naive-ui';
 import { api, errorMessage, json } from '@/service/operations';
 import type { ActivityDefinition } from '@/service/activity-schedules';
 import { activityRepeatLabel, activityRepeatPolicy, deleteActivityTemplate, newActivityForm } from '@/service/activity-operations';
@@ -115,25 +115,44 @@ function changeMode(mode: string) {
     claimDays.value = 1;
   }
 }
+let pendingDiscard: { promise: Promise<boolean>; dispose: () => void } | null = null;
 function confirmDiscard(): Promise<boolean> {
   if (busy.value) return Promise.resolve(false);
   if (!dirty.value) return Promise.resolve(true);
-  return new Promise(resolve => {
-    if (!window.$dialog) {
-      resolve(false);
-      return;
-    }
-    window.$dialog.warning({
-      title: '放弃未保存的模板修改？',
-      content: '已发布的区服排期不会受到影响。',
-      positiveText: '放弃修改',
-      negativeText: '继续编辑',
-      onPositiveClick: () => resolve(true),
-      onNegativeClick: () => resolve(false),
-      onClose: () => resolve(false),
-      onMaskClick: () => resolve(false)
-    });
+  if (pendingDiscard) return pendingDiscard.promise;
+  if (!window.$dialog) return Promise.resolve(false);
+  let resolveConfirmation!: (accepted: boolean) => void;
+  const promise = new Promise<boolean>(resolve => { resolveConfirmation = resolve; });
+  let accepted = false;
+  let decided = false;
+  let settled = false;
+  let dialog: DialogReactive;
+  const settle = (value: boolean) => {
+    if (settled) return;
+    settled = true;
+    pendingDiscard = null;
+    resolveConfirmation(value);
+  };
+  const dismiss = (value: boolean) => {
+    if (!decided) { accepted = value; decided = true; }
+    dialog.destroy();
+    return false;
+  };
+  dialog = window.$dialog.warning({
+    title: '放弃未保存的模板修改？',
+    content: '已发布的区服排期不会受到影响。',
+    positiveText: '放弃修改',
+    negativeText: '继续编辑',
+    onPositiveClick: () => dismiss(true),
+    onNegativeClick: () => dismiss(false),
+    onClose: () => dismiss(false),
+    onMaskClick: () => dismiss(false),
+    onEsc: () => dismiss(false),
+    // Release the editor/route only after this dialog has left the provider.
+    onAfterLeave: () => settle(accepted)
   });
+  pendingDiscard = { promise, dispose: () => { dialog.destroy(); settle(false); } };
+  return promise;
 }
 async function close() {
   if (!busy.value && (await confirmDiscard())) {
@@ -273,7 +292,10 @@ onMounted(() => {
   window.addEventListener('beforeunload', beforeUnload);
   load();
 });
-onUnmounted(() => window.removeEventListener('beforeunload', beforeUnload));
+onUnmounted(() => {
+  pendingDiscard?.dispose();
+  window.removeEventListener('beforeunload', beforeUnload);
+});
 </script>
 
 <template>

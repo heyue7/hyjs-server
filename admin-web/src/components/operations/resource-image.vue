@@ -2,10 +2,11 @@
 import { computed } from 'vue';
 import { resourceImage } from '@/service/operations';
 import type { Item } from '@/service/operations';
-const props = withDefaults(defineProps<{ item?: Item | null; size?: number; preview?: boolean }>(), {
+const props = withDefaults(defineProps<{ item?: Item | null; size?: number; preview?: boolean; lazy?: boolean }>(), {
   item: null,
   size: 44,
-  preview: true
+  preview: true,
+  lazy: true
 });
 const src = computed(() => resourceImage(props.item));
 </script>
@@ -20,7 +21,7 @@ const src = computed(() => resourceImage(props.item));
     :height="size"
     object-fit="contain"
     :preview-disabled="!preview"
-    lazy
+    :lazy="lazy"
     class="resource-thumb"
   >
     <template #error>
