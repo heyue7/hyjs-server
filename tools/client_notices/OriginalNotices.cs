@@ -240,7 +240,9 @@ namespace HYJS.Notices
             label.effectColor = template.effectColor;
             label.effectDistance = template.effectDistance;
             label.depth = baseDepth + 4;
-            label.pivot = UIWidget.Pivot.TopLeft;
+            // rawPivot retains the explicit top-left layout coordinates. The
+            // normal pivot setter moves the transform to preserve old corners.
+            label.rawPivot = UIWidget.Pivot.TopLeft;
             label.alignment = NGUIText.Alignment.Left;
             label.supportEncoding = false;
             label.maxLineCount = 0;
