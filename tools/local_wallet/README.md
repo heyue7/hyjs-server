@@ -66,3 +66,9 @@ Unity stub只进独立编译classpath；D8仅接收钱包class，验证其定义
 最终整包f5006a54已安装，UI r7仅补48dp浮球自身的系统手势排除。左右普通拖动/半露圆形/闲置透明/打开、金额草稿与冷登88元通过。活动/时间三区和原开服第二天、单项新期刷新已原机通过；后端407cb04已发布，73受影响域与真实MySQL/HTTP整链通过。当前支持30活动类型，6项明确未开放。日期±1/恢复已验；登录奖励仍需原真实重登。
 
 原输入IME适配修改了classes.dex中的四个键盘类，详见`tools/modern_ime/README.md`；r6/r7仅UI升级时继承已验classes.dex/classes3.dex和原managed全部字节。上方“保持原classes.dex”的首次钱包安装步骤适用于68cc基线，不能作为后续IME整包未改原DEX的声明。原机证据入口：`analysis/growth-first-20261016/modern-ime/native-r7-20261016/summary.json`。
+
+## 2026-10-19 拖动窗口修复
+
+浮球改由48dp应用内子窗口承载，保持非聚焦与非模态，不需要系统悬浮权限；登录/注册、钱包与账单Dialog按其token挂接并在关闭后回退。全屏主宿主只提供稳定坐标，拖动移动实际小窗口，停靠半球在小窗口内裁切。
+
+旧Decor手绘r1在真机保持DOWN跨屏时仍不可见，已明确作废；r2原机验证了同一次DOWN经过中央/右上/左下/左上、再次DOWN长拖、半球停靠与闲置透明、纯Unity和原生登录/注册/钱包面板、IME不丢焦点。当前APK只替换classes2.dex，其余10296项压缩载荷、托管程序集与547引擎方法保持。原机未提交登录或注册，已有加密登录缓存字节保持。证据见analysis/wallet-drag-20261019/phone-r2/final.json，打包用本目录package_overlay.py和固定SHA的DEX-only输出。

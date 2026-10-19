@@ -11,6 +11,7 @@ import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.Rect;
+import android.graphics.PixelFormat;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.RippleDrawable;
@@ -51,6 +52,7 @@ import java.net.URI;
 import java.net.URL;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collections;
 import java.util.Locale;
@@ -86,6 +88,12 @@ public final class WalletActivity extends UnityPlayerActivity {
     private final ExecutorService network=Executors.newSingleThreadExecutor();
     private FrameLayout overlay;
     private View bubble;
+    private FrameLayout bubbleWindow;
+    private WindowManager bubbleWindowManager;
+    private View bubbleWindowAnchor;
+    private final ArrayList<View> bubbleWindowAnchors=new ArrayList<View>();
+    private float bubbleX,bubbleY;
+    private ValueAnimator bubbleDockAnimation;
     private Dialog panel;
     private LinearLayout shell;
     private EditText amount;
@@ -130,17 +138,9 @@ public final class WalletActivity extends UnityPlayerActivity {
         private boolean moved, longDragTraced;
         private final int[] screenPosition=new int[2];
         WalletOverlay(){super(WalletActivity.this);}
-        @Override protected void dispatchDraw(Canvas canvas){
-            if(bubble==null || bubble.getWidth()==0 || bubble.getHeight()==0)return;
-            // The full-screen host owns drawing and clipping. Do not replay a
-            // translated child RenderNode whose cached local clip can hide an
-            // icon midway through a long drag above Unity's SurfaceView.
-            int saved=canvas.save();canvas.clipRect(bubbleBounds());
-            float x=bubble.getX(),y=bubble.getY();
-            int alpha=Math.max(0,Math.min(255,Math.round(bubble.getAlpha()*255)));
-            if(alpha<255)canvas.saveLayerAlpha(x,y,x+bubble.getWidth(),y+bubble.getHeight(),alpha);
-            canvas.translate(x,y);bubble.draw(canvas);canvas.restoreToCount(saved);
-        }
+        // This host supplies stable activity coordinates only. The actual icon
+        // and pointer window are a separate 48dp application sub-window.
+        @Override protected void dispatchDraw(Canvas canvas) { }
         boolean dispatchWalletTouch(MotionEvent event){
             int action=event.getActionMasked();
             getLocationOnScreen(screenPosition);
@@ -155,7 +155,7 @@ public final class WalletActivity extends UnityPlayerActivity {
                 pointer=event.getPointerId(0);dragging=true;moved=false;longDragTraced=false;
                 if(getParent()!=null)getParent().requestDisallowInterceptTouchEvent(true);
                 revealBubble();bubble.setPressed(true);
-                downX=x;downY=y;startX=bubble.getX();startY=bubble.getY();
+                downX=x;downY=y;startX=bubbleX;startY=bubbleY;
                 traceBubbleGeometry("down");requestUnbufferedDispatch(event);
                 return true;
             }
@@ -168,7 +168,7 @@ public final class WalletActivity extends UnityPlayerActivity {
                     int next=event.getActionIndex()==0?1:0;
                     pointer=event.getPointerId(next);
                     downX=x+event.getX(next)-event.getX(0);downY=y+event.getY(next)-event.getY(0);
-                    startX=bubble.getX();startY=bubble.getY();moved=true;return true;
+                    startX=bubbleX;startY=bubbleY;moved=true;return true;
                 }
                 if(action==MotionEvent.ACTION_MOVE || action==MotionEvent.ACTION_UP){
                     float dx=x+event.getX(index)-event.getX(0)-downX,dy=y+event.getY(index)-event.getY(0)-downY;
@@ -176,8 +176,8 @@ public final class WalletActivity extends UnityPlayerActivity {
                     if(Math.hypot(dx,dy)>slop)moved=true;
                     if(moved){
                         Rect bounds=bubbleBounds();
-                        bubble.setX(Math.max(bounds.left,Math.min(bounds.right-bubble.getWidth(),startX+dx)));
-                        bubble.setY(clampBubbleY(startY+dy,bounds));updateBubbleGestureExclusion();invalidate();
+                        setBubblePosition(Math.max(bounds.left,Math.min(bounds.right-dp(48),startX+dx)),clampBubbleY(startY+dy,bounds));
+                        updateBubbleGestureExclusion();invalidate();
                         if(!longDragTraced && Math.hypot(dx,dy)>dp(160)){longDragTraced=true;traceBubbleGeometry("long-move");}
                     }
                     if(action==MotionEvent.ACTION_UP)finish(!moved);
@@ -195,17 +195,12 @@ public final class WalletActivity extends UnityPlayerActivity {
             if(getParent()!=null)getParent().requestDisallowInterceptTouchEvent(false);
             bubble.setPressed(false);traceBubbleGeometry(click?"click":"finish");
             if(click){bubble.performClick();return;}
-            Rect bounds=bubbleBounds();dockRight=bubble.getX()+bubble.getWidth()/2f>=(bounds.left+bounds.right)/2f;
+            Rect bounds=bubbleBounds();dockRight=bubbleX+dp(48)/2f>=(bounds.left+bounds.right)/2f;
             foldBubble(true);scheduleDim();
         }
     }
 
-    @Override public boolean dispatchTouchEvent(MotionEvent event){
-        // Capture the wallet at the activity boundary before Unity/decor dispatch.
-        // Touches starting anywhere else keep their original game routing.
-        if(overlay instanceof WalletOverlay && ((WalletOverlay)overlay).dispatchWalletTouch(event))return true;
-        return super.dispatchTouchEvent(event);
-    }
+    @Override public boolean dispatchTouchEvent(MotionEvent event){return super.dispatchTouchEvent(event);}
 
     @Override protected void onCreate(Bundle state){
         try { LocalAssetOverlay.synchronize(this); } catch(java.io.IOException failure) { throw new IllegalStateException("本地游戏资源刷新失败", failure); }
@@ -221,6 +216,8 @@ public final class WalletActivity extends UnityPlayerActivity {
     @Override protected void onDestroy(){
         destroyed=true;if(current==this)current=null;
         if(bubble!=null){bubble.removeCallbacks(dimBubble);bubble.animate().cancel();}
+        if(bubbleDockAnimation!=null)bubbleDockAnimation.cancel();
+        removeBubbleWindow();bubbleWindowAnchors.clear();
         if(panel!=null)panel.dismiss();network.shutdownNow();super.onDestroy();
     }
     private int dp(float n){return Math.round(n*getResources().getDisplayMetrics().density);}
@@ -251,11 +248,20 @@ public final class WalletActivity extends UnityPlayerActivity {
         ImageView icon=new CircularWalletIcon(this);icon.setContentDescription("蓝绿钱包，点击展开，拖动位置");icon.setScaleType(ImageView.ScaleType.CENTER_CROP);
         try{InputStream in=getAssets().open("local-wallet/icon.png");BitmapFactory.Options options=new BitmapFactory.Options();options.inSampleSize=4;Bitmap bitmap=BitmapFactory.decodeStream(in,null,options);in.close();if(bitmap!=null)icon.setImageBitmap(bitmap);}catch(Exception unavailable){icon.setImageResource(android.R.drawable.ic_menu_save);icon.setColorFilter(BLUE);}
         bubble=icon;bubble.setAlpha(.40f);
-        FrameLayout.LayoutParams lp=new FrameLayout.LayoutParams(dp(48),dp(48));lp.gravity=Gravity.TOP|Gravity.LEFT;lp.topMargin=dp(70);overlay.addView(icon,lp);
+        bubbleX=0;bubbleY=dp(70);
+        bubbleWindow=new FrameLayout(this){
+            @Override public boolean dispatchTouchEvent(MotionEvent event){return ((WalletOverlay)overlay).dispatchWalletTouch(event);}
+        };
+        // The 48dp surface moves as a Window; the child never travels through
+        // Unity's main Decor/RenderNode hierarchy and never takes keyboard focus.
+        bubbleWindow.setClipChildren(true);bubbleWindow.setClipToPadding(true);
+        bubbleWindow.addView(icon,new FrameLayout.LayoutParams(dp(48),dp(48),Gravity.TOP|Gravity.LEFT));
+        bubbleWindowManager=(WindowManager)getSystemService(WINDOW_SERVICE);
+        attachWalletWindow(getWindow().getDecorView());
         icon.addOnLayoutChangeListener(new View.OnLayoutChangeListener(){public void onLayoutChange(View v,int l,int t,int r,int b,int ol,int ot,int or,int ob){updateBubbleGestureExclusion();overlay.invalidate();}});
-        // Parent-drawn alpha and docking must redraw throughout the animation,
-        // including Android23–28 where gesture exclusion is unavailable.
-        icon.animate().setUpdateListener(new ValueAnimator.AnimatorUpdateListener(){public void onAnimationUpdate(ValueAnimator animation){updateBubbleGestureExclusion();overlay.invalidate();}});
+        // Opacity remains on the real small-window child; docking moves its
+        // application Window rather than translating across the Unity hierarchy.
+        icon.animate().setUpdateListener(new ValueAnimator.AnimatorUpdateListener(){public void onAnimationUpdate(ValueAnimator animation){updateBubbleGestureExclusion();}});
         icon.setOnClickListener(new View.OnClickListener(){public void onClick(View v){revealBubble();openPanel();}});
         overlay.addOnLayoutChangeListener(new View.OnLayoutChangeListener(){public void onLayoutChange(View v,int l,int t,int r,int b,int ol,int ot,int or,int ob){
             repositionBubble();
@@ -264,6 +270,54 @@ public final class WalletActivity extends UnityPlayerActivity {
             view.post(new Runnable(){public void run(){repositionBubble();}});return insets;
         }});
         overlay.requestApplyInsets();icon.post(new Runnable(){public void run(){repositionBubble();}});
+    }
+    /** Keep the icon above the current app-owned dialog without overlay permission. */
+    public static void attachToNativeWindow(Window window){
+        WalletActivity a=current;if(a!=null && window!=null)a.attachWalletWindow(window.getDecorView());
+    }
+    private void attachWalletWindow(final View decor){
+        if(destroyed || decor==null || bubbleWindowAnchors.contains(decor))return;
+        if(decor==getWindow().getDecorView())bubbleWindowAnchors.add(0,decor);else bubbleWindowAnchors.add(decor);
+        decor.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener(){
+            public void onViewAttachedToWindow(View view){updateBubbleWindow();}
+            public void onViewDetachedFromWindow(View view){bubbleWindowAnchors.remove(view);updateBubbleWindow();}
+        });
+        updateBubbleWindow();
+    }
+    private void removeBubbleWindow(){
+        if(bubbleWindowAnchor==null || bubbleWindowManager==null)return;
+        try{bubbleWindowManager.removeViewImmediate(bubbleWindow);}catch(IllegalArgumentException detached){/* Parent dialog already removed its children. */}
+        bubbleWindowAnchor=null;
+    }
+    private void setBubblePosition(float x,float y){bubbleX=x;bubbleY=y;updateBubbleWindow();}
+    private void updateBubbleWindow(){
+        if(destroyed || bubbleWindow==null || overlay==null || overlay.getWidth()==0)return;
+        View anchor=null;
+        for(int i=bubbleWindowAnchors.size()-1;i>=0;i--){View candidate=bubbleWindowAnchors.get(i);if(candidate.isAttachedToWindow() && candidate.getWindowToken()!=null){anchor=candidate;break;}}
+        if(anchor==null){removeBubbleWindow();return;}
+        Rect handle=bubbleTouchBounds();if(handle.isEmpty())return;
+        int[] origin=new int[2];overlay.getLocationOnScreen(origin);
+        WindowManager.LayoutParams lp=new WindowManager.LayoutParams(dp(48),dp(48),
+            WindowManager.LayoutParams.TYPE_APPLICATION_SUB_PANEL,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE|WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL|WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN|WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+            PixelFormat.TRANSLUCENT);
+        lp.token=anchor.getWindowToken();lp.gravity=Gravity.TOP|Gravity.LEFT;
+        lp.x=origin[0]+handle.left;lp.y=origin[1]+handle.top;
+        lp.softInputMode=WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING;
+        lp.setTitle("HYJSWalletBubble");
+        if(Build.VERSION.SDK_INT>=30)lp.setFitInsetsTypes(0);
+        // Docked half stays clipped inside the safe 48dp handle; the handle itself
+        // remains usable for a new DOWN over either the game or a native dialog.
+        bubble.setTranslationX(bubbleX-handle.left);bubble.setTranslationY(bubbleY-handle.top);
+        if(anchor!=bubbleWindowAnchor){
+            removeBubbleWindow();
+            try{bubbleWindowManager.addView(bubbleWindow,lp);bubbleWindowAnchor=anchor;}
+            catch(WindowManager.BadTokenException detached){/* A closing dialog's attach callback selects its predecessor. */}
+        }else{
+            try{bubbleWindowManager.updateViewLayout(bubbleWindow,lp);}
+            catch(IllegalArgumentException detached){bubbleWindowAnchor=null;}
+        }
+        updateBubbleGestureExclusion();
     }
     private Rect bubbleBounds(){
         if(overlay==null)return new Rect();
@@ -291,32 +345,36 @@ public final class WalletActivity extends UnityPlayerActivity {
         if(overlay==null || bubble==null || !android.util.Log.isLoggable("HYJSWalletDrag",android.util.Log.DEBUG))return;
         Rect visible=new Rect();overlay.getGlobalVisibleRect(visible);
         // Opt-in geometry only: disabled by default; never include login, wallet or session data.
-        android.util.Log.d("HYJSWalletDrag",stage+" host="+overlay.getWidth()+"x"+overlay.getHeight()+" visible="+visible+" safe="+bubbleBounds()+" icon="+bubble.getX()+","+bubble.getY());
+        android.util.Log.d("HYJSWalletDrag",stage+" host="+overlay.getWidth()+"x"+overlay.getHeight()+" visible="+visible+" safe="+bubbleBounds()+" icon="+bubbleX+","+bubbleY);
     }
     private Rect bubbleTouchBounds(){
         Rect safe=bubbleBounds();
         if(bubble==null || safe.isEmpty())return new Rect();
-        int size=Math.max(dp(48),bubble.getWidth()),height=Math.max(dp(48),bubble.getHeight());
-        int left=Math.max(safe.left,Math.min(safe.right-size,Math.round(bubble.getX())));
-        int top=Math.max(safe.top,Math.min(safe.bottom-height,Math.round(bubble.getY())));
+        int size=dp(48),height=dp(48);
+        int left=Math.max(safe.left,Math.min(safe.right-size,Math.round(bubbleX)));
+        int top=Math.max(safe.top,Math.min(safe.bottom-height,Math.round(bubbleY)));
         return new Rect(left,top,Math.min(safe.right,left+size),Math.min(safe.bottom,top+height));
     }
-    private float clampBubbleY(float y,Rect bounds){return Math.max(bounds.top+dp(6),Math.min(bounds.bottom-bubble.getHeight()-dp(6),y));}
+    private float clampBubbleY(float y,Rect bounds){return Math.max(bounds.top+dp(6),Math.min(bounds.bottom-dp(48)-dp(6),y));}
     private void updateBubbleGestureExclusion(){
-        // Keep the visible handle in the overlay's stable coordinate space.
-        // All remaining screen edges retain the system's normal Back gesture.
-        if(Build.VERSION.SDK_INT>=29 && overlay!=null && bubble!=null && bubble.getWidth()>0 && bubble.getHeight()>0)
-            overlay.setSystemGestureExclusionRects(Collections.singletonList(bubbleTouchBounds()));
+        // Only the actual small input window excludes the system Back gesture.
+        if(Build.VERSION.SDK_INT>=29 && bubbleWindow!=null)
+            bubbleWindow.setSystemGestureExclusionRects(Collections.singletonList(new Rect(0,0,dp(48),dp(48))));
     }
     private void repositionBubble(){
-        if(bubble==null || overlay.getWidth()==0)return;bubble.setY(clampBubbleY(bubble.getY(),bubbleBounds()));
+        if(bubble==null || overlay.getWidth()==0)return;setBubblePosition(bubbleX,clampBubbleY(bubbleY,bubbleBounds()));
         if(!dragging){if(panel!=null && panel.isShowing())revealBubble();else foldBubble(false);}updateBubbleGestureExclusion();overlay.invalidate();
     }
-    private void revealBubble(){if(bubble==null)return;bubble.removeCallbacks(dimBubble);bubble.animate().cancel();bubble.setAlpha(1);Rect bounds=bubbleBounds();bubble.setX(Math.max(bounds.left,Math.min(bounds.right-bubble.getWidth(),bubble.getX())));updateBubbleGestureExclusion();}
+    private void revealBubble(){if(bubble==null)return;bubble.removeCallbacks(dimBubble);bubble.animate().cancel();if(bubbleDockAnimation!=null)bubbleDockAnimation.cancel();bubble.setAlpha(1);Rect bounds=bubbleBounds();setBubblePosition(Math.max(bounds.left,Math.min(bounds.right-dp(48),bubbleX)),bubbleY);updateBubbleGestureExclusion();}
     private void foldBubble(boolean animate){
         if(bubble==null || overlay.getWidth()==0)return;bubble.animate().cancel();
-        Rect bounds=bubbleBounds();float x=dockRight?bounds.right-bubble.getWidth()/2f:bounds.left-bubble.getWidth()/2f;
-        if(animate)bubble.animate().x(x).setDuration(160).start();else bubble.setX(x);
+        Rect bounds=bubbleBounds();float x=dockRight?bounds.right-dp(48)/2f:bounds.left-dp(48)/2f;
+        if(bubbleDockAnimation!=null)bubbleDockAnimation.cancel();
+        if(animate){
+            bubbleDockAnimation=ValueAnimator.ofFloat(bubbleX,x);bubbleDockAnimation.setDuration(160);
+            bubbleDockAnimation.addUpdateListener(new ValueAnimator.AnimatorUpdateListener(){public void onAnimationUpdate(ValueAnimator animation){setBubblePosition((Float)animation.getAnimatedValue(),bubbleY);}});
+            bubbleDockAnimation.start();
+        }else setBubblePosition(x,bubbleY);
         updateBubbleGestureExclusion();
     }
     private void scheduleDim(){if(bubble!=null && !destroyed){bubble.removeCallbacks(dimBubble);bubble.postDelayed(dimBubble,1500);}}
@@ -335,7 +393,7 @@ public final class WalletActivity extends UnityPlayerActivity {
             if(event.getAction()==KeyEvent.ACTION_UP){if(keyboardBack){keyboardBack=false;return true;}back();return true;}
             return true;
         }});
-        panel.show();window.setGravity(Gravity.CENTER);
+        panel.show();window.setGravity(Gravity.CENTER);attachWalletWindow(window.getDecorView());
         render();refreshPage();
     }
     private void fitPanel(){
@@ -494,7 +552,7 @@ public final class WalletActivity extends UnityPlayerActivity {
         addFull(outer,center(signedMoney(item.optLong("amountCents")),30,INK),56);
         LinearLayout content=column();ledgerDetailField(content,"交易时间",date(item.optLong("createdAt"),"yyyy年MM月dd日 HH:mm:ss"));ledgerDetailField(content,"流水号",item.optString("id"));ledgerDetailField(content,"关联订单",item.optString("orderId"));ledgerDetailField(content,"入账原因","credit".equals(item.optString("kind"))?item.optString("label"):"");ledgerDetailField(content,"原因编号",item.optString("reasonId"));ledgerDetailField(content,"交易后余额（元）",money(item.optLong("balanceCents")));
         ScrollView scroll=new ScrollView(this);scroll.addView(content);outer.addView(scroll,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,0,1));addFull(outer,action("完成",true,true,new Runnable(){public void run(){detail.dismiss();}}),46);detail.setContentView(outer);
-        Window window=detail.getWindow();if(window!=null){window.setBackgroundDrawableResource(android.R.color.white);window.setDimAmount(.30f);}detail.show();window=detail.getWindow();if(window!=null){window.setLayout(Math.min(dp(430),getResources().getDisplayMetrics().widthPixels-dp(36)),Math.min(dp(560),getResources().getDisplayMetrics().heightPixels-dp(48)));window.setGravity(Gravity.CENTER);}
+        Window window=detail.getWindow();if(window!=null){window.setBackgroundDrawableResource(android.R.color.white);window.setDimAmount(.30f);}detail.show();window=detail.getWindow();if(window!=null)attachWalletWindow(window.getDecorView());if(window!=null){window.setLayout(Math.min(dp(430),getResources().getDisplayMetrics().widthPixels-dp(36)),Math.min(dp(560),getResources().getDisplayMetrics().heightPixels-dp(48)));window.setGravity(Gravity.CENTER);}
     }
     private JSONObject currentOrder(){JSONArray orders=array(wallet,"pendingOrders");for(int i=0;i<orders.length();i++){JSONObject order=orders.optJSONObject(i);if(order!=null && order.optString("orderId").equals(selectedOrderId))return order;}return null;}
     private void renderOrders(LinearLayout body){

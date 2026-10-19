@@ -85,5 +85,6 @@ public final class LoginStyle {
         }
         w.setLayout(panelWidth,panelHeight);
         w.setGravity(Gravity.CENTER);
+        WalletActivity.attachToNativeWindow(w);
     }
 }
