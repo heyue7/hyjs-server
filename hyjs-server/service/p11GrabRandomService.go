@@ -394,6 +394,11 @@ func (s *GameService) DispatchP11GrabRandom(ctx context.Context, id int64, reque
 				return nil, true, pointErr
 			}
 			result[0].(*pb.SCRedPoint).RedPointList = append(result[0].(*pb.SCRedPoint).RedPointList, points.RedPointList...)
+			welfare, welfareErr := s.WelfareAchievementRedPoints(ctx, id)
+			if welfareErr != nil {
+				return nil, true, welfareErr
+			}
+			result[0].(*pb.SCRedPoint).RedPointList = append(result[0].(*pb.SCRedPoint).RedPointList, welfare.RedPointList...)
 		}
 		return result, true, err
 	case *pb.CSGetRandReward:

@@ -124,7 +124,8 @@ func (s *GameService) loadGameplayPool(tx *gorm.DB, key string) (*db.GameplayPoo
 		return nil, nil, constUtil.ErrKingRecruitActivityClosed
 	}
 	if kingRecruit {
-		if err := s.validateKingRecruitActivityPool(cfg, rewards); err != nil {
+		world, _ := tx.Statement.Context.Value(kingRecruitWorldScopeKey{}).(int64)
+		if err := s.validateKingRecruitActivityPool(cfg, rewards, world); err != nil {
 			return nil, nil, err
 		}
 	}

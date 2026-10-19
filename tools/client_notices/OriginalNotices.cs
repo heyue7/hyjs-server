@@ -130,12 +130,9 @@ namespace HYJS.Notices
         UILabel template;
         WWW request;
         List<NoticeEntry> entries = new List<NoticeEntry>();
-        List<UILabel> navigation = new List<UILabel>();
         GameObject root;
         GameObject bodyRoot;
-        UIScrollView leftScroll;
         UIScrollView rightScroll;
-        int selected;
         bool visible;
         string status;
         int baseDepth;
@@ -152,7 +149,6 @@ namespace HYJS.Notices
             background = originalBackground;
             visible = true;
             status = "公告加载中…";
-            selected = 0;
             entries.Clear();
             Build();
             StartCoroutine(Load(url));
@@ -165,7 +161,6 @@ namespace HYJS.Notices
             if (request != null) { request.Dispose(); request = null; }
             if (root != null) { root.SetActive(false); Destroy(root); root = null; }
             bodyRoot = null;
-            navigation.Clear();
         }
 
         void OnDisable() { Close(); }
@@ -287,7 +282,6 @@ namespace HYJS.Notices
         {
             if (!visible || background == null) return;
             if (root != null) { root.SetActive(false); Destroy(root); root = null; }
-            navigation.Clear();
             template = FontTemplate();
             Trace("build template=" + (template != null) + " status=" + status);
             if (template == null) return;
@@ -317,54 +311,37 @@ namespace HYJS.Notices
                 empty.fontSize = 22;
                 return;
             }
-            float leftWidth = width * .27f;
-            float rightLeft = left + leftWidth + 20f;
-            rightWidth = width - leftWidth - 20f;
-            leftScroll = Scroll("AnnouncementTitles", root.transform, left, top, leftWidth, viewHeight);
-            rightScroll = Scroll("AnnouncementContent", root.transform, rightLeft, top, rightWidth, viewHeight);
-            float y = viewHeight / 2f - 8f;
+            // Show all published articles in one full-width native scroll view.
+            // Titles and paragraphs share a left edge; no side navigation is needed.
+            rightWidth = width;
+            rightScroll = Scroll("AnnouncementContent", root.transform, left, top, rightWidth, viewHeight);
+            bodyRoot = Child("Articles", rightScroll.transform, Vector3.zero);
+            float x = -rightWidth / 2f + 12f;
+            float y = viewHeight / 2f - 12f;
+            float textWidth = rightWidth - 28f;
             for (int i = 0; i < entries.Count; i++)
             {
-                int index = i;
-                UILabel label = Label("AnnouncementTitle" + i, leftScroll.transform, -leftWidth / 2f + 10f, y, leftWidth - 24f, entries[i].Title, true, leftScroll);
-                navigation.Add(label);
-                UIEventListener.Get(label.gameObject).onClick = delegate(GameObject ignored) { Select(index); };
-                y -= label.height + 24f;
-            }
-            Select(Mathf.Clamp(selected, 0, entries.Count - 1));
-            leftScroll.ResetPosition();
-        }
-
-        void Select(int index)
-        {
-            if (entries.Count == 0 || rightScroll == null) return;
-            selected = index;
-            for (int i = 0; i < navigation.Count; i++)
-                navigation[i].color = i == selected ? new Color(.68f, .45f, .08f, 1f) : new Color(.21f, .31f, .36f, 1f);
-            if (bodyRoot != null) { bodyRoot.SetActive(false); Destroy(bodyRoot); }
-            bodyRoot = Child("Article", rightScroll.transform, Vector3.zero);
-            float x = -rightWidth / 2f + 8f;
-            float y = viewHeight / 2f - 8f;
-            float width = rightWidth - 24f;
-            UILabel title = Label("Title", bodyRoot.transform, x, y, width, entries[index].Title, true, rightScroll);
-            y -= title.height + 24f;
-            // Bound each label's geometry while preserving every character of a
-            // long article in reading order. NGUI measures with the original font.
-            string text = entries[index].Content;
-            int offset = 0;
-            int part = 0;
-            while (offset < text.Length)
-            {
-                int count = Math.Min(2048, text.Length - offset);
-                if (offset + count < text.Length)
+                UILabel title = Label("Title" + i, bodyRoot.transform, x, y, textWidth, entries[i].Title, true, rightScroll);
+                y -= title.height + 20f;
+                // Bound each text mesh while retaining the complete article and
+                // original line breaks. Native font measurement determines height.
+                string text = entries[i].Content;
+                int offset = 0;
+                int part = 0;
+                while (offset < text.Length)
                 {
-                    int line = text.LastIndexOf('\n', offset + count - 1, count);
-                    if (line >= offset + count / 2) count = line - offset + 1;
-                    if (count > 0 && Char.IsHighSurrogate(text[offset + count - 1])) count--;
+                    int count = Math.Min(2048, text.Length - offset);
+                    if (offset + count < text.Length)
+                    {
+                        int line = text.LastIndexOf('\n', offset + count - 1, count);
+                        if (line >= offset + count / 2) count = line - offset + 1;
+                        if (count > 0 && Char.IsHighSurrogate(text[offset + count - 1])) count--;
+                    }
+                    UILabel paragraph = Label("Text" + i + "_" + part++, bodyRoot.transform, x, y, textWidth, text.Substring(offset, count), false, rightScroll);
+                    y -= paragraph.height + 4f;
+                    offset += count;
                 }
-                UILabel paragraph = Label("Text" + part++, bodyRoot.transform, x, y, width, text.Substring(offset, count), false, rightScroll);
-                y -= paragraph.height + 4f;
-                offset += count;
+                y -= 32f;
             }
             rightScroll.ResetPosition();
         }

@@ -14,6 +14,7 @@ export interface ActivityGameplayOptions extends Record<string, any> {
   rankRewards?: Reward[];
   /** 服务端冻结的原王者池快照，不提供运营编辑入口。 */
   kingPoolSource?: string;
+  kingWorld?: number;
 }
 export interface KingRecruitResource extends Item {
   space: number;
@@ -105,7 +106,7 @@ const milestoneTargets: Record<string, { label: string; unit: string; note?: str
   'plunder-count': { label: '累计夺宝', unit: '次' },
   'hero-collection': { label: '不同英雄数量', unit: '种', note: '相同英雄重复获得不重复计数。' },
   'trial-stars': { label: '试炼星数峰值', unit: '星', note: '按本期试炼星数最高值判断，多轮结果不相加。' },
-  'single-spend': { label: '累计消费钻石', unit: '钻', note: '沿用 Re 此原活动的实际消费资格。' },
+  'single-spend': { label: '累计消费钻石', unit: '钻', note: '按活动期内已实际消费的钻石累计。' },
   'work': { label: '主线胜利次数', unit: '次' },
   'wanted-attempts': { label: '悬赏挑战次数', unit: '次' },
   'wanted-kills': { label: '悬赏击杀次数', unit: '次' },

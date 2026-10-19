@@ -64,12 +64,16 @@ func (s *GameService) p7ScopedStageAvailable(ctx context.Context, tx *gorm.DB, p
 	if err != nil {
 		return false, nil
 	}
-	if cfg.Kind == constUtil.P7RushTrial {
+	if cfg.Kind == constUtil.P7RushTrial || cfg.Source == constUtil.P7ReRushSource {
 		state, e := p7State(tx, player.GetPlayerId(), now)
 		if e != nil {
 			return false, e
 		}
-		attacker, e = s.p7ApplyRushAddition(tx, state, attacker)
+		if cfg.Source == constUtil.P7ReRushSource {
+			attacker, e = s.p7ApplyReRushBonus(tx, state, attacker)
+		} else {
+			attacker, e = s.p7ApplyRushAddition(tx, state, attacker)
+		}
 		if e != nil {
 			return false, e
 		}

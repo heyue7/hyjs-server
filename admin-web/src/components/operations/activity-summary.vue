@@ -62,7 +62,7 @@ function minuteText(value: number) { return value === 1440 ? '24:00' : `${String
       </article>
     </section>
     <section v-if="form.mode === 'king-recruit'" class="activity-summary-section">
-      <KingPrizes :model-value="prizes" readonly />
+      <KingPrizes :world="form.options.kingWorld || 0" :model-value="prizes" readonly />
     </section>
     <section v-else-if="prizes.length" class="activity-summary-section">
       <h3>转盘奖位</h3>

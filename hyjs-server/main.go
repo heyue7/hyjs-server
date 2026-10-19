@@ -140,6 +140,10 @@ func run() error {
 	if err = s.InitializeP2(ctx); err != nil {
 		return err
 	}
+	// 按世界持久化玩家选择，保留原王者次数和幸运值。
+	if err = s.InitializeKingRecruitWorlds(ctx); err != nil {
+		return err
+	}
 	if err = s.InitializeP6(ctx); err != nil {
 		return err
 	}

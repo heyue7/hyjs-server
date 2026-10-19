@@ -136,7 +136,8 @@ func adminActivityDefinitionDTO(row db.AdminActivityDefinition) (model.AdminActi
 	if json.Unmarshal(row.FormJSON, &form) != nil {
 		return model.AdminActivityDefinitionDTO{}, constUtil.ErrAdminConfiguration
 	}
-	return model.AdminActivityDefinitionDTO{ID: row.ID, Name: row.Name, Mode: row.Mode, Form: form, DefaultDays: row.DefaultDays, ClaimDays: row.ClaimDays, Enabled: row.Enabled, Version: adminVersion(row), Availability: model.AdminActivityAvailability{Usable: row.Usable, Reason: row.UnavailableReason, Missing: []string{}}, SourceActivityID: row.SourceActivityID}, nil
+	form.Name = PlayerDisplayName(form.Name)
+	return model.AdminActivityDefinitionDTO{ID: row.ID, Name: PlayerDisplayName(row.Name), Mode: row.Mode, Form: form, DefaultDays: row.DefaultDays, ClaimDays: row.ClaimDays, Enabled: row.Enabled, Version: adminVersion(row), Availability: model.AdminActivityAvailability{Usable: row.Usable, Reason: row.UnavailableReason, Missing: []string{}}, SourceActivityID: row.SourceActivityID}, nil
 }
 
 // AdminActivityDefinitions reads globally reusable forms. No original consumer is switched by a GET.
@@ -461,7 +462,8 @@ func (s *GameService) adminActivityOccurrenceDTO(tx *gorm.DB, row db.AdminActivi
 	}
 	timing := adminActivityTiming(row)
 	startDay, durationDays, claimDays := adminCharacterScheduleDays(row)
-	return model.AdminActivityOccurrenceDTO{Timing: timing, StartDay: startDay, DurationDays: durationDays, ClaimDays: claimDays, Form: form, ID: row.ID, TemplateID: row.TemplateID, TemplateVersion: row.TemplateVersion, Name: row.Name, Mode: row.Mode, StartAt: row.StartAt, EndAt: row.EndAt, ClaimEndAt: row.ClaimEndAt, Lane: row.Lane, Enabled: row.Enabled, Frozen: frozen, Version: adminVersion(row), ConsumerID: row.ConsumerID}, err
+	form.Name = PlayerDisplayName(form.Name)
+	return model.AdminActivityOccurrenceDTO{Timing: timing, StartDay: startDay, DurationDays: durationDays, ClaimDays: claimDays, Form: form, ID: row.ID, TemplateID: row.TemplateID, TemplateVersion: row.TemplateVersion, Name: PlayerDisplayName(row.Name), Mode: row.Mode, StartAt: row.StartAt, EndAt: row.EndAt, ClaimEndAt: row.ClaimEndAt, Lane: row.Lane, Enabled: row.Enabled, Frozen: frozen, Version: adminVersion(row), ConsumerID: row.ConsumerID}, err
 }
 func adminRequireActivityServer(tx *gorm.DB, id int64) error {
 	if !tx.Migrator().HasTable("admin_game_servers") {
@@ -542,7 +544,18 @@ func (s *GameService) AdminActivitySchedule(ctx context.Context, p *model.AdminP
 }
 
 func adminActivityModeSingleton(mode string) bool {
-	return strings.HasPrefix(mode, "shop-window:") || mode == "opening-14" || mode == "turntable" || mode == "king-recruit" || mode == "plunder-count" || mode == "login-rewards" || mode == "limited-sign" || mode == "stamina-meal" || mode == "diamond-rebate" || mode == "treasure-box" || mode == "mystic-shop"
+	return strings.HasPrefix(mode, "king-recruit:") || strings.HasPrefix(mode, "shop-window:") || mode == "opening-14" || mode == "turntable" || mode == "king-recruit" || mode == "plunder-count" || mode == "login-rewards" || mode == "limited-sign" || mode == "stamina-meal" || mode == "diamond-rebate" || mode == "treasure-box" || mode == "mystic-shop"
+}
+
+// Explicit worlds may run together; a legacy rotating pool occupies every world.
+func adminActivityModesConflict(a, b string) bool {
+	if a == b {
+		return true
+	}
+	if strings.HasPrefix(a, "king-recruit:") && strings.HasPrefix(b, "king-recruit:") {
+		return a == "king-recruit:0" || b == "king-recruit:0"
+	}
+	return false
 }
 
 func (s *GameService) adminActivityScheduleCheck(tx *gorm.DB, serverID int64, version string, items []model.AdminActivityOccurrenceDTO) (*model.AdminActivitySchedulePreviewResponse, map[string]db.AdminActivityOccurrence, error) {
@@ -581,6 +594,13 @@ func (s *GameService) adminActivityScheduleCheck(tx *gorm.DB, serverID int64, ve
 			return nil, nil, err
 		}
 		modes[i] = definition.Mode
+		if definition.Mode == constUtil.AdminKingRecruitMode {
+			var f model.AdminActivityForm
+			if json.Unmarshal(definition.FormJSON, &f) != nil {
+				return nil, nil, constUtil.ErrAdminConfiguration
+			}
+			modes[i] = fmt.Sprintf("king-recruit:%d", f.Options.KingWorld)
+		}
 		if definition.Mode == "shop-window" {
 			var f model.AdminActivityForm
 			if json.Unmarshal(definition.FormJSON, &f) != nil {
@@ -622,6 +642,13 @@ func (s *GameService) adminActivityScheduleCheck(tx *gorm.DB, serverID int64, ve
 				return nil, nil, constUtil.ErrAdminConfigConflict
 			}
 			modes[i] = row.Mode
+			if row.Mode == constUtil.AdminKingRecruitMode {
+				var f model.AdminActivityForm
+				if json.Unmarshal(row.FormJSON, &f) != nil {
+					return nil, nil, constUtil.ErrAdminConfiguration
+				}
+				modes[i] = fmt.Sprintf("king-recruit:%d", f.Options.KingWorld)
+			}
 			if row.Mode == "shop-window" {
 				var f model.AdminActivityForm
 				if json.Unmarshal(row.FormJSON, &f) != nil {
@@ -663,7 +690,7 @@ func (s *GameService) adminActivityScheduleCheck(tx *gorm.DB, serverID int64, ve
 		}
 		for j := 0; j < i; j++ {
 			b := items[j]
-			if b.Enabled && modes[j] == modes[i] && adminActivityWindowsOverlap(a, b, modes[i]) {
+			if b.Enabled && adminActivityModesConflict(modes[j], modes[i]) && adminActivityWindowsOverlap(a, b, modes[i]) {
 				add(i, j, "此模式原客户端没有独立实例入口，活动及领奖窗口不能重叠")
 			}
 		}

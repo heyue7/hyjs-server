@@ -87,6 +87,9 @@ func (s *GameService) InitializeP7(ctx context.Context) error {
 	if err := s.InitializeP7RushContinuation(ctx); err != nil {
 		return err
 	}
+	if err := s.InitializeP7ReRush(ctx); err != nil {
+		return err
+	}
 	return tx.Transaction(func(tx *gorm.DB) error {
 		if err := ServerGameClockGuardTransaction(tx); err != nil {
 			return err
@@ -222,7 +225,7 @@ func p7HasPassed(tx *gorm.DB, id int64, task string) (bool, error) {
 // 兼容分支只读取已接受的冻结战斗，不写入03等虚构通关记录或补发奖励。
 func (s *GameService) p7StagePrerequisite(tx *gorm.DB, id int64, stage db.P7RushStageRule) (bool, error) {
 	passed, err := p7HasPassed(tx, id, stage.ConditionTaskID)
-	if err != nil || passed || stage.Kind != constUtil.P7RushElite {
+	if err != nil || stage.Kind != constUtil.P7RushElite || passed && stage.Source != constUtil.P7ReRushSource {
 		return passed, err
 	}
 	original := s.table("RushEliteBoss", "EliteTaskId", stage.TaskID)
@@ -243,6 +246,15 @@ func (s *GameService) p7StagePrerequisite(tx *gorm.DB, id int64, stage db.P7Rush
 	if state.HighFloor < floor {
 		return false, nil
 	}
+	if stage.Source == constUtil.P7ReRushSource {
+		wins, err := p7ReRushRunWins(tx, &state, 1, floor)
+		if err != nil {
+			return false, err
+		}
+		if len(wins) == int(floor) {
+			return true, nil
+		}
+	}
 	var fights []db.P7RushFight
 	if err = tx.Where("player_id=? AND kind=? AND status=? AND diagnostic=? AND run_id > 0", id, constUtil.P7RushTrial, constUtil.P7RushSettled, false).Find(&fights).Error; err != nil {
 		return false, err
@@ -254,7 +266,7 @@ func (s *GameService) p7StagePrerequisite(tx *gorm.DB, id int64, stage db.P7Rush
 		if p6Digest(fight.Rule) != fight.RuleHash || json.Unmarshal(fight.Rule, &rule) != nil || rule.Kind != constUtil.P7RushTrial || rule.TaskID != fight.TaskID || rule.Floor < 1 || rule.Floor > floor || rule.Star < 1 || rule.Star > 3 {
 			continue
 		}
-		if rule.Source != constUtil.P7SectionStageSource && rule.Source != constUtil.P7RushContinuationSource {
+		if rule.Source != constUtil.P7SectionStageSource && rule.Source != constUtil.P7RushContinuationSource && rule.Source != constUtil.P7ReRushSource {
 			continue
 		}
 		end := &pb.CSRushFightEnd{}
@@ -360,7 +372,7 @@ func (s *GameService) P7RushQuery(ctx context.Context, id int64, request proto.M
 			if pending {
 				switch request.(type) {
 				case *pb.CSGetRushInfo:
-					result, e = s.p7PendingRushContinuationInfo(tx, p, state, cfg, now)
+					result, e = s.p7PendingRushContinuationInfo(tx, p, state, cfg, now, pendingStage.Source)
 				case *pb.CSRushCurrentInfo:
 					projected, pe := p7RushContinuationTaskProjection(*pendingStage)
 					if pe != nil {
@@ -377,7 +389,18 @@ func (s *GameService) P7RushQuery(ctx context.Context, id int64, request proto.M
 				return err
 			}
 			var current []db.P7RushStageRule
+			legacyFirst, legacyErr := s.p7ReRushLegacyFirstSection(tx, state)
+			if legacyErr != nil {
+				return legacyErr
+			}
 			for _, stage := range stages {
+				if legacyFirst {
+					allowed, err := s.p7ReRushLegacyStage(tx, state, stage)
+					if err != nil {
+						return err
+					}
+					stage.Enabled = allowed
+				}
 				if stage.Enabled && stage.Floor == state.Floor {
 					if _, err := s.validateP7Stage(stage); err != nil {
 						return err
@@ -393,6 +416,21 @@ func (s *GameService) P7RushQuery(ctx context.Context, id int64, request proto.M
 				}
 			}
 			if len(current) == 0 {
+				reEnabled, reErr := p7ReRushEnabled(tx)
+				if reErr != nil {
+					return reErr
+				}
+				if reEnabled && state.Floor > constUtil.P7ReRushLastFloor {
+					switch request.(type) {
+					case *pb.CSGetRushInfo:
+						result, reErr = s.p7ReRushCompletedInfo(tx, p, state, cfg, now)
+					case *pb.CSRushCurrentInfo:
+						result = &pb.SCRushCurrentInfo{}
+					case *pb.CSRushGetTopSweepInfo:
+						result = &pb.SCRushGetTopSweepInfo{TopFloor: proto.Int32(state.HighFloor)}
+					}
+					return reErr
+				}
 				if _, ok := request.(*pb.CSGetRushInfo); ok {
 					earned, handled, e := s.p7EarnedSectionOnlyInfo(tx, p, state, cfg, now)
 					if e != nil {
@@ -414,6 +452,9 @@ func (s *GameService) P7RushQuery(ctx context.Context, id int64, request proto.M
 				return errors.New(constUtil.P7RushContentMissing)
 			}
 			floorScene := current[0].Scene
+			if current[0].Source == constUtil.P7ReRushSource {
+				floorScene = p7ReRushNavigation(state.Floor)
+			}
 			if !authority && cfg.Enabled {
 				scopedEnabled, err := p7ScopedRushAvailable(tx)
 				if err != nil {
@@ -429,7 +470,9 @@ func (s *GameService) P7RushQuery(ctx context.Context, id int64, request proto.M
 					}
 					// Original RoomRush navigation and actual battle scenery have
 					// separate fields/default assets. Keep stage.Scene for Start.
-					floorScene = constUtil.P7OriginalScopedFloorScene
+					if current[0].Source != constUtil.P7ReRushSource {
+						floorScene = constUtil.P7OriginalScopedFloorScene
+					}
 				}
 			}
 			free, err := s.p7VIP(p, "numPerk2")
@@ -453,12 +496,31 @@ func (s *GameService) P7RushQuery(ctx context.Context, id int64, request proto.M
 				if e != nil {
 					return e
 				}
+				if current[0].Source == constUtil.P7ReRushSource {
+					rewardRe, additionRe, reErr := p7ReRushSectionFlags(tx, state)
+					e = reErr
+					rewardReady, additionReady = max(rewardReady, rewardRe), max(additionReady, additionRe)
+					if e != nil {
+						return e
+					}
+					valid, err := p7ReRushTraderValid(tx, state)
+					if err != nil {
+						return err
+					}
+					if valid {
+						mazeValid = 1
+					}
+				}
 				result = &pb.SCGetRushInfo{IsAdditionNeedGet: proto.Int32(additionReady), IsRewardNeedGet: proto.Int32(rewardReady), IsMustReset: proto.Int32(mustReset), IsMazeTraderValid: proto.Int32(mazeValid), CurFloor: proto.Int32(state.Floor), CurTotalStar: proto.Int32(state.TotalStars), ResetLeftTime: proto.Int32(max(0, free-state.FreeResetUsed)), DiamondRestLeftTime: proto.Int32(max(0, paid-state.PaidResetUsed)), DiamondRestCostNum: proto.Int32(cfg.TrialResetCost), HighRecordFloor: proto.Int32(state.HighFloor), RecordTotalStar: proto.Int32(state.RecordStars), CurFloorSceneName: proto.String(floorScene), WinKey: proto.Int32(current[0].WinKey), WinValue: proto.Int32(current[0].WinValue)}
 			} else if _, ok := request.(*pb.CSRushGetTopSweepInfo); ok {
 				result = &pb.SCRushGetTopSweepInfo{TopFloor: proto.Int32(state.HighFloor)}
 			} else {
 				response := &pb.SCRushCurrentInfo{}
 				for _, stage := range current {
+					if stage.Source == constUtil.P7ReRushSource {
+						response.TaskInfoList = append(response.TaskInfoList, p7ReRushTaskProjection(stage))
+						continue
+					}
 					if stage.Source == constUtil.P7RushContinuationSource {
 						projected, err := p7RushContinuationTaskProjection(stage)
 						if err != nil {
@@ -608,7 +670,14 @@ func (s *GameService) p7Start(ctx context.Context, id int64, request *pb.CSRushF
 		}
 		cfg := stages[0]
 		if !cfg.Enabled {
-			return errors.New(constUtil.P7RushContentMissing)
+			legacy, err := s.p7ReRushLegacyStage(tx, state, cfg)
+			if err != nil {
+				return err
+			}
+			if !legacy {
+				return errors.New(constUtil.P7RushContentMissing)
+			}
+			cfg.Enabled = true
 		}
 		if !diagnostic {
 			allowed, e := s.p7RushContinuationStageAvailable(tx, state, cfg)
@@ -638,6 +707,31 @@ func (s *GameService) p7Start(ctx context.Context, id int64, request *pb.CSRushF
 			}
 			if cfg.Kind == constUtil.P7RushTrial && cfg.Floor != state.Floor {
 				return errors.New("试炼楼层顺序不匹配")
+			}
+			if cfg.Kind == constUtil.P7RushTrial && cfg.Source == constUtil.P7ReRushSource {
+				legacy, err := s.p7ReRushLegacyFirstSection(tx, state)
+				if err != nil {
+					return err
+				}
+				if legacy {
+					return errors.New("请先完成本轮已冻结的原试炼首组")
+				}
+				reward, addition, err := p7ReRushSectionFlags(tx, state)
+				if err != nil {
+					return err
+				}
+				oldReward, err := s.p7SectionRewardFlag(tx, state, LocalPlayNow(ctx))
+				if err != nil {
+					return err
+				}
+				oldAddition, err := s.p7RushAdditionFlag(tx, state, LocalPlayNow(ctx))
+				if err != nil {
+					return err
+				}
+				reward, addition = max(reward, oldReward), max(addition, oldAddition)
+				if reward != 0 || addition != 0 {
+					return errors.New("请先领取本段试炼奖励并选择加成")
+				}
 			}
 			passed, err := s.p7StagePrerequisite(tx, id, cfg)
 			if err != nil {
@@ -672,8 +766,12 @@ func (s *GameService) p7Start(ctx context.Context, id int64, request *pb.CSRushF
 		if err != nil {
 			return err
 		}
-		if !diagnostic && cfg.Kind == constUtil.P7RushTrial {
-			attacker, err = s.p7ApplyRushAddition(tx, state, attacker)
+		if !diagnostic && (cfg.Kind == constUtil.P7RushTrial || cfg.Source == constUtil.P7ReRushSource) {
+			if cfg.Source == constUtil.P7ReRushSource {
+				attacker, err = s.p7ApplyReRushBonus(tx, state, attacker)
+			} else {
+				attacker, err = s.p7ApplyRushAddition(tx, state, attacker)
+			}
 			if err != nil {
 				return err
 			}
@@ -929,6 +1027,9 @@ func (s *GameService) p7End(ctx context.Context, id int64, request *pb.CSRushFig
 
 // P7RushMutation 保留已实现的原次数/重置原子路径；权威与内容门禁关闭时不留下部分消费。
 func (s *GameService) P7RushMutation(ctx context.Context, id int64, request proto.Message, stamp int64) ([]proto.Message, error) {
+	if result, handled, err := s.p7ReRushMutation(ctx, id, request, stamp); handled || err != nil {
+		return result, err
+	}
 	switch request.(type) {
 	case *pb.CSRushAddition, *pb.CSRushAdditionView, *pb.CSRushGetSectionAddition:
 		return s.P7RushAddition(ctx, id, request, stamp, time.Now())
@@ -989,7 +1090,11 @@ func (s *GameService) P7RushMutation(ctx context.Context, id int64, request prot
 				return err
 			}
 		}
-		if !policy.Enabled || (!available && !(domain == "trial-reset" && (failed || completedSection))) {
+		reEnabled, err := p7ReRushEnabled(tx)
+		if err != nil {
+			return err
+		}
+		if !policy.Enabled || (!available && !reEnabled && !(domain == "trial-reset" && (failed || completedSection))) {
 			return errors.New(constUtil.P7RushGateClosed)
 		}
 		var cost []*pb.BaseResource

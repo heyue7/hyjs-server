@@ -121,7 +121,9 @@ func (s *GameService) Dispatch(ctx context.Context, request *model.GamePacket, p
 	if !failed {
 		s.AfterP10SceneRequest(ctx, request.PlayerId, request.Body)
 		s.afterInventoryMailRequest(ctx, request.PlayerId, request.Body, result)
+		s.afterWelfareAchievementRequest(ctx, request.PlayerId, request.Body, result)
 	}
+	SanitizePlayerDisplay(result)
 	return result
 }
 

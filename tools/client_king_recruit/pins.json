@@ -1,0 +1,11 @@
+{
+  "UI.RecruitResultCardItem::SetHeroBuyId": "643245cc64ff83ea4b425ab2dad9d8309d62055cfece2fe35560f2057e0c7e7e",
+  "UI.TabKingsRecruit::OnPreviewBtn": "eb878dea2bc6be6b0898bae54b33c4c29b6a2d1c1f509333e51dac9838ba1551",
+  "UI.TabKingsRecruit::OnRewardBtn": "f2945dff15c4e7de396cae25fcb5f2a45de268c6d58536becb1efa38e1e06457",
+  "UI.TabKingsRecruit::OnBattlePreviewBtn": "8e61e72bdc0d2c8713cebb81a8626c59208aee7636e2bf20e54820662b5e0766",
+  "UI.TabKingsRecruit::OnRecruitOnce": "161a713479d8277e549954ccfb904ea5d471a2ab15350b121796daa6093efb5e",
+  "UI.TabKingsRecruit::OnRecruitTen": "7a44a0f531cd640d0c5aaa2e18ceaf4071f2f52775e375e43c6ed3047c525f39",
+  "UI.TabKingsRecruit::UpdateAll": "6efa89b48072ced6a553bf391554bc65f05b0de508719dd5d3003836d80486f7",
+  "UI.TabKingsRecruit::OnMsgCallback": "b15600d61af2c3b371bc4285f3628cdb20acc9cda042d0d0610d7d9a3a14043d",
+  "UI.TabKingsRecruit::RecruitCallback": "eeedf78f22cc6ff9773c3fddf6c22808873b7ee632f56fdab6e32c2edf9fedd8"
+}

@@ -221,6 +221,10 @@ func (s *GameService) kingConfiguration(tx *gorm.DB, now time.Time) (*db.KingRec
 	if rules.DailyLimit != 50 || rules.LuckLimit != 500 || rules.LuckPerDraw != 10 || rules.RotationMillis != 172800000 {
 		return nil, 0, 0, errors.New("王者运营规则与原客户端不匹配")
 	}
+	if world, _ := tx.Statement.Context.Value(kingRecruitWorldScopeKey{}).(int64); world > 0 && world <= 3 {
+		end, _ := tx.Statement.Context.Value(kingRecruitEndScopeKey{}).(int64)
+		return &rules, int32(world), end, nil
+	}
 	cycle := max(int64(0), (now.UnixMilli()-rules.EpochMillis)/rules.RotationMillis)
 	return &rules, int32(cycle%3 + 1), rules.EpochMillis + (cycle+1)*rules.RotationMillis, nil
 }

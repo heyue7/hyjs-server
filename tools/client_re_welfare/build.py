@@ -109,6 +109,7 @@ def verify(before, after):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--base-apk', type=Path, default=ROOT/'apks/build/hyjs-local.apk')
+    parser.add_argument('--helper-only', action='store_true', help='Recompile the existing helper without altering an already composed main')
     parser.add_argument('--input-managed', type=Path, required=True)
     parser.add_argument('--output-directory', type=Path, required=True)
     args = parser.parse_args()
@@ -140,15 +141,21 @@ def main():
         project = work/'Patch.csproj'
         project.write_text('<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable></PropertyGroup><ItemGroup><Reference Include="dnlib"><HintPath>'+str(dnlib)+'</HintPath></Reference></ItemGroup></Project>')
         run('compile-injector', [dotnet, 'build', project, '--nologo', '--verbosity', 'quiet', '-p:NuGetAudit=false'])
-        run('inject', [dotnet, work/'bin/Debug/net8.0/Patch.dll', host, bridge, out/'Assembly-CSharp.dll'])
+        if args.helper_only:
+            shutil.copy2(host, out/'Assembly-CSharp.dll')
+        else:
+            run('inject', [dotnet, work/'bin/Debug/net8.0/Patch.dll', host, bridge, out/'Assembly-CSharp.dll'])
         consumer = work/'Consumer.cs'
         consumer.write_text('public static class Consumer { public static UI.UIActivityTreasureCast Keep(UI.UIActivityTreasureCast page) { return page; } }')
         run('compile-metadata-consumer', [dotnet, compiler, '/nologo', '/target:library', '/nostdlib+', '/langversion:3', '/out:'+str(work/'Consumer.dll'), '/reference:'+str(out/'Assembly-CSharp.dll'), *['/reference:'+str(r) for r in refs[1:]], consumer])
     after = (out/'Assembly-CSharp.dll').read_bytes()
-    checks = verify(before, after)
+    checks = {'composedMainAllBytesUnchanged': before == after} if args.helper_only else verify(before, after)
+    if args.helper_only:
+        require(before == after, 'Composed main changed in helper-only mode')
+        require(any(str(r.Name) == 'SoulFlowerReWelfare' for r in dnfile.dnPE(data=before).net.mdtables.AssemblyRef.rows), 'Existing welfare hook reference absent')
     report = {'schema': 'hyjs-client-re-welfare-v1', 'status': 'STATIC_VERIFIED_NOT_PACKAGED', 'inputManagedSHA256': sha(before), 'outputManagedSHA256': sha(after), 'bridgeSHA256': sha(bridge.read_bytes()), 'oldUnityProfileCSharp3Compiled': True, 'metadataConsumerCompiled': True, 'deviceExecuted': False, 'replacementEntries': ['assets/bin/Data/Managed/Assembly-CSharp.dll', 'assets/bin/Data/Managed/SoulFlowerReWelfare.dll'], 'sourcePins': {str(p.relative_to(ROOT)): sha(p.read_bytes()) for p in [SOURCE/'ReWelfare.cs', SOURCE/'Injector.cs', SOURCE/'build.py', SOURCE/'target-pins.json']}, **checks}
     (out/'manifest.json').write_text(json.dumps(report, ensure_ascii=False, indent=2)+'\n')
-    print(json.dumps({k: report[k] for k in ['status', 'outputManagedSHA256', 'bridgeSHA256', 'unrelatedInputRawMethodsUnchanged', 'originalEngineMethodsUnchanged']}))
+    print(json.dumps({k: report[k] for k in ['status', 'outputManagedSHA256', 'bridgeSHA256']}))
 
 
 if __name__ == '__main__':

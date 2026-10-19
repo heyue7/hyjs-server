@@ -103,7 +103,7 @@ const turntableNumbers = [
       <p v-if="!options.rankPlaces && rankRewards.length" class="ops-inline-note">奖励草稿已保留，当前不发放。</p>
     </template>
     <template v-else-if="mode === 'king-recruit'">
-      <p class="ops-inline-note">按 SAO、ALO、GGO 原所属世界轮换，价格、保底和轮换间隔沿用原规则。</p>
+      <p class="ops-inline-note">各世界可独立排期并同时开放；价格、每日次数和保底沿用原规则。</p>
     </template>
     <template v-else-if="mode === 'shop-window'">
       <NFormItem label="对应商店" :validation-status="shopStatus ? 'warning' : undefined" :feedback="shopStatus || undefined">

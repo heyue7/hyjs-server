@@ -11,11 +11,12 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--type', action='append', required=True)
     parser.add_argument('--output', type=Path, required=True)
+    parser.add_argument('--assembly',type=Path,default=ROOT / 'analysis/extracted/assets/bin/Data/Managed/Assembly-CSharp.dll')
     args = parser.parse_args()
     output = args.output.resolve()
     if not output.is_relative_to(ROOT / 'analysis'):
         raise RuntimeError('Keep original evidence inside the analysis tree')
-    pe = dnfile.dnPE(str(ROOT / 'analysis/extracted/assets/bin/Data/Managed/Assembly-CSharp.dll'))
+    pe = dnfile.dnPE(str(args.assembly))
     methods, fields = {}, {}
     for owner in pe.net.mdtables.TypeDef.rows:
         name = str(owner.TypeNamespace) + '.' + str(owner.TypeName)

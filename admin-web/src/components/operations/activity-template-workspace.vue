@@ -401,6 +401,7 @@ onUnmounted(() => window.removeEventListener('beforeunload', beforeUnload));
                 :choice="form.mode === 'login-rewards'"
               />
               <KingPrizes
+                v-model:world="form.options.kingWorld"
                 v-else-if="form.mode === 'king-recruit' && selectedMode?.supportsPrizes"
                 v-model="form.prizes"
                 :disabled="busy || readOnly"

@@ -59,6 +59,7 @@ type AdminCoinPrize struct {
 
 // AdminActivityOptions 只包含当前模式原消费者可读的运营参数。
 type AdminActivityOptions struct {
+	KingWorld      int64                 `json:"kingWorld,omitempty"`      // KingWorld selects SAO=1, ALO=2, GGO=3; 0 preserves legacy rotation.
 	DailySpend     int64                 `json:"dailySpend,omitempty"`     // DailySpend 是连续消费每个实际消费日的钻石门槛。
 	KingPoolSource string                `json:"kingPoolSource,omitempty"` // KingPoolSource is a server-generated costType3 fixed-price and rotation snapshot; not an editable reward field.
 	RankPlaces     int64                 `json:"rankPlaces,omitempty"`     // RankPlaces is the power-race award range, 0 disables ranking, 1..1000 enables equal awards within that range.

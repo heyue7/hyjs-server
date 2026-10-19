@@ -188,14 +188,14 @@ func (s *GameService) reActivityForms() []model.AdminActivityForm {
 		mode, name string
 		tiers      []p1PeriodMilestone
 	}{
-		{"login-total", "Re累计登录", []p1PeriodMilestone{{Goal: 1, Rewards: "coin,100000"}, {Goal: 2, Rewards: "item_007,40"}, {Goal: 3, Rewards: "item_010,30"}, {Goal: 4, Rewards: "item_006,60"}, {Goal: 5, Rewards: "item_005,60"}, {Goal: 6, Rewards: "diamond,300"}, {Goal: 7, Rewards: "item_016,5"}}},
-		{"single-spend", "Re消费奖励", []p1PeriodMilestone{{Goal: 600, Rewards: "item_002,10"}, {Goal: 3000, Rewards: "item_006,50"}, {Goal: 9800, Rewards: "item_010,30"}, {Goal: 19800, Rewards: "diamond,300"}, {Goal: 32800, Rewards: "diamond,800"}, {Goal: 64800, Rewards: "diamond,2000"}}},
-		{"arena-wins", "Re竞技胜场", []p1PeriodMilestone{{Goal: 1, Rewards: "item_002,10"}, {Goal: 3, Rewards: "coin,200000"}, {Goal: 5, Rewards: "item_006,50"}, {Goal: 10, Rewards: "item_010,30"}, {Goal: 20, Rewards: "diamond,300"}, {Goal: 50, Rewards: "diamond,800"}}},
-		{"plunder-count", "Re夺宝次数", []p1PeriodMilestone{{Goal: 1, Rewards: "item_002,10"}, {Goal: 3, Rewards: "coin,200000"}, {Goal: 5, Rewards: "item_006,50"}, {Goal: 10, Rewards: "item_010,30"}, {Goal: 20, Rewards: "diamond,300"}, {Goal: 50, Rewards: "diamond,800"}}},
-		{"wanted-attempts", "Re悬赏挑战", []p1PeriodMilestone{{Goal: 1, Rewards: "item_002,10"}, {Goal: 3, Rewards: "coin,200000"}, {Goal: 5, Rewards: "item_006,50"}, {Goal: 10, Rewards: "item_010,30"}, {Goal: 20, Rewards: "diamond,300"}, {Goal: 50, Rewards: "diamond,800"}}},
-		{"wanted-kills", "Re悬赏击杀", []p1PeriodMilestone{{Goal: 1, Rewards: "item_002,10"}, {Goal: 3, Rewards: "coin,200000"}, {Goal: 5, Rewards: "item_006,50"}, {Goal: 10, Rewards: "item_010,30"}, {Goal: 20, Rewards: "diamond,300"}, {Goal: 50, Rewards: "diamond,800"}}},
-		{"copy-win", "Re主线通关", []p1PeriodMilestone{{Goal: 1, Rewards: "item_002,10"}, {Goal: 3, Rewards: "coin,200000"}, {Goal: 5, Rewards: "item_006,50"}, {Goal: 10, Rewards: "item_010,30"}, {Goal: 20, Rewards: "diamond,300"}, {Goal: 50, Rewards: "diamond,800"}}},
-		{"diamond-spent", "Re累计消费", []p1PeriodMilestone{{Goal: 1000, Rewards: "coin,100000"}, {Goal: 5000, Rewards: "item_002,10"}, {Goal: 10000, Rewards: "item_006,50"}, {Goal: 50000, Rewards: "item_010,30"}, {Goal: 100000, Rewards: "diamond,500"}}},
+		{"login-total", "累计登录", []p1PeriodMilestone{{Goal: 1, Rewards: "coin,100000"}, {Goal: 2, Rewards: "item_007,40"}, {Goal: 3, Rewards: "item_010,30"}, {Goal: 4, Rewards: "item_006,60"}, {Goal: 5, Rewards: "item_005,60"}, {Goal: 6, Rewards: "diamond,300"}, {Goal: 7, Rewards: "item_016,5"}}},
+		{"single-spend", "消费奖励", []p1PeriodMilestone{{Goal: 600, Rewards: "item_002,10"}, {Goal: 3000, Rewards: "item_006,50"}, {Goal: 9800, Rewards: "item_010,30"}, {Goal: 19800, Rewards: "diamond,300"}, {Goal: 32800, Rewards: "diamond,800"}, {Goal: 64800, Rewards: "diamond,2000"}}},
+		{"arena-wins", "竞技胜场", []p1PeriodMilestone{{Goal: 1, Rewards: "item_002,10"}, {Goal: 3, Rewards: "coin,200000"}, {Goal: 5, Rewards: "item_006,50"}, {Goal: 10, Rewards: "item_010,30"}, {Goal: 20, Rewards: "diamond,300"}, {Goal: 50, Rewards: "diamond,800"}}},
+		{"plunder-count", "夺宝次数", []p1PeriodMilestone{{Goal: 1, Rewards: "item_002,10"}, {Goal: 3, Rewards: "coin,200000"}, {Goal: 5, Rewards: "item_006,50"}, {Goal: 10, Rewards: "item_010,30"}, {Goal: 20, Rewards: "diamond,300"}, {Goal: 50, Rewards: "diamond,800"}}},
+		{"wanted-attempts", "悬赏挑战", []p1PeriodMilestone{{Goal: 1, Rewards: "item_002,10"}, {Goal: 3, Rewards: "coin,200000"}, {Goal: 5, Rewards: "item_006,50"}, {Goal: 10, Rewards: "item_010,30"}, {Goal: 20, Rewards: "diamond,300"}, {Goal: 50, Rewards: "diamond,800"}}},
+		{"wanted-kills", "悬赏击杀", []p1PeriodMilestone{{Goal: 1, Rewards: "item_002,10"}, {Goal: 3, Rewards: "coin,200000"}, {Goal: 5, Rewards: "item_006,50"}, {Goal: 10, Rewards: "item_010,30"}, {Goal: 20, Rewards: "diamond,300"}, {Goal: 50, Rewards: "diamond,800"}}},
+		{"copy-win", "主线通关", []p1PeriodMilestone{{Goal: 1, Rewards: "item_002,10"}, {Goal: 3, Rewards: "coin,200000"}, {Goal: 5, Rewards: "item_006,50"}, {Goal: 10, Rewards: "item_010,30"}, {Goal: 20, Rewards: "diamond,300"}, {Goal: 50, Rewards: "diamond,800"}}},
+		{"diamond-spent", "累计消费", []p1PeriodMilestone{{Goal: 1000, Rewards: "coin,100000"}, {Goal: 5000, Rewards: "item_002,10"}, {Goal: 10000, Rewards: "item_006,50"}, {Goal: 50000, Rewards: "item_010,30"}, {Goal: 100000, Rewards: "diamond,500"}}},
 	} {
 		form := model.AdminActivityForm{Mode: spec.mode, Name: spec.name, TemplateID: spec.mode + "-original", Source: constUtil.ReActivityCatalogueSource, RepeatPolicy: "repeat", Products: []model.AdminActivityProduct{}, Prizes: []model.AdminActivityPrize{}, Milestones: []model.AdminActivityMilestone{}}
 		for _, tier := range spec.tiers {
@@ -203,12 +203,12 @@ func (s *GameService) reActivityForms() []model.AdminActivityForm {
 		}
 		out = append(out, form)
 	}
-	sign := model.AdminActivityForm{Mode: "limited-sign", Name: "Re限时签到", TemplateID: "limited-sign-original", Source: constUtil.ReActivityCatalogueSource, RepeatPolicy: "repeat", Products: []model.AdminActivityProduct{}, Prizes: []model.AdminActivityPrize{}, Milestones: []model.AdminActivityMilestone{}}
+	sign := model.AdminActivityForm{Mode: "limited-sign", Name: "限时签到", TemplateID: "limited-sign-original", Source: constUtil.ReActivityCatalogueSource, RepeatPolicy: "repeat", Products: []model.AdminActivityProduct{}, Prizes: []model.AdminActivityPrize{}, Milestones: []model.AdminActivityMilestone{}}
 	for day := int32(1); day <= 7; day++ {
 		sign.Milestones = append(sign.Milestones, model.AdminActivityMilestone{Goal: int64(day), Rewards: adminTypedResources(reMonthSignReward(day))})
 	}
 	out = append(out, sign)
-	work := model.AdminActivityForm{Mode: "work", Name: "Re开工挑战", TemplateID: "work-original", Source: constUtil.ReActivityCatalogueSource + " 原开服表前12条非空奖励，真实周主线通关1..12。", RepeatPolicy: "repeat", Products: []model.AdminActivityProduct{}, Prizes: []model.AdminActivityPrize{}, Milestones: []model.AdminActivityMilestone{}}
+	work := model.AdminActivityForm{Mode: "work", Name: "开工挑战", TemplateID: "work-original", Source: constUtil.ReActivityCatalogueSource + " 原开服表前12条非空奖励，真实周主线通关1..12。", RepeatPolicy: "repeat", Products: []model.AdminActivityProduct{}, Prizes: []model.AdminActivityPrize{}, Milestones: []model.AdminActivityMilestone{}}
 	for _, row := range s.Tables["ActivityNewOpen7Day"] {
 		reward := strings.TrimSuffix(strings.TrimSpace(row["reward"]), ";")
 		if reward == "" {

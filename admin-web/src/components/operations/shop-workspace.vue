@@ -287,6 +287,7 @@ function renderLines(lines: string[]) {
   return h('div', { class: 'shop-cell-stack shop-rule-lines' }, lines.length ? lines.map(line => h('span', line)) : [h('span', { class: 'ops-muted' }, '不限')]);
 }
 function limitLines(row: ShopProduct) {
+  if (props.shopId === 'vip') return ['每日 1 份'];
   return [
     ...(supports('dailyLimit') && row.dailyLimit > 0 ? [`每日 ${row.dailyLimit.toLocaleString()} 次`] : []),
     ...(supports('totalLimit') && row.totalLimit > 0 ? [`累计 ${row.totalLimit.toLocaleString()} 次`] : []),
@@ -295,6 +296,7 @@ function limitLines(row: ShopProduct) {
 }
 function qualificationLines(row: ShopProduct) {
   return [
+    ...(props.shopId === 'vip' ? ['需有已确认付款记录'] : []),
     ...(supports('minLevel') && row.minLevel > 1 ? [`角色 ${row.minLevel} 级`] : []),
     ...(supports('minVip') && row.minVip > 0 ? [`VIP ${row.minVip}`] : []),
     ...(supports('guildLevel') && row.guildLevel > 1 ? [`公会 ${row.guildLevel} 级`] : []),
@@ -337,14 +339,14 @@ const columns = computed<DataTableColumns<ShopProduct>>(() => [
   { title: '购买资格', key: 'qualifications', minWidth: 140, render: row => renderLines(qualificationLines(row)) },
   {
     title: '状态', key: 'enabled', width: 85,
-    render: row => h(NSwitch, {
+    render: row => h('div', { class: 'shop-cell-stack' }, [h(NSwitch, {
       value: row.enabled,
       size: 'small',
       loading: toggling.value === row.id,
       disabled: !canWrite.value || loading.value || saving.value || Boolean(toggling.value),
       'aria-label': `启用商品：${row.name || '商品'}`,
       'onUpdate:value': (value: boolean) => toggleProduct(row, value)
-    })
+    }), h('span', { class: 'ops-muted' }, row.enabled ? '已启用' : '已停用')])
   },
   {
     title: '操作', key: 'action', width: 135, fixed: 'right',
@@ -442,6 +444,9 @@ watch(
             </span>
           </NSpace>
         </div>
+        <NAlert v-if="shopId === 'vip' && snapshot && !snapshot.items.some(item => item.enabled)" type="info" title="暂无开放的会员礼包" class="mb-16px">
+          下方保留全部 {{ snapshot.items.length }} 件已停用商品，可查看和编辑内容、价格与购买资格。商品启用后才会在游戏中显示。
+        </NAlert>
         <NCard :bordered="false" class="ops-panel">
           <NTabs v-if="isPopularityShop" :value="shopId" type="line" class="mb-20px" @update:value="router.push(`/shops/${$event}`)">
             <NTab name="popularity">声望商店商品</NTab>

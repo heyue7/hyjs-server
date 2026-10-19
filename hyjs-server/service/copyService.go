@@ -301,6 +301,14 @@ func (s *GameService) battleWarrior(player *pb.Player, warrior *pb.Warrior, game
 		return nil, err
 	}
 	actor.TalentList = append(actor.TalentList, extraTalents...)
+	// 原模型加载器按真实佩戴武器ID选择外观，战斗属性与旧录像保持原合同。
+	weaponID, err := s.battleWeaponID(game, slot)
+	if err != nil {
+		return nil, err
+	}
+	if weaponID != "" {
+		actor.WeaponId = proto.String(weaponID)
+	}
 	return actor, nil
 }
 

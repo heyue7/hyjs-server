@@ -14,3 +14,12 @@ rtk proxy env PYTHONDONTWRITEBYTECODE=1 .analysis-venv/bin/python tools/client_r
 ```
 
 输出仅包含托管文件和静态资格，不创建或安装 APK。打包时保留其他全部 helper，并增加 `SoulFlowerReWelfare.dll`。
+
+
+## 界面反馈修复（2026-10-19）
+
+`--helper-only` 重新编译已有四个桥接方法使用的 helper，输入必须已经引用 SoulFlowerReWelfare；输出 main 逐字节不变。用于在当前组合 main 上修 UI，避免重复注入。
+
+- 猫消耗/返还说明写入原 Root 下可见的兄弟 UILabel；原 solgon/solgon2 是金币池字图的父节点，隐藏时其子数值也会隐藏。采用原 UIFont、原人物/背景/按钮和固定左侧350宽区域。顶部两旧label同时隐藏，在原Root中的350宽label显示余次；原btnCharge根UISprite（UI_button_zhaomu_02、176×64）明确启用并绑定button.target，仅隐藏旧探索字图；中央展示本期冻结的真实5档报价。
+- 连续消费的顶部恢复原 prefab 306×40边界及 ShrinkContent，显示实际消费/门槛；累计天数文案沿原占位长度改为消费达标累计，保留原7天数值与领取分支。
+- 当前候选和原机证据分别记录在 `analysis/play-feedback-20261019/welfare`；静态编译通过不代表新候选已经原机验证。

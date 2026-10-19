@@ -6,6 +6,9 @@ import ResourceSelect from './resource-select.vue';
 import RewardSummary from './reward-summary.vue';
 
 const rows = defineModel<ActivityPrize[]>({ required: true });
+const world = defineModel<number>('world', { default: 0 });
+const worldDrafts = new Map<number, ActivityPrize[]>();
+const worldOptions = [{ label: 'SAO', value: 1 }, { label: 'ALO', value: 2 }, { label: 'GGO', value: 3 }, { label: '原48小时轮换（三个世界）', value: 0 }];
 const props = defineProps<{ disabled?: boolean; readonly?: boolean }>();
 const resources = ref<KingRecruitResource[]>([]);
 const loading = ref(false);
@@ -13,10 +16,16 @@ const loadError = ref('');
 let generation = 0;
 let nextId = 1;
 const resourceMap = computed(() => new Map(resources.value.map(item => [item.id, item] as const)));
-const pickerResources = computed(() => resources.value.map(item => ({ ...item, applicableType: `king.world:${item.space}`, applicableTypes: [`king.world:${item.space}`], applicableTypeLabel: item.spaceLabel })));
+const pickerResources = computed(() => resources.value.filter(item => !world.value || item.space === world.value).map(item => ({ ...item, applicableType: `king.world:${item.space}`, applicableTypes: [`king.world:${item.space}`], applicableTypeLabel: item.spaceLabel })));
 const editingDisabled = computed(() => Boolean(props.disabled || props.readonly || loading.value || loadError.value));
 const worlds = computed(() => [...new Map(resources.value.map(item => [item.space, item.spaceLabel] as const)).entries()].sort(([a], [b]) => a - b));
-const missingGuarantees = computed(() => rows.value.length ? worlds.value.filter(([space]) => !rows.value.some(row => row.guaranteed && Number(resourceMap.value.get(row.resourceId)?.quality) === 6 && resourceMap.value.get(row.resourceId)?.space === space)).map(([, label]) => label) : []);
+const missingGuarantees = computed(() => rows.value.length ? worlds.value.filter(([space]) => !world.value || space === world.value).filter(([space]) => !rows.value.some(row => row.guaranteed && Number(resourceMap.value.get(row.resourceId)?.quality) === 6 && resourceMap.value.get(row.resourceId)?.space === space)).map(([, label]) => label) : []);
+function changeWorld(value: number) {
+  worldDrafts.set(world.value, rows.value.map(row => ({ ...row })));
+  const source = [...rows.value, ...(worldDrafts.get(0) || [])];
+  rows.value = worldDrafts.get(value) || source.filter((row, index) => source.findIndex(item => item.id === row.id) === index && (!value || resourceMap.value.get(row.resourceId)?.space === value)).map(row => ({ ...row }));
+  world.value = value;
+}
 async function loadResources() {
   const current = ++generation;
   loading.value = true;
@@ -59,6 +68,10 @@ onBeforeUnmount(() => { generation += 1; });
       <h3>王者招募角色池</h3>
       <NButton v-if="!readonly" size="small" :disabled="editingDisabled || !resources.length" @click="add">添加角色</NButton>
     </div>
+    <NFormItem label="开放世界" required>
+      <NSelect :value="world" :options="worldOptions" :disabled="editingDisabled" @update:value="changeWorld" />
+    </NFormItem>
+    <p class="ops-inline-note">每期可单独配置一个世界，不同世界可同时发布。玩家可在当前开放世界间切换；每日次数、幸运值和保底共用。</p>
     <p class="ops-inline-note">每次获得 1 名角色，不限库存。按所属世界分别抽取，保底候选仅限红色角色。</p>
     <NAlert v-if="loadError" type="error" :title="loadError" class="mb-16px"><NButton size="small" @click="loadResources">重新加载角色</NButton></NAlert>
     <p v-if="!loading && !loadError && missingGuarantees.length" class="ops-inline-note">尚缺红色保底候选：{{ missingGuarantees.join('、') }}。</p>

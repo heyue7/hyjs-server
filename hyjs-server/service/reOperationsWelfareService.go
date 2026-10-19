@@ -37,11 +37,11 @@ type reOperationsWelfareProgress struct {
 }
 
 func reOperationsWelfareForms() []model.AdminActivityForm {
-	cat := model.AdminActivityForm{Mode: "fortune-cat", TemplateID: "fortune-cat-original", Name: "Re招财猫", Source: constUtil.ReOperationsWelfareSource, RepeatPolicy: "repeat", Products: []model.AdminActivityProduct{}, Prizes: []model.AdminActivityPrize{}, Milestones: []model.AdminActivityMilestone{}}
+	cat := model.AdminActivityForm{Mode: "fortune-cat", TemplateID: "fortune-cat-original", Name: "招财猫", Source: constUtil.ReOperationsWelfareSource, RepeatPolicy: "repeat", Products: []model.AdminActivityProduct{}, Prizes: []model.AdminActivityPrize{}, Milestones: []model.AdminActivityMilestone{}}
 	for _, cost := range []int64{100, 300, 800, 1500, 3000} {
 		cat.Milestones = append(cat.Milestones, model.AdminActivityMilestone{Goal: cost, Rewards: []model.AdminResourceAmount{{ResourceID: "diamond", Amount: cost + max(int64(1), cost/20)}}})
 	}
-	continued := model.AdminActivityForm{Mode: "continued-spend", TemplateID: "continued-spend-original", Name: "Re连续消费", Source: constUtil.ReOperationsWelfareSource, RepeatPolicy: "repeat", Products: []model.AdminActivityProduct{}, Prizes: []model.AdminActivityPrize{}, Milestones: []model.AdminActivityMilestone{}}
+	continued := model.AdminActivityForm{Mode: "continued-spend", TemplateID: "continued-spend-original", Name: "连续消费", Source: constUtil.ReOperationsWelfareSource, RepeatPolicy: "repeat", Products: []model.AdminActivityProduct{}, Prizes: []model.AdminActivityPrize{}, Milestones: []model.AdminActivityMilestone{}}
 	continued.Options.DailySpend = 3000
 	continued.Options.FinalRewards = []model.AdminResourceAmount{{ResourceID: "diamond", Amount: 9000}}
 	for day := int64(1); day <= 7; day++ {
@@ -455,7 +455,7 @@ func (s *GameService) reContinuedWelfare(ctx context.Context, owner int64, reque
 
 func (s *GameService) reOperationsWelfareTabs(tx *gorm.DB, now time.Time) ([]*pb.ActivityTab, error) {
 	out := []*pb.ActivityTab{}
-	for _, spec := range []struct{ kind, prefix, name string }{{constUtil.ReWelfareCatKind, constUtil.ReWelfareCatPrefix, "Re招财猫"}, {constUtil.ReWelfareContinuedKind, constUtil.ReWelfareContinuedPrefix, "Re连续消费"}} {
+	for _, spec := range []struct{ kind, prefix, name string }{{constUtil.ReWelfareCatKind, constUtil.ReWelfareCatPrefix, "招财猫"}, {constUtil.ReWelfareContinuedKind, constUtil.ReWelfareContinuedPrefix, "连续消费"}} {
 		key, err := reOperationsWelfareRuleKey(tx, spec.kind, now)
 		if err != nil {
 			return nil, err

@@ -13,6 +13,7 @@ import (
 	"hyjs-server/model"
 	pb "hyjs-server/model/protocol"
 	"math"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -272,6 +273,8 @@ func (s *GameService) p5Achievements(ctx context.Context, id int64) ([]proto.Mes
 		}
 		return nil
 	})
+	// 沿原状态分组，优先展示可领取项并保留组内原ID顺序。
+	sort.SliceStable(out.List, func(i, j int) bool { return out.List[i].GetState() < out.List[j].GetState() })
 	return []proto.Message{out}, err
 }
 func (s *GameService) p5AchievementReward(ctx context.Context, id int64, b *pb.CSGetAchievementReward, stamp int64) ([]proto.Message, error) {

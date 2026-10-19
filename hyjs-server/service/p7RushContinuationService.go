@@ -88,6 +88,9 @@ func p7RushContinuationCatalogue(first, last int32, enabled bool) ([]db.P7RushSt
 
 // p7RushContinuationStageAvailable 同时验证发布目录与本轮前三层真实完整来源。
 func (s *GameService) p7RushContinuationStageAvailable(tx *gorm.DB, state *db.P7RushState, stage db.P7RushStageRule) (bool, error) {
+	if stage.Source == constUtil.P7ReRushSource {
+		return p7ReRushEnabled(tx)
+	}
 	if stage.Source != constUtil.P7RushContinuationSource {
 		return true, nil
 	}
@@ -122,6 +125,9 @@ func (s *GameService) p7RushContinuationStageAvailable(tx *gorm.DB, state *db.P7
 
 // p7RushContinuationTaskProjection 使用原Ready的实际point预览，不制造首通奖励。
 func p7RushContinuationTaskProjection(stage db.P7RushStageRule) (*pb.RushTaskInfo, error) {
+	if stage.Source == constUtil.P7ReRushSource {
+		return p7ReRushTaskProjection(stage), nil
+	}
 	if stage.Source != constUtil.P7RushContinuationSource && stage.Source != constUtil.P7SectionStageSource || stage.Reward != "point,10" || stage.FirstReward != "" {
 		return nil, errors.New("本地试炼后继奖励展示冲突")
 	}
@@ -141,7 +147,7 @@ func (s *GameService) p7PendingRushContinuation(tx *gorm.DB, state *db.P7RushSta
 	if p6Digest(fight.Rule) != fight.RuleHash || json.Unmarshal(fight.Rule, &stage) != nil {
 		return nil, nil, false, errors.New("试炼活动战斗规则快照损坏")
 	}
-	if stage.Source != constUtil.P7RushContinuationSource && stage.Source != constUtil.P7SectionStageSource {
+	if stage.Source != constUtil.P7RushContinuationSource && stage.Source != constUtil.P7SectionStageSource && stage.Source != constUtil.P7ReRushSource {
 		return nil, nil, false, nil
 	}
 	if fight.Diagnostic || fight.Kind != constUtil.P7RushTrial || fight.Status != constUtil.P7RushComputed || stage.Floor != state.Floor || stage.TaskID != fight.TaskID || p6Digest(fight.Start) != fight.StartHash {
@@ -162,7 +168,7 @@ func (s *GameService) p7PendingRushContinuation(tx *gorm.DB, state *db.P7RushSta
 }
 
 // p7PendingRushContinuationInfo 沿原Info字段恢复同一待结束战斗的入口。
-func (s *GameService) p7PendingRushContinuationInfo(tx *gorm.DB, player *pb.Player, state *db.P7RushState, reset db.P7RushPolicy, now time.Time) (*pb.SCGetRushInfo, error) {
+func (s *GameService) p7PendingRushContinuationInfo(tx *gorm.DB, player *pb.Player, state *db.P7RushState, reset db.P7RushPolicy, now time.Time, source ...string) (*pb.SCGetRushInfo, error) {
 	free, err := s.p7VIP(player, "numPerk2")
 	if err != nil {
 		return nil, err
@@ -171,5 +177,9 @@ func (s *GameService) p7PendingRushContinuationInfo(tx *gorm.DB, player *pb.Play
 	if err != nil {
 		return nil, err
 	}
-	return &pb.SCGetRushInfo{CurFloor: proto.Int32(state.Floor), CurTotalStar: proto.Int32(state.TotalStars), ResetLeftTime: proto.Int32(max(0, free-state.FreeResetUsed)), DiamondRestLeftTime: proto.Int32(max(0, paid-state.PaidResetUsed)), DiamondRestCostNum: proto.Int32(reset.TrialResetCost), HighRecordFloor: proto.Int32(state.HighFloor), RecordTotalStar: proto.Int32(state.RecordStars), CurFloorSceneName: proto.String(constUtil.P7OriginalScopedFloorScene), WinKey: proto.Int32(0), WinValue: proto.Int32(0), IsMustReset: proto.Int32(0), IsRewardNeedGet: proto.Int32(0), IsAdditionNeedGet: proto.Int32(0), IsMazeTraderValid: proto.Int32(0)}, nil
+	scene := constUtil.P7OriginalScopedFloorScene
+	if len(source) == 1 && source[0] == constUtil.P7ReRushSource {
+		scene = p7ReRushNavigation(state.Floor)
+	}
+	return &pb.SCGetRushInfo{CurFloor: proto.Int32(state.Floor), CurTotalStar: proto.Int32(state.TotalStars), ResetLeftTime: proto.Int32(max(0, free-state.FreeResetUsed)), DiamondRestLeftTime: proto.Int32(max(0, paid-state.PaidResetUsed)), DiamondRestCostNum: proto.Int32(reset.TrialResetCost), HighRecordFloor: proto.Int32(state.HighFloor), RecordTotalStar: proto.Int32(state.RecordStars), CurFloorSceneName: proto.String(scene), WinKey: proto.Int32(0), WinValue: proto.Int32(0), IsMustReset: proto.Int32(0), IsRewardNeedGet: proto.Int32(0), IsAdditionNeedGet: proto.Int32(0), IsMazeTraderValid: proto.Int32(0)}, nil
 }

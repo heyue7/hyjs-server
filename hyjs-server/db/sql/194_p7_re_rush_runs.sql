@@ -1,0 +1,5 @@
+CREATE TABLE IF NOT EXISTS p7_re_rush_runs (
+ player_id BIGINT NOT NULL, run_id BIGINT NOT NULL,
+ trader_bought BOOLEAN NOT NULL DEFAULT FALSE,
+ PRIMARY KEY(player_id,run_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

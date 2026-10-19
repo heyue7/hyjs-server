@@ -94,9 +94,6 @@ func (s *GameService) seedP4Commerce(tx *gorm.DB, now time.Time) error {
 		memory.Products = append(memory.Products, p)
 	}
 	popularity := p4CommerceRules{Products: []p4Product{p4BaseProduct("p4Popularity_1", "item_001,1", "popularity,20", 1, 10), p4BaseProduct("p4Popularity_2", "frag_hero_001,1", "popularity,100", 2, 10)}}
-	point := p4CommerceRules{Products: []p4Product{p4BaseProduct("p4Point_1", "item_021,1", "point,100", 1, 22), p4BaseProduct("p4Point_2", "equip_037,1", "item_021,10", 2, 22)}}
-	point.Products[1].Priority = 2001
-	point.Products[1].DailyLimit = 1
 	score := p4CommerceRules{Products: []p4Product{p4BaseProduct("p4Score_1", "item_005,5", "score,50", 1, 35), p4BaseProduct("p4Score_2", "item_004,1", "score,100", 2, 35)}}
 	half := p4CommerceRules{Products: []p4Product{p4BaseProduct("p4Half_1", "item_006,2", "diamond,40", 1, 1)}}
 	half.Products[0].DiscountBps = 5000
@@ -117,7 +114,7 @@ func (s *GameService) seedP4Commerce(tx *gorm.DB, now time.Time) error {
 		prefix string
 		rules  p4CommerceRules
 	}{
-		{"ordinary", 1, "p4:ordinary:", ordinary}, {"memory", 3, "p4:memory:", memory}, {"popularity", 4, "p4:popularity:", popularity}, {"point", 5, "p4:point:", point}, {"score", 7, "p4:score:", score},
+		{"ordinary", 1, "p4:ordinary:", ordinary}, {"memory", 3, "p4:memory:", memory}, {"popularity", 4, "p4:popularity:", popularity}, {"score", 7, "p4:score:", score},
 		{"half", 0, "halfDiscountSale_p4_", half}, {"discount", 0, "discountSale_p4_", discount}, {"exchange", 0, "limitExchange_p4_", exchange}, {"sale", 0, "limitSale_p4_", sale}, {"mystic", 0, "mysticDiscount_p4_", mystic},
 	} {
 		raw, err := json.Marshal(spec.rules)
@@ -138,6 +135,9 @@ func (s *GameService) seedP4Commerce(tx *gorm.DB, now time.Time) error {
 		if err = tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&cfg).Error; err != nil {
 			return err
 		}
+	}
+	if err := s.seedReRushShop(tx, now); err != nil {
+		return err
 	}
 	if err := s.seedP5SpecialtySupply(tx, now); err != nil {
 		return err

@@ -101,6 +101,13 @@ func (s *GameService) p7FreezeMazeTrader(tx *gorm.DB, fight *db.P7RushFight, now
 	if err != nil || !failed {
 		return err
 	}
+	var stage db.P7RushStageRule
+	if json.Unmarshal(fight.Rule, &stage) != nil {
+		return errors.New("迷宫商人试炼来源损坏")
+	}
+	if stage.Source == constUtil.P7ReRushSource {
+		return nil
+	}
 	var count int64
 	if err = tx.Model(&db.P7MazeTraderOffer{}).Where("player_id=? AND run_id=?", fight.PlayerID, fight.RunID).Count(&count).Error; err != nil || count > 0 {
 		return err

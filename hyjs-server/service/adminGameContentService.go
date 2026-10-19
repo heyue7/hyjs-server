@@ -58,11 +58,11 @@ func AdminAchievementKinds() []model.AdminAchievementKind {
 		}
 	}
 	kinds = append(kinds,
-		model.AdminAchievementKind{ID: constUtil.ReAchievementLoginKind, Label: "累计登录日数（Re）", Type: constUtil.ReAchievementLoginType, Supported: true, Notes: "Re成就：读取已提交的北京时间登录日，同日重连不重复。"},
-		model.AdminAchievementKind{ID: "collection", Label: "累计图鉴角色种类（Re）", Type: constUtil.ReAchievementCollectionType, Supported: true, Notes: "Re成就：按真实已获得的不同角色ID计算；回收不抹除已记录图鉴。"},
-		model.AdminAchievementKind{ID: constUtil.ReAchievementStagesKind, Label: "不同主线通关数（Re）", Type: constUtil.ReAchievementStagesType, Supported: true, Notes: "Re成就：仅计原主线表有效关卡且真实星数大于0，同一关不重复。"},
-		model.AdminAchievementKind{ID: constUtil.ReAchievementFormationKind, Label: "上阵角色人数（Re）", Type: constUtil.ReAchievementFormationType, Supported: true, Notes: "Re成就：读取真实上阵且在背包中的不同GUID，不计空位和重复GUID。"},
-		model.AdminAchievementKind{ID: constUtil.ReAchievementGrowthKind, Label: "OS成长三项资格（Re）", Type: constUtil.ReAchievementGrowthType, Supported: true, FixedTarget: 3, Notes: "Re成就：累计登录、角色等级和不同主线通关数三项同时达成；需分别配置三项门槛。"},
+		model.AdminAchievementKind{ID: constUtil.ReAchievementLoginKind, Label: "累计登录日数", Type: constUtil.ReAchievementLoginType, Supported: true, Notes: "读取已提交的北京时间登录日，同日重连不重复。"},
+		model.AdminAchievementKind{ID: "collection", Label: "累计图鉴角色种类", Type: constUtil.ReAchievementCollectionType, Supported: true, Notes: "按真实已获得的不同角色ID计算；回收不抹除已记录图鉴。"},
+		model.AdminAchievementKind{ID: constUtil.ReAchievementStagesKind, Label: "不同主线通关数", Type: constUtil.ReAchievementStagesType, Supported: true, Notes: "仅计原主线表有效关卡且真实星数大于0，同一关不重复。"},
+		model.AdminAchievementKind{ID: constUtil.ReAchievementFormationKind, Label: "上阵角色人数", Type: constUtil.ReAchievementFormationType, Supported: true, Notes: "读取真实上阵且在背包中的不同GUID，不计空位和重复GUID。"},
+		model.AdminAchievementKind{ID: constUtil.ReAchievementGrowthKind, Label: "OS成长三项资格", Type: constUtil.ReAchievementGrowthType, Supported: true, FixedTarget: 3, Notes: "累计登录、角色等级和不同主线通关数三项同时达成；需分别配置三项门槛。"},
 	)
 	return kinds
 }
@@ -94,7 +94,7 @@ func AdminAchievements(ctx context.Context, p *model.AdminPrincipal) (*model.Adm
 	if err := tx.Order("id").Find(&rows).Error; err != nil {
 		return nil, err
 	}
-	out := &model.AdminAchievementsResponse{Items: []model.AdminAchievementDTO{}, Kinds: AdminAchievementKinds(), Notes: "保留原36组触发与Re现成成就；Re条件/奖励标明独立来源。未恢复的探索场景继续禁用，旧领取快照与已领标记不改。高水位仅记录真实观察到的进度，不补造缺失历史。"}
+	out := &model.AdminAchievementsResponse{Items: []model.AdminAchievementDTO{}, Kinds: AdminAchievementKinds(), Notes: "支持原36组触发与已恢复成就；条件和奖励可分别配置。未恢复的探索场景继续禁用，旧领取快照与已领标记不改。高水位仅记录真实观察到的进度，不补造缺失历史。"}
 	for _, r := range rows {
 		out.Items = append(out.Items, adminAchievementProjection(r))
 	}

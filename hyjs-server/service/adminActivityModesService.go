@@ -38,8 +38,8 @@ func adminActivityDefinitions() []adminActivityDefinition {
 		{"limited-sign", "限时签到", "welfare", "limit", "p4:limit:admin_", "ActivityInnerPage/every day sign", false, true, false, 31},
 		{"stamina-meal", "月光餐厅", "welfare", "meal", "p4:meal:admin_", "ActivityInnerPage/asuna kitchen", false, false, false, 0},
 		{"diamond-rebate", "消费返利", "welfare", "rebate", "p4:rebate:admin_", "ActivityInnerPage/CostReturn", false, false, false, 0},
-		{"fortune-cat", "Re招财猫", "welfare", constUtil.ReWelfareCatKind, "fortuneCat_re_", "ActivityInnerPage/treasurecast", false, true, false, 5},
-		{"continued-spend", "Re连续消费", "welfare", constUtil.ReWelfareContinuedKind, "continuedRecharge_re_", "ActivityInnerPage/continueChargeGift", false, true, false, 7},
+		{"fortune-cat", "招财猫", "welfare", constUtil.ReWelfareCatKind, "fortuneCat_re_", "ActivityInnerPage/treasurecast", false, true, false, 5},
+		{"continued-spend", "连续消费", "welfare", constUtil.ReWelfareContinuedKind, "continuedRecharge_re_", "ActivityInnerPage/continueChargeGift", false, true, false, 7},
 		{"treasure-box", "藏宝箱", "welfare", "cat", "p4:cat:admin_", "ActivityInnerPage/treasurecast", false, false, false, 0},
 		{"turntable", "幸运转盘", "pool", "turntable", "admin_turntable_", "ActivityInnerPage/BigTurnTable", false, false, true, 0},
 		{"recharge-total", "累计充值", "period", "payment_amount", "rechargeTotal_p4_admin_", "ActivityInnerPage/recharge surprise", false, true, false, 31},
@@ -98,8 +98,9 @@ func (s *GameService) AdminActivityModes() []model.AdminActivityMode {
 			mode.Notes += " 每实例支持最多31档独立目标；累计充值目标单位为分。"
 		}
 		if d.mode == "king-recruit" {
-			mode.FixedValues = map[string]int64{"dayLimit": 50, "luckyGoal": 500, "luckyPerDraw": 10, "rotationHours": 48}
-			mode.Notes = "沿用原王者招募页面、阵营轮换和价格；日限、保底与幸运进度跨排期保留。未排期前沿用现有常驻池，首次排期后由本服日历控制。"
+			mode.DefaultForm.Options.KingWorld = 1
+			mode.FixedValues = map[string]int64{"dayLimit": 50, "luckyGoal": 500, "luckyPerDraw": 10, "freeHours": 48, "guaranteeEvery": 10}
+			mode.Notes = "各世界可独立排期并同时开放，玩家选择当前开放世界；沿用原价格，日限、保底与幸运进度跨世界保留。未排期前沿用现有常驻池，首次排期后由本服日历控制。"
 		}
 		if d.mode == "power-race" {
 			mode.Notes = "记录真实阵容战力峰值；目标奖励与截止排名奖励分开配置，同一排名范围使用同档奖励。"
@@ -249,10 +250,10 @@ func adminActivityReadableName(name, id, kind, mode string) string {
 		}
 	}
 	if readable && !strings.ContainsRune(name, '\ufffd') {
-		return name
+		return PlayerDisplayName(name)
 	}
 	if name != "" && !strings.ContainsAny(name, "_:·") && !strings.ContainsRune(name, '\ufffd') {
-		return name
+		return PlayerDisplayName(name)
 	}
 	if d, ok := adminActivityDefinitionFor(mode); ok {
 		for _, named := range []struct{ key, label string }{

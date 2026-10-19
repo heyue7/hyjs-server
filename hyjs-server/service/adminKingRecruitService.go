@@ -19,10 +19,13 @@ import (
 )
 
 type adminKingRecruitSource struct {
+	World int64               `json:"world,omitempty"`
 	Pool  db.GameplayPool     `json:"pool"`
 	Rules db.KingRecruitRules `json:"rules"`
 }
 type kingRecruitRulesScopeKey struct{}
+type kingRecruitWorldScopeKey struct{}
+type kingRecruitEndScopeKey struct{}
 
 func adminKingRecruitPoolID(key string) bool {
 	return key == "recruit_3" || strings.HasPrefix(key, constUtil.AdminKingRecruitPrefix)
@@ -33,11 +36,18 @@ func validateKingRecruitActivityRules(r db.KingRecruitRules) error {
 	}
 	return nil
 }
-func (s *GameService) validateKingRecruitActivityPool(pool db.GameplayPool, rewards []db.GameplayPoolReward) error {
+func (s *GameService) validateKingRecruitActivityPool(pool db.GameplayPool, rewards []db.GameplayPoolReward, worlds ...int64) error {
 	if err := s.validateRecruitClientPrices(&pool, 3); err != nil {
 		return err
 	}
 	if len(rewards) == 0 || len(rewards) > 1000 {
+		return constUtil.ErrAdminInput
+	}
+	world := int64(0)
+	if len(worlds) > 0 {
+		world = worlds[0]
+	}
+	if world < 0 || world > 3 {
 		return constUtil.ErrAdminInput
 	}
 	ids := map[int32]bool{}
@@ -48,13 +58,20 @@ func (s *GameService) validateKingRecruitActivityPool(pool db.GameplayPool, rewa
 		if reward.ID < 1 || ids[reward.ID] || reward.Amount != 1 || reward.Stock != 0 || reward.Weight < 1 || reward.Weight > 1000000000000 || total > math.MaxInt64-reward.Weight || hero == nil || hero["heroClass"] != "0" || (hero["quality"] != "20" && hero["quality"] != "23") || (hero["space"] != "1" && hero["space"] != "2" && hero["space"] != "3") || reward.Guaranteed && hero["quality"] != "23" {
 			return constUtil.ErrAdminInput
 		}
+		if world > 0 && hero["space"] != strconv.FormatInt(world, 10) {
+			return constUtil.ErrAdminInput
+		}
 		ids[reward.ID] = true
 		total += reward.Weight
 		if reward.Guaranteed {
 			guaranteed[hero["space"]] = true
 		}
 	}
-	for _, space := range []string{"1", "2", "3"} {
+	spaces := []string{"1", "2", "3"}
+	if world > 0 {
+		spaces = []string{strconv.FormatInt(world, 10)}
+	}
+	for _, space := range spaces {
 		if !guaranteed[space] {
 			return constUtil.ErrAdminConfiguration
 		}
@@ -78,6 +95,7 @@ func (s *GameService) adminKingRecruitCanonicalForm(tx *gorm.DB, form model.Admi
 	if err := validateKingRecruitActivityRules(source.Rules); err != nil {
 		return form, err
 	}
+	source.World = form.Options.KingWorld
 	form.Options.KingPoolSource = string(adminJSON(source))
 	return form, nil
 }
@@ -86,9 +104,6 @@ func (s *GameService) adminKingRecruitActivityForm(tx *gorm.DB, cfg db.GameplayP
 	form := model.AdminActivityForm{Mode: constUtil.AdminKingRecruitMode, TemplateID: constUtil.AdminKingRecruitMode + "-original", Name: cfg.Name, Source: cfg.Source, StartAt: cfg.StartAt, EndAt: cfg.EndAt, ClaimEndAt: cfg.RewardEndAt, Products: []model.AdminActivityProduct{}, Milestones: []model.AdminActivityMilestone{}, Prizes: []model.AdminActivityPrize{}}
 	for _, r := range rewards {
 		form.Prizes = append(form.Prizes, model.AdminActivityPrize{ID: int64(r.ID), ResourceID: r.ResourceID, Amount: 1, Weight: r.Weight, Stock: 0, Guaranteed: r.Guaranteed})
-	}
-	if err := s.validateKingRecruitActivityPool(cfg, rewards); err != nil {
-		return form, err
 	}
 	var snapshot db.KingRecruitActivitySnapshot
 	var source adminKingRecruitSource
@@ -114,6 +129,10 @@ func (s *GameService) adminKingRecruitActivityForm(tx *gorm.DB, cfg db.GameplayP
 	if err := validateKingRecruitActivityRules(source.Rules); err != nil {
 		return form, err
 	}
+	if err := s.validateKingRecruitActivityPool(cfg, rewards, source.World); err != nil {
+		return form, err
+	}
+	form.Options.KingWorld = source.World
 	form.Options.KingPoolSource = string(adminJSON(source))
 	return form, nil
 }
@@ -131,6 +150,9 @@ func (s *GameService) adminPersistKingRecruitActivity(tx *gorm.DB, key string, f
 	if err := validateKingRecruitActivityRules(source.Rules); err != nil {
 		return err
 	}
+	if source.World != form.Options.KingWorld || source.World < 0 || source.World > 3 {
+		return constUtil.ErrAdminInput
+	}
 	pool := source.Pool
 	pool.ID = key
 	pool.Name = form.Name
@@ -146,7 +168,7 @@ func (s *GameService) adminPersistKingRecruitActivity(tx *gorm.DB, key string, f
 		}
 		rewards = append(rewards, db.GameplayPoolReward{PoolID: key, ID: int32(prize.ID), ResourceID: prize.ResourceID, Amount: 1, Weight: prize.Weight, Stock: 0, Guaranteed: prize.Guaranteed})
 	}
-	if err := s.validateKingRecruitActivityPool(pool, rewards); err != nil {
+	if err := s.validateKingRecruitActivityPool(pool, rewards, source.World); err != nil {
 		return err
 	}
 	if exists {
@@ -200,6 +222,7 @@ func adminKingRecruitActivityFrozen(tx *gorm.DB, key string) (bool, error) {
 
 func (s *GameService) bindKingRecruitActivityRules(tx *gorm.DB, key string) error {
 	tx.Statement.Context = context.WithValue(tx.Statement.Context, kingRecruitRulesScopeKey{}, (*db.KingRecruitRules)(nil))
+	tx.Statement.Context = context.WithValue(tx.Statement.Context, kingRecruitWorldScopeKey{}, int64(0))
 	if key == "recruit_3" {
 		if !tx.Migrator().HasTable(&db.KingRecruitActivitySnapshot{}) {
 			return nil
@@ -228,6 +251,11 @@ func (s *GameService) bindKingRecruitActivityRules(tx *gorm.DB, key string) erro
 			return err
 		}
 	}
+	if source.World < 0 || source.World > 3 {
+		return constUtil.ErrAdminConfiguration
+	}
+	tx.Statement.Context = context.WithValue(tx.Statement.Context, kingRecruitWorldScopeKey{}, source.World)
+	tx.Statement.Context = context.WithValue(tx.Statement.Context, kingRecruitEndScopeKey{}, source.Pool.EndAt)
 	rules := source.Rules
 	tx.Statement.Context = context.WithValue(tx.Statement.Context, kingRecruitRulesScopeKey{}, &rules)
 	return nil
@@ -237,43 +265,28 @@ func (s *GameService) bindKingRecruitActivityRules(tx *gorm.DB, key string) erro
 // The realm takes over after its first explicit king schedule, including rows
 // later stopped, expired or archived; an empty window then stays closed.
 func (s *GameService) adminScheduledKingRecruitPool(tx *gorm.DB, now int64) (string, bool, error) {
-	if !tx.Migrator().HasTable(&db.AdminActivityOccurrence{}) {
-		return "recruit_3", false, nil
+	candidates, scheduled, err := s.kingRecruitAvailablePools(tx, now)
+	if err != nil || len(candidates) == 0 {
+		return "", scheduled, err
 	}
-	tx = tx.WithContext(context.WithValue(tx.Statement.Context, constUtil.GameServiceContextKey, s))
-	var count int64
-	if err := tx.Model(&db.AdminActivityOccurrence{}).Where("server_id=? AND mode=?", s.OriginalServerID(), constUtil.AdminKingRecruitMode).Count(&count).Error; err != nil {
-		return "", false, err
-	}
-	if count == 0 {
-		return "recruit_3", false, nil
-	}
-	if key, err := adminCharacterActivityCurrentKey(tx, constUtil.AdminKingRecruitMode, now, true); err != nil || key != "" {
-		return key, true, err
-	}
-	var rows []db.AdminActivityOccurrence
-	if err := tx.Where("server_id=? AND mode=? AND timing<>? AND enabled=? AND archived=? AND start_at<=? AND claim_end_at>?", s.OriginalServerID(), constUtil.AdminKingRecruitMode, "character-day", true, false, now, now).Order("start_at,id").Find(&rows).Error; err != nil {
-		return "", true, err
-	}
-	key := ""
 	owner := GameCalendarOwner(tx.Statement.Context)
-	for _, row := range rows {
-		if owner < 1 {
-			return "", true, constUtil.ErrAdminPermission
+	if owner > 0 && tx.Migrator().HasTable(&db.KingRecruitSelection{}) {
+		var selected db.KingRecruitSelection
+		err := tx.First(&selected, "player_id=?", owner).Error
+		if err == nil {
+			for _, candidate := range candidates {
+				if candidate.Key == selected.PoolID {
+					return candidate.Key, scheduled, nil
+				}
+			}
+			// A closed selected world cannot silently spend in a different world.
+			return "", scheduled, nil
 		}
-		allowed, err := adminAcceptActivityTemplate(tx, owner, row)
-		if err != nil {
-			return "", true, err
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return "", scheduled, err
 		}
-		if !allowed {
-			continue
-		}
-		if key != "" {
-			return "", true, constUtil.ErrAdminConfiguration
-		}
-		key = row.ConsumerKey
 	}
-	return key, true, nil
+	return candidates[0].Key, scheduled, nil
 }
 
 // AdminKingRecruitResources returns only original, recruitable king candidates.
@@ -320,10 +333,11 @@ func (s *GameService) kingRecruitOpenState(ctx context.Context, id int64, now ti
 		if err != nil {
 			return err
 		}
-		key, _, err := s.adminScheduledKingRecruitPool(tx, now.UnixMilli())
-		if err != nil || key == "" {
+		available, _, err := s.kingRecruitAvailablePools(tx, now.UnixMilli())
+		if err != nil || len(available) == 0 {
 			return err
 		}
+		key := available[0].Key
 		var pool db.GameplayPool
 		if err := tx.First(&pool, "id=?", key).Error; err != nil {
 			return err
@@ -335,7 +349,11 @@ func (s *GameService) kingRecruitOpenState(ctx context.Context, id int64, now ti
 		if err := tx.Where("pool_id=?", key).Find(&rewards).Error; err != nil {
 			return err
 		}
-		if err := s.validateKingRecruitActivityPool(pool, rewards); err != nil {
+		if err := s.bindKingRecruitActivityRules(tx, key); err != nil {
+			return err
+		}
+		world, _ := tx.Statement.Context.Value(kingRecruitWorldScopeKey{}).(int64)
+		if err := s.validateKingRecruitActivityPool(pool, rewards, world); err != nil {
 			return err
 		}
 		result.IsOpen = proto.Int32(1)
