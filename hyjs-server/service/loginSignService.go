@@ -114,6 +114,9 @@ func (s *GameService) seedP4Welfare(tx *gorm.DB, now time.Time) error {
 
 func (s *GameService) validateP4Welfare(cfg db.P4WelfareRule) (p4WelfareRules, error) {
 	var rules p4WelfareRules
+	if cfg.Kind == constUtil.ReWelfareCatKind || cfg.Kind == constUtil.ReWelfareContinuedKind {
+		return rules, s.validateReOperationsWelfare(cfg)
+	}
 	if cfg.ID == "" || len(cfg.ID) > 64 || cfg.StartAt <= 0 || cfg.StartAt >= cfg.EndAt || cfg.ClaimEndAt < cfg.EndAt || json.Unmarshal(cfg.Rules, &rules) != nil {
 		return rules, errors.New("福利实例规则无效")
 	}
@@ -409,6 +412,13 @@ func p4CatData(rules p4WelfareRules, state *p4WelfareProgress, now time.Time) *p
 
 // p4Welfare 所有领奖与回执在角色行锁事务中；只读查询不制造登录日或补签事实。
 func (s *GameService) p4Welfare(ctx context.Context, id int64, request proto.Message, stamp int64, now time.Time) ([]proto.Message, error) {
+	// New Re cat publications share the original no-ID messages and keep the legacy frozen cat ledger separate.
+	switch request.(type) {
+	case *pb.CSFortuneCatInfo, *pb.CSFortuneCatReward:
+		if reply, handled, err := s.reFortuneCatWelfare(ctx, id, request, stamp, now); handled {
+			return reply, err
+		}
+	}
 	var response proto.Message
 	err := updateProfileWithTx(ctx, id, func(tx *gorm.DB, p *pb.Player, g *model.GameState) error {
 		kind := p4Kind(request)

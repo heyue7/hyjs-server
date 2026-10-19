@@ -31,6 +31,13 @@ func (s *GameService) InitializeAdminActivitySchedules(ctx context.Context) erro
 		if strings.Contains(row.ID, "_schedule_") || strings.Contains(row.ID, "_character_") || adminActivityRedundantSource(row.ID) {
 			continue
 		}
+		var mapped int64
+		if err = tx.Model(&db.AdminActivityDefinition{}).Where("source_activity_id=?", row.ID).Count(&mapped).Error; err != nil {
+			return err
+		}
+		if mapped > 0 {
+			continue
+		}
 		id := "import_" + p6Digest([]byte(row.ID))[:24]
 		days := (row.Form.EndAt - row.Form.StartAt + 86399999) / 86400000
 		if days < 1 || days > 366 {

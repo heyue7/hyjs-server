@@ -56,6 +56,11 @@ export interface AchievementKind {
   notes: string;
   fixedTarget?: number;
 }
+export interface AchievementRequirements {
+  loginDays: number;
+  level: number;
+  stages: number;
+}
 export interface Achievement {
   id: string;
   name: string;
@@ -68,6 +73,7 @@ export interface Achievement {
   version: string;
   supported?: boolean;
   notes?: string;
+  requirements?: AchievementRequirements;
 }
 export interface TitleEffect {
   key: string;

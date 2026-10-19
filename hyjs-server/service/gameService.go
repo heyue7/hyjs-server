@@ -120,6 +120,7 @@ func (s *GameService) Dispatch(ctx context.Context, request *model.GamePacket, p
 	}
 	if !failed {
 		s.AfterP10SceneRequest(ctx, request.PlayerId, request.Body)
+		s.afterInventoryMailRequest(ctx, request.PlayerId, request.Body, result)
 	}
 	return result
 }
@@ -210,6 +211,8 @@ func (s *GameService) dispatch(ctx context.Context, r *model.GamePacket, peer st
 	s = runtime
 	ctx = bindFieldRuntime(ctx, s)
 	switch b := r.Body.(type) {
+	case *pb.CSRefreshSideHp:
+		return s.formationSideHPRefresh(ctx, row.Id, b)
 	case *pb.CSGenerateName:
 		return gameReply("SCGenerateName", map[string]any{"playerName": fmt.Sprintf("归来的剑士%d", row.Id)})
 	case *pb.CSPlayerCreate:

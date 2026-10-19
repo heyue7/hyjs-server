@@ -41,6 +41,15 @@ func ConfigureGame(s *service.GameService) { gameService = s }
 // ValidateGameRequest 在 HTTP 和 TCP 的公共入口检查游戏请求字段。
 func ValidateGameRequest(p *model.GamePacket) error {
 	switch b := p.Body.(type) {
+	case *pb.CSRefreshSideHp:
+		if b.GetOldFormation() == "" || b.GetNewFormation() == "" || len(b.GetOldFormation()) > 128 || len(b.GetNewFormation()) > 128 || strings.IndexFunc(b.GetOldFormation(), unicode.IsControl) >= 0 || strings.IndexFunc(b.GetNewFormation(), unicode.IsControl) >= 0 {
+			return errors.New("阵型血量刷新参数无效")
+		}
+	case *pb.CSGetAchievementReward:
+		if p.Timestamp <= 0 || b.GetId() == "" || len(b.GetId()) > 128 || strings.TrimSpace(b.GetId()) != b.GetId() || strings.IndexFunc(b.GetId(), unicode.IsControl) >= 0 {
+			return errors.New("成就领取参数无效")
+		}
+
 	case *pb.CSBigClientReward:
 		if b.GetType() != constUtil.BigClientRewardType {
 			return errors.New(constUtil.BigClientRewardInvalidType)

@@ -1,5 +1,15 @@
+import { api, json } from './operations';
 import type { Item, ResourceAmount as Reward } from './operations';
+
+export function deleteActivityTemplate(id: string, version: string) {
+  return api<{ ok: boolean; archived: boolean }>(`/activity-templates/${encodeURIComponent(id)}`, json('DELETE', { version }));
+}
+export function deleteActivityInstance(id: string, version: string) {
+  return api<{ ok: boolean; archived: boolean }>(`/activity-instances/${encodeURIComponent(id)}`, json('DELETE', { version }));
+}
+
 export interface ActivityGameplayOptions extends Record<string, any> {
+  dailySpend?: number;
   rankPlaces?: number;
   rankRewards?: Reward[];
   /** 服务端冻结的原王者池快照，不提供运营编辑入口。 */
@@ -95,6 +105,12 @@ const milestoneTargets: Record<string, { label: string; unit: string; note?: str
   'plunder-count': { label: '累计夺宝', unit: '次' },
   'hero-collection': { label: '不同英雄数量', unit: '种', note: '相同英雄重复获得不重复计数。' },
   'trial-stars': { label: '试炼星数峰值', unit: '星', note: '按本期试炼星数最高值判断，多轮结果不相加。' },
+  'single-spend': { label: '累计消费钻石', unit: '钻', note: '沿用 Re 此原活动的实际消费资格。' },
+  'work': { label: '主线胜利次数', unit: '次' },
+  'wanted-attempts': { label: '悬赏挑战次数', unit: '次' },
+  'wanted-kills': { label: '悬赏击杀次数', unit: '次' },
+  'fortune-cat': { label: '当次钻石成本', unit: '钻', note: '奖励填含本金的实际返还钻石数量。' },
+  'continued-spend': { label: '累计达标消费日', unit: '天', note: '奖励档目标依次为 1 至 7 天。' },
   'power-race': { label: '战力峰值', unit: '战力', note: '按本期战力最高值判断达成目标与排名。' }
 };
 export function activityMilestoneTarget(mode?: string): { label: string; unit: string; note?: string } {

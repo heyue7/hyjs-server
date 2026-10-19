@@ -43,6 +43,9 @@ func (s *GameService) validateP1Period(cfg db.PeriodInstance) error {
 	if cfg.ID == "" || len(cfg.ID) > 64 || cfg.StartAt <= 0 || cfg.StartAt >= cfg.EndAt || cfg.EndAt > cfg.RewardEndAt || cfg.Goal <= 0 || cfg.Goal > math.MaxInt32 || cfg.Kind == "" || len(cfg.Kind) > 64 {
 		return errors.New("活动实例规则无效")
 	}
+	if err := s.validateP1Milestones(cfg); err != nil {
+		return err
+	}
 	if cfg.Mode != "cumulative" && cfg.Mode != "daily" && cfg.Mode != "single" {
 		return errors.New("活动统计口径无效")
 	}
@@ -129,7 +132,7 @@ func (s *GameService) P1ActivityTabs(ctx context.Context, id int64) ([]*pb.Activ
 		}
 		status := int32(0)
 		var pending int64
-		if err := db.GetIns().WithContext(ctx).Model(&db.RewardDelivery{}).Where("player_id = ? AND source_key = ? AND claimed_at = 0 AND (expires_at = 0 OR expires_at > ?)", id, "activity:"+cfg.ID, now).Count(&pending).Error; err != nil {
+		if err := db.GetIns().WithContext(ctx).Model(&db.RewardDelivery{}).Where("player_id = ? AND source_key IN ? AND claimed_at = 0 AND (expires_at = 0 OR expires_at > ?)", id, p1PeriodSources(cfg), now).Count(&pending).Error; err != nil {
 			return nil, err
 		}
 		if pending > 0 {
@@ -233,26 +236,10 @@ func (s *GameService) p1ActivityApply(tx *gorm.DB, id int64, player *pb.Player, 
 			return nil, err
 		}
 	}
-	resources, err := p1RewardResources(frozen.Rewards)
+	items, deliveries, err := s.p1PeriodItems(tx, id, progress, frozen, now)
 	if err != nil {
 		return nil, err
 	}
-	value := progress.Value
-	if frozen.Mode == "daily" && progress.LastDay != p1Day(LocalPlayNow(tx.Statement.Context)) && now < frozen.EndAt {
-		value = 0
-	}
-	status := int32(0)
-	var delivery db.RewardDelivery
-	if progress.RewardID > 0 {
-		if err = tx.Where("id = ? AND player_id = ?", progress.RewardID, id).First(&delivery).Error; err != nil {
-			return nil, err
-		}
-		status = 1
-		if delivery.ClaimedAt > 0 {
-			status = 2
-		}
-	}
-	item := &pb.ActivityItem{Index: proto.Int32(1), Value: proto.String(strconv.FormatInt(frozen.Goal, 10)), RewardList: resources, Status: proto.Int32(status), Left: proto.Int32(int32(min(value, frozen.Goal))), Total: proto.Int32(int32(frozen.Goal)), PickOneOrGetAll: proto.Int32(1)}
 	switch b := request.(type) {
 	case *pb.CSActivityInfo:
 		// Keep rule provenance in the frozen record; the original UI renders
@@ -261,12 +248,15 @@ func (s *GameService) p1ActivityApply(tx *gorm.DB, id int64, player *pb.Player, 
 		if frozen.Kind == constUtil.P1EventCopyWin && frozen.Mode == "cumulative" {
 			information = "主线胜利累计" + strconv.FormatInt(frozen.Goal, 10) + "次，可领取" + frozen.Title + "。"
 		}
-		response = &pb.SCActivityInfo{ActivityId: proto.String(key), ItemList: []*pb.ActivityItem{item}, StartTime: proto.Int64(frozen.StartAt), EndTime: proto.Int64(frozen.EndAt), RewardEndTime: proto.Int64(frozen.RewardEndAt), Param: proto.String("1"), Information: proto.String(information)}
+		response = &pb.SCActivityInfo{ActivityId: proto.String(key), ItemList: items, StartTime: proto.Int64(frozen.StartAt), EndTime: proto.Int64(frozen.EndAt), RewardEndTime: proto.Int64(frozen.RewardEndAt), Param: proto.String("1"), Information: proto.String(information)}
 	case *pb.CSActivityReward:
-		if b.GetIndex() != 1 || !p1SameResources(resources, b.GetGetResources()) {
+		index := int(b.GetIndex()) - 1
+		if index < 0 || index >= len(items) || !p1SameResources(items[index].RewardList, b.GetGetResources()) {
 			return nil, errors.New("活动领奖选项无效")
 		}
-		if progress.RewardID == 0 {
+		item := items[index]
+		delivery := deliveries[index]
+		if delivery.ID == 0 {
 			return nil, errors.New("活动条件未达成")
 		}
 		gain := &pb.ResultObject{}
@@ -289,7 +279,7 @@ func (s *GameService) p1ActivityApply(tx *gorm.DB, id int64, player *pb.Player, 
 			}
 		}
 		item.Status = proto.Int32(2)
-		response = &pb.SCActivityReward{ActivityId: proto.String(key), ItemList: []*pb.ActivityItem{item}, Get: gain}
+		response = &pb.SCActivityReward{ActivityId: proto.String(key), ItemList: items, Get: gain}
 	}
 	return response, nil
 }
@@ -352,17 +342,19 @@ func (s *GameService) p1LoginDirectoryApply(tx *gorm.DB, id int64, player *pb.Pl
 		if now < cfg.StartAt || now >= cfg.RewardEndAt {
 			continue
 		}
-		index, err := p1LoginDirectoryIndex(tx, cfg.ID, 1)
-		if err != nil {
-			return nil, err
-		}
 		reply, err := s.p1ActivityApply(tx, id, player, game, cfg.ID, &pb.CSActivityInfo{ActivityId: proto.String(cfg.ID)}, now)
 		if err != nil {
 			return nil, err
 		}
 		child := reply.(*pb.SCActivityInfo)
-		child.ItemList[0].Index = proto.Int32(index)
-		child.ItemList[0].Message = proto.String(p1LoginDirectoryCaption(cfg.Title, child.ItemList[0], child.GetRewardEndTime()))
+		for _, item := range child.ItemList {
+			index, err := p1LoginDirectoryIndex(tx, cfg.ID, item.GetIndex())
+			if err != nil {
+				return nil, err
+			}
+			item.Index = proto.Int32(index)
+			item.Message = proto.String(p1LoginDirectoryCaption(cfg.Title, item, child.GetRewardEndTime()))
+		}
 		result.ItemList = append(result.ItemList, child.ItemList...)
 		if result.GetStartTime() == 0 || child.GetStartTime() < result.GetStartTime() {
 			result.StartTime = proto.Int64(child.GetStartTime())

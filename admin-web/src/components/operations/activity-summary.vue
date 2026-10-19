@@ -12,7 +12,7 @@ const milestones = computed(() => props.form.milestones || []);
 const prizes = computed(() => props.form.prizes || []);
 const totalWeight = computed(() => prizes.value.reduce((sum, row) => sum + row.weight, 0));
 const numberFields = [
-  ['scorePerDraw', '每次抽取积分'], ['initialDiamondPool', '初始大奖钻石池'],
+  ['dailySpend', '每日消费钻石门槛'], ['scorePerDraw', '每次抽取积分'], ['initialDiamondPool', '初始大奖钻石池'],
   ['rebateCap', '返还钻石上限'], ['dayLimit', '每日探索次数'], ['totalLimit', '累计探索次数上限'], ['cooldownSeconds', '探索间隔（秒）']
 ];
 const hasRules = computed(() =>

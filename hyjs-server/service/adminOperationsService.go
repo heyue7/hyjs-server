@@ -508,6 +508,9 @@ func (s *GameService) AdminGrant(ctx context.Context, p *model.AdminPrincipal, r
 		result = model.AdminGrantResponse{DeliveryID: delivery.ID, RequestID: req.RequestID}
 		return adminAudit(tx, p, "resource.grant", strconv.FormatInt(req.PlayerID, 10), fmt.Sprintf("%s x%d; request=%s; %s", req.ResourceID, req.Amount, req.RequestID, req.Reason))
 	})
+	if err == nil {
+		s.publishInventoryMailRedPoints(ctx, req.PlayerID)
+	}
 	return &result, err
 }
 

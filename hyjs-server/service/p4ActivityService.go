@@ -297,6 +297,11 @@ func (s *GameService) P4ActivityTabs(ctx context.Context, now time.Time) ([]*pb.
 				returnTabs = append(returnTabs, &pb.ActivityTab{ActivityId: proto.String(activityKey), Name: proto.String(spec.title), Order: proto.Int32(int32(30 + len(returnTabs))), Status: proto.Int32(0)})
 			}
 		}
+		reWelfare, err := s.reOperationsWelfareTabs(tx, now)
+		if err != nil {
+			return err
+		}
+		returnTabs = append(returnTabs, reWelfare...)
 		seasonal, err := s.p15SeasonalTabs(tx, now)
 		if err != nil {
 			return err

@@ -8,6 +8,7 @@ type PeriodInstance struct {
 	Kind        string `gorm:"size:64;not null" json:"kind"`
 	Mode        string `gorm:"size:16;not null" json:"mode"`
 	Goal        int64  `gorm:"not null" json:"goal"`
+	Milestones  []byte `gorm:"type:longblob" json:"milestones,omitempty"` // Milestones freezes optional ordered goals and rewards; empty keeps the legacy single goal.
 	Rewards     string `gorm:"type:text;not null" json:"rewards"`
 	StartAt     int64  `gorm:"not null" json:"startAt"`
 	EndAt       int64  `gorm:"not null" json:"endAt"`

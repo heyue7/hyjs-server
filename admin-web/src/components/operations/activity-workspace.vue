@@ -5,7 +5,7 @@ import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router';
 import { NButton, NDropdown, NImage, NMenu, NSpace, NTag } from 'naive-ui';
 import type { DataTableColumns, MenuOption, SelectOption } from 'naive-ui';
 import { api, errorMessage, formatTime, json } from '@/service/operations';
-import { newActivityForm } from '@/service/activity-operations';
+import { deleteActivityInstance, newActivityForm } from '@/service/activity-operations';
 import type { ActivityForm, ActivityInstance, ActivityMode } from '@/service/activity-operations';
 import { useOperations } from '@/composables/useOperations';
 import ActivityProducts from '@/components/operations/activity-products.vue';
@@ -76,6 +76,8 @@ async function load() {
 }
 const open = ref(false);
 const saving = ref(false);
+const deletingId = ref('');
+const busy = computed(() => saving.value || Boolean(deletingId.value));
 const saveError = ref('');
 const selected = ref<ActivityInstance | null>(null);
 const editorKind = ref<'create' | 'edit' | 'view' | 'copy'>('create');
@@ -94,7 +96,7 @@ const currentSection = computed(() => sectionOptions.value.find(section => secti
 const chosenTemplate = computed(() => selectedMode.value?.templates.find(template => template.id === form.value?.templateId));
 function leave() { open.value = false; nextTick(() => listHeading.value?.scrollIntoView({ block: 'start' })); }
 function requestClose() {
-  if (saving.value) return;
+  if (busy.value) return;
   if (!dirty.value) { leave(); return; }
   window.$dialog?.warning({ title: '放弃未保存的修改？', content: '返回列表后，本次修改不会保存。', positiveText: '放弃修改', negativeText: '继续编辑', onPositiveClick: leave });
 }
@@ -122,10 +124,11 @@ const vipOptions = computed(
 const showSettings = computed(() =>
   Boolean(
     form.value &&
-    (['turntable', 'mystic-shop'].includes(form.value.mode) || Array.isArray(form.value.options.discounts))
+    (['turntable', 'mystic-shop', 'continued-spend'].includes(form.value.mode) || Array.isArray(form.value.options.discounts))
   )
 );
 function show(row?: ActivityInstance, copy = false, view = false) {
+  if (busy.value) return;
   if (copy && !row?.availability?.usable) return;
   selected.value = row || null;
   saveError.value = '';
@@ -178,7 +181,7 @@ function validateForm() {
   return '';
 }
 async function save() {
-  if (!editable.value || !form.value || saving.value) return;
+  if (!editable.value || !form.value || busy.value) return;
   saveError.value = validateForm();
   if (saveError.value) return;
   saving.value = true;
@@ -205,7 +208,9 @@ async function save() {
   }
 }
 async function changeState(row: ActivityInstance, enabled: boolean, makeCurrent = false) {
+  if (busy.value) return;
   if (enabled && !row.availability?.usable) return;
+  saving.value = true;
   try {
     await api(
       `/activity-instances/${encodeURIComponent(row.id)}/state`,
@@ -215,16 +220,48 @@ async function changeState(row: ActivityInstance, enabled: boolean, makeCurrent 
     await load();
   } catch (e) {
     window.$message?.error(errorMessage(e));
+  } finally {
+    saving.value = false;
   }
 }
-async function remove(row: ActivityInstance) {
-  try {
-    await api(`/activity-instances/${encodeURIComponent(row.id)}`, json('DELETE', { version: row.version }));
-    window.$message?.success('活动已归档');
-    await load();
-  } catch (e) {
-    window.$message?.error(errorMessage(e));
-  }
+function requestDelete(row: ActivityInstance) {
+  if (!canWrite.value || busy.value || !window.$dialog) return;
+  deletingId.value = row.id;
+  let submitting = false;
+  const dialog = window.$dialog.warning({
+    title: `删除活动“${row.name}”？`,
+    content: `此活动将停用并从列表移除，原参与进度和领奖记录保留；已发布的排期快照不变。${open.value && selected.value?.id === row.id && dirty.value ? '本次未保存的修改也将丢弃。' : ''}`,
+    positiveText: '删除活动',
+    negativeText: '取消',
+    positiveButtonProps: { type: 'error' },
+    maskClosable: false,
+    closeOnEsc: false,
+    closable: false,
+    onPositiveClick: async () => {
+      if (submitting) return false;
+      submitting = true;
+      dialog.loading = true;
+      dialog.negativeButtonProps = { disabled: true };
+      try {
+        await deleteActivityInstance(row.id, row.version);
+        rows.value = rows.value.filter(item => item.id !== row.id);
+        if (open.value && selected.value?.id === row.id) {
+          baseline.value = JSON.stringify(form.value);
+          leave();
+        }
+        window.$message?.success('活动已删除，参与和领奖记录已保留');
+        return true;
+      } catch (e) {
+        window.$message?.error(errorMessage(e));
+        return false;
+      } finally {
+        submitting = false;
+        dialog.loading = false;
+        dialog.negativeButtonProps = { disabled: false };
+      }
+    },
+    onAfterLeave: () => { deletingId.value = ''; }
+  });
 }
 function activityActions(row: ActivityInstance) {
   if (!canWrite.value || (!row.availability?.usable && !row.editable)) return [];
@@ -234,14 +271,14 @@ function activityActions(row: ActivityInstance) {
     options.push({ key: 'state', label: row.enabled ? '关闭活动' : '开启活动' });
     if (row.mode === 'turntable') options.push({ key: 'current', label: '设为当前转盘' });
   } else if (row.enabled) options.push({ key: 'state', label: '关闭活动' });
-  options.push({ key: 'archive', label: '归档活动' });
   return options;
 }
 function selectAction(key: string, row: ActivityInstance) {
+  if (busy.value) return;
   if (key === 'copy') { show(row, true); return; }
-  const label = key === 'archive' ? '归档活动' : key === 'current' ? '设为当前转盘' : row.enabled ? '关闭活动' : '开启活动';
-  const content = key === 'archive' ? '停用并归档，原参与和领奖记录继续保留。' : key === 'current' ? '启用此转盘供后续活动期使用，已有活动期和领奖历史保持。' : `${label}“${row.name}”？`;
-  window.$dialog?.warning({ title: label, content, positiveText: '确认', negativeText: '取消', onPositiveClick: () => key === 'archive' ? remove(row) : changeState(row, key === 'current' || !row.enabled, key === 'current') });
+  const label = key === 'current' ? '设为当前转盘' : row.enabled ? '关闭活动' : '开启活动';
+  const content = key === 'current' ? '启用此转盘供后续活动期使用，已有活动期和领奖历史保持。' : `${label}“${row.name}”？`;
+  window.$dialog?.warning({ title: label, content, positiveText: '确认', negativeText: '取消', onPositiveClick: () => changeState(row, key === 'current' || !row.enabled, key === 'current') });
 }
 const columns = computed<DataTableColumns<ActivityInstance>>(() => [
   { title: '活动', key: 'name', minWidth: 250, render: row => h('strong', row.name) },
@@ -249,14 +286,16 @@ const columns = computed<DataTableColumns<ActivityInstance>>(() => [
   { title: unavailableOnly.value ? '不可用原因' : '状态', key: 'enabled', minWidth: unavailableOnly.value ? 230 : 150,
     render: row => unavailableOnly.value ? h('div', [h('div', row.availability?.reason || '暂不可运营'), h('span', { class: 'ops-muted' }, row.editable ? '可补齐配置' : '仅供查看')]) : h(NSpace, { size: 6 }, () => [h(NTag, { type: row.enabled ? 'success' : 'default', size: 'small', bordered: false }, () => row.enabled ? '已开启' : '已关闭'), row.frozen ? h(NTag, { size: 'small', bordered: false }, () => '已冻结') : null]) },
   { title: '结束时间', key: 'endAt', width: 185, render: row => formatTime(row.form.endAt) },
-  { title: '操作', key: 'action', width: 245, render: row => h(NSpace, { size: 6 }, () => [
-    h(NButton, { size: 'small', secondary: true, onClick: () => show(row, false, true) }, () => '查看'),
-    canWrite.value && row.editable ? h(NButton, { size: 'small', onClick: () => show(row) }, () => row.availability?.usable ? '编辑' : '补齐配置') : null,
-    activityActions(row).length ? h(NDropdown, { trigger: 'click', options: activityActions(row), onSelect: (key: string) => selectAction(key, row) }, { default: () => h(NButton, { size: 'small', quaternary: true }, () => '更多') }) : null
+  { title: '操作', key: 'action', width: 310, render: row => h(NSpace, { size: 6 }, () => [
+    h(NButton, { size: 'small', disabled: busy.value, secondary: true, onClick: () => show(row, false, true) }, () => '查看'),
+    canWrite.value && row.editable ? h(NButton, { size: 'small', disabled: busy.value, onClick: () => show(row) }, () => row.availability?.usable ? '编辑' : '补齐配置') : null,
+    activityActions(row).length ? h(NDropdown, { trigger: 'click', options: activityActions(row), onSelect: (key: string) => selectAction(key, row) }, { default: () => h(NButton, { size: 'small', disabled: busy.value, quaternary: true }, () => '更多') }) : null,
+    canWrite.value ? h(NButton, { size: 'small', quaternary: true, type: 'error', disabled: busy.value, loading: deletingId.value === row.id, onClick: () => requestDelete(row) }, () => '删除') : null
   ]) }
 ]);
 onBeforeRouteLeave(() => {
-  if (!open.value || !dirty.value || saving.value) return true;
+  if (busy.value) return false;
+  if (!open.value || !dirty.value) return true;
   return new Promise<boolean>(resolve => {
     if (!window.$dialog) { resolve(false); return; }
     window.$dialog.warning({ title: '离开前放弃修改？', content: '此活动有未保存的修改。', positiveText: '放弃并离开', negativeText: '继续编辑', onPositiveClick: () => resolve(true), onNegativeClick: () => resolve(false), onClose: () => resolve(false), onMaskClick: () => resolve(false) });
@@ -270,7 +309,7 @@ onMounted(load);
     <div v-show="!open" class="activity-list">
       <div ref="listHeading" class="ops-toolbar mb-20px">
         <div class="ops-page-label">活动配置<span class="ops-count">{{ rows.length }}</span></div>
-        <NSpace><NButton :loading="loading" @click="load">刷新</NButton><NButton v-if="canWrite" type="primary" :disabled="!modes.length" @click="show()">新建活动</NButton></NSpace>
+        <NSpace><NButton :loading="loading" :disabled="busy" @click="load">刷新</NButton><NButton v-if="canWrite" type="primary" :disabled="busy || !modes.length" @click="show()">新建活动</NButton></NSpace>
       </div>
       <NAlert v-if="error" type="error" :title="error" class="mb-18px" />
       <NCard :bordered="false" class="ops-panel">
@@ -282,12 +321,12 @@ onMounted(load);
           <NSelect v-if="!unavailableOnly" v-model:value="stateFilter" :options="stateOptions" clearable placeholder="全部状态" class="ops-filter-select" @update:value="listPage = 1" />
           <span v-if="q || modeFilter || stateFilter" class="ops-muted">找到 {{ filtered.length }} 项</span>
         </div>
-        <NDataTable :columns="columns" :data="filtered" :loading="loading" :row-key="(row: ActivityInstance) => row.id" :scroll-x="1150" :bordered="false" :pagination="{ page: listPage, pageSize: 20, onChange: (value: number) => listPage = value }" />
+        <NDataTable :columns="columns" :data="filtered" :loading="loading" :row-key="(row: ActivityInstance) => row.id" :scroll-x="1215" :bordered="false" :pagination="{ page: listPage, pageSize: 20, onChange: (value: number) => listPage = value }" />
       </NCard>
     </div>
     <template v-if="open && form">
       <div ref="editorHeading" class="activity-editor-header">
-        <NButton quaternary :disabled="saving" @click="requestClose">← 返回活动列表</NButton>
+        <NButton quaternary :disabled="busy" @click="requestClose">← 返回活动列表</NButton>
         <div class="activity-editor-title"><h1>{{ editorTitle }}</h1><NSpace :size="8"><NTag size="small" :bordered="false">{{ editorKind === 'create' || editorKind === 'copy' ? '新草稿' : selected?.enabled ? '已开启' : '已关闭' }}</NTag><NTag v-if="selected?.frozen && editorKind !== 'copy'" size="small" :bordered="false">已冻结</NTag><NTag v-if="!editable" size="small" :bordered="false">只读查看</NTag></NSpace></div>
 
       </div>
@@ -306,28 +345,28 @@ onMounted(load);
           <ActivitySummary v-if="!editable || activeTab === 'review'" :form="form" :mode="selectedMode" />
           <template v-else>
             <div class="activity-section-title"><h2>{{ currentSection?.title }}</h2><p>{{ currentSection?.detail }}</p></div>
-            <NForm label-placement="top" :disabled="saving">
+            <NForm label-placement="top" :disabled="busy">
               <template v-if="activeTab === 'basics'">
-                <NFormItem label="活动名称" required><NInput v-model:value="form.name" :maxlength="80" placeholder="在游戏中显示的活动名称" :disabled="saving" /></NFormItem>
-                <NFormItem required><template #label><span class="ops-field-label">活动模式<ContextHelp v-if="selectedMode?.notes" title="活动模式说明" :text="selectedMode.notes" /></span></template><NSelect :value="form.mode" :options="modeOptions" :disabled="saving || editorKind === 'edit'" @update:value="changeMode" /></NFormItem>
-                <NFormItem label="游戏界面模板" required><NSelect v-model:value="form.templateId" :options="templateOptions" :render-label="renderTemplate" :disabled="saving" /></NFormItem>
+                <NFormItem label="活动名称" required><NInput v-model:value="form.name" :maxlength="80" placeholder="在游戏中显示的活动名称" :disabled="busy" /></NFormItem>
+                <NFormItem required><template #label><span class="ops-field-label">活动模式<ContextHelp v-if="selectedMode?.notes" title="活动模式说明" :text="selectedMode.notes" /></span></template><NSelect :value="form.mode" :options="modeOptions" :disabled="busy || editorKind === 'edit'" @update:value="changeMode" /></NFormItem>
+                <NFormItem label="游戏界面模板" required><NSelect v-model:value="form.templateId" :options="templateOptions" :render-label="renderTemplate" :disabled="busy" /></NFormItem>
                 <div v-if="chosenTemplate?.preview" class="activity-template-preview"><NImage :src="chosenTemplate.preview" :width="180" :height="110" object-fit="contain" /><span class="ops-muted">界面预览</span></div>
               </template>
               <template v-if="activeTab === 'content'">
-                <ActivityProducts v-if="selectedMode?.supportsProducts" v-model="form.products" :vip-options="vipOptions" :disabled="saving" />
-                <ActivityMilestones v-if="selectedMode?.supportsMilestones" v-model="form.milestones" :mode="form.mode" :disabled="saving" :single="selectedMode?.maxMilestones === 1" :max="selectedMode?.maxMilestones" :day-based="['login-rewards', 'limited-sign'].includes(form.mode)" :choice="form.mode === 'login-rewards'" />
-                <KingPrizes v-if="form.mode === 'king-recruit' && selectedMode?.supportsPrizes" v-model="form.prizes" :disabled="saving" />
-                <ActivityPrizes v-else-if="selectedMode?.supportsPrizes" v-model="form.prizes" :disabled="saving" />
-                <ActivityOptions v-if="!selectedMode?.supportsProducts && !selectedMode?.supportsMilestones && !selectedMode?.supportsPrizes" v-model="form.options" :mode="form.mode" :fixed-values="selectedMode?.fixedValues" :disabled="saving" />
+                <ActivityProducts v-if="selectedMode?.supportsProducts" v-model="form.products" :vip-options="vipOptions" :disabled="busy" />
+                <ActivityMilestones v-if="selectedMode?.supportsMilestones" v-model="form.milestones" :mode="form.mode" :disabled="busy" :single="selectedMode?.maxMilestones === 1" :max="selectedMode?.maxMilestones" :day-based="['login-rewards', 'limited-sign'].includes(form.mode)" :choice="form.mode === 'login-rewards'" />
+                <KingPrizes v-if="form.mode === 'king-recruit' && selectedMode?.supportsPrizes" v-model="form.prizes" :disabled="busy" />
+                <ActivityPrizes v-else-if="selectedMode?.supportsPrizes" v-model="form.prizes" :disabled="busy" />
+                <ActivityOptions v-if="!selectedMode?.supportsProducts && !selectedMode?.supportsMilestones && !selectedMode?.supportsPrizes" v-model="form.options" :mode="form.mode" :fixed-values="selectedMode?.fixedValues" :disabled="busy" />
               </template>
               <template v-if="activeTab === 'schedule'">
-                <NFormItem label="开始时间" required><NDatePicker :value="form.startAt || null" type="datetime" class="w-full" :disabled="saving" @update:value="form.startAt = $event || 0" /></NFormItem>
-                <NFormItem label="结束时间" required><NDatePicker :value="form.endAt || null" type="datetime" class="w-full" :disabled="saving" @update:value="form.endAt = $event || 0" /></NFormItem>
-                <NFormItem label="领奖截止时间" required><NDatePicker :value="form.claimEndAt || null" type="datetime" class="w-full" :disabled="saving" @update:value="form.claimEndAt = $event || 0" /></NFormItem>
+                <NFormItem label="开始时间" required><NDatePicker :value="form.startAt || null" type="datetime" class="w-full" :disabled="busy" @update:value="form.startAt = $event || 0" /></NFormItem>
+                <NFormItem label="结束时间" required><NDatePicker :value="form.endAt || null" type="datetime" class="w-full" :disabled="busy" @update:value="form.endAt = $event || 0" /></NFormItem>
+                <NFormItem label="领奖截止时间" required><NDatePicker :value="form.claimEndAt || null" type="datetime" class="w-full" :disabled="busy" @update:value="form.claimEndAt = $event || 0" /></NFormItem>
                 <p class="ops-muted mb-24px">时间采用北京时间，领奖截止不能早于活动结束。</p>
-                <NFormItem label="运营备注"><NInput v-model:value="form.source" type="textarea" :maxlength="255" :disabled="saving" /></NFormItem>
+                <NFormItem label="运营备注"><NInput v-model:value="form.source" type="textarea" :maxlength="255" :disabled="busy" /></NFormItem>
               </template>
-              <ActivityOptions v-if="activeTab === 'settings'" v-model="form.options" :mode="form.mode" :fixed-values="selectedMode?.fixedValues" :disabled="saving" />
+              <ActivityOptions v-if="activeTab === 'settings'" v-model="form.options" :mode="form.mode" :fixed-values="selectedMode?.fixedValues" :disabled="busy" />
             </NForm>
           </template>
         </NCard>
@@ -335,7 +374,7 @@ onMounted(load);
       </div>
       <div class="activity-editor-footer">
         <span class="ops-muted">{{ dirty ? '有未保存的修改' : editable ? editorKind === 'create' || editorKind === 'copy' ? '草稿尚未创建' : '当前配置已保存' : '只读' }}</span>
-        <NSpace><NButton :disabled="saving" @click="requestClose">{{ editable ? '取消并返回' : '返回列表' }}</NButton><NButton v-if="editable && activeTab !== 'review'" :disabled="saving" @click="activeTab = 'review'">检查配置</NButton><NButton v-if="editable" type="primary" :loading="saving" @click="save">{{ editorKind === 'edit' ? '保存配置' : '保存草稿' }}</NButton><NButton v-else-if="canWrite && selected?.availability?.usable" type="primary" @click="show(selected, true)">复制为新一期</NButton></NSpace>
+        <NSpace><NButton v-if="canWrite && selected && (editorKind === 'edit' || editorKind === 'view')" quaternary type="error" :disabled="busy" :loading="deletingId === selected.id" @click="requestDelete(selected)">删除活动</NButton><NButton :disabled="busy" @click="requestClose">{{ editable ? '取消并返回' : '返回列表' }}</NButton><NButton v-if="editable && activeTab !== 'review'" :disabled="busy" @click="activeTab = 'review'">检查配置</NButton><NButton v-if="editable" type="primary" :loading="saving" :disabled="busy" @click="save">{{ editorKind === 'edit' ? '保存配置' : '保存草稿' }}</NButton><NButton v-else-if="canWrite && selected?.availability?.usable" type="primary" :disabled="busy" @click="show(selected, true)">复制为新一期</NButton></NSpace>
       </div>
     </template>
   </div>

@@ -41,6 +41,7 @@ watch(
   mode => {
     if (mode === 'mystic-shop' && !Array.isArray(options.value.discounts)) options.value.discounts = [];
     if (mode === 'stamina-meal' && !Array.isArray(options.value.meals)) options.value.meals = [];
+    if (mode === 'continued-spend' && !Array.isArray(options.value.finalRewards)) options.value.finalRewards = [];
     if (mode === 'treasure-box') {
       for (const key of ['exploreRewards', 'finalRewards', 'coinPrizes'])
         if (!Array.isArray(options.value[key])) options.value[key] = [];
@@ -171,6 +172,13 @@ const turntableNumbers = [
         <NInputNumber v-model:value="options.rebateCap" :min="0" :precision="0" :disabled="disabled" class="w-full" />
       </NFormItem>
     </template>
+    <template v-else-if="mode === 'continued-spend'">
+      <NFormItem label="每日消费钻石门槛" required>
+        <NInputNumber v-model:value="options.dailySpend" :min="1" :max="2147483647" :precision="0" :disabled="disabled" class="w-full"><template #suffix>钻</template></NInputNumber>
+      </NFormItem>
+      <p class="ops-inline-note">每个北京时间自然日实际消费达到门槛计为 1 个达标日。</p>
+      <NFormItem label="七档完成终奖" required><RewardList v-model:value="options.finalRewards" :disabled="disabled" /></NFormItem>
+    </template>
     <template v-else-if="mode === 'treasure-box'">
       <NDescriptions :column="1" label-placement="left" class="mb-20px">
         <NDescriptionsItem label="每日探索次数">{{ options.dayLimit }}</NDescriptionsItem>
@@ -287,7 +295,7 @@ const turntableNumbers = [
       </div>
     </template>
     <p
-      v-if="!['shop-window', 'stamina-meal', 'diamond-rebate', 'treasure-box', 'turntable', 'power-race', 'king-recruit'].includes(mode) && !Array.isArray(options.discounts) && !Object.keys(fixedValues || {}).length"
+      v-if="!['shop-window', 'stamina-meal', 'diamond-rebate', 'treasure-box', 'turntable', 'power-race', 'king-recruit', 'continued-spend'].includes(mode) && !Array.isArray(options.discounts) && !Object.keys(fixedValues || {}).length"
       class="ops-inline-note"
     >该模式按奖励与资格中的配置执行，无需额外玩法参数。</p>
   </div>

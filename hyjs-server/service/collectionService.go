@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"google.golang.org/protobuf/proto"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -101,21 +102,16 @@ func (s *GameService) p5AchievementValue(tx *gorm.DB, p *pb.Player, g *model.Gam
 		}
 		return progress.RecordStars, err
 	case "copy-stars", "copy-stars-advanced":
-		highest := map[string]int32{}
-		for _, passed := range g.Copy.GetPassedCopyInfo() {
-			mission := s.table("CopyMission", "MissionId", passed.GetMissionId())
-			if mission == nil || mission["ChapterId"] != passed.GetChapterId() {
-				continue
-			}
-			key := passed.GetChapterId() + "/" + passed.GetMissionId()
-			highest[key] = max(highest[key], min(int32(3), max(int32(0), passed.GetStar())))
-		}
-		var total int64
-		for _, v := range highest {
-			total += int64(v)
-		}
-		return int32(min(total, int64(math.MaxInt32))), nil
-	case "equipped-heroes", "treasure-heroes", "formation-level", "formation-breach":
+		_, stars := s.p5AchievementCopyProgress(g)
+		return stars, nil
+	case constUtil.ReAchievementStagesKind:
+		stages, _ := s.p5AchievementCopyProgress(g)
+		return stages, nil
+	case constUtil.ReAchievementLoginKind:
+		return p5AchievementLoginDays(tx, p.GetPlayerId())
+	case constUtil.ReAchievementGrowthKind:
+		return s.p5ReGrowthValue(tx, p.GetPlayerId(), p.GetLevel(), g, r)
+	case "equipped-heroes", "treasure-heroes", "formation-level", "formation-breach", constUtil.ReAchievementFormationKind:
 		return s.p5AchievementFormation(g, r.Kind), nil
 	case "expedition-hours":
 		if !tx.Migrator().HasTable(&db.P7ExpeditionMission{}) {
@@ -241,13 +237,17 @@ func (s *GameService) p5Achievements(ctx context.Context, id int64) ([]proto.Mes
 			if err != nil {
 				return err
 			}
-			value, known := valuesByKind[frozen.Kind]
+			valueKey := frozen.Kind
+			if frozen.Kind == constUtil.ReAchievementGrowthKind {
+				valueKey += fmt.Sprintf("/%d/%d/%d", frozen.RequiredLoginDays, frozen.RequiredLevel, frozen.RequiredStages)
+			}
+			value, known := valuesByKind[valueKey]
 			if !known {
 				value, err = s.p5AchievementValue(tx, p, g, frozen)
 				if err != nil {
 					return err
 				}
-				valuesByKind[frozen.Kind] = value
+				valuesByKind[valueKey] = value
 			}
 			value = max(value, state.Progress)
 			if value > state.Progress {
@@ -256,14 +256,19 @@ func (s *GameService) p5Achievements(ctx context.Context, id int64) ([]proto.Mes
 					return err
 				}
 			}
-			status := int32(0)
+			// 原Prefab明确0=领取、1=前往、2=已领取。
+			status := int32(1)
 			if value >= frozen.Target {
-				status = 1
+				status = 0
 			}
-			if state.ClaimedAt > 0 {
+			acquired, err := p5ReGrowthAlreadyAcquired(tx, id, g, frozen)
+			if err != nil {
+				return err
+			}
+			if state.ClaimedAt > 0 || acquired {
 				status = 2
 			}
-			out.List = append(out.List, &pb.AchievementInfo{Id: proto.String(r.ID), Type: proto.Int32(max(int32(1), frozen.Type)), State: proto.Int32(status), CurrentNum: proto.Int32(value), TotalNum: proto.Int32(frozen.Target), Reward: proto.String(frozen.Reward)})
+			out.List = append(out.List, &pb.AchievementInfo{Id: proto.String(p5AchievementWireID(frozen)), Type: proto.Int32(max(int32(1), frozen.Type)), State: proto.Int32(status), CurrentNum: proto.Int32(value), TotalNum: proto.Int32(frozen.Target), Reward: proto.String(frozen.Reward)})
 		}
 		return nil
 	})
@@ -271,9 +276,15 @@ func (s *GameService) p5Achievements(ctx context.Context, id int64) ([]proto.Mes
 }
 func (s *GameService) p5AchievementReward(ctx context.Context, id int64, b *pb.CSGetAchievementReward, stamp int64) ([]proto.Message, error) {
 	out := &pb.SCGetAchievementReward{}
-	return s.p5Mutation(ctx, id, "achievement", stamp, b, out, func(tx *gorm.DB, p *pb.Player, g *model.GameState) error {
+	canonicalID, err := p5AchievementCanonicalID(ctx, id, b.GetId())
+	if err != nil {
+		return nil, err
+	}
+	canonical := proto.Clone(b).(*pb.CSGetAchievementReward)
+	canonical.Id = proto.String(canonicalID)
+	return s.p5Mutation(ctx, id, "achievement", stamp, canonical, out, func(tx *gorm.DB, p *pb.Player, g *model.GameState) error {
 		var r db.P5Achievement
-		if err := tx.First(&r, "id=?", b.GetId()).Error; err != nil {
+		if err := tx.First(&r, "id=?", canonicalID).Error; err != nil {
 			return err
 		}
 		if r.Disabled {
@@ -285,6 +296,13 @@ func (s *GameService) p5AchievementReward(ctx context.Context, id int64, b *pb.C
 		state, frozen, err := p5AchievementSnapshot(tx, id, &r)
 		if err != nil {
 			return err
+		}
+		acquired, err := p5ReGrowthAlreadyAcquired(tx, id, g, frozen)
+		if err != nil {
+			return err
+		}
+		if acquired {
+			return p5Error()
 		}
 		value, err := s.p5AchievementValue(tx, p, g, frozen)
 		if err != nil {
@@ -693,6 +711,10 @@ func (s *GameService) p5AchievementFormation(g *model.GameState, kind string) in
 			continue
 		}
 		seen[hero.GetGuid()] = true
+		if kind == constUtil.ReAchievementFormationKind {
+			count++
+			continue
+		}
 		if kind == "formation-level" || kind == "formation-breach" {
 			value := warrior.GetLevel()
 			if kind == "formation-breach" {

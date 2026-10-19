@@ -216,6 +216,13 @@ func (s *GameService) AdminBroadcastSend(ctx context.Context, actor *model.Admin
 	if err != nil {
 		return nil, err
 	}
+	// 批次已完整提交后刷新在线角色；离线角色下次原CSRedPoint读取同一待领事实。
+	var recipients []db.AdminBroadcastRecipient
+	if db.GetIns().WithContext(ctx).Where("batch_id=? AND delivery_id>0", id).Find(&recipients).Error == nil {
+		for _, recipient := range recipients {
+			s.publishInventoryMailRedPoints(ctx, recipient.PlayerID)
+		}
+	}
 	return &out, nil
 }
 

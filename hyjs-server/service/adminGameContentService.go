@@ -57,6 +57,13 @@ func AdminAchievementKinds() []model.AdminAchievementKind {
 			kinds = append(kinds, model.AdminAchievementKind{ID: fmt.Sprintf("awake-%d-%d", scene+1, difficulty), Label: fmt.Sprintf("%s·难度%d完整探索", name, difficulty), Type: int32(22 + scene*3 + difficulty - 1), Supported: supported, Notes: notes, FixedTarget: 100})
 		}
 	}
+	kinds = append(kinds,
+		model.AdminAchievementKind{ID: constUtil.ReAchievementLoginKind, Label: "累计登录日数（Re）", Type: constUtil.ReAchievementLoginType, Supported: true, Notes: "Re成就：读取已提交的北京时间登录日，同日重连不重复。"},
+		model.AdminAchievementKind{ID: "collection", Label: "累计图鉴角色种类（Re）", Type: constUtil.ReAchievementCollectionType, Supported: true, Notes: "Re成就：按真实已获得的不同角色ID计算；回收不抹除已记录图鉴。"},
+		model.AdminAchievementKind{ID: constUtil.ReAchievementStagesKind, Label: "不同主线通关数（Re）", Type: constUtil.ReAchievementStagesType, Supported: true, Notes: "Re成就：仅计原主线表有效关卡且真实星数大于0，同一关不重复。"},
+		model.AdminAchievementKind{ID: constUtil.ReAchievementFormationKind, Label: "上阵角色人数（Re）", Type: constUtil.ReAchievementFormationType, Supported: true, Notes: "Re成就：读取真实上阵且在背包中的不同GUID，不计空位和重复GUID。"},
+		model.AdminAchievementKind{ID: constUtil.ReAchievementGrowthKind, Label: "OS成长三项资格（Re）", Type: constUtil.ReAchievementGrowthType, Supported: true, FixedTarget: 3, Notes: "Re成就：累计登录、角色等级和不同主线通关数三项同时达成；需分别配置三项门槛。"},
+	)
 	return kinds
 }
 func adminAchievementProjection(row db.P5Achievement) model.AdminAchievementDTO {
@@ -67,7 +74,10 @@ func adminAchievementProjection(row db.P5Achievement) model.AdminAchievementDTO 
 			out.Notes = kind.Notes
 		}
 	}
-	if row.Kind == "collection" || row.Kind == "warrior_training" {
+	if row.Kind == constUtil.ReAchievementGrowthKind {
+		out.Requirements = &model.AdminAchievementRequirements{LoginDays: row.RequiredLoginDays, Level: row.RequiredLevel, Stages: row.RequiredStages}
+	}
+	if row.Kind == "warrior_training" {
 		out.Supported = true
 		out.Notes = "旧历史兼容条件；只保留已有合同，不作为原36组新建选项。"
 	}
@@ -84,7 +94,7 @@ func AdminAchievements(ctx context.Context, p *model.AdminPrincipal) (*model.Adm
 	if err := tx.Order("id").Find(&rows).Error; err != nil {
 		return nil, err
 	}
-	out := &model.AdminAchievementsResponse{Items: []model.AdminAchievementDTO{}, Kinds: AdminAchievementKinds(), Notes: "原APK的36组触发文案与跳转已恢复；未找到原服务端分段目标/奖励表，目标和奖励由运营填写。22组有真实消费者，14组探索场景未恢复且禁止启用。notes中的兼容聚合不冒充原服公式。高水位仅保留列表/领取时观察到的进度；不会补造未留存且从未观察到的历史峰值。旧原创奖励不恢复，已查看玩家继续使用原冻结合同。"}
+	out := &model.AdminAchievementsResponse{Items: []model.AdminAchievementDTO{}, Kinds: AdminAchievementKinds(), Notes: "保留原36组触发与Re现成成就；Re条件/奖励标明独立来源。未恢复的探索场景继续禁用，旧领取快照与已领标记不改。高水位仅记录真实观察到的进度，不补造缺失历史。"}
 	for _, r := range rows {
 		out.Items = append(out.Items, adminAchievementProjection(r))
 	}
@@ -137,6 +147,19 @@ func (s *GameService) AdminSaveAchievement(ctx context.Context, p *model.AdminPr
 			row.Kind = req.Kind
 			row.Type = typeID
 			row.Target = req.Target
+			if req.Kind == constUtil.ReAchievementGrowthKind {
+				if req.Requirements != nil {
+					row.RequiredLoginDays = req.Requirements.LoginDays
+					row.RequiredLevel = req.Requirements.Level
+					row.RequiredStages = req.Requirements.Stages
+				}
+				// 保存后必须仍是一套可执行的三项资格；旧编辑器漏字段时保留原条件。
+				if row.RequiredLoginDays < 1 || row.RequiredLevel < 1 || row.RequiredStages < 1 {
+					return constUtil.ErrAdminInput
+				}
+			} else {
+				row.RequiredLoginDays, row.RequiredLevel, row.RequiredStages = 0, 0, 0
+			}
 			row.Reward = rewards
 			row.Source = req.Source
 			row.Disabled = !req.Enabled

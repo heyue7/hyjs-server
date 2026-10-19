@@ -44,7 +44,7 @@ func TestAdminContentFrozenClaims(t *testing.T) {
 	for _, a := range out[0].(*pb.SCAchievementList).GetList() {
 		if a.GetId() == created.ID {
 			found = true
-			if a.GetType() != 2 || a.GetState() != 1 || a.GetReward() != "coin,7" {
+			if a.GetType() != 2 || a.GetState() != 0 || a.GetReward() != "coin,7" {
 				t.Fatal("wrong original achievement projection", a)
 			}
 		}
@@ -228,13 +228,13 @@ func TestAdminOriginalAchievementConditions(t *testing.T) {
 	}
 	actor := adminWalletTestActor(t, f, constUtil.AdminRoleOperator)
 	kinds := AdminAchievementKinds()
-	if len(kinds) != 36 {
+	if len(kinds) != 41 {
 		t.Fatal("original category count", len(kinds))
 	}
 	supported := 0
 	seen := map[int32]bool{}
 	for _, kind := range kinds {
-		if seen[kind.Type] || kind.Type < 1 || kind.Type > 36 || kind.Notes == "" {
+		if seen[kind.Type] || kind.Type < 1 || kind.Type > 41 || kind.Notes == "" {
 			t.Fatal("invalid original group", kind)
 		}
 		seen[kind.Type] = true
@@ -242,7 +242,7 @@ func TestAdminOriginalAchievementConditions(t *testing.T) {
 			supported++
 		}
 	}
-	if supported != 22 {
+	if supported != 27 {
 		t.Fatal("invented or missing available progress consumer", supported)
 	}
 	unsupported := model.AdminAchievementDTO{Name: "未恢复地图隔离草稿", Kind: "awake-5-3", Target: 100, Rewards: []model.AdminResourceAmount{{ResourceID: "coin", Amount: 1}}, Source: "isolated unsupported condition test", Enabled: true}

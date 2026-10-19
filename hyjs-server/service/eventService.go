@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"google.golang.org/protobuf/proto"
 	"math"
 	"sort"
 	"strconv"
@@ -147,6 +146,11 @@ func (s *GameService) RecordP1Event(tx *gorm.DB, playerID int64, sourceKey, kind
 			}
 			progress.RewardID = reward.ID
 		}
+		if len(frozen.Milestones) > 0 {
+			if _, _, err = s.p1PeriodItems(tx, playerID, progress, frozen, acceptedAt); err != nil {
+				return err
+			}
+		}
 		if err = tx.Save(progress).Error; err != nil {
 			return err
 		}
@@ -208,21 +212,9 @@ func (s *GameService) RecordP1Save(tx *gorm.DB, row *db.Profile, player *pb.Play
 		if b.GetShopType() != 1 {
 			return nil
 		}
-		// 商店回执重试提前返回、不执行save；所选价格行已由原业务SHARE锁冻结。
-		var cfg db.ShopProduct
-		if err = tx.Where("id = ?", b.GetShopItemId()).First(&cfg).Error; err != nil {
-			return err
-		}
-		cost, err := parsePoolCost(cfg.Cost)
-		if err != nil {
-			return err
-		}
-		total := int64(cost.GetNum()) * int64(b.GetBuyCount())
-		if total <= 0 || total > math.MaxInt32 {
-			return errors.New("购买事件数量无效")
-		}
-		cost.Num = proto.Int32(int32(total))
-		actualCosts = []*pb.BaseResource{cost}
+		// The shop's p4Deduct records the exact paid resource with its stable
+		// transaction source. This save hook owns only the purchase quantity;
+		// a second inferred cost would count the same payment twice.
 		purchases = int64(b.GetBuyCount())
 	case *pb.CSWarriorRecruitGuide:
 		recruit = int64(max(0, len(game.Warriors)-len(old.Warriors)))
@@ -426,6 +418,11 @@ func (s *GameService) p1ReconcileLoginPeriods(tx *gorm.DB, id int64, now time.Ti
 				return err
 			}
 			progress.RewardID = reward.ID
+		}
+		if len(frozen.Milestones) > 0 {
+			if _, _, err = s.p1PeriodItems(tx, id, progress, frozen, now.UnixMilli()); err != nil {
+				return err
+			}
 		}
 		if err = tx.Save(progress).Error; err != nil {
 			return err

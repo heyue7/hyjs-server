@@ -6,7 +6,7 @@ import { NButton, NSpace, NTag } from 'naive-ui';
 import type { DataTableColumns } from 'naive-ui';
 import { api, errorMessage, json } from '@/service/operations';
 import type { ActivityDefinition } from '@/service/activity-schedules';
-import { activityRepeatLabel, activityRepeatPolicy, newActivityForm } from '@/service/activity-operations';
+import { activityRepeatLabel, activityRepeatPolicy, deleteActivityTemplate, newActivityForm } from '@/service/activity-operations';
 import type { ActivityForm, ActivityMode } from '@/service/activity-operations';
 import { useOperations } from '@/composables/useOperations';
 import ActivityProducts from './activity-products.vue';
@@ -17,7 +17,7 @@ import ActivityOptions from './activity-options.vue';
 import ActivitySummary from './activity-summary.vue';
 
 const props = defineProps<{ inline?: boolean }>();
-const emit = defineEmits<{ saved: [definition: ActivityDefinition]; closed: [] }>();
+const emit = defineEmits<{ saved: [definition: ActivityDefinition]; deleted: [id: string]; closed: [] }>();
 const { canWrite, loading, error, run } = useOperations();
 const definitions = ref<ActivityDefinition[]>([]);
 const modes = ref<ActivityMode[]>([]);
@@ -33,6 +33,8 @@ const claimDays = ref(0);
 const enabled = ref(false);
 const activeSection = ref('basics');
 const saving = ref(false);
+const deletingId = ref('');
+const busy = computed(() => saving.value || Boolean(deletingId.value));
 const saveError = ref('');
 const baseline = ref('');
 const draft = computed(() => ({
@@ -89,6 +91,7 @@ async function load() {
   ];
 }
 function openEditor(row?: ActivityDefinition, view = false, copy = false) {
+  if (busy.value) return;
   selected.value = copy ? null : row || null;
   readOnly.value = view || !canWrite.value || Boolean(row && !modeMap.value.has(row.mode));
   if (!row && !modes.value[0]) return;
@@ -113,6 +116,7 @@ function changeMode(mode: string) {
   }
 }
 function confirmDiscard(): Promise<boolean> {
+  if (busy.value) return Promise.resolve(false);
   if (!dirty.value) return Promise.resolve(true);
   return new Promise(resolve => {
     if (!window.$dialog) {
@@ -132,13 +136,13 @@ function confirmDiscard(): Promise<boolean> {
   });
 }
 async function close() {
-  if (!saving.value && (await confirmDiscard())) {
+  if (!busy.value && (await confirmDiscard())) {
     editorOpen.value = false;
     emit('closed');
   }
 }
 async function save() {
-  if (!form.value || readOnly.value || saving.value) return;
+  if (!form.value || readOnly.value || busy.value) return;
   if (!form.value.name.trim()) {
     saveError.value = '请填写活动名称';
     activeSection.value = 'basics';
@@ -148,7 +152,7 @@ async function save() {
   saveError.value = '';
   try {
     const saved = await api<ActivityDefinition>(
-      selected.value ? `/activity-templates/${selected.value.id}` : '/activity-templates',
+      selected.value ? `/activity-templates/${encodeURIComponent(selected.value.id)}` : '/activity-templates',
       json(selected.value ? 'PUT' : 'POST', {
         name: form.value.name.trim(),
         form: { ...form.value, startAt: 0, endAt: 0, claimEndAt: 0 },
@@ -168,6 +172,49 @@ async function save() {
   } finally {
     saving.value = false;
   }
+}
+function requestDelete(row: ActivityDefinition) {
+  if (!canWrite.value || busy.value || !window.$dialog) return;
+  deletingId.value = row.id;
+  let submitting = false;
+  const dialog = window.$dialog.warning({
+    title: `删除模板“${row.name}”？`,
+    content: `删除后将从模板库移除，不能再用于新排期。已发布活动、参与进度和领奖记录保留。${selected.value?.id === row.id && dirty.value ? '本次未保存的修改也将丢弃。' : ''}`,
+    positiveText: '删除模板',
+    negativeText: '取消',
+    positiveButtonProps: { type: 'error' },
+    maskClosable: false,
+    closeOnEsc: false,
+    closable: false,
+    onPositiveClick: async () => {
+      if (submitting) return false;
+      submitting = true;
+      dialog.loading = true;
+      dialog.negativeButtonProps = { disabled: true };
+      try {
+        await deleteActivityTemplate(row.id, row.version);
+        definitions.value = definitions.value.filter(item => item.id !== row.id);
+        if (selected.value?.id === row.id) {
+          editorOpen.value = false;
+          selected.value = null;
+          form.value = null;
+          baseline.value = '';
+          emit('closed');
+        }
+        emit('deleted', row.id);
+        window.$message?.success('模板已删除，已发布活动保持不变');
+        return true;
+      } catch (e) {
+        window.$message?.error(errorMessage(e));
+        return false;
+      } finally {
+        submitting = false;
+        dialog.loading = false;
+        dialog.negativeButtonProps = { disabled: false };
+      }
+    },
+    onAfterLeave: () => { deletingId.value = ''; }
+  });
 }
 const columns = computed<DataTableColumns<ActivityDefinition>>(() => [
   { title: '活动', key: 'name', minWidth: 240, render: row => h('strong', row.name) },
@@ -194,21 +241,24 @@ const columns = computed<DataTableColumns<ActivityDefinition>>(() => [
   {
     title: '操作',
     key: 'actions',
-    width: 220,
+    width: 300,
     render: row =>
       h(NSpace, { size: 6 }, () => [
-        h(NButton, { size: 'small', onClick: () => openEditor(row, true) }, () => '查看'),
+        h(NButton, { size: 'small', disabled: busy.value, onClick: () => openEditor(row, true) }, () => '查看'),
         canWrite.value && modeMap.value.has(row.mode)
-          ? h(NButton, { size: 'small', onClick: () => openEditor(row) }, () => '编辑')
+          ? h(NButton, { size: 'small', disabled: busy.value, onClick: () => openEditor(row) }, () => '编辑')
           : null,
         canWrite.value && row.availability.usable
-          ? h(NButton, { size: 'small', quaternary: true, onClick: () => openEditor(row, false, true) }, () => '复制')
+          ? h(NButton, { size: 'small', disabled: busy.value, quaternary: true, onClick: () => openEditor(row, false, true) }, () => '复制')
+          : null,
+        canWrite.value
+          ? h(NButton, { size: 'small', quaternary: true, type: 'error', disabled: busy.value, loading: deletingId.value === row.id, onClick: () => requestDelete(row) }, () => '删除')
           : null
       ])
   }
 ]);
 function beforeUnload(event: BeforeUnloadEvent) {
-  if (dirty.value || saving.value) {
+  if (dirty.value || busy.value) {
     event.preventDefault();
     event.returnValue = '';
   }
@@ -217,8 +267,8 @@ async function openFromSchedule(row: ActivityDefinition, view = false) {
   if (!modes.value.length) await load();
   openEditor(row, view);
 }
-defineExpose({ openFromSchedule, confirmDiscard, saving, dirty });
-onBeforeRouteLeave(() => props.inline ? true : saving.value ? false : confirmDiscard());
+defineExpose({ openFromSchedule, confirmDiscard, saving: busy, dirty });
+onBeforeRouteLeave(() => busy.value ? false : props.inline ? true : confirmDiscard());
 onMounted(() => {
   window.addEventListener('beforeunload', beforeUnload);
   load();
@@ -235,8 +285,8 @@ onUnmounted(() => window.removeEventListener('beforeunload', beforeUnload));
         </div>
         <NSpace>
           <RouterLink to="/daily-sign"><NButton>每日签到</NButton></RouterLink>
-          <NButton :loading="loading" @click="load">刷新</NButton>
-          <NButton v-if="canWrite" type="primary" :disabled="!modes.length" @click="openEditor()">新建活动模板</NButton>
+          <NButton :loading="loading" :disabled="busy" @click="load">刷新</NButton>
+          <NButton v-if="canWrite" type="primary" :disabled="busy || !modes.length" @click="openEditor()">新建活动模板</NButton>
         </NSpace>
       </div>
       <NAlert v-if="error" type="error" :title="error" class="mb-16px" />
@@ -262,7 +312,7 @@ onUnmounted(() => window.removeEventListener('beforeunload', beforeUnload));
           :loading="loading"
           :row-key="(row: ActivityDefinition) => row.id"
           :bordered="false"
-          :scroll-x="1060"
+          :scroll-x="1140"
           :pagination="{ pageSize: 20 }"
         />
       </NCard>
@@ -270,7 +320,7 @@ onUnmounted(() => window.removeEventListener('beforeunload', beforeUnload));
     <template v-else-if="form">
       <div class="ops-toolbar mb-20px">
         <div>
-          <NButton v-if="!inline" quaternary @click="close">← 返回模板库</NButton>
+          <NButton v-if="!inline" quaternary :disabled="busy" @click="close">← 返回模板库</NButton>
           <h1>{{ selected?.name || '新建活动模板' }}</h1>
         </div>
       </div>
@@ -288,7 +338,7 @@ onUnmounted(() => window.removeEventListener('beforeunload', beforeUnload));
           </button>
         </nav>
         <NCard :bordered="false">
-          <NForm v-if="activeSection !== 'review'" label-placement="top" :disabled="saving || readOnly">
+          <NForm v-if="activeSection !== 'review'" label-placement="top" :disabled="busy || readOnly">
             <template v-if="activeSection === 'basics'">
               <NFormItem label="活动名称" required><NInput v-model:value="form.name" :maxlength="80" /></NFormItem>
               <NFormItem required>
@@ -338,13 +388,13 @@ onUnmounted(() => window.removeEventListener('beforeunload', beforeUnload));
                 v-if="selectedMode?.supportsProducts"
                 v-model="form.products"
                 :vip-options="vipOptions"
-                :disabled="saving || readOnly"
+                :disabled="busy || readOnly"
               />
               <ActivityMilestones
                 v-else-if="selectedMode?.supportsMilestones"
                 v-model="form.milestones"
                 :mode="form.mode"
-                :disabled="saving || readOnly"
+                :disabled="busy || readOnly"
                 :single="selectedMode.maxMilestones === 1"
                 :max="selectedMode.maxMilestones"
                 :day-based="['login-rewards', 'limited-sign'].includes(form.mode)"
@@ -353,12 +403,12 @@ onUnmounted(() => window.removeEventListener('beforeunload', beforeUnload));
               <KingPrizes
                 v-else-if="form.mode === 'king-recruit' && selectedMode?.supportsPrizes"
                 v-model="form.prizes"
-                :disabled="saving || readOnly"
+                :disabled="busy || readOnly"
               />
               <ActivityPrizes
                 v-else-if="selectedMode?.supportsPrizes"
                 v-model="form.prizes"
-                :disabled="saving || readOnly"
+                :disabled="busy || readOnly"
               />
               <NAlert
                 v-else-if="form.mode === 'opening-14'"
@@ -370,7 +420,7 @@ onUnmounted(() => window.removeEventListener('beforeunload', beforeUnload));
                 v-model="form.options"
                 :mode="form.mode"
                 :fixed-values="selectedMode?.fixedValues"
-                :disabled="saving || readOnly"
+                :disabled="busy || readOnly"
               />
             </template>
             <template v-if="activeSection === 'settings'">
@@ -384,7 +434,7 @@ onUnmounted(() => window.removeEventListener('beforeunload', beforeUnload));
                 v-model="form.options"
                 :mode="form.mode"
                 :fixed-values="selectedMode?.fixedValues"
-                :disabled="saving || readOnly"
+                :disabled="busy || readOnly"
               />
             </template>
           </NForm>
@@ -394,8 +444,9 @@ onUnmounted(() => window.removeEventListener('beforeunload', beforeUnload));
       <div class="template-footer">
         <span class="ops-muted">{{ dirty ? '未保存' : '开放日期在活动排期中设置' }}</span>
         <NSpace>
-          <NButton :disabled="saving" @click="close">{{ inline ? '取消' : '返回' }}</NButton>
-          <NButton v-if="!readOnly" type="primary" :loading="saving" @click="save">保存活动设置</NButton>
+          <NButton v-if="canWrite && selected" quaternary type="error" :disabled="busy" :loading="deletingId === selected.id" @click="requestDelete(selected)">删除模板</NButton>
+          <NButton :disabled="busy" @click="close">{{ inline ? '取消' : '返回' }}</NButton>
+          <NButton v-if="!readOnly" type="primary" :loading="saving" :disabled="busy" @click="save">保存活动设置</NButton>
         </NSpace>
       </div>
     </template>

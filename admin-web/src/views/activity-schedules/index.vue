@@ -237,6 +237,12 @@ function definitionSaved(definition: ActivityDefinition) {
   });
   changed();
 }
+function definitionDeleted(id: string) {
+  definitions.value = definitions.value.filter(item => item.id !== id);
+  items.value = items.value.filter(item => item.id || item.templateId !== id);
+  definitionEditorOpen.value = false;
+  changed();
+}
 async function closeDefinitionEditor() {
   if (!definitionEditor.value?.saving && await definitionEditor.value?.confirmDiscard()) definitionEditorOpen.value = false;
 }
@@ -1046,7 +1052,7 @@ onUnmounted(() => {
       <template #footer><NSpace justify="end"><NButton @click="activityPreview = null">关闭</NButton></NSpace></template>
     </NModal>
     <NModal :show="definitionEditorOpen" preset="card" class="activity-editor-modal" :mask-closable="false" :close-on-esc="false" @update:show="!$event && closeDefinitionEditor()">
-      <ActivityTemplateWorkspace ref="definitionEditor" inline @saved="definitionSaved" @closed="definitionEditorOpen = false" />
+      <ActivityTemplateWorkspace ref="definitionEditor" inline @saved="definitionSaved" @deleted="definitionDeleted" @closed="definitionEditorOpen = false" />
     </NModal>
   </div>
 </template>

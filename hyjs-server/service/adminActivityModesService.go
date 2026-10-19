@@ -38,19 +38,25 @@ func adminActivityDefinitions() []adminActivityDefinition {
 		{"limited-sign", "限时签到", "welfare", "limit", "p4:limit:admin_", "ActivityInnerPage/every day sign", false, true, false, 31},
 		{"stamina-meal", "月光餐厅", "welfare", "meal", "p4:meal:admin_", "ActivityInnerPage/asuna kitchen", false, false, false, 0},
 		{"diamond-rebate", "消费返利", "welfare", "rebate", "p4:rebate:admin_", "ActivityInnerPage/CostReturn", false, false, false, 0},
+		{"fortune-cat", "Re招财猫", "welfare", constUtil.ReWelfareCatKind, "fortuneCat_re_", "ActivityInnerPage/treasurecast", false, true, false, 5},
+		{"continued-spend", "Re连续消费", "welfare", constUtil.ReWelfareContinuedKind, "continuedRecharge_re_", "ActivityInnerPage/continueChargeGift", false, true, false, 7},
 		{"treasure-box", "藏宝箱", "welfare", "cat", "p4:cat:admin_", "ActivityInnerPage/treasurecast", false, false, false, 0},
 		{"turntable", "幸运转盘", "pool", "turntable", "admin_turntable_", "ActivityInnerPage/BigTurnTable", false, false, true, 0},
-		{"recharge-total", "累计充值", "period", "payment_amount", "rechargeTotal_p4_admin_", "ActivityInnerPage/recharge surprise", false, true, false, 1},
-		{"diamond-spent", "累计消费", "period", constUtil.P1EventDiamondSpent, "costTotal_p4_admin_", "ActivityInnerPage/recharge surprise", false, true, false, 1},
-		{"recruit-count", "累计招募", "period", constUtil.P1EventRecruit, "warriorRescruitTimes_p4_admin_", "ActivityInnerPage/recharge surprise", false, true, false, 1},
-		{"copy-win", "主线胜利", "period", constUtil.P1EventCopyWin, "mainCopyWinTimes_p4_admin_", "ActivityInnerPage/BattleRace", false, true, false, 1},
-		{"arena-wins", "竞技胜场", "period", constUtil.P4ArenaWinKind, "pvpWinTimes_p4_arena_admin_", "ActivityInnerPage/BattleRace", false, true, false, 1},
-		{"plunder-count", "夺宝次数", "period", constUtil.P4PlunderActivityKind, "robTreasureTimes_p4_admin_", "ActivityInnerPage/BattleRace", false, true, false, 1},
-		{"hero-collection", "英雄收藏", "period", constUtil.P4KindCollect, "warriorGetSpecial_p4_admin_", "ActivityInnerPage/collection warrior", false, true, false, 1},
-		{"trial-stars", "试炼星数", "period", constUtil.P7RushStarEvent, "aincradStars_p4_admin_", "ActivityInnerPage/BattleRace", false, true, false, 1},
-		{"power-race", "战力竞赛", "period", constUtil.P4KindPower, "kaiFuJingSai_p4_admin_", "ActivityInnerPage/open server race", false, true, false, 1},
+		{"recharge-total", "累计充值", "period", "payment_amount", "rechargeTotal_p4_admin_", "ActivityInnerPage/recharge surprise", false, true, false, 31},
+		{"single-spend", "单档消费", "period", constUtil.P1EventDiamondSpent, "rechargeSingle_p4_admin_", "ActivityInnerPage/recharge surprise", false, true, false, 31},
+		{"work", "开工活动", "period", constUtil.P1EventCopyWin, "kaiGongActivity_p4_admin_", "ActivityInnerPage/recharge surprise", false, true, false, 31},
+		{"diamond-spent", "累计消费", "period", constUtil.P1EventDiamondSpent, "costTotal_p4_admin_", "ActivityInnerPage/recharge surprise", false, true, false, 31},
+		{"recruit-count", "累计招募", "period", constUtil.P1EventRecruit, "warriorRescruitTimes_p4_admin_", "ActivityInnerPage/recharge surprise", false, true, false, 31},
+		{"copy-win", "主线胜利", "period", constUtil.P1EventCopyWin, "mainCopyWinTimes_p4_admin_", "ActivityInnerPage/BattleRace", false, true, false, 31},
+		{"arena-wins", "竞技胜场", "period", constUtil.P4ArenaWinKind, "pvpWinTimes_p4_arena_admin_", "ActivityInnerPage/BattleRace", false, true, false, 31},
+		{"plunder-count", "夺宝次数", "period", constUtil.P4PlunderActivityKind, "robTreasureTimes_p4_admin_", "ActivityInnerPage/BattleRace", false, true, false, 31},
+		{"wanted-attempts", "悬赏挑战", "period", constUtil.ReActivityWantedAttemptKind, "fightRedNameTimes_p4_admin_", "ActivityInnerPage/BattleRace", false, true, false, 31},
+		{"wanted-kills", "悬赏击杀", "period", constUtil.ReActivityWantedKillKind, "killRedNameTimes_p4_admin_", "ActivityInnerPage/BattleRace", false, true, false, 31},
+		{"hero-collection", "英雄收藏", "period", constUtil.P4KindCollect, "warriorGetSpecial_p4_admin_", "ActivityInnerPage/collection warrior", false, true, false, 31},
+		{"trial-stars", "试炼星数", "period", constUtil.P7RushStarEvent, "aincradStars_p4_admin_", "ActivityInnerPage/BattleRace", false, true, false, 31},
+		{"power-race", "战力竞赛", "period", constUtil.P4KindPower, "kaiFuJingSai_p4_admin_", "ActivityInnerPage/open server race", false, true, false, 31},
 		{"king-recruit", "王者招募", "pool", "king-recruit", "admin_king_recruit_", "ShopInnerPage/KingRecruit", false, false, true, 0},
-		{"login-total", "累计登录", "period", constUtil.P1EventLoginDay, "totalLogin_p1_admin_", "ActivityInnerPage/login award", false, true, false, 1},
+		{"login-total", "累计登录", "period", constUtil.P1EventLoginDay, "totalLogin_p1_admin_", "ActivityInnerPage/login award", false, true, false, 31},
 	}
 }
 func adminActivityDefinitionFor(mode string) (adminActivityDefinition, bool) {
@@ -89,7 +95,7 @@ func (s *GameService) AdminActivityModes() []model.AdminActivityMode {
 			mode.Conditions = []model.AdminActivityCondition{{Key: "minLevel", Label: "角色等级", Type: "number"}, {Key: "minVip", Label: "最低VIP", Type: "select", Options: vip}}
 		}
 		if d.domain == "period" {
-			mode.Notes += " 当前原消费者每实例支持1档目标；累计充值目标单位为分。"
+			mode.Notes += " 每实例支持最多31档独立目标；累计充值目标单位为分。"
 		}
 		if d.mode == "king-recruit" {
 			mode.FixedValues = map[string]int64{"dayLimit": 50, "luckyGoal": 500, "luckyPerDraw": 10, "rotationHours": 48}
@@ -112,6 +118,12 @@ func (s *GameService) AdminActivityModes() []model.AdminActivityMode {
 			mode.FixedValues = map[string]int64{"singleDiamond": 50, "tenDiamond": 488, "coinPerDraw": 10000}
 			mode.DefaultForm.Options.ScorePerDraw = 1
 			mode.Notes += " 奖品库存、钻石大奖池和记录按角色独立计算，不发排名奖。"
+		}
+		if d.mode == "fortune-cat" {
+			mode.Notes = "每日5次；每档目标填写当次消耗钻石，奖励填写包含本金的实际返钻。"
+		}
+		if d.mode == "continued-spend" {
+			mode.Notes = "按7个消费日统计，每个北京时间自然日实际消费钻石达到门槛计1日；七档完成后可领终奖。"
 		}
 		if d.mode == "stamina-meal" {
 			mode.DefaultForm.Options.Meals = []model.AdminMealWindow{{StartMinute: 720, EndMinute: 840}, {StartMinute: 1080, EndMinute: 1200}}
@@ -356,6 +368,12 @@ func (s *GameService) adminActivityTypedProjection(tx *gorm.DB, raw model.AdminA
 		form.StartAt = cfg.StartAt
 		form.EndAt = cfg.EndAt
 		form.ClaimEndAt = cfg.ClaimEndAt
+		if cfg.Kind == constUtil.ReWelfareCatKind || cfg.Kind == constUtil.ReWelfareContinuedKind {
+			if err := s.adminProjectReOperationsWelfare(cfg, &form); err != nil {
+				return model.AdminActivityInstance{}, err
+			}
+			break
+		}
 		var rules p4WelfareRules
 		_ = json.Unmarshal(cfg.Rules, &rules)
 		form.Options.RebateBps = rules.RebateBps
@@ -390,7 +408,9 @@ func (s *GameService) adminActivityTypedProjection(tx *gorm.DB, raw model.AdminA
 		form.StartAt = cfg.StartAt
 		form.EndAt = cfg.EndAt
 		form.ClaimEndAt = cfg.RewardEndAt
-		form.Milestones = []model.AdminActivityMilestone{{Goal: cfg.Goal, Rewards: adminTypedResources(cfg.Rewards)}}
+		for _, tier := range p1PeriodMilestones(cfg) {
+			form.Milestones = append(form.Milestones, model.AdminActivityMilestone{Goal: tier.Goal, Rewards: adminTypedResources(tier.Rewards)})
+		}
 		if cfg.Kind == constUtil.P4KindPower {
 			form.Options.RankPlaces = int64(cfg.RankPlaces)
 			form.Options.RankRewards = adminTypedResources(cfg.RankRewards)
@@ -435,6 +455,12 @@ func (s *GameService) adminActivityTypedProjection(tx *gorm.DB, raw model.AdminA
 	}
 	supported := false
 	for _, d := range adminActivityDefinitions() {
+		if d.mode == "single-spend" && !strings.Contains(raw.ID, "rechargeSingle_") {
+			continue
+		}
+		if d.mode == "work" && !strings.Contains(raw.ID, "kaiGongActivity_") {
+			continue
+		}
 		if d.domain == raw.Type && d.kind == kind {
 			form.Mode = d.mode
 			form.TemplateID = d.mode + "-original"
@@ -503,6 +529,13 @@ func (s *GameService) AdminActivityInstances(ctx context.Context) ([]model.Admin
 		dto, err := s.adminActivityTypedProjection(tx, raw, frozen)
 		if err != nil {
 			return nil, err
+		}
+		hidden, e := adminActivityHideUnverifiedSource(tx, row.ID, dto.Form)
+		if e != nil {
+			return nil, e
+		}
+		if hidden {
+			continue
 		}
 		out = append(out, dto)
 	}
@@ -651,6 +684,9 @@ func (s *GameService) adminPersistTypedActivity(tx *gorm.DB, d adminActivityDefi
 		}
 		return save(&cfg)
 	case "welfare":
+		if d.kind == constUtil.ReWelfareCatKind || d.kind == constUtil.ReWelfareContinuedKind {
+			return s.adminPersistReOperationsWelfare(tx, key, f, enabled, exists)
+		}
 		rules := p4WelfareRules{RebateBps: f.Options.RebateBps, RebateCap: f.Options.RebateCap, DayLimit: int32(f.Options.DayLimit), TotalLimit: int32(f.Options.TotalLimit), CooldownSeconds: f.Options.CooldownSeconds}
 		for _, m := range f.Milestones {
 			rewards, err := s.adminTypedResourceSpec(m.Rewards, true)
@@ -696,7 +732,7 @@ func (s *GameService) adminPersistTypedActivity(tx *gorm.DB, d adminActivityDefi
 		}
 		return save(&cfg)
 	case "period":
-		if len(f.Milestones) > 1 || enabled && len(f.Milestones) != 1 {
+		if len(f.Milestones) > 31 || enabled && len(f.Milestones) == 0 {
 			return constUtil.ErrAdminInput
 		}
 		goal := int64(1)
@@ -710,6 +746,17 @@ func (s *GameService) adminPersistTypedActivity(tx *gorm.DB, d adminActivityDefi
 			}
 		}
 		cfg := db.PeriodInstance{ID: key, Kind: d.kind, Mode: "cumulative", Enabled: enabled, Title: f.Name, Goal: goal, Rewards: rewards, StartAt: f.StartAt, EndAt: f.EndAt, RewardEndAt: f.ClaimEndAt, Source: f.Source}
+		if len(f.Milestones) > 1 {
+			tiers := []p1PeriodMilestone{}
+			for _, milestone := range f.Milestones {
+				reward, err := s.adminTypedResourceSpec(milestone.Rewards, !enabled)
+				if err != nil {
+					return err
+				}
+				tiers = append(tiers, p1PeriodMilestone{Goal: milestone.Goal, Rewards: reward})
+			}
+			cfg.Milestones = adminJSON(tiers)
+		}
 		if d.mode == "trial-stars" || d.mode == "power-race" {
 			cfg.Mode = "single"
 		}

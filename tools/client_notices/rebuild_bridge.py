@@ -45,7 +45,37 @@ def main():
         assert run.returncode == 0, 'Bridge compile failed; inspect compile.log'
         before, after = [dnfile.dnPE(data=raw) for raw in [old_bridge, bridge.read_bytes()]]
         def api(pe):
-            return [(str(t.TypeNamespace), str(t.TypeName), str(m.row.Name), m.row.Signature.value.hex(), m.row.struct.Flags) for t in pe.net.mdtables.TypeDef.rows for m in t.MethodList if m.row.Flags.mdPublic]
+            def signature(raw):
+                offset = 0
+                def integer():
+                    nonlocal offset
+                    value = raw[offset]; offset += 1
+                    if value & 0x80 == 0: return value
+                    if value & 0xc0 == 0x80:
+                        value = ((value & 0x3f) << 8) | raw[offset]; offset += 1; return value
+                    value = ((value & 0x1f) << 24) | int.from_bytes(raw[offset:offset + 3], 'big'); offset += 3; return value
+                def kind():
+                    tag = integer()
+                    if tag in (0x11, 0x12):
+                        token = integer()
+                        table = [pe.net.mdtables.TypeDef, pe.net.mdtables.TypeRef][token & 3]
+                        row = table.rows[(token >> 2) - 1]
+                        return (tag, str(row.TypeNamespace) + '.' + str(row.TypeName))
+                    if tag == 0x15:
+                        parent = kind(); count = integer(); return (tag, parent, tuple(kind() for _ in range(count)))
+                    if tag in (0x10, 0x1d): return (tag, kind())
+                    assert tag in (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 24, 25, 28), 'Unsupported public ABI element'
+                    return tag
+                flags = integer(); assert not flags & 0x10, 'Generic public method requires explicit verification'
+                count = integer(); result = (flags, kind(), tuple(kind() for _ in range(count)))
+                assert offset == len(raw)
+                return result
+            # Metadata token ordinals may move when private implementation references change.
+            # Private compiler-generated coroutine/closure types have public
+            # constructors, but are not part of the injected helper contract.
+            public_types = [t for t in pe.net.mdtables.TypeDef.rows if t.Flags.tdPublic]
+            assert {str(t.TypeName) for t in public_types} == {'NoticeEntry', 'OriginalNotices', 'NoticeContent'}
+            return sorted([(str(t.TypeNamespace), str(t.TypeName), str(m.row.Name), signature(m.row.Signature.value), m.row.struct.Flags) for t in public_types for m in t.MethodList if m.row.Flags.mdPublic], key=repr)
         assert api(before) == api(after), 'Existing injected helper ABI changed'
         payload = 'assets/bin/Data/Managed/SoulFlowerNotices.dll'
         proof = {

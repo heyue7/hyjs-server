@@ -140,6 +140,12 @@ func (s *GameService) syncFormationPositions(g *model.GameState, tactical *pb.Ta
 			return errors.New("当前英雄阵容不适用于该阵型")
 		}
 		seen[slot.GetFormatPos()] = true
+	}
+	// Preserve HP by the server-owned camp identity before changing board cells.
+	if err := syncFormationSideHP(g, positions); err != nil {
+		return err
+	}
+	for _, slot := range g.Formation {
 		slot.BattlePos = proto.Int32(positions[slot.GetFormatPos()])
 	}
 	return nil
@@ -404,6 +410,16 @@ func (s *GameService) formationExchange(ctx context.Context, id int64, b *pb.CSF
 			if _, err := s.formationWarrior(g, hero.GetGuid(), hero.GetId()); err != nil {
 				return err
 			}
+		}
+		// Avatar exchange carries life with each hero while board cells stay put.
+		positions := map[int32]int32{}
+		for _, slot := range g.Formation {
+			positions[slot.GetFormatPos()] = slot.GetBattlePos()
+		}
+		positions[from.GetFormatPos()] = to.GetBattlePos()
+		positions[to.GetFormatPos()] = from.GetBattlePos()
+		if err := syncFormationSideHP(g, positions); err != nil {
+			return err
 		}
 		from.Things, to.Things = to.Things, from.Things
 		if err := s.syncEquipmentOwners(g); err != nil {

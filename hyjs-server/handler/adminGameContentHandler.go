@@ -72,6 +72,16 @@ func AdminAchievementCreateHandler(c *gin.Context) {
 		adminError(c, constUtil.ErrAdminInput)
 		return
 	}
+	// Validate the three independent OS growth requirements before storing a new rule.
+	if req.Kind == constUtil.ReAchievementGrowthKind {
+		if req.Requirements == nil || req.Requirements.LoginDays < 1 || req.Requirements.Level < 1 || req.Requirements.Stages < 1 {
+			adminError(c, constUtil.ErrAdminInput)
+			return
+		}
+	} else if req.Requirements != nil {
+		adminError(c, constUtil.ErrAdminInput)
+		return
+	}
 	if req.Enabled && len(req.Rewards) == 0 {
 		adminError(c, constUtil.ErrAdminInput)
 		return
@@ -125,6 +135,16 @@ func AdminAchievementUpdateHandler(c *gin.Context) {
 		}
 	}
 	if !known {
+		adminError(c, constUtil.ErrAdminInput)
+		return
+	}
+	// Validate the three independent OS growth requirements before storing a new rule.
+	if req.Kind == constUtil.ReAchievementGrowthKind {
+		if req.Requirements == nil || req.Requirements.LoginDays < 1 || req.Requirements.Level < 1 || req.Requirements.Stages < 1 {
+			adminError(c, constUtil.ErrAdminInput)
+			return
+		}
+	} else if req.Requirements != nil {
 		adminError(c, constUtil.ErrAdminInput)
 		return
 	}

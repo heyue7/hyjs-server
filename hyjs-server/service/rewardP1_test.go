@@ -476,6 +476,7 @@ func TestP1PeriodCutoffRankingTieOfflineRecoveryAndOps(t *testing.T) {
 
 func TestP1SuccessfulLoginDayAndServerHook(t *testing.T) {
 	f := p1Setup(t)
+	p1PublishDirectoryCompatibilityFixture(t, f)
 	for i := 0; i < 3; i++ {
 		if err := f.s.RecordP1Login(f.ctx, f.id); err != nil {
 			t.Fatal(err)
@@ -619,6 +620,7 @@ func TestP1SourceCaseAndGetAllBounds(t *testing.T) {
 // TestP1FutureMonthInstance 发布新月实例不覆盖旧月，也不提前冻结/计入未来活动。
 func TestP1FutureMonthInstance(t *testing.T) {
 	f := p1Setup(t)
+	p1PublishDirectoryCompatibilityFixture(t, f)
 	future := time.Now().AddDate(0, 1, 0)
 	for i := 0; i < 2; i++ {
 		if err := f.s.seedP1Periods(f.ctx, future); err != nil {
@@ -626,6 +628,13 @@ func TestP1FutureMonthInstance(t *testing.T) {
 		}
 	}
 	futureMonth := future.In(time.FixedZone("UTC+8", 8*3600)).Format("200601")
+	// Publish only this fixture's future pair so the test exercises the time
+	// boundary even when an operator has prepared the next month in advance.
+	futurePublication := db.GetIns().Model(&db.PeriodInstance{}).Where("id IN ?", []string{"totalLogin_p1_" + futureMonth + "_welcome", "totalLogin_p1_" + futureMonth + "_three"}).Update("enabled", true)
+	if futurePublication.Error != nil || futurePublication.RowsAffected != 2 {
+		t.Fatal("finite future publication", futurePublication.Error, futurePublication.RowsAffected)
+	}
+
 	if p1Count(t, &db.PeriodInstance{}, "id LIKE ?", "totalLogin_p1_"+futureMonth+"_%") != 2 {
 		t.Fatal("new month duplicated")
 	}
@@ -691,11 +700,22 @@ func TestP1ActualRecruitAndPurchaseCosts(t *testing.T) {
 	if p1Count(t, &db.EventFact{}, "player_id = ? AND kind = ?", f.id, "spend:item_016") != 1 {
 		t.Fatal("recruit retry counted twice")
 	}
+	// The historical shelf is default-off. This isolated cost-accounting fixture
+	// explicitly publishes its one finite product; production remains closed.
+	publication := db.GetIns().Model(&db.ShopProduct{}).Where("id=?", "itemShopId_8").Update("enabled", true)
+	if publication.Error != nil || publication.RowsAffected != 1 {
+		t.Fatal("finite shelf publication", publication.Error, publication.RowsAffected)
+	}
 	buy := &pb.CSShopBuy{ShopType: proto.Int32(1), ShopItemId: proto.String("itemShopId_8"), BuyCount: proto.Int32(2)}
 	ctx = context.WithValue(ctx, constUtil.GameRequestContextKey, buy)
 	if _, err = f.s.shopBuy(ctx, f.id, buy, 102); err != nil {
 		t.Fatal(err)
 	}
+	var firstFacts []db.EventFact
+	if err = db.GetIns().Where("player_id=?", f.id).Order("source_key,kind").Find(&firstFacts).Error; err != nil {
+		t.Fatal(err)
+	}
+	firstFactsJSON, _ := json.Marshal(firstFacts)
 	if _, err = f.s.shopBuy(ctx, f.id, buy, 102); err != nil {
 		t.Fatal(err)
 	}
@@ -704,10 +724,20 @@ func TestP1ActualRecruitAndPurchaseCosts(t *testing.T) {
 		t.Fatal("real purchase fact missing", err, purchase)
 	}
 	var spent db.EventFact
-	if err = db.GetIns().Where("player_id = ? AND kind = ?", f.id, constUtil.P1EventDiamondSpent).First(&spent).Error; err != nil || spent.Amount != 40 {
+	if err = db.GetIns().Where("player_id = ? AND kind = ? AND source_key=?", f.id, constUtil.P1EventDiamondSpent, fmt.Sprintf("shop:%d:102", f.id)).First(&spent).Error; err != nil || spent.Amount != 40 {
 		t.Fatal("shop original cost missing", err, spent)
 	}
-	if p1Count(t, &db.EventFact{}, "player_id = ? AND kind IN ?", f.id, []string{constUtil.P1EventPurchase, constUtil.P1EventDiamondSpent}) != 2 {
-		t.Fatal("shop retry counted twice")
+	var replayFacts []db.EventFact
+	if err = db.GetIns().Where("player_id=?", f.id).Order("source_key,kind").Find(&replayFacts).Error; err != nil {
+		t.Fatal(err)
 	}
+	replayFactsJSON, _ := json.Marshal(replayFacts)
+	if string(firstFactsJSON) != string(replayFactsJSON) {
+		t.Fatal("shop retry changed accepted event facts")
+	}
+	var diamondSpent int64
+	if err = db.GetIns().Model(&db.EventFact{}).Select("COALESCE(SUM(amount),0)").Where("player_id=? AND kind=?", f.id, constUtil.P1EventDiamondSpent).Scan(&diamondSpent).Error; err != nil || diamondSpent != 40 {
+		t.Fatal("same actual shop payment recorded under multiple sources", diamondSpent, err)
+	}
+
 }

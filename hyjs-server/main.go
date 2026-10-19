@@ -323,6 +323,9 @@ func run() error {
 	if err = service.InitializeAdminGameContent(ctx); err != nil {
 		return err
 	}
+	if err = s.InitializeReAchievements(ctx); err != nil {
+		return err
+	}
 	if err = service.InitializeGameFeedback(ctx); err != nil {
 		return err
 	}
@@ -405,6 +408,10 @@ func run() error {
 	}
 	// Re's verified meal rules are a separate editable period; older receipts remain intact.
 	if err = s.InitializeReRestaurant(ctx); err != nil {
+		return err
+	}
+	// Restore verified Re catalogue entries once and retire placeholder consumers before accepting players.
+	if err = s.InitializeReActivityCatalogue(ctx); err != nil {
 		return err
 	}
 	if err = s.InitializeAdminFields(ctx); err != nil {

@@ -43,8 +43,19 @@ const sections = [
 const dirty = computed(() => editing.value && original.value !== JSON.stringify(draft.value));
 const kindLabel = (value: string) =>
   kinds.value.find((row) => row.id === value)?.label ||
-  ({ collection: '历史伙伴收集', warrior_training: '历史强者培养' } as Record<string, string>)[value] ||
-  value;
+  ({ collection: '图鉴收集', warrior_training: '历史强者培养', 'login-days': '累计登录', 'copy-stages': '主线通关', 'formation-count': '上阵人数', 're-os-growth': 'OS角色成长' } as Record<string, string>)[value] ||
+  '未识别条件';
+const targetUnit = (value: string) =>
+  ({ 'login-days': '天', collection: '种角色', 'copy-stages': '关', 'formation-count': '人', 're-os-growth': '项', level: '级', 'level-advanced': '级', 'copy-stars': '颗星', 'copy-stars-advanced': '颗星' } as Record<string, string>)[value] || '';
+const isOSGrowth = computed(() => draft.value.kind === 're-os-growth');
+const osRequirements = computed(() => draft.value.requirements);
+function goalSummary(row: Achievement) {
+  if (row.kind === 're-os-growth') {
+    const goal = row.requirements;
+    return goal ? `登录 ${goal.loginDays} 天 · 等级 ${goal.level} 级 · 通关 ${goal.stages} 关` : '请配置登录天数、角色等级和主线关卡数';
+  }
+  return `${kindLabel(row.kind)} · ${row.target.toLocaleString()}${targetUnit(row.kind)}`;
+}
 const kindFilterOptions = computed(() =>
   [...new Set([...kinds.value.map((row) => row.id), ...rows.value.map((row) => row.kind)])].map((value) => ({
     value,
@@ -66,7 +77,7 @@ const condition = computed(
     kinds.value.find((row) => row.id === draft.value.kind) ||
     (selected.value?.kind === draft.value.kind ? selected.value : undefined)
 );
-const fixedTarget = computed(() => kinds.value.find(row => row.id === draft.value.kind)?.fixedTarget);
+const fixedTarget = computed(() => isOSGrowth.value ? 3 : kinds.value.find(row => row.id === draft.value.kind)?.fixedTarget);
 const conditionColumns: DataTableColumns<AchievementKind> = [
   { title: '触发条件', key: 'label', minWidth: 230 },
   {
@@ -104,6 +115,7 @@ async function load() {
 function edit(row: Achievement | null) {
   selected.value = row;
   draft.value = row ? JSON.parse(JSON.stringify(row)) : fresh();
+  if (isOSGrowth.value && !draft.value.requirements) draft.value.requirements = { loginDays: 1, level: 1, stages: 1 };
   if (fixedTarget.value !== undefined) draft.value.target = fixedTarget.value;
   original.value = JSON.stringify(draft.value);
   section.value = 'goal';
@@ -114,6 +126,7 @@ function setKind(value: string) {
   if (kinds.value.find((row) => row.id === value)?.supported === false) return;
   draft.value.kind = value;
   draft.value.type = kinds.value.find((row) => row.id === value)?.type ?? 0;
+  if (value === 're-os-growth' && !draft.value.requirements) draft.value.requirements = { loginDays: 1, level: 1, stages: 1 };
   if (fixedTarget.value !== undefined) draft.value.target = fixedTarget.value;
 }
 function back() {
@@ -140,6 +153,8 @@ async function save() {
         ? '请选择成就条件'
         : !Number.isInteger(draft.value.target) || draft.value.target < 1
           ? '目标需为正整数'
+          : isOSGrowth.value && (!osRequirements.value || [osRequirements.value.loginDays, osRequirements.value.level, osRequirements.value.stages].some(value => !Number.isSafeInteger(value) || value < 1 || value > 2147483647))
+            ? '请为OS角色成长填写正整数的登录天数、角色等级和主线关卡数'
           : !draft.value.rewards.length ||
               draft.value.rewards.some((r) => !r.resourceId || !Number.isInteger(r.amount) || r.amount < 1)
             ? '请填写完整的完成奖励'
@@ -149,7 +164,7 @@ async function save() {
   try {
     await api(
       `/achievements${selected.value ? `/${encodeURIComponent(selected.value.id)}` : ''}`,
-      json(selected.value ? 'PUT' : 'POST', draft.value)
+      json(selected.value ? 'PUT' : 'POST', { ...draft.value, requirements: isOSGrowth.value ? draft.value.requirements : undefined })
     );
     original.value = JSON.stringify(draft.value);
     editing.value = false;
@@ -191,8 +206,8 @@ const columns: DataTableColumns<Achievement> = [
   {
     title: '目标',
     key: 'target',
-    minWidth: 190,
-    render: (row) => `${kindLabel(row.kind)} · ${row.target.toLocaleString()}`
+    minWidth: 250,
+    render: goalSummary
   },
   {
     title: '奖励',
@@ -306,6 +321,7 @@ onMounted(load);
           v-model:value="kind"
           :options="kindFilterOptions"
           clearable
+          filterable
           class="ops-filter-select"
           placeholder="全部类型"
         />
@@ -335,19 +351,26 @@ onMounted(load);
         <h3 class="mb-20px">成就目标</h3>
         <div class="ops-date-grid">
           <NFormItem v-if="selected" label="成就编号"><span class="ops-mono ops-muted">{{ draft.id }}</span></NFormItem>
-          <NFormItem label="显示名称" required><NInput v-model:value="draft.name" placeholder="成就名称" /></NFormItem>
+          <NFormItem label="后台名称" required><NInput v-model:value="draft.name" placeholder="成就名称" /></NFormItem>
         </div>
         <NFormItem label="进度条件" required>
-          <NSelect :value="draft.kind" :options="kindOptions" placeholder="选择触发条件" @update:value="setKind" />
+          <template #label><span class="achievement-condition-label">进度条件<ContextHelp v-if="condition?.notes && condition.supported !== false" title="成就条件说明" :text="condition.notes" /></span></template>
+          <NSelect :value="draft.kind" :options="kindOptions" filterable placeholder="搜索或选择触发条件" @update:value="setKind" />
         </NFormItem>
         <NAlert
-          v-if="condition?.notes"
-          :type="condition.supported === false ? 'warning' : 'info'"
+          v-if="condition?.notes && condition.supported === false"
+          type="warning"
           :title="condition.notes"
           class="mb-20px"
         />
-        <NFormItem label="达成目标" required>
-          <NInputNumber v-model:value="draft.target" :disabled="fixedTarget !== undefined || saving || !canWrite" :min="1" :precision="0" />
+        <div v-if="isOSGrowth && draft.requirements" class="achievement-requirements">
+          <NFormItem label="累计登录天数" required><NInputNumber v-model:value="draft.requirements.loginDays" :min="1" :max="2147483647" :precision="0"><template #suffix>天</template></NInputNumber></NFormItem>
+          <NFormItem label="角色等级" required><NInputNumber v-model:value="draft.requirements.level" :min="1" :max="2147483647" :precision="0"><template #suffix>级</template></NInputNumber></NFormItem>
+          <NFormItem label="通关主线关卡数" required><NInputNumber v-model:value="draft.requirements.stages" :min="1" :max="2147483647" :precision="0"><template #suffix>关</template></NInputNumber></NFormItem>
+        </div>
+        <p v-if="isOSGrowth" class="ops-inline-note mb-16px">以上三项需同时满足；主线按不同已通关关卡计数。</p>
+        <NFormItem :label="isOSGrowth ? '需达成条件数' : '达成目标'" required>
+          <NInputNumber v-model:value="draft.target" :disabled="fixedTarget !== undefined || saving || !canWrite" :min="1" :max="2147483647" :precision="0"><template v-if="targetUnit(draft.kind)" #suffix>{{ targetUnit(draft.kind) }}</template></NInputNumber>
         </NFormItem>
       </section>
       <section v-show="section === 'rewards'">
@@ -366,8 +389,15 @@ onMounted(load);
         <NFormItem label="配置备注">
           <NInput v-model:value="draft.source" type="textarea" :maxlength="1000" />
         </NFormItem>
-        <p class="ops-inline-note">修改仅影响之后的新奖励，已领取的记录不变。</p>
+        <p class="ops-inline-note">玩家已查看的成就保留当时的目标与奖励；保存后的配置用于之后首次接收此成就的玩家。已领取记录保留。</p>
       </section>
     </NForm>
   </ManagementWorkspace>
 </template>
+
+<style scoped>
+.achievement-condition-label { display: inline-flex; align-items: center; gap: 8px; }
+.achievement-requirements { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.achievement-requirements :deep(.n-input-number) { width: 100%; }
+@media (max-width: 650px) { .achievement-requirements { grid-template-columns: minmax(0, 1fr); gap: 0; } }
+</style>

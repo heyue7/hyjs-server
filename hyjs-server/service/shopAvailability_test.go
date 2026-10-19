@@ -2,7 +2,9 @@ package service
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
+	"reflect"
 	"testing"
 	"time"
 
@@ -13,8 +15,8 @@ import (
 	pb "hyjs-server/model/protocol"
 )
 
-// TestAdminShopUnlimitedFrozenCatalogueAndOriginalReceipt changes only operating
-// hours around an actual native purchase; old terms, quota and receipt stay exact.
+// TestAdminShopUnlimitedFrozenCatalogueAndOriginalReceipt edits live operating
+// hours around a native purchase while retaining its historical quote and quota.
 func TestAdminShopUnlimitedFrozenCatalogueAndOriginalReceipt(t *testing.T) {
 	f, actor := adminModesFixture(t)
 	p4Fund(t, f)
@@ -69,7 +71,7 @@ func TestAdminShopUnlimitedFrozenCatalogueAndOriginalReceipt(t *testing.T) {
 	settings.ClaimEndAt = settings.EndAt
 	limited, err := f.s.AdminSaveShopSettings(f.ctx, actor, "point", model.AdminShopSettingsSaveRequest{AdminShopSettings: settings, Version: view.Version})
 	if err != nil || limited.Settings.Unlimited {
-		t.Fatal("frozen shop hours cannot change", err)
+		t.Fatal("live shop hours cannot change", err)
 	}
 	if _, err = f.s.p4Commerce(f.ctx, f.id, buy, 777902, now); !errors.Is(err, constUtil.ErrP4CommerceNotOpen) {
 		t.Fatal("outside limited hours charged", err)
@@ -95,8 +97,30 @@ func TestAdminShopUnlimitedFrozenCatalogueAndOriginalReceipt(t *testing.T) {
 	if err = db.GetIns().First(&after, "id=?", source.ID).Error; err != nil {
 		t.Fatal(err)
 	}
-	if !bytes.Equal(after.Frozen, frozen.Frozen) || !bytes.Equal(after.Rules, frozen.Rules) || after.StartAt != frozen.StartAt || after.EndAt != frozen.EndAt {
-		t.Fatal("hours rewrote accepted catalogue")
+	if !bytes.Equal(after.Frozen, frozen.Frozen) {
+		t.Fatal("live hours rewrote the historical accepted quote")
+	}
+	// The live-shop contract adopted in d38180b permits explicitly saved dates
+	// and marks mutable terms without resetting the historical purchase identity.
+	var (
+		beforeRules map[string]any
+		afterRules  map[string]any
+	)
+	if err := json.Unmarshal(frozen.Rules, &beforeRules); err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(after.Rules, &afterRules); err != nil {
+		t.Fatal(err)
+	}
+	beforeRules["liveEditable"] = true
+	if !reflect.DeepEqual(beforeRules, afterRules) {
+		t.Fatal("hours changed product terms beyond the live-editing marker")
+	}
+	if after.StartAt != settings.StartAt || after.EndAt != settings.EndAt || after.ClaimEndAt != settings.ClaimEndAt {
+		t.Fatal("live source ignored explicitly saved operating dates")
+	}
+	if again, err := f.s.p4Commerce(f.ctx, f.id, buy, 777901, now); err != nil || !proto.Equal(again[0], paid[0]) {
+		t.Fatal("live hours rewrote the original purchase receipt", err)
 	}
 	if err = db.GetIns().First(&progress, "player_id=? AND rule_id=?", f.id, source.ID).Error; err != nil || !bytes.Equal(progress.Payload, originalState) {
 		t.Fatal("hours reset native quota", err)

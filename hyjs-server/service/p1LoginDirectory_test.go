@@ -22,8 +22,22 @@ func p1DirectoryInfo(t *testing.T, f *p1Fixture) *pb.SCActivityInfo {
 	return replies[0].(*pb.SCActivityInfo)
 }
 
+// p1PublishDirectoryCompatibilityFixture explicitly enables the two finite
+// single-tier compatibility publications in this isolated test database.
+// Production seeds stay closed and the Re catalogue is verified separately.
+func p1PublishDirectoryCompatibilityFixture(t *testing.T, f *p1Fixture) {
+	t.Helper()
+	suffix := time.Now().In(time.FixedZone("UTC+8", 8*3600)).Format("200601")
+	ids := []string{"totalLogin_p1_" + suffix + "_welcome", "totalLogin_p1_" + suffix + "_three"}
+	result := db.GetIns().Model(&db.PeriodInstance{}).Where("id IN ?", ids).Update("enabled", true)
+	if result.Error != nil || result.RowsAffected != 2 {
+		t.Fatal("finite directory publication", result.Error, result.RowsAffected)
+	}
+}
+
 func TestP1LoginDirectoryActualGoalsCrossEntryOnceAndCold(t *testing.T) {
 	f := p1Setup(t)
+	p1PublishDirectoryCompatibilityFixture(t, f)
 	now := time.Now()
 	f.event(t, "login:"+p1Day(now.AddDate(0, 0, -1)), constUtil.P1EventLoginDay, 1, now.AddDate(0, 0, -1))
 	if err := f.s.RecordP1Login(f.ctx, f.id); err != nil {
@@ -105,6 +119,7 @@ func TestP1LoginDirectoryActualGoalsCrossEntryOnceAndCold(t *testing.T) {
 
 func TestP1LoginDirectoryRemovedChildCannotShiftIndex(t *testing.T) {
 	f := p1Setup(t)
+	p1PublishDirectoryCompatibilityFixture(t, f)
 	if err := f.s.RecordP1Login(f.ctx, f.id); err != nil {
 		t.Fatal(err)
 	}

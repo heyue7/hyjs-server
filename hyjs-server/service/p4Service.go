@@ -128,6 +128,8 @@ func (s *GameService) DispatchP4(ctx context.Context, id int64, request proto.Me
 
 func p4ResponseName(request proto.Message) string {
 	switch request.(type) {
+	case *pb.CSContinuedRechargeReward:
+		return "SCContinuedRechargeReward"
 	case *pb.CSConsumeReturnReward, *pb.CSActivityReward:
 		return "SCActivityReward"
 	case *pb.CSShopBuy:

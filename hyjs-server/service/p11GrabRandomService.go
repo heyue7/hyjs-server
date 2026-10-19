@@ -388,6 +388,13 @@ func (s *GameService) DispatchP11GrabRandom(ctx context.Context, id int64, reque
 		return result, true, err
 	case *pb.CSRedPoint:
 		result, err := s.p11GrabRandomAt(ctx, id, 0, false, time.Now())
+		if err == nil {
+			points, pointErr := s.InventoryMailRedPoints(ctx, id)
+			if pointErr != nil {
+				return nil, true, pointErr
+			}
+			result[0].(*pb.SCRedPoint).RedPointList = append(result[0].(*pb.SCRedPoint).RedPointList, points.RedPointList...)
+		}
 		return result, true, err
 	case *pb.CSGetRandReward:
 		result, err := s.p11GrabRandomAt(ctx, id, stamp, true, time.Now())

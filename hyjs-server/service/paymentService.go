@@ -644,6 +644,17 @@ func (s *GameService) HandlePayment(ctx context.Context, id int64, request proto
 			return r, true, e
 		}
 	case *pb.CSContinuedRechargeInfo, *pb.CSContinuedRechargeReward:
+		activityID := ""
+		switch continued := request.(type) {
+		case *pb.CSContinuedRechargeInfo:
+			activityID = continued.GetActivityId()
+		case *pb.CSContinuedRechargeReward:
+			activityID = continued.GetActivityId()
+		}
+		if strings.HasPrefix(activityID, constUtil.ReWelfareContinuedPrefix) {
+			r, e := s.reContinuedWelfare(ctx, id, request, stamp, LocalPlayNow(ctx))
+			return r, true, e
+		}
 		r, e := s.paymentActivity(ctx, id, request, LocalPlayNow(ctx))
 		return r, true, e
 	case *pb.CSConvertGiftCode, *pb.CSOpenLuxuryEquipment, *pb.CSLuxuryEquipmentInfo, *pb.CSLuxuryEquipmentReward:

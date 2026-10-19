@@ -1,10 +1,19 @@
 package model
 
 // AdminAchievementDTO projects the actual claim rule and its original UI type.
+// AdminAchievementRequirements 是Re成长任务的三项实际资格。
+type AdminAchievementRequirements struct {
+	LoginDays int32 `json:"loginDays"` // LoginDays 为累计真实登录日数。
+	Level     int32 `json:"level"`     // Level 为角色所需等级。
+	Stages    int32 `json:"stages"`    // Stages 为不同主线通关数。
+}
+
 type AdminAchievementDTO struct {
+	Requirements *AdminAchievementRequirements `json:"requirements,omitempty"` // Requirements 仅Re三条件成长任务使用。
+
 	ID      string                `json:"id"`      // Stable rule ID, server generated for new entries.
 	Name    string                `json:"name"`    // Operator display name; original client uses the original type text.
-	Kind    string                `json:"kind"`    // One of the 36 original condition IDs from the kinds catalogue; legacy rules remain visible.
+	Kind    string                `json:"kind"`    // Original or Re condition ID from the kinds catalogue; legacy rules remain visible.
 	Type    int32                 `json:"type"`    // Original NGUI achievement type.
 	Target  int32                 `json:"target"`  // Required progress.
 	Rewards []AdminResourceAmount `json:"rewards"` // Explicit configured payouts, never auto populated.

@@ -17,6 +17,8 @@ namespace HYJS.Notices
     {
         public static void ShowAnnouncement(string url, int top, int left, int bottom, int right, int full)
         {
+            UI.AnnouncePage current = UI.PageManager.Instance.GetDictPage("AnnouncePage") as UI.AnnouncePage;
+            if (current != null) { Open(current, current.bg, url); return; }
             UI.AnnouncePage[] pages = Resources.FindObjectsOfTypeAll<UI.AnnouncePage>();
             for (int i = 0; i < pages.Length; i++)
                 if (pages[i] != null && pages[i].gameObject.activeInHierarchy)
@@ -112,6 +114,18 @@ namespace HYJS.Notices
     // font references; never substitute an Android or Unity built-in font.
     public sealed class NoticeContent : MonoBehaviour
     {
+        int diagnosticLines;
+        void Trace(string text)
+        {
+            if (diagnosticLines >= 12) return;
+            try
+            {
+                string path = Application.persistentDataPath + "/notice-layout.txt";
+                if (diagnosticLines++ == 0) System.IO.File.WriteAllText(path, text + "\n");
+                else System.IO.File.AppendAllText(path, text + "\n");
+            }
+            catch (Exception) { }
+        }
         UISprite background;
         UILabel template;
         WWW request;
@@ -133,6 +147,8 @@ namespace HYJS.Notices
         public void Open(UISprite originalBackground, string url)
         {
             Close();
+            diagnosticLines = 0;
+            Trace("open background=" + (originalBackground != null));
             background = originalBackground;
             visible = true;
             status = "公告加载中…";
@@ -217,6 +233,7 @@ namespace HYJS.Notices
             // assigning it afterwards clears bitmapFont and loses the game's UIFont.
             if (template.bitmapFont != null) label.bitmapFont = template.bitmapFont;
             else label.trueTypeFont = template.trueTypeFont;
+            label.material = template.material;
             label.fontStyle = template.fontStyle;
             label.fontSize = heading ? 24 : 22;
             label.effectStyle = template.effectStyle;
@@ -247,6 +264,9 @@ namespace HYJS.Notices
             UIPanel panel = go.AddComponent<UIPanel>();
             UIPanel original = background.GetComponentInParent<UIPanel>();
             panel.depth = original == null ? 1 : original.depth + 1;
+            // Page panels carry a nonzero renderer sorting order. New scroll
+            // panels retain that order so the native frame cannot cover text.
+            panel.sortingOrder = original == null ? 0 : original.sortingOrder;
             panel.clipping = UIDrawCall.Clipping.SoftClip;
             panel.baseClipRegion = new Vector4(0, 0, width, height);
             panel.clipSoftness = new Vector2(2f, 2f);
@@ -267,6 +287,7 @@ namespace HYJS.Notices
             if (root != null) { root.SetActive(false); Destroy(root); root = null; }
             navigation.Clear();
             template = FontTemplate();
+            Trace("build template=" + (template != null) + " status=" + status);
             if (template == null) return;
             baseDepth = background.depth;
             lastWidth = background.width; lastHeight = background.height;
@@ -276,14 +297,15 @@ namespace HYJS.Notices
             float width = background.width - 44f;
             viewHeight = background.height - 56f;
             if (width < 260f || viewHeight < 100f) return;
-            root = Child("SoulFlowerOriginalNotices", background.transform, Vector3.zero);
-            // Every path, including loading/empty/error, stays inside the original frame.
-            UIPanel clip = root.AddComponent<UIPanel>();
-            UIPanel originalPanel = background.GetComponentInParent<UIPanel>();
-            clip.depth = originalPanel == null ? 1 : originalPanel.depth + 1;
-            clip.clipping = UIDrawCall.Clipping.SoftClip;
-            clip.baseClipRegion = new Vector4(left + width / 2f, top - viewHeight / 2f, width, viewHeight);
-            clip.clipSoftness = new Vector2(2f, 2f);
+            Trace("bounds=" + left + "," + top + "," + width + "," + viewHeight + " font=" + (template.bitmapFont == null ? template.trueTypeFont.name : template.bitmapFont.name) + " bgAlpha=" + background.finalAlpha + " templateAlpha=" + template.finalAlpha);
+            // The original centre sprite is deliberately translucent. Its alpha
+            // must not tint content. Keep the exact local transform as a sibling
+            // so text inherits the page's normal opacity and original game font.
+            root = Child("SoulFlowerOriginalNotices", background.transform.parent, background.transform.localPosition);
+            root.transform.localScale = background.transform.localScale;
+            root.transform.localRotation = background.transform.localRotation;
+            // Keep the native panel/material path. Text clamps or its own scroll
+            // bounds contain it without adding a second font-clipping shader.
             if (status != null)
             {
                 UILabel empty = Label("Status", root.transform, left + 16f, top - viewHeight / 2f + 18f, width - 32f, status, false, null);
