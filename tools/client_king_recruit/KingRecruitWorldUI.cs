@@ -84,7 +84,17 @@ namespace HYJS.KingRecruit
         WWW pending;
         float nextRefresh;
         int selectedSpace;
-        public bool Ready { get { return ready && !busy && !drawing && CurrentOwner(); } }
+        bool visible;
+        static readonly FieldInfo CurrentShopTab = typeof(ShopPage).GetField("curTab", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+        static readonly FieldInfo CurrentShopType = typeof(ShopPage).GetField("curType", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+        bool ContentVisible()
+        {
+            if (tab == null || tab.backGround == null || !tab.backGround.enabled || !tab.backGround.gameObject.activeInHierarchy) return false;
+            ShopPage shop = tab.GetComponentInParent<ShopPage>();
+            return shop != null && CurrentShopTab != null && CurrentShopType != null &&
+                CurrentShopTab.GetValue(shop) as GameObject == tab.gameObject && Convert.ToInt32(CurrentShopType.GetValue(shop)) == 1;
+        }
+        public bool Ready { get { return ready && !busy && !drawing && CurrentOwner() && ContentVisible(); } }
         bool CurrentOwner()
         {
             return StaticData.playerData != null && StaticData.playerData.playerId == owner &&
@@ -106,7 +116,8 @@ namespace HYJS.KingRecruit
             busy = false; drawing = false; initialized = true; ready = false;
             if (StaticData.playerData == null || StaticData.sessionKey == null || StaticData.sessionKey.Length != 16) return;
             owner = StaticData.playerData.playerId; ownerSession = Hex(StaticData.sessionKey);
-            if (!busy && gameObject.activeInHierarchy) StartCoroutine(Request(""));
+            visible = ContentVisible();
+            if (!busy && visible) StartCoroutine(Request(""));
         }
         public void BeginDraw() { drawing = true; ready = false; }
         public void EndDraw() { drawing = false; ready = false; nextRefresh = 0; }
@@ -115,14 +126,24 @@ namespace HYJS.KingRecruit
             // Only a reply for the selected world releases original draw actions.
             PropertyInfo property = typeof(TabKingsRecruit).GetProperty("recruitInfo", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
             ProtoBuf.Message.WarriorRecruit info = property == null ? null : property.GetValue(tab, null) as ProtoBuf.Message.WarriorRecruit;
-            ready = CurrentOwner() && !busy && selected != "" && info != null && info.on == 1 &&
+            ready = CurrentOwner() && ContentVisible() && !busy && selected != "" && info != null && info.on == 1 &&
                 (selectedSpace == 0 || info.space == selectedSpace);
         }
-        void OnDisable() { ready = false; busy = false; StopAllCoroutines(); if (pending != null) { pending.Dispose(); pending = null; } }
-        void OnEnable() { nextRefresh = 0; }
+        void Suspend()
+        {
+            ready = false; busy = false; visible = false;
+            StopAllCoroutines();
+            if (pending != null) { pending.Dispose(); pending = null; }
+            foreach (GameObject button in buttons) if (button != null) button.SetActive(false);
+        }
+        void OnDisable() { Suspend(); }
+        void OnDestroy() { Suspend(); ClearButtons(); }
+        void OnEnable() { visible = false; nextRefresh = 0; }
         void LateUpdate()
         {
             if (tab == null || !gameObject.activeInHierarchy) return;
+            if (!ContentVisible()) { Suspend(); return; }
+            if (!visible) { visible = true; ready = false; nextRefresh = 0; }
             if (!CurrentOwner()) { ready = false; initialized = false; ClearButtons(); Initialize(tab); return; }
             if (!busy && !drawing && Time.realtimeSinceStartup >= nextRefresh) StartCoroutine(Request(""));
             PositionButtons();
@@ -145,6 +166,7 @@ namespace HYJS.KingRecruit
                 button.layer = tab.gameObject.layer;
                 button.transform.parent = tab.transform;
                 button.transform.localScale = Vector3.one;
+                button.SetActive(false);
                 UILabel text = button.AddComponent<UILabel>();
                 text.bitmapFont = theme.bitmapFont; text.trueTypeFont = theme.trueTypeFont;
                 text.fontSize = 24; text.width = failure == null ? 122 : 260; text.height = 48;
@@ -156,7 +178,7 @@ namespace HYJS.KingRecruit
                 BoxCollider collider = button.AddComponent<BoxCollider>(); collider.size = new Vector3(text.width, 54f, 1f);
                 World captured = world;
                 UIEventListener.Get(button).onClick = delegate(GameObject ignored) {
-                    if (busy || drawing || !CurrentOwner()) return;
+                    if (busy || drawing || !CurrentOwner() || !ContentVisible()) return;
                     ready = false;
                     StartCoroutine(Request(captured == null ? "" : captured.Pool));
                 };
@@ -166,20 +188,32 @@ namespace HYJS.KingRecruit
         }
         void PositionButtons()
         {
-            float scale = Screen.height / 720f;
+            // Anchor to the original king content, which occupies only part of the shop.
+            // Screen coordinates can land behind the left menu on wide devices.
+            if (!ContentVisible() || buttons.Count == 0) return;
+            Vector3[] corners = tab.backGround.worldCorners;
+            Vector3 left = tab.transform.InverseTransformPoint(corners[1]);
+            Vector3 right = tab.transform.InverseTransformPoint(corners[2]);
+            Vector3 bottom = tab.transform.InverseTransformPoint(corners[0]);
+            Vector3 axis = right - left;
+            float width = axis.magnitude;
+            if (width <= 0f) return;
+            axis /= width;
+            Vector3 center = left + (right - left) * .49f + (bottom - left) * .055f;
+            float cell = Mathf.Min(buttons.Count == 1 ? 260f : 112f, width * .40f / buttons.Count);
             for (int i = 0; i < buttons.Count; i++)
             {
                 GameObject button = buttons[i]; if (button == null) continue;
-                Camera camera = NGUITools.FindCameraForLayer(button.layer); if (camera == null) continue;
-                Vector3 point = camera.WorldToScreenPoint(tab.transform.position);
-                point.x = (88f + i * 128f) * scale;
-                point.y = Screen.height - 148f * scale;
-                button.transform.position = camera.ScreenToWorldPoint(point);
+                UILabel text = button.GetComponent<UILabel>();
+                text.width = Mathf.Max(1, (int)cell - 4);
+                button.GetComponent<BoxCollider>().size = new Vector3(text.width, 54f, 1f);
+                button.transform.localPosition = center + axis * ((i - (buttons.Count - 1) * .5f) * cell);
+                button.SetActive(true);
             }
         }
         IEnumerator Request(string pool)
         {
-            if (busy || drawing || !CurrentOwner()) yield break;
+            if (busy || drawing || !CurrentOwner() || !ContentVisible()) yield break;
             busy = true; ready = false; nextRefresh = Time.realtimeSinceStartup + 20f;
             string origin = null;
             try { origin = new Uri(ServerConfig.GetServerUrl()).GetLeftPart(UriPartial.Authority); } catch (Exception) { }
@@ -195,7 +229,7 @@ namespace HYJS.KingRecruit
             bool success = false;
             try
             {
-                if (request.isDone && String.IsNullOrEmpty(request.error) && CurrentOwner())
+                if (request.isDone && String.IsNullOrEmpty(request.error) && CurrentOwner() && ContentVisible())
                 {
                     JsonData response = JsonMapper.ToObject(request.text);
                     if ((int)response["code"] == 0)
@@ -214,7 +248,7 @@ namespace HYJS.KingRecruit
             }
             catch (Exception) { }
             request.Dispose(); pending = null; busy = false;
-            if (!CurrentOwner()) yield break;
+            if (!CurrentOwner() || !ContentVisible()) yield break;
             if (!success) { CreateButtons("世界加载失败，点击重试"); yield break; }
             CreateButtons(worlds.Count == 0 ? "当前没有开放世界" : null);
             if (selected != "") tab.UpdateAll(true);

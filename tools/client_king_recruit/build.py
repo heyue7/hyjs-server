@@ -35,6 +35,7 @@ def main():
  parser=argparse.ArgumentParser(description=__doc__)
  parser.add_argument('--base-apk',type=Path,required=True);parser.add_argument('--input-managed',type=Path)
  parser.add_argument('--base-sha256',required=True);parser.add_argument('--output-directory',type=Path,required=True)
+ parser.add_argument('--helper-only',action='store_true',help='Compile helper against an already composed APK; do not rewrite original main')
  args=parser.parse_args();require(sha(args.base_apk.read_bytes())==args.base_sha256,'APK identity differs')
  out=args.output_directory.resolve();require(not out.exists(),'Use fresh output directory');out.mkdir(parents=True)
  pins=json.loads((SOURCE/'pins.json').read_text())
@@ -47,12 +48,15 @@ def main():
   original=work/'Assembly-CSharp.dll';original.write_bytes(before)
   pe=dnfile.dnPE(data=before)
   for name,_,method in methods(pe):
-   if name in TARGETS:require(sha(exact_body(pe,method))==pins[name],'Pinned input differs '+name)
+   if name in TARGETS and not args.helper_only:require(sha(exact_body(pe,method))==pins[name],'Pinned input differs '+name)
   references=[original]
   for name in ['UnityEngine.dll','mscorlib.dll','Assembly-CSharp-firstpass.dll','System.dll','System.Core.dll','LitJson.dll','SoulFlowerHeroArt.dll']:
    target=work/name;target.write_bytes(archive.read('assets/bin/Data/Managed/'+name));references.append(target)
   helper=out/'SoulFlowerKingRecruit.dll'
   run('compile-helper',[dotnet,compiler,'/nologo','/target:library','/nostdlib+','/langversion:3','/deterministic+','/out:'+str(helper),*['/reference:'+str(x) for x in references],SOURCE/'KingRecruitWorldUI.cs'])
+  if args.helper_only:
+   result={'schema':'hyjs-king-world-helper-only-v1','status':'COMPILED_NOT_PACKAGED','inputAPK_SHA256':args.base_sha256,'inputManagedSHA256':sha(before),'originalMainCopiedOrModified':False,'helperSHA256':sha(helper.read_bytes()),'replacementEntries':['assets/bin/Data/Managed/SoulFlowerKingRecruit.dll'],'phoneVerified':False,'sourcePins':{str(p.relative_to(ROOT)):sha(p.read_bytes()) for p in [SOURCE/'KingRecruitWorldUI.cs',Path(__file__).resolve()]}}
+   (out/'manifest.json').write_text(json.dumps(result,ensure_ascii=False,indent=2)+'\n');print(json.dumps(result,ensure_ascii=False));return
   shutil.copy2(SOURCE/'Injector.cs',work/'Program.cs')
   project=work/'Patch.csproj';project.write_text('<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable></PropertyGroup><ItemGroup><Reference Include="dnlib"><HintPath>'+str(dnlib)+'</HintPath></Reference></ItemGroup></Project>')
   run('compile-injector',[dotnet,'build',project,'--nologo','--verbosity','quiet','-p:NuGetAudit=false'])

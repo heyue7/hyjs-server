@@ -16,3 +16,7 @@ rtk proxy .analysis-venv/bin/python tools/client_king_recruit/build.py \
 ```
 
 产物需同时替换`Assembly-CSharp.dll`并新增`SoulFlowerKingRecruit.dll`，保留输入APK的`SoulFlowerHeroArt.dll`。先部署带`InitializeKingRecruitWorlds`、两鉴权接口与world snapshot支持的服务端。原机布局/世界选择/三图仍由root合批验收，静态校验不代表上机通过。
+
+已合成主程序集后的布局修正使用相同命令加`--helper-only`，基准APK须固定到当前合成版本。该模式只输出`SoulFlowerKingRecruit.dll`和来源清单，不重写主程序集。按钮以原`backGround.worldCorners`定位在王者内容顶部，并同时跟随原`ShopPage.curTab`、`curType`和背景可见状态；离开王者时隐藏控件、取消世界查询。
+
+公网 Nginx 必须放行原两条`/king-recruit/worlds`和`/king-recruit/select`鉴权接口。成功业务回包仍为`code:0,data:{worlds,selectedPoolId,version}`。2026-10-20原机发现的加载失败已用公网POST确认是Nginx白名单遗漏返回404 HTML；服务内测试无法覆盖这层入口，发布后须补公网实际回包与原机锚点。
