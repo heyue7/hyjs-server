@@ -119,6 +119,9 @@ func adminActivityCalendarInput(version string, items []model.AdminActivityOccur
 	}
 	seen := map[string]bool{}
 	for _, item := range items {
+		if item.Timing != "" && item.Timing != "calendar" && item.Timing != "character-day" || item.StartDay < 0 || item.StartDay > 366 || item.DurationDays < 0 || item.DurationDays > 366 || item.ClaimDays < 0 || item.ClaimDays > 90 {
+			return false
+		}
 		if len(item.ID) > 64 || len(item.TemplateID) < 1 || len(item.TemplateID) > 64 || item.StartAt < 946684800000 || item.EndAt <= item.StartAt || item.EndAt-item.StartAt > 366*86400000 || item.ClaimEndAt < item.EndAt || item.ClaimEndAt-item.EndAt > 90*86400000 || item.Lane < 0 || item.Lane > 31 || item.ID != "" && len(item.Version) != 64 || item.ID == "" && len(item.TemplateVersion) != 64 {
 			return false
 		}

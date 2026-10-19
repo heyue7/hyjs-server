@@ -33,6 +33,7 @@ redis:
 
 # 游戏服默认 MySQL；--db 指定 SQLite 仅用于隔离测试。
 game:
+  accountsDatabase: "" # 共享账号schema，需同MySQL实例；空值沿当前角色库。
   serverId: 1 # 可信部署区服编号；独立区服使用独立存档。
   enableTestPayments: false
   enableLocalWallet: false

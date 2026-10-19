@@ -73,6 +73,8 @@ export interface TitleEffect {
   value: number;
 }
 export interface GameTitle {
+  iconUrl: string;
+  requirement: string;
   id: string;
   name: string;
   type: number;

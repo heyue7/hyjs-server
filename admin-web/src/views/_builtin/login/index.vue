@@ -22,7 +22,7 @@ async function submit(event?: Event) {
   <div class="hyjs-login">
     <div class="login-brand">
       <SystemLogo class="text-32px text-primary" />
-      <span>黑衣剑士</span>
+      <span>灵魂之花</span>
     </div>
     <NCard :bordered="false" class="login-card">
       <h1>登录运营台</h1>
@@ -59,7 +59,7 @@ async function submit(event?: Event) {
       </NForm>
       <div class="login-note">仅限已授权的运营账号</div>
     </NCard>
-    <div class="login-credit">HYJS · Powered by Soybean Admin</div>
+    <div class="login-credit">灵魂之花 · 运营管理</div>
   </div>
 </template>
 
@@ -84,26 +84,27 @@ async function submit(event?: Event) {
 .login-card {
   width: 420px;
   max-width: 100%;
-  border-radius: 14px;
-  box-shadow: 0 12px 50px #123a3010;
+  border-radius: 8px;
+  border: 1px solid rgb(var(--base-text-color) / .08);
+  box-shadow: 0 8px 28px rgb(26 34 50 / .06);
 }
 .login-card :deep(.n-card__content) {
   padding: 32px;
 }
 h1 {
-  font-size: 23px;
+  font-size: 21px;
   font-weight: 600;
-  margin: 0 0 28px;
+  margin: 0 0 24px;
 }
 .login-note {
   margin-top: 20px;
   font-size: 13px;
-  color: #738079;
+  color: rgb(var(--base-text-color) / .6);
   text-align: center;
 }
 .login-credit {
   margin-top: 28px;
   font-size: 12px;
-  color: #7b8985;
+  color: rgb(var(--base-text-color) / .55);
 }
 </style>

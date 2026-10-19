@@ -77,7 +77,7 @@ const settingSupports = (key: string) => Boolean(definition.value?.settingsField
 const sections = [
   { key: 'product', label: '商品与消耗' },
   { key: 'limits', label: '资格与限购' },
-  { key: 'publish', label: '发布与来源' }
+  { key: 'publish', label: '状态与备注' }
 ];
 const title = computed(() =>
   isPopularityShop.value ? shopLabels[props.shopId] : definition.value?.label || shopLabels[props.shopId] || '商店管理'
@@ -86,6 +86,13 @@ const fields = computed(() => definition.value?.fields || []);
 const supports = (key: string) =>
   fields.value.includes(key) &&
   (!fixedPrice.value || ['rewards', 'cost', 'dailyLimit', 'minLevel', 'minVip', 'priority', 'enabled'].includes(key));
+const hasPublishFields = computed(() =>
+  (supports('enabled') && (props.shopId !== 'ordinary' || fixedPrice.value)) ||
+  ['day', 'refreshMillis', 'source'].some(supports)
+);
+const showShopStatus = computed(() => Boolean(snapshot.value && (
+  settingSupports('enabled') || snapshot.value.settings.slots || snapshot.value.settings.startAt || snapshot.value.settings.endAt
+)));
 const dirty = computed(() => editing.value && JSON.stringify(draft.value) !== original.value);
 const rows = computed(() =>
   (snapshot.value?.items || []).filter(
@@ -244,7 +251,7 @@ function remove(row: ShopProduct) {
   const version = snapshot.value?.version;
   window.$dialog?.warning({
     title: '移除商品？',
-    content: `${row.name || row.id} 将从后续可售配置移除，已有购买记录由服务端保留。`,
+    content: `${row.name || row.id} 将从后续可售配置移除，已有购买记录不变。`,
     positiveText: '移除',
     negativeText: '取消',
     onPositiveClick: async () => {
@@ -390,12 +397,11 @@ watch(
     <ManagementWorkspace
       v-model:section="section"
       :title="editing ? `${selected ? (readonly ? '查看' : '编辑') : '新建'}商品 · ${title}` : title"
-      :subtitle="definition?.notes"
       :editing="editing"
       :saving="saving"
       :readonly="readonly"
       :dirty="dirty"
-      :sections="sections"
+      :sections="sections.filter(row => row.key !== 'publish' || hasPublishFields)"
       @back="discard"
       @save="save"
     >
@@ -418,24 +424,12 @@ watch(
         <NAlert
           v-if="isFrozen"
           type="info"
-          title="当前运营期报价已冻结，期内商品只读。复制为新一期后再编辑，原固定商品位及购买记录继续保留。"
+          title="本期已有购买记录，商品价格已锁定。请复制为新一期后调整。"
         />
       </template>
       <template v-if="!editing">
-        <NCard v-if="isPopularityShop" :bordered="false" class="ops-panel">
-          <NTabs :value="shopId" type="line" @update:value="router.push(`/shops/${$event}`)">
-            <NTab name="popularity">声望商店商品</NTab>
-            <NTab name="popularity-rank">声望商店奖励</NTab>
-          </NTabs>
-          <p class="ops-muted mt-12px">
-            {{
-              shopId === 'popularity-rank'
-                ? '对应游戏内声望商店的“奖励”页签。按已发布的竞技排名资格兑换，奖励、消耗和排名门槛在此配置。'
-                : '对应游戏内声望商店的普通商品；排名资格兑换请切换到“声望商店奖励”。'
-            }}
-          </p>
-        </NCard>
-        <NCard v-if="snapshot" :bordered="false" class="ops-panel">
+        <details v-if="definition?.notes" class="ops-help"><summary>商店规则</summary><p>{{ definition.notes }}</p></details>
+        <NCard v-if="snapshot && showShopStatus" :bordered="false" class="ops-panel">
           <NSpace align="center" justify="space-between">
             <NSpace>
               <NTag
@@ -455,8 +449,13 @@ watch(
           </NSpace>
         </NCard>
         <NCard :bordered="false" class="ops-panel">
+          <NTabs v-if="isPopularityShop" :value="shopId" type="line" class="mb-20px" @update:value="router.push(`/shops/${$event}`)">
+            <NTab name="popularity">声望商店商品</NTab>
+            <NTab name="popularity-rank">声望商店奖励</NTab>
+          </NTabs>
           <div class="ops-filters">
-            <NInput v-model:value="q" class="ops-search" clearable placeholder="搜索商品名称、标识或资源 ID" />
+            <NInput v-model:value="q" class="ops-search" clearable placeholder="搜索商品名称或编号" />
+            <span v-if="snapshot && !showShopStatus" class="ops-muted">{{ snapshot.items.length }} 件商品</span>
             <NSelect
               v-model:value="state"
               clearable
@@ -486,11 +485,11 @@ watch(
             <NAlert
               v-if="fixedPrice"
               type="info"
-              title="原固定价格档的售价和日限沿原档绑定，此处只读。"
+              title="此商品使用固定售价和每日限购，暂不支持修改。"
               class="mb-20px"
             />
             <div class="ops-date-grid">
-              <NFormItem v-if="selected" label="商品标识"><NInput :value="draft.id" disabled /></NFormItem>
+              <NFormItem v-if="selected" label="商品编号"><span class="ops-mono ops-muted">{{ draft.id }}</span></NFormItem>
               <NFormItem v-if="!['vip', 'pet-market', 'union-fight'].includes(shopId) && !fixedPrice" label="显示名称">
                 <NInput v-model:value="draft.name" placeholder="商品名称" />
               </NFormItem>
@@ -635,7 +634,7 @@ watch(
             />
           </section>
           <section v-show="section === 'publish'">
-            <h3 class="mb-20px">发布与来源</h3>
+            <h3 class="mb-20px">状态与备注</h3>
             <NFormItem v-if="supports('enabled') && (shopId !== 'ordinary' || fixedPrice)" label="商品状态">
               <NSwitch v-model:value="draft.enabled">
                 <template #checked>启用</template>
@@ -661,10 +660,10 @@ watch(
                 <template #suffix>分钟</template>
               </NInputNumber>
             </NFormItem>
-            <NFormItem v-if="supports('source')" label="配置来源">
-              <NInput v-model:value="draft.source" type="textarea" :maxlength="1000" placeholder="记录配置依据与用途" />
+            <NFormItem v-if="supports('source')" label="配置备注">
+              <NInput v-model:value="draft.source" type="textarea" :maxlength="1000" placeholder="选填：记录本次调整用途" />
             </NFormItem>
-            <NAlert type="info" title="历史购买与已冻结报价继续按原规则结算，实际更新范围由服务端校验。" />
+            <p class="ops-inline-note">修改仅影响后续购买，已购买的订单不变。</p>
           </section>
         </NForm>
       </template>
@@ -687,7 +686,7 @@ watch(
       <NAlert
         v-if="needsPeriod && !settingsDraft.newPeriod"
         type="info"
-        title="先保存关闭的运营期，设置起止时间后即可添加商品。"
+        title="请先设置本期时间并保存，再添加商品。"
         class="mb-20px"
       />
       <NForm label-placement="top" :disabled="settingsSaving">
@@ -736,7 +735,7 @@ watch(
             @update:value="settingsDraft.claimEndAt = $event || 0"
           />
         </NFormItem>
-        <NFormItem v-if="settingSupports('source')" label="配置来源">
+        <NFormItem v-if="settingSupports('source')" label="配置备注">
           <NInput
             v-model:value="settingsDraft.source"
             :disabled="settingsFrozen || shopId === 'popularity-rank'"

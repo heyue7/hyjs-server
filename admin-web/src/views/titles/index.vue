@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, h, onBeforeUnmount, onMounted, ref } from 'vue';
-import { NButton, NSpace, NTag } from 'naive-ui';
+import { NButton, NImage, NSpace, NTag } from 'naive-ui';
 import type { DataTableColumns } from 'naive-ui';
 import { onBeforeRouteLeave } from 'vue-router';
 import { api, errorMessage, json } from '@/service/operations';
@@ -10,6 +10,7 @@ import ManagementWorkspace from '@/components/operations/management-workspace.vu
 const { canWrite, loading, error, run } = useOperations();
 const rows = ref<GameTitle[]>([]);
 const q = ref('');
+const chapters = ref<{ value: string; label: string }[]>([]);
 const draft = ref<GameTitle | null>(null);
 const original = ref('');
 const saving = ref(false);
@@ -35,6 +36,26 @@ const sections = [
   { key: 'publish', label: '展示与状态' }
 ];
 const paramEditable = computed(() => Boolean(draft.value) && [1, 9, 10, 11, 12, 13, 14].includes(draft.value!.type));
+const targetLabels: Record<number, [string, string, number?]> = {
+  1: ['同时上阵人数', '名角色', 4], 9: ['角色达到等级', '级'],
+  11: ['珠宝工艺等级', '级', 10], 12: ['料理工艺等级', '级', 6],
+  13: ['试炼通关层数', '层'], 14: ['竞技场进入前多少名', '名']
+};
+const target = computed(() => targetLabels[draft.value?.type || 0]);
+const targetNumber = computed({
+  get: () => draft.value?.param ? Number(draft.value.param) : null,
+  set: (value: number | null) => { if (draft.value) draft.value.param = value === null ? '' : String(value); }
+});
+const currentRequirement = computed(() => {
+  const d = draft.value; if (!d) return '';
+  if (d.type === 1) return `同时上阵 ${d.param || '—'} 名角色`;
+  if (d.type === 9) return `角色等级达到 ${d.param || '—'} 级`;
+  if (d.type === 10) return `通关${chapters.value.find(c => c.value === d.param)?.label || `第 ${d.param} 章`}`;
+  if (d.type === 11 || d.type === 12) return `${d.type === 11 ? '珠宝' : '料理'}工艺达到 ${d.param || '—'} 级`;
+  if (d.type === 13) return `试炼之地通关第 ${d.param || '—'} 层`;
+  if (d.type === 14) return `竞技场获胜并达到前 ${d.param || '—'} 名`;
+  return d.requirement || d.notes;
+});
 const seasonal = computed(() => Boolean(draft.value) && [17, 18].includes(draft.value!.type));
 const qualificationName = (value: number) =>
   (
@@ -62,12 +83,14 @@ const visible = computed(() =>
   rows.value.filter((row) => `${row.name} ${row.id} ${row.notes}`.toLowerCase().includes(q.value.trim().toLowerCase()))
 );
 async function load() {
-  const data = await run(() => api<{ items: GameTitle[] }>('/titles'));
-  if (data)
+  const data = await run(() => api<{ items: GameTitle[]; chapters: { value: string; label: string }[] }>('/titles'));
+  if (data) {
+    chapters.value = data.chapters || [];
     rows.value = (data.items || []).map((row) => ({
       ...row,
       effects: row.effects || []
     }));
+  }
 }
 function edit(row: GameTitle) {
   draft.value = JSON.parse(JSON.stringify(row));
@@ -117,7 +140,10 @@ const columns: DataTableColumns<GameTitle> = [
     title: '称号',
     key: 'name',
     minWidth: 210,
-    render: (row) => h('div', [h('strong', row.name), h('div', { class: 'ops-muted mt-4px' }, row.notes)])
+    render: (row) => h('div', { class: 'title-list-art' }, [
+      ...(row.iconUrl ? [h(NImage, { src: row.iconUrl, alt: row.name, width: 190, height: 54, objectFit: 'contain', lazy: true })] : []),
+      h('strong', row.name), h('div', { class: 'ops-muted mt-4px' }, row.requirement || row.notes)
+    ])
   },
   {
     title: '属性',
@@ -149,7 +175,7 @@ const columns: DataTableColumns<GameTitle> = [
             bordered: false,
             type: row.enabled ? 'success' : 'default'
           },
-          () => (row.enabled ? '可获得' : '关闭资格')
+          () => (row.enabled ? '已启用' : '已停用')
         ),
         ...(!row.show ? [h(NTag, { size: 'small', bordered: false }, () => '隐藏')] : [])
       ])
@@ -191,7 +217,6 @@ onMounted(load);
 <template>
   <ManagementWorkspace
     :title="draft ? `${canWrite ? '编辑' : '查看'}称号 · ${draft.name}` : '称号管理'"
-    subtitle="管理原客户端称号目录，已持有称号的历史属性快照保持原规则"
     :editing="Boolean(draft)"
     :saving="saving"
     :readonly="!canWrite"
@@ -205,7 +230,7 @@ onMounted(load);
     <template #alert><NAlert v-if="error || saveError" type="error" :title="saveError || error" /></template>
     <NCard v-if="!draft" :bordered="false" class="ops-panel">
       <div class="ops-filters">
-        <NInput v-model:value="q" clearable placeholder="搜索称号、ID 或资格说明" class="ops-search" />
+        <NInput v-model:value="q" clearable placeholder="搜索称号或获得条件" class="ops-search" />
       </div>
       <NDataTable
         :columns="columns"
@@ -216,27 +241,28 @@ onMounted(load);
         :pagination="{ pageSize: 20 }"
         :scroll-x="900"
       />
-      <p class="ops-muted mt-20px">称号标识、名称和类型对应原客户端目录，暂不创建无原资源的新称号。</p>
+
     </NCard>
     <NForm v-else label-placement="top" :disabled="saving || !canWrite">
       <section v-show="section === 'condition'">
-        <h3 class="mb-20px">称号资格</h3>
-        <NDescriptions :column="1" label-placement="left" class="mb-24px">
-          <NDescriptionsItem label="名称">{{ draft.name }}</NDescriptionsItem>
-          <NDescriptionsItem label="原始标识">
-            <span class="ops-mono">{{ draft.id }}</span>
-          </NDescriptionsItem>
-          <NDescriptionsItem label="资格说明">{{ draft.notes || '由该称号所属玩法判断资格' }}</NDescriptionsItem>
-          <NDescriptionsItem label="原类型">{{ qualificationName(draft.type) }}</NDescriptionsItem>
-        </NDescriptions>
-        <NFormItem label="资格目标参数">
-          <NInput
-            v-model:value="draft.param"
-            :disabled="!paramEditable || saving || !canWrite"
-            placeholder="沿原称号类型填写，原值为空时可保留"
-          />
+        <div class="title-art-preview">
+          <NImage v-if="draft.iconUrl" :src="draft.iconUrl" :alt="draft.name" :height="76" object-fit="contain" />
+          <strong>{{ draft.name }}</strong>
+        </div>
+        <NFormItem v-if="target" :label="target[0]" class="title-target-field">
+          <NInputNumber v-model:value="targetNumber" :min="1" :max="target[2] || 2147483647" :precision="0">
+            <template #suffix>{{ target[1] }}</template>
+          </NInputNumber>
         </NFormItem>
-        <NAlert type="info" title="参数沿原称号类型解释，赛季等特殊称号仍需真实玩法资格，修改参数不会生成资格。" />
+        <NFormItem v-else-if="draft.type === 10" label="需通关的主线章节">
+          <NSelect v-model:value="draft.param" :options="chapters" filterable placeholder="选择章节" />
+        </NFormItem>
+        <div class="title-requirement"><span class="ops-muted">获得条件</span><p>{{ currentRequirement }}</p></div>
+        <p v-if="!paramEditable" class="ops-inline-note">{{ seasonal ? '赛季结果确认后发放。' : '该条件由对应玩法判断。' }}</p>
+        <details class="ops-help"><summary>标识与修改说明</summary>
+          <p>称号编号 {{ draft.id }} · {{ qualificationName(draft.type) }}</p>
+          <p>条件和属性仅影响之后新获得的称号，已持有称号保持原属性和到期时间。</p>
+        </details>
       </section>
       <section v-show="section === 'effects'">
         <NAlert
@@ -269,7 +295,7 @@ onMounted(load);
             :min="0"
             :max="2147483647"
             :precision="0"
-            placeholder="按原字段填写整数数值"
+            placeholder="增幅数值"
           />
           <NButton quaternary :disabled="saving || !canWrite || seasonal" @click="draft.effects.splice(index, 1)">
             移除
@@ -297,13 +323,20 @@ onMounted(load);
           </NSwitch>
         </NFormItem>
         <NFormItem label="在客户端目录中展示"><NSwitch v-model:value="draft.show" /></NFormItem>
-        <NAlert type="info" title="关闭影响后续获得，已有持有记录和历史属性由服务端保留。" />
+        <p class="ops-inline-note">关闭后不能再新获得，已持有的称号不受影响。</p>
       </section>
     </NForm>
   </ManagementWorkspace>
 </template>
 
 <style scoped>
+.title-list-art { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; padding-block: 6px; }
+.title-art-preview { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; margin-bottom: 28px; }
+.title-art-preview :deep(img) { max-width: min(100%, 360px); }
+.title-target-field :deep(.n-input-number) { width: min(100%, 320px); }
+.title-requirement { margin: 16px 0 24px; }
+.title-requirement p { margin: 7px 0 0; font-size: 15px; }
+
 .title-effect-row {
   display: grid;
   grid-template-columns: minmax(140px, 1fr) minmax(140px, 1fr) auto;

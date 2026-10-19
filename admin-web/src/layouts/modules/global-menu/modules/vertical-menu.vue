@@ -46,6 +46,7 @@ watch(
     <SimpleScrollbar>
       <NMenu
         v-model:expanded-keys="expandedKeys"
+        class="ops-navigation"
         mode="vertical"
         :value="selectedKey"
         :collapsed="appStore.siderCollapse"
@@ -53,7 +54,7 @@ watch(
         :collapsed-icon-size="22"
         :options="routeStore.menus"
         :inverted="inverted"
-        :indent="18"
+        :indent="16"
         @update:value="routerPushByKeyWithMetaQuery"
       />
     </SimpleScrollbar>

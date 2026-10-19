@@ -18,7 +18,7 @@ func (s *GameService) InitializePlayerOpeningCalendar(ctx context.Context) error
 		return err
 	}
 	var roles []db.Profile
-	if err := d.Select("id", "created_at").Where("id > 1 AND player IS NOT NULL AND created_at > 0").Find(&roles).Error; err != nil {
+	if err := d.Select("id", "created_at").Where("player IS NOT NULL AND created_at > 0").Find(&roles).Error; err != nil {
 		return err
 	}
 	for _, row := range roles {
@@ -32,7 +32,7 @@ func (s *GameService) InitializePlayerOpeningCalendar(ctx context.Context) error
 }
 
 func insertPlayerOpeningCalendar(tx *gorm.DB, id int64, gameAt, realAt time.Time) error {
-	if id <= 1 {
+	if GameAccountProtectedProfile(tx, id) {
 		return nil
 	}
 	zone := time.FixedZone("UTC+8", 8*3600)
@@ -53,7 +53,7 @@ func loadPlayerOpenServerRule(tx *gorm.DB, id int64) (*db.OpenServerActivityRule
 	if err != nil {
 		return nil, err
 	}
-	if cycle != nil || id <= 1 || !tx.Migrator().HasTable(&db.PlayerOpeningCalendar{}) {
+	if cycle != nil || GameAccountProtectedProfile(tx, id) || !tx.Migrator().HasTable(&db.PlayerOpeningCalendar{}) {
 		return cfg, nil
 	}
 	var anchor db.PlayerOpeningCalendar
@@ -71,7 +71,7 @@ func loadPlayerOpenServerRule(tx *gorm.DB, id int64) (*db.OpenServerActivityRule
 	cfg.StartAt = anchor.StartAt
 	cfg.EndAt = anchor.StartAt + duration
 	cfg.RewardEndAt = cfg.EndAt + grace
-	if err := AdminScheduledOpeningRule(tx, cfg, LocalPlayNow(tx.Statement.Context).UnixMilli()); err != nil {
+	if err := AdminScheduledOpeningRule(tx, cfg, LocalPlayNow(tx.Statement.Context).UnixMilli(), id); err != nil {
 		return nil, err
 	}
 	return cfg, nil

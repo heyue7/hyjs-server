@@ -42,6 +42,8 @@ public final class GameRegistration {
         if (activity.isFinishing() || current != null && current.isShowing()) return;
         final LinearLayout body=LoginStyle.body(activity,"注册账号");
         final EditText username=LoginStyle.field(activity,body,"账号：3–32位字母、数字、_ 或 -",false);
+        final EditText nickname=LoginStyle.field(activity,body,"昵称：1–24个字",false);
+        nickname.setText("冒险者");
         final EditText password=LoginStyle.field(activity,body,"密码：至少6个字符，最多72字节",true);
         final EditText confirmation=LoginStyle.field(activity,body,"确认密码",true);
         confirmation.setImeOptions(EditorInfo.IME_ACTION_DONE|EditorInfo.IME_FLAG_NO_EXTRACT_UI);
@@ -55,7 +57,7 @@ public final class GameRegistration {
         final String[] successful=new String[]{"",""};
         dialog.setCanceledOnTouchOutside(false);
         dialog.setOnDismissListener(ignored->{
-            username.setText("");password.setText("");confirmation.setText("");
+            username.setText("");nickname.setText("");password.setText("");confirmation.setText("");
             if(current==dialog)current=null;
             if(!successful[0].isEmpty())LoginCache.registered(successful[0],successful[1]);else LoginCache.reopen();
             successful[0]="";successful[1]="";
@@ -66,17 +68,19 @@ public final class GameRegistration {
             // Capture fields on Android's UI thread; the network worker receives
             // immutable values and never reads EditText objects in the background.
             final String name=username.getText().toString();
+            final String nick=nickname.getText().toString();
             final String secret=password.getText().toString();
             final String confirm=confirmation.getText().toString();
             if(!name.matches("[A-Za-z0-9_-]{3,32}")){message.setText("账号需为3–32位字母、数字、下划线或短横线");return;}
+            if(nick.trim().isEmpty()||!nick.equals(nick.trim())||nick.codePointCount(0,nick.length())>24||nick.matches("(?s).*[\\p{Cc}\\p{Cf}].*")){message.setText("请填写1–24个字的昵称，前后不要留空格");return;}
             try{
                 if(secret.codePointCount(0,secret.length())<6||secret.getBytes("UTF-8").length>72){message.setText("密码至少6个字符，最多72字节");return;}
             }catch(Exception invalid){message.setText("密码格式无效");return;}
             if(!secret.equals(confirm)){message.setText("两次输入的密码不一样");return;}
             message.setText("正在注册…");dialog.setCancelable(false);submit.setEnabled(false);back.setEnabled(false);
-            username.setEnabled(false);password.setEnabled(false);confirmation.setEnabled(false);
+            username.setEnabled(false);nickname.setEnabled(false);password.setEnabled(false);confirmation.setEnabled(false);
             new Thread(()->{
-                final Result result=register(serverBase,name,secret,confirm);
+                final Result result=register(serverBase,name,nick,secret,confirm);
                 activity.runOnUiThread(()->{
                     if(activity.isFinishing()||!dialog.isShowing())return;
                     if(result.success){
@@ -84,7 +88,7 @@ public final class GameRegistration {
                         Toast.makeText(activity,"注册成功，请登录",Toast.LENGTH_LONG).show();
                     }else{
                         dialog.setCancelable(true);submit.setEnabled(true);back.setEnabled(true);
-                        username.setEnabled(true);password.setEnabled(true);confirmation.setEnabled(true);message.setText(result.message);
+                        username.setEnabled(true);nickname.setEnabled(true);password.setEnabled(true);confirmation.setEnabled(true);message.setText(result.message);
                     }
                 });
             },"hyjs-register").start();
@@ -98,7 +102,7 @@ public final class GameRegistration {
         Result(boolean success, String message) { this.success=success; this.message=message; }
     }
 
-    private static Result register(String serverBase, String name, String password, String confirmation) {
+    private static Result register(String serverBase, String name, String nickname, String password, String confirmation) {
         HttpURLConnection connection = null;
         try {
             URI base = new URI(serverBase);
@@ -109,7 +113,7 @@ public final class GameRegistration {
             connection.setRequestMethod("POST"); connection.setDoOutput(true);
             connection.setInstanceFollowRedirects(false);
             connection.setRequestProperty("Content-Type","application/json; charset=utf-8");
-            byte[] payload=new JSONObject().put("username",name).put("password",password).put("confirmPassword",confirmation).toString().getBytes("UTF-8");
+            byte[] payload=new JSONObject().put("username",name).put("nickname",nickname).put("password",password).put("confirmPassword",confirmation).toString().getBytes("UTF-8");
             connection.setFixedLengthStreamingMode(payload.length);
             try (OutputStream stream=connection.getOutputStream()) { stream.write(payload); }
             int status=connection.getResponseCode();

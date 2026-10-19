@@ -1,6 +1,6 @@
 const local: App.I18n.Schema = {
   system: {
-    title: '黑衣剑士运营台',
+    title: '灵魂之花运营台',
     updateTitle: 'System Version Update Notification',
     updateContent: 'A new version of the system has been detected. Do you want to refresh the page immediately?',
     updateConfirm: 'Refresh immediately',
@@ -234,7 +234,8 @@ const local: App.I18n.Schema = {
     announcements: 'Announcements',
     audit: 'Audit',
     users: 'Admin accounts',
-    players: 'Game players',
+    'game-accounts': 'Game users',
+    players: 'Players',
     wallets: 'Wallets',
     'activities-unavailable': 'Unavailable activities',
     'shops': '商店管理',

@@ -200,6 +200,11 @@ func (s *GameService) SyncP10Scene(ctx context.Context, id int64, movement bool)
 		}
 		return nil
 	}
+	// Per-map capacity shares the original line protocol and preserves stable socket ownership.
+	cfg, err = s.adminFieldSceneConfig(tx, scope, cfg)
+	if err != nil {
+		return err
+	}
 	line := old.Line
 	if line < 1 || line > cfg.LineCount {
 		line = 1
@@ -333,6 +338,10 @@ func (s *GameService) DispatchP10Scene(ctx context.Context, id int64, request pr
 		}
 		return nil, true, errors.New("请先完成真实场景TCP登录")
 	}
+	cfg, err = s.adminFieldSceneConfig(tx, own.Scene, cfg)
+	if err != nil {
+		return nil, true, err
+	}
 	if _, ok := s.p10SceneLive(tx, own); !ok {
 		if selfOnly {
 			return nil, false, nil
@@ -369,6 +378,24 @@ func (s *GameService) DispatchP10Scene(ctx context.Context, id int64, request pr
 			var row db.Profile
 			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&row, id).Error; err != nil {
 				return err
+			}
+			// Original success clears actors before requesting CurrentPosition. Do not tear down an accepted action.
+			_, game, decodeErr := decodeProfile(&row)
+			if decodeErr != nil {
+				return decodeErr
+			}
+			if game.Run != nil && !game.Run.Complete || game.Field != nil && game.Field.Fight != nil && !game.Field.Fight.Settled {
+				return errors.New("请先结束当前战斗再换线")
+			}
+			if tx.Migrator().HasTable(&db.P8GatherAttempt{}) {
+				var attempt db.P8GatherAttempt
+				gatherErr := tx.First(&attempt, "player_id=? AND active=?", id, true).Error
+				if gatherErr == nil {
+					return errors.New("请先结束当前采集再换线")
+				}
+				if !errors.Is(gatherErr, gorm.ErrRecordNotFound) {
+					return gatherErr
+				}
 			}
 			// A line change tears down visible actors, including its empty replay ack.
 			if s.P12FieldPVPReady {

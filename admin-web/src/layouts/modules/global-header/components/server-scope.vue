@@ -8,7 +8,10 @@ const scope = useServerScopeStore();
 const scoped = computed(() => serverScopedRoutes.has(String(route.name)));
 const mixed = computed(() => route.name === 'fields');
 const options = computed(() =>
-  scope.servers.map(row => ({ label: `${row.id} 区 · ${row.name}${row.enabled ? '' : '（已关闭）'}`, value: row.id }))
+  scope.servers.map(row => ({
+    label: `${/^\d+\s*区/.test(row.name) ? row.name : `${row.id} 区 · ${row.name}`}${!row.runtimeBound ? '（待部署）' : row.enabled ? '' : '（已关闭）'}`,
+    value: row.id
+  }))
 );
 let queryGeneration = 0;
 async function alignQuery() {

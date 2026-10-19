@@ -89,7 +89,8 @@ func (s *GameService) AdminActivityModes() []model.AdminActivityMode {
 				mode.DefaultForm.Prizes = append(mode.DefaultForm.Prizes, model.AdminActivityPrize{ID: i})
 			}
 			mode.FixedValues = map[string]int64{"singleDiamond": 50, "tenDiamond": 488, "coinPerDraw": 10000}
-			mode.Notes += " 9个固定奖位外的钻石大奖由原机制累积；启用后可显式设为当前全局源。"
+			mode.DefaultForm.Options.ScorePerDraw = 1
+			mode.Notes += " 奖品库存、钻石大奖池和记录按角色独立计算，不发排名奖。"
 		}
 		if d.mode == "stamina-meal" {
 			mode.DefaultForm.Options.Meals = []model.AdminMealWindow{{StartMinute: 720, EndMinute: 840}, {StartMinute: 1080, EndMinute: 1200}}
@@ -279,7 +280,14 @@ func (s *GameService) adminActivityAvailability(raw model.AdminActivityDTO, form
 		problem = json.Unmarshal(raw.Config, &cfg)
 		if problem == nil {
 			options := form.Options
-			rules := db.TurntableRules{PoolID: cfg.Pool.ID, ScorePerDraw: int32(options.ScorePerDraw), AdvancePlaces: int32(options.AdvancePlaces), TopPrize: fmt.Sprintf("%s,%d", options.TopPrize.ResourceID, options.TopPrize.Amount), AdvancePrize: fmt.Sprintf("%s,%d", options.AdvancePrize.ResourceID, options.AdvancePrize.Amount)}
+			top, advance := "", ""
+			if options.TopPrize.ResourceID != "" {
+				top = fmt.Sprintf("%s,%d", options.TopPrize.ResourceID, options.TopPrize.Amount)
+			}
+			if options.AdvancePrize.ResourceID != "" {
+				advance = fmt.Sprintf("%s,%d", options.AdvancePrize.ResourceID, options.AdvancePrize.Amount)
+			}
+			rules := db.TurntableRules{PoolID: cfg.Pool.ID, ScorePerDraw: int32(options.ScorePerDraw), AdvancePlaces: int32(options.AdvancePlaces), TopPrize: top, AdvancePrize: advance}
 			problem = s.validateTurntableConfiguration(&cfg.Pool, cfg.Rewards, &rules)
 		}
 	}
@@ -438,7 +446,7 @@ func (s *GameService) AdminActivityInstances(ctx context.Context) ([]model.Admin
 	tx := db.GetIns().WithContext(ctx)
 	out := []model.AdminActivityInstance{}
 	for _, row := range rows {
-		if row.Type == "registry" {
+		if row.Type == "registry" || strings.Contains(row.ID, "_character_") {
 			continue
 		}
 		var meta db.AdminActivityPresentation

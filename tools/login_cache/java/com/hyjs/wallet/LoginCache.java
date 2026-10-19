@@ -159,5 +159,11 @@ public final class LoginCache {
     }
     private static void toast(String message){UI.post(()->{try{Toast.makeText(activity(),message,Toast.LENGTH_SHORT).show();}catch(Exception ignored){}});}
     private static void fail(){boolean wasAutomatic=autoAttempt;autoAttempt=false;suppressed=true;hide();if(wasAutomatic)toast("自动登录未完成，请手动登录");UI.post(()->send(loginOwner,"OnSwitchAccountButtonClick"));}
+    /** Only after the authenticated server accepted a password change; system autofill stays under the user's control. */
+    public static synchronized void passwordChanged(String username,String password){
+        load();
+        if(remember && savedUser.equals(username)){savedPassword=password;save();}
+        pendingPassword="";transientPassword="";returnPass="";
+    }
     public static synchronized void pause(){suppressed=true;autoAttempt=false;active=0;++serial;pendingUser="";pendingPassword="";hide();}
 }

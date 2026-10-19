@@ -46,6 +46,10 @@ type AdminCatalogueFacets struct {
 
 // AdminCatalogueData 在启动时独立加载，后续只读；不向战斗Tables加入文本或资源表。
 type AdminCatalogueData struct {
+	// SpriteURLs maps original sprite names to verified same-origin art, read-only after startup.
+	SpriteURLs map[string]string
+	// DisplayNames maps original text keys to their localized display label.
+	DisplayNames map[string]string
 	// Items 是按ID排序的明确物品，矿点、钓点及怪物不混入可发放目录。
 	Items []AdminItemDTO
 	// UnionFightItems 仅供公会战商店选择，独立于可直接发放的背包资源。

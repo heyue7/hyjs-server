@@ -4,7 +4,7 @@ package model
 type LocalWalletView struct {
 	Name           string                    `json:"name"`                     // 固定显示名：蓝绿钱包。
 	BalanceCents   int64                     `json:"balanceCents"`             // 当前余额，单位人民币分，非负整数。
-	Revision       int64                     `json:"revision"`                 // 同角色成功入账/支付的单调递增序号。
+	Revision       int64                     `json:"revision"`                 // 同账号成功入账/支付的单调递增序号。
 	Currency       string                    `json:"currency"`                 // 枚举：CNY。
 	Enabled        bool                      `json:"enabled"`                  // 当前持久政策是否开放。
 	TestOnly       bool                      `json:"testOnly"`                 // 固定true，本地试玩余额。
@@ -21,7 +21,7 @@ type LocalWalletView struct {
 
 // LocalWalletEntryView projects one immutable wallet ledger entry.
 type LocalWalletEntryView struct {
-	ID           string `json:"id"`                // 同角色唯一流水标识。
+	ID           string `json:"id"`                // 同账号唯一流水标识。
 	Kind         string `json:"kind"`              // 枚举：credit增加余额；payment原充值消费。
 	AmountCents  int64  `json:"amountCents"`       // 本次变动分数，credit正数、payment负数。
 	BalanceCents int64  `json:"balanceCents"`      // 此次成功变动后的余额分数。

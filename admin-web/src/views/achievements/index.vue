@@ -37,7 +37,7 @@ const section = ref('goal');
 const sections = [
   { key: 'goal', label: '成就目标' },
   { key: 'rewards', label: '完成奖励' },
-  { key: 'publish', label: '发布与来源' }
+  { key: 'publish', label: '状态与备注' }
 ];
 const dirty = computed(() => editing.value && original.value !== JSON.stringify(draft.value));
 const kindLabel = (value: string) =>
@@ -68,7 +68,7 @@ const condition = computed(
 const fixedTarget = computed(() => kinds.value.find(row => row.id === draft.value.kind)?.fixedTarget);
 const supportedKinds = computed(() => kinds.value.filter((row) => row.supported !== false).length);
 const conditionColumns: DataTableColumns<AchievementKind> = [
-  { title: '原触发条件', key: 'label', minWidth: 230 },
+  { title: '触发条件', key: 'label', minWidth: 230 },
   {
     title: '可用性',
     key: 'supported',
@@ -78,7 +78,7 @@ const conditionColumns: DataTableColumns<AchievementKind> = [
         row.supported === false ? '暂不可用' : '可配置'
       )
   },
-  { title: '条件依据与恢复情况', key: 'notes', minWidth: 360, render: (row) => row.notes || '按原进度条件配置' }
+  { title: '说明', key: 'notes', minWidth: 360, render: (row) => row.notes || '按原进度条件配置' }
 ];
 const visible = computed(() =>
   rows.value.filter(
@@ -137,7 +137,7 @@ async function save() {
     : draft.value.enabled && condition.value?.supported === false
       ? `此条件暂不能启用：${condition.value.notes || '对应玩法尚未恢复'}`
       : !draft.value.kind
-        ? '请选择服务端支持的成就类型'
+        ? '请选择成就条件'
         : !Number.isInteger(draft.value.target) || draft.value.target < 1
           ? '目标需为正整数'
           : !draft.value.rewards.length ||
@@ -164,7 +164,7 @@ async function save() {
 function remove(row: Achievement) {
   window.$dialog?.warning({
     title: '停用并移除成就？',
-    content: `${row.name} 不再提供新奖励，已领取和个人快照由服务端保留。`,
+    content: `${row.name} 将停止发放新奖励，已领取的奖励不受影响。`,
     positiveText: '移除',
     negativeText: '取消',
     onPositiveClick: async () => {
@@ -270,7 +270,6 @@ onMounted(load);
 <template>
   <ManagementWorkspace
     :title="editing ? `${selected ? (canWrite ? '编辑' : '查看') : '新建'}成就` : '成就管理'"
-    subtitle="配置实际进度条件与完成奖励，保留已领取记录和个人规则快照"
     :editing="editing"
     :saving="saving"
     :readonly="!canWrite"
@@ -286,11 +285,11 @@ onMounted(load);
     </template>
     <template #alert>
       <NAlert v-if="error || saveError" type="error" :title="saveError || error" />
-      <NAlert v-if="notes && !editing" type="info" :title="notes" />
+      <details v-if="notes && !editing" class="ops-help"><summary>成就规则说明</summary><p>{{ notes }}</p></details>
     </template>
     <NCard v-if="!editing" :bordered="false" class="ops-panel">
       <NCollapse class="mb-24px">
-        <NCollapseItem :title="`原触发条件目录 · ${kinds.length} 类 / ${supportedKinds} 类可配置`" name="conditions">
+        <NCollapseItem :title="`条件目录 · ${kinds.length} 类 / ${supportedKinds} 类可配置`" name="conditions">
           <NDataTable
             :columns="conditionColumns"
             :data="kinds"
@@ -335,11 +334,11 @@ onMounted(load);
       <section v-show="section === 'goal'">
         <h3 class="mb-20px">成就目标</h3>
         <div class="ops-date-grid">
-          <NFormItem v-if="selected" label="成就标识"><NInput :value="draft.id" disabled /></NFormItem>
+          <NFormItem v-if="selected" label="成就编号"><span class="ops-mono ops-muted">{{ draft.id }}</span></NFormItem>
           <NFormItem label="显示名称" required><NInput v-model:value="draft.name" placeholder="成就名称" /></NFormItem>
         </div>
         <NFormItem label="进度条件" required>
-          <NSelect :value="draft.kind" :options="kindOptions" placeholder="选择已有进度机制" @update:value="setKind" />
+          <NSelect :value="draft.kind" :options="kindOptions" placeholder="选择触发条件" @update:value="setKind" />
         </NFormItem>
         <NAlert
           v-if="condition?.notes"
@@ -350,14 +349,14 @@ onMounted(load);
         <NFormItem label="达成目标" required>
           <NInputNumber v-model:value="draft.target" :disabled="fixedTarget !== undefined || saving || !canWrite" :min="1" :precision="0" />
         </NFormItem>
-        <NAlert type="info" title="条件类型来自游戏已有进度统计，新建成就不会生成额外计数机制。" />
+        <p class="ops-inline-note">玩家完成所选条件并达到目标后，即可领取奖励。</p>
       </section>
       <section v-show="section === 'rewards'">
         <h3 class="mb-20px">完成奖励</h3>
         <RewardList v-model:value="draft.rewards" :disabled="saving || !canWrite" />
       </section>
       <section v-show="section === 'publish'">
-        <h3 class="mb-20px">发布与来源</h3>
+        <h3 class="mb-20px">状态与备注</h3>
         <NFormItem label="规则状态">
           <NSwitch
             v-model:value="draft.enabled"
@@ -367,10 +366,10 @@ onMounted(load);
             <template #unchecked>关闭</template>
           </NSwitch>
         </NFormItem>
-        <NFormItem label="配置来源">
+        <NFormItem label="配置备注">
           <NInput v-model:value="draft.source" type="textarea" :maxlength="1000" />
         </NFormItem>
-        <NAlert type="info" title="已领取及已生成个人快照的成就继续按历史规则处理。" />
+        <p class="ops-inline-note">修改仅影响之后的新奖励，已领取的记录不变。</p>
       </section>
     </NForm>
   </ManagementWorkspace>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { onBeforeRouteLeave } from 'vue-router';
 import { api, errorMessage, json } from '@/service/operations';
 import { activityDay, calendarDate, calendarMidnight, expandActivityPattern } from '@/service/activity-schedules';
@@ -14,7 +14,13 @@ import type {
 import type { ActivityMode } from '@/service/activity-operations';
 import { useServerScopeStore } from '@/store/modules/server-scope';
 import { useOperations } from '@/composables/useOperations';
+import ActivitySummary from '@/components/operations/activity-summary.vue';
+import ActivityTemplateWorkspace from '@/components/operations/activity-template-workspace.vue';
+import type { ActivityForm } from '@/service/activity-operations';
 
+const definitionEditor = ref<InstanceType<typeof ActivityTemplateWorkspace> | null>(null);
+const definitionEditorOpen = ref(false);
+const activityPreview = ref<{ name: string; form: ActivityForm; published: boolean; relative?: ActivityOccurrence } | null>(null);
 const scope = useServerScopeStore();
 const { canWrite, loading, error, run } = useOperations();
 const definitions = ref<ActivityDefinition[]>([]);
@@ -35,6 +41,7 @@ const preview = ref<SchedulePreview | null>(null);
 const startDate = ref(calendarMidnight(Date.now()) - 3 * activityDay);
 const visibleDays = ref(28);
 const dayWidth = 48;
+const planningTab = ref<'character-day' | 'calendar'>('calendar');
 const libraryTab = ref('patterns');
 const librarySearch = ref('');
 const selectedKey = ref<string | null>(null);
@@ -54,7 +61,7 @@ const patternDraft = computed(() =>
 const patternDirty = computed(
   () => patternDialog.value && canWrite.value && patternDraft.value !== patternBaseline.value
 );
-const busy = computed(() => saving.value || checking.value || confirmingPublish.value || patternSaving.value);
+const busy = computed(() => saving.value || checking.value || confirmingPublish.value || patternSaving.value || Boolean(definitionEditor.value?.saving));
 let requestGeneration = 0;
 let removeScopeGuard: (() => void) | undefined;
 const draftBody = computed(() => ({
@@ -64,6 +71,9 @@ const draftBody = computed(() => ({
 const dirty = computed(() => version.value !== '' && JSON.stringify(draftBody.value.items) !== baseline.value);
 const ready = computed(() => Boolean(scope.serverId && version.value && !busy.value && !loading.value));
 const canPublish = computed(() => ready.value && canWrite.value && (dirty.value || !managed.value));
+function isCharacterItem(item: ActivityOccurrence) { return item.mode === 'opening-14' || item.timing === 'character-day'; }
+const characterItems = computed(() => items.value.filter(isCharacterItem));
+const calendarItems = computed(() => items.value.filter(item => !isCharacterItem(item)));
 const selected = computed(() => items.value.find(item => keyOf(item) === selectedKey.value));
 const usableDefinitions = computed(() => definitions.value.filter(item => item.enabled && item.availability.usable));
 const templateOptions = computed(() =>
@@ -78,12 +88,12 @@ const modeMap = computed(
 );
 const filteredPatterns = computed(() =>
   patterns.value.filter(
-    pattern => !librarySearch.value || pattern.name.toLowerCase().includes(librarySearch.value.toLowerCase())
+    pattern => !pattern.entries.some(entry => definitions.value.find(definition => definition.id === entry.templateId)?.mode === 'opening-14') && (!librarySearch.value || pattern.name.toLowerCase().includes(librarySearch.value.toLowerCase()))
   )
 );
 const filteredDefinitions = computed(() =>
   usableDefinitions.value.filter(
-    item => !librarySearch.value || item.name.toLowerCase().includes(librarySearch.value.toLowerCase())
+    item => (planningTab.value === 'character-day' || item.mode !== 'opening-14') && (!librarySearch.value || item.name.toLowerCase().includes(librarySearch.value.toLowerCase()))
   )
 );
 const dates = computed(() =>
@@ -97,7 +107,7 @@ const rows = computed(() => {
     const bars = items.value
       .filter(
         item =>
-          item.lane === lane &&
+          !isCharacterItem(item) && item.lane === lane &&
           item.claimEndAt > startDate.value &&
           item.startAt < startDate.value + visibleDays.value * activityDay
       )
@@ -121,7 +131,8 @@ function changed() {
 function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value));
 }
-function confirmDiscard(): Promise<boolean> {
+async function confirmDiscard(): Promise<boolean> {
+  if (definitionEditorOpen.value && !(await definitionEditor.value?.confirmDiscard())) return false;
   if (!dirty.value && !patternDirty.value) return Promise.resolve(true);
   return new Promise(resolve => {
     if (!window.$dialog) {
@@ -181,16 +192,50 @@ async function loadLibrary() {
   patterns.value = result[1].items;
   modes.value = result[2].items;
 }
+function previewActivity(templateId: string, occurrence?: ActivityOccurrence) {
+  const definition = definitions.value.find(item => item.id === templateId);
+  const source = occurrence?.form || definition?.form;
+  if (!source) { window.$message?.warning('找不到活动配置，请刷新活动库'); return; }
+  const form = clone(source);
+  if (occurrence) Object.assign(form, { startAt: occurrence.startAt, endAt: occurrence.endAt, claimEndAt: occurrence.claimEndAt });
+  activityPreview.value = { name: occurrence?.name || definition!.name, form, published: Boolean(occurrence?.id), relative: occurrence && isCharacterItem(occurrence) ? occurrence : undefined };
+}
+async function editActivity(templateId: string) {
+  const definition = definitions.value.find(item => item.id === templateId);
+  if (!definition) return;
+  definitionEditorOpen.value = true;
+  await nextTick();
+  await definitionEditor.value?.openFromSchedule(definition, !canWrite.value);
+}
+function definitionSaved(definition: ActivityDefinition) {
+  const index = definitions.value.findIndex(item => item.id === definition.id);
+  if (index >= 0) definitions.value[index] = definition;
+  // Only unpublished bars follow this edit. Published bars retain their stored form and version.
+  items.value.filter(item => !item.id && item.templateId === definition.id).forEach(item => {
+    item.templateVersion = definition.version;
+    item.name = definition.name;
+    item.form = clone(definition.form);
+  });
+  changed();
+}
+async function closeDefinitionEditor() {
+  if (!definitionEditor.value?.saving && await definitionEditor.value?.confirmDiscard()) definitionEditorOpen.value = false;
+}
 function firstFreeLane(startAt: number, endAt: number): number {
   for (let lane = 0; lane < 32; lane += 1)
-    if (!items.value.some(item => item.lane === lane && item.startAt < endAt && item.claimEndAt > startAt)) return lane;
+    if (!calendarItems.value.some(item => item.lane === lane && item.startAt < endAt && item.claimEndAt > startAt)) return lane;
   return 31;
 }
 function addDefinition(definition: ActivityDefinition, startAt: number, lane?: number) {
   if (!ready.value || !canWrite.value) return;
+  if (definition.mode === 'opening-14' && characterItems.value.some(item => item.enabled)) {
+    window.$message?.warning('开服任务已按角色独立起算，无需重复安排'); return;
+  }
   const endAt = calendarMidnight(startAt) + definition.defaultDays * activityDay;
   items.value.push({
     id: '',
+    timing: planningTab.value,
+    startDay: 1, durationDays: definition.defaultDays, claimDays: definition.claimDays,
     templateId: definition.id,
     templateVersion: definition.version,
     name: definition.name,
@@ -205,13 +250,15 @@ function addDefinition(definition: ActivityDefinition, startAt: number, lane?: n
     consumerId: '',
     draftKey: `draft-${Date.now()}-${Math.random()}`
   });
+  if (planningTab.value === 'character-day') selectedKey.value = keyOf(items.value[items.value.length - 1]);
   changed();
 }
 function applyPattern(pattern: ActivityPattern, date: number, laneOffset = 0) {
   if (!ready.value || !canWrite.value) return;
   try {
     const expanded = expandActivityPattern(pattern, definitions.value, { anchor: date, repeats: repeats.value || 1 });
-    if (expanded.length + items.value.length > 1000) throw new Error('一次排期最多1000项，请减少循环次数');
+    if (expanded.some(item => item.mode === 'opening-14') && characterItems.value.some(item => item.enabled)) throw new Error('开服任务已按角色独立起算，请从方案中移除重复项');
+    if (expanded.length + items.value.length > 1000) throw new Error('一次排期最多1000项，请减少填充次数');
     if (expanded.some(item => item.lane + laneOffset > 31))
       throw new Error('拖入后的方案超出32条轨道，请选择更靠上的轨道或修改方案');
     expanded.forEach(item => {
@@ -259,7 +306,7 @@ const pointer = ref<{
   kind: 'move' | 'start' | 'end';
 } | null>(null);
 function startPointer(event: PointerEvent, item: ActivityOccurrence, kind: 'move' | 'start' | 'end') {
-  if (!ready.value || !canWrite.value || item.frozen || event.button !== 0) return;
+  if (!ready.value || !canWrite.value || item.frozen || item.mode === 'opening-14' || event.button !== 0) return;
   event.preventDefault();
   event.stopPropagation();
   (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
@@ -300,7 +347,7 @@ function endPointer(event: PointerEvent) {
   pointer.value = null;
 }
 function keyboardMove(event: KeyboardEvent, item: ActivityOccurrence) {
-  if (item.frozen || !canWrite.value || !ready.value || !['ArrowLeft', 'ArrowRight'].includes(event.key)) return;
+  if (item.mode === 'opening-14' || item.frozen || !canWrite.value || !ready.value || !['ArrowLeft', 'ArrowRight'].includes(event.key)) return;
   event.preventDefault();
   const delta = (event.key === 'ArrowRight' ? 1 : -1) * (event.shiftKey ? 7 : 1) * activityDay;
   item.startAt += delta;
@@ -337,10 +384,12 @@ function copySelected() {
   item.consumerId = '';
   item.frozen = false;
   item.draftKey = `copy-${Date.now()}`;
-  const delta = item.endAt - item.startAt;
-  item.startAt += delta;
-  item.endAt += delta;
-  item.claimEndAt += delta;
+  if (!isCharacterItem(item)) {
+    const delta = item.endAt - item.startAt;
+    item.startAt += delta;
+    item.endAt += delta;
+    item.claimEndAt += delta;
+  }
   items.value.push(item);
   selectedKey.value = keyOf(item);
   changed();
@@ -409,7 +458,7 @@ async function publish() {
     version.value = out.version;
     baseline.value = JSON.stringify(draftBody.value.items);
     preview.value = null;
-    window.$message?.success('本服活动排期已原子发布，原玩法入口同步生效');
+    window.$message?.success('本服排期已发布');
   } catch (e) {
     saveError.value = errorMessage(e);
   } finally {
@@ -444,6 +493,7 @@ function openPattern(pattern?: ActivityPattern, fromCalendar = false) {
       Math.max(1, ...current.map(item => Math.ceil((item.claimEndAt - anchor) / activityDay)))
     );
   } else patternEntries.value = [];
+  patternEntries.value.forEach(normalizePatternEntry);
   patternBaseline.value = patternDraft.value;
   patternDialog.value = true;
 }
@@ -470,6 +520,8 @@ async function closePattern() {
   }
   patternDialog.value = false;
 }
+function isCharacterEntry(entry: ActivityPatternEntry) { return definitions.value.find(item => item.id === entry.templateId)?.mode === 'opening-14'; }
+function normalizePatternEntry(entry: ActivityPatternEntry) { if (isCharacterEntry(entry)) Object.assign(entry, { startDay: 0, durationDays: 14, claimDays: 1, lane: 0 }); }
 function addPatternEntry() {
   if (usableDefinitions.value[0])
     patternEntries.value.push({
@@ -479,6 +531,7 @@ function addPatternEntry() {
       claimDays: 0,
       lane: 0
     });
+  if (patternEntries.value.length) normalizePatternEntry(patternEntries.value[patternEntries.value.length - 1]);
 }
 async function savePattern() {
   if (!canWrite.value || patternSaving.value) return;
@@ -499,7 +552,7 @@ async function savePattern() {
     );
     patternDialog.value = false;
     await loadLibrary();
-    window.$message?.success('方案已保存，可反复拖入任何区服日期');
+    window.$message?.success('方案已保存，可按选定次数填入日期');
   } catch (e) {
     window.$message?.error(errorMessage(e));
   } finally {
@@ -526,6 +579,8 @@ watch(
   () => scope.serverId,
   () => {
     patternDialog.value = false;
+    definitionEditorOpen.value = false;
+    activityPreview.value = null;
     items.value = [];
     managed.value = false;
     calendarWarnings.value = [];
@@ -535,7 +590,7 @@ watch(
   }
 );
 function beforeUnload(event: BeforeUnloadEvent) {
-  if (dirty.value || patternDirty.value || busy.value) {
+  if (dirty.value || patternDirty.value || definitionEditor.value?.dirty || busy.value) {
     event.preventDefault();
     event.returnValue = '';
   }
@@ -557,17 +612,22 @@ onUnmounted(() => {
 
 <template>
   <div class="ops-page schedule-page">
+    <NTabs v-model:value="planningTab" type="line" class="mb-20px" @update:value="selectedKey = null">
+      <NTab name="character-day">新玩家排期</NTab>
+      <NTab name="calendar">定期排期</NTab>
+    </NTabs>
+    <p class="planning-description">{{ planningTab === 'character-day' ? '每个区服角色创建当天为第1天，同一账号在其他服的角色独立计算。' : '按固定日历日期开放，所有玩家共用；不会跟随账号或角色创建时间移动。' }}</p>
     <div class="ops-toolbar mb-20px">
       <div>
         <h1>
           活动排期
           <NTag v-if="scope.currentServer" :bordered="false" type="info">{{ scope.currentServer.name }}</NTag>
         </h1>
-        <p class="ops-muted">全局活动模板 → 本服时间轴 · 拖动移动日期，两端拉伸持续时间，按天吸附。</p>
+        <p class="ops-muted">{{ managed ? '已由本服排期控制开放' : '尚未发布本服排期' }} · {{ items.length }} 项活动</p>
       </div>
       <NSpace>
         <NButton :disabled="busy" :loading="loading" @click="loadCalendar(true)">刷新本服</NButton>
-        <NButton v-if="canWrite" :disabled="!ready" @click="openPattern(undefined, true)">可见活动存为方案</NButton>
+        <NButton v-if="canWrite && planningTab === 'calendar'" :disabled="!ready" @click="openPattern(undefined, true)">可见活动存为方案</NButton>
         <NButton v-if="canWrite" type="primary" :disabled="!canPublish" :loading="saving" @click="publish">
           发布本服排期
         </NButton>
@@ -580,32 +640,21 @@ onUnmounted(() => {
       class="mb-20px"
     />
     <NAlert v-if="error || saveError" type="error" :title="saveError || error" class="mb-16px" />
-    <NAlert
-      v-if="scope.serverId && version"
-      :type="managed ? 'info' : 'warning'"
-      :title="managed ? '本服已使用独立活动排期' : '本服尚未启用排期，当前仍沿用旧活动入口'"
-      class="mb-16px"
-    >
-      {{
-        managed
-          ? '仅按本服已发布日历开放活动；空档停止开放。草稿需要发布后才生效。'
-          : '首次发布将切换为本服日历控制。可以发布空日历停用旧入口，之后再逐项安排活动。'
-      }}
-    </NAlert>
+    <NAlert v-if="scope.serverId && version && !managed" type="warning" title="首次发布会接管本服活动；未排期的活动将关闭。" class="mb-16px" />
     <div class="schedule-layout">
       <NCard :bordered="false" class="schedule-library">
-        <NTabs v-model:value="libraryTab" type="segment">
+        <NTabs v-if="planningTab === 'calendar'" v-model:value="libraryTab" type="segment">
           <NTab name="patterns">排期方案</NTab>
           <NTab name="templates">单个活动</NTab>
         </NTabs>
         <NInput v-model:value="librarySearch" class="mb-16px mt-16px" clearable placeholder="搜索活动或方案" />
-        <div class="library-fill">
+        <div v-if="planningTab === 'calendar'" class="library-fill">
           <label>
             填充起日
             <NDatePicker v-model:value="fillDate" type="date" :clearable="false" />
           </label>
           <label>
-            循环次数
+            填充次数
             <NInputNumber v-model:value="repeats" :min="1" :max="52" />
           </label>
           <NButton
@@ -616,8 +665,8 @@ onUnmounted(() => {
             从本服开服日开始
           </NButton>
         </div>
-        <p class="ops-muted library-help">拖到某一天可直接填充；也可点击“填入草稿”。循环间隔由方案周期决定。</p>
-        <template v-if="libraryTab === 'patterns'">
+        <p v-if="planningTab === 'calendar'" class="ops-muted library-help">选定起日和次数后手动填充；保存方案不会自动续排。</p>
+        <template v-if="planningTab === 'calendar' && libraryTab === 'patterns'">
           <NButton v-if="canWrite" block secondary class="mb-12px" :disabled="busy" @click="openPattern()">
             ＋ 新建排期方案
           </NButton>
@@ -629,7 +678,7 @@ onUnmounted(() => {
             @dragstart="startLibraryDrag($event, 'pattern', pattern.id)"
           >
             <strong>{{ pattern.name }}</strong>
-            <span>{{ pattern.entries.length }} 个活动 · 每 {{ pattern.cycleDays }} 天循环</span>
+            <span>{{ pattern.entries.length }} 个活动 · 填充间隔 {{ pattern.cycleDays }} 天</span>
             <NSpace :size="6">
               <NButton size="tiny" :disabled="!ready || !canWrite" @click="applyPattern(pattern, fillDate)">
                 填入草稿
@@ -658,7 +707,17 @@ onUnmounted(() => {
         </template>
       </NCard>
       <div class="schedule-main">
-        <NCard :bordered="false">
+        <NCard v-if="planningTab === 'character-day'" :bordered="false">
+          <section class="character-schedules" aria-label="新玩家排期">
+            <h2>新玩家活动</h2>
+            <NEmpty v-if="!characterItems.length" description="从左侧添加活动，再设置角色的起始日与持续天数。" />
+            <article v-for="item in characterItems" :key="keyOf(item)">
+              <div><strong>{{ item.name }}</strong><p>角色第{{ item.startDay || 1 }}天开始 · 持续{{ item.durationDays || 14 }}天<template v-if="item.claimDays"> · 另留{{ item.claimDays }}天领奖</template> <NTag size="small" :bordered="false" :type="item.enabled ? 'success' : 'default'">{{ item.enabled ? '开放' : '停用' }}</NTag></p></div>
+              <NSpace :size="6"><NButton size="small" @click="previewActivity(item.templateId, item)">预览</NButton><NButton size="small" @click="selectedKey = keyOf(item)">编辑</NButton></NSpace>
+            </article>
+          </section>
+        </NCard>
+        <NCard v-else :bordered="false">
           <div class="calendar-toolbar">
             <NSpace>
               <NButton size="small" @click="startDate -= visibleDays * activityDay">←</NButton>
@@ -747,14 +806,10 @@ onUnmounted(() => {
                       {{ calendarDate(bar.item.startAt) }} — {{ calendarDate(bar.item.endAt)
                       }}{{ bar.item.frozen ? ' · 已冻结' : '' }}
                     </small>
-                    <button
-                      class="bar-edit"
-                      title="查看或精确修改日期"
-                      @pointerdown.stop
-                      @click.stop="selectedKey = keyOf(bar.item)"
-                    >
-                      ⋯
-                    </button>
+                    <div v-if="bar.item.endAt - bar.item.startAt >= 3 * activityDay" class="bar-actions" @pointerdown.stop>
+                      <button @click.stop="previewActivity(bar.item.templateId, bar.item)">预览</button>
+                      <button @click.stop="selectedKey = keyOf(bar.item)">编辑</button>
+                    </div>
                     <span
                       v-if="!bar.item.frozen && canWrite"
                       class="resize-handle right"
@@ -767,6 +822,12 @@ onUnmounted(() => {
                 </div>
               </div>
             </div>
+          </div>
+          <div v-if="calendarItems.length" class="scheduled-activities" aria-label="本服活动清单">
+            <article v-for="item in calendarItems" :key="keyOf(item)">
+              <div><strong>{{ item.name }}</strong><span>{{ calendarDate(item.startAt) }} — {{ calendarDate(item.endAt) }}<template v-if="item.frozen"> · 已冻结</template><template v-else-if="!item.id"> · 草稿</template></span></div>
+              <NSpace :size="6"><NButton size="small" @click="previewActivity(item.templateId, item)">预览</NButton><NButton size="small" @click="selectedKey = keyOf(item)">编辑排期</NButton></NSpace>
+            </article>
           </div>
           <div class="calendar-legend">
             <span class="legend-dot" />
@@ -793,9 +854,7 @@ onUnmounted(() => {
           </ul>
         </NAlert>
         <NAlert v-for="warning in calendarWarnings" :key="warning" type="info" :title="warning" class="mt-16px" />
-        <NAlert type="info" title="规则与历史保护" class="mt-16px">
-          不同玩法可并行；转盘及原无实例福利同模式不能重叠，领奖宽限也计入检查。已冻结活动保留时间和奖励，可停用或复制新一期。开服14天任务保留每角色第1天与原领取记录。
-        </NAlert>
+
       </div>
     </div>
     <div v-if="dirty || (version && !managed)" class="schedule-draft-footer">
@@ -812,6 +871,14 @@ onUnmounted(() => {
             title="已冻结的活动不能移动或改时，原奖励和领取状态继续保留。"
             class="mb-16px mt-16px"
           />
+          <template v-if="isCharacterItem(selected)">
+            <p class="pattern-help mt-16px">按本服角色创建日计算，已领取记录保留。</p>
+            <NFormItem label="角色第几天开始"><NInputNumber :value="selected.startDay || 1" :min="1" :max="366" :disabled="selected.frozen" @update:value="selected.startDay = $event || 1; changed()" /></NFormItem>
+            <NFormItem label="持续天数"><NInputNumber :value="selected.durationDays || 14" :min="1" :max="366" :disabled="selected.frozen" @update:value="selected.durationDays = $event || 1; changed()" /></NFormItem>
+            <NFormItem label="额外领奖天数"><NInputNumber :value="selected.claimDays || 0" :min="0" :max="90" :disabled="selected.frozen" @update:value="selected.claimDays = $event || 0; changed()" /></NFormItem>
+            <p v-if="selected.mode === 'opening-14'" class="pattern-help">任务按本服开服自然日解锁，共14档；有效期从该角色开始日计算，晚加入仍保留完整配置时长。</p>
+          </template>
+          <template v-else>
           <NFormItem label="开始日期">
             <NDatePicker
               v-model:value="selected.startAt"
@@ -853,12 +920,15 @@ onUnmounted(() => {
               "
             />
           </NFormItem>
+          </template>
           <NFormItem label="发布开放"><NSwitch v-model:value="selected.enabled" @update:value="changed" /></NFormItem>
-          <p class="ops-muted">{{ selected.id ? '原玩法实例：' + selected.consumerId : '未保存的新排期' }}</p>
+          <NButton class="mt-12px" @click="previewActivity(selected.templateId, selected)">预览活动内容</NButton>
+          <NButton v-if="!selected.id" class="ml-8px mt-12px" @click="editActivity(selected.templateId)">编辑活动内容</NButton>
+          <p v-if="selected.mode !== 'opening-14'" class="ops-muted mt-12px">{{ selected.id ? '本期奖励已保存。调整奖励请复制为新一期。' : '日期修改留在草稿中，发布后生效。' }}</p>
         </NForm>
         <template #footer>
           <NSpace>
-            <NButton v-if="canWrite" @click="copySelected">复制到下一期</NButton>
+            <NButton v-if="canWrite" @click="copySelected">{{ isCharacterItem(selected) ? '复制为新排期' : '复制到下一期' }}</NButton>
             <NButton v-if="canWrite && !selected.frozen" type="error" secondary @click="removeSelected">
               从草稿移除
             </NButton>
@@ -876,11 +946,7 @@ onUnmounted(() => {
       :close-on-esc="!patternSaving"
       @update:show="!$event && closePattern()"
     >
-      <NAlert
-        type="info"
-        title="方案以第1天为起点保存相对日序。拖入日期时展开；重复填充按周期相隔，不影响之前发布的活动。"
-        class="mb-20px"
-      />
+      <p class="pattern-help">第1天对应填充起日；重复填充间隔决定下一组活动的开始时间。</p>
       <NAlert
         v-if="patternSourceStart !== null"
         type="info"
@@ -890,28 +956,33 @@ onUnmounted(() => {
       <NForm label-placement="top" :disabled="!canWrite || patternSaving">
         <div class="pattern-top">
           <NFormItem label="方案名称"><NInput v-model:value="patternName" :maxlength="80" /></NFormItem>
-          <NFormItem label="循环周期（天）"><NInputNumber v-model:value="cycleDays" :min="1" :max="366" /></NFormItem>
+          <NFormItem label="重复填充间隔（天）"><NInputNumber v-model:value="cycleDays" :min="1" :max="366" /></NFormItem>
         </div>
         <article v-for="(entry, index) in patternEntries" :key="index" class="pattern-entry">
           <NFormItem label="活动">
-            <NSelect v-model:value="entry.templateId" :options="templateOptions" filterable />
+            <NSelect v-model:value="entry.templateId" :options="templateOptions" filterable @update:value="normalizePatternEntry(entry)" />
           </NFormItem>
           <NFormItem label="第几天开始">
             <NInputNumber
               :value="entry.startDay + 1"
+              :disabled="isCharacterEntry(entry)"
               :min="1"
               :max="366"
               @update:value="entry.startDay = ($event || 1) - 1"
             />
           </NFormItem>
           <NFormItem label="持续天数">
-            <NInputNumber v-model:value="entry.durationDays" :min="1" :max="366" />
+            <NInputNumber v-model:value="entry.durationDays" :disabled="isCharacterEntry(entry)" :min="1" :max="366" />
           </NFormItem>
-          <NFormItem label="领奖宽限"><NInputNumber v-model:value="entry.claimDays" :min="0" :max="90" /></NFormItem>
+          <NFormItem label="领奖宽限"><NInputNumber v-model:value="entry.claimDays" :disabled="isCharacterEntry(entry)" :min="0" :max="90" /></NFormItem>
           <NFormItem label="并行轨道">
-            <NInputNumber :value="entry.lane + 1" :min="1" :max="32" @update:value="entry.lane = ($event || 1) - 1" />
+            <NInputNumber :value="entry.lane + 1" :disabled="isCharacterEntry(entry)" :min="1" :max="32" @update:value="entry.lane = ($event || 1) - 1" />
           </NFormItem>
-          <NButton v-if="canWrite" quaternary type="error" @click="patternEntries.splice(index, 1)">移除</NButton>
+          <div class="pattern-actions">
+            <NButton size="small" :disabled="!entry.templateId" @click="previewActivity(entry.templateId)">预览</NButton>
+            <NButton size="small" :disabled="!entry.templateId" @click="editActivity(entry.templateId)">{{ canWrite ? '编辑活动' : '查看活动' }}</NButton>
+            <NButton v-if="canWrite" size="small" quaternary type="error" @click="patternEntries.splice(index, 1)">移除</NButton>
+          </div>
         </article>
         <NButton v-if="canWrite" :disabled="!usableDefinitions.length" @click="addPatternEntry">＋ 添加活动</NButton>
       </NForm>
@@ -922,10 +993,30 @@ onUnmounted(() => {
         </NSpace>
       </template>
     </NModal>
+    <NModal :show="Boolean(activityPreview)" preset="card" :title="activityPreview?.name" class="activity-preview-modal" @update:show="!$event && (activityPreview = null)">
+      <template v-if="activityPreview">
+        <p class="pattern-help">{{ activityPreview.published ? '本期已发布配置' : '活动模板预览' }}</p>
+        <p v-if="activityPreview.relative" class="pattern-help">角色第{{ activityPreview.relative.startDay || 1 }}天开始 · 持续{{ activityPreview.relative.durationDays || 14 }}天 · 另留{{ activityPreview.relative.claimDays || 0 }}天领奖</p>
+        <p v-if="activityPreview.form.mode === 'opening-14'" class="pattern-help">原249项任务按本服开服自然日解锁，角色有各自完整有效期；已领记录不会因重新排期重置。</p>
+        <ActivitySummary :form="activityPreview.form" :mode="modes.find(mode => mode.mode === activityPreview?.form.mode)" :hide-schedule="!activityPreview.published || Boolean(activityPreview.relative)" />
+      </template>
+      <template #footer><NSpace justify="end"><NButton @click="activityPreview = null">关闭</NButton></NSpace></template>
+    </NModal>
+    <NModal :show="definitionEditorOpen" preset="card" class="activity-editor-modal" :mask-closable="false" :close-on-esc="false" @update:show="!$event && closeDefinitionEditor()">
+      <ActivityTemplateWorkspace ref="definitionEditor" inline @saved="definitionSaved" @closed="definitionEditorOpen = false" />
+    </NModal>
   </div>
 </template>
 
 <style scoped>
+.planning-description { margin: 0 0 18px; font-size: 13px; line-height: 1.7; color: rgb(var(--base-text-color) / .65); }
+
+.character-schedules { margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid rgb(var(--base-text-color) / .09); }
+.character-schedules h2 { font-size: 14px; font-weight: 600; margin: 0 0 10px; }
+.character-schedules article { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 10px 0; }
+.character-schedules strong { font-size: 13px; font-weight: 500; }
+.character-schedules p { font-size: 12px; color: rgb(var(--base-text-color) / .65); margin: 6px 0 0; }
+
 h1 {
   display: flex;
   align-items: center;
@@ -1069,7 +1160,7 @@ h1 {
 .activity-bar {
   position: absolute;
   height: 46px;
-  padding: 6px 23px 6px 12px;
+  padding: 6px 12px;
   background: rgb(var(--primary-color) / 0.12);
   color: rgb(var(--primary-color));
   border: 1px solid rgb(var(--primary-color) / 0.3);
@@ -1147,18 +1238,19 @@ h1 {
 .resize-handle.right {
   right: 0;
 }
-.bar-edit {
-  position: absolute;
-  right: 6px;
-  top: 9px;
-  padding: 0;
-  width: 17px;
-  background: transparent;
-  border: 0;
-  color: inherit;
-  cursor: pointer;
-  font-size: 18px;
-}
+.bar-actions { position: absolute; right: 5px; top: 7px; display: flex; gap: 3px; background: rgb(var(--container-bg-color)); border-radius: 4px; }
+.bar-actions button { color: rgb(var(--primary-color)); background: transparent; border: 0; border-radius: 4px; font-size: 11px; padding: 3px 5px; cursor: pointer; }
+.bar-actions button:hover { background: rgb(var(--primary-color) / .1); }
+.bar-actions button:focus-visible { outline: 2px solid rgb(var(--primary-color)); }
+.bar-title { padding-right: 62px; }
+.scheduled-activities { margin-top: 16px; }
+.scheduled-activities article { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 10px 0; border-bottom: 1px solid rgb(var(--base-text-color) / .07); }
+.scheduled-activities strong { font-size: 13px; font-weight: 500; }
+.scheduled-activities span { color: rgb(var(--base-text-color) / .6); font-size: 12px; margin-left: 12px; }
+.pattern-actions { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.pattern-help { margin: 0 0 18px; line-height: 1.7; font-size: 13px; color: rgb(var(--base-text-color) / .65); }
+:global(.n-card.activity-preview-modal) { width: min(960px, calc(100vw - 40px)); max-height: calc(100vh - 60px); overflow: auto; }
+:global(.n-card.activity-editor-modal) { width: min(1200px, calc(100vw - 40px)); max-height: calc(100vh - 60px); overflow: auto; }
 .calendar-legend {
   display: flex;
   align-items: center;
@@ -1195,8 +1287,8 @@ h1 {
   border-radius: 8px;
   z-index: 8;
 }
-.pattern-modal {
-  width: min(1000px, calc(100vw - 40px));
+:global(.n-card.pattern-modal) {
+  width: min(1280px, calc(100vw - 40px));
   max-height: calc(100vh - 64px);
   overflow: auto;
 }
@@ -1207,7 +1299,7 @@ h1 {
 }
 .pattern-entry {
   display: grid;
-  grid-template-columns: minmax(180px, 1fr) repeat(4, 110px) 55px;
+  grid-template-columns: minmax(180px, 1fr) repeat(4, 100px) minmax(180px, auto);
   gap: 12px;
   align-items: center;
   padding-top: 16px;
@@ -1220,6 +1312,10 @@ h1 {
   .schedule-main :deep(.n-card__content) {
     padding: 16px;
   }
+}
+@media (max-width: 1000px) {
+  .pattern-entry { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .pattern-entry > :first-child, .pattern-actions { grid-column: 1 / -1; }
 }
 @media (max-width: 760px) {
   .schedule-layout {

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, h, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { NButton, NSpace } from 'naive-ui';
 import type { DataTableColumns } from 'naive-ui';
 import { api, errorMessage, formatTime, json } from '@/service/operations';
@@ -8,6 +9,18 @@ import type { GamePlayer, GamePlayerDetail, InventoryItem } from '@/service/play
 import { useOperations } from '@/composables/useOperations';
 import { useServerScopeStore } from '@/store/modules/server-scope';
 const scope = useServerScopeStore();
+const route = useRoute();
+const router = useRouter();
+const walletTarget = ref<Pick<GamePlayer, 'id' | 'name'> & { accountId?: number } | null>(null);
+function openWallet(player: Pick<GamePlayer, 'id' | 'name'> & { accountId?: number }) { walletTarget.value = { id: player.id, name: player.name, accountId: player.accountId }; }
+function closeWallet() {
+  walletTarget.value = null;
+  if (route.query.wallet) { const query = { ...route.query }; delete query.wallet; router.replace({ query }); }
+}
+function requestedWallet() {
+  const id = Number(route.query.wallet);
+  if (Number.isSafeInteger(id) && id > 0) openWallet(rows.value.find(row => row.id === id) || { id, name: `用户 #${id}` });
+}
 import ResourceImage from '@/components/operations/resource-image.vue';
 import WalletLedger from '@/components/operations/wallet-ledger.vue';
 import GamePlayerCreate from '@/components/operations/game-player-create.vue';
@@ -19,6 +32,10 @@ const page = ref(1);
 const pageSize = ref(25);
 const total = ref(0);
 const rows = ref<GamePlayer[]>([]);
+function sceneLabel(scene: string) {
+  const names: Record<string, string> = { town: '主城', town_main: '主城', field_001: '森林野外', field_002: '雪原野外', field_003: '沙漠野外', field_004: '夜森林野外', field_005: '火山野外', field_006: '峡谷野外' };
+  return names[scene] || (scene ? '其他场景' : '—');
+}
 async function load() {
   const data = await run(() =>
     api<{ items: GamePlayer[]; total: number }>(
@@ -177,15 +194,19 @@ const columns: DataTableColumns<GamePlayer> = [
     minWidth: 220,
     render: row => h('div', [h('strong', row.name), h('div', { class: 'ops-mono ops-muted' }, `ID ${row.id}`)])
   },
+  { title: '所属用户', key: 'username', minWidth: 180, render: row => `${row.nickname || '—'} · ${row.username || '—'}` },
   { title: '等级', key: 'level', width: 100 },
   { title: 'VIP', key: 'vip', width: 100, render: row => `VIP${row.vip || 0}` },
   { title: '主线', key: 'chapter', width: 140, render: row => `${row.chapter || 0} - ${row.mission || 0}` },
-  { title: '所在场景', key: 'scene', minWidth: 170 },
+  { title: '所在场景', key: 'scene', minWidth: 170, render: row => sceneLabel(row.scene) },
   {
     title: '操作',
     key: 'action',
-    width: 150,
-    render: row => h(NButton, { size: 'small', secondary: true, onClick: () => show(row) }, () => '查看与管理')
+    width: 220,
+    render: row => h(NSpace, { size: 6 }, () => [
+      h(NButton, { size: 'small', secondary: true, onClick: () => show(row) }, () => '查看角色'),
+      h(NButton, { size: 'small', onClick: () => openWallet(row) }, () => '蓝绿钱包')
+    ])
   }
 ];
 const removeSwitchGuard = scope.addSwitchGuard(() => {
@@ -204,17 +225,23 @@ watch(activeTab, value => {
       detailError.value = errorMessage(e);
     });
 });
-onMounted(load);
+onMounted(async () => {
+ if (typeof route.query.q === 'string') q.value = route.query.q;
+ await load(); requestedWallet();
+ const id = Number(route.query.playerId);
+ if (Number.isSafeInteger(id) && id > 0) { open.value = true; await loadDetail(id); }
+});
+watch(() => route.query.wallet, requestedWallet);
 </script>
 
 <template>
   <div class="ops-page">
     <div class="ops-toolbar">
       <div class="ops-page-label">
-        用户与角色
+        玩家管理
         <span class="ops-count">{{ total.toLocaleString() }}</span>
       </div>
-      <NSpace><NButton :loading="loading" @click="load">刷新</NButton><NButton v-if="canWrite" type="primary" :disabled="!scope.currentServer?.runtimeBound || !scope.currentServer?.enabled" @click="createOpen = true">新增用户</NButton></NSpace>
+      <NSpace><NButton :loading="loading" @click="load">刷新</NButton><NButton v-if="canWrite" type="primary" :disabled="!scope.currentServer?.runtimeBound || !scope.currentServer?.enabled" @click="createOpen = true">新增玩家</NButton></NSpace>
     </div>
     <NAlert v-if="!scope.currentServer?.runtimeBound" type="info" title="该区服待部署，可先安排活动；绑定游戏服务后可新增游戏用户。" />
     <NAlert v-if="error" type="error" :title="error" />
@@ -243,6 +270,11 @@ onMounted(load);
         />
       </div>
     </NCard>
+    <NDrawer :show="Boolean(walletTarget)" :width="1020" class="ops-editor-drawer" @update:show="!$event && closeWallet()">
+      <NDrawerContent :title="`${walletTarget?.name || ''} · 蓝绿钱包`" closable>
+        <WalletLedger v-if="walletTarget" :key="`${scope.serverId}:${walletTarget.id}`" :account-id="walletTarget.accountId || undefined" :player-id="walletTarget.accountId ? undefined : walletTarget.id" />
+      </NDrawerContent>
+    </NDrawer>
     <GamePlayerCreate v-model:show="createOpen" @created="createdPlayer" />
     <NDrawer v-model:show="open" :width="980" class="ops-editor-drawer">
       <NDrawerContent title="玩家管理" closable>
@@ -256,6 +288,7 @@ onMounted(load);
               </div>
               <NSpace>
                 <NButton :loading="detailLoading" @click="loadDetail(detail.id)">刷新</NButton>
+                <NButton @click="openWallet(detail)">蓝绿钱包</NButton>
                 <NButton v-if="canWrite" @click="edit('name')">修改名称</NButton>
                 <NButton v-if="canWrite" @click="edit('kick')">踢下线</NButton>
               </NSpace>
@@ -266,7 +299,7 @@ onMounted(load);
                   <NDescriptionsItem label="角色等级">{{ detail.level }}</NDescriptionsItem>
                   <NDescriptionsItem label="会员等级">VIP{{ detail.vip }}</NDescriptionsItem>
                   <NDescriptionsItem label="主线进度">{{ detail.chapter }} - {{ detail.mission }}</NDescriptionsItem>
-                  <NDescriptionsItem label="所在场景">{{ detail.scene || '—' }}</NDescriptionsItem>
+                  <NDescriptionsItem label="所在场景">{{ sceneLabel(detail.scene) }}</NDescriptionsItem>
                   <NDescriptionsItem label="创建时间">{{ formatTime(detail.createdAt) }}</NDescriptionsItem>
                 </NDescriptions>
                 <h3 class="player-section-title">当前资源</h3>
@@ -290,12 +323,12 @@ onMounted(load);
                   </NDescriptionsItem>
                 </NDescriptions>
               </NTabPane>
-              <NTabPane name="inventory" tab="背包与实例">
+              <NTabPane name="inventory" tab="背包">
                 <div class="ops-filters mt-16px">
                   <NInput
                     v-model:value="inventoryQ"
                     clearable
-                    placeholder="资源名称、ID 或实例 GUID"
+                    placeholder="搜索物品名称或编号"
                     @update:value="inventoryPage = 1"
                   />
                 </div>
@@ -311,7 +344,7 @@ onMounted(load);
                   }"
                 />
               </NTabPane>
-              <NTabPane name="wallet" tab="钱包账单"><WalletLedger :key="detail.id" :player-id="detail.id" /></NTabPane>
+
             </NTabs>
           </template>
         </NSpin>

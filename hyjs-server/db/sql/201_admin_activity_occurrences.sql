@@ -1,5 +1,6 @@
 CREATE TABLE IF NOT EXISTS admin_activity_occurrences (
  id VARCHAR(64) NOT NULL PRIMARY KEY, server_id BIGINT NOT NULL, template_id VARCHAR(64) NOT NULL, template_version VARCHAR(64) NOT NULL,
+ timing VARCHAR(24) NOT NULL DEFAULT 'calendar', start_day BIGINT NOT NULL DEFAULT 1, duration_days BIGINT NOT NULL DEFAULT 14, claim_days BIGINT NOT NULL DEFAULT 0,
  name VARCHAR(160) NOT NULL, mode VARCHAR(64) NOT NULL, consumer_key VARCHAR(128) NOT NULL,
  consumer_id VARCHAR(160) NOT NULL, start_at BIGINT NOT NULL, end_at BIGINT NOT NULL,
  claim_end_at BIGINT NOT NULL, lane BIGINT NOT NULL, enabled BOOLEAN NOT NULL,

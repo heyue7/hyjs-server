@@ -75,3 +75,17 @@ export interface FieldDeployments {
   serverId: number;
   items: FieldDeployment[];
 }
+
+export interface FieldPresentation {
+  name: string;
+  iconUrl: string;
+  detail: string;
+}
+export interface FieldChannel {
+  scene: string;
+  name: string;
+  lineCount: number;
+  maxPlayers: number;
+  version: string;
+  lines: { line: number; online: number }[];
+}

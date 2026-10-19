@@ -197,6 +197,12 @@ func (s *GameService) dispatch(ctx context.Context, r *model.GamePacket, peer st
 	if err != nil {
 		return nil, err
 	}
+	// Create this role's configured relative activity instances before their original consumers run.
+	if row.Player != nil {
+		if err = s.PrepareAdminCharacterActivitySchedules(ctx, row.Id); err != nil {
+			return nil, err
+		}
+	}
 	runtime, err := s.fieldRuntimeForRequest(ctx, r)
 	if err != nil {
 		return nil, err

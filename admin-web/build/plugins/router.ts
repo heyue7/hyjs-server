@@ -96,7 +96,8 @@ export function setupElegantRouter() {
           icon: 'ph:clock-counter-clockwise',
           order: 5
         },
-        players: { title: '游戏玩家', icon: 'ph:users', order: 2 },
+        'game-accounts': { title: '用户管理', icon: 'ph:users', order: 1 },
+        players: { title: '玩家管理', icon: 'ph:users', order: 2 },
         wallets: { title: '蓝绿钱包', icon: 'ph:treasure-chest', order: 5 },
         users: { title: '后台账号', icon: 'ph:users', order: 9 },
         'activities-unavailable': {

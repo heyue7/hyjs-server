@@ -290,7 +290,7 @@ onMounted(load);
           />
         </NFormItem>
       </NForm>
-      <div class="ops-muted mb-20px">道具将通过游戏领奖中心发放，本次操作会记入审计。</div>
+      <div class="ops-muted mb-20px">道具将发送到该角色的领奖中心。</div>
       <template #footer>
         <div class="ops-drawer-actions">
           <NButton :disabled="granting" @click="grantOpen = false">取消</NButton>

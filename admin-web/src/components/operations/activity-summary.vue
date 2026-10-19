@@ -10,9 +10,16 @@ const milestones = computed(() => props.form.milestones || []);
 const prizes = computed(() => props.form.prizes || []);
 const totalWeight = computed(() => prizes.value.reduce((sum, row) => sum + row.weight, 0));
 const numberFields = [
-  ['scorePerDraw', '每次抽取积分'], ['advancePlaces', '进阶奖名次范围'], ['initialDiamondPool', '初始大奖钻石池'],
+  ['scorePerDraw', '每次抽取积分'], ['initialDiamondPool', '初始大奖钻石池'],
   ['rebateCap', '返还钻石上限'], ['dayLimit', '每日探索次数'], ['totalLimit', '累计探索次数上限'], ['cooldownSeconds', '探索间隔（秒）']
 ];
+const hasRules = computed(() =>
+  Object.keys(props.mode?.fixedValues || {}).length > 0 ||
+  numberFields.some(([key]) => options.value[key] !== undefined) ||
+  ['rebateBps', 'jackpotPerMillion', 'poolContributionBps'].some(key => options.value[key] !== undefined) ||
+  ['discounts', 'meals', 'coinPrizes', 'exploreRewards', 'finalRewards'].some(key => options.value[key]?.length > 0) ||
+  (props.form.mode !== 'turntable' && Boolean(options.value.topPrize?.resourceId || options.value.advancePrize?.resourceId))
+);
 const fixedLabels: Record<string, string> = { singleDiamond: '单抽钻石', tenDiamond: '十连钻石', coinPerDraw: '每次购买金币', dayLimit: '每日次数' };
 function minuteText(value: number) { return value === 1440 ? '24:00' : `${String(Math.floor(value / 60)).padStart(2, '0')}:${String(value % 60).padStart(2, '0')}`; }
 </script>
@@ -22,13 +29,14 @@ function minuteText(value: number) { return value === 1440 ? '24:00' : `${String
     <section class="activity-summary-section">
       <h3>活动信息</h3>
       <NDescriptions :column="2" label-placement="top">
-        <NDescriptionsItem label="模式">{{ mode?.label || '暂未支持此模式' }}</NDescriptionsItem>
-        <NDescriptionsItem label="游戏模板">{{ mode?.templates.find(template => template.id === form.templateId)?.name || '无可用模板' }}</NDescriptionsItem>
+        <NDescriptionsItem label="模式">{{ mode?.label || (form.mode === 'opening-14' ? '开服14天任务' : '暂未支持此模式') }}</NDescriptionsItem>
+        <NDescriptionsItem label="游戏模板">{{ mode?.templates.find(template => template.id === form.templateId)?.name || (form.mode === 'opening-14' ? '原开服任务页面' : '无可用模板') }}</NDescriptionsItem>
         <NDescriptionsItem v-if="!hideSchedule" label="开始">{{ formatTime(form.startAt) }}</NDescriptionsItem>
         <NDescriptionsItem v-if="!hideSchedule" label="结束">{{ formatTime(form.endAt) }}</NDescriptionsItem>
         <NDescriptionsItem v-if="!hideSchedule" label="领奖截止">{{ formatTime(form.claimEndAt) }}</NDescriptionsItem>
-        <NDescriptionsItem label="运营备注">{{ form.source || '—' }}</NDescriptionsItem>
+
       </NDescriptions>
+      <details v-if="form.source" class="activity-source"><summary>配置来源与备注</summary><p>{{ form.source }}</p></details>
     </section>
     <section v-if="rows.length" class="activity-summary-section">
       <h3>商品与兑换项目 <span class="ops-muted">{{ rows.length }} 项</span></h3>
@@ -61,7 +69,7 @@ function minuteText(value: number) { return value === 1440 ? '24:00' : `${String
       </div>
       <p class="ops-muted mt-12px">权重占比不包含保底及超级大奖规则。</p>
     </section>
-    <section v-if="Object.keys(options).length || mode?.fixedValues" class="activity-summary-section">
+    <section v-if="hasRules" class="activity-summary-section">
       <h3>规则与额外奖励</h3>
       <NDescriptions :column="2" label-placement="top">
         <NDescriptionsItem v-for="(value, key) in mode?.fixedValues || {}" :key="key" :label="fixedLabels[String(key)] || String(key)">{{ value }}</NDescriptionsItem>
@@ -74,17 +82,21 @@ function minuteText(value: number) { return value === 1440 ? '24:00' : `${String
         <NDescriptionsItem v-if="options.discounts" label="可用折扣">{{ options.discounts.map((value: number) => `${value / 100}%`).join('、') || '未配置' }}</NDescriptionsItem>
       </NDescriptions>
       <div v-for="(meal, index) in options.meals || []" :key="index" class="activity-summary-entry">{{ minuteText(meal.startMinute) }}–{{ minuteText(meal.endMinute) }} · 体力 {{ meal.amount }}</div>
-      <div v-if="options.topPrize?.resourceId" class="activity-summary-entry"><h4>榜首奖励</h4><RewardSummary :rewards="[options.topPrize]" /></div>
-      <div v-if="options.advancePrize?.resourceId" class="activity-summary-entry"><h4>进阶排名奖励</h4><RewardSummary :rewards="[options.advancePrize]" /></div>
+      <div v-if="form.mode !== 'turntable' && options.topPrize?.resourceId" class="activity-summary-entry"><h4>榜首奖励</h4><RewardSummary :rewards="[options.topPrize]" /></div>
+      <div v-if="form.mode !== 'turntable' && options.advancePrize?.resourceId" class="activity-summary-entry"><h4>进阶排名奖励</h4><RewardSummary :rewards="[options.advancePrize]" /></div>
       <div v-if="options.exploreRewards" class="activity-summary-entry"><h4>单次探索奖励</h4><RewardSummary :rewards="options.exploreRewards" /></div>
       <div v-if="options.finalRewards" class="activity-summary-entry"><h4>最终奖励</h4><RewardSummary :rewards="options.finalRewards" /></div>
       <div v-for="(prize, index) in options.coinPrizes || []" :key="index" class="activity-summary-entry">金币 {{ Number(prize.coin).toLocaleString() }} · 相对权重 {{ prize.weight }}</div>
     </section>
-    <NEmpty v-if="!mode && !rows.length && !milestones.length && !prizes.length" description="该活动暂未提供可运营表单，原配置和参与历史保持。" />
+    <NEmpty v-if="!mode && form.mode !== 'opening-14' && !rows.length && !milestones.length && !prizes.length" description="该活动暂未提供可运营表单，原配置和参与历史保持。" />
   </div>
 </template>
 
 <style scoped>
+.activity-source { margin-top: 14px; color: rgb(var(--base-text-color) / .65); font-size: 13px; }
+.activity-source summary { cursor: pointer; }
+.activity-source p { line-height: 1.7; overflow-wrap: anywhere; }
+
 .activity-summary-section + .activity-summary-section { margin-top: 32px; padding-top: 28px; border-top: 1px solid rgb(var(--base-text-color) / .09); }
 .activity-summary h3 { margin: 0 0 22px; font-size: 17px; font-weight: 600; }
 .activity-summary h4 { display: flex; align-items: center; gap: 10px; margin: 0 0 15px; font-size: 14px; font-weight: 600; }

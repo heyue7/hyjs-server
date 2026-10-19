@@ -27,21 +27,27 @@ func TestGameAccountRegistrationHTTPValidationDuplicateAndThrottle(t *testing.T)
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 	router.POST("/game-account/register", wrapper.Wrapper(GameAccountRegisterHandler))
-	call := func(body string) *httptest.ResponseRecorder {
+	call := func(body string, clients ...string) *httptest.ResponseRecorder {
 		req := httptest.NewRequest("POST", "/game-account/register", strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
 		req.RemoteAddr = "198.51.100.77:31415"
+		if len(clients) > 0 {
+			req.RemoteAddr = clients[0]
+		}
 		out := httptest.NewRecorder()
 		router.ServeHTTP(out, req)
 		return out
 	}
-	if out := call(`{"username":"bad space","password":"original-password","confirmPassword":"original-password"}`); out.Code != 400 {
+	if out := call(`{"username":"nickname-required","password":"original-password","confirmPassword":"original-password"}`, "198.51.100.78:31415"); out.Code != 400 {
+		t.Fatal("registration accepted a missing nickname", out.Code)
+	}
+	if out := call(`{"username":"bad space","password":"original-password","confirmPassword":"original-password","nickname":"冒险者"}`); out.Code != 400 {
 		t.Fatal("invalid login identity accepted", out.Code)
 	}
-	if out := call(`{"username":"valid-name","password":"中文","confirmPassword":"中文"}`); out.Code != 400 {
+	if out := call(`{"username":"valid-name","password":"中文","confirmPassword":"中文","nickname":"冒险者"}`); out.Code != 400 {
 		t.Fatal("registered password rejected later by original six-character login", out.Code)
 	}
-	body := `{"username":"registered-http","password":"original-password","confirmPassword":"original-password"}`
+	body := `{"username":"registered-http","password":"original-password","confirmPassword":"original-password","nickname":"冒险者"}`
 	first := call(body)
 	var decoded struct {
 		Code int
@@ -53,10 +59,10 @@ func TestGameAccountRegistrationHTTPValidationDuplicateAndThrottle(t *testing.T)
 	if out := call(body); out.Code != 409 {
 		t.Fatal("duplicate HTTP registration silently logged in", out.Code)
 	}
-	if out := call(`{"username":"registered-second","password":"original-password","confirmPassword":"original-password"}`); out.Code != 200 {
+	if out := call(`{"username":"registered-second","password":"original-password","confirmPassword":"original-password","nickname":"冒险者"}`); out.Code != 200 {
 		t.Fatal("registration budget rejected before configured limit", out.Code)
 	}
-	if out := call(`{"username":"registered-third","password":"original-password","confirmPassword":"original-password"}`); out.Code != 429 || out.Header().Get("Retry-After") == "" {
+	if out := call(`{"username":"registered-third","password":"original-password","confirmPassword":"original-password","nickname":"冒险者"}`); out.Code != 429 || out.Header().Get("Retry-After") == "" {
 		t.Fatal("guest registration limit not enforced", out.Code)
 	}
 	var count int64

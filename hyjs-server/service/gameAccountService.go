@@ -96,8 +96,15 @@ func gameAccountNewProfile(ctx context.Context, username, password string) (*db.
 	return row, nil
 }
 
-// RegisterGameAccount strictly inserts a new original account; duplicates never rotate its session or authenticate it.
-func RegisterGameAccount(ctx context.Context, username, password string) (*model.GameAccountRegisterResponse, error) {
+// RegisterGameAccount inserts a global identity and its current-runtime role shell after migration; duplicates never log in.
+func RegisterGameAccount(ctx context.Context, username, password string, nicknames ...string) (*model.GameAccountRegisterResponse, error) {
+	if globalGameAccountsAvailable(db.GetIns().WithContext(ctx)) {
+		nickname := username
+		if len(nicknames) > 0 && nicknames[0] != "" {
+			nickname = nicknames[0]
+		}
+		return registerGlobalGameAccount(ctx, username, password, nickname)
+	}
 	var existing int64
 	if err := db.GetIns().WithContext(ctx).Model(&db.Profile{}).Where("uid=?", username).Count(&existing).Error; err != nil {
 		return nil, err
@@ -118,7 +125,7 @@ func RegisterGameAccount(ctx context.Context, username, password string) (*model
 	return &model.GameAccountRegisterResponse{Registered: true, PlayerID: row.Id, Username: row.Uid}, nil
 }
 
-// AdminCreateGamePlayer creates account, original starter state and audit in one transaction.
+// AdminCreateGamePlayer selects an existing global account or a compatibility account, then creates the current runtime starter with audit.
 func (s *GameService) AdminCreateGamePlayer(ctx context.Context, p *model.AdminPrincipal, req model.AdminGamePlayerCreateRequest) (*model.AdminGamePlayerDTO, error) {
 	selected := req.ServerID
 	if selected == 0 {
@@ -134,9 +141,18 @@ func (s *GameService) AdminCreateGamePlayer(ctx context.Context, p *model.AdminP
 	if err := adminOperationUser(db.GetIns().WithContext(ctx), p, true); err != nil {
 		return nil, err
 	}
-	row, err := gameAccountNewProfile(ctx, req.Username, req.Password)
-	if err != nil {
-		return nil, err
+	var row *db.Profile
+	var err error
+	if req.AccountID > 0 {
+		row = &db.Profile{ServerID: selected, Session: make([]byte, 16)}
+		if _, err = rand.Read(row.Session); err != nil {
+			return nil, err
+		}
+	} else {
+		row, err = gameAccountNewProfile(ctx, req.Username, req.Password)
+		if err != nil {
+			return nil, err
+		}
 	}
 	var out model.AdminGamePlayerDTO
 	err = db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
@@ -161,11 +177,50 @@ func (s *GameService) AdminCreateGamePlayer(ctx context.Context, p *model.AdminP
 		if err := adminOperationUser(tx, p, true); err != nil {
 			return err
 		}
-		if err := tx.Create(row).Error; err != nil {
-			if gameAccountDuplicate(err) {
-				return fmt.Errorf("%w: %s", constUtil.ErrAdminConfigConflict, constUtil.ErrGameAccountExists)
+		if globalGameAccountsAvailable(tx) {
+			var account db.GameAccount
+			if req.AccountID > 0 {
+				if err := db.AccountsTable(tx, "game_accounts").Clauses(clause.Locking{Strength: "UPDATE"}).First(&account, req.AccountID).Error; err != nil {
+					return err
+				}
+				if !account.Enabled || account.Protected {
+					return constUtil.ErrAdminPermission
+				}
+				row.Uid = account.Username
+				row.PasswordSalt, row.PasswordHash = append([]byte{}, account.PasswordSalt...), append([]byte{}, account.PasswordHash...)
+			} else {
+				account = db.GameAccount{Username: req.Username, Nickname: req.Name, PasswordSalt: row.PasswordSalt, PasswordHash: row.PasswordHash, Enabled: true, Revision: 1, CreatedAt: time.Now().UnixMilli()}
+				if err := db.AccountsTable(tx, "game_accounts").Create(&account).Error; err != nil {
+					if gameAccountDuplicate(err) {
+						return constUtil.ErrGameAccountExists
+					}
+					return err
+				}
 			}
-			return err
+			row.AccountID, row.AccountAuthRevision = account.ID, account.AuthRevision
+		} else if req.AccountID > 0 {
+			return constUtil.ErrAdminConfiguration
+		}
+		if req.AccountID > 0 {
+			var existing db.Profile
+			found := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("uid=?", row.Uid).First(&existing).Error
+			if found == nil {
+				if existing.AccountID != req.AccountID || AdminProfileServerID(existing) != selected || existing.Player != nil || existing.Game != nil {
+					return constUtil.ErrAdminConfigConflict
+				}
+				// Registration already created this role shell. Keep its original ID, credentials and session without reviving an old auth revision.
+				row = &existing
+			} else if !errors.Is(found, gorm.ErrRecordNotFound) {
+				return found
+			}
+		}
+		if row.Id == 0 {
+			if err := tx.Create(row).Error; err != nil {
+				if gameAccountDuplicate(err) {
+					return fmt.Errorf("%w: %s", constUtil.ErrAdminConfigConflict, constUtil.ErrGameAccountExists)
+				}
+				return err
+			}
 		}
 		created, err := createPlayerLocked(tx, row.Id, req.Name, req.HeroID)
 		if err != nil {
@@ -175,7 +230,14 @@ func (s *GameService) AdminCreateGamePlayer(ctx context.Context, p *model.AdminP
 		if err != nil {
 			return err
 		}
-		return adminAudit(tx, p, "player.create", fmt.Sprint(row.Id), fmt.Sprintf("username=%s; name=%s; hero=%s; reason=%s", req.Username, req.Name, req.HeroID, req.Reason))
+		if created.AccountID > 0 {
+			account, e := AccountForProfile(tx, created)
+			if e != nil {
+				return e
+			}
+			out.Nickname = account.Nickname
+		}
+		return adminAudit(tx, p, "player.create", fmt.Sprint(row.Id), fmt.Sprintf("username=%s; name=%s; hero=%s; reason=%s", row.Uid, req.Name, req.HeroID, req.Reason))
 	})
 	if err != nil {
 		return nil, err

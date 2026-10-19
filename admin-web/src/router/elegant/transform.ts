@@ -175,6 +175,7 @@ const routeMap: RouteMap = {
   "audit": "/audit",
   "feedback": "/feedback",
   "fields": "/fields",
+  "game-accounts": "/game-accounts",
   "home": "/home",
   "iframe-page": "/iframe-page/:url",
   "items": "/items",

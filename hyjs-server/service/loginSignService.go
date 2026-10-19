@@ -10,6 +10,7 @@ import (
 	"math/big"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"google.golang.org/protobuf/proto"
@@ -188,6 +189,15 @@ func (s *GameService) validateP4Welfare(cfg db.P4WelfareRule) (p4WelfareRules, e
 	return rules, nil
 }
 
+// Character schedules own normal P4 states and receipts. Only legacy demo
+// cycles have retired snapshots in the separate local-play ledger.
+func p4WelfareRetired(tx *gorm.DB, ruleID string) (*localPlayRetiredWelfare, error) {
+	if strings.Contains(ruleID, "_character_") {
+		return nil, nil
+	}
+	return localPlayWelfareRetired(tx, ruleID)
+}
+
 func (s *GameService) loadP4Welfare(tx *gorm.DB, id int64, kind string, now time.Time) (*db.P4WelfareState, db.P4WelfareRule, p4WelfareRules, *p4WelfareProgress, error) {
 	var empty db.P4WelfareRule
 	var zero p4WelfareRules
@@ -197,6 +207,15 @@ func (s *GameService) loadP4Welfare(tx *gorm.DB, id int64, kind string, now time
 	scopedKey, err := localPlayWelfareRuleID(tx, kind)
 	if err != nil {
 		return nil, empty, zero, nil, err
+	}
+	// A new-player programme owns an ordinary native consumer per role.
+	// Keep old demo-cycle precedence and global pending-order behavior when
+	// no authenticated role-specific window is currently applicable.
+	if scopedKey == "" {
+		scopedKey, err = AdminCurrentCharacterWelfareRuleKey(tx, kind, now.UnixMilli())
+		if err != nil {
+			return nil, empty, zero, nil, err
+		}
 	}
 	var configs []db.P4WelfareRule
 	order := "start_at DESC, id DESC"
@@ -208,7 +227,7 @@ func (s *GameService) loadP4Welfare(tx *gorm.DB, id int64, kind string, now time
 	var pendingKeys []string
 	if scopedKey != "" {
 		pendingKeys = []string{scopedKey}
-		if kind == constUtil.P4WelfareLogin || kind == constUtil.P4WelfareCat {
+		if !strings.Contains(scopedKey, "_character_") && (kind == constUtil.P4WelfareLogin || kind == constUtil.P4WelfareCat) {
 			pendingKeys, err = localPlayWelfarePendingKeys(tx, id, kind, scopedKey)
 			if err != nil {
 				return nil, empty, zero, nil, err
@@ -227,7 +246,7 @@ func (s *GameService) loadP4Welfare(tx *gorm.DB, id int64, kind string, now time
 		sort.SliceStable(configs, func(i, j int) bool { return rank[configs[i].ID] < rank[configs[j].ID] })
 	}
 	for _, live := range configs {
-		retired, e := localPlayWelfareRetired(tx, live.ID)
+		retired, e := p4WelfareRetired(tx, live.ID)
 		if e != nil {
 			return nil, empty, zero, nil, e
 		}
@@ -419,7 +438,7 @@ func (s *GameService) p4Welfare(ctx context.Context, id int64, request proto.Mes
 		switch b := request.(type) {
 		case *pb.CSLoginRewardInfo, *pb.CSGetLoginReward:
 			var days int64
-			retired, e := localPlayWelfareRetired(tx, cfg.ID)
+			retired, e := p4WelfareRetired(tx, cfg.ID)
 			if e != nil {
 				return e
 			}

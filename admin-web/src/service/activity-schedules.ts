@@ -14,6 +14,10 @@ export interface ActivityDefinition {
   sourceActivityId: string;
 }
 export interface ActivityOccurrence {
+  timing?: 'calendar' | 'character-day';
+  startDay?: number;
+  durationDays?: number;
+  claimDays?: number;
   id: string;
   templateId: string;
   templateVersion: string;
@@ -27,6 +31,7 @@ export interface ActivityOccurrence {
   frozen: boolean;
   version: string;
   consumerId: string;
+  form?: ActivityForm;
   draftKey?: string;
 }
 export interface ActivitySchedule {
@@ -71,6 +76,8 @@ export function expandActivityPattern(
   options: { anchor: number; repeats: number }
 ): ActivityOccurrence[] {
   const { anchor, repeats } = options;
+  if (repeats > 1 && pattern.entries.some(entry => definitions.find(definition => definition.id === entry.templateId)?.mode === 'opening-14')) throw new Error('开服任务按角色独立起算，只需安排一次，无需循环');
+  if (pattern.entries.filter(entry => definitions.find(definition => definition.id === entry.templateId)?.mode === 'opening-14').length > 1) throw new Error('同一方案只需安排一次角色开服任务');
   const lookup = new Map(definitions.map(item => [item.id, item]));
   const out: ActivityOccurrence[] = [];
   for (let repeat = 0; repeat < repeats; repeat += 1) {
@@ -83,6 +90,7 @@ export function expandActivityPattern(
       const endAt = startAt + entry.durationDays * activityDay;
       out.push({
         id: '',
+        timing: definition.mode === 'opening-14' ? 'character-day' : 'calendar',
         templateId: entry.templateId,
         templateVersion: definition.version,
         name: definition.name,

@@ -150,6 +150,18 @@ export const generatedRoutes: GeneratedRoute[] = [
     }
   },
   {
+    name: 'game-accounts',
+    path: '/game-accounts',
+    component: 'layout.base$view.game-accounts',
+    meta: {
+      title: '用户管理',
+      i18nKey: 'route.game-accounts',
+      icon: 'ph:users',
+      order: 1,
+      roles: ['viewer', 'operator', 'admin']
+    }
+  },
+  {
     name: 'home',
     path: '/home',
     component: 'layout.base$view.home',
@@ -203,7 +215,7 @@ export const generatedRoutes: GeneratedRoute[] = [
     path: '/players',
     component: 'layout.base$view.players',
     meta: {
-      title: '游戏玩家',
+      title: '玩家管理',
       i18nKey: 'route.players',
       icon: 'ph:users',
       order: 2,

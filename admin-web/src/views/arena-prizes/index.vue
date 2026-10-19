@@ -95,8 +95,8 @@ function validate() {
 }
 function validatePool() {
   const value = pool.value;
-  if (value.items.length > 32) return '运营奖池最多配置 32 项奖励';
-  if (!integer(value.minLevel, 10)) return '运营奖池最低角色等级不能小于 10';
+  if (value.items.length > 32) return '额外奖励池最多配置 32 项奖励';
+  if (!integer(value.minLevel, 10)) return '额外奖励池最低角色等级不能小于 10';
   if (
     !integer(value.dailyWins, 1) ||
     value.dailyWins > 100 ||
@@ -107,7 +107,7 @@ function validatePool() {
     return '每日胜场限 1–100，整期胜场限 1–3100，且整期不能少于每日';
   if ((value.enabled || value.startAt || value.endAt) && (!value.startAt || value.endAt <= value.startAt))
     return '请填写完整的奖池开始、结束时间，结束需晚于开始';
-  if (!value.items.length) return '运营奖池请至少配置一项奖励；只调整常规金币时可保持运营池原样';
+  if (!value.items.length) return '额外奖励池请至少配置一项奖励；只调整常规金币时可保持额外奖励池原样';
   if (
     value.items.some(
       item =>
@@ -197,11 +197,11 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload));
               </NFormItem>
             </div>
           </NForm>
-          <p class="ops-muted">保存后用于新生成的翻牌；已经生成的牌面和重复领取按原冻结结果结算。</p>
+          <p class="ops-muted">保存后用于下一次胜利翻牌，已生成的奖励不变。</p>
         </NCard>
         <NCard :bordered="false" class="ops-panel">
           <NCollapse>
-            <NCollapseItem title="可选运营奖池" name="operator-pool">
+            <NCollapseItem title="额外奖励池" name="operator-pool">
               <template #header-extra>
                 <NTag :type="pool.enabled ? 'success' : 'default'" :bordered="false">
                   {{ pool.enabled ? '已启用' : '未启用' }}
@@ -213,12 +213,12 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload));
               <NAlert
                 v-if="snapshot.operatorPoolFrozen"
                 type="info"
-                title="本月运营池已冻结，保留原资格、奖池和结算。常规金币仍可单独修改。"
+                title="本月奖励已开始发放，额外奖池已锁定。金币范围仍可修改。"
                 class="mb-20px"
               />
               <NAlert v-if="resourceError" type="error" :title="`可选资源载入失败：${resourceError}`" class="mb-20px" />
               <NForm label-placement="top" :disabled="poolReadonly || saving || loading || conflict">
-                <NFormItem label="运营奖池状态">
+                <NFormItem label="额外奖励池状态">
                   <NSwitch v-model:value="pool.enabled" :disabled="poolReadonly || saving || conflict" />
                 </NFormItem>
                 <div class="pool-fields-grid">
@@ -241,10 +241,10 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload));
                   <NFormItem label="最低角色等级">
                     <NInputNumber v-model:value="pool.minLevel" :min="10" :max="maxInteger" :precision="0" />
                   </NFormItem>
-                  <NFormItem label="每日可进入运营池的胜场">
+                  <NFormItem label="每日可进入额外奖励池的胜场">
                     <NInputNumber v-model:value="pool.dailyWins" :min="1" :max="100" :precision="0" />
                   </NFormItem>
-                  <NFormItem label="整期可进入运营池的胜场">
+                  <NFormItem label="整期可进入额外奖励池的胜场">
                     <NInputNumber v-model:value="pool.windowWins" :min="1" :max="3100" :precision="0" />
                   </NFormItem>
                 </div>
@@ -274,7 +274,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload));
                     移除
                   </NButton>
                 </div>
-                <NEmpty v-if="!pool.items.length" description="尚未配置运营奖励" class="mb-16px" />
+                <NEmpty v-if="!pool.items.length" description="尚未配置额外奖励" class="mb-16px" />
                 <NButton
                   v-if="pool.items.length < 32"
                   dashed
@@ -285,16 +285,16 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload));
                 </NButton>
                 <p class="ops-muted mt-12px">
                   概率按单项权重 ÷
-                  总权重计算。启用需设置同一个全服自然月内的未来生效窗口，实际资格与可投放资源由服务端校验。
+                  总权重计算。开始和结束时间需位于同一个自然月，且从未来时间开始。
                 </p>
                 <RewardSummary v-if="pool.items.length" class="mt-20px" :rewards="pool.items" :resources="resources" />
               </NForm>
             </NCollapseItem>
           </NCollapse>
         </NCard>
-        <p v-if="snapshot.notes" class="ops-muted prize-notes">{{ snapshot.notes }}</p>
+        <details v-if="snapshot.notes" class="ops-help"><summary>奖励规则说明</summary><p>{{ snapshot.notes }}</p></details>
         <div class="prize-footer">
-          <span class="ops-muted">保存后由服务端校验，并记录操作审计</span>
+          <span class="ops-muted">{{ dirty ? '有未保存的修改' : '' }}</span>
           <NButton
             v-if="canWrite"
             type="primary"

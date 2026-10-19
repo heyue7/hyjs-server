@@ -135,7 +135,7 @@ onMounted(load);
 <template>
   <div class="ops-page">
     <div class="ops-toolbar">
-      <div class="ops-page-label">账号管理</div>
+      <div class="ops-page-label">后台账号</div>
       <NSpace>
         <NButton :loading="loading" @click="load">刷新</NButton>
         <NButton type="primary" @click="edit('create')">新建账号</NButton>
@@ -195,7 +195,7 @@ onMounted(load);
               type="password"
               show-password-on="click"
               autocomplete="new-password"
-              placeholder="12–72字节"
+              placeholder="12–72 位字符（中文按 3 位计算）"
             />
           </NFormItem>
           <NFormItem label="确认密码" required>

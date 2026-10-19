@@ -29,6 +29,7 @@ export const views: Record<LastLevelRouteKey, RouteComponent | (() => Promise<Ro
   audit: () => import("@/views/audit/index.vue"),
   feedback: () => import("@/views/feedback/index.vue"),
   fields: () => import("@/views/fields/index.vue"),
+  "game-accounts": () => import("@/views/game-accounts/index.vue"),
   home: () => import("@/views/home/index.vue"),
   items: () => import("@/views/items/index.vue"),
   players: () => import("@/views/players/index.vue"),

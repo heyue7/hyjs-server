@@ -395,6 +395,17 @@ func (s *GameService) fieldScene(ctx context.Context, id int64, login bool) ([]p
 		var side = &pb.PlayerSide{PlayerId: proto.Int64(id), Kills: proto.Int32(0)}
 		isField := s.fieldSceneRow(g.Position.GetScene()) != nil
 		if isField {
+			base, configErr := p10SceneConfig(tx)
+			if configErr != nil {
+				return configErr
+			}
+			lineConfig, configErr := s.adminFieldSceneConfig(tx, g.Position.GetScene(), base)
+			if configErr != nil {
+				return configErr
+			}
+			if lineConfig != nil {
+				limit = lineConfig.MaxPlayers
+			}
 			if err := s.refreshField(id, g); err != nil {
 				return err
 			}

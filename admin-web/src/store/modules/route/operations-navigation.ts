@@ -33,6 +33,7 @@ export function organizeOperationsMenus(menus: App.Global.Menu[]) {
     };
   }
   const global = group('global-settings', '全局设置', [
+    take('game-accounts', '用户管理'),
     take('items', '道具与资源'),
     take('activities', '活动设置'),
     group('growth-settings', '成长配置', [take('achievements'), take('titles')]),
@@ -41,14 +42,16 @@ export function organizeOperationsMenus(menus: App.Global.Menu[]) {
       take('wallet-reasons'),
       take('server-clock', '统一游戏时间')
     ]),
-    take('shops', '商店管理 · 全服共享'),
-    take('announcements', '公告管理 · 全服共享')
+    take('shops', '商店管理'),
+    take('announcements', '公告管理')
   ]);
+  // Wallet deep links remain valid; its entry lives on each user row.
+  take('wallets');
   const realms = group('server-operations', '区服运营', [
     take('servers'),
     take('activity-schedules'),
     take('fields', '野外地图与部署'),
-    group('player-management', '用户管理', [take('players', '用户与角色'), take('wallets')]),
+    take('players', '玩家管理'),
     take('feedback')
   ]);
   const system = group('system-management', '系统管理', [take('users', '后台账号与权限'), take('audit')]);

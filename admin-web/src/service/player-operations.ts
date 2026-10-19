@@ -1,4 +1,7 @@
 export interface GamePlayer {
+  accountId: number;
+  username: string;
+  nickname: string;
   id: number;
   name: string;
   level: number;
@@ -22,8 +25,7 @@ export interface GamePlayerDetail extends GamePlayer {
 }
 
 export interface GamePlayerCreate {
-  username: string;
-  password: string;
+  accountId: number | null;
   name: string;
   heroId: string;
   reason: string;

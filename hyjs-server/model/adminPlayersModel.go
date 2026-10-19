@@ -2,6 +2,9 @@ package model
 
 // AdminGamePlayerDTO 仅包含游戏运营需要的角色摘要，不包含登录凭据或完整存档。
 type AdminGamePlayerDTO struct {
+	AccountID int64                      `json:"accountId"`           // AccountID is the global account owning this realm role.
+	Username  string                     `json:"username"`            // Username is the global login name.
+	Nickname  string                     `json:"nickname"`            // Nickname is the global account display name.
 	ServerID  int64                      `json:"serverId"`            // ServerID is immutable role ownership.
 	ID        int64                      `json:"id"`                  // ID 是游戏角色ID。
 	Name      string                     `json:"name"`                // Name 是游戏昵称。

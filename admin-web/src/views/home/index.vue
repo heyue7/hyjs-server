@@ -12,7 +12,7 @@ const overview = ref<{
 const metrics = [
   { key: 'players', label: '游戏角色', icon: 'ph:users' },
   { key: 'items', label: '资源目录', icon: 'ph:treasure-chest' },
-  { key: 'activities', label: '已注册活动', icon: 'ph:calendar-blank' },
+  { key: 'activities', label: '活动配置', icon: 'ph:calendar-blank' },
   { key: 'announcements', label: '公告', icon: 'ph:megaphone' }
 ];
 async function load() {
@@ -47,7 +47,7 @@ onMounted(load);
                 :type="overview.server.status === 'running' || overview.server.status === 'ok' ? 'success' : 'default'"
                 size="small"
               >
-                {{ overview.server.status }}
+                {{ ({ running: '运行正常', ok: '运行正常', stopped: '已停止', error: '运行异常' } as Record<string, string>)[overview.server.status] || '状态待确认' }}
               </NTag>
             </NDescriptionsItem>
             <NDescriptionsItem label="运行版本">

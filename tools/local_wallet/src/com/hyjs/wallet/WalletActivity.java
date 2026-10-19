@@ -36,6 +36,8 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
+import android.widget.PopupMenu;
+import android.text.InputFilter;
 import com.unity3d.player.UnityPlayerActivity;
 import com.unity3d.player.UnityPlayer;
 import org.json.JSONArray;
@@ -60,7 +62,7 @@ import java.util.concurrent.Executors;
 /** A native wallet layered on the original Unity activity; the engine remains original. */
 public final class WalletActivity extends UnityPlayerActivity {
     private static final int BLUE=Color.rgb(22,119,255), INK=Color.rgb(17,17,17), GRAY=Color.rgb(128,128,128), LINE=Color.rgb(240,240,240);
-    private static final int HOME=0, ADD=3, BILLS=4, ORDERS=5, CASHIER=6;
+    private static final int HOME=0, ADD=3, BILLS=4, ORDERS=5, CASHIER=6, ACCOUNT=7, NICKNAME=8, PASSWORD=9;
     private static volatile WalletActivity current;
     private static volatile Credentials credentials=new Credentials(0,"",0);
 
@@ -88,7 +90,9 @@ public final class WalletActivity extends UnityPlayerActivity {
     private LinearLayout shell;
     private EditText amount;
     private TextView feedback;
-    private JSONObject wallet, ledger;
+    private JSONObject wallet, ledger, account;
+    private EditText nicknameInput, oldPasswordInput, newPasswordInput, confirmationInput;
+    private String nicknameDraft="";
     private JSONArray ledgerEntries=new JSONArray();
     private String origin, creditRequestId, selectedOrderId;
     private long creditAmount;
@@ -328,11 +332,12 @@ public final class WalletActivity extends UnityPlayerActivity {
         panel.getWindow().setLayout(width,height);
     }
     private void navigate(int destination){
-        rememberLedgerScroll();hideKeyboard();page=destination;message="";messageError=false;render();refreshPage();
+        rememberLedgerScroll();hideKeyboard();if(destination==NICKNAME)nicknameDraft=account==null?"":account.optString("nickname");page=destination;message="";messageError=false;render();refreshPage();
     }
     private void back(){
         hideKeyboard();
         if(page==HOME){panel.dismiss();return;}
+        if(page==NICKNAME || page==PASSWORD){navigate(ACCOUNT);return;}
         if(page==ADD){navigate(addReturn==CASHIER && currentOrder()!=null?CASHIER:HOME);return;}
         if(page==CASHIER && array(wallet,"pendingOrders").length()>1){navigate(ORDERS);return;}
         navigate(HOME);
@@ -344,7 +349,7 @@ public final class WalletActivity extends UnityPlayerActivity {
         if(panel==null)return;View focus=panel.getCurrentFocus();if(focus!=null){InputMethodManager ime=(InputMethodManager)getSystemService(INPUT_METHOD_SERVICE);if(ime!=null)ime.hideSoftInputFromWindow(focus.getWindowToken(),0);focus.clearFocus();}if(shell!=null)shell.requestFocus();
     }
     private void setMessage(String value,boolean error){message=value;messageError=error;if(feedback!=null){feedback.setText(value);feedback.setVisibility(value.isEmpty()?View.GONE:View.VISIBLE);feedback.setTextColor(error?Color.rgb(200,65,50):GRAY);}}
-    private String title(){switch(page){case ADD:return "增加余额";case BILLS:return "账单";case CASHIER:return "付款";case ORDERS:return "待支付订单";default:return "蓝绿钱包";}}
+    private String title(){switch(page){case ADD:return "增加余额";case BILLS:return "账单";case CASHIER:return "付款";case ORDERS:return "待支付订单";case ACCOUNT:return "账号设置";case NICKNAME:return "修改昵称";case PASSWORD:return "修改密码";default:return "蓝绿钱包";}}
     private void render(){
         if(panel==null || !panel.isShowing())return;
         fitPanel();
@@ -353,11 +358,11 @@ public final class WalletActivity extends UnityPlayerActivity {
         FrameLayout nav=new FrameLayout(this);
         TextView title=center(title(),18,INK);nav.addView(title,new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(52)));
         TextView back=center("‹",34,INK);back.setContentDescription(page==HOME?"收起蓝绿钱包":"返回");FrameLayout.LayoutParams left=new FrameLayout.LayoutParams(dp(56),dp(52),Gravity.LEFT);nav.addView(back,left);back.setOnClickListener(new View.OnClickListener(){public void onClick(View v){back();}});
-        if(page==HOME){TextView bill=center("账单",14,INK);FrameLayout.LayoutParams right=new FrameLayout.LayoutParams(dp(64),dp(52),Gravity.RIGHT);nav.addView(bill,right);bill.setOnClickListener(new View.OnClickListener(){public void onClick(View v){navigate(BILLS);}});}
+        if(page==HOME){TextView menu=center("⋯",28,INK);menu.setContentDescription("钱包菜单");FrameLayout.LayoutParams right=new FrameLayout.LayoutParams(dp(56),dp(52),Gravity.RIGHT);nav.addView(menu,right);menu.setOnClickListener(v->{PopupMenu popup=new PopupMenu(this,menu);popup.getMenu().add(0,1,0,"账单");popup.getMenu().add(0,2,1,"账号设置").setEnabled(ready());popup.setOnMenuItemClickListener(item->{navigate(item.getItemId()==1?BILLS:ACCOUNT);return true;});popup.show();});}
         else if(page==BILLS){TextView reload=center("刷新",14,BLUE);reload.setEnabled(!busy);nav.addView(reload,new FrameLayout.LayoutParams(dp(64),dp(52),Gravity.RIGHT));reload.setOnClickListener(new View.OnClickListener(){public void onClick(View v){refreshPage();}});}
         addFull(shell,nav,52);divider(shell);
         LinearLayout body=column();shell.addView(body,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,0,1));
-        switch(page){case ADD:renderAdd(body);break;case BILLS:renderBills(body);break;case ORDERS:renderOrders(body);break;case CASHIER:renderCashier(body);break;default:renderHome(body);}
+        switch(page){case ADD:renderAdd(body);break;case BILLS:renderBills(body);break;case ORDERS:renderOrders(body);break;case CASHIER:renderCashier(body);break;case ACCOUNT:renderAccount(body);break;case NICKNAME:case PASSWORD:renderAccountForm(body);break;default:renderHome(body);}
         feedback=center("",12,GRAY);feedback.setPadding(dp(20),dp(6),dp(20),dp(6));feedback.setMaxLines(2);shell.addView(feedback);
         if(!credentials.valid())setMessage("登录游戏后可用",false);else if(origin==null)setMessage("蓝绿钱包连接未配置",true);else setMessage(message,messageError);
         if(wasEditing && page==ADD && amount!=null && !busy){amount.requestFocus();amount.setSelection(amount.length());}
@@ -373,6 +378,53 @@ public final class WalletActivity extends UnityPlayerActivity {
         if(orders.length()>0){TextView entry=text("待支付订单  "+orders.length()+"  ›",14,BLUE);entry.setGravity(Gravity.CENTER_VERTICAL);addFull(body,entry,42);entry.setOnClickListener(new View.OnClickListener(){public void onClick(View v){if(orders.length()==1){selectedOrderId=orders.optJSONObject(0).optString("orderId");navigate(CASHIER);}else navigate(ORDERS);}});}
         addFull(body,action("增加余额",true,active(),new Runnable(){public void run(){addReturn=HOME;navigate(ADD);}}),48);
         TextView virtual=center("本地虚拟余额",11,GRAY);virtual.setPadding(0,dp(10),0,0);body.addView(virtual);
+    }
+    private void renderAccount(LinearLayout body){
+        LinearLayout content=column();content.setPadding(dp(24),dp(18),dp(24),dp(20));scrolling(body,content);
+        addFull(content,text("登录账号",13,GRAY),24);
+        TextView username=text(account==null?"读取中…":account.optString("username"),18,INK);username.setTextIsSelectable(true);addFull(content,username,38);
+        addFull(content,text("昵称",13,GRAY),28);addFull(content,text(account==null?"—":account.optString("nickname"),18,INK),38);divider(content);
+        LinearLayout.LayoutParams gap=new LinearLayout.LayoutParams(-1,dp(46));gap.topMargin=dp(18);
+        content.addView(action("修改昵称  ›",false,active() && account!=null,()->navigate(NICKNAME)),gap);
+        LinearLayout.LayoutParams next=new LinearLayout.LayoutParams(-1,dp(46));next.topMargin=dp(10);
+        content.addView(action("修改密码  ›",false,active() && account!=null,()->navigate(PASSWORD)),next);
+        TextView note=text("账号与钱包在各区服通用，游戏角色按区服分别保存。",12,GRAY);note.setPadding(0,dp(22),0,0);content.addView(note);
+    }
+    private EditText accountField(LinearLayout parent,String label,String hint,boolean secret){
+        TextView caption=text(label,13,GRAY);caption.setPadding(0,dp(10),0,0);addFull(parent,caption,30);
+        EditText field=new EditText(this);field.setSingleLine(true);field.setTextSize(16);field.setTextColor(INK);field.setHint(hint);field.setHintTextColor(GRAY);field.setPadding(dp(12),0,dp(12),0);field.setBackground(shape(Color.rgb(247,248,250),7));
+        field.setInputType(InputType.TYPE_CLASS_TEXT|(secret?InputType.TYPE_TEXT_VARIATION_PASSWORD:InputType.TYPE_TEXT_FLAG_CAP_SENTENCES));
+        field.setImeOptions(EditorInfo.IME_FLAG_NO_EXTRACT_UI|EditorInfo.IME_FLAG_NO_FULLSCREEN|EditorInfo.IME_ACTION_NEXT);field.setEnabled(!busy);addFull(parent,field,46);return field;
+    }
+    private void renderAccountForm(LinearLayout body){
+        LinearLayout content=column();content.setPadding(dp(24),dp(10),dp(24),dp(20));scrolling(body,content);
+        if(page==NICKNAME){
+            nicknameInput=accountField(content,"昵称","1–24个字",false);nicknameInput.setFilters(new InputFilter[]{new InputFilter.LengthFilter(24)});nicknameInput.setText(nicknameDraft);
+            nicknameInput.addTextChangedListener(new TextWatcher(){public void beforeTextChanged(CharSequence t,int start,int count,int after){}public void onTextChanged(CharSequence t,int start,int before,int count){nicknameDraft=t.toString();}public void afterTextChanged(Editable t){}});
+            nicknameInput.setImeOptions(EditorInfo.IME_FLAG_NO_EXTRACT_UI|EditorInfo.IME_FLAG_NO_FULLSCREEN|EditorInfo.IME_ACTION_DONE);
+        }else{
+            oldPasswordInput=accountField(content,"原密码","输入当前密码",true);newPasswordInput=accountField(content,"新密码","至少6个字符",true);confirmationInput=accountField(content,"确认新密码","再次输入新密码",true);
+            confirmationInput.setImeOptions(EditorInfo.IME_FLAG_NO_EXTRACT_UI|EditorInfo.IME_FLAG_NO_FULLSCREEN|EditorInfo.IME_ACTION_DONE);
+        }
+        TextView note=text(page==PASSWORD?"修改后，其他设备需要使用新密码重新登录。":"昵称显示在账号与钱包中，不会修改各区服的角色名。",12,GRAY);note.setPadding(0,dp(16),0,dp(14));content.addView(note);
+        addFull(content,action(busy?"保存中…":"保存",true,active(),()->saveAccount()),46);
+    }
+    private void saveAccount(){
+        if(!active())return;
+        try{
+            JSONObject payload=new JSONObject();
+            if(page==NICKNAME){
+                String name=nicknameDraft;
+                if(name.trim().isEmpty() || !name.equals(name.trim()) || name.codePointCount(0,name.length())>24 || name.matches("(?s).*[\\p{Cc}\\p{Cf}].*")){setMessage("请填写1–24个字的昵称",true);return;}
+                payload.put("nickname",name);hideKeyboard();request("/game-account/nickname",payload,true);
+            }else if(page==PASSWORD){
+                String old=oldPasswordInput.getText().toString(),value=newPasswordInput.getText().toString(),confirmation=confirmationInput.getText().toString();
+                if(old.isEmpty()){setMessage("请输入原密码",true);return;}
+                if(value.codePointCount(0,value.length())<6 || value.getBytes("UTF-8").length>72){setMessage("新密码至少6个字符，最多72字节",true);return;}
+                if(!value.equals(confirmation)){setMessage("两次新密码不一致",true);return;}
+                payload.put("oldPassword",old).put("password",value).put("confirmPassword",confirmation);hideKeyboard();request("/game-account/password",payload,true);
+            }
+        }catch(Exception invalid){setMessage("填写内容无效，请重试",true);}
     }
     private void renderAdd(LinearLayout body){
         LinearLayout form=column();ScrollView viewport=new ScrollView(this);viewport.setFillViewport(true);viewport.addView(form);body.addView(viewport,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.MATCH_PARENT));body=form;
@@ -449,7 +501,7 @@ public final class WalletActivity extends UnityPlayerActivity {
     private void renderRequestState(){render();}
     private void rememberLedgerScroll(){if(page==BILLS && ledgerScroll!=null)ledgerScrollY=ledgerScroll.getScrollY();}
 
-    private void sessionChanged(){wallet=null;ledger=null;ledgerEntries=new JSONArray();ledgerPage=1;ledgerScrollY=0;busy=false;refreshQueued=false;page=HOME;message="";loadPendingRequests();if(panel!=null && panel.isShowing()){render();refreshPage();}}
+    private void sessionChanged(){wallet=null;ledger=null;account=null;nicknameDraft="";ledgerEntries=new JSONArray();ledgerPage=1;ledgerScrollY=0;busy=false;refreshQueued=false;page=HOME;message="";loadPendingRequests();if(panel!=null && panel.isShowing()){render();refreshPage();}}
     private SharedPreferences prefs(){return getSharedPreferences("local-wallet-pending",MODE_PRIVATE);}
     private void loadPendingRequests(){
         creditRequestId=null;creditAmount=0;amountDraft="100";
@@ -465,7 +517,7 @@ public final class WalletActivity extends UnityPlayerActivity {
     private void refreshPage(){
         if(busy){refreshQueued=true;return;}
         if(!active())return;
-        if(page==BILLS)requestLedger(1);else request("/local-wallet/state",new JSONObject(),false);
+        if(page==ACCOUNT || (page==NICKNAME || page==PASSWORD) && account==null)request("/game-account/profile",new JSONObject(),false);else if(page==NICKNAME || page==PASSWORD)return;else if(page==BILLS)requestLedger(1);else request("/local-wallet/state",new JSONObject(),false);
     }
     private void requestLedger(int number){
         if(!active())return;
@@ -495,23 +547,33 @@ public final class WalletActivity extends UnityPlayerActivity {
     // Only authenticated server results update money, summaries and receipts.
     // Sessions remain memory-only and old-generation replies drop.
     private void request(final String route,final JSONObject payload,final boolean mutation){
-        if(busy || destroyed || !ready())return;final Credentials auth=credentials;final String address=origin+route;busy=true;if(mutation)setMessage("处理中…",false);renderRequestState();
+        if(busy || destroyed || !ready())return;final Credentials auth=credentials;final String address=origin+route;final boolean accountRoute=route.startsWith("/game-account/");final String accountUsername=account==null?"":account.optString("username");busy=true;if(mutation)setMessage("处理中…",false);renderRequestState();
         network.execute(new Runnable(){public void run(){JSONObject data=null;String error=null;HttpURLConnection connection=null;
             try{
                 payload.put("playerId",auth.player);payload.put("sessionHex",auth.session);
                 connection=(HttpURLConnection)new URL(address).openConnection();connection.setRequestMethod("POST");connection.setConnectTimeout(8000);connection.setReadTimeout(15000);connection.setInstanceFollowRedirects(false);connection.setDoOutput(true);connection.setRequestProperty("Content-Type","application/json; charset=utf-8");connection.setRequestProperty("Cache-Control","no-store");
                 byte[] body=payload.toString().getBytes("UTF-8");connection.setFixedLengthStreamingMode(body.length);OutputStream out=connection.getOutputStream();out.write(body);out.close();
-                if(connection.getResponseCode()!=200)throw new Exception("连接失败，请重试");InputStream in=connection.getInputStream();byte[] raw=readBounded(in,1048576);in.close();JSONObject reply=new JSONObject(new String(raw,"UTF-8"));
-                if(reply.optInt("code",-1)!=0)throw new Exception(reply.optString("msg","操作未完成，请重试"));data=reply.getJSONObject("data");
+                int status=connection.getResponseCode();InputStream in=status>=400?connection.getErrorStream():connection.getInputStream();if(in==null)throw new Exception("连接失败，请重试");byte[] raw=readBounded(in,1048576);in.close();JSONObject reply=new JSONObject(new String(raw,"UTF-8"));
+                if(status!=200 || reply.optInt("code",-1)!=0)throw new Exception(reply.optString("msg","操作未完成，请重试"));data=reply.getJSONObject("data");
+                if(accountRoute){
+                    if(data.optLong("id",0)<1 || data.optString("username").isEmpty() || data.optString("nickname").isEmpty())throw new Exception("账号信息无效，请重试");
+                    if("/game-account/password".equals(route) && !data.optBoolean("passwordChanged",false))throw new Exception("密码修改未确认，请重试");
+                }else{
                 if(!data.optBoolean("testOnly",false))throw new Exception("返回数据无效，请重试");
                 if(!"CNY".equals(data.optString("currency")) || !data.has("balanceCents") || data.getLong("balanceCents")<0)throw new Exception("余额数据无效，请重试");
                 if("/local-wallet/ledger".equals(route) && (data.optJSONObject("summary")==null || data.optJSONArray("entries")==null || data.optInt("page",0)<1))throw new Exception("账单数据无效，请重试");
+                }
             }catch(Exception failure){error=failure.getMessage();if(error==null || error.length()>120 || error.contains(auth.session))error="连接中断，请重试";}
             finally{if(connection!=null)connection.disconnect();}
             final JSONObject result=data;final String failure=error;
             runOnUiThread(new Runnable(){public void run(){
                 if(destroyed || credentials.generation!=auth.generation)return;busy=false;
                 if(failure==null){
+                    if(accountRoute){
+                        account=result;
+                        if("/game-account/password".equals(route)){LoginCache.passwordChanged(accountUsername,payload.optString("password"));page=ACCOUNT;setMessage("密码已修改",false);}
+                        else if("/game-account/nickname".equals(route)){nicknameDraft=result.optString("nickname");page=ACCOUNT;setMessage("昵称已更新",false);}
+                    }else{
                     wallet=result;
                     if("/local-wallet/ledger".equals(route)){
                         if(result.optInt("page",1)==1)ledgerEntries=new JSONArray();
@@ -523,7 +585,9 @@ public final class WalletActivity extends UnityPlayerActivity {
                         if(label.isEmpty()){JSONArray rows=array(result,"entries");for(int i=0;i<rows.length();i++){JSONObject row=rows.optJSONObject(i);if(row!=null && ("add:"+creditRequestId).equals(row.optString("id"))){label=row.optString("label","");break;}}}
                         clearCreditRequest(auth.player);ledger=null;ledgerEntries=new JSONArray();page=addReturn==CASHIER && currentOrder()!=null?CASHIER:HOME;setMessage(label.isEmpty()?"余额已增加":label,false);
                     }else if("/local-wallet/pay".equals(route)){ledger=null;ledgerEntries=new JSONArray();UnityPlayer.UnitySendMessage("LocalWalletSession","RefreshAfterPayment","");page=HOME;setMessage("支付成功，去享受这一刻",false);}
+                    }
                 }else setMessage(failure+(mutation?"；可重试原操作":""),true);
+                payload.remove("oldPassword");payload.remove("password");payload.remove("confirmPassword");
                 renderRequestState();
                 if(refreshQueued){refreshQueued=false;refreshPage();}
             }});

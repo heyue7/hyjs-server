@@ -250,7 +250,31 @@ export function getNaiveTheme(
   const theme: GlobalThemeOverrides = {
     common: {
       ...getNaiveThemeColors(colors, settings.recommendColor),
-      borderRadius: `${settings.themeRadius}px`
+      borderRadius: `${settings.themeRadius}px`,
+      fontSize: '14px',
+      heightMedium: '34px'
+    },
+    Menu: {
+      colorInverted: '#1a2232',
+      itemHeight: '38px',
+      borderRadius: '6px',
+      itemTextColorInverted: '#c5cedb',
+      itemTextColorHoverInverted: '#ffffff',
+      itemTextColorActiveInverted: '#ffffff',
+      itemTextColorChildActiveInverted: '#ffffff',
+      itemIconColorInverted: '#a9b6c9',
+      itemIconColorHoverInverted: '#ffffff',
+      itemIconColorActiveInverted: '#ffffff',
+      itemIconColorChildActiveInverted: '#ffffff',
+      arrowColorInverted: '#8a9bb1',
+      itemColorHoverInverted: 'rgb(46, 57, 78)',
+      itemColorActiveInverted: colors.primary,
+      itemColorActiveHoverInverted: colors.primary
+    },
+    DataTable: {
+      thFontWeight: '500',
+      tdPaddingMedium: '12px 16px',
+      thPaddingMedium: '11px 16px'
     },
     LoadingBar: {
       colorLoading

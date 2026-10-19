@@ -55,22 +55,12 @@ func localWalletOwner(row *db.Profile) bool {
 
 // walletAccountOwner accepts every authenticated local account with a created character.
 // Historical account 1 remains protected; legacy personal tools keep their separate demo guard.
-func walletAccountOwner(row *db.Profile) bool {
-	return row != nil && row.Id > 1 && row.Player != nil
+func walletAccountOwner(tx *gorm.DB, row *db.Profile) bool {
+	return row != nil && row.Player != nil && GameAccountWalletOwner(tx, row)
 }
 
 func localWalletLock(tx *gorm.DB, id int64) (*db.LocalWalletBalance, error) {
-	balance := &db.LocalWalletBalance{PlayerID: id}
-	if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(balance).Error; err != nil {
-		return nil, err
-	}
-	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(balance, "player_id=?", id).Error; err != nil {
-		return nil, err
-	}
-	if balance.BalanceCents < 0 || balance.Revision < 0 {
-		return nil, ErrLocalWalletInvalid
-	}
-	return balance, nil
+	return walletReadBalance(tx, id, true)
 }
 
 func localWalletView(balance *db.LocalWalletBalance, enabled bool) *LocalWalletView {
@@ -125,24 +115,19 @@ func (s *GameService) LocalWalletSnapshot(ctx context.Context, id int64) (*Local
 	}
 	var result *LocalWalletView
 	err := s.p3Profile(ctx, id, func(tx *gorm.DB, row *db.Profile, p *pb.Player, _ *model.GameState) error {
-		if !walletAccountOwner(row) || !localWalletSessionAllowed(ctx, row) {
+		if !walletAccountOwner(tx, row) || !localWalletSessionAllowed(ctx, row) {
 			return ErrLocalWalletInvalid
 		}
 		policy, err := localWalletPolicy(tx)
 		if err != nil {
 			return err
 		}
-		var balance db.LocalWalletBalance
-		err = tx.First(&balance, "player_id=?", id).Error
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			balance = db.LocalWalletBalance{PlayerID: id}
-		} else if err != nil {
+		balance, err := walletReadBalance(tx, id, false)
+		if err != nil {
 			return err
 		}
-		if balance.BalanceCents < 0 || balance.Revision < 0 {
-			return ErrLocalWalletInvalid
-		}
-		result, err = localWalletProjection(tx, row, p, &balance, policy.Enabled, time.Now())
+
+		result, err = localWalletProjection(tx, row, p, balance, policy.Enabled, time.Now())
 		return err
 	})
 	return result, err
@@ -173,7 +158,7 @@ func (s *GameService) localWalletAddAt(ctx context.Context, id int64, requestKey
 	}
 	var result *LocalWalletView
 	err := s.p3Profile(ctx, id, func(tx *gorm.DB, row *db.Profile, p *pb.Player, _ *model.GameState) error {
-		if !walletAccountOwner(row) || !localWalletSessionAllowed(ctx, row) {
+		if !walletAccountOwner(tx, row) || !localWalletSessionAllowed(ctx, row) {
 			return ErrLocalWalletInvalid
 		}
 		policy, err := localWalletPolicy(tx)
@@ -185,7 +170,7 @@ func (s *GameService) localWalletAddAt(ctx context.Context, id int64, requestKey
 			return err
 		}
 		var prior db.LocalWalletEntry
-		err = tx.First(&prior, "player_id=? AND `key`=?", id, "add:"+requestKey).Error
+		err = walletFindEntry(tx, id, "add:"+requestKey, "", &prior)
 		if err == nil {
 			if prior.Kind != "add" || prior.DeltaCents != cents || prior.OrderID != nil || prior.Source != constUtil.LocalWalletVersion {
 				return ErrLocalWalletConflict
@@ -214,10 +199,10 @@ func (s *GameService) localWalletAddAt(ctx context.Context, id int64, requestKey
 			return err
 		}
 		entry := db.LocalWalletEntry{ReasonID: reason.ID, Label: walletReasonLabel(reason.Label, cents), PlayerID: id, Key: "add:" + requestKey, Kind: "add", DeltaCents: cents, BalanceAfter: balance.BalanceCents, Revision: balance.Revision, At: now.UnixMilli(), Source: constUtil.LocalWalletVersion}
-		if err = tx.Create(&entry).Error; err != nil {
+		if err = walletCreateEntry(tx, &entry); err != nil {
 			return err
 		}
-		if err = tx.Save(balance).Error; err != nil {
+		if err = walletSaveBalance(tx, balance); err != nil {
 			return err
 		}
 		result, err = localWalletProjection(tx, row, p, balance, true, now)
@@ -235,7 +220,7 @@ func (s *GameService) LocalWalletDebitOrder(tx *gorm.DB, owner *db.Profile, orde
 	if !s.P3LocalWalletEnabled {
 		return ErrLocalWalletDisabled
 	}
-	if !walletAccountOwner(owner) || order == nil || order.PlayerID != owner.Id || len(order.ID) < 1 || len(order.ID) > 64 || order.Cents <= 0 || order.Source != constUtil.P3PaymentSource {
+	if !walletAccountOwner(tx, owner) || order == nil || order.PlayerID != owner.Id || len(order.ID) < 1 || len(order.ID) > 64 || order.Cents <= 0 || order.Source != constUtil.P3PaymentSource {
 		return ErrLocalWalletInvalid
 	}
 	if tx.Statement.Context.Value(constUtil.LocalWalletAPIContextKey) == true && !localWalletSessionAllowed(tx.Statement.Context, owner) {
@@ -250,7 +235,7 @@ func (s *GameService) LocalWalletDebitOrder(tx *gorm.DB, owner *db.Profile, orde
 		return err
 	}
 	var prior db.LocalWalletEntry
-	err = tx.First(&prior, "order_id=?", order.ID).Error
+	err = walletFindEntry(tx, owner.Id, "", order.ID, &prior)
 	if err == nil {
 		if prior.PlayerID != owner.Id || prior.Key != "order:"+order.ID || prior.Kind != "debit" || prior.DeltaCents != -order.Cents || prior.Source != constUtil.LocalWalletVersion {
 			return ErrLocalWalletConflict
@@ -281,8 +266,8 @@ func (s *GameService) LocalWalletDebitOrder(tx *gorm.DB, owner *db.Profile, orde
 		label = product.Name
 	}
 	entry := db.LocalWalletEntry{Label: label, PlayerID: owner.Id, Key: "order:" + order.ID, Kind: "debit", DeltaCents: -order.Cents, BalanceAfter: balance.BalanceCents, Revision: balance.Revision, OrderID: &orderID, At: now.UnixMilli(), Source: constUtil.LocalWalletVersion}
-	if err = tx.Create(&entry).Error; err != nil {
+	if err = walletCreateEntry(tx, &entry); err != nil {
 		return err
 	}
-	return tx.Save(balance).Error
+	return walletSaveBalance(tx, balance)
 }

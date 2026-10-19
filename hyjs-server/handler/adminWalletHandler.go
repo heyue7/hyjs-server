@@ -37,7 +37,7 @@ func RegisterAdminWalletRoutes(a *gin.RouterGroup) {
 // @Router /local-wallet/ledger [post]
 func LocalWalletLedgerHandler(c *gin.Context) error {
 	var req model.LocalWalletLedgerRequest
-	if c.ShouldBindJSON(&req) != nil || req.PlayerID <= 1 || len(req.SessionHex) != 32 {
+	if c.ShouldBindJSON(&req) != nil || req.PlayerID < 1 || len(req.SessionHex) != 32 {
 		return model.NewErrParamsError()
 	}
 	if req.Page == 0 {

@@ -195,6 +195,42 @@ func adminTitleProjection(original map[string]string, override *db.AdminTitleOve
 	return out
 }
 
+// adminTitlePresentation resolves original artwork and explains the current target without changing qualification.
+func (s *GameService) adminTitlePresentation(value model.AdminTitleDTO, original map[string]string) model.AdminTitleDTO {
+	if s.AdminCatalogueData != nil {
+		value.IconURL = s.AdminCatalogueData.SpriteURLs[value.ID]
+	}
+	switch value.Type {
+	case 1:
+		value.Requirement = "同时上阵 " + value.Param + " 名角色"
+	case 2, 3, 4:
+		world := map[int64]string{2: "SAO", 3: "ALO", 4: "GGO"}[value.Type]
+		value.Requirement = "收集全部 " + world + " 角色"
+	case 5, 6, 7, 8:
+		quality := map[int64]string{5: "蓝色", 6: "紫色", 7: "橙色", 8: "红色"}[value.Type]
+		value.Requirement = "收集全部" + quality + "角色"
+	case 9:
+		value.Requirement = "角色等级达到 " + value.Param + " 级"
+	case 10:
+		value.Requirement = "通关主线第 " + value.Param + " 章"
+	case 11:
+		value.Requirement = "珠宝工艺达到 " + value.Param + " 级"
+	case 12:
+		value.Requirement = "料理工艺达到 " + value.Param + " 级"
+	case 13:
+		value.Requirement = "试炼之地通关第 " + value.Param + " 层"
+	case 14:
+		value.Requirement = "竞技场获胜并达到前 " + value.Param + " 名"
+	default:
+		value.Requirement = original["titleSimpDesc"]
+	}
+	if value.Requirement == "" {
+		value.Requirement = "原客户端未注明获得条件"
+	}
+	value.Notes = value.Requirement
+	return value
+}
+
 // AdminTitles returns only title identities actually present in the original resource table.
 func (s *GameService) AdminTitles(ctx context.Context, p *model.AdminPrincipal) (*model.AdminTitlesResponse, error) {
 	tx := db.GetIns().WithContext(ctx)
@@ -209,7 +245,14 @@ func (s *GameService) AdminTitles(ctx context.Context, p *model.AdminPrincipal) 
 	for _, r := range rows {
 		values[r.ID] = r
 	}
-	out := &model.AdminTitlesResponse{Items: []model.AdminTitleDTO{}}
+	out := &model.AdminTitlesResponse{Items: []model.AdminTitleDTO{}, Chapters: []model.AdminCatalogueOption{}}
+	for _, chapter := range s.Tables["CopyChapter"] {
+		name := chapter["ChapterName"]
+		if s.AdminCatalogueData != nil && s.AdminCatalogueData.DisplayNames[name] != "" {
+			name = s.AdminCatalogueData.DisplayNames[name]
+		}
+		out.Chapters = append(out.Chapters, model.AdminCatalogueOption{Value: chapter["ChapterId"], Label: "第 " + chapter["ChapterSequence"] + " 章 · " + name})
+	}
 	for _, r := range s.Tables["Title"] {
 		if r["titleId"] == "" {
 			continue
@@ -218,7 +261,7 @@ func (s *GameService) AdminTitles(ctx context.Context, p *model.AdminPrincipal) 
 		if v, ok := values[r["titleId"]]; ok {
 			override = &v
 		}
-		out.Items = append(out.Items, adminTitleProjection(r, override))
+		out.Items = append(out.Items, s.adminTitlePresentation(adminTitleProjection(r, override), r))
 	}
 	return out, nil
 }
@@ -302,5 +345,8 @@ func (s *GameService) AdminSaveTitle(ctx context.Context, p *model.AdminPrincipa
 		out = adminTitleProjection(original, &row)
 		return nil
 	})
+	if err == nil {
+		out = s.adminTitlePresentation(out, original)
+	}
 	return &out, err
 }

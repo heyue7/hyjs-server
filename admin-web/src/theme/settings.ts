@@ -4,7 +4,7 @@ export const themeSettings: App.Theme.ThemeSetting = {
   grayscale: false,
   colourWeakness: false,
   recommendColor: false,
-  themeColor: '#646cff',
+  themeColor: '#1677ff',
   themeRadius: 6,
   otherColor: {
     info: '#2080f0',
@@ -43,8 +43,8 @@ export const themeSettings: App.Theme.ThemeSetting = {
   },
   fixedHeaderAndTab: true,
   sider: {
-    inverted: false,
-    width: 220,
+    inverted: true,
+    width: 248,
     collapsedWidth: 64,
     mixWidth: 90,
     mixCollapsedWidth: 64,
@@ -59,7 +59,7 @@ export const themeSettings: App.Theme.ThemeSetting = {
   },
   watermark: {
     visible: false,
-    text: '黑衣剑士运营台',
+    text: '灵魂之花运营台',
     enableUserName: false,
     enableTime: false,
     timeFormat: 'YYYY-MM-DD HH:mm'
@@ -68,13 +68,13 @@ export const themeSettings: App.Theme.ThemeSetting = {
     light: {
       colors: {
         container: 'rgb(255, 255, 255)',
-        layout: 'rgb(247, 250, 252)',
-        inverted: 'rgb(0, 20, 40)',
-        'base-text': 'rgb(31, 31, 31)'
+        layout: 'rgb(244, 246, 249)',
+        inverted: 'rgb(26, 34, 50)',
+        'base-text': 'rgb(31, 45, 61)'
       },
       boxShadow: {
         header: '0 1px 2px rgb(0, 21, 41, 0.08)',
-        sider: '2px 0 8px 0 rgb(29, 35, 41, 0.05)',
+        sider: 'none',
         tab: '0 1px 2px rgb(0, 21, 41, 0.08)'
       }
     },
@@ -93,4 +93,9 @@ export const themeSettings: App.Theme.ThemeSetting = {
  *
  * If publish new version, use `overrideThemeSettings` to override certain theme settings
  */
-export const overrideThemeSettings: Partial<App.Theme.ThemeSetting> = {};
+export const overrideThemeSettings: Partial<App.Theme.ThemeSetting> = {
+  themeColor: themeSettings.themeColor,
+  sider: themeSettings.sider,
+  tokens: themeSettings.tokens,
+  watermark: themeSettings.watermark
+};

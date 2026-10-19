@@ -86,68 +86,61 @@ func drawWalletReason(tx *gorm.DB, cents int64) (*db.LocalWalletReason, error) {
 	}
 	return nil, ErrLocalWalletInvalid
 }
-func walletSummary(tx *gorm.DB, id, start, end int64) (model.LocalWalletSummary, error) {
+func walletSummaryFromQuery(query *gorm.DB, start, end int64) (model.LocalWalletSummary, error) {
 	summary := model.LocalWalletSummary{StartAt: start, EndAt: end}
-	q := tx.Model(&db.LocalWalletEntry{}).Where("player_id=?", id)
 	if start > 0 {
-		q = q.Where("at>=?", start)
+		query = query.Where("at>=?", start)
 	}
 	if end > 0 {
-		q = q.Where("at<?", end)
+		query = query.Where("at<?", end)
 	}
-	var totals struct {
-		Income  int64
-		Expense int64
-		Count   int64
-	}
-	err := q.Select("COALESCE(SUM(CASE WHEN delta_cents>0 THEN delta_cents ELSE 0 END),0) AS income, COALESCE(SUM(CASE WHEN delta_cents<0 THEN -delta_cents ELSE 0 END),0) AS expense, COUNT(*) AS count").Scan(&totals).Error
-	summary.IncomeCents = totals.Income
-	summary.ExpenseCents = totals.Expense
-	summary.NetCents = totals.Income - totals.Expense
-	summary.TransactionCount = totals.Count
+	var totals struct{ Income, Expense, Count int64 }
+	err := query.Select("COALESCE(SUM(CASE WHEN delta_cents>0 THEN delta_cents ELSE 0 END),0) AS income, COALESCE(SUM(CASE WHEN delta_cents<0 THEN -delta_cents ELSE 0 END),0) AS expense, COUNT(*) AS count").Scan(&totals).Error
+	summary.IncomeCents, summary.ExpenseCents, summary.NetCents, summary.TransactionCount = totals.Income, totals.Expense, totals.Income-totals.Expense, totals.Count
 	return summary, err
 }
-func walletLedger(tx *gorm.DB, id, start, end int64, kind string, page, size int64) (*model.LocalWalletView, error) {
-	var balance db.LocalWalletBalance
-	err := tx.First(&balance, "player_id=?", id).Error
-	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, err
+func walletSummary(tx *gorm.DB, id, start, end int64) (model.LocalWalletSummary, error) {
+	query, err := walletEntryQuery(tx, id)
+	if err != nil {
+		return model.LocalWalletSummary{}, err
 	}
-	view := localWalletView(&balance, true)
-	view.Page = page
-	view.PageSize = size
-	view.Summary, err = walletSummary(tx, id, start, end)
+	return walletSummaryFromQuery(query, start, end)
+}
+func walletLedgerFromQuery(query *gorm.DB, balance *db.LocalWalletBalance, start, end int64, kind string, page, size int64) (*model.LocalWalletView, error) {
+	view := localWalletView(balance, true)
+	view.Page, view.PageSize = page, size
+	var err error
+	view.Summary, err = walletSummaryFromQuery(query.Session(&gorm.Session{}), start, end)
 	if err != nil {
 		return nil, err
 	}
-	q := tx.Model(&db.LocalWalletEntry{}).Where("player_id=?", id)
 	if start > 0 {
-		q = q.Where("at>=?", start)
+		query = query.Where("at>=?", start)
 	}
 	if end > 0 {
-		q = q.Where("at<?", end)
+		query = query.Where("at<?", end)
 	}
 	if kind == "credit" {
-		q = q.Where("kind=?", "add")
+		query = query.Where("kind=?", "add")
 	}
 	if kind == "payment" {
-		q = q.Where("kind=?", "debit")
+		query = query.Where("kind=?", "debit")
 	}
-	if err = q.Count(&view.Total).Error; err != nil {
+	if err = query.Count(&view.Total).Error; err != nil {
 		return nil, err
 	}
 	var entries []db.LocalWalletEntry
-	if err = q.Order("revision DESC, `key` DESC").Offset(int((page - 1) * size)).Limit(int(size)).Find(&entries).Error; err != nil {
+	if err = query.Order("revision DESC, at DESC, `key` DESC").Offset(int((page - 1) * size)).Limit(int(size)).Find(&entries).Error; err != nil {
 		return nil, err
 	}
-	for _, e := range entries {
-		k, label := "credit", e.Label
-		if e.Kind == "debit" {
-			k = "payment"
+	for _, entry := range entries {
+		kind, label := "credit", entry.Label
+		if entry.Kind == "debit" {
+			kind = "payment"
 			if label == "" {
 				label = "游戏充值"
 			}
-		} else if e.Kind == "add" {
+		} else if entry.Kind == "add" {
 			if label == "" {
 				label = "余额入账"
 			}
@@ -155,12 +148,31 @@ func walletLedger(tx *gorm.DB, id, start, end int64, kind string, page, size int
 			return nil, ErrLocalWalletInvalid
 		}
 		order := ""
-		if e.OrderID != nil {
-			order = *e.OrderID
+		if entry.OrderID != nil {
+			order = *entry.OrderID
 		}
-		view.Entries = append(view.Entries, model.LocalWalletEntryView{ID: e.Key, Kind: k, AmountCents: e.DeltaCents, BalanceCents: e.BalanceAfter, CreatedAt: e.At, Label: label, ReasonID: e.ReasonID, OrderID: order})
+		view.Entries = append(view.Entries, model.LocalWalletEntryView{ID: entry.Key, Kind: kind, AmountCents: entry.DeltaCents, BalanceCents: entry.BalanceAfter, CreatedAt: entry.At, Label: label, ReasonID: entry.ReasonID, OrderID: order})
 	}
 	return view, nil
+}
+func walletLedger(tx *gorm.DB, id, start, end int64, kind string, page, size int64) (*model.LocalWalletView, error) {
+	balance, err := walletReadBalance(tx, id, false)
+	if err != nil {
+		return nil, err
+	}
+	query, err := walletEntryQuery(tx, id)
+	if err != nil {
+		return nil, err
+	}
+	return walletLedgerFromQuery(query, balance, start, end, kind, page, size)
+}
+func accountWalletLedger(tx *gorm.DB, id, start, end int64, kind string, page, size int64) (*model.LocalWalletView, error) {
+	balance, err := accountWalletBalance(tx, id, false)
+	if err != nil {
+		return nil, err
+	}
+	query := db.AccountsTable(tx, "account_wallet_entries").Where("account_id=?", id)
+	return walletLedgerFromQuery(query, &db.LocalWalletBalance{BalanceCents: balance.BalanceCents, Revision: balance.Revision}, start, end, kind, page, size)
 }
 
 // LocalWalletLedger 仅读取当前认证角色的账单，时间使用真实账务时钟。
@@ -170,7 +182,7 @@ func (s *GameService) LocalWalletLedger(ctx context.Context, req model.LocalWall
 	}
 	var view *model.LocalWalletView
 	err := s.p3Profile(ctx, req.PlayerID, func(tx *gorm.DB, owner *db.Profile, _ *pb.Player, _ *model.GameState) error {
-		if !walletAccountOwner(owner) || !localWalletSessionAllowed(ctx, owner) {
+		if !walletAccountOwner(tx, owner) || !localWalletSessionAllowed(ctx, owner) {
 			return ErrLocalWalletInvalid
 		}
 		policy, err := localWalletPolicy(tx)
@@ -240,8 +252,14 @@ func AdminWalletLedger(ctx context.Context, p *model.AdminPrincipal, id, start, 
 			return err
 		}
 		var owner db.Profile
-		if err := tx.Select("id").First(&owner, id).Error; err != nil {
+		if err := tx.First(&owner, id).Error; err != nil {
 			return err
+		}
+		if err := AdminCheckProfileScope(ctx, owner); err != nil {
+			return err
+		}
+		if !GameAccountWalletOwner(tx, &owner) {
+			return ErrLocalWalletInvalid
 		}
 		var err error
 		out, err = walletLedger(tx, id, start, end, kind, page, size)

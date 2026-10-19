@@ -29,6 +29,7 @@ declare module "@elegant-router/types" {
     "audit": "/audit";
     "feedback": "/feedback";
     "fields": "/fields";
+    "game-accounts": "/game-accounts";
     "home": "/home";
     "iframe-page": "/iframe-page/:url";
     "items": "/items";
@@ -94,6 +95,7 @@ declare module "@elegant-router/types" {
     | "audit"
     | "feedback"
     | "fields"
+    | "game-accounts"
     | "home"
     | "iframe-page"
     | "items"
@@ -136,6 +138,7 @@ declare module "@elegant-router/types" {
     | "audit"
     | "feedback"
     | "fields"
+    | "game-accounts"
     | "home"
     | "items"
     | "players"

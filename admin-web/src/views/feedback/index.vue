@@ -346,7 +346,7 @@ onMounted(load);
               @update:value="replyChanged"
             />
             <p v-if="replySentUncertain" class="ops-muted mt-10px">
-              上次发送结果尚未确认。请先刷新查看，重试会沿用同一请求标识，避免重复回复。
+              上次发送结果尚未确认，请刷新查看后再重试。
             </p>
             <div class="feedback-send">
               <NButton

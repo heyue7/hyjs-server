@@ -277,7 +277,10 @@ func (s *GameService) validateTurntableConfiguration(cfg *db.GameplayPool, rewar
 		total += reward.Weight
 	}
 
-	if len(rewards) != 9 || cfg.StartAt <= 0 || cfg.EndAt <= cfg.StartAt || cfg.RewardEndAt < cfg.EndAt || cfg.JackpotPerMillion < 0 || cfg.JackpotPerMillion > 1000000 || cfg.PoolContributionBps < 0 || cfg.PoolContributionBps > 10000 || cfg.InitialDiamondPool < 0 || cfg.InitialDiamondPool > math.MaxInt32 || rules.ScorePerDraw <= 0 || rules.AdvancePlaces < 1 || rules.AdvancePlaces > 1000 {
+	// Pure personal wheels have no legacy global ranking; nonempty legacy
+	// rules retain their complete original validation and settlement checks.
+	hasLegacyRanking := rules.TopPrize != "" || rules.AdvancePrize != "" || rules.AdvancePlaces != 0
+	if len(rewards) != 9 || cfg.StartAt <= 0 || cfg.EndAt <= cfg.StartAt || cfg.RewardEndAt < cfg.EndAt || cfg.JackpotPerMillion < 0 || cfg.JackpotPerMillion > 1000000 || cfg.PoolContributionBps < 0 || cfg.PoolContributionBps > 10000 || cfg.InitialDiamondPool < 0 || cfg.InitialDiamondPool > math.MaxInt32 || rules.ScorePerDraw <= 0 || hasLegacyRanking && (rules.AdvancePlaces < 1 || rules.AdvancePlaces > 1000) {
 		return errors.New("转盘运营规则无效")
 	}
 	for index, value := range []string{cfg.SingleCost, cfg.TenCost} {
@@ -292,6 +295,9 @@ func (s *GameService) validateTurntableConfiguration(cfg *db.GameplayPool, rewar
 		if r.ID != int32(i) || !s.turntableResource(r.ResourceID) || (strings.HasPrefix(r.ResourceID, "equip_") && r.Amount > 10) || (strings.HasPrefix(r.ResourceID, "pet_") && r.Amount > 100) {
 			return errors.New("转盘必须配置0至8九个有效奖位")
 		}
+	}
+	if !hasLegacyRanking {
+		return nil
 	}
 	for _, value := range []string{rules.TopPrize, rules.AdvancePrize} {
 		cost, e := parsePoolCost(value)
@@ -348,7 +354,7 @@ func (s *GameService) turntableGain(tx *gorm.DB, player *pb.Player, game *model.
 
 // turntableRanks 只纳入发生过抽奖且仍有真实角色的参与者，同积分按玩家ID稳定排序。
 func (s *GameService) turntableRanks(tx *gorm.DB, global *db.TurntableGlobal, rules *db.TurntableRules) ([]*pb.BigTurnRankItem, error) {
-	if turntablePersonalOwner(tx) > 0 {
+	if turntablePersonalOwner(tx) > 0 || rules.TopPrize == "" && rules.AdvancePrize == "" && rules.AdvancePlaces == 0 {
 		return []*pb.BigTurnRankItem{}, nil
 	}
 	if global.Settled {
@@ -416,8 +422,10 @@ func (s *GameService) settleTurntable(tx *gorm.DB, global *db.TurntableGlobal, c
 	if global.Settled || now < cfg.EndAt {
 		return nil
 	}
-	if turntablePersonalOwner(tx) > 0 {
+	if turntablePersonalOwner(tx) > 0 || rules.TopPrize == "" && rules.AdvancePrize == "" && rules.AdvancePlaces == 0 {
+		// No legacy ranking means no reward queue or rank snapshot is created.
 		global.Settled = true
+		global.FinalRanks = []byte("[]")
 		return saveTurntableRuntimeGlobal(tx, global)
 	}
 	ranks, err := s.turntableRanks(tx, global, rules)

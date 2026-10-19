@@ -26,19 +26,25 @@ type AdminActivityDefinitionSaveRequest struct {
 
 // AdminActivityOccurrenceDTO is one realm calendar bar.
 type AdminActivityOccurrenceDTO struct {
-	ID              string `json:"id"`              // ID is the stable occurrence identity, empty for unsaved rows.
-	TemplateID      string `json:"templateId"`      // TemplateID references a global template.
-	TemplateVersion string `json:"templateVersion"` // TemplateVersion confirms the exact global rules selected for new publication.
-	Name            string `json:"name"`            // Name is the published title.
-	Mode            string `json:"mode"`            // Mode identifies the original UI and consumer.
-	StartAt         int64  `json:"startAt"`         // StartAt is an inclusive millisecond boundary.
-	EndAt           int64  `json:"endAt"`           // EndAt is an exclusive millisecond boundary.
-	ClaimEndAt      int64  `json:"claimEndAt"`      // ClaimEndAt preserves a separate claim grace window.
-	Lane            int64  `json:"lane"`            // Lane is a visual row, 0 through 31.
-	Enabled         bool   `json:"enabled"`         // Enabled true publishes the slot.
-	Frozen          bool   `json:"frozen"`          // Frozen true protects issued rules and dates.
-	Version         string `json:"version"`         // Version protects a single occurrence identity.
-	ConsumerID      string `json:"consumerId"`      // ConsumerID links the original gameplay consumer for audit.
+	StartDay     int64 `json:"startDay"`     // StartDay is one-based in this realm's character life, never account registration.
+	DurationDays int64 `json:"durationDays"` // DurationDays is the relative activity window; the original opening task structure remains fourteen days.
+	ClaimDays    int64 `json:"claimDays"`    // ClaimDays is the relative post-activity claim grace.
+
+	Timing          string            `json:"timing"`          // Timing is calendar for absolute realm dates, character-day for each role's fixed opening days.
+	Form            AdminActivityForm `json:"form"`            // Form is this occurrence's exact stored content; newer template edits never replace it.
+	ID              string            `json:"id"`              // ID is the stable occurrence identity, empty for unsaved rows.
+	TemplateID      string            `json:"templateId"`      // TemplateID references a global template.
+	TemplateVersion string            `json:"templateVersion"` // TemplateVersion confirms the exact global rules selected for new publication.
+	Name            string            `json:"name"`            // Name is the published title.
+	Mode            string            `json:"mode"`            // Mode identifies the original UI and consumer.
+	StartAt         int64             `json:"startAt"`         // StartAt is an inclusive millisecond boundary.
+	EndAt           int64             `json:"endAt"`           // EndAt is an exclusive millisecond boundary.
+	ClaimEndAt      int64             `json:"claimEndAt"`      // ClaimEndAt preserves a separate claim grace window.
+	Lane            int64             `json:"lane"`            // Lane is a visual row, 0 through 31.
+	Enabled         bool              `json:"enabled"`         // Enabled true publishes the slot.
+	Frozen          bool              `json:"frozen"`          // Frozen true protects issued rules and dates.
+	Version         string            `json:"version"`         // Version protects a single occurrence identity.
+	ConsumerID      string            `json:"consumerId"`      // ConsumerID links the original gameplay consumer for audit.
 }
 
 // AdminActivityScheduleResponse returns the whole realm calendar so saving never drops hidden dates.

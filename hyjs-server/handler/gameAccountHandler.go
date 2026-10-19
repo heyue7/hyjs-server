@@ -26,6 +26,7 @@ func init() {
 // RegisterAdminAccountCreationRoutes adds original game account creation to the authenticated admin group.
 func RegisterAdminAccountCreationRoutes(a *gin.RouterGroup) {
 	a.POST("/game-players", AdminGamePlayerCreateHandler)
+	RegisterGlobalGameAccountRoutes(a)
 }
 
 // GameAccountRegisterHandler strictly registers an account before the original game login/new-player flow.
@@ -49,17 +50,17 @@ func GameAccountRegisterHandler(c *gin.Context) error {
 		return nil
 	}
 	var req model.GameAccountRegisterRequest
-	if c.ShouldBindJSON(&req) != nil || len(req.Username) < constUtil.GameAccountUsernameMinBytes || len(req.Username) > constUtil.GameAccountUsernameMaxBytes || utf8.RuneCountInString(req.Password) < constUtil.GameAccountPasswordMinCharacters || len(req.Password) > constUtil.GameAccountPasswordMaxBytes || !utf8.ValidString(req.Password) || req.Password != req.ConfirmPassword || strings.IndexFunc(req.Username, func(r rune) bool {
+	if c.ShouldBindJSON(&req) != nil || !gameAccountNicknameValid(req.Nickname) || len(req.Username) < constUtil.GameAccountUsernameMinBytes || len(req.Username) > constUtil.GameAccountUsernameMaxBytes || utf8.RuneCountInString(req.Password) < constUtil.GameAccountPasswordMinCharacters || len(req.Password) > constUtil.GameAccountPasswordMaxBytes || !utf8.ValidString(req.Password) || req.Password != req.ConfirmPassword || strings.IndexFunc(req.Username, func(r rune) bool {
 		return !((r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '_' || r == '-')
 	}) >= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "msg": "账号需3–32位字母、数字、下划线或短横线；密码需至少6个字符、最多72字节且两次一致", "data": nil})
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "msg": "昵称需1–24个字符；账号需3–32位字母、数字、下划线或短横线；密码需至少6个字符、最多72字节且两次一致", "data": nil})
 		return nil
 	}
 	ctx := c.Request.Context()
 	if gameService != nil {
 		ctx = context.WithValue(ctx, constUtil.GameServiceContextKey, gameService)
 	}
-	out, err := service.RegisterGameAccount(ctx, req.Username, req.Password)
+	out, err := service.RegisterGameAccount(ctx, req.Username, req.Password, req.Nickname)
 	if err != nil {
 		if errors.Is(err, constUtil.ErrGameAccountExists) {
 			c.JSON(http.StatusConflict, gin.H{"code": 409, "msg": err.Error(), "data": nil})
@@ -83,9 +84,7 @@ func GameAccountRegisterHandler(c *gin.Context) error {
 // @Router /admin/api/game-players [post]
 func AdminGamePlayerCreateHandler(c *gin.Context) {
 	var req model.AdminGamePlayerCreateRequest
-	if c.ShouldBindJSON(&req) != nil || len(req.Username) < constUtil.GameAccountUsernameMinBytes || len(req.Username) > constUtil.GameAccountUsernameMaxBytes || strings.IndexFunc(req.Username, func(r rune) bool {
-		return !((r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '_' || r == '-')
-	}) >= 0 || utf8.RuneCountInString(req.Password) < constUtil.GameAccountPasswordMinCharacters || len(req.Password) > constUtil.GameAccountPasswordMaxBytes || !utf8.ValidString(req.Password) || !utf8.ValidString(req.Name) || req.Name == "" || strings.TrimSpace(req.Name) != req.Name || strings.IndexFunc(req.Name, func(r rune) bool { return unicode.IsControl(r) || unicode.Is(unicode.Cf, r) }) >= 0 || strings.TrimSpace(req.Reason) == "" || len(req.Reason) > 1000 {
+	if c.ShouldBindJSON(&req) != nil || req.AccountID < 0 || (req.AccountID == 0 && (!gameAccountUsernameValid(req.Username) || !gameAccountPasswordValid(req.Password))) || !utf8.ValidString(req.Name) || req.Name == "" || strings.TrimSpace(req.Name) != req.Name || strings.IndexFunc(req.Name, func(r rune) bool { return unicode.IsControl(r) || unicode.Is(unicode.Cf, r) }) >= 0 || strings.TrimSpace(req.Reason) == "" || len(req.Reason) > 1000 {
 		adminError(c, constUtil.ErrAdminInput)
 		return
 	}
@@ -116,7 +115,7 @@ func AdminGamePlayerCreateHandler(c *gin.Context) {
 	}
 	out, err := gameService.AdminCreateGamePlayer(c.Request.Context(), adminPrincipal(c), req)
 	if err != nil {
-		adminError(c, err)
+		gameAccountAdminError(c, err)
 		return
 	}
 	adminSuccess(c, out)

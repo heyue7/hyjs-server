@@ -3,6 +3,10 @@ package db
 // AdminActivityOccurrence binds one immutable consumer identity to a realm calendar slot.
 // Archived rows remain so guessed foreign IDs and historical claims retain their ownership.
 type AdminActivityOccurrence struct {
+	Timing          string `gorm:"size:24;not null;default:calendar" json:"timing"`
+	StartDay        int64  `gorm:"not null;default:1" json:"startDay"`
+	DurationDays    int64  `gorm:"not null;default:14" json:"durationDays"`
+	ClaimDays       int64  `gorm:"not null;default:0" json:"claimDays"`
 	ID              string `gorm:"primaryKey;size:64" json:"id"`
 	ServerID        int64  `gorm:"not null;index:idx_activity_realm_dates,priority:1" json:"serverId"`
 	TemplateID      string `gorm:"size:64;not null;index" json:"templateId"`

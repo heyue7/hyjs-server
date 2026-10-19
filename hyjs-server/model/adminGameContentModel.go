@@ -45,19 +45,22 @@ type AdminTitleEffect struct {
 
 // AdminTitleDTO retains original title identity and resources.
 type AdminTitleDTO struct {
-	ID         string             `json:"id"`         // Original title ID.
-	Name       string             `json:"name"`       // Original localized name.
-	Type       int64              `json:"type"`       // Original qualification category, immutable.
-	Param      string             `json:"param"`      // Original qualification parameter.
-	Effects    []AdminTitleEffect `json:"effects"`    // Future grant effect values.
-	EffectTime int64              `json:"effectTime"` // Hours; 0 means permanent.
-	Show       bool               `json:"show"`       // Original list presentation flag.
-	Enabled    bool               `json:"enabled"`    // Future qualification enabled.
-	Version    string             `json:"version"`    // Original plus override version.
-	Notes      string             `json:"notes"`      // Protected qualification/history notes.
+	ID          string             `json:"id"`          // Original title ID.
+	Name        string             `json:"name"`        // Original localized name.
+	Type        int64              `json:"type"`        // Original qualification category, immutable.
+	Param       string             `json:"param"`       // Original qualification parameter.
+	Effects     []AdminTitleEffect `json:"effects"`     // Future grant effect values.
+	EffectTime  int64              `json:"effectTime"`  // Hours; 0 means permanent.
+	Show        bool               `json:"show"`        // Original list presentation flag.
+	Enabled     bool               `json:"enabled"`     // Future qualification enabled.
+	Version     string             `json:"version"`     // Original plus override version.
+	Notes       string             `json:"notes"`       // Protected qualification/history notes.
+	IconURL     string             `json:"iconUrl"`     // Original title-ID sprite exported from the client atlas.
+	Requirement string             `json:"requirement"` // Human-readable current qualification, including any target override.
 }
 
 // AdminTitlesResponse lists the original resource-backed title catalogue.
 type AdminTitlesResponse struct {
-	Items []AdminTitleDTO `json:"items"` // Original titles with optional future-grant overrides.
+	Items    []AdminTitleDTO        `json:"items"`    // Original titles with optional future-grant overrides.
+	Chapters []AdminCatalogueOption `json:"chapters"` // Original main-story chapters for the chapter qualification selector.
 }

@@ -47,7 +47,7 @@ defineEmits<{ back: []; save: []; 'update:section': [value: string] }>();
     <slot v-else />
     <footer v-if="editing" class="management-footer">
       <span class="ops-muted">
-        <slot name="status">{{ readonly ? '当前账号可查看配置' : '保存后由服务端校验并记录操作审计' }}</slot>
+        <slot name="status">{{ readonly ? '只读权限' : dirty ? '有未保存的修改' : '' }}</slot>
       </span>
       <NSpace>
         <NButton :disabled="saving" @click="$emit('back')">{{ readonly ? '返回列表' : '取消' }}</NButton>
@@ -70,8 +70,8 @@ defineEmits<{ back: []; save: []; 'update:section': [value: string] }>();
 }
 .management-layout {
   display: grid;
-  grid-template-columns: 170px minmax(0, 1fr);
-  gap: 24px;
+  grid-template-columns: 160px minmax(0, 1fr);
+  gap: 20px;
   align-items: start;
 }
 .management-layout-simple {
@@ -86,10 +86,17 @@ defineEmits<{ back: []; save: []; 'update:section': [value: string] }>();
 }
 .management-nav button {
   text-align: left;
-  padding: 12px 14px;
+  padding: 10px 12px;
+  background: transparent;
+  border: 1px solid transparent;
+  transition: background-color 120ms, color 120ms;
   border-radius: 7px;
-  color: rgb(var(--base-text-color) / 0.65);
+  color: rgb(var(--base-text-color) / 0.75);
   cursor: pointer;
+}
+.management-nav button:focus-visible {
+  outline: 2px solid rgb(var(--primary-color));
+  outline-offset: 2px;
 }
 .management-nav button:hover {
   background: rgb(var(--base-text-color) / 0.035);
@@ -110,11 +117,11 @@ defineEmits<{ back: []; save: []; 'update:section': [value: string] }>();
   align-items: center;
   justify-content: space-between;
   gap: 18px;
-  padding: 16px 22px;
+  padding: 12px 18px;
   border: 1px solid rgb(var(--base-text-color) / 0.08);
   background: rgb(var(--container-bg-color));
   border-radius: 9px;
-  box-shadow: 0 -4px 20px rgb(0 0 0/0.025);
+  box-shadow: 0 -2px 8px rgb(0 0 0/0.025);
 }
 @media (max-width: 800px) {
   .management-layout {

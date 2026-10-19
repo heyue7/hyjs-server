@@ -58,7 +58,7 @@ onMounted(load);
 <template>
   <div class="ops-page">
     <div class="ops-toolbar">
-      <div class="ops-page-label">服务器时间</div>
+      <div class="ops-page-label">游戏时间</div>
       <NButton :loading="loading" :disabled="changing" @click="load">刷新</NButton>
     </div>
     <NAlert v-if="error" type="error" :title="error" />
@@ -73,12 +73,12 @@ onMounted(load);
             <NTag :type="clock.enabled ? 'success' : 'default'" :bordered="false">{{ clock.enabled ? '全服生效' : '调整未启用' }}</NTag>
           </div>
           <NDescriptions :column="2" label-placement="top" class="mt-28px mb-28px">
-            <NDescriptionsItem label="服务器">{{ clock.serverId }}</NDescriptionsItem>
+            <NDescriptionsItem label="运行区服">{{ clock.serverId }} 区</NDescriptionsItem>
             <NDescriptionsItem label="偏移天数">{{ clock.offsetDays > 0 ? '+' : '' }}{{ clock.offsetDays }} 天</NDescriptionsItem>
             <NDescriptionsItem label="实际时间">{{ serverTime(clock.realTimeMs) }}</NDescriptionsItem>
             <NDescriptionsItem label="时区">{{ clock.timezone }}</NDescriptionsItem>
           </NDescriptions>
-          <p class="ops-muted mb-24px">日期调整对全服游戏玩法生效；钱包账单、真实支付及登录安全继续使用实际时间。</p>
+          <p class="ops-muted mb-24px">日期调整对全服玩法生效。账单、支付和登录仍按实际时间记录。</p>
           <NAlert v-if="!clock.enabled" type="info" title="服务器暂未启用游戏日期调整" />
           <NAlert v-else-if="!canChange" type="info" title="当前账号可查看服务器时间，调整需要管理员权限。" />
           <template v-else>

@@ -123,6 +123,13 @@ func run() error {
 		return err
 	}
 	ctx = context.WithValue(ctx, constUtil.GameServiceContextKey, s)
+	// Global identity is migrated before per-role calendars and account-owned wallets.
+	if err = s.InitializeAdminGameServers(ctx); err != nil {
+		return err
+	}
+	if err = s.InitializeGlobalGameAccounts(ctx); err != nil {
+		return err
+	}
 	// 六绿采用同源兼容表与原动作，原始制品及既有培养数值保留。
 	if err = s.ApplyP15GreenHeroCompatibility(); err != nil {
 		return err
@@ -208,6 +215,9 @@ func run() error {
 		return err
 	}
 	if err = s.InitializeLocalWallet(ctx); err != nil {
+		return err
+	}
+	if err = s.InitializeAccountWallets(ctx); err != nil {
 		return err
 	}
 	if err = s.InitializeLocalPlay(ctx); err != nil {
@@ -310,9 +320,6 @@ func run() error {
 	if err = s.InitializeP5(ctx); err != nil {
 		return err
 	}
-	if err = s.InitializeAdminGameServers(ctx); err != nil {
-		return err
-	}
 	if err = service.InitializeAdminGameContent(ctx); err != nil {
 		return err
 	}
@@ -390,6 +397,10 @@ func run() error {
 		return err
 	}
 	if err = s.InitializeAdminActivitySchedules(ctx); err != nil {
+		return err
+	}
+	// Adopt existing live windows once after original domains are ready, before accepting players.
+	if err = s.AdoptAdminActivityCalendar(ctx); err != nil {
 		return err
 	}
 	if err = s.InitializeAdminFields(ctx); err != nil {

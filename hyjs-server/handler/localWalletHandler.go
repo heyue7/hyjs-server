@@ -31,7 +31,7 @@ func init() {
 // @Router /local-wallet/state [post]
 func LocalWalletStateHandler(c *gin.Context) error {
 	var req model.LocalWalletStateRequest
-	if err := c.ShouldBindJSON(&req); err != nil || req.PlayerID <= 1 || len(req.SessionHex) != 32 {
+	if err := c.ShouldBindJSON(&req); err != nil || req.PlayerID < 1 || len(req.SessionHex) != 32 {
 		return model.NewErrParamsError()
 	}
 	session, err := hex.DecodeString(req.SessionHex)
@@ -71,7 +71,7 @@ func LocalWalletStateHandler(c *gin.Context) error {
 // @Router /local-wallet/add [post]
 func LocalWalletAddHandler(c *gin.Context) error {
 	var req model.LocalWalletAddRequest
-	if err := c.ShouldBindJSON(&req); err != nil || req.PlayerID <= 1 || len(req.SessionHex) != 32 || req.AmountCents <= 0 || req.AmountCents > constUtil.LocalWalletMaxCreditCents || len(req.RequestID) < 1 || len(req.RequestID) > 128 || req.RequestID != strings.TrimSpace(req.RequestID) {
+	if err := c.ShouldBindJSON(&req); err != nil || req.PlayerID < 1 || len(req.SessionHex) != 32 || req.AmountCents <= 0 || req.AmountCents > constUtil.LocalWalletMaxCreditCents || len(req.RequestID) < 1 || len(req.RequestID) > 128 || req.RequestID != strings.TrimSpace(req.RequestID) {
 		return model.NewErrParamsError()
 	}
 	for _, char := range req.RequestID {
@@ -116,7 +116,7 @@ func LocalWalletAddHandler(c *gin.Context) error {
 // @Router /local-wallet/pay [post]
 func LocalWalletPayHandler(c *gin.Context) error {
 	var req model.LocalWalletPayRequest
-	if err := c.ShouldBindJSON(&req); err != nil || req.PlayerID <= 1 || len(req.SessionHex) != 32 || len(req.OrderID) != 35 || !strings.HasPrefix(req.OrderID, "p3-") {
+	if err := c.ShouldBindJSON(&req); err != nil || req.PlayerID < 1 || len(req.SessionHex) != 32 || len(req.OrderID) != 35 || !strings.HasPrefix(req.OrderID, "p3-") {
 		return model.NewErrParamsError()
 	}
 	if _, err := hex.DecodeString(req.OrderID[3:]); err != nil {

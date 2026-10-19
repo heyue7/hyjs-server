@@ -19,8 +19,11 @@ import (
 	"time"
 )
 
-// LoginAccount 校验已有密码或者创建本地账号，并在同一事务中轮换会话。
+// LoginAccount uses the global identity after migration; untouched isolated legacy stores retain their original account flow.
 func LoginAccount(ctx context.Context, uid, password string) (*db.Profile, error) {
+	if globalGameAccountsAvailable(db.GetIns().WithContext(ctx)) {
+		return loginGlobalGameAccount(ctx, uid, password)
+	}
 	var row db.Profile
 	var err error
 	// 唯一键竞争与死锁重试整个登录事务，已有账号先锁定再轮换会话。
@@ -37,6 +40,9 @@ func LoginAccount(ctx context.Context, uid, password string) (*db.Profile, error
 			}
 			if game, ok := ctx.Value(constUtil.GameServiceContextKey).(*GameService); ok && found == nil && AdminProfileServerID(row) != game.OriginalServerID() {
 				return errors.New("账号不属于当前区服")
+			}
+			if found == nil && row.AccountID > 0 {
+				return errors.New("全局账号资料不可用，请稍后重试")
 			}
 			if found == nil && len(row.PasswordHash) == 0 {
 				return errors.New("此账号属于早期无密码测试数据，请使用新的本地账号")
@@ -83,6 +89,12 @@ func AuthorizeAccount(ctx context.Context, id int64, session []byte) (*db.Profil
 	if len(session) != 16 || subtle.ConstantTimeCompare(row.Session, session) != 1 {
 		return nil, errors.New("本地会话无效，请重新登录")
 	}
+	if row.AccountID > 0 {
+		account, err := AccountForProfile(db.GetIns().WithContext(ctx), &row)
+		if err != nil || !account.Enabled || row.AccountAuthRevision != account.AuthRevision {
+			return nil, errors.New("账号登录已失效，请重新登录")
+		}
+	}
 	return &row, nil
 }
 
@@ -110,11 +122,13 @@ func decodeProfile(row *db.Profile) (*pb.Player, *model.GameState, error) {
 func saveProfile(tx *gorm.DB, row *db.Profile, player *pb.Player, game *model.GameState) error {
 	// 业务在恢复后的余额上执行；从满值扣到未满时重开计时，其他消费保留余数。
 	nowMS := time.Now().UnixMilli()
+	accountRoleChanged := row.Player == nil || row.Game == nil
 	if row.Player != nil && row.Game != nil {
 		before, _, err := decodeProfile(row)
 		if err != nil {
 			return err
 		}
+		accountRoleChanged = before.GetName() != player.GetName() || before.GetLevel() != player.GetLevel()
 		if err = finalizeResourceRecovery(player, before.GetEnergy(), before.GetStamina(), nowMS); err != nil {
 			return err
 		}
@@ -163,7 +177,16 @@ func saveProfile(tx *gorm.DB, row *db.Profile, player *pb.Player, game *model.Ga
 	if err != nil {
 		return err
 	}
-	return tx.Model(row).Updates(map[string]any{"player": string(p), "game": string(g)}).Error
+	if err := tx.Model(row).Updates(map[string]any{"player": string(p), "game": string(g)}).Error; err != nil {
+		return err
+	}
+	if accountRoleChanged && row.AccountID > 0 {
+		snapshot := *row
+		playerJSON, gameJSON := string(p), string(g)
+		snapshot.Player, snapshot.Game = &playerJSON, &gameJSON
+		return syncGlobalAccountRole(tx, &snapshot)
+	}
+	return nil
 }
 
 // updateProfile 在立即事务内读取并保存存档，业务校验失败时回滚所有奖励。
@@ -304,7 +327,10 @@ func createPlayerLocked(tx *gorm.DB, id int64, name, heroId string) (*db.Profile
 		if err = tx.Model(&row).Update("created_at", realCreatedAt.UnixMilli()).Error; err != nil {
 			return err
 		}
-		return tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&row, id).Error
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&row, id).Error; err != nil {
+			return err
+		}
+		return syncGlobalAccountRole(tx, &row)
 	}()
 	return &row, err
 }

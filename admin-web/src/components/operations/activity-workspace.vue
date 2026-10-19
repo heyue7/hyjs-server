@@ -169,7 +169,7 @@ function validateForm() {
   }
   if (form.value.products.some(product => !product.cost.resourceId && product.cost.amount > 0)) {
     activeTab.value = 'content';
-    return '请选择消耗资源，或明确勾选免费领取';
+    return '请选择消耗资源并填写数量';
   }
   if (form.value.startAt && form.value.endAt && form.value.endAt <= form.value.startAt) { activeTab.value = 'schedule'; return '结束时间需要晚于开始时间'; }
   if (form.value.endAt && form.value.claimEndAt && form.value.claimEndAt < form.value.endAt) { activeTab.value = 'schedule'; return '领奖截止不能早于结束时间'; }
@@ -191,7 +191,7 @@ async function save() {
         ...(updating ? { version: selected.value!.version } : {})
       })
     );
-    window.$message?.success(updating ? '活动配置已保存' : '活动草稿已创建；未配齐项目可在不可用活动中继续编辑。');
+    window.$message?.success(updating ? '活动配置已保存' : '活动草稿已创建');
     baseline.value = JSON.stringify(form.value);
     open.value = false;
     await load();
@@ -273,7 +273,7 @@ onMounted(load);
       <NAlert v-if="error" type="error" :title="error" class="mb-18px" />
       <NCard :bordered="false" class="ops-panel">
         <NMenu mode="horizontal" :value="availabilitySection" :options="availabilityMenu" class="mb-18px" aria-label="活动可用性分类" @update:value="selectAvailability" />
-        <NAlert v-if="unavailableOnly" type="info" title="此处列出缺少配置、个人活动期及暂未适配的活动。可补齐的草稿保留编辑入口。" class="mb-18px" />
+
         <div class="ops-filters">
           <NInput v-model:value="q" clearable placeholder="活动名称或 ID" class="ops-search" @update:value="listPage = 1" />
           <NSelect v-model:value="modeFilter" :options="modeOptions" clearable filterable placeholder="全部活动模式" class="ops-filter-select" @update:value="listPage = 1" />
@@ -287,7 +287,7 @@ onMounted(load);
       <div ref="editorHeading" class="activity-editor-header">
         <NButton quaternary :disabled="saving" @click="requestClose">← 返回活动列表</NButton>
         <div class="activity-editor-title"><h1>{{ editorTitle }}</h1><NSpace :size="8"><NTag size="small" :bordered="false">{{ editorKind === 'create' || editorKind === 'copy' ? '新草稿' : selected?.enabled ? '已开启' : '已关闭' }}</NTag><NTag v-if="selected?.frozen && editorKind !== 'copy'" size="small" :bordered="false">已冻结</NTag><NTag v-if="!editable" size="small" :bordered="false">只读查看</NTag></NSpace></div>
-        <p v-if="selected" class="ops-mono ops-muted">{{ selected.id }}</p>
+
       </div>
       <NAlert v-if="saveError" type="error" :title="saveError" />
       <NAlert v-if="selected && !selected.availability?.usable" type="warning" :title="selected.availability?.reason || '此活动暂不可运营'">
@@ -297,7 +297,7 @@ onMounted(load);
       <div class="activity-editor-layout" :class="{ 'activity-view-layout': !editable }">
         <nav v-if="editable" class="activity-sections" aria-label="活动编辑分区">
           <button v-for="section in sectionOptions" :key="section.key" type="button" :class="{ selected: activeTab === section.key }" :aria-current="activeTab === section.key ? 'step' : undefined" @click="activeTab = section.key">
-            <strong>{{ section.title }}</strong><span>{{ section.detail }}</span>
+            <strong>{{ section.title }}</strong>
           </button>
         </nav>
         <NCard :bordered="false" class="ops-panel activity-editor-body">
@@ -329,11 +329,7 @@ onMounted(load);
             </NForm>
           </template>
         </NCard>
-        <aside class="activity-context">
-          <h3>本次配置</h3>
-          <dl><dt>模式</dt><dd>{{ selectedMode?.label || '暂未支持' }}</dd><dt>项目</dt><dd>{{ form.products?.length || 0 }} 个商品 · {{ form.milestones?.length || 0 }} 档奖励 · {{ form.prizes?.length || 0 }} 个奖位</dd><dt>开始</dt><dd>{{ formatTime(form.startAt) }}</dd><dt>结束</dt><dd>{{ formatTime(form.endAt) }}</dd><dt>领奖截止</dt><dd>{{ formatTime(form.claimEndAt) }}</dd></dl>
-          <p>{{ editorKind === 'create' || editorKind === 'copy' ? '先保存草稿，核对后再从列表开启。' : '保存配置保留原参与记录和领奖历史。' }}</p>
-        </aside>
+
       </div>
       <div class="activity-editor-footer">
         <span class="ops-muted">{{ dirty ? '有未保存的修改' : editable ? editorKind === 'create' || editorKind === 'copy' ? '草稿尚未创建' : '当前配置已保存' : '原配置与历史记录保持' }}</span>
@@ -348,10 +344,10 @@ onMounted(load);
 .activity-editor-header > .n-button { margin-left: -12px; }
 .activity-editor-title { display: flex; gap: 20px; align-items: center; margin: 12px 0 6px; }
 .activity-editor-title h1 { margin: 0; font-size: 24px; font-weight: 600; line-height: 1.4; }
-.activity-editor-layout { display: grid; grid-template-columns: 190px minmax(0, 1fr) 235px; gap: 24px; align-items: start; }
-.activity-view-layout { grid-template-columns: minmax(0, 1fr) 235px; }
+.activity-editor-layout { display: grid; grid-template-columns: 160px minmax(0, 1fr); gap: 24px; align-items: start; }
+.activity-view-layout { grid-template-columns: minmax(0, 1fr); }
 .activity-sections { display: flex; flex-direction: column; gap: 5px; position: sticky; top: 20px; }
-.activity-sections button { display: flex; flex-direction: column; gap: 6px; padding: 13px 14px; border: 0; border-radius: 7px; color: rgb(var(--base-text-color) / .65); background: transparent; text-align: left; cursor: pointer; }
+.activity-sections button { display: flex; flex-direction: column; gap: 6px; padding: 13px 14px; border: 0; border-radius: 7px; color: rgb(var(--base-text-color) / .65); background: transparent; appearance: none; text-align: left; cursor: pointer; }
 .activity-sections button:hover { background: rgb(var(--base-text-color) / .035); }
 .activity-sections button.selected { background: rgb(var(--primary-color) / .08); color: rgb(var(--primary-color)); }
 .activity-sections button:focus-visible { outline: 2px solid rgb(var(--primary-color) / .55); outline-offset: 2px; }

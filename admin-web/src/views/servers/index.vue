@@ -97,7 +97,6 @@ const columns: DataTableColumns<GameServer> = [
     <div class="ops-toolbar">
       <div>
         <div class="ops-page-label">区服管理</div>
-        <p class="ops-muted mt-8px">管理名称、开服日期与运营状态，进入对应区服安排活动和管理玩家。</p>
       </div>
       <NSpace>
         <NButton :loading="scope.loading" @click="scope.loadServers">刷新</NButton>
@@ -105,7 +104,7 @@ const columns: DataTableColumns<GameServer> = [
       </NSpace>
     </div>
     <NAlert v-if="scope.error" type="error" :title="scope.error" />
-    <NAlert type="info" title="新建区服可以提前编排活动；部署并绑定游戏服务后，才能开放玩家进入。" />
+    <p class="ops-inline-note">待部署区服可提前安排活动，绑定游戏服务后才能开放登录。</p>
     <NCard :bordered="false" class="ops-panel">
       <NInput v-model:value="search" placeholder="搜索区服名称或编号" clearable class="mb-20px max-w-360px" />
       <NDataTable

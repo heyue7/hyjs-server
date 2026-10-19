@@ -194,12 +194,9 @@ select {
 2. Remove default button styles.
 */
 
-button,
-[type='button'],
-[type='reset'],
-[type='submit'] {
+:where(button, [type='button'], [type='reset'], [type='submit']) {
   -webkit-appearance: button; /* 1 */
-  /* background-color: transparent;  */
+  background-color: transparent;
   background-image: none; /* 2 */
 }
 

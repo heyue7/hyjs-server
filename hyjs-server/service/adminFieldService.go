@@ -21,7 +21,10 @@ import (
 // InitializeAdminFields creates independent operations tables and preserves source tables.
 func (s *GameService) InitializeAdminFields(ctx context.Context) error {
 	tx := db.GetIns().WithContext(ctx)
-	if err := tx.AutoMigrate(&db.AdminFieldTemplate{}, &db.AdminFieldDeployment{}, &db.AdminFieldBattleSnapshot{}); err != nil {
+	if err := tx.AutoMigrate(&db.AdminFieldTemplate{}, &db.AdminFieldDeployment{}, &db.AdminFieldBattleSnapshot{}, &db.AdminFieldChannel{}, &db.AdminFieldChannelActivation{}); err != nil {
+		return err
+	}
+	if err := s.initializeAdminFieldChannelPolicy(ctx); err != nil {
 		return err
 	}
 	for _, row := range s.Tables["Field"] {
@@ -39,7 +42,7 @@ func (s *GameService) InitializeAdminFields(ctx context.Context) error {
 	return nil
 }
 func (s *GameService) adminFieldName(scene string) string {
-	names := map[string]string{"field_001": "森林野外", "field_002": "雪原野外", "field_003": "野外三区", "field_004": "野外四区", "field_005": "野外五区", "field_006": "野外六区"}
+	names := map[string]string{"field_001": "森林野外", "field_002": "雪原野外", "field_003": "沙漠野外", "field_004": "夜森林野外", "field_005": "火山野外", "field_006": "峡谷野外"}
 	if names[scene] != "" {
 		return names[scene]
 	}
@@ -182,7 +185,7 @@ func (s *GameService) AdminFields(ctx context.Context, actor *model.AdminPrincip
 	if err := tx.Order("scene,id").Find(&rows).Error; err != nil {
 		return nil, err
 	}
-	out := &model.AdminFieldListResponse{Items: []model.AdminFieldTemplateDTO{}, Resources: []model.AdminFieldResource{}}
+	out := &model.AdminFieldListResponse{Items: []model.AdminFieldTemplateDTO{}, Resources: []model.AdminFieldResource{}, Presentation: s.adminFieldPresentation()}
 	if s.AdminCatalogueData != nil {
 		for _, item := range s.AdminCatalogueData.Items {
 			kinds := []string{}

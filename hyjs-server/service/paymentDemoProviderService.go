@@ -17,11 +17,11 @@ func (s *GameService) autoConfirmDemoPaymentAt(ctx context.Context, order *db.Pa
 		return order, nil
 	}
 	var owner db.Profile
-	if err := db.GetIns().WithContext(ctx).Select("id", "uid", "player").First(&owner, order.PlayerID).Error; err != nil {
+	if err := db.GetIns().WithContext(ctx).Select("id", "uid", "player", "account_id", "account_auth_revision").First(&owner, order.PlayerID).Error; err != nil {
 		return nil, err
 	}
 	// The enabled local wallet covers all created accounts; account 1 stays protected.
-	if !walletAccountOwner(&owner) {
+	if !walletAccountOwner(db.GetIns().WithContext(ctx), &owner) {
 		return order, nil
 	}
 	trusted := context.WithValue(ctx, constUtil.P3TestPaymentContextKey, true)

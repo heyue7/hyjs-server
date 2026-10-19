@@ -80,7 +80,7 @@ onMounted(load);
 <template>
   <div>
     <div class="ops-toolbar mb-20px">
-      <span class="ops-muted">游戏内添加余额时按权重抽取，历史账单保留当时的理由。</span>
+      <span class="ops-muted">添加余额时，在对应金额范围内随机选取理由。</span>
       <NButton :loading="loading" @click="load">刷新</NButton>
     </div>
     <NAlert v-if="error" type="error" :title="error" class="mb-20px" />

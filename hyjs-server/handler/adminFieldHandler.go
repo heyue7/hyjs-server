@@ -17,6 +17,8 @@ func RegisterAdminFieldRoutes(a *gin.RouterGroup) {
 	a.DELETE("/fields/templates", AdminFieldDeleteHandler)
 	a.GET("/fields/deployments", AdminFieldDeploymentsHandler)
 	a.PUT("/fields/deployments", AdminFieldDeployHandler)
+	a.GET("/fields/channels", AdminFieldChannelsHandler)
+	a.PUT("/fields/channels", AdminFieldChannelSaveHandler)
 }
 
 // AdminFieldListHandler returns global reusable map-resource schemes.
@@ -274,4 +276,62 @@ func AdminFieldDeployHandler(c *gin.Context) {
 		return
 	}
 	adminSuccess(c, v)
+}
+
+// AdminFieldChannelsHandler returns original line capacities and authorized online counts.
+// @Summary 野外分线
+// @Description 返回所选区服各地图的线路和在线人数
+// @Tags Admin
+// @Accept json
+// @Produce json
+// @Param serverId query int true "区服编号"
+// @Success 200 {object} model.AdminFieldChannelsResponse
+// @Router /admin/api/fields/channels [get]
+func AdminFieldChannelsHandler(c *gin.Context) {
+	id, err := strconv.ParseInt(c.Query("serverId"), 10, 64)
+	if err != nil || id < 1 {
+		adminError(c, constUtil.ErrAdminInput)
+		return
+	}
+	if err = service.AdminRequireGameServer(c.Request.Context(), id); err != nil {
+		adminError(c, err)
+		return
+	}
+	result, err := gameService.AdminFieldChannels(c.Request.Context(), adminPrincipal(c), id)
+	if err != nil {
+		adminError(c, err)
+		return
+	}
+	adminSuccess(c, result)
+}
+
+// AdminFieldChannelSaveHandler validates and saves one map's original line limits.
+// @Summary 保存野外分线
+// @Description 不会关闭仍有在线角色的线路
+// @Tags Admin
+// @Accept json
+// @Produce json
+// @Param body body model.AdminFieldChannelSaveRequest true "分线设置"
+// @Success 200 {object} model.AdminFieldChannelsResponse
+// @Router /admin/api/fields/channels [put]
+func AdminFieldChannelSaveHandler(c *gin.Context) {
+	var req model.AdminFieldChannelSaveRequest
+	if c.ShouldBindJSON(&req) != nil || req.ServerID < 1 || !constUtil.P8OriginalFieldScene(req.Scene) || req.LineCount < 1 || req.LineCount > 32 || req.MaxPlayers < 1 || req.MaxPlayers > 1000 || req.Version != "" && len(req.Version) != 64 {
+		adminError(c, constUtil.ErrAdminInput)
+		return
+	}
+	if !constUtil.P8PackagedFieldScene(req.Scene) {
+		adminError(c, constUtil.ErrAdminInput)
+		return
+	}
+	if err := service.AdminRequireGameServer(c.Request.Context(), req.ServerID); err != nil {
+		adminError(c, err)
+		return
+	}
+	result, err := gameService.AdminSaveFieldChannels(c.Request.Context(), adminPrincipal(c), req)
+	if err != nil {
+		adminError(c, err)
+		return
+	}
+	adminSuccess(c, result)
 }

@@ -6,12 +6,14 @@
 
 ## 功能范围
 
-- 账号注册、登录、角色存档与新手引导协议。
+- 全局账号注册、登录、昵称及密码管理，各区服独立角色存档与新手引导协议。
 - 人物、装备饰品、精灵、宝石、料理及相关养成结算。
 - 主线、副本、试炼、精英、远征和已恢复的战斗结算。
 - 抽卡、商店、转盘、活动、礼包与会员配置。
 - 蓝绿钱包：测试余额、充值订单、收支账本和账单。
-- 运营后台：用户、道具、活动、各类商店、成就、称号、公告和客服反馈。
+- 运营后台：全局用户、区服玩家、道具、活动、各类商店、成就、称号、公告和客服反馈。
+- 新玩家相对排期与固定日期排期，开服任务按区服自然日解锁、保留每个角色完整参与时长。
+- 野外整组资源方案及区服分线管理，缺失场景保持暂未开放。
 
 蓝绿钱包用于本项目内的模拟体验，不接入实际收款渠道。未恢复的资源与运营投放仍需单独配置。
 
@@ -65,6 +67,7 @@ go run . --env dev
 | 配置 | 用途 |
 | --- | --- |
 | `HYJS_MYSQL_HOST / USER / PASSWORD / DATABASE` | MySQL 连接 |
+| `HYJS_GAME_ACCOUNTS_DATABASE` | 同一 MySQL 实例的共享账号/钱包库，可选，默认当前角色库 |
 | `HYJS_GAME_BIND` | 监听接口 |
 | `HYJS_GAME_ADVERTISE_HOST` | 原协议公布给客户端的地址 |
 | `HYJS_GAME_HTTP_PORT / TCP_PORT` | 游戏 HTTP / TCP 端口 |
@@ -72,6 +75,8 @@ go run . --env dev
 | `HYJS_CORS_ORIGINS` | 精确允许的浏览器来源，以逗号分隔 |
 | `HYJS_ADMIN_ASSETS` | 编译后的后台静态目录 |
 | `HYJS_ADMIN_BOOTSTRAP_FILE` | 首次建立管理员所用的私有 JSON 文件 |
+
+共享账号库须事先创建，并给各区服数据库用户授予所需权限；各区服角色库仍独立。该选项要求共享库与角色库位于同一 MySQL 实例，以保持钱包扣款和充值结算的事务一致性。
 
 更多配置见 [Go 配置模板](hyjs-server/config.example.yaml) 和 [配置加载实现](hyjs-server/config/config.go)。默认没有公开的管理员密码。首次初始化使用的 JSON 格式为 `{"username":"your-admin","password":"your-own-strong-password"}`，文件权限必须为 `0600`；通过 `HYJS_ADMIN_BOOTSTRAP_FILE` 指定其绝对路径。已有管理员时不会覆盖其账号。
 

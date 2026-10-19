@@ -328,7 +328,7 @@ func (s *GameService) confirmTestPaymentAt(ctx context.Context, orderID, eventID
 	var order db.PaymentOrder
 	hash := p3Hash([]byte(fmt.Sprintf("%s|%d|%s", orderID, cents, outcome)))
 	err := s.p3Profile(ctx, initial.PlayerID, func(tx *gorm.DB, row *db.Profile, p *pb.Player, g *model.GameState) error {
-		if !walletAccountOwner(row) || (ctx.Value(constUtil.LocalWalletPaymentContextKey) != true && !strings.HasPrefix(row.Uid, "demo-")) {
+		if !walletAccountOwner(tx, row) || (ctx.Value(constUtil.LocalWalletPaymentContextKey) != true && !strings.HasPrefix(row.Uid, "demo-")) {
 			return p3Error()
 		}
 		if ctx.Value(constUtil.LocalWalletAPIContextKey) == true && !localWalletSessionAllowed(ctx, row) {

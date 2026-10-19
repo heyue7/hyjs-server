@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, h, ref, watch } from 'vue';
+import { computed, h, onBeforeUnmount, ref, watch } from 'vue';
 import { NTag } from 'naive-ui';
 import type { DataTableColumns } from 'naive-ui';
 import { api, errorMessage, formatTime } from '@/service/operations';
@@ -7,7 +7,7 @@ import { useServerScopeStore } from '@/store/modules/server-scope';
 import { money } from '@/service/wallet-operations';
 import type { WalletLedger, WalletLedgerItem } from '@/service/wallet-operations';
 const scope = useServerScopeStore();
-const props = defineProps<{ playerId: number }>();
+const props = defineProps<{ playerId?: number; accountId?: number }>();
 const loading = ref(false);
 const error = ref('');
 const data = ref<WalletLedger | null>(null);
@@ -21,7 +21,9 @@ const kindOptions = [
   { label: '充值支出', value: 'payment' }
 ];
 const rangeLabel = computed(() =>
-  data.value ? `${formatTime(data.value.summary.startAt)} 至 ${formatTime(data.value.summary.endAt)}` : ''
+  data.value?.summary.startAt && data.value.summary.endAt
+    ? `${formatTime(data.value.summary.startAt)} 至 ${formatTime(data.value.summary.endAt)}`
+    : ''
 );
 async function load() {
   generation += 1;
@@ -38,7 +40,17 @@ async function load() {
     params.set('endAt', String(range.value[1]));
   }
   try {
-    const result = await api<WalletLedger>(scope.serverQuery(`/wallets/${props.playerId}/ledger?${params}`));
+    let result: WalletLedger;
+    if (props.accountId) {
+      const ledger = await api<Omit<WalletLedger, 'items'> & { entries: WalletLedgerItem[] | null }>(
+        `/game-accounts/${props.accountId}/wallet?${params}`
+      );
+      if (!('entries' in ledger)) throw new Error('钱包账单数据不完整，请刷新重试');
+      result = { ...ledger, items: ledger.entries || [] };
+    } else {
+      if (!props.playerId) throw new Error('请先选择钱包所属用户');
+      result = await api<WalletLedger>(scope.serverQuery(`/wallets/${props.playerId}/ledger?${params}`));
+    }
     if (seq === generation) data.value = result;
   } catch (e) {
     if (seq === generation) error.value = errorMessage(e);
@@ -62,7 +74,7 @@ const columns: DataTableColumns<WalletLedgerItem> = [
     render: row =>
       h('div', [
         h('strong', row.label),
-        h('div', { class: 'ops-muted ops-mono' }, row.orderId || row.reasonId || String(row.id))
+        ...(row.orderId ? [h('div', { class: 'ops-muted' }, `订单 ${row.orderId}`)] : [])
       ])
   },
   {
@@ -85,7 +97,7 @@ const columns: DataTableColumns<WalletLedgerItem> = [
   { title: '时间（北京）', key: 'createdAt', width: 185, render: row => formatTime(row.createdAt) }
 ];
 watch(
-  () => props.playerId,
+  () => [props.accountId, props.playerId, props.accountId ? null : scope.serverId],
   () => {
     data.value = null;
     page.value = 1;
@@ -95,6 +107,7 @@ watch(
   },
   { immediate: true }
 );
+onBeforeUnmount(() => { generation += 1; });
 </script>
 
 <template>

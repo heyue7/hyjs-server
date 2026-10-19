@@ -10,6 +10,8 @@ import (
 
 // GameConfig 定义本地兼容服监听地址、存档和 APK 配置表来源。
 type GameConfig struct {
+	// AccountsDatabase optionally selects a pre-created shared identity schema on the same MySQL instance; empty uses the realm database.
+	AccountsDatabase string `mapstructure:"accountsDatabase"`
 	// ServerID 来自部署配置，标识该独立存档区服；客户端不能修改。
 	ServerID      int64  `mapstructure:"serverId"`
 	Bind          string `mapstructure:"bind"`
@@ -118,6 +120,7 @@ func Init(env string) error {
 
 // environmentBindings 公开变量名合同；实际部署值只保存在私有 YAML 或进程环境中。
 var environmentBindings = map[string]string{
+	"game.accountsDatabase":         "HYJS_GAME_ACCOUNTS_DATABASE",
 	"game.serverId":                 "HYJS_GAME_SERVER_ID",
 	"game.bind":                     "HYJS_GAME_BIND",
 	"game.advertiseHost":            "HYJS_GAME_ADVERTISE_HOST",

@@ -1,0 +1,75 @@
+package model
+
+// GameAccountDTO exposes the global identity without credential or session bytes.
+type GameAccountDTO struct {
+	PasswordChanged bool                 `json:"passwordChanged,omitempty"` // PasswordChanged confirms a successful self-service credential update.
+	ID              int64                `json:"id"`                        // ID is the global account ID.
+	Username        string               `json:"username"`                  // Username is the case-sensitive login name.
+	Nickname        string               `json:"nickname"`                  // Nickname is separate from all realm character names.
+	Protected       bool                 `json:"protected"`                 // Protected identifies the inherited protected historical account.
+	Enabled         bool                 `json:"enabled"`                   // Enabled=false rejects authentication and existing sessions.
+	CreatedAt       int64                `json:"createdAt"`                 // CreatedAt is real Unix milliseconds.
+	Version         string               `json:"version"`                   // Version protects admin concurrent changes.
+	Players         []GameAccountRoleDTO `json:"players"`                   // Players indexes actual roles in their owning runtimes.
+}
+
+// GameAccountRoleDTO indexes a real server role; details remain owned by that server.
+type GameAccountRoleDTO struct {
+	ServerID int64  `json:"serverId"` // 所属真实运行区服编号。
+	PlayerID int64  `json:"playerId"` // 当前区服的角色编号。
+	Name     string `json:"name"`     // 当前区服的角色名。
+	Level    int64  `json:"level"`    // 关联角色的当前等级。
+}
+
+// AdminGameAccountsResponse is a global identity page.
+type AdminGameAccountsResponse struct {
+	Items []GameAccountDTO `json:"items"` // 本页真实账号列表。
+	Total int64            `json:"total"` // 符合筛选的账号总数。
+}
+
+// AdminGameAccountCreateRequest creates a global identity without inventing a realm role.
+type AdminGameAccountCreateRequest struct {
+	Username        string `json:"username" binding:"required"`        // 区分大小写的登录账号，新增时3至32位字母数字下划线或短横线。
+	Password        string `json:"password" binding:"required"`        // 新密码，至少6字符且最多72字节，绝不返回。
+	ConfirmPassword string `json:"confirmPassword" binding:"required"` // 与新密码完全相同的确认值。
+	Nickname        string `json:"nickname" binding:"required"`        // 全局账号昵称，1至24个可见字符，与角色名独立。
+	Reason          string `json:"reason" binding:"required"`          // 本次后台操作的审计原因。
+}
+
+// AdminGameAccountUpdateRequest edits global display and login state.
+type AdminGameAccountUpdateRequest struct {
+	Nickname string `json:"nickname" binding:"required"` // 全局账号昵称，1至24个可见字符，与角色名独立。
+	Enabled  bool   `json:"enabled"`                     // false停用登录和旧会话，true允许后续重新登录。
+	Version  string `json:"version" binding:"required"`  // 读取账号时的乐观并发版本。
+	Reason   string `json:"reason" binding:"required"`   // 本次后台操作的审计原因。
+}
+
+// AdminGameAccountPasswordRequest resets a global account password with an audit reason.
+type AdminGameAccountPasswordRequest struct {
+	Password        string `json:"password" binding:"required"`        // 新密码，至少6字符且最多72字节，绝不返回。
+	ConfirmPassword string `json:"confirmPassword" binding:"required"` // 与新密码完全相同的确认值。
+	Version         string `json:"version" binding:"required"`         // 读取账号时的乐观并发版本。
+	Reason          string `json:"reason" binding:"required"`          // 本次后台操作的审计原因。
+}
+
+// GameAccountProfileRequest authorizes a global identity through the current real role session.
+type GameAccountProfileRequest struct {
+	PlayerID   int64  `json:"playerId" binding:"required"`   // 当前区服的角色编号。
+	SessionHex string `json:"sessionHex" binding:"required"` // 当前角色的16字节会话，以32位十六进制传入。
+}
+
+// GameAccountNicknameRequest changes only the global nickname.
+type GameAccountNicknameRequest struct {
+	PlayerID   int64  `json:"playerId" binding:"required"`   // 当前区服的角色编号。
+	SessionHex string `json:"sessionHex" binding:"required"` // 当前角色的16字节会话，以32位十六进制传入。
+	Nickname   string `json:"nickname" binding:"required"`   // 全局账号昵称，1至24个可见字符，与角色名独立。
+}
+
+// GameAccountPasswordRequest verifies the old password before changing the global credential.
+type GameAccountPasswordRequest struct {
+	PlayerID        int64  `json:"playerId" binding:"required"`        // 当前区服的角色编号。
+	SessionHex      string `json:"sessionHex" binding:"required"`      // 当前角色的16字节会话，以32位十六进制传入。
+	OldPassword     string `json:"oldPassword" binding:"required"`     // 用户当前原密码，只用于验证，不保存明文。
+	Password        string `json:"password" binding:"required"`        // 新密码，至少6字符且最多72字节，绝不返回。
+	ConfirmPassword string `json:"confirmPassword" binding:"required"` // 与新密码完全相同的确认值。
+}

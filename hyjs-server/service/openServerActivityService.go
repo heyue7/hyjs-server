@@ -94,7 +94,7 @@ func loadOpenServerRule(tx *gorm.DB) (*db.OpenServerActivityRule, error) {
 		return nil, err
 	}
 	local := time.UnixMilli(cfg.StartAt).In(time.FixedZone("UTC+8", 8*3600))
-	if local.Hour() != 0 || local.Minute() != 0 || local.Second() != 0 || local.Nanosecond() != 0 || cfg.EndAt-cfg.StartAt != 14*24*3600000 || cfg.RewardEndAt < cfg.EndAt {
+	if local.Hour() != 0 || local.Minute() != 0 || local.Second() != 0 || local.Nanosecond() != 0 || cfg.EndAt <= cfg.StartAt || cfg.EndAt-cfg.StartAt > 366*24*3600000 || cfg.RewardEndAt < cfg.EndAt || cfg.RewardEndAt-cfg.EndAt > 90*24*3600000 {
 		return nil, errors.New("开服活动SQL时间窗无效")
 	}
 	return &cfg, nil
@@ -137,10 +137,16 @@ func openServerPurchase(kind int32) bool {
 }
 func openServerChoice(kind int32) bool { return kind == 28 || kind == 100 || kind == 107 }
 func openServerDay(cfg *db.OpenServerActivityRule, now time.Time) int32 {
-	if now.UnixMilli() < cfg.StartAt {
+	// Unlocks follow realm natural days; participation expiry keeps the role's
+	// own StartAt/EndAt, so joining late never loses configured duration.
+	start := cfg.StartAt
+	if cfg.UnlockStartAt > 0 {
+		start = cfg.UnlockStartAt
+	}
+	if now.UnixMilli() < start {
 		return 0
 	}
-	day := int32((now.UnixMilli()-cfg.StartAt)/(24*3600000)) + 1
+	day := int32((now.UnixMilli()-start)/(24*3600000)) + 1
 	if day > 14 {
 		day = 14
 	}
@@ -526,7 +532,7 @@ func (s *GameService) openServerActivityAt(ctx context.Context, id int64, reques
 					seen[task.OpenDay] = true
 				}
 			}
-			result = &pb.SCOpenServerActivity{ActivityEndTime: proto.Int64(cfg.EndAt), GetRewardEndTime: proto.Int64(cfg.RewardEndAt), CurrentDay: proto.Int32(currentDay), Days: days}
+			result = &pb.SCOpenServerActivity{ActivityEndTime: proto.Int64(cfg.EndAt), GetRewardEndTime: proto.Int64(cfg.RewardEndAt), CurrentDay: proto.Int32(min(currentDay, req.GetDayType())), Days: days}
 		case *pb.CSNewOpenSevenDayByTitle:
 			if req.GetDay() < 1 || req.GetDay() > currentDay || req.GetTap() < 1 || req.GetTap() > 4 {
 				return errors.New("开服活动日期或页签尚未开放")
@@ -848,9 +854,13 @@ func (s *GameService) openServerOpenStatesAt(ctx context.Context, id int64, now 
 	}
 	seven, fourteen := int32(0), int32(0)
 	if cfg.Enabled && now.UnixMilli() >= cfg.StartAt && now.UnixMilli() < cfg.RewardEndAt {
-		if openServerDay(cfg, now) <= 7 {
+		// Late joiners retain the first seven-day entrance as well as every
+		// later unlocked tier for their full individual participation window.
+		day := openServerDay(cfg, now)
+		if day > 0 {
 			seven = 1
-		} else {
+		}
+		if day >= 8 {
 			fourteen = 1
 		}
 	}

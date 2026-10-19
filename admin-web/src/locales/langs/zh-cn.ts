@@ -1,6 +1,6 @@
 const local: App.I18n.Schema = {
   system: {
-    title: '黑衣剑士运营台',
+    title: '灵魂之花运营台',
     updateTitle: '系统版本更新通知',
     updateContent: '检测到系统有新版本发布，是否立即刷新页面？',
     updateConfirm: '立即刷新',
@@ -230,7 +230,8 @@ const local: App.I18n.Schema = {
     announcements: '公告管理',
     audit: '操作审计',
     users: '后台账号',
-    players: '游戏玩家',
+    'game-accounts': '用户管理',
+    players: '玩家管理',
     wallets: '蓝绿钱包',
     'activities-unavailable': '不可用活动',
     'shops': '商店管理',

@@ -14,6 +14,8 @@ import ActivityPrizes from './activity-prizes.vue';
 import ActivityOptions from './activity-options.vue';
 import ActivitySummary from './activity-summary.vue';
 
+const props = defineProps<{ inline?: boolean }>();
+const emit = defineEmits<{ saved: [definition: ActivityDefinition]; closed: [] }>();
 const { canWrite, loading, error, run } = useOperations();
 const definitions = ref<ActivityDefinition[]>([]);
 const modes = ref<ActivityMode[]>([]);
@@ -79,7 +81,7 @@ async function load() {
       supportsProducts: false,
       supportsMilestones: false,
       supportsPrizes: false,
-      notes: '复用原249项开服任务及奖励。每个角色仍从自己的第1天开始；区服排期只控制入口开放，不重置已有领取记录。'
+      notes: '任务按区服开服自然日解锁，角色保留完整配置时长。'
     }
   ];
 }
@@ -126,7 +128,10 @@ function confirmDiscard(): Promise<boolean> {
   });
 }
 async function close() {
-  if (!saving.value && (await confirmDiscard())) editorOpen.value = false;
+  if (!saving.value && (await confirmDiscard())) {
+    editorOpen.value = false;
+    emit('closed');
+  }
 }
 async function save() {
   if (!form.value || readOnly.value || saving.value) return;
@@ -138,7 +143,7 @@ async function save() {
   saving.value = true;
   saveError.value = '';
   try {
-    await api<ActivityDefinition>(
+    const saved = await api<ActivityDefinition>(
       selected.value ? `/activity-templates/${selected.value.id}` : '/activity-templates',
       json(selected.value ? 'PUT' : 'POST', {
         name: form.value.name.trim(),
@@ -149,7 +154,9 @@ async function save() {
         version: selected.value?.version || ''
       })
     );
-    window.$message?.success('全局活动设置已保存；已发布排期保持原规则');
+    window.$message?.success('活动设置已保存');
+    emit('saved', saved);
+    emit('closed');
     editorOpen.value = false;
     await load();
   } catch (e) {
@@ -159,7 +166,7 @@ async function save() {
   }
 }
 const columns = computed<DataTableColumns<ActivityDefinition>>(() => [
-  { title: '全局活动', key: 'name', minWidth: 240, render: row => h('strong', row.name) },
+  { title: '活动', key: 'name', minWidth: 240, render: row => h('strong', row.name) },
   { title: '模式', key: 'mode', width: 155, render: row => modeMap.value.get(row.mode)?.label || '暂未适配' },
   {
     title: '可排期',
@@ -176,7 +183,7 @@ const columns = computed<DataTableColumns<ActivityDefinition>>(() => [
     minWidth: 200,
     render: row =>
       availability.value === 'usable'
-        ? `${row.defaultDays}天 · 领奖宽限${row.claimDays}天`
+        ? `${row.defaultDays}天${row.claimDays ? ` · 另留${row.claimDays}天领奖` : ''}`
         : row.availability.reason || '尚无完整原消费者'
   },
   {
@@ -201,7 +208,12 @@ function beforeUnload(event: BeforeUnloadEvent) {
     event.returnValue = '';
   }
 }
-onBeforeRouteLeave(() => (saving.value ? false : confirmDiscard()));
+async function openFromSchedule(row: ActivityDefinition, view = false) {
+  if (!modes.value.length) await load();
+  openEditor(row, view);
+}
+defineExpose({ openFromSchedule, confirmDiscard, saving, dirty });
+onBeforeRouteLeave(() => props.inline ? true : saving.value ? false : confirmDiscard());
 onMounted(() => {
   window.addEventListener('beforeunload', beforeUnload);
   load();
@@ -210,12 +222,11 @@ onUnmounted(() => window.removeEventListener('beforeunload', beforeUnload));
 </script>
 
 <template>
-  <div class="ops-page template-workspace">
-    <template v-if="!editorOpen">
+  <div class="ops-page template-workspace" :class="{ 'template-inline': inline }">
+    <template v-if="!editorOpen && !inline">
       <div class="ops-toolbar mb-20px">
         <div>
           <h1>活动设置</h1>
-          <p class="ops-muted">全局模板库 · 奖励、资格和原美术资源统一设置；开放日期在区服活动排期中管理。</p>
         </div>
         <NSpace>
           <NButton :loading="loading" @click="load">刷新</NButton>
@@ -253,17 +264,13 @@ onUnmounted(() => window.removeEventListener('beforeunload', beforeUnload));
     <template v-else-if="form">
       <div class="ops-toolbar mb-20px">
         <div>
-          <NButton quaternary @click="close">← 返回模板库</NButton>
+          <NButton v-if="!inline" quaternary @click="close">← 返回模板库</NButton>
           <h1>{{ selected?.name || '新建活动模板' }}</h1>
         </div>
         <NTag :bordered="false">全局设置</NTag>
       </div>
       <NAlert v-if="saveError" type="error" :title="saveError" class="mb-16px" />
-      <NAlert
-        type="info"
-        title="模板供所有区服复用。保存仅影响今后新增的排期，已发布和已领取内容保留。"
-        class="mb-20px"
-      />
+      <p class="template-context">修改供后续排期使用，已发布活动保持原配置。</p>
       <div class="template-editor">
         <nav aria-label="活动模板编辑分区">
           <button
@@ -300,7 +307,7 @@ onUnmounted(() => window.removeEventListener('beforeunload', beforeUnload));
                   object-fit="contain"
                 />
               </div>
-              <NAlert v-if="selectedMode?.notes" type="info" :title="selectedMode.notes" class="mb-20px" />
+              <p v-if="selectedMode?.notes" class="template-help">{{ selectedMode.notes }}</p>
               <div class="template-durations">
                 <NFormItem label="默认活动天数">
                   <NInputNumber v-model:value="defaultDays" :min="1" :max="366" />
@@ -341,7 +348,7 @@ onUnmounted(() => window.removeEventListener('beforeunload', beforeUnload));
               <NAlert
                 v-else-if="form.mode === 'opening-14'"
                 type="info"
-                title="沿用原249项开服任务及原奖励、前7天与14天阶段，不生成新的奖励获取渠道。"
+                title="沿用客户端249项任务与奖励。"
               />
               <ActivityOptions
                 v-else
@@ -355,7 +362,7 @@ onUnmounted(() => window.removeEventListener('beforeunload', beforeUnload));
               <NAlert
                 v-if="form.mode === 'opening-14'"
                 type="info"
-                title="每角色从自己的第1天开始，服排期控制入口开放。重复排期开服任务不会重置已领取记录。"
+                title="任务解锁按区服开服日期，有效期按角色独立起算；已领记录保持。"
               />
               <ActivityOptions
                 v-else
@@ -370,9 +377,9 @@ onUnmounted(() => window.removeEventListener('beforeunload', beforeUnload));
         </NCard>
       </div>
       <div class="template-footer">
-        <span class="ops-muted">{{ dirty ? '有未保存的修改' : '全局模板 · 日期独立在各服排期设置' }}</span>
+        <span class="ops-muted">{{ dirty ? '未保存' : '开放日期在活动排期中设置' }}</span>
         <NSpace>
-          <NButton :disabled="saving" @click="close">返回</NButton>
+          <NButton :disabled="saving" @click="close">{{ inline ? '取消' : '返回' }}</NButton>
           <NButton v-if="!readOnly" type="primary" :loading="saving" @click="save">保存活动设置</NButton>
         </NSpace>
       </div>
@@ -381,6 +388,12 @@ onUnmounted(() => window.removeEventListener('beforeunload', beforeUnload));
 </template>
 
 <style scoped>
+.template-inline { padding: 0; }
+.template-inline h1 { font-size: 18px; }
+.template-context, .template-help { color: rgb(var(--base-text-color) / .65); font-size: 13px; line-height: 1.7; margin: 0 0 20px; }
+.template-editor nav button:hover { background: rgb(var(--base-text-color) / .04); }
+.template-editor nav button:focus-visible { outline: 2px solid rgb(var(--primary-color)); outline-offset: 2px; }
+
 h1 {
   margin: 4px 0 8px;
   font-size: 22px;
@@ -399,7 +412,8 @@ h1 {
 .template-editor nav button {
   border: 0;
   background: transparent;
-  padding: 14px;
+  appearance: none;
+  padding: 12px 14px;
   text-align: left;
   color: inherit;
   cursor: pointer;

@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { watch } from 'vue';
 import RewardList from './reward-list.vue';
-import ResourceSelect from './resource-select.vue';
 const options = defineModel<Record<string, any>>({ required: true });
 const props = defineProps<{ mode: string; disabled?: boolean; fixedValues?: Record<string, string | number> }>();
 watch(
@@ -45,7 +44,6 @@ const fixedLabels: Record<string, string> = {
 };
 const turntableNumbers = [
   { key: 'scorePerDraw', label: '每次抽取积分' },
-  { key: 'advancePlaces', label: '进阶奖名次范围' },
   { key: 'initialDiamondPool', label: '初始大奖钻石池' }
 ];
 </script>
@@ -220,18 +218,7 @@ const turntableNumbers = [
           </NFormItem>
         </NGi>
       </NGrid>
-      <NFormItem label="榜首奖励">
-        <div class="resource-cost-line">
-          <ResourceSelect v-model:value="options.topPrize.resourceId" :disabled="disabled" />
-          <NInputNumber v-model:value="options.topPrize.amount" :min="0" :precision="0" :disabled="disabled" />
-        </div>
-      </NFormItem>
-      <NFormItem label="进阶排名奖励">
-        <div class="resource-cost-line">
-          <ResourceSelect v-model:value="options.advancePrize.resourceId" :disabled="disabled" />
-          <NInputNumber v-model:value="options.advancePrize.amount" :min="0" :precision="0" :disabled="disabled" />
-        </div>
-      </NFormItem>
+      <p class="ops-muted">库存、钻石大奖池和抽取记录按角色独立计算。</p>
     </template>
     <template v-if="Array.isArray(options.discounts)">
       <div class="ops-section-heading">
@@ -252,5 +239,9 @@ const turntableNumbers = [
         <NButton quaternary :disabled="disabled" @click="options.discounts.splice(index, 1)">移除</NButton>
       </div>
     </template>
+    <p
+      v-if="!['stamina-meal', 'diamond-rebate', 'treasure-box', 'turntable'].includes(mode) && !Array.isArray(options.discounts) && !Object.keys(fixedValues || {}).length"
+      class="ops-inline-note"
+    >该模式按奖励与资格中的配置执行，无需额外玩法参数。</p>
   </div>
 </template>

@@ -44,6 +44,15 @@ func OpenGameMySQL(ctx context.Context, cfg MySQLConfig, applySchema bool) (*gor
 	if err == nil && applySchema && !d.Migrator().HasColumn(&Profile{}, "server_id") {
 		err = d.WithContext(ctx).Migrator().AddColumn(&Profile{}, "ServerID")
 	}
+	if err == nil && applySchema {
+		for _, column := range []struct{ name, field string }{{"account_id", "AccountID"}, {"account_auth_revision", "AccountAuthRevision"}} {
+			if !d.Migrator().HasColumn(&Profile{}, column.name) {
+				if err = d.WithContext(ctx).Migrator().AddColumn(&Profile{}, column.field); err != nil {
+					break
+				}
+			}
+		}
+	}
 	if err == nil {
 		err = validateMySQLProfiles(ctx, d)
 	}

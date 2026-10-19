@@ -27,7 +27,7 @@ func adminPlayerProjection(row db.Profile, details bool) (model.AdminGamePlayerD
 	if err != nil {
 		return model.AdminGamePlayerDTO{}, err
 	}
-	out := model.AdminGamePlayerDTO{ID: row.Id, ServerID: AdminProfileServerID(row), Name: p.GetName(), Level: int64(p.GetLevel()), Vip: int64(p.GetVip()), Chapter: g.Copy.GetCurrentChapterId(), Mission: g.Copy.GetCurrentMissionId(), Scene: g.Position.GetScene(), Version: adminPlayerVersion(row), Balances: map[string]int64{"coin": p.GetCoin(), "diamond": int64(p.GetDiamond()), "energy": int64(p.GetEnergy()), "stamina": int64(p.GetStamina()), "light": int64(p.GetLight()), "point": int64(p.GetPoint()), "popularity": int64(p.GetPopularity()), "score": int64(p.GetScore())}, Counts: map[string]int64{"characters": int64(len(g.Warriors)), "equipment": int64(len(g.Equipment)), "accessories": int64(len(g.Treasures)), "items": int64(len(g.Items)), "gems": int64(len(g.Gems)), "cooking": int64(len(g.Cooking))}}
+	out := model.AdminGamePlayerDTO{AccountID: row.AccountID, Username: row.Uid, ID: row.Id, ServerID: AdminProfileServerID(row), Name: p.GetName(), Level: int64(p.GetLevel()), Vip: int64(p.GetVip()), Chapter: g.Copy.GetCurrentChapterId(), Mission: g.Copy.GetCurrentMissionId(), Scene: g.Position.GetScene(), Version: adminPlayerVersion(row), Balances: map[string]int64{"coin": p.GetCoin(), "diamond": int64(p.GetDiamond()), "energy": int64(p.GetEnergy()), "stamina": int64(p.GetStamina()), "light": int64(p.GetLight()), "point": int64(p.GetPoint()), "popularity": int64(p.GetPopularity()), "score": int64(p.GetScore())}, Counts: map[string]int64{"characters": int64(len(g.Warriors)), "equipment": int64(len(g.Equipment)), "accessories": int64(len(g.Treasures)), "items": int64(len(g.Items)), "gems": int64(len(g.Gems)), "cooking": int64(len(g.Cooking))}}
 	if row.CreatedAt != nil {
 		out.CreatedAt = *row.CreatedAt
 	}
@@ -79,7 +79,7 @@ func AdminGamePlayers(ctx context.Context, q string, page, size int64) (*model.A
 		return nil, err
 	}
 	var rows []db.Profile
-	if err := query.Select("id", "server_id", "player", "game", "session", "created_at").Order("id DESC").Offset(int((page - 1) * size)).Limit(int(size)).Find(&rows).Error; err != nil {
+	if err := query.Select("id", "server_id", "account_id", "uid", "player", "game", "session", "created_at").Order("id DESC").Offset(int((page - 1) * size)).Limit(int(size)).Find(&rows).Error; err != nil {
 		return nil, err
 	}
 	out := &model.AdminGamePlayersResponse{Items: []model.AdminGamePlayerDTO{}, Total: total}
@@ -87,6 +87,13 @@ func AdminGamePlayers(ctx context.Context, q string, page, size int64) (*model.A
 		dto, err := adminPlayerProjection(row, false)
 		if err != nil {
 			return nil, err
+		}
+		if row.AccountID > 0 {
+			account, e := AccountForProfile(db.GetIns().WithContext(ctx), &row)
+			if e != nil {
+				return nil, e
+			}
+			dto.Nickname = account.Nickname
 		}
 		out.Items = append(out.Items, dto)
 	}
@@ -96,7 +103,7 @@ func AdminGamePlayers(ctx context.Context, q string, page, size int64) (*model.A
 // AdminGamePlayer 读取一名游戏角色的有限运营详情。
 func AdminGamePlayer(ctx context.Context, id int64) (*model.AdminGamePlayerDTO, error) {
 	var row db.Profile
-	if err := db.GetIns().WithContext(ctx).Select("id", "server_id", "player", "game", "session", "created_at").First(&row, id).Error; err != nil {
+	if err := db.GetIns().WithContext(ctx).Select("id", "server_id", "account_id", "uid", "player", "game", "session", "created_at").First(&row, id).Error; err != nil {
 		return nil, err
 	}
 	if err := AdminCheckProfileScope(ctx, row); err != nil {
@@ -105,6 +112,13 @@ func AdminGamePlayer(ctx context.Context, id int64) (*model.AdminGamePlayerDTO, 
 	dto, err := adminPlayerProjection(row, true)
 	if err != nil {
 		return nil, err
+	}
+	if row.AccountID > 0 {
+		account, e := AccountForProfile(db.GetIns().WithContext(ctx), &row)
+		if e != nil {
+			return nil, e
+		}
+		dto.Nickname = account.Nickname
 	}
 	return &dto, nil
 }
@@ -162,6 +176,10 @@ func AdminRenameGamePlayer(ctx context.Context, p *model.AdminPrincipal, id int6
 			return err
 		}
 		if err := tx.Model(&row).Updates(map[string]any{"player": string(playerJSON), "game": string(gameJSON)}).Error; err != nil {
+			return err
+		}
+		row.Player, row.Game = func() *string { v := string(playerJSON); return &v }(), func() *string { v := string(gameJSON); return &v }()
+		if err := syncGlobalAccountRole(tx, &row); err != nil {
 			return err
 		}
 		return adminAudit(tx, p, "player.rename", strconv.FormatInt(id, 10), oldName+" -> "+req.Name+"; "+req.Reason)

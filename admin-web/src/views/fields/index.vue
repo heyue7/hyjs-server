@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { onBeforeRouteLeave, useRoute } from 'vue-router';
 import { ApiError, api, errorMessage, json } from '@/service/operations';
-import type { FieldDeployment, FieldDeployments, FieldResource, FieldTemplate } from '@/service/fields';
+import type { FieldChannel, FieldDeployment, FieldDeployments, FieldPresentation, FieldResource, FieldTemplate } from '@/service/fields';
 import { useServerScopeStore } from '@/store/modules/server-scope';
 import { useOperations } from '@/composables/useOperations';
 import DropEditor from './drop-editor.vue';
@@ -14,6 +14,15 @@ const { canWrite } = useOperations();
 const mode = ref<'templates' | 'deployments'>(route.query.mode === 'deployments' ? 'deployments' : 'templates');
 const templates = ref<FieldTemplate[]>([]);
 const resources = ref<FieldResource[]>([]);
+const presentation = ref<Record<string, FieldPresentation>>({});
+const channels = ref<FieldChannel[]>([]);
+const originalChannels = ref('[]');
+const channelsEnabled = ref(false);
+const channelsDirty = computed(() => JSON.stringify(channels.value) !== originalChannels.value);
+const label = (id: string, fallback: string) => presentation.value[id]?.name || fallback;
+const icon = (id: string) => presentation.value[id]?.iconUrl || '';
+const detail = (id: string) => presentation.value[id]?.detail || '';
+
 const gatherResources = computed(() => resources.value.filter(r => r.allowedKinds.includes('gather')));
 const monsterResources = computed(() => resources.value.filter(r => r.allowedKinds.includes('monster')));
 const bossResources = computed(() => resources.value.filter(r => r.allowedKinds.includes('boss')));
@@ -37,9 +46,9 @@ const readonly = computed(() => !canWrite.value || saving.value);
 const gatherOptions = (kind: string) =>
   (cfg.value?.gatherGroups || [])
     .filter(g => g.id.includes(`group_${kind}_`))
-    .map(g => ({ label: `${kind === 'mine' ? '矿脉' : '鱼群'} · 生活等级 ${g.level} · ${g.id}`, value: g.id }));
+    .map(g => ({ label: label(g.id, `${g.level} 级${kind === 'mine' ? '矿脉' : '鱼群'}`), value: g.id, iconUrl: icon(g.id) }));
 const monsterOptions = computed(() =>
-  (cfg.value?.monsterGroups || []).map(g => ({ label: `野外怪物编队 · 等级 ${g.level} · ${g.id}`, value: g.id }))
+  (cfg.value?.monsterGroups || []).map(g => ({ label: `${label(g.id, '野外怪物')} · 等级 ${g.level}`, value: g.id, iconUrl: icon(g.id) }))
 );
 const selectedBossRewards = computed(() => cfg.value?.bossRewards.filter(r => r.level === bossLevel.value) || []);
 const bossLabels = ['参与奖励', '伤害第 11 名以后', '伤害第 4～10 名', '伤害第 2～3 名', '伤害第 1 名', '最后一击奖励'];
@@ -73,23 +82,28 @@ async function confirmLeave() {
     error.value = '正在保存或发布，请稍候再切换';
     return false;
   }
-  return !dirty.value || (await confirmAction('当前全局方案有未保存修改，确认放弃？'));
+  return !(dirty.value || channelsDirty.value) || (await confirmAction('有未保存的修改，确认放弃？'));
 }
 async function choose(row: FieldTemplate) {
-  if (dirty.value && !(await confirmAction('放弃当前方案未保存的修改？'))) return;
+  if (dirty.value && !(await confirmAction('放弃未保存的修改？'))) return;
   accept(row);
 }
 async function loadTemplates() {
-  const data = await api<{ items: FieldTemplate[]; resources: FieldResource[] }>('/fields/templates');
+  const data = await api<{ items: FieldTemplate[]; resources: FieldResource[]; presentation: Record<string, FieldPresentation> }>('/fields/templates');
   templates.value = data.items;
   resources.value = data.resources || [];
+  presentation.value = data.presentation || {};
   if (!selected.value && data.items[0]) accept(data.items[0]);
 }
 async function loadDeployments() {
   deployments.value = [];
+  channels.value = [];
+  originalChannels.value = '[]';
   if (!scope.serverId) return;
   const data = await api<FieldDeployments>(scope.serverQuery('/fields/deployments'));
   if (data.serverId === scope.serverId) deployments.value = data.items;
+  const channelData = await api<{ serverId: number; enabled: boolean; items: FieldChannel[] }>(scope.serverQuery('/fields/channels'));
+  if (channelData.serverId === scope.serverId) { channelsEnabled.value = channelData.enabled; channels.value = channelData.items; originalChannels.value = JSON.stringify(channelData.items); }
 }
 async function load() {
   loading.value = true;
@@ -122,7 +136,7 @@ async function save(asNew = false) {
     const data = await api<FieldTemplate>('/fields/templates', json('POST', body));
     accept(data);
     await loadTemplates();
-    success.value = '全局方案已保存；区服需重新发布后生效。';
+    success.value = '方案已保存，发布到区服后生效';
   } catch (e) {
     error.value = errorMessage(e);
     conflict.value = e instanceof ApiError && e.status === 409;
@@ -131,7 +145,7 @@ async function save(asNew = false) {
   }
 }
 async function remove() {
-  if (!selected.value || !(await confirmAction('删除此方案？已部署的方案会受到保护。'))) return;
+  if (!selected.value || !(await confirmAction('删除此方案？已发布到区服的方案不能删除。'))) return;
   saving.value = true;
   error.value = '';
   try {
@@ -155,7 +169,7 @@ async function deploy(row: FieldDeployment) {
   }
   if (
     !(await confirmAction(
-      `将“${template.name}”发布至 ${scope.currentServer?.name || scope.serverId}？${row.enabled ? '地图将开放。' : '地图将关闭新进入和新采集/战斗，已接受的回执保留。'}`
+      `将“${template.name}”发布至 ${scope.currentServer?.name || scope.serverId}？${row.enabled ? '地图将开放。' : '关闭后不能进入或开始新的采集与战斗，进行中的奖励仍可结算。'}`
     ))
   )
     return;
@@ -176,13 +190,26 @@ async function deploy(row: FieldDeployment) {
     );
     if (scope.serverId === serverId && data.serverId === serverId) {
       deployments.value = data.items;
-      success.value = '区服野外配置已发布，后继进入和刷新使用新方案。';
+      success.value = '已发布到当前区服';
     }
   } catch (e) {
     error.value = errorMessage(e);
   } finally {
     saving.value = false;
   }
+}
+async function saveChannels(row: FieldChannel) {
+  if (!scope.serverId || saving.value) return;
+  saving.value = true;
+  error.value = '';
+  const serverId = scope.serverId;
+  try {
+    const result = await api<{ serverId: number; items: FieldChannel[] }>('/fields/channels', json('PUT', {
+      serverId, scene: row.scene, lineCount: row.lineCount, maxPlayers: row.maxPlayers, version: row.version
+    }));
+    if (scope.serverId === serverId) { channels.value = result.items; originalChannels.value = JSON.stringify(result.items); }
+    success.value = '分线设置已保存';
+  } catch (e) { error.value = errorMessage(e); } finally { saving.value = false; }
 }
 const removeGuard = scope.addSwitchGuard(confirmLeave);
 onBeforeRouteLeave(confirmLeave);
@@ -210,12 +237,9 @@ onMounted(load);
   <div class="p-4 space-y-4">
     <div class="flex flex-wrap items-start justify-between gap-3">
       <div>
-        <h1 class="text-xl font-semibold">野外管理</h1>
-        <p class="mt-1 text-sm text-gray-500">
-          先配置完整地图资源组合，再按区服发布。每张地图同时包含场景、矿物、钓鱼、小怪与首领奖励。
-        </p>
+        <h1 class="text-lg font-semibold">野外地图</h1>
       </div>
-      <NButton :loading="loading" :disabled="saving || dirty" @click="load">刷新</NButton>
+      <NButton :loading="loading" :disabled="saving || dirty || channelsDirty" @click="load">刷新</NButton>
     </div>
     <NAlert v-if="error" type="error" closable @close="error = ''">
       {{ error }}
@@ -232,8 +256,8 @@ onMounted(load);
     </NAlert>
     <NAlert v-if="success" type="success" closable @close="success = ''">{{ success }}</NAlert>
     <NTabs v-model:value="mode" type="segment">
-      <NTab name="templates">全局 · 地图资源方案</NTab>
-      <NTab name="deployments">区服 · 野外部署</NTab>
+      <NTab name="templates">地图资源方案</NTab>
+      <NTab name="deployments">区服开放与分线</NTab>
     </NTabs>
     <template v-if="mode === 'templates'">
       <div class="field-workspace">
@@ -251,9 +275,12 @@ onMounted(load);
               "
               @click="choose(row)"
             >
-              <span class="block font-medium">{{ row.name }}</span>
+              <div class="flex items-center gap-3">
+                <NImage v-if="icon(row.configuration.scene)" :src="icon(row.configuration.scene)" width="36" height="36" object-fit="contain" @click.stop />
+                <span class="block font-medium">{{ row.name }}</span>
+              </div>
               <span class="text-xs text-gray-500">
-                {{ row.available ? '场景资源齐备' : '暂未开放 · 场景资源缺失' }}
+                {{ row.available ? '可用' : '暂未开放' }}
               </span>
             </button>
           </div>
@@ -273,14 +300,19 @@ onMounted(load);
             <NButton :disabled="readonly" @click="remove">删除</NButton>
           </div>
           <NAlert v-if="!selected.available" type="warning" class="mb-4">
-            {{ selected.unavailableReason }}。可整理资源方案，区服暂不能启用。
+            {{ selected.unavailableReason }}。可编辑方案，暂不能开放地图。
           </NAlert>
           <NTabs v-model:value="activeTab" type="line" animated>
             <NTabPane name="overview" tab="地图与规则">
               <NDescriptions :column="1" label-placement="left" bordered>
-                <NDescriptionsItem label="原地图">{{ cfg.scene }}</NDescriptionsItem>
-                <NDescriptionsItem label="场景资源">{{ cfg.sceneResource }}</NDescriptionsItem>
-                <NDescriptionsItem label="战斗资源">{{ cfg.battleResource }}</NDescriptionsItem>
+                <NDescriptionsItem label="地图">
+                  <div class="flex items-center gap-3">
+                    <NImage v-if="icon(cfg.scene)" :src="icon(cfg.scene)" width="220" height="150" object-fit="contain" />
+                    <span>{{ label(cfg.scene, '野外地图') }}</span>
+                  </div>
+                </NDescriptionsItem>
+                <NDescriptionsItem label="场景资源">{{ selected.available ? '客户端已内置' : '缺失，暂未开放' }}</NDescriptionsItem>
+                <NDescriptionsItem label="战斗场景">{{ label(cfg.scene, '野外地图') }}战斗场景</NDescriptionsItem>
               </NDescriptions>
               <NForm label-placement="left" label-width="140" class="mt-5">
                 <NFormItem label="开放等级">
@@ -288,7 +320,7 @@ onMounted(load);
                 </NFormItem>
                 <NFormItem label="允许野外 PK">
                   <NSwitch v-model:value="cfg.allowPk" :disabled="readonly" />
-                  <span class="ml-3 text-xs text-gray-500">发布后只允许本服本图 PK，保留原 25 级门槛与同屏、安全区等保护。</span>
+                  <span class="ml-3 text-xs text-gray-500">角色达到 25 级后可在同线非安全区 PK</span>
                 </NFormItem>
                 <NFormItem label="同时存在矿点">
                   <NInputNumber
@@ -307,9 +339,7 @@ onMounted(load);
                   />
                 </NFormItem>
               </NForm>
-              <NAlert type="info">
-                矿物与鱼群从原候选点无放回随机分布，按权重刷新。客户端坐标与场景资源保持原组合。
-              </NAlert>
+              <p class="text-sm text-gray-500">矿物和鱼群从候选位置随机刷新，同一轮不会占用重复位置。</p>
             </NTabPane>
             <NTabPane name="gather" tab="矿物与钓鱼">
               <NCollapse>
@@ -317,20 +347,25 @@ onMounted(load);
                   v-for="group in cfg.gatherGroups"
                   :key="group.id"
                   :name="group.id"
-                  :title="`${group.id.includes('mine') ? '矿脉' : '鱼群'} · 生活等级 ${group.level} · ${group.id}`"
                 >
+                  <template #header>
+                    <div class="flex items-center gap-3">
+                      <NImage v-if="icon(group.id)" :src="icon(group.id)" width="32" height="32" object-fit="contain" @click.stop />
+                      <div><span class="font-medium">{{ label(group.id, '采集资源') }}</span><p class="text-xs text-gray-500">{{ detail(group.id) }}</p></div>
+                    </div>
+                  </template>
                   <div class="grid grid-cols-2 mb-4 gap-3 lg:grid-cols-3">
                     <label>
                       生活等级
                       <NInputNumber v-model:value="group.level" :min="1" :max="6" :disabled="readonly" />
                     </label>
                     <label>
-                      采集时长 ms
-                      <NInputNumber v-model:value="group.gatherMs" :min="1" :max="600000" :disabled="readonly" />
+                      采集时长（秒）
+                      <NInputNumber :value="group.gatherMs / 1000" @update:value="group.gatherMs = Math.round(($event || 0) * 1000)" :min="0.001" :max="600" :precision="3" :disabled="readonly" />
                     </label>
                     <label>
-                      刷新时长 ms
-                      <NInputNumber v-model:value="group.cooldownMs" :min="1" :max="600000" :disabled="readonly" />
+                      刷新间隔（秒）
+                      <NInputNumber :value="group.cooldownMs / 1000" @update:value="group.cooldownMs = Math.round(($event || 0) * 1000)" :min="0.001" :max="600" :precision="3" :disabled="readonly" />
                     </label>
                     <label>
                       每轮次数
@@ -359,14 +394,19 @@ onMounted(load);
                   v-for="group in cfg.monsterGroups"
                   :key="group.id"
                   :name="group.id"
-                  :title="`野外怪物编队 · 等级 ${group.level} · ${group.id}`"
                 >
+                  <template #header>
+                    <div class="flex items-center gap-3">
+                      <NImage v-if="icon(group.id)" :src="icon(group.id)" width="40" height="40" object-fit="contain" @click.stop />
+                      <span class="font-medium">{{ label(group.id, '野外怪物') }}</span><span class="text-sm text-gray-500">等级 {{ group.level }}</span>
+                    </div>
+                  </template>
                   <label class="mb-4 block">
-                    重生时长 ms
+                    重生间隔（秒）
                     <NInputNumber
-                      v-model:value="group.cooldownMs"
-                      :min="1"
-                      :max="86400000"
+                      :value="group.cooldownMs / 1000" @update:value="group.cooldownMs = Math.round(($event || 0) * 1000)"
+                      :min="0.001"
+                      :max="86400" :precision="3"
                       :disabled="readonly"
                       class="mt-1 w-60"
                     />
@@ -377,15 +417,16 @@ onMounted(load);
             </NTabPane>
             <NTabPane name="boss" tab="首领与掉落">
               <div class="mb-4 flex items-center gap-3">
-                <span>显示原首领周期</span>
+                <span>开放世界首领</span>
                 <NSwitch v-model:value="cfg.bossEnabled" :disabled="readonly" />
-                <span class="text-xs text-gray-500">原首领当前出生于雪原，其他地图的该项保持备用。</span>
+                <span class="text-xs text-gray-500">世界首领出生于雪原，其余地图暂不投放。</span>
               </div>
-              <NAlert type="info" class="mb-4">
-                奖励调整只用于后继首领周期，当前已冻结周期与历史奖励保持。原首领刷新时间与战斗政策继续沿用。
-              </NAlert>
+              <div class="mb-4 flex items-center gap-3">
+                <NImage v-if="icon('boss_001')" :src="icon('boss_001')" width="48" height="48" object-fit="contain" />
+                <div><strong>{{ label('boss_001', '世界首领') }}</strong><p class="text-sm text-gray-500">奖励调整从下一轮刷新生效。</p></div>
+              </div>
               <label class="mb-4 block">
-                选择首领等级
+                首领等级
                 <NInputNumber v-model:value="bossLevel" :min="1" :max="50" class="mt-1 w-48" />
               </label>
               <NCollapse>
@@ -393,7 +434,7 @@ onMounted(load);
                   v-for="reward in selectedBossRewards"
                   :key="reward.type"
                   :name="reward.type"
-                  :title="bossLabels[reward.type] || `原奖励档 ${reward.type}`"
+                  :title="bossLabels[reward.type] || `奖励档 ${reward.type}`"
                 >
                   <DropEditor
                     v-model:value="reward.drops"
@@ -411,9 +452,7 @@ onMounted(load);
     <template v-else>
       <NAlert v-if="!scope.serverId" type="info">请先在顶部选择区服。</NAlert>
       <NCard v-else size="small" :title="`${scope.currentServer?.name || scope.serverId} · 野外部署`">
-        <p class="mb-4 text-sm text-gray-500">
-          选择全局方案后单独发布。全局修改不会自动覆盖区服，需再次发布；采集中和战斗中的已接受结果保持。
-        </p>
+        <p class="mb-4 text-sm text-gray-500">每张地图独立发布。修改资源方案后，需要重新发布到区服。</p>
         <div class="space-y-4">
           <div
             v-for="row in deployments"
@@ -421,6 +460,7 @@ onMounted(load);
             class="border border-gray-200 rounded p-4 dark:border-gray-700"
           >
             <div class="mb-3 flex flex-wrap items-center gap-3">
+              <NImage v-if="icon(row.scene)" :src="icon(row.scene)" width="40" height="40" object-fit="contain" />
               <strong>{{ row.name }}</strong>
               <NTag :type="row.available ? 'success' : 'warning'">
                 {{ row.available ? '资源齐备' : '暂未开放 · 场景缺失' }}
@@ -440,6 +480,17 @@ onMounted(load);
               <NSwitch v-model:value="row.enabled" :disabled="readonly || !row.available" />
               <span>{{ row.enabled ? '开放' : '关闭' }}</span>
               <NButton type="primary" :disabled="readonly" :loading="saving" @click="deploy(row)">发布至本区服</NButton>
+            </div>
+            <div v-for="channel in channels.filter(c => c.scene === row.scene)" :key="channel.scene" class="mt-4 border-t pt-4 space-y-3">
+              <div class="flex items-center gap-2"><span class="text-sm font-medium">分线</span><NTag size="small" :type="channelsEnabled ? 'success' : 'warning'">{{ !scope.currentServer?.runtimeBound ? '待部署' : channelsEnabled ? '已启用' : '当前已关闭' }}</NTag></div>
+              <p v-if="!channelsEnabled && scope.currentServer?.runtimeBound" class="text-sm text-orange-600">同屏分线已由运营关闭，客户端暂不能换线。配置保存不会自行重开。</p>
+              <div class="flex flex-wrap items-end gap-4">
+                <label>分线数量<NInputNumber v-model:value="channel.lineCount" :min="1" :max="32" :disabled="readonly || !row.available" class="mt-1 w-36" /></label>
+                <label>每线人数上限<NInputNumber v-model:value="channel.maxPlayers" :min="1" :max="1000" :disabled="readonly || !row.available" class="mt-1 w-40" /></label>
+                <NButton :disabled="readonly || !row.available" @click="saveChannels(channel)">保存分线</NButton>
+              </div>
+              <div class="flex flex-wrap gap-2"><NTag v-for="line in channel.lines" :key="line.line" :type="line.online >= channel.maxPlayers ? 'warning' : 'default'">{{ line.line }} 线 · {{ line.online }} 人</NTag></div>
+              <p class="text-xs text-gray-500">同线玩家共享同屏和野外聊天。采集资源与普通怪物保持个人进度，世界首领保持全服周期。</p>
             </div>
           </div>
         </div>

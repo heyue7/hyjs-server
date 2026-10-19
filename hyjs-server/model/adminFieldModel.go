@@ -83,8 +83,16 @@ type AdminFieldTemplateDTO struct {
 
 // AdminFieldListResponse 为全局方案目录。
 type AdminFieldListResponse struct {
-	Items     []AdminFieldTemplateDTO `json:"items"`
-	Resources []AdminFieldResource    `json:"resources"` // Resources 为实际消费者支持的原道具目录。
+	Items        []AdminFieldTemplateDTO           `json:"items"`
+	Resources    []AdminFieldResource              `json:"resources"`    // Resources 为实际消费者支持的原道具目录。
+	Presentation map[string]AdminFieldPresentation `json:"presentation"` // Presentation 为地图、资源组及怪物的名称和原图，不参与配置保存。
+}
+
+// AdminFieldPresentation 将稳定资源值转换为运营可读的名称和真实原图。
+type AdminFieldPresentation struct {
+	Name    string `json:"name"`    // Name 为原文或按用途命名的中文标签。
+	IconURL string `json:"iconUrl"` // IconURL 为原美术缩略图，无原图时为空。
+	Detail  string `json:"detail"`  // Detail 为地图或编队的简短用途说明。
 }
 
 // AdminFieldResource 限定掉落编辑器可选的真实道具和消费者。
@@ -133,4 +141,36 @@ type AdminFieldDeployRequest struct {
 	TemplateVersion string `json:"templateVersion" binding:"required"`
 	Version         string `json:"version"`
 	Enabled         bool   `json:"enabled"`
+}
+
+// AdminFieldChannelLine reports actual live sessions on an original client line.
+type AdminFieldChannelLine struct {
+	Line   int64 `json:"line"`   // Line is the client line number from one.
+	Online int64 `json:"online"` // Online counts authorized TCP sessions only.
+}
+
+// AdminFieldChannelDTO exposes one realm map's line settings.
+type AdminFieldChannelDTO struct {
+	Scene      string                  `json:"scene"`      // Scene is the stable original map ID.
+	Name       string                  `json:"name"`       // Name is the localized map name.
+	LineCount  int64                   `json:"lineCount"`  // LineCount is 1 to 32.
+	MaxPlayers int64                   `json:"maxPlayers"` // MaxPlayers is capacity per line, 1 to 1000.
+	Version    string                  `json:"version"`    // Version protects concurrent edits.
+	Lines      []AdminFieldChannelLine `json:"lines"`      // Lines contains current online counts.
+}
+
+// AdminFieldChannelsResponse contains only the requested realm's line states.
+type AdminFieldChannelsResponse struct {
+	Enabled  bool                   `json:"enabled"`  // Enabled reports the real original presence policy; false cannot provide client lines.
+	ServerID int64                  `json:"serverId"` // ServerID is the requested realm.
+	Items    []AdminFieldChannelDTO `json:"items"`    // Items are the original maps.
+}
+
+// AdminFieldChannelSaveRequest updates original line capacities for one realm map.
+type AdminFieldChannelSaveRequest struct {
+	ServerID   int64  `json:"serverId" binding:"required"`   // ServerID is an existing realm.
+	Scene      string `json:"scene" binding:"required"`      // Scene is an original map ID.
+	LineCount  int64  `json:"lineCount" binding:"required"`  // LineCount is 1 to 32.
+	MaxPlayers int64  `json:"maxPlayers" binding:"required"` // MaxPlayers is 1 to 1000.
+	Version    string `json:"version"`                       // Version is required once settings exist.
 }
