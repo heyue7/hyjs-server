@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import type { ActivityForm, ActivityMode } from '@/service/activity-operations';
-import { activityRepeatLabel } from '@/service/activity-operations';
+import { activityFixedLabels, activityMilestoneTitle, activityRepeatLabel } from '@/service/activity-operations';
 import { formatTime } from '@/service/operations';
 import RewardSummary from './reward-summary.vue';
+import KingPrizes from './king-prizes.vue';
 const props = defineProps<{ form: ActivityForm; mode?: ActivityMode; hideSchedule?: boolean }>();
 const options = computed(() => props.form.options || {});
 const rows = computed(() => props.form.products || []);
@@ -15,13 +16,13 @@ const numberFields = [
   ['rebateCap', '返还钻石上限'], ['dayLimit', '每日探索次数'], ['totalLimit', '累计探索次数上限'], ['cooldownSeconds', '探索间隔（秒）']
 ];
 const hasRules = computed(() =>
+  props.form.mode === 'power-race' ||
   Object.keys(props.mode?.fixedValues || {}).length > 0 ||
   numberFields.some(([key]) => options.value[key] !== undefined) ||
   ['rebateBps', 'jackpotPerMillion', 'poolContributionBps'].some(key => options.value[key] !== undefined) ||
   ['discounts', 'meals', 'coinPrizes', 'exploreRewards', 'finalRewards'].some(key => options.value[key]?.length > 0) ||
   (props.form.mode !== 'turntable' && Boolean(options.value.topPrize?.resourceId || options.value.advancePrize?.resourceId))
 );
-const fixedLabels: Record<string, string> = { singleDiamond: '单抽钻石', tenDiamond: '十连钻石', coinPerDraw: '每次购买金币', dayLimit: '每日次数' };
 function minuteText(value: number) { return value === 1440 ? '24:00' : `${String(Math.floor(value / 60)).padStart(2, '0')}:${String(value % 60).padStart(2, '0')}`; }
 </script>
 
@@ -56,11 +57,14 @@ function minuteText(value: number) { return value === 1440 ? '24:00' : `${String
     <section v-if="milestones.length" class="activity-summary-section">
       <h3>{{ ['login-rewards', 'limited-sign'].includes(form.mode) ? '每日奖励' : '达成奖励' }}</h3>
       <article v-for="(row, index) in milestones" :key="index" class="activity-summary-entry">
-        <h4>{{ ['login-rewards', 'limited-sign'].includes(form.mode) ? `第 ${row.goal} 天` : `目标 ${row.goal.toLocaleString()}` }}<NTag v-if="row.options" size="small" :bordered="false">单项选一</NTag></h4>
+        <h4>{{ activityMilestoneTitle(form.mode, row.goal, ['login-rewards', 'limited-sign'].includes(form.mode)) }}<NTag v-if="row.options" size="small" :bordered="false">单项选一</NTag></h4>
         <RewardSummary :rewards="row.options || row.rewards" />
       </article>
     </section>
-    <section v-if="prizes.length" class="activity-summary-section">
+    <section v-if="form.mode === 'king-recruit'" class="activity-summary-section">
+      <KingPrizes :model-value="prizes" readonly />
+    </section>
+    <section v-else-if="prizes.length" class="activity-summary-section">
       <h3>转盘奖位</h3>
       <div class="activity-summary-prizes">
         <article v-for="(row, index) in prizes" :key="row.id" class="activity-summary-entry">
@@ -74,7 +78,8 @@ function minuteText(value: number) { return value === 1440 ? '24:00' : `${String
     <section v-if="hasRules" class="activity-summary-section">
       <h3>规则与额外奖励</h3>
       <NDescriptions :column="2" label-placement="top">
-        <NDescriptionsItem v-for="(value, key) in mode?.fixedValues || {}" :key="key" :label="fixedLabels[String(key)] || String(key)">{{ value }}</NDescriptionsItem>
+        <NDescriptionsItem v-for="(value, key) in mode?.fixedValues || {}" :key="key" :label="activityFixedLabels[String(key)] || '原版固定规则'">{{ typeof value === 'number' ? value.toLocaleString() : value }}</NDescriptionsItem>
+        <NDescriptionsItem v-if="form.mode === 'power-race'" label="排名奖励范围">{{ options.rankPlaces ? `前 ${options.rankPlaces} 名，同档奖励` : '不发排名奖励' }}</NDescriptionsItem>
         <template v-for="field in numberFields" :key="field[0]">
           <NDescriptionsItem v-if="options[field[0]] !== undefined" :label="field[1]">{{ Number(options[field[0]]).toLocaleString() }}</NDescriptionsItem>
         </template>
@@ -83,6 +88,7 @@ function minuteText(value: number) { return value === 1440 ? '24:00' : `${String
         <NDescriptionsItem v-if="options.poolContributionBps !== undefined" label="消费计入大奖池比例">{{ options.poolContributionBps / 100 }}%</NDescriptionsItem>
         <NDescriptionsItem v-if="options.discounts" label="可用折扣">{{ options.discounts.map((value: number) => `${value / 100}%`).join('、') || '未配置' }}</NDescriptionsItem>
       </NDescriptions>
+      <div v-if="form.mode === 'power-race' && (options.rankRewards?.length || options.rankPlaces)" class="activity-summary-entry"><h4>{{ options.rankPlaces ? `前 ${options.rankPlaces} 名每人奖励` : '排名奖励草稿（不发放）' }}</h4><RewardSummary :rewards="options.rankRewards || []" /></div>
       <div v-for="(meal, index) in options.meals || []" :key="index" class="activity-summary-entry">{{ minuteText(meal.startMinute) }}–{{ minuteText(meal.endMinute) }} · 体力 {{ meal.amount }}</div>
       <div v-if="form.mode !== 'turntable' && options.topPrize?.resourceId" class="activity-summary-entry"><h4>榜首奖励</h4><RewardSummary :rewards="[options.topPrize]" /></div>
       <div v-if="form.mode !== 'turntable' && options.advancePrize?.resourceId" class="activity-summary-entry"><h4>进阶排名奖励</h4><RewardSummary :rewards="[options.advancePrize]" /></div>

@@ -10,15 +10,17 @@ import type { Item, ItemsResponse } from '@/service/operations';
 import { useOperations } from '@/composables/useOperations';
 import ManagementWorkspace from './management-workspace.vue';
 import RewardList from './reward-list.vue';
-import RewardSummary from './reward-summary.vue';
 import ResourceSelect from './resource-select.vue';
+import ResourceImage from './resource-image.vue';
+import ItemQuality from './item-quality.vue';
 const props = defineProps<{ shopId: string }>();
 const router = useRouter();
 const isPopularityShop = computed(() => ['popularity', 'popularity-rank'].includes(props.shopId));
 const { canWrite, loading, error, run } = useOperations();
 const definition = ref<ShopDefinition>();
 const snapshot = ref<ShopSnapshot>();
-const currencyItems = ref<Item[]>([]);
+const catalogue = ref<Record<string, Item>>({});
+const catalogueError = ref('');
 const q = ref('');
 const state = ref<string | null>(null);
 const editing = ref(false);
@@ -40,34 +42,16 @@ const settingsDraft = ref<ShopSnapshot['settings']>({
 });
 const settingsError = ref('');
 const settingsSaving = ref(false);
-const settingsFrozen = computed(() => isFrozen.value && !settingsDraft.value.newPeriod);
-const isFrozen = computed(() => Boolean(snapshot.value?.settings.frozen));
 const needsPeriod = computed(
   () => !['vip', 'union-fight', 'pet-market'].includes(props.shopId) && !snapshot.value?.settings.periodId
 );
-const productReadonly = (row: ShopProduct | null) =>
-  !canWrite.value || (isFrozen.value && (!row || row.id.startsWith('period:')));
+const productReadonly = (_row: ShopProduct | null) => !canWrite.value;
 const readonly = computed(() => productReadonly(selected.value));
-const fixedCurrency = computed(
-  () =>
-    (
-      ({
-        vip: { id: 'diamond', name: '钻石' },
-        'union-fight': { id: 'unionFightToken', name: '公会战代币' }
-      }) as Record<string, { id: string; name: string }>
-    )[props.shopId]
-);
-const fixedPrice = computed(() => props.shopId === 'ordinary' && Boolean(selected.value?.id.startsWith('legacy:')));
-const petCurrencies = computed<Item[]>(() =>
-  ['coinpet', 'diamond'].map(
-    id =>
-      currencyItems.value.find(item => item.id === id) || {
-        id,
-        name: id === 'coinpet' ? '精灵币' : '钻石',
-        category: 'currency'
-      }
-  )
-);
+const isLegacyProduct = computed(() => props.shopId === 'ordinary' && Boolean(selected.value?.id.startsWith('legacy:')));
+const recommendedCosts = computed(() => {
+  const original = ({ ordinary: ['coin', 'diamond'], memory: ['light'], popularity: ['popularity'], 'popularity-rank': ['popularity'], point: ['point'], score: ['score'], vip: ['diamond'], 'pet-market': ['coinpet', 'diamond'], 'union-fight': ['unionFightToken'] } as Record<string, string[]>)[props.shopId] || [];
+  return [...new Set([...original, ...(snapshot.value?.items || []).map(row => row.cost?.resourceId).filter(Boolean)])].slice(0, 20);
+});
 const vipOptions = computed(() =>
   Array.from({ length: props.shopId === 'vip' ? 12 : 13 }, (_, index) => {
     const value = props.shopId === 'vip' ? index + 1 : index;
@@ -84,11 +68,9 @@ const title = computed(() =>
   isPopularityShop.value ? shopLabels[props.shopId] : definition.value?.label || shopLabels[props.shopId] || '商店管理'
 );
 const fields = computed(() => definition.value?.fields || []);
-const supports = (key: string) =>
-  fields.value.includes(key) &&
-  (!fixedPrice.value || ['rewards', 'cost', 'dailyLimit', 'minLevel', 'minVip', 'priority', 'enabled'].includes(key));
+const supports = (key: string) => fields.value.includes(key);
 const hasPublishFields = computed(() =>
-  (supports('enabled') && (props.shopId !== 'ordinary' || fixedPrice.value)) ||
+  (supports('enabled') && (props.shopId !== 'ordinary' || isLegacyProduct.value)) ||
   ['day', 'refreshMillis', 'source'].some(supports)
 );
 const showShopStatus = computed(() => Boolean(snapshot.value && (
@@ -99,7 +81,7 @@ const rows = computed(() =>
   (snapshot.value?.items || []).filter(
     row =>
       (state.value === null || row.enabled === (state.value === 'enabled')) &&
-      `${row.name} ${row.id} ${row.rewards.map(r => r.resourceId).join(' ')}`
+      `${row.name} ${row.id} ${row.rewards.map(r => `${r.resourceId} ${catalogue.value[r.resourceId]?.name || ''}`).join(' ')} ${catalogue.value[row.cost?.resourceId]?.name || ''}`
         .toLowerCase()
         .includes(q.value.trim().toLowerCase())
   )
@@ -112,16 +94,26 @@ async function load() {
       api<{ items: ShopDefinition[] }>('/shops'),
       api<ShopSnapshot>(`/shops/${encodeURIComponent(props.shopId)}`)
     ]);
-    const currencies =
-      props.shopId === 'pet-market'
-        ? await api<ItemsResponse>('/items?ids=coinpet,diamond&page=1&pageSize=100')
-        : undefined;
-    return { directory, data, currencies };
+    return { directory, data };
   });
   if (result && current === generation) {
     definition.value = result.directory.items.find(row => row.id === props.shopId);
     snapshot.value = { ...result.data, items: result.data.items || [] };
-    currencyItems.value = result.currencies?.items || [];
+    catalogueError.value = '';
+    const resources = Object.fromEntries((result.data.resources || []).map(item => [item.id, item]));
+    const ids = [...new Set(result.data.items.flatMap(row => [...row.rewards.map(reward => reward.resourceId), row.cost?.resourceId]).filter(Boolean))].filter(id => !resources[id]);
+    try {
+      const batches = [];
+      for (let index = 0; index < ids.length; index += 100)
+        batches.push(api<ItemsResponse>(`/items?${new URLSearchParams({ ids: ids.slice(index, index + 100).join(','), page: '1', pageSize: '100' })}`));
+      const responses = await Promise.all(batches);
+      if (current !== generation) return;
+      for (const response of responses) for (const item of response.items) resources[item.id] = item;
+    } catch {
+      if (current !== generation) return;
+      catalogueError.value = '部分资源名称暂未载入，请刷新重试。';
+    }
+    if (current === generation) catalogue.value = resources;
   }
 }
 function edit(row: ShopProduct | null) {
@@ -137,14 +129,14 @@ function edit(row: ShopProduct | null) {
   if (!row && ['pet-market', 'union-fight'].includes(props.shopId)) draft.value.stock = 1;
   if (!row && props.shopId === 'union-fight') draft.value.refreshMillis = 60000;
   if (!row && props.shopId === 'vip') draft.value.minVip = 1;
-  if (!row && fixedCurrency.value) draft.value.cost.resourceId = fixedCurrency.value.id;
+  if (!row && recommendedCosts.value.length) draft.value.cost.resourceId = recommendedCosts.value[0];
   original.value = JSON.stringify(draft.value);
   section.value = 'product';
   saveError.value = '';
   editing.value = true;
 }
 function beginCreate() {
-  if (needsPeriod.value) configure(false);
+  if (needsPeriod.value) configure();
   else edit(null);
 }
 function discard() {
@@ -202,15 +194,12 @@ async function save() {
     saving.value = false;
   }
 }
-function configure(newPeriod = false) {
+function configure() {
   if (!snapshot.value) return;
   settingsDraft.value = {
     ...snapshot.value.settings,
     source: snapshot.value.settings.source || '用户运营配置',
-    newPeriod,
-    ...(newPeriod
-      ? { enabled: false, startAt: Math.max(Date.now(), snapshot.value.settings.startAt + 1), endAt: 0, claimEndAt: 0 }
-      : {})
+    newPeriod: false
   };
   settingsError.value = '';
   settingsOpen.value = true;
@@ -242,7 +231,7 @@ async function saveSettings() {
     settingsOpen.value = false;
     editing.value = false;
     await load();
-    window.$message?.success(settingsDraft.value.newPeriod ? '已复制为关闭的新一期，可继续编辑商品' : '商店设置已保存');
+    window.$message?.success('商店设置已保存');
   } catch (e) {
     settingsError.value = errorMessage(e);
   } finally {
@@ -267,91 +256,79 @@ function remove(row: ShopProduct) {
     }
   });
 }
+function resourceName(id: string) {
+  return catalogue.value[id]?.name || (id ? '资源名称暂未载入' : '未配置');
+}
+function renderResourceNames(row: ShopProduct) {
+  return h('div', { class: 'shop-cell-stack' }, row.rewards.map(reward =>
+    h('div', { class: 'shop-resource-name', title: reward.resourceId }, [
+      h('span', resourceName(reward.resourceId)),
+      ...(catalogue.value[reward.resourceId]?.qualityLabel ? [h(ItemQuality, { item: catalogue.value[reward.resourceId] })] : [])
+    ])
+  ));
+}
+function renderLines(lines: string[]) {
+  return h('div', { class: 'shop-cell-stack shop-rule-lines' }, lines.length ? lines.map(line => h('span', line)) : [h('span', { class: 'ops-muted' }, '不限')]);
+}
+function limitLines(row: ShopProduct) {
+  return [
+    ...(supports('dailyLimit') && row.dailyLimit > 0 ? [`每日 ${row.dailyLimit.toLocaleString()} 次`] : []),
+    ...(supports('totalLimit') && row.totalLimit > 0 ? [`累计 ${row.totalLimit.toLocaleString()} 次`] : []),
+    ...(supports('stock') && row.stock >= 0 ? [`${props.shopId === 'pet-market' ? '每周库存' : '库存'} ${row.stock.toLocaleString()}`] : [])
+  ];
+}
+function qualificationLines(row: ShopProduct) {
+  return [
+    ...(supports('minLevel') && row.minLevel > 1 ? [`角色 ${row.minLevel} 级`] : []),
+    ...(supports('minVip') && row.minVip > 0 ? [`VIP ${row.minVip}`] : []),
+    ...(supports('guildLevel') && row.guildLevel > 1 ? [`公会 ${row.guildLevel} 级`] : []),
+    ...(supports('buyCondition') && row.buyCondition > 0 ? [row.buyCondition === 2 ? '会长' : '副会长／会长'] : []),
+    ...(supports('maxRank') && row.maxRank > 0 ? [`竞技前 ${row.maxRank.toLocaleString()} 名`] : [])
+  ];
+}
 const columns = computed<DataTableColumns<ShopProduct>>(() => [
-  ...(props.shopId === 'popularity-rank'
-    ? [
-        {
-          title: '排名资格',
-          key: 'maxRank',
-          minWidth: 135,
-          render: (row: ShopProduct) => (row.maxRank > 0 ? `前 ${row.maxRank.toLocaleString()} 名` : '待配置')
-        }
-      ]
-    : []),
   {
-    title: '商品',
-    key: 'name',
-    minWidth: 280,
-    render: row =>
-      h('div', [
-        h('strong', row.name || '未命名商品'),
-        h(RewardSummary, {
-          rewards: row.rewards,
-          resources: props.shopId === 'union-fight' ? snapshot.value?.resources || [] : undefined
-        })
-      ])
+    title: '图片', key: 'image', width: 72,
+    render: row => h('div', { class: 'shop-cell-stack' }, row.rewards.map(reward => h(ResourceImage, { item: catalogue.value[reward.resourceId], size: 34 })))
   },
   {
-    title: '消耗',
-    key: 'cost',
-    minWidth: 190,
-    render: row =>
-      h('div', [
-        ...(props.shopId === 'union-fight'
-          ? [h('span', `公会战代币 × ${row.cost?.amount || 0}`)]
-          : row.cost?.resourceId
-            ? [
-                h(RewardSummary, {
-                  rewards: [row.cost],
-                  resources: props.shopId === 'pet-market' ? petCurrencies.value : undefined
-                })
-              ]
-            : []),
-        ...(row.contributionCost > 0
-          ? [h('div', { class: 'ops-muted mt-5px' }, `公会贡献 × ${row.contributionCost}`)]
-          : []),
-        ...(!row.cost?.resourceId && !row.contributionCost ? [h('span', '未配置消耗')] : [])
-      ])
+    title: '商品名称', key: 'name', minWidth: 225,
+    render: row => h('div', [
+      ...(row.name && !row.rewards.some(reward => row.name === catalogue.value[reward.resourceId]?.name) ? [h('div', { class: 'shop-custom-name' }, row.name)] : []),
+      renderResourceNames(row)
+    ])
   },
   {
-    title: '状态',
-    key: 'enabled',
-    width: 100,
-    render: row =>
-      h(
-        NTag,
-        {
-          type: row.enabled ? 'success' : 'default',
-          bordered: false,
-          size: 'small'
-        },
-        () => (row.enabled ? '启用' : '关闭')
-      )
+    title: '获得数量', key: 'rewardAmounts', width: 110,
+    render: row => h('div', { class: 'shop-cell-stack shop-number-cell' }, row.rewards.map(reward => h('span', Number(reward.amount).toLocaleString())))
   },
   {
-    title: '操作',
-    key: 'action',
-    width: 155,
-    render: row =>
-      h(NSpace, { size: 5 }, () => [
-        h(NButton, { size: 'small', secondary: true, onClick: () => edit(row) }, () =>
-          productReadonly(row) ? '查看' : '编辑'
-        ),
-        ...(!productReadonly(row)
-          ? [
-              h(
-                NButton,
-                {
-                  size: 'small',
-                  quaternary: true,
-                  type: 'error',
-                  onClick: () => remove(row)
-                },
-                () => '移除'
-              )
-            ]
-          : [])
-      ])
+    title: '消耗资源', key: 'costResource', minWidth: 180,
+    render: row => h('div', { class: 'shop-cell-stack' }, [
+      ...(row.cost?.resourceId ? [h('div', { class: 'shop-cost-resource', title: row.cost.resourceId }, [h(ResourceImage, { item: catalogue.value[row.cost.resourceId], size: 28 }), h('span', resourceName(row.cost.resourceId))])] : []),
+      ...(row.contributionCost > 0 ? [h('span', '公会贡献')] : []),
+      ...(!row.cost?.resourceId && !row.contributionCost ? [h('span', { class: 'ops-muted' }, '未配置')] : [])
+    ])
+  },
+  {
+    title: '消耗数量', key: 'costAmount', width: 110,
+    render: row => h('div', { class: 'shop-cell-stack shop-number-cell' }, [
+      ...(row.cost?.resourceId ? [h('span', Number(row.cost.amount).toLocaleString())] : []),
+      ...(row.contributionCost > 0 ? [h('span', row.contributionCost.toLocaleString())] : [])
+    ])
+  },
+  { title: '限购与库存', key: 'limits', minWidth: 125, render: row => renderLines(limitLines(row)) },
+  { title: '购买资格', key: 'qualifications', minWidth: 140, render: row => renderLines(qualificationLines(row)) },
+  {
+    title: '状态', key: 'enabled', width: 85,
+    render: row => h(NTag, { type: row.enabled ? 'success' : 'default', bordered: false, size: 'small' }, () => row.enabled ? '启用' : '关闭')
+  },
+  {
+    title: '操作', key: 'action', width: 135, fixed: 'right',
+    render: row => h(NSpace, { size: 4, wrap: false }, () => [
+      h(NButton, { size: 'small', secondary: true, onClick: () => edit(row) }, () => productReadonly(row) ? '查看' : '编辑'),
+      ...(!productReadonly(row) ? [h(NButton, { size: 'small', quaternary: true, type: 'error', onClick: () => remove(row) }, () => '移除')] : [])
+    ])
   }
 ]);
 function beforeUnload(event: BeforeUnloadEvent) {
@@ -409,12 +386,11 @@ watch(
     >
       <template v-if="!editing" #actions>
         <NButton :loading="loading" @click="load">刷新</NButton>
-        <NButton v-if="canWrite && snapshot && definition?.settingsFields?.length" @click="configure(false)">
+        <NButton v-if="canWrite && snapshot && definition?.settingsFields?.length" @click="configure()">
           商店设置
         </NButton>
-        <NButton v-if="canWrite && isFrozen" type="primary" @click="configure(true)">复制为新一期</NButton>
         <NButton
-          v-else-if="canWrite && definition && definition.canCreate !== false"
+          v-if="canWrite && definition && definition.canCreate !== false"
           type="primary"
           @click="beginCreate"
         >
@@ -423,15 +399,10 @@ watch(
       </template>
       <template #alert>
         <NAlert v-if="error || saveError" type="error" :title="saveError || error" />
-        <NAlert
-          v-if="isFrozen"
-          type="info"
-          title="本期已有购买记录，商品价格已锁定。请复制为新一期后调整。"
-        />
       </template>
       <template v-if="!editing">
         <details v-if="definition?.notes" class="ops-help"><summary>商店规则</summary><p>{{ definition.notes }}</p></details>
-        <NCard v-if="snapshot && showShopStatus" :bordered="false" class="ops-panel">
+        <div v-if="snapshot && showShopStatus" class="shop-status-line">
           <NSpace align="center" justify="space-between">
             <NSpace>
               <NTag
@@ -439,7 +410,7 @@ watch(
                 :type="snapshot.settings.enabled ? 'success' : 'default'"
                 :bordered="false"
               >
-                {{ snapshot.settings.enabled ? '当前配置已开放' : '当前配置已关闭' }}
+                {{ snapshot.settings.enabled ? '营业中' : '已停用' }}
               </NTag>
               <span v-if="snapshot.settings.slots" class="ops-muted">展示 {{ snapshot.settings.slots }} 个槽位</span>
               <NTag v-if="snapshot.settings.unlimited" :bordered="false" size="small">不限时</NTag>
@@ -450,7 +421,7 @@ watch(
             </NSpace>
             <span class="ops-muted">{{ snapshot.items.length }} 件商品</span>
           </NSpace>
-        </NCard>
+        </div>
         <NCard :bordered="false" class="ops-panel">
           <NTabs v-if="isPopularityShop" :value="shopId" type="line" class="mb-20px" @update:value="router.push(`/shops/${$event}`)">
             <NTab name="popularity">声望商店商品</NTab>
@@ -470,6 +441,7 @@ watch(
               class="ops-filter-select"
             />
           </div>
+          <p v-if="catalogueError" class="ops-inline-note">{{ catalogueError }}</p>
           <NDataTable
             :columns="columns"
             :data="rows"
@@ -477,7 +449,7 @@ watch(
             :row-key="(row: ShopProduct) => row.id"
             :bordered="false"
             :pagination="{ pageSize: 20 }"
-            :scroll-x="800"
+            :scroll-x="1285"
           />
         </NCard>
       </template>
@@ -485,15 +457,9 @@ watch(
         <NForm label-placement="top" :disabled="saving || readonly">
           <section v-show="section === 'product'">
             <h3 class="mb-20px">商品与消耗</h3>
-            <NAlert
-              v-if="fixedPrice"
-              type="info"
-              title="此商品使用固定售价和每日限购，暂不支持修改。"
-              class="mb-20px"
-            />
             <div class="ops-date-grid">
               <NFormItem v-if="selected" label="商品编号"><span class="ops-mono ops-muted">{{ draft.id }}</span></NFormItem>
-              <NFormItem v-if="!['vip', 'pet-market', 'union-fight'].includes(shopId) && !fixedPrice" label="显示名称">
+              <NFormItem v-if="!['vip', 'pet-market', 'union-fight'].includes(shopId) && !isLegacyProduct" label="显示名称">
                 <NInput v-model:value="draft.name" placeholder="商品名称" />
               </NFormItem>
             </div>
@@ -502,22 +468,22 @@ watch(
                 v-model:value="draft.rewards"
                 :disabled="saving || readonly"
                 :resources="shopId === 'union-fight' ? snapshot?.resources || [] : undefined"
-                :max="['union-fight', 'vip', 'pet-market'].includes(shopId) || fixedPrice ? 1 : 50"
+                :max="['union-fight', 'vip', 'pet-market'].includes(shopId) || isLegacyProduct ? 1 : 50"
               />
             </NFormItem>
             <template v-if="supports('cost')">
               <NFormItem label="消耗资源" required>
                 <div class="resource-cost-line">
-                  <NInput v-if="fixedCurrency" :value="fixedCurrency.name" readonly />
                   <ResourceSelect
-                    v-else
                     v-model:value="draft.cost.resourceId"
-                    :disabled="saving || readonly || fixedPrice"
-                    :resources="shopId === 'pet-market' ? petCurrencies : undefined"
+                    :disabled="saving || readonly"
+                    commerce-cost
+                    :recommended-ids="recommendedCosts"
+                    placeholder="搜索可消耗的货币、材料或道具"
                   />
                   <NInputNumber
                     v-model:value="draft.cost.amount"
-                    :disabled="readonly || saving || fixedPrice"
+                    :disabled="readonly || saving"
                     :min="shopId === 'union-fight' ? 0 : 1"
                     :precision="0"
                   />
@@ -541,13 +507,12 @@ watch(
           </section>
           <section v-show="section === 'limits'">
             <h3 class="mb-20px">资格与限购</h3>
-            <p class="ops-muted mb-20px">仅显示此商店实际支持的资格和库存规则。</p>
             <NGrid cols="1 m:2" responsive="screen" :x-gap="22">
               <NGi v-if="supports('dailyLimit')">
                 <NFormItem label="每日限购">
                   <NInputNumber
                     v-model:value="draft.dailyLimit"
-                    :disabled="readonly || saving || fixedPrice"
+                    :disabled="readonly || saving"
                     :min="1"
                     :precision="0"
                   />
@@ -638,7 +603,7 @@ watch(
           </section>
           <section v-show="section === 'publish'">
             <h3 class="mb-20px">状态与备注</h3>
-            <NFormItem v-if="supports('enabled') && (shopId !== 'ordinary' || fixedPrice)" label="商品状态">
+            <NFormItem v-if="supports('enabled') && (shopId !== 'ordinary' || isLegacyProduct)" label="商品状态">
               <NSwitch v-model:value="draft.enabled">
                 <template #checked>启用</template>
                 <template #unchecked>关闭</template>
@@ -674,48 +639,36 @@ watch(
     <NModal
       v-model:show="settingsOpen"
       preset="card"
-      :title="settingsDraft.newPeriod ? '复制为新一期' : `商店设置 · ${title}`"
+      :title="`商店设置 · ${title}`"
       class="ops-modal shop-settings-modal"
       :mask-closable="!settingsSaving"
       :closable="!settingsSaving"
     >
       <NAlert v-if="settingsError" type="error" :title="settingsError" class="mb-20px" />
       <NAlert
-        v-if="settingsDraft.newPeriod"
-        type="info"
-        title="复制后保持关闭，商品按新期编辑。请重新确认生效时间与报价。"
-        class="mb-20px"
-      />
-      <NAlert
-        v-if="needsPeriod && !settingsDraft.newPeriod"
+        v-if="needsPeriod"
         type="info"
         title="保存商店设置后即可添加商品。"
         class="mb-20px"
       />
       <NForm label-placement="top" :disabled="settingsSaving">
-        <p v-if="settingsDraft.periodId" class="ops-muted mb-20px">
-          当前期
-          <span class="ops-mono">{{ settingsDraft.periodId }}</span>
-        </p>
-        <NFormItem v-if="settingSupports('enabled') && !settingsDraft.newPeriod && !needsPeriod" label="开放状态">
+        <NFormItem v-if="settingSupports('enabled') && !needsPeriod" label="营业状态">
           <NSwitch v-model:value="settingsDraft.enabled" />
         </NFormItem>
         <NFormItem v-if="settingSupports('slots')" label="展示槽位">
           <NInputNumber
             v-model:value="settingsDraft.slots"
-            :disabled="settingsFrozen"
             :min="1"
             :max="16"
             :precision="0"
           />
         </NFormItem>
         <NFormItem v-if="settingSupports('unlimited')" label="不限时">
-          <NSwitch v-model:value="settingsDraft.unlimited" />
-          <span class="ml-3 ops-muted">持续营业，原商品资格、库存与限购继续生效</span>
+          <NSwitch v-model:value="settingsDraft.unlimited"><template #checked>不限时</template><template #unchecked>按日期营业</template></NSwitch>
         </NFormItem>
         <p v-if="!settingsDraft.unlimited" class="ops-muted mb-4">日期留空时暂停营业，也可到活动排期安排营业时段。</p>
         <div v-if="!settingsDraft.unlimited" class="ops-date-grid">
-          <NFormItem v-if="settingSupports('startAt') || settingsDraft.newPeriod" label="开始时间">
+          <NFormItem v-if="settingSupports('startAt')" label="开始时间">
             <NDatePicker
               :value="settingsDraft.startAt || null"
               :disabled="settingsSaving"
@@ -724,7 +677,7 @@ watch(
               @update:value="settingsDraft.startAt = $event || 0"
             />
           </NFormItem>
-          <NFormItem v-if="settingSupports('endAt') || settingsDraft.newPeriod" label="结束时间">
+          <NFormItem v-if="settingSupports('endAt')" label="结束时间">
             <NDatePicker
               :value="settingsDraft.endAt || null"
               :disabled="settingsSaving"
@@ -734,7 +687,7 @@ watch(
             />
           </NFormItem>
         </div>
-        <NFormItem v-if="!settingsDraft.unlimited && (settingSupports('claimEndAt') || settingsDraft.newPeriod)" label="领奖截止">
+        <NFormItem v-if="!settingsDraft.unlimited && settingSupports('claimEndAt')" label="领奖截止">
           <NDatePicker
             :value="settingsDraft.claimEndAt || null"
             :disabled="settingsSaving"
@@ -746,7 +699,7 @@ watch(
         <NFormItem v-if="settingSupports('source')" label="配置备注">
           <NInput
             v-model:value="settingsDraft.source"
-            :disabled="settingsFrozen || shopId === 'popularity-rank'"
+            :disabled="shopId === 'popularity-rank'"
             type="textarea"
             :maxlength="1000"
           />
@@ -755,7 +708,7 @@ watch(
       <div class="ops-drawer-actions">
         <NButton :disabled="settingsSaving" @click="settingsOpen = false">取消</NButton>
         <NButton type="primary" :loading="settingsSaving" @click="saveSettings">
-          {{ settingsDraft.newPeriod ? '创建新一期' : '保存设置' }}
+          保存设置
         </NButton>
       </div>
     </NModal>
@@ -765,6 +718,53 @@ watch(
 <style scoped>
 .shop-workspace-root {
   width: 100%;
+}
+.shop-status-line {
+  padding: 2px 2px 10px;
+}
+.shop-workspace-root :deep(.shop-cell-stack) {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.shop-workspace-root :deep(.shop-cell-stack > *) {
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+}
+.shop-workspace-root :deep(.shop-resource-name),
+.shop-workspace-root :deep(.shop-cost-resource) {
+  gap: 7px;
+  line-height: 1.45;
+}
+.shop-workspace-root :deep(.shop-resource-name) {
+  flex-wrap: wrap;
+}
+.shop-workspace-root :deep(.shop-custom-name) {
+  margin-bottom: 6px;
+  font-size: 12px;
+  color: rgb(var(--base-text-color) / .6);
+}
+.shop-workspace-root :deep(.shop-number-cell) {
+  font-variant-numeric: tabular-nums;
+}
+.shop-workspace-root :deep(.shop-rule-lines) {
+  gap: 4px;
+  font-size: 12px;
+}
+.shop-workspace-root :deep(.shop-rule-lines > *) {
+  min-height: 0;
+}
+.shop-workspace-root :deep(.n-data-table-td) {
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+.shop-workspace-root :deep(.n-form-item-label) {
+  font-size: 13px;
+}
+.shop-workspace-root :deep(section > h3) {
+  font-size: 14px;
+  font-weight: 500;
 }
 .shop-settings-modal {
   width: 680px;

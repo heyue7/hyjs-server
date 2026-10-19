@@ -5,6 +5,7 @@ type P13UnionFightShopStock struct {
 	MatchID       string `gorm:"primaryKey;type:char(64)" json:"matchId"`
 	PlayerID      int64  `gorm:"primaryKey;autoIncrement:false" json:"playerId"`
 	ShopItemID    string `gorm:"primaryKey;type:varchar(64)" json:"shopItemId"`
+	Capacity      int64  `gorm:"not null;default:0" json:"capacity"`
 	LeftCount     int64  `gorm:"not null" json:"leftCount"`
 	LastRefreshAt int64  `gorm:"not null" json:"lastRefreshAt"`
 }

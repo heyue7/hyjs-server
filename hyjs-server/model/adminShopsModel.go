@@ -43,8 +43,8 @@ type AdminShopSettings struct {
 	EndAt      int64  `json:"endAt"`      // Closing time in milliseconds.
 	ClaimEndAt int64  `json:"claimEndAt"` // Final claim time.
 	Source     string `json:"source"`     // Operator configuration note.
-	PeriodID   string `json:"periodId"`   // Current immutable period identity.
-	Frozen     bool   `json:"frozen"`     // Existing consumer snapshot prevents in-place editing.
+	PeriodID   string `json:"periodId"`   // Stable catalogue identity; edits keep existing purchase counters.
+	Frozen     bool   `json:"frozen"`     // Historical field retained for compatibility; ordinary shop editors remain editable.
 }
 
 // AdminShopResponse is a versioned shop configuration.
@@ -71,5 +71,5 @@ type AdminShopProductDeleteRequest struct {
 type AdminShopSettingsSaveRequest struct {
 	AdminShopSettings
 	Version   string `json:"version" binding:"required"` // Last-read shop version.
-	NewPeriod bool   `json:"newPeriod"`                  // Copy to a new closed period before editing frozen products.
+	NewPeriod bool   `json:"newPeriod"`                  // Legacy request field retained for compatibility; edits use the current catalogue.
 }

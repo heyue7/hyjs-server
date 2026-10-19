@@ -1,16 +1,23 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { api, errorMessage } from '@/service/operations';
 import { shopLabels } from '@/service/management-operations';
 import type { ShopSnapshot } from '@/service/management-operations';
+import { activityFixedLabels } from '@/service/activity-operations';
+import type { ActivityGameplayOptions } from '@/service/activity-operations';
+import type { ResourceAmount } from '@/service/operations';
 import RewardList from './reward-list.vue';
-const options = defineModel<Record<string, any>>({ required: true });
+const options = defineModel<ActivityGameplayOptions>({ required: true });
 const props = defineProps<{ mode: string; disabled?: boolean; fixedValues?: Record<string, string | number> }>();
 const router = useRouter();
 const shopOptions = Object.entries(shopLabels).map(([value, label]) => ({ value, label }));
 const shopStatus = ref('');
 const shopLoading = ref(false);
+const rankRewards = computed<ResourceAmount[]>({
+  get: () => options.value.rankRewards || [],
+  set: value => { options.value.rankRewards = value; }
+});
 let shopLoad = 0;
 watch(() => [props.mode, options.value.shopKey], async ([mode, key]) => {
   const request = ++shopLoad;
@@ -60,14 +67,6 @@ function addMeal() {
 function addCoinPrize() {
   options.value.coinPrizes.push({ coin: 0, weight: 0 });
 }
-const fixedLabels: Record<string, string> = {
-  singleDiamond: '单抽钻石',
-  tenDiamond: '十连钻石',
-  singleCost: '单抽消耗',
-  tenCost: '十连消耗',
-  coinPerDraw: '购买金币',
-  dayLimit: '每日次数'
-};
 const turntableNumbers = [
   { key: 'scorePerDraw', label: '每次抽取积分' },
   { key: 'initialDiamondPool', label: '初始大奖钻石池' }
@@ -85,12 +84,27 @@ const turntableNumbers = [
       <NDescriptionsItem
         v-for="(value, key) in fixedValues"
         :key="key"
-        :label="fixedLabels[String(key)] || String(key)"
+        :label="activityFixedLabels[String(key)] || '原版固定规则'"
       >
-        {{ value }}
+        {{ typeof value === 'number' ? value.toLocaleString() : value }}
       </NDescriptionsItem>
     </NDescriptions>
-    <template v-if="mode === 'shop-window'">
+    <template v-if="mode === 'power-race'">
+      <NFormItem label="获奖名次上限">
+        <NInputNumber :value="options.rankPlaces ?? 0" :min="0" :max="1000" :precision="0" :disabled="disabled" class="w-full" @update:value="options.rankPlaces = $event ?? 0">
+          <template #suffix>名</template>
+        </NInputNumber>
+      </NFormItem>
+      <p class="ops-inline-note">0 不发排名奖；设置后，前 N 名每人领取下列相同奖励。</p>
+      <NFormItem label="排名奖励">
+        <RewardList v-model:value="rankRewards" :disabled="disabled || !options.rankPlaces" />
+      </NFormItem>
+      <p v-if="!options.rankPlaces && rankRewards.length" class="ops-inline-note">奖励草稿已保留，当前不发放。</p>
+    </template>
+    <template v-else-if="mode === 'king-recruit'">
+      <p class="ops-inline-note">按 SAO、ALO、GGO 原所属世界轮换，价格、保底和轮换间隔沿用原规则。</p>
+    </template>
+    <template v-else-if="mode === 'shop-window'">
       <NFormItem label="对应商店" :validation-status="shopStatus ? 'warning' : undefined" :feedback="shopStatus || undefined">
         <NSelect v-model:value="options.shopKey" :options="shopOptions" filterable :disabled="disabled" :loading="shopLoading" placeholder="选择商店" />
       </NFormItem>
@@ -273,7 +287,7 @@ const turntableNumbers = [
       </div>
     </template>
     <p
-      v-if="!['stamina-meal', 'diamond-rebate', 'treasure-box', 'turntable'].includes(mode) && !Array.isArray(options.discounts) && !Object.keys(fixedValues || {}).length"
+      v-if="!['shop-window', 'stamina-meal', 'diamond-rebate', 'treasure-box', 'turntable', 'power-race', 'king-recruit'].includes(mode) && !Array.isArray(options.discounts) && !Object.keys(fixedValues || {}).length"
       class="ops-inline-note"
     >该模式按奖励与资格中的配置执行，无需额外玩法参数。</p>
   </div>

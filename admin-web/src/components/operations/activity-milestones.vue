@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import type { ActivityMilestone } from '@/service/activity-operations';
+import { activityMilestoneTarget, activityMilestoneTitle } from '@/service/activity-operations';
 import RewardList from './reward-list.vue';
 const rows = defineModel<ActivityMilestone[]>({ required: true });
-const props = defineProps<{ disabled?: boolean; single?: boolean; max?: number; choice?: boolean; dayBased?: boolean }>();
+const props = defineProps<{ mode?: string; disabled?: boolean; single?: boolean; max?: number; choice?: boolean; dayBased?: boolean }>();
 const activeIndex = ref(0);
 const selectedRows = computed(() => rows.value.slice(activeIndex.value, activeIndex.value + 1));
-const milestoneOptions = computed(() => rows.value.map((row, index) => ({ value: index, label: props.dayBased ? `第 ${row.goal} 天` : `目标 ${row.goal.toLocaleString()}` })));
+const target = computed(() => activityMilestoneTarget(props.mode));
+const milestoneOptions = computed(() => rows.value.map((row, index) => ({ value: index, label: activityMilestoneTitle(props.mode, row.goal, props.dayBased) })));
 watch(() => rows.value.length, length => { activeIndex.value = Math.max(0, Math.min(activeIndex.value, length - 1)); });
 function add() {
   activeIndex.value = rows.value.length;
@@ -46,9 +48,12 @@ function switchChoice(row: ActivityMilestone, value: string) {
         <strong>{{ dayBased ? '第' : '奖励档 ' }}{{ activeIndex + 1 }}{{ dayBased ? ' 天' : '' }}</strong>
         <NButton quaternary size="small" :disabled="disabled" @click="remove(activeIndex)">移除</NButton>
       </div>
-      <NFormItem :label="dayBased ? '第几天' : '达成目标'" required>
-        <NInputNumber v-model:value="row.goal" :disabled="disabled" :min="1" :precision="0" class="w-full" />
+      <NFormItem :label="dayBased ? '第几天' : target.label" required>
+        <NInputNumber v-model:value="row.goal" :disabled="disabled" :min="1" :precision="0" class="w-full">
+          <template v-if="!dayBased && target.unit" #suffix>{{ target.unit }}</template>
+        </NInputNumber>
       </NFormItem>
+      <p v-if="!dayBased && target.note" class="ops-inline-note">{{ target.note }}</p>
       <NFormItem v-if="choice" label="奖励方式">
         <NRadioGroup
           :value="row.options ? 'choice' : 'fixed'"

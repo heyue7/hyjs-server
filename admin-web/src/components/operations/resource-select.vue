@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, h, onBeforeUnmount, ref, watch } from 'vue';
 import type { SelectOption } from 'naive-ui';
+import { NTag } from 'naive-ui';
 import { api } from '@/service/operations';
 import type { Item, ItemFacets, ItemsResponse } from '@/service/operations';
 import ResourceImage from './resource-image.vue';
@@ -12,6 +13,7 @@ const props = defineProps<{
   placeholder?: string;
   resources?: Item[];
   commerceCost?: boolean;
+  recommendedIds?: string[];
 }>();
 const emit = defineEmits<{ 'update:value': [value: string] }>();
 interface Option extends SelectOption { value: string; label: string; item?: Item }
@@ -44,6 +46,7 @@ const localFacets = computed<ItemFacets>(() => {
   return { categories: [...categories].map(([value, label]) => ({ value, label })), qualities: [], applicableTypes: [...targets].map(([value, label]) => ({ value, label })) };
 });
 const availableFacets = computed(() => props.resources !== undefined ? localFacets.value : facets.value);
+const recommended = computed(() => new Set(props.recommendedIds || []));
 const categoryOptions = computed(() => availableFacets.value.categories.map(option => ({ label: String(option.label), value: String(option.value) })));
 const targetOptions = computed(() => availableFacets.value.applicableTypes.map(option => ({ label: String(option.label), value: String(option.value) })));
 const options = computed<Option[]>(() => {
@@ -72,11 +75,13 @@ async function loadMore(reset = false) {
         (!category || item.category === category) &&
         (!targetFilter.value || (item.applicableTypes || [item.applicableType]).includes(targetFilter.value)) &&
         `${item.name} ${item.id} ${item.description || ''}`.toLowerCase().includes(keyword)
-      );
+      ).sort((a, b) => Number(recommended.value.has(b.id)) - Number(recommended.value.has(a.id)));
       result = { items: filtered.slice((nextPage - 1) * pageSize, nextPage * pageSize), total: filtered.length };
     } else {
       const path = props.commerceCost ? '/activity-cost-resources' : '/items';
-      result = await api<ItemsResponse>(`${path}?${new URLSearchParams({ q: searchText.value, category: props.category || categoryFilter.value || '', applicableType: targetFilter.value || '', page: String(nextPage), pageSize: String(pageSize) })}`);
+      const params = new URLSearchParams({ q: searchText.value, category: props.category || categoryFilter.value || '', applicableType: targetFilter.value || '', page: String(nextPage), pageSize: String(pageSize) });
+      if (props.recommendedIds?.length) params.set('preferredIds', props.recommendedIds.join(','));
+      result = await api<ItemsResponse>(`${path}?${params}`);
     }
     if (!alive || current !== generation) return;
     remember(result.items);
@@ -108,12 +113,12 @@ function renderLabel(raw: SelectOption) {
   return h('div', { class: 'resource-select-option' }, [
     h(ResourceImage, { item: option.item, size: 32, preview: false }),
     h('div', { class: 'resource-select-copy' }, [
-      h('div', { class: 'resource-select-heading' }, [h('span', { class: 'resource-select-name' }, option.label), ...(option.item?.qualityLabel ? [h(ItemQuality, { item: option.item })] : [])]),
+      h('div', { class: 'resource-select-heading' }, [h('span', { class: 'resource-select-name' }, option.label), ...(option.item?.qualityLabel ? [h(ItemQuality, { item: option.item })] : []), ...(recommended.value.has(option.value) ? [h(NTag, { size: 'small', bordered: false, type: 'info' }, () => '推荐')] : [])]),
       h('div', { class: 'ops-mono ops-muted' }, option.value)
     ])
   ]);
 }
-watch(() => [props.resources, props.category, props.commerceCost], () => {
+watch(() => [props.resources, props.category, props.commerceCost, props.recommendedIds?.join(',')], () => {
   invalidate(); page.value = 0; rows.value = []; total.value = 0;
   if (props.resources) remember(props.resources);
   if (opened.value) loadMore(true);
@@ -157,5 +162,12 @@ onBeforeUnmount(() => { alive = false; invalidate(); selectionGeneration += 1; }
 .resource-picker-filters { position: relative; z-index: 2; display: flex; gap: 8px; padding: 8px 10px; min-width: 260px; }
 .resource-picker-filters > :deep(.n-select) { flex: 1; min-width: 0; }
 .resource-picker-status { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 12px; color: rgb(var(--base-text-color) / .6); font-size: 12px; }
+:deep(.n-base-selection .resource-select-option) { width: 100%; gap: 6px; padding: 0; }
+:deep(.n-base-selection .resource-select-copy) { flex: 1; min-width: 0; }
+:deep(.n-base-selection .resource-select-heading) { display: block; }
+:deep(.n-base-selection .resource-select-option .item-quality),
+:deep(.n-base-selection .resource-select-option .n-tag),
+:deep(.n-base-selection .resource-select-option .ops-mono) { display: none; }
+:deep(.n-base-selection .resource-select-option .resource-thumb) { width: 24px !important; height: 24px !important; }
 @media(max-width: 480px) { .resource-picker-filters { min-width: 0; } }
 </style>

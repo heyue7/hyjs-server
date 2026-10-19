@@ -28,7 +28,7 @@ func (s *GameService) InitializeAdminActivitySchedules(ctx context.Context) erro
 		return err
 	}
 	for _, row := range rows {
-		if strings.Contains(row.ID, "_schedule_") || strings.Contains(row.ID, "_character_") {
+		if strings.Contains(row.ID, "_schedule_") || strings.Contains(row.ID, "_character_") || adminActivityRedundantSource(row.ID) {
 			continue
 		}
 		id := "import_" + p6Digest([]byte(row.ID))[:24]
@@ -54,7 +54,74 @@ func (s *GameService) InitializeAdminActivitySchedules(ctx context.Context) erro
 		return err
 	}
 	pattern := db.AdminActivityPattern{ID: "original_opening_14", Name: "开服14天 · 原版开服任务", CycleDays: 15, EntriesJSON: adminJSON([]model.AdminActivityPatternEntry{{TemplateID: opening.ID, StartDay: 0, DurationDays: 14, ClaimDays: 1, Lane: 0}}), Revision: 1, UpdatedAtMillis: time.Now().UnixMilli()}
-	return tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&pattern).Error
+	if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&pattern).Error; err != nil {
+		return err
+	}
+	return s.reconcileAdminActivityCatalogue(ctx, rows)
+}
+
+// adminActivityRedundantSource identifies generated aliases, never operator
+// template names or business history. Ordinary shops have their own real menu
+// and shop-window adapter; basic recruitment remains in its original shop.
+func adminActivityRedundantSource(id string) bool {
+	if strings.Contains(id, "lp-") || id == "pool:recruit_1" || id == "pool:recruit_2" {
+		return true
+	}
+	if !strings.HasPrefix(id, "commerce:p4:") {
+		return false
+	}
+	key, _, ok := strings.Cut(strings.TrimPrefix(id, "commerce:p4:"), ":")
+	return ok && adminOrdinarySchedulableShop(key)
+}
+
+// reconcileAdminActivityCatalogue archives obsolete automatic aliases and
+// upgrades newly supported untouched imports. Issued forms, consumers, claims,
+// repeat owners and source rows are never changed by this catalogue migration.
+func (s *GameService) reconcileAdminActivityCatalogue(ctx context.Context, sources []model.AdminActivityInstance) error {
+	current := map[string]model.AdminActivityInstance{}
+	for _, source := range sources {
+		current[source.ID] = source
+	}
+	return db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var definitions []db.AdminActivityDefinition
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("archived=?", false).Find(&definitions).Error; err != nil {
+			return err
+		}
+		for _, row := range definitions {
+			if row.SourceActivityID == "" || row.ID != "import_"+p6Digest([]byte(row.SourceActivityID))[:24] {
+				continue
+			}
+			var edits int64
+			if err := tx.Model(&db.AdminAudit{}).Where("action=? AND target=?", "activity.template.save", row.ID).Count(&edits).Error; err != nil {
+				return err
+			}
+			if edits != 0 {
+				continue
+			}
+			if adminActivityRedundantSource(row.SourceActivityID) {
+				if err := tx.Model(&row).Updates(map[string]any{"archived": true, "revision": row.Revision + 1, "updated_at_millis": time.Now().UnixMilli()}).Error; err != nil {
+					return err
+				}
+				continue
+			}
+			source, ok := current[row.SourceActivityID]
+			if !ok || row.Mode != "unsupported" || source.Mode == "unsupported" {
+				continue
+			}
+			form := source.Form
+			form.StartAt, form.EndAt, form.ClaimEndAt = 0, 0, 0
+			form.Name = row.Name
+			row.Mode, row.FormJSON = source.Mode, adminJSON(form)
+			row.Usable, row.UnavailableReason = source.Availability.Usable, source.Availability.Reason
+			row.Enabled = source.Enabled && row.Usable
+			row.Revision++
+			row.UpdatedAtMillis = time.Now().UnixMilli()
+			if err := tx.Save(&row).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
 func adminActivityDefinitionDTO(row db.AdminActivityDefinition) (model.AdminActivityDefinitionDTO, error) {
@@ -158,6 +225,13 @@ func (s *GameService) AdminSaveActivityDefinition(ctx context.Context, p *model.
 			canonical.RepeatPolicy = form.RepeatPolicy
 			form = canonical
 		}
+		if form.Mode == "king-recruit" {
+			canonical, err := s.adminKingRecruitCanonicalForm(tx, form)
+			if err != nil {
+				return err
+			}
+			form = canonical
+		}
 		form.RepeatPolicy = adminActivityRepeatPolicy(form)
 		form.Name = req.Name
 		form.StartAt = 0
@@ -219,6 +293,7 @@ func adminActivityScheduledLegacyMode(key string) string {
 		{"p4:login:", "login-rewards"}, {"p4:limit:", "limited-sign"}, {"p4:meal:", "stamina-meal"}, {"p4:rebate:", "diamond-rebate"}, {"p4:cat:", "treasure-box"},
 		{"halfDiscountSale_", "half-price"}, {"discountSale_", "discount-shop"}, {"limitExchange_", "exchange"}, {"limitSale_", "limited-shop"}, {"mysticDiscount_", "mystic-shop"},
 		{"rechargeTotal_", "recharge-total"}, {"costTotal_", "diamond-spent"}, {"warriorRescruitTimes_", "recruit-count"}, {"mainCopyWinTimes_", "copy-win"}, {"totalLogin_", "login-total"},
+		{"pvpWinTimes_", "arena-wins"}, {"robTreasureTimes_", "plunder-count"}, {"warriorGetSpecial_", "hero-collection"}, {"aincradStars_", "trial-stars"}, {"kaiFuJingSai_", "power-race"},
 	} {
 		if strings.HasPrefix(key, entry.prefix) {
 			return entry.mode
@@ -460,7 +535,7 @@ func (s *GameService) AdminActivitySchedule(ctx context.Context, p *model.AdminP
 }
 
 func adminActivityModeSingleton(mode string) bool {
-	return strings.HasPrefix(mode, "shop-window:") || mode == "opening-14" || mode == "turntable" || mode == "login-rewards" || mode == "limited-sign" || mode == "stamina-meal" || mode == "diamond-rebate" || mode == "treasure-box" || mode == "mystic-shop"
+	return strings.HasPrefix(mode, "shop-window:") || mode == "opening-14" || mode == "turntable" || mode == "king-recruit" || mode == "plunder-count" || mode == "login-rewards" || mode == "limited-sign" || mode == "stamina-meal" || mode == "diamond-rebate" || mode == "treasure-box" || mode == "mystic-shop"
 }
 
 func (s *GameService) adminActivityScheduleCheck(tx *gorm.DB, serverID int64, version string, items []model.AdminActivityOccurrenceDTO) (*model.AdminActivitySchedulePreviewResponse, map[string]db.AdminActivityOccurrence, error) {
@@ -491,7 +566,11 @@ func (s *GameService) adminActivityScheduleCheck(tx *gorm.DB, serverID int64, ve
 	modes := make([]string, len(items))
 	for i, item := range items {
 		var definition db.AdminActivityDefinition
-		if err = tx.First(&definition, "id=? AND archived=?", item.TemplateID, false).Error; err != nil {
+		query := tx.Where("id=?", item.TemplateID)
+		if item.ID == "" {
+			query = query.Where("archived=?", false)
+		}
+		if err = query.First(&definition).Error; err != nil {
 			return nil, nil, err
 		}
 		modes[i] = definition.Mode
@@ -913,7 +992,7 @@ func (s *GameService) AdminActivityCostResources(ctx context.Context, p *model.A
 			request.Q = q
 		}
 	}
-	data := s.adminActivityCostCatalogue()
+	data := s.adminActivityCostCatalogue(request.PreferredIDs...)
 	catalogue := (&GameService{AdminCatalogueData: data}).AdminCatalogueFiltered(request)
 	return &model.AdminActivityCostResourcesResponse{Items: catalogue.Items, Total: catalogue.Total, Facets: catalogue.Facets}, nil
 }
@@ -1040,4 +1119,11 @@ func (s *GameService) AdoptAdminActivityCalendar(ctx context.Context) error {
 		revision.Revision = 1
 		return tx.Save(&revision).Error
 	})
+}
+
+// adminConfiguredPeriodIdentity recognizes only the separately minted typed
+// activity IDs. Original monthly identities retain their stricter contracts;
+// accepted battle witnesses and source-bound facts remain mandatory.
+func adminConfiguredPeriodIdentity(cfg db.PeriodInstance, prefix, kind string) bool {
+	return strings.HasPrefix(cfg.ID, prefix+"admin_") && len(cfg.ID) > len(prefix+"admin_") && cfg.Kind == kind && cfg.Mode == "cumulative" && cfg.Goal > 0 && cfg.RankPlaces == 0 && cfg.StartAt > 0 && cfg.EndAt > cfg.StartAt && cfg.RewardEndAt >= cfg.EndAt
 }

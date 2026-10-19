@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue';
 import { ApiError, api, errorMessage, formatTime, json } from '@/service/operations';
 import type { ServerClock, ServerClockChange } from '@/service/server-clock';
 import { useAuthStore } from '@/store/modules/auth';
+import { createRequestId } from '@/utils/request-id';
 const auth = useAuthStore();
 const canChange = computed(() => auth.userInfo.roles.includes('admin'));
 const clock = ref<ServerClock | null>(null);
@@ -27,7 +28,7 @@ async function load() {
 }
 async function change(deltaDays: -1 | 1) {
   if (!clock.value || blocked.value || (pending.value && pending.value.deltaDays !== deltaDays)) return;
-  const request = pending.value || { deltaDays, revision: clock.value.revision, requestId: crypto.randomUUID() };
+  const request = pending.value || { deltaDays, revision: clock.value.revision, requestId: createRequestId() };
   pending.value = request;
   changing.value = true;
   error.value = '';

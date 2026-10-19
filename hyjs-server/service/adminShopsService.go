@@ -22,30 +22,30 @@ func AdminShopDefinitions() []model.AdminShopDefinition {
 	base := []string{"rewards", "cost", "dailyLimit", "totalLimit", "stock", "minLevel", "minVip", "priority", "weight", "discountBps"}
 	out := []model.AdminShopDefinition{}
 	for _, v := range []struct{ id, label string }{{"ordinary", "普通商店"}, {"memory", "记忆圣坛"}, {"popularity", "声望商店商品"}, {"popularity-rank", "声望商店奖励"}, {"point", "攻略点商店"}, {"score", "积分商店"}, {"guild", "公会商店"}, {"pet-market", "精灵商店"}, {"union-fight", "公会战商店"}, {"vip", "会员礼包"}} {
-		d := model.AdminShopDefinition{ID: v.id, Label: v.label, Fields: append([]string{}, base...), SettingsFields: []string{"unlimited", "enabled", "startAt", "endAt", "claimEndAt", "source"}, CanCreate: true, Notes: "已冻结目录先复制为新一期；历史购买和限购保留。"}
+		d := model.AdminShopDefinition{ID: v.id, Label: v.label, Fields: append([]string{}, base...), SettingsFields: []string{"unlimited", "enabled", "startAt", "endAt", "claimEndAt", "source"}, CanCreate: true, Notes: "保存后立即用于后续购买；历史交易、库存使用和限购保留。"}
 		switch v.id {
 		case "ordinary":
 			d.Fields = append(d.Fields, "enabled")
-			d.Notes = "包含原固定商品位与当前运营期；固定商品价格和限购须匹配原客户端价格档。"
+			d.Notes = "商品、价格与材料保存后生效；原阶梯价格保留到该商品被显式修改。"
 		case "memory":
 			d.SettingsFields = append(d.SettingsFields, "slots")
 		case "popularity-rank":
 			d.Fields = append(d.Fields, "maxRank")
-			d.Notes = "对应游戏声望商店的“奖励”页签。配置奖励道具、声望价格与最高排名门槛；每日/整期各1次，保留原排名证明。发布后用于后继目录，已冻结目录先复制新一期。"
+			d.Notes = "对应游戏声望商店的“奖励”页签。配置奖励道具、声望价格与最高排名门槛；每日/整期各1次，保留原排名证明。保存后生效，历史购买和排名资格保留。"
 		case "guild":
 			d.Fields = append(d.Fields, "contributionCost", "guildLevel")
 		case "pet-market":
 			d.Fields = []string{"rewards", "cost", "stock", "weight"}
 			d.SettingsFields = []string{"unlimited", "startAt", "endAt", "claimEndAt", "enabled", "slots"}
-			d.Notes = "变更用于下一周库存；当前玩家已冻结周目录保持。原150钻刷新/每周10次和分解规则保留。"
+			d.Notes = "变更立即更新当前可见商品，已用库存及刷新次数保留。原150钻刷新/每周10次和分解规则保留。"
 		case "union-fight":
 			d.Fields = []string{"rewards", "cost", "stock", "priority", "day", "buyCondition", "refreshMillis", "enabled", "source"}
 			d.SettingsFields = []string{"unlimited", "startAt", "endAt", "claimEndAt"}
-			d.Notes = "按公会战日期发布；仅影响之后建立的场次，原场内道具和携带上限保持。"
+			d.Notes = "按公会战日期设置商品，保存后更新当前场次后续购买；已用库存和携带上限保留。"
 		case "vip":
 			d.Fields = []string{"rewards", "cost", "minVip", "enabled", "source"}
 			d.SettingsFields = []string{"unlimited", "startAt", "endAt", "claimEndAt"}
-			d.Notes = "对应游戏商城的“会员礼包”（原VIP商店，shopType=2）。空列表表示尚无已启用商品；请自行配置奖励、价格及会员条件后启用。已有当日快照保持，下次有效刷新使用新配置。"
+			d.Notes = "对应游戏商城的“会员礼包”（原VIP商店，shopType=2）。空列表表示尚无已启用商品；请自行配置奖励、价格及会员条件后启用。保存后立即更新后续购买，已领次数保持。"
 		}
 		out = append(out, d)
 	}
@@ -130,7 +130,7 @@ func (s *GameService) adminReadShop(tx *gorm.DB, key string) (*model.AdminShopRe
 			return nil, nil, err
 		}
 		for _, p := range raw.VIP {
-			v := adminShopBaseProduct(p.ID, p.Reward, fmt.Sprintf("diamond,%d", p.Cost))
+			v := adminShopBaseProduct(p.ID, p.Reward, fmt.Sprintf("%s,%d", vipShopCostResource(p), p.Cost))
 			v.MinVip = p.MinVIP
 			v.Source = p.Source
 			v.Enabled = p.Enabled
@@ -158,7 +158,7 @@ func (s *GameService) adminReadShop(tx *gorm.DB, key string) (*model.AdminShopRe
 			return nil, nil, err
 		}
 		for _, p := range raw.Union {
-			v := adminShopBaseProduct(p.Day+"@"+p.ShopItemID, fmt.Sprintf("%s,%d", p.ItemID, p.Quantity), fmt.Sprintf("unionFightToken,%d", p.Price))
+			v := adminShopBaseProduct(p.Day+"@"+p.ShopItemID, fmt.Sprintf("%s,%d", p.ItemID, p.Quantity), fmt.Sprintf("%s,%d", p13UFShopCostResource(p), p.Price))
 			v.Stock = p.BuyCount
 			v.Day = p.Day
 			v.Priority = p.Priority
@@ -179,7 +179,7 @@ func (s *GameService) adminReadShop(tx *gorm.DB, key string) (*model.AdminShopRe
 		}
 		if err == nil {
 			raw.Period = &row
-			out.Settings = model.AdminShopSettings{Enabled: row.Enabled, StartAt: row.StartAt, EndAt: row.EndAt, ClaimEndAt: row.ClaimEndAt, Source: row.Source, PeriodID: row.ID, Frozen: len(row.Frozen) > 0}
+			out.Settings = model.AdminShopSettings{Enabled: row.Enabled, StartAt: row.StartAt, EndAt: row.EndAt, ClaimEndAt: row.ClaimEndAt, Source: row.Source, PeriodID: row.ID, Frozen: false}
 			var rules p4CommerceRules
 			if json.Unmarshal(row.Rules, &rules) != nil {
 				return nil, nil, constUtil.ErrAdminConfiguration
@@ -258,6 +258,9 @@ func (s *GameService) adminShopMutation(ctx context.Context, actor *model.AdminP
 		if current.Version != version {
 			return constUtil.ErrAdminConfigConflict
 		}
+		if err = s.ArchiveP4PopularityRankOffer(tx, raw.Period); err != nil {
+			return err
+		}
 		if err = fn(tx, raw); err != nil {
 			return err
 		}
@@ -290,10 +293,13 @@ func (s *GameService) AdminSaveShopProduct(ctx context.Context, actor *model.Adm
 		cost := fmt.Sprintf("%s,%d", p.Cost.ResourceID, p.Cost.Amount)
 		switch key {
 		case "vip":
-			if p.Cost.ResourceID != "diamond" || p.MinVip < 1 || p.MinVip > 12 || p.Cost.Amount > 100000 {
+			if p.MinVip < 1 || p.MinVip > 12 {
 				return constUtil.ErrAdminInput
 			}
-			row := db.VIPShopProduct{ID: id, MinVIP: p.MinVip, Cost: p.Cost.Amount, Reward: reward, Enabled: p.Enabled, Source: p.Source}
+			if _, err := s.p4ParseCost(cost); err != nil {
+				return err
+			}
+			row := db.VIPShopProduct{ID: id, MinVIP: p.MinVip, CostResource: p.Cost.ResourceID, Cost: p.Cost.Amount, Reward: reward, Enabled: p.Enabled, Source: p.Source}
 			if !create {
 				found := false
 				for _, old := range raw.VIP {
@@ -331,7 +337,7 @@ func (s *GameService) AdminSaveShopProduct(ctx context.Context, actor *model.Adm
 			raw.Pet.Input = adminJSON(cfg)
 			return tx.Save(raw.Pet).Error
 		case "union-fight":
-			if len(p.Rewards) != 1 || p.Cost.ResourceID != "unionFightToken" {
+			if len(p.Rewards) != 1 {
 				return constUtil.ErrAdminInput
 			}
 			item := s.table("UnionFightItem", "UFItemId", p.Rewards[0].ResourceID)
@@ -356,7 +362,12 @@ func (s *GameService) AdminSaveShopProduct(ctx context.Context, actor *model.Adm
 					return fmt.Errorf("%w: 商品已不存在，请刷新", constUtil.ErrAdminInput)
 				}
 			}
-			row := db.P13UnionFightShopSource{Day: p.Day, ShopItemID: productID, Enabled: p.Enabled, ItemID: p.Rewards[0].ResourceID, Price: p.Cost.Amount, Quantity: p.Rewards[0].Amount, BuyCount: p.Stock, BuyCondition: p.BuyCondition, Priority: p.Priority, RefreshMillis: p.RefreshMillis, PublishedAt: time.Now().UnixMilli(), Source: p.Source}
+			if p.Cost.ResourceID != "unionFightToken" {
+				if _, err := s.p4ParseCost(cost); err != nil {
+					return err
+				}
+			}
+			row := db.P13UnionFightShopSource{CostResource: p.Cost.ResourceID, Day: p.Day, ShopItemID: productID, Enabled: p.Enabled, ItemID: p.Rewards[0].ResourceID, Price: p.Cost.Amount, Quantity: p.Rewards[0].Amount, BuyCount: p.Stock, BuyCondition: p.BuyCondition, Priority: p.Priority, RefreshMillis: p.RefreshMillis, PublishedAt: time.Now().UnixMilli(), Source: p.Source}
 			return tx.Save(&row).Error
 		default:
 			if strings.HasPrefix(id, "legacy:") {
@@ -373,6 +384,7 @@ func (s *GameService) AdminSaveShopProduct(ctx context.Context, actor *model.Adm
 				if row == nil {
 					return fmt.Errorf("%w: 商品已不存在，请刷新", constUtil.ErrAdminInput)
 				}
+				row.LiveEditable = true
 				row.ResourceID = p.Rewards[0].ResourceID
 				row.Amount = int32(p.Rewards[0].Amount)
 				row.Cost = cost
@@ -391,14 +403,22 @@ func (s *GameService) AdminSaveShopProduct(ctx context.Context, actor *model.Adm
 			}
 			row := raw.Period
 			if row == nil {
-				return fmt.Errorf("%w: 请先保存商店开放时间，建立关闭的新期", constUtil.ErrAdminInput)
+				return fmt.Errorf("%w: 请先保存商店设置，再添加商品", constUtil.ErrAdminInput)
 			}
-			if len(row.Frozen) > 0 {
-				return fmt.Errorf("%w: 本期已冻结，请先复制为新一期", constUtil.ErrAdminInput)
+
+			// A closed original rank seed has no issued window yet. Operators may
+			// edit its catalogue directly; valid internal dates do not enable it.
+			if !row.Enabled && (row.StartAt <= 0 || row.EndAt <= row.StartAt) {
+				start := LocalPlayNow(ctx)
+				row.StartAt, row.EndAt, row.ClaimEndAt = start.UnixMilli(), start.AddDate(0, 1, 0).UnixMilli(), start.AddDate(0, 1, 0).UnixMilli()
 			}
 			originalID := strings.TrimPrefix(id, "period:")
 			var rules p4CommerceRules
 			_ = json.Unmarshal(row.Rules, &rules)
+			rules.LiveEditable = true
+			if key == "popularity-rank" && rules.RankPublishedAt <= 0 {
+				rules.RankPublishedAt = min(time.Now().UnixMilli(), row.StartAt-1)
+			}
 			found := -1
 			nextIndex := int32(1)
 			for i, old := range rules.Products {
@@ -413,10 +433,9 @@ func (s *GameService) AdminSaveShopProduct(ctx context.Context, actor *model.Adm
 			value := p4Product{ID: originalID, Name: p.Name, Index: nextIndex, Rewards: reward, Cost: cost, Priority: int32(p.Priority), DailyLimit: int32(p.DailyLimit), TotalLimit: int32(p.TotalLimit), Stock: int32(p.Stock), MinLevel: int32(p.MinLevel), MinVIP: int32(p.MinVip), Weight: p.Weight, DiscountBps: int32(p.DiscountBps), MaxRank: p.MaxRank}
 			if found >= 0 {
 				value.Index = rules.Products[found].Index
-				value.TierID = rules.Products[found].TierID
-				if value.TierID && rules.Products[found].Cost != cost {
-					return fmt.Errorf("%w: 原固定价格档不可改为客户端未显示的价格", constUtil.ErrAdminInput)
-				}
+				// An explicit product edit uses the configured linear price. Unedited
+				// original tier products keep their original tier contract.
+				value.TierID = false
 				rules.Products[found] = value
 			} else {
 				rules.Products = append(rules.Products, value)
@@ -424,6 +443,7 @@ func (s *GameService) AdminSaveShopProduct(ctx context.Context, actor *model.Adm
 			if key == "guild" {
 				var gr p4GuildRules
 				_ = json.Unmarshal(row.Rules, &gr)
+				gr.LiveEditable = true
 				entry := p4GuildProduct{p4Product: value, ContributionCost: int32(p.ContributionCost), GuildLevel: int32(p.GuildLevel)}
 				if found >= 0 {
 					gr.Products[found] = entry
@@ -482,9 +502,7 @@ func (s *GameService) AdminDeleteShopProduct(ctx context.Context, actor *model.A
 			if row == nil {
 				return fmt.Errorf("%w: 商品已不存在，请刷新", constUtil.ErrAdminInput)
 			}
-			if len(row.Frozen) > 0 {
-				return fmt.Errorf("%w: 本期已冻结，请先复制为新一期", constUtil.ErrAdminInput)
-			}
+
 			// Decode the product objects as raw entries so guild/rank fields remain intact.
 			var document map[string]json.RawMessage
 			_ = json.Unmarshal(row.Rules, &document)
@@ -502,6 +520,7 @@ func (s *GameService) AdminDeleteShopProduct(ctx context.Context, actor *model.A
 				return fmt.Errorf("%w: 商品已不存在，请刷新", constUtil.ErrAdminInput)
 			}
 			document["products"] = adminJSON(kept)
+			document["liveEditable"] = adminJSON(true)
 			row.Rules = adminJSON(document)
 			if len(kept) == 0 {
 				row.Enabled = false
@@ -540,10 +559,7 @@ func (s *GameService) AdminSaveShopSettings(ctx context.Context, actor *model.Ad
 			return tx.Save(raw.Pet).Error
 		}
 		row := raw.Period
-		create := row == nil || req.NewPeriod
-		if req.NewPeriod && !req.Unlimited && row != nil && req.StartAt <= row.StartAt {
-			return fmt.Errorf("%w: 新期开启时间须晚于上一期", constUtil.ErrAdminInput)
-		}
+		create := row == nil
 		if row == nil {
 			shopType := map[string]int32{"ordinary": 1, "memory": 3, "popularity": 4, "popularity-rank": 4, "point": 5, "score": 7, "guild": 8}[key]
 			rules := p4CommerceRules{Products: []p4Product{}}
@@ -561,13 +577,6 @@ func (s *GameService) AdminSaveShopSettings(ctx context.Context, actor *model.Ad
 			row.ID = "p4:" + key + ":" + strings.ReplaceAll(uuid.NewString(), "-", "")[:16]
 			row.Frozen = nil
 			row.Enabled = false
-		} else if len(row.Frozen) > 0 {
-			// Enable/disable remains operational; immutable content/window stays frozen.
-			if req.Source != row.Source {
-				return fmt.Errorf("%w: 已冻结的商品来源不可覆盖，请复制新期", constUtil.ErrAdminInput)
-			}
-			row.Enabled = req.Enabled
-			return tx.Model(&db.P4CommerceRule{}).Where("id=?", row.ID).Update("enabled", row.Enabled).Error
 		} else {
 			row.Enabled = req.Enabled
 		}
@@ -589,6 +598,7 @@ func (s *GameService) AdminSaveShopSettings(ctx context.Context, actor *model.Ad
 		}
 		var document map[string]json.RawMessage
 		_ = json.Unmarshal(row.Rules, &document)
+		document["liveEditable"] = adminJSON(true)
 		if key == "memory" {
 			document["slots"] = adminJSON(req.Slots)
 		}
@@ -608,4 +618,29 @@ func (s *GameService) AdminSaveShopSettings(ctx context.Context, actor *model.Ad
 		}
 		return tx.Save(row).Error
 	})
+}
+
+// Public quotes bind the displayed resource/reward/limits to a stable product.
+// Receipts continue to compare the original unmodified request bytes first.
+func adminLiveShopParseSKU(value string) (string, string, bool) {
+	parts := strings.SplitN(value, ":", 3)
+	if len(parts) != 3 || (parts[0] != "p4q" && parts[0] != "p4qt" && parts[0] != "s1q") || len(parts[1]) != 16 || parts[2] == "" {
+		return "", value, false
+	}
+	return parts[1], parts[2], true
+}
+func adminLiveP4SKU(cfg db.P4CommerceRule, product p4Product, extra any) string {
+	prefix := "p4q"
+	if product.TierID {
+		prefix = "p4qt"
+	}
+	hash := p6Digest(adminJSON(struct {
+		Rule    string
+		Product p4Product
+		Extra   any
+	}{cfg.ID, product, extra}))[:16]
+	return prefix + ":" + hash + ":" + product.ID
+}
+func adminLiveLegacySKU(row db.ShopProduct) string {
+	return "s1q:" + p6Digest(adminJSON(row))[:16] + ":" + row.ID
 }

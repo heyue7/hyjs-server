@@ -61,6 +61,13 @@ func (s *GameService) recordP4VerifiedArenaWin(tx *gorm.DB, row *db.P11ArenaFigh
 		return err
 	}
 	for _, live := range periods {
+		allowed, err := localPlayActivityVisible(tx, live.ID)
+		if err != nil {
+			return err
+		}
+		if !allowed {
+			continue
+		}
 		frozen, e := s.freezeP1Period(tx, live, false)
 		if e != nil {
 			return e
@@ -124,6 +131,9 @@ func (s *GameService) p4ReconcileArenaWinProgress(tx *gorm.DB, progress *db.Peri
 // p4ArenaWinFrozenIdentity allows pure tests and support tools to verify the
 // same original Type9 prefix and finite no-grace local window without a DB read.
 func p4ArenaWinFrozenIdentity(cfg db.PeriodInstance) bool {
+	if adminConfiguredPeriodIdentity(cfg, constUtil.P4ArenaWinPeriodPrefix, constUtil.P4ArenaWinKind) {
+		return true
+	}
 	if !strings.HasPrefix(cfg.ID, constUtil.P4ArenaWinPeriodPrefix) || cfg.Kind != constUtil.P4ArenaWinKind || cfg.Mode != "cumulative" || cfg.Source != constUtil.P4ArenaWinSource || cfg.EndAt != cfg.RewardEndAt {
 		return false
 	}

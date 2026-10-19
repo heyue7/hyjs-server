@@ -107,8 +107,11 @@ func (s *GameService) validateP9MarketConfig(cfg *p9MarketConfig) error {
 	}
 	seen := map[string]bool{}
 	for _, offer := range cfg.Offers {
-		if offer.ID == "" || len(offer.ID) > 20 || strings.TrimSpace(offer.ID) != offer.ID || strings.ContainsAny(offer.ID, ":|;\r\n") || seen[offer.ID] || offer.Amount < 1 || offer.Amount > 10000 || offer.Price < 1 || offer.Stock < 1 || offer.Stock > 100 || offer.Weight < 1 || offer.Weight > 1000000000000 || (offer.Currency != "coinpet" && offer.Currency != "diamond") {
+		if offer.ID == "" || len(offer.ID) > 20 || strings.TrimSpace(offer.ID) != offer.ID || strings.ContainsAny(offer.ID, ":|;\r\n") || seen[offer.ID] || offer.Amount < 1 || offer.Amount > 10000 || offer.Price < 1 || offer.Stock < 1 || offer.Stock > 100 || offer.Weight < 1 || offer.Weight > 1000000000000 {
 			return errors.New(constUtil.P9MarketError)
+		}
+		if _, err := s.p4ParseCost(fmt.Sprintf("%s,%d", offer.Currency, offer.Price)); err != nil {
+			return err
 		}
 		if !(strings.HasPrefix(offer.Resource, "item_") && s.table("Item", "itemId", offer.Resource) != nil) && !(strings.HasPrefix(offer.Resource, "frag_pet_") && s.table("Frag", "id", offer.Resource) != nil) {
 			return errors.New(constUtil.P9MarketError)
@@ -172,10 +175,10 @@ func (s *GameService) p9MarketState(tx *gorm.DB, id int64, now time.Time) (*db.P
 		return nil, nil, errors.New(constUtil.P9MarketError)
 	}
 	cfg := &p9MarketConfig{}
+	if len(live.Input) > 131072 || strings.TrimSpace(live.Source) == "" || json.Unmarshal(live.Input, cfg) != nil || s.validateP9MarketConfig(cfg) != nil {
+		return nil, nil, errors.New(constUtil.P9MarketError)
+	}
 	if errors.Is(err, gorm.ErrRecordNotFound) || state.WeekKey != week {
-		if len(live.Input) > 131072 || strings.TrimSpace(live.Source) == "" || json.Unmarshal(live.Input, cfg) != nil || s.validateP9MarketConfig(cfg) != nil {
-			return nil, nil, errors.New(constUtil.P9MarketError)
-		}
 		state.PlayerID = id
 		state.WeekKey = week
 		state.Input = append([]byte(nil), live.Input...)
@@ -188,8 +191,22 @@ func (s *GameService) p9MarketState(tx *gorm.DB, id int64, now time.Time) (*db.P
 			return nil, nil, err
 		}
 	} else {
-		if state.InputHash != p6Digest(state.Input) || json.Unmarshal(state.Input, cfg) != nil || s.validateP9MarketConfig(cfg) != nil || state.Generation < 1 || state.RefreshUsed < 0 || state.RefreshUsed > cfg.RefreshCap {
+		var oldCfg p9MarketConfig
+		if state.InputHash != p6Digest(state.Input) || json.Unmarshal(state.Input, &oldCfg) != nil || s.validateP9MarketConfig(&oldCfg) != nil || state.Generation < 1 || state.RefreshUsed < 0 || state.RefreshUsed > cfg.RefreshCap {
 			return nil, nil, errors.New(constUtil.P9MarketError)
+		}
+		if _, _, err := s.p9MarketInventory(&state, &oldCfg); err != nil {
+			return nil, nil, err
+		}
+		if state.InputHash != p6Digest(live.Input) {
+			if err := s.p9MarketUpdateLive(&state, cfg); err != nil {
+				return nil, nil, err
+			}
+			state.Input = append([]byte(nil), live.Input...)
+			state.InputHash = p6Digest(state.Input)
+			if err := tx.Save(&state).Error; err != nil {
+				return nil, nil, err
+			}
 		}
 	}
 	if _, _, err := s.p9MarketInventory(&state, cfg); err != nil {
@@ -210,13 +227,13 @@ func (s *GameService) p9MarketInventory(state *db.P9PetMarketState, cfg *p9Marke
 	}
 	seen := map[string]bool{}
 	for _, offer := range selected {
-		if seen[offer.ID] || allowed[offer.ID] != offer || bought[offer.ID] < 0 || bought[offer.ID] > offer.Stock {
+		if seen[offer.ID] || allowed[offer.ID] != offer || bought[offer.ID] < 0 {
 			return nil, nil, errors.New(constUtil.P9MarketError)
 		}
 		seen[offer.ID] = true
 	}
 	for id, n := range bought {
-		if !seen[id] || n < 0 {
+		if id == "" || n < 0 {
 			return nil, nil, errors.New(constUtil.P9MarketError)
 		}
 	}
@@ -227,6 +244,55 @@ func p9MarketSKU(state *db.P9PetMarketState, id string) string {
 	return fmt.Sprintf("p9shop:%s:%d:%s", state.WeekKey, state.Generation, id)
 }
 
+func p9MarketQuoteSKU(state *db.P9PetMarketState, offer p9MarketOffer) string {
+	return p9MarketSKU(state, offer.ID) + ":" + p6Digest(adminJSON(offer))[:16]
+}
+
+// Reconcile current selected identities in place. Operational edits never call
+// p9MarketSelect, which deliberately starts a new refresh inventory generation.
+func (s *GameService) p9MarketUpdateLive(state *db.P9PetMarketState, cfg *p9MarketConfig) error {
+	var previous []p9MarketOffer
+	if json.Unmarshal(state.Selected, &previous) != nil {
+		return errors.New(constUtil.P9MarketError)
+	}
+	available := map[string]p9MarketOffer{}
+	for _, offer := range cfg.Offers {
+		available[offer.ID] = offer
+	}
+	next := make([]p9MarketOffer, 0, cfg.Slots)
+	seen := map[string]bool{}
+	for _, old := range previous {
+		if offer, ok := available[old.ID]; ok && len(next) < cfg.Slots {
+			next = append(next, offer)
+			seen[offer.ID] = true
+		}
+	}
+	for len(next) < cfg.Slots {
+		var options []p9MarketOffer
+		var weights []db.GameplayPoolReward
+		for _, offer := range cfg.Offers {
+			if !seen[offer.ID] {
+				weights = append(weights, db.GameplayPoolReward{ID: int32(len(options)), Amount: 1, Weight: offer.Weight})
+				options = append(options, offer)
+			}
+		}
+		chosen, err := choosePoolReward(weights, false)
+		if err != nil {
+			return err
+		}
+		offer := options[chosen.ID]
+		next = append(next, offer)
+		seen[offer.ID] = true
+	}
+	raw, err := json.Marshal(next)
+	if err != nil {
+		return err
+	}
+	state.Selected = raw
+	state.SelectedHash = p6Digest(raw)
+	return nil
+}
+
 func (s *GameService) p9MarketListing(state *db.P9PetMarketState, cfg *p9MarketConfig) (*pb.SCPetShopProductList, error) {
 	selected, bought, err := s.p9MarketInventory(state, cfg)
 	if err != nil {
@@ -234,27 +300,20 @@ func (s *GameService) p9MarketListing(state *db.P9PetMarketState, cfg *p9MarketC
 	}
 	out := &pb.SCPetShopProductList{RefreshTimes: proto.Int32(cfg.RefreshCap - state.RefreshUsed)}
 	for index, offer := range selected {
-		left := offer.Stock - bought[offer.ID]
+		left := max(int32(0), offer.Stock-bought[offer.ID])
 		price := &pb.BaseResource{Id: proto.String(offer.Currency), Num: proto.Int32(offer.Price)}
-		out.ShopItemList = append(out.ShopItemList, &pb.ShopItem{Id: proto.String(p9MarketSKU(state, offer.ID)), Item: []*pb.BaseResource{{Id: proto.String(offer.Resource), Num: proto.Int32(offer.Amount)}}, Price: []*pb.BaseResource{price}, ExchangeList: []*pb.BaseResource{proto.Clone(price).(*pb.BaseResource)}, Priority: proto.Int32(int32(index + 1)), CanBuy: proto.Int32(left), DayLeftTimes: proto.Int32(left), DayTotalTimes: proto.Int32(offer.Stock), TotalLeftTimes: proto.Int32(left), TotalTimes: proto.Int32(offer.Stock)})
+		out.ShopItemList = append(out.ShopItemList, &pb.ShopItem{Id: proto.String(p9MarketQuoteSKU(state, offer)), Item: []*pb.BaseResource{{Id: proto.String(offer.Resource), Num: proto.Int32(offer.Amount)}}, Price: []*pb.BaseResource{price}, ExchangeList: []*pb.BaseResource{proto.Clone(price).(*pb.BaseResource)}, Priority: proto.Int32(int32(index + 1)), CanBuy: proto.Int32(left), DayLeftTimes: proto.Int32(left), DayTotalTimes: proto.Int32(offer.Stock), TotalLeftTimes: proto.Int32(left), TotalTimes: proto.Int32(offer.Stock)})
 	}
 	return out, nil
 }
 
 // p9MarketReceiptCurrent 检查旧库存投影，后续购买或刷新后的旧目录不能回写当前UI。
 func (s *GameService) p9MarketReceiptCurrent(tx *gorm.DB, id int64, response proto.Message) error {
-	var row db.P9PetMarketState
-	if err := tx.First(&row, "player_id=?", id).Error; err != nil {
+	row, cfg, err := s.p9MarketState(tx, id, time.Now())
+	if err != nil {
 		return err
 	}
-	if row.WeekKey != p9MarketWeek(LocalPlayNow(tx.Statement.Context)) {
-		return errors.New(constUtil.P9MarketReceiptExpired)
-	}
-	var cfg p9MarketConfig
-	if row.InputHash != p6Digest(row.Input) || json.Unmarshal(row.Input, &cfg) != nil || s.validateP9MarketConfig(&cfg) != nil {
-		return errors.New(constUtil.P9MarketError)
-	}
-	actual, err := s.p9MarketListing(&row, &cfg)
+	actual, err := s.p9MarketListing(row, cfg)
 	if err != nil {
 		return err
 	}
@@ -354,8 +413,8 @@ func (s *GameService) p9PetShopList(ctx context.Context, id int64) ([]proto.Mess
 
 func (s *GameService) p9PetShopBuy(ctx context.Context, id int64, request *pb.CSPetShopBuy, stamp int64) ([]proto.Message, error) {
 	out := &pb.SCPetShopBuy{Get: &pb.ResultObject{}}
-	return s.p9MarketMutation(ctx, id, constUtil.P9MarketBuyOperation, stamp, request, out, func(tx *gorm.DB, p *pb.Player, g *model.GameState) error {
-		if request.GetBuyCount() < 1 || request.GetBuyCount() > 100 || len(request.GetShopItemId()) > 64 || strings.TrimSpace(request.GetShopItemId()) != request.GetShopItemId() {
+	messages, err := s.p9MarketMutation(ctx, id, constUtil.P9MarketBuyOperation, stamp, request, out, func(tx *gorm.DB, p *pb.Player, g *model.GameState) error {
+		if request.GetBuyCount() < 1 || request.GetBuyCount() > 100 || len(request.GetShopItemId()) > 128 || strings.TrimSpace(request.GetShopItemId()) != request.GetShopItemId() {
 			return p5Error()
 		}
 		state, cfg, err := s.p9MarketState(tx, id, time.Now())
@@ -368,7 +427,7 @@ func (s *GameService) p9PetShopBuy(ctx context.Context, id int64, request *pb.CS
 		}
 		var chosen *p9MarketOffer
 		for i, offer := range selected {
-			if p9MarketSKU(state, offer.ID) == request.GetShopItemId() {
+			if p9MarketQuoteSKU(state, offer) == request.GetShopItemId() {
 				chosen = &selected[i]
 				break
 			}
@@ -381,15 +440,12 @@ func (s *GameService) p9PetShopBuy(ctx context.Context, id int64, request *pb.CS
 		if price > math.MaxInt32 || amount > math.MaxInt32 {
 			return p5Error()
 		}
-		if chosen.Currency == "coinpet" {
-			if p.GetCoinpet() < price {
-				return errors.New("精灵币不足")
-			}
-			p.Coinpet = proto.Int64(p.GetCoinpet() - price)
-		} else {
-			if err := deductPoolCost(p, g, &pb.BaseResource{Id: proto.String("diamond"), Num: proto.Int32(int32(price))}); err != nil {
-				return err
-			}
+		cost, err := s.p4ParseCost(fmt.Sprintf("%s,%d", chosen.Currency, price))
+		if err != nil {
+			return err
+		}
+		if err = s.p4Deduct(tx, id, p, g, cost, "p9:shop-buy:"+strconv.FormatInt(stamp, 10), LocalPlayNow(ctx)); err != nil {
+			return err
 		}
 		gain, err := s.GrantFixedReward(p, g, chosen.Resource+","+strconv.FormatInt(amount, 10))
 		if err != nil {
@@ -410,11 +466,13 @@ func (s *GameService) p9PetShopBuy(ctx context.Context, id int64, request *pb.CS
 			return err
 		}
 		out.ShopItemList = listing.ShopItemList
-		if s.P1Ready {
-			return s.RecordP1Event(tx, id, "p9:shop-buy:"+strconv.FormatInt(stamp, 10), "spend:"+chosen.Currency, price, LocalPlayNow(ctx))
-		}
+
 		return nil
 	})
+	if err != nil {
+		return nil, err
+	}
+	return s.shopInventorySync(ctx, id, messages)
 }
 
 // p9PetShopRefresh 发送原回调实际读取的ProductList，并追加完整钱包同步扣费。

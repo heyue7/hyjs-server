@@ -13,7 +13,6 @@ import (
 	"math"
 	"strconv"
 	"strings"
-	"time"
 )
 
 // InitializeShop 只创建首次目录，奖励和限购热改不会被重启覆盖。
@@ -60,30 +59,32 @@ func (s *GameService) shopItem(tx *gorm.DB, player *pb.Player, cfg *db.ShopProdu
 	if cfg.Amount < 1 || cfg.Amount > 10000 || cfg.DailyLimit < 1 || cfg.DailyLimit > 10000 || cfg.MinLevel < 1 || cfg.MinVIP < 0 || s.table("Item", "itemId", cfg.ResourceID) == nil {
 		return nil, errors.New("商店目录配置无效")
 	}
-	cost, err := parsePoolCost(cfg.Cost)
+	cost, err := s.p4ParseCost(cfg.Cost)
 	if err != nil {
 		return nil, err
 	}
 	// 普通道具页从原表计算显示价格，只允许完整固定价格档，避免暗中多扣。
 	var maxCount int64
-	for _, row := range s.Tables["ItemShopPrice"] {
-		if row["shopItemId"] != cfg.ID {
-			continue
+	if !cfg.LiveEditable {
+		for _, row := range s.Tables["ItemShopPrice"] {
+			if row["shopItemId"] != cfg.ID {
+				continue
+			}
+			if row["price"] != cfg.Cost {
+				return nil, errors.New("当前客户端仅支持原表固定商品价格")
+			}
+			rangeParts := strings.Split(row["count"], "-")
+			last, e := strconv.ParseInt(rangeParts[len(rangeParts)-1], 10, 32)
+			if e != nil {
+				return nil, e
+			}
+			if last > maxCount {
+				maxCount = last
+			}
 		}
-		if row["price"] != cfg.Cost {
-			return nil, errors.New("当前客户端仅支持原表固定商品价格")
+		if int64(cfg.DailyLimit) > maxCount {
+			return nil, errors.New("商店限购超出原客户端价格档")
 		}
-		rangeParts := strings.Split(row["count"], "-")
-		last, e := strconv.ParseInt(rangeParts[len(rangeParts)-1], 10, 32)
-		if e != nil {
-			return nil, e
-		}
-		if last > maxCount {
-			maxCount = last
-		}
-	}
-	if int64(cfg.DailyLimit) > maxCount {
-		return nil, errors.New("商店限购超出原客户端价格档")
 	}
 	var state db.ShopState
 	if err = tx.Where("player_id = ? AND product_id = ? AND day = ?", player.GetPlayerId(), cfg.ID, day).First(&state).Error; err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
@@ -97,7 +98,11 @@ func (s *GameService) shopItem(tx *gorm.DB, player *pb.Player, cfg *db.ShopProdu
 	if player.GetLevel() < cfg.MinLevel || player.GetVip() < cfg.MinVIP {
 		canBuy = 0
 	}
-	return &pb.ShopItem{Id: proto.String(cfg.ID), Item: []*pb.BaseResource{{Id: proto.String(cfg.ResourceID), Num: proto.Int32(cfg.Amount)}}, Price: []*pb.BaseResource{cost}, ExchangeList: []*pb.BaseResource{cost}, Priority: proto.Int32(cfg.Priority), CanBuy: proto.Int32(canBuy), DayLeftTimes: proto.Int32(left), DayTotalTimes: proto.Int32(cfg.DailyLimit), Condition: &pb.ShopCondition{Type: proto.String("level"), Value: proto.Int64(int64(cfg.MinLevel))}}, nil
+	publicID := cfg.ID
+	if cfg.LiveEditable {
+		publicID = adminLiveLegacySKU(*cfg)
+	}
+	return &pb.ShopItem{Id: proto.String(publicID), Item: []*pb.BaseResource{{Id: proto.String(cfg.ResourceID), Num: proto.Int32(cfg.Amount)}}, Price: []*pb.BaseResource{cost}, ExchangeList: []*pb.BaseResource{cost}, Priority: proto.Int32(cfg.Priority), CanBuy: proto.Int32(canBuy), DayLeftTimes: proto.Int32(left), DayTotalTimes: proto.Int32(cfg.DailyLimit), Condition: &pb.ShopCondition{Type: proto.String("level"), Value: proto.Int64(int64(cfg.MinLevel))}}, nil
 }
 
 func (s *GameService) shopList(tx *gorm.DB, player *pb.Player, day string) ([]*pb.ShopItem, error) {
@@ -151,11 +156,14 @@ func (s *GameService) shopProducts(ctx context.Context, id int64, b *pb.CSShopPr
 		if err := s.requireShopAvailability(tx, "ordinary", LocalPlayNow(ctx)); err != nil {
 			return err
 		}
-		day := time.Now().In(time.FixedZone("UTC+8", 8*3600)).Format("2006-01-02")
+		day := p1Day(LocalPlayNow(ctx))
 		result.ShopItemList, err = s.shopList(tx, player, day)
 		return err
 	})
-	return []proto.Message{result}, err
+	if err != nil {
+		return nil, err
+	}
+	return s.shopInventorySync(ctx, id, []proto.Message{result})
 }
 
 // shopBuy 将扣费、资源入库、日限购和重试回执放在一个行锁事务。
@@ -192,14 +200,21 @@ func (s *GameService) shopBuy(ctx context.Context, id int64, b *pb.CSShopBuy, st
 			result = &pb.SCShopBuy{}
 			return proto.Unmarshal(receipt.Response, result)
 		}
+		_, stable, quoted := adminLiveShopParseSKU(b.GetShopItemId())
+		if !quoted {
+			stable = b.GetShopItemId()
+		}
 		var cfg db.ShopProduct
-		if err = tx.Clauses(clause.Locking{Strength: "SHARE"}).First(&cfg, "id = ? AND enabled = ?", b.GetShopItemId(), true).Error; err != nil {
+		if err = tx.Clauses(clause.Locking{Strength: "SHARE"}).First(&cfg, "id = ? AND enabled = ?", stable, true).Error; err != nil {
 			return err
 		}
 		if err := s.requireShopAvailability(tx, "ordinary", LocalPlayNow(ctx)); err != nil {
 			return err
 		}
-		day := time.Now().In(time.FixedZone("UTC+8", 8*3600)).Format("2006-01-02")
+		if cfg.LiveEditable && b.GetShopItemId() != adminLiveLegacySKU(cfg) {
+			return errors.New("商品已调整，请刷新商店后重新购买")
+		}
+		day := p1Day(LocalPlayNow(ctx))
 		item, err := s.shopItem(tx, player, &cfg, day)
 		if err != nil {
 			return err
@@ -207,7 +222,7 @@ func (s *GameService) shopBuy(ctx context.Context, id int64, b *pb.CSShopBuy, st
 		if item.GetCanBuy() < b.GetBuyCount() {
 			return errors.New("商店等级、会员资格或每日购买次数不足")
 		}
-		cost, err := parsePoolCost(cfg.Cost)
+		cost, err := s.p4ParseCost(cfg.Cost)
 		if err != nil {
 			return err
 		}
@@ -217,7 +232,7 @@ func (s *GameService) shopBuy(ctx context.Context, id int64, b *pb.CSShopBuy, st
 			return errors.New("商店数量超出协议范围")
 		}
 		cost.Num = proto.Int32(int32(total))
-		if err = deductPoolCost(player, game, cost); err != nil {
+		if err = s.p4Deduct(tx, id, player, game, cost, fmt.Sprintf("shop:%d:%d", id, stamp), LocalPlayNow(ctx)); err != nil {
 			return err
 		}
 		gain, err := s.chapterBoxGain(player, game, fmt.Sprintf("%s,%d", cfg.ResourceID, amount))
@@ -252,5 +267,22 @@ func (s *GameService) shopBuy(ctx context.Context, id int64, b *pb.CSShopBuy, st
 		}
 		return tx.Save(&receipt).Error
 	})
-	return []proto.Message{result}, err
+	if err != nil {
+		return nil, err
+	}
+	return s.shopInventorySync(ctx, id, []proto.Message{result})
+}
+
+// shopInventorySync reconciles all displayed material balances after a purchase,
+// including committed receipt replays. Read persisted state after the transaction.
+func (s *GameService) shopInventorySync(ctx context.Context, id int64, messages []proto.Message) ([]proto.Message, error) {
+	var row db.Profile
+	if err := db.GetIns().WithContext(ctx).First(&row, id).Error; err != nil {
+		return nil, err
+	}
+	player, game, err := decodeProfile(&row)
+	if err != nil {
+		return nil, err
+	}
+	return append(messages, &pb.SCItemList{ItemList: game.Items}, &pb.SCGemAndCookingList{GemList: game.Gems, CookingList: game.Cooking}, &pb.SCPlayer{Player: player}), nil
 }

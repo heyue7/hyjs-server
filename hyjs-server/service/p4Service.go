@@ -19,7 +19,7 @@ func (s *GameService) InitializeP4(ctx context.Context) error {
 	if !s.P1Ready {
 		return errors.New("P4需要先初始化P1公共能力")
 	}
-	if err := db.GetIns().WithContext(ctx).AutoMigrate(&db.P4WelfareRule{}, &db.P4WelfareState{}, &db.P4Receipt{}, &db.P4PlayerStats{}, &db.P4CommerceRule{}, &db.P4CommerceState{}, &db.P4CommerceStock{}, &db.P4PopularityRankClaim{}, &db.P4RecruitRotation{}, &db.P4ActivityRegistry{}, &db.P15SeasonalBundle{}, &db.P4ResourceExchangeDirectory{}); err != nil {
+	if err := db.GetIns().WithContext(ctx).AutoMigrate(&db.P4WelfareRule{}, &db.P4WelfareState{}, &db.P4Receipt{}, &db.P4PlayerStats{}, &db.P4CommerceRule{}, &db.P4CommerceState{}, &db.P4CommerceStock{}, &db.P4PopularityRankClaim{}, &db.P4PopularityRankOfferHistory{}, &db.P4RecruitRotation{}, &db.P4ActivityRegistry{}, &db.P15SeasonalBundle{}, &db.P4ResourceExchangeDirectory{}); err != nil {
 		return err
 	}
 	if err := s.seedP4Welfare(db.GetIns().WithContext(ctx), time.Now()); err != nil {

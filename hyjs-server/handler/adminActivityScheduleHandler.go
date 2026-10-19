@@ -73,7 +73,7 @@ func adminActivityDefinitionWrite(c *gin.Context, update bool) {
 	}
 	req.Name = strings.TrimSpace(req.Name)
 	form := req.Form
-	if (form.RepeatPolicy != "" && form.RepeatPolicy != "once" && form.RepeatPolicy != "repeat") || req.Name == "" || len([]rune(req.Name)) > 80 || req.DefaultDays < 1 || req.DefaultDays > 366 || req.ClaimDays < 0 || req.ClaimDays > 90 || len(form.Mode) > 64 || len(form.TemplateID) > 96 || len(form.Source) > 1000 || len(form.Products) > 100 || len(form.Milestones) > 31 || len(form.Prizes) > 9 || form.Mode == "opening-14" && form.TemplateID != "opening-14-original" || update && (len(req.Version) != 64 || len(c.Param("id")) > 64) || !update && req.Version != "" {
+	if (form.RepeatPolicy != "" && form.RepeatPolicy != "once" && form.RepeatPolicy != "repeat") || req.Name == "" || len([]rune(req.Name)) > 80 || req.DefaultDays < 1 || req.DefaultDays > 366 || req.ClaimDays < 0 || req.ClaimDays > 90 || len(form.Mode) > 64 || len(form.TemplateID) > 96 || len(form.Source) > 1000 || len(form.Products) > 100 || len(form.Milestones) > 31 || (len(form.Prizes) > 1000 || form.Mode != "king-recruit" && len(form.Prizes) > 9) || form.Mode == "opening-14" && form.TemplateID != "opening-14-original" || update && (len(req.Version) != 64 || len(c.Param("id")) > 64) || !update && req.Version != "" {
 		adminError(c, constUtil.ErrAdminInput)
 		return
 	}
@@ -318,6 +318,21 @@ func AdminActivityCostResourcesHandler(c *gin.Context) {
 				return
 			}
 			req.IDs = append(req.IDs, id)
+		}
+	}
+	if raw := c.Query("preferredIds"); raw != "" {
+		parts := strings.Split(raw, ",")
+		if len(parts) > 20 {
+			adminError(c, constUtil.ErrAdminInput)
+			return
+		}
+		for _, part := range parts {
+			id := strings.TrimSpace(part)
+			if id == "" || len(id) > 128 || strings.ContainsAny(id, " \t\r\n/\\?#&;\x00") {
+				adminError(c, constUtil.ErrAdminInput)
+				return
+			}
+			req.PreferredIDs = append(req.PreferredIDs, id)
 		}
 	}
 	facets := gameService.AdminCatalogueFiltered(model.AdminItemsRequest{Page: 1, PageSize: 1}).Facets

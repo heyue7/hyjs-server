@@ -9,7 +9,6 @@ import (
 	"math"
 	"sort"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -328,7 +327,7 @@ func (s *GameService) RecordP1Cost(tx *gorm.DB, id int64, source string, costs [
 			kind = constUtil.P1EventDiamondSpent
 		case "light", "point", "popularity", "energy", "stamina", "wantedAttTimes":
 		default:
-			if !strings.HasPrefix(key, "item_") || s.table("Item", "itemId", key) == nil {
+			if _, err := s.p4ParseCost(key + ",1"); err != nil {
 				return errors.New("消费资源未恢复")
 			}
 		}

@@ -2,6 +2,7 @@ package model
 
 // AdminItemsRequest 是已经由目录Handler校验的筛选及分页条件。
 type AdminItemsRequest struct {
+	PreferredIDs []string `json:"preferredIds,omitempty"` // PreferredIDs changes ordering only; filters and full pagination remain available.
 	// Q 是原名称、ID或说明的搜索词。
 	Q string `json:"q"`
 	// Category 是目录facets.categories内的分组值，空表示全部。

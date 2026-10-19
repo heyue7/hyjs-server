@@ -381,7 +381,7 @@ func adminCatalogueBuild(tables map[string][]map[string]string, media adminCatal
 		}
 		byID[id] = item
 	}
-	for id, name := range map[string]string{"coin": "金币", "diamond": "钻石", "energy": "精力", "stamina": "体力", "light": "滞留之光", "point": "攻略点数", "popularity": "声望", "score": "悬赏积分"} {
+	for id, name := range map[string]string{"coin": "金币", "diamond": "钻石", "energy": "精力", "stamina": "体力", "light": "滞留之光", "point": "攻略点数", "popularity": "声望", "score": "悬赏积分", "coinpet": "精灵币", "contribution": "公会贡献", "unionFightToken": "公会战代币"} {
 		item := model.AdminItemDTO{ID: id, Name: name, Category: "currency", ApplicableTypes: []string{}}
 		item.Icon = media.ResourceIcons[id]
 		if item.Icon == "" {
@@ -477,7 +477,27 @@ func (s *GameService) AdminCatalogueFiltered(req model.AdminItemsRequest) model.
 	if size < 1 {
 		size = 25
 	}
-	for _, item := range data.Items {
+	items := data.Items
+	if len(req.PreferredIDs) > 0 {
+		items = append([]model.AdminItemDTO{}, items...)
+		order := map[string]int{}
+		for i, id := range req.PreferredIDs {
+			if _, ok := order[id]; !ok {
+				order[id] = i + 1
+			}
+		}
+		sort.SliceStable(items, func(i, j int) bool {
+			a, b := order[items[i].ID], order[items[j].ID]
+			if a == 0 {
+				a = len(order) + 1
+			}
+			if b == 0 {
+				b = len(order) + 1
+			}
+			return a < b
+		})
+	}
+	for _, item := range items {
 		if req.Category != "" && item.Category != req.Category {
 			continue
 		}

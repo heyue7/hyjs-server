@@ -84,6 +84,20 @@ func (s *GameService) InitializeGameplayPools(ctx context.Context) error {
 
 // loadGameplayPool 在当前资源事务中读取配置，非法配置会让整次操作失败而不扣费。
 func (s *GameService) loadGameplayPool(tx *gorm.DB, key string) (*db.GameplayPool, []db.GameplayPoolReward, error) {
+	kingRecruit := key == "recruit_3"
+	if kingRecruit {
+		selected, _, err := s.adminScheduledKingRecruitPool(tx, LocalPlayNow(tx.Statement.Context).UnixMilli())
+		if err != nil {
+			return nil, nil, err
+		}
+		if selected == "" {
+			return nil, nil, constUtil.ErrKingRecruitActivityClosed
+		}
+		key = selected
+		if err = s.bindKingRecruitActivityRules(tx, key); err != nil {
+			return nil, nil, err
+		}
+	}
 	var cfg db.GameplayPool
 	if err := tx.Where("id = ?", key).First(&cfg).Error; err != nil {
 		return nil, nil, err
@@ -104,6 +118,14 @@ func (s *GameService) loadGameplayPool(tx *gorm.DB, key string) (*db.GameplayPoo
 		// 限时轮换停用后继续使用常驻池，保留原招募入口和费用。
 		if err == nil {
 			rewards = rotation
+		}
+	}
+	if kingRecruit && !cfg.Enabled {
+		return nil, nil, constUtil.ErrKingRecruitActivityClosed
+	}
+	if kingRecruit {
+		if err := s.validateKingRecruitActivityPool(cfg, rewards); err != nil {
+			return nil, nil, err
 		}
 	}
 	if !cfg.Enabled || cfg.MinLevel < 1 || cfg.CoinPerDraw < 0 || cfg.FreeSeconds < 1 || cfg.FreeSeconds > 31536000 || cfg.FreePerDay < -1 || cfg.GuaranteeEvery < 0 || cfg.GuaranteeEvery > 10000 || len(rewards) == 0 {
@@ -190,6 +212,10 @@ func (s *GameService) recruitInfo(ctx context.Context, id int64, b *pb.CSWarrior
 		now := LocalPlayNow(ctx)
 		for _, kind := range kinds {
 			cfg, baseRewards, err := s.loadGameplayPool(tx, fmt.Sprintf("recruit_%d", kind))
+			if kind == 3 && errors.Is(err, constUtil.ErrKingRecruitActivityClosed) {
+				result.Recruit = append(result.Recruit, &pb.WarriorRecruit{CostType: proto.Int32(3), On: proto.Int32(0), Free: proto.Bool(false)})
+				continue
+			}
 			if err != nil {
 				return err
 			}
@@ -210,6 +236,10 @@ func (s *GameService) recruitInfo(ctx context.Context, id int64, b *pb.CSWarrior
 			on := int32(0)
 			if player.GetLevel() >= cfg.MinLevel {
 				on = 1
+			}
+			if kind == 3 && cfg.EndAt > 0 && now.UnixMilli() >= cfg.EndAt {
+				on = 0
+				free = false
 			}
 			entry := &pb.WarriorRecruit{CostType: proto.Int32(kind), FreeTime: proto.Int64(st.NextFree), Num: proto.Int32(num), Free: proto.Bool(free), On: proto.Int32(on)}
 			if s.P4Ready && (kind == 1 || kind == 2) {
@@ -234,11 +264,7 @@ func (s *GameService) recruitInfo(ctx context.Context, id int64, b *pb.CSWarrior
 				if err != nil {
 					return err
 				}
-				_, rewards, err := s.loadGameplayPool(tx, "recruit_3")
-				if err != nil {
-					return err
-				}
-				_, red := s.kingRewards(rewards, space)
+				_, red := s.kingRewards(baseRewards, space)
 				if len(red) == 0 {
 					return errors.New("当前王者卡池缺少红卡")
 				}
@@ -380,6 +406,9 @@ func (s *GameService) warriorRecruit(ctx context.Context, id int64, b *pb.CSWarr
 		cfg, rewards, err := s.loadGameplayPool(tx, fmt.Sprintf("recruit_%d", b.GetCostType()))
 		if err != nil {
 			return err
+		}
+		if b.GetCostType() == 3 && cfg.EndAt > 0 && now.UnixMilli() >= cfg.EndAt {
+			return constUtil.ErrKingRecruitActivityClosed
 		}
 		if err := s.validateRecruitClientPrices(cfg, b.GetCostType()); err != nil {
 			return err

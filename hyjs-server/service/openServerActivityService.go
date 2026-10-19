@@ -223,6 +223,11 @@ func (s *GameService) refreshOpenServerProgressAt(tx *gorm.DB, player *pb.Player
 	if !cfg.Enabled || now.UnixMilli() < cfg.StartAt || now.UnixMilli() >= cfg.EndAt {
 		return nil
 	}
+	// Recheck committed payment facts when opening the page as well as paying;
+	// orders confirmed before this policy must satisfy the same original tasks.
+	if e := s.refreshP3OpenServerCounters(tx, player.GetPlayerId(), cfg, now); e != nil {
+		return e
+	}
 	tasks, e := openServerReadTasks(tx, openServerDay(cfg, now))
 	if e != nil {
 		return e
@@ -284,13 +289,36 @@ func (s *GameService) refreshOpenServerProgressAt(tx *gorm.DB, player *pb.Player
 // openServerCurrent 从真实存档或事务事件读取条件，未恢复玩法一律返回未达成。
 func (s *GameService) openServerCurrent(player *pb.Player, g *model.GameState, cfg *db.OpenServerActivityRule, t db.OpenServerActivityTask, values map[string]int32) (int32, error) {
 	date := openServerTaskDate(cfg, t.OpenDay)
+	value := func(prefix string, sum bool) int32 {
+		if (t.OpenDay < 8 || t.OpenDay > 14) && t.TaskType != 28 {
+			return values[prefix+date]
+		}
+		// Second-week tasks and the day-seven character choice accept actual
+		// events throughout this period. Other first-week dates stay intact.
+		var current int64
+		for key, n := range values {
+			if !strings.HasPrefix(key, prefix) {
+				continue
+			}
+			at, err := time.ParseInLocation("2006-01-02", strings.TrimPrefix(key, prefix), time.FixedZone("UTC+8", 8*3600))
+			if err != nil || at.AddDate(0, 0, 1).UnixMilli() <= cfg.StartAt || at.UnixMilli() >= cfg.EndAt {
+				continue
+			}
+			if sum {
+				current = min(int64(math.MaxInt32), current+int64(n))
+			} else {
+				current = max(current, int64(n))
+			}
+		}
+		return int32(current)
+	}
 	switch t.TaskType {
 	case 2:
 		return values[constUtil.P3OpenServerTotalPaid], nil
 	case 101:
-		return values[constUtil.P3OpenServerSinglePaid+date], nil
+		return value(constUtil.P3OpenServerSinglePaid, false), nil
 	case 1, 28, 100:
-		return values[constUtil.OpenServerActivityCounterLogin+date], nil
+		return value(constUtil.OpenServerActivityCounterLogin, false), nil
 	case 4:
 		return player.GetLevel(), nil
 	case 3:
@@ -325,9 +353,9 @@ func (s *GameService) openServerCurrent(player *pb.Player, g *model.GameState, c
 	case 18:
 		return values[constUtil.OpenServerActivityCounterBuyAttackToken], nil
 	case 102:
-		return values[constUtil.OpenServerActivityCounterCopyWin+date], nil
+		return value(constUtil.OpenServerActivityCounterCopyWin, true), nil
 	case 106:
-		return values[constUtil.OpenServerActivityCounterPredatory+date], nil
+		return value(constUtil.OpenServerActivityCounterPredatory, true), nil
 	case 27:
 		return s.formationFightPower(player, g)
 	case 5, 6, 14, 15, 16, 17, 25, 26:

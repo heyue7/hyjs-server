@@ -44,6 +44,12 @@ func adminActivityDefinitions() []adminActivityDefinition {
 		{"diamond-spent", "累计消费", "period", constUtil.P1EventDiamondSpent, "costTotal_p4_admin_", "ActivityInnerPage/recharge surprise", false, true, false, 1},
 		{"recruit-count", "累计招募", "period", constUtil.P1EventRecruit, "warriorRescruitTimes_p4_admin_", "ActivityInnerPage/recharge surprise", false, true, false, 1},
 		{"copy-win", "主线胜利", "period", constUtil.P1EventCopyWin, "mainCopyWinTimes_p4_admin_", "ActivityInnerPage/BattleRace", false, true, false, 1},
+		{"arena-wins", "竞技胜场", "period", constUtil.P4ArenaWinKind, "pvpWinTimes_p4_arena_admin_", "ActivityInnerPage/BattleRace", false, true, false, 1},
+		{"plunder-count", "夺宝次数", "period", constUtil.P4PlunderActivityKind, "robTreasureTimes_p4_admin_", "ActivityInnerPage/BattleRace", false, true, false, 1},
+		{"hero-collection", "英雄收藏", "period", constUtil.P4KindCollect, "warriorGetSpecial_p4_admin_", "ActivityInnerPage/collection warrior", false, true, false, 1},
+		{"trial-stars", "试炼星数", "period", constUtil.P7RushStarEvent, "aincradStars_p4_admin_", "ActivityInnerPage/BattleRace", false, true, false, 1},
+		{"power-race", "战力竞赛", "period", constUtil.P4KindPower, "kaiFuJingSai_p4_admin_", "ActivityInnerPage/open server race", false, true, false, 1},
+		{"king-recruit", "王者招募", "pool", "king-recruit", "admin_king_recruit_", "ShopInnerPage/KingRecruit", false, false, true, 0},
 		{"login-total", "累计登录", "period", constUtil.P1EventLoginDay, "totalLogin_p1_admin_", "ActivityInnerPage/login award", false, true, false, 1},
 	}
 }
@@ -84,6 +90,16 @@ func (s *GameService) AdminActivityModes() []model.AdminActivityMode {
 		}
 		if d.domain == "period" {
 			mode.Notes += " 当前原消费者每实例支持1档目标；累计充值目标单位为分。"
+		}
+		if d.mode == "king-recruit" {
+			mode.FixedValues = map[string]int64{"dayLimit": 50, "luckyGoal": 500, "luckyPerDraw": 10, "rotationHours": 48}
+			mode.Notes = "沿用原王者招募页面、阵营轮换和价格；日限、保底与幸运进度跨排期保留。未排期前沿用现有常驻池，首次排期后由本服日历控制。"
+		}
+		if d.mode == "power-race" {
+			mode.Notes = "记录真实阵容战力峰值；目标奖励与截止排名奖励分开配置，同一排名范围使用同档奖励。"
+		}
+		if d.mode == "trial-stars" {
+			mode.Notes = "读取真实试炼结算的累计星数峰值；每期目标与奖励独立。"
 		}
 		if d.mode == "shop-window" {
 			mode.Notes = "从商店管理关闭不限时后排期；商品与价格取该商店的已保存目录。"
@@ -202,7 +218,11 @@ func adminActivityRaw(tx *gorm.DB, id string) (model.AdminActivityDTO, bool, err
 				return model.AdminActivityDTO{}, false, err
 			}
 		}
-		return adminActivityProjection(domain, row, rewards), count > 0, nil
+		kingFrozen, err := adminKingRecruitActivityFrozen(tx, key)
+		if err != nil {
+			return model.AdminActivityDTO{}, false, err
+		}
+		return adminActivityProjection(domain, row, rewards), count > 0 || kingFrozen, nil
 	}
 	return model.AdminActivityDTO{}, false, constUtil.ErrAdminInput
 }
@@ -243,7 +263,7 @@ func adminActivityReadableName(name, id, kind, mode string) string {
 }
 
 // adminActivityAvailability 只检查配置与后台适配，不改变开关、不创建奖品。
-func (s *GameService) adminActivityAvailability(raw model.AdminActivityDTO, form model.AdminActivityForm, supported bool) model.AdminActivityAvailability {
+func (s *GameService) adminActivityAvailability(tx *gorm.DB, raw model.AdminActivityDTO, form model.AdminActivityForm, supported bool) model.AdminActivityAvailability {
 	result := model.AdminActivityAvailability{Usable: true, Missing: []string{}}
 	if !supported {
 		result.Usable = false
@@ -284,6 +304,10 @@ func (s *GameService) adminActivityAvailability(raw model.AdminActivityDTO, form
 		}
 		problem = json.Unmarshal(raw.Config, &cfg)
 		if problem == nil {
+			if form.Mode == "king-recruit" {
+				_, problem = s.adminKingRecruitActivityForm(tx, cfg.Pool, cfg.Rewards)
+				break
+			}
 			options := form.Options
 			top, advance := "", ""
 			if options.TopPrize.ResourceID != "" {
@@ -360,13 +384,17 @@ func (s *GameService) adminActivityTypedProjection(tx *gorm.DB, raw model.AdminA
 			return model.AdminActivityInstance{}, constUtil.ErrAdminInput
 		}
 		kind = cfg.Kind
-		if cfg.Mode != "cumulative" || cfg.RankPlaces > 0 {
+		if cfg.Mode != "cumulative" && cfg.Kind != constUtil.P4KindPower && cfg.Kind != constUtil.P7RushStarEvent || cfg.RankPlaces > 0 && cfg.Kind != constUtil.P4KindPower {
 			kind = "unsupported"
 		}
 		form.StartAt = cfg.StartAt
 		form.EndAt = cfg.EndAt
 		form.ClaimEndAt = cfg.RewardEndAt
 		form.Milestones = []model.AdminActivityMilestone{{Goal: cfg.Goal, Rewards: adminTypedResources(cfg.Rewards)}}
+		if cfg.Kind == constUtil.P4KindPower {
+			form.Options.RankPlaces = int64(cfg.RankPlaces)
+			form.Options.RankRewards = adminTypedResources(cfg.RankRewards)
+		}
 	case "pool":
 		var cfg struct {
 			Pool    db.GameplayPool         `json:"pool"`
@@ -374,6 +402,12 @@ func (s *GameService) adminActivityTypedProjection(tx *gorm.DB, raw model.AdminA
 		}
 		if json.Unmarshal(raw.Config, &cfg) != nil {
 			return model.AdminActivityInstance{}, constUtil.ErrAdminInput
+		}
+		if cfg.Pool.ID == "recruit_3" || strings.HasPrefix(cfg.Pool.ID, "admin_king_recruit_") {
+			kingForm, _ := s.adminKingRecruitActivityForm(tx, cfg.Pool, cfg.Rewards)
+			form = kingForm
+			kind = "king-recruit"
+			break
 		}
 		var wheel db.TurntableRules
 		err := gorm.ErrRecordNotFound
@@ -435,7 +469,7 @@ func (s *GameService) adminActivityTypedProjection(tx *gorm.DB, raw model.AdminA
 			}
 		}
 	}
-	availability := s.adminActivityAvailability(raw, form, supported)
+	availability := s.adminActivityAvailability(tx, raw, form, supported)
 	return model.AdminActivityInstance{ID: raw.ID, Name: form.Name, Mode: form.Mode, TemplateID: form.TemplateID, Enabled: raw.Enabled, Version: adminVersion(struct {
 		Source   string
 		Metadata db.AdminActivityPresentation
@@ -513,6 +547,13 @@ func (s *GameService) AdminSaveTypedActivity(ctx context.Context, p *model.Admin
 		} else if req.Version != "" {
 			return constUtil.ErrAdminConfigConflict
 		}
+		if req.Mode == "king-recruit" {
+			form, err := s.adminKingRecruitCanonicalForm(tx, req.AdminActivityForm)
+			if err != nil {
+				return err
+			}
+			req.AdminActivityForm = form
+		}
 		if err := s.adminPersistTypedActivity(tx, definition, key, req.AdminActivityForm, req.Enabled, exists); err != nil {
 			return err
 		}
@@ -553,6 +594,9 @@ func (s *GameService) AdminSaveTypedActivity(ctx context.Context, p *model.Admin
 }
 
 func (s *GameService) adminPersistTypedActivity(tx *gorm.DB, d adminActivityDefinition, key string, f model.AdminActivityForm, enabled, exists bool) error {
+	if f.Mode == "king-recruit" {
+		return s.adminPersistKingRecruitActivity(tx, key, f, enabled, exists)
+	}
 	if f.Mode == "shop-window" {
 		return s.adminPersistShopSchedule(tx, key, f, enabled, exists)
 	}
@@ -666,6 +710,20 @@ func (s *GameService) adminPersistTypedActivity(tx *gorm.DB, d adminActivityDefi
 			}
 		}
 		cfg := db.PeriodInstance{ID: key, Kind: d.kind, Mode: "cumulative", Enabled: enabled, Title: f.Name, Goal: goal, Rewards: rewards, StartAt: f.StartAt, EndAt: f.EndAt, RewardEndAt: f.ClaimEndAt, Source: f.Source}
+		if d.mode == "trial-stars" || d.mode == "power-race" {
+			cfg.Mode = "single"
+		}
+		if f.Options.RankPlaces < 0 || f.Options.RankPlaces > 1000 || d.mode != "power-race" && (f.Options.RankPlaces != 0 || len(f.Options.RankRewards) != 0) {
+			return constUtil.ErrAdminInput
+		}
+		if d.mode == "power-race" {
+			cfg.RankPlaces = int32(f.Options.RankPlaces)
+			var err error
+			cfg.RankRewards, err = s.adminTypedResourceSpec(f.Options.RankRewards, !enabled || cfg.RankPlaces == 0)
+			if err != nil {
+				return err
+			}
+		}
 		if enabled || rewards != "" {
 			if err := s.validateP1Period(cfg); err != nil {
 				return adminActivityValidationError(err)

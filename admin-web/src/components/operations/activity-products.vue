@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue';
 import type { ActivityProduct } from '@/service/activity-operations';
+import { createRequestId } from '@/utils/request-id';
 import RewardList from './reward-list.vue';
 import ResourceSelect from './resource-select.vue';
 const products = defineModel<ActivityProduct[]>({ required: true });
@@ -33,7 +34,7 @@ function toggleQualification(product: ActivityProduct, value: boolean) {
   }
 }
 function add() {
-  const id = crypto.randomUUID();
+  const id = createRequestId();
   selectedId.value = id;
   products.value = [
     ...products.value,
@@ -92,16 +93,14 @@ const hasProducts = computed(() => products.value.length > 0);
       <NFormItem label="获得资源" required>
         <RewardList v-model:value="product.rewards" :disabled="disabled" />
       </NFormItem>
-      <NAlert type="info" :bordered="false" class="mb-16px">
-        此类商品与资源兑换需要正数消耗，可选择货币或原道具；免费奖励请使用登录奖励等福利模式。
-      </NAlert>
       <NFormItem label="消耗资源" required>
         <div class="resource-cost-line">
           <ResourceSelect
             v-model:value="product.cost.resourceId"
             :disabled="disabled"
             commerce-cost
-            placeholder="搜索货币或道具名称"
+            :recommended-ids="['diamond', 'coin']"
+            placeholder="搜索可消耗的货币、材料或道具"
           />
           <NInputNumber
             v-model:value="product.cost.amount"

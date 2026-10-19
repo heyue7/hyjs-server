@@ -23,7 +23,8 @@ type p4GuildProduct struct {
 	GuildLevel       int32 `json:"guildLevel"`
 }
 type p4GuildRules struct {
-	Products []p4GuildProduct `json:"products"`
+	LiveEditable bool             `json:"liveEditable,omitempty"`
+	Products     []p4GuildProduct `json:"products"`
 }
 
 // seedP4GuildShop publishes a separate default-off catalog for the original union shop8.
@@ -59,7 +60,7 @@ func (s *GameService) p4GuildShopRules(cfg db.P4CommerceRule) (p4GuildRules, err
 	}
 	for _, product := range rules.Products {
 		cost, err := s.p4ParseCost(product.Cost)
-		if err != nil || cost.GetId() != "item_311" || product.ContributionCost < 1 || product.GuildLevel < 1 || product.GuildLevel > 100 || product.TierID || product.DiscountBps != 10000 || product.Stock != -1 {
+		if err != nil || cost == nil || product.ContributionCost < 0 || product.GuildLevel < 1 || product.GuildLevel > 100 || product.TierID || product.DiscountBps != 10000 {
 			return rules, errors.New("原公会商店双成本或等级配置无效")
 		}
 		resources, err := p1RewardResources(product.Rewards)
@@ -85,7 +86,17 @@ func (s *GameService) p4GuildShopProjection(tx *gorm.DB, p *pb.Player, cfg db.P4
 		byID[product.ID] = product
 	}
 	for _, item := range items {
-		product := byID[item.GetId()]
+		_, stable, quoted := adminLiveShopParseSKU(item.GetId())
+		if !quoted {
+			stable = item.GetId()
+		}
+		product := byID[stable]
+		if rules.LiveEditable {
+			item.Id = proto.String(adminLiveP4SKU(cfg, product.p4Product, struct {
+				ContributionCost int32
+				GuildLevel       int32
+			}{product.ContributionCost, product.GuildLevel}))
+		}
 		badge, err := s.p4ParseCost(product.Cost)
 		if err != nil {
 			return nil, err
@@ -174,23 +185,51 @@ func (s *GameService) p4GuildShop(ctx context.Context, id int64, request proto.M
 		var costs []*pb.BaseResource
 		if purchasing {
 			var product *p4GuildProduct
+			_, stable, quoted := adminLiveShopParseSKU(buy.GetShopItemId())
+			if !quoted {
+				stable = buy.GetShopItemId()
+			}
 			for i := range custom.Products {
-				if custom.Products[i].ID == buy.GetShopItemId() {
+				if custom.Products[i].ID == stable {
 					product = &custom.Products[i]
 				}
 			}
 			if product == nil || player.GetLevel() < product.MinLevel || player.GetVip() < product.MinVIP || guild.Level < product.GuildLevel {
 				return errors.New("原公会商店商品或实际公会等级未满足")
 			}
+			if custom.LiveEditable && buy.GetShopItemId() != adminLiveP4SKU(cfg, product.p4Product, struct {
+				ContributionCost int32
+				GuildLevel       int32
+			}{product.ContributionCost, product.GuildLevel}) {
+				return errors.New("商品已调整，请刷新商店后重新购买")
+			}
 			key := p4SlotKey(cfg, state, product.p4Product)
 			if state.Bought[key] < 0 || state.Total[product.ID] < 0 || state.Bought[key] >= product.DailyLimit || product.TotalLimit > 0 && state.Total[product.ID] >= product.TotalLimit {
 				return errors.New("原公会商店日或月限购已用完")
+			}
+			if product.Stock >= 0 {
+				var stock db.P4CommerceStock
+				err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("rule_id=? AND product_id=?", cfg.ID, product.ID).First(&stock).Error
+				if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+					return err
+				}
+				if stock.Used < 0 || stock.Used >= product.Stock {
+					return errors.New("共享库存不足")
+				}
+				stock.RuleID, stock.ProductID, stock.Used = cfg.ID, product.ID, stock.Used+1
+				if err := tx.Save(&stock).Error; err != nil {
+					return err
+				}
 			}
 			badge, err := s.p4ParseCost(product.Cost)
 			if err != nil {
 				return err
 			}
-			if player.GetContribution() < product.ContributionCost {
+			requiredContribution := int64(product.ContributionCost)
+			if badge.GetId() == "contribution" {
+				requiredContribution += int64(badge.GetNum())
+			}
+			if int64(player.GetContribution()) < requiredContribution {
 				return errors.New("可用公会贡献不足")
 			}
 			source := fmt.Sprintf("p4:guild:%d:%d", id, stamp)
@@ -199,8 +238,10 @@ func (s *GameService) p4GuildShop(ctx context.Context, id int64, request proto.M
 			}
 			player.Contribution = proto.Int32(player.GetContribution() - product.ContributionCost)
 			// Member.Contribution is the original cumulative ranking value and remains unchanged.
-			if err = s.RecordP1Event(tx, id, source+":contribution", "spend:contribution", int64(product.ContributionCost), now); err != nil {
-				return err
+			if product.ContributionCost > 0 {
+				if err = s.RecordP1Event(tx, id, source+":contribution", "spend:contribution", int64(product.ContributionCost), now); err != nil {
+					return err
+				}
 			}
 			gain, err = s.GrantFixedReward(player, game, product.Rewards)
 			if err != nil {
@@ -227,5 +268,11 @@ func (s *GameService) p4GuildShop(ctx context.Context, id int64, request proto.M
 		}
 		return saveProfile(tx.WithContext(context.WithValue(tx.Statement.Context, constUtil.GameRequestContextKey, nil)), &profile, player, game)
 	}, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
-	return []proto.Message{response}, err
+	if err != nil {
+		return nil, err
+	}
+	if _, purchasing := request.(*pb.CSShopBuy); purchasing {
+		return s.shopInventorySync(ctx, id, []proto.Message{response})
+	}
+	return []proto.Message{response}, nil
 }

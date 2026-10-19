@@ -42,11 +42,123 @@ func (s *GameService) p4PopularityRankRules(cfg db.P4CommerceRule, rules p4Comme
 		return errors.New(constUtil.P4PopularityRankDenied)
 	}
 	for _, product := range rules.Products {
-		if !strings.HasPrefix(product.ID, constUtil.P4PopularityRankProductPrefix) || product.MaxRank < 1 || product.MaxRank > 1000000 || !strings.HasPrefix(product.Cost, "popularity,") || product.DailyLimit != 1 || product.TotalLimit != 1 || product.Stock != -1 || product.TierID || product.DiscountBps != 10000 || product.MinVIP != 0 {
+		if !strings.HasPrefix(product.ID, constUtil.P4PopularityRankProductPrefix) || product.MaxRank < 1 || product.MaxRank > 1000000 || product.DailyLimit != 1 || product.TotalLimit != 1 || product.Stock != -1 || product.TierID || product.DiscountBps != 10000 || product.MinVIP != 0 {
 			return errors.New(constUtil.P4PopularityRankDenied)
+		}
+		if _, err := s.p4ParseCost(product.Cost); err != nil {
+			return err
 		}
 	}
 	return nil
+}
+
+// ArchiveP4PopularityRankOffer runs before changing an operational catalogue.
+// Exact old bodies and old Frozen bytes remain independently addressable by
+// claim.OfferHash; no claim hash, earned rank or quota is rewritten.
+func (s *GameService) ArchiveP4PopularityRankOffer(tx *gorm.DB, live *db.P4CommerceRule) error {
+	if live == nil || live.Kind != constUtil.P4PopularityRankKind {
+		return nil
+	}
+	candidates := [][]byte{}
+	candidates = append(candidates, adminJSON(*live))
+	if len(live.Frozen) > 0 {
+		candidates = append(candidates, append([]byte{}, live.Frozen...))
+		var old db.P4CommerceRule
+		if json.Unmarshal(live.Frozen, &old) == nil && old.ID == live.ID && old.Kind == live.Kind {
+			old.Enabled = live.Enabled
+			candidates = append(candidates, adminJSON(old))
+			old.Enabled = true
+			candidates = append(candidates, adminJSON(old))
+		}
+	}
+	for _, payload := range candidates {
+		var cfg db.P4CommerceRule
+		if json.Unmarshal(payload, &cfg) != nil || cfg.ID != live.ID || cfg.Kind != constUtil.P4PopularityRankKind {
+			continue
+		}
+		row := db.P4PopularityRankOfferHistory{OfferHash: p6Digest(payload), RuleID: live.ID, Payload: payload}
+		if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&row).Error; err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// A historic claim keeps its own threshold and proof. Current best rank may
+// have improved, so resolve the exact immutable settlement hash of the claim.
+func (s *GameService) p4PopularityRankHistoricalClaim(tx *gorm.DB, claim db.P4PopularityRankClaim, current db.P4CommerceRule) (bool, error) {
+	if claim.Rank < 1 || len(claim.RankProof) != 64 || len(claim.OfferHash) != 64 {
+		return false, nil
+	}
+	var historic db.P4CommerceRule
+	currentRaw := adminJSON(current)
+	if p6Digest(currentRaw) == claim.OfferHash {
+		historic = current
+	} else {
+		var archive db.P4PopularityRankOfferHistory
+		err := tx.First(&archive, "offer_hash=? AND rule_id=?", claim.OfferHash, claim.RuleID).Error
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			// Recover only an exact retained legacy body. Do not repeatedly insert the
+			// current quote on each list read when an unrelated old proof is absent.
+			candidate := append([]byte{}, current.Frozen...)
+			if p6Digest(candidate) != claim.OfferHash {
+				var previous db.P4CommerceRule
+				if json.Unmarshal(candidate, &previous) != nil {
+					return false, nil
+				}
+				previous.Enabled = true
+				candidate = adminJSON(previous)
+			}
+			if p6Digest(candidate) != claim.OfferHash {
+				return false, nil
+			}
+			recovered := db.P4PopularityRankOfferHistory{OfferHash: claim.OfferHash, RuleID: claim.RuleID, Payload: candidate}
+			if err = tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&recovered).Error; err != nil {
+				return false, err
+			}
+			err = tx.First(&archive, "offer_hash=? AND rule_id=?", claim.OfferHash, claim.RuleID).Error
+		}
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return false, nil
+		}
+		if err != nil {
+			return false, err
+		}
+		if p6Digest(archive.Payload) != claim.OfferHash || json.Unmarshal(archive.Payload, &historic) != nil {
+			return false, nil
+		}
+	}
+	if historic.ID != claim.RuleID || historic.Source != claim.Source || historic.Kind != constUtil.P4PopularityRankKind {
+		return false, nil
+	}
+	var rules p4CommerceRules
+	if json.Unmarshal(historic.Rules, &rules) != nil || s.p4PopularityRankRules(historic, rules) != nil {
+		return false, nil
+	}
+	allowed := false
+	for _, product := range rules.Products {
+		if product.ID == claim.ProductID && claim.Rank <= product.MaxRank {
+			allowed = true
+			break
+		}
+	}
+	if !allowed || !tx.Migrator().HasTable(&db.P11ArenaFightSettlement{}) {
+		return false, nil
+	}
+	var settlements []db.P11ArenaFightSettlement
+	if err := tx.Where("winner_id=? AND ((player_id=? AND attacker_new_rank=?) OR (opponent_id=? AND defender_new_rank=?))", claim.PlayerID, claim.PlayerID, claim.Rank, claim.PlayerID, claim.Rank).Find(&settlements).Error; err != nil {
+		return false, err
+	}
+	for _, settled := range settlements {
+		proof := p6Digest([]byte(settled.P6RecordID + ":" + settled.ResponseHash + ":" + settled.TerminalHash + ":" + settled.ScopeProof + ":" + settled.PolicyHash))
+		if proof != claim.RankProof {
+			continue
+		}
+		if _, err := p11ReadArenaFightReceipt(tx, &settled); err == nil {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func (s *GameService) p4PopularityRankResolve(tx *gorm.DB, productID string, now time.Time) (string, error) {
@@ -110,6 +222,9 @@ func (s *GameService) p4PopularityRankBuy(tx *gorm.DB, id int64, p *pb.Player, c
 	}
 	raw, err := json.Marshal(cfg)
 	if err != nil {
+		return err
+	}
+	if err = s.ArchiveP4PopularityRankOffer(tx, &cfg); err != nil {
 		return err
 	}
 	claim := db.P4PopularityRankClaim{PlayerID: id, RuleID: cfg.ID, ProductID: product.ID, Rank: rank, RankProof: proof, OfferHash: p6Digest(raw), Source: cfg.Source, Stamp: stamp, ClaimedAt: now.UnixMilli()}
@@ -179,21 +294,26 @@ func (s *GameService) p4PopularityShopItems(tx *gorm.DB, id int64, p *pb.Player,
 			return nil, err
 		}
 		// A real earlier exchange can resume the later tutorial without granting or
-		// charging anything again. A numeric quota without its witness is rejected.
+		// charging anything again. Missing proof keeps the used quota closed.
 		for _, product := range rules.Products {
 			if state.Total[product.ID] == 0 {
 				continue
 			}
 			var claim db.P4PopularityRankClaim
-			if err = tx.Where("player_id=? AND rule_id=? AND product_id=?", id, frozen.ID, product.ID).First(&claim).Error; err != nil {
+			if err = tx.Where("player_id=? AND rule_id=? AND product_id=?", id, frozen.ID, product.ID).First(&claim).Error; errors.Is(err, gorm.ErrRecordNotFound) {
+				continue // Used quota stays closed; absent history cannot grant anything.
+			} else if err != nil {
 				return nil, err
 			}
-			raw, e := json.Marshal(frozen)
+			if state.Total[product.ID] != 1 {
+				return nil, errors.New("排名兑换实际资格存档损坏")
+			}
+			valid, e := s.p4PopularityRankHistoricalClaim(tx, claim, frozen)
 			if e != nil {
 				return nil, e
 			}
-			if state.Total[product.ID] != 1 || claim.Rank < 1 || claim.Rank > product.MaxRank || len(claim.RankProof) != 64 || claim.OfferHash != p6Digest(raw) || claim.Source != frozen.Source {
-				return nil, errors.New("排名兑换实际资格存档损坏")
+			if !valid {
+				continue
 			}
 			if p.GetNoviceGuideSchedule() == 13 {
 				p.NoviceGuideSchedule = proto.Int32(constUtil.P4PopularityGuideCompleted)

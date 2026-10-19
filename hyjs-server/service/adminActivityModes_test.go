@@ -190,10 +190,10 @@ func TestAdminActivityReadableAvailabilityAndPrivateHistory(t *testing.T) {
 	}
 	private := raw
 	private.ID = "commerce:limitExchange_p4_lp-testhistory"
-	if state := f.s.adminActivityAvailability(private, form, true); state.Usable || !strings.Contains(state.Reason, "个人活动期") {
+	if state := f.s.adminActivityAvailability(db.GetIns().WithContext(f.ctx), private, form, true); state.Usable || !strings.Contains(state.Reason, "个人活动期") {
 		t.Fatalf("个人期未独立标记: %+v", state)
 	}
-	if state := f.s.adminActivityAvailability(raw, form, false); state.Usable || !strings.Contains(state.Reason, "尚未适配") {
+	if state := f.s.adminActivityAvailability(db.GetIns().WithContext(f.ctx), raw, form, false); state.Usable || !strings.Contains(state.Reason, "尚未适配") {
 		t.Fatal(state)
 	}
 	blank := adminModeForm("login-rewards")

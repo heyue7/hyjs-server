@@ -1,4 +1,14 @@
-import type { ResourceAmount as Reward } from './operations';
+import type { Item, ResourceAmount as Reward } from './operations';
+export interface ActivityGameplayOptions extends Record<string, any> {
+  rankPlaces?: number;
+  rankRewards?: Reward[];
+  /** 服务端冻结的原王者池快照，不提供运营编辑入口。 */
+  kingPoolSource?: string;
+}
+export interface KingRecruitResource extends Item {
+  space: number;
+  spaceLabel: string;
+}
 export interface ActivityTemplate {
   id: string;
   name: string;
@@ -15,7 +25,7 @@ export interface ActivityMode {
   supportsPrizes: boolean;
   maxMilestones?: number;
   notes?: string;
-  defaultOptions?: Record<string, any>;
+  defaultOptions?: ActivityGameplayOptions;
   defaultForm?: ActivityForm;
   requiredFields?: string[];
   fixedValues?: Record<string, number | string>;
@@ -59,7 +69,7 @@ export interface ActivityForm {
   products: ActivityProduct[];
   milestones: ActivityMilestone[];
   prizes: ActivityPrize[];
-  options: Record<string, any>;
+  options: ActivityGameplayOptions;
 }
 export interface ActivityInstance {
   id: string;
@@ -74,7 +84,35 @@ export interface ActivityInstance {
   availability: { usable: boolean; reason: string; missing: string[] };
 }
 export const productModes = ['exchange', 'discount-shop', 'half-price', 'limited-shop', 'mystic-shop'];
-export const cumulativeModes = ['recharge-total', 'diamond-spent', 'recruit-count', 'copy-win', 'login-total'];
+export const cumulativeModes = ['recharge-total', 'diamond-spent', 'recruit-count', 'copy-win', 'login-total', 'arena-wins', 'plunder-count', 'hero-collection'];
+const milestoneTargets: Record<string, { label: string; unit: string; note?: string }> = {
+  'recharge-total': { label: '累计充值', unit: '分' },
+  'diamond-spent': { label: '累计消耗钻石', unit: '钻' },
+  'recruit-count': { label: '累计招募', unit: '次' },
+  'copy-win': { label: '累计主线胜利', unit: '次' },
+  'login-total': { label: '累计登录', unit: '天' },
+  'arena-wins': { label: '累计竞技胜利', unit: '次' },
+  'plunder-count': { label: '累计夺宝', unit: '次' },
+  'hero-collection': { label: '不同英雄数量', unit: '种', note: '相同英雄重复获得不重复计数。' },
+  'trial-stars': { label: '试炼星数峰值', unit: '星', note: '按本期试炼星数最高值判断，多轮结果不相加。' },
+  'power-race': { label: '战力峰值', unit: '战力', note: '按本期战力最高值判断达成目标与排名。' }
+};
+export function activityMilestoneTarget(mode?: string): { label: string; unit: string; note?: string } {
+  return milestoneTargets[mode || ''] || { label: '达成目标', unit: '' };
+}
+export function activityMilestoneTitle(mode: string | undefined, goal: number, dayBased = false) {
+  const value = Number.isFinite(goal) ? goal.toLocaleString() : '未填写';
+  if (dayBased) return `第 ${value} 天`;
+  const target = activityMilestoneTarget(mode);
+  return `${target.label} ${value}${target.unit ? ` ${target.unit}` : ''}`;
+}
+export const activityFixedLabels: Record<string, string> = {
+  singleDiamond: '单抽钻石', tenDiamond: '十连钻石', singleCost: '单抽消耗', tenCost: '十连消耗',
+  coinPerDraw: '每次购买金币', dayLimit: '每日次数', minLevel: '解锁等级', dailyLimit: '每日招募次数',
+  freeHours: '免费招募间隔（小时）', rotationHours: '世界轮换间隔（小时）',
+  guaranteeEvery: '保底间隔（抽）', luckLimit: '幸运值上限', luckPerDraw: '每抽幸运值',
+  luckyGoal: '幸运值上限', luckyPerDraw: '每抽幸运值'
+};
 export function activityRepeatPolicy(form: Pick<ActivityForm, 'mode' | 'repeatPolicy'>): 'once' | 'repeat' {
   return form.repeatPolicy || (form.mode === 'opening-14' ? 'once' : 'repeat');
 }

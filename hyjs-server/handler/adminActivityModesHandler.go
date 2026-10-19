@@ -56,7 +56,7 @@ func AdminActivityInstancesHandler(c *gin.Context) {
 // @Router /admin/api/activity-instances [post]
 func AdminTypedActivityCreateHandler(c *gin.Context) {
 	var req model.AdminTypedActivityRequest
-	if c.ShouldBindJSON(&req) != nil || req.Version != "" || len(req.Mode) > 64 || len(req.TemplateID) > 96 || len([]rune(req.Name)) > 80 || len(req.Source) > 1000 || req.StartAt <= 0 || req.EndAt <= req.StartAt || req.ClaimEndAt < req.EndAt || len(req.Products) > 100 || len(req.Milestones) > 31 || len(req.Prizes) > 9 {
+	if c.ShouldBindJSON(&req) != nil || req.Version != "" || len(req.Mode) > 64 || len(req.TemplateID) > 96 || len([]rune(req.Name)) > 80 || len(req.Source) > 1000 || req.StartAt <= 0 || req.EndAt <= req.StartAt || req.ClaimEndAt < req.EndAt || len(req.Products) > 100 || len(req.Milestones) > 31 || (len(req.Prizes) > 1000 || req.Mode != "king-recruit" && len(req.Prizes) > 9) {
 		adminError(c, constUtil.ErrAdminInput)
 		return
 	}
@@ -79,7 +79,7 @@ func AdminTypedActivityCreateHandler(c *gin.Context) {
 // @Router /admin/api/activity-instances/{id} [put]
 func AdminTypedActivitySaveHandler(c *gin.Context) {
 	var req model.AdminTypedActivityRequest
-	if len(c.Param("id")) > 160 || c.ShouldBindJSON(&req) != nil || len(req.Version) != 64 || len(req.Mode) > 64 || len(req.TemplateID) > 96 || len([]rune(req.Name)) > 80 || len(req.Source) > 1000 || req.StartAt <= 0 || req.EndAt <= req.StartAt || req.ClaimEndAt < req.EndAt || len(req.Products) > 100 || len(req.Milestones) > 31 || len(req.Prizes) > 9 {
+	if len(c.Param("id")) > 160 || c.ShouldBindJSON(&req) != nil || len(req.Version) != 64 || len(req.Mode) > 64 || len(req.TemplateID) > 96 || len([]rune(req.Name)) > 80 || len(req.Source) > 1000 || req.StartAt <= 0 || req.EndAt <= req.StartAt || req.ClaimEndAt < req.EndAt || len(req.Products) > 100 || len(req.Milestones) > 31 || (len(req.Prizes) > 1000 || req.Mode != "king-recruit" && len(req.Prizes) > 9) {
 		adminError(c, constUtil.ErrAdminInput)
 		return
 	}

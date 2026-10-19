@@ -4,6 +4,7 @@ CREATE TABLE IF NOT EXISTS p13_union_fight_shop_sources (
  enabled BOOLEAN NOT NULL DEFAULT 0,
  item_id VARCHAR(64) NOT NULL,
  price BIGINT NOT NULL,
+ cost_resource VARCHAR(64) NOT NULL DEFAULT '',
  quantity BIGINT NOT NULL,
  buy_count BIGINT NOT NULL,
  buy_condition BIGINT NOT NULL,

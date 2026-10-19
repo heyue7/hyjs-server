@@ -22,6 +22,9 @@ func p4PlunderActivityPeriod(now time.Time) db.PeriodInstance {
 }
 
 func p4PlunderActivityIdentity(cfg db.PeriodInstance) bool {
+	if adminConfiguredPeriodIdentity(cfg, constUtil.P4PlunderActivityPrefix, constUtil.P4PlunderActivityKind) {
+		return true
+	}
 	if !strings.HasPrefix(cfg.ID, constUtil.P4PlunderActivityPrefix) || cfg.Kind != constUtil.P4PlunderActivityKind || cfg.Mode != "cumulative" || cfg.Source != constUtil.P4PlunderActivitySource || cfg.RewardEndAt != cfg.EndAt || cfg.Goal < 1 || cfg.RankPlaces != 0 {
 		return false
 	}
@@ -65,6 +68,13 @@ func (s *GameService) recordP4VerifiedPlunderAttempt(tx *gorm.DB, row *db.P11Plu
 	}
 	var active *db.PeriodInstance
 	for _, live := range published {
+		allowed, err := localPlayActivityVisible(tx, live.ID)
+		if err != nil {
+			return err
+		}
+		if !allowed {
+			continue
+		}
 		cfg, e := s.freezeP1Period(tx, live, false)
 		if e != nil {
 			return e

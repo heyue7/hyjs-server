@@ -16,11 +16,16 @@ def main():
  require(not output.exists() and not record.exists(),"Fresh output required");require(common.digest(base)==proof["baseAPKSHA256"],"Base changed")
  pins={ROOT/n:h for n,h in proof["sourcePins"].items()}
  for f,h in pins.items():require(f.resolve().is_relative_to(ROOT)and common.digest(f)==h,"Source pin changed: "+str(f))
- raw=(overlay/"classes2.dex").read_bytes();require(hashlib.sha256(raw).hexdigest()==proof["outputDexSHA256"],"DEX differs")
- payload={"classes2.dex":raw}
+ payload={}
+ if not proof.get("managedOnly",False):
+  raw=(overlay/"classes2.dex").read_bytes();require(hashlib.sha256(raw).hexdigest()==proof["outputDexSHA256"],"DEX differs")
+  payload["classes2.dex"]=raw
+ else:
+  require(proof.get("inheritedJavaByteExact") is True,"Managed-only overlay must retain all Java entries")
  for name,file in proof.get("payloadFiles",{}).items():
   require(name.startswith("assets/bin/Data/Managed/") and name.endswith(".dll"),"Unexpected overlay entry")
   f=ROOT/file;require(f.resolve().is_relative_to(ROOT),"Overlay file outside project");payload[name]=f.read_bytes()
+ require(bool(payload),"Empty overlay is not a release")
  hashes={n:hashlib.sha256(v).hexdigest()for n,v in payload.items()}
  for n,h in proof.get("replacementEntries",{}).items():require(hashes[n]==h,"Overlay payload differs: "+n)
  sdk=Path.home()/"Library/Android/sdk/build-tools/33.0.0";jdk=Path("/opt/homebrew/opt/openjdk@21");env=dict(os.environ,JAVA_HOME=str(jdk),PATH=str(jdk/"bin")+os.pathsep+os.environ.get("PATH",""))

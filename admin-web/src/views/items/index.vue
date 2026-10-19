@@ -9,6 +9,7 @@ import ResourceImage from '@/components/operations/resource-image.vue';
 import ItemQuality from '@/components/operations/item-quality.vue';
 import { getItemDetail } from '@/service/item-details';
 import type { ItemDetail } from '@/service/item-details';
+import { createRequestId } from '@/utils/request-id';
 const { canWrite, loading, error, run } = useOperations();
 const q = ref('');
 const category = ref<string | null>(null);
@@ -103,7 +104,7 @@ function findPlayers(value: string) {
 }
 function openGrant(item: Item) {
   selectedItem.value = item;
-  Object.assign(grant, { playerId: null, amount: 1, reason: '', requestId: crypto.randomUUID() });
+  Object.assign(grant, { playerId: null, amount: 1, reason: '', requestId: createRequestId() });
   playerOptions.value = [];
   grantError.value = '';
   grantOpen.value = true;

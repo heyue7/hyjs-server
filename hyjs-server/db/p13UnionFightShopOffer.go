@@ -1,6 +1,6 @@
 package db
 
-// P13UnionFightShopOffer 冻结本场原UF物品身份与明确报价，后续发布不改当前实例。
+// P13UnionFightShopOffer 保存本场当前运营报价；稳定库存与已提交回执独立保留。
 type P13UnionFightShopOffer struct {
 	MatchID    string `gorm:"primaryKey;type:char(64)" json:"matchId"`
 	ShopItemID string `gorm:"primaryKey;type:varchar(64)" json:"shopItemId"`

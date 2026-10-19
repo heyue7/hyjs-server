@@ -9,6 +9,7 @@ import type { ActivityForm, ActivityInstance, ActivityMode } from '@/service/act
 import { useOperations } from '@/composables/useOperations';
 import ActivityProducts from '@/components/operations/activity-products.vue';
 import ActivityMilestones from '@/components/operations/activity-milestones.vue';
+import KingPrizes from '@/components/operations/king-prizes.vue';
 import ActivityPrizes from '@/components/operations/activity-prizes.vue';
 import ActivityOptions from '@/components/operations/activity-options.vue';
 import ActivitySummary from '@/components/operations/activity-summary.vue';
@@ -314,8 +315,9 @@ onMounted(load);
               </template>
               <template v-if="activeTab === 'content'">
                 <ActivityProducts v-if="selectedMode?.supportsProducts" v-model="form.products" :vip-options="vipOptions" :disabled="saving" />
-                <ActivityMilestones v-if="selectedMode?.supportsMilestones" v-model="form.milestones" :disabled="saving" :single="selectedMode?.maxMilestones === 1" :max="selectedMode?.maxMilestones" :day-based="['login-rewards', 'limited-sign'].includes(form.mode)" :choice="form.mode === 'login-rewards'" />
-                <ActivityPrizes v-if="selectedMode?.supportsPrizes" v-model="form.prizes" :disabled="saving" />
+                <ActivityMilestones v-if="selectedMode?.supportsMilestones" v-model="form.milestones" :mode="form.mode" :disabled="saving" :single="selectedMode?.maxMilestones === 1" :max="selectedMode?.maxMilestones" :day-based="['login-rewards', 'limited-sign'].includes(form.mode)" :choice="form.mode === 'login-rewards'" />
+                <KingPrizes v-if="form.mode === 'king-recruit' && selectedMode?.supportsPrizes" v-model="form.prizes" :disabled="saving" />
+                <ActivityPrizes v-else-if="selectedMode?.supportsPrizes" v-model="form.prizes" :disabled="saving" />
                 <ActivityOptions v-if="!selectedMode?.supportsProducts && !selectedMode?.supportsMilestones && !selectedMode?.supportsPrizes" v-model="form.options" :mode="form.mode" :fixed-values="selectedMode?.fixedValues" :disabled="saving" />
               </template>
               <template v-if="activeTab === 'schedule'">

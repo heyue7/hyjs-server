@@ -1,6 +1,7 @@
 -- 本地服商店：程序首次建立目录；配置热改不被重启重置。
 CREATE TABLE IF NOT EXISTS shop_products (
   id VARCHAR(64) PRIMARY KEY,
+  live_editable BOOLEAN NOT NULL DEFAULT FALSE,
   source VARCHAR(255) NOT NULL,
   enabled BOOLEAN NOT NULL,
   resource_id VARCHAR(64) NOT NULL,

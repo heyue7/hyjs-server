@@ -447,20 +447,19 @@ func (s *GameService) confirmTestPaymentAt(ctx context.Context, orderID, eventID
 	return &order, nil
 }
 
-// refreshP3OpenServer 由新确认订单事实投影原14天累计元/当日单笔元条件。
-// 按人民币分汇总后统一取整，避免半元渠道逐笔截断；与付款同事务保存。
+// refreshP3OpenServer projects confirmed orders and evaluates original opening
+// tasks in the payment transaction. Page reads use the same fact-only helper.
 func (s *GameService) refreshP3OpenServer(tx *gorm.DB, p *pb.Player, g *model.GameState, now time.Time) error {
 	if !tx.Migrator().HasTable(&db.OpenServerActivityRule{}) {
 		return nil
 	}
-	cfg, err := loadPlayerOpenServerRule(tx, p.GetPlayerId())
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil
-	}
-	if err != nil {
-		return err
-	}
-	if now.UnixMilli() < cfg.StartAt || now.UnixMilli() >= cfg.EndAt {
+	return s.refreshOpenServerProgressAt(tx, p, g, now)
+}
+
+// refreshP3OpenServerCounters rechecks actual paid orders within the accepted
+// activity window; daily maximums never combine two small orders into one.
+func (s *GameService) refreshP3OpenServerCounters(tx *gorm.DB, id int64, cfg *db.OpenServerActivityRule, now time.Time) error {
+	if !tx.Migrator().HasTable(&db.PaymentOrder{}) {
 		return nil
 	}
 	paymentStart := cfg.StartAt
@@ -471,33 +470,45 @@ func (s *GameService) refreshP3OpenServer(tx *gorm.DB, p *pb.Player, g *model.Ga
 	if cycle != nil {
 		paymentStart = max(paymentStart, cycle.CreatedAt)
 	}
-	orders, err := localPlayActivityPaymentOrders(tx, p.GetPlayerId(), cfg.ID, paymentStart, min(cfg.EndAt, now.UnixMilli()+1))
+	orders, err := localPlayActivityPaymentOrders(tx, id, cfg.ID, paymentStart, min(cfg.EndAt, now.UnixMilli()+1))
 	if err != nil {
 		return err
 	}
 	total, _, _, err := paymentTotalsFromOrders(orders)
+	if err != nil || total/100 > math.MaxInt32 {
+		if err != nil {
+			return err
+		}
+		return p3Error()
+	}
+	// Rebuild every actual payment day, including orders confirmed before the
+	// current server process or before the period-wide second-week policy.
+	values := map[string]int32{constUtil.P3OpenServerTotalPaid: int32(total / 100)}
+	for _, order := range orders {
+		if order.Cents/100 > math.MaxInt32 {
+			return p3Error()
+		}
+		key := constUtil.P3OpenServerSinglePaid + p3Day(time.UnixMilli(order.ConfirmedAt))
+		values[key] = max(values[key], int32(order.Cents/100))
+	}
+	previous, err := openServerReadCounters(tx, id)
 	if err != nil {
 		return err
 	}
-	day := p3Day(now)
-	local := now.In(time.FixedZone("UTC+8", 8*3600))
-	start := time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, local.Location())
-	if orders, err = localPlayActivityPaymentOrders(tx, p.GetPlayerId(), cfg.ID, max(start.UnixMilli(), paymentStart), min(start.AddDate(0, 0, 1).UnixMilli(), cfg.EndAt, now.UnixMilli()+1)); err != nil {
-		return err
+	old := map[string]int32{}
+	for _, row := range previous {
+		old[row.CounterKey] = row.Value
 	}
-	var single int64
-	for _, order := range orders {
-		single = max(single, order.Cents)
-	}
-	if total/100 > math.MaxInt32 || single/100 > math.MaxInt32 {
-		return p3Error()
-	}
-	for _, value := range []db.OpenServerActivityCounter{{PlayerID: p.GetPlayerId(), CounterKey: constUtil.P3OpenServerTotalPaid, Value: int32(total / 100)}, {PlayerID: p.GetPlayerId(), CounterKey: constUtil.P3OpenServerSinglePaid + day, Value: int32(single / 100)}} {
-		if err = openServerSaveCounter(tx, &value); err != nil {
+	for key, value := range values {
+		if old[key] == value {
+			continue
+		}
+		counter := db.OpenServerActivityCounter{PlayerID: id, CounterKey: key, Value: value}
+		if err = openServerSaveCounter(tx, &counter); err != nil {
 			return err
 		}
 	}
-	return s.RefreshOpenServerProgress(tx, p, g)
+	return nil
 }
 
 func (s *GameService) applyP3VIP(p *pb.Player, old int32) error {

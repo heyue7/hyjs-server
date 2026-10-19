@@ -6,6 +6,7 @@ type P13UnionFightShopSource struct {
 	ShopItemID    string `gorm:"primaryKey;type:varchar(64)" json:"shopItemId"`
 	Enabled       bool   `gorm:"not null;default:false" json:"enabled"`
 	ItemID        string `gorm:"type:varchar(64);not null" json:"itemId"`
+	CostResource  string `gorm:"size:64;not null;default:''" json:"costResource"`
 	Price         int64  `gorm:"not null" json:"price"`
 	Quantity      int64  `gorm:"not null" json:"quantity"`
 	BuyCount      int64  `gorm:"not null" json:"buyCount"`

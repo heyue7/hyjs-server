@@ -40,6 +40,7 @@ type p4Product struct {
 	Weight      int64  `json:"weight"`
 }
 type p4CommerceRules struct {
+	LiveEditable       bool        `json:"liveEditable,omitempty"`
 	Products           []p4Product `json:"products"`
 	RankPublishedAt    int64       `json:"rankPublishedAt,omitempty"`
 	FreeCap            int32       `json:"freeCap,omitempty"`
@@ -187,9 +188,10 @@ func (s *GameService) p4ParseCost(content string) (*pb.BaseResource, error) {
 		return nil, err
 	}
 	switch pair[0] {
-	case "coin", "diamond", "energy", "stamina", "light", "point", "popularity", "score":
+	case "coin", "diamond", "energy", "stamina", "light", "point", "popularity", "score", "coinpet", "contribution":
 	default:
-		if !strings.HasPrefix(pair[0], "item_") || s.table("Item", "itemId", pair[0]) == nil {
+		valid := strings.HasPrefix(pair[0], "item_") && s.table("Item", "itemId", pair[0]) != nil || strings.HasPrefix(pair[0], "frag_") && s.table("Frag", "id", pair[0]) != nil || strings.HasPrefix(pair[0], "MineItem_") && s.table("MineSkill", "MineItemID", pair[0]) != nil && s.table("MineSkill", "MineItemID", pair[0])["Type"] != "mine" || strings.HasPrefix(pair[0], "FishItem_") && s.table("FishSkill", "FishItemID", pair[0]) != nil && s.table("FishSkill", "FishItemID", pair[0])["Type"] != "dock"
+		if !valid {
 			return nil, errors.New("交易货币或道具未恢复")
 		}
 	}
@@ -240,7 +242,9 @@ func (s *GameService) validateP4Commerce(cfg db.P4CommerceRule) (p4CommerceRules
 // p4CommerceSnapshot 让投放列表和交易读取同一冻结目录，后台编辑只影响尚未冻结的实例。
 func (s *GameService) p4CommerceSnapshot(live db.P4CommerceRule) (db.P4CommerceRule, p4CommerceRules, error) {
 	cfg := live
-	if len(live.Frozen) > 0 {
+	var current p4CommerceRules
+	_ = json.Unmarshal(live.Rules, &current)
+	if len(live.Frozen) > 0 && !(adminOrdinarySchedulableShop(live.Kind) && live.ShopType > 0 && current.LiveEditable) {
 		if json.Unmarshal(live.Frozen, &cfg) != nil || cfg.ID != live.ID || cfg.ShopType != live.ShopType {
 			return cfg, p4CommerceRules{}, errors.New("目录冻结存档损坏")
 		}
@@ -378,6 +382,18 @@ func (s *GameService) loadP4Commerce(tx *gorm.DB, id int64, key string, shopType
 			}
 		}
 		var err error
+		// A timed shop keeps its own window/quota identity while reading the current
+		// editable global catalogue. Activity exchanges retain frozen terms.
+		if live.ShopType > 0 && adminOrdinarySchedulableShop(live.Kind) && strings.Contains(live.ID, "shop_schedule_") {
+			source, e := s.AdminOrdinaryShopSource(tx, live.Kind)
+			if e != nil {
+				return cfg, rules, nil, nil, e
+			}
+			var sourceRules p4CommerceRules
+			if json.Unmarshal(source.Rules, &sourceRules) == nil && sourceRules.LiveEditable {
+				live.Rules = source.Rules
+			}
+		}
 		cfg, rules, err = s.p4CommerceSnapshot(live)
 		if err != nil {
 			return cfg, rules, nil, nil, err
@@ -389,7 +405,7 @@ func (s *GameService) loadP4Commerce(tx *gorm.DB, id int64, key string, shopType
 		if !open {
 			continue
 		}
-		if len(live.Frozen) == 0 {
+		if len(live.Frozen) == 0 && !rules.LiveEditable {
 			raw, _ := json.Marshal(cfg)
 			if err = tx.Model(&live).Update("frozen", raw).Error; err != nil {
 				return cfg, rules, nil, nil, err
@@ -423,6 +439,37 @@ func (s *GameService) loadP4Commerce(tx *gorm.DB, id int64, key string, shopType
 			if elapsed > 0 {
 				state.FreeLeft = int32(min(int64(rules.FreeCap), int64(state.FreeLeft)+elapsed))
 				state.FreeAt += elapsed * seconds
+			}
+			// Keep purchased-slot keys and refresh counters when an operator changes
+			// the catalogue. Only deleted slots disappear; vacancies use new offers.
+			if rules.LiveEditable && len(state.Slots) > 0 {
+				available := map[string]bool{}
+				for _, product := range rules.Products {
+					available[product.ID] = true
+				}
+				kept := []string{}
+				for _, id := range state.Slots {
+					if available[id] && len(kept) < rules.Slots {
+						kept = append(kept, id)
+						delete(available, id)
+					}
+				}
+				if len(kept) < rules.Slots {
+					vacant := rules
+					vacant.Slots = rules.Slots - len(kept)
+					vacant.Products = nil
+					for _, product := range rules.Products {
+						if available[product.ID] {
+							vacant.Products = append(vacant.Products, product)
+						}
+					}
+					fill, e := p4SampleSlots(vacant)
+					if e != nil {
+						return cfg, rules, nil, nil, e
+					}
+					kept = append(kept, fill...)
+				}
+				state.Slots = kept
 			}
 			if len(state.Slots) == 0 {
 				state.Slots, err = p4SampleSlots(rules)
@@ -537,10 +584,10 @@ func (s *GameService) p4Projection(tx *gorm.DB, p *pb.Player, cfg db.P4CommerceR
 		if state.Total[product.ID] < 0 {
 			return nil, nil, errors.New("商品总限购存档无效")
 		}
-		if bought < 0 || bought > product.DailyLimit {
+		if bought < 0 || !rules.LiveEditable && bought > product.DailyLimit {
 			return nil, nil, errors.New("商品日限购存档无效")
 		}
-		left := product.DailyLimit - bought
+		left := max(int32(0), product.DailyLimit-bought)
 		allLeft := int32(math.MaxInt32)
 		if product.TotalLimit > 0 {
 			allLeft = product.TotalLimit - state.Total[product.ID]
@@ -552,7 +599,7 @@ func (s *GameService) p4Projection(tx *gorm.DB, p *pb.Player, cfg db.P4CommerceR
 			if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 				return nil, nil, err
 			}
-			if stock.Used < 0 || stock.Used > product.Stock {
+			if stock.Used < 0 || !rules.LiveEditable && stock.Used > product.Stock {
 				return nil, nil, errors.New("共享库存存档无效")
 			}
 			left = min(left, product.Stock-stock.Used)
@@ -589,7 +636,17 @@ func (s *GameService) p4Projection(tx *gorm.DB, p *pb.Player, cfg db.P4CommerceR
 				}
 			}
 		}
-		shop = append(shop, &pb.ShopItem{Id: proto.String(product.ID), Item: rewards, Price: []*pb.BaseResource{price}, ExchangeList: []*pb.BaseResource{price}, Priority: proto.Int32(product.Priority), CanBuy: proto.Int32(max(0, can)), DayLeftTimes: proto.Int32(max(0, left)), DayTotalTimes: proto.Int32(product.DailyLimit), TotalLeftTimes: proto.Int32(max(0, allLeft)), TotalTimes: proto.Int32(max(product.TotalLimit, allLeft)), PerDiscount: proto.String(strconv.Itoa(int(bps / 100))), Condition: condition})
+		publicID := product.ID
+		if rules.LiveEditable {
+			publicID = adminLiveP4SKU(cfg, product, nil)
+		}
+		dayTotal := product.DailyLimit
+		if rules.LiveEditable && product.TierID {
+			// The original price formatter derives its next ordinal from these two
+			// fields; stock/total caps must not masquerade as purchased units.
+			dayTotal = max(int32(0), left) + bought
+		}
+		shop = append(shop, &pb.ShopItem{Id: proto.String(publicID), Item: rewards, Price: []*pb.BaseResource{price}, ExchangeList: []*pb.BaseResource{price}, Priority: proto.Int32(product.Priority), CanBuy: proto.Int32(max(0, can)), DayLeftTimes: proto.Int32(max(0, left)), DayTotalTimes: proto.Int32(dayTotal), TotalLeftTimes: proto.Int32(max(0, allLeft)), TotalTimes: proto.Int32(max(product.TotalLimit, allLeft)), PerDiscount: proto.String(strconv.Itoa(int(bps / 100))), Condition: condition})
 		status := int32(0)
 		if can > 0 {
 			status = 1
@@ -615,6 +672,10 @@ func (s *GameService) p4Projection(tx *gorm.DB, p *pb.Player, cfg db.P4CommerceR
 }
 func p4ResourceBalance(p *pb.Player, g *model.GameState, key string) int64 {
 	switch key {
+	case "coinpet":
+		return p.GetCoinpet()
+	case "contribution":
+		return int64(p.GetContribution())
 	case "light":
 		return int64(p.GetLight())
 	case "point":
@@ -628,6 +689,22 @@ func p4ResourceBalance(p *pb.Player, g *model.GameState, key string) int64 {
 	case "stamina":
 		return int64(p.GetStamina())
 	default:
+		if strings.HasPrefix(key, "MineItem_") {
+			for _, item := range g.Gems {
+				if item.GetId() == key {
+					return int64(item.GetNum())
+				}
+			}
+			return 0
+		}
+		if strings.HasPrefix(key, "FishItem_") {
+			for _, item := range g.Cooking {
+				if item.GetId() == key {
+					return int64(item.GetNum())
+				}
+			}
+			return 0
+		}
 		return simpleOwned(p, g, key)
 	}
 }
@@ -637,6 +714,10 @@ func (s *GameService) p4Deduct(tx *gorm.DB, id int64, p *pb.Player, g *model.Gam
 	}
 	n := cost.GetNum()
 	switch cost.GetId() {
+	case "coinpet":
+		p.Coinpet = proto.Int64(p.GetCoinpet() - int64(n))
+	case "contribution":
+		p.Contribution = proto.Int32(p.GetContribution() - n)
 	case "light":
 		p.Light = proto.Int32(p.GetLight() - n)
 	case "point":
@@ -650,7 +731,15 @@ func (s *GameService) p4Deduct(tx *gorm.DB, id int64, p *pb.Player, g *model.Gam
 	case "stamina":
 		p.Stamina = proto.Int32(p.GetStamina() - n)
 	default:
-		if err := deductPoolCost(p, g, cost); err != nil {
+		if strings.HasPrefix(cost.GetId(), "MineItem_") {
+			if err := s.gemInventoryDelta(p, g, map[string]int64{cost.GetId(): -int64(n)}); err != nil {
+				return err
+			}
+		} else if strings.HasPrefix(cost.GetId(), "FishItem_") {
+			if err := s.cookingInventoryDelta(p, g, map[string]int64{cost.GetId(): -int64(n)}); err != nil {
+				return err
+			}
+		} else if err := deductPoolCost(p, g, cost); err != nil {
 			return err
 		}
 	}
@@ -692,6 +781,9 @@ func (s *GameService) p4OrdinaryProjection(tx *gorm.DB, p *pb.Player, now time.T
 	return items, err
 }
 func p4IsOrdinaryProduct(id string) bool {
+	if strings.HasPrefix(id, "p4q:") || strings.HasPrefix(id, "p4qt:") {
+		return true
+	}
 	for i := 1; i <= 7; i++ {
 		if id == fmt.Sprintf("itemShopId_%d", i) {
 			return true
@@ -792,6 +884,10 @@ func (s *GameService) p4Commerce(ctx context.Context, id int64, request proto.Me
 		}
 		// The original client stores one activity ID per type. Keep its outer ID for receipts,
 		// and resolve purchases into the existing child transaction and quota.
+		quotedProductID := productID
+		if _, stable, ok := adminLiveShopParseSKU(productID); ok {
+			productID = stable
+		}
 		rankPurchase := shopType == 4 && strings.HasPrefix(productID, constUtil.P4PopularityRankProductPrefix)
 		if rankPurchase {
 			// Acquire the existing ordinary directory before all rank offers, matching
@@ -937,6 +1033,9 @@ func (s *GameService) p4Commerce(ctx context.Context, id int64, request proto.Me
 			if err != nil {
 				return err
 			}
+			if rules.LiveEditable && productID != "" && quotedProductID != adminLiveP4SKU(cfg, *selected, nil) {
+				return errors.New("商品已调整，请刷新商店后重新购买")
+			}
 			unit, err := s.p4Price(*selected, state, bought+1, 1)
 			if err != nil {
 				return err
@@ -1056,6 +1155,10 @@ func (s *GameService) p4Commerce(ctx context.Context, id int64, request proto.Me
 	})
 	if err != nil {
 		return nil, err
+	}
+	switch request.(type) {
+	case *pb.CSShopBuy, *pb.CSRefreshShopBuy, *pb.CSRefreshShopRefresh, *pb.CSGetActivityShopReward, *pb.CSBuyActivityShop:
+		return s.shopInventorySync(ctx, id, []proto.Message{response})
 	}
 	if guidePlayer != nil {
 		return []proto.Message{response, &pb.SCPlayer{Player: guidePlayer}}, nil

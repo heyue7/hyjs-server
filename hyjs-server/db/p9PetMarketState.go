@@ -1,6 +1,6 @@
 package db
 
-// P9PetMarketState 保存冻结周规则、已选商品与独立库存代次。
+// P9PetMarketState 保存当前周报价、稳定已选商品与独立库存代次；运营编辑保留已用次数。
 type P9PetMarketState struct {
 	PlayerID     int64  `gorm:"primaryKey;autoIncrement:false" json:"playerId"`
 	WeekKey      string `gorm:"size:8;not null" json:"weekKey"`

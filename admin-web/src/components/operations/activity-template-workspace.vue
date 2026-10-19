@@ -11,6 +11,7 @@ import { useOperations } from '@/composables/useOperations';
 import ActivityProducts from './activity-products.vue';
 import ActivityMilestones from './activity-milestones.vue';
 import ActivityPrizes from './activity-prizes.vue';
+import KingPrizes from './king-prizes.vue';
 import ActivityOptions from './activity-options.vue';
 import ActivitySummary from './activity-summary.vue';
 
@@ -341,11 +342,17 @@ onUnmounted(() => window.removeEventListener('beforeunload', beforeUnload));
               <ActivityMilestones
                 v-else-if="selectedMode?.supportsMilestones"
                 v-model="form.milestones"
+                :mode="form.mode"
                 :disabled="saving || readOnly"
                 :single="selectedMode.maxMilestones === 1"
                 :max="selectedMode.maxMilestones"
                 :day-based="['login-rewards', 'limited-sign'].includes(form.mode)"
                 :choice="form.mode === 'login-rewards'"
+              />
+              <KingPrizes
+                v-else-if="form.mode === 'king-recruit' && selectedMode?.supportsPrizes"
+                v-model="form.prizes"
+                :disabled="saving || readOnly"
               />
               <ActivityPrizes
                 v-else-if="selectedMode?.supportsPrizes"

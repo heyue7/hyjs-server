@@ -7,6 +7,7 @@ import { ApiError, api, errorMessage, formatTime, json } from '@/service/operati
 import type { FeedbackTicket } from '@/service/management-operations';
 import { useOperations } from '@/composables/useOperations';
 import { useServerScopeStore } from '@/store/modules/server-scope';
+import { createRequestId } from '@/utils/request-id';
 const scope = useServerScopeStore();
 const { canWrite, loading, error, run } = useOperations();
 const q = ref('');
@@ -108,7 +109,7 @@ async function sendReply() {
   }
   replyPending.value = true;
   actionError.value = '';
-  if (!replyRequestId.value) replyRequestId.value = crypto.randomUUID();
+  if (!replyRequestId.value) replyRequestId.value = createRequestId();
   try {
     await api(
       scope.serverQuery(`/feedback/${encodeURIComponent(detail.value.id)}/replies`),

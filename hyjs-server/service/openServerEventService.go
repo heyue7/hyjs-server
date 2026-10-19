@@ -76,7 +76,7 @@ func (s *GameService) recordOpenServerSave(tx *gorm.DB, row *db.Profile, player 
 		current := game.Run
 		prior := before.Run
 		if current != nil && prior != nil && current.Complete && !prior.Complete {
-			day := time.Now().In(time.FixedZone("UTC+8", 8*3600)).Format("2006-01-02")
+			day := LocalPlayNow(tx.Statement.Context).In(time.FixedZone("UTC+8", 8*3600)).Format("2006-01-02")
 			if err := RecordOpenServerCounter(tx, row.Id, constUtil.OpenServerActivityCounterCopyWin+day, 1); err != nil {
 				return err
 			}

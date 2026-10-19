@@ -100,6 +100,31 @@ const dates = computed(() =>
   Array.from({ length: visibleDays.value }, (_, index) => startDate.value + index * activityDay)
 );
 const timelineWidth = computed(() => visibleDays.value * dayWidth);
+const calendarViewport = ref<HTMLElement | null>(null);
+const calendarScrollLeft = ref(0);
+const calendarViewportWidth = ref(0);
+let calendarResizeObserver: ResizeObserver | undefined;
+function syncCalendarViewport() {
+  const viewport = calendarViewport.value;
+  calendarScrollLeft.value = viewport?.scrollLeft || 0;
+  calendarViewportWidth.value = viewport?.clientWidth || 0;
+}
+watch(calendarViewport, viewport => {
+  calendarResizeObserver?.disconnect();
+  if (viewport) {
+    calendarResizeObserver = new ResizeObserver(syncCalendarViewport);
+    calendarResizeObserver.observe(viewport);
+  }
+  syncCalendarViewport();
+}, { flush: 'post' });
+const barMenuOptions = computed(() => [
+  { label: '预览', key: 'preview' },
+  { label: canWrite.value ? '编辑' : '查看', key: 'edit' }
+]);
+function selectBarAction(action: string | number, item: ActivityOccurrence) {
+  if (action === 'preview') previewActivity(item.templateId, item);
+  if (action === 'edit') selectedKey.value = keyOf(item);
+}
 const rows = computed(() => {
   const max = Math.min(31, Math.max(3, ...items.value.map(item => item.lane)) + 1);
   return Array.from({ length: max + 1 }, (_, lane) => {
@@ -357,6 +382,26 @@ function barStyle(item: ActivityOccurrence, track: number) {
     width: `${Math.max(16, ((item.endAt - item.startAt) / activityDay) * dayWidth - 4)}px`
   };
 }
+function barVisibleContent(item: ActivityOccurrence) {
+  const start = ((item.startAt - startDate.value) / activityDay) * dayWidth;
+  const duration = Math.max(16, ((item.endAt - item.startAt) / activityDay) * dayWidth - 4);
+  const claim = Math.max(0, ((item.claimEndAt - item.endAt) / activityDay) * dayWidth);
+  // The claim tail belongs to the same occurrence but keeps its own dashed date range.
+  const end = start + duration + (claim > 0 ? claim + 4 : 0);
+  const left = Math.max(0, start, calendarScrollLeft.value);
+  const right = Math.min(timelineWidth.value, end, calendarScrollLeft.value + calendarViewportWidth.value);
+  const width = Math.max(0, right - left);
+  return { left: left - start + 8, width: Math.max(0, width - 16), compact: width < 210, visible: width >= 40 };
+}
+function barContentStyle(item: ActivityOccurrence) {
+  const content = barVisibleContent(item);
+  return { left: `${content.left}px`, width: `${content.width}px`, visibility: content.visible ? 'visible' as const : 'hidden' as const };
+}
+function barPeriodSummary(item: ActivityOccurrence, lane: number) {
+  const state = item.enabled ? (item.id ? '已发布' : '草稿') : '已停用';
+  const claim = item.claimEndAt > item.endAt ? ` · 领奖至${calendarDate(item.claimEndAt)}（不含）` : '';
+  return `${calendarDate(item.startAt)} — ${calendarDate(item.endAt)} · 轨道${lane + 1} · ${item.frozen ? '已冻结' : state}${claim}`;
+}
 function removeSelected() {
   if (!selected.value || !canWrite.value || !ready.value || selected.value.frozen) return;
   items.value = items.value.filter(item => keyOf(item) !== selectedKey.value);
@@ -600,6 +645,7 @@ onMounted(async () => {
 });
 onUnmounted(() => {
   requestGeneration += 1;
+  calendarResizeObserver?.disconnect();
   window.removeEventListener('beforeunload', beforeUnload);
   removeScopeGuard?.();
 });
@@ -733,10 +779,9 @@ onUnmounted(() => {
               <NButton :disabled="!ready" :loading="checking" @click="checkCalendar">检查冲突</NButton>
             </NSpace>
           </div>
-          <div class="calendar-scroll" :class="{ 'calendar-disabled': !scope.serverId }">
-            <div class="calendar-canvas" :style="{ width: `${timelineWidth + 368}px` }">
+          <div ref="calendarViewport" class="calendar-scroll" :class="{ 'calendar-disabled': !scope.serverId }" @scroll.passive="syncCalendarViewport">
+            <div class="calendar-canvas" :style="{ width: `${timelineWidth}px` }">
               <div class="calendar-head">
-                <div class="lane-label calendar-fixed-heading">活动 / 并行轨道</div>
                 <div
                   v-for="date in dates"
                   :key="date"
@@ -749,22 +794,15 @@ onUnmounted(() => {
                     {{ ['日', '一', '二', '三', '四', '五', '六'][new Date(date + 8 * 3600000).getUTCDay()] }}
                   </small>
                 </div>
-                <div class="calendar-operations calendar-fixed-heading">操作</div>
               </div>
               <div v-for="row in rows" :key="row.lane" class="calendar-row" :style="{ height: `${row.height}px` }">
-                <div class="lane-label calendar-names">
-                  <span v-if="!row.bars.length" class="empty-lane-name">轨道 {{ row.lane + 1 }} · 拖入活动</span>
-                  <button v-for="bar in row.bars" :key="keyOf(bar.item)" class="activity-fixed-name" :style="{ top: `${bar.track * 58 + 8}px` }" :title="bar.item.name" @click="selectedKey = keyOf(bar.item)">
-                    <strong>{{ bar.item.name }}</strong>
-                    <small>轨道 {{ row.lane + 1 }} · {{ bar.item.enabled ? (bar.item.id ? '已发布' : '草稿') : '已停用' }}</small>
-                  </button>
-                </div>
                 <div
                   class="calendar-lane"
                   :style="{ width: `${timelineWidth}px`, backgroundSize: `${dayWidth}px 100%` }"
                   @dragover.prevent
                   @drop="dropLibrary($event, row.lane)"
                 >
+                  <span v-if="!row.bars.length" class="empty-lane-name" :style="{ left: `${calendarScrollLeft + 12}px` }">轨道 {{ row.lane + 1 }} · 拖入活动</span>
                   <div
                     v-for="bar in row.bars"
                     :key="keyOf(bar.item)"
@@ -776,9 +814,9 @@ onUnmounted(() => {
                       opening: bar.item.mode === 'opening-14'
                     }"
                     :style="barStyle(bar.item, bar.track)"
-                    role="button"
+                    role="group"
                     tabindex="0"
-                    :aria-label="`${bar.item.name}，${calendarDate(bar.item.startAt)}至${calendarDate(bar.item.endAt)}，回车编辑，左右键移动一天`"
+                    :aria-label="`${bar.item.name}，${barPeriodSummary(bar.item, row.lane)}，回车编辑，左右键移动一天`"
                     @pointerdown="startPointer($event, bar.item, 'move')"
                     @pointermove="movePointer"
                     @pointerup="endPointer"
@@ -800,14 +838,22 @@ onUnmounted(() => {
                       class="claim-tail"
                       :style="{ width: `${((bar.item.claimEndAt - bar.item.endAt) / activityDay) * dayWidth}px` }"
                       :title="`领奖期至 ${calendarDate(bar.item.claimEndAt)}（不含）`"
-                    >
-                      领奖
-                    </span>
-                    <div class="bar-title">{{ bar.item.name }}</div>
-                    <small>
-                      {{ calendarDate(bar.item.startAt) }} — {{ calendarDate(bar.item.endAt)
-                      }}{{ bar.item.frozen ? ' · 已冻结' : '' }}
-                    </small>
+                    />
+                    <div class="bar-visible-content" :class="{ compact: barVisibleContent(bar.item).compact }" :style="barContentStyle(bar.item)">
+                      <div class="bar-copy" :title="`${bar.item.name}\n${barPeriodSummary(bar.item, row.lane)}`">
+                        <div class="bar-title">{{ bar.item.name }}</div>
+                        <small>{{ barPeriodSummary(bar.item, row.lane) }}</small>
+                      </div>
+                      <div class="bar-actions" @pointerdown.stop @pointermove.stop @pointerup.stop @pointercancel.stop @keydown.stop @dblclick.stop>
+                        <NDropdown v-if="barVisibleContent(bar.item).compact" trigger="click" :options="barMenuOptions" @select="selectBarAction($event, bar.item)">
+                          <NButton size="tiny" quaternary class="bar-menu-button" :aria-label="`${bar.item.name}操作`" :title="`${bar.item.name}：预览或${canWrite ? '编辑' : '查看'}`">⋯</NButton>
+                        </NDropdown>
+                        <template v-else>
+                          <NButton size="tiny" quaternary @click="previewActivity(bar.item.templateId, bar.item)">预览</NButton>
+                          <NButton size="tiny" quaternary @click="selectedKey = keyOf(bar.item)">{{ canWrite ? '编辑' : '查看' }}</NButton>
+                        </template>
+                      </div>
+                    </div>
                     <span
                       v-if="!bar.item.frozen && canWrite"
                       class="resize-handle right"
@@ -816,12 +862,6 @@ onUnmounted(() => {
                       @pointerup.stop="endPointer"
                       @pointercancel.stop="endPointer"
                     />
-                  </div>
-                </div>
-                <div class="calendar-operations">
-                  <div v-for="bar in row.bars" :key="keyOf(bar.item)" class="activity-fixed-actions" :style="{ top: `${bar.track * 58 + 8}px` }">
-                    <NButton size="small" @click="previewActivity(bar.item.templateId, bar.item)">预览</NButton>
-                    <NButton size="small" @click="selectedKey = keyOf(bar.item)">编辑</NButton>
                   </div>
                 </div>
               </div>
@@ -1116,20 +1156,6 @@ h1 {
   background: rgb(var(--container-bg-color));
   border-bottom: 1px solid rgb(var(--base-text-color) / 0.09);
 }
-.lane-label {
-  width: 220px;
-  flex: 0 0 220px;
-  position: sticky;
-  left: 0;
-  z-index: 4;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgb(var(--container-bg-color));
-  border-right: 1px solid rgb(var(--base-text-color) / 0.09);
-  font-size: 12px;
-  color: rgb(var(--base-text-color) / 0.55);
-}
 .date-cell {
   flex: 0 0 auto;
   display: flex;
@@ -1161,10 +1187,17 @@ h1 {
     rgb(var(--base-text-color) / 0.055) calc(100% - 1px)
   );
 }
+.empty-lane-name {
+  position: absolute;
+  top: 12px;
+  font-size: 12px;
+  color: rgb(var(--base-text-color) / .5);
+  white-space: nowrap;
+  pointer-events: none;
+}
 .activity-bar {
   position: absolute;
   height: 46px;
-  padding: 6px 12px;
   background: rgb(var(--primary-color) / 0.12);
   color: rgb(var(--primary-color));
   border: 1px solid rgb(var(--primary-color) / 0.3);
@@ -1203,6 +1236,25 @@ h1 {
   white-space: nowrap;
   line-height: 17px;
 }
+.bar-visible-content {
+  position: absolute;
+  top: 4px;
+  height: 36px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  z-index: 2;
+}
+.bar-copy { min-width: 0; }
+.bar-copy small { font-size: 10px; line-height: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bar-actions { display: flex; align-items: center; gap: 2px; cursor: default; }
+.bar-actions :deep(.n-button) { color: inherit; }
+.bar-visible-content.compact { grid-template-columns: minmax(0, 1fr); grid-template-rows: 15px 20px; gap: 0; }
+.compact .bar-title { font-size: 11px; line-height: 15px; }
+.compact .bar-copy small { display: none; }
+.compact .bar-actions { justify-self: end; }
+.bar-menu-button { height: 20px; min-width: 22px; padding: 0 4px; font-size: 18px; }
 .claim-tail {
   position: absolute;
   left: calc(100% + 4px);
@@ -1223,18 +1275,13 @@ h1 {
   border-style: dashed;
   opacity: 0.5;
 }
-.activity-bar small {
-  font-size: 10px;
-  white-space: nowrap;
-  display: block;
-  overflow: hidden;
-}
 .resize-handle {
   position: absolute;
   top: 0;
   bottom: 0;
   width: 7px;
   cursor: ew-resize;
+  z-index: 3;
 }
 .resize-handle.left {
   left: 0;
@@ -1242,11 +1289,6 @@ h1 {
 .resize-handle.right {
   right: 0;
 }
-.bar-actions { position: absolute; right: 5px; top: 7px; display: flex; gap: 3px; background: rgb(var(--container-bg-color)); border-radius: 4px; }
-.bar-actions button { color: rgb(var(--primary-color)); background: transparent; border: 0; border-radius: 4px; font-size: 11px; padding: 3px 5px; cursor: pointer; }
-.bar-actions button:hover { background: rgb(var(--primary-color) / .1); }
-.bar-actions button:focus-visible { outline: 2px solid rgb(var(--primary-color)); }
-.bar-title { padding-right: 0; }
 .scheduled-activities { margin-top: 16px; }
 .scheduled-activities article { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 10px 0; border-bottom: 1px solid rgb(var(--base-text-color) / .07); }
 .scheduled-activities strong { font-size: 13px; font-weight: 500; }
@@ -1342,18 +1384,4 @@ h1 {
     flex-wrap: wrap;
   }
 }
-</style>
-
-<style scoped>
-.calendar-fixed-heading { font-weight: 600; color: rgb(var(--base-text-color) / .75); }
-.calendar-names { display: block; align-self: stretch; box-shadow: 4px 0 8px rgb(0 0 0 / .025); }
-.empty-lane-name { display: flex; height: 100%; align-items: center; justify-content: center; font-size: 12px; }
-.activity-fixed-name { position: absolute; inset-inline: 0; height: 46px; width: 220px; display: flex; flex-direction: column; justify-content: center; gap: 2px; padding: 4px 12px; text-align: left; border: 0; border-radius: 0; background: transparent; cursor: pointer; color: rgb(var(--base-text-color)); }
-.activity-fixed-name:hover { background: rgb(var(--primary-color) / .05); }
-.activity-fixed-name:focus-visible { outline: 2px solid rgb(var(--primary-color)); outline-offset: -3px; }
-.activity-fixed-name strong { width: 100%; font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.activity-fixed-name small { font-size: 11px; color: rgb(var(--base-text-color) / .5); }
-.calendar-operations { position: sticky; right: 0; z-index: 4; flex: 0 0 148px; width: 148px; background: rgb(var(--container-bg-color)); border-left: 1px solid rgb(var(--base-text-color) / .09); box-shadow: -4px 0 8px rgb(0 0 0 / .025); }
-.calendar-head .calendar-operations { display: flex; align-items: center; justify-content: center; }
-.activity-fixed-actions { position: absolute; inset-inline: 0; height: 46px; display: flex; align-items: center; justify-content: center; gap: 6px; }
 </style>

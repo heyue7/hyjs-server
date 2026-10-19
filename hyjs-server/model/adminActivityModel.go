@@ -59,8 +59,11 @@ type AdminCoinPrize struct {
 
 // AdminActivityOptions 只包含当前模式原消费者可读的运营参数。
 type AdminActivityOptions struct {
-	ShopKey    string `json:"shopKey,omitempty"`    // ShopKey references an actual ordinary shop, not an activity sale.
-	ShopSource string `json:"shopSource,omitempty"` // ShopSource is the server-generated immutable native catalogue snapshot.
+	KingPoolSource string                `json:"kingPoolSource,omitempty"` // KingPoolSource is a server-generated costType3 fixed-price and rotation snapshot; not an editable reward field.
+	RankPlaces     int64                 `json:"rankPlaces,omitempty"`     // RankPlaces is the power-race award range, 0 disables ranking, 1..1000 enables equal awards within that range.
+	RankRewards    []AdminResourceAmount `json:"rankRewards,omitempty"`    // RankRewards is the actual same-tier power-race deadline award, separate from the goal reward.
+	ShopKey        string                `json:"shopKey,omitempty"`        // ShopKey references an actual ordinary shop, not an activity sale.
+	ShopSource     string                `json:"shopSource,omitempty"`     // ShopSource is the server-generated immutable native catalogue snapshot.
 	// RebateBps 是返利比例基点，1至10000。
 	RebateBps int64 `json:"rebateBps,omitempty"`
 	// RebateCap 是每日钻石返利上限。

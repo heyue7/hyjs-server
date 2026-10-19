@@ -4,9 +4,13 @@ import "hyjs-server/model"
 
 // Filter through the real original parser before counting, facets or paging.
 // The display catalogue alone includes objects that cannot be consumed as cost.
-func (s *GameService) adminActivityCostCatalogue() *model.AdminCatalogueData {
+func (s *GameService) adminActivityCostCatalogue(preferred ...string) *model.AdminCatalogueData {
 	all := s.AdminCatalogueFiltered(model.AdminItemsRequest{Page: 1, PageSize: 1 << 60})
 	data := &model.AdminCatalogueData{Items: []model.AdminItemDTO{}, Categories: []string{}, Facets: model.AdminCatalogueFacets{Categories: []model.AdminCatalogueOption{}, Qualities: []model.AdminCatalogueQualityOption{}, ApplicableTypes: []model.AdminCatalogueOption{}}}
+	allowUnionToken := false
+	for _, id := range preferred {
+		allowUnionToken = allowUnionToken || id == "unionFightToken"
+	}
 	categories := map[string]bool{}
 	qualities := map[int64]bool{}
 	types := map[string]bool{}
@@ -15,7 +19,7 @@ func (s *GameService) adminActivityCostCatalogue() *model.AdminCatalogueData {
 			if (item.Category == "currency") != currency {
 				continue
 			}
-			if _, err := s.p4ParseCost(item.ID + ",1"); err != nil {
+			if _, err := s.p4ParseCost(item.ID + ",1"); err != nil && !(allowUnionToken && item.ID == "unionFightToken") {
 				continue
 			}
 			data.Items = append(data.Items, item)

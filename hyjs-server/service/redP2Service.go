@@ -20,7 +20,7 @@ import (
 
 // InitializeP2 只首次写入兼容服规则，保留运营修改及历史转盘库存/记录。
 func (s *GameService) InitializeP2(ctx context.Context) error {
-	if err := db.GetIns().WithContext(ctx).AutoMigrate(&db.KingRecruitRules{}, &db.KingRecruitState{}, &db.RedP2Receipt{}, &db.RedP2Exchange{}, &db.RedP2ExchangeState{}, &db.RedP2BoxReward{}, &db.TurntableGlobal{}, &db.TurntableRules{}, &db.TurntableState{}, &db.TurntableRecord{}); err != nil {
+	if err := db.GetIns().WithContext(ctx).AutoMigrate(&db.KingRecruitActivitySnapshot{}, &db.KingRecruitRules{}, &db.KingRecruitState{}, &db.RedP2Receipt{}, &db.RedP2Exchange{}, &db.RedP2ExchangeState{}, &db.RedP2BoxReward{}, &db.TurntableGlobal{}, &db.TurntableRules{}, &db.TurntableState{}, &db.TurntableRecord{}); err != nil {
 		return err
 	}
 	return db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
@@ -213,7 +213,9 @@ func (s *GameService) p2TurntablePoolID(tx *gorm.DB) string {
 
 func (s *GameService) kingConfiguration(tx *gorm.DB, now time.Time) (*db.KingRecruitRules, int32, int64, error) {
 	var rules db.KingRecruitRules
-	if err := tx.First(&rules, 1).Error; err != nil {
+	if scoped, _ := tx.Statement.Context.Value(kingRecruitRulesScopeKey{}).(*db.KingRecruitRules); scoped != nil {
+		rules = *scoped
+	} else if err := tx.First(&rules, 1).Error; err != nil {
 		return nil, 0, 0, err
 	}
 	if rules.DailyLimit != 50 || rules.LuckLimit != 500 || rules.LuckPerDraw != 10 || rules.RotationMillis != 172800000 {

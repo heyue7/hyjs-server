@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-// TestAdminShopsMutations covers distinct storage adapters and immutable consumer snapshots.
+// TestAdminShopsMutations covers distinct storage adapters and immediately editable catalogues.
 func TestAdminShopsMutations(t *testing.T) {
 	f, actor := adminModesFixture(t)
 	if err := f.s.InitializeAdminShopAvailability(f.ctx); err != nil {
@@ -62,19 +62,21 @@ func TestAdminShopsMutations(t *testing.T) {
 		t.Fatal(err)
 	}
 	frozen, err := f.s.AdminShop(f.ctx, "point")
-	if err != nil || !frozen.Settings.Frozen {
-		t.Fatal(err)
+	if err != nil || frozen.Settings.Frozen {
+		t.Fatal("shop must remain editable after prior purchases", err)
 	}
-	if _, err = f.s.AdminSaveShopProduct(f.ctx, actor, "point", item.ID, model.AdminShopProductSaveRequest{AdminShopProduct: item, Version: frozen.Version}, false); err == nil {
-		t.Fatal("frozen overwritten")
+	item.Cost.Amount++
+	changed, err = f.s.AdminSaveShopProduct(f.ctx, actor, "point", item.ID, model.AdminShopProductSaveRequest{AdminShopProduct: item, Version: frozen.Version}, false)
+	if err != nil {
+		t.Fatal("live catalogue edit", err)
 	}
-	settings := frozen.Settings
+	settings := changed.Settings
 	settings.StartAt += 1000
 	settings.EndAt += 1000
 	settings.ClaimEndAt += 1000
-	next, err := f.s.AdminSaveShopSettings(f.ctx, actor, "point", model.AdminShopSettingsSaveRequest{AdminShopSettings: settings, Version: frozen.Version, NewPeriod: true})
-	if err != nil || next.Settings.Frozen || next.Settings.Enabled || next.Settings.PeriodID == frozen.Settings.PeriodID {
-		t.Fatal("closed new period", err)
+	next, err := f.s.AdminSaveShopSettings(f.ctx, actor, "point", model.AdminShopSettingsSaveRequest{AdminShopSettings: settings, Version: changed.Version, NewPeriod: true})
+	if err != nil || next.Settings.Frozen || next.Settings.PeriodID != changed.Settings.PeriodID {
+		t.Fatal("settings edit must retain existing quota identity", err)
 	}
 	vip, err := f.s.AdminShop(f.ctx, "vip")
 	if err != nil {

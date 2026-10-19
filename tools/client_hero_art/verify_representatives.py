@@ -13,8 +13,31 @@ STUBS = r'''
 namespace UnityEngine {
  public struct Rect { public float x,y,width,height; public Rect(float x,float y,float w,float h){this.x=x;this.y=y;width=w;height=h;} }
  public struct Vector4 { public float x,y,z,w; public Vector4(float x,float y,float z,float w){this.x=x;this.y=y;this.z=z;this.w=w;} }
- public class Texture { public string name; public Texture(string n){name=n;} }
+ public class Object { public string name;public HideFlags hideFlags;public static void Destroy(Object o){} }
+ public enum HideFlags { DontSave }
+ public enum TextureFormat { RGBA32 }
+ public enum RenderTextureFormat { ARGB32 }
+ public enum TextureWrapMode { Clamp }
+ public enum FilterMode { Bilinear }
+ public struct Color32 { public byte r,g,b,a;public Color32(byte r,byte g,byte b,byte a){this.r=r;this.g=g;this.b=b;this.a=a;} }
+ public class Texture:Object { public int width=1024,height=1024;public Texture(){}public Texture(string n){name=n;} }
+ public class Texture2D:Texture {
+  public TextureWrapMode wrapMode;public FilterMode filterMode;
+  public Texture2D(int w,int h,TextureFormat f,bool m){width=w;height=h;}
+  public void ReadPixels(Rect r,int x,int y){throw new System.NotSupportedException("GPU is outside stub scope");}
+  public Color32[] GetPixels32(){throw new System.NotSupportedException("GPU is outside stub scope");}
+  public void SetPixels32(Color32[] p){} public void Apply(bool m,bool r){}
+ }
+ public class RenderTexture:Texture {
+  public static RenderTexture active;
+  public static RenderTexture GetTemporary(int w,int h,int d,RenderTextureFormat f){throw new System.NotSupportedException("GPU is outside stub scope");}
+  public static void ReleaseTemporary(RenderTexture t){}
+ }
+ public static class Graphics { public static void Blit(Texture t,RenderTexture r){throw new System.NotSupportedException("GPU is outside stub scope");} }
+ public static class Debug { public static void LogWarning(string text){} }
+ public static class Mathf {public static float Clamp(float v,float min,float max){return System.Math.Max(min,System.Math.Min(max,v));}public static int RoundToInt(float n){return (int)System.Math.Round(n);} }
  public class GameObject {
+  public bool activeInHierarchy=true;
   System.Collections.Generic.Dictionary<System.Type,Component> parts=new System.Collections.Generic.Dictionary<System.Type,Component>();
   public T AddComponent<T>() where T:Component,new(){var p=new T();p.gameObject=this;parts[typeof(T)]=p;return p;}
   public T GetComponent<T>() where T:Component{return parts.TryGetValue(typeof(T),out var p)?(T)p:null;}
@@ -22,7 +45,18 @@ namespace UnityEngine {
  public class Component { public GameObject gameObject; public T GetComponent<T>() where T:Component{return gameObject.GetComponent<T>();} }
  public class MonoBehaviour:Component {}
 }
-namespace Dict.DataModel { public class TableHero { public string id;public int IsShowInCard;} }
+namespace Dict.DataModel { public class TableHero { public string id;public int IsShowInCard;} public class TableSkill {public int LevelGrowFactor;} public class TableSkillCast {} }
+namespace Dict {
+ public class FakeCastDao {public System.Collections.Generic.List<DataModel.TableSkillCast> GetByOneIndex(string s){throw new System.NotSupportedException("Native dictionary is outside stub scope");}}
+ public class FakeSkillDao {public DataModel.TableSkill GetById(string s){throw new System.NotSupportedException("Native dictionary is outside stub scope");}}
+ public class DictDataManager {public static DictDataManager Instance;public FakeCastDao tableSkillCastDao;public FakeSkillDao tableSkillDao;}
+}
+namespace Dict.Blo {public static class DictSkillCastBlo {public static double GetSkillExportFactor(string s){throw new System.NotSupportedException("Native dictionary is outside stub scope");}}}
+namespace UI {
+ public class PageManager {public static PageManager Instance;public object GetDictPage(string name){throw new System.NotSupportedException("Native page lifecycle is outside stub scope");}}
+ public class SevenDayPage:UnityEngine.Component {public TopLeftDays topLeft;}
+ public class TopLeftDays:UnityEngine.Component {public void ReFreshDayAct(){throw new System.NotSupportedException("Native indicator request is outside stub scope");}}
+}
 public class UITexture:UnityEngine.Component {
  public UnityEngine.Texture mainTexture;
  public UnityEngine.Rect uvRect=new UnityEngine.Rect(.1f,.2f,.7f,.8f);
@@ -44,6 +78,12 @@ static class Program {
  static bool Eq(Rect a,Rect b){return Eq(a.x,b.x)&&Eq(a.y,b.y)&&Eq(a.width,b.width)&&Eq(a.height,b.height);}
  static void Main(){
   foreach(string id in new[]{"069","070","073"}){
+   Check(HeroArtFallback.MissingOriginalText("desc_hero_"+id)=="原客户端未提供该角色简介。","exact missing original biography status");
+   for(int slot=1;slot<=3;slot++){
+    // Native SkillCast reads require the original initialized dictionary and
+    // are validated in the fixed managed candidate/phone, outside these stubs.
+    Check(!String.IsNullOrEmpty(HeroArtFallback.MissingOriginalText("name_skill_"+id+"_"+slot)),"missing skill has explicit placeholder");
+   }
    string painting="heropainter/hero_card_"+id;
    foreach(string request in new[]{"heroheader/hero_icon_"+id,"HeroHeader/hero_icon_"+id,"hero2d/hero_2d_"+id}){
     Check(HeroArtFallback.MapBundle(request)==painting,"alias "+request);
@@ -86,6 +126,8 @@ static class Program {
   }
   foreach(string path in new[]{"heroheader/hero_icon_071","hero2d/hero_2d_007","model/roa01_body","heropainter/hero_card_070","heroheader/hero_icon_069_extra","",null})
    Check(HeroArtFallback.MapBundle(path)==path,"other path unchanged");
+  foreach(string key in new[]{"desc_hero_001","name_hero_069","desc_skill_068_1","name_skill_070_10","desc_skill_073_3_extra","",null})
+   Check(HeroArtFallback.MissingOriginalText(key)==null,"all existing/unrelated text retains original reader");
   Check(HeroArtFallback.AtlasHidden(new TableHero{id="hero_074",IsShowInCard=1})==1,"other hidden preserved");
   Check(HeroArtFallback.AtlasHidden(new TableHero{id="hero_007",IsShowInCard=0})==0,"normal atlas preserved");
   Console.WriteLine("PASS "+checks+" bounded alias, visibility and pooled UV assertions");
