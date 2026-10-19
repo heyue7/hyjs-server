@@ -234,6 +234,7 @@ const local: App.I18n.Schema = {
     announcements: 'Announcements',
     audit: 'Audit',
     users: 'Admin accounts',
+    cdk: 'Redeem codes',
     'game-accounts': 'Game users',
     players: 'Players',
     wallets: 'Wallets',

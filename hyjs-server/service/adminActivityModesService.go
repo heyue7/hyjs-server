@@ -28,6 +28,7 @@ type adminActivityDefinition struct {
 // adminActivityDefinitions 绑定已实现原消费者与实际原UI prefab；未恢复页面不虚构为可运营模式。
 func adminActivityDefinitions() []adminActivityDefinition {
 	return []adminActivityDefinition{
+		{"shop-window", "限时商店", "commerce", "shop-window", "shop_schedule_", "Shop", false, false, false, 0},
 		{"exchange", "资源兑换", "commerce", "exchange", "limitExchange_p4_admin_", "ActivityInnerPage/OnSail", true, false, false, 0},
 		{"discount-shop", "折扣礼包", "commerce", "discount", "discountSale_p4_admin_", "ActivityInnerPage/OnSail", true, false, false, 0},
 		{"half-price", "半价抢购", "commerce", "half", "halfDiscountSale_p4_admin_", "ActivityInnerPage/OnSail", true, false, false, 0},
@@ -83,6 +84,10 @@ func (s *GameService) AdminActivityModes() []model.AdminActivityMode {
 		}
 		if d.domain == "period" {
 			mode.Notes += " 当前原消费者每实例支持1档目标；累计充值目标单位为分。"
+		}
+		if d.mode == "shop-window" {
+			mode.Notes = "从商店管理关闭不限时后排期；商品与价格取该商店的已保存目录。"
+			mode.DefaultForm.Options.ShopKey = "ordinary"
 		}
 		if d.mode == "turntable" {
 			for i := int64(0); i < 9; i++ {
@@ -548,6 +553,12 @@ func (s *GameService) AdminSaveTypedActivity(ctx context.Context, p *model.Admin
 }
 
 func (s *GameService) adminPersistTypedActivity(tx *gorm.DB, d adminActivityDefinition, key string, f model.AdminActivityForm, enabled, exists bool) error {
+	if f.Mode == "shop-window" {
+		return s.adminPersistShopSchedule(tx, key, f, enabled, exists)
+	}
+	if f.RepeatPolicy != "" && f.RepeatPolicy != "once" && f.RepeatPolicy != "repeat" {
+		return constUtil.ErrAdminInput
+	}
 	if f.Options.DayLimit < 0 || f.Options.DayLimit > math.MaxInt32 || f.Options.TotalLimit < 0 || f.Options.TotalLimit > math.MaxInt32 || f.Options.ScorePerDraw < 0 || f.Options.ScorePerDraw > math.MaxInt32 || f.Options.AdvancePlaces < 0 || f.Options.AdvancePlaces > 1000 || f.Options.InitialDiamondPool < 0 || f.Options.InitialDiamondPool > math.MaxInt32 || f.Options.JackpotPerMillion < 0 || f.Options.JackpotPerMillion > 1000000 || f.Options.PoolContributionBps < 0 || f.Options.PoolContributionBps > 10000 {
 		return constUtil.ErrAdminInput
 	}

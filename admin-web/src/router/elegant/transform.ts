@@ -173,6 +173,7 @@ const routeMap: RouteMap = {
   "announcements": "/announcements",
   "arena-prizes": "/arena-prizes",
   "audit": "/audit",
+  "cdk": "/cdk",
   "feedback": "/feedback",
   "fields": "/fields",
   "game-accounts": "/game-accounts",

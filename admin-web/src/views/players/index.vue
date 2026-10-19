@@ -194,7 +194,12 @@ const columns: DataTableColumns<GamePlayer> = [
     minWidth: 220,
     render: row => h('div', [h('strong', row.name), h('div', { class: 'ops-mono ops-muted' }, `ID ${row.id}`)])
   },
-  { title: '所属用户', key: 'username', minWidth: 180, render: row => `${row.nickname || '—'} · ${row.username || '—'}` },
+  {
+    title: '所属用户', key: 'username', minWidth: 180,
+    render: row => row.accountId
+      ? h(NButton, { text: true, type: 'primary', onClick: () => router.push({ path: '/game-accounts', query: { accountId: row.accountId, q: row.username || '' } }) }, () => `${row.nickname || '—'} · ${row.username || '用户 #' + row.accountId}`)
+      : `${row.nickname || '—'} · ${row.username || '—'}`
+  },
   { title: '等级', key: 'level', width: 100 },
   { title: 'VIP', key: 'vip', width: 100, render: row => `VIP${row.vip || 0}` },
   { title: '主线', key: 'chapter', width: 140, render: row => `${row.chapter || 0} - ${row.mission || 0}` },

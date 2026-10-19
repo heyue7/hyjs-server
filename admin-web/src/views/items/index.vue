@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, h, onMounted, reactive, ref } from 'vue';
+import { computed, h, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 import { NButton, NTag } from 'naive-ui';
 import type { DataTableColumns, SelectOption } from 'naive-ui';
 import { api, errorMessage, json } from '@/service/operations';
@@ -7,6 +7,8 @@ import type { Item, ItemFacets, ItemsResponse } from '@/service/operations';
 import { useOperations } from '@/composables/useOperations';
 import ResourceImage from '@/components/operations/resource-image.vue';
 import ItemQuality from '@/components/operations/item-quality.vue';
+import { getItemDetail } from '@/service/item-details';
+import type { ItemDetail } from '@/service/item-details';
 const { canWrite, loading, error, run } = useOperations();
 const q = ref('');
 const category = ref<string | null>(null);
@@ -123,6 +125,21 @@ async function submitGrant() {
     granting.value = false;
   }
 }
+const detailOpen = ref(false);
+const detailLoading = ref(false);
+const detailError = ref('');
+const detail = ref<ItemDetail | null>(null);
+const detailItem = ref<Item | null>(null);
+let detailGeneration = 0;
+async function showDetail(item: Item) {
+  const current = ++detailGeneration;
+  detailItem.value = item; detail.value = null; detailError.value = ''; detailLoading.value = true; detailOpen.value = true;
+  try { const result = await getItemDetail(item.id); if (current === detailGeneration) detail.value = result; }
+  catch (e) { if (current === detailGeneration) detailError.value = errorMessage(e); }
+  finally { if (current === detailGeneration) detailLoading.value = false; }
+}
+function closeDetail() { detailOpen.value = false; detailGeneration += 1; }
+onBeforeUnmount(() => { detailGeneration += 1; playerRequest += 1; clearTimeout(playerTimer); });
 const qualityColors: NonNullable<Item['qualityColor']>[] = ['gray', 'white', 'green', 'blue', 'purple', 'orange', 'red'];
 function renderQuality(option: SelectOption) { return h(ItemQuality, { label: String(option.label), color: qualityColors[Number(option.value)] || 'gray' }); }
 const columns: DataTableColumns<Item> = [
@@ -133,7 +150,7 @@ const columns: DataTableColumns<Item> = [
     render: item =>
       h('div', { class: 'item-name' }, [
         h(ResourceImage, { item, size: 44 }),
-        h('div', [h('strong', item.name || item.id), h('div', { class: 'ops-mono ops-muted' }, item.id)])
+        h('div', [h(NButton, { text: true, type: 'primary', onClick: () => showDetail(item) }, () => item.name || item.id), h('div', { class: 'ops-mono ops-muted' }, item.id)])
       ])
   },
   {
@@ -165,13 +182,13 @@ const columns: DataTableColumns<Item> = [
   {
     title: '操作',
     key: 'action',
-    width: 100,
-    render: item =>
+    width: 160,
+    render: item => h('div', { class: 'item-actions' }, [h(NButton, { size: 'small', secondary: true, onClick: () => showDetail(item) }, () => '详情'),
       h(
         NButton,
         { size: 'small', secondary: true, disabled: !canWrite.value, onClick: () => openGrant(item) },
         () => '发放'
-      )
+      )])
   }
 ];
 onMounted(load);
@@ -236,7 +253,7 @@ onMounted(load);
         :data="rows"
         :loading="loading"
         :row-key="(row: Item) => row.id"
-        :scroll-x="1050"
+        :scroll-x="1110"
         :bordered="false"
       />
       <div class="ops-pagination">
@@ -251,6 +268,16 @@ onMounted(load);
         />
       </div>
     </NCard>
+    <NDrawer :show="detailOpen" :width="780" @update:show="!$event && closeDetail()">
+      <NDrawerContent :title="(detail?.item.name || detailItem?.name || '道具') + ' · 详情'" closable>
+        <NSpin :show="detailLoading">
+          <div class="item-detail-heading"><ResourceImage :item="detail?.item || detailItem" :size="100" /><div><h2>{{ detail?.item.name || detailItem?.name }}</h2><ItemQuality :item="detail?.item || detailItem || undefined" /><div class="ops-mono ops-muted mt-8px">{{ detailItem?.id }}</div></div></div>
+          <NAlert v-if="detailError" type="error" :title="detailError" /><NButton v-if="detailError && detailItem" class="mt-12px" @click="showDetail(detailItem)">重新加载</NButton>
+          <section v-for="section in detail?.sections || []" :key="section.title" class="item-detail-section"><h3>{{ section.title }}</h3><dl><template v-for="field in section.fields" :key="field.label"><dt>{{ field.label }}</dt><dd><details v-if="field.label === '配置来源'"><summary>查看配置说明</summary>{{ field.value }}</details><template v-else>{{ field.value || '原表未提供' }}</template></dd></template></dl></section>
+        </NSpin>
+        <template #footer><div class="ops-drawer-actions"><NButton @click="closeDetail">关闭</NButton><NButton v-if="canWrite && detailItem" type="primary" @click="openGrant(detailItem)">发放此道具</NButton></div></template>
+      </NDrawerContent>
+    </NDrawer>
     <NModal
       v-model:show="grantOpen"
       preset="card"
@@ -307,3 +334,8 @@ onMounted(load);
     </NModal>
   </div>
 </template>
+
+<style scoped>
+.item-actions{display:flex;gap:6px}.item-detail-heading{display:flex;gap:20px;align-items:center;margin-bottom:28px}.item-detail-heading h2{font-size:20px;margin:0 0 10px}.item-detail-section{padding:20px 0;border-top:1px solid rgb(var(--base-text-color)/.08)}.item-detail-section h3{font-size:15px;margin:0 0 16px}.item-detail-section dl{display:grid;grid-template-columns:160px minmax(0,1fr);gap:12px 20px;margin:0}.item-detail-section dt{color:rgb(var(--base-text-color)/.6)}.item-detail-section dd{margin:0;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.7}
+@media(max-width:600px){.item-detail-section dl{grid-template-columns:1fr;gap:6px}.item-detail-section dd{margin-bottom:10px}}
+</style>

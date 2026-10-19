@@ -406,6 +406,12 @@ func run() error {
 	if err = s.InitializeAdminFields(ctx); err != nil {
 		return err
 	}
+	if err = s.InitializeAdminShopAvailability(ctx); err != nil {
+		return err
+	}
+	if err = s.InitializeAdminCDK(ctx); err != nil {
+		return err
+	}
 	httpListener, err := net.Listen("tcp", net.JoinHostPort(cfg.Bind, strconv.Itoa(cfg.HTTPPort)))
 	if err != nil {
 		return err

@@ -83,6 +83,15 @@ func TestAdminActivityScheduleHTTP(t *testing.T) {
 	if costResponse.Code != 200 || json.Unmarshal(costResponse.Body.Bytes(), &costs) != nil || len(costs.Data.Items) != 1 || costs.Data.Items[0].ID != "diamond" || costs.Data.Items[0].Name != "钻石" {
 		t.Fatal("typed cost resource search", costResponse.Code, costResponse.Body.String())
 	}
+	pagedCosts := call("GET", "/admin/api/activity-cost-resources?category=currency&ids=coin,diamond&page=2&pageSize=1", nil, "", cookies)
+	if pagedCosts.Code != 200 || json.Unmarshal(pagedCosts.Body.Bytes(), &costs) != nil || costs.Data.Total != 2 || len(costs.Data.Items) != 1 || costs.Data.Items[0].ID != "diamond" || len(costs.Data.Facets.Categories) == 0 {
+		t.Fatal("cost selector filter/paging contract", pagedCosts.Code, pagedCosts.Body.String())
+	}
+	for _, query := range []string{"category=unknown-category", "quality=999", "applicableType=unknown-type", "ids=coin;drop", "page=0"} {
+		if invalid := call("GET", "/admin/api/activity-cost-resources?"+query, nil, "", cookies); invalid.Code != 400 {
+			t.Fatal("invalid cost filter accepted", query, invalid.Code)
+		}
+	}
 	create := model.AdminActivityDefinitionSaveRequest{Name: "开服原任务", Form: model.AdminActivityForm{Mode: "opening-14", TemplateID: "opening-14-original", Name: "开服原任务"}, DefaultDays: 14, ClaimDays: 1, Enabled: true}
 	if w := call("POST", "/admin/api/activity-templates", create, "", cookies); w.Code != 403 {
 		t.Fatal("csrf", w.Code)

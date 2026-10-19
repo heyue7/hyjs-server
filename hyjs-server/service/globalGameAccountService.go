@@ -266,12 +266,15 @@ func registerGlobalGameAccount(ctx context.Context, username, password, nickname
 }
 
 // AdminGlobalGameAccounts lists global identities independently from the selected game realm.
-func AdminGlobalGameAccounts(ctx context.Context, actor *model.AdminPrincipal, q string, page, size int64) (*model.AdminGameAccountsResponse, error) {
+func AdminGlobalGameAccounts(ctx context.Context, actor *model.AdminPrincipal, q string, page, size int64, accountIDs ...int64) (*model.AdminGameAccountsResponse, error) {
 	tx := db.GetIns().WithContext(ctx)
 	if err := adminOperationUser(tx, actor, false); err != nil {
 		return nil, err
 	}
 	query := db.AccountsTable(tx, "game_accounts").Model(&db.GameAccount{})
+	if len(accountIDs) > 0 && accountIDs[0] > 0 {
+		query = query.Where("id=?", accountIDs[0])
+	}
 	if q != "" {
 		query = query.Where("username LIKE ? OR nickname LIKE ?", "%"+q+"%", "%"+q+"%")
 	}

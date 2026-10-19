@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { h, onBeforeUnmount, ref, watch } from 'vue';
+import { computed, h, onBeforeUnmount, ref, watch } from 'vue';
 import type { SelectOption } from 'naive-ui';
 import { api } from '@/service/operations';
-import type { Item, ItemsResponse } from '@/service/operations';
+import type { Item, ItemFacets, ItemsResponse } from '@/service/operations';
 import ResourceImage from './resource-image.vue';
 import ItemQuality from './item-quality.vue';
 const props = defineProps<{
@@ -14,121 +14,148 @@ const props = defineProps<{
   commerceCost?: boolean;
 }>();
 const emit = defineEmits<{ 'update:value': [value: string] }>();
-interface Option extends SelectOption {
-  value: string;
-  label: string;
-  item?: Item;
-}
-const options = ref<Option[]>([]);
-const known = new Map<string, Item>();
+interface Option extends SelectOption { value: string; label: string; item?: Item }
+const pageSize = 40;
+const rows = ref<Item[]>([]);
+const known = ref<Record<string, Item>>({});
 const loading = ref(false);
 const loadError = ref('');
 const searchText = ref('');
+const categoryFilter = ref<string | null>(null);
+const targetFilter = ref<string | null>(null);
+const facets = ref<ItemFacets>({ categories: [], qualities: [], applicableTypes: [] });
+const page = ref(0);
+const total = ref(0);
+const opened = ref(false);
 let timer: ReturnType<typeof setTimeout>;
 let generation = 0;
-function keepSelected(items: Item[]) {
-  for (const item of items) known.set(item.id, item);
-  const rows: Option[] = items.map(item => ({
-    value: item.id,
-    label: item.name || item.id,
-    item
-  }));
-  if (props.value && !rows.some(option => option.value === props.value)) {
-    const item = known.get(props.value);
-    rows.unshift({
-      value: props.value,
-      label: item?.name || props.value,
-      item
-    });
+let selectionGeneration = 0;
+let alive = true;
+const categoryLabels: Record<string, string> = { currency: '货币', character: '角色', 'character-exp': '角色经验', equipment: '装备', accessory: '饰品', pet: '精灵', 'pet-equipment': '精灵装备', material: '生活材料', item: '道具', fragment: '碎片', gem: '宝石', cooking: '料理' };
+function remember(items: Item[]) { for (const item of items) known.value[item.id] = item; }
+const localFacets = computed<ItemFacets>(() => {
+  const categories = new Map<string, string>();
+  const targets = new Map<string, string>();
+  for (const item of props.resources || []) {
+    if (item.category) categories.set(item.category, categoryLabels[item.category] || '其他资源');
+    for (const key of item.applicableTypes || (item.applicableType ? [item.applicableType] : []))
+      targets.set(key, item.applicableTypeLabel || facets.value.applicableTypes.find(row => row.value === key)?.label || '其他适用对象');
   }
-  options.value = rows;
-}
-async function load(q = searchText.value) {
-  generation += 1;
+  return { categories: [...categories].map(([value, label]) => ({ value, label })), qualities: [], applicableTypes: [...targets].map(([value, label]) => ({ value, label })) };
+});
+const availableFacets = computed(() => props.resources !== undefined ? localFacets.value : facets.value);
+const categoryOptions = computed(() => availableFacets.value.categories.map(option => ({ label: String(option.label), value: String(option.value) })));
+const targetOptions = computed(() => availableFacets.value.applicableTypes.map(option => ({ label: String(option.label), value: String(option.value) })));
+const options = computed<Option[]>(() => {
+  const result = rows.value.map(item => ({ value: item.id, label: item.name || item.id, item }));
+  if (props.value && !result.some(row => row.value === props.value)) {
+    const item = known.value[props.value];
+    result.unshift({ value: props.value, label: item?.name || props.value, item });
+  }
+  return result;
+});
+const hasMore = computed(() => rows.value.length < total.value);
+function invalidate() { clearTimeout(timer); generation += 1; loading.value = false; }
+async function loadMore(reset = false) {
+  if (!alive || props.disabled || (loading.value && !reset) || (!reset && !hasMore.value)) return;
+  if (reset) { invalidate(); page.value = 0; rows.value = []; total.value = 0; }
   const current = generation;
+  const nextPage = page.value + 1;
   loading.value = true;
   loadError.value = '';
   try {
+    let result: ItemsResponse;
     if (props.resources !== undefined) {
-      const keyword = q.toLowerCase().trim();
-      keepSelected(props.resources.filter(item => `${item.name} ${item.id}`.toLowerCase().includes(keyword)));
-      return;
+      const keyword = searchText.value.toLowerCase().trim();
+      const category = props.category || categoryFilter.value;
+      const filtered = props.resources.filter(item =>
+        (!category || item.category === category) &&
+        (!targetFilter.value || (item.applicableTypes || [item.applicableType]).includes(targetFilter.value)) &&
+        `${item.name} ${item.id} ${item.description || ''}`.toLowerCase().includes(keyword)
+      );
+      result = { items: filtered.slice((nextPage - 1) * pageSize, nextPage * pageSize), total: filtered.length };
+    } else {
+      const path = props.commerceCost ? '/activity-cost-resources' : '/items';
+      result = await api<ItemsResponse>(`${path}?${new URLSearchParams({ q: searchText.value, category: props.category || categoryFilter.value || '', applicableType: targetFilter.value || '', page: String(nextPage), pageSize: String(pageSize) })}`);
     }
-    const path = props.commerceCost ? '/activity-cost-resources' : '/items';
-    const result = await api<Pick<ItemsResponse, 'items'>>(
-      `${path}?${new URLSearchParams({ q, category: props.category || '', page: '1', pageSize: '40' })}`
-    );
-    if (current === generation) keepSelected(result.items);
+    if (!alive || current !== generation) return;
+    remember(result.items);
+    const seen = new Set(rows.value.map(item => item.id));
+    rows.value = [...rows.value, ...result.items.filter(item => !seen.has(item.id))];
+    total.value = result.total;
+    page.value = nextPage;
+    if (result.facets) facets.value = result.facets;
   } catch (error) {
-    if (current === generation) {
-      loadError.value = error instanceof Error ? error.message : '资源加载失败，请重新打开重试';
-    }
-  } finally {
-    if (current === generation) loading.value = false;
-  }
+    if (alive && current === generation) loadError.value = error instanceof Error ? error.message : '资源加载失败';
+  } finally { if (alive && current === generation) loading.value = false; }
 }
-watch(
-  () => props.resources,
-  () => {
-    if (props.resources !== undefined) load().catch(() => {});
-  },
-  { immediate: true }
-);
 function search(q: string) {
   searchText.value = q;
-  clearTimeout(timer);
-  timer = setTimeout(() => load(q).catch(() => {}), 250);
+  invalidate(); page.value = 0; rows.value = []; total.value = 0;
+  timer = setTimeout(() => loadMore(true), 250);
+}
+function filterChanged() { loadMore(true); }
+function showChanged(show: boolean) {
+  opened.value = show;
+  if (show && !page.value) loadMore(true);
+}
+function onScroll(event: Event) {
+  const el = event.target as HTMLElement | null;
+  if (el && el.scrollTop + el.clientHeight >= el.scrollHeight - 60) loadMore();
 }
 function renderLabel(raw: SelectOption) {
   const option = raw as Option;
   return h('div', { class: 'resource-select-option' }, [
     h(ResourceImage, { item: option.item, size: 32, preview: false }),
     h('div', { class: 'resource-select-copy' }, [
-      h('div', { class: 'resource-select-heading' }, [
-        h('span', { class: 'resource-select-name' }, option.label),
-        ...(option.item?.qualityLabel ? [h(ItemQuality, { item: option.item })] : [])
-      ]),
+      h('div', { class: 'resource-select-heading' }, [h('span', { class: 'resource-select-name' }, option.label), ...(option.item?.qualityLabel ? [h(ItemQuality, { item: option.item })] : [])]),
       h('div', { class: 'ops-mono ops-muted' }, option.value)
     ])
   ]);
 }
-watch(
-  () => props.value,
-  async value => {
-    if (!value || known.has(value)) return;
-    try {
-      const result = await api<ItemsResponse>(
-        `/items?${new URLSearchParams({ ids: value, page: '1', pageSize: '1' })}`
-      );
-      for (const item of result.items) known.set(item.id, item);
-      keepSelected(options.value.flatMap(option => (option.item ? [option.item] : [])));
-    } catch {
-      // A missing display label does not replace the current search result or its selected ID.
-    }
-  },
-  { immediate: true }
-);
-onBeforeUnmount(() => {
-  clearTimeout(timer);
-  generation += 1;
-});
+watch(() => [props.resources, props.category, props.commerceCost], () => {
+  invalidate(); page.value = 0; rows.value = []; total.value = 0;
+  if (props.resources) remember(props.resources);
+  if (opened.value) loadMore(true);
+}, { immediate: true });
+watch(() => props.value, async value => {
+  const current = ++selectionGeneration;
+  if (!value || known.value[value]) return;
+  try {
+    const result = await api<ItemsResponse>(`/items?${new URLSearchParams({ ids: value, page: '1', pageSize: '1' })}`);
+    if (alive && current === selectionGeneration && value === props.value) remember(result.items);
+  } catch { /* Preserve the selected ID when display metadata cannot be loaded. */ }
+}, { immediate: true });
+onBeforeUnmount(() => { alive = false; invalidate(); selectionGeneration += 1; });
 </script>
 
 <template>
   <NSelect
-    :value="value"
-    :options="options"
-    :render-label="renderLabel"
-    :loading="loading"
-    :disabled="disabled"
-    filterable
-    remote
-    clearable
-    :placeholder="placeholder || '搜索资源名称或 ID'"
-    @search="search"
-    @focus="load().catch(() => {})"
+    :value="value" :options="options" :render-label="renderLabel" :loading="loading" :disabled="disabled"
+    :reset-menu-on-options-change="false" :theme-overrides="{ peers: { InternalSelectMenu: { height: '220px' } } }"
+    filterable remote clearable :placeholder="placeholder || '搜索资源名称或 ID'"
+    @search="search" @update:show="showChanged" @scroll="onScroll"
     @update:value="emit('update:value', $event || '')"
   >
-    <template #empty>{{ loadError || (searchText ? '没有匹配的资源，可尝试名称或ID' : '暂无可用资源') }}</template>
+    <template #header>
+      <div class="resource-picker-filters" @keydown.stop>
+        <NSelect v-if="!category" v-model:value="categoryFilter" :options="categoryOptions" :to="false" size="small" filterable clearable placeholder="全部分类" aria-label="资源分类" @update:value="filterChanged" />
+        <NSelect v-model:value="targetFilter" :options="targetOptions" :to="false" size="small" filterable clearable placeholder="全部适用对象" aria-label="资源适用对象" @update:value="filterChanged" />
+      </div>
+    </template>
+    <template #empty>{{ loadError || (searchText || categoryFilter || targetFilter ? '没有匹配的资源，试试其他筛选条件' : '暂无可用资源') }}</template>
+    <template #action>
+      <div class="resource-picker-status">
+        <span>{{ loading ? '加载中…' : `${rows.length} / ${total} 项${hasMore ? ' · 向下滚动加载更多' : ''}` }}</span>
+        <NButton v-if="loadError" size="tiny" text type="primary" @click="loadMore(page === 0)">重试</NButton>
+      </div>
+    </template>
   </NSelect>
 </template>
+
+<style scoped>
+.resource-picker-filters { position: relative; z-index: 2; display: flex; gap: 8px; padding: 8px 10px; min-width: 260px; }
+.resource-picker-filters > :deep(.n-select) { flex: 1; min-width: 0; }
+.resource-picker-status { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 12px; color: rgb(var(--base-text-color) / .6); font-size: 12px; }
+@media(max-width: 480px) { .resource-picker-filters { min-width: 0; } }
+</style>

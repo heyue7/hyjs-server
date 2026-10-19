@@ -111,5 +111,7 @@ type AdminActivityPatternSaveRequest struct {
 
 // AdminActivityCostResourcesResponse contains only resources accepted by the original commerce consumer.
 type AdminActivityCostResourcesResponse struct {
-	Items []AdminItemDTO `json:"items"` // Items carries readable names and original thumbnails for valid positive-cost resources.
+	Total  int64                `json:"total"`  // Total counts all legal costs matching the requested filters.
+	Facets AdminCatalogueFacets `json:"facets"` // Facets contains labels present in the legal-cost catalogue.
+	Items  []AdminItemDTO       `json:"items"`  // Items carries readable names and original thumbnails for valid positive-cost resources.
 }

@@ -96,6 +96,7 @@ export function setupElegantRouter() {
           icon: 'ph:clock-counter-clockwise',
           order: 5
         },
+        cdk: { title: '兑换码管理', icon: 'ph:gift', order: 4 },
         'game-accounts': { title: '用户管理', icon: 'ph:users', order: 1 },
         players: { title: '玩家管理', icon: 'ph:users', order: 2 },
         wallets: { title: '蓝绿钱包', icon: 'ph:treasure-chest', order: 5 },

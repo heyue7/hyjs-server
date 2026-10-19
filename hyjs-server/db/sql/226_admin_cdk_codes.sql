@@ -1,0 +1,7 @@
+CREATE TABLE IF NOT EXISTS admin_cdk_codes (
+ hash VARCHAR(64) NOT NULL PRIMARY KEY, server_id BIGINT NOT NULL,
+ name VARCHAR(80) NOT NULL, code_hint VARCHAR(16) NOT NULL,
+ enabled BOOLEAN NOT NULL, unlimited BOOLEAN NOT NULL,
+ start_at BIGINT NOT NULL, end_at BIGINT NOT NULL, revision BIGINT NOT NULL,
+ created_at BIGINT NOT NULL, updated_at BIGINT NOT NULL
+);

@@ -144,6 +144,9 @@ func (s *GameService) p13UFShopList(ctx context.Context, id int64, request *pb.C
 		if err != nil {
 			return err
 		}
+		if err := s.requireShopAvailability(tx, "union-fight", now); err != nil {
+			return err
+		}
 		if actor.Hooked || frame.GetState() != 0 || now.UnixMilli() >= match.EndAt {
 			return errors.New("原非挂机空闲/未结束才可打开商店")
 		}
@@ -264,6 +267,9 @@ func (s *GameService) p13UFShopBuy(ctx context.Context, id int64, request *pb.CS
 			if !errors.Is(err, gorm.ErrRecordNotFound) {
 				return err
 			}
+		}
+		if err := s.requireShopAvailability(tx, "union-fight", now); err != nil {
+			return err
 		}
 		if actor.Hooked || frame.GetState() != 0 || now.UnixMilli() >= match.EndAt {
 			return errors.New("原非挂机空闲/未结束才可购买道具")

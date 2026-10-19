@@ -36,6 +36,7 @@ type AdminShopProduct struct {
 
 // AdminShopSettings configures the original shop window and its source.
 type AdminShopSettings struct {
+	Unlimited  bool   `json:"unlimited"`  // true=不限营业时间，false=按配置日期营业；商品资格和限购继续生效。
 	Enabled    bool   `json:"enabled"`    // Whether the current source is enabled.
 	Slots      int64  `json:"slots"`      // Refresh slot count.
 	StartAt    int64  `json:"startAt"`    // Opening time in milliseconds.

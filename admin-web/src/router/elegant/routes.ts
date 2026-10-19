@@ -126,6 +126,18 @@ export const generatedRoutes: GeneratedRoute[] = [
     }
   },
   {
+    name: 'cdk',
+    path: '/cdk',
+    component: 'layout.base$view.cdk',
+    meta: {
+      title: '兑换码管理',
+      i18nKey: 'route.cdk',
+      icon: 'ph:gift',
+      order: 4,
+      roles: ['viewer', 'operator', 'admin']
+    }
+  },
+  {
     name: 'feedback',
     path: '/feedback',
     component: 'layout.base$view.feedback',

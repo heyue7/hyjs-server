@@ -101,6 +101,12 @@ func (s *GameService) shopItem(tx *gorm.DB, player *pb.Player, cfg *db.ShopProdu
 }
 
 func (s *GameService) shopList(tx *gorm.DB, player *pb.Player, day string) ([]*pb.ShopItem, error) {
+	if err := s.requireShopAvailability(tx, "ordinary", LocalPlayNow(tx.Statement.Context)); err != nil {
+		if errors.Is(err, constUtil.ErrP4CommerceNotOpen) {
+			return []*pb.ShopItem{}, nil
+		}
+		return nil, err
+	}
 	var products []db.ShopProduct
 	if err := tx.Clauses(clause.Locking{Strength: "SHARE"}).Where("enabled = ?", true).Order("priority,id").Find(&products).Error; err != nil {
 		return nil, err
@@ -114,7 +120,7 @@ func (s *GameService) shopList(tx *gorm.DB, player *pb.Player, day string) ([]*p
 		result = append(result, item)
 	}
 	if s.P4Ready {
-		extra, err := s.p4OrdinaryProjection(tx, player, time.Now())
+		extra, err := s.p4OrdinaryProjection(tx, player, LocalPlayNow(tx.Statement.Context))
 		if err != nil {
 			return nil, err
 		}
@@ -140,6 +146,9 @@ func (s *GameService) shopProducts(ctx context.Context, id int64, b *pb.CSShopPr
 		}
 		player, _, err := decodeProfileForCalendarUpdate(tx, &row)
 		if err != nil {
+			return err
+		}
+		if err := s.requireShopAvailability(tx, "ordinary", LocalPlayNow(ctx)); err != nil {
 			return err
 		}
 		day := time.Now().In(time.FixedZone("UTC+8", 8*3600)).Format("2006-01-02")
@@ -185,6 +194,9 @@ func (s *GameService) shopBuy(ctx context.Context, id int64, b *pb.CSShopBuy, st
 		}
 		var cfg db.ShopProduct
 		if err = tx.Clauses(clause.Locking{Strength: "SHARE"}).First(&cfg, "id = ? AND enabled = ?", b.GetShopItemId(), true).Error; err != nil {
+			return err
+		}
+		if err := s.requireShopAvailability(tx, "ordinary", LocalPlayNow(ctx)); err != nil {
 			return err
 		}
 		day := time.Now().In(time.FixedZone("UTC+8", 8*3600)).Format("2006-01-02")

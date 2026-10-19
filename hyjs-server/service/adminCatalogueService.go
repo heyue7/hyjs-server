@@ -77,6 +77,7 @@ func (s *GameService) LoadAdminCatalogue(rootTables, mediaManifest string) error
 		}
 	}
 	s.AdminCatalogueData = adminCatalogueBuild(tables, media)
+	s.AdminCatalogueData.SourceTables = tables
 	// Presentation-only consumers reuse exported original pixels without modifying gameplay tables.
 	s.AdminCatalogueData.SpriteURLs = map[string]string{}
 	for key, sprite := range media.Sprites {

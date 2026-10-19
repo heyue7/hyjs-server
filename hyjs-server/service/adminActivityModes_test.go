@@ -22,7 +22,7 @@ func adminModesFixture(t *testing.T) (*p1Fixture, *model.AdminPrincipal) {
 			t.Fatal(err)
 		}
 	}
-	user := db.AdminUser{Username: "mode-operator-" + strings.ToLower(t.Name()), PasswordHash: "unused-fixture", Role: constUtil.AdminRoleOperator, Enabled: true}
+	user := db.AdminUser{Username: "mode-operator-" + p6Digest([]byte(t.Name()))[:24], PasswordHash: "unused-fixture", Role: constUtil.AdminRoleOperator, Enabled: true}
 	if err := db.GetIns().Create(&user).Error; err != nil {
 		t.Fatal(err)
 	}

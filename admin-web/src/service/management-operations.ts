@@ -36,6 +36,7 @@ export interface ShopSnapshot {
   version: string;
   resources?: Item[];
   settings: {
+    unlimited: boolean;
     enabled: boolean;
     slots: number;
     startAt: number;

@@ -230,6 +230,7 @@ const local: App.I18n.Schema = {
     announcements: '公告管理',
     audit: '操作审计',
     users: '后台账号',
+    cdk: '兑换码管理',
     'game-accounts': '用户管理',
     players: '玩家管理',
     wallets: '蓝绿钱包',

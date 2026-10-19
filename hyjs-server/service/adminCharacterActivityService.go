@@ -56,9 +56,7 @@ func adminNormalizeCharacterItems(items []model.AdminActivityOccurrenceDTO) []mo
 	return out
 }
 func adminActivityWindowsOverlap(a, b model.AdminActivityOccurrenceDTO, mode string) bool {
-	if mode == "opening-14" {
-		return true
-	}
+
 	if a.Timing != b.Timing {
 		return true
 	}
@@ -138,10 +136,22 @@ func (s *GameService) PrepareAdminCharacterActivitySchedules(ctx context.Context
 			var issued db.AdminCharacterActivityInstance
 			err := tx.First(&issued, "player_id=? AND occurrence_id=?", playerID, schedule.ID).Error
 			if err == nil {
+				accepted := schedule
+				accepted.FormJSON = issued.FormJSON
+				if _, e := adminAcceptActivityTemplate(tx, playerID, accepted); e != nil {
+					return e
+				}
 				continue
 			}
 			if !errors.Is(err, gorm.ErrRecordNotFound) {
 				return err
+			}
+			allowed, err := adminAcceptActivityTemplate(tx, playerID, schedule)
+			if err != nil {
+				return err
+			}
+			if !allowed {
+				continue
 			}
 			definition, ok := adminActivityDefinitionFor(schedule.Mode)
 			if !ok {
@@ -156,10 +166,16 @@ func (s *GameService) PrepareAdminCharacterActivitySchedules(ctx context.Context
 			form.ClaimEndAt = claimEndAt
 			digest := p6Digest([]byte(fmt.Sprintf("%d/%d/%s", s.OriginalServerID(), playerID, schedule.ID)))[:20]
 			key := definition.prefix + "character_" + digest
+			if form.Mode == "shop-window" {
+				key = "shop_schedule_" + form.Options.ShopKey + "_character_" + digest
+			}
 			if err := s.adminPersistTypedActivity(tx, definition, key, form, true, false); err != nil {
 				return err
 			}
 			issued = db.AdminCharacterActivityInstance{PlayerID: playerID, OccurrenceID: schedule.ID, ServerID: s.OriginalServerID(), ConsumerID: definition.domain + ":" + key, ConsumerKey: key, Mode: schedule.Mode, StartAt: startAt, EndAt: endAt, ClaimEndAt: claimEndAt, SourceVersion: adminVersion(schedule), FormJSON: adminJSON(form)}
+			if form.Mode == "shop-window" && !adminOrdinarySchedulableShop(form.Options.ShopKey) {
+				issued.ConsumerID = "shop-gate:" + key
+			}
 			if err := tx.Create(&issued).Error; err != nil {
 				return err
 			}
@@ -198,7 +214,16 @@ func adminCharacterActivityAccess(tx *gorm.DB, key string) (bool, error) {
 	if err := tx.Clauses(clause.Locking{Strength: "SHARE"}).First(&occurrence, "id=?", issued.OccurrenceID).Error; err != nil {
 		return false, err
 	}
-	return occurrence.ServerID == issued.ServerID && occurrence.Enabled && !occurrence.Archived && adminActivityTiming(occurrence) == "character-day", nil
+	if occurrence.ServerID != issued.ServerID || adminActivityTiming(occurrence) != "character-day" {
+		return false, nil
+	}
+	accepted := occurrence
+	accepted.FormJSON = issued.FormJSON
+	allowed, err := adminAcceptActivityTemplate(tx, owner, accepted)
+	if err != nil {
+		return false, err
+	}
+	return allowed && occurrence.Enabled && !occurrence.Archived, nil
 }
 func adminCharacterActivityCurrentKey(tx *gorm.DB, mode string, now int64, claim bool) (string, error) {
 	if !tx.Migrator().HasTable(&db.AdminCharacterActivityInstance{}) {

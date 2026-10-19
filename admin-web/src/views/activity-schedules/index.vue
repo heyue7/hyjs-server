@@ -103,7 +103,6 @@ const timelineWidth = computed(() => visibleDays.value * dayWidth);
 const rows = computed(() => {
   const max = Math.min(31, Math.max(3, ...items.value.map(item => item.lane)) + 1);
   return Array.from({ length: max + 1 }, (_, lane) => {
-    const ends: number[] = [];
     const bars = items.value
       .filter(
         item =>
@@ -112,13 +111,8 @@ const rows = computed(() => {
           item.startAt < startDate.value + visibleDays.value * activityDay
       )
       .sort((a, b) => a.startAt - b.startAt || keyOf(a).localeCompare(keyOf(b)))
-      .map(item => {
-        let track = ends.findIndex(end => end <= item.startAt);
-        if (track < 0) track = ends.length;
-        ends[track] = item.claimEndAt;
-        return { item, track };
-      });
-    return { lane, bars, height: Math.max(1, ends.length) * 58 + 14 };
+      .map((item, track) => ({ item, track }));
+    return { lane, bars, height: Math.max(1, bars.length) * 58 + 14 };
   });
 });
 function keyOf(item: ActivityOccurrence): string {
@@ -228,14 +222,16 @@ function firstFreeLane(startAt: number, endAt: number): number {
 }
 function addDefinition(definition: ActivityDefinition, startAt: number, lane?: number) {
   if (!ready.value || !canWrite.value) return;
-  if (definition.mode === 'opening-14' && characterItems.value.some(item => item.enabled)) {
-    window.$message?.warning('开服任务已按角色独立起算，无需重复安排'); return;
-  }
+  // Consecutive opening programmes use separate relative days; the server
+  // checks overlaps and applies each programme's frozen participation policy.
+  const nextOpeningDay = definition.mode === 'opening-14'
+    ? Math.max(1, ...characterItems.value.filter(item => item.mode === 'opening-14' && item.enabled).map(item => (item.startDay || 1) + (item.durationDays || 14) + (item.claimDays || 0)))
+    : 1;
   const endAt = calendarMidnight(startAt) + definition.defaultDays * activityDay;
   items.value.push({
     id: '',
     timing: planningTab.value,
-    startDay: 1, durationDays: definition.defaultDays, claimDays: definition.claimDays,
+    startDay: nextOpeningDay, durationDays: definition.defaultDays, claimDays: definition.claimDays,
     templateId: definition.id,
     templateVersion: definition.version,
     name: definition.name,
@@ -257,7 +253,6 @@ function applyPattern(pattern: ActivityPattern, date: number, laneOffset = 0) {
   if (!ready.value || !canWrite.value) return;
   try {
     const expanded = expandActivityPattern(pattern, definitions.value, { anchor: date, repeats: repeats.value || 1 });
-    if (expanded.some(item => item.mode === 'opening-14') && characterItems.value.some(item => item.enabled)) throw new Error('开服任务已按角色独立起算，请从方案中移除重复项');
     if (expanded.length + items.value.length > 1000) throw new Error('一次排期最多1000项，请减少填充次数');
     if (expanded.some(item => item.lane + laneOffset > 31))
       throw new Error('拖入后的方案超出32条轨道，请选择更靠上的轨道或修改方案');
@@ -739,9 +734,9 @@ onUnmounted(() => {
             </NSpace>
           </div>
           <div class="calendar-scroll" :class="{ 'calendar-disabled': !scope.serverId }">
-            <div class="calendar-canvas" :style="{ width: `${timelineWidth + 72}px` }">
+            <div class="calendar-canvas" :style="{ width: `${timelineWidth + 368}px` }">
               <div class="calendar-head">
-                <div class="lane-label">并行轨道</div>
+                <div class="lane-label calendar-fixed-heading">活动 / 并行轨道</div>
                 <div
                   v-for="date in dates"
                   :key="date"
@@ -754,9 +749,16 @@ onUnmounted(() => {
                     {{ ['日', '一', '二', '三', '四', '五', '六'][new Date(date + 8 * 3600000).getUTCDay()] }}
                   </small>
                 </div>
+                <div class="calendar-operations calendar-fixed-heading">操作</div>
               </div>
               <div v-for="row in rows" :key="row.lane" class="calendar-row" :style="{ height: `${row.height}px` }">
-                <div class="lane-label">轨道 {{ row.lane + 1 }}</div>
+                <div class="lane-label calendar-names">
+                  <span v-if="!row.bars.length" class="empty-lane-name">轨道 {{ row.lane + 1 }} · 拖入活动</span>
+                  <button v-for="bar in row.bars" :key="keyOf(bar.item)" class="activity-fixed-name" :style="{ top: `${bar.track * 58 + 8}px` }" :title="bar.item.name" @click="selectedKey = keyOf(bar.item)">
+                    <strong>{{ bar.item.name }}</strong>
+                    <small>轨道 {{ row.lane + 1 }} · {{ bar.item.enabled ? (bar.item.id ? '已发布' : '草稿') : '已停用' }}</small>
+                  </button>
+                </div>
                 <div
                   class="calendar-lane"
                   :style="{ width: `${timelineWidth}px`, backgroundSize: `${dayWidth}px 100%` }"
@@ -806,10 +808,6 @@ onUnmounted(() => {
                       {{ calendarDate(bar.item.startAt) }} — {{ calendarDate(bar.item.endAt)
                       }}{{ bar.item.frozen ? ' · 已冻结' : '' }}
                     </small>
-                    <div v-if="bar.item.endAt - bar.item.startAt >= 3 * activityDay" class="bar-actions" @pointerdown.stop>
-                      <button @click.stop="previewActivity(bar.item.templateId, bar.item)">预览</button>
-                      <button @click.stop="selectedKey = keyOf(bar.item)">编辑</button>
-                    </div>
                     <span
                       v-if="!bar.item.frozen && canWrite"
                       class="resize-handle right"
@@ -818,6 +816,12 @@ onUnmounted(() => {
                       @pointerup.stop="endPointer"
                       @pointercancel.stop="endPointer"
                     />
+                  </div>
+                </div>
+                <div class="calendar-operations">
+                  <div v-for="bar in row.bars" :key="keyOf(bar.item)" class="activity-fixed-actions" :style="{ top: `${bar.track * 58 + 8}px` }">
+                    <NButton size="small" @click="previewActivity(bar.item.templateId, bar.item)">预览</NButton>
+                    <NButton size="small" @click="selectedKey = keyOf(bar.item)">编辑</NButton>
                   </div>
                 </div>
               </div>
@@ -997,7 +1001,7 @@ onUnmounted(() => {
       <template v-if="activityPreview">
         <p class="pattern-help">{{ activityPreview.published ? '本期已发布配置' : '活动模板预览' }}</p>
         <p v-if="activityPreview.relative" class="pattern-help">角色第{{ activityPreview.relative.startDay || 1 }}天开始 · 持续{{ activityPreview.relative.durationDays || 14 }}天 · 另留{{ activityPreview.relative.claimDays || 0 }}天领奖</p>
-        <p v-if="activityPreview.form.mode === 'opening-14'" class="pattern-help">原249项任务按本服开服自然日解锁，角色有各自完整有效期；已领记录不会因重新排期重置。</p>
+        <p v-if="activityPreview.form.mode === 'opening-14'" class="pattern-help">原249项任务按本服开服自然日解锁，角色有各自完整有效期；同一期的领取记录保持，新一期按参与方式执行。</p>
         <ActivitySummary :form="activityPreview.form" :mode="modes.find(mode => mode.mode === activityPreview?.form.mode)" :hide-schedule="!activityPreview.published || Boolean(activityPreview.relative)" />
       </template>
       <template #footer><NSpace justify="end"><NButton @click="activityPreview = null">关闭</NButton></NSpace></template>
@@ -1113,8 +1117,8 @@ h1 {
   border-bottom: 1px solid rgb(var(--base-text-color) / 0.09);
 }
 .lane-label {
-  width: 72px;
-  flex: 0 0 72px;
+  width: 220px;
+  flex: 0 0 220px;
   position: sticky;
   left: 0;
   z-index: 4;
@@ -1242,7 +1246,7 @@ h1 {
 .bar-actions button { color: rgb(var(--primary-color)); background: transparent; border: 0; border-radius: 4px; font-size: 11px; padding: 3px 5px; cursor: pointer; }
 .bar-actions button:hover { background: rgb(var(--primary-color) / .1); }
 .bar-actions button:focus-visible { outline: 2px solid rgb(var(--primary-color)); }
-.bar-title { padding-right: 62px; }
+.bar-title { padding-right: 0; }
 .scheduled-activities { margin-top: 16px; }
 .scheduled-activities article { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 10px 0; border-bottom: 1px solid rgb(var(--base-text-color) / .07); }
 .scheduled-activities strong { font-size: 13px; font-weight: 500; }
@@ -1338,4 +1342,18 @@ h1 {
     flex-wrap: wrap;
   }
 }
+</style>
+
+<style scoped>
+.calendar-fixed-heading { font-weight: 600; color: rgb(var(--base-text-color) / .75); }
+.calendar-names { display: block; align-self: stretch; box-shadow: 4px 0 8px rgb(0 0 0 / .025); }
+.empty-lane-name { display: flex; height: 100%; align-items: center; justify-content: center; font-size: 12px; }
+.activity-fixed-name { position: absolute; inset-inline: 0; height: 46px; width: 220px; display: flex; flex-direction: column; justify-content: center; gap: 2px; padding: 4px 12px; text-align: left; border: 0; border-radius: 0; background: transparent; cursor: pointer; color: rgb(var(--base-text-color)); }
+.activity-fixed-name:hover { background: rgb(var(--primary-color) / .05); }
+.activity-fixed-name:focus-visible { outline: 2px solid rgb(var(--primary-color)); outline-offset: -3px; }
+.activity-fixed-name strong { width: 100%; font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.activity-fixed-name small { font-size: 11px; color: rgb(var(--base-text-color) / .5); }
+.calendar-operations { position: sticky; right: 0; z-index: 4; flex: 0 0 148px; width: 148px; background: rgb(var(--container-bg-color)); border-left: 1px solid rgb(var(--base-text-color) / .09); box-shadow: -4px 0 8px rgb(0 0 0 / .025); }
+.calendar-head .calendar-operations { display: flex; align-items: center; justify-content: center; }
+.activity-fixed-actions { position: absolute; inset-inline: 0; height: 46px; display: flex; align-items: center; justify-content: center; gap: 6px; }
 </style>

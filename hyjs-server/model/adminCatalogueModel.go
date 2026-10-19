@@ -46,6 +46,8 @@ type AdminCatalogueFacets struct {
 
 // AdminCatalogueData 在启动时独立加载，后续只读；不向战斗Tables加入文本或资源表。
 type AdminCatalogueData struct {
+	// SourceTables keeps the independently loaded original catalogue rows read-only for item details.
+	SourceTables map[string][]map[string]string
 	// SpriteURLs maps original sprite names to verified same-origin art, read-only after startup.
 	SpriteURLs map[string]string
 	// DisplayNames maps original text keys to their localized display label.

@@ -59,6 +59,8 @@ type AdminCoinPrize struct {
 
 // AdminActivityOptions 只包含当前模式原消费者可读的运营参数。
 type AdminActivityOptions struct {
+	ShopKey    string `json:"shopKey,omitempty"`    // ShopKey references an actual ordinary shop, not an activity sale.
+	ShopSource string `json:"shopSource,omitempty"` // ShopSource is the server-generated immutable native catalogue snapshot.
 	// RebateBps 是返利比例基点，1至10000。
 	RebateBps int64 `json:"rebateBps,omitempty"`
 	// RebateCap 是每日钻石返利上限。
@@ -97,17 +99,18 @@ type AdminActivityOptions struct {
 
 // AdminActivityForm 是按模式编辑的业务字段，不接收原始规则JSON。
 type AdminActivityForm struct {
-	Mode       string                   `json:"mode" binding:"required"`       // Mode 必须来自模式目录。
-	TemplateID string                   `json:"templateId" binding:"required"` // TemplateID 必须属于当前模式原美术模板。
-	Name       string                   `json:"name" binding:"required"`       // Name 是活动标题。
-	Source     string                   `json:"source"`                        // Source 是运营来源说明。
-	StartAt    int64                    `json:"startAt"`                       // StartAt 是开始毫秒。
-	EndAt      int64                    `json:"endAt"`                         // EndAt 是结束毫秒。
-	ClaimEndAt int64                    `json:"claimEndAt"`                    // ClaimEndAt 是最后领奖毫秒。
-	Products   []AdminActivityProduct   `json:"products"`                      // Products 是商品模式列表。
-	Milestones []AdminActivityMilestone `json:"milestones"`                    // Milestones 是奖历或累计目标。
-	Prizes     []AdminActivityPrize     `json:"prizes"`                        // Prizes 是转盘九个奖位。
-	Options    AdminActivityOptions     `json:"options"`                       // Options 是当前模式特定参数。
+	RepeatPolicy string                   `json:"repeatPolicy,omitempty" binding:"omitempty,oneof=once repeat"` // RepeatPolicy freezes per-template reuse: once per role, or independent participation in each occurrence.
+	Mode         string                   `json:"mode" binding:"required"`                                      // Mode 必须来自模式目录。
+	TemplateID   string                   `json:"templateId" binding:"required"`                                // TemplateID 必须属于当前模式原美术模板。
+	Name         string                   `json:"name" binding:"required"`                                      // Name 是活动标题。
+	Source       string                   `json:"source"`                                                       // Source 是运营来源说明。
+	StartAt      int64                    `json:"startAt"`                                                      // StartAt 是开始毫秒。
+	EndAt        int64                    `json:"endAt"`                                                        // EndAt 是结束毫秒。
+	ClaimEndAt   int64                    `json:"claimEndAt"`                                                   // ClaimEndAt 是最后领奖毫秒。
+	Products     []AdminActivityProduct   `json:"products"`                                                     // Products 是商品模式列表。
+	Milestones   []AdminActivityMilestone `json:"milestones"`                                                   // Milestones 是奖历或累计目标。
+	Prizes       []AdminActivityPrize     `json:"prizes"`                                                       // Prizes 是转盘九个奖位。
+	Options      AdminActivityOptions     `json:"options"`                                                      // Options 是当前模式特定参数。
 }
 
 // AdminTypedActivityRequest 创建或保存一份模式表单。

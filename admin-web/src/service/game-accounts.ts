@@ -16,9 +16,9 @@ export interface GameAccount {
   version: string;
   players: AccountPlayer[];
 }
-export const getGameAccounts = (q: string, page = 1, pageSize = 25) =>
+export const getGameAccounts = (q: string, page = 1, pageSize = 25, accountId = 0) =>
   api<{ items: GameAccount[]; total: number }>(
-    `/game-accounts?${new URLSearchParams({ q, page: String(page), pageSize: String(pageSize) })}`
+    `/game-accounts?${new URLSearchParams({ q, page: String(page), pageSize: String(pageSize), ...(accountId > 0 ? { accountId: String(accountId) } : {}) })}`
   );
 export const createGameAccount = (draft: {
   username: string;

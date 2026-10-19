@@ -22,7 +22,7 @@ func AdminShopDefinitions() []model.AdminShopDefinition {
 	base := []string{"rewards", "cost", "dailyLimit", "totalLimit", "stock", "minLevel", "minVip", "priority", "weight", "discountBps"}
 	out := []model.AdminShopDefinition{}
 	for _, v := range []struct{ id, label string }{{"ordinary", "普通商店"}, {"memory", "记忆圣坛"}, {"popularity", "声望商店商品"}, {"popularity-rank", "声望商店奖励"}, {"point", "攻略点商店"}, {"score", "积分商店"}, {"guild", "公会商店"}, {"pet-market", "精灵商店"}, {"union-fight", "公会战商店"}, {"vip", "会员礼包"}} {
-		d := model.AdminShopDefinition{ID: v.id, Label: v.label, Fields: append([]string{}, base...), SettingsFields: []string{"enabled", "startAt", "endAt", "claimEndAt", "source"}, CanCreate: true, Notes: "已冻结目录先复制为新一期；历史购买和限购保留。"}
+		d := model.AdminShopDefinition{ID: v.id, Label: v.label, Fields: append([]string{}, base...), SettingsFields: []string{"unlimited", "enabled", "startAt", "endAt", "claimEndAt", "source"}, CanCreate: true, Notes: "已冻结目录先复制为新一期；历史购买和限购保留。"}
 		switch v.id {
 		case "ordinary":
 			d.Fields = append(d.Fields, "enabled")
@@ -36,15 +36,15 @@ func AdminShopDefinitions() []model.AdminShopDefinition {
 			d.Fields = append(d.Fields, "contributionCost", "guildLevel")
 		case "pet-market":
 			d.Fields = []string{"rewards", "cost", "stock", "weight"}
-			d.SettingsFields = []string{"enabled", "slots"}
+			d.SettingsFields = []string{"unlimited", "startAt", "endAt", "claimEndAt", "enabled", "slots"}
 			d.Notes = "变更用于下一周库存；当前玩家已冻结周目录保持。原150钻刷新/每周10次和分解规则保留。"
 		case "union-fight":
 			d.Fields = []string{"rewards", "cost", "stock", "priority", "day", "buyCondition", "refreshMillis", "enabled", "source"}
-			d.SettingsFields = []string{}
+			d.SettingsFields = []string{"unlimited", "startAt", "endAt", "claimEndAt"}
 			d.Notes = "按公会战日期发布；仅影响之后建立的场次，原场内道具和携带上限保持。"
 		case "vip":
 			d.Fields = []string{"rewards", "cost", "minVip", "enabled", "source"}
-			d.SettingsFields = []string{}
+			d.SettingsFields = []string{"unlimited", "startAt", "endAt", "claimEndAt"}
 			d.Notes = "对应游戏商城的“会员礼包”（原VIP商店，shopType=2）。空列表表示尚无已启用商品；请自行配置奖励、价格及会员条件后启用。已有当日快照保持，下次有效刷新使用新配置。"
 		}
 		out = append(out, d)
@@ -61,11 +61,12 @@ func AdminShopValid(id string) bool {
 }
 
 type adminShopStorage struct {
-	Legacy []db.ShopProduct
-	VIP    []db.VIPShopProduct
-	Period *db.P4CommerceRule
-	Pet    *db.P9PetMarketRule
-	Union  []db.P13UnionFightShopSource
+	Availability *db.AdminShopAvailability
+	Legacy       []db.ShopProduct
+	VIP          []db.VIPShopProduct
+	Period       *db.P4CommerceRule
+	Pet          *db.P9PetMarketRule
+	Union        []db.P13UnionFightShopSource
 }
 
 func adminShopBaseProduct(id, reward, cost string) model.AdminShopProduct {
@@ -172,7 +173,7 @@ func (s *GameService) adminReadShop(tx *gorm.DB, key string) (*model.AdminShopRe
 		}
 	default:
 		var row db.P4CommerceRule
-		err := tx.Where("kind=?", key).Order("start_at DESC,id DESC").First(&row).Error
+		err := tx.Where("kind=? AND id NOT LIKE ?", key, "shop_schedule_%").Order("start_at DESC,id DESC").First(&row).Error
 		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil, err
 		}
@@ -211,7 +212,25 @@ func (s *GameService) adminReadShop(tx *gorm.DB, key string) (*model.AdminShopRe
 			}
 		}
 	}
-	out.Version = adminVersion(raw)
+	availability, err := AdminShopAvailability(tx, key)
+	if err != nil {
+		return nil, nil, err
+	}
+	raw.Availability = availability
+	if availability != nil {
+		out.Settings.Unlimited = availability.Unlimited
+		if !availability.Unlimited || availability.StartAt > 0 {
+			out.Settings.StartAt, out.Settings.EndAt, out.Settings.ClaimEndAt = availability.StartAt, availability.EndAt, availability.ClaimEndAt
+		}
+	}
+	availabilityRevision := int64(0)
+	if availability != nil {
+		availabilityRevision = availability.Revision
+	}
+	out.Version = adminVersion(struct {
+		Source               *adminShopStorage
+		AvailabilityRevision int64
+	}{raw, availabilityRevision})
 	return out, raw, nil
 }
 func (s *GameService) AdminShop(ctx context.Context, key string) (*model.AdminShopResponse, error) {
@@ -496,8 +515,18 @@ func (s *GameService) AdminDeleteShopProduct(ctx context.Context, actor *model.A
 
 func (s *GameService) AdminSaveShopSettings(ctx context.Context, actor *model.AdminPrincipal, key string, req model.AdminShopSettingsSaveRequest) (*model.AdminShopResponse, error) {
 	return s.adminShopMutation(ctx, actor, key, req.Version, "settings", func(tx *gorm.DB, raw *adminShopStorage) error {
+		// Operating hours are mutable independently from accepted product terms.
+		hours := db.AdminShopAvailability{ShopKey: key, Revision: 1}
+		if raw.Availability != nil {
+			hours = *raw.Availability
+			hours.Revision++
+		}
+		hours.Unlimited, hours.StartAt, hours.EndAt, hours.ClaimEndAt = req.Unlimited, req.StartAt, req.EndAt, req.ClaimEndAt
+		if err := tx.Save(&hours).Error; err != nil {
+			return err
+		}
 		if key == "vip" || key == "union-fight" {
-			return constUtil.ErrAdminInput
+			return nil
 		}
 		if key == "pet-market" {
 			var cfg p9MarketConfig
@@ -512,7 +541,7 @@ func (s *GameService) AdminSaveShopSettings(ctx context.Context, actor *model.Ad
 		}
 		row := raw.Period
 		create := row == nil || req.NewPeriod
-		if req.NewPeriod && row != nil && req.StartAt <= row.StartAt {
+		if req.NewPeriod && !req.Unlimited && row != nil && req.StartAt <= row.StartAt {
 			return fmt.Errorf("%w: 新期开启时间须晚于上一期", constUtil.ErrAdminInput)
 		}
 		if row == nil {
@@ -534,17 +563,25 @@ func (s *GameService) AdminSaveShopSettings(ctx context.Context, actor *model.Ad
 			row.Enabled = false
 		} else if len(row.Frozen) > 0 {
 			// Enable/disable remains operational; immutable content/window stays frozen.
-			if req.StartAt != row.StartAt || req.EndAt != row.EndAt || req.ClaimEndAt != row.ClaimEndAt || req.Source != row.Source {
-				return fmt.Errorf("%w: 已冻结的时间和来源不可覆盖，请复制新期", constUtil.ErrAdminInput)
+			if req.Source != row.Source {
+				return fmt.Errorf("%w: 已冻结的商品来源不可覆盖，请复制新期", constUtil.ErrAdminInput)
 			}
 			row.Enabled = req.Enabled
 			return tx.Model(&db.P4CommerceRule{}).Where("id=?", row.ID).Update("enabled", row.Enabled).Error
 		} else {
 			row.Enabled = req.Enabled
 		}
-		row.StartAt = req.StartAt
-		row.EndAt = req.EndAt
-		row.ClaimEndAt = req.ClaimEndAt
+		// Native source dates remain a valid frozen snapshot; actual business hours
+		// come from the separate switch and never create a fresh quota implicitly.
+		if req.StartAt > 0 && req.EndAt > req.StartAt && req.ClaimEndAt >= req.EndAt {
+			row.StartAt, row.EndAt, row.ClaimEndAt = req.StartAt, req.EndAt, req.ClaimEndAt
+		} else if create || row.StartAt <= 0 || row.EndAt <= row.StartAt {
+			start := LocalPlayNow(ctx)
+			if raw.Period != nil && start.UnixMilli() <= raw.Period.StartAt {
+				start = time.UnixMilli(raw.Period.StartAt + 1)
+			}
+			row.StartAt, row.EndAt, row.ClaimEndAt = start.UnixMilli(), start.AddDate(0, 1, 0).UnixMilli(), start.AddDate(0, 1, 0).UnixMilli()
+		}
 		if key == "popularity-rank" {
 			row.Source = constUtil.P4PopularityRankSource
 		} else {
@@ -555,7 +592,7 @@ func (s *GameService) AdminSaveShopSettings(ctx context.Context, actor *model.Ad
 		if key == "memory" {
 			document["slots"] = adminJSON(req.Slots)
 		}
-		if key == "popularity-rank" && create {
+		if key == "popularity-rank" && (create || len(document["rankPublishedAt"]) == 0) {
 			document["rankPublishedAt"] = adminJSON(min(time.Now().UnixMilli(), row.StartAt-1))
 		}
 		row.Rules = adminJSON(document)

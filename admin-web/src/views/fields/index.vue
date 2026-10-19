@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, toRaw, watch } from 'vue';
 import { onBeforeRouteLeave, useRoute } from 'vue-router';
 import { ApiError, api, errorMessage, json } from '@/service/operations';
 import type { FieldChannel, FieldDeployment, FieldDeployments, FieldPresentation, FieldResource, FieldTemplate } from '@/service/fields';
@@ -53,7 +53,7 @@ const monsterOptions = computed(() =>
 const selectedBossRewards = computed(() => cfg.value?.bossRewards.filter(r => r.level === bossLevel.value) || []);
 const bossLabels = ['参与奖励', '伤害第 11 名以后', '伤害第 4～10 名', '伤害第 2～3 名', '伤害第 1 名', '最后一击奖励'];
 function accept(row: FieldTemplate) {
-  selected.value = structuredClone(row);
+  selected.value = structuredClone(toRaw(row));
   original.value = JSON.stringify(selected.value);
   conflict.value = false;
   bossLevel.value = 1;
@@ -85,6 +85,9 @@ async function confirmLeave() {
   return !(dirty.value || channelsDirty.value) || (await confirmAction('有未保存的修改，确认放弃？'));
 }
 async function choose(row: FieldTemplate) {
+  if (saving.value || loading.value || selected.value?.id === row.id) return;
+  error.value = '';
+  success.value = '';
   if (dirty.value && !(await confirmAction('放弃未保存的修改？'))) return;
   accept(row);
 }
@@ -93,7 +96,10 @@ async function loadTemplates() {
   templates.value = data.items;
   resources.value = data.resources || [];
   presentation.value = data.presentation || {};
-  if (!selected.value && data.items[0]) accept(data.items[0]);
+  if (!dirty.value) {
+    const current = data.items.find(row => row.id === selected.value?.id) || data.items[0];
+    if (current) accept(current);
+  }
 }
 async function loadDeployments() {
   deployments.value = [];
@@ -273,6 +279,8 @@ onMounted(load);
                   ? 'border-blue-500 bg-blue-50 dark:bg-blue-950'
                   : 'border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900'
               "
+              :disabled="saving || loading"
+              :aria-pressed="selected?.id === row.id"
               @click="choose(row)"
             >
               <div class="flex items-center gap-3">
@@ -285,7 +293,7 @@ onMounted(load);
             </button>
           </div>
         </NCard>
-        <NCard v-if="selected && cfg" size="small">
+        <NCard v-if="selected && cfg" :key="selected.id" size="small">
           <div class="mb-4 flex flex-wrap items-center gap-2">
             <NInput
               v-model:value="selected.name"

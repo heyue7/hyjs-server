@@ -20,7 +20,7 @@ import (
 // It never enables a draft or alters an issued gameplay instance.
 func (s *GameService) InitializeAdminActivitySchedules(ctx context.Context) error {
 	tx := db.GetIns().WithContext(ctx)
-	if err := tx.AutoMigrate(&db.AdminActivityDefinition{}, &db.AdminActivityOccurrence{}, &db.AdminActivityPattern{}, &db.AdminActivityScheduleRevision{}, &db.AdminCharacterActivityInstance{}); err != nil {
+	if err := tx.AutoMigrate(&db.AdminActivityDefinition{}, &db.AdminActivityOccurrence{}, &db.AdminActivityPattern{}, &db.AdminActivityScheduleRevision{}, &db.AdminCharacterActivityInstance{}, &db.AdminActivityTemplateOwner{}, &db.AdminOpeningState{}, &db.AdminOpeningCounter{}, &db.AdminOpeningStock{}, &db.AdminOpeningReceipt{}); err != nil {
 		return err
 	}
 	rows, err := s.AdminActivityInstances(ctx)
@@ -71,6 +71,9 @@ func (s *GameService) AdminActivityDefinitions(ctx context.Context, p *model.Adm
 	if err := adminOperationUser(tx, p, false); err != nil {
 		return nil, err
 	}
+	if err := s.syncAdminShopScheduleDefinitions(tx); err != nil {
+		return nil, err
+	}
 	var rows []db.AdminActivityDefinition
 	if err := tx.Where("archived=?", false).Order("name,id").Find(&rows).Error; err != nil {
 		return nil, err
@@ -89,8 +92,25 @@ func (s *GameService) AdminActivityDefinitions(ctx context.Context, p *model.Adm
 // adminValidateDefinition reuses the real original adapters in a rolled-back savepoint.
 // Resource validation stays identical to gameplay while global templates issue no live instance.
 func (s *GameService) adminValidateDefinition(tx *gorm.DB, f model.AdminActivityForm, complete bool) error {
+	if f.RepeatPolicy != "" && f.RepeatPolicy != "once" && f.RepeatPolicy != "repeat" {
+		return constUtil.ErrAdminInput
+	}
 	if f.Mode == "opening-14" {
 		return nil
+	}
+	if f.Mode == "shop-window" {
+		if f.Options.ShopKey == "" || f.Options.ShopSource == "" {
+			return constUtil.ErrAdminInput
+		}
+		if complete {
+			availability, err := AdminShopAvailability(tx, f.Options.ShopKey)
+			if err != nil {
+				return err
+			}
+			if availability == nil || availability.Unlimited {
+				return constUtil.ErrAdminInput
+			}
+		}
 	}
 	definition, ok := adminActivityDefinitionFor(f.Mode)
 	if !ok || f.TemplateID != definition.mode+"-original" {
@@ -130,6 +150,15 @@ func (s *GameService) AdminSaveActivityDefinition(ctx context.Context, p *model.
 			row.ID = "template_" + strings.ReplaceAll(uuid.NewString(), "-", "")[:24]
 		}
 		form := req.Form
+		if form.Mode == "shop-window" {
+			canonical, err := s.adminShopScheduleSourceForm(tx, form.Options.ShopKey)
+			if err != nil {
+				return err
+			}
+			canonical.RepeatPolicy = form.RepeatPolicy
+			form = canonical
+		}
+		form.RepeatPolicy = adminActivityRepeatPolicy(form)
 		form.Name = req.Name
 		form.StartAt = 0
 		form.EndAt = 0
@@ -226,7 +255,15 @@ func adminActivityScheduleAccess(tx *gorm.DB, key string) (bool, error) {
 	if !ok {
 		return false, nil
 	}
-	return row.ServerID == service.OriginalServerID() && !row.Archived && row.Enabled, nil
+	if row.ServerID != service.OriginalServerID() || row.Archived || !row.Enabled {
+		return false, nil
+	}
+	owner := GameCalendarOwner(tx.Statement.Context)
+	now := LocalPlayNow(tx.Statement.Context).UnixMilli()
+	if owner > 0 && now >= row.StartAt && now < row.ClaimEndAt {
+		return adminAcceptActivityTemplate(tx, owner, row)
+	}
+	return true, nil
 }
 
 // AdminScheduledTurntablePool selects only this trusted realm's active pool.
@@ -296,61 +333,17 @@ func AdminScheduledOpeningRule(tx *gorm.DB, cfg *db.OpenServerActivityRule, now 
 		}
 		return nil
 	}
-	// The original opening protocol has one task state per role, not one per
-	// programme. Bind its first accepted window permanently so replacing a
-	// disabled programme cannot extend TTL or let that role enter a new one.
-	var accepted db.AdminCharacterActivityInstance
-	key := ""
-	if len(playerIDs) > 0 && playerIDs[0] > 0 && tx.Migrator().HasTable(&db.AdminCharacterActivityInstance{}) {
-		key = fmt.Sprintf("opening_character_%d_%d", service.OriginalServerID(), playerIDs[0])
-		err := tx.Clauses(clause.Locking{Strength: "SHARE"}).Where("consumer_key=?", key).Take(&accepted).Error
-		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-			return err
-		}
+	playerID := int64(0)
+	if len(playerIDs) > 0 {
+		playerID = playerIDs[0]
 	}
-	if accepted.ConsumerKey != "" {
-		cfg.StartAt, cfg.EndAt, cfg.RewardEndAt = accepted.StartAt, accepted.EndAt, accepted.ClaimEndAt
-		sourceEnabled := cfg.Enabled
-		cfg.Enabled = false
-		for _, row := range rows {
-			if row.ID == accepted.OccurrenceID {
-				cfg.Enabled = sourceEnabled && row.Enabled
-				break
-			}
-		}
-		return nil
-	}
-	open := false
-	for _, row := range rows {
-		if !row.Enabled {
-			continue
-		}
-		start, duration, grace := adminCharacterScheduleDays(row)
-		cfg.StartAt += (start - 1) * 86400000
-		cfg.EndAt = cfg.StartAt + duration*86400000
-		cfg.RewardEndAt = cfg.EndAt + grace*86400000
-		open = true
-		if key != "" && cfg.Enabled && now >= cfg.StartAt && now < cfg.RewardEndAt {
-			accepted = db.AdminCharacterActivityInstance{PlayerID: playerIDs[0], OccurrenceID: row.ID, ServerID: service.OriginalServerID(), ConsumerID: "opening:" + key, ConsumerKey: key, Mode: "opening-14", StartAt: cfg.StartAt, EndAt: cfg.EndAt, ClaimEndAt: cfg.RewardEndAt, SourceVersion: adminVersion(row), FormJSON: append([]byte{}, row.FormJSON...)}
-			if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&accepted).Error; err != nil {
-				return err
-			}
-			// A concurrent entrance may have accepted the same identity already.
-			if err := tx.Clauses(clause.Locking{Strength: "SHARE"}).Where("consumer_key=?", key).Take(&accepted).Error; err != nil {
-				return err
-			}
-			cfg.StartAt, cfg.EndAt, cfg.RewardEndAt = accepted.StartAt, accepted.EndAt, accepted.ClaimEndAt
-			if accepted.OccurrenceID != row.ID {
-				open = false
-			}
-		}
-		break
-	}
-	cfg.Enabled = cfg.Enabled && open
-	return nil
+	return adminResolveOpeningSchedule(tx, cfg, now, playerID, rows)
 }
 
 func (s *GameService) adminActivityOccurrenceFrozen(tx *gorm.DB, row db.AdminActivityOccurrence) (bool, error) {
+	if adminShopGateOccurrence(row) {
+		return true, nil
+	}
 	if adminActivityTiming(row) == "character-day" && row.Mode != "opening-14" {
 		if !tx.Migrator().HasTable(&db.AdminCharacterActivityInstance{}) {
 			return false, nil
@@ -467,7 +460,7 @@ func (s *GameService) AdminActivitySchedule(ctx context.Context, p *model.AdminP
 }
 
 func adminActivityModeSingleton(mode string) bool {
-	return mode == "opening-14" || mode == "turntable" || mode == "login-rewards" || mode == "limited-sign" || mode == "stamina-meal" || mode == "diamond-rebate" || mode == "treasure-box" || mode == "mystic-shop"
+	return strings.HasPrefix(mode, "shop-window:") || mode == "opening-14" || mode == "turntable" || mode == "login-rewards" || mode == "limited-sign" || mode == "stamina-meal" || mode == "diamond-rebate" || mode == "treasure-box" || mode == "mystic-shop"
 }
 
 func (s *GameService) adminActivityScheduleCheck(tx *gorm.DB, serverID int64, version string, items []model.AdminActivityOccurrenceDTO) (*model.AdminActivitySchedulePreviewResponse, map[string]db.AdminActivityOccurrence, error) {
@@ -502,6 +495,13 @@ func (s *GameService) adminActivityScheduleCheck(tx *gorm.DB, serverID int64, ve
 			return nil, nil, err
 		}
 		modes[i] = definition.Mode
+		if definition.Mode == "shop-window" {
+			var f model.AdminActivityForm
+			if json.Unmarshal(definition.FormJSON, &f) != nil {
+				return nil, nil, constUtil.ErrAdminConfiguration
+			}
+			modes[i] = "shop-window:" + f.Options.ShopKey
+		}
 		if definition.Mode == "opening-14" {
 			item.Mode = definition.Mode
 			item.Timing = "character-day"
@@ -536,6 +536,13 @@ func (s *GameService) adminActivityScheduleCheck(tx *gorm.DB, serverID int64, ve
 				return nil, nil, constUtil.ErrAdminConfigConflict
 			}
 			modes[i] = row.Mode
+			if row.Mode == "shop-window" {
+				var f model.AdminActivityForm
+				if json.Unmarshal(row.FormJSON, &f) != nil {
+					return nil, nil, constUtil.ErrAdminConfiguration
+				}
+				modes[i] = "shop-window:" + f.Options.ShopKey
+			}
 			if item.TemplateID != row.TemplateID {
 				add(i, -1, "已有排期不能切换模板，请另建一期")
 			}
@@ -626,7 +633,7 @@ func (s *GameService) AdminSaveActivitySchedule(ctx context.Context, p *model.Ad
 			return e
 		}
 		for _, row := range lockedRows {
-			if adminActivityTiming(row) != "character-day" {
+			if adminActivityTiming(row) != "character-day" && !adminShopGateOccurrence(row) {
 				if _, _, e := adminActivityRaw(tx.Clauses(clause.Locking{Strength: "UPDATE"}), row.ConsumerID); e != nil {
 					return e
 				}
@@ -714,7 +721,13 @@ func (s *GameService) AdminSaveActivitySchedule(ctx context.Context, p *model.Ad
 						return constUtil.ErrAdminInput
 					}
 					row.ConsumerKey = d.prefix + "schedule_" + strings.TrimPrefix(row.ID, "occ_")[:16]
+					if row.Mode == "shop-window" {
+						row.ConsumerKey = "shop_schedule_" + form.Options.ShopKey + "_" + strings.TrimPrefix(row.ID, "occ_")[:16]
+					}
 					row.ConsumerID = d.domain + ":" + row.ConsumerKey
+					if row.Mode == "shop-window" && !adminOrdinarySchedulableShop(form.Options.ShopKey) {
+						row.ConsumerID = "shop-gate:" + row.ConsumerKey
+					}
 					if err := s.adminPersistTypedActivity(tx, d, row.ConsumerKey, form, item.Enabled, false); err != nil {
 						return err
 					}
@@ -759,6 +772,8 @@ func adminEnableActivityConsumer(tx *gorm.DB, id string, enabled bool) error {
 	}
 	var table any
 	switch domain {
+	case "shop-gate":
+		return nil
 	case "commerce":
 		table = &db.P4CommerceRule{}
 	case "welfare":
@@ -887,28 +902,20 @@ func adminActivityScheduleFallback(tx *gorm.DB, key string) (string, error) {
 
 // AdminActivityCostResources filters the original display catalogue through the actual commerce parser.
 // It does not create currencies, prices or a new acquisition channel.
-func (s *GameService) AdminActivityCostResources(ctx context.Context, p *model.AdminPrincipal, q string) (*model.AdminActivityCostResourcesResponse, error) {
+func (s *GameService) AdminActivityCostResources(ctx context.Context, p *model.AdminPrincipal, q string, filters ...model.AdminItemsRequest) (*model.AdminActivityCostResourcesResponse, error) {
 	if err := adminOperationUser(db.GetIns().WithContext(ctx), p, false); err != nil {
 		return nil, err
 	}
-	catalogue := s.AdminCatalogueFiltered(model.AdminItemsRequest{Q: q, Page: 1, PageSize: 100000})
-	out := &model.AdminActivityCostResourcesResponse{Items: []model.AdminItemDTO{}}
-	// Keep real currencies visible before the larger item catalogue when no nickname is entered.
-	for _, currency := range []bool{true, false} {
-		for _, item := range catalogue.Items {
-			if (item.Category == "currency") != currency {
-				continue
-			}
-			if _, err := s.p4ParseCost(item.ID + ",1"); err != nil {
-				continue
-			}
-			out.Items = append(out.Items, item)
-			if len(out.Items) >= 100 {
-				return out, nil
-			}
+	request := model.AdminItemsRequest{Q: q, Page: 1, PageSize: 100}
+	if len(filters) > 0 {
+		request = filters[0]
+		if request.Q == "" {
+			request.Q = q
 		}
 	}
-	return out, nil
+	data := s.adminActivityCostCatalogue()
+	catalogue := (&GameService{AdminCatalogueData: data}).AdminCatalogueFiltered(request)
+	return &model.AdminActivityCostResourcesResponse{Items: catalogue.Items, Total: catalogue.Total, Facets: catalogue.Facets}, nil
 }
 
 // AdoptAdminActivityCalendar is the one-time startup bridge from existing live

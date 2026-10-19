@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"net/url"
 	"strconv"
 	"strings"
 
@@ -72,7 +73,7 @@ func adminActivityDefinitionWrite(c *gin.Context, update bool) {
 	}
 	req.Name = strings.TrimSpace(req.Name)
 	form := req.Form
-	if req.Name == "" || len([]rune(req.Name)) > 80 || req.DefaultDays < 1 || req.DefaultDays > 366 || req.ClaimDays < 0 || req.ClaimDays > 90 || len(form.Mode) > 64 || len(form.TemplateID) > 96 || len(form.Source) > 1000 || len(form.Products) > 100 || len(form.Milestones) > 31 || len(form.Prizes) > 9 || form.Mode == "opening-14" && form.TemplateID != "opening-14-original" || update && (len(req.Version) != 64 || len(c.Param("id")) > 64) || !update && req.Version != "" {
+	if (form.RepeatPolicy != "" && form.RepeatPolicy != "once" && form.RepeatPolicy != "repeat") || req.Name == "" || len([]rune(req.Name)) > 80 || req.DefaultDays < 1 || req.DefaultDays > 366 || req.ClaimDays < 0 || req.ClaimDays > 90 || len(form.Mode) > 64 || len(form.TemplateID) > 96 || len(form.Source) > 1000 || len(form.Products) > 100 || len(form.Milestones) > 31 || len(form.Prizes) > 9 || form.Mode == "opening-14" && form.TemplateID != "opening-14-original" || update && (len(req.Version) != 64 || len(c.Param("id")) > 64) || !update && req.Version != "" {
 		adminError(c, constUtil.ErrAdminInput)
 		return
 	}
@@ -286,12 +287,62 @@ func AdminActivityPatternDeleteHandler(c *gin.Context) {
 // @Success 200 {object} model.AdminActivityCostResourcesResponse
 // @Router /admin/api/activity-cost-resources [get]
 func AdminActivityCostResourcesHandler(c *gin.Context) {
-	q := strings.TrimSpace(c.Query("q"))
-	if len(q) > 128 {
+	if _, err := url.ParseQuery(c.Request.URL.RawQuery); err != nil {
 		adminError(c, constUtil.ErrAdminInput)
 		return
 	}
-	out, err := gameService.AdminActivityCostResources(c.Request.Context(), adminPrincipal(c), q)
+	page, size, ok := adminPage(c)
+	req := model.AdminItemsRequest{Q: strings.TrimSpace(c.Query("q")), Category: strings.TrimSpace(c.Query("category")), ApplicableType: strings.TrimSpace(c.Query("applicableType")), Page: page, PageSize: size}
+	if !ok || len(req.Q) > 128 || len(req.Category) > 128 || len(req.ApplicableType) > 128 {
+		adminError(c, constUtil.ErrAdminInput)
+		return
+	}
+	if raw, present := c.GetQuery("quality"); present {
+		quality, err := strconv.ParseInt(strings.TrimSpace(raw), 10, 64)
+		if err != nil || quality < 0 {
+			adminError(c, constUtil.ErrAdminInput)
+			return
+		}
+		req.Quality = &quality
+	}
+	if raw := c.Query("ids"); raw != "" {
+		parts := strings.Split(raw, ",")
+		if len(parts) > 100 {
+			adminError(c, constUtil.ErrAdminInput)
+			return
+		}
+		for _, part := range parts {
+			id := strings.TrimSpace(part)
+			if id == "" || len(id) > 128 || strings.ContainsAny(id, " \t\r\n/\\?#&;\x00") {
+				adminError(c, constUtil.ErrAdminInput)
+				return
+			}
+			req.IDs = append(req.IDs, id)
+		}
+	}
+	facets := gameService.AdminCatalogueFiltered(model.AdminItemsRequest{Page: 1, PageSize: 1}).Facets
+	categoryOK, typeOK, qualityOK := req.Category == "", req.ApplicableType == "", req.Quality == nil
+	for _, option := range facets.Categories {
+		if option.Value == req.Category {
+			categoryOK = true
+		}
+	}
+	for _, option := range facets.ApplicableTypes {
+		if option.Value == req.ApplicableType {
+			typeOK = true
+		}
+	}
+	for _, option := range facets.Qualities {
+		if req.Quality != nil && option.Value == *req.Quality {
+			qualityOK = true
+		}
+	}
+	if !categoryOK || !typeOK || !qualityOK {
+		adminError(c, constUtil.ErrAdminInput)
+		return
+	}
+
+	out, err := gameService.AdminActivityCostResources(c.Request.Context(), adminPrincipal(c), req.Q, req)
 	if err != nil {
 		adminError(c, err)
 		return

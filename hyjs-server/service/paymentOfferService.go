@@ -29,8 +29,18 @@ func (s *GameService) paymentOffer(ctx context.Context, id int64, request proto.
 				return p3Error()
 			}
 			var code db.PaymentGiftCode
-			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&code, "hash = ?", p3Hash([]byte(value))).Error; err != nil {
+			lookup := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&code, "hash = ?", p3Hash([]byte(value))).Error
+			if errors.Is(lookup, gorm.ErrRecordNotFound) && value != strings.ToUpper(value) {
+				lookup = tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&code, "hash = ?", p3Hash([]byte(strings.ToUpper(value)))).Error
+				if lookup == nil && !strings.HasPrefix(code.Source, "admin-cdk:") {
+					lookup = gorm.ErrRecordNotFound
+				}
+			}
+			if lookup != nil {
 				return errors.New(constUtil.P3PaymentUnavailable)
+			}
+			if err := s.adminCDKEligible(tx, code, now); err != nil {
+				return err
 			}
 			if code.Source == "" || code.Limit < 1 || code.Used < 0 || code.Used >= code.Limit || now.UnixMilli() >= code.ExpiresAt || (code.DemoOnly && (!strings.HasPrefix(row.Uid, "demo-") || row.Id == 1)) {
 				return errors.New(constUtil.P3PaymentUnavailable)

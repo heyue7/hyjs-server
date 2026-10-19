@@ -76,8 +76,6 @@ export function expandActivityPattern(
   options: { anchor: number; repeats: number }
 ): ActivityOccurrence[] {
   const { anchor, repeats } = options;
-  if (repeats > 1 && pattern.entries.some(entry => definitions.find(definition => definition.id === entry.templateId)?.mode === 'opening-14')) throw new Error('开服任务按角色独立起算，只需安排一次，无需循环');
-  if (pattern.entries.filter(entry => definitions.find(definition => definition.id === entry.templateId)?.mode === 'opening-14').length > 1) throw new Error('同一方案只需安排一次角色开服任务');
   const lookup = new Map(definitions.map(item => [item.id, item]));
   const out: ActivityOccurrence[] = [];
   for (let repeat = 0; repeat < repeats; repeat += 1) {
@@ -91,6 +89,9 @@ export function expandActivityPattern(
       out.push({
         id: '',
         timing: definition.mode === 'opening-14' ? 'character-day' : 'calendar',
+        startDay: repeat * pattern.cycleDays + entry.startDay + 1,
+        durationDays: entry.durationDays,
+        claimDays: entry.claimDays,
         templateId: entry.templateId,
         templateVersion: definition.version,
         name: definition.name,

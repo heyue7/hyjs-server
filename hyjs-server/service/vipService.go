@@ -83,6 +83,9 @@ func (s *GameService) p3VIPShopList(tx *gorm.DB, p *pb.Player, now time.Time) ([
 func (s *GameService) vipShop(ctx context.Context, id int64, request proto.Message, now time.Time) ([]proto.Message, error) {
 	var response proto.Message
 	err := s.p3Profile(ctx, id, func(tx *gorm.DB, row *db.Profile, p *pb.Player, g *model.GameState) error {
+		if err := s.requireShopAvailability(tx, "vip", now); err != nil {
+			return err
+		}
 		if _, ok := request.(*pb.CSShopProductList); ok {
 			items, e := s.p3VIPShopList(tx, p, now)
 			response = &pb.SCShopProductList{ShopType: proto.Int32(2), ShopItemList: items}

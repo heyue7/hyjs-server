@@ -137,14 +137,13 @@ async function save() {
 }
 const columns: DataTableColumns<GameTitle> = [
   {
-    title: '称号',
-    key: 'name',
-    minWidth: 210,
-    render: (row) => h('div', { class: 'title-list-art' }, [
-      ...(row.iconUrl ? [h(NImage, { src: row.iconUrl, alt: row.name, width: 190, height: 54, objectFit: 'contain', lazy: true })] : []),
-      h('strong', row.name), h('div', { class: 'ops-muted mt-4px' }, row.requirement || row.notes)
-    ])
+    title: '称号图片', key: 'iconUrl', width: 220,
+    render: row => row.iconUrl
+      ? h(NImage, { src: row.iconUrl, alt: row.name, width: 190, height: 54, objectFit: 'contain', lazy: true })
+      : h('span', { class: 'ops-muted' }, '暂无原图')
   },
+  { title: '称号名称', key: 'name', minWidth: 150, render: row => h('strong', row.name) },
+  { title: '获得条件', key: 'requirement', minWidth: 260, render: row => row.requirement || row.notes || '—' },
   {
     title: '属性',
     key: 'effects',
@@ -239,7 +238,7 @@ onMounted(load);
         :bordered="false"
         :loading="loading"
         :pagination="{ pageSize: 20 }"
-        :scroll-x="900"
+        :scroll-x="1300"
       />
 
     </NCard>

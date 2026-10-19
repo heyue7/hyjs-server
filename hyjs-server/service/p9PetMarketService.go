@@ -303,6 +303,9 @@ func (s *GameService) p9MarketMutation(ctx context.Context, id int64, operation 
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return err
 		}
+		if err := s.requireShopAvailability(tx, "pet-market", LocalPlayNow(ctx)); err != nil {
+			return err
+		}
 		if err := s.p9Open(p); err != nil {
 			return err
 		}
@@ -330,6 +333,9 @@ func (s *GameService) p9MarketMutation(ctx context.Context, id int64, operation 
 func (s *GameService) p9PetShopList(ctx context.Context, id int64) ([]proto.Message, error) {
 	var out *pb.SCPetShopProductList
 	err := s.p3Profile(ctx, id, func(tx *gorm.DB, _ *db.Profile, p *pb.Player, _ *model.GameState) error {
+		if err := s.requireShopAvailability(tx, "pet-market", LocalPlayNow(ctx)); err != nil {
+			return err
+		}
 		if err := s.p9Open(p); err != nil {
 			return err
 		}

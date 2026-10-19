@@ -4,11 +4,27 @@ import { useSvgIcon } from '@/hooks/common/icon';
 export function organizeOperationsMenus(menus: App.Global.Menu[]) {
   const pages = new Map(menus.map(row => [row.key, row]));
   const used = new Set<string>();
+  const pageIcons: Record<string, string> = {
+    home: 'ph:chart-line-up', 'game-accounts': 'ph:identification-card', items: 'ph:treasure-chest',
+    activities: 'ph:calendar-blank', achievements: 'ph:medal', titles: 'ph:crown',
+    'arena-prizes': 'ph:cards-three', 'wallet-reasons': 'ph:wallet', 'server-clock': 'ph:clock-counter-clockwise',
+    shops: 'ph:storefront', announcements: 'ph:megaphone', servers: 'ph:hard-drives',
+    'activity-schedules': 'ph:calendar-dots', fields: 'ph:map-trifold', players: 'ph:users-three',
+    feedback: 'ph:chat-circle-text', users: 'ph:shield-check', audit: 'ph:clipboard-text',
+    cdk: 'ph:gift', 'redeem-codes': 'ph:ticket',
+    shops_ordinary: 'ph:shopping-bag', shops_memory: 'ph:sparkle', shops_popularity: 'ph:star',
+    'shops_popularity-rank': 'ph:ranking', shops_point: 'ph:compass', shops_score: 'ph:coins',
+    shops_guild: 'ph:flag', 'shops_pet-market': 'ph:paw-print', 'shops_union-fight': 'ph:sword', shops_vip: 'ph:crown'
+  };
+  function withIcons(row: App.Global.Menu): App.Global.Menu {
+    return { ...row, icon: useSvgIcon().SvgIconVNode({ icon: pageIcons[row.key] || 'ph:squares-four', fontSize: 20 }), children: row.children?.map(withIcons) };
+  }
   function take(key: string, label?: string) {
     const row = pages.get(key);
     if (!row) return undefined;
     used.add(key);
-    return label ? { ...row, label, i18nKey: null } : row;
+    const decorated = withIcons(row);
+    return label ? { ...decorated, label, i18nKey: null } : decorated;
   }
   function group(key: string, label: string, input: (App.Global.Menu | undefined)[]): App.Global.Menu | undefined {
     const children = input.filter((row): row is App.Global.Menu => Boolean(row));
@@ -49,6 +65,7 @@ export function organizeOperationsMenus(menus: App.Global.Menu[]) {
   take('wallets');
   const realms = group('server-operations', '区服运营', [
     take('servers'),
+    take('cdk', '兑换码管理'),
     take('activity-schedules'),
     take('fields', '野外地图与部署'),
     take('players', '玩家管理'),
@@ -57,7 +74,7 @@ export function organizeOperationsMenus(menus: App.Global.Menu[]) {
   const system = group('system-management', '系统管理', [take('users', '后台账号与权限'), take('audit')]);
   const result = [take('home'), global, realms, system].filter((row): row is App.Global.Menu => Boolean(row));
   // A future authorized page remains reachable even before its category is assigned.
-  return [...result, ...menus.filter(row => !used.has(row.key))];
+  return [...result, ...menus.filter(row => !used.has(row.key)).map(withIcons)];
 }
 
 export function findOperationsMenu(menus: App.Global.Menu[], key: string): App.Global.Menu | undefined {

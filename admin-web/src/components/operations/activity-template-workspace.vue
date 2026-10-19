@@ -5,7 +5,7 @@ import { NButton, NSpace, NTag } from 'naive-ui';
 import type { DataTableColumns } from 'naive-ui';
 import { api, errorMessage, json } from '@/service/operations';
 import type { ActivityDefinition } from '@/service/activity-schedules';
-import { newActivityForm } from '@/service/activity-operations';
+import { activityRepeatLabel, activityRepeatPolicy, newActivityForm } from '@/service/activity-operations';
 import type { ActivityForm, ActivityMode } from '@/service/activity-operations';
 import { useOperations } from '@/composables/useOperations';
 import ActivityProducts from './activity-products.vue';
@@ -43,6 +43,7 @@ const dirty = computed(() => editorOpen.value && !readOnly.value && JSON.stringi
 const modeMap = computed(() => new Map(modes.value.map(mode => [mode.mode, mode])));
 const selectedMode = computed(() => modeMap.value.get(form.value?.mode || ''));
 const modeOptions = computed(() => modes.value.map(mode => ({ label: mode.label, value: mode.mode })));
+const repeatOptions = [{ label: '一次性', value: 'once' }, { label: '可重复', value: 'repeat' }];
 const availableCount = computed(() => definitions.value.filter(row => row.availability.usable).length);
 const filtered = computed(() =>
   definitions.value.filter(
@@ -90,6 +91,7 @@ function openEditor(row?: ActivityDefinition, view = false, copy = false) {
   readOnly.value = view || !canWrite.value || Boolean(row && !modeMap.value.has(row.mode));
   if (!row && !modes.value[0]) return;
   form.value = row ? JSON.parse(JSON.stringify(row.form)) : newActivityForm(modes.value[0]);
+  if (form.value) form.value.repeatPolicy = activityRepeatPolicy(form.value);
   if (copy && form.value) form.value.name = `${row!.name}（副本）`;
   defaultDays.value = row?.defaultDays || 14;
   claimDays.value = row?.claimDays || 0;
@@ -168,6 +170,7 @@ async function save() {
 const columns = computed<DataTableColumns<ActivityDefinition>>(() => [
   { title: '活动', key: 'name', minWidth: 240, render: row => h('strong', row.name) },
   { title: '模式', key: 'mode', width: 155, render: row => modeMap.value.get(row.mode)?.label || '暂未适配' },
+  { title: '参与方式', key: 'repeatPolicy', width: 110, render: row => activityRepeatLabel(row.form) },
   {
     title: '可排期',
     key: 'enabled',
@@ -256,7 +259,7 @@ onUnmounted(() => window.removeEventListener('beforeunload', beforeUnload));
           :loading="loading"
           :row-key="(row: ActivityDefinition) => row.id"
           :bordered="false"
-          :scroll-x="950"
+          :scroll-x="1060"
           :pagination="{ pageSize: 20 }"
         />
       </NCard>
@@ -300,6 +303,10 @@ onUnmounted(() => window.removeEventListener('beforeunload', beforeUnload));
                   :options="selectedMode?.templates.map(item => ({ label: item.name, value: item.id })) || []"
                 />
               </NFormItem>
+              <NFormItem label="参与方式" required>
+                <NSelect v-model:value="form.repeatPolicy" :options="repeatOptions" />
+              </NFormItem>
+              <p class="template-help">{{ form.repeatPolicy === 'once' ? '每个角色只能参与一期，再次排期不会重新参与。' : '每次新建排期可重新参与，同一期内的修改或停启保留进度。' }}</p>
               <div v-if="selectedMode?.templates.find(item => item.id === form?.templateId)?.preview" class="mb-20px">
                 <NImage
                   :src="selectedMode.templates.find(item => item.id === form?.templateId)?.preview"
@@ -362,7 +369,7 @@ onUnmounted(() => window.removeEventListener('beforeunload', beforeUnload));
               <NAlert
                 v-if="form.mode === 'opening-14'"
                 type="info"
-                title="任务解锁按区服开服日期，有效期按角色独立起算；已领记录保持。"
+                title="任务按区服开服自然日解锁，有效期按角色起算；每一期独立保留领取记录。"
               />
               <ActivityOptions
                 v-else

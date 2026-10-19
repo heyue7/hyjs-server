@@ -13,6 +13,9 @@ import (
 // TestAdminShopsMutations covers distinct storage adapters and immutable consumer snapshots.
 func TestAdminShopsMutations(t *testing.T) {
 	f, actor := adminModesFixture(t)
+	if err := f.s.InitializeAdminShopAvailability(f.ctx); err != nil {
+		t.Fatal(err)
+	}
 	if err := f.s.LoadAdminCatalogue("../../analysis/tables", "../../admin-web/public/media/content-manifest.json"); err != nil {
 		t.Fatal(err)
 	}

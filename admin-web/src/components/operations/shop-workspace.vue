@@ -30,6 +30,7 @@ const saveError = ref('');
 const section = ref('product');
 const settingsOpen = ref(false);
 const settingsDraft = ref<ShopSnapshot['settings']>({
+  unlimited: true,
   enabled: false,
   slots: 0,
   startAt: 0,
@@ -91,7 +92,7 @@ const hasPublishFields = computed(() =>
   ['day', 'refreshMillis', 'source'].some(supports)
 );
 const showShopStatus = computed(() => Boolean(snapshot.value && (
-  settingSupports('enabled') || snapshot.value.settings.slots || snapshot.value.settings.startAt || snapshot.value.settings.endAt
+  settingSupports('unlimited') || settingSupports('enabled') || snapshot.value.settings.slots || snapshot.value.settings.startAt || snapshot.value.settings.endAt
 )));
 const dirty = computed(() => editing.value && JSON.stringify(draft.value) !== original.value);
 const rows = computed(() =>
@@ -217,19 +218,20 @@ function configure(newPeriod = false) {
 async function saveSettings() {
   if (!snapshot.value || settingsSaving.value || !canWrite.value) return;
   settingsError.value =
-    props.shopId !== 'pet-market' &&
+    !settingsDraft.value.unlimited &&
+    Boolean(settingsDraft.value.startAt || settingsDraft.value.endAt || settingsDraft.value.claimEndAt) &&
     (!settingsDraft.value.startAt ||
       !settingsDraft.value.endAt ||
-      !settingsDraft.value.claimEndAt ||
-      !settingsDraft.value.source.trim())
-      ? '请填写开始、结束、领奖截止时间与配置来源'
-      : settingsDraft.value.endAt && settingsDraft.value.endAt <= settingsDraft.value.startAt
+      !settingsDraft.value.claimEndAt)
+      ? '请填写营业开始、结束和领奖截止时间'
+      : !settingsDraft.value.unlimited && settingsDraft.value.endAt && settingsDraft.value.endAt <= settingsDraft.value.startAt
         ? '结束时间需晚于开始时间'
-        : settingsDraft.value.claimEndAt &&
+        : !settingsDraft.value.unlimited && settingsDraft.value.claimEndAt &&
             settingsDraft.value.endAt &&
             settingsDraft.value.claimEndAt < settingsDraft.value.endAt
           ? '领奖结束时间不能早于活动结束时间'
           : '';
+  if (!settingsError.value && settingSupports('source') && !settingsDraft.value.source.trim()) settingsError.value = '请填写配置备注';
   if (settingsError.value) return;
   settingsSaving.value = true;
   try {
@@ -440,7 +442,8 @@ watch(
                 {{ snapshot.settings.enabled ? '当前配置已开放' : '当前配置已关闭' }}
               </NTag>
               <span v-if="snapshot.settings.slots" class="ops-muted">展示 {{ snapshot.settings.slots }} 个槽位</span>
-              <span v-if="snapshot.settings.startAt || snapshot.settings.endAt" class="ops-muted">
+              <NTag v-if="snapshot.settings.unlimited" :bordered="false" size="small">不限时</NTag>
+              <span v-else-if="snapshot.settings.startAt || snapshot.settings.endAt" class="ops-muted">
                 {{ formatTime(snapshot.settings.startAt) }} →
                 {{ snapshot.settings.endAt ? formatTime(snapshot.settings.endAt) : '不限' }}
               </span>
@@ -686,7 +689,7 @@ watch(
       <NAlert
         v-if="needsPeriod && !settingsDraft.newPeriod"
         type="info"
-        title="请先设置本期时间并保存，再添加商品。"
+        title="保存商店设置后即可添加商品。"
         class="mb-20px"
       />
       <NForm label-placement="top" :disabled="settingsSaving">
@@ -706,11 +709,16 @@ watch(
             :precision="0"
           />
         </NFormItem>
-        <div class="ops-date-grid">
+        <NFormItem v-if="settingSupports('unlimited')" label="不限时">
+          <NSwitch v-model:value="settingsDraft.unlimited" />
+          <span class="ml-3 ops-muted">持续营业，原商品资格、库存与限购继续生效</span>
+        </NFormItem>
+        <p v-if="!settingsDraft.unlimited" class="ops-muted mb-4">日期留空时暂停营业，也可到活动排期安排营业时段。</p>
+        <div v-if="!settingsDraft.unlimited" class="ops-date-grid">
           <NFormItem v-if="settingSupports('startAt') || settingsDraft.newPeriod" label="开始时间">
             <NDatePicker
               :value="settingsDraft.startAt || null"
-              :disabled="settingsFrozen"
+              :disabled="settingsSaving"
               type="datetime"
               clearable
               @update:value="settingsDraft.startAt = $event || 0"
@@ -719,17 +727,17 @@ watch(
           <NFormItem v-if="settingSupports('endAt') || settingsDraft.newPeriod" label="结束时间">
             <NDatePicker
               :value="settingsDraft.endAt || null"
-              :disabled="settingsFrozen"
+              :disabled="settingsSaving"
               type="datetime"
               clearable
               @update:value="settingsDraft.endAt = $event || 0"
             />
           </NFormItem>
         </div>
-        <NFormItem v-if="settingSupports('claimEndAt') || settingsDraft.newPeriod" label="领奖截止">
+        <NFormItem v-if="!settingsDraft.unlimited && (settingSupports('claimEndAt') || settingsDraft.newPeriod)" label="领奖截止">
           <NDatePicker
             :value="settingsDraft.claimEndAt || null"
-            :disabled="settingsFrozen"
+            :disabled="settingsSaving"
             type="datetime"
             clearable
             @update:value="settingsDraft.claimEndAt = $event || 0"

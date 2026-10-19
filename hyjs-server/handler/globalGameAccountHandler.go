@@ -57,7 +57,16 @@ func AdminGameAccountsHandler(c *gin.Context) {
 		adminError(c, constUtil.ErrAdminInput)
 		return
 	}
-	out, err := service.AdminGlobalGameAccounts(c.Request.Context(), adminPrincipal(c), strings.TrimSpace(c.Query("q")), page, size)
+	var accountID int64
+	if raw, present := c.GetQuery("accountId"); present {
+		var e error
+		accountID, e = strconv.ParseInt(raw, 10, 64)
+		if e != nil || accountID < 1 {
+			adminError(c, constUtil.ErrAdminInput)
+			return
+		}
+	}
+	out, err := service.AdminGlobalGameAccounts(c.Request.Context(), adminPrincipal(c), strings.TrimSpace(c.Query("q")), page, size, accountID)
 	if err != nil {
 		gameAccountAdminError(c, err)
 		return

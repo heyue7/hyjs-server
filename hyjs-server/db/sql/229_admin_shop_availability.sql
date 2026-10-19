@@ -1,0 +1,8 @@
+CREATE TABLE IF NOT EXISTS admin_shop_availability (
+ shop_key VARCHAR(32) NOT NULL PRIMARY KEY,
+ unlimited BOOLEAN NOT NULL,
+ start_at BIGINT NOT NULL,
+ end_at BIGINT NOT NULL,
+ claim_end_at BIGINT NOT NULL,
+ revision BIGINT NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

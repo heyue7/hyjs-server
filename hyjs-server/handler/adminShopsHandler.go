@@ -164,7 +164,11 @@ func AdminShopSettingsSaveHandler(c *gin.Context) {
 		adminError(c, constUtil.ErrAdminInput)
 		return
 	}
-	if key != "pet-market" && (req.StartAt <= 0 || req.StartAt >= req.EndAt || req.ClaimEndAt < req.EndAt || req.ClaimEndAt > 7258118400000 || strings.TrimSpace(req.Source) == "") {
+	if !req.Unlimited && (req.StartAt != 0 || req.EndAt != 0 || req.ClaimEndAt != 0) && (req.StartAt <= 0 || req.StartAt >= req.EndAt || req.ClaimEndAt < req.EndAt || req.ClaimEndAt > 7258118400000) {
+		adminError(c, constUtil.ErrAdminInput)
+		return
+	}
+	if key != "pet-market" && key != "vip" && key != "union-fight" && strings.TrimSpace(req.Source) == "" {
 		adminError(c, constUtil.ErrAdminInput)
 		return
 	}

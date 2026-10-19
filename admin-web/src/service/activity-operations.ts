@@ -49,6 +49,7 @@ export interface ActivityPrize {
 }
 export interface ActivityForm {
   mode: string;
+  repeatPolicy?: 'once' | 'repeat';
   templateId: string;
   name: string;
   source: string;
@@ -74,10 +75,21 @@ export interface ActivityInstance {
 }
 export const productModes = ['exchange', 'discount-shop', 'half-price', 'limited-shop', 'mystic-shop'];
 export const cumulativeModes = ['recharge-total', 'diamond-spent', 'recruit-count', 'copy-win', 'login-total'];
+export function activityRepeatPolicy(form: Pick<ActivityForm, 'mode' | 'repeatPolicy'>): 'once' | 'repeat' {
+  return form.repeatPolicy || (form.mode === 'opening-14' ? 'once' : 'repeat');
+}
+export function activityRepeatLabel(form: Pick<ActivityForm, 'mode' | 'repeatPolicy'>): string {
+  return activityRepeatPolicy(form) === 'once' ? '一次性' : '可重复';
+}
 export function newActivityForm(mode: ActivityMode): ActivityForm {
-  if (mode.defaultForm) return JSON.parse(JSON.stringify(mode.defaultForm));
+  if (mode.defaultForm) {
+    const form: ActivityForm = JSON.parse(JSON.stringify(mode.defaultForm));
+    form.repeatPolicy = activityRepeatPolicy(form);
+    return form;
+  }
   return {
     mode: mode.mode,
+    repeatPolicy: mode.mode === 'opening-14' ? 'once' : 'repeat',
     templateId: mode.templates[0]?.id || '',
     name: '',
     source: '用户运营配置',

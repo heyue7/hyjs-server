@@ -38,7 +38,7 @@ func (s *GameService) p4PopularityRankRules(cfg db.P4CommerceRule, rules p4Comme
 		}
 		return nil
 	}
-	if cfg.ShopType != 4 || !strings.HasPrefix(cfg.ID, constUtil.P4PopularityRankRulePrefix) || cfg.Source != constUtil.P4PopularityRankSource || rules.RankPublishedAt <= 0 || rules.RankPublishedAt >= cfg.StartAt || len(rules.Products) > 20 {
+	if cfg.ShopType != 4 || (!strings.HasPrefix(cfg.ID, constUtil.P4PopularityRankRulePrefix) && !strings.HasPrefix(cfg.ID, "shop_schedule_popularity-rank_")) || cfg.Source != constUtil.P4PopularityRankSource || rules.RankPublishedAt <= 0 || rules.RankPublishedAt >= cfg.StartAt || len(rules.Products) > 20 {
 		return errors.New(constUtil.P4PopularityRankDenied)
 	}
 	for _, product := range rules.Products {
@@ -50,8 +50,21 @@ func (s *GameService) p4PopularityRankRules(cfg db.P4CommerceRule, rules p4Comme
 }
 
 func (s *GameService) p4PopularityRankResolve(tx *gorm.DB, productID string, now time.Time) (string, error) {
+	scheduled, managed, err := s.AdminScheduledOrdinaryShopConsumer(tx, "popularity-rank", now.UnixMilli())
+	if err != nil {
+		return "", err
+	}
+	if managed && scheduled == "" {
+		return "", errors.New(constUtil.P4PopularityRankDenied)
+	}
+	query := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("kind=? AND enabled=?", constUtil.P4PopularityRankKind, true)
+	if managed {
+		query = query.Where("id=?", scheduled)
+	} else {
+		query = query.Where("id NOT LIKE ?", "shop_schedule_%")
+	}
 	var rows []db.P4CommerceRule
-	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("kind=? AND enabled=?", constUtil.P4PopularityRankKind, true).Order("id").Find(&rows).Error; err != nil {
+	if err := query.Order("id").Find(&rows).Error; err != nil {
 		return "", err
 	}
 	key := ""
@@ -60,7 +73,11 @@ func (s *GameService) p4PopularityRankResolve(tx *gorm.DB, productID string, now
 		if err != nil {
 			return "", err
 		}
-		if now.UnixMilli() < cfg.StartAt || now.UnixMilli() >= cfg.EndAt {
+		open, err := p4ShopSourceWindow(tx, cfg, now)
+		if err != nil {
+			return "", err
+		}
+		if !open {
 			continue
 		}
 		for _, product := range rules.Products {
@@ -124,8 +141,21 @@ func (s *GameService) p4PopularityShopItems(tx *gorm.DB, id int64, p *pb.Player,
 			items = nil
 		}
 	}
+	scheduled, managed, err := s.AdminScheduledOrdinaryShopConsumer(tx, "popularity-rank", now.UnixMilli())
+	if err != nil {
+		return nil, err
+	}
+	if managed && scheduled == "" {
+		return items, nil
+	}
+	query := tx.Where("kind=? AND enabled=?", constUtil.P4PopularityRankKind, true)
+	if managed {
+		query = query.Where("id=?", scheduled)
+	} else {
+		query = query.Where("id NOT LIKE ?", "shop_schedule_%")
+	}
 	var rows []db.P4CommerceRule
-	if err := tx.Where("kind=? AND enabled=?", constUtil.P4PopularityRankKind, true).Order("id").Find(&rows).Error; err != nil {
+	if err := query.Order("id").Find(&rows).Error; err != nil {
 		return nil, err
 	}
 	seen := map[string]bool{}
@@ -137,7 +167,11 @@ func (s *GameService) p4PopularityShopItems(tx *gorm.DB, id int64, p *pb.Player,
 		if err != nil {
 			return nil, err
 		}
-		if now.UnixMilli() < frozen.StartAt || now.UnixMilli() >= frozen.EndAt {
+		open, err := p4ShopSourceWindow(tx, frozen, now)
+		if err != nil {
+			return nil, err
+		}
+		if !open {
 			continue
 		}
 		frozen, rules, row, state, err := s.loadP4Commerce(tx, id, live.ID, 0, now)

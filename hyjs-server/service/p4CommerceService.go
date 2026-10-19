@@ -304,6 +304,21 @@ func (s *GameService) loadP4Commerce(tx *gorm.DB, id int64, key string, shopType
 	if err := s.seedP4Commerce(tx, now); err != nil {
 		return cfg, rules, nil, nil, err
 	}
+	if key == "" {
+		shopKey := map[int32]string{1: "ordinary", 3: "memory", 4: "popularity", 5: "point", 7: "score", 8: "guild"}[shopType]
+		if shopKey != "" {
+			scheduled, managed, err := s.AdminScheduledOrdinaryShopConsumer(tx, shopKey, now.UnixMilli())
+			if err != nil {
+				return cfg, rules, nil, nil, err
+			}
+			if managed && scheduled == "" {
+				return cfg, rules, nil, nil, constUtil.ErrP4CommerceNotOpen
+			}
+			if managed {
+				key = scheduled
+			}
+		}
+	}
 	if key != "" {
 		allowed, err := localPlayActivityAccess(tx, key, false)
 		if err != nil {
@@ -340,7 +355,7 @@ func (s *GameService) loadP4Commerce(tx *gorm.DB, id int64, key string, shopType
 	if key != "" {
 		query = query.Where("id = ?", key)
 	} else {
-		query = query.Where("shop_type = ?", shopType)
+		query = query.Where("shop_type = ? AND id NOT LIKE ?", shopType, "shop_schedule_%")
 		// Rank-tab offers append independently; they never replace the original
 		// monthly ordinary catalogue or reset its existing per-player quota.
 		if shopType == 4 {
@@ -367,7 +382,11 @@ func (s *GameService) loadP4Commerce(tx *gorm.DB, id int64, key string, shopType
 		if err != nil {
 			return cfg, rules, nil, nil, err
 		}
-		if now.UnixMilli() < cfg.StartAt || now.UnixMilli() >= cfg.EndAt {
+		open, windowErr := p4ShopSourceWindow(tx, cfg, now)
+		if windowErr != nil {
+			return cfg, rules, nil, nil, windowErr
+		}
+		if !open {
 			continue
 		}
 		if len(live.Frozen) == 0 {

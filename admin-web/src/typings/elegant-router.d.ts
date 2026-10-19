@@ -27,6 +27,7 @@ declare module "@elegant-router/types" {
     "announcements": "/announcements";
     "arena-prizes": "/arena-prizes";
     "audit": "/audit";
+    "cdk": "/cdk";
     "feedback": "/feedback";
     "fields": "/fields";
     "game-accounts": "/game-accounts";
@@ -93,6 +94,7 @@ declare module "@elegant-router/types" {
     | "announcements"
     | "arena-prizes"
     | "audit"
+    | "cdk"
     | "feedback"
     | "fields"
     | "game-accounts"
@@ -136,6 +138,7 @@ declare module "@elegant-router/types" {
     | "announcements"
     | "arena-prizes"
     | "audit"
+    | "cdk"
     | "feedback"
     | "fields"
     | "game-accounts"

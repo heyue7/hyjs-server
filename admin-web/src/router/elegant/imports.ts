@@ -27,6 +27,7 @@ export const views: Record<LastLevelRouteKey, RouteComponent | (() => Promise<Ro
   announcements: () => import("@/views/announcements/index.vue"),
   "arena-prizes": () => import("@/views/arena-prizes/index.vue"),
   audit: () => import("@/views/audit/index.vue"),
+  cdk: () => import("@/views/cdk/index.vue"),
   feedback: () => import("@/views/feedback/index.vue"),
   fields: () => import("@/views/fields/index.vue"),
   "game-accounts": () => import("@/views/game-accounts/index.vue"),

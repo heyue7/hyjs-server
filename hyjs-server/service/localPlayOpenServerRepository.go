@@ -37,6 +37,9 @@ func openServerReadTasks(tx *gorm.DB, day int32) ([]db.OpenServerActivityTask, e
 			query = query.Where("open_day <= ?", day)
 		}
 		err := query.Find(&tasks).Error
+		if err == nil && adminOpeningPeriod(tx) != nil {
+			err = adminOpeningTaskStock(tx, tasks)
+		}
 		return tasks, err
 	}
 	var snapshot localPlayOpenServerSnapshot
@@ -70,6 +73,11 @@ func openServerReadTask(tx *gorm.DB, taskID int32) (db.OpenServerActivityTask, e
 	if cycle == nil {
 		var task db.OpenServerActivityTask
 		err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&task, "id=?", taskID).Error
+		if err == nil && adminOpeningPeriod(tx) != nil {
+			tasks := []db.OpenServerActivityTask{task}
+			err = adminOpeningTaskStock(tx, tasks, true)
+			task = tasks[0]
+		}
 		return task, err
 	}
 	tasks, err := openServerReadTasks(tx, 0)
@@ -85,6 +93,9 @@ func openServerReadTask(tx *gorm.DB, taskID int32) (db.OpenServerActivityTask, e
 }
 
 func openServerReadStates(tx *gorm.DB, id int64) ([]db.OpenServerActivityState, error) {
+	if adminOpeningPeriod(tx) != nil {
+		return adminOpeningReadStates(tx, id)
+	}
 	cycle, err := localPlayOpenServerCycle(tx)
 	if err != nil {
 		return nil, err
@@ -108,6 +119,9 @@ func openServerReadStates(tx *gorm.DB, id int64) ([]db.OpenServerActivityState, 
 }
 
 func openServerSaveState(tx *gorm.DB, state *db.OpenServerActivityState) error {
+	if adminOpeningPeriod(tx) != nil {
+		return adminOpeningSaveState(tx, state)
+	}
 	cycle, err := localPlayOpenServerCycle(tx)
 	if err != nil {
 		return err
@@ -123,6 +137,9 @@ func openServerSaveState(tx *gorm.DB, state *db.OpenServerActivityState) error {
 }
 
 func openServerSaveStock(tx *gorm.DB, task db.OpenServerActivityTask, id int64) error {
+	if adminOpeningPeriod(tx) != nil {
+		return adminOpeningSaveStock(tx, task)
+	}
 	cycle, err := localPlayOpenServerCycle(tx)
 	if err != nil {
 		return err
@@ -137,6 +154,9 @@ func openServerSaveStock(tx *gorm.DB, task db.OpenServerActivityTask, id int64) 
 }
 
 func openServerReadCounters(tx *gorm.DB, id int64) ([]db.OpenServerActivityCounter, error) {
+	if adminOpeningPeriod(tx) != nil {
+		return adminOpeningReadCounters(tx, id)
+	}
 	cycle, err := localPlayOpenServerCycle(tx)
 	if err != nil {
 		return nil, err
@@ -173,6 +193,9 @@ func openServerReadCounter(tx *gorm.DB, id int64, key string) (db.OpenServerActi
 }
 
 func openServerSaveCounter(tx *gorm.DB, row *db.OpenServerActivityCounter) error {
+	if adminOpeningPeriod(tx) != nil {
+		return adminOpeningSaveCounter(tx, row)
+	}
 	cycle, err := localPlayOpenServerCycle(tx)
 	if err != nil {
 		return err
@@ -192,6 +215,12 @@ func openServerReadReceipt(tx *gorm.DB, id, stamp int64) (db.OpenServerActivityR
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return row, err
 	}
+	if tx.Migrator().HasTable(&db.AdminOpeningReceipt{}) {
+		period, e := adminOpeningReadReceipt(tx, id, stamp)
+		if !errors.Is(e, gorm.ErrRecordNotFound) {
+			return period, e
+		}
+	}
 	if localPlayActivityOwner(tx) != id || !tx.Migrator().HasTable(&db.LocalPlayOpenServerReceipt{}) {
 		return row, err
 	}
@@ -201,6 +230,9 @@ func openServerReadReceipt(tx *gorm.DB, id, stamp int64) (db.OpenServerActivityR
 }
 
 func openServerCreateReceipt(tx *gorm.DB, row *db.OpenServerActivityReceipt) error {
+	if adminOpeningPeriod(tx) != nil {
+		return adminOpeningCreateReceipt(tx, row)
+	}
 	cycle, err := localPlayOpenServerCycle(tx)
 	if err != nil {
 		return err

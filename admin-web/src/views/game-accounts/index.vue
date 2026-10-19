@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, h, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
-import { useRouter } from 'vue-router';
+import { computed, h, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { NButton, NSpace, NTag } from 'naive-ui';
 import type { DataTableColumns } from 'naive-ui';
 import { useAuthStore } from '@/store/modules/auth';
@@ -12,6 +12,10 @@ import type { AccountPlayer, GameAccount } from '@/service/game-accounts';
 import WalletLedger from '@/components/operations/wallet-ledger.vue';
 
 const router = useRouter();
+const route = useRoute();
+const locatedId = computed(() => { const id = Number(route.query.accountId); return Number.isSafeInteger(id) && id > 0 ? id : 0; });
+function rowClass(row: GameAccount) { return row.id === locatedId.value ? 'account-located-row' : ''; }
+function applyLocation() { q.value = typeof route.query.q === 'string' ? route.query.q : ''; page.value = 1; load(); }
 const scope = useServerScopeStore();
 const auth = useAuthStore();
 const { canWrite } = useOperations();
@@ -29,7 +33,7 @@ async function load() {
   loading.value = true;
   error.value = '';
   try {
-    const result = await getGameAccounts(q.value.trim(), page.value, pageSize.value);
+    const result = await getGameAccounts(q.value.trim(), page.value, pageSize.value, locatedId.value);
     if (current !== generation) return;
     rows.value = (result.items || []).map(row => ({ ...row, players: row.players || [] }));
     total.value = result.total;
@@ -41,6 +45,7 @@ async function load() {
 }
 function search() {
   page.value = 1;
+  if (locatedId.value) { router.replace({ query: q.value.trim() ? { q: q.value.trim() } : {} }); return; }
   load();
 }
 const modal = ref<'' | 'create' | 'edit' | 'password'>('');
@@ -125,7 +130,8 @@ const columns: DataTableColumns<GameAccount> = [
     ...(isAdmin.value ? [h(NButton, { size: 'small', quaternary: true, disabled: row.protected, onClick: () => edit('password', row) }, () => '重置密码')] : [])
   ]) }
 ];
-onMounted(load);
+onMounted(applyLocation);
+watch(() => [route.query.accountId, route.query.q], applyLocation);
 onBeforeUnmount(() => { generation += 1; draft.password = ''; draft.confirmPassword = ''; });
 </script>
 
@@ -137,8 +143,9 @@ onBeforeUnmount(() => { generation += 1; draft.password = ''; draft.confirmPassw
     </div>
     <NAlert v-if="error" type="error" :title="error" />
     <NCard :bordered="false" class="ops-panel">
+      <p v-if="locatedId" class="ops-inline-note">用户 #{{ locatedId }} <NButton text type="primary" @click="q = ''; search()">查看全部用户</NButton></p>
       <div class="ops-filters"><NInput v-model:value="q" clearable class="ops-search" placeholder="搜索账号或昵称" @keydown.enter="search" /><NButton type="primary" @click="search">搜索</NButton></div>
-      <NDataTable :columns="columns" :data="rows" :loading="loading" :row-key="(row: GameAccount) => row.id" :bordered="false" :scroll-x="1100" />
+      <NDataTable :columns="columns" :data="rows" :loading="loading" :row-key="(row: GameAccount) => row.id" :row-class-name="rowClass" :bordered="false" :scroll-x="1100" />
       <div class="ops-pagination"><NPagination v-model:page="page" v-model:page-size="pageSize" :item-count="total" :page-sizes="[25, 50, 100]" show-size-picker @update:page="load" @update:page-size="search" /></div>
     </NCard>
     <NModal :show="Boolean(modal)" preset="card" :title="title" class="ops-modal account-editor" :mask-closable="!saving" :closable="!saving" @update:show="!$event && close()">
@@ -164,6 +171,7 @@ onBeforeUnmount(() => { generation += 1; draft.password = ''; draft.confirmPassw
 </template>
 
 <style scoped>
+:deep(.account-located-row td){background:rgb(var(--primary-color) / .07)!important}:deep(.account-located-row td:first-child){box-shadow:inset 3px 0 rgb(var(--primary-color))}
 .account-editor{width:540px}.account-context{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:20px}
 @media(max-width:600px){.account-context{align-items:flex-start;flex-direction:column;gap:4px}}
 </style>

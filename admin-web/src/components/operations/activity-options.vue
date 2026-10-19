@@ -1,8 +1,34 @@
 <script setup lang="ts">
-import { watch } from 'vue';
+import { ref, watch } from 'vue';
+import { useRouter } from 'vue-router';
+import { api, errorMessage } from '@/service/operations';
+import { shopLabels } from '@/service/management-operations';
+import type { ShopSnapshot } from '@/service/management-operations';
 import RewardList from './reward-list.vue';
 const options = defineModel<Record<string, any>>({ required: true });
 const props = defineProps<{ mode: string; disabled?: boolean; fixedValues?: Record<string, string | number> }>();
+const router = useRouter();
+const shopOptions = Object.entries(shopLabels).map(([value, label]) => ({ value, label }));
+const shopStatus = ref('');
+const shopLoading = ref(false);
+let shopLoad = 0;
+watch(() => [props.mode, options.value.shopKey], async ([mode, key]) => {
+  const request = ++shopLoad;
+  shopStatus.value = '';
+  if (mode !== 'shop-window' || !key) return;
+  shopLoading.value = true;
+  try {
+    const shop = await api<ShopSnapshot>(`/shops/${encodeURIComponent(key)}`);
+    if (request !== shopLoad) return;
+    if (shop.settings.unlimited) shopStatus.value = '请先在商店管理关闭「不限时」。';
+    else if (!shop.items.length || (!shop.items.some(item => item.enabled) && !(key === 'pet-market' && shop.settings.enabled)))
+      shopStatus.value = '请先在商店管理保存可用商品目录并启用。';
+  } catch (error) {
+    if (request === shopLoad) shopStatus.value = errorMessage(error);
+  } finally {
+    if (request === shopLoad) shopLoading.value = false;
+  }
+}, { immediate: true });
 watch(
   () => props.mode,
   mode => {
@@ -64,7 +90,14 @@ const turntableNumbers = [
         {{ value }}
       </NDescriptionsItem>
     </NDescriptions>
-    <template v-if="mode === 'stamina-meal'">
+    <template v-if="mode === 'shop-window'">
+      <NFormItem label="对应商店" :validation-status="shopStatus ? 'warning' : undefined" :feedback="shopStatus || undefined">
+        <NSelect v-model:value="options.shopKey" :options="shopOptions" filterable :disabled="disabled" :loading="shopLoading" placeholder="选择商店" />
+      </NFormItem>
+      <div class="ops-muted">商品、价格与购买资格取该商店的已保存目录。</div>
+      <NButton v-if="options.shopKey" text type="primary" class="mt-12px" @click="router.push(`/shops/${options.shopKey}`)">前往商店管理</NButton>
+    </template>
+    <template v-else-if="mode === 'stamina-meal'">
       <div class="ops-section-heading">
         <h3>领取时段</h3>
         <NButton v-if="options.meals.length < 2" :disabled="disabled" size="small" @click="addMeal">添加时段</NButton>
