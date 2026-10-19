@@ -10,7 +10,6 @@ import ManagementWorkspace from '@/components/operations/management-workspace.vu
 import RewardList from '@/components/operations/reward-list.vue';
 import RewardSummary from '@/components/operations/reward-summary.vue';
 const { canWrite, loading, error, run } = useOperations();
-const notes = ref('');
 const rows = ref<Achievement[]>([]);
 const kinds = ref<AchievementKind[]>([]);
 const q = ref('');
@@ -66,7 +65,6 @@ const condition = computed(
     (selected.value?.kind === draft.value.kind ? selected.value : undefined)
 );
 const fixedTarget = computed(() => kinds.value.find(row => row.id === draft.value.kind)?.fixedTarget);
-const supportedKinds = computed(() => kinds.value.filter((row) => row.supported !== false).length);
 const conditionColumns: DataTableColumns<AchievementKind> = [
   { title: '触发条件', key: 'label', minWidth: 230 },
   {
@@ -98,7 +96,6 @@ async function load() {
       rewards: row.rewards || []
     }));
     kinds.value = data.kinds || [];
-    notes.value = data.notes || '';
   }
 }
 function edit(row: Achievement | null) {
@@ -285,11 +282,10 @@ onMounted(load);
     </template>
     <template #alert>
       <NAlert v-if="error || saveError" type="error" :title="saveError || error" />
-      <details v-if="notes && !editing" class="ops-help"><summary>成就规则说明</summary><p>{{ notes }}</p></details>
     </template>
     <NCard v-if="!editing" :bordered="false" class="ops-panel">
       <NCollapse class="mb-24px">
-        <NCollapseItem :title="`条件目录 · ${kinds.length} 类 / ${supportedKinds} 类可配置`" name="conditions">
+        <NCollapseItem title="条件目录" name="conditions">
           <NDataTable
             :columns="conditionColumns"
             :data="kinds"
@@ -349,7 +345,6 @@ onMounted(load);
         <NFormItem label="达成目标" required>
           <NInputNumber v-model:value="draft.target" :disabled="fixedTarget !== undefined || saving || !canWrite" :min="1" :precision="0" />
         </NFormItem>
-        <p class="ops-inline-note">玩家完成所选条件并达到目标后，即可领取奖励。</p>
       </section>
       <section v-show="section === 'rewards'">
         <h3 class="mb-20px">完成奖励</h3>

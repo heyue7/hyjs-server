@@ -74,7 +74,7 @@ const hasPublishFields = computed(() =>
   ['day', 'refreshMillis', 'source'].some(supports)
 );
 const showShopStatus = computed(() => Boolean(snapshot.value && (
-  settingSupports('unlimited') || settingSupports('enabled') || snapshot.value.settings.slots || snapshot.value.settings.startAt || snapshot.value.settings.endAt
+  settingSupports('unlimited') || settingSupports('enabled') || snapshot.value.settings.startAt || snapshot.value.settings.endAt
 )));
 const dirty = computed(() => editing.value && JSON.stringify(draft.value) !== original.value);
 const rows = computed(() =>
@@ -401,25 +401,21 @@ watch(
         <NAlert v-if="error || saveError" type="error" :title="saveError || error" />
       </template>
       <template v-if="!editing">
-        <details v-if="definition?.notes" class="ops-help"><summary>商店规则</summary><p>{{ definition.notes }}</p></details>
         <div v-if="snapshot && showShopStatus" class="shop-status-line">
-          <NSpace align="center" justify="space-between">
-            <NSpace>
-              <NTag
-                v-if="settingSupports('enabled')"
-                :type="snapshot.settings.enabled ? 'success' : 'default'"
-                :bordered="false"
-              >
-                {{ snapshot.settings.enabled ? '营业中' : '已停用' }}
-              </NTag>
-              <span v-if="snapshot.settings.slots" class="ops-muted">展示 {{ snapshot.settings.slots }} 个槽位</span>
-              <NTag v-if="snapshot.settings.unlimited" :bordered="false" size="small">不限时</NTag>
-              <span v-else-if="snapshot.settings.startAt || snapshot.settings.endAt" class="ops-muted">
-                {{ formatTime(snapshot.settings.startAt) }} →
-                {{ snapshot.settings.endAt ? formatTime(snapshot.settings.endAt) : '不限' }}
-              </span>
-            </NSpace>
-            <span class="ops-muted">{{ snapshot.items.length }} 件商品</span>
+          <NSpace align="center" :size="8">
+            <NTag
+              v-if="settingSupports('enabled')"
+              :type="snapshot.settings.enabled ? 'success' : 'default'"
+              :bordered="false"
+              size="small"
+            >
+              {{ snapshot.settings.enabled ? '营业中' : '已停用' }}
+            </NTag>
+            <NTag v-if="snapshot.settings.unlimited" :bordered="false" size="small">不限时</NTag>
+            <span v-else-if="snapshot.settings.startAt || snapshot.settings.endAt" class="ops-muted">
+              {{ formatTime(snapshot.settings.startAt) }} →
+              {{ snapshot.settings.endAt ? formatTime(snapshot.settings.endAt) : '不限' }}
+            </span>
           </NSpace>
         </div>
         <NCard :bordered="false" class="ops-panel">
@@ -429,7 +425,6 @@ watch(
           </NTabs>
           <div class="ops-filters">
             <NInput v-model:value="q" class="ops-search" clearable placeholder="搜索商品名称或编号" />
-            <span v-if="snapshot && !showShopStatus" class="ops-muted">{{ snapshot.items.length }} 件商品</span>
             <NSelect
               v-model:value="state"
               clearable
@@ -571,7 +566,7 @@ watch(
               <NGi v-if="supports('maxRank')">
                 <NFormItem label="可兑换的最末排名">
                   <NInputNumber v-model:value="draft.maxRank" :min="1" :precision="0" />
-                  <template #feedback>填写 500 表示前 500 名可兑换；消费已发布的竞技排名资格。</template>
+                  <template #feedback>填写 500，表示历史最高排名进入前 500 名可兑换。</template>
                 </NFormItem>
               </NGi>
               <NGi v-if="supports('priority')">
@@ -720,7 +715,10 @@ watch(
   width: 100%;
 }
 .shop-status-line {
-  padding: 2px 2px 10px;
+  line-height: 24px;
+}
+.shop-workspace-root :deep(.management-workspace) {
+  gap: 12px;
 }
 .shop-workspace-root :deep(.shop-cell-stack) {
   display: flex;

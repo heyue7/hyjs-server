@@ -657,14 +657,13 @@ onUnmounted(() => {
       <NTab name="character-day">新玩家排期</NTab>
       <NTab name="calendar">定期排期</NTab>
     </NTabs>
-    <p class="planning-description">{{ planningTab === 'character-day' ? '每个区服角色创建当天为第1天，同一账号在其他服的角色独立计算。' : '按固定日历日期开放，所有玩家共用；不会跟随账号或角色创建时间移动。' }}</p>
+    <p class="planning-description">{{ planningTab === 'character-day' ? '从角色创建日计算活动时长，开服任务按区服开服天数解锁。' : '按固定日期开放，全服玩家共用。' }}</p>
     <div class="ops-toolbar mb-20px">
       <div>
         <h1>
           活动排期
-          <NTag v-if="scope.currentServer" :bordered="false" type="info">{{ scope.currentServer.name }}</NTag>
         </h1>
-        <p class="ops-muted">{{ managed ? '已由本服排期控制开放' : '尚未发布本服排期' }} · {{ items.length }} 项活动</p>
+        <p class="ops-muted">{{ managed ? '已由本服排期控制开放' : '尚未发布本服排期' }}</p>
       </div>
       <NSpace>
         <NButton :disabled="busy" :loading="loading" @click="loadCalendar(true)">刷新本服</NButton>
@@ -677,7 +676,7 @@ onUnmounted(() => {
     <NAlert
       v-if="!scope.serverId"
       type="info"
-      title="请先在顶部选择区服，再安排活动。全局模板与方案库可跨服复用。"
+      title="请先在顶部选择区服。"
       class="mb-20px"
     />
     <NAlert v-if="error || saveError" type="error" :title="saveError || error" class="mb-16px" />
@@ -1041,7 +1040,7 @@ onUnmounted(() => {
       <template v-if="activityPreview">
         <p class="pattern-help">{{ activityPreview.published ? '本期已发布配置' : '活动模板预览' }}</p>
         <p v-if="activityPreview.relative" class="pattern-help">角色第{{ activityPreview.relative.startDay || 1 }}天开始 · 持续{{ activityPreview.relative.durationDays || 14 }}天 · 另留{{ activityPreview.relative.claimDays || 0 }}天领奖</p>
-        <p v-if="activityPreview.form.mode === 'opening-14'" class="pattern-help">原249项任务按本服开服自然日解锁，角色有各自完整有效期；同一期的领取记录保持，新一期按参与方式执行。</p>
+        <p v-if="activityPreview.form.mode === 'opening-14'" class="pattern-help">任务按区服开服自然日解锁，每个角色保留完整活动时长。</p>
         <ActivitySummary :form="activityPreview.form" :mode="modes.find(mode => mode.mode === activityPreview?.form.mode)" :hide-schedule="!activityPreview.published || Boolean(activityPreview.relative)" />
       </template>
       <template #footer><NSpace justify="end"><NButton @click="activityPreview = null">关闭</NButton></NSpace></template>

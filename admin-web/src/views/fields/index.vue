@@ -460,7 +460,7 @@ onMounted(load);
     <template v-else>
       <NAlert v-if="!scope.serverId" type="info">请先在顶部选择区服。</NAlert>
       <NCard v-else size="small" :title="`${scope.currentServer?.name || scope.serverId} · 野外部署`">
-        <p class="mb-4 text-sm text-gray-500">每张地图独立发布。修改资源方案后，需要重新发布到区服。</p>
+        <p class="mb-4 text-sm text-gray-500">方案修改后需重新发布到区服。</p>
         <div class="space-y-4">
           <div
             v-for="row in deployments"
@@ -498,7 +498,7 @@ onMounted(load);
                 <NButton :disabled="readonly || !row.available" @click="saveChannels(channel)">保存分线</NButton>
               </div>
               <div class="flex flex-wrap gap-2"><NTag v-for="line in channel.lines" :key="line.line" :type="line.online >= channel.maxPlayers ? 'warning' : 'default'">{{ line.line }} 线 · {{ line.online }} 人</NTag></div>
-              <p class="text-xs text-gray-500">同线玩家共享同屏和野外聊天。采集资源与普通怪物保持个人进度，世界首领保持全服周期。</p>
+              <p class="text-xs text-gray-500">采集与小怪为个人进度；世界首领按全服周期。</p>
             </div>
           </div>
         </div>

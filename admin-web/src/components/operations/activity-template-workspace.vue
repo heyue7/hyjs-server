@@ -271,10 +271,9 @@ onUnmounted(() => window.removeEventListener('beforeunload', beforeUnload));
           <NButton v-if="!inline" quaternary @click="close">← 返回模板库</NButton>
           <h1>{{ selected?.name || '新建活动模板' }}</h1>
         </div>
-        <NTag :bordered="false">全局设置</NTag>
       </div>
       <NAlert v-if="saveError" type="error" :title="saveError" class="mb-16px" />
-      <p class="template-context">修改供后续排期使用，已发布活动保持原配置。</p>
+      <p class="template-context">修改用于新排期，已发布活动不变。</p>
       <div class="template-editor">
         <nav aria-label="活动模板编辑分区">
           <button
@@ -298,7 +297,7 @@ onUnmounted(() => window.removeEventListener('beforeunload', beforeUnload));
                   @update:value="changeMode"
                 />
               </NFormItem>
-              <NFormItem label="对应原美术资源" required>
+              <NFormItem label="游戏界面模板" required>
                 <NSelect
                   v-model:value="form.templateId"
                   :options="selectedMode?.templates.map(item => ({ label: item.name, value: item.id })) || []"
@@ -315,7 +314,6 @@ onUnmounted(() => window.removeEventListener('beforeunload', beforeUnload));
                   object-fit="contain"
                 />
               </div>
-              <p v-if="selectedMode?.notes" class="template-help">{{ selectedMode.notes }}</p>
               <div class="template-durations">
                 <NFormItem label="默认活动天数">
                   <NInputNumber v-model:value="defaultDays" :min="1" :max="366" />
@@ -326,7 +324,7 @@ onUnmounted(() => window.removeEventListener('beforeunload', beforeUnload));
               </div>
               <NFormItem label="允许新增排期">
                 <NSwitch v-model:value="enabled" />
-                <span class="ops-muted ml-12px">关闭后保留草稿；现有区服排期不追改</span>
+                <span class="ops-muted ml-12px">关闭后不能新增排期，已发布活动不变</span>
               </NFormItem>
               <NFormItem label="运营备注">
                 <NInput v-model:value="form.source" type="textarea" :maxlength="1000" />

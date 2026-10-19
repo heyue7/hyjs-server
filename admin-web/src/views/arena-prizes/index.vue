@@ -185,7 +185,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload));
         <NCard :bordered="false" class="ops-panel mb-20px">
           <h3 class="prize-section-title">常规金币</h3>
           <p class="ops-muted mb-20px">
-            竞技胜利后生成 3 张牌，每张在以下范围独立随机；玩家选中 1 张，领取该张金币。允许出现相同金额。
+            每次胜利生成 3 张随机金币牌，玩家选 1 张领取。
           </p>
           <NForm label-placement="top" :disabled="!canWrite || saving || loading || conflict">
             <div class="coin-range-grid">
@@ -208,7 +208,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload));
                 </NTag>
               </template>
               <p class="ops-muted mb-20px">
-                配置额外投放的资源、资格和随机权重。保持关闭即可继续仅使用常规金币，不会自动添加稀有奖励。
+                关闭时只发放常规金币。
               </p>
               <NAlert
                 v-if="snapshot.operatorPoolFrozen"
@@ -292,7 +292,6 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload));
             </NCollapseItem>
           </NCollapse>
         </NCard>
-        <details v-if="snapshot.notes" class="ops-help"><summary>奖励规则说明</summary><p>{{ snapshot.notes }}</p></details>
         <div class="prize-footer">
           <span class="ops-muted">{{ dirty ? '有未保存的修改' : '' }}</span>
           <NButton

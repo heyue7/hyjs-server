@@ -309,9 +309,8 @@ onMounted(load);
               <template v-if="activeTab === 'basics'">
                 <NFormItem label="活动名称" required><NInput v-model:value="form.name" :maxlength="80" placeholder="在游戏中显示的活动名称" :disabled="saving" /></NFormItem>
                 <NFormItem label="活动模式" required><NSelect :value="form.mode" :options="modeOptions" :disabled="saving || editorKind === 'edit'" @update:value="changeMode" /></NFormItem>
-                <div v-if="selectedMode?.notes" class="activity-mode-help">{{ selectedMode.notes }}</div>
                 <NFormItem label="游戏界面模板" required><NSelect v-model:value="form.templateId" :options="templateOptions" :render-label="renderTemplate" :disabled="saving" /></NFormItem>
-                <div v-if="chosenTemplate?.preview" class="activity-template-preview"><NImage :src="chosenTemplate.preview" :width="180" :height="110" object-fit="contain" /><span class="ops-muted">原美术部件预览，完整布局以游戏内页面为准。</span></div>
+                <div v-if="chosenTemplate?.preview" class="activity-template-preview"><NImage :src="chosenTemplate.preview" :width="180" :height="110" object-fit="contain" /><span class="ops-muted">界面预览</span></div>
               </template>
               <template v-if="activeTab === 'content'">
                 <ActivityProducts v-if="selectedMode?.supportsProducts" v-model="form.products" :vip-options="vipOptions" :disabled="saving" />
@@ -334,7 +333,7 @@ onMounted(load);
 
       </div>
       <div class="activity-editor-footer">
-        <span class="ops-muted">{{ dirty ? '有未保存的修改' : editable ? editorKind === 'create' || editorKind === 'copy' ? '草稿尚未创建' : '当前配置已保存' : '原配置与历史记录保持' }}</span>
+        <span class="ops-muted">{{ dirty ? '有未保存的修改' : editable ? editorKind === 'create' || editorKind === 'copy' ? '草稿尚未创建' : '当前配置已保存' : '只读' }}</span>
         <NSpace><NButton :disabled="saving" @click="requestClose">{{ editable ? '取消并返回' : '返回列表' }}</NButton><NButton v-if="editable && activeTab !== 'review'" :disabled="saving" @click="activeTab = 'review'">检查配置</NButton><NButton v-if="editable" type="primary" :loading="saving" @click="save">{{ editorKind === 'edit' ? '保存配置' : '保存草稿' }}</NButton><NButton v-else-if="canWrite && selected?.availability?.usable" type="primary" @click="show(selected, true)">复制为新一期</NButton></NSpace>
       </div>
     </template>

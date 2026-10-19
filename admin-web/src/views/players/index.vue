@@ -248,7 +248,7 @@ watch(() => route.query.wallet, requestedWallet);
       </div>
       <NSpace><NButton :loading="loading" @click="load">刷新</NButton><NButton v-if="canWrite" type="primary" :disabled="!scope.currentServer?.runtimeBound || !scope.currentServer?.enabled" @click="createOpen = true">新增玩家</NButton></NSpace>
     </div>
-    <NAlert v-if="!scope.currentServer?.runtimeBound" type="info" title="该区服待部署，可先安排活动；绑定游戏服务后可新增游戏用户。" />
+    <NAlert v-if="!scope.currentServer?.runtimeBound" type="info" title="该区服尚未部署，绑定游戏服务后可新增角色。" />
     <NAlert v-if="error" type="error" :title="error" />
     <NCard :bordered="false" class="ops-panel">
       <div class="ops-filters">

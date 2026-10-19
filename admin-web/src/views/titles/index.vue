@@ -35,7 +35,6 @@ const sections = [
   { key: 'effects', label: '属性与期限' },
   { key: 'publish', label: '展示与状态' }
 ];
-const paramEditable = computed(() => Boolean(draft.value) && [1, 9, 10, 11, 12, 13, 14].includes(draft.value!.type));
 const targetLabels: Record<number, [string, string, number?]> = {
   1: ['同时上阵人数', '名角色', 4], 9: ['角色达到等级', '级'],
   11: ['珠宝工艺等级', '级', 10], 12: ['料理工艺等级', '级', 6],
@@ -57,27 +56,6 @@ const currentRequirement = computed(() => {
   return d.requirement || d.notes;
 });
 const seasonal = computed(() => Boolean(draft.value) && [17, 18].includes(draft.value!.type));
-const qualificationName = (value: number) =>
-  (
-    ({
-      1: '上阵人数',
-      2: 'SAO角色收集',
-      3: 'ALO角色收集',
-      4: 'GGO角色收集',
-      5: '角色品质收集',
-      6: '角色品质收集',
-      7: '角色品质收集',
-      8: '角色品质收集',
-      9: '角色等级',
-      10: '主线章节通关',
-      11: '宝石工艺等级',
-      12: '料理工艺等级',
-      13: '试炼最高层',
-      14: '竞技胜利排名',
-      17: '赛季胜者',
-      18: '赛季胜者'
-    }) as Record<number, string>
-  )[value] || '所属玩法资格';
 const dirty = computed(() => Boolean(draft.value) && original.value !== JSON.stringify(draft.value));
 const visible = computed(() =>
   rows.value.filter((row) => `${row.name} ${row.id} ${row.notes}`.toLowerCase().includes(q.value.trim().toLowerCase()))
@@ -257,11 +235,8 @@ onMounted(load);
           <NSelect v-model:value="draft.param" :options="chapters" filterable placeholder="选择章节" />
         </NFormItem>
         <div class="title-requirement"><span class="ops-muted">获得条件</span><p>{{ currentRequirement }}</p></div>
-        <p v-if="!paramEditable" class="ops-inline-note">{{ seasonal ? '赛季结果确认后发放。' : '该条件由对应玩法判断。' }}</p>
-        <details class="ops-help"><summary>标识与修改说明</summary>
-          <p>称号编号 {{ draft.id }} · {{ qualificationName(draft.type) }}</p>
-          <p>条件和属性仅影响之后新获得的称号，已持有称号保持原属性和到期时间。</p>
-        </details>
+        <p v-if="seasonal" class="ops-inline-note">赛季结果确认后发放。</p>
+        <p class="ops-inline-note">修改仅影响新获得的称号，已持有称号保持原属性和期限。</p>
       </section>
       <section v-show="section === 'effects'">
         <NAlert
