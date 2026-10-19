@@ -403,6 +403,10 @@ func run() error {
 	if err = s.AdoptAdminActivityCalendar(ctx); err != nil {
 		return err
 	}
+	// Re's verified meal rules are a separate editable period; older receipts remain intact.
+	if err = s.InitializeReRestaurant(ctx); err != nil {
+		return err
+	}
 	if err = s.InitializeAdminFields(ctx); err != nil {
 		return err
 	}
@@ -410,6 +414,10 @@ func run() error {
 		return err
 	}
 	if err = s.InitializeAdminCDK(ctx); err != nil {
+		return err
+	}
+	// Compensation previews and delivery receipts are ready before operations requests arrive.
+	if err = s.InitializeAdminBroadcast(ctx); err != nil {
 		return err
 	}
 	httpListener, err := net.Listen("tcp", net.JoinHostPort(cfg.Bind, strconv.Itoa(cfg.HTTPPort)))

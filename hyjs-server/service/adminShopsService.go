@@ -19,13 +19,12 @@ import (
 
 // AdminShopDefinitions lists original consumers, with controls restricted to fields each consumes.
 func AdminShopDefinitions() []model.AdminShopDefinition {
-	base := []string{"rewards", "cost", "dailyLimit", "totalLimit", "stock", "minLevel", "minVip", "priority", "weight", "discountBps"}
+	base := []string{"rewards", "cost", "dailyLimit", "totalLimit", "stock", "minLevel", "minVip", "priority", "weight", "discountBps", "enabled"}
 	out := []model.AdminShopDefinition{}
 	for _, v := range []struct{ id, label string }{{"ordinary", "普通商店"}, {"memory", "记忆圣坛"}, {"popularity", "声望商店商品"}, {"popularity-rank", "声望商店奖励"}, {"point", "攻略点商店"}, {"score", "积分商店"}, {"guild", "公会商店"}, {"pet-market", "精灵商店"}, {"union-fight", "公会战商店"}, {"vip", "会员礼包"}} {
 		d := model.AdminShopDefinition{ID: v.id, Label: v.label, Fields: append([]string{}, base...), SettingsFields: []string{"unlimited", "enabled", "startAt", "endAt", "claimEndAt", "source"}, CanCreate: true, Notes: "保存后立即用于后续购买；历史交易、库存使用和限购保留。"}
 		switch v.id {
 		case "ordinary":
-			d.Fields = append(d.Fields, "enabled")
 			d.Notes = "商品、价格与材料保存后生效；原阶梯价格保留到该商品被显式修改。"
 		case "memory":
 			d.SettingsFields = append(d.SettingsFields, "slots")
@@ -35,7 +34,7 @@ func AdminShopDefinitions() []model.AdminShopDefinition {
 		case "guild":
 			d.Fields = append(d.Fields, "contributionCost", "guildLevel")
 		case "pet-market":
-			d.Fields = []string{"rewards", "cost", "stock", "weight"}
+			d.Fields = []string{"rewards", "cost", "stock", "weight", "enabled"}
 			d.SettingsFields = []string{"unlimited", "startAt", "endAt", "claimEndAt", "enabled", "slots"}
 			d.Notes = "变更立即更新当前可见商品，已用库存及刷新次数保留。原150钻刷新/每周10次和分解规则保留。"
 		case "union-fight":
@@ -75,6 +74,7 @@ func adminShopBaseProduct(id, reward, cost string) model.AdminShopProduct {
 func adminShopP4Product(p p4Product) model.AdminShopProduct {
 	v := adminShopBaseProduct("period:"+p.ID, p.Rewards, p.Cost)
 	v.Name = p.Name
+	v.Enabled = p.isEnabled()
 	v.DailyLimit = int64(p.DailyLimit)
 	v.TotalLimit = int64(p.TotalLimit)
 	v.Stock = int64(p.Stock)
@@ -151,6 +151,7 @@ func (s *GameService) adminReadShop(tx *gorm.DB, key string) (*model.AdminShopRe
 			v := adminShopBaseProduct(p.ID, fmt.Sprintf("%s,%d", p.Resource, p.Amount), fmt.Sprintf("%s,%d", p.Currency, p.Price))
 			v.Stock = int64(p.Stock)
 			v.Weight = p.Weight
+			v.Enabled = p.isEnabled()
 			out.Items = append(out.Items, v)
 		}
 	case "union-fight":
@@ -318,7 +319,7 @@ func (s *GameService) AdminSaveShopProduct(ctx context.Context, actor *model.Adm
 			}
 			var cfg p9MarketConfig
 			_ = json.Unmarshal(raw.Pet.Input, &cfg)
-			offer := p9MarketOffer{ID: id, Resource: p.Rewards[0].ResourceID, Amount: int32(p.Rewards[0].Amount), Currency: p.Cost.ResourceID, Price: int32(p.Cost.Amount), Stock: int32(p.Stock), Weight: p.Weight}
+			offer := p9MarketOffer{Enabled: &p.Enabled, ID: id, Resource: p.Rewards[0].ResourceID, Amount: int32(p.Rewards[0].Amount), Currency: p.Cost.ResourceID, Price: int32(p.Cost.Amount), Stock: int32(p.Stock), Weight: p.Weight}
 			found := false
 			for i := range cfg.Offers {
 				if cfg.Offers[i].ID == id {
@@ -430,12 +431,29 @@ func (s *GameService) AdminSaveShopProduct(ctx context.Context, actor *model.Adm
 			if !create && found < 0 {
 				return fmt.Errorf("%w: 商品已不存在，请刷新", constUtil.ErrAdminInput)
 			}
-			value := p4Product{ID: originalID, Name: p.Name, Index: nextIndex, Rewards: reward, Cost: cost, Priority: int32(p.Priority), DailyLimit: int32(p.DailyLimit), TotalLimit: int32(p.TotalLimit), Stock: int32(p.Stock), MinLevel: int32(p.MinLevel), MinVIP: int32(p.MinVip), Weight: p.Weight, DiscountBps: int32(p.DiscountBps), MaxRank: p.MaxRank}
+			value := p4Product{Enabled: &p.Enabled, ID: originalID, Name: p.Name, Index: nextIndex, Rewards: reward, Cost: cost, Priority: int32(p.Priority), DailyLimit: int32(p.DailyLimit), TotalLimit: int32(p.TotalLimit), Stock: int32(p.Stock), MinLevel: int32(p.MinLevel), MinVIP: int32(p.MinVip), Weight: p.Weight, DiscountBps: int32(p.DiscountBps), MaxRank: p.MaxRank}
 			if found >= 0 {
 				value.Index = rules.Products[found].Index
+				old := rules.Products[found]
+				current := adminShopP4Product(old)
+				s.adminShopName(&current)
+				if key == "guild" {
+					var gr p4GuildRules
+					_ = json.Unmarshal(row.Rules, &gr)
+					current.ContributionCost = int64(gr.Products[found].ContributionCost)
+					current.GuildLevel = int64(gr.Products[found].GuildLevel)
+				}
+				current.Enabled = p.Enabled
+				statusOnly := string(adminJSON(current)) == string(adminJSON(p))
 				// An explicit product edit uses the configured linear price. Unedited
 				// original tier products keep their original tier contract.
 				value.TierID = false
+				if statusOnly {
+					// A list toggle changes only availability; original price tiers and
+					// stored fields remain byte-equivalent except the explicit flag.
+					value = old
+					value.Enabled = &p.Enabled
+				}
 				rules.Products[found] = value
 			} else {
 				rules.Products = append(rules.Products, value)

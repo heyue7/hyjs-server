@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ContextHelp from '@/components/operations/context-help.vue';
 import { computed, h, onBeforeUnmount, onMounted, ref } from 'vue';
 import { NButton, NSpace, NTag } from 'naive-ui';
 import type { DataTableColumns } from 'naive-ui';
@@ -9,6 +10,7 @@ import { useOperations } from '@/composables/useOperations';
 import ManagementWorkspace from '@/components/operations/management-workspace.vue';
 import RewardList from '@/components/operations/reward-list.vue';
 import RewardSummary from '@/components/operations/reward-summary.vue';
+const notes = ref('');
 const { canWrite, loading, error, run } = useOperations();
 const rows = ref<Achievement[]>([]);
 const kinds = ref<AchievementKind[]>([]);
@@ -96,6 +98,7 @@ async function load() {
       rewards: row.rewards || []
     }));
     kinds.value = data.kinds || [];
+    notes.value = data.notes || '';
   }
 }
 function edit(row: Achievement | null) {
@@ -276,6 +279,7 @@ onMounted(load);
     @back="back"
     @save="save"
   >
+    <template #title-extra><ContextHelp v-if="notes" title="成就配置说明" :text="notes" /></template>
     <template v-if="!editing" #actions>
       <NButton :loading="loading" @click="load">刷新</NButton>
       <NButton v-if="canWrite" type="primary" @click="edit(null)">新建成就</NButton>
@@ -352,14 +356,12 @@ onMounted(load);
       </section>
       <section v-show="section === 'publish'">
         <h3 class="mb-20px">状态与备注</h3>
-        <NFormItem label="规则状态">
+        <NFormItem label="启用成就">
           <NSwitch
             v-model:value="draft.enabled"
             :disabled="saving || !canWrite || (condition?.supported === false && !draft.enabled)"
-          >
-            <template #checked>启用</template>
-            <template #unchecked>关闭</template>
-          </NSwitch>
+            aria-label="启用成就"
+          />
         </NFormItem>
         <NFormItem label="配置备注">
           <NInput v-model:value="draft.source" type="textarea" :maxlength="1000" />

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ContextHelp from './context-help.vue';
 import { computed, h, nextTick, onMounted, ref, watch } from 'vue';
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router';
 import { NButton, NDropdown, NImage, NMenu, NSpace, NTag } from 'naive-ui';
@@ -308,7 +309,7 @@ onMounted(load);
             <NForm label-placement="top" :disabled="saving">
               <template v-if="activeTab === 'basics'">
                 <NFormItem label="活动名称" required><NInput v-model:value="form.name" :maxlength="80" placeholder="在游戏中显示的活动名称" :disabled="saving" /></NFormItem>
-                <NFormItem label="活动模式" required><NSelect :value="form.mode" :options="modeOptions" :disabled="saving || editorKind === 'edit'" @update:value="changeMode" /></NFormItem>
+                <NFormItem required><template #label><span class="ops-field-label">活动模式<ContextHelp v-if="selectedMode?.notes" title="活动模式说明" :text="selectedMode.notes" /></span></template><NSelect :value="form.mode" :options="modeOptions" :disabled="saving || editorKind === 'edit'" @update:value="changeMode" /></NFormItem>
                 <NFormItem label="游戏界面模板" required><NSelect v-model:value="form.templateId" :options="templateOptions" :render-label="renderTemplate" :disabled="saving" /></NFormItem>
                 <div v-if="chosenTemplate?.preview" class="activity-template-preview"><NImage :src="chosenTemplate.preview" :width="180" :height="110" object-fit="contain" /><span class="ops-muted">界面预览</span></div>
               </template>

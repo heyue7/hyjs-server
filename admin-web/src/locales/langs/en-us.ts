@@ -232,6 +232,8 @@ const local: App.I18n.Schema = {
     items: 'Items',
     activities: 'Activities',
     announcements: 'Announcements',
+    broadcast: 'Compensation mail',
+    'daily-sign': 'Daily sign-in',
     audit: 'Audit',
     users: 'Admin accounts',
     cdk: 'Redeem codes',

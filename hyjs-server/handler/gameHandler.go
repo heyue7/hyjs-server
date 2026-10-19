@@ -521,7 +521,7 @@ func ValidateGameRequest(p *model.GamePacket) error {
 			return errors.New("活动ID无效")
 		}
 	case *pb.CSActivityReward:
-		if b.GetActivityId() == "" || len(b.GetActivityId()) > 64 || strings.TrimSpace(b.GetActivityId()) != b.GetActivityId() || b.GetIndex() <= 0 || len(b.GetGetResources()) < 1 || len(b.GetGetResources()) > constUtil.P1RewardMaximumBatch {
+		if b.GetActivityId() == "" || len(b.GetActivityId()) > 64 || strings.TrimSpace(b.GetActivityId()) != b.GetActivityId() || b.GetIndex() <= 0 || (len(b.GetGetResources()) < 1 && b.GetActivityId() != constUtil.P3NativeFirstActivityID) || len(b.GetGetResources()) > constUtil.P1RewardMaximumBatch {
 			return errors.New("活动领奖参数无效")
 		}
 		for _, resource := range b.GetGetResources() {

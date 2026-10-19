@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, h, onBeforeUnmount, ref, watch } from 'vue';
 import { onBeforeRouteLeave, useRouter } from 'vue-router';
-import { NButton, NSpace, NTag } from 'naive-ui';
+import { NButton, NSpace, NSwitch } from 'naive-ui';
 import type { DataTableColumns } from 'naive-ui';
 import { api, errorMessage, formatTime, json } from '@/service/operations';
 import { newShopProduct, shopLabels } from '@/service/management-operations';
@@ -9,6 +9,7 @@ import type { ShopDefinition, ShopProduct, ShopSnapshot } from '@/service/manage
 import type { Item, ItemsResponse } from '@/service/operations';
 import { useOperations } from '@/composables/useOperations';
 import ManagementWorkspace from './management-workspace.vue';
+import ContextHelp from './context-help.vue';
 import RewardList from './reward-list.vue';
 import ResourceSelect from './resource-select.vue';
 import ResourceImage from './resource-image.vue';
@@ -28,6 +29,7 @@ const selected = ref<ShopProduct | null>(null);
 const draft = ref<ShopProduct>(newShopProduct());
 const original = ref('');
 const saving = ref(false);
+const toggling = ref('');
 const saveError = ref('');
 const section = ref('product');
 const settingsOpen = ref(false);
@@ -70,7 +72,7 @@ const title = computed(() =>
 const fields = computed(() => definition.value?.fields || []);
 const supports = (key: string) => fields.value.includes(key);
 const hasPublishFields = computed(() =>
-  (supports('enabled') && (props.shopId !== 'ordinary' || isLegacyProduct.value)) ||
+  supports('enabled') ||
   ['day', 'refreshMillis', 'source'].some(supports)
 );
 const showShopStatus = computed(() => Boolean(snapshot.value && (
@@ -192,6 +194,20 @@ async function save() {
     saveError.value = errorMessage(e);
   } finally {
     saving.value = false;
+  }
+}
+async function toggleProduct(row: ShopProduct, enabled: boolean) {
+  if (!snapshot.value || !canWrite.value || toggling.value || saving.value) return;
+  toggling.value = row.id;
+  try {
+    await api(`/shops/${encodeURIComponent(props.shopId)}/products/${encodeURIComponent(row.id)}`,
+      json('PUT', { ...row, enabled, version: snapshot.value.version }));
+    await load();
+    window.$message?.success(enabled ? '商品已启用' : '商品已停用');
+  } catch (e) {
+    window.$message?.error(errorMessage(e));
+  } finally {
+    toggling.value = '';
   }
 }
 function configure() {
@@ -321,7 +337,14 @@ const columns = computed<DataTableColumns<ShopProduct>>(() => [
   { title: '购买资格', key: 'qualifications', minWidth: 140, render: row => renderLines(qualificationLines(row)) },
   {
     title: '状态', key: 'enabled', width: 85,
-    render: row => h(NTag, { type: row.enabled ? 'success' : 'default', bordered: false, size: 'small' }, () => row.enabled ? '启用' : '关闭')
+    render: row => h(NSwitch, {
+      value: row.enabled,
+      size: 'small',
+      loading: toggling.value === row.id,
+      disabled: !canWrite.value || loading.value || saving.value || Boolean(toggling.value),
+      'aria-label': `启用商品：${row.name || '商品'}`,
+      'onUpdate:value': (value: boolean) => toggleProduct(row, value)
+    })
   },
   {
     title: '操作', key: 'action', width: 135, fixed: 'right',
@@ -384,6 +407,7 @@ watch(
       @back="discard"
       @save="save"
     >
+      <template #title-extra><ContextHelp v-if="definition?.notes" title="商店规则" :text="definition.notes" /></template>
       <template v-if="!editing" #actions>
         <NButton :loading="loading" @click="load">刷新</NButton>
         <NButton v-if="canWrite && snapshot && definition?.settingsFields?.length" @click="configure()">
@@ -430,7 +454,7 @@ watch(
               clearable
               :options="[
                 { label: '启用', value: 'enabled' },
-                { label: '关闭', value: 'disabled' }
+                { label: '停用', value: 'disabled' }
               ]"
               placeholder="全部状态"
               class="ops-filter-select"
@@ -598,11 +622,8 @@ watch(
           </section>
           <section v-show="section === 'publish'">
             <h3 class="mb-20px">状态与备注</h3>
-            <NFormItem v-if="supports('enabled') && (shopId !== 'ordinary' || isLegacyProduct)" label="商品状态">
-              <NSwitch v-model:value="draft.enabled">
-                <template #checked>启用</template>
-                <template #unchecked>关闭</template>
-              </NSwitch>
+            <NFormItem v-if="supports('enabled')" label="启用商品">
+              <NSwitch v-model:value="draft.enabled" aria-label="启用商品" />
             </NFormItem>
             <NFormItem v-if="supports('day')" label="报价日期">
               <NDatePicker
@@ -648,7 +669,7 @@ watch(
       />
       <NForm label-placement="top" :disabled="settingsSaving">
         <NFormItem v-if="settingSupports('enabled') && !needsPeriod" label="营业状态">
-          <NSwitch v-model:value="settingsDraft.enabled" />
+          <NSwitch v-model:value="settingsDraft.enabled" aria-label="营业状态" />
         </NFormItem>
         <NFormItem v-if="settingSupports('slots')" label="展示槽位">
           <NInputNumber
@@ -659,7 +680,7 @@ watch(
           />
         </NFormItem>
         <NFormItem v-if="settingSupports('unlimited')" label="不限时">
-          <NSwitch v-model:value="settingsDraft.unlimited"><template #checked>不限时</template><template #unchecked>按日期营业</template></NSwitch>
+          <NSwitch v-model:value="settingsDraft.unlimited" aria-label="不限时" />
         </NFormItem>
         <p v-if="!settingsDraft.unlimited" class="ops-muted mb-4">日期留空时暂停营业，也可到活动排期安排营业时段。</p>
         <div v-if="!settingsDraft.unlimited" class="ops-date-grid">

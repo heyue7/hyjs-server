@@ -4,7 +4,7 @@ import { getServers } from '@/service/servers';
 import type { GameServer } from '@/service/servers';
 import { errorMessage } from '@/service/operations';
 
-export const serverScopedRoutes = new Set(['cdk', 'players', 'wallets', 'feedback', 'activity-schedules']);
+export const serverScopedRoutes = new Set(['broadcast', 'cdk', 'players', 'wallets', 'feedback', 'activity-schedules']);
 export const useServerScopeStore = defineStore('server-scope', () => {
   const saved = Number(sessionStorage.getItem('hyjs-admin-server'));
   const serverId = ref<number | null>(Number.isSafeInteger(saved) && saved > 0 ? saved : null);

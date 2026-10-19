@@ -175,6 +175,11 @@ func localPlayActivityVisible(tx *gorm.DB, key string) (bool, error) {
 	if localPlayPrivateCycleID(key) != "" {
 		return localPlayActivityAccess(tx, key, true)
 	}
+	// 已退休试玩绑定仅在其原个人时钟上下文选择旧实例。
+	// 普通全服时钟请求继续服从后台日历，不被旧绑定隐藏。
+	if !LocalPlayContextBound(tx.Statement.Context) {
+		return true, nil
+	}
 	owner := localPlayActivityOwner(tx)
 	activity := localPlayActivityIDForConfig(key)
 	if owner <= 1 || activity == "" || !tx.Migrator().HasTable(&db.LocalPlayActivityBinding{}) {

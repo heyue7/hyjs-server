@@ -11,7 +11,7 @@ export function organizeOperationsMenus(menus: App.Global.Menu[]) {
     shops: 'ph:storefront', announcements: 'ph:megaphone', servers: 'ph:hard-drives',
     'activity-schedules': 'ph:calendar-dots', fields: 'ph:map-trifold', players: 'ph:users-three',
     feedback: 'ph:chat-circle-text', users: 'ph:shield-check', audit: 'ph:clipboard-text',
-    cdk: 'ph:gift', 'redeem-codes': 'ph:ticket',
+    cdk: 'ph:gift', 'redeem-codes': 'ph:ticket', broadcast: 'ph:envelope-open',
     shops_ordinary: 'ph:shopping-bag', shops_memory: 'ph:sparkle', shops_popularity: 'ph:star',
     'shops_popularity-rank': 'ph:ranking', shops_point: 'ph:compass', shops_score: 'ph:coins',
     shops_guild: 'ph:flag', 'shops_pet-market': 'ph:paw-print', 'shops_union-fight': 'ph:sword', shops_vip: 'ph:crown'
@@ -69,6 +69,7 @@ export function organizeOperationsMenus(menus: App.Global.Menu[]) {
     take('activity-schedules'),
     take('fields', '野外地图与部署'),
     take('players', '玩家管理'),
+    take('broadcast', '群发补偿'),
     take('feedback')
   ]);
   const system = group('system-management', '系统管理', [take('users', '后台账号与权限'), take('audit')]);

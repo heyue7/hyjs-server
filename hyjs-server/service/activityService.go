@@ -38,6 +38,9 @@ func (s *GameService) InitializeActivities(ctx context.Context) error {
 			return created.Error
 		}
 		if created.RowsAffected == 0 {
+			if err := migrateEveryoneBenefitCounts(tx); err != nil {
+				return err
+			}
 			return s.seedLoginActivity(tx, cfg)
 		}
 		for _, spec := range []struct{ table, key, kind string }{{"OpenServerFund", "level", "openServerFund"}, {"EveryoneBenefit", "count", "everyoneBenefit"}} {
@@ -51,8 +54,36 @@ func (s *GameService) InitializeActivities(ctx context.Context) error {
 				}
 			}
 		}
+		if err := migrateEveryoneBenefitCounts(tx); err != nil {
+			return err
+		}
 		return s.seedLoginActivity(tx, cfg)
 	})
+}
+
+// migrateEveryoneBenefitCounts 将原档位按顺序改为1、2、3人；旧主键和领取键保持。
+// 仅回填未转换的配置，重启及运营保存均不会重置既有领取。
+func migrateEveryoneBenefitCounts(tx *gorm.DB) error {
+	var rewards []db.ActivityReward
+	if err := tx.Where("activity_id=? AND reward_type=?", "open_server_fund", "everyoneBenefit").Order("threshold ASC").Find(&rewards).Error; err != nil {
+		return err
+	}
+	for i, row := range rewards {
+		if row.RequiredCount > 0 {
+			continue
+		}
+		if err := tx.Model(&db.ActivityReward{}).Where("activity_id=? AND reward_type=? AND threshold=? AND required_count=0", row.ActivityID, row.RewardType, row.Threshold).Update("required_count", i+1).Error; err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func activityRewardDisplayIndex(row db.ActivityReward) int32 {
+	if row.RewardType == "everyoneBenefit" && row.RequiredCount > 0 {
+		return row.RequiredCount
+	}
+	return row.Threshold
 }
 
 // openServerFund 锁定真实角色后完成查询、购买或领取，存档与领取标记原子提交。
@@ -152,7 +183,7 @@ func (s *GameService) openServerFund(ctx context.Context, id int64, request prot
 			}
 			var selected *db.ActivityReward
 			for i := range rewards {
-				if rewards[i].RewardType == kind && rewards[i].Threshold == req.GetIndex() {
+				if rewards[i].RewardType == kind && activityRewardDisplayIndex(rewards[i]) == req.GetIndex() {
 					selected = &rewards[i]
 					break
 				}
@@ -160,14 +191,14 @@ func (s *GameService) openServerFund(ctx context.Context, id int64, request prot
 			if selected == nil {
 				return errors.New("奖励档位不存在")
 			}
-			key := kind + ":" + strconv.Itoa(int(req.GetIndex()))
+			key := kind + ":" + strconv.Itoa(int(selected.Threshold))
 			if claims[key] {
 				return errors.New("奖励已领取")
 			}
 			if kind == "openServerFund" && (!state.Bought || player.GetLevel() < selected.Threshold) {
 				return errors.New("基金未购买或角色等级不足")
 			}
-			if kind == "everyoneBenefit" && count < int64(selected.Threshold) {
+			if kind == "everyoneBenefit" && count < int64(activityRewardDisplayIndex(*selected)) {
 				return errors.New("真实购买人数不足")
 			}
 			// 使用已有固定奖励引擎，物品、装备和余额与领取状态一起落库。
@@ -254,13 +285,13 @@ func (s *GameService) openServerFund(ctx context.Context, id int64, request prot
 			if reward.RewardType == "openServerFund" && state.Bought && player.GetLevel() >= reward.Threshold {
 				status = 1
 			}
-			if reward.RewardType == "everyoneBenefit" && count >= int64(reward.Threshold) {
+			if reward.RewardType == "everyoneBenefit" && count >= int64(activityRewardDisplayIndex(reward)) {
 				status = 1
 			}
 			if claims[reward.RewardType+":"+strconv.Itoa(int(reward.Threshold))] {
 				status = 2
 			}
-			item := &pb.ActivityItem{Index: proto.Int32(reward.Threshold), RewardList: resources, Status: proto.Int32(status)}
+			item := &pb.ActivityItem{Index: proto.Int32(activityRewardDisplayIndex(reward)), RewardList: resources, Status: proto.Int32(status)}
 			switch reward.RewardType {
 			case "openServerFund":
 				fund = append(fund, item)

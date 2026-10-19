@@ -1,6 +1,7 @@
 package constUtil
 
 // 豪华签到只读取后台明确配置的活动和日奖，不再自动补设奖励。
+const P3NativeFirstActivityID = "firstRecharge_local_p3"
 const P3LuxurySignActivityID = "luxury_sign"
 const P3LuxurySignRewardType = "daily"
 

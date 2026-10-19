@@ -200,7 +200,9 @@ namespace HYJS.Notices
         {
             UILabel[] labels = GetComponentsInChildren<UILabel>(true);
             for (int i = 0; i < labels.Length; i++)
-                if (labels[i] != null && (labels[i].bitmapFont != null || labels[i].trueTypeFont != null)) return labels[i];
+                if (labels[i] != null && labels[i].gameObject.activeInHierarchy &&
+                    labels[i].GetComponentInParent<NoticeContent>() == this &&
+                    (labels[i].bitmapFont != null || labels[i].trueTypeFont != null)) return labels[i];
             labels = Resources.FindObjectsOfTypeAll<UILabel>();
             for (int i = 0; i < labels.Length; i++)
                 if (labels[i] != null && labels[i].gameObject.activeInHierarchy && labels[i].bitmapFont != null) return labels[i];
@@ -211,10 +213,15 @@ namespace HYJS.Notices
         {
             GameObject go = Child(name, parent, new Vector3(x, top, 0));
             UILabel label = go.AddComponent<UILabel>();
-            label.bitmapFont = template.bitmapFont;
-            label.trueTypeFont = template.trueTypeFont;
+            // NGUI's trueTypeFont getter can expose bitmapFont.dynamicFont;
+            // assigning it afterwards clears bitmapFont and loses the game's UIFont.
+            if (template.bitmapFont != null) label.bitmapFont = template.bitmapFont;
+            else label.trueTypeFont = template.trueTypeFont;
             label.fontStyle = template.fontStyle;
             label.fontSize = heading ? 24 : 22;
+            label.effectStyle = template.effectStyle;
+            label.effectColor = template.effectColor;
+            label.effectDistance = template.effectDistance;
             label.depth = baseDepth + 4;
             label.pivot = UIWidget.Pivot.TopLeft;
             label.alignment = NGUIText.Alignment.Left;
@@ -270,9 +277,20 @@ namespace HYJS.Notices
             viewHeight = background.height - 56f;
             if (width < 260f || viewHeight < 100f) return;
             root = Child("SoulFlowerOriginalNotices", background.transform, Vector3.zero);
+            // Every path, including loading/empty/error, stays inside the original frame.
+            UIPanel clip = root.AddComponent<UIPanel>();
+            UIPanel originalPanel = background.GetComponentInParent<UIPanel>();
+            clip.depth = originalPanel == null ? 1 : originalPanel.depth + 1;
+            clip.clipping = UIDrawCall.Clipping.SoftClip;
+            clip.baseClipRegion = new Vector4(left + width / 2f, top - viewHeight / 2f, width, viewHeight);
+            clip.clipSoftness = new Vector2(2f, 2f);
             if (status != null)
             {
-                Label("Status", root.transform, left + 8f, top - 8f, width - 16f, status, false, null);
+                UILabel empty = Label("Status", root.transform, left + 16f, top - viewHeight / 2f + 18f, width - 32f, status, false, null);
+                empty.overflowMethod = UILabel.Overflow.ClampContent;
+                empty.alignment = NGUIText.Alignment.Center;
+                empty.height = Mathf.Min(72, Mathf.RoundToInt(viewHeight - 16f));
+                empty.fontSize = 22;
                 return;
             }
             float leftWidth = width * .27f;

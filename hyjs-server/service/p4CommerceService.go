@@ -23,6 +23,7 @@ import (
 )
 
 type p4Product struct {
+	Enabled     *bool  `json:"enabled,omitempty"` // nil preserves enabled legacy catalogues; false suspends new purchases.
 	ID          string `json:"id"`
 	MaxRank     int64  `json:"maxRank,omitempty"`
 	Name        string `json:"name,omitempty"`
@@ -39,6 +40,11 @@ type p4Product struct {
 	DiscountBps int32  `json:"discountBps"`
 	Weight      int64  `json:"weight"`
 }
+
+func (p p4Product) isEnabled() bool {
+	return p.Enabled == nil || *p.Enabled
+}
+
 type p4CommerceRules struct {
 	LiveEditable       bool        `json:"liveEditable,omitempty"`
 	Products           []p4Product `json:"products"`
@@ -491,9 +497,14 @@ func saveP4Commerce(tx *gorm.DB, row *db.P4CommerceState, state *p4CommerceProgr
 	return tx.Save(row).Error
 }
 func p4SampleSlots(rules p4CommerceRules) ([]string, error) {
-	candidates := append([]p4Product(nil), rules.Products...)
+	candidates := make([]p4Product, 0, len(rules.Products))
+	for _, product := range rules.Products {
+		if product.isEnabled() {
+			candidates = append(candidates, product)
+		}
+	}
 	var selected []string
-	for len(selected) < rules.Slots {
+	for len(selected) < rules.Slots && len(candidates) > 0 {
 		var total int64
 		for _, p := range candidates {
 			if total > math.MaxInt64-p.Weight {
@@ -530,6 +541,9 @@ func p4SlotKey(cfg db.P4CommerceRule, state *p4CommerceProgress, p p4Product) st
 	return p.ID
 }
 func p4Visible(cfg db.P4CommerceRule, state *p4CommerceProgress, p p4Product) bool {
+	if !p.isEnabled() {
+		return false
+	}
 	if cfg.Kind != "memory" {
 		return true
 	}

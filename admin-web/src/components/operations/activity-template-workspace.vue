@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ContextHelp from './context-help.vue';
 import { computed, h, onMounted, onUnmounted, ref } from 'vue';
 import { onBeforeRouteLeave } from 'vue-router';
 import { NButton, NSpace, NTag } from 'naive-ui';
@@ -233,6 +234,7 @@ onUnmounted(() => window.removeEventListener('beforeunload', beforeUnload));
           <h1>活动设置</h1>
         </div>
         <NSpace>
+          <RouterLink to="/daily-sign"><NButton>每日签到</NButton></RouterLink>
           <NButton :loading="loading" @click="load">刷新</NButton>
           <NButton v-if="canWrite" type="primary" :disabled="!modes.length" @click="openEditor()">新建活动模板</NButton>
         </NSpace>
@@ -289,7 +291,8 @@ onUnmounted(() => window.removeEventListener('beforeunload', beforeUnload));
           <NForm v-if="activeSection !== 'review'" label-placement="top" :disabled="saving || readOnly">
             <template v-if="activeSection === 'basics'">
               <NFormItem label="活动名称" required><NInput v-model:value="form.name" :maxlength="80" /></NFormItem>
-              <NFormItem label="活动模式" required>
+              <NFormItem required>
+                <template #label><span class="ops-field-label">活动模式<ContextHelp v-if="selectedMode?.notes" title="活动模式说明" :text="selectedMode.notes" /></span></template>
                 <NSelect
                   :value="form.mode"
                   :options="modeOptions"

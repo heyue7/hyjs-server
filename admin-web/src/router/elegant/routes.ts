@@ -126,6 +126,18 @@ export const generatedRoutes: GeneratedRoute[] = [
     }
   },
   {
+    name: 'broadcast',
+    path: '/broadcast',
+    component: 'layout.base$view.broadcast',
+    meta: {
+      title: '群发补偿',
+      i18nKey: 'route.broadcast',
+      icon: 'ph:envelope-open',
+      order: 5,
+      roles: ['viewer', 'operator', 'admin']
+    }
+  },
+  {
     name: 'cdk',
     path: '/cdk',
     component: 'layout.base$view.cdk',
@@ -134,6 +146,19 @@ export const generatedRoutes: GeneratedRoute[] = [
       i18nKey: 'route.cdk',
       icon: 'ph:gift',
       order: 4,
+      roles: ['viewer', 'operator', 'admin']
+    }
+  },
+  {
+    name: 'daily-sign',
+    path: '/daily-sign',
+    component: 'layout.base$view.daily-sign',
+    meta: {
+      title: '每日签到',
+      i18nKey: 'route.daily-sign',
+      icon: 'ph:calendar-check',
+      hideInMenu: true,
+      activeMenu: 'activities',
       roles: ['viewer', 'operator', 'admin']
     }
   },

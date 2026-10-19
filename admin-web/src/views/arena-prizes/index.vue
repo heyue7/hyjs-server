@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ContextHelp from '@/components/operations/context-help.vue';
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { onBeforeRouteLeave, useRouter } from 'vue-router';
 import { ApiError, api, errorMessage, json } from '@/service/operations';
@@ -170,7 +171,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload));
 <template>
   <div class="ops-page arena-prizes-page">
     <div class="ops-toolbar">
-      <div class="ops-page-label">竞技胜利翻牌</div>
+      <div class="ops-inline-heading"><div class="ops-page-label">竞技胜利翻牌</div><ContextHelp v-if="snapshot?.notes" title="竞技奖励规则" :text="snapshot.notes" /></div>
       <NSpace align="center">
         <NTag v-if="dirty && canWrite" type="warning" :bordered="false">未保存</NTag>
         <NTag v-if="!canWrite" :bordered="false">只读</NTag>

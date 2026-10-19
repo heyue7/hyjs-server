@@ -6,6 +6,7 @@ import (
 	"google.golang.org/protobuf/proto"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
+	"hyjs-server/constUtil"
 	"hyjs-server/db"
 	pb "hyjs-server/model/protocol"
 	"strconv"
@@ -24,8 +25,13 @@ func (s *GameService) InitializeMonthSign(ctx context.Context) error {
 		}
 
 		for day := int32(1); day <= 31; day++ {
-			r := db.MonthSignRule{Day: day, Reward: "coin," + strconv.FormatInt(int64(day)*1000, 10), DoubleVIP: 2, Enabled: false, Source: "本地服SQL奖历；原服奖历未恢复；UTC+8每月累计，每日一档，VIP2双倍及当日差额补领"}
+			r := db.MonthSignRule{Day: day, Reward: reMonthSignReward(day), DoubleVIP: 0, Enabled: true, Source: constUtil.ReMonthSignSource}
 			if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&r).Error; err != nil {
+				return err
+			}
+			// 仅替换从未启用的旧自动奖历；运营保存和已领取快照保持。
+			legacy := "coin," + strconv.FormatInt(int64(day)*1000, 10)
+			if err := tx.Model(&db.MonthSignRule{}).Where("day=? AND reward=? AND double_vip=? AND enabled=? AND source=?", day, legacy, 2, false, constUtil.LegacyMonthSignSeedSource).Updates(map[string]any{"reward": r.Reward, "double_vip": r.DoubleVIP, "enabled": true, "source": r.Source}).Error; err != nil {
 				return err
 			}
 		}
@@ -101,8 +107,12 @@ func (s *GameService) monthSignAt(ctx context.Context, id int64, request proto.M
 			if r.Day != int32(i+1) || !r.Enabled || r.DoubleVIP < 0 {
 				return errors.New("月签到SQL日历无效或已关闭")
 			}
-			if _, err := activityLoginResources(r.Reward); err != nil {
+			supported, err := s.openServerRewardSupported(r.Reward)
+			if err != nil {
 				return err
+			}
+			if !supported {
+				return errors.New("签到奖励资源尚未恢复")
 			}
 		}
 		state := db.MonthSignState{PlayerID: id, Month: month}
@@ -152,7 +162,7 @@ func (s *GameService) monthSignAt(ctx context.Context, id int64, request proto.M
 			if double {
 				content += ";" + content
 			}
-			gain, err := s.chapterBoxGain(player, game, content)
+			gain, err := s.GrantFixedReward(player, game, content)
 			if err != nil {
 				return err
 			}
@@ -203,4 +213,10 @@ func (s *GameService) monthSignAt(ctx context.Context, id int64, request proto.M
 		return nil, err
 	}
 	return []proto.Message{response}, nil
+}
+
+// reMonthSignReward 复用Re现成七档，原服奖历未知的边界保留在来源中。
+func reMonthSignReward(day int32) string {
+	rewards := []string{"coin,100000", "item_007,40", "item_010,30", "item_006,60", "item_005,60", "diamond,300", "item_016,5"}
+	return rewards[(day-1)%int32(len(rewards))]
 }

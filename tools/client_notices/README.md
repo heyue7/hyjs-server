@@ -34,3 +34,9 @@ The content check executes the exact compiled bridge's parser under .NET with no
 The earlier `notices-after-art-r1` output had an incomplete helper-signature check and must not be integrated. `r2` stopped at the added SDK-ABI guard. The final handoff names its exact qualified output and helper SHA; historical artifacts are diagnostic evidence only.
 
 Prototype r3/r4 used Re's runtime Words Font lookup and are not deliverables: the original-font inventory exposed that assumption before packaging. r5 implemented NGUI rendering; r6 also qualifies the compiled NGUI font-copy call contract and corrects report metadata. The root handoff identifies only the final candidate.
+
+## Existing-client style updates
+
+For an already integrated notice bridge, `rebuild_bridge.py --base-apk <current.apk> --output-directory <fresh analysis directory>` recompiles only SoulFlowerNotices.dll and checks its public ABI against the inherited helper. Package with client_release/package_native.py; the main assembly, DEX and all other compressed payloads stay exact.
+
+NGUI bitmapFont and trueTypeFont must be assigned exclusively: the trueTypeFont getter may expose UIFont.dynamicFont, and its setter clears bitmapFont. Retain the original UIFont wrapper. All view states share the original frame clipping boundary, including centered loading/empty/error states.

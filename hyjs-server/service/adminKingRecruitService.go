@@ -4,9 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"google.golang.org/protobuf/proto"
+	pb "hyjs-server/model/protocol"
 	"math"
 	"strconv"
 	"strings"
+	"time"
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -296,4 +299,47 @@ func (s *GameService) AdminKingRecruitResources(ctx context.Context, actor *mode
 		out.Items = append(out.Items, model.AdminKingRecruitResource{AdminItemDTO: item, Space: space, SpaceLabel: labels[space]})
 	}
 	return out, nil
+}
+
+// kingRecruitOpenState 使用与原招募相同的角色、排期和奖池，驱动原主城入口。
+// 原客户端会把缺失或关闭的heroRecuritKing入口等级设为99999。
+func (s *GameService) kingRecruitOpenState(ctx context.Context, id int64, now time.Time) (*pb.OpenState, error) {
+	result := &pb.OpenState{Type: proto.String(constUtil.KingRecruitNativeOpenState), IsOpen: proto.Int32(0)}
+	if !s.P1Ready || !db.GetIns().Migrator().HasTable(&db.KingRecruitRules{}) {
+		return result, nil
+	}
+	err := db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := ServerGameClockGuardTransaction(tx); err != nil {
+			return err
+		}
+		var row db.Profile
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&row, id).Error; err != nil {
+			return err
+		}
+		player, _, err := decodeProfileForCalendarUpdate(tx, &row)
+		if err != nil {
+			return err
+		}
+		key, _, err := s.adminScheduledKingRecruitPool(tx, now.UnixMilli())
+		if err != nil || key == "" {
+			return err
+		}
+		var pool db.GameplayPool
+		if err := tx.First(&pool, "id=?", key).Error; err != nil {
+			return err
+		}
+		if !pool.Enabled || player.GetLevel() < pool.MinLevel || (pool.StartAt > 0 && now.UnixMilli() < pool.StartAt) || (pool.EndAt > 0 && now.UnixMilli() >= pool.EndAt) {
+			return nil
+		}
+		var rewards []db.GameplayPoolReward
+		if err := tx.Where("pool_id=?", key).Find(&rewards).Error; err != nil {
+			return err
+		}
+		if err := s.validateKingRecruitActivityPool(pool, rewards); err != nil {
+			return err
+		}
+		result.IsOpen = proto.Int32(1)
+		return nil
+	})
+	return result, err
 }

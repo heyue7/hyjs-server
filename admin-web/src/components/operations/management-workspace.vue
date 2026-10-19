@@ -18,7 +18,7 @@ defineEmits<{ back: []; save: []; 'update:section': [value: string] }>();
       <div class="management-title">
         <NButton v-if="editing" quaternary :disabled="saving" @click="$emit('back')">← 返回列表</NButton>
         <div>
-          <div class="ops-page-label">{{ title }}</div>
+          <div class="management-heading"><div class="ops-page-label">{{ title }}</div><slot name="title-extra" /></div>
           <p v-if="subtitle" class="ops-muted">{{ subtitle }}</p>
         </div>
       </div>
@@ -63,6 +63,12 @@ defineEmits<{ back: []; save: []; 'update:section': [value: string] }>();
   align-items: center;
   gap: 16px;
   min-width: 0;
+}
+.management-heading {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 .management-title p {
   margin: 6px 0 0;

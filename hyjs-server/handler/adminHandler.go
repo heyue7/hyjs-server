@@ -53,6 +53,8 @@ func RegisterAdminRoutes(r *gin.Engine, assets string) {
 	RegisterAdminFeedbackRoutes(a)
 	RegisterAdminCDKRoutes(a)
 	RegisterAdminItemDetailRoutes(a)
+	RegisterAdminBroadcastRoutes(a)
+	RegisterAdminMonthSignRoutes(a)
 	a.GET("/auth/me", AdminMeHandler)
 	a.POST("/auth/logout", AdminLogoutHandler)
 	a.GET("/overview", AdminOverviewHandler)

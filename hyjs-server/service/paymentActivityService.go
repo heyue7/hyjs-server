@@ -280,7 +280,9 @@ func (s *GameService) paymentActivity(ctx context.Context, id int64, request pro
 			if e != nil {
 				return e
 			}
-			if !p3ResourcesEqual(selected, expected) {
+			// 原首充面板只提交活动ID和档位，固定奖品由服务端快照决定。
+			// 非空清单仍须完全匹配，其他活动继续验证原选择结果。
+			if !(r.Kind == "first" && len(selected) == 0) && !p3ResourcesEqual(selected, expected) {
 				return p3Error()
 			}
 			gain, err = s.GrantFixedReward(p, g, reward)

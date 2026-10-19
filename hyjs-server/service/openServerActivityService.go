@@ -901,5 +901,10 @@ func (s *GameService) openServerOpenStatesAt(ctx context.Context, id int64, now 
 		}
 		states = append(states, benefit)
 	}
+	king, err := s.kingRecruitOpenState(ctx, id, now)
+	if err != nil {
+		return nil, err
+	}
+	states = append(states, king)
 	return states, nil
 }

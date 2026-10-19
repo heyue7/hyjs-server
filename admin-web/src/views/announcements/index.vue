@@ -142,11 +142,8 @@ onMounted(load);
               />
             </NFormItem>
           </div>
-          <NFormItem label="发布状态">
-            <NSwitch v-model:value="draft.enabled">
-              <template #checked>发布</template>
-              <template #unchecked>草稿</template>
-            </NSwitch>
+          <NFormItem label="发布公告">
+            <NSwitch v-model:value="draft.enabled" aria-label="发布公告" />
           </NFormItem>
         </NForm>
         <NButton text @click="preview = !preview">{{ preview ? '收起预览' : '预览公告' }}</NButton>

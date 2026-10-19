@@ -5,7 +5,9 @@ type ActivityReward struct {
 	ActivityID string `gorm:"primaryKey;size:64" json:"activityId"`
 	RewardType string `gorm:"primaryKey;size:32" json:"rewardType"`
 	Threshold  int32  `gorm:"primaryKey;autoIncrement:false" json:"threshold"`
-	Reward     string `gorm:"size:512;not null" json:"reward"`
+	// RequiredCount 为全民福利的新人数门槛；Threshold 保留旧档位身份和领取键。
+	RequiredCount int32  `gorm:"not null;default:0" json:"requiredCount"`
+	Reward        string `gorm:"size:512;not null" json:"reward"`
 }
 
 func (ActivityReward) TableName() string { return "activity_rewards" }

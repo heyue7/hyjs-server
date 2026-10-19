@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ContextHelp from '@/components/operations/context-help.vue';
 import { computed, h, onBeforeUnmount, onMounted, ref } from 'vue';
 import { NButton, NImage, NSpace, NTag } from 'naive-ui';
 import type { DataTableColumns } from 'naive-ui';
@@ -203,6 +204,7 @@ onMounted(load);
     @back="back"
     @save="save"
   >
+    <template #title-extra><ContextHelp v-if="draft" title="称号配置说明" :text="`称号编号：${draft.id}\n条件和属性仅影响新获得的称号，已持有称号保持原属性和到期时间。`" /></template>
     <template v-if="!draft" #actions><NButton :loading="loading" @click="load">刷新</NButton></template>
     <template #alert><NAlert v-if="error || saveError" type="error" :title="saveError || error" /></template>
     <NCard v-if="!draft" :bordered="false" class="ops-panel">
@@ -291,10 +293,7 @@ onMounted(load);
       <section v-show="section === 'publish'">
         <h3 class="mb-20px">展示与状态</h3>
         <NFormItem label="开放新资格">
-          <NSwitch v-model:value="draft.enabled">
-            <template #checked>开放</template>
-            <template #unchecked>关闭</template>
-          </NSwitch>
+          <NSwitch v-model:value="draft.enabled" aria-label="开放新资格" />
         </NFormItem>
         <NFormItem label="在客户端目录中展示"><NSwitch v-model:value="draft.show" /></NFormItem>
         <p class="ops-inline-note">关闭后不能再新获得，已持有的称号不受影响。</p>

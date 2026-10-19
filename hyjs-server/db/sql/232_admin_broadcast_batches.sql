@@ -1,0 +1,22 @@
+CREATE TABLE IF NOT EXISTS admin_broadcast_batches (
+  id VARCHAR(36) NOT NULL PRIMARY KEY,
+  server_id BIGINT NOT NULL,
+  actor_id BIGINT NOT NULL,
+  actor_name VARCHAR(80) NOT NULL,
+  title VARCHAR(191) NOT NULL,
+  body TEXT NOT NULL,
+  rewards TEXT NOT NULL,
+  reason TEXT NOT NULL,
+  body_hash VARCHAR(64) NOT NULL,
+  version VARCHAR(64) NOT NULL,
+  recipient_count BIGINT NOT NULL,
+  excluded_count BIGINT NOT NULL,
+  success_count BIGINT NOT NULL,
+  created_at BIGINT NOT NULL,
+  expires_at BIGINT NOT NULL,
+  sent_at BIGINT NOT NULL,
+  commit_request_id VARCHAR(36) NULL,
+  UNIQUE KEY admin_broadcast_commit (commit_request_id),
+  INDEX idx_admin_broadcast_batches_server_id (server_id),
+  INDEX idx_admin_broadcast_batches_actor_id (actor_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
