@@ -24,6 +24,7 @@ namespace HYJS.KingRecruit
 
         ShopPage shop;
         ShopTabButton template;
+        int originalEntryIndex;
         readonly List<ShopWorldEntry> entries = new List<ShopWorldEntry>();
         readonly List<EntryWorld> worlds = new List<EntryWorld>();
         long owner;
@@ -95,6 +96,8 @@ namespace HYJS.KingRecruit
             if (current != template)
             {
                 template = current;
+                int index = shop.simpleGrid.childs.IndexOf(current.gameObject);
+                originalEntryIndex = index < 0 ? 0 : index;
                 entries.Clear();
                 // The original type-1 dispatch is replaced by the explicit world entry.
                 template.m_callback = null;
@@ -352,7 +355,13 @@ namespace HYJS.KingRecruit
                 bool open = HasWorld(space);
                 entry.gameObject.SetActive(open);
                 if (button != null && button.labName != null)
+                {
                     button.labName.text = "王者招募·" + (space == 1 ? "SAO" : space == 2 ? "ALO" : "GGO");
+                    button.labName.fontSize = 20;
+                    button.labName.width = 150;
+                    button.labName.maxLineCount = 1;
+                    button.labName.overflowMethod = UILabel.Overflow.ShrinkContent;
+                }
                 if (button != null && button.chosedBg != null) button.chosedBg.SetActive(false);
                 if (button != null && button.objPointer != null) button.objPointer.SetActive(false);
             }
@@ -374,8 +383,7 @@ namespace HYJS.KingRecruit
                 entries[0] = entry;
                 return entry;
             }
-            if (shop.tabBtnPrefab == null) return null;
-            GameObject clone = (GameObject)UnityEngine.Object.Instantiate((UnityEngine.Object)shop.tabBtnPrefab);
+            GameObject clone = (GameObject)UnityEngine.Object.Instantiate((UnityEngine.Object)template.gameObject);
             clone.name = "ShopWorld" + space;
             clone.transform.parent = shop.simpleGrid.transform;
             clone.transform.localScale = Vector3.one;
@@ -388,7 +396,8 @@ namespace HYJS.KingRecruit
             // Same original button template, font and sprites; the original type-1 callback is removed.
             button.SetType(ShopType.KingsRecruit);
             button.m_callback = null;
-            entry = clone.AddComponent<ShopWorldEntry>();
+            entry = clone.GetComponent<ShopWorldEntry>();
+            if (entry == null) entry = clone.AddComponent<ShopWorldEntry>();
             entry.Menu = this;
             entry.Space = space;
             entries[space - 1] = entry;
@@ -401,14 +410,12 @@ namespace HYJS.KingRecruit
             if (shop == null || shop.simpleGrid == null || template == null) return;
             List<GameObject> childs = shop.simpleGrid.childs;
             if (childs == null) return;
-            int at = childs.IndexOf(template.gameObject);
-            if (at < 0) at = childs.Count;
             for (int space = 1; space <= 3; space++)
             {
                 ShopWorldEntry entry = entries.Count >= 3 ? entries[space - 1] : null;
                 if (entry != null) childs.Remove(entry.gameObject);
             }
-            int insert = Math.Min(at, childs.Count);
+            int insert = Math.Min(originalEntryIndex, childs.Count);
             for (int space = 1; space <= 3; space++)
             {
                 ShopWorldEntry entry = entries.Count >= 3 ? entries[space - 1] : null;
