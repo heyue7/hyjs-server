@@ -75,8 +75,21 @@ func p13UFPlayerBattleRulesValid(r *p13UFPlayerBattleRules) bool {
 	if r == nil {
 		return false
 	}
+	// Validate operator-controlled values against the published admin bounds.
+	if len(r.ReviveSeconds) < 1 || len(r.ReviveSeconds) > 64 {
+		return false
+	}
+	for _, seconds := range r.ReviveSeconds {
+		if seconds < 1 || seconds > 86400 {
+			return false
+		}
+	}
 	p := r.Policy
-	return p.Enabled && (p.ID == 1 && r.FullHPOnly && r.PartialCapabilityProof == "" || p.ID == constUtil.P13UFPlayerPartialPolicyID && !r.FullHPOnly && r.PartialCapabilityProof != "" && r.PartialCapabilityProof == constUtil.P6UFPartialPlayerNativeProof) && strings.TrimSpace(p.Version) != "" && strings.TrimSpace(p.Source) != "" && p.PublishedAt > 0 && p.StartsAt >= p.PublishedAt && p.EndsAt > p.StartsAt && p.ReviveRule == constUtil.P13UFPlayerBattleReviveRule && r.MatchID != "" && r.MatchSHA != "" && r.Engine == constUtil.P6EngineVersion && r.Client == constUtil.P6OriginalClientHash && r.Configuration != "" && r.CapabilityProof == constUtil.P6UFPlayerNativeProof && r.CapabilityProof != "" && r.MaxRounds == 40 && r.AttackerFirst && r.AttackerFactor == 1 && r.DefenderFactor == 1 && r.AttackCost == 0 && r.DurationMillis == 5000 && r.KillScore == 5 && r.KillToken == 5 && r.ArriveRange == .8 && fmt.Sprint(r.ReviveSeconds) == "[5 10 15 20 25 30 35 40]"
+	return p.Enabled && (p.ID == 1 && r.FullHPOnly && r.PartialCapabilityProof == "" || p.ID == constUtil.P13UFPlayerPartialPolicyID && !r.FullHPOnly && r.PartialCapabilityProof != "" && r.PartialCapabilityProof == constUtil.P6UFPartialPlayerNativeProof) && strings.TrimSpace(p.Version) != "" && strings.TrimSpace(p.Source) != "" && p.PublishedAt > 0 && p.StartsAt >= p.PublishedAt && p.EndsAt > p.StartsAt && p.ReviveRule == constUtil.P13UFPlayerBattleReviveRule && r.MatchID != "" && r.MatchSHA != "" && r.Engine == constUtil.P6EngineVersion && r.Client == constUtil.P6OriginalClientHash && r.Configuration != "" && r.CapabilityProof == constUtil.P6UFPlayerNativeProof && r.CapabilityProof != "" && r.MaxRounds == 40 && r.AttackerFirst && r.AttackerFactor == 1 && r.DefenderFactor == 1 && r.AttackCost == 0 && r.DurationMillis >= 100 && r.DurationMillis <= 3600000 && p13UFGuildFiniteRange(r.KillScore, 0, 1e9) && p13UFGuildFiniteRange(r.KillToken, 0, 1e9) && p13UFGuildFiniteRange(r.ArriveRange, .1, 100)
+}
+
+func p13UFGuildFiniteRange(value, minimum, maximum float64) bool {
+	return !math.IsNaN(value) && !math.IsInf(value, 0) && value >= minimum && value <= maximum
 }
 
 // Freeze only while a new field is being built, before any participant enters.
@@ -152,7 +165,7 @@ func p13UFPlayerBattleReadRules(tx *gorm.DB, row *db.P13UnionFightPlayerBattleAt
 		return nil, err
 	}
 	var rules p13UFPlayerBattleRules
-	if offer.SourceHash != row.OfferHash || p6Digest([]byte(offer.Snapshot)) != offer.SourceHash || json.Unmarshal([]byte(offer.Snapshot), &rules) != nil || !p13UFPlayerBattleRulesValid(&rules) || rules.MatchID != row.MatchID || offer.CapturedAt > row.CreatedAt || row.CreatedAt < rules.Policy.StartsAt || row.DueAt >= rules.Policy.EndsAt {
+	if offer.SourceHash != row.OfferHash || p6Digest([]byte(offer.Snapshot)) != offer.SourceHash || json.Unmarshal([]byte(offer.Snapshot), &rules) != nil || !p13UFPlayerBattleRulesValid(&rules) || rules.MatchID != row.MatchID || row.CreatedAt <= 0 || row.CreatedAt > math.MaxInt64-rules.DurationMillis || row.DueAt <= row.CreatedAt || offer.CapturedAt > row.CreatedAt || row.CreatedAt < rules.Policy.StartsAt || row.DueAt >= rules.Policy.EndsAt || row.DueAt != row.CreatedAt+rules.DurationMillis {
 		return nil, errors.New(constUtil.P13UFPlayerBattleConflict)
 	}
 	return &rules, nil
@@ -306,7 +319,12 @@ func (s *GameService) p13UFTryPlayerBattle(ctx context.Context, id int64, reques
 				return e
 			}
 		}
-		if actor.MatchID != target.MatchID || match.ID != targetMatch.ID || actor.GuildID == target.GuildID || actor.Camp == target.Camp || actor.Hooked || target.Hooked || (frame.GetState() != 0 && frame.GetState() != 5) || (targetFrame.GetState() != 0 && targetFrame.GetState() != 5) || now.UnixMilli() < match.StartAt || now.UnixMilli()+5000 >= match.EndAt || offer.CapturedAt > actor.JoinedAt || offer.CapturedAt > target.JoinedAt || p13UFResourceDistance(actor, target.X, target.Y, target.Z) > .8 {
+		// Decode the field's immutable offer before checking distance and scheduling.
+		var frozenRules p13UFPlayerBattleRules
+		if p6Digest([]byte(offer.Snapshot)) != offer.SourceHash || json.Unmarshal([]byte(offer.Snapshot), &frozenRules) != nil || !p13UFPlayerBattleRulesValid(&frozenRules) || frozenRules.MatchID != match.ID || now.UnixMilli() <= 0 || now.UnixMilli() > math.MaxInt64-frozenRules.DurationMillis {
+			return errors.New(constUtil.P13UFPlayerBattleConflict)
+		}
+		if actor.MatchID != target.MatchID || match.ID != targetMatch.ID || actor.GuildID == target.GuildID || actor.Camp == target.Camp || actor.Hooked || target.Hooked || (frame.GetState() != 0 && frame.GetState() != 5) || (targetFrame.GetState() != 0 && targetFrame.GetState() != 5) || now.UnixMilli() < match.StartAt || now.UnixMilli()+frozenRules.DurationMillis >= match.EndAt || offer.CapturedAt > actor.JoinedAt || offer.CapturedAt > target.JoinedAt || p13UFResourceDistance(actor, target.X, target.Y, target.Z) > frozenRules.ArriveRange {
 			return errors.New(constUtil.P13UFPlayerBattleRefusal)
 		}
 		var busy int64
@@ -330,7 +348,7 @@ func (s *GameService) p13UFTryPlayerBattle(ctx context.Context, id int64, reques
 			}
 			internalStamp = number.Int64() + 1
 		}
-		row := db.P13UnionFightPlayerBattleAttempt{ID: p6Digest([]byte(fmt.Sprintf("%s/%d/%d", match.ID, id, internalStamp))), MatchID: match.ID, PlayerID: id, TargetID: request.GetTargetGuid(), Stamp: internalStamp, ClientStamp: stamp, Status: constUtil.P13UFPlayerBattlePending, OfferHash: offer.SourceHash, CreatedAt: now.UnixMilli(), DueAt: now.UnixMilli() + 5000}
+		row := db.P13UnionFightPlayerBattleAttempt{ID: p6Digest([]byte(fmt.Sprintf("%s/%d/%d", match.ID, id, internalStamp))), MatchID: match.ID, PlayerID: id, TargetID: request.GetTargetGuid(), Stamp: internalStamp, ClientStamp: stamp, Status: constUtil.P13UFPlayerBattlePending, OfferHash: offer.SourceHash, CreatedAt: now.UnixMilli(), DueAt: now.UnixMilli() + frozenRules.DurationMillis}
 		row.FightID = strconv.FormatInt(p13UFFieldGUID(match.ID, "ordinary-player14", row.ID), 10)
 		req, _ := proto.MarshalOptions{Deterministic: true}.Marshal(request)
 		row.RequestHash = p6Digest(req)
@@ -426,8 +444,8 @@ func (s *GameService) p13UFTryPlayerBattle(ctx context.Context, id int64, reques
 		}
 		row.TerminalHash = p6Digest(row.Terminal)
 		frame.State, targetFrame.State = proto.Int32(1), proto.Int32(1)
-		frame.LeftTime, targetFrame.LeftTime = proto.Float32(5), proto.Float32(5)
-		frame.TotalTime, targetFrame.TotalTime = proto.Float32(5), proto.Float32(5)
+		frame.LeftTime, targetFrame.LeftTime = proto.Float32(float32(rules.DurationMillis)/1000), proto.Float32(float32(rules.DurationMillis)/1000)
+		frame.TotalTime, targetFrame.TotalTime = proto.Float32(float32(rules.DurationMillis)/1000), proto.Float32(float32(rules.DurationMillis)/1000)
 		if e = p13UFFieldSaveActor(tx, actor, frame); e != nil {
 			return e
 		}
@@ -574,7 +592,7 @@ func (s *GameService) p13UFPlayerBattleVerify(tx *gorm.DB, row *db.P13UnionFight
 	reject := func() (*model.FrozenBattleInput, *model.CombatFinalHPOutcome, []p13UFPlayerBattleSide, *p13UFPlayerBattleRules, error) {
 		return nil, nil, nil, nil, errors.New(constUtil.P13UFPlayerBattleConflict)
 	}
-	if row == nil || row.ID != p6Digest([]byte(fmt.Sprintf("%s/%d/%d", row.MatchID, row.PlayerID, row.Stamp))) || row.FightID != strconv.FormatInt(p13UFFieldGUID(row.MatchID, "ordinary-player14", row.ID), 10) || row.SourceHash != p13UFPlayerBattleHash(row) || row.PlayerID <= 0 || row.TargetID <= 0 || row.PlayerID == row.TargetID || row.Stamp <= 0 || row.ClientStamp < 0 || (row.ClientStamp > 0 && row.ClientStamp != row.Stamp) || row.CreatedAt <= 0 || row.DueAt != row.CreatedAt+5000 || (row.Status != constUtil.P13UFPlayerBattlePending && row.Status != constUtil.P13UFPlayerBattleSettled) || row.StartHash != p6Digest(row.StartPB) || row.TerminalHash != p6Digest(row.Terminal) {
+	if row == nil || row.ID != p6Digest([]byte(fmt.Sprintf("%s/%d/%d", row.MatchID, row.PlayerID, row.Stamp))) || row.FightID != strconv.FormatInt(p13UFFieldGUID(row.MatchID, "ordinary-player14", row.ID), 10) || row.SourceHash != p13UFPlayerBattleHash(row) || row.PlayerID <= 0 || row.TargetID <= 0 || row.PlayerID == row.TargetID || row.Stamp <= 0 || row.ClientStamp < 0 || (row.ClientStamp > 0 && row.ClientStamp != row.Stamp) || row.CreatedAt <= 0 || (row.Status != constUtil.P13UFPlayerBattlePending && row.Status != constUtil.P13UFPlayerBattleSettled) || row.StartHash != p6Digest(row.StartPB) || row.TerminalHash != p6Digest(row.Terminal) {
 		return reject()
 	}
 	request, _ := proto.MarshalOptions{Deterministic: true}.Marshal(&pb.CSUFPlayerAskFight{TargetGuid: proto.Int64(row.TargetID)})
@@ -832,11 +850,12 @@ func p13UFPlayerBattleProject(tx *gorm.DB, actor *db.P13UnionFightFieldPlayer, f
 		if err != nil {
 			return err
 		}
-		if active.SourceHash != p13UFPlayerBattleHash(&active) || active.DueAt != active.CreatedAt+5000 {
+		rules, rulesErr := p13UFPlayerBattleReadRules(tx, &active)
+		if active.SourceHash != p13UFPlayerBattleHash(&active) || rulesErr != nil {
 			return errors.New(constUtil.P13UFPlayerBattleConflict)
 		}
 		frame.LeftTime = proto.Float32(float32(max(int64(0), active.DueAt-now.UnixMilli())) / 1000)
-		frame.TotalTime = proto.Float32(5)
+		frame.TotalTime = proto.Float32(float32(rules.DurationMillis) / 1000)
 		return nil
 	}
 	if frame.GetState() != 3 {

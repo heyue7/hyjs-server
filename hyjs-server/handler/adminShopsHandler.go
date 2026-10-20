@@ -72,6 +72,10 @@ func AdminShopProductSaveHandler(c *gin.Context) {
 		return
 	}
 	for _, r := range req.Rewards {
+		if r.ResourceID == "stamina" {
+			adminError(c, constUtil.ErrAdminInput)
+			return
+		}
 		if strings.TrimSpace(r.ResourceID) != r.ResourceID || r.ResourceID == "" || len(r.ResourceID) > 64 || r.Amount < 1 || r.Amount > 10000 {
 			adminError(c, constUtil.ErrAdminInput)
 			return

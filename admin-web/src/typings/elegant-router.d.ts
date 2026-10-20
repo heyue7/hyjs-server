@@ -33,6 +33,8 @@ declare module "@elegant-router/types" {
     "feedback": "/feedback";
     "fields": "/fields";
     "game-accounts": "/game-accounts";
+    "guild-settings": "/guild-settings";
+    "guilds": "/guilds";
     "home": "/home";
     "iframe-page": "/iframe-page/:url";
     "items": "/items";
@@ -103,6 +105,8 @@ declare module "@elegant-router/types" {
     | "feedback"
     | "fields"
     | "game-accounts"
+    | "guild-settings"
+    | "guilds"
     | "home"
     | "iframe-page"
     | "items"
@@ -150,6 +154,8 @@ declare module "@elegant-router/types" {
     | "feedback"
     | "fields"
     | "game-accounts"
+    | "guild-settings"
+    | "guilds"
     | "home"
     | "items"
     | "mail"

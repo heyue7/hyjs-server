@@ -258,7 +258,10 @@ func (s *GameService) dispatch(ctx context.Context, r *model.GamePacket, peer st
 	if err != nil {
 		return nil, err
 	}
-	s = runtime
+	s, err = runtime.guildRuntimeForRequest(ctx, r)
+	if err != nil {
+		return nil, err
+	}
 	ctx = bindFieldRuntime(ctx, s)
 	switch b := r.Body.(type) {
 	case *pb.CSRefreshSideHp:

@@ -612,7 +612,13 @@ func (s *GameService) AdminNativeActivities(ctx context.Context, p *model.AdminP
 			return nil, err
 		}
 		for _, row := range products {
-			ids = append(ids, "product:"+row.ID)
+			// 当前客户端固定映射 gf_default；其他渠道保留支付兼容和订单历史，不占当前活动列表。
+			for _, channel := range strings.Split(row.Channels, ";") {
+				if channel == p3PaymentChannel("AND0003") {
+					ids = append(ids, "product:"+row.ID)
+					break
+				}
+			}
 		}
 	}
 	ids = append(ids, "vip-benefits")
@@ -664,8 +670,23 @@ func (s *GameService) AdminNativeActivities(ctx context.Context, p *model.AdminP
 			}
 		}
 	}
+	// 一次读取移除标记，原配置和所有奖励历史继续留在各业务表。
+	archived := map[string]bool{}
+	if tx.Migrator().HasTable(&db.AdminActivityPresentation{}) {
+		var hidden []db.AdminActivityPresentation
+		if err := tx.Select("activity_id").Where("archived = ?", true).Find(&hidden).Error; err != nil {
+			return nil, err
+		}
+		for _, row := range hidden {
+			archived[row.ActivityID] = true
+		}
+	}
 	out := []model.AdminNativeActivityDTO{}
 	for _, id := range ids {
+		// 个人活动日历的独立期由个人工具管理，后台只配置公共来源。
+		if archived[id] || strings.Contains(id, "_lp-") {
+			continue
+		}
 		snap, err := s.adminNativeLoad(tx, id, false)
 		if err != nil {
 			return nil, err
@@ -688,6 +709,13 @@ func (s *GameService) AdminSaveNativeActivity(ctx context.Context, p *model.Admi
 		snap, err := s.adminNativeLoad(tx, id, true)
 		if err != nil {
 			return err
+		}
+		meta, err := adminNativeMeta(tx, id, true)
+		if err != nil {
+			return err
+		}
+		if meta.Archived {
+			return constUtil.ErrAdminConfigConflict
 		}
 		if snap.dto.Version != req.Version {
 			return constUtil.ErrAdminConfigConflict
@@ -1353,4 +1381,33 @@ func adminNativePBResourceSpec(values []*pb.BaseResource) (string, error) {
 		parts = append(parts, value.GetId()+","+strconv.Itoa(int(value.GetNum())))
 	}
 	return strings.Join(parts, ";"), nil
+}
+
+// AdminRemoveNativeActivity 从运营列表移除停用配置，保留源配置、回执与玩家历史。
+func (s *GameService) AdminRemoveNativeActivity(ctx context.Context, p *model.AdminPrincipal, id, version string) error {
+	return db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := ServerGameClockGuardTransaction(tx); err != nil {
+			return err
+		}
+		if err := adminOperationUser(tx, p, true); err != nil {
+			return err
+		}
+		snap, err := s.adminNativeLoad(tx, id, true)
+		if err != nil {
+			return err
+		}
+		meta, err := adminNativeMeta(tx, id, true)
+		if err != nil {
+			return err
+		}
+		if meta.Archived || snap.dto.Version != version || snap.dto.Enabled {
+			return constUtil.ErrAdminConfigConflict
+		}
+		meta.ActivityID, meta.Mode, meta.TemplateID = id, "native-"+snap.dto.Kind, "native-"+snap.dto.Kind
+		meta.Name, meta.Alias, meta.Archived, meta.UpdatedAtMillis = snap.dto.Name, snap.dto.Alias, true, time.Now().UnixMilli()
+		if err = tx.Save(&meta).Error; err != nil {
+			return err
+		}
+		return adminAudit(tx, p, "native-activity.remove", id, "移除停用配置；保留源数据及玩家历史")
+	})
 }

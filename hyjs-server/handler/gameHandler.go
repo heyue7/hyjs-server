@@ -772,16 +772,18 @@ func ValidateGameRequest(p *model.GamePacket) error {
 			return errors.New("Missing field monster")
 		}
 	case *pb.CSSidePveFightEnd:
-		if b.GetFightId() == "" || b.Result == nil || (b.GetResult() != 0 && b.GetResult() != 1) || b.GetBattlePlayer() == nil || b.GetBattlePlayer().GetInst() == nil || len(b.GetBattlePlayer().GetFormation()) == 0 || b.GetOptRecord() == nil {
+		// 原 protobuf-net 省略零值：败场 result=0、死亡 HP=0 和终末总血量缺省均合法。
+		// 仍校验消息容器、非零身份、枚举和有限数值；归属/阵型/HP 上限由冻结战斗核对。
+		if b.GetFightId() == "" || (b.GetResult() != 0 && b.GetResult() != 1) || b.GetBattlePlayer() == nil || b.GetBattlePlayer().GetInst() == nil || len(b.GetBattlePlayer().GetFormation()) == 0 || b.GetOptRecord() == nil {
 			return errors.New("Invalid field battle result")
 		}
 		record := b.GetOptRecord()
-		if record.FinalRoundNum == nil || record.GetFinalRoundNum() < 0 || record.GetFinalRoundNum() > 40 || record.AttackerTotalLeftHp == nil || record.DefenderTotalLeftHp == nil {
+		if record.GetFinalRoundNum() < 0 || record.GetFinalRoundNum() > 40 {
 			return errors.New("Missing field battle record")
 		}
 		values := []float64{record.GetAttackerTotalLeftHp(), record.GetDefenderTotalLeftHp(), b.GetBattlePlayer().GetInst().GetAnger()}
 		for _, hero := range b.GetBattlePlayer().GetFormation() {
-			if hero == nil || hero.GetGuid() == "" || hero.GetId() == "" || hero.Pose == nil || hero.GetInst() == nil || hero.GetInst().CurHp == nil {
+			if hero == nil || hero.GetGuid() == "" || hero.GetId() == "" || hero.Pose == nil || hero.GetInst() == nil {
 				return errors.New("Invalid field battle actor")
 			}
 			values = append(values, hero.GetInst().GetCurHp())
@@ -1469,27 +1471,42 @@ func serveGameConnection(ctx context.Context, c net.Conn, s *service.GameService
 			unregister()
 		}
 	}()
+	// 仅记录连接终止原因与协议编号，避免把账号凭据或原始帧写入日志。
+	var lastOpcode int32
+	closed := func(reason string, err error) {
+		fields := []zap.Field{zap.String("reason", reason), zap.Int64("player_id", playerId), zap.Int32("opcode", lastOpcode)}
+		if err != nil {
+			fields = append(fields, zap.Error(err))
+		}
+		elog.Info("game tcp closed", fields...)
+	}
 	peer, _, _ := net.SplitHostPort(c.RemoteAddr().String())
 	for {
 		c.SetDeadline(time.Now().Add(constUtil.PacketTimeout))
 		prefix := make([]byte, 4)
 		if _, err := io.ReadFull(c, prefix); err != nil {
+			closed("read-prefix", err)
 			return
 		}
 		size := binary.BigEndian.Uint32(prefix)
 		if size < 24 || size > constUtil.MaxPacket-4 {
+			closed("packet-size", nil)
 			return
 		}
 		raw := make([]byte, int(size)+4)
 		copy(raw, prefix)
 		if _, err := io.ReadFull(c, raw[4:]); err != nil {
+			closed("read-body", err)
 			return
 		}
 		p, err := model.ParseGamePacket(raw, true)
 		if err != nil {
+			closed("packet-parse", err)
 			return
 		}
+		lastOpcode = p.Opcode
 		if err = ValidateGameRequest(p); err != nil {
+			closed("request-validation", err)
 			return
 		}
 		// 每条消息仍重新校验数据库中的会话，账号重登会使旧 TCP 连接失效。
@@ -1509,6 +1526,7 @@ func serveGameConnection(ctx context.Context, c net.Conn, s *service.GameService
 			}
 		}
 		if err = writeMessages(messages); err != nil {
+			closed("response-write", err)
 			return
 		}
 		// 原登录响应先完整写入，再允许私聊推送进入同一连接。

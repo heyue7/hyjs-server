@@ -34,7 +34,7 @@ func p13UFDrumEffectHash(row *db.P13UnionFightWarDrumEffect) string {
 	return p6Digest(raw)
 }
 func p13UFDrumQuoteValid(row *db.P13UnionFightWarDrumOffer) bool {
-	return row.SourceHash == p13UFDrumOfferHash(row) && row.ItemID == "ufitem_014" && row.AttackPercent >= 1 && row.AttackPercent <= 500 && row.Radius > 0 && row.Radius <= 20 && !math.IsNaN(row.Radius) && !math.IsInf(row.Radius, 0) && row.DurationMillis >= 1000 && row.DurationMillis <= 300000 && row.AuthorityMask >= 1 && row.AuthorityMask <= 7 && row.CooldownMillis == 5000 && row.ModelName == constUtil.P13UnionFightWarDrumLocalModel && row.ModelScale >= .01 && row.ModelScale <= 10 && !math.IsNaN(row.ModelScale) && !math.IsInf(row.ModelScale, 0)
+	return row.SourceHash == p13UFDrumOfferHash(row) && row.ItemID == "ufitem_014" && row.AttackPercent >= 1 && row.AttackPercent <= 500 && row.Radius > 0 && row.Radius <= 20 && !math.IsNaN(row.Radius) && !math.IsInf(row.Radius, 0) && row.DurationMillis >= 1000 && row.DurationMillis <= 300000 && row.AuthorityMask >= 1 && row.AuthorityMask <= 7 && row.CooldownMillis >= 100 && row.CooldownMillis <= 3600000 && row.ModelName == constUtil.P13UnionFightWarDrumLocalModel && row.ModelScale >= .01 && row.ModelScale <= 10 && !math.IsNaN(row.ModelScale) && !math.IsInf(row.ModelScale, 0)
 }
 
 // p13UFDrumBuild 原014/totem1和周围提高战力语义保留；原模型绑定/范围/时长/属性及资格缺失须具名本地发布。
@@ -48,10 +48,11 @@ func (s *GameService) p13UFDrumBuild(tx *gorm.DB, match *db.P13UnionFightMatch, 
 		if source.ItemID != "ufitem_014" || cfg == nil || cfg["ItemSelector"] != "0" || cfg["ItemEffect"] != "totem,1" || cfg["ItemType"] != "1" || cfg["ItemUseCondition"] != "2" || cfg["ItemCatchMaxNum"] != "5" || source.PublishedAt <= 0 || source.PublishedAt > now.UnixMilli() || strings.TrimSpace(source.Source) == "" {
 			return errors.New("原战鼓/totem1和未知规则来源未完整提前发布")
 		}
-		if original.table("GameConfigure", "StaticName", "UnionFightPlayerUseDiamondItemCD")["NameValue"] != "5" {
-			return errors.New("原战鼓钻石类五秒CD缺失")
+		cd, cdErr := strconv.ParseFloat(original.table("GameConfigure", "StaticName", "UnionFightPlayerUseDiamondItemCD")["NameValue"], 64)
+		if cdErr != nil || math.IsNaN(cd) || math.IsInf(cd, 0) || cd < 0.1 || cd > 3600 {
+			return errors.New("公会战道具冷却配置无效")
 		}
-		row := db.P13UnionFightWarDrumOffer{MatchID: match.ID, ItemID: source.ItemID, AttackPercent: source.AttackPercent, Radius: source.Radius, DurationMillis: source.DurationMillis, AuthorityMask: source.AuthorityMask, CooldownMillis: 5000, ModelName: source.ModelName, ModelScale: source.ModelScale, Source: constUtil.P13UnionFightWarDrumSource + "；发布：" + source.Source}
+		row := db.P13UnionFightWarDrumOffer{MatchID: match.ID, ItemID: source.ItemID, AttackPercent: source.AttackPercent, Radius: source.Radius, DurationMillis: source.DurationMillis, AuthorityMask: source.AuthorityMask, CooldownMillis: int64(cd * 1000), ModelName: source.ModelName, ModelScale: source.ModelScale, Source: constUtil.P13UnionFightWarDrumSource + "；发布：" + source.Source}
 		row.SourceHash = p13UFDrumOfferHash(&row)
 		if !p13UFDrumQuoteValid(&row) {
 			return errors.New("具名战鼓本地数值/已核模型/资格无效")

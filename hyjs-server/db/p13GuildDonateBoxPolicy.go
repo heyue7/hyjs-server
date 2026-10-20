@@ -6,6 +6,7 @@ type P13GuildDonateBoxPolicy struct {
 	Enabled     bool   `gorm:"not null;default:false" json:"enabled"`
 	Version     string `gorm:"type:varchar(128);not null" json:"version"`
 	Source      string `gorm:"type:varchar(1024);not null" json:"source"`
+	RulesJSON   string `gorm:"type:text" json:"rulesJson"`
 	PublishedAt int64  `gorm:"not null;default:0" json:"publishedAt"`
 }
 

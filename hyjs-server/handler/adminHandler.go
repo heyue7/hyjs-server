@@ -40,6 +40,8 @@ func RegisterAdminRoutes(r *gin.Engine, assets string) {
 	RegisterAdminGameServerRoutes(a)
 	RegisterAdminActivityScheduleRoutes(a)
 	RegisterAdminFieldRoutes(a)
+	RegisterAdminGuildRoutes(a)
+	RegisterAdminGuildRewardRoutes(a)
 	RegisterAdminActivityModeRoutes(a)
 	RegisterAdminKingRecruitRoutes(a)
 	RegisterAdminGamePlayerRoutes(a)

@@ -54,7 +54,7 @@ func TestP4OrdinaryOriginalTierPriceAndReceiptLimits(t *testing.T) {
 	if !p1SameResources(first.GetCost(), []*pb.BaseResource{expected}) {
 		t.Fatal("original tier sum changed")
 	}
-	// The seven variable tiers and eight fixed slots include the recovered
+	// The six available variable tiers and eight fixed slots include the recovered
 	// original item004 slot12. Verify the complete directory and its actual terms.
 	catalogue := map[string]*pb.ShopItem{}
 	for _, item := range first.GetShopItemList() {
@@ -63,13 +63,16 @@ func TestP4OrdinaryOriginalTierPriceAndReceiptLimits(t *testing.T) {
 		}
 		catalogue[item.GetId()] = item
 	}
-	for _, suffix := range []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 16} {
+	for _, suffix := range []int{1, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 16} {
 		if catalogue[fmt.Sprintf("itemShopId_%d", suffix)] == nil {
 			t.Fatal("missing original or recovered ordinary shop slot", suffix)
 		}
 	}
+	if catalogue["itemShopId_2"] != nil {
+		t.Fatal("direct stamina product remained visible")
+	}
 	wanted := catalogue["itemShopId_12"]
-	if len(catalogue) != 15 || !p1SameResources(wanted.GetItem(), []*pb.BaseResource{{Id: proto.String("item_004"), Num: proto.Int32(1)}}) || !p1SameResources(wanted.GetPrice(), []*pb.BaseResource{{Id: proto.String("diamond"), Num: proto.Int32(200)}}) || wanted.GetDayTotalTimes() != 10 || wanted.GetDayLeftTimes() != 10 {
+	if len(catalogue) != 14 || !p1SameResources(wanted.GetItem(), []*pb.BaseResource{{Id: proto.String("item_004"), Num: proto.Int32(1)}}) || !p1SameResources(wanted.GetPrice(), []*pb.BaseResource{{Id: proto.String("diamond"), Num: proto.Int32(200)}}) || wanted.GetDayTotalTimes() != 10 || wanted.GetDayLeftTimes() != 10 {
 		t.Fatal("recovered wanted slot or full ordinary directory changed", wanted)
 	}
 	before, _ := f.profile(t)

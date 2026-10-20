@@ -149,6 +149,11 @@ func (s *GameService) RecordP13GuildLogin(ctx context.Context, id int64) error {
 	return s.p13GuildLoginAt(ctx, id, LocalPlayNow(ctx))
 }
 func (s *GameService) p13GuildLoginAt(ctx context.Context, id int64, now time.Time) error {
+	tables, err := AdminGuildRuntimeTables(ctx, s.Tables)
+	if err != nil {
+		return err
+	}
+	s = s.withRuntimeTables(tables)
 	// 旧独立域测试没有本域迁移；正式main初始化失败会在监听前返回错误。
 	if !db.GetIns().WithContext(ctx).Migrator().HasTable(&db.P13GuildPolicy{}) {
 		return nil
@@ -422,8 +427,41 @@ func (s *GameService) p13GuildMutate(ctx context.Context, id int64, request, res
 	}
 	return []proto.Message{response, &pb.SCPlayer{Player: resultPlayer}}, nil
 }
+
+// p13GuildFirstFormationHeroID 取真实阵容中第一个仍有效上阵角色的静态 hero id。
+// 无效阵位和已不存在的实例继续向后查找，全部不可用时回退原主角投影。
+func p13GuildFirstFormationHeroID(p *pb.Player, g *model.GameState) string {
+	for _, slot := range g.Formation {
+		hero := formationHero(slot)
+		if hero == nil || hero.GetGuid() == "" || hero.GetId() == "" {
+			continue
+		}
+		owned, err := p5Warrior(g, hero.GetGuid())
+		if err != nil || owned.GetId() != hero.GetId() {
+			continue
+		}
+		return owned.GetId()
+	}
+	if owned, err := p5Warrior(g, p.GetHeroWarId()); err == nil {
+		return owned.GetId()
+	}
+	return ""
+}
+
 func (s *GameService) p13GuildPlayer(tx *gorm.DB, viewer, id int64, member *db.P13GuildMember, now time.Time) (*pb.UnionPlayerInfo, error) {
-	info, err := s.p10Player(tx, id)
+	// 同一行存档同时生成战力与首发头像，避免再按成员逐条读取第二份 profile。
+	var row db.Profile
+	if err := tx.First(&row, id).Error; err != nil {
+		return nil, err
+	}
+	player, game, err := decodeProfile(&row)
+	if err != nil {
+		return nil, err
+	}
+	if err = s.PrepareP5GuildPrayerProperties(tx.Statement.Context, tx, player, game, p13UFNow(tx.Statement.Context)); err != nil {
+		return nil, err
+	}
+	power, err := s.formationFightPower(player, game)
 	if err != nil {
 		return nil, err
 	}
@@ -452,7 +490,7 @@ func (s *GameService) p13GuildPlayer(tx *gorm.DB, viewer, id int64, member *db.P
 	if friend {
 		isFriend = 1
 	}
-	return &pb.UnionPlayerInfo{PlayerId: info.PlayerId, PlayerName: info.PlayerName, FightPower: proto.Int64(int64(info.GetFightPower())), Role: proto.Int32(role), HeroWarId: info.HeroWarId, IsFriend: proto.Int32(isFriend), LastLoginTime: proto.Int64(online), Level: info.Level, Contribution: proto.Int32(contribution), TodayCoin: proto.Int32(coin), TodayBadge: proto.Int32(badge)}, nil
+	return &pb.UnionPlayerInfo{PlayerId: proto.Int64(id), PlayerName: proto.String(player.GetName()), FightPower: proto.Int64(int64(power)), Role: proto.Int32(role), HeroWarId: proto.String(p13GuildFirstFormationHeroID(player, game)), IsFriend: proto.Int32(isFriend), LastLoginTime: proto.Int64(online), Level: proto.Int32(player.GetLevel()), Contribution: proto.Int32(contribution), TodayCoin: proto.Int32(coin), TodayBadge: proto.Int32(badge)}, nil
 }
 func (s *GameService) p13GuildSimple(tx *gorm.DB, viewer int64, g db.P13Guild) (*pb.SimpleUnionInfo, error) {
 	var members []db.P13GuildMember

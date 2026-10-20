@@ -87,10 +87,11 @@ func (s *GameService) p13UFGateItemBuild(tx *gorm.DB, match *db.P13UnionFightMat
 		if cfg == nil || cfg["ItemSelector"] != selector || cfg["ItemEffect"] != effect || cfg["ItemType"] != "0" || cfg["ItemUseCondition"] != "0" || cfg["ItemCatchMaxNum"] != "5" || source.HPPercent < 1 || source.HPPercent > 100 || source.PublishedAt <= 0 || source.PublishedAt > now.UnixMilli() || strings.TrimSpace(source.Source) == "" {
 			return errors.New("原城门道具5米/阵营规则或具名提前发布比例无效")
 		}
-		if original.table("GameConfigure", "StaticName", "UnionFightPlayerUseNormalItemCD")["NameValue"] != "5" {
+		cd, cdErr := strconv.ParseFloat(original.table("GameConfigure", "StaticName", "UnionFightPlayerUseNormalItemCD")["NameValue"], 64)
+		if cdErr != nil || math.IsNaN(cd) || math.IsInf(cd, 0) || cd < 0.1 || cd > 3600 {
 			return errors.New("原城门普通道具5秒CD缺失")
 		}
-		quote := db.P13UnionFightGateItemOffer{MatchID: match.ID, ItemID: source.ItemID, HPPercent: source.HPPercent, Enemy: source.ItemID == "ufitem_020", Radius: 5, CooldownMillis: 5000, Source: constUtil.P13UnionFightGateItemSource + "；发布：" + source.Source}
+		quote := db.P13UnionFightGateItemOffer{MatchID: match.ID, ItemID: source.ItemID, HPPercent: source.HPPercent, Enemy: source.ItemID == "ufitem_020", Radius: 5, CooldownMillis: int64(cd * 1000), Source: constUtil.P13UnionFightGateItemSource + "；发布：" + source.Source}
 		quote.SourceHash = p13UFGateItemOfferHash(&quote)
 		if err := tx.Create(&quote).Error; err != nil {
 			return err
@@ -277,7 +278,7 @@ func (s *GameService) p13UFGateItemUse(ctx context.Context, id int64, request *p
 		if err = tx.First(&quote, "match_id=? AND item_id=?", scope, request.GetItemId()).Error; err != nil {
 			return errors.New("本场原城门道具效果未提前发布并冻结")
 		}
-		if quote.SourceHash != p13UFGateItemOfferHash(&quote) || quote.Radius != 5 || quote.CooldownMillis != 5000 || quote.HPPercent < 1 || quote.HPPercent > 100 || quote.Enemy != (quote.ItemID == "ufitem_020") || (quote.ItemID != "ufitem_019" && quote.ItemID != "ufitem_020") {
+		if quote.SourceHash != p13UFGateItemOfferHash(&quote) || quote.Radius != 5 || (quote.CooldownMillis < 100 || quote.CooldownMillis > 3600000) || quote.HPPercent < 1 || quote.HPPercent > 100 || quote.Enemy != (quote.ItemID == "ufitem_020") || (quote.ItemID != "ufitem_019" && quote.ItemID != "ufitem_020") {
 			return errors.New("原城门道具目标或具名效果SHA损坏")
 		}
 		state, err := p13UFItemProject(tx, scope, id, frame, now)

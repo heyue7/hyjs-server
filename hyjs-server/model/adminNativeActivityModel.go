@@ -107,3 +107,9 @@ type AdminNativeActivitySaveRequest struct {
 	// Form 是按当前类型编辑的经济字段；冻结行必须与当前规则完全一致。
 	Form AdminNativeActivityForm `json:"form"`
 }
+
+// AdminNativeActivityRemoveRequest 按当前版本移除停用配置。
+type AdminNativeActivityRemoveRequest struct {
+	// Version 是列表返回的配置版本。
+	Version string `json:"version" binding:"required"`
+}

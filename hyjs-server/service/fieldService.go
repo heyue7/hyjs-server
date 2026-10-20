@@ -409,6 +409,17 @@ func (s *GameService) fieldScene(ctx context.Context, id int64, login bool) ([]p
 			if err := s.refreshField(id, g); err != nil {
 				return err
 			}
+			// 原客户端重连会重建野外房间，不会重放正在加载的小怪战斗。
+			// 释放未结算占用，保留战前HP/怒气/疲劳与奖励计数，旧fightId随之失效。
+			if login && g.Field.Fight != nil && !g.Field.Fight.Settled {
+				if monster := fieldFind(g, g.Field.Fight.MonsterUUID); monster != nil {
+					monster.State = proto.Int32(1)
+				}
+				g.Field.Fight = nil
+				if g.Field.Side.GetCurHp() > 0 {
+					g.Field.Side.State = proto.Int32(0)
+				}
+			}
 			side = g.Field.Side
 		}
 		if s.P12FieldPVPReady {

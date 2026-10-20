@@ -194,7 +194,7 @@ func (s *GameService) p4GuildShop(ctx context.Context, id int64, request proto.M
 					product = &custom.Products[i]
 				}
 			}
-			if product == nil || !product.isEnabled() || player.GetLevel() < product.MinLevel || player.GetVip() < product.MinVIP || guild.Level < product.GuildLevel {
+			if product == nil || !product.isEnabled() || shopHasDirectStamina(product.Rewards) || player.GetLevel() < product.MinLevel || player.GetVip() < product.MinVIP || guild.Level < product.GuildLevel {
 				return errors.New("原公会商店商品或实际公会等级未满足")
 			}
 			if custom.LiveEditable && buy.GetShopItemId() != adminLiveP4SKU(cfg, product.p4Product, struct {

@@ -109,7 +109,7 @@ func (s *GameService) p13GuildTechOriginalRows() ([]p13GuildTechOriginalRow, str
 	if err != nil {
 		return nil, "", err
 	}
-	if len(rows) != constUtil.P13GuildTechOriginalRowCount || p6Digest(raw) != constUtil.P13GuildTechOriginalRowsHash {
+	if len(rows) != constUtil.P13GuildTechOriginalRowCount || (p6Digest(raw) != constUtil.P13GuildTechOriginalRowsHash && len(s.Tables["AdminGuildSettings"]) == 0) {
 		return nil, "", errors.New("公会科技原始属性和消耗配置不兼容")
 	}
 	return rows, string(raw), nil
@@ -127,7 +127,7 @@ func p13GuildTechUpgradeHash(row *db.P13GuildTechUpgrade) string {
 	return p6Digest(raw)
 }
 func p13GuildTechOfferRead(offer *db.P13GuildTechOffer) (*p13GuildTechDirectory, []p13GuildTechOriginalRow, error) {
-	if offer.GuildID == "" || offer.Version == "" || offer.PublishedAt <= 0 || offer.CapturedAt < offer.PublishedAt || offer.Source != constUtil.P13GuildTechSource || offer.SourceHash != p13GuildTechOfferHash(offer) || offer.OriginalClient != constUtil.P6OriginalClientHash || offer.OriginalRowsHash != constUtil.P13GuildTechOriginalRowsHash || p6Digest([]byte(offer.OriginalRowsJSON)) != offer.OriginalRowsHash {
+	if offer.GuildID == "" || offer.Version == "" || offer.PublishedAt <= 0 || offer.CapturedAt < offer.PublishedAt || (offer.Source != constUtil.P13GuildTechSource && offer.Source != constUtil.AdminGuildTechSource) || offer.SourceHash != p13GuildTechOfferHash(offer) || offer.OriginalClient != constUtil.P6OriginalClientHash || (offer.Source == constUtil.P13GuildTechSource && offer.OriginalRowsHash != constUtil.P13GuildTechOriginalRowsHash) || p6Digest([]byte(offer.OriginalRowsJSON)) != offer.OriginalRowsHash {
 		return nil, nil, errors.New("公会科技实际来源无效")
 	}
 	directory, err := p13GuildTechDirectoryRead(offer.DirectoryJSON, offer.DirectoryHash)
@@ -421,7 +421,10 @@ func (s *GameService) p13GuildTechUpgrade(ctx context.Context, id int64, request
 			if err != nil {
 				return err
 			}
-			offer = db.P13GuildTechOffer{GuildID: guild.ID, Version: policy.Version, DirectoryJSON: policy.DirectoryJSON, DirectoryHash: policy.DirectoryHash, OriginalRowsJSON: originalJSON, OriginalRowsHash: constUtil.P13GuildTechOriginalRowsHash, OriginalClient: constUtil.P6OriginalClientHash, PublishedAt: policy.PublishedAt, CapturedAt: now.UnixMilli(), Source: constUtil.P13GuildTechSource}
+			offer = db.P13GuildTechOffer{GuildID: guild.ID, Version: policy.Version, DirectoryJSON: policy.DirectoryJSON, DirectoryHash: policy.DirectoryHash, OriginalRowsJSON: originalJSON, OriginalRowsHash: p6Digest([]byte(originalJSON)), OriginalClient: constUtil.P6OriginalClientHash, PublishedAt: policy.PublishedAt, CapturedAt: now.UnixMilli(), Source: constUtil.P13GuildTechSource}
+			if offer.OriginalRowsHash != constUtil.P13GuildTechOriginalRowsHash {
+				offer.Source = constUtil.AdminGuildTechSource
+			}
 			offer.SourceHash = p13GuildTechOfferHash(&offer)
 			if err = tx.Create(&offer).Error; err != nil {
 				return err

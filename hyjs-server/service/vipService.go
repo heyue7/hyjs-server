@@ -35,7 +35,7 @@ func loadP3VIPShop(tx *gorm.DB, id int64, product string, now time.Time) (db.VIP
 	if err := tx.Clauses(clause.Locking{Strength: "SHARE"}).First(&result, "id=?", product).Error; err != nil {
 		return result, err
 	}
-	if result.ID != product || !result.Enabled || result.MinVIP < 1 || result.MinVIP > 12 || result.Cost <= 0 || result.Cost > math.MaxInt32 || result.Source == "" {
+	if result.ID != product || !result.Enabled || shopHasDirectStamina(result.Reward) || result.MinVIP < 1 || result.MinVIP > 12 || result.Cost <= 0 || result.Cost > math.MaxInt32 || result.Source == "" {
 		return result, errors.New(constUtil.P3PaymentConfigError)
 	}
 	key := "vip-shop:" + product + ":" + p3Day(now)
@@ -87,6 +87,9 @@ func (s *GameService) p3VIPShopList(tx *gorm.DB, p *pb.Player, now time.Time) ([
 	}
 	var items []*pb.ShopItem
 	for _, live := range products {
+		if shopHasDirectStamina(live.Reward) {
+			continue
+		}
 		cfg, e := loadP3VIPShop(tx, p.GetPlayerId(), live.ID, now)
 		if e != nil {
 			return nil, e

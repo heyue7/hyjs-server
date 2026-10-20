@@ -6,6 +6,7 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"math"
 	"os"
 	"path/filepath"
@@ -566,8 +567,18 @@ func (s *GameService) p8StartGather(ctx context.Context, id int64, b *pb.CSField
 		if err != nil {
 			return err
 		}
-		if level < cfg.Level || g.Field.Side.GetTiredness() < cfg.Fatigue || !p8Near(g.Position.GetCurrent(), cfg) {
-			return p8GatherError()
+		if level < cfg.Level {
+			kind := "冶炼"
+			if cfg.Kind == "fish" {
+				kind = "料理"
+			}
+			return fmt.Errorf("需要%s等级%d，当前等级%d", kind, cfg.Level, level)
+		}
+		if g.Field.Side.GetTiredness() < cfg.Fatigue {
+			return errors.New("疲劳不足，无法开始采集")
+		}
+		if !p8Near(g.Position.GetCurrent(), cfg) {
+			return errors.New("请靠近资源点后再开始采集")
 		}
 		var old db.P8GatherAttempt
 		err = tx.First(&old, "player_id=?", id).Error

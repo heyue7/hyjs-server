@@ -24,7 +24,7 @@ func (s *GameService) InitializeP13GuildDonationBadge(ctx context.Context) error
 }
 
 func p13GuildDonationBadgePolicyValid(policy *db.P13GuildDonationBadgePolicy, now time.Time) bool {
-	return policy.Version == constUtil.P13GuildDonationBadgeVersion && policy.Source == constUtil.P13GuildDonationBadgeSource && policy.CoinCost == constUtil.P13GuildDonationBadgeCoinCost && policy.BadgeAmount == constUtil.P13GuildDonationBadgeAmount && policy.DailyLimit == constUtil.P13GuildDonationBadgeDailyLimit && policy.PublishedAt > 0 && policy.PublishedAt <= now.UnixMilli()
+	return policy.Version == constUtil.P13GuildDonationBadgeVersion && policy.Source == constUtil.P13GuildDonationBadgeSource && policy.CoinCost > 0 && policy.BadgeAmount > 0 && policy.DailyLimit > 0 && policy.DailyLimit <= 1000 && policy.PublishedAt > 0 && policy.PublishedAt <= now.UnixMilli()
 }
 
 func p13GuildDonationBadgeSourceHash(row db.P13GuildDonationBadgeSource) string {
@@ -59,7 +59,7 @@ func (s *GameService) RecordP13GuildDonationBadge(tx *gorm.DB, member *db.P13Gui
 	if err != nil {
 		return err
 	}
-	if minimum != policy.CoinCost || int64(maximum) != int64(policy.CoinCost)*policy.DailyLimit || amount != minimum || member.GuildID == "" || member.JoinedAt <= 0 || member.JoinedAt > now.UnixMilli() || member.DonateDay != p13GuildDay(now) || member.TodayCoin < int64(amount) || member.TodayCoin > int64(maximum) || stamp <= 0 {
+	if minimum != policy.CoinCost || int64(maximum) < int64(policy.CoinCost)*policy.DailyLimit || amount != minimum || member.GuildID == "" || member.JoinedAt <= 0 || member.JoinedAt > now.UnixMilli() || member.DonateDay != p13GuildDay(now) || member.TodayCoin < int64(amount) || member.TodayCoin > int64(maximum) || stamp <= 0 {
 		return errors.New("公会捐献徽章实际金币来源与原限额不符")
 	}
 	day := p13GuildDay(now)
@@ -67,21 +67,20 @@ func (s *GameService) RecordP13GuildDonationBadge(tx *gorm.DB, member *db.P13Gui
 	if err = tx.Where("player_id=? AND day=?", member.PlayerID, day).Order("ordinal").Find(&previous).Error; err != nil {
 		return err
 	}
+	var previousCoin int64
 	for index, saved := range previous {
-		if saved.Ordinal != int64(index+1) || saved.SourceHash != p13GuildDonationBadgeSourceHash(saved) || saved.Version != policy.Version || saved.Source != policy.Source || saved.CoinCost != policy.CoinCost || saved.BadgeAmount != policy.BadgeAmount || saved.DailyLimit != policy.DailyLimit || saved.Stamp <= 0 || saved.GuildID == "" || saved.JoinedAt <= 0 || saved.JoinedAt > saved.CreatedAt || saved.PublishedAt <= 0 || saved.PublishedAt > saved.CreatedAt || saved.CreatedAt > now.UnixMilli() || saved.DeliveryID <= 0 || saved.DeliveryKey != fmt.Sprintf("p13:coin-badge:%d:%d", saved.PlayerID, saved.Stamp) {
+		if saved.Ordinal != int64(index+1) || saved.SourceHash != p13GuildDonationBadgeSourceHash(saved) || saved.Version != policy.Version || saved.Source != policy.Source || saved.CoinCost <= 0 || saved.BadgeAmount <= 0 || saved.DailyLimit < 1 || saved.DailyLimit > 1000 || saved.Stamp <= 0 || saved.GuildID == "" || saved.JoinedAt <= 0 || saved.JoinedAt > saved.CreatedAt || saved.PublishedAt <= 0 || saved.PublishedAt > saved.CreatedAt || saved.CreatedAt > now.UnixMilli() || saved.DeliveryID <= 0 || saved.DeliveryKey != fmt.Sprintf("p13:coin-badge:%d:%d", saved.PlayerID, saved.Stamp) {
 			return errors.New("公会捐献徽章已冻结来源损坏")
 		}
+		previousCoin += int64(saved.CoinCost)
 	}
 	if int64(len(previous)) >= policy.DailyLimit {
-		return errors.New("公会捐献徽章每日实际来源已达上限")
+		return nil
 	}
-	if int64(len(previous)+1)*int64(amount) > member.TodayCoin {
+	if previousCoin+int64(amount) > member.TodayCoin {
 		return errors.New("公会捐献徽章来源超过当日实际金币捐献")
 	}
-	// Reopening cannot rewrite the earlier publication frozen for today's source.
-	if len(previous) > 0 {
-		policy.PublishedAt = previous[0].PublishedAt
-	}
+	// 每笔来源保留当时参数；更新规则不会重写已发出的奖励。
 	rewards := fmt.Sprintf("item_089,%d", policy.BadgeAmount)
 	key := fmt.Sprintf("p13:coin-badge:%d:%d", member.PlayerID, stamp)
 	delivery, err := s.EnqueueReward(tx, member.PlayerID, key, constUtil.P13GuildDonationBadgeTitle, constUtil.P13GuildDonationBadgeContent, rewards, 0)

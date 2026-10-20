@@ -1,4 +1,4 @@
-import { api, json } from './operations';
+import { ApiError, api, json } from './operations';
 import type { ResourceAmount } from './operations';
 import type { ActivityForm, ActivityPrize } from './activity-operations';
 
@@ -22,3 +22,15 @@ export const saveNativeActivity = (row: NativeActivity) => api<NativeActivity>(
   `/activity-native-settings/${encodeURIComponent(row.id)}`,
   json('PUT', { version: row.version, enabled: row.enabled, alias: row.alias, form: row.form })
 );
+export async function removeNativeActivity(row: NativeActivity) {
+  try {
+    return await api<unknown>(
+      `/activity-native-settings/${encodeURIComponent(row.id)}`,
+      json('DELETE', { version: row.version })
+    );
+  } catch (error) {
+    // 后端返回 204 空响应时同样是成功，普通成功 data 由上面的 api 处理。
+    if (error instanceof ApiError && error.status === 204) return;
+    throw error;
+  }
+}

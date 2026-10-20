@@ -70,7 +70,10 @@ func p13GuildPrayerRollHash(row *db.P13GuildPrayerRoll) string {
 }
 
 func p13GuildPrayerRollRead(row *db.P13GuildPrayerRoll) (*pb.BaseProp, error) {
-	if row.PlayerID <= 0 || row.Stamp <= 0 || row.GuildID == "" || row.Ordinal < 1 || row.Ordinal > int64(row.DailyLimit) || row.AppliedAt <= 0 || row.PublishedAt <= 0 || row.PublishedAt > row.AppliedAt || row.AppliedAt > math.MaxInt64-int64(constUtil.P13GuildPrayerDurationHours*time.Hour/time.Millisecond) || row.ExpiresAt != row.AppliedAt+int64(constUtil.P13GuildPrayerDurationHours*time.Hour/time.Millisecond) || row.ContributionCost != constUtil.P13GuildPrayerContributionCost || row.DailyLimit != constUtil.P13GuildPrayerDailyLimit || row.DurationHours != constUtil.P13GuildPrayerDurationHours || row.Day != p13GuildDay(time.UnixMilli(row.AppliedAt)) || strings.TrimSpace(row.PoolVersion) == "" || row.Source != constUtil.P13GuildPrayerSource || row.SourceHash != p13GuildPrayerRollHash(row) {
+	if row.DurationHours < 1 || row.DurationHours > 720 {
+		return nil, errors.New("公会祈祷有效时长无效")
+	}
+	if row.PlayerID <= 0 || row.Stamp <= 0 || row.GuildID == "" || row.Ordinal < 1 || row.Ordinal > int64(row.DailyLimit) || row.AppliedAt <= 0 || row.PublishedAt <= 0 || row.PublishedAt > row.AppliedAt || row.AppliedAt > math.MaxInt64-int64(time.Duration(row.DurationHours)*time.Hour/time.Millisecond) || row.ExpiresAt != row.AppliedAt+int64(time.Duration(row.DurationHours)*time.Hour/time.Millisecond) || row.ContributionCost < 1 || row.DailyLimit < 1 || row.DailyLimit > 100 || row.DurationHours < 1 || row.DurationHours > 720 || row.Day != p13GuildDay(time.UnixMilli(row.AppliedAt)) || strings.TrimSpace(row.PoolVersion) == "" || row.Source != constUtil.P13GuildPrayerSource || row.SourceHash != p13GuildPrayerRollHash(row) {
 		return nil, errors.New("公会祈祷实际扣费与冻结来源不符")
 	}
 	choices, total, err := p13GuildPrayerPool(row.PoolJSON, row.PoolHash)
@@ -122,8 +125,8 @@ func (s *GameService) p13GuildPrayerConfig() (int32, int32, int32, error) {
 	if err != nil {
 		return 0, 0, 0, err
 	}
-	if cost != constUtil.P13GuildPrayerContributionCost || limit != constUtil.P13GuildPrayerDailyLimit || duration != constUtil.P13GuildPrayerDurationHours {
-		return 0, 0, 0, errors.New("原祈祷贡献/次数/有效时长配置不兼容")
+	if cost < 1 || limit < 1 || limit > 100 || duration < 1 || duration > 720 {
+		return 0, 0, 0, errors.New("公会祈祷贡献、次数或有效时长无效")
 	}
 	return cost, limit, duration, nil
 }

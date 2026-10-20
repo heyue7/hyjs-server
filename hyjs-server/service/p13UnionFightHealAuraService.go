@@ -34,7 +34,7 @@ func p13UFHealAuraEffectHash(row *db.P13UnionFightHealAuraEffect) string {
 	return p6Digest(raw)
 }
 func p13UFHealAuraQuoteValid(row *db.P13UnionFightHealAuraOffer) bool {
-	return row.SourceHash == p13UFHealAuraOfferHash(row) && row.ItemID == "ufitem_013" && row.HPPercent >= 1 && row.HPPercent <= 100 && row.Radius > 0 && row.Radius <= 20 && !math.IsNaN(row.Radius) && !math.IsInf(row.Radius, 0) && row.AuthorityMask >= 1 && row.AuthorityMask <= 7 && row.DurationMillis == 5000 && row.CooldownMillis == 5000 && row.TickMillis >= 100 && row.TickMillis <= 5000 && 5000%row.TickMillis == 0
+	return row.SourceHash == p13UFHealAuraOfferHash(row) && row.ItemID == "ufitem_013" && row.HPPercent >= 1 && row.HPPercent <= 100 && row.Radius > 0 && row.Radius <= 20 && !math.IsNaN(row.Radius) && !math.IsInf(row.Radius, 0) && row.AuthorityMask >= 1 && row.AuthorityMask <= 7 && row.DurationMillis == 5000 && row.CooldownMillis >= 100 && row.CooldownMillis <= 3600000 && row.TickMillis >= 100 && row.TickMillis <= 5000 && 5000%row.TickMillis == 0
 }
 
 // p13UFHealAuraBuild 原013自体挂载、buff009五秒及团队治疗语义保留；未知数量/范围/tick/资格须具名预发布。
@@ -49,10 +49,11 @@ func (s *GameService) p13UFHealAuraBuild(tx *gorm.DB, match *db.P13UnionFightMat
 		if source.ItemID != "ufitem_013" || cfg == nil || cfg["ItemSelector"] != "0" || cfg["ItemEffect"] != "buff,uf_buff_009" || cfg["ItemType"] != "1" || cfg["ItemUseCondition"] != "2" || cfg["ItemCatchMaxNum"] != "5" || buff == nil || buff["BuffClass"] != "2" || buff["lastTime"] != "5.0" || buff["buffLastEffect"] != "recoverMatrix" || source.PublishedAt <= 0 || source.PublishedAt > now.UnixMilli() || strings.TrimSpace(source.Source) == "" {
 			return errors.New("原回复法阵/团队治疗来源未完整提前发布")
 		}
-		if original.table("GameConfigure", "StaticName", "UnionFightPlayerUseDiamondItemCD")["NameValue"] != "5" {
+		cd, cdErr := strconv.ParseFloat(original.table("GameConfigure", "StaticName", "UnionFightPlayerUseDiamondItemCD")["NameValue"], 64)
+		if cdErr != nil || math.IsNaN(cd) || math.IsInf(cd, 0) || cd < 0.1 || cd > 3600 {
 			return errors.New("原法阵钻石类五秒CD缺失")
 		}
-		quote := db.P13UnionFightHealAuraOffer{MatchID: match.ID, ItemID: source.ItemID, HPPercent: source.HPPercent, Radius: source.Radius, TickMillis: source.TickMillis, AuthorityMask: source.AuthorityMask, DurationMillis: 5000, CooldownMillis: 5000, Source: constUtil.P13UnionFightHealAuraSource + "；发布：" + source.Source}
+		quote := db.P13UnionFightHealAuraOffer{MatchID: match.ID, ItemID: source.ItemID, HPPercent: source.HPPercent, Radius: source.Radius, TickMillis: source.TickMillis, AuthorityMask: source.AuthorityMask, DurationMillis: 5000, CooldownMillis: int64(cd * 1000), Source: constUtil.P13UnionFightHealAuraSource + "；发布：" + source.Source}
 		quote.SourceHash = p13UFHealAuraOfferHash(&quote)
 		if !p13UFHealAuraQuoteValid(&quote) {
 			return errors.New("本地法阵比例/范围/tick/资格数值无效")

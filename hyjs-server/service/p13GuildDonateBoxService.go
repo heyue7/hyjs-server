@@ -55,6 +55,35 @@ func p13GuildDonateBoxRules() string {
 	return string(raw)
 }
 
+// p13GuildDonateBoxReadRules 读取已冻结四档，旧空覆盖继续使用原规则。
+func p13GuildDonateBoxReadRules(raw string) ([]model.AdminGuildDonateBoxTier, error) {
+	if raw == "" {
+		raw = p13GuildDonateBoxRules()
+	}
+	var tiers []model.AdminGuildDonateBoxTier
+	if len(raw) > 16384 || json.Unmarshal([]byte(raw), &tiers) != nil || len(tiers) != int(constUtil.P13GuildDonateBoxCount) {
+		return nil, errors.New("公会捐献宝箱档位无效")
+	}
+	var previous int32
+	for _, tier := range tiers {
+		if tier.Threshold <= previous || tier.Reward == "" {
+			return nil, errors.New("公会捐献宝箱积分必须递增且奖励不能为空")
+		}
+		if _, err := p1RewardResources(tier.Reward); err != nil {
+			return nil, err
+		}
+		previous = tier.Threshold
+	}
+	return tiers, nil
+}
+func p13GuildDonateBoxFrozenRule(day *db.P13GuildDonateBoxDay, ordinal int64) (int32, string, error) {
+	tiers, err := p13GuildDonateBoxReadRules(day.RulesJSON)
+	if err != nil || ordinal < 1 || ordinal > int64(len(tiers)) {
+		return 0, "", errors.New("公会捐献宝箱冻结档位无效")
+	}
+	return tiers[ordinal-1].Threshold, tiers[ordinal-1].Reward, nil
+}
+
 func p13GuildDonateBoxSourceHash(source db.P13GuildDonateBoxSource) string {
 	source.SourceHash = ""
 	raw, _ := json.Marshal(source)
@@ -93,7 +122,10 @@ func (s *GameService) RecordP13GuildDonateBox(tx *gorm.DB, member *db.P13GuildMe
 	var frozen db.P13GuildDonateBoxDay
 	err = tx.First(&frozen, "guild_id=? AND day=?", member.GuildID, day).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		rules := p13GuildDonateBoxRules()
+		rules := policy.RulesJSON
+		if rules == "" {
+			rules = p13GuildDonateBoxRules()
+		}
 		frozen = db.P13GuildDonateBoxDay{GuildID: member.GuildID, Day: day, Version: policy.Version, Source: policy.Source, RulesJSON: rules, RulesHash: p6Digest([]byte(rules)), PublishedAt: policy.PublishedAt, CreatedAt: now.UnixMilli()}
 		if err = tx.Create(&frozen).Error; err != nil {
 			return err
@@ -101,8 +133,11 @@ func (s *GameService) RecordP13GuildDonateBox(tx *gorm.DB, member *db.P13GuildMe
 	} else if err != nil {
 		return err
 	}
-	if frozen.Version != constUtil.P13GuildDonateBoxVersion || frozen.Source != constUtil.P13GuildDonateBoxSource || frozen.RulesJSON != p13GuildDonateBoxRules() || frozen.RulesHash != p6Digest([]byte(frozen.RulesJSON)) || frozen.PublishedAt <= 0 || frozen.PublishedAt > frozen.CreatedAt || frozen.CreatedAt > now.UnixMilli() || frozen.Score < 0 || int64(frozen.Score)+int64(score) > math.MaxInt32 {
+	if frozen.Version != constUtil.P13GuildDonateBoxVersion || frozen.Source != constUtil.P13GuildDonateBoxSource || frozen.RulesHash != p6Digest([]byte(frozen.RulesJSON)) || frozen.PublishedAt <= 0 || frozen.PublishedAt > frozen.CreatedAt || frozen.CreatedAt > now.UnixMilli() || frozen.Score < 0 || int64(frozen.Score)+int64(score) > math.MaxInt32 {
 		return errors.New("公会捐献宝箱当日冻结规则无效")
+	}
+	if _, err := p13GuildDonateBoxReadRules(frozen.RulesJSON); err != nil {
+		return err
 	}
 	source := db.P13GuildDonateBoxSource{PlayerID: member.PlayerID, Stamp: stamp, GuildID: member.GuildID, Day: day, JoinedAt: member.JoinedAt, DonateType: request.GetDonateType(), Amount: amount, Score: score, CreatedAt: now.UnixMilli()}
 	source.SourceHash = p13GuildDonateBoxSourceHash(source)
@@ -125,14 +160,20 @@ func p13GuildDonateBoxDayRead(tx *gorm.DB, member *db.P13GuildMember, now time.T
 		if err != nil || policy == nil {
 			return nil, false, err
 		}
-		rules := p13GuildDonateBoxRules()
+		rules := policy.RulesJSON
+		if rules == "" {
+			rules = p13GuildDonateBoxRules()
+		}
 		return &db.P13GuildDonateBoxDay{GuildID: member.GuildID, Day: p13GuildDay(now), Version: policy.Version, Source: policy.Source, RulesJSON: rules, RulesHash: p6Digest([]byte(rules)), PublishedAt: policy.PublishedAt}, false, nil
 	}
 	if err != nil {
 		return nil, false, err
 	}
-	if day.Version != constUtil.P13GuildDonateBoxVersion || day.Source != constUtil.P13GuildDonateBoxSource || day.RulesJSON != p13GuildDonateBoxRules() || day.RulesHash != p6Digest([]byte(day.RulesJSON)) || day.CreatedAt <= 0 || day.PublishedAt <= 0 || day.PublishedAt > day.CreatedAt || day.CreatedAt > now.UnixMilli() || day.Score < 0 {
+	if day.Version != constUtil.P13GuildDonateBoxVersion || day.Source != constUtil.P13GuildDonateBoxSource || day.RulesHash != p6Digest([]byte(day.RulesJSON)) || day.CreatedAt <= 0 || day.PublishedAt <= 0 || day.PublishedAt > day.CreatedAt || day.CreatedAt > now.UnixMilli() || day.Score < 0 {
 		return nil, false, errors.New("公会捐献宝箱冻结日来源损坏")
+	}
+	if _, err := p13GuildDonateBoxReadRules(day.RulesJSON); err != nil {
+		return nil, false, err
 	}
 	var sources []db.P13GuildDonateBoxSource
 	if err = tx.Where("guild_id=? AND day=?", day.GuildID, day.Day).Find(&sources).Error; err != nil {
@@ -171,7 +212,18 @@ func (s *GameService) ProjectP13GuildDonateBoxes(tx *gorm.DB, member *db.P13Guil
 	}
 	claimed := map[int64]bool{}
 	for _, claim := range claims {
-		threshold, reward, ruleErr := p13GuildDonateBoxRule(claim.Ordinal)
+		claimDay := day
+		if claim.GuildID != day.GuildID {
+			var prior db.P13GuildDonateBoxDay
+			if err := tx.First(&prior, "guild_id=? AND day=?", claim.GuildID, day.Day).Error; err != nil {
+				return nil, 0, false, err
+			}
+			if prior.RulesHash != p6Digest([]byte(prior.RulesJSON)) || prior.Version != claim.Version {
+				return nil, 0, false, errors.New("公会捐献宝箱原公会档位损坏")
+			}
+			claimDay = &prior
+		}
+		threshold, reward, ruleErr := p13GuildDonateBoxFrozenRule(claimDay, claim.Ordinal)
 		if ruleErr != nil || claim.Version != day.Version || claim.Threshold != threshold || claim.Reward != reward || claim.Score < threshold || claim.BoxID != p13GuildDonateBoxID(claim.GuildID, day.Day, claim.Ordinal) || claim.ResponseHash != p6Digest(claim.Response) {
 			return nil, 0, false, errors.New("公会捐献宝箱领取来源损坏")
 		}
@@ -179,7 +231,10 @@ func (s *GameService) ProjectP13GuildDonateBoxes(tx *gorm.DB, member *db.P13Guil
 	}
 	var boxes []*pb.UnionContributionBox
 	for ordinal := int64(1); ordinal <= constUtil.P13GuildDonateBoxCount; ordinal++ {
-		threshold, reward, _ := p13GuildDonateBoxRule(ordinal)
+		threshold, reward, ruleErr := p13GuildDonateBoxFrozenRule(day, ordinal)
+		if ruleErr != nil {
+			return nil, 0, false, ruleErr
+		}
 		state := int32(0)
 		if claimed[ordinal] {
 			state = 2

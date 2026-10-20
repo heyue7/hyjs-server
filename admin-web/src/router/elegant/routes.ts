@@ -199,6 +199,30 @@ export const generatedRoutes: GeneratedRoute[] = [
     }
   },
   {
+    name: 'guild-settings',
+    path: '/guild-settings',
+    component: 'layout.base$view.guild-settings',
+    meta: {
+      title: 'guild-settings',
+      i18nKey: 'route.guild-settings',
+      icon: 'ph:flag',
+      order: 4,
+      roles: ['viewer', 'operator', 'admin']
+    }
+  },
+  {
+    name: 'guilds',
+    path: '/guilds',
+    component: 'layout.base$view.guilds',
+    meta: {
+      title: 'guilds',
+      i18nKey: 'route.guilds',
+      icon: 'ph:users-three',
+      order: 5,
+      roles: ['viewer', 'operator', 'admin']
+    }
+  },
+  {
     name: 'home',
     path: '/home',
     component: 'layout.base$view.home',

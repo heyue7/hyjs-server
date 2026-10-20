@@ -252,6 +252,8 @@ const local: App.I18n.Schema = {
     'shops_popularity-rank': '声望商店奖励',
     'shops_point': '攻略点商店',
     'shops_score': '积分商店',
+    'guild-settings': 'Guild settings',
+    guilds: 'Guild management',
     'shops_guild': '公会商店',
     'shops_pet-market': '精灵商店',
     'shops_union-fight': '公会战商店',

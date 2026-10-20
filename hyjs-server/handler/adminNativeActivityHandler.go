@@ -14,6 +14,7 @@ import (
 func RegisterAdminNativeActivityRoutes(a *gin.RouterGroup) {
 	a.GET("/activity-native-settings", AdminNativeActivitiesHandler)
 	a.PUT("/activity-native-settings/:id", AdminSaveNativeActivityHandler)
+	a.DELETE("/activity-native-settings/:id", AdminRemoveNativeActivityHandler)
 }
 
 // AdminNativeActivitiesHandler 返回真实活动来源及当前生效规则。
@@ -161,4 +162,28 @@ func adminNativeResourcesValid(values []model.AdminResourceAmount) bool {
 		}
 	}
 	return true
+}
+
+// AdminRemoveNativeActivityHandler 移除已停用配置并保留历史。
+// @Summary 移除停用的精彩活动配置
+// @Description 仅当前版本的停用配置可移除，源配置和奖励历史保留
+// @Tags Admin
+// @Accept json
+// @Produce json
+// @Param id path string true "配置ID"
+// @Param body body model.AdminNativeActivityRemoveRequest true "当前版本"
+// @Success 200 {object} map[string]bool
+// @Router /admin/api/activity-native-settings/{id} [delete]
+func AdminRemoveNativeActivityHandler(c *gin.Context) {
+	id := strings.TrimSpace(c.Param("id"))
+	var req model.AdminNativeActivityRemoveRequest
+	if id == "" || len(id) > 160 || c.ShouldBindJSON(&req) != nil || len(req.Version) != 64 {
+		adminError(c, constUtil.ErrAdminInput)
+		return
+	}
+	if err := gameService.AdminRemoveNativeActivity(c.Request.Context(), adminPrincipal(c), id, req.Version); err != nil {
+		adminError(c, err)
+		return
+	}
+	adminSuccess(c, gin.H{"removed": true})
 }

@@ -179,6 +179,8 @@ const routeMap: RouteMap = {
   "feedback": "/feedback",
   "fields": "/fields",
   "game-accounts": "/game-accounts",
+  "guild-settings": "/guild-settings",
+  "guilds": "/guilds",
   "home": "/home",
   "iframe-page": "/iframe-page/:url",
   "items": "/items",

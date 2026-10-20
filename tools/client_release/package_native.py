@@ -10,7 +10,7 @@ from tools.local_asset_ready.remove_gate import exact_body
 import dnfile
 
 def main():
- p=argparse.ArgumentParser(description=__doc__);p.add_argument("--base-apk",type=Path,required=True);p.add_argument("--overlay",type=Path,required=True);p.add_argument("--output",type=Path,required=True);p.add_argument("--record",type=Path,required=True);a=p.parse_args()
+ p=argparse.ArgumentParser(description=__doc__);p.add_argument("--base-apk",type=Path,required=True);p.add_argument("--overlay",type=Path,required=True);p.add_argument("--output",type=Path,required=True);p.add_argument("--record",type=Path,required=True);p.add_argument("--opening-font-overlay",type=Path);a=p.parse_args()
  base,overlay,output,record=[x.resolve()for x in (a.base_apk,a.overlay,a.output,a.record)]
  proof=json.loads((overlay/"manifest.json").read_text());require(proof["inheritedJavaPublicProtectedABIExact"],"Qualified native ABI required")
  require(not output.exists() and not record.exists(),"Fresh output required");require(common.digest(base)==proof["baseAPKSHA256"],"Base changed")
@@ -25,6 +25,24 @@ def main():
  for name,file in proof.get("payloadFiles",{}).items():
   require(name.startswith("assets/bin/Data/Managed/") and name.endswith(".dll"),"Unexpected overlay entry")
   f=ROOT/file;require(f.resolve().is_relative_to(ROOT),"Overlay file outside project");payload[name]=f.read_bytes()
+ # This optional resource overlay has an exact two-entry, two-byte scope.
+ # Rebuild expected bytes from the pinned base rather than trusting its manifest.
+ font_changes=[]
+ if a.opening_font_overlay:
+  from tools.client_opening_fonts import build as opening_fonts
+  font_dir=a.opening_font_overlay.resolve()
+  require(font_dir.is_relative_to(ROOT),"Font overlay outside project")
+  require(common.digest(base)==opening_fonts.APK_SHA,"Font base differs")
+  pins[Path(opening_fonts.__file__).resolve()]=common.digest(Path(opening_fonts.__file__))
+  with zipfile.ZipFile(base) as z:
+   opening_fonts.font_evidence(z)
+   for pin in opening_fonts.PINS:
+    expected,change=opening_fonts.verify_and_patch(z.read(pin["entry"]),pin)
+    f=font_dir/pin["entry"]
+    require(f.resolve().is_relative_to(font_dir) and f.read_bytes()==expected,"Font payload differs: "+pin["entry"])
+    require(pin["entry"] not in payload,"Overlapping font payload")
+    payload[pin["entry"]]=expected
+    font_changes.append(change)
  require(bool(payload),"Empty overlay is not a release")
  hashes={n:hashlib.sha256(v).hexdigest()for n,v in payload.items()}
  for n,h in proof.get("replacementEntries",{}).items():require(hashes[n]==h,"Overlay payload differs: "+n)
@@ -65,7 +83,7 @@ def main():
     for n,h in compressed.items():require(compressed_hash(stream,z.getinfo(n))==h,"Compressed inherited entry differs: "+n)
    for f,h in pins.items():require(common.digest(f)==h,"Source changed while packaging")
    require(common.digest(base)==proof["baseAPKSHA256"],"Base changed while packaging")
-   result={"status":"PASS_SIGN_ALIGN_SCOPED_OVERLAY_NOT_INSTALLED","binarySHA256":common.digest(signed),"baseAPKSHA256":proof["baseAPKSHA256"],"replacementEntries":hashes,"allOtherEntriesAndCompressedPayloadsExact":True,"managedAssemblyByteExact":common.DLL not in payload,"signatureVerified":True,"zipalignVerified":True,"originalEngineMethodsExact":547,"outputAPK":str(output.relative_to(ROOT))}
+   result={"status":"PASS_SIGN_ALIGN_SCOPED_OVERLAY_NOT_INSTALLED","binarySHA256":common.digest(signed),"baseAPKSHA256":proof["baseAPKSHA256"],"replacementEntries":hashes,"openingFontChanges":font_changes,"allOtherEntriesAndCompressedPayloadsExact":True,"managedAssemblyByteExact":common.DLL not in payload,"signatureVerified":True,"zipalignVerified":True,"originalEngineMethodsExact":547,"outputAPK":str(output.relative_to(ROOT))}
    signed.replace(output)
    if signed.with_suffix(".apk.idsig").exists():signed.with_suffix(".apk.idsig").replace(output.with_suffix(".apk.idsig"))
  record.parent.mkdir(parents=True,exist_ok=True);record.write_text(json.dumps(result,indent=2)+"\n");print(json.dumps(result))

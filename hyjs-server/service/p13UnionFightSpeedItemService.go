@@ -48,10 +48,10 @@ func (s *GameService) p13UFSpeedBuild(tx *gorm.DB, match *db.P13UnionFightMatch,
 			return errors.New("原冲锋3米/5秒与未知资格/倍率提前来源缺失")
 		}
 		cd, err := strconv.ParseFloat(original.table("GameConfigure", "StaticName", "UnionFightPlayerUseDiamondItemCD")["NameValue"], 64)
-		if err != nil || cd != 5 {
+		if err != nil || math.IsNaN(cd) || math.IsInf(cd, 0) || cd < 0.1 || cd > 3600 {
 			return errors.New("原冲锋钻石类五秒CD缺失")
 		}
-		quote := db.P13UnionFightSpeedItemOffer{MatchID: match.ID, ItemID: source.ItemID, Multiplier: source.Multiplier, AuthorityMask: source.AuthorityMask, Radius: 3, DurationMillis: 5000, CooldownMillis: 5000, Source: constUtil.P13UnionFightSpeedItemSource + "；发布：" + source.Source}
+		quote := db.P13UnionFightSpeedItemOffer{MatchID: match.ID, ItemID: source.ItemID, Multiplier: source.Multiplier, AuthorityMask: source.AuthorityMask, Radius: 3, DurationMillis: 5000, CooldownMillis: int64(cd * 1000), Source: constUtil.P13UnionFightSpeedItemSource + "；发布：" + source.Source}
 		quote.SourceHash = p13UFSpeedOfferHash(&quote)
 		if err = tx.Create(&quote).Error; err != nil {
 			return err
@@ -71,7 +71,7 @@ func p13UFSpeedRead(tx *gorm.DB, row *db.P13UnionFightSpeedItemEffect) (*db.P13U
 	if err := tx.First(&quote, "match_id=? AND item_id=?", row.MatchID, "ufitem_015").Error; err != nil {
 		return nil, err
 	}
-	if quote.SourceHash != p13UFSpeedOfferHash(&quote) || quote.ItemID != "ufitem_015" || quote.Multiplier <= 1 || quote.Multiplier > 10 || math.IsNaN(quote.Multiplier) || math.IsInf(quote.Multiplier, 0) || quote.AuthorityMask < 1 || quote.AuthorityMask > 7 || quote.Radius != 3 || quote.DurationMillis != 5000 || quote.CooldownMillis != 5000 || row.SourceHash != p13UFSpeedEffectHash(row) || row.Multiplier != quote.Multiplier || row.OfferHash != quote.SourceHash || row.TargetID <= 0 || row.CasterID <= 0 || row.StartedAt <= 0 || row.ExpiresAt <= row.StartedAt || row.ExpiresAt > row.StartedAt+quote.DurationMillis || (row.EndedAt != 0 && (row.EndedAt < row.StartedAt || row.EndedAt > row.ExpiresAt)) || row.GUID != p13UFFieldGUID(row.MatchID, "speed-buff", strconv.FormatInt(row.CasterID, 10)+"/"+strconv.FormatInt(row.StartedAt, 10)+"/"+strconv.FormatInt(row.TargetID, 10)) {
+	if quote.SourceHash != p13UFSpeedOfferHash(&quote) || quote.ItemID != "ufitem_015" || quote.Multiplier <= 1 || quote.Multiplier > 10 || math.IsNaN(quote.Multiplier) || math.IsInf(quote.Multiplier, 0) || quote.AuthorityMask < 1 || quote.AuthorityMask > 7 || quote.Radius != 3 || quote.DurationMillis != 5000 || (quote.CooldownMillis < 100 || quote.CooldownMillis > 3600000) || row.SourceHash != p13UFSpeedEffectHash(row) || row.Multiplier != quote.Multiplier || row.OfferHash != quote.SourceHash || row.TargetID <= 0 || row.CasterID <= 0 || row.StartedAt <= 0 || row.ExpiresAt <= row.StartedAt || row.ExpiresAt > row.StartedAt+quote.DurationMillis || (row.EndedAt != 0 && (row.EndedAt < row.StartedAt || row.EndedAt > row.ExpiresAt)) || row.GUID != p13UFFieldGUID(row.MatchID, "speed-buff", strconv.FormatInt(row.CasterID, 10)+"/"+strconv.FormatInt(row.StartedAt, 10)+"/"+strconv.FormatInt(row.TargetID, 10)) {
 		return nil, errors.New("冲锋冻结效果SHA/原身份时序损坏")
 	}
 	return &quote, nil
@@ -207,7 +207,7 @@ func (s *GameService) p13UFSpeedUse(ctx context.Context, id int64, request *pb.C
 		if err = tx.First(&quote, "match_id=? AND item_id=?", scope, request.GetItemId()).Error; err != nil {
 			return errors.New("本场未知冲锋资格/倍率来源未提前发布")
 		}
-		if quote.SourceHash != p13UFSpeedOfferHash(&quote) || quote.ItemID != "ufitem_015" || quote.DurationMillis != 5000 || quote.CooldownMillis != 5000 || quote.Radius != 3 || quote.Multiplier <= 1 || quote.Multiplier > 10 || math.IsNaN(quote.Multiplier) || math.IsInf(quote.Multiplier, 0) || quote.AuthorityMask < 1 || quote.AuthorityMask > 7 {
+		if quote.SourceHash != p13UFSpeedOfferHash(&quote) || quote.ItemID != "ufitem_015" || quote.DurationMillis != 5000 || (quote.CooldownMillis < 100 || quote.CooldownMillis > 3600000) || quote.Radius != 3 || quote.Multiplier <= 1 || quote.Multiplier > 10 || math.IsNaN(quote.Multiplier) || math.IsInf(quote.Multiplier, 0) || quote.AuthorityMask < 1 || quote.AuthorityMask > 7 {
 			return errors.New("冲锋冻结资格/倍率SHA损坏")
 		}
 		if frame.GetUnionAuthority() < 0 || frame.GetUnionAuthority() > 2 || quote.AuthorityMask&(1<<frame.GetUnionAuthority()) == 0 {

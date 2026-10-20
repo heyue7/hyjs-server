@@ -128,6 +128,12 @@ func (s *GameService) p13UFDeclare(tx *gorm.DB, guild *db.P13Guild, now time.Tim
 
 // TickP13UnionFight 使用明确传入的时钟处理原自动窗口与截止冻结；不会制造匹配、胜负或奖励。
 func (s *GameService) TickP13UnionFight(ctx context.Context, now time.Time) error {
+	// 新报名/截止快照采用当前全局规则，已冻结场次继续使用原快照。
+	tables, configErr := AdminGuildRuntimeTables(ctx, s.Tables)
+	if configErr != nil {
+		return configErr
+	}
+	s = s.withRuntimeTables(tables)
 	err := db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := ServerGameClockGuardTransaction(tx); err != nil {
 			return err

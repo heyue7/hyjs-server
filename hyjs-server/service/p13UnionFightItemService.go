@@ -74,10 +74,10 @@ func (s *GameService) p13UFItemBuild(tx *gorm.DB, match *db.P13UnionFightMatch, 
 			key = "UnionFightPlayerUseDiamondItemCD"
 		}
 		cd, err := strconv.ParseFloat(original.table("GameConfigure", "StaticName", key)["NameValue"], 64)
-		if err != nil || cd != 5 {
+		if err != nil || math.IsNaN(cd) || math.IsInf(cd, 0) || cd < 0.1 || cd > 3600 {
 			return errors.New("原生命道具5秒冷却缺失")
 		}
-		quote := db.P13UnionFightItemOffer{MatchID: match.ID, ItemID: source.ItemID, HPPercent: source.HPPercent, ItemType: kind, CooldownMillis: 5000, Maximum: maximum, Source: constUtil.P13UnionFightItemSource + "；发布：" + source.Source}
+		quote := db.P13UnionFightItemOffer{MatchID: match.ID, ItemID: source.ItemID, HPPercent: source.HPPercent, ItemType: kind, CooldownMillis: int64(cd * 1000), Maximum: maximum, Source: constUtil.P13UnionFightItemSource + "；发布：" + source.Source}
 		quote.SourceHash = p13UFItemOfferHash(&quote)
 		if err = tx.Create(&quote).Error; err != nil {
 			return err
@@ -212,7 +212,7 @@ func (s *GameService) p13UFItemUse(ctx context.Context, id int64, request *pb.CS
 		if err = tx.First(&quote, "match_id=? AND item_id=?", scope, request.GetItemId()).Error; err != nil {
 			return errors.New("本场请求的生命道具效果未提前发布并冻结")
 		}
-		if quote.SourceHash != p13UFItemOfferHash(&quote) || quote.HPPercent < 1 || quote.HPPercent > 100 || quote.Maximum != 5 || quote.CooldownMillis != 5000 || quote.ItemType < 0 || quote.ItemType > 1 {
+		if quote.SourceHash != p13UFItemOfferHash(&quote) || quote.HPPercent < 1 || quote.HPPercent > 100 || quote.Maximum != 5 || (quote.CooldownMillis < 100 || quote.CooldownMillis > 3600000) || quote.ItemType < 0 || quote.ItemType > 1 {
 			return errors.New("本场生命道具效果来源SHA损坏")
 		}
 		switch quote.ItemID {

@@ -44,7 +44,7 @@ func p13UFBattleAuditFactorValid(value *float64) bool {
 }
 
 func p13UFBattleAuditQuoteValid(quote *db.P13UnionFightBattleAuditOffer) bool {
-	return quote.SourceHash == p13UFBattleAuditOfferHash(quote) && quote.SeedSalt >= 0 && quote.ArriveRange == .8 && quote.MaxRounds == 40 && p13UFBattleAuditFactorValid(quote.AttackerDamageFactor) && p13UFBattleAuditFactorValid(quote.DefenderDamageFactor) && strings.TrimSpace(quote.Source) != ""
+	return quote.SourceHash == p13UFBattleAuditOfferHash(quote) && quote.SeedSalt >= 0 && p13UFGuildFiniteRange(quote.ArriveRange, .1, 100) && quote.MaxRounds == 40 && p13UFBattleAuditFactorValid(quote.AttackerDamageFactor) && p13UFBattleAuditFactorValid(quote.DefenderDamageFactor) && strings.TrimSpace(quote.Source) != ""
 }
 
 func (s *GameService) p13UFBattleAuditBuild(tx *gorm.DB, match *db.P13UnionFightMatch, original *GameService, now time.Time) error {
@@ -57,8 +57,8 @@ func (s *GameService) p13UFBattleAuditBuild(tx *gorm.DB, match *db.P13UnionFight
 		return err
 	}
 	rangeValue, err := strconv.ParseFloat(original.table("GameConfigure", "StaticName", "UnionFightArriveOther")["NameValue"], 64)
-	if err != nil || rangeValue != .8 || source.SeedSalt < 0 || !p13UFBattleAuditFactorValid(source.AttackerDamageFactor) || !p13UFBattleAuditFactorValid(source.DefenderDamageFactor) || source.PublishedAt <= 0 || source.PublishedAt > now.UnixMilli() || strings.TrimSpace(source.Source) == "" {
-		return errors.New("原公会战14/0.8与提前具名审计种子/倍率来源缺失")
+	if err != nil || !p13UFGuildFiniteRange(rangeValue, .1, 100) || source.SeedSalt < 0 || !p13UFBattleAuditFactorValid(source.AttackerDamageFactor) || !p13UFBattleAuditFactorValid(source.DefenderDamageFactor) || source.PublishedAt <= 0 || source.PublishedAt > now.UnixMilli() || strings.TrimSpace(source.Source) == "" {
+		return errors.New("公会战距离配置或提前具名审计种子/倍率来源无效")
 	}
 	quote := db.P13UnionFightBattleAuditOffer{MatchID: match.ID, SeedSalt: source.SeedSalt, ArriveRange: rangeValue, MaxRounds: 40, AttackerDamageFactor: source.AttackerDamageFactor, DefenderDamageFactor: source.DefenderDamageFactor, Source: constUtil.P13UnionFightBattleAuditSource + "；发布：" + source.Source}
 	quote.SourceHash = p13UFBattleAuditOfferHash(&quote)

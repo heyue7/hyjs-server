@@ -400,6 +400,9 @@ func run() error {
 	if err = service.AdminInitialize(ctx, os.Getenv("HYJS_ADMIN_BOOTSTRAP_FILE")); err != nil {
 		return err
 	}
+	if err = s.InitializeAdminGuildSettings(ctx); err != nil {
+		return err
+	}
 	if err = service.InitializeAdminActivityModes(ctx); err != nil {
 		return err
 	}

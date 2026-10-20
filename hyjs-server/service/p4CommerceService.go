@@ -78,6 +78,10 @@ func (s *GameService) seedP4Commerce(tx *gorm.DB, now time.Time) error {
 	end := start.AddDate(0, 1, 0)
 	ordinary := p4CommerceRules{}
 	for i, reward := range []string{"energy,10", "stamina,25", "item_001,1", "item_002,1", "hero_exp_001,1", "item_016,1", "item_013,1"} {
+		// 体力补充通过原体力药剂，旧直接体力商品不再生成。
+		if reward == "stamina,25" {
+			continue
+		}
 		id := fmt.Sprintf("itemShopId_%d", i+1)
 		cost, err := s.p4TierCost(id, 1, 1)
 		if err != nil {
@@ -590,7 +594,7 @@ func (s *GameService) p4Projection(tx *gorm.DB, p *pb.Player, cfg db.P4CommerceR
 		}
 	}
 	for _, product := range rules.Products {
-		if !p4Visible(cfg, state, product) {
+		if shopHasDirectStamina(product.Rewards) || !p4Visible(cfg, state, product) {
 			continue
 		}
 		key := p4SlotKey(cfg, state, product)
@@ -1035,7 +1039,7 @@ func (s *GameService) p4Commerce(ctx context.Context, id int64, request proto.Me
 					break
 				}
 			}
-			if selected == nil || !p4Visible(cfg, state, *selected) {
+			if selected == nil || shopHasDirectStamina(selected.Rewards) || !p4Visible(cfg, state, *selected) {
 				return errors.New("当前目录无该商品")
 			}
 			selectedKey := p4SlotKey(cfg, state, *selected)
@@ -1178,4 +1182,14 @@ func (s *GameService) p4Commerce(ctx context.Context, id int64, request proto.Me
 		return []proto.Message{response, &pb.SCPlayer{Player: guidePlayer}}, nil
 	}
 	return []proto.Message{response}, nil
+}
+
+// shopHasDirectStamina 统一拒绝新购买直接发体力；已经确认的历史回执仍可原样重放。
+func shopHasDirectStamina(rewards string) bool {
+	for _, part := range strings.Split(rewards, ";") {
+		if strings.TrimSpace(strings.SplitN(part, ",", 2)[0]) == "stamina" {
+			return true
+		}
+	}
+	return false
 }

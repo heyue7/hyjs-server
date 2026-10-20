@@ -32,7 +32,7 @@ func p13UFRevivePointStateHash(row *db.P13UnionFightRevivePointState) string {
 	return p6Digest(raw)
 }
 func p13UFRevivePointQuoteValid(row *db.P13UnionFightRevivePointOffer) bool {
-	return row.SourceHash == p13UFRevivePointOfferHash(row) && row.PointID == 5 && !math.IsNaN(float64(row.X)) && !math.IsInf(float64(row.X), 0) && !math.IsNaN(float64(row.Z)) && !math.IsInf(float64(row.Z), 0) && row.PointGUID == p13UFFieldGUID(row.MatchID, "revive", "5") && row.Radius == 3 && row.Speed == .2 && row.MaxStepMillis > 0 && row.MaxStepMillis <= 1000 && row.MaxGapMillis >= 2000 && row.MaxGapMillis <= 60000 && strings.TrimSpace(row.Source) != ""
+	return row.SourceHash == p13UFRevivePointOfferHash(row) && row.PointID == 5 && !math.IsNaN(float64(row.X)) && !math.IsInf(float64(row.X), 0) && !math.IsNaN(float64(row.Z)) && !math.IsInf(float64(row.Z), 0) && row.PointGUID == p13UFFieldGUID(row.MatchID, "revive", "5") && row.Radius == 3 && p13UFGuildFiniteRange(row.Speed, .01, 100) && row.MaxStepMillis > 0 && row.MaxStepMillis <= 1000 && row.MaxGapMillis >= 2000 && row.MaxGapMillis <= 60000 && strings.TrimSpace(row.Source) != ""
 }
 func (s *GameService) p13UFRevivePointBuild(tx *gorm.DB, match *db.P13UnionFightMatch, buildings *pb.SCUFBuildingRefresh, original *GameService, now time.Time) error {
 	var sources []db.P13UnionFightRevivePointSource
@@ -42,7 +42,7 @@ func (s *GameService) p13UFRevivePointBuild(tx *gorm.DB, match *db.P13UnionFight
 	for _, source := range sources {
 		cfg := original.table("UnionFightRevivePoint", "UFRPId", strconv.FormatInt(source.PointID, 10))
 		speed, err := strconv.ParseFloat(original.table("GameConfigure", "StaticName", "UnionFightRevivePointOccupySpeed")["NameValue"], 64)
-		if cfg == nil || source.PointID != 5 || cfg["InitCamp"] != "2" || cfg["IsCanOccupy"] != "1" || cfg["OccupyRange"] != "3.0" || err != nil || speed != .2 || source.PublishedAt <= 0 || source.PublishedAt > now.UnixMilli() || source.MaxStepMillis <= 0 || source.MaxStepMillis > 1000 || source.MaxGapMillis < 2000 || source.MaxGapMillis > 60000 || strings.TrimSpace(source.Source) == "" {
+		if cfg == nil || source.PointID != 5 || cfg["InitCamp"] != "2" || cfg["IsCanOccupy"] != "1" || cfg["OccupyRange"] != "3.0" || err != nil || !p13UFGuildFiniteRange(speed, .01, 100) || source.PublishedAt <= 0 || source.PublishedAt > now.UnixMilli() || source.MaxStepMillis <= 0 || source.MaxStepMillis > 1000 || source.MaxGapMillis < 2000 || source.MaxGapMillis > 60000 || strings.TrimSpace(source.Source) == "" {
 			return errors.New("原中立可占领点/水平半径/速度及提前具名人数规则缺失")
 		}
 		point, err := fieldPoint(cfg["Position"])

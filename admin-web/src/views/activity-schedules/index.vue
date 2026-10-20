@@ -89,6 +89,12 @@ function occurrenceTitle(item: ActivityOccurrence): string {
   const alias = occurrenceAlias(item);
   return alias ? `${item.name}（后台别名：${alias}）` : item.name;
 }
+type StatusType = 'default' | 'success' | 'warning' | 'info' | 'error';
+function occurrenceStatus(item: ActivityOccurrence): { label: string; type: StatusType } {
+  if (!item.id) return { label: '未保存草稿', type: 'warning' };
+  if (item.frozen) return { label: '已冻结', type: 'info' };
+  return item.enabled ? { label: '已发布', type: 'success' } : { label: '已停用', type: 'default' };
+}
 const templateOptions = computed(() =>
   definitions.value.map(item => ({
     label: `${item.name}${definitionAlias(item) ? ` · 别名 ${definitionAlias(item)}` : ''}${
@@ -677,17 +683,13 @@ onUnmounted(() => {
 
 <template>
   <div class="ops-page schedule-page">
-    <NTabs v-model:value="planningTab" type="line" class="mb-20px" @update:value="selectedKey = null">
-      <NTab name="character-day">新玩家排期</NTab>
-      <NTab name="calendar">定期排期</NTab>
-    </NTabs>
-    <p class="planning-description">{{ planningTab === 'character-day' ? '从角色创建日计算活动时长，开服任务按区服开服天数解锁。' : '按固定日期开放，全服玩家共用。' }}</p>
-    <div class="ops-toolbar mb-20px">
+    <div class="ops-toolbar">
       <div>
-        <h1>
+        <div class="ops-page-label">
           活动排期
-        </h1>
-        <p class="ops-muted">{{ managed ? '已由本服排期控制开放' : '尚未发布本服排期' }}</p>
+          <NTag size="small" :bordered="false" :type="managed ? 'success' : 'warning'">{{ managed ? '已发布' : '未启用' }}</NTag>
+        </div>
+        <p class="ops-muted schedule-status">{{ managed ? '本服活动开放由当前排期控制' : '尚未发布本服排期' }}</p>
       </div>
       <NSpace>
         <NButton :disabled="busy" :loading="loading" @click="loadCalendar(true)">刷新本服</NButton>
@@ -697,14 +699,18 @@ onUnmounted(() => {
         </NButton>
       </NSpace>
     </div>
+    <NTabs v-model:value="planningTab" type="line" @update:value="selectedKey = null">
+      <NTab name="character-day">新玩家排期</NTab>
+      <NTab name="calendar">定期排期</NTab>
+    </NTabs>
+    <p class="planning-description">{{ planningTab === 'character-day' ? '从角色创建日计算活动时长，开服任务按区服开服天数解锁。' : '按固定日期开放，全服玩家共用。' }}</p>
     <NAlert
       v-if="!scope.serverId"
       type="info"
       title="请先在顶部选择区服。"
-      class="mb-20px"
     />
-    <NAlert v-if="error || saveError" type="error" :title="saveError || error" class="mb-16px" />
-    <NAlert v-if="scope.serverId && version && !managed" type="warning" title="首次发布会接管本服活动；未排期的活动将关闭。" class="mb-16px" />
+    <NAlert v-if="error || saveError" type="error" :title="saveError || error" />
+    <NAlert v-if="scope.serverId && version && !managed" type="warning" title="首次发布会接管本服活动；未排期的活动将关闭。" />
     <div class="schedule-layout">
       <NCard :bordered="false" class="schedule-library">
         <NTabs v-if="planningTab === 'calendar'" v-model:value="libraryTab" type="segment">
@@ -777,7 +783,16 @@ onUnmounted(() => {
             <h2>新玩家活动</h2>
             <NEmpty v-if="!characterItems.length" description="从左侧添加活动，再设置角色的起始日与持续天数。" />
             <article v-for="item in characterItems" :key="keyOf(item)">
-              <div><strong>{{ item.name }}</strong><span v-if="occurrenceAlias(item)" class="schedule-item-alias">后台别名：{{ occurrenceAlias(item) }}</span><p>角色第{{ item.startDay || 1 }}天开始 · 持续{{ item.durationDays || 14 }}天<template v-if="item.claimDays"> · 另留{{ item.claimDays }}天领奖</template> <NTag size="small" :bordered="false" :type="item.enabled ? 'success' : 'default'">{{ item.enabled ? '开放' : '停用' }}</NTag></p></div>
+              <div class="schedule-row-main">
+                <div class="schedule-row-title">
+                  <strong>{{ item.name }}</strong>
+                  <span v-if="occurrenceAlias(item)" class="schedule-item-alias">后台别名：{{ occurrenceAlias(item) }}</span>
+                </div>
+                <div class="schedule-row-meta">
+                  <NTag size="small" :bordered="false" :type="occurrenceStatus(item).type">{{ occurrenceStatus(item).label }}</NTag>
+                  <span>角色第{{ item.startDay || 1 }}天开始 · 持续{{ item.durationDays || 14 }}天<template v-if="item.claimDays"> · 另留{{ item.claimDays }}天领奖</template></span>
+                </div>
+              </div>
               <NSpace :size="6"><NButton size="small" @click="previewActivity(item.templateId, item)">预览</NButton><NButton size="small" @click="selectedKey = keyOf(item)">编辑</NButton></NSpace>
             </article>
           </section>
@@ -785,9 +800,9 @@ onUnmounted(() => {
         <NCard v-else :bordered="false">
           <div class="calendar-toolbar">
             <NSpace>
-              <NButton size="small" @click="startDate -= visibleDays * activityDay">←</NButton>
-              <NDatePicker v-model:value="startDate" type="date" :clearable="false" />
-              <NButton size="small" @click="startDate += visibleDays * activityDay">→</NButton>
+              <NButton size="small" aria-label="向前查看一个周期" @click="startDate -= visibleDays * activityDay">←</NButton>
+              <NDatePicker v-model:value="startDate" type="date" :clearable="false" aria-label="日历起始日期" />
+              <NButton size="small" aria-label="向后查看一个周期" @click="startDate += visibleDays * activityDay">→</NButton>
               <NButton size="small" @click="startDate = calendarMidnight(gameNow) - 3 * activityDay">游戏今天</NButton>
             </NSpace>
             <NSpace>
@@ -799,6 +814,7 @@ onUnmounted(() => {
                   { label: '八周', value: 56 }
                 ]"
                 class="w-100px"
+                aria-label="日历显示周期"
               />
               <NButton :disabled="!ready" :loading="checking" @click="checkCalendar">检查冲突</NButton>
             </NSpace>
@@ -896,7 +912,16 @@ onUnmounted(() => {
           </div>
           <div v-if="calendarItems.length" class="scheduled-activities" aria-label="本服活动清单">
             <article v-for="item in calendarItems" :key="keyOf(item)">
-              <div><strong>{{ item.name }}</strong><span v-if="occurrenceAlias(item)" class="schedule-item-alias">后台别名：{{ occurrenceAlias(item) }}</span><span>{{ calendarDate(item.startAt) }} — {{ calendarDate(item.endAt) }}<template v-if="item.frozen"> · 已冻结</template><template v-else-if="!item.id"> · 草稿</template></span></div>
+              <div class="schedule-row-main">
+                <div class="schedule-row-title">
+                  <strong>{{ item.name }}</strong>
+                  <span v-if="occurrenceAlias(item)" class="schedule-item-alias">后台别名：{{ occurrenceAlias(item) }}</span>
+                </div>
+                <div class="schedule-row-meta">
+                  <NTag size="small" :bordered="false" :type="occurrenceStatus(item).type">{{ occurrenceStatus(item).label }}</NTag>
+                  <span>{{ calendarDate(item.startAt) }} — {{ calendarDate(item.endAt) }}<template v-if="item.claimEndAt > item.endAt"> · 领奖至{{ calendarDate(item.claimEndAt) }}</template> · 轨道{{ item.lane + 1 }}</span>
+                </div>
+              </div>
               <NSpace :size="6"><NButton size="small" @click="previewActivity(item.templateId, item)">预览</NButton><NButton size="small" @click="selectedKey = keyOf(item)">编辑排期</NButton></NSpace>
             </article>
           </div>
@@ -932,10 +957,13 @@ onUnmounted(() => {
       <span>{{ !managed ? '本服排期尚未启用' : '本服排期有未发布修改' }} · {{ items.length }} 项活动</span>
       <NButton type="primary" :disabled="!canPublish" :loading="saving" @click="publish">检查并发布</NButton>
     </div>
-    <NDrawer :show="Boolean(selected)" :width="440" @update:show="selectedKey = $event ? selectedKey : null">
+    <NDrawer :show="Boolean(selected)" :width="480" @update:show="selectedKey = $event ? selectedKey : null">
       <NDrawerContent v-if="selected" :title="selected.name" closable>
         <NForm label-placement="top" :disabled="!canWrite || busy">
-          <NTag :bordered="false">{{ modeMap.get(selected.mode) || selected.mode }}</NTag>
+          <NSpace :size="6" class="mb-12px">
+            <NTag :bordered="false" :type="occurrenceStatus(selected).type">{{ occurrenceStatus(selected).label }}</NTag>
+            <NTag :bordered="false">{{ modeMap.get(selected.mode) || selected.mode }}</NTag>
+          </NSpace>
           <p v-if="occurrenceAlias(selected)" class="pattern-help" style="margin:8px 0 0">后台别名：{{ occurrenceAlias(selected) }}（仅后台显示）</p>
           <NAlert
             v-if="selected.frozen"
@@ -1082,23 +1110,20 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-.planning-description { margin: 0 0 18px; font-size: 13px; line-height: 1.7; color: rgb(var(--base-text-color) / .65); }
+.planning-description { margin: 0; font-size: 13px; line-height: 1.7; color: rgb(var(--base-text-color) / .65); }
 
+.schedule-status { margin: 4px 0 0; }
+.schedule-page .ops-page-label { display: flex; align-items: center; gap: 10px; }
 .character-schedules { margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid rgb(var(--base-text-color) / .09); }
 .character-schedules h2 { font-size: 14px; font-weight: 600; margin: 0 0 10px; }
-.character-schedules article { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 10px 0; }
-.character-schedules strong { font-size: 13px; font-weight: 500; }
-.character-schedules p { font-size: 12px; color: rgb(var(--base-text-color) / .65); margin: 6px 0 0; }
-.schedule-item-alias { margin-left: 10px; font-size: 12px; color: rgb(var(--base-text-color) / .55); }
+.character-schedules article,
+.scheduled-activities article { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 12px 0; border-bottom: 1px solid rgb(var(--base-text-color) / .07); }
+.schedule-row-main { min-width: 0; }
+.schedule-row-title { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.schedule-row-title strong { font-size: 13px; font-weight: 500; }
+.schedule-row-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 6px; font-size: 12px; color: rgb(var(--base-text-color) / .65); }
+.schedule-item-alias { font-size: 12px; color: rgb(var(--base-text-color) / .55); }
 
-h1 {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin: 0 0 8px;
-  font-size: 22px;
-  font-weight: 600;
-}
 .schedule-layout {
   display: grid;
   grid-template-columns: 265px minmax(0, 1fr);
@@ -1135,17 +1160,18 @@ h1 {
 .library-card {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   border: 1px solid rgb(var(--base-text-color) / 0.1);
   border-radius: 9px;
-  padding: 14px 12px;
-  margin-top: 12px;
+  padding: 12px 10px;
+  margin-top: 10px;
   cursor: grab;
 }
 .library-card[draggable='false'] {
   cursor: default;
 }
-.library-card:hover {
+.library-card:hover,
+.library-card:focus-within {
   border-color: rgb(var(--primary-color) / 0.45);
 }
 .library-card strong {
@@ -1336,9 +1362,7 @@ h1 {
   right: 0;
 }
 .scheduled-activities { margin-top: 16px; }
-.scheduled-activities article { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 10px 0; border-bottom: 1px solid rgb(var(--base-text-color) / .07); }
-.scheduled-activities strong { font-size: 13px; font-weight: 500; }
-.scheduled-activities span { color: rgb(var(--base-text-color) / .6); font-size: 12px; margin-left: 12px; }
+.scheduled-activities article:last-child { border-bottom: 0; }
 .pattern-actions { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 .pattern-help { margin: 0 0 18px; line-height: 1.7; font-size: 13px; color: rgb(var(--base-text-color) / .65); }
 :global(.n-card.activity-preview-modal) { width: min(960px, calc(100vw - 40px)); max-height: calc(100vh - 60px); overflow: auto; }
@@ -1410,6 +1434,11 @@ h1 {
   .pattern-entry > :first-child, .pattern-actions { grid-column: 1 / -1; }
 }
 @media (max-width: 760px) {
+  .character-schedules article,
+  .scheduled-activities article {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
   .schedule-layout {
     display: block;
   }

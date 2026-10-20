@@ -50,6 +50,20 @@ const editorName = computed(() => (form.value ? activityFormName(form.value, sel
 const modeOptions = computed(() => modes.value.map(mode => ({ label: mode.label, value: mode.mode })));
 const repeatOptions = [{ label: '一次性', value: 'once' }, { label: '可重复', value: 'repeat' }];
 const availableCount = computed(() => definitions.value.filter(row => row.availability.usable).length);
+const availabilityOptions = computed(() => [
+  { label: `可使用模板 ${availableCount.value}`, value: 'usable' },
+  { label: `暂不可用模板 ${definitions.value.length - availableCount.value}`, value: 'unavailable' }
+]);
+function definitionName(row: ActivityDefinition): string {
+  return row.mode === 'king-recruit' ? '王者招募' : row.name;
+}
+function definitionAlias(row: ActivityDefinition): string {
+  const alias = (row.form?.alias || '').trim();
+  if (alias) return alias;
+  if (row.mode === 'king-recruit' && row.name.startsWith('王者招募') && row.name !== '王者招募')
+    return row.name.slice('王者招募'.length).replace(/^[·\s-]+/, '');
+  return '';
+}
 const filtered = computed(() =>
   definitions.value.filter(
     row =>
@@ -167,6 +181,19 @@ async function close() {
     emit('closed');
   }
 }
+async function beforeTabLeave() {
+  if (busy.value) return false;
+  const hadDraft = dirty.value;
+  if (!(await confirmDiscard())) return false;
+  if (hadDraft && editorOpen.value) {
+    editorOpen.value = false;
+    selected.value = null;
+    form.value = null;
+    baseline.value = '';
+    emit('closed');
+  }
+  return true;
+}
 async function save() {
   if (!form.value || readOnly.value || busy.value) return;
   const name = activityFormName(form.value, selectedMode.value).trim();
@@ -251,13 +278,15 @@ const columns = computed<DataTableColumns<ActivityDefinition>>(() => [
     title: '活动',
     key: 'name',
     minWidth: 260,
-    render: row =>
-      h('div', [
-        h('strong', row.name),
-        row.form?.alias
-          ? h('div', { class: 'ops-muted', style: 'margin-top:2px;font-size:12px' }, `后台别名：${row.form.alias}`)
+    render: row => {
+      const alias = definitionAlias(row);
+      return h('div', [
+        h('strong', definitionName(row)),
+        alias
+          ? h('div', { class: 'ops-muted', style: 'margin-top:2px;font-size:12px' }, `后台别名：${alias}`)
           : null
-      ])
+      ]);
+    }
   },
   { title: '模式', key: 'mode', width: 155, render: row => modeMap.value.get(row.mode)?.label || '暂未适配' },
   { title: '参与方式', key: 'repeatPolicy', width: 110, render: row => activityRepeatLabel(row.form) },
@@ -267,7 +296,7 @@ const columns = computed<DataTableColumns<ActivityDefinition>>(() => [
     width: 110,
     render: row =>
       h(NTag, { size: 'small', bordered: false, type: row.enabled ? 'success' : 'default' }, () =>
-        row.enabled ? '可使用' : '草稿 / 停用'
+        row.enabled ? '可使用' : '已停用'
       )
   },
   {
@@ -283,17 +312,18 @@ const columns = computed<DataTableColumns<ActivityDefinition>>(() => [
     title: '操作',
     key: 'actions',
     width: 300,
+    fixed: 'right',
     render: row =>
       h(NSpace, { size: 6 }, () => [
-        h(NButton, { size: 'small', disabled: busy.value, onClick: () => openEditor(row, true) }, () => '查看'),
+        h(NButton, { size: 'small', disabled: busy.value, 'aria-label': `查看${definitionName(row)}`, onClick: () => openEditor(row, true) }, () => '查看'),
         canWrite.value && modeMap.value.has(row.mode)
-          ? h(NButton, { size: 'small', disabled: busy.value, onClick: () => openEditor(row) }, () => '编辑')
+          ? h(NButton, { size: 'small', disabled: busy.value, 'aria-label': `编辑${definitionName(row)}`, onClick: () => openEditor(row) }, () => '编辑')
           : null,
         canWrite.value && row.availability.usable
-          ? h(NButton, { size: 'small', disabled: busy.value, quaternary: true, onClick: () => openEditor(row, false, true) }, () => '复制')
+          ? h(NButton, { size: 'small', disabled: busy.value, quaternary: true, 'aria-label': `复制${definitionName(row)}`, onClick: () => openEditor(row, false, true) }, () => '复制')
           : null,
         canWrite.value
-          ? h(NButton, { size: 'small', quaternary: true, type: 'error', disabled: busy.value, loading: deletingId.value === row.id, onClick: () => requestDelete(row) }, () => '删除')
+          ? h(NButton, { size: 'small', quaternary: true, type: 'error', disabled: busy.value, loading: deletingId.value === row.id, 'aria-label': `删除${definitionName(row)}`, onClick: () => requestDelete(row) }, () => '删除')
           : null
       ])
   }
@@ -308,7 +338,7 @@ async function openFromSchedule(row: ActivityDefinition, view = false) {
   if (!modes.value.length) await load();
   openEditor(row, view);
 }
-defineExpose({ openFromSchedule, confirmDiscard, saving: busy, dirty });
+defineExpose({ openFromSchedule, confirmDiscard, beforeTabLeave, saving: busy, dirty });
 onBeforeRouteLeave(() => busy.value ? false : props.inline ? true : confirmDiscard());
 onMounted(() => {
   window.addEventListener('beforeunload', beforeUnload);
@@ -323,24 +353,26 @@ onUnmounted(() => {
 <template>
   <div class="ops-page template-workspace" :class="{ 'template-inline': inline }">
     <template v-if="!editorOpen && !inline">
-      <div class="ops-toolbar mb-20px">
+      <div class="ops-toolbar">
         <div>
-          <h1>活动设置</h1>
+          <div class="ops-page-label">排期模板<span class="ops-count">{{ definitions.length }} 个</span></div>
+          <p class="ops-muted template-intro">可复用的活动内容；开放日期和区服在活动排期中设置。</p>
         </div>
         <NSpace>
-          <RouterLink to="/daily-sign"><NButton>每日签到</NButton></RouterLink>
           <NButton :loading="loading" :disabled="busy" @click="load">刷新</NButton>
           <NButton v-if="canWrite" type="primary" :disabled="busy || !modes.length" @click="openEditor()">新建活动模板</NButton>
         </NSpace>
       </div>
-      <NAlert v-if="error" type="error" :title="error" class="mb-16px" />
-      <NCard :bordered="false">
-        <NTabs v-model:value="availability" type="line">
-          <NTab name="usable">可用模板 {{ availableCount }}</NTab>
-          <NTab name="unavailable">暂不可用 {{ definitions.length - availableCount }}</NTab>
-        </NTabs>
-        <div class="ops-filters mt-16px">
-          <NInput v-model:value="search" clearable placeholder="搜索活动名称、别名或模式" class="ops-search" />
+      <NAlert v-if="error" type="error" :title="error" />
+      <NCard :bordered="false" class="ops-panel">
+        <div class="ops-filters">
+          <NInput v-model:value="search" clearable placeholder="搜索活动名称、别名或模式" class="ops-search" aria-label="搜索活动名称、别名或模式" />
+          <NSelect
+            v-model:value="availability"
+            :options="availabilityOptions"
+            class="ops-filter-select"
+            aria-label="按可用性筛选"
+          />
           <NSelect
             v-model:value="modeFilter"
             :options="modeOptions"
@@ -348,7 +380,9 @@ onUnmounted(() => {
             clearable
             placeholder="全部模式"
             class="ops-filter-select"
+            aria-label="按活动模式筛选"
           />
+          <span class="ops-muted template-count">{{ filtered.length }} / {{ definitions.length }} 个</span>
         </div>
         <NDataTable
           :columns="columns"
@@ -356,16 +390,20 @@ onUnmounted(() => {
           :loading="loading"
           :row-key="(row: ActivityDefinition) => row.id"
           :bordered="false"
-          :scroll-x="1140"
+          :scroll-x="1160"
           :pagination="{ pageSize: 20 }"
-        />
+        >
+          <template #empty>
+            <NEmpty :description="definitions.length ? '没有符合筛选条件的模板' : '暂无活动模板'" />
+          </template>
+        </NDataTable>
       </NCard>
     </template>
     <template v-else-if="form">
       <div class="ops-toolbar mb-20px">
         <div>
           <NButton v-if="!inline" quaternary :disabled="busy" @click="close">← 返回模板库</NButton>
-          <h1>{{ selected?.name || '新建活动模板' }}</h1>
+          <div class="ops-page-label">{{ selected ? editorName : '新建活动模板' }}</div>
         </div>
       </div>
       <NAlert v-if="saveError" type="error" :title="saveError" class="mb-16px" />
@@ -506,16 +544,13 @@ onUnmounted(() => {
 
 <style scoped>
 .template-inline { padding: 0; }
-.template-inline h1 { font-size: 18px; }
+.template-inline .ops-page-label { font-size: 18px; }
+.template-intro { margin: 4px 0 0; }
+.template-count { margin-left: auto; font-variant-numeric: tabular-nums; }
 .template-context, .template-help { color: rgb(var(--base-text-color) / .65); font-size: 13px; line-height: 1.7; margin: 0 0 20px; }
 .template-editor nav button:hover { background: rgb(var(--base-text-color) / .04); }
 .template-editor nav button:focus-visible { outline: 2px solid rgb(var(--primary-color)); outline-offset: 2px; }
 
-h1 {
-  margin: 4px 0 8px;
-  font-size: 22px;
-  font-weight: 600;
-}
 .template-editor {
   display: grid;
   grid-template-columns: 160px minmax(0, 1fr);
@@ -559,6 +594,9 @@ h1 {
   z-index: 3;
 }
 @media (max-width: 760px) {
+  .template-count {
+    margin-left: 0;
+  }
   .template-editor {
     display: block;
   }
