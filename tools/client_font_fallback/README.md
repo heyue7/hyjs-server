@@ -8,7 +8,7 @@
 
 ```sh
 rtk proxy .analysis-venv/bin/python tools/client_font_fallback/build.py \
-  --base-apk build/hyjs-local.apk \
+  --base-apk apks/build/hyjs-feedback-b27-sao-r16.apk \
   --output-directory analysis/playability31-20261020/client/fonts-fallback-r1
 ```
 
