@@ -29,6 +29,16 @@ namespace HYJS.NativeAccount
             AccountControl value = input.GetComponent<AccountControl>();
             return value != null && value.Submit();
         }
+        public static bool ResumeField()
+        {
+            string scene = Login.LoginManager.willLoginScene;
+            if (scene != "field_001" && scene != "field_002") return false;
+            // LoginToField accepts the original resource-dispatch prefix and strips it itself.
+            // The authoritative protocol scene and saved position retain field_001/002.
+            UI.UIFieldRunMap.fieldId = String.Empty;
+            ManagerController.Instance.LoginToField("town_side_" + scene);
+            return true;
+        }
     }
 
     public sealed class AccountControl : MonoBehaviour
@@ -173,7 +183,11 @@ namespace HYJS.NativeAccount
                 confirm.name = "ConfirmPassword"; confirm.transform.parent = input.passWordInput.transform.parent;
                 confirm.transform.localScale = input.passWordInput.transform.localScale;
                 confirm.transform.localPosition = passwordPosition + Vector3.down * 52f;
+                // Cloning the password field also clones its localization and saved-value bindings.
+                // The confirmation field owns its placeholder and never loads/stores a password preference.
+                foreach (UILocalize localized in confirm.GetComponentsInChildren<UILocalize>(true)) localized.enabled = false;
                 confirmation = confirm.GetComponent<UIInput>(); confirmation.value = "";
+                confirmation.savedAs = String.Empty;
                 confirmation.onSubmit.Clear(); confirmation.onChange.Clear();
                 confirmation.defaultText = "确认密码：请再次输入";
                 confirmation.UpdateLabel();
@@ -202,6 +216,7 @@ namespace HYJS.NativeAccount
         {
             if (busy) return;
             registering = !registering; confirmation.value = ""; owner.ErrInfoFalse(); Apply();
+            StartCoroutine(RefreshPlaceholders());
         }
         void Apply()
         {
@@ -217,6 +232,7 @@ namespace HYJS.NativeAccount
                     confirmation.label.text = confirmation.defaultText;
                 }
                 confirmation.gameObject.SetActive(registering);
+                confirmation.UpdateLabel();
             }
             foreach (UILabel title in owner.GetComponentsInChildren<UILabel>(true))
                 if (title.text == "游戏登录" || title.text == "游戏注册") title.text = registering ? "游戏注册" : "游戏登录";

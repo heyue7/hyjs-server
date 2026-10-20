@@ -15,14 +15,17 @@ sys.path.insert(0, str(ROOT))
 from tools.awake_diff_rows.build import methods
 from tools.local_asset_ready.remove_gate import exact_body, require
 ENTRY = 'assets/bin/Data/Managed/Assembly-CSharp.dll'
-ALLOWED = {'UserInput::Show', 'UserInput::OnRegistButtonClick', 'UserInput::OnLoginButton', 'UI.KeFuPage::DoOpen', 'UI.WorldMapPage::transfer'}
+ALLOWED = {'UserInput::Show', 'UserInput::OnRegistButtonClick', 'UserInput::OnLoginButton', 'UI.KeFuPage::DoOpen', 'UI.WorldMapPage::transfer', 'Login.LoginManager::LoginScene'}
 def sha(value): return hashlib.sha256(value).hexdigest()
 
 def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--base-apk',type=Path,required=True);p.add_argument('--base-sha256',required=True)
     p.add_argument('--input-managed',type=Path);p.add_argument('--output-directory',type=Path,required=True)
+    p.add_argument('--recovery-only',action='store_true',help='Compose only field cold-login recovery onto an already integrated managed candidate')
     a=p.parse_args();out=a.output_directory.resolve();require(not out.exists(),'Fresh directory required')
+    require(not a.recovery_only or a.input_managed is not None,'Recovery composition requires the fixed managed candidate')
+    allowed={'Login.LoginManager::LoginScene'} if a.recovery_only else ALLOWED
     require(sha(a.base_apk.read_bytes())==a.base_sha256,'APK identity changed');out.mkdir(parents=True)
     runtime=ROOT/'.tools/native-batch';dotnet=runtime/'dotnet/dotnet';compiler=next((runtime/'dotnet/sdk').glob('*/Roslyn/bincore/csc.dll'))
     source=Path(__file__).resolve().parent;dnlib=runtime/'injector/bin/Debug/net8.0/dnlib.dll'
@@ -39,16 +42,16 @@ def main():
         shutil.copy2(source/'Injector.cs',work/'Program.cs');project=work/'Patch.csproj'
         project.write_text('<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable></PropertyGroup><ItemGroup><Reference Include="dnlib"><HintPath>'+str(dnlib)+'</HintPath></Reference></ItemGroup></Project>')
         run('compile-injector',[dotnet,'build',project,'--nologo','--verbosity','quiet','-p:NuGetAudit=false'])
-        run('inject',[dotnet,work/'bin/Debug/net8.0/Patch.dll',host,helper,out/'Assembly-CSharp.dll'])
+        run('inject',[dotnet,work/'bin/Debug/net8.0/Patch.dll',host,helper,out/'Assembly-CSharp.dll',*(['--recovery-only'] if a.recovery_only else [])])
     after=(out/'Assembly-CSharp.dll').read_bytes();left,right=[dnfile.dnPE(data=b)for b in [before,after]]
     changes=[];engine=0
     for (n,i,x),(m,j,y) in zip(methods(left),methods(right)):
         require((n,i,x.Signature.value,x.struct.Flags)==(m,j,y.Signature.value,y.struct.Flags),'ABI changed: '+n)
         if not x.Rva:continue
         old,new=exact_body(left,x),exact_body(right,y)
-        if old!=new:require(n in ALLOWED,'Unrelated body changed: '+n);changes.append(n)
+        if old!=new:require(n in allowed,'Unrelated body changed: '+n);changes.append(n)
         else:engine+=n.startswith('Battle.Engine')
-    require(set(changes)==ALLOWED and engine==547,'Expected scoped method changes')
+    require(set(changes)==allowed and engine==547,'Expected scoped method changes')
     require(not getattr(right.net.mdtables,'FieldPtr',None),'Unsupported FieldPtr')
     require(len(left.net.mdtables.ModuleRef.rows)==len(right.net.mdtables.ModuleRef.rows),'Unexpected ModuleRef')
     inputs=[source/'NativeAccount.cs',source/'Injector.cs',source/'build.py',*sorted((source/'resources/sao-v2').glob('*'))]

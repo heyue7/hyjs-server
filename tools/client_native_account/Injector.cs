@@ -12,6 +12,22 @@ var api = new TypeRefUser(module,"HYJS.NativeAccount","AccountUI",reference);
 var user = module.GetTypes().Single(t=>t.FullName=="UserInput");
 // Use the local TypeDef in signatures. Importing it from the helper can create an unsupported self ModuleRef.
 IMethod Bridge(string name) => new MemberRefUser(module,name,MethodSig.CreateStatic(name=="HandleLogin"?module.CorLibTypes.Boolean:module.CorLibTypes.Void,user.ToTypeSig()),api);
+void AddFieldRecovery()
+{
+    var scene=Method("Login.LoginManager","LoginScene");
+    if(scene.Body.Instructions.Any(i=>i.OpCode==OpCodes.Call && i.Operand is IMethod m && m.Name=="ResumeField"))throw new InvalidOperationException("Recovery already installed");
+    var first=scene.Body.Instructions[0];
+    var bridge=new MemberRefUser(module,"ResumeField",MethodSig.CreateStatic(module.CorLibTypes.Boolean),api);
+    var prefix=new[]{Instruction.Create(OpCodes.Call,bridge),Instruction.Create(OpCodes.Brfalse,first),Instruction.Create(OpCodes.Ret)};
+    for(int i=0;i<prefix.Length;i++)scene.Body.Instructions.Insert(i,prefix[i]);
+    scene.Body.MaxStack=12;scene.Body.KeepOldMaxStack=true;
+}
+if(args.Length>3 && args[3]=="--recovery-only")
+{
+    AddFieldRecovery();
+    var recoveryOptions=new ModuleWriterOptions(module);recoveryOptions.MetadataOptions.Flags|=MetadataFlags.PreserveAll|MetadataFlags.KeepOldMaxStack;
+    module.Write(args[2],recoveryOptions);return;
+}
 var show = Method("UserInput", "Show");
 var ret = show.Body.Instructions.Last();
 show.Body.Instructions.Insert(show.Body.Instructions.Count-1, Instruction.Create(OpCodes.Ldarg_0));
@@ -33,5 +49,6 @@ var transfer=Method("UI.WorldMapPage","transfer");
 int count=0;
 foreach(var instruction in transfer.Body.Instructions)if(instruction.OpCode==OpCodes.Ldstr && (string)instruction.Operand=="town_side_"){instruction.Operand="";count++;}
 if(count!=2)throw new InvalidOperationException("Expected two original world-map transfer prefixes");
+AddFieldRecovery();
 var options=new ModuleWriterOptions(module);options.MetadataOptions.Flags|=MetadataFlags.PreserveAll|MetadataFlags.KeepOldMaxStack;
 module.Write(args[2],options);

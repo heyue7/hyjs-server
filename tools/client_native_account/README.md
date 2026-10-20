@@ -4,6 +4,6 @@
 
 注册复用同一面板，增加确认密码，调用现有账号注册接口；成功后返回手动登录。记住密码继续使用原加密缓存，默认凭据不指向验收账号时禁止直接登录。
 
-`build.py` 为可组合覆盖：只改 UserInput 的 Show/OnRegistButtonClick/OnLoginButton，修正客服 DoOpen 的 maxStack，并去除 WorldMapPage.transfer 错误的两处 town_side_ 前缀。其余原方法逐字节验证，547 个原战斗方法保持。Java 改动由 login_ui 的 DEX 构建合成，既有公开 ABI 保持。
+`build.py` 为可组合覆盖：改 UserInput 的 Show/OnRegistButtonClick/OnLoginButton，修正客服 DoOpen 的 maxStack，并去除 WorldMapPage.transfer 请求中错误的两处 town_side_ 前缀。冷登录单独为 Login.LoginManager.LoginScene 增加 field_001/002 恢复分支，调用原 LoginToField 的 town_side_ 资源调度命名；持久化/网络场景名保持 field_001/002。`--recovery-only --input-managed <fixed candidate>` 仅追加这一恢复分支到已有集成程序集，禁止重复追加。其余原方法逐字节验证，547 个原战斗方法保持。Java 改动由 login_ui 的 DEX 构建合成，既有公开 ABI 保持。
 
 本轮原机验收和最终制品以 `plans/27-play-feedback-20261020.md` 为准，早期 r1/r2/r4 仅为问题定位候选。
