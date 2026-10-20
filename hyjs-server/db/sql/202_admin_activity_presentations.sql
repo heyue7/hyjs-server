@@ -3,6 +3,7 @@ CREATE TABLE IF NOT EXISTS admin_activity_presentations (
  mode VARCHAR(64) NOT NULL,
  template_id VARCHAR(96) NOT NULL,
  name VARCHAR(160) NOT NULL,
+ alias VARCHAR(320) NOT NULL DEFAULT '',
  archived BOOLEAN NOT NULL,
  updated_at_millis BIGINT NOT NULL
 ) ENGINE=InnoDB;

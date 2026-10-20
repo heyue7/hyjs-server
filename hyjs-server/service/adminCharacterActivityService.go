@@ -179,7 +179,7 @@ func (s *GameService) PrepareAdminCharacterActivitySchedules(ctx context.Context
 			if err := tx.Create(&issued).Error; err != nil {
 				return err
 			}
-			meta := db.AdminActivityPresentation{ActivityID: issued.ConsumerID, Mode: schedule.Mode, TemplateID: form.TemplateID, Name: schedule.Name, UpdatedAtMillis: time.Now().UnixMilli()}
+			meta := db.AdminActivityPresentation{ActivityID: issued.ConsumerID, Mode: schedule.Mode, TemplateID: form.TemplateID, Name: form.Name, Alias: form.Alias, UpdatedAtMillis: time.Now().UnixMilli()}
 			if err := tx.Create(&meta).Error; err != nil {
 				return err
 			}

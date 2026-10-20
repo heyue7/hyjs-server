@@ -76,15 +76,30 @@ const characterItems = computed(() => items.value.filter(isCharacterItem));
 const calendarItems = computed(() => items.value.filter(item => !isCharacterItem(item)));
 const selected = computed(() => items.value.find(item => keyOf(item) === selectedKey.value));
 const usableDefinitions = computed(() => definitions.value.filter(item => item.enabled && item.availability.usable));
+function definitionAlias(definition: ActivityDefinition): string {
+  return (definition.form?.alias || '').trim();
+}
+function occurrenceAlias(item: ActivityOccurrence): string {
+  // 已保存的排期带自己的表单，沿用当时的别名；仅未绑定表单的草稿回查模板。
+  if (item.form) return (item.form.alias || '').trim();
+  const definition = definitions.value.find(value => value.id === item.templateId);
+  return (definition?.form?.alias || '').trim();
+}
+function occurrenceTitle(item: ActivityOccurrence): string {
+  const alias = occurrenceAlias(item);
+  return alias ? `${item.name}（后台别名：${alias}）` : item.name;
+}
 const templateOptions = computed(() =>
   definitions.value.map(item => ({
-    label: item.name + (!item.enabled || !item.availability.usable ? '（暂不可排期）' : ''),
+    label: `${item.name}${definitionAlias(item) ? ` · 别名 ${definitionAlias(item)}` : ''}${
+      !item.enabled || !item.availability.usable ? '（暂不可排期）' : ''
+    }`,
     value: item.id,
     disabled: !item.enabled || !item.availability.usable
   }))
 );
 const modeMap = computed(
-  () => new Map([...modes.value.map(mode => [mode.mode, mode.label] as const), ['opening-14', '开服14天原版任务']])
+  () => new Map([...modes.value.map(mode => [mode.mode, mode.label] as const), ['opening-14', '开服狂欢']])
 );
 const filteredPatterns = computed(() =>
   patterns.value.filter(
@@ -93,7 +108,10 @@ const filteredPatterns = computed(() =>
 );
 const filteredDefinitions = computed(() =>
   usableDefinitions.value.filter(
-    item => (planningTab.value === 'character-day' || item.mode !== 'opening-14') && (!librarySearch.value || item.name.toLowerCase().includes(librarySearch.value.toLowerCase()))
+    item =>
+      (planningTab.value === 'character-day' || item.mode !== 'opening-14') &&
+      (!librarySearch.value ||
+        `${item.name} ${definitionAlias(item)}`.toLowerCase().includes(librarySearch.value.toLowerCase()))
   )
 );
 const dates = computed(() =>
@@ -409,7 +427,7 @@ function barPeriodSummary(item: ActivityOccurrence, lane: number) {
   return `${calendarDate(item.startAt)} — ${calendarDate(item.endAt)} · 轨道${lane + 1} · ${item.frozen ? '已冻结' : state}${claim}`;
 }
 function removeSelected() {
-  if (!selected.value || !canWrite.value || !ready.value || selected.value.frozen) return;
+  if (!selected.value || !canWrite.value || !ready.value || selected.value.frozen && selected.value.enabled) return;
   items.value = items.value.filter(item => keyOf(item) !== selectedKey.value);
   selectedKey.value = null;
   changed();
@@ -693,7 +711,7 @@ onUnmounted(() => {
           <NTab name="patterns">排期方案</NTab>
           <NTab name="templates">单个活动</NTab>
         </NTabs>
-        <NInput v-model:value="librarySearch" class="mb-16px mt-16px" clearable placeholder="搜索活动或方案" />
+        <NInput v-model:value="librarySearch" class="mb-16px mt-16px" clearable placeholder="搜索活动、别名或方案" />
         <div v-if="planningTab === 'calendar'" class="library-fill">
           <label>
             填充起日
@@ -744,6 +762,7 @@ onUnmounted(() => {
             @dragstart="startLibraryDrag($event, 'template', definition.id)"
           >
             <strong>{{ definition.name }}</strong>
+            <span v-if="definitionAlias(definition)" class="library-alias">后台别名：{{ definitionAlias(definition) }}</span>
             <span>{{ modeMap.get(definition.mode) || definition.mode }} · {{ definition.defaultDays }}天</span>
             <NButton size="tiny" :disabled="!ready || !canWrite" @click="addDefinition(definition, fillDate)">
               填入草稿
@@ -758,7 +777,7 @@ onUnmounted(() => {
             <h2>新玩家活动</h2>
             <NEmpty v-if="!characterItems.length" description="从左侧添加活动，再设置角色的起始日与持续天数。" />
             <article v-for="item in characterItems" :key="keyOf(item)">
-              <div><strong>{{ item.name }}</strong><p>角色第{{ item.startDay || 1 }}天开始 · 持续{{ item.durationDays || 14 }}天<template v-if="item.claimDays"> · 另留{{ item.claimDays }}天领奖</template> <NTag size="small" :bordered="false" :type="item.enabled ? 'success' : 'default'">{{ item.enabled ? '开放' : '停用' }}</NTag></p></div>
+              <div><strong>{{ item.name }}</strong><span v-if="occurrenceAlias(item)" class="schedule-item-alias">后台别名：{{ occurrenceAlias(item) }}</span><p>角色第{{ item.startDay || 1 }}天开始 · 持续{{ item.durationDays || 14 }}天<template v-if="item.claimDays"> · 另留{{ item.claimDays }}天领奖</template> <NTag size="small" :bordered="false" :type="item.enabled ? 'success' : 'default'">{{ item.enabled ? '开放' : '停用' }}</NTag></p></div>
               <NSpace :size="6"><NButton size="small" @click="previewActivity(item.templateId, item)">预览</NButton><NButton size="small" @click="selectedKey = keyOf(item)">编辑</NButton></NSpace>
             </article>
           </section>
@@ -821,7 +840,7 @@ onUnmounted(() => {
                     :style="barStyle(bar.item, bar.track)"
                     role="group"
                     tabindex="0"
-                    :aria-label="`${bar.item.name}，${barPeriodSummary(bar.item, row.lane)}，回车编辑，左右键移动一天`"
+                    :aria-label="`${occurrenceTitle(bar.item)}，${barPeriodSummary(bar.item, row.lane)}，回车编辑，左右键移动一天`"
                     @pointerdown="startPointer($event, bar.item, 'move')"
                     @pointermove="movePointer"
                     @pointerup="endPointer"
@@ -845,13 +864,16 @@ onUnmounted(() => {
                       :title="`领奖期至 ${calendarDate(bar.item.claimEndAt)}（不含）`"
                     />
                     <div class="bar-visible-content" :class="{ compact: barVisibleContent(bar.item).compact }" :style="barContentStyle(bar.item)">
-                      <div class="bar-copy" :title="`${bar.item.name}\n${barPeriodSummary(bar.item, row.lane)}`">
-                        <div class="bar-title">{{ bar.item.name }}</div>
+                      <div class="bar-copy" :title="`${occurrenceTitle(bar.item)}\n${barPeriodSummary(bar.item, row.lane)}`">
+                        <div class="bar-title-row">
+                          <span class="bar-title">{{ bar.item.name }}</span>
+                          <span v-if="occurrenceAlias(bar.item)" class="bar-alias">别名 {{ occurrenceAlias(bar.item) }}</span>
+                        </div>
                         <small>{{ barPeriodSummary(bar.item, row.lane) }}</small>
                       </div>
                       <div class="bar-actions" @pointerdown.stop @pointermove.stop @pointerup.stop @pointercancel.stop @keydown.stop @dblclick.stop>
                         <NDropdown v-if="barVisibleContent(bar.item).compact" trigger="click" :options="barMenuOptions" @select="selectBarAction($event, bar.item)">
-                          <NButton size="tiny" quaternary class="bar-menu-button" :aria-label="`${bar.item.name}操作`" :title="`${bar.item.name}：预览或${canWrite ? '编辑' : '查看'}`">⋯</NButton>
+                          <NButton size="tiny" quaternary class="bar-menu-button" :aria-label="`${occurrenceTitle(bar.item)}操作`" :title="`${occurrenceTitle(bar.item)}：预览或${canWrite ? '编辑' : '查看'}`">⋯</NButton>
                         </NDropdown>
                         <template v-else>
                           <NButton size="tiny" quaternary @click="previewActivity(bar.item.templateId, bar.item)">预览</NButton>
@@ -874,7 +896,7 @@ onUnmounted(() => {
           </div>
           <div v-if="calendarItems.length" class="scheduled-activities" aria-label="本服活动清单">
             <article v-for="item in calendarItems" :key="keyOf(item)">
-              <div><strong>{{ item.name }}</strong><span>{{ calendarDate(item.startAt) }} — {{ calendarDate(item.endAt) }}<template v-if="item.frozen"> · 已冻结</template><template v-else-if="!item.id"> · 草稿</template></span></div>
+              <div><strong>{{ item.name }}</strong><span v-if="occurrenceAlias(item)" class="schedule-item-alias">后台别名：{{ occurrenceAlias(item) }}</span><span>{{ calendarDate(item.startAt) }} — {{ calendarDate(item.endAt) }}<template v-if="item.frozen"> · 已冻结</template><template v-else-if="!item.id"> · 草稿</template></span></div>
               <NSpace :size="6"><NButton size="small" @click="previewActivity(item.templateId, item)">预览</NButton><NButton size="small" @click="selectedKey = keyOf(item)">编辑排期</NButton></NSpace>
             </article>
           </div>
@@ -914,6 +936,7 @@ onUnmounted(() => {
       <NDrawerContent v-if="selected" :title="selected.name" closable>
         <NForm label-placement="top" :disabled="!canWrite || busy">
           <NTag :bordered="false">{{ modeMap.get(selected.mode) || selected.mode }}</NTag>
+          <p v-if="occurrenceAlias(selected)" class="pattern-help" style="margin:8px 0 0">后台别名：{{ occurrenceAlias(selected) }}（仅后台显示）</p>
           <NAlert
             v-if="selected.frozen"
             type="info"
@@ -978,7 +1001,7 @@ onUnmounted(() => {
         <template #footer>
           <NSpace>
             <NButton v-if="canWrite" @click="copySelected">{{ isCharacterItem(selected) ? '复制为新排期' : '复制到下一期' }}</NButton>
-            <NButton v-if="canWrite && !selected.frozen" type="error" secondary @click="removeSelected">
+            <NButton v-if="canWrite && (!selected.frozen || !selected.enabled)" type="error" secondary @click="removeSelected">
               从草稿移除
             </NButton>
             <NButton @click="selectedKey = null">完成</NButton>
@@ -1045,6 +1068,7 @@ onUnmounted(() => {
     <NModal :show="Boolean(activityPreview)" preset="card" :title="activityPreview?.name" class="activity-preview-modal" @update:show="!$event && (activityPreview = null)">
       <template v-if="activityPreview">
         <p class="pattern-help">{{ activityPreview.published ? '本期已发布配置' : '活动模板预览' }}</p>
+        <p v-if="activityPreview.form.alias" class="pattern-help">后台别名：{{ activityPreview.form.alias }}（仅后台显示）</p>
         <p v-if="activityPreview.relative" class="pattern-help">角色第{{ activityPreview.relative.startDay || 1 }}天开始 · 持续{{ activityPreview.relative.durationDays || 14 }}天 · 另留{{ activityPreview.relative.claimDays || 0 }}天领奖</p>
         <p v-if="activityPreview.form.mode === 'opening-14'" class="pattern-help">任务按区服开服自然日解锁，每个角色保留完整活动时长。</p>
         <ActivitySummary :form="activityPreview.form" :mode="modes.find(mode => mode.mode === activityPreview?.form.mode)" :hide-schedule="!activityPreview.published || Boolean(activityPreview.relative)" />
@@ -1065,6 +1089,7 @@ onUnmounted(() => {
 .character-schedules article { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 10px 0; }
 .character-schedules strong { font-size: 13px; font-weight: 500; }
 .character-schedules p { font-size: 12px; color: rgb(var(--base-text-color) / .65); margin: 6px 0 0; }
+.schedule-item-alias { margin-left: 10px; font-size: 12px; color: rgb(var(--base-text-color) / .55); }
 
 h1 {
   display: flex;
@@ -1131,6 +1156,9 @@ h1 {
 .library-card > span {
   font-size: 12px;
   color: rgb(var(--base-text-color) / 0.5);
+}
+.library-card > .library-alias {
+  color: rgb(var(--base-text-color) / 0.42);
 }
 .calendar-toolbar {
   display: flex;
@@ -1234,12 +1262,25 @@ h1 {
   opacity: 0.5;
 }
 .bar-title {
+  min-width: 0;
   font-size: 12px;
   font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   line-height: 17px;
+}
+.bar-title-row { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+.bar-alias {
+  flex: 0 1 auto;
+  min-width: 0;
+  font-size: 10px;
+  font-weight: 400;
+  line-height: 15px;
+  opacity: 0.72;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .bar-visible-content {
   position: absolute;

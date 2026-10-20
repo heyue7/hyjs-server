@@ -6,7 +6,7 @@ import { NButton, NSpace, NTag } from 'naive-ui';
 import type { DataTableColumns, DialogReactive } from 'naive-ui';
 import { api, errorMessage, json } from '@/service/operations';
 import type { ActivityDefinition } from '@/service/activity-schedules';
-import { activityRepeatLabel, activityRepeatPolicy, deleteActivityTemplate, newActivityForm } from '@/service/activity-operations';
+import { activityCopyAlias, activityFormName, activityRepeatLabel, activityRepeatPolicy, deleteActivityTemplate, newActivityForm, normalizeActivityForm } from '@/service/activity-operations';
 import type { ActivityForm, ActivityMode } from '@/service/activity-operations';
 import { useOperations } from '@/composables/useOperations';
 import ActivityProducts from './activity-products.vue';
@@ -46,6 +46,7 @@ const draft = computed(() => ({
 const dirty = computed(() => editorOpen.value && !readOnly.value && JSON.stringify(draft.value) !== baseline.value);
 const modeMap = computed(() => new Map(modes.value.map(mode => [mode.mode, mode])));
 const selectedMode = computed(() => modeMap.value.get(form.value?.mode || ''));
+const editorName = computed(() => (form.value ? activityFormName(form.value, selectedMode.value) : ''));
 const modeOptions = computed(() => modes.value.map(mode => ({ label: mode.label, value: mode.mode })));
 const repeatOptions = [{ label: '一次性', value: 'once' }, { label: '可重复', value: 'repeat' }];
 const availableCount = computed(() => definitions.value.filter(row => row.availability.usable).length);
@@ -55,7 +56,9 @@ const filtered = computed(() =>
       row.availability.usable === (availability.value === 'usable') &&
       (!modeFilter.value || row.mode === modeFilter.value) &&
       (!search.value ||
-        `${row.name} ${modeMap.value.get(row.mode)?.label || ''}`.toLowerCase().includes(search.value.toLowerCase()))
+        `${row.name} ${row.form?.alias || ''} ${modeMap.value.get(row.mode)?.label || ''}`
+          .toLowerCase()
+          .includes(search.value.toLowerCase()))
   )
 );
 const vipOptions = computed(
@@ -80,7 +83,7 @@ async function load() {
     ...result[1].items,
     {
       mode: 'opening-14',
-      label: '开服14天原版任务',
+      label: '开服狂欢',
       templates: [{ id: 'opening-14-original', name: '原开服任务页面', prefab: '' }],
       conditions: [],
       supportsProducts: false,
@@ -96,8 +99,12 @@ function openEditor(row?: ActivityDefinition, view = false, copy = false) {
   readOnly.value = view || !canWrite.value || Boolean(row && !modeMap.value.has(row.mode));
   if (!row && !modes.value[0]) return;
   form.value = row ? JSON.parse(JSON.stringify(row.form)) : newActivityForm(modes.value[0]);
-  if (form.value) form.value.repeatPolicy = activityRepeatPolicy(form.value);
-  if (copy && form.value) form.value.name = `${row!.name}（副本）`;
+  if (form.value) {
+    normalizeActivityForm(form.value, modeMap.value.get(form.value.mode));
+    form.value.repeatPolicy = activityRepeatPolicy(form.value);
+    // 复制只改后台别名，游戏内固定标题保持服务端给出的名称。
+    if (copy) form.value.alias = activityCopyAlias(form.value.alias);
+  }
   defaultDays.value = row?.defaultDays || 14;
   claimDays.value = row?.claimDays || 0;
   enabled.value = copy ? false : Boolean(row?.enabled);
@@ -162,18 +169,22 @@ async function close() {
 }
 async function save() {
   if (!form.value || readOnly.value || busy.value) return;
-  if (!form.value.name.trim()) {
-    saveError.value = '请填写活动名称';
+  const name = activityFormName(form.value, selectedMode.value).trim();
+  if (!name) {
+    saveError.value = '当前活动模式缺少客户端名称';
     activeSection.value = 'basics';
     return;
   }
   saving.value = true;
   saveError.value = '';
   try {
+    // 名称由客户端固定，后台别名单独保存，避免写回时相互覆盖。
+    form.value.name = name;
+    form.value.alias = (form.value.alias || '').trim();
     const saved = await api<ActivityDefinition>(
       selected.value ? `/activity-templates/${encodeURIComponent(selected.value.id)}` : '/activity-templates',
       json(selected.value ? 'PUT' : 'POST', {
-        name: form.value.name.trim(),
+        name,
         form: { ...form.value, startAt: 0, endAt: 0, claimEndAt: 0 },
         defaultDays: defaultDays.value,
         claimDays: claimDays.value,
@@ -236,7 +247,18 @@ function requestDelete(row: ActivityDefinition) {
   });
 }
 const columns = computed<DataTableColumns<ActivityDefinition>>(() => [
-  { title: '活动', key: 'name', minWidth: 240, render: row => h('strong', row.name) },
+  {
+    title: '活动',
+    key: 'name',
+    minWidth: 260,
+    render: row =>
+      h('div', [
+        h('strong', row.name),
+        row.form?.alias
+          ? h('div', { class: 'ops-muted', style: 'margin-top:2px;font-size:12px' }, `后台别名：${row.form.alias}`)
+          : null
+      ])
+  },
   { title: '模式', key: 'mode', width: 155, render: row => modeMap.value.get(row.mode)?.label || '暂未适配' },
   { title: '参与方式', key: 'repeatPolicy', width: 110, render: row => activityRepeatLabel(row.form) },
   {
@@ -318,7 +340,7 @@ onUnmounted(() => {
           <NTab name="unavailable">暂不可用 {{ definitions.length - availableCount }}</NTab>
         </NTabs>
         <div class="ops-filters mt-16px">
-          <NInput v-model:value="search" clearable placeholder="搜索活动名称或模式" class="ops-search" />
+          <NInput v-model:value="search" clearable placeholder="搜索活动名称、别名或模式" class="ops-search" />
           <NSelect
             v-model:value="modeFilter"
             :options="modeOptions"
@@ -362,7 +384,13 @@ onUnmounted(() => {
         <NCard :bordered="false">
           <NForm v-if="activeSection !== 'review'" label-placement="top" :disabled="busy || readOnly">
             <template v-if="activeSection === 'basics'">
-              <NFormItem label="活动名称" required><NInput v-model:value="form.name" :maxlength="80" /></NFormItem>
+              <NFormItem label="活动名称" required>
+                <NInput :value="editorName" disabled />
+                <p class="template-help" style="margin:8px 0 0">游戏内名称由客户端固定，后台不能修改；需要区分批次请填写后台别名。</p>
+              </NFormItem>
+              <NFormItem label="后台别名">
+                <NInput v-model:value="form.alias" :maxlength="80" clearable placeholder="仅后台列表与排期显示，不改游戏内名称" />
+              </NFormItem>
               <NFormItem required>
                 <template #label><span class="ops-field-label">活动模式<ContextHelp v-if="selectedMode?.notes" title="活动模式说明" :text="selectedMode.notes" /></span></template>
                 <NSelect

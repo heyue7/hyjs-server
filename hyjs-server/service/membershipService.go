@@ -92,10 +92,19 @@ func (s *GameService) vipBoon(tx *gorm.DB, p *pb.Player, now time.Time) ([]*pb.A
 	if err != nil {
 		return nil, nil, err
 	}
+	// 已保存档位优先；未建表或缺行时沿用当前硬编码默认，关闭策略时不开放领取。
+	form, policyEnabled, _, err := s.adminNativeVIPPolicy(tx, false)
+	if err != nil {
+		return nil, nil, err
+	}
+	tier, ok := adminNativeVIPTierFor(form, int64(p.GetVip()))
+	if !ok {
+		return nil, nil, errors.New(constUtil.P3PaymentConfigError)
+	}
 	dailyStatus := int32(0)
 	weekStatus := int32(0)
 	left := int32(0)
-	if count > 0 && p.GetVip() > 0 {
+	if policyEnabled && count > 0 && p.GetVip() > 0 {
 		dailyStatus = 1
 		weekStatus = 1
 		left = 1
@@ -115,8 +124,20 @@ func (s *GameService) vipBoon(tx *gorm.DB, p *pb.Player, now time.Time) ([]*pb.A
 		weekStatus = 2
 		left = 0
 	}
-	daily := []*pb.ActivityDailyBoonItem{{Vip: proto.Int32(p.GetVip()), Reward: []*pb.BaseResource{{Id: proto.String("coin"), Num: proto.Int32((p.GetVip() + 1) * 1000)}}, Status: proto.Int32(dailyStatus), NeedRecharge: proto.Int64(60)}}
-	week := []*pb.ActivityShopItem{{Index: proto.Int32(1), GetResource: []*pb.BaseResource{{Id: proto.String("item_005"), Num: proto.Int32(10)}}, CostResource: []*pb.BaseResource{{Id: proto.String("diamond"), Num: proto.Int32(100)}}, Total: proto.Int32(1), Left: proto.Int32(left), Status: proto.Int32(weekStatus), PickOneOrGetAll: proto.Int32(1), Discount: proto.String("1"), Name: proto.String("本地VIP每周解放材料礼包")}}
+	dailyRewards, err := adminNativePBResources(tier.DailyRewards)
+	if err != nil {
+		return nil, nil, err
+	}
+	weekRewards, err := adminNativePBResources(tier.WeekRewards)
+	if err != nil {
+		return nil, nil, err
+	}
+	weekCost, err := adminNativePBResources([]model.AdminResourceAmount{tier.WeekCost})
+	if err != nil || len(weekCost) != 1 || weekCost[0].GetId() != "diamond" {
+		return nil, nil, errors.New(constUtil.P3PaymentConfigError)
+	}
+	daily := []*pb.ActivityDailyBoonItem{{Vip: proto.Int32(p.GetVip()), Reward: dailyRewards, Status: proto.Int32(dailyStatus), NeedRecharge: proto.Int64(60)}}
+	week := []*pb.ActivityShopItem{{Index: proto.Int32(1), GetResource: weekRewards, CostResource: weekCost, Total: proto.Int32(1), Left: proto.Int32(left), Status: proto.Int32(weekStatus), PickOneOrGetAll: proto.Int32(1), Discount: proto.String("1"), Name: proto.String("会员每周福利")}}
 	return daily, week, nil
 }
 
@@ -168,7 +189,12 @@ func (s *GameService) membership(ctx context.Context, id int64, request proto.Me
 			if daily[0].GetStatus() != 1 {
 				return errors.New(constUtil.P3PaymentUnavailable)
 			}
-			gain, err := s.p3Claim(tx, p, g, "vip:daily", p3Day(now), fmt.Sprintf("coin,%d", daily[0].Reward[0].GetNum()), now)
+			// 领取内容来自同一已保存档位，不再固定为第一项金币。
+			content, err := adminNativePBResourceSpec(daily[0].GetReward())
+			if err != nil {
+				return err
+			}
+			gain, err := s.p3Claim(tx, p, g, "vip:daily", p3Day(now), content, now)
 			if err != nil {
 				return err
 			}
@@ -183,15 +209,24 @@ func (s *GameService) membership(ctx context.Context, id int64, request proto.Me
 			if b.GetIndex() != 1 || week[0].GetStatus() != 1 || !p3ResourcesEqual(b.GetCostResources(), week[0].CostResource) || !p3ResourcesEqual(b.GetGetResources(), week[0].GetResource) {
 				return p3Error()
 			}
-			if p.GetDiamond() < 100 {
+			cost := week[0].GetCostResource()
+			if len(cost) != 1 || cost[0].GetId() != "diamond" || cost[0].GetNum() <= 0 {
 				return errors.New(constUtil.P3PaymentUnavailable)
 			}
-			p.Diamond = proto.Int64(p.GetDiamond() - 100)
-			gain, err := s.p3Claim(tx, p, g, "vip:week", p3Week(now), "item_005,10", now)
+			costValue := int64(cost[0].GetNum())
+			if p.GetDiamond() < costValue {
+				return errors.New(constUtil.P3PaymentUnavailable)
+			}
+			content, err := adminNativePBResourceSpec(week[0].GetResource)
 			if err != nil {
 				return err
 			}
-			if err := s.RecordP1Event(tx, id, "vip:week:"+p3Week(now), constUtil.P1EventDiamondSpent, 100, now); err != nil {
+			p.Diamond = proto.Int64(p.GetDiamond() - costValue)
+			gain, err := s.p3Claim(tx, p, g, "vip:week", p3Week(now), content, now)
+			if err != nil {
+				return err
+			}
+			if err := s.RecordP1Event(tx, id, "vip:week:"+p3Week(now), constUtil.P1EventDiamondSpent, costValue, now); err != nil {
 				return err
 			}
 			week[0].Status = proto.Int32(2)

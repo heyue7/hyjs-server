@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import type { ActivityForm, ActivityMode } from '@/service/activity-operations';
-import { activityFixedLabels, activityMilestoneTitle, activityRepeatLabel } from '@/service/activity-operations';
+import { activityFixedLabels, activityFormName, activityMilestoneTitle, activityRepeatLabel } from '@/service/activity-operations';
 import { formatTime } from '@/service/operations';
 import RewardSummary from './reward-summary.vue';
 import KingPrizes from './king-prizes.vue';
@@ -31,6 +31,8 @@ function minuteText(value: number) { return value === 1440 ? '24:00' : `${String
     <section class="activity-summary-section">
       <h3>活动信息</h3>
       <NDescriptions :column="2" label-placement="top">
+        <NDescriptionsItem label="活动名称">{{ activityFormName(form, mode) }}</NDescriptionsItem>
+        <NDescriptionsItem label="后台别名">{{ (form.alias || '').trim() || '未设置' }}</NDescriptionsItem>
         <NDescriptionsItem label="模式">{{ mode?.label || (form.mode === 'opening-14' ? '开服14天任务' : '暂未支持此模式') }}</NDescriptionsItem>
         <NDescriptionsItem label="游戏模板">{{ mode?.templates.find(template => template.id === form.templateId)?.name || (form.mode === 'opening-14' ? '原开服任务页面' : '无可用模板') }}</NDescriptionsItem>
         <NDescriptionsItem label="参与方式">{{ activityRepeatLabel(form) }}</NDescriptionsItem>

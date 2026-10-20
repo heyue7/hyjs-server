@@ -6,6 +6,7 @@ type AdminActivityPresentation struct {
 	Mode            string `gorm:"size:64;not null" json:"mode"`
 	TemplateID      string `gorm:"size:96;not null" json:"templateId"`
 	Name            string `gorm:"size:160;not null" json:"name"`
+	Alias           string `gorm:"size:320;not null;default:''" json:"alias"`
 	Archived        bool   `gorm:"not null" json:"archived"`
 	UpdatedAtMillis int64  `gorm:"not null" json:"updatedAt"`
 }

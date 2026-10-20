@@ -5,7 +5,7 @@ import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router';
 import { NButton, NDropdown, NImage, NMenu, NSpace, NTag } from 'naive-ui';
 import type { DataTableColumns, MenuOption, SelectOption } from 'naive-ui';
 import { api, errorMessage, formatTime, json } from '@/service/operations';
-import { deleteActivityInstance, newActivityForm } from '@/service/activity-operations';
+import { activityCopyAlias, activityFormName, deleteActivityInstance, newActivityForm, normalizeActivityForm } from '@/service/activity-operations';
 import type { ActivityForm, ActivityInstance, ActivityMode } from '@/service/activity-operations';
 import { useOperations } from '@/composables/useOperations';
 import ActivityProducts from '@/components/operations/activity-products.vue';
@@ -50,7 +50,7 @@ const filtered = computed(() =>
   scopedRows.value.filter(row => {
     if (
       q.value &&
-      !`${row.name} ${row.id} ${modeMap.value.get(row.mode)?.label || row.mode}`
+      !`${row.name} ${row.form?.alias || ''} ${row.id} ${modeMap.value.get(row.mode)?.label || row.mode}`
         .toLowerCase()
         .includes(q.value.toLowerCase())
     )
@@ -101,6 +101,7 @@ function requestClose() {
   window.$dialog?.warning({ title: '放弃未保存的修改？', content: '返回列表后，本次修改不会保存。', positiveText: '放弃修改', negativeText: '继续编辑', onPositiveClick: leave });
 }
 const selectedMode = computed(() => (form.value ? modeMap.value.get(form.value.mode) : undefined));
+const activityName = computed(() => (form.value ? activityFormName(form.value, selectedMode.value) : ''));
 const editable = computed(
   () =>
     canWrite.value && editorKind.value !== 'view' && (editorKind.value !== 'edit' || Boolean(selected.value?.editable))
@@ -135,10 +136,13 @@ function show(row?: ActivityInstance, copy = false, view = false) {
   activeTab.value = 'basics';
   editorKind.value = 'create';
   if (row) {
-    form.value = JSON.parse(JSON.stringify(row.form));
+    const next = JSON.parse(JSON.stringify(row.form)) as ActivityForm;
+    form.value = next;
+    normalizeActivityForm(next, modeMap.value.get(next.mode));
     editorKind.value = copy ? 'copy' : 'view';
     if (!copy && !view && canWrite.value && row.editable) editorKind.value = 'edit';
-    if (copy) form.value!.name = `${row.name}（副本）`;
+    // 复制保持游戏内固定名称，只给后台别名追加副本标记。
+    if (copy) next.alias = activityCopyAlias(next.alias);
   } else {
     const first = modes.value[0];
     if (!first) {
@@ -167,7 +171,7 @@ function renderTemplate(option: SelectOption) {
 function validateForm() {
   if (!form.value) return '尚未选择活动';
   if (!form.value.mode || !form.value.templateId) return '请选择活动模式和对应界面模板';
-  if (!form.value.name.trim()) { activeTab.value = 'basics'; return '请填写活动名称'; }
+  if (!activityName.value.trim()) { activeTab.value = 'basics'; return '当前活动模式缺少客户端名称'; }
   if (!form.value.startAt || !form.value.endAt || !form.value.claimEndAt) {
     activeTab.value = 'schedule';
     return '请设置开始、结束和领奖截止时间';
@@ -186,6 +190,9 @@ async function save() {
   if (saveError.value) return;
   saving.value = true;
   try {
+    // 名称随模式固定，后台别名独立保存，防止保存时把别名写进游戏内名称。
+    form.value.name = activityName.value.trim();
+    form.value.alias = (form.value.alias || '').trim();
     const updating = editorKind.value === 'edit' && selected.value;
     const saved = await api<ActivityInstance>(
       updating ? `/activity-instances/${encodeURIComponent(selected.value!.id)}` : '/activity-instances',
@@ -281,7 +288,18 @@ function selectAction(key: string, row: ActivityInstance) {
   window.$dialog?.warning({ title: label, content, positiveText: '确认', negativeText: '取消', onPositiveClick: () => changeState(row, key === 'current' || !row.enabled, key === 'current') });
 }
 const columns = computed<DataTableColumns<ActivityInstance>>(() => [
-  { title: '活动', key: 'name', minWidth: 250, render: row => h('strong', row.name) },
+  {
+    title: '活动',
+    key: 'name',
+    minWidth: 270,
+    render: row =>
+      h('div', [
+        h('strong', row.name),
+        row.form?.alias
+          ? h('div', { class: 'ops-muted', style: 'margin-top:2px;font-size:12px' }, `后台别名：${row.form.alias}`)
+          : null
+      ])
+  },
   { title: '模式', key: 'mode', width: 135, render: row => modeMap.value.get(row.mode)?.label || '暂未支持' },
   { title: unavailableOnly.value ? '不可用原因' : '状态', key: 'enabled', minWidth: unavailableOnly.value ? 230 : 150,
     render: row => unavailableOnly.value ? h('div', [h('div', row.availability?.reason || '暂不可运营'), h('span', { class: 'ops-muted' }, row.editable ? '可补齐配置' : '仅供查看')]) : h(NSpace, { size: 6 }, () => [h(NTag, { type: row.enabled ? 'success' : 'default', size: 'small', bordered: false }, () => row.enabled ? '已开启' : '已关闭'), row.frozen ? h(NTag, { size: 'small', bordered: false }, () => '已冻结') : null]) },
@@ -316,12 +334,12 @@ onMounted(load);
         <NMenu mode="horizontal" :value="availabilitySection" :options="availabilityMenu" class="mb-18px" aria-label="活动可用性分类" @update:value="selectAvailability" />
 
         <div class="ops-filters">
-          <NInput v-model:value="q" clearable placeholder="活动名称或 ID" class="ops-search" @update:value="listPage = 1" />
+          <NInput v-model:value="q" clearable placeholder="活动名称、别名或 ID" class="ops-search" @update:value="listPage = 1" />
           <NSelect v-model:value="modeFilter" :options="modeOptions" clearable filterable placeholder="全部活动模式" class="ops-filter-select" @update:value="listPage = 1" />
           <NSelect v-if="!unavailableOnly" v-model:value="stateFilter" :options="stateOptions" clearable placeholder="全部状态" class="ops-filter-select" @update:value="listPage = 1" />
           <span v-if="q || modeFilter || stateFilter" class="ops-muted">找到 {{ filtered.length }} 项</span>
         </div>
-        <NDataTable :columns="columns" :data="filtered" :loading="loading" :row-key="(row: ActivityInstance) => row.id" :scroll-x="1215" :bordered="false" :pagination="{ page: listPage, pageSize: 20, onChange: (value: number) => listPage = value }" />
+        <NDataTable :columns="columns" :data="filtered" :loading="loading" :row-key="(row: ActivityInstance) => row.id" :scroll-x="1235" :bordered="false" :pagination="{ page: listPage, pageSize: 20, onChange: (value: number) => listPage = value }" />
       </NCard>
     </div>
     <template v-if="open && form">
@@ -347,7 +365,13 @@ onMounted(load);
             <div class="activity-section-title"><h2>{{ currentSection?.title }}</h2><p>{{ currentSection?.detail }}</p></div>
             <NForm label-placement="top" :disabled="busy">
               <template v-if="activeTab === 'basics'">
-                <NFormItem label="活动名称" required><NInput v-model:value="form.name" :maxlength="80" placeholder="在游戏中显示的活动名称" :disabled="busy" /></NFormItem>
+                <NFormItem label="活动名称" required>
+                  <NInput :value="activityName" disabled />
+                  <p class="ops-muted" style="margin:8px 0 0">游戏内名称由客户端固定，后台不能修改；需要区分批次请填写后台别名。</p>
+                </NFormItem>
+                <NFormItem label="后台别名">
+                  <NInput v-model:value="form.alias" :maxlength="80" clearable placeholder="仅后台列表与排期显示，不改游戏内名称" :disabled="busy" />
+                </NFormItem>
                 <NFormItem required><template #label><span class="ops-field-label">活动模式<ContextHelp v-if="selectedMode?.notes" title="活动模式说明" :text="selectedMode.notes" /></span></template><NSelect :value="form.mode" :options="modeOptions" :disabled="busy || editorKind === 'edit'" @update:value="changeMode" /></NFormItem>
                 <NFormItem label="游戏界面模板" required><NSelect v-model:value="form.templateId" :options="templateOptions" :render-label="renderTemplate" :disabled="busy" /></NFormItem>
                 <div v-if="chosenTemplate?.preview" class="activity-template-preview"><NImage :src="chosenTemplate.preview" :width="180" :height="110" object-fit="contain" /><span class="ops-muted">界面预览</span></div>

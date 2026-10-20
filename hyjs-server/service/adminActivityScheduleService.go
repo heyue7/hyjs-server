@@ -136,8 +136,11 @@ func adminActivityDefinitionDTO(row db.AdminActivityDefinition) (model.AdminActi
 	if json.Unmarshal(row.FormJSON, &form) != nil {
 		return model.AdminActivityDefinitionDTO{}, constUtil.ErrAdminConfiguration
 	}
-	form.Name = PlayerDisplayName(form.Name)
-	return model.AdminActivityDefinitionDTO{ID: row.ID, Name: PlayerDisplayName(row.Name), Mode: row.Mode, Form: form, DefaultDays: row.DefaultDays, ClaimDays: row.ClaimDays, Enabled: row.Enabled, Version: adminVersion(row), Availability: model.AdminActivityAvailability{Usable: row.Usable, Reason: row.UnavailableReason, Missing: []string{}}, SourceActivityID: row.SourceActivityID}, nil
+	if form.Name == "" {
+		form.Name = row.Name
+	}
+	form = adminActivityCanonicalForm(form)
+	return model.AdminActivityDefinitionDTO{ID: row.ID, Name: form.Name, Mode: row.Mode, Form: form, DefaultDays: row.DefaultDays, ClaimDays: row.ClaimDays, Enabled: row.Enabled, Version: adminVersion(row), Availability: model.AdminActivityAvailability{Usable: row.Usable, Reason: row.UnavailableReason, Missing: []string{}}, SourceActivityID: row.SourceActivityID}, nil
 }
 
 // AdminActivityDefinitions reads globally reusable forms. No original consumer is switched by a GET.
@@ -231,6 +234,7 @@ func (s *GameService) AdminSaveActivityDefinition(ctx context.Context, p *model.
 				return err
 			}
 			canonical.RepeatPolicy = form.RepeatPolicy
+			canonical.Alias = form.Alias
 			form = canonical
 		}
 		if form.Mode == "king-recruit" {
@@ -242,6 +246,7 @@ func (s *GameService) AdminSaveActivityDefinition(ctx context.Context, p *model.
 		}
 		form.RepeatPolicy = adminActivityRepeatPolicy(form)
 		form.Name = req.Name
+		form = adminActivityCanonicalForm(form)
 		form.StartAt = 0
 		form.EndAt = 0
 		form.ClaimEndAt = 0
@@ -252,7 +257,7 @@ func (s *GameService) AdminSaveActivityDefinition(ctx context.Context, p *model.
 		if req.Enabled && validation != nil {
 			return validation
 		}
-		row.Name = req.Name
+		row.Name = form.Name
 		row.Mode = form.Mode
 		row.FormJSON = adminJSON(form)
 		row.DefaultDays = req.DefaultDays
@@ -325,6 +330,9 @@ func adminActivityScheduleAccess(tx *gorm.DB, key string) (bool, error) {
 	var row db.AdminActivityOccurrence
 	err := tx.Where("consumer_key=?", key).Take(&row).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) && !strings.Contains(key, "_schedule_") {
+		if managed, allowed, lookupErr := adminNativePaymentAccess(tx, key); lookupErr != nil || managed {
+			return allowed, lookupErr
+		}
 		if adminActivityScheduledLegacyMode(key) == "" {
 			return true, nil
 		}
@@ -462,8 +470,8 @@ func (s *GameService) adminActivityOccurrenceDTO(tx *gorm.DB, row db.AdminActivi
 	}
 	timing := adminActivityTiming(row)
 	startDay, durationDays, claimDays := adminCharacterScheduleDays(row)
-	form.Name = PlayerDisplayName(form.Name)
-	return model.AdminActivityOccurrenceDTO{Timing: timing, StartDay: startDay, DurationDays: durationDays, ClaimDays: claimDays, Form: form, ID: row.ID, TemplateID: row.TemplateID, TemplateVersion: row.TemplateVersion, Name: PlayerDisplayName(row.Name), Mode: row.Mode, StartAt: row.StartAt, EndAt: row.EndAt, ClaimEndAt: row.ClaimEndAt, Lane: row.Lane, Enabled: row.Enabled, Frozen: frozen, Version: adminVersion(row), ConsumerID: row.ConsumerID}, err
+	form = adminActivityCanonicalForm(form)
+	return model.AdminActivityOccurrenceDTO{Timing: timing, StartDay: startDay, DurationDays: durationDays, ClaimDays: claimDays, Form: form, ID: row.ID, TemplateID: row.TemplateID, TemplateVersion: row.TemplateVersion, Name: form.Name, Mode: row.Mode, StartAt: row.StartAt, EndAt: row.EndAt, ClaimEndAt: row.ClaimEndAt, Lane: row.Lane, Enabled: row.Enabled, Frozen: frozen, Version: adminVersion(row), ConsumerID: row.ConsumerID}, err
 }
 func adminRequireActivityServer(tx *gorm.DB, id int64) error {
 	if !tx.Migrator().HasTable("admin_game_servers") {
@@ -679,8 +687,9 @@ func (s *GameService) adminActivityScheduleCheck(tx *gorm.DB, serverID int64, ve
 			if e != nil {
 				return nil, nil, e
 			}
-			if frozen {
-				add(-1, -1, "已冻结活动“"+row.Name+"”不能移除，请保留历史或停用")
+			// 停用后允许归档排期入口，冻结规则和全部参与回执仍留在原表。
+			if frozen && row.Enabled {
+				add(-1, -1, "已冻结活动“"+row.Name+"”请先停用，再从排期归档")
 			}
 		}
 	}
@@ -786,6 +795,7 @@ func (s *GameService) AdminSaveActivitySchedule(ctx context.Context, p *model.Ad
 					if json.Unmarshal(row.FormJSON, &form) != nil {
 						return constUtil.ErrAdminConfiguration
 					}
+					form = adminActivityCanonicalForm(form)
 					form.StartAt = item.StartAt
 					form.EndAt = item.EndAt
 					form.ClaimEndAt = item.ClaimEndAt
@@ -818,10 +828,11 @@ func (s *GameService) AdminSaveActivitySchedule(ctx context.Context, p *model.Ad
 				if json.Unmarshal(definition.FormJSON, &form) != nil {
 					return constUtil.ErrAdminConfiguration
 				}
+				form = adminActivityCanonicalForm(form)
 				form.StartAt = item.StartAt
 				form.EndAt = item.EndAt
 				form.ClaimEndAt = item.ClaimEndAt
-				row = db.AdminActivityOccurrence{Timing: item.Timing, StartDay: item.StartDay, DurationDays: item.DurationDays, ClaimDays: item.ClaimDays, ID: "occ_" + strings.ReplaceAll(uuid.NewString(), "-", "")[:24], ServerID: serverID, TemplateID: definition.ID, TemplateVersion: adminVersion(definition), Name: definition.Name, Mode: definition.Mode, StartAt: item.StartAt, EndAt: item.EndAt, ClaimEndAt: item.ClaimEndAt, Lane: item.Lane, Enabled: item.Enabled, FormJSON: adminJSON(form), Revision: 1}
+				row = db.AdminActivityOccurrence{Timing: item.Timing, StartDay: item.StartDay, DurationDays: item.DurationDays, ClaimDays: item.ClaimDays, ID: "occ_" + strings.ReplaceAll(uuid.NewString(), "-", "")[:24], ServerID: serverID, TemplateID: definition.ID, TemplateVersion: adminVersion(definition), Name: form.Name, Mode: definition.Mode, StartAt: item.StartAt, EndAt: item.EndAt, ClaimEndAt: item.ClaimEndAt, Lane: item.Lane, Enabled: item.Enabled, FormJSON: adminJSON(form), Revision: 1}
 				if item.Timing == "character-day" {
 					row.ConsumerKey = "character_plan_" + strings.TrimPrefix(row.ID, "occ_")
 					row.ConsumerID = "character-plan:" + row.ConsumerKey
@@ -844,7 +855,7 @@ func (s *GameService) AdminSaveActivitySchedule(ctx context.Context, p *model.Ad
 					if err := s.adminPersistTypedActivity(tx, d, row.ConsumerKey, form, item.Enabled, false); err != nil {
 						return err
 					}
-					presentation := db.AdminActivityPresentation{ActivityID: row.ConsumerID, Mode: row.Mode, TemplateID: form.TemplateID, Name: row.Name, UpdatedAtMillis: time.Now().UnixMilli()}
+					presentation := db.AdminActivityPresentation{ActivityID: row.ConsumerID, Mode: row.Mode, TemplateID: form.TemplateID, Name: form.Name, Alias: form.Alias, UpdatedAtMillis: time.Now().UnixMilli()}
 					if err := tx.Create(&presentation).Error; err != nil {
 						return err
 					}

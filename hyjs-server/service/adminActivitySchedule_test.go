@@ -195,6 +195,35 @@ func TestAdminActivityScheduleRuntime(t *testing.T) {
 	if err = db.GetIns().Model(&db.AdminAudit{}).Where("action=?", "activity.schedule.save").Count(&audits).Error; err != nil || audits != 2 {
 		t.Fatal("atomic successful-only audit", audits, err)
 	}
+	// 清理已停用的排期只归档入口，原消费者、冻结快照及领取回执全部保留。
+	current, err := f.s.AdminActivitySchedule(f.ctx, operator, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = f.s.AdminSaveActivitySchedule(f.ctx, operator, 1, model.AdminActivityScheduleSaveRequest{Version: current.Version}); !errors.Is(err, constUtil.ErrAdminConfigConflict) {
+		t.Fatal("active frozen schedule was removed", err)
+	}
+	current.Items[0].Enabled = false
+	stopped, err := f.s.AdminSaveActivitySchedule(f.ctx, operator, 1, model.AdminActivityScheduleSaveRequest{Version: current.Version, Items: current.Items})
+	if err != nil {
+		t.Fatal("stop frozen schedule", err)
+	}
+	var retainedConsumer db.P4CommerceRule
+	if err = db.GetIns().First(&retainedConsumer, "id=?", key).Error; err != nil {
+		t.Fatal(err)
+	}
+	receipts := p1Count(t, &db.P4Receipt{}, "player_id=? AND domain=?", f.id, key)
+	archived, err := f.s.AdminSaveActivitySchedule(f.ctx, operator, 1, model.AdminActivityScheduleSaveRequest{Version: stopped.Version})
+	if err != nil || len(archived.Items) != 0 {
+		t.Fatal("archive stopped schedule", err)
+	}
+	var afterConsumer db.P4CommerceRule
+	if err = db.GetIns().First(&afterConsumer, "id=?", key).Error; err != nil || string(afterConsumer.Frozen) != string(retainedConsumer.Frozen) || receipts != p1Count(t, &db.P4Receipt{}, "player_id=? AND domain=?", f.id, key) {
+		t.Fatal("schedule cleanup changed history", err)
+	}
+	if err = db.GetIns().First(&occurrence, "id=?", slot.ID).Error; err != nil || !occurrence.Archived || occurrence.Enabled {
+		t.Fatal("stopped schedule not archived", err)
+	}
 }
 
 // TestAdminActivityScheduleScopeEmpty checks empty publication, retired window guards and per-character opening anchors.

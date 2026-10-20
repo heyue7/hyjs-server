@@ -29,34 +29,34 @@ type adminActivityDefinition struct {
 func adminActivityDefinitions() []adminActivityDefinition {
 	return []adminActivityDefinition{
 		{"shop-window", "限时商店", "commerce", "shop-window", "shop_schedule_", "Shop", false, false, false, 0},
-		{"exchange", "资源兑换", "commerce", "exchange", "limitExchange_p4_admin_", "ActivityInnerPage/OnSail", true, false, false, 0},
-		{"discount-shop", "折扣礼包", "commerce", "discount", "discountSale_p4_admin_", "ActivityInnerPage/OnSail", true, false, false, 0},
-		{"half-price", "半价抢购", "commerce", "half", "halfDiscountSale_p4_admin_", "ActivityInnerPage/OnSail", true, false, false, 0},
-		{"limited-shop", "限时特卖", "commerce", "sale", "limitSale_p4_admin_", "ActivityInnerPage/OnSail", true, false, false, 0},
+		{"exchange", "限时兑换", "commerce", "exchange", "limitExchange_p4_admin_", "ActivityInnerPage/OnSail", true, false, false, 0},
+		{"discount-shop", "折扣贩售", "commerce", "discount", "discountSale_p4_admin_", "ActivityInnerPage/OnSail", true, false, false, 0},
+		{"half-price", "半价限购", "commerce", "half", "halfDiscountSale_p4_admin_", "ActivityInnerPage/OnSail", true, false, false, 0},
+		{"limited-shop", "限时抢购", "commerce", "sale", "limitSale_p4_admin_", "ActivityInnerPage/OnSail", true, false, false, 0},
 		{"mystic-shop", "神秘小屋", "commerce", "mystic", "mysticDiscount_p4_admin_", "ActivityInnerPage/MysticDiscount", true, false, false, 0},
-		{"login-rewards", "登录奖历", "welfare", "login", "p4:login:admin_", "ActivityInnerPage/login award", false, true, false, 31},
-		{"limited-sign", "限时签到", "welfare", "limit", "p4:limit:admin_", "ActivityInnerPage/every day sign", false, true, false, 31},
+		{"login-rewards", "登录奖励", "welfare", "login", "p4:login:admin_", "ActivityInnerPage/login award", false, true, false, 31},
+		{"limited-sign", "每日签到", "welfare", "limit", "p4:limit:admin_", "ActivityInnerPage/every day sign", false, true, false, 31},
 		{"stamina-meal", "月光餐厅", "welfare", "meal", "p4:meal:admin_", "ActivityInnerPage/asuna kitchen", false, false, false, 0},
 		{"diamond-rebate", "消费返利", "welfare", "rebate", "p4:rebate:admin_", "ActivityInnerPage/CostReturn", false, false, false, 0},
-		{"fortune-cat", "招财猫", "welfare", constUtil.ReWelfareCatKind, "fortuneCat_re_", "ActivityInnerPage/treasurecast", false, true, false, 5},
-		{"continued-spend", "连续消费", "welfare", constUtil.ReWelfareContinuedKind, "continuedRecharge_re_", "ActivityInnerPage/continueChargeGift", false, true, false, 7},
+		{"fortune-cat", "藏宝箱", "welfare", constUtil.ReWelfareCatKind, "fortuneCat_re_", "ActivityInnerPage/treasurecast", false, true, false, 5},
+		{"continued-spend", "连充送礼", "welfare", constUtil.ReWelfareContinuedKind, "continuedRecharge_re_", "ActivityInnerPage/continueChargeGift", false, true, false, 7},
 		{"treasure-box", "藏宝箱", "welfare", "cat", "p4:cat:admin_", "ActivityInnerPage/treasurecast", false, false, false, 0},
-		{"turntable", "幸运转盘", "pool", "turntable", "admin_turntable_", "ActivityInnerPage/BigTurnTable", false, false, true, 0},
+		{"turntable", "幸运大转盘", "pool", "turntable", "admin_turntable_", "ActivityInnerPage/BigTurnTable", false, false, true, 0},
 		{"recharge-total", "累计充值", "period", "payment_amount", "rechargeTotal_p4_admin_", "ActivityInnerPage/recharge surprise", false, true, false, 31},
-		{"single-spend", "单档消费", "period", constUtil.P1EventDiamondSpent, "rechargeSingle_p4_admin_", "ActivityInnerPage/recharge surprise", false, true, false, 31},
-		{"work", "开工活动", "period", constUtil.P1EventCopyWin, "kaiGongActivity_p4_admin_", "ActivityInnerPage/recharge surprise", false, true, false, 31},
+		{"single-spend", "单充送礼", "period", constUtil.P1EventDiamondSpent, "rechargeSingle_p4_admin_", "ActivityInnerPage/recharge surprise", false, true, false, 31},
+		{"work", "攻略福利", "period", constUtil.P1EventCopyWin, "kaiGongActivity_p4_admin_", "ActivityInnerPage/recharge surprise", false, true, false, 31},
 		{"diamond-spent", "累计消费", "period", constUtil.P1EventDiamondSpent, "costTotal_p4_admin_", "ActivityInnerPage/recharge surprise", false, true, false, 31},
-		{"recruit-count", "累计招募", "period", constUtil.P1EventRecruit, "warriorRescruitTimes_p4_admin_", "ActivityInnerPage/recharge surprise", false, true, false, 31},
-		{"copy-win", "主线胜利", "period", constUtil.P1EventCopyWin, "mainCopyWinTimes_p4_admin_", "ActivityInnerPage/BattleRace", false, true, false, 31},
-		{"arena-wins", "竞技胜场", "period", constUtil.P4ArenaWinKind, "pvpWinTimes_p4_arena_admin_", "ActivityInnerPage/BattleRace", false, true, false, 31},
-		{"plunder-count", "夺宝次数", "period", constUtil.P4PlunderActivityKind, "robTreasureTimes_p4_admin_", "ActivityInnerPage/BattleRace", false, true, false, 31},
-		{"wanted-attempts", "悬赏挑战", "period", constUtil.ReActivityWantedAttemptKind, "fightRedNameTimes_p4_admin_", "ActivityInnerPage/BattleRace", false, true, false, 31},
-		{"wanted-kills", "悬赏击杀", "period", constUtil.ReActivityWantedKillKind, "killRedNameTimes_p4_admin_", "ActivityInnerPage/BattleRace", false, true, false, 31},
-		{"hero-collection", "英雄收藏", "period", constUtil.P4KindCollect, "warriorGetSpecial_p4_admin_", "ActivityInnerPage/collection warrior", false, true, false, 31},
-		{"trial-stars", "试炼星数", "period", constUtil.P7RushStarEvent, "aincradStars_p4_admin_", "ActivityInnerPage/BattleRace", false, true, false, 31},
-		{"power-race", "战力竞赛", "period", constUtil.P4KindPower, "kaiFuJingSai_p4_admin_", "ActivityInnerPage/open server race", false, true, false, 31},
+		{"recruit-count", "招募送礼", "period", constUtil.P1EventRecruit, "warriorRescruitTimes_p4_admin_", "ActivityInnerPage/recharge surprise", false, true, false, 31},
+		{"copy-win", "攻略前线", "period", constUtil.P1EventCopyWin, "mainCopyWinTimes_p4_admin_", "ActivityInnerPage/BattleRace", false, true, false, 31},
+		{"arena-wins", "竞技场", "period", constUtil.P4ArenaWinKind, "pvpWinTimes_p4_arena_admin_", "ActivityInnerPage/BattleRace", false, true, false, 31},
+		{"plunder-count", "夺宝送礼", "period", constUtil.P4PlunderActivityKind, "robTreasureTimes_p4_admin_", "ActivityInnerPage/BattleRace", false, true, false, 31},
+		{"wanted-attempts", "悬赏任务", "period", constUtil.ReActivityWantedAttemptKind, "fightRedNameTimes_p4_admin_", "ActivityInnerPage/BattleRace", false, true, false, 31},
+		{"wanted-kills", "悬赏首领", "period", constUtil.ReActivityWantedKillKind, "killRedNameTimes_p4_admin_", "ActivityInnerPage/BattleRace", false, true, false, 31},
+		{"hero-collection", "收集角色", "period", constUtil.P4KindCollect, "warriorGetSpecial_p4_admin_", "ActivityInnerPage/collection warrior", false, true, false, 31},
+		{"trial-stars", "试炼之地", "period", constUtil.P7RushStarEvent, "aincradStars_p4_admin_", "ActivityInnerPage/BattleRace", false, true, false, 31},
+		{"power-race", "开服竞赛", "period", constUtil.P4KindPower, "kaiFuJingSai_p4_admin_", "ActivityInnerPage/open server race", false, true, false, 31},
 		{"king-recruit", "王者招募", "pool", "king-recruit", "admin_king_recruit_", "ShopInnerPage/KingRecruit", false, false, true, 0},
-		{"login-total", "累计登录", "period", constUtil.P1EventLoginDay, "totalLogin_p1_admin_", "ActivityInnerPage/login award", false, true, false, 31},
+		{"login-total", "登录奖励", "period", constUtil.P1EventLoginDay, "totalLogin_p1_admin_", "ActivityInnerPage/login award", false, true, false, 31},
 	}
 }
 func adminActivityDefinitionFor(mode string) (adminActivityDefinition, bool) {
@@ -70,7 +70,10 @@ func adminActivityDefinitionFor(mode string) (adminActivityDefinition, bool) {
 
 // InitializeAdminActivityModes 仅迁移展示关联表，不创建未知活动、奖品或运营投放。
 func InitializeAdminActivityModes(ctx context.Context) error {
-	return db.GetIns().WithContext(ctx).AutoMigrate(&db.AdminActivityPresentation{})
+	if err := db.GetIns().WithContext(ctx).AutoMigrate(&db.AdminActivityPresentation{}); err != nil {
+		return err
+	}
+	return InitializeAdminNativeActivitySettings(ctx)
 }
 
 // AdminActivityModes 提供按原消费者裁剪的字段、资格枚举及空奖品模板。
@@ -479,9 +482,11 @@ func (s *GameService) adminActivityTypedProjection(tx *gorm.DB, raw model.AdminA
 	}
 	if err == nil {
 		form.Name = meta.Name
+		form.Alias = meta.Alias
 		form.TemplateID = meta.TemplateID
 	}
 	form.Name = adminActivityReadableName(form.Name, raw.ID, kind, form.Mode)
+	form = adminActivityCanonicalForm(form)
 	for i := range form.Products {
 		product := &form.Products[i]
 		if strings.Contains(product.Name, "name_") || product.Name == "" || product.Name == product.ID {
@@ -545,6 +550,7 @@ func (s *GameService) AdminActivityInstances(ctx context.Context) ([]model.Admin
 
 // AdminSaveTypedActivity 将模式表单适配到原消费者规则，资格写入原商品字段，在原交易入口强制生效。
 func (s *GameService) AdminSaveTypedActivity(ctx context.Context, p *model.AdminPrincipal, id string, req model.AdminTypedActivityRequest) (*model.AdminActivityInstance, error) {
+	req.AdminActivityForm = adminActivityCanonicalForm(req.AdminActivityForm)
 	definition, ok := adminActivityDefinitionFor(req.AdminActivityForm.Mode)
 	if !ok || req.AdminActivityForm.TemplateID != definition.mode+"-original" {
 		return nil, constUtil.ErrAdminInput
@@ -603,7 +609,7 @@ func (s *GameService) AdminSaveTypedActivity(ctx context.Context, p *model.Admin
 				return err
 			}
 		}
-		meta := db.AdminActivityPresentation{ActivityID: id, Mode: req.AdminActivityForm.Mode, TemplateID: req.AdminActivityForm.TemplateID, Name: req.AdminActivityForm.Name, UpdatedAtMillis: time.Now().UnixMilli()}
+		meta := db.AdminActivityPresentation{ActivityID: id, Mode: req.AdminActivityForm.Mode, TemplateID: req.AdminActivityForm.TemplateID, Name: req.AdminActivityForm.Name, Alias: req.AdminActivityForm.Alias, UpdatedAtMillis: time.Now().UnixMilli()}
 		if err := tx.Save(&meta).Error; err != nil {
 			return err
 		}
@@ -935,7 +941,7 @@ func (s *GameService) AdminDeleteTypedActivity(ctx context.Context, p *model.Adm
 		if err := tx.Table(table).Where("id=?", key).Update("enabled", false).Error; err != nil {
 			return err
 		}
-		meta := db.AdminActivityPresentation{ActivityID: id, Mode: current.Mode, TemplateID: current.TemplateID, Name: current.Name, Archived: true, UpdatedAtMillis: time.Now().UnixMilli()}
+		meta := db.AdminActivityPresentation{ActivityID: id, Mode: current.Mode, TemplateID: current.TemplateID, Name: current.Name, Alias: current.Form.Alias, Archived: true, UpdatedAtMillis: time.Now().UnixMilli()}
 		if err := tx.Save(&meta).Error; err != nil {
 			return err
 		}

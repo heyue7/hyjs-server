@@ -104,6 +104,7 @@ type AdminActivityOptions struct {
 
 // AdminActivityForm 是按模式编辑的业务字段，不接收原始规则JSON。
 type AdminActivityForm struct {
+	Alias        string                   `json:"alias,omitempty" binding:"max=80"`                             // Alias 仅供后台区分活动，不映射游戏协议。
 	RepeatPolicy string                   `json:"repeatPolicy,omitempty" binding:"omitempty,oneof=once repeat"` // RepeatPolicy freezes per-template reuse: once per role, or independent participation in each occurrence.
 	Mode         string                   `json:"mode" binding:"required"`                                      // Mode 必须来自模式目录。
 	TemplateID   string                   `json:"templateId" binding:"required"`                                // TemplateID 必须属于当前模式原美术模板。

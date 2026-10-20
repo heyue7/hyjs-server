@@ -69,6 +69,8 @@ export interface ActivityPrize {
   guaranteed: boolean;
 }
 export interface ActivityForm {
+  /** 后台别名只用于运营区分，不映射到游戏内活动名称。 */
+  alias?: string;
   mode: string;
   repeatPolicy?: 'once' | 'repeat';
   templateId: string;
@@ -136,17 +138,61 @@ export function activityRepeatPolicy(form: Pick<ActivityForm, 'mode' | 'repeatPo
 export function activityRepeatLabel(form: Pick<ActivityForm, 'mode' | 'repeatPolicy'>): string {
   return activityRepeatPolicy(form) === 'once' ? '一次性' : '可重复';
 }
+/** 游戏内标题沿用客户端固定名称，后台只通过 alias 区分运营批次。 */
+export function activityClientName(
+  mode?: Pick<ActivityMode, 'mode' | 'label' | 'defaultForm'> | null,
+  fallback = ''
+): string {
+  const current = fallback.trim();
+  if (!mode) return current;
+  if (mode.mode === 'opening-14') return '开服狂欢';
+  // 限时商店沿用各商店自己的名称，后端同样不强制改成模式标签。
+  if (mode.mode === 'shop-window') return current || mode.defaultForm?.name?.trim() || mode.label?.trim() || '';
+  const defaultName = mode.defaultForm?.name?.trim() || '';
+  return defaultName || mode.label?.trim() || current;
+}
+/** 表单缺少模式信息时仍按 opening-14 的客户端名称展示。 */
+export function activityFormName(
+  form: Pick<ActivityForm, 'mode' | 'name'>,
+  mode?: Pick<ActivityMode, 'mode' | 'label' | 'defaultForm'> | null
+): string {
+  if (!mode && form.mode === 'opening-14') return '开服狂欢';
+  return activityClientName(mode, form.name) || form.name.trim();
+}
+/** 旧数据未带 alias 时把历史自定义名保留到后台别名，再把表单名称收敛到客户端名。 */
+export function normalizeActivityForm(form: ActivityForm, mode?: ActivityMode | null): ActivityForm {
+  const current = form.name.trim();
+  const alias = (form.alias || '').trim();
+  if (mode || form.mode === 'opening-14') {
+    const name = activityFormName(form, mode);
+    if (!alias && current && current !== name) form.alias = current;
+    form.name = name;
+  } else {
+    form.alias = alias;
+    form.name = current;
+  }
+  return form;
+}
+/** 复制活动时仅给后台别名追加标记，避免改动游戏内固定名称。 */
+export function activityCopyAlias(alias?: string): string {
+  const suffix = '（副本）';
+  const base = (alias || '').trim();
+  return base.slice(0, 80 - suffix.length) + suffix;
+}
 export function newActivityForm(mode: ActivityMode): ActivityForm {
   if (mode.defaultForm) {
     const form: ActivityForm = JSON.parse(JSON.stringify(mode.defaultForm));
+    form.alias ||= '';
     form.repeatPolicy = activityRepeatPolicy(form);
-    return form;
+    return normalizeActivityForm(form, mode);
   }
-  return {
+  const name = activityClientName(mode);
+  return normalizeActivityForm({
     mode: mode.mode,
     repeatPolicy: mode.mode === 'opening-14' ? 'once' : 'repeat',
     templateId: mode.templates[0]?.id || '',
-    name: '',
+    name,
+    alias: '',
     source: '用户运营配置',
     startAt: Date.now(),
     endAt: 0,
@@ -165,5 +211,5 @@ export function newActivityForm(mode: ActivityMode): ActivityForm {
           }))
         : [],
     options: JSON.parse(JSON.stringify(mode.defaultOptions || {}))
-  };
+  }, mode);
 }

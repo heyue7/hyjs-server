@@ -72,8 +72,9 @@ func adminActivityDefinitionWrite(c *gin.Context, update bool) {
 		return
 	}
 	req.Name = strings.TrimSpace(req.Name)
+	req.Form.Alias = strings.TrimSpace(req.Form.Alias)
 	form := req.Form
-	if (form.RepeatPolicy != "" && form.RepeatPolicy != "once" && form.RepeatPolicy != "repeat") || req.Name == "" || len([]rune(req.Name)) > 80 || req.DefaultDays < 1 || req.DefaultDays > 366 || req.ClaimDays < 0 || req.ClaimDays > 90 || len(form.Mode) > 64 || len(form.TemplateID) > 96 || len(form.Source) > 1000 || len(form.Products) > 100 || len(form.Milestones) > 31 || (len(form.Prizes) > 1000 || form.Mode != "king-recruit" && len(form.Prizes) > 9) || form.Mode == "opening-14" && form.TemplateID != "opening-14-original" || update && (len(req.Version) != 64 || len(c.Param("id")) > 64) || !update && req.Version != "" {
+	if (form.RepeatPolicy != "" && form.RepeatPolicy != "once" && form.RepeatPolicy != "repeat") || req.Name == "" || len([]rune(req.Name)) > 80 || req.DefaultDays < 1 || req.DefaultDays > 366 || req.ClaimDays < 0 || req.ClaimDays > 90 || len([]rune(form.Alias)) > 80 || len(form.Mode) > 64 || len(form.TemplateID) > 96 || len(form.Source) > 1000 || len(form.Products) > 100 || len(form.Milestones) > 31 || (len(form.Prizes) > 1000 || form.Mode != "king-recruit" && len(form.Prizes) > 9) || form.Mode == "opening-14" && form.TemplateID != "opening-14-original" || update && (len(req.Version) != 64 || len(c.Param("id")) > 64) || !update && req.Version != "" {
 		adminError(c, constUtil.ErrAdminInput)
 		return
 	}

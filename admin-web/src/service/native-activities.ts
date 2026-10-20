@@ -1,0 +1,24 @@
+import { api, json } from './operations';
+import type { ResourceAmount } from './operations';
+import type { ActivityForm, ActivityPrize } from './activity-operations';
+
+export interface NativeMilestone { key: string; goal: number; rewards: ResourceAmount[] }
+export interface NativeVIPTier { vip: number; dailyRewards: ResourceAmount[]; weekCost: ResourceAmount; weekRewards: ResourceAmount[] }
+export interface NativeActivityChild { id: string; domain: string; form: ActivityForm }
+export interface NativeActivityForm {
+  startAt: number; endAt: number; claimEndAt: number;
+  minVip: number; diamondCost: number; threshold: number;
+  cents: number; charge: number; dailyDiamond: number;
+  weekdayMask: number; startMinute: number; endMinute: number; currencyFactor: number; dropFactor: number;
+  rewards: ResourceAmount[]; milestones: NativeMilestone[]; prizes: ActivityPrize[];
+  vipTiers: NativeVIPTier[]; children: NativeActivityChild[];
+}
+export interface NativeActivity {
+  id: string; kind: string; name: string; alias: string; version: string;
+  enabled: boolean; frozen: boolean; note: string; form: NativeActivityForm;
+}
+export const getNativeActivities = () => api<{items: NativeActivity[]}>('/activity-native-settings');
+export const saveNativeActivity = (row: NativeActivity) => api<NativeActivity>(
+  `/activity-native-settings/${encodeURIComponent(row.id)}`,
+  json('PUT', { version: row.version, enabled: row.enabled, alias: row.alias, form: row.form })
+);

@@ -32,7 +32,7 @@ def main():
   forms=[]
   for world,label in [(1,'SAO'),(2,'ALO'),(3,'GGO')]:
    form=copy.deepcopy(source['form']);form['options']['kingWorld']=world
-   form['name']='王者招募·'+label;form['source']=f'原已发布王者奖池按世界拆分；来源排期{source["id"]}；世界{world}；奖品和权重逐项保持。'
+   form['name']='王者招募';form['alias']=label;form['source']=f'原已发布王者奖池按世界拆分；来源排期{source["id"]}；世界{world}；奖品和权重逐项保持。'
    form['prizes']=[p for p in form['prizes'] if world_by_id.get(p['resourceId'])==world]
    if not form['prizes'] or not any(p['guaranteed'] for p in form['prizes']):raise RuntimeError('Source lacks an original guaranteed candidate for world '+str(world))
    forms.append(form)
