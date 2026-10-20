@@ -356,9 +356,9 @@ namespace HYJS.KingRecruit
                 entry.gameObject.SetActive(open);
                 if (button != null && button.labName != null)
                 {
-                    button.labName.text = "王者招募·" + (space == 1 ? "SAO" : space == 2 ? "ALO" : "GGO");
-                    button.labName.fontSize = 20;
-                    button.labName.width = 150;
+                    button.labName.text = "王者·" + (space == 1 ? "SAO" : space == 2 ? "ALO" : "GGO");
+                    button.labName.fontSize = 22;
+                    button.labName.width = 108;
                     button.labName.maxLineCount = 1;
                     button.labName.overflowMethod = UILabel.Overflow.ShrinkContent;
                 }
