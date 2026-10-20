@@ -720,7 +720,7 @@ func (s *GameService) dispatch(ctx context.Context, r *model.GamePacket, peer st
 				}
 			}
 			if s.P8GatherReady {
-				if err := s.P8CancelGather(tx, row.Id, g); err != nil {
+				if err := s.P8ObserveGatherMove(tx, row.Id, g, b.GetPointNew()); err != nil {
 					return err
 				}
 			}

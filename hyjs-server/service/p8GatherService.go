@@ -320,6 +320,31 @@ func (s *GameService) P8CancelGather(tx *gorm.DB, id int64, g *model.GameState) 
 	return nil
 }
 
+// P8ObserveGatherMove 保留原客户端进入采集动画时补发的点内停止位置。
+// 冻结资源半径同时用于开始、移动及领取；走出范围后立即取消，不改变奖励与计时。
+func (s *GameService) P8ObserveGatherMove(tx *gorm.DB, id int64, g *model.GameState, next *pb.PointNew) error {
+	if g.Field == nil || g.Field.Side == nil || (g.Field.Side.GetState() != constUtil.P8FieldFishing && g.Field.Side.GetState() != constUtil.P8FieldMining) {
+		return nil
+	}
+	var attempt db.P8GatherAttempt
+	err := tx.First(&attempt, "player_id=? AND active=?", id, true).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		g.Field.Side.State = proto.Int32(constUtil.P8FieldIdle)
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	cfg, err := p8DecodeConfig(attempt.Snapshot)
+	if err != nil {
+		return err
+	}
+	if attempt.Scene == g.Position.GetScene() && p8Near(next, cfg) {
+		return nil
+	}
+	return s.P8CancelGather(tx, id, g)
+}
+
 // RefreshP8Resources 用于场景恢复和心跳，原刷新帧refreshTime>0移除模型、0重新出现。
 func (s *GameService) RefreshP8Resources(tx *gorm.DB, p *pb.Player, g *model.GameState, now time.Time, force bool) ([]proto.Message, error) {
 	if s.p8GatherMap(g.Position.GetScene()) == nil || !s.P8FieldSceneAvailable(g.Position.GetScene()) {
