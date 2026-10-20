@@ -35,7 +35,7 @@ def main():
         for name in ['UnityEngine.dll','mscorlib.dll','Assembly-CSharp-firstpass.dll','System.dll','System.Core.dll']:
             f=work/name;f.write_bytes(z.read('assets/bin/Data/Managed/'+name));refs.append(f)
         helper=out/'SoulFlowerNativeAccount.dll'
-        run('compile-helper',[dotnet,compiler,'/nologo','/target:library','/nostdlib+','/langversion:3','/deterministic+','/resource:'+str(source/'resources/account-button.png')+',HYJS.AccountButton.png','/out:'+str(helper),*['/reference:'+str(x) for x in refs],source/'NativeAccount.cs'])
+        run('compile-helper',[dotnet,compiler,'/nologo','/target:library','/nostdlib+','/langversion:3','/deterministic+','/resource:'+str(source/'resources/sao-v2/button-atlas.png')+',HYJS.AccountButtons.png','/out:'+str(helper),*['/reference:'+str(x) for x in refs],source/'NativeAccount.cs'])
         shutil.copy2(source/'Injector.cs',work/'Program.cs');project=work/'Patch.csproj'
         project.write_text('<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable></PropertyGroup><ItemGroup><Reference Include="dnlib"><HintPath>'+str(dnlib)+'</HintPath></Reference></ItemGroup></Project>')
         run('compile-injector',[dotnet,'build',project,'--nologo','--verbosity','quiet','-p:NuGetAudit=false'])
@@ -51,6 +51,7 @@ def main():
     require(set(changes)==ALLOWED and engine==547,'Expected scoped method changes')
     require(not getattr(right.net.mdtables,'FieldPtr',None),'Unsupported FieldPtr')
     require(len(left.net.mdtables.ModuleRef.rows)==len(right.net.mdtables.ModuleRef.rows),'Unexpected ModuleRef')
-    report={'status':'STATIC_VERIFIED_NOT_PACKAGED','baseAPKSHA256':a.base_sha256,'inputManagedSHA256':sha(before),'outputManagedSHA256':sha(after),'allowedChangedMethods':changes,'originalEngineMethodsExact':engine,'sourcePins':{str(f.relative_to(ROOT)):sha(f.read_bytes()) for f in [source/'NativeAccount.cs',source/'Injector.cs',source/'build.py',source/'resources/account-button.png',source/'resources/source.json']}}
+    inputs=[source/'NativeAccount.cs',source/'Injector.cs',source/'build.py',*sorted((source/'resources/sao-v2').glob('*'))]
+    report={'status':'STATIC_VERIFIED_NOT_PACKAGED','baseAPKSHA256':a.base_sha256,'inputManagedSHA256':sha(before),'outputManagedSHA256':sha(after),'allowedChangedMethods':changes,'originalEngineMethodsExact':engine,'sourcePins':{str(f.relative_to(ROOT)):sha(f.read_bytes()) for f in inputs if f.is_file()}}
     (out/'manifest.json').write_text(json.dumps(report,ensure_ascii=False,indent=2)+'\n');print(json.dumps(report))
 if __name__=='__main__':main()

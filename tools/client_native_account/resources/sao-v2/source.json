@@ -1,0 +1,46 @@
+{
+  "origin": "AI generated with built-in image_gen; not original APK pixels",
+  "reference": "login-reference.png",
+  "atlas": "button-atlas.png",
+  "atlasSHA256": "ac0efa981b788be7b16803b28dbb95473488c24beb78a5ca98ad3713caed1997",
+  "canvas": [
+    1536,
+    1024
+  ],
+  "alpha": "RGBA; outside clear alpha 0",
+  "coordinates": "top-left source; UV sampling only, original PNG unchanged",
+  "normalPrimary": [
+    110,
+    280,
+    636,
+    170
+  ],
+  "normalSecondary": [
+    792,
+    280,
+    636,
+    170
+  ],
+  "pressedPrimary": [
+    110,
+    568,
+    636,
+    170
+  ],
+  "pressedSecondary": [
+    792,
+    568,
+    636,
+    170
+  ],
+  "runtimeWidget": [
+    156,
+    44
+  ],
+  "font": "Original game UIFont, 20, no outline",
+  "checkbox": "native NGUI geometry; 21 square, 17 text, 150x34 touch area",
+  "prompts": [
+    "login-design.prompt.txt",
+    "buttons.prompt.txt"
+  ]
+}

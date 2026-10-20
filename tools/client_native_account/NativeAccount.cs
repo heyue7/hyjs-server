@@ -41,6 +41,10 @@ namespace HYJS.NativeAccount
         bool registering, busy, initialized;
         int request;
         static Texture2D buttonTexture;
+        static UIAtlas buttonAtlas;
+        UITexture rememberFace;
+        GameObject rememberTick;
+        static readonly Color Ink = new Color(0.19f, 0.28f, 0.33f, 1f);
         static AndroidJavaClass Cache() { return new AndroidJavaClass("com.hyjs.wallet.LoginCache"); }
         static AndroidJavaClass Registration() { return new AndroidJavaClass("com.hyjs.wallet.GameRegistration"); }
         UIButton Find(string method)
@@ -53,14 +57,16 @@ namespace HYJS.NativeAccount
         UILabel Label(UIButton button)
         {
             if (button == null) return null;
-            // Reuse the shipped gold game button pixels inside the original account panel.
+            // Keep the original event/collider; skin only the small action control.
             UISprite background = button.GetComponent<UISprite>();
             foreach (UISprite sprite in button.GetComponentsInChildren<UISprite>(true)) if (sprite != background) sprite.enabled = false;
             // NGUI uses the root widget for hit testing and child alpha. Keep it active beneath the game skin.
-            if (background != null) { background.enabled = true; background.color = Color.black; background.width = 156; background.height = 52; }
+            bool primary = button == login;
+            if (background == null) return null;
+            background.enabled = true;
             if (buttonTexture == null)
             {
-                using (System.IO.Stream stream = typeof(AccountControl).Assembly.GetManifestResourceStream("HYJS.AccountButton.png"))
+                using (System.IO.Stream stream = typeof(AccountControl).Assembly.GetManifestResourceStream("HYJS.AccountButtons.png"))
                 {
                     byte[] bytes = new byte[stream.Length];
                     int offset = 0, count;
@@ -68,19 +74,30 @@ namespace HYJS.NativeAccount
                     buttonTexture = new Texture2D(2, 2); buttonTexture.LoadImage(bytes);
                 }
             }
-            Transform skinChild = button.transform.Find("GameButtonSkin");
-            if (skinChild == null)
+            if (buttonAtlas == null)
             {
-                GameObject go = new GameObject("GameButtonSkin"); go.layer = button.gameObject.layer;
-                go.transform.parent = button.transform; go.transform.localPosition = Vector3.zero; go.transform.localScale = Vector3.one;
-                skinChild = go.transform;
+                GameObject resource = new GameObject("SAOAccountButtonAtlas");
+                UnityEngine.Object.DontDestroyOnLoad(resource);
+                buttonAtlas = resource.AddComponent<UIAtlas>();
+                Material material = new Material(background.atlas.spriteMaterial); material.mainTexture = buttonTexture;
+                buttonAtlas.spriteMaterial = material;
+                List<UISpriteData> sprites = new List<UISpriteData>();
+                string[] names = { "Primary", "Secondary", "PrimaryPressed", "SecondaryPressed" };
+                for (int i = 0; i < 4; i++)
+                {
+                    UISpriteData data = new UISpriteData(); data.name = names[i];
+                    data.x = (i % 2 == 0) ? 110 : 792; data.y = i < 2 ? 280 : 568; data.width = 636; data.height = 170;
+                    sprites.Add(data);
+                }
+                buttonAtlas.spriteList = sprites;
             }
-            UITexture skin = skinChild.GetComponent<UITexture>();
-            if (skin == null) skin = skinChild.gameObject.AddComponent<UITexture>();
-            skin.mainTexture = buttonTexture; skin.width = 156; skin.height = 52;
-            skin.depth = background == null ? 10 : background.depth + 1;
-            button.tweenTarget = skin.gameObject;
+            string normal = primary ? "Primary" : "Secondary";
+            background.atlas = buttonAtlas; background.type = UIBasicSprite.Type.Simple;
+            background.spriteName = normal; background.width = 156; background.height = 44; background.color = Color.white;
+            button.tweenTarget = button.gameObject;
+            button.normalSprite = normal; button.hoverSprite = normal; button.pressedSprite = normal + "Pressed"; button.disabledSprite = normal;
             button.defaultColor = Color.white;
+            button.hover = Color.white; button.pressed = Color.white;
             Transform existing = button.transform.Find("NativeButtonCaption");
             if (existing != null) return existing.GetComponent<UILabel>();
             GameObject text = new GameObject("NativeButtonCaption"); text.layer = button.gameObject.layer;
@@ -89,11 +106,48 @@ namespace HYJS.NativeAccount
             UILabel theme = owner.nameInput.GetComponent<UIInput>().label;
             if (theme.bitmapFont != null) label.bitmapFont = theme.bitmapFont; else label.trueTypeFont = theme.trueTypeFont;
             label.material = theme.material;
-            label.fontSize = 20; label.color = Color.white; label.width = 140; label.height = 40;
-            label.effectStyle = UILabel.Effect.Outline; label.effectColor = Color.black;
+            label.fontSize = 20; label.color = primary ? Color.white : Ink; label.width = 140; label.height = 40;
+            label.effectStyle = UILabel.Effect.None;
             label.alignment = NGUIText.Alignment.Center; label.pivot = UIWidget.Pivot.Center;
-            label.depth = skin.depth + 5;
+            label.depth = background.depth + 5;
             return label;
+        }
+        UITexture Solid(Transform parent, string name, int width, int height, Vector3 position, int depth, Color color)
+        {
+            GameObject go = new GameObject(name); go.layer = parent.gameObject.layer;
+            go.transform.parent = parent; go.transform.localPosition = position; go.transform.localScale = Vector3.one;
+            UITexture value = go.AddComponent<UITexture>(); value.mainTexture = Texture2D.whiteTexture;
+            value.width = width; value.height = height; value.depth = depth; value.color = color; return value;
+        }
+        void MakeRemember()
+        {
+            GameObject go = new GameObject("RememberPassword"); go.layer = register.gameObject.layer;
+            go.transform.parent = register.transform.parent; go.transform.localScale = register.transform.localScale;
+            go.transform.localPosition = register.transform.localPosition + new Vector3(-75f, 64f, 0f);
+            int depth = register.GetComponent<UISprite>().depth + 10;
+            UITexture border = go.AddComponent<UITexture>(); border.mainTexture = Texture2D.whiteTexture;
+            border.width = 21; border.height = 21; border.depth = depth;
+            border.color = new Color(0.49f, 0.65f, 0.71f, 1f);
+            rememberFace = Solid(go.transform, "Face", 17, 17, Vector3.zero, depth + 1, Color.white);
+            rememberTick = new GameObject("Checkmark"); rememberTick.layer = go.layer;
+            rememberTick.transform.parent = go.transform; rememberTick.transform.localPosition = Vector3.zero; rememberTick.transform.localScale = Vector3.one;
+            UITexture a = Solid(rememberTick.transform, "ShortStroke", 7, 3, new Vector3(-3f, -1f, 0f), depth + 2, Color.white);
+            a.transform.localRotation = Quaternion.Euler(0f, 0f, -45f);
+            UITexture b = Solid(rememberTick.transform, "LongStroke", 12, 3, new Vector3(3f, 1f, 0f), depth + 2, Color.white);
+            b.transform.localRotation = Quaternion.Euler(0f, 0f, 45f);
+            GameObject caption = new GameObject("Caption"); caption.layer = go.layer;
+            caption.transform.parent = go.transform; caption.transform.localPosition = new Vector3(18f, 0f, 0f); caption.transform.localScale = Vector3.one;
+            rememberLabel = caption.AddComponent<UILabel>(); UILabel theme = owner.nameInput.GetComponent<UIInput>().label;
+            if (theme.bitmapFont != null) rememberLabel.bitmapFont = theme.bitmapFont; else rememberLabel.trueTypeFont = theme.trueTypeFont;
+            rememberLabel.material = theme.material; rememberLabel.fontSize = 17; rememberLabel.color = Ink;
+            rememberLabel.width = 120; rememberLabel.height = 28; rememberLabel.pivot = UIWidget.Pivot.Left;
+            rememberLabel.alignment = NGUIText.Alignment.Left; rememberLabel.depth = depth + 2;
+            rememberLabel.effectStyle = UILabel.Effect.None; rememberLabel.text = "记住密码";
+            caption.transform.localPosition = new Vector3(18f, 0f, 0f);
+            BoxCollider hit = go.AddComponent<BoxCollider>(); hit.center = new Vector3(55f, 0f, 0f); hit.size = new Vector3(150f, 34f, 1f);
+            remember = go.AddComponent<UIButton>(); remember.tweenTarget = border.gameObject; remember.defaultColor = border.color;
+            remember.hover = new Color(0.35f, 0.74f, 0.82f, 1f); remember.pressed = new Color(0.2f, 0.65f, 0.75f, 1f);
+            EventDelegate.Add(remember.onClick, ChangeRemember);
         }
         public void Open(UserInput input)
         {
@@ -107,20 +161,13 @@ namespace HYJS.NativeAccount
                 loginLabel = Label(login); registerLabel = Label(register);
                 input.nameInput.GetComponent<UIInput>().defaultText = "账号：请输入账号";
                 input.passWordInput.GetComponent<UIInput>().defaultText = "密码：请输入密码";
-                // Reuse the original blue button for the cache preference; obsolete empty callbacks disappear.
+                // A native checkbox and label sit between the password row and the two actions.
                 UIButton unused = Find("OnForgetPassWord");
                 if (unused != null) unused.gameObject.SetActive(false);
                 unused = Find("OnTouristsLogin"); if (unused != null) unused.gameObject.SetActive(false);
                 if (register != null)
                 {
-                    GameObject copy = (GameObject)UnityEngine.Object.Instantiate(register.gameObject);
-                    copy.name = "RememberPassword"; copy.transform.parent = register.transform.parent;
-                    copy.transform.localScale = register.transform.localScale;
-                    // Use the free original link row inside the panel, above its two action buttons.
-                    copy.transform.localPosition = register.transform.localPosition + new Vector3(0f, 60f, 0f);
-                    remember = copy.GetComponent<UIButton>(); remember.onClick.Clear();
-                    EventDelegate.Add(remember.onClick, ChangeRemember);
-                    rememberLabel = Label(remember);
+                    MakeRemember();
                 }
                 GameObject confirm = (GameObject)UnityEngine.Object.Instantiate(input.passWordInput);
                 confirm.name = "ConfirmPassword"; confirm.transform.parent = input.passWordInput.transform.parent;
@@ -161,13 +208,29 @@ namespace HYJS.NativeAccount
             // Fit the extra confirmation row in the same original panel; the title scene stays intact.
             owner.nameInput.transform.localPosition = namePosition;
             owner.passWordInput.transform.localPosition = passwordPosition;
-            if (confirmation != null) { confirmation.transform.localPosition = passwordPosition + Vector3.down * 52f; confirmation.gameObject.SetActive(registering); }
+            if (confirmation != null)
+            {
+                confirmation.transform.localPosition = passwordPosition + Vector3.down * 52f;
+                if (registering && !confirmation.gameObject.activeSelf && String.IsNullOrEmpty(confirmation.value))
+                {
+                    confirmation.defaultText = "确认密码：请再次输入";
+                    confirmation.label.text = confirmation.defaultText;
+                }
+                confirmation.gameObject.SetActive(registering);
+            }
+            foreach (UILabel title in owner.GetComponentsInChildren<UILabel>(true))
+                if (title.text == "游戏登录" || title.text == "游戏注册") title.text = registering ? "游戏注册" : "游戏登录";
             if (loginLabel != null) loginLabel.text = busy ? "注册中…" : registering ? "注册" : "登录";
             if (registerLabel != null) registerLabel.text = registering ? "返回登录" : "注册账号";
+            if (login != null) login.isEnabled = !busy;
+            if (register != null) register.isEnabled = !busy;
             if (remember != null)
             {
                 remember.gameObject.SetActive(!registering);
-                using (AndroidJavaClass cache = Cache()) if (rememberLabel != null) rememberLabel.text = cache.CallStatic<bool>("rememberEnabled") ? "记住密码：开" : "记住密码：关";
+                bool selected;
+                using (AndroidJavaClass cache = Cache()) selected = cache.CallStatic<bool>("rememberEnabled");
+                if (rememberFace != null) rememberFace.color = selected ? new Color(0.16f, 0.71f, 0.81f, 1f) : new Color(0.96f, 0.98f, 0.99f, 1f);
+                if (rememberTick != null) rememberTick.SetActive(selected);
             }
         }
         void Error(string message) { BoxManager.CreatePopupTextBox(message, 0f); }
@@ -215,4 +278,5 @@ namespace HYJS.NativeAccount
             if (confirmation != null) confirmation.value = "";
         }
     }
+
 }
