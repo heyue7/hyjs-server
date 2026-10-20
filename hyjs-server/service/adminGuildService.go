@@ -209,6 +209,10 @@ func adminGuildFieldGroups(s *GameService, stored adminGuildStored) []model.Admi
 	}
 	for _, def := range adminGuildConfigDefs {
 		label := s.table("GameConfigure", "StaticName", def.Key)["Name"]
+		// The recovered table labels this badge field as coins; the consumer uses badges.
+		if def.Key == "UnionOpenGuardTreeBadgeCost" {
+			label = "守护之树开启消耗徽章（公会的消耗）"
+		}
 		if strings.TrimSpace(label) == "" {
 			label = def.Key
 		}
