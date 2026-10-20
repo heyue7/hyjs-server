@@ -19,7 +19,7 @@ def build(output):
     with tempfile.TemporaryDirectory(prefix='hyjs-auth-rollback-') as temporary:
         work = Path(temporary)
         archive = work / 'source.tar'
-        archive.write_bytes(run('git', 'archive', BASE, 'hyjs-server', cwd=ROOT).stdout)
+        archive.write_bytes(run('git', 'archive', BASE, 'hyjs-server', 'analysis/tables', cwd=ROOT).stdout)
         with tarfile.open(archive) as source:
             source.extractall(work, filter='data')
         source = work / 'hyjs-server'
