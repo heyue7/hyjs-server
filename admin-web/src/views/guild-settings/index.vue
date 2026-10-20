@@ -3,7 +3,6 @@ import { computed, h, onBeforeUnmount, onMounted, ref } from 'vue';
 import { onBeforeRouteLeave } from 'vue-router';
 import { NButton, NInput, NInputNumber, NSwitch, NTag } from 'naive-ui';
 import type { DataTableColumns } from 'naive-ui';
-import { formatTime } from '@/service/operations';
 import {
   getGuildSettings,
   saveGuildSettings
@@ -14,6 +13,7 @@ import type {
   GuildTableColumn
 } from '@/service/guilds';
 import GuildRewardsWorkspace from '@/components/operations/guild-rewards-workspace.vue';
+import ContextHelp from '@/components/operations/context-help.vue';
 import { useOperations } from '@/composables/useOperations';
 
 interface EditorState {
@@ -152,11 +152,14 @@ function reset() {
 
 <template>
   <div class="ops-page">
-    <NSpace align="center">
+    <NSpace align="center" class="guild-actions">
       <NInput v-model:value="q" clearable placeholder="搜索参数名称" class="guild-search" />
+      <ContextHelp title="设置何时生效" text="修改对后续操作与新场次生效。已开始的祈祷、科技报价和公会战继续使用开始时的设置。" />
       <NButton :loading="loading" :disabled="saving" @click="load">刷新</NButton>
       <NButton v-if="canWrite && tab !== 'rewards'" :disabled="!dirty || saving" @click="reset">放弃修改</NButton>
       <NButton v-if="canWrite && tab !== 'rewards'" type="primary" :loading="saving" :disabled="!form || !dirty" @click="save">保存设置</NButton>
+      <NTag v-if="dirty && canWrite && tab !== 'rewards'" type="warning" :bordered="false">未保存</NTag>
+      <NTag v-if="!canWrite" :bordered="false">只读</NTag>
     </NSpace>
     <NAlert v-if="error" type="error" :title="error" class="mb-12px" />
     <NAlert v-if="saveError" type="error" :title="saveError" class="mb-12px" />
@@ -164,16 +167,6 @@ function reset() {
 
     <NSpin :show="loading">
       <template v-if="settings && form">
-        <NCard :bordered="false" class="ops-panel mb-12px">
-          <NSpace align="center" justify="space-between">
-            <div>
-              <div class="ops-muted">参数修改用于后续操作与新场次；已开始的祈祷、科技报价和公会战沿用原规则。</div>
-              <div class="ops-muted mt-4px">版本 {{ settings.version.slice(0, 12) }} · {{ settings.updatedBy || '—' }} · {{ formatTime(settings.updatedAt) }}</div>
-            </div>
-            <NTag :type="canWrite ? 'success' : 'default'" :bordered="false">{{ canWrite ? (dirty ? '有未保存修改' : '已保存') : '只读账号' }}</NTag>
-          </NSpace>
-        </NCard>
-
         <NTabs :value="tab" @update:value="changeTab" type="line" animated>
           <NTabPane v-for="group in settings.groups" :key="group.key" :name="group.key" :tab="group.label">
             <template v-if="group.key === 'shop'">
@@ -192,9 +185,9 @@ function reset() {
               <div v-else class="guild-field-grid">
                 <NCard v-for="field in groupFields(group.key)" :key="field.key" :bordered="false" class="guild-field-card">
                   <div class="guild-field-label">{{ field.label }}</div>
-                  <div class="guild-field-key" />
                   <NInput
                     v-model:value="form.fields[field.key]"
+                    :aria-label="field.label"
                     :disabled="!canWrite"
                     :status="form.fields[field.key] === '' ? 'error' : undefined"
                     placeholder="必填"
@@ -370,11 +363,11 @@ function reset() {
 </template>
 
 <style scoped>
+.guild-actions { margin-bottom: 12px; }
 .guild-search { width: min(260px, 100%); }
 .guild-field-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
 .guild-field-card { border: 1px solid var(--n-border-color, #e5e7eb); border-radius: 8px; }
 .guild-field-label { min-height: 42px; font-weight: 600; line-height: 1.45; }
-.guild-field-key { margin: 4px 0 10px; font-size: 12px; font-variant-numeric: tabular-nums; }
 @media (max-width: 600px) {
   .guild-field-grid { grid-template-columns: minmax(0, 1fr); }
   .guild-search { width: 100%; }
