@@ -20,7 +20,10 @@ namespace HYJS.Membership
   {
    if(row==null||item==null||preview)return;
    int status=item.status;
-   if(row.btnGet!=null){row.btnGet.SetActive(status==1);if(status==1)Caption(row.btnGet,"领取",row.labTitle,true);}
+   if(row.btnGet!=null){row.btnGet.SetActive(status==1);if(status==1){
+    if(row.labWordOnBtn!=null){row.labWordOnBtn.enabled=true;row.labWordOnBtn.gameObject.SetActive(true);row.labWordOnBtn.text="领取";}
+    else Caption(row.btnGet,"领取",row.labTitle,true);
+   }}
    if(row.getted!=null){row.getted.SetActive(status==2);if(status==2)Caption(row.getted,"已领取",row.labTitle,false);}
   }
  }

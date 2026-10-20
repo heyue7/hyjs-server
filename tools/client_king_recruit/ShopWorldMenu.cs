@@ -88,9 +88,10 @@ namespace HYJS.KingRecruit
                 owner = currentOwner;
                 session = currentSession;
             }
-            Dictionary<ShopType, ShopTabButton> buttons = TabBtns();
+            Dictionary<ShopType, GameObject> buttons = TabBtns();
             if (buttons == null || !buttons.ContainsKey(ShopType.KingsRecruit)) return;
-            ShopTabButton current = buttons[ShopType.KingsRecruit];
+            ShopTabButton current = buttons[ShopType.KingsRecruit].GetComponent<ShopTabButton>();
+            if (current == null) return;
             if (current != template)
             {
                 template = current;
@@ -124,9 +125,9 @@ namespace HYJS.KingRecruit
             Notice = "";
         }
 
-        Dictionary<ShopType, ShopTabButton> TabBtns()
+        Dictionary<ShopType, GameObject> TabBtns()
         {
-            return shop == null || TabBtnsField == null ? null : TabBtnsField.GetValue(shop) as Dictionary<ShopType, ShopTabButton>;
+            return shop == null || TabBtnsField == null ? null : TabBtnsField.GetValue(shop) as Dictionary<ShopType, GameObject>;
         }
 
         bool OwnerCurrent()
@@ -169,9 +170,13 @@ namespace HYJS.KingRecruit
             if (!OwnerCurrent())
             {
                 ResetOwner();
-                Apply();
+                Reapply(shop);
                 return;
             }
+            // Rebind after the original shop rebuilds its GameObject-valued dictionary.
+            Dictionary<ShopType, GameObject> buttons = TabBtns();
+            if (buttons == null || !buttons.ContainsKey(ShopType.KingsRecruit)) return;
+            if (template == null || template.gameObject != buttons[ShopType.KingsRecruit]) { Reapply(shop); return; }
             if (DrawInFlight && Time.realtimeSinceStartup >= DrawDeadline) { DrawInFlight = false; Notice = "抽卡结果待确认，请重新打开王者招募"; }
             if (!catalogLoaded && !loading && Time.realtimeSinceStartup >= nextCatalog) StartCoroutine(RefreshCatalog());
             if (catalogLoaded) Highlight();
