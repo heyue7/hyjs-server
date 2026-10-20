@@ -157,6 +157,7 @@ func TestAdminKingRecruitOnceRepeatOwnershipAndCounters(t *testing.T) {
 			if _, err := f.s.warriorRecruit(bound, f.id, p2Recruit(1, 0), 95101); err != nil {
 				t.Fatal(err)
 			}
+			priorWorld := adminKingInfo(t, f, bound).GetSpace()
 			reuseClockDay(t, f, actor)
 			bound = serverClockBindTest(t, f, f.id)
 			info := adminKingInfo(t, f, bound)
@@ -166,14 +167,18 @@ func TestAdminKingRecruitOnceRepeatOwnershipAndCounters(t *testing.T) {
 				}
 				return
 			}
-			if info.GetOn() != 1 || info.GetLuck() != 10 {
-				t.Fatal("new repeat occurrence reset global luck or remained closed", info)
+			wantLuck := int32(0)
+			if info.GetSpace() == priorWorld {
+				wantLuck = 10
+			}
+			if info.GetOn() != 1 || info.GetLuck() != wantLuck {
+				t.Fatal("repeat occurrence did not retain its own world luck", info)
 			}
 			if _, err := f.s.warriorRecruit(bound, f.id, p2Recruit(1, 0), 95102); err != nil {
 				t.Fatal(err)
 			}
 			info = adminKingInfo(t, f, bound)
-			if info.GetLuck() != 20 || info.GetLeftTimes() != 49 {
+			if info.GetLuck() != wantLuck+10 || info.GetLeftTimes() != 49 {
 				t.Fatal("repeat date broke native global accounting", info)
 			}
 		})

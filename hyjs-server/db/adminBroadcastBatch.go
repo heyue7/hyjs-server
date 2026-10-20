@@ -1,11 +1,12 @@
 package db
 
-// AdminBroadcastBatch freezes an operator preview before any original mail is sent.
+// AdminBroadcastBatch freezes an operator preview before original reward-center deliveries are committed.
 type AdminBroadcastBatch struct {
 	ID              string  `gorm:"primaryKey;size:36" json:"id"`
 	ServerID        int64   `gorm:"not null;index" json:"serverId"`
 	ActorID         int64   `gorm:"not null;index" json:"actorId"`
 	ActorName       string  `gorm:"size:80;not null" json:"actorName"`
+	AudienceMode    string  `gorm:"size:16;not null;default:all" json:"audienceMode"`
 	Title           string  `gorm:"size:191;not null" json:"title"`
 	Body            string  `gorm:"type:text;not null" json:"body"`
 	Rewards         string  `gorm:"type:text;not null" json:"-"`

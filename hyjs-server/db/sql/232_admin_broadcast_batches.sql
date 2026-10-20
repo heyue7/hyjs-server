@@ -3,6 +3,7 @@ CREATE TABLE IF NOT EXISTS admin_broadcast_batches (
   server_id BIGINT NOT NULL,
   actor_id BIGINT NOT NULL,
   actor_name VARCHAR(80) NOT NULL,
+  audience_mode VARCHAR(16) NOT NULL DEFAULT 'all',
   title VARCHAR(191) NOT NULL,
   body TEXT NOT NULL,
   rewards TEXT NOT NULL,

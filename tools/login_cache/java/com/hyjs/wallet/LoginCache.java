@@ -75,8 +75,8 @@ public final class LoginCache {
             if(!prefs().edit().putString("ciphertext",Base64.encodeToString(encrypted,Base64.NO_WRAP)).putString("iv",Base64.encodeToString(cipher.getIV(),Base64.NO_WRAP)).commit())throw new Exception();
         }catch(Exception failed){clear();remember=false;automatic=false;toast("密码未能加密保存，请手动登录");}
     }
-    public static synchronized String username(){load();return remember?savedUser:"";}
-    public static synchronized String password(){load();return remember?savedPassword:"";}
+    public static synchronized String username(){load();return !returnUser.isEmpty()?returnUser:(remember?savedUser:"");}
+    public static synchronized String password(){load();String result=!returnUser.isEmpty()?returnPass:(remember?savedPassword:"");returnUser="";returnPass="";return result;}
     public static synchronized String transientUserName(){return transientUser;}
     public static synchronized String transientPassWord(){return transientPassword;}
     public static synchronized void setTransientUserName(String value){transientUser=value==null?"":value;}
@@ -89,55 +89,12 @@ public final class LoginCache {
         formUser=username.getText().toString();formPass=password.getText().toString();
     }
     private static synchronized void manual(){autoAttempt=false;suppressed=true;}
-    public static void reopen(){String target;synchronized(LoginCache.class){target=owner;}if(target!=null&&!target.isEmpty())show(target);}
+    public static void reopen(){String target;synchronized(LoginCache.class){target=owner;}if(target!=null&&!target.isEmpty())send(target,"Show");}
     public static void registered(String username,String password){synchronized(LoginCache.class){returnUser=username;returnPass=password;}reopen();}
-    public static synchronized void show(String object){
-        load();owner=object;final String target=object;
-        automatic=false;autoAttempt=false;
-        UI.post(()->{
-            hideNow();try{
-                Activity a=activity();if(a==null||a.isFinishing())return;
-                final Dialog opened=new Dialog(a);opened.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE);
-                final LinearLayout body=LoginStyle.body(a,"账号登录");
-                final EditText username=LoginStyle.field(a,body,"请输入账号",false);
-                final EditText password=LoginStyle.field(a,body,"请输入密码",true);
-                password.setImeOptions(EditorInfo.IME_ACTION_DONE|EditorInfo.IME_FLAG_NO_EXTRACT_UI);
-                synchronized(LoginCache.class){
-                    username.setText(!returnUser.isEmpty()?returnUser:(remember?savedUser:""));
-                    password.setText(!returnUser.isEmpty()?returnPass:(remember?savedPassword:""));
-                    returnUser="";returnPass="";updateForm(username,password);
-                }
-                TextWatcher watcher=new TextWatcher(){
-                    public void beforeTextChanged(CharSequence text,int start,int count,int after){}
-                    public void onTextChanged(CharSequence text,int start,int before,int count){synchronized(LoginCache.class){if(dialog==opened)updateForm(username,password);}}
-                    public void afterTextChanged(Editable text){}
-                };
-                username.addTextChangedListener(watcher);password.addTextChangedListener(watcher);
-                row=new LinearLayout(a);row.setOrientation(LinearLayout.HORIZONTAL);row.setGravity(android.view.Gravity.CENTER_VERTICAL);
-                rememberBox=box(a,"记住密码");
-                rememberBox.setChecked(remember);
-                row.addView(rememberBox,new LinearLayout.LayoutParams(0,LoginStyle.dp(a,46),1f));
-                body.addView(row,new LinearLayout.LayoutParams(-1,LoginStyle.dp(a,48)));
-                rememberBox.setOnCheckedChangeListener((button,checked)->{synchronized(LoginCache.class){remember=checked;if(!checked){automatic=false;clear();}}});
-                Button login=LoginStyle.button(a,"登 录",true);
-                LinearLayout.LayoutParams loginLayout=new LinearLayout.LayoutParams(-1,LoginStyle.dp(a,44));loginLayout.topMargin=LoginStyle.dp(a,4);body.addView(login,loginLayout);
-                LinearLayout actions=new LinearLayout(a);actions.setOrientation(LinearLayout.HORIZONTAL);
-                Button close=LoginStyle.button(a,"返回",false),register=LoginStyle.button(a,"注册账号",false);
-                LinearLayout.LayoutParams actionLayout=new LinearLayout.LayoutParams(0,LoginStyle.dp(a,38),1f);actionLayout.topMargin=LoginStyle.dp(a,8);
-                actions.addView(close,actionLayout);LinearLayout.LayoutParams registerLayout=new LinearLayout.LayoutParams(0,LoginStyle.dp(a,38),1f);registerLayout.topMargin=LoginStyle.dp(a,8);registerLayout.leftMargin=LoginStyle.dp(a,12);actions.addView(register,registerLayout);
-                body.addView(actions,new LinearLayout.LayoutParams(-1,-2));
-                login.setOnClickListener(view->{manual();send(target,"OnLoginButton");});
-                password.setOnEditorActionListener((text,action,event)->{if(action==EditorInfo.IME_ACTION_DONE){manual();send(target,"OnLoginButton");return true;}return false;});
-                register.setOnClickListener(view->{manual();send(target,"OnRegistButtonClick");});
-                close.setOnClickListener(view->{manual();send(target,"OnCloseButtonClick");});
-                opened.setContentView(LoginStyle.panel(a,body));opened.setCanceledOnTouchOutside(false);
-                opened.setOnCancelListener(ignored->{manual();send(target,"OnCloseButtonClick");});
-                opened.setOnDismissListener(ignored->{synchronized(LoginCache.class){if(dialog==opened){dialog=null;formVisible=false;formUser="";formPass="";row=null;rememberBox=null;}}username.setText("");password.setText("");});
-                synchronized(LoginCache.class){dialog=opened;formVisible=true;}
-                opened.show();LoginStyle.fit(a,opened);body.setFocusableInTouchMode(true);body.requestFocus();
-            }catch(Exception unavailable){fail();}
-        });
-    }
+    // Unity owns the original account panel. Java retains only the encrypted cache and attempt guard.
+    public static synchronized void show(String object){load();owner=object;automatic=false;autoAttempt=false;formVisible=false;}
+    public static synchronized boolean rememberEnabled(){load();return remember;}
+    public static synchronized void setRemember(boolean value){load();remember=value;if(!value){automatic=false;clear();}}
     private static CheckBox box(Activity a,String title){CheckBox result=new CheckBox(a);result.setText(title);result.setTextColor(LoginStyle.INK);result.setTextSize(15);result.setPadding(LoginStyle.dp(a,2),0,LoginStyle.dp(a,8),0);result.setButtonTintList(android.content.res.ColorStateList.valueOf(LoginStyle.BLUE));return result;}
     private static void hideNow(){Dialog previous;synchronized(LoginCache.class){previous=dialog;dialog=null;formVisible=false;formUser="";formPass="";row=null;rememberBox=null;}if(previous!=null)previous.dismiss();}
     public static void hide(){UI.post(()->hideNow());}

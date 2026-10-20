@@ -1,10 +1,11 @@
 package model
 
-// AdminBroadcastPreviewRequest freezes the selected realm's current characters and attachment.
+// AdminBroadcastPreviewRequest freezes the selected realm's audience and reward-center attachment.
 type AdminBroadcastPreviewRequest struct {
 	RequestID string                `json:"requestId" binding:"required"` // RequestID is the preview UUID; retries must keep the same content.
-	Title     string                `json:"title" binding:"required"`     // Title is the original system mail title.
-	Body      string                `json:"body" binding:"required"`      // Body is the original mail text.
+	Audience  AdminAudience         `json:"audience" binding:"required"`  // Audience selects all players across pages or an explicit player subset.
+	Title     string                `json:"title" binding:"required"`     // Title is the exact reward-center title.
+	Body      string                `json:"body" binding:"required"`      // Body is the exact reward-center description.
 	Rewards   []AdminResourceAmount `json:"rewards" binding:"required"`   // Rewards contains 1..100 distinct original resources.
 	Reason    string                `json:"reason" binding:"required"`    // Reason is retained in operation audit.
 }
@@ -15,19 +16,20 @@ type AdminBroadcastSendRequest struct {
 	Version   string `json:"version" binding:"required"`   // Version binds the reviewed content and frozen audience.
 }
 
-// AdminBroadcastDTO describes a preview or committed delivery batch without credentials.
+// AdminBroadcastDTO describes a preview or committed reward-center delivery batch without credentials.
 type AdminBroadcastDTO struct {
 	ID             string                `json:"id"`             // ID is the preview/batch UUID.
 	ServerID       int64                 `json:"serverId"`       // ServerID is the actual serving realm.
 	ServerName     string                `json:"serverName"`     // ServerName is the current realm label.
 	ActorName      string                `json:"actorName"`      // ActorName identifies the operator.
-	Title          string                `json:"title"`          // Title is the exact frozen mail title.
-	Body           string                `json:"body"`           // Body is the frozen original mail body.
+	AudienceMode   string                `json:"audienceMode"`   // AudienceMode is all=全部玩家，players=指定玩家；历史批次为空时按all展示。
+	Title          string                `json:"title"`          // Title is the exact frozen reward-center title.
+	Body           string                `json:"body"`           // Body is the frozen reward-center description.
 	Rewards        []AdminResourceAmount `json:"rewards"`        // Rewards is the same attachment for every recipient.
 	Reason         string                `json:"reason"`         // Reason records the operator's purpose.
-	RecipientCount int64                 `json:"recipientCount"` // RecipientCount is the frozen number of created, unprotected characters.
-	ExcludedCount  int64                 `json:"excludedCount"`  // ExcludedCount counts protected characters omitted from the preview.
-	SuccessCount   int64                 `json:"successCount"`   // SuccessCount counts committed original reward notices.
+	RecipientCount int64                 `json:"recipientCount"` // RecipientCount is the frozen number of created, unprotected, enabled characters.
+	ExcludedCount  int64                 `json:"excludedCount"`  // ExcludedCount counts frozen or protected characters omitted from the preview.
+	SuccessCount   int64                 `json:"successCount"`   // SuccessCount counts committed original reward-center deliveries.
 	CreatedAt      int64                 `json:"createdAt"`      // CreatedAt is real preview time in milliseconds.
 	ExpiresAt      int64                 `json:"expiresAt"`      // ExpiresAt is the send-preview deadline, not an attachment expiry.
 	SentAt         int64                 `json:"sentAt"`         // SentAt=0 means not sent; positive means the entire batch committed.

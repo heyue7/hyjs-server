@@ -183,6 +183,7 @@ const routeMap: RouteMap = {
   "iframe-page": "/iframe-page/:url",
   "items": "/items",
   "login": "/login/:module(pwd-login|code-login|register|reset-pwd|bind-wechat)?",
+  "mail": "/mail",
   "players": "/players",
   "server-clock": "/server-clock",
   "servers": "/servers",

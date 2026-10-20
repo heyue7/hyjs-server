@@ -18,8 +18,8 @@ func RegisterAdminBroadcastRoutes(a *gin.RouterGroup) {
 }
 
 // AdminBroadcastListHandler reads committed realm-owned compensation receipts.
-// @Summary 本服群发批次
-// @Description 仅显示顶部所选真实运行区服已提交的群发批次
+// @Summary 本服群发补偿批次
+// @Description 仅显示顶部所选真实运行区服已提交到原领奖中心的补偿批次
 // @Tags Admin
 // @Accept json
 // @Produce json
@@ -43,13 +43,13 @@ func AdminBroadcastListHandler(c *gin.Context) {
 }
 
 // AdminBroadcastPreviewHandler freezes the current audience without delivering attachments.
-// @Summary 预览本服群发
-// @Description 冻结当前已建角色和奖励，保护账号不在收件范围；预览15分钟有效
+// @Summary 预览本服群发补偿
+// @Description 按全部玩家（跨分页）或勾选玩家冻结收件角色和领奖中心附件，冻结/保护账号排除；预览15分钟有效
 // @Tags Admin
 // @Accept json
 // @Produce json
 // @Param serverId query integer true "区服"
-// @Param body body model.AdminBroadcastPreviewRequest true "邮件标题正文附件及预览UUID"
+// @Param body body model.AdminBroadcastPreviewRequest true "补偿标题正文附件、收件范围及预览UUID"
 // @Success 200 {object} model.AdminBroadcastPreviewResponse
 // @Router /admin/api/broadcast/preview [post]
 func AdminBroadcastPreviewHandler(c *gin.Context) {
@@ -62,7 +62,12 @@ func AdminBroadcastPreviewHandler(c *gin.Context) {
 	req.Title = strings.TrimSpace(req.Title)
 	req.Body = strings.TrimSpace(req.Body)
 	req.Reason = strings.TrimSpace(req.Reason)
+	req.Audience.Mode = strings.TrimSpace(req.Audience.Mode)
 	if err != nil || id == uuid.Nil || req.Title == "" || len(req.Title) > 191 || strings.ContainsAny(req.Title, "\r\n\x00") || req.Body == "" || len(req.Body) > 16384 || strings.ContainsRune(req.Body, '\x00') || req.Reason == "" || len(req.Reason) > 1000 || len(req.Rewards) < 1 || len(req.Rewards) > 100 {
+		adminError(c, constUtil.ErrAdminInput)
+		return
+	}
+	if !adminAudienceInputValid(req.Audience.Mode, req.Audience.PlayerIDs) {
 		adminError(c, constUtil.ErrAdminInput)
 		return
 	}
@@ -85,7 +90,7 @@ func AdminBroadcastPreviewHandler(c *gin.Context) {
 
 // AdminBroadcastSendHandler explicitly confirms exactly one reviewed immutable audience.
 // @Summary 确认群发补偿
-// @Description 与预览绑定且同事务生成原系统邮件和领奖中心附件；同UUID重试不会重复发放
+// @Description 与预览绑定且同事务写入原领奖中心待领附件；不生成系统邮件，同UUID重试不会重复发放
 // @Tags Admin
 // @Accept json
 // @Produce json
@@ -114,4 +119,26 @@ func AdminBroadcastSendHandler(c *gin.Context) {
 		return
 	}
 	adminSuccess(c, out)
+}
+
+// adminAudienceInputValid validates the shared all-or-explicit player selection contract.
+func adminAudienceInputValid(mode string, playerIDs []int64) bool {
+	switch mode {
+	case constUtil.AdminAudienceModeAll:
+		return len(playerIDs) == 0
+	case constUtil.AdminAudienceModePlayers:
+		if len(playerIDs) < 1 || len(playerIDs) > constUtil.AdminAudienceMaximumPlayers {
+			return false
+		}
+		seen := make(map[int64]bool, len(playerIDs))
+		for _, id := range playerIDs {
+			if id < 1 || seen[id] {
+				return false
+			}
+			seen[id] = true
+		}
+		return true
+	default:
+		return false
+	}
 }

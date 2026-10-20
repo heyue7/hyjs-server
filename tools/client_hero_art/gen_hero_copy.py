@@ -1,0 +1,166 @@
+"""Emit the single hero-copy source as a C# table; no table or server writes."""
+import json
+import re
+import sys
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+COPY = HERE / 'hero_copy.json'
+OUTPUT = HERE / 'HeroCopyTable.g.cs'
+IDS = ('069', '070', '073')
+WORLD_PREFIX = {'069': '刀剑神域', '070': '精灵神域', '073': '枪战神域'}
+
+
+def fail(message):
+    raise SystemExit(message)
+
+
+def escape(value):
+    return value.replace('\\', '\\\\').replace('"', '\\"')
+
+
+def load():
+    data = json.loads(COPY.read_text())
+    if data.get('schema') != 'hyjs-three-hero-copy-v1':
+        fail('Unexpected copy schema')
+    heroes = data['heroes']
+    if tuple(hero['id'] for hero in heroes) != IDS:
+        fail('Copy heroes differ from 069/070/073')
+    text = {row['id']: row['text'] for row in data['tableTextProposal']}
+    totals = {row['skill']: row['new'] for row in data['tableSkillCastProposal']['skillTotals']}
+    rows = data['tableSkillCastProposal']['rows']
+    entries = []
+    for hero in heroes:
+        ident = hero['id']
+        intro = hero['intro']
+        if not 60 <= len(intro) <= 100:
+            fail('Intro length outside 60..100 for ' + ident + ': ' + str(len(intro)))
+        if WORLD_PREFIX[ident] not in intro:
+            fail('Intro world binding missing for ' + ident)
+        if '原客户端未提供' in intro or '待补' in intro:
+            fail('Placeholder text in intro ' + ident)
+        if text.get('desc_hero_' + ident) != intro:
+            fail('intro/tableTextProposal mismatch ' + ident)
+        for index, skill in enumerate(hero['skills'], 1):
+            if skill['slot'] != index:
+                fail('Skill slot order differs ' + ident)
+            name_key = 'name_skill_%s_%d' % (ident, index)
+            desc_key = 'desc_skill_%s_%d' % (ident, index)
+            if text.get(name_key) != skill['name'] or text.get(desc_key) != skill['text']:
+                fail('skill/tableTextProposal mismatch ' + desc_key)
+            if len(skill['name']) < 4 or len(skill['name']) > 12:
+                fail('Skill name length differs ' + name_key)
+            if '前排单体' not in skill['text']:
+                fail('Skill target mechanism missing ' + desc_key)
+            numbers = re.findall(r'造成(\d+)%', skill['text'])
+            if skill.get('ultimate'):
+                if '{0}' not in skill['text'] or numbers:
+                    fail('Ultimate must keep the {0} placeholder ' + desc_key)
+            else:
+                if numbers != [str(totals[ident + '_' + str(index)])]:
+                    fail('Skill damage text differs from the row proposal ' + desc_key)
+    seen = {}
+    for row in rows:
+        seen[row['skill']] = seen.get(row['skill'], 0) + row['new']
+        if not isinstance(row['id'], int) or not isinstance(row['new'], int) or row['new'] < 1:
+            fail('Bad cast row ' + str(row))
+    for skill, total in totals.items():
+        if seen.get(skill) != total:
+            fail('Cast proposal total differs %s: %s != %s' % (skill, seen.get(skill), total))
+    return entries_text(data), data
+
+
+def entries_text(data):
+    keys, values = [], []
+    for hero in data['heroes']:
+        keys.append('desc_hero_' + hero['id'])
+        values.append(hero['intro'])
+        for index, skill in enumerate(hero['skills'], 1):
+            keys.append('name_skill_%s_%d' % (hero['id'], index))
+            values.append(skill['name'])
+            keys.append('desc_skill_%s_%d' % (hero['id'], index))
+            values.append(skill['text'])
+    lines = []
+    for key, value in zip(keys, values):
+        lines.append('            "%s",' % escape(key))
+    body = ['        internal static readonly string[] Keys = new string[] {', *lines, '        };']
+    lines = []
+    for value in values:
+        lines.append('            "%s",' % escape(value))
+    body += ['        internal static readonly string[] Values = new string[] {', *lines, '        };']
+    return '\n'.join(body)
+
+
+def factor_body(data):
+    cases = []
+    for row in data['tableSkillCastProposal']['rows']:
+        cases.append('                case "{id}": skill="{skill}"; factor={new}; break;'.format(**row))
+    return '''
+        internal static void Adjust(Dict.DataModel.TableSkillCast row)
+        {
+            string skill; double factor;
+            switch(row.SkillCastId)
+            {
+%s
+                default: return;
+            }
+            if(row.SkillId!=skill || (row.ExportFactor!=1 && row.ExportFactor!=factor))
+                throw new System.InvalidOperationException("Orange skill compatibility input differs");
+            row.ExportFactor=factor;
+        }
+''' % '\n'.join(cases)
+
+
+def emit_server(data):
+    target=HERE.parents[1]/'hyjs-server/service/threeOrangeSkillFactorsService.go'
+    specs='\n'.join('        {"%s", "%s", "%s"},' % (r['id'],r['skill'],r['new']) for r in data['tableSkillCastProposal']['rows'])
+    target.write_text('''// Code generated by tools/client_hero_art/gen_hero_copy.py --server; DO NOT EDIT.
+package service
+import "hyjs-server/constUtil"
+
+// ApplyThreeOrangeSkillFactors corrects only the authored three orange partners before any game requests.
+// The original recovered TSVs remain source evidence; each runtime consumer uses the same 30-row projection.
+func (s *GameService) ApplyThreeOrangeSkillFactors() error {
+    specs:=[]struct{id,skill,factor string}{
+%s
+    }
+    // Validate every original row before changing the startup configuration.
+    for _,spec:=range specs{
+        row:=s.table("SkillCast","SkillCastId",spec.id)
+        if row==nil || row["SkillId"]!=spec.skill || (row["ExportFactor"]!="1" && row["ExportFactor"]!=spec.factor){return constUtil.ErrAdminConfiguration}
+    }
+    for _,spec:=range specs{s.table("SkillCast","SkillCastId",spec.id)["ExportFactor"]=spec.factor}
+    return nil
+}
+''' % specs)
+    return target
+
+
+def main(server=False):
+    body, data = load()
+    text = '''// Generated by gen_hero_copy.py from hero_copy.json; do not edit by hand.
+namespace HYJS.HeroArt
+{
+    internal static class HeroCopyTable
+    {
+%s
+
+        internal static string Get(string key)
+        {
+            if (string.IsNullOrEmpty(key)) return null;
+            for (int index = 0; index < Keys.Length; index++)
+                if (Keys[index] == key) return Values[index];
+            return null;
+        }
+
+        internal static int Count { get { return Keys.Length; } }
+    }
+}
+''' % (body + factor_body(data))
+    OUTPUT.write_text(text)
+    if server: emit_server(data)
+    print(json.dumps({'output': str(OUTPUT), 'keys': len(data['tableTextProposal']), 'serverGenerated': server}, ensure_ascii=False))
+
+
+if __name__ == '__main__':
+    main('--server' in sys.argv)

@@ -229,6 +229,7 @@ const local: App.I18n.Schema = {
     activities: '活动设置',
     announcements: '公告管理',
     broadcast: '群发补偿',
+    mail: '发送邮件',
     'daily-sign': '每日签到',
     audit: '操作审计',
     users: '后台账号',

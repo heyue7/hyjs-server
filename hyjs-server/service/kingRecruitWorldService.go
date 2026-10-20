@@ -151,7 +151,7 @@ func (s *GameService) KingRecruitWorlds(ctx context.Context, id int64, session [
 		return nil, err
 	}
 	out := &model.KingRecruitWorldsResponse{Worlds: []model.KingRecruitWorld{}}
-	err = updateProfileWithTx(ctx, id, func(tx *gorm.DB, _ *pb.Player, _ *model.GameState) error {
+	err = updateProfileWithTx(ctx, id, func(tx *gorm.DB, _ *pb.Player, g *model.GameState) error {
 		var current db.Profile
 		if err := tx.Select("id", "session", "server_id").First(&current, id).Error; err != nil {
 			return err
@@ -168,6 +168,37 @@ func (s *GameService) KingRecruitWorlds(ctx context.Context, id int64, session [
 		err = tx.First(&selected, "player_id=?", id).Error
 		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 			return err
+		}
+		// 切换前把旧共享幸运值归入原选择世界，防止首次切换复制或转移余额。
+		if g.KingRecruitLuck == nil {
+			_, world, _, err := s.kingConfiguration(tx, LocalPlayNow(ctx))
+			if err != nil {
+				return err
+			}
+			if selected.PoolID != "" && tx.Migrator().HasTable(&db.KingRecruitActivitySnapshot{}) {
+				var snapshot db.KingRecruitActivitySnapshot
+				loadErr := tx.First(&snapshot, "pool_id=?", selected.PoolID).Error
+				if loadErr == nil {
+					var source adminKingRecruitSource
+					if json.Unmarshal(snapshot.Payload, &source) != nil {
+						return constUtil.ErrAdminConfiguration
+					}
+					if source.World > 0 {
+						world = int32(source.World)
+					}
+				} else if !errors.Is(loadErr, gorm.ErrRecordNotFound) {
+					return loadErr
+				}
+			} else if selected.PoolID == "" && len(candidates) > 0 && candidates[0].World > 0 {
+				world = int32(candidates[0].World)
+			}
+			legacy, err := kingState(tx, id, LocalPlayNow(ctx))
+			if err != nil {
+				return err
+			}
+			if _, err := kingWorldLuck(g, world, legacy.Luck); err != nil {
+				return err
+			}
 		}
 		present := false
 		for _, candidate := range candidates {

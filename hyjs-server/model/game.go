@@ -27,16 +27,18 @@ type GameState struct {
 	// WarriorBagCapacityScale reads the unreleased hero-only fivefold candidate without multiplying it again.
 	WarriorBagCapacityScale int32 `json:"warrior_bag_capacity_scale,omitempty"`
 	// Guild prayer attributes are recaptured from the current transaction and never persisted.
-	GuildPrayerProjection   *P5GuildPrayerProjection           `json:"-"`
-	CopySweepReceipt        *CopySweepReceipt                  `json:"copy_sweep_receipt,omitempty"`
-	SkillSpecialtyReceipts  map[string]*SkillSpecialtyReceipt  `json:"skill_specialty_receipts,omitempty"`
-	TreasureBoxReceipt      *TreasureBoxReceipt                `json:"treasure_box_receipt,omitempty"`
-	TreasureCombineReceipt  *TreasureCombineReceipt            `json:"treasure_combine_receipt,omitempty"`
-	TreasureRefineReceipts  map[string]*TreasureRefineReceipt  `json:"treasure_refine_receipts,omitempty"`
-	Treasures               []*pb.Treasure                     `json:"treasures,omitempty"`
-	Gems                    []*pb.SimpleItem                   `json:"gems,omitempty"`
-	Cooking                 []*pb.SimpleItem                   `json:"cooking,omitempty"`
-	Recruit                 map[int32]*RecruitState            `json:"recruit,omitempty"`
+	GuildPrayerProjection  *P5GuildPrayerProjection          `json:"-"`
+	CopySweepReceipt       *CopySweepReceipt                 `json:"copy_sweep_receipt,omitempty"`
+	SkillSpecialtyReceipts map[string]*SkillSpecialtyReceipt `json:"skill_specialty_receipts,omitempty"`
+	TreasureBoxReceipt     *TreasureBoxReceipt               `json:"treasure_box_receipt,omitempty"`
+	TreasureCombineReceipt *TreasureCombineReceipt           `json:"treasure_combine_receipt,omitempty"`
+	TreasureRefineReceipts map[string]*TreasureRefineReceipt `json:"treasure_refine_receipts,omitempty"`
+	Treasures              []*pb.Treasure                    `json:"treasures,omitempty"`
+	Gems                   []*pb.SimpleItem                  `json:"gems,omitempty"`
+	Cooking                []*pb.SimpleItem                  `json:"cooking,omitempty"`
+	Recruit                map[int32]*RecruitState           `json:"recruit,omitempty"`
+	// KingRecruitLuck 保存三个世界各自的幸运值；nil 仅用于一次性迁移旧共享余额。
+	KingRecruitLuck         map[int32]int32                    `json:"king_recruit_luck,omitempty"`
 	EquipmentRefineReceipts map[string]*EquipmentRefineReceipt `json:"equipment_refine_receipts,omitempty"`
 	EquipmentStarReceipts   map[string]*EquipmentStarReceipt   `json:"equipment_star_receipts,omitempty"`
 	Field                   *FieldState                        `json:"field,omitempty"`

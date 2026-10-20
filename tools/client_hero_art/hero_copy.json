@@ -1,0 +1,449 @@
+{
+  "schema": "hyjs-three-hero-copy-v1",
+  "note": "本轮原创文案：只依据本包模型、世界归属与技能动作写，不绑定正传人物亲属/公会/剧情。Root 的 host-research.md 记录未能找到可与 hero069/070/073 资源绑定的官方简介。",
+  "worlds": {
+    "1": "SAO",
+    "2": "ALO",
+    "3": "GGO"
+  },
+  "heroes": [
+    {
+      "id": "069",
+      "name": "凪",
+      "world": 1,
+      "intro": "刀剑神域世界中以薙刀为武器的白衣武者，发间系着红色注连绳。她习惯从敌方前排撕开缺口，三段连击节奏稳定，是队伍里沉默可靠的开路者。",
+      "skills": [
+        {
+          "slot": 1,
+          "name": "薙刀·三段突",
+          "text": "对敌方前排单体造成100%攻击伤害，薙刀连刺三段，伤害分摊在每一次突刺上。"
+        },
+        {
+          "slot": 2,
+          "name": "薙刀·回旋薙",
+          "text": "对敌方前排单体造成100%攻击伤害，回旋横扫共四段，落点始终集中在同一目标。"
+        },
+        {
+          "slot": 3,
+          "name": "神乐·薙刀乱舞",
+          "text": "对敌方前排单体造成{0}%攻击伤害，前两段薙击牵制走位，最后一斩承接主要伤害。",
+          "ultimate": true
+        }
+      ]
+    },
+    {
+      "id": "070",
+      "name": "罗亚",
+      "world": 2,
+      "intro": "精灵神域的薄翼枪手，身形轻盈，能在空中迅速变向。她以三叉长枪在中距离连续突刺，出手落点分散，让对手难以判断下一枪会从哪个方向刺来。",
+      "skills": [
+        {
+          "slot": 1,
+          "name": "长枪·三连刺",
+          "text": "对敌方前排单体造成100%攻击伤害，三叉长枪连续刺出三次。"
+        },
+        {
+          "slot": 2,
+          "name": "长枪·五月雨突",
+          "text": "对敌方前排单体造成100%攻击伤害，五段突刺如五月雨般接连落下。"
+        },
+        {
+          "slot": 3,
+          "name": "翔空·三叉贯心枪",
+          "text": "对敌方前排单体造成{0}%攻击伤害，前段轻刺牵制走位，最后一击贯穿目标。",
+          "ultimate": true
+        }
+      ]
+    },
+    {
+      "id": "073",
+      "name": "克洛维",
+      "world": 3,
+      "intro": "枪战神域世界的狙击手，背着长管狙击枪在掩体间穿行，只为等待一个一击定胜负的角度。她单次出手的伤害集中在最后一发子弹上，得手后立刻收枪转移。",
+      "skills": [
+        {
+          "slot": 1,
+          "name": "狙击·定点射击",
+          "text": "对敌方前排单体造成100%攻击伤害，单发狙击一击命中。"
+        },
+        {
+          "slot": 2,
+          "name": "狙击·四连点射",
+          "text": "对敌方前排单体造成100%攻击伤害，四连点射依次落在同一目标身上。"
+        },
+        {
+          "slot": 3,
+          "name": "狙击·绝命一击",
+          "text": "对敌方前排单体造成{0}%攻击伤害，蓄力后以一发狙击决出胜负。",
+          "ultimate": true
+        }
+      ]
+    }
+  ],
+  "tableTextProposal": [
+    {
+      "id": "desc_hero_069",
+      "text": "刀剑神域世界中以薙刀为武器的白衣武者，发间系着红色注连绳。她习惯从敌方前排撕开缺口，三段连击节奏稳定，是队伍里沉默可靠的开路者。"
+    },
+    {
+      "id": "desc_hero_070",
+      "text": "精灵神域的薄翼枪手，身形轻盈，能在空中迅速变向。她以三叉长枪在中距离连续突刺，出手落点分散，让对手难以判断下一枪会从哪个方向刺来。"
+    },
+    {
+      "id": "desc_hero_073",
+      "text": "枪战神域世界的狙击手，背着长管狙击枪在掩体间穿行，只为等待一个一击定胜负的角度。她单次出手的伤害集中在最后一发子弹上，得手后立刻收枪转移。"
+    },
+    {
+      "id": "name_skill_069_1",
+      "text": "薙刀·三段突"
+    },
+    {
+      "id": "name_skill_069_2",
+      "text": "薙刀·回旋薙"
+    },
+    {
+      "id": "name_skill_069_3",
+      "text": "神乐·薙刀乱舞"
+    },
+    {
+      "id": "name_skill_070_1",
+      "text": "长枪·三连刺"
+    },
+    {
+      "id": "name_skill_070_2",
+      "text": "长枪·五月雨突"
+    },
+    {
+      "id": "name_skill_070_3",
+      "text": "翔空·三叉贯心枪"
+    },
+    {
+      "id": "name_skill_073_1",
+      "text": "狙击·定点射击"
+    },
+    {
+      "id": "name_skill_073_2",
+      "text": "狙击·四连点射"
+    },
+    {
+      "id": "name_skill_073_3",
+      "text": "狙击·绝命一击"
+    },
+    {
+      "id": "desc_skill_069_1",
+      "text": "对敌方前排单体造成100%攻击伤害，薙刀连刺三段，伤害分摊在每一次突刺上。"
+    },
+    {
+      "id": "desc_skill_069_2",
+      "text": "对敌方前排单体造成100%攻击伤害，回旋横扫共四段，落点始终集中在同一目标。"
+    },
+    {
+      "id": "desc_skill_069_3",
+      "text": "对敌方前排单体造成{0}%攻击伤害，前两段薙击牵制走位，最后一斩承接主要伤害。"
+    },
+    {
+      "id": "desc_skill_070_1",
+      "text": "对敌方前排单体造成100%攻击伤害，三叉长枪连续刺出三次。"
+    },
+    {
+      "id": "desc_skill_070_2",
+      "text": "对敌方前排单体造成100%攻击伤害，五段突刺如五月雨般接连落下。"
+    },
+    {
+      "id": "desc_skill_070_3",
+      "text": "对敌方前排单体造成{0}%攻击伤害，前段轻刺牵制走位，最后一击贯穿目标。"
+    },
+    {
+      "id": "desc_skill_073_1",
+      "text": "对敌方前排单体造成100%攻击伤害，单发狙击一击命中。"
+    },
+    {
+      "id": "desc_skill_073_2",
+      "text": "对敌方前排单体造成100%攻击伤害，四连点射依次落在同一目标身上。"
+    },
+    {
+      "id": "desc_skill_073_3",
+      "text": "对敌方前排单体造成{0}%攻击伤害，蓄力后以一发狙击决出胜负。"
+    }
+  ],
+  "tableSkillCastProposal": {
+    "note": "只改30行ExportFactor。普通技总量100参考橙卡hero_010的010_1/010_2，必杀总量620及每级12参考同为前排单体物理的010_3。保留段数、原动作时间、目标、伤害类型与其他字段。",
+    "rows": [
+      {
+        "id": 1560,
+        "skill": "069_1",
+        "old": 1,
+        "new": 33,
+        "donor": "橙卡hero_010 010_1/010_2 total 100"
+      },
+      {
+        "id": 1561,
+        "skill": "069_1",
+        "old": 1,
+        "new": 33,
+        "donor": "橙卡hero_010 010_1/010_2 total 100"
+      },
+      {
+        "id": 1562,
+        "skill": "069_1",
+        "old": 1,
+        "new": 34,
+        "donor": "橙卡hero_010 010_1/010_2 total 100"
+      },
+      {
+        "id": 1563,
+        "skill": "069_2",
+        "old": 1,
+        "new": 25,
+        "donor": "橙卡hero_010 010_1/010_2 total 100"
+      },
+      {
+        "id": 1564,
+        "skill": "069_2",
+        "old": 1,
+        "new": 25,
+        "donor": "橙卡hero_010 010_1/010_2 total 100"
+      },
+      {
+        "id": 1565,
+        "skill": "069_2",
+        "old": 1,
+        "new": 25,
+        "donor": "橙卡hero_010 010_1/010_2 total 100"
+      },
+      {
+        "id": 1566,
+        "skill": "069_2",
+        "old": 1,
+        "new": 25,
+        "donor": "橙卡hero_010 010_1/010_2 total 100"
+      },
+      {
+        "id": 1567,
+        "skill": "069_3",
+        "old": 1,
+        "new": 1,
+        "donor": "橙卡hero_010 010_3 total 620, grow 12"
+      },
+      {
+        "id": 1568,
+        "skill": "069_3",
+        "old": 1,
+        "new": 1,
+        "donor": "橙卡hero_010 010_3 total 620, grow 12"
+      },
+      {
+        "id": 1569,
+        "skill": "069_3",
+        "old": 1,
+        "new": 618,
+        "donor": "橙卡hero_010 010_3 total 620, grow 12"
+      },
+      {
+        "id": 1570,
+        "skill": "070_1",
+        "old": 1,
+        "new": 33,
+        "donor": "橙卡hero_010 010_1/010_2 total 100"
+      },
+      {
+        "id": 1571,
+        "skill": "070_1",
+        "old": 1,
+        "new": 33,
+        "donor": "橙卡hero_010 010_1/010_2 total 100"
+      },
+      {
+        "id": 1572,
+        "skill": "070_1",
+        "old": 1,
+        "new": 34,
+        "donor": "橙卡hero_010 010_1/010_2 total 100"
+      },
+      {
+        "id": 1573,
+        "skill": "070_2",
+        "old": 1,
+        "new": 20,
+        "donor": "橙卡hero_010 010_1/010_2 total 100"
+      },
+      {
+        "id": 1574,
+        "skill": "070_2",
+        "old": 1,
+        "new": 20,
+        "donor": "橙卡hero_010 010_1/010_2 total 100"
+      },
+      {
+        "id": 1575,
+        "skill": "070_2",
+        "old": 1,
+        "new": 20,
+        "donor": "橙卡hero_010 010_1/010_2 total 100"
+      },
+      {
+        "id": 1576,
+        "skill": "070_2",
+        "old": 1,
+        "new": 20,
+        "donor": "橙卡hero_010 010_1/010_2 total 100"
+      },
+      {
+        "id": 1577,
+        "skill": "070_2",
+        "old": 1,
+        "new": 20,
+        "donor": "橙卡hero_010 010_1/010_2 total 100"
+      },
+      {
+        "id": 1578,
+        "skill": "070_3",
+        "old": 1,
+        "new": 1,
+        "donor": "橙卡hero_010 010_3 total 620, grow 12"
+      },
+      {
+        "id": 1579,
+        "skill": "070_3",
+        "old": 1,
+        "new": 1,
+        "donor": "橙卡hero_010 010_3 total 620, grow 12"
+      },
+      {
+        "id": 1580,
+        "skill": "070_3",
+        "old": 1,
+        "new": 1,
+        "donor": "橙卡hero_010 010_3 total 620, grow 12"
+      },
+      {
+        "id": 1581,
+        "skill": "070_3",
+        "old": 1,
+        "new": 1,
+        "donor": "橙卡hero_010 010_3 total 620, grow 12"
+      },
+      {
+        "id": 1582,
+        "skill": "070_3",
+        "old": 1,
+        "new": 1,
+        "donor": "橙卡hero_010 010_3 total 620, grow 12"
+      },
+      {
+        "id": 1583,
+        "skill": "070_3",
+        "old": 1,
+        "new": 615,
+        "donor": "橙卡hero_010 010_3 total 620, grow 12"
+      },
+      {
+        "id": 1643,
+        "skill": "073_1",
+        "old": 1,
+        "new": 100,
+        "donor": "橙卡hero_010 010_1/010_2 total 100"
+      },
+      {
+        "id": 1644,
+        "skill": "073_2",
+        "old": 1,
+        "new": 25,
+        "donor": "橙卡hero_010 010_1/010_2 total 100"
+      },
+      {
+        "id": 1645,
+        "skill": "073_2",
+        "old": 1,
+        "new": 25,
+        "donor": "橙卡hero_010 010_1/010_2 total 100"
+      },
+      {
+        "id": 1646,
+        "skill": "073_2",
+        "old": 1,
+        "new": 25,
+        "donor": "橙卡hero_010 010_1/010_2 total 100"
+      },
+      {
+        "id": 1647,
+        "skill": "073_2",
+        "old": 1,
+        "new": 25,
+        "donor": "橙卡hero_010 010_1/010_2 total 100"
+      },
+      {
+        "id": 1648,
+        "skill": "073_3",
+        "old": 1,
+        "new": 620,
+        "donor": "橙卡hero_010 010_3 total 620, grow 12"
+      }
+    ],
+    "skillTotals": [
+      {
+        "skill": "069_1",
+        "hits": 3,
+        "old": 3,
+        "new": 100,
+        "donor": "hero_010 quality20 / same physical front single target"
+      },
+      {
+        "skill": "069_2",
+        "hits": 4,
+        "old": 4,
+        "new": 100,
+        "donor": "hero_010 quality20 / same physical front single target"
+      },
+      {
+        "skill": "069_3",
+        "hits": 3,
+        "old": 3,
+        "new": 620,
+        "donor": "hero_010 quality20 / same physical front single target"
+      },
+      {
+        "skill": "070_1",
+        "hits": 3,
+        "old": 3,
+        "new": 100,
+        "donor": "hero_010 quality20 / same physical front single target"
+      },
+      {
+        "skill": "070_2",
+        "hits": 5,
+        "old": 5,
+        "new": 100,
+        "donor": "hero_010 quality20 / same physical front single target"
+      },
+      {
+        "skill": "070_3",
+        "hits": 6,
+        "old": 6,
+        "new": 620,
+        "donor": "hero_010 quality20 / same physical front single target"
+      },
+      {
+        "skill": "073_1",
+        "hits": 1,
+        "old": 1,
+        "new": 100,
+        "donor": "hero_010 quality20 / same physical front single target"
+      },
+      {
+        "skill": "073_2",
+        "hits": 4,
+        "old": 4,
+        "new": 100,
+        "donor": "hero_010 quality20 / same physical front single target"
+      },
+      {
+        "skill": "073_3",
+        "hits": 1,
+        "old": 1,
+        "new": 620,
+        "donor": "hero_010 quality20 / same physical front single target"
+      }
+    ]
+  }
+}

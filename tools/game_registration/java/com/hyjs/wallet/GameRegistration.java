@@ -97,6 +97,19 @@ public final class GameRegistration {
         dialog.show();LoginStyle.fit(activity,dialog);body.setFocusableInTouchMode(true);body.requestFocus();
     }
 
+    private static int nativeSerial;
+    private static int nativeState;
+    private static String nativeMessage="";
+    /** Return only this request's state; credentials stay in the worker's closure. */
+    public static synchronized int submitNative(final String origin,final String name,final String secret,final String confirmation){
+        final int request=++nativeSerial;nativeState=0;nativeMessage="正在注册…";
+        new Thread(()->{Result result=register(origin,name,"冒险者",secret,confirmation);synchronized(GameRegistration.class){if(request!=nativeSerial)return;nativeState=result.success?1:2;nativeMessage=result.message;}},"hyjs-register-native").start();
+        return request;
+    }
+    public static synchronized int nativeStatus(int request){return request==nativeSerial?nativeState:3;}
+    public static synchronized String nativeError(int request){return request==nativeSerial?nativeMessage:"注册请求已取消";}
+    public static synchronized void cancelNative(){++nativeSerial;nativeState=3;nativeMessage="";}
+
     private static final class Result {
         final boolean success; final String message;
         Result(boolean success, String message) { this.success=success; this.message=message; }

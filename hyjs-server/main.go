@@ -134,6 +134,9 @@ func run() error {
 	if err = s.ApplyP15GreenHeroCompatibility(); err != nil {
 		return err
 	}
+	if err = s.ApplyThreeOrangeSkillFactors(); err != nil {
+		return err
+	}
 	if err = s.InitializeGameplayPools(ctx); err != nil {
 		return err
 	}
@@ -429,6 +432,9 @@ func run() error {
 	}
 	// Compensation previews and delivery receipts are ready before operations requests arrive.
 	if err = s.InitializeAdminBroadcast(ctx); err != nil {
+		return err
+	}
+	if err = s.InitializeAdminMail(ctx); err != nil {
 		return err
 	}
 	httpListener, err := net.Listen("tcp", net.JoinHostPort(cfg.Bind, strconv.Itoa(cfg.HTTPPort)))

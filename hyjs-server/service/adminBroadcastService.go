@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -14,60 +13,16 @@ import (
 	"hyjs-server/model"
 )
 
-// InitializeAdminBroadcast adds only frozen previews and per-recipient original delivery receipts.
+// InitializeAdminBroadcast adds only frozen previews and per-recipient original reward-center receipts.
 func (s *GameService) InitializeAdminBroadcast(ctx context.Context) error {
 	return db.GetIns().WithContext(ctx).AutoMigrate(&db.AdminBroadcastBatch{}, &db.AdminBroadcastRecipient{})
 }
 
-func (s *GameService) adminBroadcastScope(ctx context.Context, tx *gorm.DB, actor *model.AdminPrincipal, write bool) (*db.AdminGameServer, error) {
-	if err := adminOperationUser(tx, actor, write); err != nil {
-		return nil, err
-	}
-	id := AdminSelectedServerID(ctx)
-	if id < 1 || id != s.OriginalServerID() {
-		return nil, constUtil.ErrAdminPermission
-	}
-	var realm db.AdminGameServer
-	if err := tx.First(&realm, id).Error; err != nil {
-		return nil, err
-	}
-	// Maintenance compensation must also work while normal realm login is disabled.
-	if !realm.RuntimeBound {
-		return nil, constUtil.ErrAdminPermission
-	}
-	return &realm, nil
-}
-
 func adminBroadcastProjection(row db.AdminBroadcastBatch, realm db.AdminGameServer) model.AdminBroadcastDTO {
-	return model.AdminBroadcastDTO{ID: row.ID, ServerID: row.ServerID, ServerName: realm.Name, ActorName: row.ActorName, Title: row.Title, Body: row.Body, Rewards: adminTypedResources(row.Rewards), Reason: row.Reason, RecipientCount: row.RecipientCount, ExcludedCount: row.ExcludedCount, SuccessCount: row.SuccessCount, CreatedAt: row.CreatedAt, ExpiresAt: row.ExpiresAt, SentAt: row.SentAt, Version: row.Version}
+	return model.AdminBroadcastDTO{ID: row.ID, ServerID: row.ServerID, ServerName: realm.Name, ActorName: row.ActorName, AudienceMode: adminAudienceStoredMode(row.AudienceMode), Title: row.Title, Body: row.Body, Rewards: adminTypedResources(row.Rewards), Reason: row.Reason, RecipientCount: row.RecipientCount, ExcludedCount: row.ExcludedCount, SuccessCount: row.SuccessCount, CreatedAt: row.CreatedAt, ExpiresAt: row.ExpiresAt, SentAt: row.SentAt, Version: row.Version}
 }
 
-// adminBroadcastEligible shares the established protected-account boundary and rejects corrupt identity reads.
-func adminBroadcastEligible(tx *gorm.DB, profile db.Profile) (string, bool, error) {
-	if profile.Player == nil || *profile.Player == "" || *profile.Player == "null" {
-		return "", false, nil
-	}
-	var player struct {
-		Name  string `json:"name"`
-		Level int64  `json:"level"`
-	}
-	if err := json.Unmarshal([]byte(*profile.Player), &player); err != nil {
-		return "", false, err
-	}
-	if player.Name == "" || player.Level < 1 {
-		return "", false, nil
-	}
-	if profile.AccountID == 0 {
-		return player.Name, profile.Id > 1, nil
-	}
-	account, err := AccountForProfile(tx, &profile)
-	if err != nil {
-		return "", false, err
-	}
-	return player.Name, !account.Protected, nil
-}
-
-// AdminBroadcastPreview freezes a concrete current audience without creating mail or touching inventories.
+// AdminBroadcastPreview freezes a concrete audience without creating reward-center deliveries or mail.
 func (s *GameService) AdminBroadcastPreview(ctx context.Context, actor *model.AdminPrincipal, req model.AdminBroadcastPreviewRequest) (*model.AdminBroadcastPreviewResponse, error) {
 	rewards, err := s.adminTypedResourceSpec(req.Rewards, false)
 	if err != nil {
@@ -79,7 +34,7 @@ func (s *GameService) AdminBroadcastPreview(ctx context.Context, actor *model.Ad
 		if e := ServerGameClockGuardTransaction(tx); e != nil {
 			return e
 		}
-		realm, e := s.adminBroadcastScope(ctx, tx, actor, true)
+		realm, e := s.adminAudienceScope(ctx, tx, actor, true)
 		if e != nil {
 			return e
 		}
@@ -95,28 +50,17 @@ func (s *GameService) AdminBroadcastPreview(ctx context.Context, actor *model.Ad
 		if !errors.Is(e, gorm.ErrRecordNotFound) {
 			return e
 		}
-		var profiles []db.Profile
-		if e = tx.Select("id", "account_id", "server_id", "player").Where("server_id=? AND player IS NOT NULL", realm.ID).Order("id").Find(&profiles).Error; e != nil {
+		// Freeze either the complete cross-page realm audience or exactly the checked players.
+		members, excluded, e := adminAudienceFreeze(tx, realm.ID, req.Audience.Mode, req.Audience.PlayerIDs)
+		if e != nil {
 			return e
 		}
-		recipients := []db.AdminBroadcastRecipient{}
-		var excluded int64
-		for _, profile := range profiles {
-			name, eligible, checkErr := adminBroadcastEligible(tx, profile)
-			if checkErr != nil {
-				return checkErr
-			}
-			if name == "" {
-				continue
-			}
-			if !eligible {
-				excluded++
-				continue
-			}
-			recipients = append(recipients, db.AdminBroadcastRecipient{BatchID: req.RequestID, PlayerID: profile.Id, PlayerName: name})
+		recipients := make([]db.AdminBroadcastRecipient, 0, len(members))
+		for _, member := range members {
+			recipients = append(recipients, db.AdminBroadcastRecipient{BatchID: req.RequestID, PlayerID: member.PlayerID, PlayerName: member.PlayerName})
 		}
 		now := time.Now().UnixMilli()
-		batch := db.AdminBroadcastBatch{ID: req.RequestID, ServerID: realm.ID, ActorID: actor.UserID, ActorName: actor.Username, Title: req.Title, Body: req.Body, Rewards: rewards, Reason: req.Reason, BodyHash: bodyHash, RecipientCount: int64(len(recipients)), ExcludedCount: excluded, CreatedAt: now, ExpiresAt: now + constUtil.AdminBroadcastPreviewTTL.Milliseconds()}
+		batch := db.AdminBroadcastBatch{ID: req.RequestID, ServerID: realm.ID, ActorID: actor.UserID, ActorName: actor.Username, AudienceMode: req.Audience.Mode, Title: req.Title, Body: req.Body, Rewards: rewards, Reason: req.Reason, BodyHash: bodyHash, RecipientCount: int64(len(recipients)), ExcludedCount: excluded, CreatedAt: now, ExpiresAt: now + constUtil.AdminBroadcastPreviewTTL.Milliseconds()}
 		batch.Version = adminVersion(struct {
 			Content    string
 			Recipients []db.AdminBroadcastRecipient
@@ -130,7 +74,7 @@ func (s *GameService) AdminBroadcastPreview(ctx context.Context, actor *model.Ad
 			}
 		}
 		out.Batch = adminBroadcastProjection(batch, *realm)
-		return adminAudit(tx, actor, "resource.broadcast.preview", batch.ID, fmt.Sprintf("server=%d; recipients=%d; %s", realm.ID, batch.RecipientCount, req.Reason))
+		return adminAudit(tx, actor, "resource.broadcast.preview", batch.ID, fmt.Sprintf("server=%d; audience=%s; recipients=%d; %s", realm.ID, batch.AudienceMode, batch.RecipientCount, req.Reason))
 	})
 	if err != nil {
 		return nil, err
@@ -138,14 +82,14 @@ func (s *GameService) AdminBroadcastPreview(ctx context.Context, actor *model.Ad
 	return &out, nil
 }
 
-// AdminBroadcastSend atomically commits original notices for only the reviewed recipient IDs.
+// AdminBroadcastSend atomically commits original reward-center deliveries for only the reviewed recipient IDs.
 func (s *GameService) AdminBroadcastSend(ctx context.Context, actor *model.AdminPrincipal, id string, req model.AdminBroadcastSendRequest) (*model.AdminBroadcastSendResponse, error) {
 	var out model.AdminBroadcastSendResponse
 	err := db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if e := ServerGameClockGuardTransaction(tx); e != nil {
 			return e
 		}
-		realm, e := s.adminBroadcastScope(ctx, tx, actor, true)
+		realm, e := s.adminAudienceScope(ctx, tx, actor, true)
 		if e != nil {
 			return e
 		}
@@ -189,14 +133,15 @@ func (s *GameService) AdminBroadcastSend(ctx context.Context, actor *model.Admin
 			if e = tx.Clauses(clause.Locking{Strength: "UPDATE"}).Select("id", "account_id", "server_id", "player").First(&profile, recipient.PlayerID).Error; e != nil {
 				return e
 			}
-			_, eligible, checkErr := adminBroadcastEligible(tx, profile)
+			_, eligible, checkErr := adminAudienceEligible(tx, profile)
 			if checkErr != nil {
 				return checkErr
 			}
 			if AdminProfileServerID(profile) != realm.ID || !eligible {
 				return constUtil.ErrAdminBroadcastAudience
 			}
-			delivery, deliveryErr := s.EnqueueRewardNotice(tx, profile.Id, "admin-broadcast:"+batch.ID, batch.Title, batch.Body, batch.Rewards, 0)
+			// Compensation uses the original reward-center protocol only and never creates a mailbox message.
+			delivery, deliveryErr := s.EnqueueReward(tx, profile.Id, "admin-broadcast:"+batch.ID, batch.Title, batch.Body, batch.Rewards, 0)
 			if deliveryErr != nil {
 				return deliveryErr
 			}
@@ -226,10 +171,10 @@ func (s *GameService) AdminBroadcastSend(ctx context.Context, actor *model.Admin
 	return &out, nil
 }
 
-// AdminBroadcastList exposes committed realm-owned receipts to authorized operators and viewers.
+// AdminBroadcastList exposes committed realm-owned reward-center receipts to authorized operators and viewers.
 func (s *GameService) AdminBroadcastList(ctx context.Context, actor *model.AdminPrincipal, page, size int64) (*model.AdminBroadcastListResponse, error) {
 	tx := db.GetIns().WithContext(ctx)
-	realm, err := s.adminBroadcastScope(ctx, tx, actor, false)
+	realm, err := s.adminAudienceScope(ctx, tx, actor, false)
 	if err != nil {
 		return nil, err
 	}

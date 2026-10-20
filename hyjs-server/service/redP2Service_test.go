@@ -157,7 +157,9 @@ func TestP2KingDrawGatePityQuotaReplay(t *testing.T) {
 	}
 	var st db.KingRecruitState
 	db.GetIns().First(&st, id)
-	if st.Draws != 11 || st.Luck != 110 {
+	_, saved := p2Profile(t, id)
+	_, selectedWorld, _, _ := s.kingConfiguration(db.GetIns(), LocalPlayNow(ctx))
+	if st.Draws != 11 || saved.KingRecruitLuck[selectedWorld] != 110 {
 		t.Fatal(st)
 	}
 	st.Draws = 49
@@ -181,7 +183,8 @@ func TestP2KingDrawGatePityQuotaReplay(t *testing.T) {
 		t.Fatal("paid day reset", e)
 	}
 	db.GetIns().First(&st, id)
-	if st.Draws != 1 || st.Luck != 130 {
+	_, saved = p2Profile(t, id)
+	if st.Draws != 1 || saved.KingRecruitLuck[selectedWorld] != 130 {
 		t.Fatal(st)
 	}
 }
@@ -248,7 +251,8 @@ func TestP2LuckyRedSelectionDurable(t *testing.T) {
 		t.Fatal("luck charged twice")
 	}
 	db.GetIns().First(state, id)
-	if state.Luck != 0 {
+	_, saved := p2Profile(t, id)
+	if saved.KingRecruitLuck[space] != 0 {
 		t.Fatal(state)
 	}
 }

@@ -1,11 +1,25 @@
 {
-  "UI.RecruitResultCardItem::SetHeroBuyId": "643245cc64ff83ea4b425ab2dad9d8309d62055cfece2fe35560f2057e0c7e7e",
-  "UI.TabKingsRecruit::OnPreviewBtn": "eb878dea2bc6be6b0898bae54b33c4c29b6a2d1c1f509333e51dac9838ba1551",
-  "UI.TabKingsRecruit::OnRewardBtn": "f2945dff15c4e7de396cae25fcb5f2a45de268c6d58536becb1efa38e1e06457",
-  "UI.TabKingsRecruit::OnBattlePreviewBtn": "8e61e72bdc0d2c8713cebb81a8626c59208aee7636e2bf20e54820662b5e0766",
-  "UI.TabKingsRecruit::OnRecruitOnce": "161a713479d8277e549954ccfb904ea5d471a2ab15350b121796daa6093efb5e",
-  "UI.TabKingsRecruit::OnRecruitTen": "7a44a0f531cd640d0c5aaa2e18ceaf4071f2f52775e375e43c6ed3047c525f39",
-  "UI.TabKingsRecruit::UpdateAll": "6efa89b48072ced6a553bf391554bc65f05b0de508719dd5d3003836d80486f7",
-  "UI.TabKingsRecruit::OnMsgCallback": "b15600d61af2c3b371bc4285f3628cdb20acc9cda042d0d0610d7d9a3a14043d",
-  "UI.TabKingsRecruit::RecruitCallback": "eeedf78f22cc6ff9773c3fddf6c22808873b7ee632f56fdab6e32c2edf9fedd8"
+  "schema": "hyjs-king-recruit-shop-entries-v1",
+  "inputManagedSHA256": "4e1d309538e6da67978fb4566056aa06b047d16b20900997a9d44e214d2dbb93",
+  "unchanged": {
+    "UI.TabKingsRecruit::UpdateAll": "8eac87ea32320a6ef4be786aaf7191edd1f53e63321e71d60b96bbf13d649393",
+    "UI.TabKingsRecruit::OnMsgCallback": "9b736a1cfceddfcd31beba3d62489f350f10dd228fc1529e85ad1fd0822019c9",
+    "UI.TabKingsRecruit::RecruitCallback": "8dd95b82acd7830dac992aee7761fdd3c65dc1b700530199159fd097f05ea9c5",
+    "UI.TabKingsRecruit::OnRecruitOnce": "755bb139e92aa78ea71f13f63add0cecaacbae0852cb16d69c4b5c786838a37f",
+    "UI.TabKingsRecruit::OnRecruitTen": "532de36e64353016033f002ef15b90add8337633587c9a987a8320255a590a13",
+    "UI.TabKingsRecruit::OnRewardBtn": "e4d314f1bdf78db8023f74df26ba95262d169de8ffbff07f5152271bceca741e",
+    "UI.TabKingsRecruit::OnPreviewBtn": "d749db01ee62c32366090bd8190d6f26605e799efdbe54c29ce2d9d3aa7c77e0",
+    "UI.TabKingsRecruit::OnBattlePreviewBtn": "eccfa567739118844143acf853262e92046fa79126f61dd28dcce13d2665354a",
+    "UI.RecruitResultCardItem::SetHeroBuyId": "866d72b788d75290cd79b9f6be1233cf7a6bda0a0c2ca8dfced2a9536f6ddc8f"
+  },
+  "before": {
+    "UI.ShopPage::UpdateTabBtns": "eeca2b3f6a94bbc0750e4c052efd8f9620faa30338296273fd5b0a8db9535466"
+  },
+  "tail": {
+    "UI.ShopPage::UpdateTabBtns": [
+      "ldarg.0",
+      "call HYJS.KingRecruit.ShopWorldMenuControl::Ensure(UI.ShopPage)",
+      "ret"
+    ]
+  }
 }

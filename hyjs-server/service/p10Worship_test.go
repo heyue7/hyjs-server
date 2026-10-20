@@ -179,3 +179,43 @@ func TestP10WorshipActualRankSourceCoinDailyThreeSharedTargetsConcurrencyAndCold
 		t.Fatal("tampered actual rank source accepted")
 	}
 }
+
+// The viewer may be ranked too. Both original famous tabs use formation slot order.
+func TestP10WorshipModelFollowsFirstFormationSlotAfterReload(t *testing.T) {
+	f, ids := p10WorshipSetup(t)
+	id := ids[0]
+	if err := updateProfile(f.ctx, id, func(p *pb.Player, g *model.GameState) error {
+		hero := proto.Clone(g.Warriors[0]).(*pb.Warrior)
+		hero.Id = proto.String("hero_001")
+		hero.Guid = proto.String("rank-model-first")
+		g.Warriors = append(g.Warriors, hero)
+		// Store the list out of order to prove the protocol's formatPos owns the first place.
+		g.Formation = []*pb.FormationItem{
+			{FormatPos: proto.Int32(3), Things: []*pb.FormationThing{{Pos: proto.Int32(0)}}},
+			{FormatPos: proto.Int32(2), Things: []*pb.FormationThing{{Pos: proto.Int32(0), Id: g.Warriors[0].Id, Guid: g.Warriors[0].Guid}}},
+			{FormatPos: proto.Int32(1), Things: []*pb.FormationThing{{Pos: proto.Int32(0), Id: hero.Id, Guid: hero.Guid}}},
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	f.restart(t)
+	for _, kind := range []int32{0, 1} {
+		out, err := f.s.p10Worship(f.ctx, id, &pb.CSFamous{Type: proto.Int32(kind)}, 0, time.Now())
+		if err != nil {
+			t.Fatal(err)
+		}
+		found := false
+		for _, row := range out[0].(*pb.SCFamous).PlayerList {
+			if row.GetPlayerId() == id {
+				found = true
+				if row.GetHeroWarId() != "hero_001" {
+					t.Fatalf("rank tab %d uses %s", kind, row.GetHeroWarId())
+				}
+			}
+		}
+		if !found {
+			t.Fatalf("self not on rank tab %d", kind)
+		}
+	}
+}

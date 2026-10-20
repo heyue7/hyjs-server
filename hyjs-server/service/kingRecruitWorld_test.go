@@ -34,6 +34,23 @@ func TestKingRecruitParallelWorldsNativeSelectionAndCold(t *testing.T) {
 	if err != nil || len(state.Worlds) != 3 {
 		t.Fatal("three simultaneous native worlds", state, err)
 	}
+	// A legacy balance belongs to the selected SAO world, even if the first operation switches elsewhere.
+	legacy, err := kingState(db.GetIns(), f.id, LocalPlayNow(bound))
+	if err != nil {
+		t.Fatal(err)
+	}
+	legacy.Luck = 50
+	if err = db.GetIns().Save(legacy).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err = updateProfile(bound, f.id, func(_ *pb.Player, g *model.GameState) error { g.KingRecruitLuck = nil; return nil }); err != nil {
+		t.Fatal(err)
+	}
+	_, lastKey, _ := strings.Cut(slots[2].ConsumerID, ":")
+	state, err = f.s.KingRecruitWorlds(bound, f.id, session, lastKey, state.Version)
+	if err != nil || adminKingInfo(t, f, bound).GetLuck() != 0 {
+		t.Fatal("legacy balance leaked into first switch", err)
+	}
 	before, _ := f.profile(t)
 	for index, slot := range slots {
 		_, key, _ := strings.Cut(slot.ConsumerID, ":")
@@ -44,6 +61,13 @@ func TestKingRecruitParallelWorldsNativeSelectionAndCold(t *testing.T) {
 		info := adminKingInfo(t, f, bound)
 		if info.GetSpace() != int32(index+1) || len(info.GetRewardList()) != 1 || info.GetRewardList()[0] != base.Prizes[index].ResourceID {
 			t.Fatal("native selected header", info)
+		}
+		wantLuck := int32(0)
+		if index == 0 {
+			wantLuck = 50
+		}
+		if info.GetLuck() != wantLuck {
+			t.Fatal("world balance before draw", index, info)
 		}
 		preview, err := f.s.kingRecruitPreview(bound, f.id, &pb.CSWarriorRecruitGetPreview{CostType: proto.Int32(3)})
 		if err != nil || preview[0].(*pb.SCWarriorRecruitGetPreview).GetRewards()[0] != info.GetRewardList()[0] {
@@ -58,13 +82,16 @@ func TestKingRecruitParallelWorldsNativeSelectionAndCold(t *testing.T) {
 			t.Fatal("world native retry", err)
 		}
 	}
-	after, _ := f.profile(t)
+	after, saved := f.profile(t)
+	if saved.KingRecruitLuck[1] != 60 || saved.KingRecruitLuck[2] != 10 || saved.KingRecruitLuck[3] != 10 {
+		t.Fatal("world balances after native retry", saved.KingRecruitLuck)
+	}
 	if before.GetDiamond()-after.GetDiamond() != 900 {
 		t.Fatal("world switching changed price or duplicated retry")
 	}
 	info := adminKingInfo(t, f, bound)
-	if info.GetLuck() != 30 || info.GetLeftTimes() != 47 {
-		t.Fatal("world switching reset global counters", info)
+	if info.GetLuck() != 10 || info.GetLeftTimes() != 47 {
+		t.Fatal("world lucky balance must stay independent", info)
 	}
 	if _, err = f.s.KingRecruitWorlds(bound, f.id, session, state.SelectedPoolID, "stale"); !errors.Is(err, constUtil.ErrAdminConfigConflict) {
 		t.Fatal("stale world catalogue accepted", err)
@@ -90,8 +117,8 @@ func TestKingRecruitParallelWorldsNativeSelectionAndCold(t *testing.T) {
 	f.restart(t)
 	bound = serverClockBindTest(t, f, f.id)
 	state, err = f.s.KingRecruitWorlds(bound, f.id, session, "", "")
-	if err != nil || len(state.Worlds) != 2 || adminKingInfo(t, f, bound).GetLuck() != 30 {
-		t.Fatal("cold selection/counter", err)
+	if err != nil || len(state.Worlds) != 2 || adminKingInfo(t, f, bound).GetLuck() != 60 {
+		t.Fatal("cold selection and world luck", err)
 	}
 }
 

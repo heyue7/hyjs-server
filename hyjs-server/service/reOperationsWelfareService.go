@@ -37,9 +37,9 @@ type reOperationsWelfareProgress struct {
 }
 
 func reOperationsWelfareForms() []model.AdminActivityForm {
-	cat := model.AdminActivityForm{Mode: "fortune-cat", TemplateID: "fortune-cat-original", Name: "招财猫", Source: constUtil.ReOperationsWelfareSource, RepeatPolicy: "repeat", Products: []model.AdminActivityProduct{}, Prizes: []model.AdminActivityPrize{}, Milestones: []model.AdminActivityMilestone{}}
+	cat := model.AdminActivityForm{Mode: "fortune-cat", TemplateID: "fortune-cat-original", Name: "藏宝箱", Source: constUtil.ReOperationsWelfareSource, RepeatPolicy: "repeat", Products: []model.AdminActivityProduct{}, Prizes: []model.AdminActivityPrize{}, Milestones: []model.AdminActivityMilestone{}}
 	for _, cost := range []int64{100, 300, 800, 1500, 3000} {
-		cat.Milestones = append(cat.Milestones, model.AdminActivityMilestone{Goal: cost, Rewards: []model.AdminResourceAmount{{ResourceID: "diamond", Amount: cost + max(int64(1), cost/20)}}})
+		cat.Milestones = append(cat.Milestones, model.AdminActivityMilestone{Goal: cost, Rewards: []model.AdminResourceAmount{{ResourceID: "coin", Amount: cost + max(int64(1), cost/20)}}})
 	}
 	continued := model.AdminActivityForm{Mode: "continued-spend", TemplateID: "continued-spend-original", Name: "连续消费", Source: constUtil.ReOperationsWelfareSource, RepeatPolicy: "repeat", Products: []model.AdminActivityProduct{}, Prizes: []model.AdminActivityPrize{}, Milestones: []model.AdminActivityMilestone{}}
 	continued.Options.DailySpend = 3000
@@ -62,7 +62,8 @@ func (s *GameService) validateReOperationsWelfare(cfg db.P4WelfareRule) error {
 		}
 		for _, tier := range rules.Tiers {
 			res, err := p1RewardResources(tier.Reward)
-			if err != nil || tier.Cost < 1 || tier.Cost > math.MaxInt32 || len(res) != 1 || res[0].GetId() != "diamond" || int64(res[0].GetNum()) < tier.Cost {
+			// 接受旧冻结行供历史读取；新的发奖投影统一转换为金币。
+			if err != nil || tier.Cost < 1 || tier.Cost > math.MaxInt32 || len(res) != 1 || (res[0].GetId() != "coin" && res[0].GetId() != "diamond") || res[0].GetNum() < 1 {
 				return constUtil.ErrAdminConfiguration
 			}
 		}
@@ -105,6 +106,9 @@ func (s *GameService) adminPersistReOperationsWelfare(tx *gorm.DB, key string, f
 		tier := reOperationsWelfareTier{Reward: reward}
 		if kind == constUtil.ReWelfareCatKind {
 			tier.Cost = m.Goal
+			if len(m.Rewards) != 1 || m.Rewards[0].ResourceID != "coin" {
+				return constUtil.ErrAdminInput
+			}
 		}
 		rules.Tiers = append(rules.Tiers, tier)
 	}
@@ -129,6 +133,11 @@ func (s *GameService) adminProjectReOperationsWelfare(cfg db.P4WelfareRule, form
 	var rules reOperationsWelfareRules
 	if json.Unmarshal(cfg.Rules, &rules) != nil {
 		return constUtil.ErrAdminConfiguration
+	}
+	if cfg.Kind == constUtil.ReWelfareCatKind {
+		if err := reTreasureCoinRewards(&rules); err != nil {
+			return err
+		}
 	}
 	form.Options.DailySpend = rules.DailySpend
 	form.Options.FinalRewards = adminTypedResources(rules.FinalReward)
@@ -197,6 +206,11 @@ func (s *GameService) loadReOperationsWelfare(tx *gorm.DB, owner int64, key, kin
 	if json.Unmarshal(cfg.Rules, &rules) != nil {
 		return nil, cfg, rules, nil, constUtil.ErrAdminConfiguration
 	}
+	if kind == constUtil.ReWelfareCatKind {
+		if err := reTreasureCoinRewards(&rules); err != nil {
+			return nil, cfg, rules, nil, err
+		}
+	}
 	if state.CatUses == nil {
 		state.CatUses = map[string]int32{}
 	}
@@ -222,6 +236,18 @@ func (s *GameService) loadReOperationsWelfare(tx *gorm.DB, owner int64, key, kin
 	return row, cfg, rules, state, nil
 }
 
+// 旧快照和回执保持原字节；仅对尚未发放的藏宝箱奖励纠正资源种类。
+func reTreasureCoinRewards(rules *reOperationsWelfareRules) error {
+	for i, tier := range rules.Tiers {
+		items, err := p1RewardResources(tier.Reward)
+		if err != nil || len(items) != 1 || (items[0].GetId() != "coin" && items[0].GetId() != "diamond") || items[0].GetNum() < 1 {
+			return constUtil.ErrAdminConfiguration
+		}
+		rules.Tiers[i].Reward = "coin," + strconv.FormatInt(int64(items[0].GetNum()), 10)
+	}
+	return nil
+}
+
 func saveReOperationsWelfare(tx *gorm.DB, row *db.P4WelfareState, cfg db.P4WelfareRule, state *reOperationsWelfareProgress) error {
 	row.Snapshot = adminJSON(cfg)
 	row.Payload = adminJSON(state)
@@ -240,7 +266,7 @@ func reFortuneCatInfo(rules reOperationsWelfareRules, state *reOperationsWelfare
 }
 
 // reFortuneCatWelfare keeps native cat requests and same-stamp receipts, with daily counts keyed by calendar date.
-// The debit and full return share the player transaction. Its positive net return creates no ordinary spend fact.
+// 钻石消耗和金币奖励共用角色事务；已成功的旧请求继续返回原回执。
 func (s *GameService) reFortuneCatWelfare(ctx context.Context, owner int64, request proto.Message, stamp int64, now time.Time) ([]proto.Message, bool, error) {
 	query := db.GetIns().WithContext(ctx)
 	key, err := reOperationsWelfareRuleKey(query, constUtil.ReWelfareCatKind, now)

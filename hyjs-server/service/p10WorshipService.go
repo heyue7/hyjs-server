@@ -59,6 +59,17 @@ func (s *GameService) p10WorshipRanks(tx *gorm.DB, kind int32) ([]*pb.SimplePlay
 		if err != nil {
 			return nil, err
 		}
+		// 名人榜模型跟随当前队伍的第一位角色，读取阵容顺序而不依赖账号主角。
+		var first *pb.FormationItem
+		for _, slot := range g.Formation {
+			hero := formationHero(slot)
+			if hero != nil && hero.GetId() != "" && hero.GetGuid() != "" && (first == nil || slot.GetFormatPos() < first.GetFormatPos()) {
+				first = slot
+			}
+		}
+		if first != nil {
+			info.HeroWarId = proto.String(formationHero(first).GetId())
+		}
 		ranked = append(ranked, info)
 	}
 	sort.Slice(ranked, func(i, j int) bool {

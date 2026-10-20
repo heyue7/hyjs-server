@@ -81,91 +81,38 @@ namespace HYJS.ReWelfare
             string[] values = parts[used + 1].Split(new char[] { ',' });
             long cost, payout;
             if (values.Length != 2 || !Int64.TryParse(values[0], NumberStyles.None, CultureInfo.InvariantCulture, out cost) ||
-                !Int64.TryParse(values[1], NumberStyles.None, CultureInfo.InvariantCulture, out payout) || cost != data.coinPool || payout < cost) return 0;
+                !Int64.TryParse(values[1], NumberStyles.None, CultureInfo.InvariantCulture, out payout) || cost != data.coinPool || payout < 1) return 0;
             return payout;
         }
 
         public static void BindCat(UIActivityTreasureCast page, ActivityFortuneCatData data)
         {
             if (!Cat(page) || data == null) return;
-            // The old once-per-second coroutine otherwise re-enables an exhausted button.
+            // Keep the original treasure artwork and 探索 caption. Daily eligibility still comes from the server.
             page.StopCoroutine("UpdateUI");
             if (page.time != null) page.time.SetActive(false);
-            if (page.solgon != null) page.solgon.SetActive(false);
+            if (page.solgon != null) page.solgon.SetActive(true);
             if (page.solgon2 != null) page.solgon2.SetActive(false);
             int left = Math.Max(0, Math.Min(5, data.todayLeft));
             long payout = ReturnQuote(page, data);
-            GameObject root=page.btn==null||page.btn.transform.parent==null?null:page.btn.transform.parent.gameObject;
-            // Replace both original title labels together. Their independent
-            // anchors cannot fit a sentence in the old 28px numeric slot.
-            if(page.surplusNumber!=null&&page.surplusNumber.transform.parent!=null)
+            if (page.surplusNumber != null) page.surplusNumber.text = left.ToString(CultureInfo.InvariantCulture) + "/5";
+            if (page.totlaCoin != null) page.totlaCoin.text = payout.ToString(CultureInfo.InvariantCulture);
+            GameObject root = page.btn == null || page.btn.transform.parent == null ? null : page.btn.transform.parent.gameObject;
+            UILabel cost = NativeLabel(root, "CatCostQuote", page.surplusNumber);
+            if (cost != null)
             {
-                UILabel[] old=page.surplusNumber.transform.parent.GetComponentsInChildren<UILabel>(true);
-                for(int i=0;i<old.Length;i++)old[i].enabled=false;
-            }
-            UILabel remaining=NativeLabel(root,"CatRemaining",page.surplusNumber);
-            if(remaining!=null)
-            {
-                remaining.transform.localPosition=new Vector3(-187.2f,224.8f,0f);
-                remaining.width=350;remaining.height=36;remaining.fontSize=20;
-                remaining.text="今日剩余次数："+left.ToString(CultureInfo.InvariantCulture)+" / 5";
-            }
-            // Original solgon/solgon2 contain the old coin-pool art AND both
-            // number labels. Put the diamond quote on their visible Root sibling.
-            UILabel cost=NativeLabel(root,"CatCostQuote",page.surplusNumber);
-            UILabel gain=NativeLabel(root,"CatReturnQuote",page.surplusNumber);
-            UILabel rule=NativeLabel(root,"CatRuleCaption",page.surplusNumber);
-            if(cost!=null)
-            {
-                cost.transform.localPosition=new Vector3(-130f,20f,0f);
-                cost.width=350;cost.height=48;cost.fontSize=24;
-                cost.text=left==0?"今日招财已完成":"本次消耗 "+data.coinPool.ToString(CultureInfo.InvariantCulture)+" 钻";
-            }
-            if(gain!=null)
-            {
-                gain.transform.localPosition=new Vector3(-130f,-30f,0f);
-                gain.width=350;gain.height=48;gain.fontSize=20;
-                gain.text=left==0?"次日恢复5次":payout>0?"返还 "+payout.ToString(CultureInfo.InvariantCulture)+" 钻（净增 "+(payout-data.coinPool).ToString(CultureInfo.InvariantCulture)+"）":"返钻以本期配置为准";
-            }
-            if(rule!=null)
-            {
-                rule.transform.localPosition=new Vector3(-130f,-116f,0f);
-                rule.width=350;rule.height=120;rule.fontSize=18;
-                string[] quote=page.activityId.Split(new char[]{'~'});
-                string caption=String.Empty;
-                if(quote.Length==6)for(int i=1;i<quote.Length;i++)
-                {
-                    string[] pair=quote[i].Split(new char[]{','});
-                    if(pair.Length!=2)continue;
-                    if(caption.Length>0)caption+="\n";
-                    caption+="第"+i.ToString(CultureInfo.InvariantCulture)+"次："+pair[0]+" 钻 → "+pair[1]+" 钻";
-                }
-                rule.text=caption.Length>0?caption:"每日5次，收益即时到账";
+                cost.transform.localPosition = new Vector3(-130f, -116f, 0f);
+                cost.width = 350; cost.height = 40; cost.fontSize = 20;
+                cost.text = left > 0 ? "消耗 " + data.coinPool.ToString(CultureInfo.InvariantCulture) + " 钻石" : "今日探索次数已用完";
             }
             if (page.btn != null)
             {
                 UIImageButton button = page.btn.GetComponent<UIImageButton>();
-                UISprite background=page.btn.GetComponent<UISprite>();
-                // This root sprite is the shipped 176x64 button. Keep it visible
-                // even when UIImageButton.target was the original word sprite.
-                if(background!=null)
-                {
-                    background.enabled=true;
-                    background.spriteName="UI_button_zhaomu_02";
-                    background.width=176;background.height=64;
-                    background.color=Color.white;
-                    if(button!=null)button.target=background;
-                }
-                if(button!=null)button.isEnabled=left>0;
-                UISprite[] sprites=page.btn.GetComponentsInChildren<UISprite>(true);
-                for(int i=0;i<sprites.Length;i++)
-                    if(sprites[i]!=background&&sprites[i].spriteName.StartsWith("UI_huodong_cangbaoxiang_word_",StringComparison.Ordinal))sprites[i].enabled=false;
-                UILabel text=NativeLabel(page.btn,"ReCatButton",page.surplusNumber);
-                if(text!=null)
-                {
-                    text.width=160;text.height=40;text.fontSize=20;
-                    text.text=left>0?"招财一次":"今日次数已用完";
-                }
+                if (button != null) button.isEnabled = left > 0;
+                UISprite[] words = page.btn.GetComponentsInChildren<UISprite>(true);
+                for (int i = 0; i < words.Length; i++)
+                    if (words[i].spriteName.StartsWith("UI_huodong_cangbaoxiang_word_", StringComparison.Ordinal))
+                        words[i].spriteName = "UI_huodong_cangbaoxiang_word_tansuo";
             }
         }
 

@@ -48,7 +48,11 @@ func TestReFortuneCatNativeCostsDailyReplayAndCold(t *testing.T) {
 		t.Fatal("frozen native payout quote omitted", tabs, err)
 	}
 	// This finite wallet funds real native cat debits; no paid-order or consumption fact is injected.
-	if err := updateProfile(f.ctx, f.id, func(p *pb.Player, _ *model.GameState) error { p.Diamond = proto.Int64(10000); return nil }); err != nil {
+	if err := updateProfile(f.ctx, f.id, func(p *pb.Player, _ *model.GameState) error {
+		p.Diamond = proto.Int64(10000)
+		p.Coin = proto.Int64(0)
+		return nil
+	}); err != nil {
 		t.Fatal(err)
 	}
 	info, err := f.s.p4Welfare(f.ctx, f.id, &pb.CSFortuneCatInfo{}, 0, at)
@@ -66,7 +70,7 @@ func TestReFortuneCatNativeCostsDailyReplayAndCold(t *testing.T) {
 			t.Fatal("actual native cat debit", i, err)
 		}
 		reward := out[0].(*pb.SCFortuneCatReward)
-		if len(reward.GetGet().GetSimps()) != 1 || reward.GetGet().GetSimps()[0].GetNum() != want || reward.GetInfo().GetTodayLeft() != int32(4-i) {
+		if len(reward.GetGet().GetSimps()) != 1 || reward.GetGet().GetSimps()[0].GetId() != "coin" || reward.GetGet().GetSimps()[0].GetNum() != want || reward.GetInfo().GetTodayLeft() != int32(4-i) {
 			t.Fatal("wrong native full return", reward)
 		}
 		if i == 0 {
@@ -74,7 +78,7 @@ func TestReFortuneCatNativeCostsDailyReplayAndCold(t *testing.T) {
 		}
 	}
 	p, _ := f.profile(t)
-	if p.GetDiamond() != 10285 {
+	if p.GetDiamond() != 4300 || p.GetCoin() != 5985 {
 		t.Fatal("five actual debits/returns not conserved", p.GetDiamond())
 	}
 	if p1Count(t, &db.EventFact{}, "player_id=? AND kind=?", f.id, constUtil.P1EventDiamondSpent) != 0 {
@@ -106,7 +110,11 @@ func TestReFortuneCatNativeCostsDailyReplayAndCold(t *testing.T) {
 		t.Fatal("calendar rewind reset old daily uses", err)
 	}
 	// A reward overflow must roll back both the debit and the daily ordinal.
-	if err = updateProfile(f.ctx, f.id, func(p *pb.Player, _ *model.GameState) error { p.Diamond = proto.Int64(math.MaxInt64); return nil }); err != nil {
+	if err = updateProfile(f.ctx, f.id, func(p *pb.Player, _ *model.GameState) error {
+		p.Diamond = proto.Int64(math.MaxInt64)
+		p.Coin = proto.Int64(math.MaxInt64)
+		return nil
+	}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err = f.s.p4Welfare(f.ctx, f.id, &pb.CSFortuneCatReward{Type: proto.Int32(0)}, 507, at.AddDate(0, 0, 1)); err == nil {
@@ -268,7 +276,7 @@ func TestReFortuneCatConcurrentOriginalStamp(t *testing.T) {
 		}
 	}
 	p, _ := f.profile(t)
-	if p.GetDiamond() != 1005 || p1Count(t, &db.P4Receipt{}, "player_id=? AND domain=?", f.id, constUtil.ReWelfareCatKind) != 1 {
+	if p.GetDiamond() != 900 || p1Count(t, &db.P4Receipt{}, "player_id=? AND domain=?", f.id, constUtil.ReWelfareCatKind) != 1 {
 		t.Fatal("race duplicated paid cat", p.GetDiamond())
 	}
 }
@@ -294,11 +302,54 @@ func TestReFortuneCatConfiguredPayoutMatchesNativeQuote(t *testing.T) {
 		t.Fatal("configured native full return", err)
 	}
 	p, _ := f.profile(t)
-	if p.GetDiamond() != 777 {
+	if p.GetDiamond() != 0 {
 		t.Fatal("actual configured cost was not deducted", p.GetDiamond())
 	}
 	var cfg db.P4WelfareRule
 	if err = db.GetIns().First(&cfg, "id=?", key).Error; err != nil || len(cfg.Frozen) == 0 {
 		t.Fatal("visible quote was not frozen", err)
+	}
+}
+
+// Existing frozen diamond rows change only future payout resource; counts and committed receipts survive.
+func TestReTreasureLegacyFrozenPayoutCorrection(t *testing.T) {
+	f, actor := adminModesFixture(t)
+	at := time.Now()
+	_, key := reWelfarePublish(t, f, actor, "fortune-cat", at)
+	var cfg db.P4WelfareRule
+	if err := db.GetIns().First(&cfg, "id=?", key).Error; err != nil {
+		t.Fatal(err)
+	}
+	cfg.Rules = []byte(strings.ReplaceAll(string(cfg.Rules), "coin,", "diamond,"))
+	frozen := adminJSON(cfg)
+	if err := db.GetIns().Model(&cfg).Updates(map[string]any{"rules": cfg.Rules, "frozen": frozen}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := updateProfile(f.ctx, f.id, func(p *pb.Player, _ *model.GameState) error {
+		p.Diamond = proto.Int64(1000)
+		p.Coin = proto.Int64(0)
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	first, err := f.s.p4Welfare(f.ctx, f.id, &pb.CSFortuneCatReward{Type: proto.Int32(0)}, 88001, at)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := first[0].(*pb.SCFortuneCatReward)
+	if r.GetGet().GetSimps()[0].GetId() != "coin" || r.GetInfo().GetTodayLeft() != 4 {
+		t.Fatal(r)
+	}
+	f.restart(t)
+	replay, err := f.s.p4Welfare(f.ctx, f.id, &pb.CSFortuneCatReward{Type: proto.Int32(0)}, 88001, at)
+	if err != nil || !proto.Equal(first[0], replay[0]) {
+		t.Fatal("cold receipt", err)
+	}
+	p, _ := f.profile(t)
+	if p.GetDiamond() != 900 || p.GetCoin() != 105 {
+		t.Fatal("payout correction duplicated or refunded diamonds", p)
+	}
+	if err = db.GetIns().First(&cfg, "id=?", key).Error; err != nil || string(cfg.Frozen) != string(frozen) {
+		t.Fatal("historical frozen configuration rewritten", err)
 	}
 }

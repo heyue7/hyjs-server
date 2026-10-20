@@ -28,6 +28,24 @@ func (s *GameService) WelfareAchievementRedPoints(ctx context.Context, id int64)
 		if err != nil {
 			return err
 		}
+		// 日卡和会员提示复用实际支付及领取资格，查询本身不创建领取行。
+		if tx.Migrator().HasTable(&db.PaymentOrder{}) && tx.Migrator().HasTable(&db.MembershipClaim{}) {
+			now := LocalPlayNow(ctx)
+			for _, kind := range []string{"month", "permanent"} {
+				status, _, e := s.cardStatus(tx, player, kind, now)
+				if e != nil {
+					return e
+				}
+				values["monthCardReward"] = values["monthCardReward"] || status == "canClaim"
+			}
+			daily, _, e := s.vipBoon(tx, player, now)
+			if e != nil {
+				return e
+			}
+			for _, item := range daily {
+				values["vipBoon"] = values["vipBoon"] || item.GetStatus() == 1
+			}
+		}
 		if tx.Migrator().HasTable(&db.P5Achievement{}) {
 			ready, e := s.achievementReady(tx, id, player, game)
 			if e != nil {
@@ -95,7 +113,7 @@ func (s *GameService) WelfareAchievementRedPoints(ctx context.Context, id int64)
 		return nil, err
 	}
 	out := &pb.SCRedPoint{}
-	keys := []string{"achievement", "totalLogin", "rechargeSingle", "firstRechargeGift", "rechargeTotal", "fightRedNameTimes", "killRedNameTimes", "robTreasureTimes", "pvpWinTimes", "mainCopyWinTimes", "aincradStars", "costTotal", "continuedRecharge", "warriorRescruitTimes", "warriorGetSpecial", "kaiGongActivity", "limitSignOpen", "moonlightRestaurant", "openServerFund", "openServerFundChild", "allPeopleBoon"}
+	keys := []string{"monthCardReward", "vipBoon", "achievement", "totalLogin", "rechargeSingle", "firstRechargeGift", "rechargeTotal", "fightRedNameTimes", "killRedNameTimes", "robTreasureTimes", "pvpWinTimes", "mainCopyWinTimes", "aincradStars", "costTotal", "continuedRecharge", "warriorRescruitTimes", "warriorGetSpecial", "kaiGongActivity", "limitSignOpen", "moonlightRestaurant", "openServerFund", "openServerFundChild", "allPeopleBoon"}
 	for _, key := range keys {
 		value := int32(0)
 		if values[key] {
@@ -373,7 +391,7 @@ func (s *GameService) afterWelfareAchievementRequest(ctx context.Context, id int
 	}
 	refresh := false
 	switch string(request.ProtoReflect().Descriptor().Name()) {
-	case "CSAchievementList", "CSGetAchievementReward", "CSActivityList", "CSActivityInfo", "CSActivityReward", "CSLoginRewardInfo", "CSGetLoginReward", "CSRewardLimitSignList", "CSReceiveLimitMonthSign", "CSStaminaRefill", "CSStaminaGet", "CSContinuedRechargeInfo", "CSContinuedRechargeReward", "CSOpenServerFundInfo", "CSBuyOpenServerFund", "CSOpenServerFundReward":
+	case "CSIsCardClaimed", "CSClaimCard", "CSGetVipBoonInfo", "CSGetVipDailyBoonReward", "CSGetVipWeekBoonReward", "CSAchievementList", "CSGetAchievementReward", "CSActivityList", "CSActivityInfo", "CSActivityReward", "CSLoginRewardInfo", "CSGetLoginReward", "CSRewardLimitSignList", "CSReceiveLimitMonthSign", "CSStaminaRefill", "CSStaminaGet", "CSContinuedRechargeInfo", "CSContinuedRechargeReward", "CSOpenServerFundInfo", "CSBuyOpenServerFund", "CSOpenServerFundReward":
 		refresh = true
 	}
 	if !refresh {

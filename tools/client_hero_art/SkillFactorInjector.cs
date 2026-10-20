@@ -1,0 +1,17 @@
+using System;
+using System.Linq;
+using dnlib.DotNet;
+using dnlib.DotNet.Emit;
+using dnlib.DotNet.Writer;
+using var module=ModuleDefMD.Load(args[0]);
+var row=module.GetTypes().Single(t=>t.FullName=="Dict.DataModel.TableSkillCast");
+var method=module.GetTypes().Single(t=>t.FullName=="Dict.Dao.TableSkillCastDao").Methods.Single(m=>m.Name=="ParseRowData");
+var assembly=module.GetAssemblyRefs().Single(a=>a.Name=="SoulFlowerHeroArt");
+var type=new TypeRefUser(module,"HYJS.HeroArt","HeroArtFallback",assembly);
+var fix=new MemberRefUser(module,"AdjustSkillCast",MethodSig.CreateStatic(module.CorLibTypes.Void,row.ToTypeSig()),type);
+var returns=method.Body.Instructions.Where(i=>i.OpCode==OpCodes.Ret).ToArray();
+if(returns.Length!=1)throw new InvalidOperationException("Expected one original row return");
+var ret=returns[0];ret.OpCode=OpCodes.Dup;ret.Operand=null;
+method.Body.Instructions.Add(Instruction.Create(OpCodes.Call,fix));method.Body.Instructions.Add(Instruction.Create(OpCodes.Ret));
+method.Body.MaxStack=8;method.Body.KeepOldMaxStack=true;
+var options=new ModuleWriterOptions(module);options.MetadataOptions.Flags|=MetadataFlags.PreserveAll|MetadataFlags.KeepOldMaxStack;module.Write(args[1],options);

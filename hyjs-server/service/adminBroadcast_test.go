@@ -51,7 +51,7 @@ func TestAdminBroadcastFrozenAudienceAtomicMailIdempotencyAndCold(t *testing.T) 
 	if err := d.Model(&db.Profile{}).Where("id=?", foreign).Update("server_id", f.s.OriginalServerID()+1).Error; err != nil {
 		t.Fatal(err)
 	}
-	request := model.AdminBroadcastPreviewRequest{RequestID: uuid.NewString(), Title: "维护补偿", Body: "隔离验证正文", Rewards: []model.AdminResourceAmount{{ResourceID: "coin", Amount: 7}}, Reason: "finite native broadcast fixture"}
+	request := model.AdminBroadcastPreviewRequest{RequestID: uuid.NewString(), Audience: model.AdminAudience{Mode: constUtil.AdminAudienceModeAll}, Title: "维护补偿", Body: "隔离验证正文", Rewards: []model.AdminResourceAmount{{ResourceID: "coin", Amount: 7}}, Reason: "finite native broadcast fixture"}
 	preview, err := f.s.AdminBroadcastPreview(f.ctx, actor, request)
 	if err != nil || preview.Batch.RecipientCount != 2 || preview.Batch.ExcludedCount != 1 {
 		t.Fatal("preview audience", err, preview)
@@ -85,7 +85,7 @@ func TestAdminBroadcastFrozenAudienceAtomicMailIdempotencyAndCold(t *testing.T) 
 		t.Fatal("failed batch partially delivered", count)
 	}
 	if count := p1Count(t, &db.MailMessage{}, "source_key=?", "admin-broadcast:"+preview.Batch.ID); count != 0 {
-		t.Fatal("failed batch retained mail", count)
+		t.Fatal("compensation created mail", count)
 	}
 	if err = d.Model(&db.Profile{}).Where("id=?", second).Update("server_id", f.s.OriginalServerID()).Error; err != nil {
 		t.Fatal(err)
@@ -111,10 +111,13 @@ func TestAdminBroadcastFrozenAudienceAtomicMailIdempotencyAndCold(t *testing.T) 
 			t.Fatal(sendErr)
 		}
 	}
-	for _, target := range []any{&db.RewardDelivery{}, &db.MailMessage{}} {
+	for _, target := range []any{&db.RewardDelivery{}} {
 		if count := p1Count(t, target, "source_key=?", "admin-broadcast:"+preview.Batch.ID); count != 2 {
 			t.Fatal("duplicate or missing notices", count)
 		}
+	}
+	if count := p1Count(t, &db.MailMessage{}, "source_key=?", "admin-broadcast:"+preview.Batch.ID); count != 0 {
+		t.Fatal("compensation must not create mailbox messages", count)
 	}
 	for _, id := range []int64{f.id, foreign, late} {
 		if count := p1Count(t, &db.RewardDelivery{}, "source_key=? AND player_id=?", "admin-broadcast:"+preview.Batch.ID, id); count != 0 {
@@ -148,6 +151,9 @@ func TestAdminBroadcastFrozenAudienceAtomicMailIdempotencyAndCold(t *testing.T) 
 	if _, err = f.s.AdminBroadcastSend(f.ctx, actor, preview.Batch.ID, confirm); err != nil {
 		t.Fatal("cold send retry", err)
 	}
+	if count := p1Count(t, &db.MailMessage{}, "source_key=?", "admin-broadcast:"+preview.Batch.ID); count != 0 {
+		t.Fatal("cold retry created mailbox messages", count)
+	}
 	if _, err = f.s.RewardCenter(f.ctx, first, &pb.CSAddRewardsToPlayer{RewardIds: []int64{delivery.ID}}); err != nil {
 		t.Fatal("native idempotent claim", err)
 	}
@@ -159,7 +165,7 @@ func TestAdminBroadcastFrozenAudienceAtomicMailIdempotencyAndCold(t *testing.T) 
 		t.Fatal("cold claim duplicated", err)
 	}
 	history, err := f.s.AdminBroadcastList(f.ctx, actor, 1, 25)
-	if err != nil || history.Total != 1 || history.Items[0].SuccessCount != 2 {
+	if err != nil || history.Total != 1 || history.Items[0].SuccessCount != 2 || history.Items[0].AudienceMode != constUtil.AdminAudienceModeAll {
 		t.Fatal("history", err, history)
 	}
 	// Expired previews never create original rewards, and a viewer cannot create a preview.

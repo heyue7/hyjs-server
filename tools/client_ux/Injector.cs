@@ -58,7 +58,7 @@ foreach(var pair in new[]{("UI.AnnouncePage","DoOpen"),("SystemAnnouncePage","Sh
 {
     var target=Method(module,"UI.KeFuPage","DoOpen");
     var baseOpen=(IMethod)target.Body.Instructions.First(i=>i.OpCode==OpCodes.Call&&i.Operand is IMethod method&&method.Name=="DoOpen").Operand;
-    target.Body=new CilBody();target.Body.Instructions.Add(Instruction.Create(OpCodes.Ldarg_0));target.Body.Instructions.Add(Instruction.Create(OpCodes.Call,baseOpen));
+    target.Body=new CilBody{MaxStack=8,KeepOldMaxStack=true};target.Body.Instructions.Add(Instruction.Create(OpCodes.Ldarg_0));target.Body.Instructions.Add(Instruction.Create(OpCodes.Call,baseOpen));
     foreach(var instruction in Java("show",true))target.Body.Instructions.Add(instruction);
     target.Body.Instructions.Add(Instruction.Create(OpCodes.Ret));
 }

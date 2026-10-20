@@ -248,6 +248,18 @@ export const generatedRoutes: GeneratedRoute[] = [
     }
   },
   {
+    name: 'mail',
+    path: '/mail',
+    component: 'layout.base$view.mail',
+    meta: {
+      title: '发送邮件',
+      i18nKey: 'route.mail',
+      icon: 'ph:paper-plane-tilt',
+      order: 6,
+      roles: ['viewer', 'operator', 'admin']
+    }
+  },
+  {
     name: 'players',
     path: '/players',
     component: 'layout.base$view.players',

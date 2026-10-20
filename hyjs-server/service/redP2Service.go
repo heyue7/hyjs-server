@@ -244,6 +244,23 @@ func kingState(tx *gorm.DB, id int64, now time.Time) (*db.KingRecruitState, erro
 	return state, nil
 }
 
+// 在持有角色锁的事务内迁移一次旧余额，其他世界从零开始，保留原领取回执。
+func kingWorldLuck(g *model.GameState, world, legacy int32) (int32, error) {
+	if world < 1 || world > 3 || legacy < 0 || legacy > 500 {
+		return 0, errors.New(constUtil.P2KingLuckInvalid)
+	}
+	if g.KingRecruitLuck == nil {
+		g.KingRecruitLuck = map[int32]int32{1: 0, 2: 0, 3: 0}
+		g.KingRecruitLuck[world] = legacy
+	}
+	for key, value := range g.KingRecruitLuck {
+		if key < 1 || key > 3 || value < 0 || value > 500 {
+			return 0, errors.New(constUtil.P2KingLuckInvalid)
+		}
+	}
+	return g.KingRecruitLuck[world], nil
+}
+
 func (s *GameService) kingRewards(rewards []db.GameplayPoolReward, space int32) ([]db.GameplayPoolReward, []string) {
 	var eligible []db.GameplayPoolReward
 	var red []string
@@ -312,7 +329,11 @@ func (s *GameService) kingRecruitLucky(ctx context.Context, id int64, b *pb.CSWa
 		if err != nil {
 			return err
 		}
-		if state.Luck < rules.LuckLimit {
+		luck, err := kingWorldLuck(g, space, state.Luck)
+		if err != nil {
+			return err
+		}
+		if luck < rules.LuckLimit {
 			return errors.New("幸运值不足")
 		}
 		gain, err := s.GrantFixedReward(player, g, b.GetReward()+",1")
@@ -320,7 +341,7 @@ func (s *GameService) kingRecruitLucky(ctx context.Context, id int64, b *pb.CSWa
 			return err
 		}
 		result.Get = gain
-		state.Luck -= rules.LuckLimit
+		g.KingRecruitLuck[space] = luck - rules.LuckLimit
 		return tx.Save(state).Error
 	})
 	return []proto.Message{result}, err

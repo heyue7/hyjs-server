@@ -1,0 +1,46 @@
+{
+  "iconUrl": "/admin/media/items/UI_gonghui_item_button_yellow_a.png",
+  "previewUrl": "/admin/media/items/UI_gonghui_item_button_yellow_a.png",
+  "source": {
+    "apk": "10056262.apk",
+    "apkSHA256": "b1d99496c7ffe17c45ab7646c72023be406924997d471e3f18db169fb0dfd641",
+    "entry": "assets/bin/Data/d68556c146371a04ca3dd07498e39920",
+    "entrySHA256": "0d66b5f4ea96ee7c9c2ff3108d735e6ce8ca12fa7cb59014a71e8ca747af409f",
+    "objectPathID": 3,
+    "objectType": "MonoBehaviour",
+    "extraction": "original NGUI UIAtlas serialized mSprites",
+    "atlasName": "Union Atlas",
+    "materialPathID": 1,
+    "texturePathID": 1,
+    "textureName": "Union Atlas",
+    "textureSize": [
+      1024,
+      1024
+    ],
+    "pixelSize": 1.0,
+    "coordinateOrigin": "top-left",
+    "packedRotation": "not present in original UISpriteData",
+    "spriteRect": {
+      "x": 882,
+      "y": 568,
+      "width": 127,
+      "height": 43
+    },
+    "border": {
+      "left": 0,
+      "right": 0,
+      "top": 0,
+      "bottom": 0
+    },
+    "padding": {
+      "left": 0,
+      "right": 0,
+      "top": 0,
+      "bottom": 0
+    }
+  },
+  "sha256": "3f3a47a9d0e4665e8d763e9ad3782e55634c58cbeb244c921be7c0c51ec5cb9b",
+  "sha": "3f3a47a9d0e4665e8d763e9ad3782e55634c58cbeb244c921be7c0c51ec5cb9b",
+  "width": 127,
+  "height": 43
+}

@@ -269,7 +269,11 @@ func (s *GameService) recruitInfo(ctx context.Context, id int64, b *pb.CSWarrior
 				if len(red) == 0 {
 					return errors.New("当前王者卡池缺少红卡")
 				}
-				entry.Luck = proto.Int32(state.Luck)
+				luck, err := kingWorldLuck(g, space, state.Luck)
+				if err != nil {
+					return err
+				}
+				entry.Luck = proto.Int32(luck)
 				entry.LeftTimes = proto.Int32(max(0, rules.DailyLimit-state.Draws))
 				entry.Space = proto.Int32(space)
 				entry.ChangeTime = proto.Int64(change)
@@ -423,9 +427,9 @@ func (s *GameService) warriorRecruit(ctx context.Context, id int64, b *pb.CSWarr
 		}
 		var king *db.KingRecruitState
 		var kingRules *db.KingRecruitRules
+		var kingSpace, kingLuck int32
 		if b.GetCostType() == 3 {
-			var space int32
-			kingRules, space, _, err = s.kingConfiguration(tx, now)
+			kingRules, kingSpace, _, err = s.kingConfiguration(tx, now)
 			if err != nil {
 				return err
 			}
@@ -433,10 +437,14 @@ func (s *GameService) warriorRecruit(ctx context.Context, id int64, b *pb.CSWarr
 			if err != nil {
 				return err
 			}
+			kingLuck, err = kingWorldLuck(g, kingSpace, king.Luck)
+			if err != nil {
+				return err
+			}
 			if king.Draws > kingRules.DailyLimit-count {
 				return errors.New("今日王者招募次数不足")
 			}
-			rewards, _ = s.kingRewards(rewards, space)
+			rewards, _ = s.kingRewards(rewards, kingSpace)
 		}
 		if int64(len(g.Warriors))+int64(count) > int64(player.GetWarriorBagSize()) {
 			return errors.New("伙伴背包已满")
@@ -522,7 +530,7 @@ func (s *GameService) warriorRecruit(ctx context.Context, id int64, b *pb.CSWarr
 		st.Response = proto.Clone(result).(*pb.SCWarriorRecruit)
 		if king != nil {
 			king.Draws += count
-			king.Luck = min(kingRules.LuckLimit, king.Luck+kingRules.LuckPerDraw*count)
+			g.KingRecruitLuck[kingSpace] = min(kingRules.LuckLimit, kingLuck+kingRules.LuckPerDraw*count)
 			if err := tx.Save(king).Error; err != nil {
 				return err
 			}
