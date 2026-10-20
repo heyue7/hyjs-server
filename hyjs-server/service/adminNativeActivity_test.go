@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -646,11 +647,13 @@ func TestAdminNativeCardUpdatesOnlyEconomicFields(t *testing.T) {
 // TestAdminNativeRecruitBuildsOriginalRotation 验证橙卡招募奖池构造和冻结保护。
 func TestAdminNativeRecruitBuildsOriginalRotation(t *testing.T) {
 	f, operator := adminNativeFixture(t, false)
-	if err := f.s.seedP4Rotations(db.GetIns().WithContext(f.ctx), time.Now()); err != nil {
+	// 新服在任何玩家招募之前就能从后台配置已有的关闭轮换。
+	startup := context.WithValue(f.ctx, constUtil.GameServiceContextKey, f.s)
+	if err := InitializeAdminActivityModes(startup); err != nil {
 		t.Fatal(err)
 	}
 	item := adminNativeFind(t, f, operator, "recruit-rotation")
-	if item.Name != "橙卡招募" || len(item.Form.Prizes) == 0 {
+	if item.Name != "橙卡招募" || len(item.Form.Prizes) == 0 || item.Enabled {
 		t.Fatalf("unexpected rotation dto %+v", item)
 	}
 	form := item.Form

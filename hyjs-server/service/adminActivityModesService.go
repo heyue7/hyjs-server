@@ -68,12 +68,19 @@ func adminActivityDefinitionFor(mode string) (adminActivityDefinition, bool) {
 	return adminActivityDefinition{}, false
 }
 
-// InitializeAdminActivityModes 仅迁移展示关联表，不创建未知活动、奖品或运营投放。
+// InitializeAdminActivityModes 迁移后台展示与策略表，提前登记既有招募的关闭轮换供后台配置。
+// 沿用原初始化方法和已存在奖池，保留运营修改，不开放新投放。
 func InitializeAdminActivityModes(ctx context.Context) error {
 	if err := db.GetIns().WithContext(ctx).AutoMigrate(&db.AdminActivityPresentation{}); err != nil {
 		return err
 	}
-	return InitializeAdminNativeActivitySettings(ctx)
+	if err := InitializeAdminNativeActivitySettings(ctx); err != nil {
+		return err
+	}
+	if s, ok := ctx.Value(constUtil.GameServiceContextKey).(*GameService); ok && s.P4Ready {
+		return s.seedP4Rotations(db.GetIns().WithContext(ctx), LocalPlayNow(ctx))
+	}
+	return nil
 }
 
 // AdminActivityModes 提供按原消费者裁剪的字段、资格枚举及空奖品模板。
