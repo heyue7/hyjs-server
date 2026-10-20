@@ -3,6 +3,10 @@
 # Set HYJS_MYSQL_PASSWORD separately. Redis/storage are optional legacy adapters.
 port: 8080
 
+security:
+  trustedProxies: "" # Only explicit proxy IP/CIDR; never trust arbitrary forwarded headers.
+  adminSecureCookies: false # Enable only when the public admin origin uses HTTPS.
+
 # log
 logConfig:
   logFile: logs/app.log

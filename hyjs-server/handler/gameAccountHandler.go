@@ -3,7 +3,6 @@ package handler
 import (
 	"context"
 	"errors"
-	"net"
 	"net/http"
 	"strings"
 	"time"
@@ -16,6 +15,7 @@ import (
 	"hyjs-server/model"
 	"hyjs-server/routes"
 	"hyjs-server/service"
+	"hyjs-server/utils"
 	"hyjs-server/wrapper"
 )
 
@@ -40,10 +40,7 @@ func RegisterAdminAccountCreationRoutes(a *gin.RouterGroup) {
 // @Router /game-account/register [post]
 func GameAccountRegisterHandler(c *gin.Context) error {
 	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, constUtil.GameAccountRegisterBodyBytes)
-	host, _, err := net.SplitHostPort(c.Request.RemoteAddr)
-	if err != nil {
-		host = c.Request.RemoteAddr
-	}
+	host := c.ClientIP()
 	if !service.GameAccountRegisterAllowed(host, time.Now()) {
 		c.Header("Retry-After", "60")
 		c.JSON(http.StatusTooManyRequests, gin.H{"code": 429, "msg": constUtil.ErrGameAccountRegisterLimited.Error(), "data": nil})
@@ -62,6 +59,11 @@ func GameAccountRegisterHandler(c *gin.Context) error {
 	}
 	out, err := service.RegisterGameAccount(ctx, req.Username, req.Password, req.Nickname)
 	if err != nil {
+		if errors.Is(err, utils.ErrPasswordWorkBusy) {
+			c.Header("Retry-After", "2")
+			c.JSON(http.StatusServiceUnavailable, gin.H{"code": 503, "msg": "注册服务繁忙，请稍后重试", "data": nil})
+			return nil
+		}
 		if errors.Is(err, constUtil.ErrGameAccountExists) {
 			c.JSON(http.StatusConflict, gin.H{"code": 409, "msg": err.Error(), "data": nil})
 			return nil

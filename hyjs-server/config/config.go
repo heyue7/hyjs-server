@@ -28,13 +28,20 @@ type GameConfig struct {
 }
 
 type AppConfig struct {
-	Game          GameConfig    `mapstructure:"game"`
-	Port          string        `mapstructure:"port"`
-	LogConfig     LogConfig     `mapstructure:"logConfig"`
-	JwtKey        string        `mapstructure:"jwtKey"`
-	MysqlConfig   MysqlConfig   `mapstructure:"mysql"`
-	Redis         RedisConfig   `mapstructure:"redis"`
-	StorageConfig StorageConfig `mapstructure:"storageConfig"`
+	Security      SecurityConfig `mapstructure:"security"`
+	Game          GameConfig     `mapstructure:"game"`
+	Port          string         `mapstructure:"port"`
+	LogConfig     LogConfig      `mapstructure:"logConfig"`
+	JwtKey        string         `mapstructure:"jwtKey"`
+	MysqlConfig   MysqlConfig    `mapstructure:"mysql"`
+	Redis         RedisConfig    `mapstructure:"redis"`
+	StorageConfig StorageConfig  `mapstructure:"storageConfig"`
+}
+
+// SecurityConfig binds deployment trust explicitly; it does not enable MFA or change session lifetimes.
+type SecurityConfig struct {
+	TrustedProxies     string `mapstructure:"trustedProxies"`
+	AdminSecureCookies bool   `mapstructure:"adminSecureCookies"`
 }
 
 type LogConfig struct {
@@ -120,6 +127,8 @@ func Init(env string) error {
 
 // environmentBindings 公开变量名合同；实际部署值只保存在私有 YAML 或进程环境中。
 var environmentBindings = map[string]string{
+	"security.trustedProxies":       "HYJS_TRUSTED_PROXIES",
+	"security.adminSecureCookies":   "HYJS_ADMIN_SECURE_COOKIES",
 	"game.accountsDatabase":         "HYJS_GAME_ACCOUNTS_DATABASE",
 	"game.serverId":                 "HYJS_GAME_SERVER_ID",
 	"game.bind":                     "HYJS_GAME_BIND",

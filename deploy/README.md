@@ -60,3 +60,25 @@ Nginx 管理入口为 `/admin/`，API ingress 仅开放客户端协议，保留�
 本机发布记录在 `analysis/deploy-20261018/`，远端在项目目录的 `deployed.json`。
 这些记录含实际来源地址，应保持本机私有。脚本仅管理带归属标记的项目资源，
 不管理其他容器、站点或数据库。
+
+## 安全基础（批28）
+
+- 本批按用户决定保留现有HTTP，不启用HTTPS。后台Cookie保留HttpOnly/SameSite=Strict；如以后启用TLS，再显式配置HYJS_ADMIN_SECURE_COOKIES。不能把X-Forwarded-Proto当作任意客户端可信输入。
+- activate.py只把本部署Docker网桥的实际gateway加入HYJS_TRUSTED_PROXIES；Nginx覆盖传入的X-Forwarded-For，防止客户端伪造来源。不要设置任意来源可信。
+- 新部署前备份采用HYJSBK01格式AES-256-GCM，密钥保存在部署根的.backup-encryption.key（0600），备份在私有backups目录（0700）。密钥与备份分别保管，密钥不进入Git、日志、制品包或数据库。历史备份保留原权限，不自动清理业务历史。
+- 加密后先解密并核对摘要，再删除本次临时明文；失败保留私有.pending文件，部署中止。单快照上限256MiB，达到上限时采用另行审查的流式工具，禁止跳过备份。
+- 手工恢复前先用hyjs-backupseal --decrypt --key-file 私有密钥路径 --input 选定.aesgcm --output 新的私有.sql.gz进行认证解密；该命令不执行数据库恢复。必须确认目标实例与所选备份后才导入。
+
+### 密码升级后的直接代码回退
+
+当前制品附带hyjs-server-auth-compatible-rollback及其JSON摘要：以90b2355业务版本为基线，只补入新PHC与旧scrypt/bcrypt密码校验能力，已执行对应账号登录检查。新凭据产生后，禁止直接切回缺少新密码校验的旧二进制。
+
+在专用部署根目录建立私有临时Compose覆盖文件（仅用于回退）：
+
+```yaml
+services:
+  app:
+    entrypoint: ["/app/hyjs-server-auth-compatible-rollback"]
+```
+
+使用当前同一镜像、原compose.yaml、原.env及该覆盖文件，仅重建app服务；MySQL、账号、钱包、存档、回执及密码保持。回退业务程序不提供新安全事件API，原运营功能和原操作审计保持；不要把安全功能完整保留视为旧业务回退结果。下一次正常部署不使用此临时覆盖文件。

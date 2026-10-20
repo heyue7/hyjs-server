@@ -10,12 +10,12 @@ import (
 	"strings"
 	"time"
 
-	"golang.org/x/crypto/scrypt"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 	"hyjs-server/constUtil"
 	"hyjs-server/db"
 	"hyjs-server/model"
+	"hyjs-server/utils"
 )
 
 // InitializeGlobalGameAccounts links existing role rows without rewriting save, password or session bytes.
@@ -166,27 +166,57 @@ func syncGlobalAccountRole(tx *gorm.DB, profile *db.Profile) error {
 	return db.AccountsTable(tx, "game_account_roles").Clauses(clause.OnConflict{Columns: []clause.Column{{Name: "account_id"}, {Name: "server_id"}}, DoUpdates: clause.AssignmentColumns([]string{"name", "level"})}).Create(&row).Error
 }
 
-func globalAccountPasswordMatches(account *db.GameAccount, password string) bool {
+func globalAccountPasswordMatches(ctx context.Context, account *db.GameAccount, password string) (bool, bool, error) {
 	if account == nil || len(account.PasswordSalt) == 0 || len(account.PasswordHash) == 0 {
-		return false
+		return false, false, nil
 	}
-	digest, err := scrypt.Key([]byte(password), account.PasswordSalt, 16384, 8, 1, 32)
-	return err == nil && subtle.ConstantTimeCompare(digest, account.PasswordHash) == 1
+	return utils.VerifyPasswordCredential(ctx, password, account.PasswordSalt, account.PasswordHash)
 }
 
 // loginGlobalGameAccount authenticates once globally and materializes only the selected real runtime's original role shell.
 func loginGlobalGameAccount(ctx context.Context, uid, password string) (*db.Profile, error) {
+	var snapshot db.GameAccount
+	if err := db.AccountsTable(db.GetIns().WithContext(ctx), "game_accounts").Where("username=?", uid).Take(&snapshot).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			// 全局账号不存在时明确要求注册，绝不沿用旧存储的首次登录自动建号。
+			return nil, errors.New("账号或密码错误，请先注册账号")
+		}
+		return nil, err
+	}
+	// 密码计算在事务外完成；事务内只核对快照并更新会话，缩短账号行锁持有时间。
+	valid, legacy, err := utils.VerifyPasswordCredential(ctx, password, snapshot.PasswordSalt, snapshot.PasswordHash)
+	if err != nil {
+		if passwordCredentialRetryable(err) {
+			return nil, err
+		}
+		return nil, errors.New("账号或密码错误")
+	}
+	if !valid || !snapshot.Enabled {
+		return nil, errors.New("账号或密码错误")
+	}
+	var (
+		upgradeSalt []byte
+		upgradeHash []byte
+	)
+	if legacy {
+		// 旧 scrypt 摘要不能直接重算，必须用本次明文密码重新生成 Argon2id 凭据。
+		upgradeSalt, upgradeHash, err = utils.NewPasswordCredential(ctx, password)
+		if err != nil {
+			return nil, err
+		}
+	}
 	var result db.Profile
-	err := db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	err = db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := ServerGameClockGuardTransaction(tx); err != nil {
 			return err
 		}
 		var account db.GameAccount
-		if err := db.AccountsTable(tx, "game_accounts").Clauses(clause.Locking{Strength: "UPDATE"}).Where("username=?", uid).First(&account).Error; err != nil {
-			return errors.New("账号或密码错误，请先注册账号")
+		if err := db.AccountsTable(tx, "game_accounts").Clauses(clause.Locking{Strength: "UPDATE"}).First(&account, snapshot.ID).Error; err != nil {
+			return err
 		}
-		if !account.Enabled || !globalAccountPasswordMatches(&account, password) {
-			return errors.New("账号或密码错误")
+		// 锁内摘要、启用状态和授权版本必须与事务外快照一致，防止并发改密后发放会话。
+		if !account.Enabled || account.AuthRevision != snapshot.AuthRevision || !bytes.Equal(account.PasswordSalt, snapshot.PasswordSalt) || !bytes.Equal(account.PasswordHash, snapshot.PasswordHash) {
+			return errors.New("账号状态已变化，请重新登录")
 		}
 		serverID := constUtil.GameDefaultServerID
 		if game, ok := ctx.Value(constUtil.GameServiceContextKey).(*GameService); ok {
@@ -199,16 +229,35 @@ func loginGlobalGameAccount(ctx context.Context, uid, password string) (*db.Prof
 		if found == nil && (AdminProfileServerID(result) != serverID || result.AccountID != account.ID) {
 			return errors.New("角色不属于当前区服账号")
 		}
-		if errors.Is(found, gorm.ErrRecordNotFound) {
+		created := errors.Is(found, gorm.ErrRecordNotFound)
+		if created {
 			result = db.Profile{ServerID: serverID, AccountID: account.ID, Uid: uid, PasswordSalt: append([]byte{}, account.PasswordSalt...), PasswordHash: append([]byte{}, account.PasswordHash...)}
+		}
+		if legacy {
+			result.PasswordSalt, result.PasswordHash = upgradeSalt, upgradeHash
+			// 升级只替换摘要列，不递增 AuthRevision/Revision，避免普通登录撤销跨区会话或制造后台版本冲突。
+			if err := db.AccountsTable(tx, "game_accounts").Where("id=? AND password_salt=? AND password_hash=?", account.ID, snapshot.PasswordSalt, snapshot.PasswordHash).Updates(map[string]any{"password_salt": upgradeSalt, "password_hash": upgradeHash}).Error; err != nil {
+				return err
+			}
 		}
 		result.Session = make([]byte, 16)
 		if _, err := rand.Read(result.Session); err != nil {
 			return err
 		}
 		result.AccountAuthRevision = account.AuthRevision
-		if err := tx.Save(&result).Error; err != nil {
-			return err
+		if created {
+			if err := tx.Create(&result).Error; err != nil {
+				return err
+			}
+		} else {
+			updates := map[string]any{"session": result.Session, "account_auth_revision": result.AccountAuthRevision}
+			if legacy {
+				updates["password_salt"] = result.PasswordSalt
+				updates["password_hash"] = result.PasswordHash
+			}
+			if err := tx.Model(&db.Profile{}).Where("id=?", result.Id).Updates(updates).Error; err != nil {
+				return err
+			}
 		}
 		return syncGlobalAccountRole(tx, &result)
 	})
@@ -422,8 +471,27 @@ func UpdateCurrentGlobalGameAccount(ctx context.Context, id int64, session []byt
 	if err != nil {
 		return nil, err
 	}
-	var prepared *db.GameAccount
+	var (
+		prepared *db.GameAccount
+		snapshot *db.GameAccount
+	)
 	if newPassword != "" {
+		// 旧密码校验和新密码计算都放在事务外，短事务只负责锁定、比对快照并落库。
+		var current db.GameAccount
+		if err := db.AccountsTable(db.GetIns().WithContext(ctx), "game_accounts").First(&current, owner.AccountID).Error; err != nil {
+			return nil, err
+		}
+		valid, _, err := globalAccountPasswordMatches(ctx, &current, oldPassword)
+		if err != nil {
+			if passwordCredentialRetryable(err) {
+				return nil, err
+			}
+			return nil, errors.New("原密码不正确")
+		}
+		if !valid {
+			return nil, errors.New("原密码不正确")
+		}
+		snapshot = &current
 		prepared, err = prepareGlobalGameAccount(ctx, "", newPassword, "")
 		if err != nil {
 			return nil, err
@@ -443,8 +511,8 @@ func UpdateCurrentGlobalGameAccount(ctx context.Context, id int64, session []byt
 			return errors.New("账号登录已失效或受保护")
 		}
 		if prepared != nil {
-			if !globalAccountPasswordMatches(&account, oldPassword) {
-				return errors.New("原密码不正确")
+			if snapshot == nil || !bytes.Equal(account.PasswordSalt, snapshot.PasswordSalt) || !bytes.Equal(account.PasswordHash, snapshot.PasswordHash) {
+				return errors.New("账号凭据已更新，请重新登录")
 			}
 			account.PasswordSalt, account.PasswordHash = prepared.PasswordSalt, prepared.PasswordHash
 			account.AuthRevision++

@@ -16,18 +16,25 @@ import (
 	"strings"
 	"time"
 
-	"golang.org/x/crypto/bcrypt"
+	"encoding/base64"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 	"hyjs-server/constUtil"
 	"hyjs-server/db"
 	"hyjs-server/model"
+	"hyjs-server/utils"
 )
 
 // AdminInitialize 只创建独立后台结构；首次启动可从0600文件建立管理员，永不覆盖既有账号。
 func AdminInitialize(ctx context.Context, bootstrapFilePath string) error {
 	d := db.GetIns().WithContext(ctx)
 	if err := d.AutoMigrate(&db.AdminUser{}, &db.AdminSession{}, &db.AdminLoginThrottle{}, &db.AdminAudit{}); err != nil {
+		return err
+	}
+	if err := InitializeSecurityEvents(ctx); err != nil {
+		return err
+	}
+	if err := InitializeLoginSecurity(ctx); err != nil {
 		return err
 	}
 	if bootstrapFilePath == "" {
@@ -68,7 +75,7 @@ func AdminInitialize(ctx context.Context, bootstrapFilePath string) error {
 	if !adminUsernameValid(bootstrap.Username) || !adminPasswordValid(bootstrap.Password) {
 		return constUtil.ErrAdminConfiguration
 	}
-	passwordHash, err := bcrypt.GenerateFromPassword([]byte(bootstrap.Password), bcrypt.DefaultCost)
+	_, passwordHash, err := utils.NewPasswordCredential(ctx, bootstrap.Password)
 	if err != nil {
 		return err
 	}
@@ -119,60 +126,112 @@ func adminUserDTO(user *db.AdminUser) model.AdminUserDTO {
 	return model.AdminUserDTO{ID: user.ID, Username: user.Username, Role: user.Role}
 }
 
-// AdminLogin 原子保存失败冷却或创建随机12小时会话；失败回包与账户是否存在无关。
+// adminPasswordMatches accepts existing bcrypt and the current PHC credential.
+func adminPasswordMatches(ctx context.Context, password, encoded string) (bool, bool, error) {
+	var salt []byte
+	if strings.HasPrefix(encoded, "$argon2id$") {
+		parts := strings.Split(encoded, "$")
+		if len(parts) != 6 {
+			return false, false, constUtil.ErrAdminCredentials
+		}
+		var err error
+		salt, err = base64.RawStdEncoding.DecodeString(parts[4])
+		if err != nil {
+			return false, false, constUtil.ErrAdminCredentials
+		}
+	}
+	return utils.VerifyPasswordCredential(ctx, password, salt, []byte(encoded))
+}
+
+// AdminLogin computes credentials outside the database transaction, then locks
+// and rechecks the exact credential/state before issuing a session or upgrading.
 func AdminLogin(ctx context.Context, username, password string) (*model.AdminLoginResult, error) {
-	// Handler负责清洗；内部认证仍拒绝非规范账号，防止同账号冷却被大小写或空格绕过。
 	username = strings.ToLower(strings.TrimSpace(username))
 	if !adminUsernameValid(username) || len(password) > constUtil.AdminPasswordMaxBytes {
 		return nil, constUtil.ErrAdminCredentials
 	}
+	d := db.GetIns().WithContext(ctx)
+	now := time.Now().Unix()
+	var throttle db.AdminLoginThrottle
+	lookupThrottle := d.First(&throttle, "username=?", username).Error
+	if lookupThrottle != nil && !errors.Is(lookupThrottle, gorm.ErrRecordNotFound) {
+		return nil, lookupThrottle
+	}
+	if throttle.LockedUntilUnix > now {
+		return nil, constUtil.ErrAdminLoginCooldown
+	}
+	var snapshot db.AdminUser
+	lookup := d.Where("username=?", username).Take(&snapshot).Error
+	if lookup != nil && !errors.Is(lookup, gorm.ErrRecordNotFound) {
+		return nil, lookup
+	}
+	valid := lookup == nil && snapshot.Enabled && AdminRoleValid(snapshot.Role)
+	var matched, legacy bool
+	var err error
+	if valid {
+		matched, legacy, err = adminPasswordMatches(ctx, password, snapshot.PasswordHash)
+	} else {
+		err = utils.VerifyUnavailablePassword(ctx, password)
+	}
+	if err != nil {
+		return nil, err
+	}
+	if errors.Is(lookup, gorm.ErrRecordNotFound) {
+		return nil, constUtil.ErrAdminCredentials
+	}
+	var upgraded []byte
+	if matched && legacy {
+		_, upgraded, err = utils.NewPasswordCredential(ctx, password)
+		if err != nil {
+			return nil, err
+		}
+	}
 	var result *model.AdminLoginResult
 	var authErr error
-	now := time.Now().Unix()
-	err := db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	err = d.Transaction(func(tx *gorm.DB) error {
 		if err := ServerGameClockGuardTransaction(tx); err != nil {
 			return err
 		}
-
 		state := db.AdminLoginThrottle{Username: username}
 		if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&state).Error; err != nil {
 			return err
 		}
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&state, "username = ?", username).Error; err != nil {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&state, "username=?", username).Error; err != nil {
 			return err
 		}
+		now = time.Now().Unix()
 		if state.LockedUntilUnix > now {
 			authErr = constUtil.ErrAdminLoginCooldown
 			return nil
 		}
-		if state.WindowStartedAtUnix == 0 || now-state.WindowStartedAtUnix >= constUtil.AdminLoginCooldownSeconds {
+		if state.WindowStartedAtUnix == 0 || now-state.WindowStartedAtUnix >= int64(constUtil.LoginFailureWindow.Seconds()) {
 			state.Failures = 0
 			state.WindowStartedAtUnix = now
 			state.LockedUntilUnix = 0
 		}
 		var user db.AdminUser
-		lookup := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("username = ?", username).Take(&user).Error
-		if lookup != nil && !errors.Is(lookup, gorm.ErrRecordNotFound) {
-			return lookup
+		found := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("username=?", username).Take(&user).Error
+		if found != nil && !errors.Is(found, gorm.ErrRecordNotFound) {
+			return found
 		}
-		valid := lookup == nil && user.Enabled && AdminRoleValid(user.Role)
-		passwordHash := []byte(user.PasswordHash)
-		if !valid {
-			// 不存在的账号同样执行bcrypt，避免廉价的账号枚举与无成本猜测。
-			var err error
-			passwordHash, err = bcrypt.GenerateFromPassword([]byte("unavailable-admin-login"), bcrypt.DefaultCost)
-			if err != nil {
-				return err
-			}
-		}
-		if bcrypt.CompareHashAndPassword(passwordHash, []byte(password)) != nil || !valid {
-			state.Failures++
+		// A concurrent password/role/enable change invalidates the computed snapshot.
+		if found == nil && valid && (user.ID != snapshot.ID || user.PasswordHash != snapshot.PasswordHash || user.Enabled != snapshot.Enabled || user.Role != snapshot.Role) {
 			authErr = constUtil.ErrAdminCredentials
-			if state.Failures >= constUtil.AdminLoginFailureLimit {
-				state.LockedUntilUnix = now + constUtil.AdminLoginCooldownSeconds
+			return nil
+		}
+		if !valid || !matched || found != nil {
+			state.Failures = min(state.Failures+1, int64(10))
+			authErr = constUtil.ErrAdminCredentials
+			if delay := LoginFailureDelay(state.Failures); delay > 0 {
+				state.LockedUntilUnix = now + int64(delay.Seconds())
 				authErr = constUtil.ErrAdminLoginCooldown
 			}
 			return tx.Save(&state).Error
+		}
+		if len(upgraded) > 0 {
+			if err := tx.Model(&user).Update("password_hash", string(upgraded)).Error; err != nil {
+				return err
+			}
 		}
 		token, err := adminRandomToken()
 		if err != nil {
@@ -283,7 +342,7 @@ func AdminCreateUser(ctx context.Context, principal *model.AdminPrincipal, usern
 	if !adminUsernameValid(username) || !adminPasswordValid(password) || !AdminRoleValid(role) {
 		return nil, constUtil.ErrAdminConfiguration
 	}
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	_, hash, err := utils.NewPasswordCredential(ctx, password)
 	if err != nil {
 		return nil, err
 	}
@@ -360,7 +419,22 @@ func AdminChangePassword(ctx context.Context, principal *model.AdminPrincipal, u
 	if principal == nil || userID < 1 || !adminPasswordValid(newPassword) {
 		return constUtil.ErrAdminConfiguration
 	}
-	hash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	var snapshot db.AdminUser
+	if err := db.GetIns().WithContext(ctx).First(&snapshot, userID).Error; err != nil {
+		return err
+	}
+	if principal.UserID == userID {
+		matched, _, err := adminPasswordMatches(ctx, currentPassword, snapshot.PasswordHash)
+		if err != nil {
+			return err
+		}
+		if !snapshot.Enabled || !matched {
+			return constUtil.ErrAdminCredentials
+		}
+	} else if err := adminRequireAdministrator(db.GetIns().WithContext(ctx), principal); err != nil {
+		return err
+	}
+	_, hash, err := utils.NewPasswordCredential(ctx, newPassword)
 	if err != nil {
 		return err
 	}
@@ -374,7 +448,7 @@ func AdminChangePassword(ctx context.Context, principal *model.AdminPrincipal, u
 			return err
 		}
 		if principal.UserID == userID {
-			if !user.Enabled || bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(currentPassword)) != nil {
+			if !user.Enabled || user.PasswordHash != snapshot.PasswordHash {
 				return constUtil.ErrAdminCredentials
 			}
 		} else if err := adminRequireAdministrator(tx, principal); err != nil {

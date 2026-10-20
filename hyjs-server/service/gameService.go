@@ -13,6 +13,7 @@ import (
 	"hyjs-server/elog"
 	"hyjs-server/model"
 	pb "hyjs-server/model/protocol"
+	"hyjs-server/utils"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -172,10 +173,50 @@ func (s *GameService) dispatch(ctx context.Context, r *model.GamePacket, peer st
 		if !realm.Enabled {
 			return nil, errors.New("当前区服维护中")
 		}
-		row, err := LoginAccount(ctx, b.GetPlatformUid(), b.GetAuthCode())
+		username := b.GetPlatformUid()
+		event := model.SecurityEventInput{Actor: username, SourceIP: peer, Action: "game.login", Target: "account", Outcome: "failure", ReasonCode: "invalid_credentials"}
+		if !LoginIngressAllowed(peer, time.Now()) {
+			event.Outcome = "throttled"
+			event.ReasonCode = "ingress_limit"
+			ObserveSecurityEvent(ctx, event)
+			return nil, errors.New("登录请求较多，请稍后重试")
+		}
+		if delay, e := GameLoginRetryAfter(ctx, username, time.Now()); e != nil {
+			return nil, e
+		} else if delay > 0 {
+			event.Outcome = "throttled"
+			event.ReasonCode = "account_retry"
+			ObserveSecurityEvent(ctx, event)
+			return nil, fmt.Errorf("登录尝试较多，请%d秒后重试", max(1, int64(delay.Seconds())+1))
+		}
+		row, err := LoginAccount(ctx, username, b.GetAuthCode())
 		if err != nil {
+			if strings.HasPrefix(err.Error(), "账号或密码错误") {
+				if strings.Contains(err.Error(), "请先注册") {
+					if e := utils.VerifyUnavailablePassword(ctx, b.GetAuthCode()); e != nil {
+						return nil, e
+					}
+				}
+				delay, e := RecordGameLoginFailure(ctx, username, time.Now())
+				if e != nil {
+					return nil, e
+				}
+				ObserveSecurityEvent(ctx, event)
+				if delay > 0 {
+					return nil, fmt.Errorf("登录尝试较多，请%d秒后重试", max(1, int64(delay.Seconds())))
+				}
+				return nil, errors.New("账号或密码错误")
+			}
+			event.ReasonCode = "service_unavailable"
+			ObserveSecurityEvent(ctx, event)
 			return nil, err
 		}
+		if e := ClearGameLoginFailures(ctx, username); e != nil {
+			elog.Warn("login retry state reset unavailable")
+		}
+		event.Outcome = "success"
+		event.ReasonCode = "authenticated"
+		ObserveSecurityEvent(ctx, event)
 		ctx, err = s.BindLocalPlayContext(ctx, row)
 		if err != nil {
 			return nil, err

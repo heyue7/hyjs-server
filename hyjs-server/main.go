@@ -454,7 +454,11 @@ func run() error {
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()
 	r.Use(gin.CustomRecovery(func(c *gin.Context, _ any) { c.AbortWithStatus(http.StatusInternalServerError) }))
-	r.SetTrustedProxies(nil)
+	if err = middleware.ConfigureTrustedProxies(r, config.AppConfigIns.Security.TrustedProxies); err != nil {
+		return err
+	}
+	r.Use(middleware.SecurityHeaders(config.AppConfigIns.Security.AdminSecureCookies))
+	r.Use(handler.AdminSecurityFallback)
 	// 公网入口采用精确同源策略，原无 Origin 的游戏协议保持原路径。
 	r.Use(middleware.CORS())
 	r.GET("/health", func(c *gin.Context) {

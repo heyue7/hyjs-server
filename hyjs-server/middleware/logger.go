@@ -18,10 +18,7 @@ func Logger() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
 		path := c.Request.URL.Path
-		raw := c.Request.URL.RawQuery
-		if raw != "" {
-			path = path + "?" + raw
-		}
+		// Query values can contain authentication tokens; request logs keep the path only.
 		clientIP := c.ClientIP()
 		method := c.Request.Method
 

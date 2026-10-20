@@ -1,6 +1,7 @@
 package service
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/subtle"
@@ -9,13 +10,13 @@ import (
 	"errors"
 	"fmt"
 	mysqlDriver "github.com/go-sql-driver/mysql"
-	"golang.org/x/crypto/scrypt"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 	"hyjs-server/constUtil"
 	"hyjs-server/db"
 	"hyjs-server/model"
 	pb "hyjs-server/model/protocol"
+	"hyjs-server/utils"
 	"time"
 )
 
@@ -24,48 +25,91 @@ func LoginAccount(ctx context.Context, uid, password string) (*db.Profile, error
 	if globalGameAccountsAvailable(db.GetIns().WithContext(ctx)) {
 		return loginGlobalGameAccount(ctx, uid, password)
 	}
+	var (
+		snapshot     db.Profile
+		snapshotSalt []byte
+		snapshotHash []byte
+		newSalt      []byte
+		newEncoded   []byte
+		exists       bool
+		upgrade      bool
+		err          error
+	)
+	// 先在事务外读取凭据快照并完成密码计算，避免 Argon2id/scrypt 长时间持有角色行锁。
+	lookup := db.GetIns().WithContext(ctx).Where("uid=?", uid).Take(&snapshot).Error
+	if lookup != nil && !errors.Is(lookup, gorm.ErrRecordNotFound) {
+		return nil, lookup
+	}
+	if errors.Is(lookup, gorm.ErrRecordNotFound) {
+		// 旧存储首次登录保留自动注册兼容，新账号直接写入当前 Argon2id 凭据。
+	} else {
+		exists = true
+		if game, ok := ctx.Value(constUtil.GameServiceContextKey).(*GameService); ok && AdminProfileServerID(snapshot) != game.OriginalServerID() {
+			return nil, errors.New("账号不属于当前区服")
+		}
+		if snapshot.AccountID > 0 {
+			return nil, errors.New("全局账号资料不可用，请稍后重试")
+		}
+		if len(snapshot.PasswordHash) == 0 {
+			return nil, errors.New("此账号属于早期无密码测试数据，请使用新的本地账号")
+		}
+		var valid bool
+		valid, upgrade, err = utils.VerifyPasswordCredential(ctx, password, snapshot.PasswordSalt, snapshot.PasswordHash)
+		if err != nil {
+			if passwordCredentialRetryable(err) {
+				return nil, err
+			}
+			return nil, errors.New("账号或密码错误")
+		}
+		if !valid {
+			return nil, errors.New("账号或密码错误")
+		}
+		snapshotSalt = append([]byte{}, snapshot.PasswordSalt...)
+		snapshotHash = append([]byte{}, snapshot.PasswordHash...)
+	}
+	if !exists || upgrade {
+		newSalt, newEncoded, err = utils.NewPasswordCredential(ctx, password)
+		if err != nil {
+			return nil, err
+		}
+	}
+	serverID := constUtil.GameDefaultServerID
+	if game, ok := ctx.Value(constUtil.GameServiceContextKey).(*GameService); ok {
+		serverID = game.OriginalServerID()
+	}
 	var row db.Profile
-	var err error
-	// 唯一键竞争与死锁重试整个登录事务，已有账号先锁定再轮换会话。
+	// 唯一键竞争与死锁重试整个登录事务；短事务只锁定角色行核对快照并轮换会话。
 	for attempt := 0; attempt < 3; attempt++ {
 		row = db.Profile{}
 		err = db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 			if err := ServerGameClockGuardTransaction(tx); err != nil {
 				return err
 			}
-
-			found := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("uid = ?", uid).First(&row).Error
+			var current db.Profile
+			found := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("uid = ?", uid).First(&current).Error
 			if found != nil && !errors.Is(found, gorm.ErrRecordNotFound) {
 				return found
 			}
-			if game, ok := ctx.Value(constUtil.GameServiceContextKey).(*GameService); ok && found == nil && AdminProfileServerID(row) != game.OriginalServerID() {
-				return errors.New("账号不属于当前区服")
-			}
-			if found == nil && row.AccountID > 0 {
-				return errors.New("全局账号资料不可用，请稍后重试")
-			}
-			if found == nil && len(row.PasswordHash) == 0 {
-				return errors.New("此账号属于早期无密码测试数据，请使用新的本地账号")
-			}
-			if found != nil {
-				row.ServerID = constUtil.GameDefaultServerID
-				if game, ok := ctx.Value(constUtil.GameServiceContextKey).(*GameService); ok {
-					row.ServerID = game.OriginalServerID()
+			if exists {
+				if errors.Is(found, gorm.ErrRecordNotFound) {
+					return errors.New("账号状态已变化，请重新登录")
 				}
-				row.Uid = uid
-				row.PasswordSalt = make([]byte, 16)
-				if _, err := rand.Read(row.PasswordSalt); err != nil {
-					return err
+				// 快照与锁内摘要必须一致，防止修改密码并发时用旧密码换发新会话。
+				if !bytes.Equal(current.PasswordSalt, snapshotSalt) || !bytes.Equal(current.PasswordHash, snapshotHash) {
+					return errors.New("账号凭据已更新，请重新登录")
 				}
+				row = current
+			} else {
+				if !errors.Is(found, gorm.ErrRecordNotFound) {
+					// 并发首次登录已由其他请求创建账号，后到请求不接管该身份。
+					return errors.New("账号或密码错误")
+				}
+				row = db.Profile{ServerID: serverID, Uid: uid}
 			}
-			digest, err := scrypt.Key([]byte(password), row.PasswordSalt, 16384, 8, 1, 32)
-			if err != nil {
-				return err
+			if !exists || upgrade {
+				row.PasswordSalt, row.PasswordHash = newSalt, newEncoded
 			}
-			if found == nil && subtle.ConstantTimeCompare(digest, row.PasswordHash) != 1 {
-				return errors.New("账号或密码错误")
-			}
-			row.PasswordHash = digest
+			row.Uid = uid
 			row.Session = make([]byte, 16)
 			if _, err = rand.Read(row.Session); err != nil {
 				return err

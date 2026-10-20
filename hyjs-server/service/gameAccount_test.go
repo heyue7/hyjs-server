@@ -62,7 +62,7 @@ func TestGameAccountRegisterStrictDuplicateConcurrentAndOriginalLogin(t *testing
 	if err := db.GetIns().First(&original, registered.PlayerID).Error; err != nil {
 		t.Fatal(err)
 	}
-	if original.Player != nil || original.Game != nil || len(original.PasswordSalt) != 16 || len(original.PasswordHash) != 32 || len(original.Session) != 16 || bytes.Contains(original.PasswordHash, []byte(password)) {
+	if original.Player != nil || original.Game != nil || len(original.PasswordSalt) != 16 || !bytes.HasPrefix(original.PasswordHash, []byte("$argon2id$")) || len(original.Session) != 16 || bytes.Contains(original.PasswordHash, []byte(password)) {
 		t.Fatal("registration bypassed original new-player boundary or password storage")
 	}
 	if _, err := RegisterGameAccount(f.ctx, username, password); !errors.Is(err, constUtil.ErrGameAccountExists) {

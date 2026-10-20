@@ -128,7 +128,7 @@ func P10VoiceDownloadHandler(c *gin.Context) error {
 		return model.NewErrParamsError()
 	}
 	name := req.FileName
-	if !strings.HasPrefix(name, constUtil.P10VoicePrefix) || !strings.HasSuffix(name, ".wav") || strings.Trim(name[10:42], "0123456789abcdef") != "" {
+	if len(name) != len(constUtil.P10VoicePrefix)+32+len(".wav") || !strings.HasPrefix(name, constUtil.P10VoicePrefix) || !strings.HasSuffix(name, ".wav") || strings.Trim(name[len(constUtil.P10VoicePrefix):len(constUtil.P10VoicePrefix)+32], "0123456789abcdef") != "" {
 		return model.NewErrParamsError()
 	}
 	raw, err := gameService.DownloadP10Voice(c.Request.Context(), req.PlayerID, session, name)
@@ -164,7 +164,7 @@ func P10VoiceDeleteHandler(c *gin.Context) error {
 		return model.NewErrParamsError()
 	}
 	name := req.FileName
-	if !strings.HasPrefix(name, constUtil.P10VoicePrefix) || !strings.HasSuffix(name, ".wav") || strings.Trim(name[10:42], "0123456789abcdef") != "" {
+	if len(name) != len(constUtil.P10VoicePrefix)+32+len(".wav") || !strings.HasPrefix(name, constUtil.P10VoicePrefix) || !strings.HasSuffix(name, ".wav") || strings.Trim(name[len(constUtil.P10VoicePrefix):len(constUtil.P10VoicePrefix)+32], "0123456789abcdef") != "" {
 		return model.NewErrParamsError()
 	}
 	result, err := gameService.DeleteP10Voice(c.Request.Context(), req.PlayerID, session, name)

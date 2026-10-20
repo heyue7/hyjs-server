@@ -3,12 +3,14 @@ package handler
 import (
 	"errors"
 	"html/template"
+	"hyjs-server/middleware"
+	"hyjs-server/utils"
 	"net/http"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"hyjs-server/constUtil"
@@ -19,25 +21,22 @@ import (
 // RegisterAdminRoutes 在既有Go端口接入独立后台认证及原运营服务。
 func RegisterAdminRoutes(r *gin.Engine, assets string) {
 	a := r.Group("/admin/api")
+	a.Use(adminSecurityObservation)
 	a.Use(func(c *gin.Context) {
 		c.Header("Cache-Control", "no-store")
 		c.Header("X-Content-Type-Options", "nosniff")
 		c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 1048576)
-		if c.Request.Method != "GET" {
-			if origin := c.GetHeader("Origin"); origin != "" {
-				u, e := url.Parse(origin)
-				if e != nil || u.Host != c.Request.Host || (u.Scheme != "http" && u.Scheme != "https") {
-					adminError(c, constUtil.ErrAdminPermission)
-					c.Abort()
-					return
-				}
-			}
+		if c.Request.Method != "GET" && !middleware.ValidAdminOrigin(c.Request, middleware.SecureAdminCookies(c)) {
+			adminError(c, constUtil.ErrAdminPermission)
+			c.Abort()
+			return
 		}
 		c.Next()
 	})
 	a.POST("/auth/login", AdminLoginHandler)
 	a.Use(adminAuthentication)
 	a.Use(adminServerScope)
+	RegisterAdminSecurityEventRoutes(a)
 	RegisterAdminGameServerRoutes(a)
 	RegisterAdminActivityScheduleRoutes(a)
 	RegisterAdminFieldRoutes(a)
@@ -108,6 +107,10 @@ func adminError(c *gin.Context, err error) {
 	case errors.Is(err, constUtil.ErrAdminPermission):
 		status = http.StatusForbidden
 		message = err.Error()
+	case errors.Is(err, utils.ErrPasswordWorkBusy):
+		status = http.StatusServiceUnavailable
+		message = "登录服务繁忙，请稍后重试"
+		c.Header("Retry-After", "2")
 	case errors.Is(err, constUtil.ErrAdminLoginCooldown):
 		status = http.StatusTooManyRequests
 		message = err.Error()
@@ -178,9 +181,16 @@ func adminID(c *gin.Context) (int64, bool) {
 // @Success 200 {object} model.AdminUserDTO
 // @Router /admin/api/auth/login [post]
 func AdminLoginHandler(c *gin.Context) {
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 4096)
 	var req model.AdminLoginRequest
 	if c.ShouldBindJSON(&req) != nil || len(req.Username) > 64 || len(req.Password) > 72 {
 		adminError(c, constUtil.ErrAdminInput)
+		return
+	}
+	c.Set("hyjs-login-actor", strings.ToLower(strings.TrimSpace(req.Username)))
+	if !service.LoginIngressAllowed(c.ClientIP(), time.Now()) {
+		c.Header("Retry-After", "2")
+		adminError(c, constUtil.ErrAdminLoginCooldown)
 		return
 	}
 	result, err := service.AdminLogin(c.Request.Context(), req.Username, req.Password)
@@ -189,7 +199,7 @@ func AdminLoginHandler(c *gin.Context) {
 		return
 	}
 	c.SetSameSite(http.SameSiteStrictMode)
-	secure := c.Request.TLS != nil
+	secure := middleware.SecureAdminCookies(c)
 	c.SetCookie(constUtil.AdminSessionCookieName, result.SessionToken, int(constUtil.AdminSessionLifetimeSeconds), "/admin", "", secure, true)
 	c.SetCookie(constUtil.AdminCSRFCookieName, result.CsrfToken, int(constUtil.AdminSessionLifetimeSeconds), "/admin", "", secure, false)
 	adminSuccess(c, gin.H{"user": result.User, "csrfToken": result.CsrfToken})
@@ -225,7 +235,7 @@ func AdminLogoutHandler(c *gin.Context) {
 	}
 	c.SetSameSite(http.SameSiteStrictMode)
 	for _, n := range []string{constUtil.AdminSessionCookieName, constUtil.AdminCSRFCookieName} {
-		c.SetCookie(n, "", -1, "/admin", "", c.Request.TLS != nil, n == constUtil.AdminSessionCookieName)
+		c.SetCookie(n, "", -1, "/admin", "", middleware.SecureAdminCookies(c), n == constUtil.AdminSessionCookieName)
 	}
 	adminSuccess(c, gin.H{"ok": true})
 }

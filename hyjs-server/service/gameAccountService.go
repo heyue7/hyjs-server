@@ -9,15 +9,14 @@ import (
 	"time"
 
 	mysqlDriver "github.com/go-sql-driver/mysql"
-	"golang.org/x/crypto/scrypt"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 	"hyjs-server/constUtil"
 	"hyjs-server/db"
 	"hyjs-server/model"
+	"hyjs-server/utils"
 )
 
-var gameAccountHashSlots = make(chan struct{}, constUtil.GameAccountRegisterHashConcurrency)
 var gameAccountRegisterClients = struct {
 	sync.Mutex
 	windows   map[string]gameAccountRegisterWindow
@@ -66,14 +65,13 @@ func gameAccountDuplicate(err error) bool {
 	return errors.Is(err, gorm.ErrDuplicatedKey) || (errors.As(err, &mysqlErr) && mysqlErr.Number == 1062) || db.IsSQLiteUniqueConstraint(err)
 }
 
-// gameAccountNewProfile prepares the same salt, digest and session formats used by LoginAccount.
+// passwordCredentialRetryable 区分计算繁忙或请求取消与真正的摘要格式错误，便于调用方重试。
+func passwordCredentialRetryable(err error) bool {
+	return errors.Is(err, utils.ErrPasswordWorkBusy) || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)
+}
+
+// gameAccountNewProfile prepares the current Argon2id credential and session for a newly created identity.
 func gameAccountNewProfile(ctx context.Context, username, password string) (*db.Profile, error) {
-	select {
-	case gameAccountHashSlots <- struct{}{}:
-		defer func() { <-gameAccountHashSlots }()
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	}
 	serverID := constUtil.GameDefaultServerID
 	if game, ok := ctx.Value(constUtil.GameServiceContextKey).(*GameService); ok {
 		serverID = game.OriginalServerID()
@@ -81,18 +79,14 @@ func gameAccountNewProfile(ctx context.Context, username, password string) (*db.
 	if selected := AdminSelectedServerID(ctx); selected > 0 {
 		serverID = selected
 	}
-	row := &db.Profile{ServerID: serverID, Uid: username, PasswordSalt: make([]byte, 16), Session: make([]byte, 16)}
-	if _, err := rand.Read(row.PasswordSalt); err != nil {
-		return nil, err
-	}
-	if _, err := rand.Read(row.Session); err != nil {
-		return nil, err
-	}
-	digest, err := scrypt.Key([]byte(password), row.PasswordSalt, 16384, 8, 1, 32)
+	salt, encoded, err := utils.NewPasswordCredential(ctx, password)
 	if err != nil {
 		return nil, err
 	}
-	row.PasswordHash = digest
+	row := &db.Profile{ServerID: serverID, Uid: username, PasswordSalt: salt, PasswordHash: encoded, Session: make([]byte, 16)}
+	if _, err := rand.Read(row.Session); err != nil {
+		return nil, err
+	}
 	return row, nil
 }
 

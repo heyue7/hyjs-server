@@ -17,7 +17,7 @@ const (
 
 var (
 	ErrAdminCredentials       = errors.New("后台账号或密码错误")
-	ErrAdminLoginCooldown     = errors.New("后台登录失败过多，请15分钟后重试")
+	ErrAdminLoginCooldown     = errors.New("登录尝试较多，请稍等片刻后重试（最长30秒）")
 	ErrAdminSession           = errors.New("后台会话无效或已过期")
 	ErrAdminPermission        = errors.New("后台操作权限不足")
 	ErrAdminConfiguration     = errors.New("后台认证配置无效")

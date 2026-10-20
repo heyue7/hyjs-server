@@ -52,7 +52,7 @@ func adminAuthBootstrapSessionCSRFAndRoles(t *testing.T, mysql bool) {
 	if err := db.GetIns().Where("username = ?", "owner").Take(&owner).Error; err != nil {
 		t.Fatal(err)
 	}
-	if owner.Role != constUtil.AdminRoleAdmin || owner.PasswordHash == "initial-test-secret-123" || bcrypt.CompareHashAndPassword([]byte(owner.PasswordHash), []byte("initial-test-secret-123")) != nil {
+	if owner.Role != constUtil.AdminRoleAdmin || owner.PasswordHash == "initial-test-secret-123" || !strings.HasPrefix(owner.PasswordHash, "$argon2id$") {
 		t.Fatal("bootstrap hash or role invalid")
 	}
 	// Reinitialization ignores changed bootstrap contents once an account exists.

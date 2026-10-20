@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"hyjs-server/constUtil"
 	"hyjs-server/db"
 	"hyjs-server/model"
 	"hyjs-server/wrapper"
@@ -61,6 +62,12 @@ func TestGameAccountRegistrationHTTPValidationDuplicateAndThrottle(t *testing.T)
 	}
 	if out := call(`{"username":"registered-second","password":"original-password","confirmPassword":"original-password","nickname":"冒险者"}`); out.Code != 200 {
 		t.Fatal("registration budget rejected before configured limit", out.Code)
+	}
+	// Consume the configured remainder with invalid input, without creating extra accounts.
+	for i := 5; i < constUtil.GameAccountRegisterPerWindow; i++ {
+		if out := call(`{}`); out.Code != 400 {
+			t.Fatal("registration allowance ended early", i, out.Code)
+		}
 	}
 	if out := call(`{"username":"registered-third","password":"original-password","confirmPassword":"original-password","nickname":"冒险者"}`); out.Code != 429 || out.Header().Get("Retry-After") == "" {
 		t.Fatal("guest registration limit not enforced", out.Code)
