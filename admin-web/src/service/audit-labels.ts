@@ -1,0 +1,76 @@
+// Exact actions written by service/admin*Service.go, globalGameAccountService.go,
+// gameAccountService.go, localPlayClockService.go, localWalletBillingService.go,
+// serverGameClockService.go, gameFeedbackService.go and re*Service.go.
+// Variable shop actions come from adminShopsService adminShopMutation callers;
+// arena/catalogue actions are declared in constUtil/adminArenaPrize.go and reActivityCatalogue.go.
+// Save/state actions stay distinct: a save does not imply publication or freezing.
+const actionLabels: Readonly<Record<string, string>> = {
+  'account.create': '新建游戏用户',
+  'account.update': '编辑游戏用户',
+  'account.password.reset': '重置游戏密码',
+  'player.create': '新增游戏角色',
+  'player.rename': '修改角色名称',
+  'player.kick': '角色下线',
+  'player.clock': '调整角色游戏日期',
+  'user.bootstrap': '初始化后台账号',
+  'user.create': '新建后台账号',
+  'user.role.update': '调整后台权限',
+  'user.password.change': '修改后台密码',
+  'activity.create': '新建活动',
+  'activity.update': '编辑活动',
+  'activity.state': '调整活动状态',
+  'activity.archive': '归档活动',
+  'activity.template.save': '保存活动模板',
+  'activity.template.archive': '归档活动模板',
+  'activity.schedule.save': '保存区服活动排期',
+  'activity.pattern.save': '保存排期模板',
+  'activity.pattern.archive': '归档排期模板',
+  'native-activity.update': '编辑原生活动',
+  'native-activity.state': '调整原生活动状态',
+  'native-activity.remove': '移除已停用活动',
+  'activity.re1051.catalogue-cleanup': '清理旧活动目录',
+  'activity.re1051.restore': '恢复体力领取活动',
+  'achievement.create': '新建成就',
+  'achievement.update': '编辑成就',
+  'achievement.archive': '归档成就',
+  'achievement.re1051.import': '导入成就配置',
+  'title.update': '编辑称号',
+  'shop.product.save': '保存商店商品',
+  'shop.product.remove': '移除商店商品',
+  'shop.settings': '保存商店设置',
+  'month-sign.save': '保存每日签到奖励',
+  'arena.prizes.update': '编辑竞技翻牌奖励',
+  'field.template.save': '保存野外资源方案',
+  'field.template.delete': '删除野外资源方案',
+  'field.deploy': '发布野外地图配置',
+  'field.channels.save': '保存野外分线',
+  'guild.settings.update': '编辑公会设置',
+  'guild.update': '编辑公会数值',
+  'guild.member.update': '编辑公会成员',
+  'guild.member.add': '添加公会成员',
+  'guild.member.remove': '移除公会成员',
+  'guild.dissolve': '解散公会',
+  'guild.reward.save': '保存公会奖励',
+  'announcement.save': '保存公告',
+  'resource.grant': '发放资源',
+  'resource.broadcast.preview': '预览群发补偿',
+  'resource.broadcast.send': '发送群发补偿',
+  'resource.mail.preview': '预览系统邮件',
+  'resource.mail.send': '发送系统邮件',
+  'cdk.create': '生成兑换码',
+  'cdk.update': '编辑兑换码',
+  'wallet.reason.update': '编辑钱包入账规则',
+  'server.create': '新建区服',
+  'server.update': '编辑区服',
+  'server.clock': '调整全服游戏日期',
+  'feedback.reply': '回复客服反馈',
+  'feedback.state': '更新反馈状态',
+};
+
+export function auditActionLabel(action: string) {
+  return Object.hasOwn(actionLabels, action) ? actionLabels[action] : '其他操作';
+}
+
+export function auditActorLabel(actor: string) {
+  return actor === 'system' ? '系统' : actor;
+}

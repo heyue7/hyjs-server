@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useDraftGuard } from '@/composables/useDraftGuard';
 import { h, onMounted, reactive, ref } from 'vue';
 import { NButton, NTag } from 'naive-ui';
 import type { DataTableColumns } from 'naive-ui';
@@ -12,6 +13,7 @@ const saving = ref(false);
 const saveError = ref('');
 const selected = ref<Announcement | null>(null);
 const draft = reactive({ title: '', content: '', enabled: false, startAt: 0, endAt: 0 });
+const editorGuard = useDraftGuard({ active: () => open.value, value: () => draft, busy: () => saving.value, writable: () => canWrite.value, label: '公告修改', close: () => { open.value = false; } });
 const preview = ref(false);
 async function load() {
   const result = await run(() => api<{ items: Announcement[] }>('/announcements'));
@@ -27,9 +29,11 @@ function edit(row: Announcement | null) {
   );
   preview.value = false;
   saveError.value = '';
+  editorGuard.capture();
   open.value = true;
 }
 async function save() {
+  if (saving.value || !canWrite.value) return;
   if (!draft.title.trim() || !draft.content.trim()) {
     saveError.value = '请填写公告标题和正文';
     return;
@@ -86,8 +90,7 @@ onMounted(load);
 
 <template>
   <div class="ops-page">
-    <div class="ops-toolbar">
-      <div class="ops-page-label">公告管理</div>
+    <div class="ops-filters">
       <NSpace>
         <NButton :loading="loading" @click="load">刷新</NButton>
         <NButton v-if="canWrite" type="primary" @click="edit(null)">新建公告</NButton>
@@ -105,8 +108,8 @@ onMounted(load);
       />
       <div class="ops-section-footer ops-muted">所有时间均为北京时间</div>
     </NCard>
-    <NDrawer v-model:show="open" :width="680" :mask-closable="!saving">
-      <NDrawerContent :title="selected ? '编辑公告' : '新建公告'" closable>
+    <NDrawer :show="open" @update:show="!$event && editorGuard.requestClose()" :width="680" :mask-closable="!saving">
+      <NDrawerContent :title="selected ? '编辑公告' : '新建公告'" :closable="!saving">
         <NAlert v-if="saveError" type="error" :title="saveError" class="mb-20px" />
         <NForm label-placement="top" :disabled="!canWrite || saving">
           <NFormItem label="标题" required>
@@ -153,7 +156,7 @@ onMounted(load);
         </article>
         <template #footer>
           <div class="ops-drawer-actions">
-            <NButton :disabled="saving" @click="open = false">关闭</NButton>
+            <NButton :disabled="saving" @click="editorGuard.requestClose()">关闭</NButton>
             <NButton v-if="canWrite" type="primary" :loading="saving" @click="save">保存公告</NButton>
           </div>
         </template>

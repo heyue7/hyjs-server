@@ -214,7 +214,7 @@ func adminGuildFieldGroups(s *GameService, stored adminGuildStored) []model.Admi
 		}
 		for i := range groups {
 			if groups[i].Key == def.Group {
-				groups[i].Fields = append(groups[i].Fields, model.AdminGuildConfigField{Key: def.Key, Label: label, ValueType: def.Type, Value: values[def.Key], Editable: true})
+				groups[i].Fields = append(groups[i].Fields, model.AdminGuildConfigField{Key: def.Key, Label: label, ValueType: def.Type, Value: values[def.Key], Editable: true, Min: def.Min, Max: def.Max})
 			}
 		}
 	}

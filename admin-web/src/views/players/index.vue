@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useDraftGuard } from '@/composables/useDraftGuard';
 import { computed, h, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { NButton, NSpace } from 'naive-ui';
@@ -65,6 +66,7 @@ const actionReason = ref('');
 const newName = ref('');
 const actionError = ref('');
 const acting = ref(false);
+const actionGuard = useDraftGuard({ active: () => Boolean(action.value), value: () => ({ name: newName.value, reason: actionReason.value }), busy: () => acting.value, writable: () => canWrite.value, label: '玩家修改', close: () => { action.value = ''; } });
 let detailRequest = 0;
 const inventoryRows = computed(
   () =>
@@ -135,9 +137,10 @@ function edit(kind: 'name' | 'kick') {
   actionReason.value = '';
   newName.value = detail.value?.name || '';
   actionError.value = '';
+  actionGuard.capture();
 }
 async function submitAction() {
-  if (!actionTarget.value || !canWrite.value) return;
+  if (!actionTarget.value || !canWrite.value || acting.value) return;
   if (!actionReason.value.trim()) {
     actionError.value = '请填写操作原因';
     return;
@@ -214,16 +217,6 @@ const columns: DataTableColumns<GamePlayer> = [
     ])
   }
 ];
-const removeSwitchGuard = scope.addSwitchGuard(() => {
-  if (acting.value) return false;
-  if (!createOpen.value && !action.value) return true;
-  return new Promise<boolean>(resolve => window.$dialog?.warning({
-    title: '切换运营区服？', content: '当前打开的用户编辑将关闭，请先确认填写内容已保存。',
-    positiveText: '切换区服', negativeText: '继续编辑', onPositiveClick: () => resolve(true),
-    onNegativeClick: () => resolve(false), onClose: () => resolve(false), onMaskClick: () => resolve(false)
-  }));
-});
-onBeforeUnmount(removeSwitchGuard);
 watch(activeTab, value => {
   if (value === 'inventory' && detail.value)
     loadCatalogue(detail.value.inventory).catch(e => {
@@ -236,24 +229,36 @@ onMounted(async () => {
  const id = Number(route.query.playerId);
  if (Number.isSafeInteger(id) && id > 0) { open.value = true; await loadDetail(id); }
 });
+onBeforeUnmount(() => { detailRequest += 1; });
 watch(() => route.query.wallet, requestedWallet);
+watch(() => scope.serverId, () => {
+  detailRequest += 1;
+  open.value = false; detail.value = null; walletTarget.value = null;
+  page.value = 1; load();
+});
 </script>
 
 <template>
   <div class="ops-page">
-    <div class="ops-toolbar">
-      <div class="ops-page-label">
-        玩家管理
-        <span class="ops-count">{{ total.toLocaleString() }}</span>
-      </div>
-      <NSpace><NButton :loading="loading" @click="load">刷新</NButton><NButton v-if="canWrite" type="primary" :disabled="!scope.currentServer?.runtimeBound || !scope.currentServer?.enabled" @click="createOpen = true">新增玩家</NButton></NSpace>
-    </div>
+
     <NAlert v-if="!scope.currentServer?.runtimeBound" type="info" title="该区服尚未部署，绑定游戏服务后可新增角色。" />
     <NAlert v-if="error" type="error" :title="error" />
     <NCard :bordered="false" class="ops-panel">
       <div class="ops-filters">
         <NInput v-model:value="q" placeholder="角色名称或 ID" clearable class="ops-search" @keydown.enter="search" />
         <NButton type="primary" @click="search">搜索</NButton>
+        <span class="ops-muted">共 {{ total.toLocaleString() }} 个角色</span>
+        <NSpace>
+          <NButton :loading="loading" @click="load">刷新</NButton>
+          <NButton
+            v-if="canWrite"
+            type="primary"
+            :disabled="!scope.currentServer?.runtimeBound || !scope.currentServer?.enabled"
+            @click="createOpen = true"
+          >
+            新增玩家
+          </NButton>
+        </NSpace>
       </div>
       <NDataTable
         :columns="columns"
@@ -330,12 +335,7 @@ watch(() => route.query.wallet, requestedWallet);
               </NTabPane>
               <NTabPane name="inventory" tab="背包">
                 <div class="ops-filters mt-16px">
-                  <NInput
-                    v-model:value="inventoryQ"
-                    clearable
-                    placeholder="搜索物品名称或编号"
-                    @update:value="inventoryPage = 1"
-                  />
+                  <NInput v-model:value="inventoryQ" clearable placeholder="搜索物品名称或编号" @update:value="inventoryPage = 1" />
                 </div>
                 <NDataTable
                   :columns="inventoryColumns"
@@ -361,7 +361,8 @@ watch(() => route.query.wallet, requestedWallet);
       :title="action === 'name' ? '修改角色名称' : '踢下线'"
       class="ops-modal"
       :mask-closable="!acting"
-      @update:show="!$event && (action = '')"
+      :closable="!acting"
+      @update:show="!$event && actionGuard.requestClose()"
     >
       <NAlert v-if="actionError" type="error" :title="actionError" class="mb-16px" />
       <div class="grant-object">
@@ -379,7 +380,7 @@ watch(() => route.query.wallet, requestedWallet);
       <p v-if="action === 'kick'" class="ops-muted">将结束该角色当前登录会话，角色存档保留。</p>
       <template #footer>
         <div class="ops-drawer-actions">
-          <NButton :disabled="acting" @click="action = ''">取消</NButton>
+          <NButton :disabled="acting" @click="actionGuard.requestClose()">取消</NButton>
           <NButton type="primary" :loading="acting" @click="submitAction">
             确认{{ action === 'name' ? '修改' : '下线' }}
           </NButton>

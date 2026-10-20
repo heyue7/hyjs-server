@@ -2,15 +2,17 @@
 import { computed, reactive, ref, watch } from 'vue';
 import type { ActivityProduct } from '@/service/activity-operations';
 import { createRequestId } from '@/utils/request-id';
+import { renderActivityOption, useActivitySelectorSummary } from '@/service/activity-selector-summary';
 import RewardList from './reward-list.vue';
 import ResourceSelect from './resource-select.vue';
 const products = defineModel<ActivityProduct[]>({ required: true });
 defineProps<{ disabled?: boolean; vipOptions: { label: string; value: string | number }[] }>();
 const selectedId = ref('');
+const { rewardsText, failed, loading, retry } = useActivitySelectorSummary(() => products.value.flatMap(row => [...row.rewards, row.cost]));
 const productOptions = computed(() =>
   products.value.map((product, index) => ({
     value: product.id,
-    label: `${index + 1}. ${product.name || '未命名项目'}`
+    label: `${index + 1}. ${product.name || '未命名项目'} · ${product.minLevel > 1 ? `${product.minLevel}级 · ` : ''}${product.minVip > 0 ? `VIP${product.minVip} · ` : ''}消耗：${rewardsText([product.cost], '免费领取')} → 获得：${rewardsText(product.rewards)}`
   }))
 );
 const selectedProducts = computed(() => products.value.filter(product => product.id === selectedId.value));
@@ -71,13 +73,14 @@ const hasProducts = computed(() => products.value.length > 0);
       v-if="hasProducts"
       v-model:value="selectedId"
       :options="productOptions"
+      :render-label="renderActivityOption"
       filterable
       class="mb-20px"
       aria-label="选择商品项目"
     />
+    <NButton v-if="failed" text size="small" :loading="loading" @click="retry">资源名称载入失败，点击重试（当前显示 ID）</NButton>
     <section v-for="product in selectedProducts" :key="product.id" class="activity-edit-section">
       <div class="ops-section-heading">
-        <strong>项目 {{ products.findIndex(row => row.id === product.id) + 1 }}</strong>
         <NButton
           :disabled="disabled"
           quaternary

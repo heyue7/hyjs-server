@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
+import { auditActionLabel, auditActorLabel } from '@/service/audit-labels';
 import { api, formatTime } from '@/service/operations';
 import type { Audit } from '@/service/operations';
 import { useOperations } from '@/composables/useOperations';
@@ -24,10 +25,7 @@ onMounted(load);
 
 <template>
   <div class="ops-page">
-    <div class="ops-toolbar">
-      <div class="ops-page-label">运营概览</div>
-      <NButton :loading="loading" @click="load">刷新</NButton>
-    </div>
+    <div class="ops-filters"><NButton :loading="loading" @click="load">刷新</NButton></div>
     <NAlert v-if="error" type="error" :title="error" />
     <NSpin :show="loading">
       <template v-if="overview">
@@ -59,9 +57,9 @@ onMounted(load);
           <NEmpty v-if="!overview.recentAudit?.length" description="暂无运营操作" />
           <div v-for="entry in overview.recentAudit" :key="entry.id" class="audit-line">
             <div>
-              <strong>{{ entry.actor }}</strong>
-              <span>{{ entry.action }}</span>
-              <span class="ops-muted">{{ entry.target }}</span>
+              <strong>{{ auditActorLabel(entry.actor) }}</strong>
+              <span :title="entry.action">{{ auditActionLabel(entry.action) }}</span>
+              <span v-if="entry.target" class="ops-mono ops-muted" :title="entry.target">{{ entry.target }}</span>
             </div>
             <time>{{ formatTime(entry.time) }}</time>
           </div>

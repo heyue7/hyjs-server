@@ -6,6 +6,8 @@ export interface GuildConfigField {
   valueType: 'int' | 'double' | 'string';
   value: string;
   editable: boolean;
+  min: number;
+  max: number;
 }
 export interface GuildConfigGroup {
   key: string;

@@ -1,4 +1,11 @@
 <script setup lang="ts">
+import { Comment, Fragment, Text, useSlots } from 'vue';
+import type { VNode } from 'vue';
+const slots = useSlots();
+function hasContent(nodes: VNode[] = []): boolean {
+  return nodes.some(node => node.type === Fragment ? hasContent(node.children as VNode[]) : node.type !== Comment && (node.type !== Text || String(node.children || '').trim().length > 0));
+}
+function visibleSlot(name: string) { return hasContent(slots[name]?.()); }
 defineProps<{
   title: string;
   subtitle?: string;
@@ -14,12 +21,12 @@ defineEmits<{ back: []; save: []; 'update:section': [value: string] }>();
 
 <template>
   <div class="ops-page management-workspace">
-    <div class="ops-toolbar">
-      <div class="management-title">
+    <div v-if="editing || visibleSlot('title-extra') || visibleSlot('actions')" class="ops-toolbar">
+      <div v-if="editing || visibleSlot('title-extra')" class="management-title">
         <NButton v-if="editing" quaternary :disabled="saving" @click="$emit('back')">← 返回列表</NButton>
         <div>
-          <div class="management-heading"><div class="ops-page-label">{{ title }}</div><slot name="title-extra" /></div>
-          <p v-if="subtitle" class="ops-muted">{{ subtitle }}</p>
+          <div class="management-heading"><div v-if="editing" class="ops-page-label">{{ title }}</div><slot name="title-extra" /></div>
+          <p v-if="editing && subtitle" class="ops-muted">{{ subtitle }}</p>
         </div>
       </div>
       <NSpace>

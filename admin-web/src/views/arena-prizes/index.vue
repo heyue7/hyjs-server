@@ -170,8 +170,8 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload));
 
 <template>
   <div class="ops-page arena-prizes-page">
-    <div class="ops-toolbar">
-      <div class="ops-inline-heading"><div class="ops-page-label">竞技胜利翻牌</div><ContextHelp v-if="snapshot?.notes" title="竞技奖励规则" :text="snapshot.notes" /></div>
+    <div class="ops-filters">
+      <ContextHelp v-if="snapshot?.notes" title="竞技奖励规则" :text="snapshot.notes" />
       <NSpace align="center">
         <NTag v-if="dirty && canWrite" type="warning" :bordered="false">未保存</NTag>
         <NTag v-if="!canWrite" :bordered="false">只读</NTag>

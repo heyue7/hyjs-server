@@ -110,9 +110,15 @@ const columns: DataTableColumns<MailBatch> = [
 
 <template>
   <div class="ops-page mail-page">
-    <div class="ops-toolbar">
-      <div class="mail-heading"><div class="ops-page-label">发送邮件</div><ContextHelp title="发送范围" text="仅向当前所选真实区服、预览时冻结的角色发送原系统邮件。可选全部玩家（跨分页）或勾选部分玩家；冻结账号和保护账号自动排除，预览后新建角色不追加。邮件只写入游戏内邮箱，不创建领奖中心附件。预览15分钟有效，失败重试沿用原批次。" /></div>
-      <NSpace :size="8"><NButton :loading="loading" @click="load">刷新</NButton><NButton v-if="canWrite" type="primary" :disabled="!writable" @click="start">新建邮件</NButton></NSpace>
+    <div class="ops-filters">
+      <ContextHelp
+        title="发送范围"
+        text="仅向当前所选真实区服、预览时冻结的角色发送原系统邮件。可选全部玩家（跨分页）或勾选部分玩家；冻结账号和保护账号自动排除，预览后新建角色不追加。邮件只写入游戏内邮箱，不创建领奖中心附件。预览15分钟有效，失败重试沿用原批次。"
+      />
+      <NSpace :size="8">
+        <NButton :loading="loading" @click="load">刷新</NButton>
+        <NButton v-if="canWrite" type="primary" :disabled="!writable" @click="start">新建邮件</NButton>
+      </NSpace>
     </div>
     <NAlert v-if="!scope.currentServer?.runtimeBound" type="warning" title="请选择已部署的真实区服后发送。" />
     <NAlert v-if="error" type="error" :title="error" />
@@ -154,7 +160,6 @@ const columns: DataTableColumns<MailBatch> = [
 </template>
 
 <style scoped>
-.mail-heading { display: flex; align-items: center; gap: 8px; }
 :global(.n-card.mail-editor) { width: 780px; max-width: calc(100vw - 32px); }
 .mail-form { display: flex; flex-direction: column; gap: 18px; }
 .mail-realm { display: flex; gap: 16px; color: rgb(var(--base-text-color) / .7); }

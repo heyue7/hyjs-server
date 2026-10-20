@@ -7,6 +7,7 @@ import { useOperations } from '@/composables/useOperations';
 import { errorMessage } from '@/service/operations';
 import { getNativeActivities, removeNativeActivity, saveNativeActivity } from '@/service/native-activities';
 import type { NativeActivity } from '@/service/native-activities';
+import { renderActivityOption, useActivitySelectorSummary } from '@/service/activity-selector-summary';
 import ActivityProducts from './activity-products.vue';
 import ActivityMilestones from './activity-milestones.vue';
 import RewardList from './reward-list.vue';
@@ -105,12 +106,40 @@ const filtered = computed(() => rows.value.filter(row => {
   if (enabledFilter.value === 'disabled' && row.enabled) return false;
   return true;
 }));
+const { rewardsText, failed: resourceNamesFailed, loading: resourceNamesLoading, retry: retryResourceNames } = useActivitySelectorSummary(() => {
+  const form = selected.value?.form;
+  if (!form) return [];
+  return [
+    ...form.milestones.flatMap(tier => tier.rewards),
+    ...form.vipTiers.flatMap(tier => [...tier.dailyRewards, tier.weekCost, ...tier.weekRewards]),
+    ...form.prizes,
+    ...form.children.flatMap(child => [
+      ...child.form.products.flatMap(product => [...product.rewards, product.cost]),
+      ...child.form.milestones.flatMap(tier => tier.options || tier.rewards)
+    ])
+  ];
+});
 const milestoneOptions = computed(() => {
   const row = selected.value;
   if (!row) return [];
-  return row.form.milestones.map((tier, index) => ({ value: index, label: `${tier.key.startsWith('everyoneBenefit:') ? '全民福利' : row.kind === 'fund' ? '基金等级' : '登录目标'} · ${tier.goal}${tier.key.startsWith('everyoneBenefit:') ? ' 人' : row.kind === 'fund' ? ' 级' : ' 天'}` }));
+  return row.form.milestones.map((tier, index) => ({ value: index, label: `${tier.key.startsWith('everyoneBenefit:') ? '全民福利' : row.kind === 'fund' ? '基金等级' : '登录目标'} · ${tier.goal}${tier.key.startsWith('everyoneBenefit:') ? ' 人' : row.kind === 'fund' ? ' 级' : ' 天'} → 获得：${rewardsText(tier.rewards)}` }));
 });
 const vipOptions = Array.from({ length: 13 }, (_, value) => ({ value, label: `VIP${value}` }));
+const benefitVIPOptions = computed(() => Array.from({ length: 13 }, (_, value) => {
+  const tiers = selected.value?.form.vipTiers.filter(tier => tier.vip === value) || [];
+  return { value, label: `VIP${value} · ${tiers.map(tier => `每日：${rewardsText(tier.dailyRewards)}；每周消耗：${rewardsText([tier.weekCost], '未配置成本')} → 获得：${rewardsText(tier.weekRewards)}`).join('；') || '未配置奖励'}` };
+}));
+const prizeOptions = computed(() => (selected.value?.form.prizes || []).map((row, index) => ({
+  value: index,
+  label: `${index + 1}. ${rewardsText([row])} · 权重 ${row.weight}${row.guaranteed ? ' · 橙色保底' : ''}`
+})));
+const childOptions = computed(() => (selected.value?.form.children || []).map((child, index) => ({
+  value: index,
+  label: `${child.form.name} · ${child.domain === 'commerce'
+    ? child.form.products.map(product => `消耗：${rewardsText([product.cost], '免费领取')} → 获得：${rewardsText(product.rewards)}`).join('；')
+    : child.form.milestones.map(tier => `累计登录 ${tier.goal} 天 → ${tier.options ? '选一：' : '获得：'}${rewardsText(tier.options || tier.rewards)}`).join('；') || '未配置奖励'}`
+})));
+
 const columns = computed<DataTableColumns<NativeActivity>>(() => [
   {
     title: '正式名称',
@@ -431,6 +460,7 @@ defineExpose({ beforeLeave: leaveWorkspace, confirmDiscard, dirty, saving });
           本期规则已被使用并冻结，可以调整启停及后台别名。
         </NAlert>
         <NAlert v-if="saveError" type="error" :title="saveError" class="mb-16px" />
+        <NButton v-if="resourceNamesFailed" text size="small" :loading="resourceNamesLoading" @click="retryResourceNames">资源名称载入失败，点击重试（当前显示 ID）</NButton>
         <NForm label-placement="top">
           <NGrid cols="1 m:2" responsive="screen" :x-gap="20">
             <NGi><NFormItem label="正式名称"><NInput :value="selected.name" disabled /></NFormItem></NGi>
@@ -467,7 +497,7 @@ defineExpose({ beforeLeave: leaveWorkspace, confirmDiscard, dirty, saving });
           </template>
           <template v-if="['fund', 'celebration'].includes(selected.kind)">
             <div class="native-section-label">档位奖励</div>
-            <NSelect v-model:value="selectedMilestone" :options="milestoneOptions" aria-label="选择固定奖励档" class="mb-20px" />
+            <NSelect v-model:value="selectedMilestone" :options="milestoneOptions" :render-label="renderActivityOption" aria-label="选择固定奖励档" class="mb-20px" />
             <section v-for="tier in currentMilestone" :key="tier.key" class="activity-edit-section">
               <NFormItem :label="tier.key.startsWith('everyoneBenefit:') ? '真实购买人数' : selected.kind === 'fund' ? '角色等级' : '登录日数'"><NInputNumber v-model:value="tier.goal" :min="1" :max="maxAmount" :precision="0" :disabled="rulesDisabled || selected.kind === 'fund' && !tier.key.startsWith('everyoneBenefit:')" /></NFormItem>
               <NFormItem label="奖励"><RewardList v-model:value="tier.rewards" :disabled="rulesDisabled" /></NFormItem>
@@ -475,7 +505,7 @@ defineExpose({ beforeLeave: leaveWorkspace, confirmDiscard, dirty, saving });
           </template>
           <template v-if="selected.kind === 'vip-benefits'">
             <div class="native-section-label">会员档位</div>
-            <NSelect v-model:value="selectedVIP" :options="vipOptions" aria-label="选择会员福利档" class="mb-20px" />
+            <NSelect v-model:value="selectedVIP" :options="benefitVIPOptions" :render-label="renderActivityOption" aria-label="选择会员福利档" class="mb-20px" />
             <section v-for="tier in currentVIP" :key="tier.vip" class="activity-edit-section">
               <NFormItem label="每日奖励"><RewardList v-model:value="tier.dailyRewards" :disabled="rulesDisabled" /></NFormItem>
               <NFormItem label="每周礼包钻石成本"><NInputNumber v-model:value="tier.weekCost.amount" :min="1" :max="maxAmount" :precision="0" :disabled="rulesDisabled" /></NFormItem>
@@ -494,7 +524,7 @@ defineExpose({ beforeLeave: leaveWorkspace, confirmDiscard, dirty, saving });
           </template>
           <template v-if="selected.kind === 'recruit-rotation'">
             <div class="native-section-label">橙卡招募角色</div>
-            <NSelect v-model:value="selectedPrize" :options="selected.form.prizes.map((row, index) => ({ value: index, label: `角色 ${index + 1}${row.guaranteed ? ' · 橙色保底' : ''}` }))" aria-label="选择橙卡招募角色" class="mb-20px" />
+            <NSelect v-model:value="selectedPrize" :options="prizeOptions" :render-label="renderActivityOption" aria-label="选择橙卡招募角色" class="mb-20px" />
             <section v-for="prize in currentPrize" :key="prize.id" class="activity-edit-section">
               <NFormItem label="角色"><ResourceSelect v-model:value="prize.resourceId" category="character" :disabled="rulesDisabled" /></NFormItem>
               <NFormItem label="相对权重"><NInputNumber v-model:value="prize.weight" :min="1" :max="1000000000000" :precision="0" :disabled="rulesDisabled" /></NFormItem>
@@ -503,7 +533,7 @@ defineExpose({ beforeLeave: leaveWorkspace, confirmDiscard, dirty, saving });
           </template>
           <template v-if="['festival', 'update'].includes(selected.kind)">
             <div class="native-section-label">子活动</div>
-            <NSelect v-model:value="selectedChild" :options="selected.form.children.map((child, index) => ({ value: index, label: child.form.name }))" aria-label="选择子活动" class="mb-20px" />
+            <NSelect v-model:value="selectedChild" :options="childOptions" :render-label="renderActivityOption" aria-label="选择子活动" class="mb-20px" />
             <section v-for="child in currentChild" :key="child.id" class="activity-edit-section">
               <NFormItem label="子活动名称"><NInput :value="child.form.name" disabled /></NFormItem>
               <ActivityProducts v-if="child.domain === 'commerce'" v-model="child.form.products" :vip-options="vipOptions" :disabled="rulesDisabled" />
@@ -532,8 +562,8 @@ defineExpose({ beforeLeave: leaveWorkspace, confirmDiscard, dirty, saving });
   justify-content: space-between;
   gap: 16px;
   flex-wrap: wrap;
-  padding-bottom: 18px;
-  margin-bottom: 20px;
+  padding-bottom: 12px;
+  margin-bottom: 12px;
   border-bottom: 1px solid rgb(var(--base-text-color) / .09);
 }
 .native-enable { margin: 0; gap: 12px; }

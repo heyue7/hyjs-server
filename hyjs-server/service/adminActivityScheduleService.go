@@ -131,6 +131,22 @@ func (s *GameService) reconcileAdminActivityCatalogue(ctx context.Context, sourc
 	})
 }
 
+// adminActivityPresentationForm reflects the existing treasure consumer's coin projection.
+// Reads preserve the stored template, issued snapshot and optimistic version.
+func adminActivityPresentationForm(form model.AdminActivityForm) model.AdminActivityForm {
+	form = adminActivityCanonicalForm(form)
+	if form.Mode == "fortune-cat" {
+		form.Milestones = append([]model.AdminActivityMilestone(nil), form.Milestones...)
+		for i, milestone := range form.Milestones {
+			if len(milestone.Rewards) == 1 && milestone.Rewards[0].ResourceID == "diamond" {
+				form.Milestones[i].Rewards = append([]model.AdminResourceAmount(nil), milestone.Rewards...)
+				form.Milestones[i].Rewards[0].ResourceID = "coin"
+			}
+		}
+	}
+	return form
+}
+
 func adminActivityDefinitionDTO(row db.AdminActivityDefinition) (model.AdminActivityDefinitionDTO, error) {
 	var form model.AdminActivityForm
 	if json.Unmarshal(row.FormJSON, &form) != nil {
@@ -139,7 +155,7 @@ func adminActivityDefinitionDTO(row db.AdminActivityDefinition) (model.AdminActi
 	if form.Name == "" {
 		form.Name = row.Name
 	}
-	form = adminActivityCanonicalForm(form)
+	form = adminActivityPresentationForm(form)
 	return model.AdminActivityDefinitionDTO{ID: row.ID, Name: form.Name, Mode: row.Mode, Form: form, DefaultDays: row.DefaultDays, ClaimDays: row.ClaimDays, Enabled: row.Enabled, Version: adminVersion(row), Availability: model.AdminActivityAvailability{Usable: row.Usable, Reason: row.UnavailableReason, Missing: []string{}}, SourceActivityID: row.SourceActivityID}, nil
 }
 
@@ -470,7 +486,7 @@ func (s *GameService) adminActivityOccurrenceDTO(tx *gorm.DB, row db.AdminActivi
 	}
 	timing := adminActivityTiming(row)
 	startDay, durationDays, claimDays := adminCharacterScheduleDays(row)
-	form = adminActivityCanonicalForm(form)
+	form = adminActivityPresentationForm(form)
 	return model.AdminActivityOccurrenceDTO{Timing: timing, StartDay: startDay, DurationDays: durationDays, ClaimDays: claimDays, Form: form, ID: row.ID, TemplateID: row.TemplateID, TemplateVersion: row.TemplateVersion, Name: form.Name, Mode: row.Mode, StartAt: row.StartAt, EndAt: row.EndAt, ClaimEndAt: row.ClaimEndAt, Lane: row.Lane, Enabled: row.Enabled, Frozen: frozen, Version: adminVersion(row), ConsumerID: row.ConsumerID}, err
 }
 func adminRequireActivityServer(tx *gorm.DB, id int64) error {

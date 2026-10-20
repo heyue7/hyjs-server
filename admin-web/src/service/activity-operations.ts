@@ -112,7 +112,7 @@ const milestoneTargets: Record<string, { label: string; unit: string; note?: str
   'work': { label: '主线胜利次数', unit: '次' },
   'wanted-attempts': { label: '悬赏挑战次数', unit: '次' },
   'wanted-kills': { label: '悬赏击杀次数', unit: '次' },
-  'fortune-cat': { label: '当次钻石成本', unit: '钻', note: '奖励填含本金的实际返还钻石数量。' },
+  'fortune-cat': { label: '消耗钻石', unit: '钻石' },
   'continued-spend': { label: '累计达标消费日', unit: '天', note: '奖励档目标依次为 1 至 7 天。' },
   'power-race': { label: '战力峰值', unit: '战力', note: '按本期战力最高值判断达成目标与排名。' }
 };

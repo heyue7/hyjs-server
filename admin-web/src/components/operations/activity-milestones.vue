@@ -2,13 +2,15 @@
 import { computed, ref, watch } from 'vue';
 import type { ActivityMilestone } from '@/service/activity-operations';
 import { activityMilestoneTarget, activityMilestoneTitle } from '@/service/activity-operations';
+import { renderActivityOption, useActivitySelectorSummary } from '@/service/activity-selector-summary';
 import RewardList from './reward-list.vue';
 const rows = defineModel<ActivityMilestone[]>({ required: true });
 const props = defineProps<{ mode?: string; disabled?: boolean; single?: boolean; max?: number; choice?: boolean; dayBased?: boolean }>();
 const activeIndex = ref(0);
 const selectedRows = computed(() => rows.value.slice(activeIndex.value, activeIndex.value + 1));
 const target = computed(() => activityMilestoneTarget(props.mode));
-const milestoneOptions = computed(() => rows.value.map((row, index) => ({ value: index, label: activityMilestoneTitle(props.mode, row.goal, props.dayBased) })));
+const { rewardsText, failed, loading, retry } = useActivitySelectorSummary(() => rows.value.flatMap(row => row.options || row.rewards));
+const milestoneOptions = computed(() => rows.value.map((row, index) => ({ value: index, label: `${activityMilestoneTitle(props.mode, row.goal, props.dayBased)} → ${row.options ? '选一：' : '获得：'}${rewardsText(row.options || row.rewards)}` })));
 watch(() => rows.value.length, length => { activeIndex.value = Math.max(0, Math.min(activeIndex.value, length - 1)); });
 function add() {
   activeIndex.value = rows.value.length;
@@ -42,11 +44,11 @@ function switchChoice(row: ActivityMilestone, value: string) {
       </NButton>
     </div>
     <NEmpty v-if="!rows.length" description="尚未配置奖励" />
-    <NSelect v-if="rows.length" v-model:value="activeIndex" :options="milestoneOptions" class="mb-20px" aria-label="选择奖励档" />
+    <NSelect v-if="rows.length" v-model:value="activeIndex" :options="milestoneOptions" :render-label="renderActivityOption" class="mb-20px" aria-label="选择奖励档" />
+    <NButton v-if="failed" text size="small" :loading="loading" @click="retry">资源名称载入失败，点击重试（当前显示 ID）</NButton>
     <section v-for="row in selectedRows" :key="activeIndex" class="activity-edit-section">
-      <div class="ops-section-heading">
-        <strong>{{ dayBased ? '第' : '奖励档 ' }}{{ activeIndex + 1 }}{{ dayBased ? ' 天' : '' }}</strong>
-        <NButton quaternary size="small" :disabled="disabled" @click="remove(activeIndex)">移除</NButton>
+      <div class="flex justify-end mb-12px">
+        <NButton quaternary size="small" :disabled="disabled" @click="remove(activeIndex)">移除奖励档</NButton>
       </div>
       <NFormItem :label="dayBased ? '第几天' : target.label" required>
         <NInputNumber v-model:value="row.goal" :disabled="disabled" :min="1" :precision="0" class="w-full">

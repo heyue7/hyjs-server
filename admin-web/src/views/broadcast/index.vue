@@ -116,9 +116,15 @@ const columns: DataTableColumns<BroadcastBatch> = [
 
 <template>
   <div class="ops-page broadcast-page">
-    <div class="ops-toolbar">
-      <div class="broadcast-heading"><div class="ops-page-label">群发补偿</div><ContextHelp title="群发范围" text="仅向当前所选真实区服、预览时冻结的角色发放。可选全部玩家（跨分页）或勾选部分玩家；冻结账号和保护账号自动排除，预览后新建角色不追加。确认后只写入原领奖中心，不生成系统邮件；附件需在游戏内领奖中心领取。预览15分钟有效，失败重试沿用原批次。" /></div>
-      <NSpace :size="8"><NButton :loading="loading" @click="load">刷新</NButton><NButton v-if="canWrite" type="primary" :disabled="!writable" @click="start">新建群发</NButton></NSpace>
+    <div class="ops-filters">
+      <ContextHelp
+        title="群发范围"
+        text="仅向当前所选真实区服、预览时冻结的角色发放。可选全部玩家（跨分页）或勾选部分玩家；冻结账号和保护账号自动排除，预览后新建角色不追加。确认后只写入原领奖中心，不生成系统邮件；附件需在游戏内领奖中心领取。预览15分钟有效，失败重试沿用原批次。"
+      />
+      <NSpace :size="8">
+        <NButton :loading="loading" @click="load">刷新</NButton>
+        <NButton v-if="canWrite" type="primary" :disabled="!writable" @click="start">新建群发</NButton>
+      </NSpace>
     </div>
     <NAlert v-if="!scope.currentServer?.runtimeBound" type="warning" title="请选择已部署的真实区服后发放。" />
     <NAlert v-if="error" type="error" :title="error" />
@@ -161,7 +167,6 @@ const columns: DataTableColumns<BroadcastBatch> = [
 </template>
 
 <style scoped>
-.broadcast-heading { display: flex; align-items: center; gap: 8px; }
 :global(.n-card.broadcast-editor) { width: 780px; max-width: calc(100vw - 32px); }
 .broadcast-form { display: flex; flex-direction: column; gap: 18px; }
 .broadcast-form :deep(.reward-list) { width: 100%; }

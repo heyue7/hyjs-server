@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import ContextHelp from './context-help.vue';
+import { useDraftGuard } from '@/composables/useDraftGuard';
 import { h, onMounted, reactive, ref } from 'vue';
 import { NButton, NTag } from 'naive-ui';
 import type { DataTableColumns } from 'naive-ui';
@@ -20,6 +22,7 @@ const draft = reactive<WalletReason>({
   enabled: false,
   version: ''
 });
+const editorGuard = useDraftGuard({ active: () => open.value, value: () => draft, busy: () => saving.value, writable: () => canWrite.value, label: '入账规则修改', close: () => { open.value = false; } });
 async function load() {
   const result = await run(() => api<{ items: WalletReason[] }>('/wallet-reasons'));
   if (result) rows.value = result.items;
@@ -27,6 +30,7 @@ async function load() {
 function edit(row: WalletReason) {
   Object.assign(draft, row);
   saveError.value = '';
+  editorGuard.capture();
   open.value = true;
 }
 async function save() {
@@ -79,8 +83,8 @@ onMounted(load);
 
 <template>
   <div>
-    <div class="ops-toolbar mb-20px">
-      <span class="ops-muted">添加余额时，在对应金额范围内随机选取理由。</span>
+    <div class="ops-filters">
+      <ContextHelp title="入账规则" text="添加余额时，在对应金额范围内随机选取理由。" />
       <NButton :loading="loading" @click="load">刷新</NButton>
     </div>
     <NAlert v-if="error" type="error" :title="error" class="mb-20px" />
@@ -94,7 +98,8 @@ onMounted(load);
       :pagination="{ pageSize: 15 }"
     />
     <NModal
-      v-model:show="open"
+      :show="open"
+      @update:show="!$event && editorGuard.requestClose()"
       preset="card"
       title="入账理由"
       class="ops-modal"
@@ -133,7 +138,7 @@ onMounted(load);
       </NForm>
       <template #footer>
         <div class="ops-drawer-actions">
-          <NButton :disabled="saving" @click="open = false">关闭</NButton>
+          <NButton :disabled="saving" @click="editorGuard.requestClose()">关闭</NButton>
           <NButton v-if="canWrite" type="primary" :loading="saving" @click="save">保存</NButton>
         </div>
       </template>

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useDraftGuard } from '@/composables/useDraftGuard';
 import { computed, h, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { NButton, NSpace, NTag } from 'naive-ui';
@@ -54,6 +55,7 @@ const saving = ref(false);
 const conflict = ref(false);
 const saveError = ref('');
 const draft = reactive({ username: '', nickname: '冒险者', password: '', confirmPassword: '', enabled: true, reason: '' });
+const editorGuard = useDraftGuard({ active: () => Boolean(modal.value), value: () => draft, busy: () => saving.value, writable: () => canWrite.value, label: '用户修改', close: () => { modal.value = ''; draft.password = ''; draft.confirmPassword = ''; } });
 const title = computed(() => ({ create: '新建游戏用户', edit: '编辑用户', password: '重置游戏密码' })[modal.value || 'edit']);
 function edit(kind: 'create' | 'edit' | 'password', row: GameAccount | null = null) {
   if (!canWrite.value || row?.protected || (kind === 'password' && !isAdmin.value)) return;
@@ -61,14 +63,11 @@ function edit(kind: 'create' | 'edit' | 'password', row: GameAccount | null = nu
   Object.assign(draft, { username: row?.username || '', nickname: row?.nickname || '冒险者', password: '', confirmPassword: '', enabled: row?.enabled ?? true, reason: '' });
   saveError.value = '';
   conflict.value = false;
+  editorGuard.capture();
   modal.value = kind;
 }
-function close() {
-  if (saving.value) return;
-  modal.value = '';
-  draft.password = '';
-  draft.confirmPassword = '';
-}
+function close() { return editorGuard.requestClose(); }
+
 function validate() {
   if (modal.value === 'create' && !/^[A-Za-z0-9_-]{3,32}$/.test(draft.username)) return '账号需为 3–32 位字母、数字、下划线或连字符';
   if (modal.value !== 'password' && !draft.nickname.trim()) return '请填写用户昵称';
@@ -92,6 +91,7 @@ async function save() {
     else await updateGameAccount(target.value!.id, { nickname: draft.nickname.trim(), enabled: draft.enabled, version: target.value!.version, reason });
     window.$message?.success(modal.value === 'password' ? '密码已重置' : modal.value === 'create' ? '用户已创建，可使用此账号登录游戏' : '用户已保存');
     modal.value = '';
+    editorGuard.clear();
     draft.password = '';
     draft.confirmPassword = '';
     await load();
@@ -137,14 +137,19 @@ onBeforeUnmount(() => { generation += 1; draft.password = ''; draft.confirmPassw
 
 <template>
   <div class="ops-page">
-    <div class="ops-toolbar">
-      <div class="ops-page-label">用户管理 <span class="ops-count">{{ total.toLocaleString() }}</span></div>
-      <NSpace><NButton :loading="loading" @click="load">刷新</NButton><NButton v-if="canWrite" type="primary" @click="edit('create')">新建用户</NButton></NSpace>
-    </div>
+
     <NAlert v-if="error" type="error" :title="error" />
     <NCard :bordered="false" class="ops-panel">
       <p v-if="locatedId" class="ops-inline-note">用户 #{{ locatedId }} <NButton text type="primary" @click="q = ''; search()">查看全部用户</NButton></p>
-      <div class="ops-filters"><NInput v-model:value="q" clearable class="ops-search" placeholder="搜索账号或昵称" @keydown.enter="search" /><NButton type="primary" @click="search">搜索</NButton></div>
+      <div class="ops-filters">
+        <NInput v-model:value="q" clearable class="ops-search" placeholder="搜索账号或昵称" @keydown.enter="search" />
+        <NButton type="primary" @click="search">搜索</NButton>
+        <span class="ops-muted">共 {{ total.toLocaleString() }} 个用户</span>
+        <NSpace>
+          <NButton :loading="loading" @click="load">刷新</NButton>
+          <NButton v-if="canWrite" type="primary" @click="edit('create')">新建用户</NButton>
+        </NSpace>
+      </div>
       <NDataTable :columns="columns" :data="rows" :loading="loading" :row-key="(row: GameAccount) => row.id" :row-class-name="rowClass" :bordered="false" :scroll-x="1100" />
       <div class="ops-pagination"><NPagination v-model:page="page" v-model:page-size="pageSize" :item-count="total" :page-sizes="[25, 50, 100]" show-size-picker @update:page="load" @update:page-size="search" /></div>
     </NCard>

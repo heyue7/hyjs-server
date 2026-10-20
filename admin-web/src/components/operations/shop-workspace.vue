@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useDraftGuard } from '@/composables/useDraftGuard';
 import { computed, h, onBeforeUnmount, ref, watch } from 'vue';
 import { onBeforeRouteLeave, useRouter } from 'vue-router';
 import { NButton, NSpace, NSwitch } from 'naive-ui';
@@ -142,6 +143,7 @@ function beginCreate() {
   else edit(null);
 }
 function discard() {
+  if (saving.value || settingsSaving.value) return;
   if (!dirty.value || !canWrite.value) {
     editing.value = false;
     return;
@@ -210,6 +212,7 @@ async function toggleProduct(row: ShopProduct, enabled: boolean) {
     toggling.value = '';
   }
 }
+const settingsGuard = useDraftGuard({ active: () => settingsOpen.value, value: () => settingsDraft.value, busy: () => settingsSaving.value || saving.value, writable: () => canWrite.value, label: '商店设置', close: () => { settingsOpen.value = false; }, route: false });
 function configure() {
   if (!snapshot.value) return;
   settingsDraft.value = {
@@ -218,6 +221,7 @@ function configure() {
     newPeriod: false
   };
   settingsError.value = '';
+  settingsGuard.capture();
   settingsOpen.value = true;
 }
 async function saveSettings() {
@@ -357,7 +361,7 @@ const columns = computed<DataTableColumns<ShopProduct>>(() => [
   }
 ]);
 function beforeUnload(event: BeforeUnloadEvent) {
-  if (dirty.value && canWrite.value) {
+  if (saving.value || settingsSaving.value || (dirty.value && canWrite.value)) {
     event.preventDefault();
     event.returnValue = '';
   }
@@ -367,7 +371,8 @@ onBeforeUnmount(() => {
   generation += 1;
   window.removeEventListener('beforeunload', beforeUnload);
 });
-onBeforeRouteLeave(() => {
+onBeforeRouteLeave(async () => {
+  if (saving.value || settingsSaving.value || !await settingsGuard.canLeave()) return false;
   if (!dirty.value || !canWrite.value) return true;
   return new Promise<boolean>(resolve =>
     window.$dialog?.warning({
@@ -409,20 +414,8 @@ watch(
       @back="discard"
       @save="save"
     >
-      <template #title-extra><ContextHelp v-if="definition?.notes" title="商店规则" :text="definition.notes" /></template>
-      <template v-if="!editing" #actions>
-        <NButton :loading="loading" @click="load">刷新</NButton>
-        <NButton v-if="canWrite && snapshot && definition?.settingsFields?.length" @click="configure()">
-          商店设置
-        </NButton>
-        <NButton
-          v-if="canWrite && definition && definition.canCreate !== false"
-          type="primary"
-          @click="beginCreate"
-        >
-          新建商品
-        </NButton>
-      </template>
+      <template #title-extra><ContextHelp v-if="editing && definition?.notes" title="商店规则" :text="definition.notes" /></template>
+
       <template #alert>
         <NAlert v-if="error || saveError" type="error" :title="saveError || error" />
       </template>
@@ -459,11 +452,17 @@ watch(
               clearable
               :options="[
                 { label: '启用', value: 'enabled' },
-                { label: '停用', value: 'disabled' }
+                { label: '停用', value: 'disabled' },
               ]"
               placeholder="全部状态"
               class="ops-filter-select"
             />
+            <ContextHelp v-if="definition?.notes" title="商店规则" :text="definition.notes" />
+            <NButton :loading="loading" @click="load">刷新</NButton>
+            <NButton v-if="canWrite && snapshot && definition?.settingsFields?.length" @click="configure()">商店设置</NButton>
+            <NButton v-if="canWrite && definition && definition.canCreate !== false" type="primary" @click="beginCreate">
+              新建商品
+            </NButton>
           </div>
           <p v-if="catalogueError" class="ops-inline-note">{{ catalogueError }}</p>
           <NDataTable
@@ -658,7 +657,8 @@ watch(
       </template>
     </ManagementWorkspace>
     <NModal
-      v-model:show="settingsOpen"
+      :show="settingsOpen"
+      @update:show="!$event && settingsGuard.requestClose()"
       preset="card"
       :title="`商店设置 · ${title}`"
       class="ops-modal shop-settings-modal"
@@ -672,7 +672,7 @@ watch(
         title="保存商店设置后即可添加商品。"
         class="mb-20px"
       />
-      <NForm label-placement="top" :disabled="settingsSaving">
+      <NForm label-placement="top" :disabled="settingsSaving || !canWrite">
         <NFormItem v-if="settingSupports('enabled') && !needsPeriod" label="营业状态">
           <NSwitch v-model:value="settingsDraft.enabled" aria-label="营业状态" />
         </NFormItem>
@@ -692,7 +692,7 @@ watch(
           <NFormItem v-if="settingSupports('startAt')" label="开始时间">
             <NDatePicker
               :value="settingsDraft.startAt || null"
-              :disabled="settingsSaving"
+              :disabled="settingsSaving || !canWrite"
               type="datetime"
               clearable
               @update:value="settingsDraft.startAt = $event || 0"
@@ -701,7 +701,7 @@ watch(
           <NFormItem v-if="settingSupports('endAt')" label="结束时间">
             <NDatePicker
               :value="settingsDraft.endAt || null"
-              :disabled="settingsSaving"
+              :disabled="settingsSaving || !canWrite"
               type="datetime"
               clearable
               @update:value="settingsDraft.endAt = $event || 0"
@@ -711,7 +711,7 @@ watch(
         <NFormItem v-if="!settingsDraft.unlimited && settingSupports('claimEndAt')" label="领奖截止">
           <NDatePicker
             :value="settingsDraft.claimEndAt || null"
-            :disabled="settingsSaving"
+            :disabled="settingsSaving || !canWrite"
             type="datetime"
             clearable
             @update:value="settingsDraft.claimEndAt = $event || 0"
@@ -727,7 +727,7 @@ watch(
         </NFormItem>
       </NForm>
       <div class="ops-drawer-actions">
-        <NButton :disabled="settingsSaving" @click="settingsOpen = false">取消</NButton>
+        <NButton :disabled="settingsSaving || !canWrite" @click="settingsGuard.requestClose()">取消</NButton>
         <NButton type="primary" :loading="settingsSaving" @click="saveSettings">
           保存设置
         </NButton>

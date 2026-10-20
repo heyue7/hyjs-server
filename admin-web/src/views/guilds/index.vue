@@ -1,9 +1,11 @@
 <script setup lang="ts">
+import { useDraftGuard } from '@/composables/useDraftGuard';
+import ContextHelp from '@/components/operations/context-help.vue';
 import { computed, h, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { onBeforeRouteLeave } from 'vue-router';
 import { NButton, NInput, NInputNumber, NSelect, NSpace, NSwitch } from 'naive-ui';
 import type { DataTableColumns } from 'naive-ui';
-import { errorMessage, formatTime } from '@/service/operations';
+import { api, errorMessage, formatTime } from '@/service/operations';
 import {
   addGuildMember,
   dissolveGuild,
@@ -52,13 +54,38 @@ const dissolveReason = ref('');
 const dissolving = ref(false);
 const dissolveError = ref('');
 
+const busy = computed(() => saving.value || memberSaving.value || addSaving.value || removing.value || dissolving.value);
+const guildGuard = useDraftGuard({ active: () => drawer.value, value: () => ({ form: form.value, reason: reason.value }), busy: () => busy.value, writable: () => canWrite.value, label: '公会修改', close: () => { drawer.value = false; }, route: false, scope: false });
+const memberGuard = useDraftGuard({ active: () => memberOpen.value, value: () => memberDraft.value, busy: () => busy.value, label: '成员修改', close: () => { memberOpen.value = false; }, route: false, scope: false });
+const addGuard = useDraftGuard({ active: () => addOpen.value, value: () => addDraft.value, busy: () => busy.value, label: '加入成员草稿', close: () => { addOpen.value = false; }, route: false, scope: false });
+const removeGuard = useDraftGuard({ active: () => Boolean(removeTarget.value), value: () => removeReason.value, busy: () => busy.value, label: '移除原因', close: () => { removeTarget.value = null; }, route: false, scope: false });
+const dissolveGuard = useDraftGuard({ active: () => dissolveOpen.value, value: () => ({ name: dissolveName.value, reason: dissolveReason.value }), busy: () => busy.value, label: '解散输入', close: () => { dissolveOpen.value = false; }, route: false, scope: false });
+const playerOptions = ref<{ value: number; label: string }[]>([]);
+const playerLoading = ref(false);
+let playerGeneration = 0;
+let detailGeneration = 0;
+async function searchPlayers(query = '') {
+  const current = ++playerGeneration;
+  const serverId = currentServerID.value;
+  if (!serverId || !addOpen.value) return;
+  playerLoading.value = true;
+  addError.value = '';
+  try {
+    const result = await api<{ items: { id: number; name: string; level: number }[] }>(`/game-players?${new URLSearchParams({ serverId: String(serverId), q: query.trim(), page: '1', pageSize: '50' })}`);
+    if (current !== playerGeneration || serverId !== currentServerID.value || !addOpen.value) return;
+    const selected = playerOptions.value.find(row => row.value === addDraft.value.playerId);
+    playerOptions.value = result.items.map(row => ({ value: row.id, label: `${row.name} · ID ${row.id} · Lv.${row.level}` }));
+    if (selected && !playerOptions.value.some(row => row.value === selected.value)) playerOptions.value.unshift(selected);
+  } catch (e) { if (current === playerGeneration && addOpen.value && serverId === currentServerID.value) addError.value = errorMessage(e); }
+  finally { if (current === playerGeneration) playerLoading.value = false; }
+}
 const roleOptions = [
   { label: '普通成员', value: 0 },
   { label: '副会长', value: 1 },
   { label: '会长（原子转让）', value: 2 }
 ];
 const guildDirty = computed(() => Boolean(detail.value && form.value && JSON.stringify(form.value) !== baseline.value && canWrite.value));
-const drawerDirty = computed(() => guildDirty.value || memberOpen.value || addOpen.value || Boolean(removeTarget.value) || dissolveOpen.value);
+const drawerDirty = computed(() => guildGuard.dirty.value || memberGuard.dirty.value || addGuard.dirty.value || removeGuard.dirty.value || dissolveGuard.dirty.value);
 const currentServerID = computed(() => scope.currentServer?.id || 0);
 
 function clone<T>(value: T): T {
@@ -85,6 +112,7 @@ function setDetail(value: GuildDetail) {
   };
   baseline.value = JSON.stringify(form.value);
   reason.value = '';
+  guildGuard.capture();
 }
 
 async function load() {
@@ -105,6 +133,7 @@ function search() {
 }
 
 async function show(row: GuildSummary) {
+  if (busy.value) return;
   if (!currentServerID.value) return;
   drawer.value = true;
   detail.value = null;
@@ -113,24 +142,32 @@ async function show(row: GuildSummary) {
   await loadDetail(row.id);
 }
 async function loadDetail(id: string) {
+  const generation = ++detailGeneration;
+  const serverId = currentServerID.value;
   detailLoading.value = true;
   detailError.value = '';
   try {
     const result = await getGuild(currentServerID.value, id);
-    setDetail(result);
+    if (generation === detailGeneration && serverId === currentServerID.value && drawer.value) setDetail(result);
   } catch (e) {
-    detailError.value = errorMessage(e);
+    if (generation === detailGeneration && drawer.value) detailError.value = errorMessage(e);
   } finally {
-    detailLoading.value = false;
+    if (generation === detailGeneration) detailLoading.value = false;
   }
+}
+async function refreshDetail() {
+  if (!detail.value || !await guildGuard.canLeave()) return;
+  await loadDetail(detail.value.id);
 }
 
 function checkClean() {
-  if (!guildDirty.value) return true;
+  if (busy.value) return false;
+  if (!guildGuard.dirty.value) return true;
   return window.confirm('公会数值有未保存修改，继续操作会丢弃这些输入。确定继续？');
 }
 
 async function saveGuild() {
+  if (busy.value) return;
   if (!detail.value || !form.value || !canWrite.value || saving.value) return;
   if (!reason.value.trim()) {
     saveError.value = '请填写本次变更原因';
@@ -156,8 +193,10 @@ function editMember(row: GuildMember) {
   memberDraft.value = { contribution: row.contribution, spendableContribution: row.spendableContribution, todayCoin: row.todayCoin, todayBadge: row.todayBadge, role: row.role, reason: '' };
   memberError.value = '';
   memberOpen.value = true;
+  memberGuard.capture();
 }
 async function submitMember() {
+  if (busy.value) return;
   if (!detail.value || !memberTarget.value || memberSaving.value || !canWrite.value) return;
   if (!memberDraft.value.reason.trim()) {
     memberError.value = '请填写操作原因';
@@ -191,9 +230,13 @@ function beginAdd() {
   if (!checkClean()) return;
   addDraft.value = { playerId: null, reason: '' };
   addError.value = '';
+  playerOptions.value = [];
   addOpen.value = true;
+  addGuard.capture();
+  searchPlayers();
 }
 async function submitAdd() {
+  if (busy.value) return;
   if (!detail.value || !addDraft.value.playerId || addSaving.value || !canWrite.value) return;
   if (!addDraft.value.reason.trim()) {
     addError.value = '请填写操作原因';
@@ -223,8 +266,10 @@ function beginRemove(row: GuildMember) {
   removeTarget.value = row;
   removeReason.value = '';
   removeError.value = '';
+  removeGuard.capture();
 }
 async function submitRemove() {
+  if (busy.value) return;
   if (!detail.value || !removeTarget.value || removing.value || !canWrite.value) return;
   if (!removeReason.value.trim()) {
     removeError.value = '请填写移除原因';
@@ -260,10 +305,12 @@ function beginDissolve() {
       dissolveReason.value = '';
       dissolveError.value = '';
       dissolveOpen.value = true;
+      dissolveGuard.capture();
     }
   });
 }
 async function submitDissolve() {
+  if (busy.value) return;
   if (!detail.value || dissolving.value || !canWrite.value) return;
   if (dissolveName.value !== detail.value.name) {
     dissolveError.value = '公会名必须与当前名称完全一致';
@@ -294,8 +341,17 @@ async function submitDissolve() {
   }
 }
 
-function requestCloseDrawer() {
-  if (guildDirty.value && !window.confirm('公会数值有未保存修改，确定关闭并放弃？')) return;
+async function canLeave() {
+  if (busy.value) return false;
+  for (const guard of [memberGuard, addGuard, removeGuard, dissolveGuard, guildGuard]) {
+    if (!await guard.canLeave()) return false;
+  }
+  return true;
+}
+async function requestCloseDrawer() {
+  if (!await canLeave()) return;
+  detailGeneration += 1;
+  playerGeneration += 1;
   memberOpen.value = false;
   addOpen.value = false;
   removeTarget.value = null;
@@ -353,33 +409,20 @@ const memberColumns: DataTableColumns<GuildMember> = [
   }
 ];
 
-const removeSwitchGuard = scope.addSwitchGuard(() => {
-  if (!drawer.value) return true;
-  return new Promise<boolean>(resolve => window.$dialog?.warning({
-    title: '切换运营区服？',
-    content: '当前公会详情和未保存输入将关闭。',
-    positiveText: '切换区服',
-    negativeText: '继续编辑',
-    onPositiveClick: () => { drawer.value = false; resolve(true); },
-    onNegativeClick: () => resolve(false),
-    onClose: () => resolve(false),
-    onMaskClick: () => resolve(false)
-  }));
-});
-onBeforeUnmount(removeSwitchGuard);
+const removeSwitchGuard = scope.addSwitchGuard(canLeave);
+onBeforeUnmount(() => { removeSwitchGuard(); detailGeneration += 1; playerGeneration += 1; });
 
 function beforeUnload(event: BeforeUnloadEvent) {
-  if (!drawerDirty.value) return;
+  if (!busy.value && !drawerDirty.value) return;
   event.preventDefault();
   event.returnValue = '';
 }
 onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload));
-onBeforeRouteLeave(() => {
-  if (!drawerDirty.value) return true;
-  return window.confirm('公会页面有未保存输入，确定离开？');
-});
+onBeforeRouteLeave(canLeave);
 
 watch(() => scope.serverId, async () => {
+  detailGeneration += 1; playerGeneration += 1;
+  memberOpen.value = false; addOpen.value = false; removeTarget.value = null; dissolveOpen.value = false;
   drawer.value = false;
   detail.value = null;
   page.value = 1;
@@ -400,8 +443,8 @@ onMounted(async () => {
       <div class="ops-filters">
         <NInput v-model:value="q" placeholder="公会名称或 ID" clearable class="ops-search" @keydown.enter="search" />
         <NButton type="primary" :disabled="!scope.currentServer" @click="search">搜索</NButton>
-        <NButton :loading="loading" :disabled="!scope.currentServer" @click="load">刷新</NButton>
         <span class="ops-muted">共 {{ total.toLocaleString() }} 个公会</span>
+        <NButton :loading="loading" :disabled="!scope.currentServer" @click="load">刷新</NButton>
       </div>
       <NDataTable
         :columns="columns"
@@ -424,26 +467,25 @@ onMounted(async () => {
       </div>
     </NCard>
 
-    <NDrawer :show="drawer" :width="1040" class="ops-editor-drawer" @update:show="value => !value && requestCloseDrawer()">
-      <NDrawerContent :title="detail ? `${detail.name} · 公会管理` : '公会管理'" closable>
+    <NDrawer :show="drawer" :mask-closable="!busy" :close-on-esc="!busy" :width="1040" class="ops-editor-drawer" @update:show="value => !value && requestCloseDrawer()">
+      <NDrawerContent :title="detail ? `${detail.name} · 公会管理` : '公会管理'" :closable="!busy">
         <NAlert v-if="detailError" type="error" :title="detailError" class="mb-16px" />
         <NAlert v-if="saveError" type="error" :title="saveError" class="mb-16px" />
         <NSpin :show="detailLoading">
           <template v-if="detail && form">
             <div class="guild-detail-header">
               <div>
-                <h2>{{ detail.name }}</h2>
-                <div class="ops-mono ops-muted">ID {{ detail.id }} · 版本 {{ detail.version.slice(0, 12) }}</div>
+                <ContextHelp title="公会记录" :text="`ID ${detail.id}；版本 ${detail.version.slice(0, 12)}`" />
               </div>
               <NSpace>
-                <NButton :loading="detailLoading" @click="loadDetail(detail.id)">刷新</NButton>
+                <NButton :loading="detailLoading" @click="refreshDetail" :disabled="busy">刷新</NButton>
                 <NButton v-if="canWrite" quaternary type="error" @click="beginDissolve">解散公会</NButton>
               </NSpace>
             </div>
 
             <NCard :bordered="false" class="ops-panel mb-16px">
               <template #header>公会共享数值</template>
-              <NForm label-placement="left" label-width="140" :disabled="!canWrite">
+              <NForm label-placement="left" label-width="140" :disabled="!canWrite || busy">
                 <div class="guild-form-grid">
                   <NFormItem label="公会名称"><NInput v-model:value="form.name" maxlength="64" /></NFormItem>
                   <NFormItem label="等级"><NInputNumber v-model:value="form.level" :min="1" :max="20" /></NFormItem>
@@ -475,7 +517,7 @@ onMounted(async () => {
               <template #header>
                 <NSpace justify="space-between" align="center" style="width: 100%">
                   <span>公会成员 · {{ detail.members.length }} 人</span>
-                  <NButton v-if="canWrite" size="small" type="primary" secondary :disabled="guildDirty" @click="beginAdd">添加已有玩家</NButton>
+                  <NButton v-if="canWrite" size="small" type="primary" secondary :disabled="guildDirty || busy" @click="beginAdd">添加已有玩家</NButton>
                 </NSpace>
               </template>
               <NAlert v-if="guildDirty" type="info" title="请先保存或放弃公会数值修改，再管理成员，避免版本冲突。" class="mb-12px" />
@@ -486,9 +528,9 @@ onMounted(async () => {
       </NDrawerContent>
     </NDrawer>
 
-    <NModal v-model:show="memberOpen" preset="card" title="编辑公会成员" style="width: 560px">
+    <NModal :show="memberOpen" :closable="!busy" :mask-closable="!busy" @update:show="!$event && memberGuard.requestClose()" preset="card" title="编辑公会成员" style="width: 560px">
       <NAlert v-if="memberError" type="error" :title="memberError" class="mb-12px" />
-      <NForm label-placement="left" label-width="130">
+      <NForm label-placement="left" label-width="130" :disabled="busy || !canWrite">
         <NFormItem label="角色"><span class="ops-mono">{{ memberTarget?.playerName }} · #{{ memberTarget?.playerId }}</span></NFormItem>
         <NFormItem label="累计贡献"><NInputNumber v-model:value="memberDraft.contribution" :min="0" /></NFormItem>
         <NFormItem label="可用贡献"><NInputNumber v-model:value="memberDraft.spendableContribution" :min="0" :max="2147483647" :precision="0" /></NFormItem>
@@ -498,42 +540,42 @@ onMounted(async () => {
         <NFormItem label="变更原因" required><NInput v-model:value="memberDraft.reason" maxlength="500" /></NFormItem>
       </NForm>
       <template #footer>
-        <NSpace justify="end"><NButton @click="memberOpen = false">取消</NButton><NButton type="primary" :loading="memberSaving" :disabled="!canWrite" @click="submitMember">保存成员</NButton></NSpace>
+        <NSpace justify="end"><NButton :disabled="busy" @click="memberGuard.requestClose()">取消</NButton><NButton type="primary" :loading="memberSaving" :disabled="!canWrite || busy" @click="submitMember">保存成员</NButton></NSpace>
       </template>
     </NModal>
 
-    <NModal v-model:show="addOpen" preset="card" title="添加已有玩家" style="width: 560px">
+    <NModal :show="addOpen" :closable="!busy" :mask-closable="!busy" @update:show="!$event && addGuard.requestClose()" preset="card" title="添加已有玩家" style="width: 560px">
       <NAlert v-if="addError" type="error" :title="addError" class="mb-12px" />
-      <NForm label-placement="left" label-width="110">
-        <NFormItem label="角色 ID" required><NInputNumber v-model:value="addDraft.playerId" :min="1" placeholder="同区已创建角色 ID" style="width: 100%" /></NFormItem>
+      <NForm label-placement="left" label-width="110" :disabled="busy || !canWrite">
+        <NFormItem label="同区角色" required><NSelect v-model:value="addDraft.playerId" :options="playerOptions" :loading="playerLoading" filterable remote clearable placeholder="搜索角色名称或 ID" @search="searchPlayers" /></NFormItem>
         <NFormItem label="加入原因" required><NInput v-model:value="addDraft.reason" maxlength="500" /></NFormItem>
       </NForm>
       <NAlert type="info" title="后台会再次校验同区归属、原公会开放等级、退会冷却、人数上限和已有公会。" />
       <template #footer>
-        <NSpace justify="end"><NButton @click="addOpen = false">取消</NButton><NButton type="primary" :loading="addSaving" :disabled="!canWrite" @click="submitAdd">加入公会</NButton></NSpace>
+        <NSpace justify="end"><NButton :disabled="busy" @click="addGuard.requestClose()">取消</NButton><NButton type="primary" :loading="addSaving" :disabled="!canWrite || busy" @click="submitAdd">加入公会</NButton></NSpace>
       </template>
     </NModal>
 
-    <NModal :show="Boolean(removeTarget)" preset="card" title="移除公会成员" style="width: 540px" @update:show="value => !value && (removeTarget = null)">
+    <NModal :show="Boolean(removeTarget)" preset="card" title="移除公会成员" style="width: 540px" :closable="!busy" :mask-closable="!busy" @update:show="!$event && removeGuard.requestClose()">
       <NAlert v-if="removeError" type="error" :title="removeError" class="mb-12px" />
       <p>将 <strong>{{ removeTarget?.playerName }}</strong> 按原离会流程移出，24小时退会冷却和房间/公会战撤权立即生效；历史记录与奖励保留。</p>
-      <NForm label-placement="left" label-width="100">
+      <NForm label-placement="left" label-width="100" :disabled="busy || !canWrite">
         <NFormItem label="移除原因" required><NInput v-model:value="removeReason" maxlength="500" /></NFormItem>
       </NForm>
       <template #footer>
-        <NSpace justify="end"><NButton @click="removeTarget = null">取消</NButton><NButton type="error" :loading="removing" :disabled="!canWrite" @click="submitRemove">确认移除</NButton></NSpace>
+        <NSpace justify="end"><NButton :disabled="busy" @click="removeGuard.requestClose()">取消</NButton><NButton type="error" :loading="removing" :disabled="!canWrite || busy" @click="submitRemove">确认移除</NButton></NSpace>
       </template>
     </NModal>
 
-    <NModal v-model:show="dissolveOpen" preset="card" title="二次确认：解散公会" style="width: 620px">
+    <NModal :show="dissolveOpen" :closable="!busy" :mask-closable="!busy" @update:show="!$event && dissolveGuard.requestClose()" preset="card" title="二次确认：解散公会" style="width: 620px">
       <NAlert type="error" title="解散会移除全部成员并撤销公会频道/公会战资格，且不能撤销。历史回执、祈祷、战争结算和已发奖励保留。" class="mb-12px" />
       <NAlert v-if="dissolveError" type="error" :title="dissolveError" class="mb-12px" />
-      <NForm label-placement="left" label-width="120">
+      <NForm label-placement="left" label-width="120" :disabled="busy || !canWrite">
         <NFormItem label="精确公会名" required><NInput v-model:value="dissolveName" :placeholder="detail?.name" /></NFormItem>
         <NFormItem label="解散原因" required><NInput v-model:value="dissolveReason" maxlength="500" /></NFormItem>
       </NForm>
       <template #footer>
-        <NSpace justify="end"><NButton @click="dissolveOpen = false">取消</NButton><NButton type="error" :loading="dissolving" :disabled="!canWrite || dissolveName !== detail?.name" @click="submitDissolve">确认解散</NButton></NSpace>
+        <NSpace justify="end"><NButton :disabled="busy" @click="dissolveGuard.requestClose()">取消</NButton><NButton type="error" :loading="dissolving" :disabled="busy || !canWrite || dissolveName !== detail?.name" @click="submitDissolve">确认解散</NButton></NSpace>
       </template>
     </NModal>
   </div>

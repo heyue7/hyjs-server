@@ -241,10 +241,7 @@ onMounted(load);
 
 <template>
   <div class="p-4 space-y-4">
-    <div class="flex flex-wrap items-start justify-between gap-3">
-      <div>
-        <h1 class="text-lg font-semibold">野外地图</h1>
-      </div>
+    <div class="flex flex-wrap items-center gap-3">
       <NButton :loading="loading" :disabled="saving || dirty || channelsDirty" @click="load">刷新</NButton>
     </div>
     <NAlert v-if="error" type="error" closable @close="error = ''">

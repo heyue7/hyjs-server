@@ -131,7 +131,7 @@ func (s *GameService) AdminActivityModes() []model.AdminActivityMode {
 			mode.Notes += " 奖品库存、钻石大奖池和记录按角色独立计算，不发排名奖。"
 		}
 		if d.mode == "fortune-cat" {
-			mode.Notes = "每日5次；每档目标填写当次消耗钻石，奖励填写包含本金的实际返钻。"
+			mode.Notes = "每日5次；每档分别配置消耗钻石与获得的金币数量。"
 		}
 		if d.mode == "continued-spend" {
 			mode.Notes = "按7个消费日统计，每个北京时间自然日实际消费钻石达到门槛计1日；七档完成后可领终奖。"

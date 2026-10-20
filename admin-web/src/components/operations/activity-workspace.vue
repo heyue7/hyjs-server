@@ -106,11 +106,6 @@ const editable = computed(
   () =>
     canWrite.value && editorKind.value !== 'view' && (editorKind.value !== 'edit' || Boolean(selected.value?.editable))
 );
-const editorTitle = computed(() => {
-  if (editorKind.value === 'create') return '新建活动';
-  if (editorKind.value === 'copy') return '复制为新活动';
-  return selected.value?.name || '活动详情';
-});
 const templateOptions = computed(
   () =>
     selectedMode.value?.templates.map(template => ({
@@ -345,7 +340,7 @@ onMounted(load);
     <template v-if="open && form">
       <div ref="editorHeading" class="activity-editor-header">
         <NButton quaternary :disabled="busy" @click="requestClose">← 返回活动列表</NButton>
-        <div class="activity-editor-title"><h1>{{ editorTitle }}</h1><NSpace :size="8"><NTag size="small" :bordered="false">{{ editorKind === 'create' || editorKind === 'copy' ? '新草稿' : selected?.enabled ? '已开启' : '已关闭' }}</NTag><NTag v-if="selected?.frozen && editorKind !== 'copy'" size="small" :bordered="false">已冻结</NTag><NTag v-if="!editable" size="small" :bordered="false">只读查看</NTag></NSpace></div>
+        <div class="activity-editor-title"><NSpace :size="8"><NTag size="small" :bordered="false">{{ editorKind === 'create' || editorKind === 'copy' ? '新草稿' : selected?.enabled ? '已开启' : '已关闭' }}</NTag><NTag v-if="selected?.frozen && editorKind !== 'copy'" size="small" :bordered="false">已冻结</NTag><NTag v-if="!editable" size="small" :bordered="false">只读查看</NTag></NSpace></div>
 
       </div>
       <NAlert v-if="saveError" type="error" :title="saveError" />
@@ -362,12 +357,12 @@ onMounted(load);
         <NCard :bordered="false" class="ops-panel activity-editor-body">
           <ActivitySummary v-if="!editable || activeTab === 'review'" :form="form" :mode="selectedMode" />
           <template v-else>
-            <div class="activity-section-title"><h2>{{ currentSection?.title }}</h2><p>{{ currentSection?.detail }}</p></div>
+            <div v-if="currentSection?.detail" class="activity-section-title"><ContextHelp :title="currentSection.title" :text="currentSection.detail" /></div>
             <NForm label-placement="top" :disabled="busy">
               <template v-if="activeTab === 'basics'">
-                <NFormItem label="活动名称" required>
+                <NFormItem required>
+                  <template #label><span class="ops-field-label">活动名称<ContextHelp title="正式名称" text="游戏内名称由客户端固定；需要区分批次请填写后台别名。" /></span></template>
                   <NInput :value="activityName" disabled />
-                  <p class="ops-muted" style="margin:8px 0 0">游戏内名称由客户端固定，后台不能修改；需要区分批次请填写后台别名。</p>
                 </NFormItem>
                 <NFormItem label="后台别名">
                   <NInput v-model:value="form.alias" :maxlength="80" clearable placeholder="仅后台列表与排期显示，不改游戏内名称" :disabled="busy" />
@@ -405,11 +400,9 @@ onMounted(load);
 </template>
 
 <style scoped>
-.activity-editor-header { scroll-margin-top: 80px; }
-.activity-editor-header > .n-button { margin-left: -12px; }
-.activity-editor-title { display: flex; gap: 20px; align-items: center; margin: 12px 0 6px; }
-.activity-editor-title h1 { margin: 0; font-size: 24px; font-weight: 600; line-height: 1.4; }
-.activity-editor-layout { display: grid; grid-template-columns: 160px minmax(0, 1fr); gap: 24px; align-items: start; }
+.activity-editor-header { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; scroll-margin-top: 80px; }
+.activity-editor-title { display: flex; align-items: center; }
+.activity-editor-layout { display: grid; grid-template-columns: 160px minmax(0, 1fr); gap: 16px; align-items: start; }
 .activity-view-layout { grid-template-columns: minmax(0, 1fr); }
 .activity-sections { display: flex; flex-direction: column; gap: 5px; position: sticky; top: 20px; }
 .activity-sections button { display: flex; flex-direction: column; gap: 6px; padding: 13px 14px; border: 0; border-radius: 7px; color: rgb(var(--base-text-color) / .65); background: transparent; appearance: none; text-align: left; cursor: pointer; }
@@ -418,9 +411,7 @@ onMounted(load);
 .activity-sections button:focus-visible { outline: 2px solid rgb(var(--primary-color) / .55); outline-offset: 2px; }
 .activity-sections strong { font-size: 14px; font-weight: 500; }
 .activity-sections span { font-size: 12px; line-height: 1.5; color: rgb(var(--base-text-color) / .46); }
-.activity-section-title { margin-bottom: 28px; }
-.activity-section-title h2 { margin: 0 0 8px; font-size: 20px; font-weight: 600; }
-.activity-section-title p { margin: 0; color: rgb(var(--base-text-color) / .5); font-size: 13px; }
+.activity-section-title { margin-bottom: 12px; }
 .activity-editor-body { min-width: 0; }
 .activity-context { padding: 10px 0 10px 10px; }
 .activity-context h3 { margin: 0 0 24px; font-size: 14px; font-weight: 500; }
@@ -432,5 +423,5 @@ onMounted(load);
 .activity-template-preview { display: flex; align-items: center; gap: 20px; padding: 18px; border-radius: 8px; background: rgb(var(--base-text-color) / .025); }
 .activity-missing { margin: 8px 0 0; padding-left: 18px; }
 @media (max-width: 1300px) { .activity-editor-layout { grid-template-columns: 165px minmax(0, 1fr); } .activity-view-layout { grid-template-columns: minmax(0, 1fr); } .activity-context { display: none; } }
-@media (max-width: 760px) { .activity-editor-title { align-items: flex-start; flex-direction: column; gap: 10px; } .activity-editor-title h1 { font-size: 21px; } .activity-editor-layout { display: block; } .activity-sections { flex-direction: row; position: static; overflow-x: auto; margin-bottom: 18px; } .activity-sections button { white-space: nowrap; padding: 10px 13px; } .activity-sections span { display: none; } .activity-editor-footer { padding: 14px; flex-wrap: wrap; } .activity-editor-footer > .ops-muted { width: 100%; } .activity-template-preview { flex-direction: column; align-items: flex-start; } }
+@media (max-width: 760px) { .activity-editor-title { align-items: flex-start; flex-direction: column; gap: 10px; } .activity-editor-layout { display: block; } .activity-sections { flex-direction: row; position: static; overflow-x: auto; margin-bottom: 18px; } .activity-sections button { white-space: nowrap; padding: 10px 13px; } .activity-sections span { display: none; } .activity-editor-footer { padding: 14px; flex-wrap: wrap; } .activity-editor-footer > .ops-muted { width: 100%; } .activity-template-preview { flex-direction: column; align-items: flex-start; } }
 </style>

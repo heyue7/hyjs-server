@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useDraftGuard } from '@/composables/useDraftGuard';
 import { computed, h, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 import { NButton, NTag } from 'naive-ui';
 import type { DataTableColumns, SelectOption } from 'naive-ui';
@@ -76,6 +77,7 @@ const granting = ref(false);
 const grantError = ref('');
 const selectedItem = ref<Item | null>(null);
 const grant = reactive({ playerId: null as number | null, amount: 1, reason: '', requestId: '' });
+const grantGuard = useDraftGuard({ active: () => grantOpen.value, value: () => grant, busy: () => granting.value, writable: () => canWrite.value, label: '发放草稿', close: () => { grantOpen.value = false; } });
 const playerOptions = ref<{ label: string; value: number }[]>([]);
 const playerLoading = ref(false);
 let playerTimer: ReturnType<typeof setTimeout>;
@@ -96,7 +98,7 @@ function findPlayers(value: string) {
           label: `${p.name || p.playerName || '角色'} · ID ${p.playerId || p.id}${p.level ? ` · Lv.${p.level}` : ''}`
         }));
     } catch (e) {
-      grantError.value = errorMessage(e);
+      if (seq === playerRequest) grantError.value = errorMessage(e);
     } finally {
       if (seq === playerRequest) playerLoading.value = false;
     }
@@ -107,9 +109,11 @@ function openGrant(item: Item) {
   Object.assign(grant, { playerId: null, amount: 1, reason: '', requestId: createRequestId() });
   playerOptions.value = [];
   grantError.value = '';
+  grantGuard.capture();
   grantOpen.value = true;
 }
 async function submitGrant() {
+  if (granting.value || !canWrite.value || !selectedItem.value) return;
   if (!grant.playerId || !Number.isInteger(grant.amount) || grant.amount <= 0 || !grant.reason.trim()) {
     grantError.value = '请选择角色、填写正整数数量及发放原因';
     return;
@@ -197,13 +201,7 @@ onMounted(load);
 
 <template>
   <div class="ops-page">
-    <div class="ops-toolbar">
-      <div class="ops-page-label">
-        道具目录
-        <span class="ops-count">{{ total.toLocaleString() }}</span>
-      </div>
-      <NButton :loading="loading" @click="load">刷新</NButton>
-    </div>
+
     <NAlert v-if="error" type="error" :title="error" />
     <NCard :bordered="false" class="ops-panel">
       <div class="ops-filters">
@@ -248,6 +246,8 @@ onMounted(load);
         />
         <NButton type="primary" @click="search">搜索</NButton>
         <NButton quaternary @click="clearFilters">重置</NButton>
+        <span class="ops-muted">共 {{ total.toLocaleString() }} 项资源</span>
+        <NButton :loading="loading" @click="load">刷新</NButton>
       </div>
       <NDataTable
         :columns="columns"
@@ -280,7 +280,8 @@ onMounted(load);
       </NDrawerContent>
     </NDrawer>
     <NModal
-      v-model:show="grantOpen"
+      :show="grantOpen"
+      @update:show="!$event && grantGuard.requestClose()"
       preset="card"
       title="发放道具"
       class="ops-modal"
@@ -293,7 +294,7 @@ onMounted(load);
         <span class="ops-mono ops-muted">{{ selectedItem?.id }}</span>
       </div>
       <NAlert v-if="grantError" type="error" :title="grantError" class="mb-16px" />
-      <NForm label-placement="top">
+      <NForm label-placement="top" :disabled="granting">
         <NFormItem label="目标角色" required>
           <NSelect
             v-model:value="grant.playerId"
@@ -321,7 +322,7 @@ onMounted(load);
       <div class="ops-muted mb-20px">道具将发送到该角色的领奖中心。</div>
       <template #footer>
         <div class="ops-drawer-actions">
-          <NButton :disabled="granting" @click="grantOpen = false">取消</NButton>
+          <NButton :disabled="granting" @click="grantGuard.requestClose()">取消</NButton>
           <NPopconfirm :disabled="!grant.playerId || !grant.reason.trim() || granting" @positive-click="submitGrant">
             <template #trigger>
               <NButton type="primary" :disabled="!grant.playerId || !grant.reason.trim()" :loading="granting">

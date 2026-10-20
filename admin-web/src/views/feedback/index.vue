@@ -230,16 +230,7 @@ onMounted(load);
 
 <template>
   <div class="ops-page feedback-workspace">
-    <div class="ops-toolbar">
-      <div>
-        <div class="ops-page-label">
-          客服反馈
-          <span class="ops-count">{{ total }}</span>
-        </div>
-        <p class="ops-muted mt-6px">按反馈查看玩家消息、回复与处理状态</p>
-      </div>
-      <NButton :loading="loading" @click="load">刷新列表</NButton>
-    </div>
+
     <NAlert v-if="error" type="error" :title="error" />
     <div class="feedback-layout">
       <NCard :bordered="false" class="ops-panel feedback-list">
@@ -260,6 +251,8 @@ onMounted(load);
             @update:value="search"
           />
           <NButton :loading="loading" @click="search">搜索</NButton>
+          <span class="ops-muted">共 {{ total }} 条反馈</span>
+          <NButton :loading="loading" @click="load">刷新列表</NButton>
         </div>
         <NDataTable
           :columns="columns"

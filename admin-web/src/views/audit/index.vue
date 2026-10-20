@@ -2,6 +2,7 @@
 import { computed, h, onMounted, reactive, ref, watch } from 'vue';
 import { NButton, NTag } from 'naive-ui';
 import type { DataTableColumns } from 'naive-ui';
+import { auditActionLabel, auditActorLabel } from '@/service/audit-labels';
 import { api, formatTime } from '@/service/operations';
 import type { Audit } from '@/service/operations';
 import { getSecurityEvents, securityEventOutcomeLabel, securityEventOutcomeOptions } from '@/service/security-events';
@@ -31,8 +32,8 @@ async function load() {
 }
 const columns: DataTableColumns<Audit> = [
   { title: '时间（北京）', key: 'time', width: 190, render: row => formatTime(row.time) },
-  { title: '操作人', key: 'actor', width: 150 },
-  { title: '操作', key: 'action', minWidth: 180 },
+  { title: '操作人', key: 'actor', width: 150, render: row => auditActorLabel(row.actor) },
+  { title: '操作', key: 'action', minWidth: 180, render: row => h('span', { title: row.action }, auditActionLabel(row.action)) },
   { title: '目标', key: 'target', minWidth: 240, ellipsis: { tooltip: true } },
   {
     title: '详情',
@@ -156,11 +157,9 @@ onMounted(load);
 
 <template>
   <div class="ops-page">
-    <div class="ops-toolbar">
-      <div class="ops-page-label">
-        {{ activeTab === 'security' ? '安全事件' : '操作审计' }}
-        <span class="ops-count">{{ (activeTab === 'security' ? securityTotal : total).toLocaleString() }}</span>
-      </div>
+
+    <div class="ops-filters">
+      <span class="ops-muted">共 {{ (activeTab === 'security' ? securityTotal : total).toLocaleString() }} 条记录</span>
       <NButton :loading="activeTab === 'security' ? securityLoading : opsLoading" @click="refresh">刷新</NButton>
     </div>
     <NTabs v-model:value="activeTab" type="line">
@@ -198,16 +197,8 @@ onMounted(load);
       <NAlert v-if="securityError" type="error" :title="securityError" />
       <NCard :bordered="false" class="ops-panel">
         <div class="ops-filters">
-          <NSelect
-            v-model:value="securityDraft.action"
-            class="ops-filter-select"
-            :options="securityActionOptions"
-          />
-          <NSelect
-            v-model:value="securityDraft.outcome"
-            class="ops-filter-select"
-            :options="securityEventOutcomeOptions"
-          />
+          <NSelect v-model:value="securityDraft.action" class="ops-filter-select" :options="securityActionOptions" />
+          <NSelect v-model:value="securityDraft.outcome" class="ops-filter-select" :options="securityEventOutcomeOptions" />
           <NInput
             v-model:value="securityDraft.actor"
             class="ops-search"
@@ -246,7 +237,7 @@ onMounted(load);
       <NDrawerContent title="操作详情" closable>
         <template v-if="selected">
           <NDescriptions :column="1" label-placement="left" class="mb-24px">
-            <NDescriptionsItem label="操作人">{{ selected.actor }}</NDescriptionsItem>
+            <NDescriptionsItem label="操作人"><span :title="selected.actor">{{ auditActorLabel(selected.actor) }}</span></NDescriptionsItem>
             <NDescriptionsItem label="操作">{{ selected.action }}</NDescriptionsItem>
             <NDescriptionsItem label="目标">{{ selected.target }}</NDescriptionsItem>
             <NDescriptionsItem label="时间">{{ formatTime(selected.time) }}</NDescriptionsItem>

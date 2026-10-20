@@ -58,10 +58,7 @@ onMounted(load);
 
 <template>
   <div class="ops-page">
-    <div class="ops-toolbar">
-      <div class="ops-page-label">游戏时间</div>
-      <NButton :loading="loading" :disabled="changing" @click="load">刷新</NButton>
-    </div>
+    <div class="ops-filters"><NButton :loading="loading" :disabled="changing" @click="load">刷新</NButton></div>
     <NAlert v-if="error" type="error" :title="error" />
     <NCard :bordered="false" class="ops-panel server-clock-card">
       <NSpin :show="loading">

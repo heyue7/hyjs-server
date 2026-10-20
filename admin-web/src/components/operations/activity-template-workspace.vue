@@ -395,14 +395,12 @@ onUnmounted(() => {
       </NCard>
     </template>
     <template v-else-if="form">
-      <div class="ops-toolbar mb-20px">
-        <div>
-          <NButton v-if="!inline" quaternary :disabled="busy" @click="close">← 返回模板库</NButton>
-          <div class="ops-page-label">{{ selected ? editorName : '新建活动模板' }}</div>
-        </div>
+      <div class="template-editor-actions">
+        <NButton v-if="!inline" quaternary :disabled="busy" @click="close">← 返回模板库</NButton>
+        <ContextHelp title="生效范围" text="修改用于新排期，已发布活动不变。开放日期和区服在活动排期中设置。" />
+        <span v-if="readOnly" class="ops-muted">只读查看</span>
       </div>
       <NAlert v-if="saveError" type="error" :title="saveError" class="mb-16px" />
-      <p class="template-context">修改用于新排期，已发布活动不变。</p>
       <div class="template-editor">
         <nav aria-label="活动模板编辑分区">
           <button
@@ -417,9 +415,9 @@ onUnmounted(() => {
         <NCard :bordered="false">
           <NForm v-if="activeSection !== 'review'" label-placement="top" :disabled="busy || readOnly">
             <template v-if="activeSection === 'basics'">
-              <NFormItem label="活动名称" required>
+              <NFormItem required>
+                <template #label><span class="ops-field-label">活动名称<ContextHelp title="正式名称" text="游戏内名称由客户端固定；需要区分批次请填写后台别名。" /></span></template>
                 <NInput :value="editorName" disabled />
-                <p class="template-help" style="margin:8px 0 0">游戏内名称由客户端固定，后台不能修改；需要区分批次请填写后台别名。</p>
               </NFormItem>
               <NFormItem label="后台别名">
                 <NInput v-model:value="form.alias" :maxlength="80" clearable placeholder="仅后台列表与排期显示，不改游戏内名称" />
@@ -539,16 +537,16 @@ onUnmounted(() => {
 
 <style scoped>
 .template-inline { padding: 0; }
-.template-inline .ops-page-label { font-size: 18px; }
+.template-editor-actions { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
 .template-count { margin-left: auto; font-variant-numeric: tabular-nums; }
-.template-context, .template-help { color: rgb(var(--base-text-color) / .65); font-size: 13px; line-height: 1.7; margin: 0 0 20px; }
+.template-help { color: rgb(var(--base-text-color) / .65); font-size: 13px; line-height: 1.7; margin: 0 0 12px; }
 .template-editor nav button:hover { background: rgb(var(--base-text-color) / .04); }
 .template-editor nav button:focus-visible { outline: 2px solid rgb(var(--primary-color)); outline-offset: 2px; }
 
 .template-editor {
   display: grid;
   grid-template-columns: 160px minmax(0, 1fr);
-  gap: 24px;
+  gap: 16px;
 }
 .template-editor nav {
   display: flex;

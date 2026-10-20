@@ -23,11 +23,13 @@ type AdminGuildConfigGroup struct {
 
 // AdminGuildConfigField 表示一个实际被公会消费者读取的原 GameConfigure 参数。
 type AdminGuildConfigField struct {
-	Key       string `json:"key"`       // Key is the stable business identifier.
-	Label     string `json:"label"`     // Label is the original table description or display title.
-	ValueType string `json:"valueType"` // ValueType is int, double or string as parsed by the consumer.
-	Value     string `json:"value"`     // Value is the current effective string value.
-	Editable  bool   `json:"editable"`  // Editable=false marks a read-only or unsupported field.
+	Key       string  `json:"key"`       // Key is the stable business identifier.
+	Label     string  `json:"label"`     // Label is the original table description or display title.
+	ValueType string  `json:"valueType"` // ValueType is int, double or string as parsed by the consumer.
+	Value     string  `json:"value"`     // Value is the current effective string value.
+	Editable  bool    `json:"editable"`  // Editable=false marks a read-only or unsupported field.
+	Min       float64 `json:"min"`       // Min is the permitted numeric minimum, including zero.
+	Max       float64 `json:"max"`       // Max is the permitted numeric maximum; string editors use their own schema.
 }
 
 // AdminGuildConfigValue 是保存时提交的单字段覆盖值。

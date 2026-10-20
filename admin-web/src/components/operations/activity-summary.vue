@@ -107,13 +107,13 @@ function minuteText(value: number) { return value === 1440 ? '24:00' : `${String
 .activity-source summary { cursor: pointer; }
 .activity-source p { line-height: 1.7; overflow-wrap: anywhere; }
 
-.activity-summary-section + .activity-summary-section { margin-top: 32px; padding-top: 28px; border-top: 1px solid rgb(var(--base-text-color) / .09); }
-.activity-summary h3 { margin: 0 0 22px; font-size: 17px; font-weight: 600; }
-.activity-summary h4 { display: flex; align-items: center; gap: 10px; margin: 0 0 15px; font-size: 14px; font-weight: 600; }
+.activity-summary-section + .activity-summary-section { margin-top: 20px; padding-top: 16px; border-top: 1px solid rgb(var(--base-text-color) / .09); }
+.activity-summary h3 { margin: 0 0 12px; font-size: 17px; font-weight: 600; }
+.activity-summary h4 { display: flex; align-items: center; gap: 10px; margin: 0 0 10px; font-size: 14px; font-weight: 600; }
 .activity-summary h3 span { margin-left: 8px; font-size: 13px; font-weight: 400; }
-.activity-summary-entry { padding: 18px 0; }
+.activity-summary-entry { padding: 12px 0; }
 .activity-summary-entry + .activity-summary-entry { border-top: 1px solid rgb(var(--base-text-color) / .07); }
-.activity-summary-pairs { display: grid; grid-template-columns: 88px minmax(0, 1fr); gap: 15px; align-items: center; margin: 0; }
+.activity-summary-pairs { display: grid; grid-template-columns: 88px minmax(0, 1fr); gap: 10px; align-items: center; margin: 0; }
 .activity-summary-pairs dt { color: rgb(var(--base-text-color) / .55); }
 .activity-summary-pairs dd { margin: 0; min-width: 0; }
 .activity-summary-prizes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 28px; }

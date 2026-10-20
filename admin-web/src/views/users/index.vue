@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useDraftGuard } from '@/composables/useDraftGuard';
 import { computed, h, onMounted, reactive, ref } from 'vue';
 import { NButton, NSpace, NTag } from 'naive-ui';
 import type { DataTableColumns } from 'naive-ui';
@@ -34,6 +35,7 @@ const target = ref<User | null>(null);
 const saving = ref(false);
 const saveError = ref('');
 const draft = reactive({ username: '', password: '', confirmPassword: '', currentPassword: '', role: 'viewer' });
+const editorGuard = useDraftGuard({ active: () => Boolean(modal.value), value: () => draft, busy: () => saving.value, label: '账号修改', close: clearEditor });
 const isSelf = computed(() => target.value?.username === auth.userInfo.userName);
 const title = computed(() => {
   if (modal.value === 'password') return isSelf.value ? '修改我的密码' : '重置账号密码';
@@ -51,9 +53,11 @@ function edit(kind: 'create' | 'role' | 'password', user: User | null = null) {
     role: user?.role || 'viewer'
   });
   saveError.value = '';
+  editorGuard.capture();
   modal.value = kind;
 }
-function close() {
+function close() { return editorGuard.requestClose(); }
+function clearEditor() {
   modal.value = '';
   draft.password = '';
   draft.confirmPassword = '';
@@ -92,7 +96,8 @@ async function save() {
     const needsRelogin =
       isSelf.value && (modal.value === 'password' || (modal.value === 'role' && target.value?.role !== draft.role));
     window.$message?.success(needsRelogin ? '修改成功，请重新登录' : '账号已保存');
-    close();
+    clearEditor();
+    editorGuard.clear();
     if (needsRelogin) relogin();
     else await load();
   } catch (e) {
@@ -134,8 +139,7 @@ onMounted(load);
 
 <template>
   <div class="ops-page">
-    <div class="ops-toolbar">
-      <div class="ops-page-label">后台账号</div>
+    <div class="ops-filters">
       <NSpace>
         <NButton :loading="loading" @click="load">刷新</NButton>
         <NButton type="primary" @click="edit('create')">新建账号</NButton>

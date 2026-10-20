@@ -142,20 +142,26 @@ onBeforeUnmount(() => { removeGuard(); listGeneration += 1; claimsGeneration += 
 
 <template>
   <div class="ops-page cdk-page">
-    <div class="ops-toolbar">
-      <div class="ops-page-label">兑换码 <span class="ops-count">{{ total.toLocaleString() }}</span></div>
-      <NSpace :size="8">
-        <NButton :loading="loading" @click="load">刷新</NButton>
-        <NButton v-if="canWrite" type="primary" :disabled="!writable" @click="edit()">生成兑换码</NButton>
-      </NSpace>
-    </div>
+
     <p class="ops-inline-note cdk-note">同一码每个角色限兑一次。</p>
     <p v-if="!scope.currentServer?.runtimeBound" class="ops-inline-note cdk-note">本区服尚未部署，部署后可生成和使用兑换码。</p>
     <NAlert v-if="error" type="error" :title="error" />
     <NCard :bordered="false" class="cdk-list">
       <div class="ops-filters">
-        <NInput v-model:value="q" class="ops-search" clearable placeholder="搜索名称或尾号" :maxlength="128" @keydown.enter="search" />
+        <NInput
+          v-model:value="q"
+          class="ops-search"
+          clearable
+          placeholder="搜索名称或尾号"
+          :maxlength="128"
+          @keydown.enter="search"
+        />
         <NButton @click="search">搜索</NButton>
+        <span class="ops-muted">共 {{ total.toLocaleString() }} 项</span>
+        <NSpace :size="8">
+          <NButton :loading="loading" @click="load">刷新</NButton>
+          <NButton v-if="canWrite" type="primary" :disabled="!writable" @click="edit()">生成兑换码</NButton>
+        </NSpace>
       </div>
       <NDataTable :columns="columns" :data="rows" :loading="loading" :row-key="(row: CDK) => row.id" size="small" :bordered="false" :scroll-x="1190" />
       <div class="ops-pagination">
