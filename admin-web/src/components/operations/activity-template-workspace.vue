@@ -353,16 +353,6 @@ onUnmounted(() => {
 <template>
   <div class="ops-page template-workspace" :class="{ 'template-inline': inline }">
     <template v-if="!editorOpen && !inline">
-      <div class="ops-toolbar">
-        <div>
-          <div class="ops-page-label">排期模板<span class="ops-count">{{ definitions.length }} 个</span></div>
-          <p class="ops-muted template-intro">可复用的活动内容；开放日期和区服在活动排期中设置。</p>
-        </div>
-        <NSpace>
-          <NButton :loading="loading" :disabled="busy" @click="load">刷新</NButton>
-          <NButton v-if="canWrite" type="primary" :disabled="busy || !modes.length" @click="openEditor()">新建活动模板</NButton>
-        </NSpace>
-      </div>
       <NAlert v-if="error" type="error" :title="error" />
       <NCard :bordered="false" class="ops-panel">
         <div class="ops-filters">
@@ -383,6 +373,11 @@ onUnmounted(() => {
             aria-label="按活动模式筛选"
           />
           <span class="ops-muted template-count">{{ filtered.length }} / {{ definitions.length }} 个</span>
+          <NSpace align="center">
+            <ContextHelp title="排期设置" text="开放日期和区服在活动排期中设置。" />
+            <NButton :loading="loading" :disabled="busy" @click="load">刷新</NButton>
+            <NButton v-if="canWrite" type="primary" :disabled="busy || !modes.length" @click="openEditor()">新建活动模板</NButton>
+          </NSpace>
         </div>
         <NDataTable
           :columns="columns"
@@ -545,7 +540,6 @@ onUnmounted(() => {
 <style scoped>
 .template-inline { padding: 0; }
 .template-inline .ops-page-label { font-size: 18px; }
-.template-intro { margin: 4px 0 0; }
 .template-count { margin-left: auto; font-variant-numeric: tabular-nums; }
 .template-context, .template-help { color: rgb(var(--base-text-color) / .65); font-size: 13px; line-height: 1.7; margin: 0 0 20px; }
 .template-editor nav button:hover { background: rgb(var(--base-text-color) / .04); }

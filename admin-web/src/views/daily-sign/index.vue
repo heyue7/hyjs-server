@@ -192,11 +192,8 @@ onBeforeUnmount(() => { alive = false; resourceGeneration += 1; window.removeEve
 <template>
   <div class="ops-page daily-sign-page">
     <div class="ops-toolbar">
-      <div class="daily-sign-heading">
-        <div class="ops-page-label">每日签到</div>
-        <ContextHelp title="签到规则" :text="snapshot?.source || '每月按累计签到天数依次领取，每天限领一档。已领取奖励保留原记录。'" />
-      </div>
       <NSpace align="center" :size="8">
+        <ContextHelp title="签到规则" :text="snapshot?.source || '每月按累计签到天数依次领取，每天限领一档。已领取奖励保留原记录。'" />
         <NTag v-if="dirty && canWrite" type="warning" :bordered="false">未保存</NTag>
         <NTag v-if="!canWrite" :bordered="false">只读</NTag>
         <NButton :loading="loading" :disabled="saving || editorOpen" @click="refresh">刷新</NButton>
@@ -253,7 +250,7 @@ onBeforeUnmount(() => { alive = false; resourceGeneration += 1; window.removeEve
 
 <style scoped>
 .daily-sign-page { max-width: 1200px; }
-.daily-sign-heading, .daily-sign-enabled { display: flex; align-items: center; gap: 10px; }
+.daily-sign-enabled { display: flex; align-items: center; gap: 10px; }
 .daily-sign-settings { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px; margin-bottom: 20px; }
 .daily-sign-caption { color: rgb(var(--base-text-color) / .6); font-size: 13px; }
 .daily-sign-resource-error { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; color: rgb(var(--base-text-color) / .65); }

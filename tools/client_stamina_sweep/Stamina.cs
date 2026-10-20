@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using UnityEngine;
@@ -142,7 +143,16 @@ namespace HYJS.Stamina
                     view.Status.topAnchor.target = null;
                 }
             }
+            // Original UILocalize.Start runs after the first SetItem; refresh
+            // once on the next frame so the first opening retains short captions.
+            page.StartCoroutine(RefreshAfterLocalization(page));
             return view;
+        }
+
+        static IEnumerator RefreshAfterLocalization(UI.BuyItemPage page)
+        {
+            yield return null;
+            if (page != null && page.gameObject.activeInHierarchy) Render(page);
         }
     }
 

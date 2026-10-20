@@ -25,7 +25,7 @@ def main():
  for name,file in proof.get("payloadFiles",{}).items():
   require(name.startswith("assets/bin/Data/Managed/") and name.endswith(".dll"),"Unexpected overlay entry")
   f=ROOT/file;require(f.resolve().is_relative_to(ROOT),"Overlay file outside project");payload[name]=f.read_bytes()
- # This optional resource overlay has an exact two-entry, two-byte scope.
+ # This optional resource overlay has an exact pinned UILabel-font byte scope.
  # Rebuild expected bytes from the pinned base rather than trusting its manifest.
  font_changes=[]
  if a.opening_font_overlay:

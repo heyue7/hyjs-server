@@ -361,15 +361,6 @@ defineExpose({ beforeLeave: leaveWorkspace, confirmDiscard, dirty, saving });
 
 <template>
   <section class="native-settings ops-page">
-    <div class="ops-toolbar">
-      <div>
-        <div class="ops-page-label">常驻与精彩活动</div>
-        <p class="ops-muted native-intro">管理常驻福利、支付礼包与独立活动目录；从列表进入配置。</p>
-      </div>
-      <NSpace>
-        <NButton :loading="loading" :disabled="busy" @click="load">刷新</NButton>
-      </NSpace>
-    </div>
     <NAlert v-if="error" type="error" :title="error" />
     <NCard :bordered="false" class="ops-panel">
       <div class="ops-filters">
@@ -395,6 +386,7 @@ defineExpose({ beforeLeave: leaveWorkspace, confirmDiscard, dirty, saving });
           aria-label="按启停状态筛选"
         />
         <span class="ops-muted native-count">{{ filtered.length }} / {{ rows.length }} 项</span>
+        <NButton :loading="loading" :disabled="busy" @click="load">刷新</NButton>
       </div>
       <NDataTable
         :columns="columns"
@@ -532,7 +524,6 @@ defineExpose({ beforeLeave: leaveWorkspace, confirmDiscard, dirty, saving });
 </template>
 
 <style scoped>
-.native-intro { margin: 4px 0 0; }
 .native-count { margin-left: auto; font-variant-numeric: tabular-nums; }
 .native-kind-period { display: flex; flex-direction: column; gap: 2px; font-variant-numeric: tabular-nums; }
 .native-drawer-head {

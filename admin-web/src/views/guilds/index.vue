@@ -394,21 +394,14 @@ onMounted(async () => {
 
 <template>
   <div class="ops-page">
-    <div class="ops-toolbar">
-      <div class="ops-page-label">
-        公会管理
-        <span class="ops-count">{{ total.toLocaleString() }}</span>
-      </div>
-      <NSpace>
-        <NButton :loading="loading" :disabled="!scope.currentServer" @click="load">刷新</NButton>
-      </NSpace>
-    </div>
     <NAlert v-if="!scope.currentServer" type="info" title="请先在顶部选择区服；公会列表和写入都只允许当前区服。" />
     <NAlert v-if="error" type="error" :title="error" />
     <NCard :bordered="false" class="ops-panel">
       <div class="ops-filters">
         <NInput v-model:value="q" placeholder="公会名称或 ID" clearable class="ops-search" @keydown.enter="search" />
         <NButton type="primary" :disabled="!scope.currentServer" @click="search">搜索</NButton>
+        <NButton :loading="loading" :disabled="!scope.currentServer" @click="load">刷新</NButton>
+        <span class="ops-muted">共 {{ total.toLocaleString() }} 个公会</span>
       </div>
       <NDataTable
         :columns="columns"

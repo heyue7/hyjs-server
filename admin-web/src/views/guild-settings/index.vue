@@ -152,15 +152,12 @@ function reset() {
 
 <template>
   <div class="ops-page">
-    <div class="ops-toolbar">
-      <div class="ops-page-label">全局公会设置</div>
-      <NSpace>
-        <NInput v-model:value="q" clearable placeholder="搜索参数名称" class="guild-search" />
-        <NButton :loading="loading" :disabled="saving" @click="load">刷新</NButton>
-        <NButton v-if="canWrite && tab !== 'rewards'" :disabled="!dirty || saving" @click="reset">放弃修改</NButton>
-        <NButton v-if="canWrite && tab !== 'rewards'" type="primary" :loading="saving" :disabled="!form || !dirty" @click="save">保存设置</NButton>
-      </NSpace>
-    </div>
+    <NSpace align="center">
+      <NInput v-model:value="q" clearable placeholder="搜索参数名称" class="guild-search" />
+      <NButton :loading="loading" :disabled="saving" @click="load">刷新</NButton>
+      <NButton v-if="canWrite && tab !== 'rewards'" :disabled="!dirty || saving" @click="reset">放弃修改</NButton>
+      <NButton v-if="canWrite && tab !== 'rewards'" type="primary" :loading="saving" :disabled="!form || !dirty" @click="save">保存设置</NButton>
+    </NSpace>
     <NAlert v-if="error" type="error" :title="error" class="mb-12px" />
     <NAlert v-if="saveError" type="error" :title="saveError" class="mb-12px" />
     <NAlert v-for="gap in gaps" :key="gap.key" type="warning" :title="`${gap.label}：${gap.detail}`" class="mb-8px" />

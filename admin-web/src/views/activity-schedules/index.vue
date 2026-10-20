@@ -685,10 +685,7 @@ onUnmounted(() => {
   <div class="ops-page schedule-page">
     <div class="ops-toolbar">
       <div>
-        <div class="ops-page-label">
-          活动排期
-          <NTag size="small" :bordered="false" :type="managed ? 'success' : 'warning'">{{ managed ? '已发布' : '未启用' }}</NTag>
-        </div>
+        <NTag size="small" :bordered="false" :type="managed ? 'success' : 'warning'">{{ managed ? '已发布' : '未启用' }}</NTag>
         <p class="ops-muted schedule-status">{{ managed ? '本服活动开放由当前排期控制' : '尚未发布本服排期' }}</p>
       </div>
       <NSpace>
@@ -1113,7 +1110,6 @@ onUnmounted(() => {
 .planning-description { margin: 0; font-size: 13px; line-height: 1.7; color: rgb(var(--base-text-color) / .65); }
 
 .schedule-status { margin: 4px 0 0; }
-.schedule-page .ops-page-label { display: flex; align-items: center; gap: 10px; }
 .character-schedules { margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid rgb(var(--base-text-color) / .09); }
 .character-schedules h2 { font-size: 14px; font-weight: 600; margin: 0 0 10px; }
 .character-schedules article,
