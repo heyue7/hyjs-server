@@ -268,25 +268,30 @@ func AdminAuthenticate(ctx context.Context, token string) (*model.AdminPrincipal
 	if len(token) != 64 {
 		return nil, constUtil.ErrAdminSession
 	}
-	var session db.AdminSession
+	var sessionUser struct {
+		UserID   int64
+		Username string
+		Role     string
+		Enabled  bool
+		CSRFHash string
+	}
 	d := db.GetIns().WithContext(ctx)
-	if err := d.Where("token_hash = ? AND expires_at_unix > ?", adminDigest(token), time.Now().Unix()).Take(&session).Error; err != nil {
+	// 同一条查询读取有效会话及当前用户状态，减少数据库往返并保持撤权即时可见。
+	err := d.Table("admin_sessions AS s").
+		Select("u.id AS user_id, u.username, u.role, u.enabled, s.csrf_hash").
+		Joins("INNER JOIN admin_users AS u ON u.id = s.user_id").
+		Where("s.token_hash = ? AND s.expires_at_unix > ?", adminDigest(token), time.Now().Unix()).
+		Take(&sessionUser).Error
+	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, constUtil.ErrAdminSession
 		}
 		return nil, err
 	}
-	var user db.AdminUser
-	if err := d.First(&user, session.UserID).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, constUtil.ErrAdminSession
-		}
-		return nil, err
-	}
-	if !user.Enabled || !AdminRoleValid(user.Role) {
+	if !sessionUser.Enabled || !AdminRoleValid(sessionUser.Role) {
 		return nil, constUtil.ErrAdminSession
 	}
-	return &model.AdminPrincipal{UserID: user.ID, Username: user.Username, Role: user.Role, CSRFHash: session.CSRFHash}, nil
+	return &model.AdminPrincipal{UserID: sessionUser.UserID, Username: sessionUser.Username, Role: sessionUser.Role, CSRFHash: sessionUser.CSRFHash}, nil
 }
 
 // AdminCheckCSRF 校验请求头与认证会话绑定的随机CSRF摘要，不能由另一个会话的Cookie代替。

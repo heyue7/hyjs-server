@@ -141,6 +141,38 @@ func adminActivityProjection(domain string, v any, rewards []db.GameplayPoolRewa
 	return a
 }
 
+// adminActivityRewardsByPool 按池ID分块批量读取奖励，并按原奖励id顺序归组。
+func adminActivityRewardsByPool(d *gorm.DB, pools []db.GameplayPool) (map[string][]db.GameplayPoolReward, error) {
+	grouped := make(map[string][]db.GameplayPoolReward, len(pools))
+	if len(pools) == 0 {
+		return grouped, nil
+	}
+	ids := make([]string, 0, len(pools))
+	for _, p := range pools {
+		ids = append(ids, p.ID)
+	}
+	for start := 0; start < len(ids); start += constUtil.AdminActivityRewardQueryChunkSize {
+		end := start + constUtil.AdminActivityRewardQueryChunkSize
+		if end > len(ids) {
+			end = len(ids)
+		}
+		var rewards []db.GameplayPoolReward
+		if err := d.Where("pool_id IN ?", ids[start:end]).Order("id").Find(&rewards).Error; err != nil {
+			return nil, err
+		}
+		for _, r := range rewards {
+			grouped[r.PoolID] = append(grouped[r.PoolID], r)
+		}
+	}
+	// 空奖励保持空数组，避免各池投影的 config.rewards 出现 null。
+	for _, p := range pools {
+		if grouped[p.ID] == nil {
+			grouped[p.ID] = []db.GameplayPoolReward{}
+		}
+	}
+	return grouped, nil
+}
+
 // AdminActivities 展示真实运营实例及未配置的原活动登记。
 func AdminActivities(ctx context.Context) ([]model.AdminActivityDTO, error) {
 	d := db.GetIns().WithContext(ctx)
@@ -153,15 +185,13 @@ func AdminActivities(ctx context.Context) ([]model.AdminActivityDTO, error) {
 	if err := d.Order("id").Find(&pools).Error; err != nil {
 		return nil, err
 	}
+	// 一次读取本次池集合的奖励，避免池数量增长时逐池查询。
+	poolRewards, err := adminActivityRewardsByPool(d, pools)
+	if err != nil {
+		return nil, err
+	}
 	for _, r := range pools {
-		var rewards []db.GameplayPoolReward
-		if err := d.Where("pool_id=?", r.ID).Order("id").Find(&rewards).Error; err != nil {
-			return nil, err
-		}
-		if rewards == nil {
-			rewards = []db.GameplayPoolReward{}
-		}
-		out = append(out, adminActivityProjection("pool", r, rewards))
+		out = append(out, adminActivityProjection("pool", r, poolRewards[r.ID]))
 	}
 	if err := d.Order("id").Find(&commerce).Error; err != nil {
 		return nil, err

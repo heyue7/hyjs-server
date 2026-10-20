@@ -71,7 +71,7 @@ Nginx 管理入口为 `/admin/`，API ingress 仅开放客户端协议，保留�
 
 ### 密码升级后的直接代码回退
 
-当前制品附带hyjs-server-auth-compatible-rollback及其JSON摘要：以90b2355业务版本为基线，只补入新PHC与旧scrypt/bcrypt密码校验能力，已执行对应账号登录检查。新凭据产生后，禁止直接切回缺少新密码校验的旧二进制。
+当前制品附带hyjs-server-auth-compatible-rollback及其JSON摘要：本次性能优化以35f895f完整已发布版本作为直接回退，保留活动批29与安全批28，已检查新旧凭据登录。新凭据产生后，禁止直接切回缺少新密码校验的旧二进制；早期版本的校验兼容构建分支仍保留。
 
 在专用部署根目录建立私有临时Compose覆盖文件（仅用于回退）：
 
@@ -81,4 +81,4 @@ services:
     entrypoint: ["/app/hyjs-server-auth-compatible-rollback"]
 ```
 
-使用当前同一镜像、原compose.yaml、原.env及该覆盖文件，仅重建app服务；MySQL、账号、钱包、存档、回执及密码保持。回退业务程序不提供新安全事件API，原运营功能和原操作审计保持；不要把安全功能完整保留视为旧业务回退结果。下一次正常部署不使用此临时覆盖文件。
+使用当前同一镜像、原compose.yaml、原.env及该覆盖文件，仅重建app服务；MySQL、账号、钱包、存档、回执及密码保持。本次回退保留原安全事件API及活动配置功能。下一次正常部署不使用此临时覆盖文件。

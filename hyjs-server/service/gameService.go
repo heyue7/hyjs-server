@@ -15,6 +15,7 @@ import (
 	pb "hyjs-server/model/protocol"
 	"hyjs-server/utils"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 )
@@ -35,6 +36,12 @@ type GameService struct {
 	ServerClockReady bool
 	// ServerClockState 为本服务后台任务提供并发安全的持久时钟快照。
 	ServerClockState atomic.Pointer[model.ServerGameClockView]
+	// adminFieldRuntimeReady 在野外管理表初始化成功后置位，正式高频路径跳过表存在检查。
+	adminFieldRuntimeReady atomic.Bool
+	// adminFieldRuntimeCache 只保存该基础服务当前区服与数据库连接的一份不可变覆盖表快照。
+	adminFieldRuntimeCache atomic.Pointer[adminFieldRuntimeSnapshot]
+	// 同一服务冷启动或发布后只构建一份覆盖表，避免并发请求重复分配整表。
+	adminFieldRuntimeBuild sync.Mutex
 	// P1Ready 仅在启动初始化全部成功后设置，运行中保持只读。
 	P1Ready bool
 	// P4Ready 在福利和商店规则初始化成功后启用存档事实钩子。

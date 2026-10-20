@@ -1,4 +1,4 @@
-"""Build the previous business revision with only new-password verification compatibility."""
+"""Build the previous release; adapt credentials only for pre-security revisions."""
 from pathlib import Path
 import argparse
 import hashlib
@@ -10,7 +10,7 @@ import tarfile
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
-BASE = '90b2355'
+BASE = '35f895fd5f856a225541435607e03bac930c90d6'
 
 def build(output):
     output = Path(output).resolve()
@@ -23,6 +23,15 @@ def build(output):
         with tarfile.open(archive) as source:
             source.extractall(work, filter='data')
         source = work / 'hyjs-server'
+        if (source / 'utils/passwordCredential.go').is_file():
+            # The previous release already supports current credentials. Keep its
+            # complete activity/security behavior unchanged for performance rollback.
+            run('go', 'test', './service', '-run', '^(TestAdminAuthBootstrapSessionCSRFAndRoles|TestAdminAuthPersistentCooldownAndPasswordChange|TestGlobalAccountsLegacyMigrationAndWalletOrders)$', '-count=1', cwd=source)
+            environment = dict(os.environ, GOOS='linux', GOARCH='amd64', CGO_ENABLED='0', GOTOOLCHAIN='auto')
+            run('go', 'build', '-trimpath', '-buildvcs=false', '-o', output, '.', cwd=source, env=environment)
+            record = {'baseBusinessRevision': BASE, 'SHA256': hashlib.sha256(output.read_bytes()).hexdigest(), 'newAndLegacyCredentialLoginTested': True, 'scope': 'Unmodified previous release including activity batch29 and security batch28'}
+            output.with_suffix('.json').write_text(json.dumps(record, indent=2) + '\n')
+            return record
         for name in ('utils/passwordCredential.go', 'constUtil/passwordSecurity.go'):
             shutil.copy2(ROOT / 'hyjs-server' / name, source / name)
 

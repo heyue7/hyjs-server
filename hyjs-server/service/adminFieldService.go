@@ -39,6 +39,8 @@ func (s *GameService) InitializeAdminFields(ctx context.Context) error {
 			return err
 		}
 	}
+	// 全部表与策略初始化成功后标记本服务，正式高频请求可跳过表存在检查。
+	s.adminFieldRuntimeReady.Store(true)
 	return nil
 }
 func (s *GameService) adminFieldName(scene string) string {
@@ -293,8 +295,25 @@ func (s *GameService) AdminFieldDeployments(ctx context.Context, actor *model.Ad
 		return nil, err
 	}
 	byScene := map[string]db.AdminFieldDeployment{}
+	templateIDs := []string{}
+	seenTemplates := map[string]bool{}
 	for _, r := range rows {
 		byScene[r.Scene] = r
+		if !seenTemplates[r.TemplateID] {
+			seenTemplates[r.TemplateID] = true
+			templateIDs = append(templateIDs, r.TemplateID)
+		}
+	}
+	// 一次取出所有已部署模板，替代逐地图查询；缺失模板仍按单条读取的合同报错。
+	templates := map[string]db.AdminFieldTemplate{}
+	if len(templateIDs) > 0 {
+		var templateRows []db.AdminFieldTemplate
+		if err := tx.Where("id IN ?", templateIDs).Find(&templateRows).Error; err != nil {
+			return nil, err
+		}
+		for _, t := range templateRows {
+			templates[t.ID] = t
+		}
 	}
 	out := &model.AdminFieldDeploymentsResponse{ServerID: serverID, Items: []model.AdminFieldDeploymentDTO{}}
 	for _, field := range s.Tables["Field"] {
@@ -302,11 +321,11 @@ func (s *GameService) AdminFieldDeployments(ctx context.Context, actor *model.Ad
 		r, ok := byScene[scene]
 		v := model.AdminFieldDeploymentDTO{Scene: scene, Name: s.adminFieldName(scene), TemplateID: "original-" + scene, Enabled: constUtil.P8PackagedFieldScene(scene), Available: constUtil.P8PackagedFieldScene(scene)}
 		if ok {
-			v.TemplateID, v.Enabled, v.Version = r.TemplateID, r.Enabled, adminVersion(r)
-			var t db.AdminFieldTemplate
-			if err := tx.First(&t, "id=?", r.TemplateID).Error; err != nil {
-				return nil, err
+			t, found := templates[r.TemplateID]
+			if !found {
+				return nil, gorm.ErrRecordNotFound
 			}
+			v.TemplateID, v.Enabled, v.Version = r.TemplateID, r.Enabled, adminVersion(r)
 			v.TemplateChanged = t.Configuration != r.Configuration
 		}
 		out.Items = append(out.Items, v)
@@ -352,106 +371,49 @@ func (s *GameService) AdminDeployField(ctx context.Context, actor *model.AdminPr
 	return s.AdminFieldDeployments(ctx, actor, req.ServerID)
 }
 
-// AdminFieldRuntimeTables creates a request-local immutable overlay. Original maps and already
-// frozen gathering/fight receipts retain their own snapshots; no shared table is mutated.
+// AdminFieldRuntimeTables returns the immutable overlay for the realm. The base service keeps
+// one bounded snapshot keyed by ordered committed rows, realm and database connection, so
+// heartbeat and field traffic reuse the same tables while each call still observes new
+// deployment content. Original maps and frozen gathering/fight receipts keep their own data.
 func (s *GameService) AdminFieldRuntimeTables(ctx context.Context, serverID int64) (map[string][]map[string]string, error) {
-	tx := db.GetIns().WithContext(ctx)
-	if !tx.Migrator().HasTable(&db.AdminFieldDeployment{}) {
-		return s.Tables, nil
+	base := s.p10ClientOwner()
+	database := db.GetIns()
+	tx := database.WithContext(ctx)
+	// 正式启动完成初始化后直接查已提交行；未初始化的隔离兼容调用保留原表缺失回退。
+	if !base.adminFieldRuntimeReady.Load() && !tx.Migrator().HasTable(&db.AdminFieldDeployment{}) {
+		return base.Tables, nil
 	}
 	var deployments []db.AdminFieldDeployment
 	if err := tx.Where("server_id=?", serverID).Order("scene").Find(&deployments).Error; err != nil {
 		return nil, err
 	}
+	signature := adminFieldDeploymentSignature(deployments)
+	sqlDatabase, err := database.DB()
+	if err != nil {
+		return nil, err
+	}
+	// 同一基础服务、区服和数据库连接上的相同有序内容直接复用不可变快照。
+	if cached := base.adminFieldRuntimeCache.Load(); cached != nil &&
+		cached.serverID == serverID && cached.database == database && cached.sqlDatabase == sqlDatabase && cached.signature == signature {
+		return cached.tables, nil
+	}
+	// 只串行化缓存未命中的纯内存构建；查询已结束，正常命中不经过此锁。
+	base.adminFieldRuntimeBuild.Lock()
+	defer base.adminFieldRuntimeBuild.Unlock()
+	if cached := base.adminFieldRuntimeCache.Load(); cached != nil &&
+		cached.serverID == serverID && cached.database == database && cached.sqlDatabase == sqlDatabase && cached.signature == signature {
+		return cached.tables, nil
+	}
 	if len(deployments) == 0 {
-		return s.Tables, nil
+		base.adminFieldRuntimeCache.Store(&adminFieldRuntimeSnapshot{serverID: serverID, database: database, sqlDatabase: sqlDatabase, signature: signature, tables: base.Tables})
+		return base.Tables, nil
 	}
-	tables := make(map[string][]map[string]string, len(s.Tables))
-	for k, v := range s.Tables {
-		tables[k] = v
+	// 构建失败直接返回错误并保留旧快照不参与命中，避免旧配置冒充新发布成功。
+	tables, err := base.buildAdminFieldRuntimeTables(deployments)
+	if err != nil {
+		return nil, err
 	}
-	for _, name := range []string{"Field", "FieldResource", "FieldResourcePos", "FieldMonster", "FieldMonsterPos", "WorldBossReward"} {
-		rows := []map[string]string{}
-		for _, r := range s.Tables[name] {
-			copy := map[string]string{}
-			for k, v := range r {
-				copy[k] = v
-			}
-			rows = append(rows, copy)
-		}
-		tables[name] = rows
-	}
-	lookup := func(table, key, id string) map[string]string {
-		for _, r := range tables[table] {
-			if r[key] == id {
-				return r
-			}
-		}
-		return nil
-	}
-	for _, deployment := range deployments {
-		var cfg model.AdminFieldConfiguration
-		if json.Unmarshal([]byte(deployment.Configuration), &cfg) != nil || cfg.Scene != deployment.Scene {
-			return nil, constUtil.ErrAdminConfiguration
-		}
-		field := lookup("Field", "FieldId", cfg.Scene)
-		if field == nil {
-			return nil, constUtil.ErrAdminConfiguration
-		}
-		field["adminEnabled"] = strconv.FormatBool(deployment.Enabled)
-		field["adminPK"] = strconv.FormatBool(cfg.AllowPK)
-		if cfg.AllowPK {
-			field["allSafe"] = "0"
-		} else {
-			field["allSafe"] = "1"
-		}
-		field["adminBossEnabled"] = strconv.FormatBool(cfg.BossEnabled)
-		field["adminRevision"] = adminVersion(deployment)
-		field["levelLimit"] = fmt.Sprint(cfg.MinLevel)
-		field["MineMax"], field["FishGroupMax"] = fmt.Sprint(cfg.MineCount), fmt.Sprint(cfg.FishCount)
-		for _, spec := range []struct {
-			key                   string
-			points                []model.AdminFieldPoint
-			table, idKey, weights string
-		}{{"MinePoints", cfg.MinePoints, "FieldResourcePos", "posId", "resourceIdProbs"}, {"FishPoints", cfg.FishPoints, "FieldResourcePos", "posId", "resourceIdProbs"}, {"MonsterPoints", cfg.MonsterPoints, "FieldMonsterPos", "monsterPosId", "monsterIdProbs"}} {
-			ids := []string{}
-			for _, p := range spec.points {
-				ids = append(ids, p.ID)
-				if row := lookup(spec.table, spec.idKey, p.ID); row != nil {
-					choices := append([]model.AdminFieldWeight{}, p.Choices...)
-					if spec.table == "FieldResourcePos" {
-						for i := range choices {
-							choices[i].ID = choices[i].ID + "__" + cfg.Scene
-						}
-					}
-					row[spec.weights] = adminFieldWeightText(choices)
-				}
-			}
-			field[spec.key] = strings.Join(ids, ";")
-		}
-		for _, g := range cfg.GatherGroups {
-			if original := lookup("FieldResource", "id", g.ID); original != nil {
-				row := map[string]string{}
-				for k, v := range original {
-					row[k] = v
-				}
-				row["id"] = g.ID + "__" + cfg.Scene
-				row["adminOriginalID"] = g.ID
-				tables["FieldResource"] = append(tables["FieldResource"], row)
-				row["level"], row["gatherTime"], row["cdTime"], row["times"], row["cost"], row["rewardProbId"] = fmt.Sprint(g.Level), fmt.Sprint(g.GatherMS), fmt.Sprint(g.CooldownMS), fmt.Sprint(g.Times), fmt.Sprintf("tiredness,%d", g.Fatigue), adminFieldDropText(g.Drops)
-			}
-		}
-		for _, g := range cfg.MonsterGroups {
-			for _, row := range tables["FieldMonster"] {
-				if row["MonId"] == g.ID {
-					row["RebornTime"], row["rewardGroupId"] = fmt.Sprint(g.CooldownMS), adminFieldDropText(g.Drops)
-				}
-			}
-		}
-		// Boss definitions are supplied separately per original scene to new cycles.
-		raw, _ := json.Marshal(cfg.BossRewards)
-		field["adminBossRewards"] = string(raw)
-	}
+	base.adminFieldRuntimeCache.Store(&adminFieldRuntimeSnapshot{serverID: serverID, database: database, sqlDatabase: sqlDatabase, signature: signature, tables: tables})
 	return tables, nil
 }
 
