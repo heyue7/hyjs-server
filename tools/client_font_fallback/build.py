@@ -264,14 +264,18 @@ def build_overlay(base_apk):
         object_rows.append(dict(pathId=pid, type=old.type.name, rawEqual=raw_equal, metadataEqual=metadata_equal,
                                 beforeSHA256=sha(old.get_raw_data()), afterSHA256=sha(new.get_raw_data()),
                                 before=object_metadata(old), after=object_metadata(new)))
-    chunks, cursor = [], 0
-    for i, part in enumerate(segments):
-        chunk = output[cursor:cursor + len(part)] if i < 10 else output[cursor:]
-        chunks.append(chunk)
-        cursor += len(chunk)
+    # Unity's split reader addresses parts by 1 MiB index. Extend the tail
+    # with new fixed-size parts instead of creating an oversized final part.
+    part_size = 1048576
+    chunks = [output[start:start + part_size] for start in range(0, len(output), part_size)]
     require(b"".join(chunks) == output, "Split reassembly differs")
-    entries = {name: chunk for name, old, chunk in zip(names, segments, chunks) if chunk != old}
-    require(set(entries) == {names[0], names[10]}, "Unexpected changed APK entry")
+    require(all(len(part) == part_size for part in chunks[:-1]), "Non-final split size differs")
+    output_names = [PREFIX + str(i) for i in range(len(chunks))]
+    entries = {name: chunk for i, (name, chunk) in enumerate(zip(output_names, chunks))
+               if i >= len(segments) or chunk != segments[i]}
+    expected_changed = {names[0], names[10]} | set(output_names[len(segments):])
+    require(set(entries) == expected_changed, "Unexpected changed APK entry")
+    require(chunks[10][:len(segments[10])] == segments[10], "Original final-part bytes changed")
     proof = dict(schema="hyjs-bundled-font-fill-v1", status="STATIC_VERIFIED_NOT_PACKAGED", baseAPKSHA256=APK_SHA,
                  sourceSharedSHA256=SHARED_SHA, outputSharedSHA256=sha(output), sourceBytes=len(raw), outputBytes=len(output),
                  sourceSHA256={"tools/client_font_fallback/build.py": sha(Path(__file__).read_bytes())},
@@ -281,8 +285,11 @@ def build_overlay(base_apk):
                  nonTargetObjectCount=513, allNonTargetObjectsRawAndMetadataEqual=True,
                  allOtherTargetFontFieldsEqual=True, objects=object_rows,
                  originalSplitBoundariesPreserved=True,
-                 segments=[dict(entry=name, beforeSize=len(old), afterSize=len(new), beforeSHA256=sha(old), afterSHA256=sha(new), changed=old != new)
-                           for name, old, new in zip(names, segments, chunks)],
+                 fixedSplitPartSize=part_size, newSplitEntries=output_names[len(segments):],
+                 segments=[dict(entry=name, beforeSize=len(segments[i]) if i < len(segments) else 0,
+                                afterSize=len(new), beforeSHA256=sha(segments[i]) if i < len(segments) else None,
+                                afterSHA256=sha(new), changed=i >= len(segments) or segments[i] != new)
+                           for i, (name, new) in enumerate(zip(output_names, chunks))],
                  replacementEntries=list(entries), modifiedManagedAssemblies=[], externalFontsUsed=[], deviceExecuted=False)
     return entries, proof
 

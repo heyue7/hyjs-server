@@ -33,15 +33,16 @@ Numbers 保持 UPM875，从原 Words 补全部7455个缺失码点，Unicode覆�
 
 工具只读取 sharedassets0 的11片，合计约11MB，不解压整包。两个 Font 新 payload 追加到原 serialized 文件尾；根据真实 version15 对象表解析位置，只改文件头 fileSize 与190/191记录的 offset/size。全部513个非目标对象的 raw 与 metadata严格保持；两个Font除 `m_FontData` 外全部字段保持，包括字号、行距、ascent、material、texture、fallback与PPtr。
 
-只返回两个资源 entry：
+返回这些资源 entry：
 
 - `assets/bin/Data/sharedassets0.assets.split0`：文件头与两条 Font 对象记录。
-- `assets/bin/Data/sharedassets0.assets.split10`：原末片加新 payload。
+- `assets/bin/Data/sharedassets0.assets.split10`：保留原末片前缀，追加新 payload 到1MiB。
+- `assets/bin/Data/sharedassets0.assets.split11`～`split15`：剩余新 payload，末片以外均为1MiB。
 
-split0–9保持原1MiB边界；split1–9逐字节不变；仅split10末片伸展。工具不触碰另外三处已验证 UILabel PPtr 修复；打包器应继续合并其独立覆盖。
+所有分片沿用Unity读取器的1MiB边界；split1–9逐字节不变。新片继承原片的APK存储方式。首个候选将末片扩展到6MB，原机停在启动画面；修正分片后原机成功登录并进入雪原，证据见批31记录。工具不触碰另外三处已验证 UILabel PPtr 修复；打包器应继续合并其独立覆盖。
 
 `proof` 记录输入/输出/源码 SHA、依赖版本、每个原glyph和新增donor的校验、全部515对象比较、变化字节位置和全部split SHA。任一输入、版本、字形、Unity字段或字节范围不符合条件即失败。
 
 ## 验证边界
 
-已做固定原包重算、逐glyph/对象重载、重复输出字节一致、错误输入SHA/依赖版本拒绝与已有输出目录拒绝验证。字体扩容与资源追加通过静态验证；实际Unity加载、动态纹理、布局与末片读取仍由整包和原机验收确认。新增覆盖限于这两个原字体的既有码点，不承诺全部Unicode字符。
+已做固定原包重算、逐glyph/对象重载、重复输出字节一致、错误输入SHA/依赖版本拒绝与已有输出目录拒绝验证。固定分片整包已通过原机启动、登录和雪原文字代表检查；各页面的完整游玩验收见批31记录。新增覆盖限于这两个原字体的既有码点，原资源仍缺少TableText中的9个生僻字，不承诺全部Unicode字符。

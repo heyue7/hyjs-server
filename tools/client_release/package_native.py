@@ -86,7 +86,12 @@ def main():
       if common._signature(info.filename):continue
       if info.filename in payload:target.writestr(copy.copy(info),payload[info.filename])
       else:inherited[info.filename]=common._hash_entry(z,info.filename);compressed[info.filename]=compressed_hash(stream,info);copy_original_record(stream,target,info)
-     for name in set(payload)-set(z.namelist()):target.writestr(name,payload[name],compress_type=zipfile.ZIP_DEFLATED)
+     for name in set(payload)-set(z.namelist()):
+      if a.font_fallback_overlay and name.startswith(font_fallback.PREFIX):
+       # New split parts inherit the original part's APK storage method.
+       info=copy.copy(z.getinfo(font_fallback.PREFIX+"10"));info.filename=name;info.orig_filename=name
+       target.writestr(info,payload[name])
+      else:target.writestr(name,payload[name],compress_type=zipfile.ZIP_DEFLATED)
    common.run([sdk/"zipalign","-f","-p","4",unsigned,aligned],env);unsigned.unlink()
    common.run([sdk/"apksigner","sign","--ks",ROOT/".local-signing/debug.keystore","--ks-pass","pass:android","--key-pass","pass:android","--out",signed,aligned],env);aligned.unlink()
    require(common._certificate(common.run([sdk/"apksigner","verify","--verbose","--print-certs",signed],env))==cert,"Signer differs");common.run([sdk/"zipalign","-c","-p","4",signed],env)

@@ -187,7 +187,7 @@ function reset() {
                   <div class="guild-field-label">{{ field.label }}</div>
                   <NInput
                     v-model:value="form.fields[field.key]"
-                    :aria-label="field.label"
+                    :input-props="{ 'aria-label': field.label }"
                     :disabled="!canWrite"
                     :status="form.fields[field.key] === '' ? 'error' : undefined"
                     placeholder="必填"
