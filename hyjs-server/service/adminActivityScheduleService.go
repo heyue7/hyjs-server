@@ -213,6 +213,10 @@ func (s *GameService) adminValidateDefinition(tx *gorm.DB, f model.AdminActivity
 	f.StartAt = 946684800000
 	f.EndAt = f.StartAt + 14*86400000
 	f.ClaimEndAt = f.EndAt + 86400000
+	// 藏宝箱结束即停止领取；模板校验使用同一时间规则，避免临时宽限拒绝合法奖励。
+	if f.Mode == "fortune-cat" {
+		f.ClaimEndAt = f.EndAt
+	}
 	if err := tx.SavePoint("activity_definition_validate").Error; err != nil {
 		return err
 	}

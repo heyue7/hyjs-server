@@ -20,6 +20,6 @@ var (
 	ErrAdminLoginCooldown     = errors.New("登录尝试较多，请稍等片刻后重试（最长30秒）")
 	ErrAdminSession           = errors.New("后台会话无效或已过期")
 	ErrAdminPermission        = errors.New("后台操作权限不足")
-	ErrAdminConfiguration     = errors.New("后台认证配置无效")
+	ErrAdminConfiguration     = errors.New("后台配置无效，请检查配置内容")
 	ErrAdminLastAdministrator = errors.New("需保留至少一位后台管理员")
 )
