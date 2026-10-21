@@ -34,6 +34,7 @@ public final class ClientUpdate {
     private static volatile boolean blocked, active;
     private static boolean busy;
     private static Dialog dialog;
+    private static String displayedJson;
     private static final Runnable POLL = new Runnable(){public void run(){check();}};
     public static String version(){return "hyjs/"+BUILD+"/"+STARTUP;}
     public static synchronized void boot(Activity a){activity=a; try {
@@ -59,7 +60,7 @@ public final class ClientUpdate {
     private static void check(){
         if(!active || busy || activity==null || origin==null)return;busy=true;
         IO.execute(new Runnable(){public void run(){JSONObject result=null;Object auth=null;try{auth=credentials();result=request("/client-update/status",payload(auth));if(auth!=credentials())result=null;}catch(Exception ignored){}final JSONObject value=result;final Object identity=auth;
-            UI.post(new Runnable(){public void run(){busy=false;if(value!=null){try{if(identity!=credentials()){if(active)UI.postDelayed(POLL,1000);return;}}catch(Exception ignored){return;}statusAuth=identity;status=value;blocked=value.optBoolean("blocked",false);if(blocked && dialog!=null && dialog.isShowing() && !Boolean.TRUE.equals(dialog.getWindow().getDecorView().getTag()))dialog.dismiss();if(!blocked && dialog!=null && dialog.isShowing() && Boolean.TRUE.equals(dialog.getWindow().getDecorView().getTag()))dialog.dismiss();}if(active)UI.postDelayed(POLL,Math.max(15,Math.min(300,value==null?30:value.optInt("pollSeconds",60)))*1000L);}});
+            UI.post(new Runnable(){public void run(){busy=false;if(value!=null){try{if(identity!=credentials()){if(active)UI.postDelayed(POLL,1000);return;}}catch(Exception ignored){return;}statusAuth=identity;status=value;blocked=value.optBoolean("blocked",false);if(blocked && dialog!=null && dialog.isShowing() && Boolean.TRUE.equals(dialog.getWindow().getDecorView().getTag()) && !value.toString().equals(displayedJson))dialog.dismiss();if(blocked && dialog!=null && dialog.isShowing() && !Boolean.TRUE.equals(dialog.getWindow().getDecorView().getTag()))dialog.dismiss();if(!blocked && dialog!=null && dialog.isShowing() && Boolean.TRUE.equals(dialog.getWindow().getDecorView().getTag()))dialog.dismiss();}if(active)UI.postDelayed(POLL,Math.max(15,Math.min(300,value==null?30:value.optInt("pollSeconds",60)))*1000L);}});
         }});
     }
     private static void ack(final JSONObject s,final String kind,final Object identity){IO.execute(new Runnable(){public void run(){try{request("/client-update/ack",payload(identity).put("batchId",s.getString("batchId")).put("kind",kind));}catch(Exception ignored){}}});}
@@ -77,7 +78,7 @@ public final class ClientUpdate {
         TextView channel=new TextView(activity);channel.setText("请前往QQ群下载最新版");channel.setTextColor(Color.rgb(43,70,81));channel.setTextSize(16);channel.setSingleLine(true);channel.setPadding(0,dp(10),0,dp(16));box.addView(channel,new LinearLayout.LayoutParams(-1,-2));
         Button button=new Button(activity);button.setText(force?"重新检查":"知道了");button.setTextColor(Color.WHITE);GradientDrawable face=new GradientDrawable();face.setColor(Color.rgb(40,161,185));face.setStroke(dp(1),Color.rgb(104,202,216));button.setBackground(face);box.addView(button,new LinearLayout.LayoutParams(-1,dp(48)));
         button.setOnClickListener(v->{ack(s,"acknowledged",displayAuth);if(force){button.setText("检查中…");button.setEnabled(false);UI.removeCallbacks(POLL);check();UI.postDelayed(()->{button.setText("重新检查");button.setEnabled(true);},1500);}else dialog.dismiss();});
-        dialog.setContentView(box);dialog.show();dialog.getWindow().setLayout(Math.min(activity.getResources().getDisplayMetrics().widthPixels-dp(40),dp(460)),-2);dialog.getWindow().getDecorView().setTag(force);
+        dialog.setContentView(box);dialog.show();dialog.getWindow().setLayout(Math.min(activity.getResources().getDisplayMetrics().widthPixels-dp(40),dp(460)),-2);dialog.getWindow().getDecorView().setTag(force);displayedJson=json;
         if(!force)activity.getSharedPreferences("hyjs-client-update",0).edit().putBoolean("seen."+batch,true).apply();ack(s,"shown",displayAuth);
     }catch(Exception ignored){}}});}
     private static boolean maintenance(JSONObject s,boolean force){String reason=s.optString("reason","").toLowerCase(Locale.US);return s.optBoolean("maintenance",false) || reason.contains("maintenance") || reason.contains("维护") || (!force && "maintenance".equals(s.optString("mode")) && s.optLong("maintenanceStartAt",0)>System.currentTimeMillis());}
