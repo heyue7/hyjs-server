@@ -451,7 +451,7 @@ public final class WalletActivity extends UnityPlayerActivity {
         FrameLayout nav=new FrameLayout(this);
         TextView title=center(title(),18,INK);nav.addView(title,new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(52)));
         TextView back=center("‹",34,INK);back.setContentDescription(page==HOME?"收起蓝绿终端":"返回");FrameLayout.LayoutParams left=new FrameLayout.LayoutParams(dp(56),dp(52),Gravity.LEFT);nav.addView(back,left);back.setOnClickListener(new View.OnClickListener(){public void onClick(View v){back();}});
-        if(page==HOME){TextView menu=center("⋯",28,INK);menu.setContentDescription("终端菜单");FrameLayout.LayoutParams right=new FrameLayout.LayoutParams(dp(56),dp(52),Gravity.RIGHT);nav.addView(menu,right);menu.setOnClickListener(v->{PopupMenu popup=new PopupMenu(this,menu);popup.getMenu().add(0,1,0,"账单");popup.getMenu().add(0,2,1,"账号设置").setEnabled(ready());popup.setOnMenuItemClickListener(item->{navigate(item.getItemId()==1?BILLS:ACCOUNT);return true;});popup.show();});}
+        if(page==HOME){TextView menu=center("⋯",28,INK);menu.setContentDescription("终端菜单");FrameLayout.LayoutParams right=new FrameLayout.LayoutParams(dp(56),dp(52),Gravity.RIGHT);nav.addView(menu,right);menu.setOnClickListener(v->{PopupMenu popup=new PopupMenu(this,menu);popup.getMenu().add(0,1,0,"账单");popup.getMenu().add(0,2,1,"账号设置").setEnabled(ready());popup.getMenu().add(0,3,2,"Burst Link！规则").setEnabled(terminal()!=null);popup.setOnMenuItemClickListener(item->{if(item.getItemId()==3)showBurstRules();else navigate(item.getItemId()==1?BILLS:ACCOUNT);return true;});popup.show();});}
         else if(page==BILLS){TextView reload=center("刷新",14,BLUE);reload.setEnabled(!busy);nav.addView(reload,new FrameLayout.LayoutParams(dp(64),dp(52),Gravity.RIGHT));reload.setOnClickListener(new View.OnClickListener(){public void onClick(View v){refreshPage();}});}
         addFull(shell,nav,52);divider(shell);
         LinearLayout body=column();shell.addView(body,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,0,1));
@@ -460,28 +460,65 @@ public final class WalletActivity extends UnityPlayerActivity {
         if(!credentials.valid())setMessage("登录游戏后可用",false);else if(origin==null)setMessage("蓝绿终端连接未配置",true);else setMessage(message,messageError);
     }
     private void renderHome(LinearLayout body){
-        LinearLayout content=column();content.setPadding(dp(24),dp(18),dp(24),dp(18));
-        addFull(content,center("账户余额（超频点数）",13,GRAY),24);
-        TextView balance=center(wallet==null?"—":money(wallet.optLong("balanceCents")),36,INK);
-        balance.setSingleLine(true);if(Build.VERSION.SDK_INT>=26)balance.setAutoSizeTextTypeUniformWithConfiguration(18,36,1,android.util.TypedValue.COMPLEX_UNIT_SP);
-        addFull(content,balance,60);
-        final JSONArray orders=array(wallet,"pendingOrders");
-        if(orders.length()>0){TextView entry=text("待支付订单  "+orders.length()+"  ›",14,BLUE);entry.setGravity(Gravity.CENTER_VERTICAL);addFull(content,entry,42);entry.setOnClickListener(v->{if(orders.length()==1){selectedOrderId=orders.optJSONObject(0).optString("orderId");navigate(CASHIER);}else navigate(ORDERS);});}
+        LinearLayout content=column();
+        LinearLayout summary=column();summary.setPadding(dp(20),dp(16),dp(20),dp(16));
         JSONObject terminal=terminal();boolean enabled=terminal!=null && terminal.optBoolean("burstEnabled");boolean can=enabled && terminal.optBoolean("canBurst");
-        String label=busy?"处理中…":burstRequestId!=null?"重试 Burst Link！":terminal==null?"读取每日状态…":!enabled?"Burst Link！暂未开放":can?"每日 Burst Link！":wallet.optLong("balanceCents")<terminal.optDouble("burstCostPoints")*100?"超频点数不足":"今日已完成 Burst Link！";
-        addFull(content,action(label,true,active() && (can || burstRequestId!=null),()->burst()),48);
-        TextView rule=text(terminal==null?"正在读取终端配置": "每日一次 · 消耗 "+pointNumber(terminal.optDouble("burstCostPoints"))+" 点，随机获得 "+pointNumber(terminal.optDouble("burstMinPoints"))+"–"+pointNumber(terminal.optDouble("burstMaxPoints"))+" 点",12,GRAY);rule.setPadding(0,dp(10),0,dp(18));rule.setLineSpacing(dp(3),1);content.addView(rule);
-        if(incomeEntries.length()>0){addFull(content,text("到账通知",14,INK),34);
-            for(int i=0;i<incomeEntries.length();i++){JSONObject entry=incomeEntries.optJSONObject(i);if(entry==null)continue;
-                LinearLayout card=column();card.setPadding(dp(14),dp(13),dp(14),dp(13));card.setBackground(shape(Color.rgb(243,248,255),8));
-                String source=entry.optString("source");String labelText="signup".equals(source)?"注册赠送":"burst".equals(source)?"每日 Burst Link！":"admin_manual".equals(source)||"admin_weekly".equals(source)?entry.optString("label","运营投放"):"终端收入";
-                TextView title=text(labelText,14,INK);title.setLineSpacing(dp(3),1);card.addView(title);
-                TextView points=text("+"+unsignedMoney(entry.optLong("amountCents"))+" 超频点数",22,BLUE);points.setPadding(0,dp(10),0,dp(8));card.addView(points);
-                card.addView(text("到账成功 · "+date(entry.optLong("createdAt"),"MM月dd日 HH:mm"),11,GRAY));
-                LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.bottomMargin=dp(10);content.addView(card,lp);
+        boolean insufficient=terminal!=null && wallet.optLong("balanceCents")<terminal.optDouble("burstCostPoints")*100;
+        LinearLayout row=new LinearLayout(this);row.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout funds=column();addFull(funds,text("超频点数",12,GRAY),24);
+        TextView balance=text(wallet==null?"—":money(wallet.optLong("balanceCents")),32,INK);balance.setSingleLine(true);
+        if(Build.VERSION.SDK_INT>=26)balance.setAutoSizeTextTypeUniformWithConfiguration(14,32,1,android.util.TypedValue.COMPLEX_UNIT_SP);
+        addFull(funds,balance,46);LinearLayout.LayoutParams fundsLayout=new LinearLayout.LayoutParams(0,-2,1);fundsLayout.rightMargin=dp(12);row.addView(funds,fundsLayout);
+        LinearLayout controls=column();String label=busy?"处理中…":burstRequestId!=null?"重试 Burst Link！":"Burst Link！";
+        TextView burstButton=action(label,true,active() && (can || burstRequestId!=null),()->burst());burstButton.setTextSize(16);burstButton.setSingleLine(true);burstButton.setMinHeight(dp(42));burstButton.setPadding(dp(4),0,dp(4),0);burstButton.setBackground(new RippleDrawable(android.content.res.ColorStateList.valueOf(Color.argb(35,22,119,255)),shape(BLUE,4),null));
+        if(Build.VERSION.SDK_INT>=26)burstButton.setAutoSizeTextTypeUniformWithConfiguration(11,16,1,android.util.TypedValue.COMPLEX_UNIT_SP);
+        addFull(controls,burstButton,42);
+        String cost=terminal==null?"读取中…":terminal.optDouble("burstCostPoints")==0?"免费":"消耗 "+pointNumber(terminal.optDouble("burstCostPoints"))+" 点";
+        TextView costLabel=text(cost,11,GRAY);costLabel.setGravity(Gravity.RIGHT);costLabel.setPadding(0,dp(7),0,0);controls.addView(costLabel);
+        String state=terminal==null?"":!enabled?"暂未开放":!can && burstRequestId==null?(insufficient?"超频点数不足":"今日已使用"):"";
+        if(!state.isEmpty()){TextView status=text(state,11,GRAY);status.setGravity(Gravity.RIGHT);status.setPadding(0,dp(5),0,0);controls.addView(status);}
+        row.addView(controls,new LinearLayout.LayoutParams(dp(120),-2));summary.addView(row);
+        final JSONArray orders=array(wallet,"pendingOrders");
+        if(orders.length()>0){TextView entry=text("待支付订单  "+orders.length()+"  ›",14,BLUE);entry.setGravity(Gravity.CENTER_VERTICAL);addFull(summary,entry,42);entry.setOnClickListener(v->{if(orders.length()==1){selectedOrderId=orders.optJSONObject(0).optString("orderId");navigate(CASHIER);}else navigate(ORDERS);});}
+        content.addView(summary);
+        if(incomeEntries.length()>0){
+            LinearLayout notices=column();notices.setPadding(dp(12),dp(12),dp(12),dp(12));notices.setBackgroundColor(Color.rgb(245,245,245));
+            addFull(notices,text("到账通知",14,INK),30);
+            for(int i=0;i<incomeEntries.length();i++){final JSONObject entry=incomeEntries.optJSONObject(i);if(entry==null)continue;
+                LinearLayout card=column();card.setPadding(dp(14),dp(12),dp(14),dp(12));card.setBackground(shape(Color.WHITE,4));
+                LinearLayout header=new LinearLayout(this);header.setGravity(Gravity.CENTER_VERTICAL);header.addView(text("蓝绿终端",12,GRAY),new LinearLayout.LayoutParams(0,-2,1));header.addView(text(date(entry.optLong("createdAt"),"MM月dd日 HH:mm"),11,GRAY));card.addView(header);
+                LinearLayout amountRow=new LinearLayout(this);amountRow.setGravity(Gravity.BOTTOM);amountRow.setPadding(0,dp(14),0,dp(10));
+                TextView number=text("+"+unsignedMoney(entry.optLong("amountCents")),24,INK);number.setTypeface(Typeface.DEFAULT,Typeface.BOLD);number.setSingleLine(true);
+                if(Build.VERSION.SDK_INT>=26)number.setAutoSizeTextTypeUniformWithConfiguration(12,24,1,android.util.TypedValue.COMPLEX_UNIT_SP);
+                amountRow.addView(number,new LinearLayout.LayoutParams(0,dp(32),1));TextView unit=text("超频点数",11,GRAY);unit.setPadding(dp(8),0,0,dp(3));amountRow.addView(unit);card.addView(amountRow);
+                TextView source=text(incomeSource(entry),13,GRAY);source.setMaxLines(2);source.setEllipsize(android.text.TextUtils.TruncateAt.END);source.setLineSpacing(dp(3),1);source.setPadding(0,0,0,dp(12));card.addView(source);divider(card);
+                TextView detail=text("查看详情  ›",14,BLUE);detail.setGravity(Gravity.CENTER_VERTICAL);detail.setPadding(0,dp(12),0,0);detail.setMinHeight(dp(42));detail.setOnClickListener(v->showIncomeDetail(entry));card.addView(detail);
+                LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.bottomMargin=dp(8);notices.addView(card,lp);
             }
+            content.addView(notices);
         }
         homeScroll=scrolling(body,content);final ScrollView viewport=homeScroll;final int restore=homeScrollY;viewport.post(()->{if(homeScroll==viewport)viewport.scrollTo(0,restore);});
+    }
+    private String incomeSource(JSONObject entry){
+        String source=entry.optString("source");return "signup".equals(source)?"注册赠送":"burst".equals(source)?"Burst Link！":"admin_manual".equals(source)||"admin_weekly".equals(source)?entry.optString("label","运营投放"):"终端收入";
+    }
+    private void showIncomeDetail(JSONObject entry){
+        LinearLayout content=column();
+        addFull(content,center("已到账",13,GRAY),32);
+        TextView amount=center("+"+unsignedMoney(entry.optLong("amountCents")),30,INK);amount.setSingleLine(true);if(Build.VERSION.SDK_INT>=26)amount.setAutoSizeTextTypeUniformWithConfiguration(14,30,1,android.util.TypedValue.COMPLEX_UNIT_SP);addFull(content,amount,48);addFull(content,center("超频点数",12,GRAY),24);
+        ledgerDetailField(content,"入账来源",incomeSource(entry));ledgerDetailField(content,"到账时间",date(entry.optLong("createdAt"),"yyyy年MM月dd日 HH:mm:ss"));ledgerDetailField(content,"流水号",entry.optString("id"));
+        showTerminalDetail("到账详情",content);
+    }
+    private void showBurstRules(){
+        JSONObject terminal=terminal();if(terminal==null)return;LinearLayout content=column();
+        ledgerDetailField(content,"消耗",terminal.optDouble("burstCostPoints")==0?"免费":pointNumber(terminal.optDouble("burstCostPoints"))+" 点");
+        ledgerDetailField(content,"随机获得",pointNumber(terminal.optDouble("burstMinPoints"))+"–"+pointNumber(terminal.optDouble("burstMaxPoints"))+" 点");
+        ledgerDetailField(content,"次数","每日一次，北京时间 0 点重置");showTerminalDetail("Burst Link！规则",content);
+    }
+    private void showTerminalDetail(String title,LinearLayout content){
+        final Dialog detail=new Dialog(this);detail.requestWindowFeature(Window.FEATURE_NO_TITLE);LinearLayout outer=column();outer.setPadding(dp(24),dp(20),dp(24),dp(16));outer.setBackgroundColor(Color.WHITE);
+        addFull(outer,center(title,18,INK),40);ScrollView scroll=new ScrollView(this);content.setPadding(0,0,0,dp(18));scroll.addView(content);outer.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));addFull(outer,action("完成",true,true,()->detail.dismiss()),46);detail.setContentView(outer);
+        Window window=detail.getWindow();if(window!=null){window.setBackgroundDrawableResource(android.R.color.white);window.setDimAmount(.30f);}detail.show();window=detail.getWindow();if(window!=null){attachWalletWindow(window.getDecorView());window.setLayout(Math.min(dp(430),getResources().getDisplayMetrics().widthPixels-dp(36)),Math.min(dp(560),getResources().getDisplayMetrics().heightPixels-dp(48)));window.setGravity(Gravity.CENTER);}
     }
     private static String pointNumber(double points){return BigDecimal.valueOf(points).stripTrailingZeros().toPlainString();}
     private void renderAccount(LinearLayout body){
@@ -688,7 +725,7 @@ public final class WalletActivity extends UnityPlayerActivity {
                     }
                     if("/local-wallet/seen".equals(route)){seenConfirmedRevision=Math.max(seenConfirmedRevision,payload.optLong("seenRevision"));}
                     else if("/local-wallet/burst".equals(route)){
-                        prefs().edit().remove("burst."+auth.player).commit();burstRequestId=null;ledger=null;ledgerEntries=new JSONArray();setMessage("Burst Link！到账 +"+pointNumber(result.optDouble("burstAwardPoints"))+" 超频点数",false);
+                        prefs().edit().remove("burst."+auth.player).commit();burstRequestId=null;ledger=null;ledgerEntries=new JSONArray();setMessage("已到账 "+pointNumber(result.optDouble("burstAwardPoints"))+" 点",false);
                     }else if("/local-wallet/pay".equals(route)){ledger=null;ledgerEntries=new JSONArray();UnityPlayer.UnitySendMessage("LocalWalletSession","RefreshAfterPayment","");page=HOME;setMessage("支付成功，去享受这一刻",false);}
                     }
                 }else if(!quiet)setMessage(failure+(mutation?"；可重试原操作":""),true);
