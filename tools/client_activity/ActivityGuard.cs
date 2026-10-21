@@ -54,9 +54,12 @@ namespace HYJS.ActivitySafety
         static void ClearPanel(UIActivityPanel panel)
         {
             if (panel == null) return;
+            UIActivity owner = Owner(panel);
+            InstanceSelector selector = owner == null ? null : owner.GetComponent<InstanceSelector>();
+            if (selector != null) selector.ClearStrip();
             UIActivityTemplate current = Current(panel);
             Set(panel, "curActivity", null); Set(panel, "activedType", ActivityType.None);
-            if (current != null) UnityEngine.Object.Destroy(current.gameObject);
+            if (current != null) { current.gameObject.SetActive(false); UnityEngine.Object.Destroy(current.gameObject); }
         }
         static void RemoveEmpty(UIActivityPanel panel)
         {
@@ -112,6 +115,7 @@ namespace HYJS.ActivitySafety
 
         public static bool PrepareResponse(UIActivity page, Packet packet, bool success)
         {
+            if (page == null || !page.gameObject.activeInHierarchy) return false;
             SCActivityList response = packet == null ? null : packet.kBody as SCActivityList;
             Trace("response success=" + success + " typed=" + (response != null) + " count=" + (response == null || response.activityList == null ? -1 : response.activityList.Count));
             if (!success || response == null || response.activityList == null)
@@ -121,6 +125,9 @@ namespace HYJS.ActivitySafety
             // The original decoder uses prefix-before-underscore as its exact
             // activity category key. Keep the first occurrence in server order;
             // unknown nonempty prefixes still reach the original mapper unchanged.
+            InstanceSelector selector = page.GetComponent<InstanceSelector>();
+            if (selector == null) selector = page.gameObject.AddComponent<InstanceSelector>();
+            selector.Capture(page, response.activityList);
             Dictionary<string, bool> seen = new Dictionary<string, bool>(StringComparer.Ordinal);
             int index = 0;
             while (index < response.activityList.Count)
@@ -169,7 +176,12 @@ namespace HYJS.ActivitySafety
             UIActivityTemplate old = Current(panel);
             object previous = Get(panel, "activedType");
             if (old != null && previous is ActivityType && (ActivityType)previous == type &&
-                (String.IsNullOrEmpty(id) || String.Equals(Get(old, "activityId") as string, id, StringComparison.Ordinal))) return;
+                (String.IsNullOrEmpty(id) || String.Equals(Get(old, "activityId") as string, id, StringComparison.Ordinal)))
+            {
+                InstanceSelector sameSelector = owner.GetComponent<InstanceSelector>();
+                if (sameSelector != null) sameSelector.Render(type, id, old, Module(panel));
+                return;
+            }
             ClearPanel(panel); RemoveEmpty(panel);
             Transform root = Module(panel);
             List<Transform> existing = new List<Transform>();
@@ -185,6 +197,8 @@ namespace HYJS.ActivitySafety
                 if (!String.IsNullOrEmpty(id)) Set(current, "activityId", id);
                 Trace("template-show begin type=" + type + " component=" + current.GetType().Name);
                 current.Show();
+                InstanceSelector selector = owner.GetComponent<InstanceSelector>();
+                if (selector != null) selector.Render(type, id, current, root);
                 Call(owner, "PlayTweener", new object[0]);
                 Trace("template-show complete type=" + type);
             }

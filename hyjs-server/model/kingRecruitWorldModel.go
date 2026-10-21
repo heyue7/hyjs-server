@@ -40,6 +40,8 @@ type KingRecruitRuntimeRule struct {
 	DailyLimit int64 `json:"dailyLimit"`
 	// GuaranteeEvery 是距下一次保底的抽数间隔。
 	GuaranteeEvery int64 `json:"guaranteeEvery"`
+	// LuckExchangeCost 为王者红卡兑换门槛；余额可超过此值，强者招募为0。
+	LuckExchangeCost int64 `json:"luckExchangeCost"`
 }
 
 // KingRecruitWorldsResponse 返回当前开放世界与选择。

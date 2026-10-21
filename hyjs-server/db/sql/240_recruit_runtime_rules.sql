@@ -3,5 +3,6 @@ CREATE TABLE IF NOT EXISTS `recruit_runtime_rules` (
  `kind` int NOT NULL,
  `daily_limit` int NOT NULL,
  `guarantee_every` int NOT NULL,
+ `luck_exchange_cost` int NOT NULL DEFAULT 0 COMMENT '王者红卡兑换幸运值，0兼容旧值500',
  PRIMARY KEY (`kind`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"math"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -37,7 +38,7 @@ func AdminRecruitSettingsHandler(c *gin.Context) {
 
 // AdminRecruitSettingsSaveHandler 保存两项完整且唯一的全局招募运行规则。
 // @Summary 保存招募运行规则
-// @Description 按读取版本保存强者、王者两项规则；王者每日10至100000，橙卡每日0表示不限，保底10或20；每日次数为10的倍数。不改原奖励、价格、免费冷却和历史进度。
+// @Description 按读取版本保存强者、王者两项规则；王者每日10至100000，橙卡每日0表示不限，保底10或20；每日次数为10的倍数。王者红卡兑换幸运值1至2147483647，余额继续累计。不改原奖励、价格、免费冷却和历史进度。
 // @Tags AdminActivities
 // @Accept json
 // @Produce json
@@ -73,11 +74,11 @@ func adminRecruitSettingsValid(req *model.AdminRecruitSettingsSaveRequest) bool 
 		}
 		switch item.Kind {
 		case int64(constUtil.RecruitRuntimeKindStrong):
-			if item.DailyLimit < int64(constUtil.RecruitRuntimeDailyUnlimited) || item.DailyLimit > int64(constUtil.RecruitRuntimeDailyMaximum) {
+			if item.LuckExchangeCost != 0 || item.DailyLimit < int64(constUtil.RecruitRuntimeDailyUnlimited) || item.DailyLimit > int64(constUtil.RecruitRuntimeDailyMaximum) {
 				return false
 			}
 		case int64(constUtil.RecruitRuntimeKindKing):
-			if item.DailyLimit < 1 || item.DailyLimit > int64(constUtil.RecruitRuntimeDailyMaximum) {
+			if item.LuckExchangeCost < 1 || item.LuckExchangeCost > math.MaxInt32 || item.DailyLimit < 1 || item.DailyLimit > int64(constUtil.RecruitRuntimeDailyMaximum) {
 				return false
 			}
 		default:

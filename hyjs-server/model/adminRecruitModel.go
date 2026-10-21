@@ -10,6 +10,8 @@ type AdminRecruitSetting struct {
 	DailyLimit int64 `json:"dailyLimit"`
 	// GuaranteeEvery 是距下一次保底的抽数间隔。
 	GuaranteeEvery int64 `json:"guaranteeEvery"`
+	// LuckExchangeCost 为王者红卡兑换所需幸运值，1至2147483647；强者招募为0。
+	LuckExchangeCost int64 `json:"luckExchangeCost"`
 }
 
 // AdminRecruitSettingsResponse 返回当前全局招募运行规则及乐观版本。

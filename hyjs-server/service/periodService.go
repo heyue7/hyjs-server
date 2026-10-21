@@ -94,6 +94,12 @@ func (s *GameService) freezeP1Period(tx *gorm.DB, live db.PeriodInstance, freeze
 			return cfg, err
 		}
 	}
+	if cfg.RewardSourceID != live.RewardSourceID {
+		return cfg, constUtil.ErrAdminConfiguration
+	}
+	if err := personalOpening40ValidateSource(tx, cfg, 0); err != nil {
+		return cfg, err
+	}
 	return cfg, s.validateP1Period(cfg)
 }
 
@@ -138,7 +144,7 @@ func (s *GameService) P1ActivityTabs(ctx context.Context, id int64) ([]*pb.Activ
 		if pending > 0 {
 			status = 1
 		}
-		if strings.HasPrefix(cfg.ID, "totalLogin_p1_") {
+		if strings.HasPrefix(cfg.ID, "totalLogin_p1_") && !strings.Contains(cfg.ID, "_character_") && !strings.Contains(cfg.ID, "_schedule_") {
 			if loginTab == nil {
 				loginTab = &pb.ActivityTab{ActivityId: proto.String(constUtil.P1LoginDirectoryID), Name: proto.String("登录补给"), Order: proto.Int32(20), Status: proto.Int32(0), Param: proto.String("累计登录领取奖励")}
 			}
@@ -147,7 +153,7 @@ func (s *GameService) P1ActivityTabs(ctx context.Context, id int64) ([]*pb.Activ
 			}
 			continue
 		}
-		tabs = append(tabs, &pb.ActivityTab{ActivityId: proto.String(cfg.ID), Name: proto.String(cfg.Title), Order: proto.Int32(int32(20 + len(tabs))), Status: proto.Int32(status), Param: proto.String(cfg.Source)})
+		tabs = append(tabs, &pb.ActivityTab{ActivityId: proto.String(cfg.ID), Name: proto.String(cfg.Title), Order: proto.Int32(int32(20 + len(tabs))), Status: proto.Int32(status), Param: proto.String(personalOpening40TabScope(cfg))})
 	}
 	legacyVisible, err := p1LegacyLoginVisible(db.GetIns().WithContext(ctx), now)
 	if err != nil {

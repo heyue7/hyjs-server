@@ -1,6 +1,7 @@
 CREATE TABLE IF NOT EXISTS p11_plunder_fight_policies (
  id BIGINT NOT NULL,
  enabled BOOLEAN NOT NULL,
+ permanent BOOLEAN NOT NULL DEFAULT FALSE,
   sweep_enabled TINYINT(1) NOT NULL DEFAULT 0,
  version VARCHAR(64) NOT NULL,
  published_at BIGINT NOT NULL,
