@@ -627,7 +627,7 @@ func clientUpdateAuthenticate(ctx context.Context, build int64, startup string, 
 	}
 	session, err := hex.DecodeString(sessionHex)
 	if err != nil || len(session) != 16 {
-		return nil, constUtil.ErrClientUpdateRequired
+		return nil, constUtil.ErrClientUpdateIdentity
 	}
 	row, err := AuthorizeAccount(ctx, id, session)
 	if err != nil {
@@ -638,7 +638,7 @@ func clientUpdateAuthenticate(ctx context.Context, build int64, startup string, 
 		return nil, err
 	}
 	if bound.PlayerID == 0 || bound.BuildCode != build || bound.StartupID != startup {
-		return nil, constUtil.ErrClientUpdateRequired
+		return nil, constUtil.ErrClientUpdateIdentity
 	}
 	return row, nil
 }
@@ -658,8 +658,16 @@ func (s *GameService) ClientUpdateStatus(ctx context.Context, req model.ClientUp
 	row, authErr := clientUpdateAuthenticate(ctx, req.BuildCode, req.StartupID, req.PlayerID, req.SessionHex)
 	if req.PlayerID > 0 || req.SessionHex != "" {
 		if authErr != nil {
-			out.Blocked = true
-			out.Reason = authErr.Error()
+			// 踢线、改密及绑定失效沿原登录流程处理；状态接口不授予业务访问。
+			// 当前身份不可用时按新登录资格检查，只有更新/维护门槛展示强制更新。
+			err = authErr
+			if !errors.Is(authErr, constUtil.ErrClientUpdateRequired) && !errors.Is(authErr, constUtil.ErrClientUpdateMaintenance) {
+				err = clientUpdateLoginError(p, req.BuildCode)
+			}
+			if err != nil {
+				out.Blocked = true
+				out.Reason = err.Error()
+			}
 			return out, nil
 		}
 		r, e := clientUpdateBound(ctx, row)

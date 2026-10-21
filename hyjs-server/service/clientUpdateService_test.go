@@ -80,6 +80,32 @@ func clientUpdateBusinessSuite(t *testing.T, mysql bool) {
 		t.Fatal(err)
 	}
 	s.ClientUpdateConnected(ctx, profile.Id, profile.Session)
+	// 管理员踢线轮换会话后，零策略下不能把原会话失效显示成需要更新。
+	kicked := &db.Profile{Uid: "client-update-kicked-profile", Session: []byte("abcdefghijklmnop")}
+	_ = d.Where("uid=?", kicked.Uid).Delete(&db.Profile{})
+	if err := d.Create(kicked).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := s.BindClientLogin(ctx, kicked, app); err != nil {
+		t.Fatal(err)
+	}
+	if err := d.Model(kicked).Update("session", []byte("ponmlkjihgfedcba")).Error; err != nil {
+		t.Fatal(err)
+	}
+	stale := model.ClientUpdateStatusRequest{BuildCode: 100, StartupID: startup, PlayerID: kicked.Id, SessionHex: hex.EncodeToString([]byte("abcdefghijklmnop"))}
+	assertStaleStatus := func(build int64, want error) {
+		t.Helper()
+		req := stale
+		req.BuildCode = build
+		out, err := s.ClientUpdateStatus(ctx, req)
+		if err != nil || out == nil || out.Blocked != (want != nil) || (want != nil && out.Reason != want.Error()) || (want == nil && out.Reason != "") {
+			t.Fatalf("stale session update status: build=%d want=%v out=%+v err=%v", build, want, out, err)
+		}
+	}
+	assertStaleStatus(100, nil)
+	if _, err := AuthorizeAccount(ctx, kicked.Id, []byte("abcdefghijklmnop")); err == nil {
+		t.Fatal("status query restored kicked session access")
+	}
 	overview := func() *model.AdminClientUpdatesResponse {
 		t.Helper()
 		out, err := s.AdminClientUpdates(ctx, actor)
@@ -135,6 +161,8 @@ func clientUpdateBusinessSuite(t *testing.T, mysql bool) {
 	if err = s.CheckClientLogin(ctx, "invalid"); err == nil {
 		t.Fatal("unknown login allowed")
 	}
+	assertStaleStatus(100, constUtil.ErrClientUpdateRequired)
+	assertStaleStatus(200, nil)
 	if err = CheckClientUpdateSession(ctx, profile); err != nil {
 		t.Fatal("next_login interrupted online session", err)
 	}
@@ -160,8 +188,13 @@ func clientUpdateBusinessSuite(t *testing.T, mysql bool) {
 		t.Fatal("online receipt stats", st)
 	}
 	forged, err := s.ClientUpdateStatus(ctx, model.ClientUpdateStatusRequest{BuildCode: 200, StartupID: startup, PlayerID: profile.Id, SessionHex: hex.EncodeToString(profile.Session)})
-	if err != nil || !forged.Blocked {
-		t.Fatal("session build forged", err)
+	if err != nil || forged.Blocked {
+		t.Fatal("identity mismatch displayed as version update", err)
+	}
+	forgedAck := ack
+	forgedAck.BuildCode = 200
+	if _, err = s.ClientUpdateAck(ctx, forgedAck); !errors.Is(err, constUtil.ErrClientUpdateIdentity) {
+		t.Fatal("forged identity attributed receipt", err)
 	}
 	remind := action(id, "remind", "remind-idempotent-test")
 	if remind.Policy.NoticeBatch != published.Policy.NoticeBatch+1 {
@@ -217,6 +250,7 @@ func clientUpdateBusinessSuite(t *testing.T, mysql bool) {
 	if closed != 1 {
 		t.Fatal("scheduled maintenance did not close connection once", closed)
 	}
+	assertStaleStatus(300, constUtil.ErrClientUpdateMaintenance)
 	clientUpdateReady.Delete(clientUpdateDBKey(d))
 	if err = s.InitializeClientUpdates(ctx); err != nil {
 		t.Fatal(err)
