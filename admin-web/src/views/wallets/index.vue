@@ -120,7 +120,7 @@ onBeforeUnmount(() => { generation++; recordGeneration++; });
           <NForm v-if="draft" label-placement="top" :disabled="locked" @submit.prevent="saveSettings">
             <div class="terminal-grid">
               <NFormItem label="首次注册赠送（超频点数）"><NInputNumber v-model:value="draft.signupPoints" :min="0" :precision="0" class="w-full" /></NFormItem>
-              <NFormItem label="每日 Burst Link！"><NSwitch v-model:value="draft.burstEnabled" /></NFormItem>
+              <NFormItem label="Burst Link！"><NSwitch v-model:value="draft.burstEnabled" /></NFormItem>
               <NFormItem label="Burst 消耗（超频点数）"><NInputNumber v-model:value="draft.burstCostPoints" :min="0" :precision="0" class="w-full" /></NFormItem>
               <NFormItem label="Burst 随机下限（超频点数）"><NInputNumber v-model:value="draft.burstMinPoints" :min="1" :precision="0" class="w-full" /></NFormItem>
               <NFormItem label="Burst 随机上限（超频点数）"><NInputNumber v-model:value="draft.burstMaxPoints" :min="1" :precision="0" class="w-full" /></NFormItem>
