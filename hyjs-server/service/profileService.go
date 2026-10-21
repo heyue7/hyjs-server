@@ -139,6 +139,10 @@ func AuthorizeAccount(ctx context.Context, id int64, session []byte) (*db.Profil
 			return nil, errors.New("账号登录已失效，请重新登录")
 		}
 	}
+	// 原协议和附加HTTP入口共享客户端运行资格。
+	if err := CheckClientUpdateSession(ctx, &row); err != nil {
+		return nil, err
+	}
 	return &row, nil
 }
 

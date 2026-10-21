@@ -1,0 +1,20 @@
+CREATE TABLE IF NOT EXISTS client_update_policy (
+  id BIGINT NOT NULL,
+  release_id BIGINT NOT NULL,
+  latest_build BIGINT NOT NULL,
+  min_login_build BIGINT NOT NULL,
+  min_run_build BIGINT NOT NULL,
+  revision BIGINT NOT NULL,
+  notice_batch BIGINT NOT NULL,
+  notice_enabled BOOLEAN NOT NULL,
+  maintenance BOOLEAN NOT NULL,
+  maintenance_start_at BIGINT NOT NULL,
+  maintenance_end_at BIGINT NOT NULL,
+  maintenance_epoch BIGINT NOT NULL,
+  login_gate_at BIGINT NOT NULL,
+  version_name VARCHAR(80),
+  title VARCHAR(240),
+  content LONGTEXT,
+  mode VARCHAR(32),
+  PRIMARY KEY (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

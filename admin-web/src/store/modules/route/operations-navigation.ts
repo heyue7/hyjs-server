@@ -8,7 +8,7 @@ export function organizeOperationsMenus(menus: App.Global.Menu[]) {
     home: 'ph:chart-line-up', 'game-accounts': 'ph:identification-card', items: 'ph:treasure-chest',
     'guild-settings': 'ph:flag', guilds: 'ph:users-three', activities: 'ph:calendar-blank', achievements: 'ph:medal', titles: 'ph:crown',
     'arena-prizes': 'ph:cards-three', 'wallet-reasons': 'ph:wallet', 'server-clock': 'ph:clock-counter-clockwise',
-    shops: 'ph:storefront', announcements: 'ph:megaphone', servers: 'ph:hard-drives',
+    shops: 'ph:storefront', announcements: 'ph:megaphone', 'client-updates': 'ph:device-mobile', servers: 'ph:hard-drives',
     'activity-schedules': 'ph:calendar-dots', fields: 'ph:map-trifold', players: 'ph:users-three',
     feedback: 'ph:chat-circle-text', users: 'ph:shield-check', audit: 'ph:clipboard-text',
     cdk: 'ph:gift', 'redeem-codes': 'ph:ticket', broadcast: 'ph:envelope-open', mail: 'ph:paper-plane-tilt',
@@ -60,7 +60,7 @@ export function organizeOperationsMenus(menus: App.Global.Menu[]) {
       take('server-clock', '统一游戏时间')
     ]),
     take('shops', '商店管理'),
-    take('announcements', '公告管理')
+    take('announcements', '公告管理'), take('client-updates', '客户端更新')
   ]);
   // Wallet deep links remain valid; its entry lives on each user row.
   take('wallets');

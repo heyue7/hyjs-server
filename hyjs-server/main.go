@@ -450,6 +450,10 @@ func run() error {
 	if err = s.InitializeAdminMail(ctx); err != nil {
 		return err
 	}
+	// 默认放行历史APK，更新策略仅由后台显式发布。
+	if err = s.InitializeClientUpdates(ctx); err != nil {
+		return err
+	}
 	httpListener, err := net.Listen("tcp", net.JoinHostPort(cfg.Bind, strconv.Itoa(cfg.HTTPPort)))
 	if err != nil {
 		return err
