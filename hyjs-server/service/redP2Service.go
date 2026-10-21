@@ -232,6 +232,7 @@ func (s *GameService) kingConfiguration(tx *gorm.DB, now time.Time) (*db.KingRec
 			return nil, 0, 0, errors.New("王者运营规则与原客户端不匹配")
 		}
 		rules.DailyLimit = override.DailyLimit
+		rules.LuckLimit = override.LuckExchangeCost
 	} else if rules.DailyLimit != 50 || rules.LuckLimit != 500 || rules.LuckPerDraw != 10 || rules.RotationMillis != 172800000 {
 		return nil, 0, 0, errors.New("王者运营规则与原客户端不匹配")
 	}
@@ -252,7 +253,7 @@ func kingState(tx *gorm.DB, id int64, now time.Time) (*db.KingRecruitState, erro
 	if err := growthRecruitKingDay(tx, state, now); err != nil {
 		return nil, err
 	}
-	if state.Draws < 0 || state.Luck < 0 || state.Luck > 500 {
+	if state.Draws < 0 || state.Luck < 0 {
 		return nil, errors.New("王者招募存档无效")
 	}
 	return state, nil
@@ -260,7 +261,7 @@ func kingState(tx *gorm.DB, id int64, now time.Time) (*db.KingRecruitState, erro
 
 // 在持有角色锁的事务内迁移一次旧余额，其他世界从零开始，保留原领取回执。
 func kingWorldLuck(g *model.GameState, world, legacy int32) (int32, error) {
-	if world < 1 || world > 3 || legacy < 0 || legacy > 500 {
+	if world < 1 || world > 3 || legacy < 0 {
 		return 0, errors.New(constUtil.P2KingLuckInvalid)
 	}
 	if g.KingRecruitLuck == nil {
@@ -268,7 +269,7 @@ func kingWorldLuck(g *model.GameState, world, legacy int32) (int32, error) {
 		g.KingRecruitLuck[world] = legacy
 	}
 	for key, value := range g.KingRecruitLuck {
-		if key < 1 || key > 3 || value < 0 || value > 500 {
+		if key < 1 || key > 3 || value < 0 {
 			return 0, errors.New(constUtil.P2KingLuckInvalid)
 		}
 	}

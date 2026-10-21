@@ -85,6 +85,7 @@ namespace HYJS.KingRecruit
         static readonly FieldInfo CurTabField = typeof(ShopPage).GetField("curTab", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
         static readonly FieldInfo CurTypeField = typeof(ShopPage).GetField("curType", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
         static readonly PropertyInfo InfoProperty = typeof(TabKingsRecruit).GetProperty("recruitInfo", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+        static readonly FieldInfo ProgressWidthField = typeof(TabKingsRecruit).GetField("progressWith", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
 
         TabKingsRecruit tab;
         ShopWorldMenuControl menu;
@@ -173,6 +174,17 @@ namespace HYJS.KingRecruit
             info = CurrentInfo();
             hasInfo = info != null;
             Ready = Compute();
+            ClampProgress();
+        }
+
+        // The original label shows the full balance; only the visual fill stops
+        // at the frame width when the balance exceeds the exchange threshold.
+        void LateUpdate() { ClampProgress(); }
+        void ClampProgress()
+        {
+            if (tab == null || tab.progressBar == null || ProgressWidthField == null) return;
+            int width = (int)ProgressWidthField.GetValue(tab);
+            if (width > 0 && tab.progressBar.width > width) tab.progressBar.width = width;
         }
 
         public void BeginDraw()

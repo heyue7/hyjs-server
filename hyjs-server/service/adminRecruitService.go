@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"math"
 	"sort"
 	"strings"
 
@@ -65,14 +66,14 @@ func (s *GameService) AdminSaveRecruitSettings(ctx context.Context, actor *model
 		}
 		current := make([]model.AdminRecruitSetting, 0, len(locked))
 		for _, row := range locked {
-			current = append(current, model.AdminRecruitSetting{Kind: int64(row.Kind), Name: constUtil.RecruitRuntimeName(row.Kind), DailyLimit: int64(row.DailyLimit), GuaranteeEvery: int64(row.GuaranteeEvery)})
+			current = append(current, recruitRuntimeSetting(row))
 		}
 		version := adminVersion(current)
 		if version != req.Version {
 			return constUtil.ErrAdminConfigConflict
 		}
 		for _, item := range canonical {
-			updated := tx.Model(&db.RecruitRuntimeRule{}).Where("kind=?", item.Kind).Updates(map[string]any{"daily_limit": item.DailyLimit, "guarantee_every": item.GuaranteeEvery})
+			updated := tx.Model(&db.RecruitRuntimeRule{}).Where("kind=?", item.Kind).Updates(map[string]any{"daily_limit": item.DailyLimit, "guarantee_every": item.GuaranteeEvery, "luck_exchange_cost": item.LuckExchangeCost})
 			if updated.Error != nil {
 				return updated.Error
 			}
@@ -80,7 +81,7 @@ func (s *GameService) AdminSaveRecruitSettings(ctx context.Context, actor *model
 			// The locked rows above have already established its existence.
 		}
 		next := &model.AdminRecruitSettingsResponse{Version: adminVersion(canonical), Items: canonical}
-		if err = adminAudit(tx, actor, constUtil.RecruitRuntimeAuditAction, constUtil.RecruitRuntimeAuditTarget, fmt.Sprintf("version=%s %s", next.Version, strings.TrimSpace(req.Reason))); err != nil {
+		if err = adminAudit(tx, actor, constUtil.RecruitRuntimeAuditAction, constUtil.RecruitRuntimeAuditTarget, fmt.Sprintf("before=%s after=%s; %s", adminJSON(current), adminJSON(canonical), strings.TrimSpace(req.Reason))); err != nil {
 			return err
 		}
 		out = next
@@ -107,17 +108,17 @@ func canonicalRecruitRuntimeItems(items []model.AdminRecruitSetting) ([]model.Ad
 		}
 		switch item.Kind {
 		case int64(constUtil.RecruitRuntimeKindStrong):
-			if item.DailyLimit < int64(constUtil.RecruitRuntimeDailyUnlimited) || item.DailyLimit > int64(constUtil.RecruitRuntimeDailyMaximum) {
+			if item.LuckExchangeCost != 0 || item.DailyLimit < int64(constUtil.RecruitRuntimeDailyUnlimited) || item.DailyLimit > int64(constUtil.RecruitRuntimeDailyMaximum) {
 				return nil, constUtil.ErrAdminInput
 			}
 		case int64(constUtil.RecruitRuntimeKindKing):
-			if item.DailyLimit < 1 || item.DailyLimit > int64(constUtil.RecruitRuntimeDailyMaximum) {
+			if item.LuckExchangeCost < 1 || item.LuckExchangeCost > math.MaxInt32 || item.DailyLimit < 1 || item.DailyLimit > int64(constUtil.RecruitRuntimeDailyMaximum) {
 				return nil, constUtil.ErrAdminInput
 			}
 		default:
 			return nil, constUtil.ErrAdminInput
 		}
-		out = append(out, model.AdminRecruitSetting{Kind: item.Kind, Name: name, DailyLimit: item.DailyLimit, GuaranteeEvery: item.GuaranteeEvery})
+		out = append(out, model.AdminRecruitSetting{Kind: item.Kind, Name: name, DailyLimit: item.DailyLimit, GuaranteeEvery: item.GuaranteeEvery, LuckExchangeCost: item.LuckExchangeCost})
 	}
 	if !seen[int64(constUtil.RecruitRuntimeKindStrong)] || !seen[int64(constUtil.RecruitRuntimeKindKing)] {
 		return nil, constUtil.ErrAdminInput
@@ -151,7 +152,7 @@ func (s *GameService) adminSaveActivityRecruitSettings(tx *gorm.DB, actor *model
 	}
 	current := make([]model.AdminRecruitSetting, 0, len(locked))
 	for _, row := range locked {
-		current = append(current, model.AdminRecruitSetting{Kind: int64(row.Kind), Name: constUtil.RecruitRuntimeName(row.Kind), DailyLimit: int64(row.DailyLimit), GuaranteeEvery: int64(row.GuaranteeEvery)})
+		current = append(current, recruitRuntimeSetting(row))
 	}
 	if req.Version != adminVersion(current) {
 		return constUtil.ErrAdminConfigConflict
@@ -166,8 +167,8 @@ func (s *GameService) adminSaveActivityRecruitSettings(tx *gorm.DB, actor *model
 		}
 		selected = item
 	}
-	if err = tx.Model(&db.RecruitRuntimeRule{}).Where("kind=?", kind).Updates(map[string]any{"daily_limit": selected.DailyLimit, "guarantee_every": selected.GuaranteeEvery}).Error; err != nil {
+	if err = tx.Model(&db.RecruitRuntimeRule{}).Where("kind=?", kind).Updates(map[string]any{"daily_limit": selected.DailyLimit, "guarantee_every": selected.GuaranteeEvery, "luck_exchange_cost": selected.LuckExchangeCost}).Error; err != nil {
 		return err
 	}
-	return adminAudit(tx, actor, constUtil.RecruitRuntimeAuditAction, constUtil.RecruitRuntimeAuditTarget, fmt.Sprintf("activity kind=%d daily=%d guarantee=%d; %s", kind, selected.DailyLimit, selected.GuaranteeEvery, strings.TrimSpace(req.Reason)))
+	return adminAudit(tx, actor, constUtil.RecruitRuntimeAuditAction, constUtil.RecruitRuntimeAuditTarget, fmt.Sprintf("activity kind=%d daily=%d guarantee=%d luckExchangeCost=%d; %s", kind, selected.DailyLimit, selected.GuaranteeEvery, selected.LuckExchangeCost, strings.TrimSpace(req.Reason)))
 }

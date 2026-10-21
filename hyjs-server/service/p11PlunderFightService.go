@@ -38,13 +38,63 @@ func (s *GameService) InitializeP11PlunderFight(ctx context.Context) error {
 	return tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&cfg).Error
 }
 
+// Lock and back up the exact unpublished system policy once; never reopen maintenance closures.
+func (s *GameService) InitializePlunderPermanent40(ctx context.Context) error {
+	now := time.Now()
+	return db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var cfg db.P11PlunderFightPolicy
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&cfg, 1).Error; err != nil {
+			return err
+		}
+		var applied int64
+		if err := tx.Model(&db.AdminAudit{}).Where("action=? AND target=?", constUtil.P11PlunderPermanentMigration, "p11_plunder_fight_policies:1").Count(&applied).Error; err != nil {
+			return err
+		}
+		if applied != 0 {
+			return nil
+		}
+		if cfg.Version != "local-plunder-type3-v1" || cfg.Enabled || cfg.Permanent || cfg.PublishedAt != 0 || cfg.StartAt != 0 || cfg.EndAt != 0 || cfg.Source != constUtil.P11PlunderFightPolicySource || cfg.MatchCount != 3 || cfg.ScanLimit != 512 || cfg.LevelDifference != 20 || cfg.MatchMillis != 300000 || cfg.ChanceTier != 3 || cfg.DropPPM != 250000 {
+			return nil
+		}
+		backup, err := json.Marshal(cfg)
+		if err != nil {
+			return err
+		}
+		cfg.Enabled = true
+		cfg.Permanent = true
+		cfg.Version = constUtil.P11PlunderPermanentVersion
+		cfg.PublishedAt = now.UnixMilli()
+		cfg.StartAt = cfg.PublishedAt
+		if err := tx.Save(&cfg).Error; err != nil {
+			return err
+		}
+		detail, err := json.Marshal(map[string]any{"before": json.RawMessage(backup), "after": cfg, "source": constUtil.P11PlunderPermanentSource, "applied": true})
+		if err != nil {
+			return err
+		}
+		return tx.Create(&db.AdminAudit{Time: now.UnixMilli(), Actor: "system", Action: constUtil.P11PlunderPermanentMigration, Target: "p11_plunder_fight_policies:1", Detail: string(detail)}).Error
+	})
+}
+
+func p11PlunderPolicyOpen(cfg *db.P11PlunderFightPolicy, stamp int64) bool {
+	return p11PlunderFightPolicyValid(cfg) && stamp >= cfg.StartAt && (cfg.Permanent || stamp < cfg.EndAt)
+}
+
+func p11PlunderMatchExpires(cfg *db.P11PlunderFightPolicy, stamp int64) int64 {
+	expires := stamp + cfg.MatchMillis
+	if !cfg.Permanent {
+		expires = min(expires, cfg.EndAt)
+	}
+	return expires
+}
+
 func p11PlunderFightPolicyValid(cfg *db.P11PlunderFightPolicy) bool {
-	return cfg != nil && cfg.ID == 1 && cfg.Enabled && strings.TrimSpace(cfg.Version) != "" && len(cfg.Version) <= 64 && cfg.Source == constUtil.P11PlunderFightPolicySource && cfg.PublishedAt > 0 && cfg.PublishedAt <= cfg.StartAt && cfg.EndAt > cfg.StartAt && cfg.EndAt-cfg.StartAt <= int64(31*24*time.Hour/time.Millisecond) && cfg.MatchCount >= 1 && cfg.MatchCount <= 3 && cfg.ScanLimit >= cfg.MatchCount && cfg.ScanLimit <= 4096 && cfg.LevelDifference >= 0 && cfg.LevelDifference <= 100 && cfg.MatchMillis >= 1000 && cfg.MatchMillis <= 300000 && cfg.ChanceTier >= 1 && cfg.ChanceTier <= 6 && cfg.DropPPM >= 0 && cfg.DropPPM <= 1000000
+	return cfg != nil && cfg.ID == 1 && cfg.Enabled && strings.TrimSpace(cfg.Version) != "" && len(cfg.Version) <= 64 && cfg.Source == constUtil.P11PlunderFightPolicySource && cfg.PublishedAt > 0 && cfg.PublishedAt <= cfg.StartAt && ((cfg.Permanent && cfg.EndAt == 0) || (!cfg.Permanent && cfg.EndAt > cfg.StartAt && cfg.EndAt-cfg.StartAt <= int64(31*24*time.Hour/time.Millisecond))) && cfg.MatchCount >= 1 && cfg.MatchCount <= 3 && cfg.ScanLimit >= cfg.MatchCount && cfg.ScanLimit <= 4096 && cfg.LevelDifference >= 0 && cfg.LevelDifference <= 100 && cfg.MatchMillis >= 1000 && cfg.MatchMillis <= 300000 && cfg.ChanceTier >= 1 && cfg.ChanceTier <= 6 && cfg.DropPPM >= 0 && cfg.DropPPM <= 1000000
 }
 
 func p11PlunderFightOfferRules(offer *db.P11PlunderFightOffer) (*db.P11PlunderFightPolicy, error) {
 	var cfg db.P11PlunderFightPolicy
-	if offer == nil || p6Digest([]byte(offer.Snapshot)) != offer.SourceHash || json.Unmarshal([]byte(offer.Snapshot), &cfg) != nil || !p11PlunderFightPolicyValid(&cfg) || cfg.Version != offer.Version || offer.CapturedAt < cfg.StartAt || offer.CapturedAt >= cfg.EndAt {
+	if offer == nil || p6Digest([]byte(offer.Snapshot)) != offer.SourceHash || json.Unmarshal([]byte(offer.Snapshot), &cfg) != nil || !p11PlunderFightPolicyValid(&cfg) || cfg.Version != offer.Version || !p11PlunderPolicyOpen(&cfg, offer.CapturedAt) {
 		return nil, errors.New(constUtil.P11PlunderFightConflict)
 	}
 	return &cfg, nil
@@ -64,7 +114,7 @@ func p11PlunderFightOffer(tx *gorm.DB, now time.Time) (*db.P11PlunderFightOffer,
 	var offer db.P11PlunderFightOffer
 	err := tx.First(&offer, "version=?", live.Version).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		if !p11PlunderFightPolicyValid(&live) || now.UnixMilli() < live.StartAt || now.UnixMilli() >= live.EndAt {
+		if !p11PlunderPolicyOpen(&live, now.UnixMilli()) {
 			return nil, nil, errors.New(constUtil.P11PlunderFightUnavailable)
 		}
 		raw, err := json.Marshal(live)
@@ -82,7 +132,7 @@ func p11PlunderFightOffer(tx *gorm.DB, now time.Time) (*db.P11PlunderFightOffer,
 	if err != nil {
 		return nil, nil, err
 	}
-	if now.UnixMilli() < cfg.StartAt || now.UnixMilli() >= cfg.EndAt {
+	if !p11PlunderPolicyOpen(cfg, now.UnixMilli()) {
 		return nil, nil, errors.New(constUtil.P11PlunderFightUnavailable)
 	}
 	return &offer, cfg, nil
@@ -222,7 +272,7 @@ func (s *GameService) p11PlunderListAt(ctx context.Context, id int64, fragment s
 				if err != nil {
 					return err
 				}
-				match := db.P11PlunderFightMatch{ID: uuid.NewString(), PlayerID: id, OpponentID: peer.Id, FragmentID: fragment, OfferVersion: offer.Version, OfferHash: offer.SourceHash, Info: infoRaw, Attacker: a, Defender: d, Seed: seed.Int64(), ConfigurationHash: config, CapabilityHash: P6CapabilityHash(), CreatedAt: now.UnixMilli(), ExpiresAt: min(now.UnixMilli()+cfg.MatchMillis, cfg.EndAt)}
+				match := db.P11PlunderFightMatch{ID: uuid.NewString(), PlayerID: id, OpponentID: peer.Id, FragmentID: fragment, OfferVersion: offer.Version, OfferHash: offer.SourceHash, Info: infoRaw, Attacker: a, Defender: d, Seed: seed.Int64(), ConfigurationHash: config, CapabilityHash: P6CapabilityHash(), CreatedAt: now.UnixMilli(), ExpiresAt: p11PlunderMatchExpires(cfg, now.UnixMilli())}
 				match.SourceHash = p11PlunderMatchHash(&match)
 				if err = tx.Create(&match).Error; err != nil {
 					return err
@@ -407,10 +457,13 @@ func (s *GameService) p11PlunderFightTx(ctx context.Context, tx *gorm.DB, id int
 		}
 		terminal, err := s.ComputeP6PlunderSettlement(ctx, frozen)
 		if err != nil {
+			if err.Error() == constUtil.CombatUnsupported {
+				return errors.New(constUtil.P11PlunderFightUnsupported)
+			}
 			return err
 		}
 		if terminal == nil || terminal.Outcome == nil || !terminal.Outcome.Authoritative || !p6KnownPlunderSettlementProof(frozen, terminal.Outcome.CapabilityHash) || terminal.Outcome.Winner < 0 || terminal.Outcome.Winner > 1 {
-			return errors.New(constUtil.P11PlunderFightUnavailable)
+			return errors.New(constUtil.P11PlunderFightUnsupported)
 		}
 		won := terminal.Outcome.Winner == 0
 		draw := int64(-1)

@@ -77,7 +77,11 @@ func (s *GameService) RecordP1Event(tx *gorm.DB, playerID int64, sourceKey, kind
 	}
 	// 以拿到窗口锁的实际提交时间判断截止，晚于截止提交的动作保留事实但不回写截止快照。
 	acceptedAt := max(at.UnixMilli(), LocalPlayNow(tx.Statement.Context).UnixMilli())
+	periodScope, _ := tx.Statement.Context.Value(constUtil.PeriodEventScopeContextKey{}).(string)
 	for _, live := range configs {
+		if periodScope != "" && live.ID != periodScope {
+			continue
+		}
 		allowed, err := localPlayActivityEventVisible(tx, live, sourceKey)
 		if err != nil {
 			return err
@@ -140,7 +144,7 @@ func (s *GameService) RecordP1Event(tx *gorm.DB, playerID int64, sourceKey, kind
 		}
 		progress.LastDay = fact.Day
 		if progress.RewardID == 0 && progress.Value >= frozen.Goal {
-			reward, err := s.EnqueueRewardNotice(tx, playerID, "activity:"+cfg.ID, frozen.Title, frozen.Source, frozen.Rewards, frozen.RewardEndAt)
+			reward, err := s.EnqueueRewardNotice(tx, playerID, p1PeriodSources(frozen)[0], frozen.Title, frozen.Source, frozen.Rewards, frozen.RewardEndAt)
 			if err != nil {
 				return err
 			}
@@ -285,7 +289,16 @@ func (s *GameService) p1Progress(tx *gorm.DB, cfg db.PeriodInstance, id int64) (
 		if e != nil {
 			return nil, cfg, e
 		}
+		if e = personalOpening40InheritProgress(tx, row, cfg); e != nil {
+			return nil, cfg, e
+		}
 		row.Snapshot = blob
+		// Persist this one-time historical inheritance even when an info query has no new facts.
+		if cfg.RewardSourceID != "" {
+			if e = tx.Create(row).Error; e != nil {
+				return nil, cfg, e
+			}
+		}
 		return row, cfg, nil
 	}
 	if err != nil {
@@ -294,7 +307,7 @@ func (s *GameService) p1Progress(tx *gorm.DB, cfg db.PeriodInstance, id int64) (
 	if err = json.Unmarshal(row.Snapshot, &frozen); err != nil {
 		return nil, cfg, err
 	}
-	if frozen.ID != cfg.ID || row.Value < 0 {
+	if frozen.ID != cfg.ID || frozen.RewardSourceID != cfg.RewardSourceID || row.Value < 0 {
 		return nil, cfg, errors.New("活动冻结存档无效")
 	}
 	if err = s.validateP1Period(frozen); err != nil {
@@ -413,7 +426,7 @@ func (s *GameService) p1ReconcileLoginPeriods(tx *gorm.DB, id int64, now time.Ti
 		progress.Value = value
 		progress.LastDay = lastDay
 		if progress.RewardID == 0 && value >= frozen.Goal {
-			reward, err := s.EnqueueRewardNotice(tx, id, "activity:"+cfg.ID, frozen.Title, frozen.Source, frozen.Rewards, frozen.RewardEndAt)
+			reward, err := s.EnqueueRewardNotice(tx, id, p1PeriodSources(frozen)[0], frozen.Title, frozen.Source, frozen.Rewards, frozen.RewardEndAt)
 			if err != nil {
 				return err
 			}
@@ -468,7 +481,7 @@ func (s *GameService) p1ReconcileCopyProgress(tx *gorm.DB, progress *db.PeriodPr
 	progress.Value = stats.Total
 	progress.LastDay = max(progress.LastDay, stats.LastDay)
 	if progress.RewardID == 0 && stats.Total >= cfg.Goal {
-		reward, err := s.EnqueueRewardNotice(tx, progress.PlayerID, "activity:"+cfg.ID, cfg.Title, cfg.Source, cfg.Rewards, cfg.RewardEndAt)
+		reward, err := s.EnqueueRewardNotice(tx, progress.PlayerID, p1PeriodSources(cfg)[0], cfg.Title, cfg.Source, cfg.Rewards, cfg.RewardEndAt)
 		if err != nil {
 			return err
 		}

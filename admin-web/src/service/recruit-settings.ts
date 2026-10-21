@@ -5,6 +5,7 @@ export interface RecruitSetting {
   name: string;
   dailyLimit: number;
   guaranteeEvery: number;
+  luckExchangeCost: number;
 }
 
 export interface RecruitSettings {

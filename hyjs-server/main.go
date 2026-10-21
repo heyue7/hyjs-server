@@ -400,6 +400,9 @@ func run() error {
 	if err = service.AdminInitialize(ctx, os.Getenv("HYJS_ADMIN_BOOTSTRAP_FILE")); err != nil {
 		return err
 	}
+	if err = s.InitializePlunderPermanent40(ctx); err != nil {
+		return err
+	}
 	if err = s.InitializeAdminGuildSettings(ctx); err != nil {
 		return err
 	}
@@ -422,6 +425,9 @@ func run() error {
 	}
 	// Restore verified Re catalogue entries once and retire placeholder consumers before accepting players.
 	if err = s.InitializeReActivityCatalogue(ctx); err != nil {
+		return err
+	}
+	if err = s.InitializePersonalOpening40(ctx); err != nil {
 		return err
 	}
 	// Apply the explicitly approved mixed-rarity balance once, preserving prior configurations in the audit.

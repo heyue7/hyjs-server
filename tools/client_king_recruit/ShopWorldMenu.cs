@@ -358,7 +358,7 @@ namespace HYJS.KingRecruit
             if (!((IDictionary)data).Contains("recruitRules")) return false;
             JsonData rules = data["recruitRules"];
             if (rules == null || !rules.IsArray) return false;
-            int kingLimit = 0, kingPity = 0, orangePity = 0;
+            int kingLimit = 0, kingPity = 0, orangePity = 0, luckCost = 500;
             bool kingSeen = false, orangeSeen = false;
             foreach (JsonData row in rules)
             {
@@ -367,17 +367,24 @@ namespace HYJS.KingRecruit
                 int pity = (int)row["guaranteeEvery"];
                 if (pity < 1 || pity > 10000 || limit < 0 || limit > 100000) return false;
                 if (kind == 2 && !orangeSeen) { orangeSeen = true; orangePity = pity; }
-                else if (kind == 3 && !kingSeen && limit > 0) { kingSeen = true; kingLimit = limit; kingPity = pity; }
+                else if (kind == 3 && !kingSeen && limit > 0)
+                {
+                    kingSeen = true; kingLimit = limit; kingPity = pity;
+                    if (((IDictionary)row).Contains("luckExchangeCost")) luckCost = (int)row["luckExchangeCost"];
+                    if (luckCost < 1) return false;
+                }
                 else return false;
             }
             if (!kingSeen || !orangeSeen) return false;
             Dict.DataModel.TableGameConfigure config = Dict.DictDataManager.Instance.tableGameConfigureDao.currentData;
             if (config == null) return false;
             bool changed = config.WarriorRecruitCostType3MaxTimes != kingLimit ||
-                config.WarriorRecruitCostType3Must != kingPity || config.WarriorRecruitCostType2Must != orangePity;
+                config.WarriorRecruitCostType3Must != kingPity || config.WarriorRecruitCostType2Must != orangePity ||
+                config.WarriorRecruitCostType3LuckyLimit != luckCost;
             config.WarriorRecruitCostType3MaxTimes = kingLimit;
             config.WarriorRecruitCostType3Must = kingPity;
             config.WarriorRecruitCostType2Must = orangePity;
+            config.WarriorRecruitCostType3LuckyLimit = luckCost;
             return changed;
         }
 

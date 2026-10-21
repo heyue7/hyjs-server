@@ -14,6 +14,7 @@ interface DraftRow {
   name: string;
   dailyLimit: number | null;
   guaranteeEvery: number | null;
+  luckExchangeCost: number | null;
 }
 
 const { canWrite } = useOperations();
@@ -38,7 +39,7 @@ const helpText = computed(() =>
         '保底获得橙卡。保底间隔可设10或20抽，每日次数须为10的倍数。'
       ].join('\n')
     : [
-        '所有王者招募活动通用，三个世界共用每日次数与保底进度，幸运值仍按世界累计，兑换单独计算。',
+        '所有王者招募活动通用，三个世界共用每日次数与保底进度，幸运值按世界累计。达到兑换门槛后继续累计，兑换扣除所需值并保留余额。',
         '免费招募也占 1 次；保底间隔 N 表示连续未出高品质时最多 N 次保底；最后20%的抽数逐步提高概率。',
         '保存后对之后的所有抽取生效，已累计次数与保底进度保留。',
         '保底可能获得橙卡或红卡，不保证红卡。保底间隔可设10或20抽，每日次数须为10的倍数。'
@@ -50,7 +51,8 @@ function rowKey(value?: DraftRow) {
   return JSON.stringify({
     kind: value.kind,
     dailyLimit: value.dailyLimit,
-    guaranteeEvery: value.guaranteeEvery
+    guaranteeEvery: value.guaranteeEvery,
+    luckExchangeCost: value.luckExchangeCost
   });
 }
 
@@ -77,13 +79,18 @@ function guaranteeError(value: DraftRow) {
 
 const dailyError = computed(() => (row.value ? dailyLimitError(row.value) : ''));
 const guaranteeErr = computed(() => (row.value ? guaranteeError(row.value) : ''));
+const luckError = computed(() => props.kind === 3 && row.value &&
+  (row.value.luckExchangeCost === null || !Number.isInteger(row.value.luckExchangeCost) ||
+    row.value.luckExchangeCost < 1 || row.value.luckExchangeCost > 2147483647)
+  ? '请填写1–2,147,483,647的整数' : '');
 const invalid = computed(
   () =>
     !snapshot.value ||
     !row.value ||
     Boolean(error.value) ||
     Boolean(dailyError.value) ||
-    Boolean(guaranteeErr.value)
+    Boolean(guaranteeErr.value) ||
+    Boolean(luckError.value)
 );
 
 function apply(data: RecruitSettings) {
@@ -96,7 +103,8 @@ function apply(data: RecruitSettings) {
     kind: current.kind,
     name: current.name,
     dailyLimit: current.dailyLimit,
-    guaranteeEvery: current.guaranteeEvery
+    guaranteeEvery: current.guaranteeEvery,
+    luckExchangeCost: current.luckExchangeCost
   };
   baseline.value = rowKey(row.value);
   error.value = '';
@@ -143,7 +151,7 @@ function confirmDiscard(): Promise<boolean> {
   };
   dialog = window.$dialog.warning({
     title: '放弃未保存的招募规则修改？',
-    content: '只丢弃本次对每日次数和保底的修改，已保存规则和玩家进度不变。',
+    content: '返回后，本次招募规则修改不会保存。',
     positiveText: '放弃修改',
     negativeText: '继续编辑',
     onPositiveClick: () => dismiss(true),
@@ -172,7 +180,8 @@ function request(): RecruitSettingsSaveRequest | undefined {
           kind: item.kind,
           name: item.name,
           dailyLimit: current.dailyLimit as number,
-          guaranteeEvery: current.guaranteeEvery as number
+          guaranteeEvery: current.guaranteeEvery as number,
+          luckExchangeCost: current.luckExchangeCost as number
         }
       : { ...item }
   );
@@ -263,6 +272,11 @@ defineExpose({ dirty, loading, invalid, request, accept });
               >
                 <template #suffix>次</template>
               </NInputNumber>
+            </NFormItem>
+          </NGi>
+          <NGi v-if="kind === 3">
+            <NFormItem label="红卡兑换所需幸运值" :validation-status="luckError ? 'error' : undefined" :feedback="luckError || undefined">
+              <NInputNumber v-model:value="row.luckExchangeCost" :min="1" :max="2147483647" :precision="0" :show-button="false" :disabled="disabled" :input-props="{ 'aria-label': '红卡兑换所需幸运值' }" class="w-full" />
             </NFormItem>
           </NGi>
         </NGrid>

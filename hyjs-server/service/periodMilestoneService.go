@@ -56,7 +56,11 @@ func (s *GameService) validateP1Milestones(cfg db.PeriodInstance) error {
 func p1PeriodSources(cfg db.PeriodInstance) []string {
 	out := []string{}
 	for index := range p1PeriodMilestones(cfg) {
-		key := "activity:" + cfg.ID
+		identity := cfg.ID
+		if cfg.RewardSourceID != "" {
+			identity = cfg.RewardSourceID
+		}
+		key := "activity:" + identity
 		if index > 0 {
 			key += ":tier:" + strconv.Itoa(index+1)
 		}
@@ -91,6 +95,17 @@ func (s *GameService) p1PeriodItems(tx *gorm.DB, playerID int64, progress *db.Pe
 				return nil, nil, e
 			}
 			delivery = *row
+		}
+		// A migrated personal entitlement reuses the historical delivery verbatim.
+		// Only an unclaimed expiry may move to this still-open personal deadline.
+		if delivery.ID > 0 && cfg.RewardSourceID != "" {
+			if err := personalOpening40RenewDelivery(tx, playerID, cfg, &delivery, now); err != nil {
+				return nil, nil, err
+			}
+			resources, err = p1RewardResources(delivery.Rewards)
+			if err != nil {
+				return nil, nil, err
+			}
 		}
 		status := int32(0)
 		if delivery.ID > 0 {

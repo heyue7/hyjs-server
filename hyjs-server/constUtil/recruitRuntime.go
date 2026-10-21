@@ -9,10 +9,11 @@ const (
 	RecruitRuntimeKingName   = "王者招募"
 
 	// RecruitRuntimeDailyUnlimited 只允许强者招募使用；王者招募每日次数至少为1。
-	RecruitRuntimeDailyUnlimited int32 = 0
-	RecruitRuntimeDailyMaximum   int32 = 100000
-	RecruitRuntimeGuaranteeMin   int32 = 1
-	RecruitRuntimeGuaranteeMax   int32 = 10000
+	RecruitRuntimeDailyUnlimited  int32 = 0
+	RecruitRuntimeDailyMaximum    int32 = 100000
+	RecruitRuntimeGuaranteeMin    int32 = 1
+	RecruitRuntimeGuaranteeMax    int32 = 10000
+	RecruitRuntimeLuckCostDefault int32 = 500
 
 	RecruitRuntimeAuditAction = "recruit-settings.update"
 	RecruitRuntimeAuditTarget = "recruit_runtime_rules"

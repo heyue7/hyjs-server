@@ -9,6 +9,7 @@ import (
 // RegisterAdminActivityModeRoutes 在已认证并具CSRF保护的后台Group注册按模式活动操作。
 func RegisterAdminActivityModeRoutes(a *gin.RouterGroup) {
 	RegisterAdminNativeActivityRoutes(a)
+	RegisterAdminPersonalOpening40Routes(a)
 	a.GET("/activity-modes", AdminActivityModesHandler)
 	a.GET("/activity-instances", AdminActivityInstancesHandler)
 	a.POST("/activity-instances", AdminTypedActivityCreateHandler)

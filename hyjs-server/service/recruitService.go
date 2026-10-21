@@ -579,7 +579,12 @@ func (s *GameService) warriorRecruit(ctx context.Context, id int64, b *pb.CSWarr
 		}
 		if king != nil {
 			king.Draws += count
-			g.KingRecruitLuck[kingSpace] = min(kingRules.LuckLimit, kingLuck+kingRules.LuckPerDraw*count)
+			// 累计余额独立于兑换门槛，超出协议整数边界时整次交易回滚。
+			nextLuck := int64(kingLuck) + int64(kingRules.LuckPerDraw)*int64(count)
+			if nextLuck > math.MaxInt32 {
+				return errors.New(constUtil.P2KingLuckInvalid)
+			}
+			g.KingRecruitLuck[kingSpace] = int32(nextLuck)
 			if err := tx.Save(king).Error; err != nil {
 				return err
 			}

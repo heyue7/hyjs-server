@@ -119,7 +119,7 @@ func (s *GameService) p4ReconcileArenaWinProgress(tx *gorm.DB, progress *db.Peri
 	progress.Value = total
 	progress.LastDay = max(progress.LastDay, stats.LastDay)
 	if progress.RewardID == 0 && total >= cfg.Goal {
-		delivery, err := s.EnqueueRewardNotice(tx, progress.PlayerID, "activity:"+cfg.ID, cfg.Title, cfg.Source, cfg.Rewards, cfg.RewardEndAt)
+		delivery, err := s.EnqueueRewardNotice(tx, progress.PlayerID, p1PeriodSources(cfg)[0], cfg.Title, cfg.Source, cfg.Rewards, cfg.RewardEndAt)
 		if err != nil {
 			return err
 		}

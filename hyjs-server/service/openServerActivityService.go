@@ -676,12 +676,16 @@ func (s *GameService) openServerItem(cfg *db.OpenServerActivityRule, t db.OpenSe
 	}
 	status, current := int32(0), state.Progress
 	limit := int32(1)
+	remaining := current
 	if t.TaskType == 107 || t.TaskType == 108 {
 		limit = t.Target
-		current = t.Target - state.Claims
+		// 原 HalfPriceBg 用原表总量减 currentNum 计算剩余；此字段承载已购数。
+		current = state.Claims
+		remaining = t.Target - state.Claims
 	}
 	if t.TaskType == 7 || t.TaskType == 109 {
 		current = t.Target - t.UsedStock
+		remaining = current
 	}
 	if state.Claims > limit {
 		return nil, errors.New("开服已领取数量超过SQL上限")
@@ -697,7 +701,7 @@ func (s *GameService) openServerItem(cfg *db.OpenServerActivityRule, t db.OpenSe
 			// SQL漂移阻止新领取，已提交领取的显示状态继续保持。
 			status = 0
 		} else if openServerPurchase(t.TaskType) {
-			if now.UnixMilli() < cfg.EndAt && current > 0 {
+			if now.UnixMilli() < cfg.EndAt && remaining > 0 {
 				status = 1
 			}
 		} else if state.Achieved {

@@ -1,9 +1,10 @@
 package db
 
-// P11PlunderFightPolicy publishes a finite local window before its first use.
+// P11PlunderFightPolicy publishes a permanent or finite local window before its first use.
 type P11PlunderFightPolicy struct {
 	ID              int64  `gorm:"primaryKey;autoIncrement:false" json:"id"`
 	Enabled         bool   `gorm:"not null" json:"enabled"`
+	Permanent       bool   `gorm:"not null;default:false" json:"permanent,omitempty"`
 	SweepEnabled    bool   `gorm:"not null;default:false" json:"sweepEnabled"`
 	Version         string `gorm:"type:varchar(64);not null" json:"version"`
 	PublishedAt     int64  `gorm:"not null" json:"publishedAt"`

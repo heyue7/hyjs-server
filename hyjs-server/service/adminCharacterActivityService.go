@@ -58,6 +58,9 @@ func adminNormalizeCharacterItems(items []model.AdminActivityOccurrenceDTO) []mo
 func adminActivityWindowsOverlap(a, b model.AdminActivityOccurrenceDTO, mode string) bool {
 
 	if a.Timing != b.Timing {
+		if personalOpening40Mode(mode) {
+			return false
+		}
 		return true
 	}
 	if a.Timing == "character-day" {
@@ -177,6 +180,9 @@ func (s *GameService) PrepareAdminCharacterActivitySchedules(ctx context.Context
 				issued.ConsumerID = "shop-gate:" + key
 			}
 			if err := tx.Create(&issued).Error; err != nil {
+				return err
+			}
+			if err := personalOpening40BindSource(tx, schedule, issued); err != nil {
 				return err
 			}
 			meta := db.AdminActivityPresentation{ActivityID: issued.ConsumerID, Mode: schedule.Mode, TemplateID: form.TemplateID, Name: form.Name, Alias: form.Alias, UpdatedAtMillis: time.Now().UnixMilli()}

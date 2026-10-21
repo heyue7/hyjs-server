@@ -253,7 +253,7 @@ func TestRecruitRuntimeAdminSettingsVersionPermissionAndAudit(t *testing.T) {
 	if read.Items[0].Kind != 2 || read.Items[0].Name != constUtil.RecruitRuntimeStrongName || read.Items[0].DailyLimit != 0 || read.Items[0].GuaranteeEvery != 10 || read.Items[1].Kind != 3 || read.Items[1].Name != constUtil.RecruitRuntimeKingName || read.Items[1].DailyLimit != 50 || read.Items[1].GuaranteeEvery != 10 {
 		t.Fatal("admin recruit defaults", read.Items)
 	}
-	valid := []model.AdminRecruitSetting{{Kind: 2, Name: constUtil.RecruitRuntimeStrongName, DailyLimit: 3, GuaranteeEvery: 5}, {Kind: 3, Name: constUtil.RecruitRuntimeKingName, DailyLimit: 20, GuaranteeEvery: 4}}
+	valid := []model.AdminRecruitSetting{{Kind: 2, Name: constUtil.RecruitRuntimeStrongName, DailyLimit: 3, GuaranteeEvery: 5}, {Kind: 3, Name: constUtil.RecruitRuntimeKingName, DailyLimit: 20, GuaranteeEvery: 4, LuckExchangeCost: 500}}
 	if _, err = s.AdminSaveRecruitSettings(ctx, readActor, model.AdminRecruitSettingsSaveRequest{Version: read.Version, Reason: "只读账号不可写", Items: valid}); !errors.Is(err, constUtil.ErrAdminPermission) {
 		t.Fatal("viewer saved recruit runtime", err)
 	}

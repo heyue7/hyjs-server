@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"errors"
 	"google.golang.org/protobuf/proto"
 	"gorm.io/gorm"
@@ -66,7 +67,7 @@ func (s *GameService) recordP4VerifiedPlunderAttempt(tx *gorm.DB, row *db.P11Plu
 	if err = tx.Where("id LIKE ? AND kind=? AND enabled=?", constUtil.P4PlunderActivityPrefix+"%", constUtil.P4PlunderActivityKind, true).Find(&published).Error; err != nil {
 		return err
 	}
-	var active *db.PeriodInstance
+	var active []db.PeriodInstance
 	for _, live := range published {
 		allowed, err := localPlayActivityVisible(tx, live.ID)
 		if err != nil {
@@ -85,12 +86,9 @@ func (s *GameService) recordP4VerifiedPlunderAttempt(tx *gorm.DB, row *db.P11Plu
 		if now.UnixMilli() < cfg.StartAt || now.UnixMilli() >= cfg.EndAt {
 			continue
 		}
-		if active != nil {
-			return bad
-		}
-		active = &cfg
+		active = append(active, cfg)
 	}
-	if active == nil {
+	if len(active) == 0 {
 		return nil
 	}
 	// Bind this activity to the accepted independent type3 witness already
@@ -99,10 +97,19 @@ func (s *GameService) recordP4VerifiedPlunderAttempt(tx *gorm.DB, row *db.P11Plu
 	if err = tx.Select("id", "player_id", "source", "source_fight", "status", "authoritative", "finished_at").Where("id=?", row.P6RecordID).First(&witness).Error; err != nil {
 		return err
 	}
-	if row.ScopeProof != constUtil.P6PlunderNativeProof || witness.PlayerID != row.PlayerID || witness.Source != constUtil.P11PlunderFightSource || witness.SourceFight != row.FightID || witness.Status != constUtil.P6BattleComputed || !witness.Authoritative || witness.FinishedAt != row.CreatedAt {
+	knownProof := row.ScopeProof == constUtil.P6PlunderNativeProof || row.ScopeProof == constUtil.P11GenericPlunderCompatibilityProof
+	if !knownProof || witness.PlayerID != row.PlayerID || witness.Source != constUtil.P11PlunderFightSource || witness.SourceFight != row.FightID || witness.Status != constUtil.P6BattleComputed || !witness.Authoritative || witness.FinishedAt != row.CreatedAt {
 		return bad
 	}
-	return s.RecordP1Event(tx, row.PlayerID, constUtil.P4PlunderActivityFactPrefix+active.ID+":"+row.FightID, constUtil.P4PlunderActivityKind, 1, now)
+	// Each publication keeps its own immutable source, while the event scope prevents
+	// sibling personal/calendar consumers from applying this attempt a second time.
+	for _, cfg := range active {
+		scoped := tx.WithContext(context.WithValue(tx.Statement.Context, constUtil.PeriodEventScopeContextKey{}, cfg.ID))
+		if err := s.RecordP1Event(scoped, row.PlayerID, constUtil.P4PlunderActivityFactPrefix+cfg.ID+":"+row.FightID, constUtil.P4PlunderActivityKind, 1, now); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // p4ReconcilePlunderActivityProgress reads only source-bound real accepted
@@ -143,7 +150,7 @@ func (s *GameService) p4ReconcilePlunderActivityProgress(tx *gorm.DB, progress *
 	progress.Value = stats.Total
 	progress.LastDay = max(progress.LastDay, stats.LastDay)
 	if progress.RewardID == 0 && stats.Total >= cfg.Goal {
-		delivery, err := s.EnqueueRewardNotice(tx, progress.PlayerID, "activity:"+cfg.ID, cfg.Title, cfg.Source, cfg.Rewards, cfg.RewardEndAt)
+		delivery, err := s.EnqueueRewardNotice(tx, progress.PlayerID, p1PeriodSources(cfg)[0], cfg.Title, cfg.Source, cfg.Rewards, cfg.RewardEndAt)
 		if err != nil {
 			return err
 		}

@@ -170,7 +170,8 @@ func (s *GameService) KingRecruitWorlds(ctx context.Context, id int64, session [
 			return err
 		}
 		for _, rule := range runtimeRules {
-			out.RecruitRules = append(out.RecruitRules, model.KingRecruitRuntimeRule{Kind: int64(rule.Kind), DailyLimit: int64(rule.DailyLimit), GuaranteeEvery: int64(rule.GuaranteeEvery)})
+			setting := recruitRuntimeSetting(rule)
+			out.RecruitRules = append(out.RecruitRules, model.KingRecruitRuntimeRule{Kind: setting.Kind, DailyLimit: setting.DailyLimit, GuaranteeEvery: setting.GuaranteeEvery, LuckExchangeCost: setting.LuckExchangeCost})
 		}
 		selected := db.KingRecruitSelection{PlayerID: id}
 		err = tx.First(&selected, "player_id=?", id).Error

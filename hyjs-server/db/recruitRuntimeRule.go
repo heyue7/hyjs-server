@@ -8,6 +8,8 @@ type RecruitRuntimeRule struct {
 	DailyLimit int32 `gorm:"not null" json:"dailyLimit"`
 	// GuaranteeEvery 为本次保底间隔，1至10000。
 	GuaranteeEvery int32 `gorm:"not null" json:"guaranteeEvery"`
+	// LuckExchangeCost 为王者红卡兑换所需幸运值；0兼容旧值500，强者招募不用此字段。
+	LuckExchangeCost int32 `gorm:"not null;default:0" json:"luckExchangeCost"`
 }
 
 func (RecruitRuntimeRule) TableName() string { return "recruit_runtime_rules" }

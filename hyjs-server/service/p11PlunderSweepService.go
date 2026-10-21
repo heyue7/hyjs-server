@@ -337,7 +337,7 @@ func (s *GameService) p11PlunderSweepMatch(tx *gorm.DB, id, peerID int64, fragme
 	if err != nil {
 		return nil, err
 	}
-	match := &db.P11PlunderFightMatch{ID: uuid.NewString(), PlayerID: id, OpponentID: peerID, FragmentID: fragment, OfferVersion: offer.Version, OfferHash: offer.SourceHash, Info: infoBody, Attacker: a, Defender: d, Seed: seed.Int64(), ConfigurationHash: configuration, CapabilityHash: P6CapabilityHash(), CreatedAt: now.UnixMilli(), ExpiresAt: min(now.UnixMilli()+cfg.MatchMillis, cfg.EndAt)}
+	match := &db.P11PlunderFightMatch{ID: uuid.NewString(), PlayerID: id, OpponentID: peerID, FragmentID: fragment, OfferVersion: offer.Version, OfferHash: offer.SourceHash, Info: infoBody, Attacker: a, Defender: d, Seed: seed.Int64(), ConfigurationHash: configuration, CapabilityHash: P6CapabilityHash(), CreatedAt: now.UnixMilli(), ExpiresAt: p11PlunderMatchExpires(cfg, now.UnixMilli())}
 	match.SourceHash = p11PlunderMatchHash(match)
 	if err = tx.Create(match).Error; err != nil {
 		return nil, err

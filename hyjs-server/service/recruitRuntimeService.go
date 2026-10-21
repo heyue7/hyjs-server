@@ -78,6 +78,9 @@ func (s *GameService) seedRecruitRuntimeKing(tx *gorm.DB) error {
 
 // validateRecruitRuntimeRule 限制后台可表达的范围，避免零保底或负次数进入抽卡路径。
 func validateRecruitRuntimeRule(row db.RecruitRuntimeRule) error {
+	if row.LuckExchangeCost < 0 || row.Kind == constUtil.RecruitRuntimeKindStrong && row.LuckExchangeCost != 0 {
+		return errors.New("幸运兑换所需值超出范围")
+	}
 	switch row.Kind {
 	case constUtil.RecruitRuntimeKindStrong:
 		if row.DailyLimit < constUtil.RecruitRuntimeDailyUnlimited || row.DailyLimit > constUtil.RecruitRuntimeDailyMaximum {
@@ -111,6 +114,10 @@ func (s *GameService) recruitRuntimeRule(tx *gorm.DB, kind int32) (*db.RecruitRu
 	}
 	if err != nil {
 		return nil, err
+	}
+	// 新列为0的历史运行行沿用500兑换门槛，余额从此不受该门槛裁剪。
+	if kind == constUtil.RecruitRuntimeKindKing && row.LuckExchangeCost == 0 {
+		row.LuckExchangeCost = constUtil.RecruitRuntimeLuckCostDefault
 	}
 	if err = validateRecruitRuntimeRule(row); err != nil {
 		return nil, err
@@ -158,7 +165,7 @@ func (s *GameService) defaultRecruitRuntimeRule(tx *gorm.DB, kind int32) (*db.Re
 		} else if err != nil {
 			return nil, err
 		}
-		row := db.RecruitRuntimeRule{Kind: kind, DailyLimit: rules.DailyLimit, GuaranteeEvery: cfg.GuaranteeEvery}
+		row := db.RecruitRuntimeRule{Kind: kind, DailyLimit: rules.DailyLimit, GuaranteeEvery: cfg.GuaranteeEvery, LuckExchangeCost: rules.LuckLimit}
 		if err := validateRecruitRuntimeRule(row); err != nil {
 			return nil, err
 		}
@@ -199,9 +206,18 @@ func (s *GameService) recruitRuntimeItems(tx *gorm.DB) ([]model.AdminRecruitSett
 	}
 	items := make([]model.AdminRecruitSetting, 0, len(rules))
 	for _, rule := range rules {
-		items = append(items, model.AdminRecruitSetting{Kind: int64(rule.Kind), Name: constUtil.RecruitRuntimeName(rule.Kind), DailyLimit: int64(rule.DailyLimit), GuaranteeEvery: int64(rule.GuaranteeEvery)})
+		items = append(items, recruitRuntimeSetting(rule))
 	}
 	return items, nil
+}
+
+// recruitRuntimeSetting 保持历史零列与实时读取的版本口径一致。
+func recruitRuntimeSetting(rule db.RecruitRuntimeRule) model.AdminRecruitSetting {
+	cost := rule.LuckExchangeCost
+	if rule.Kind == constUtil.RecruitRuntimeKindKing && cost == 0 {
+		cost = constUtil.RecruitRuntimeLuckCostDefault
+	}
+	return model.AdminRecruitSetting{Kind: int64(rule.Kind), Name: constUtil.RecruitRuntimeName(rule.Kind), DailyLimit: int64(rule.DailyLimit), GuaranteeEvery: int64(rule.GuaranteeEvery), LuckExchangeCost: int64(cost)}
 }
 
 // balancedRecruit35Rewards 按品质总概率分配整数权重，同品质各角色等概率，三世界橙卡概率与常驻橙池一致。
