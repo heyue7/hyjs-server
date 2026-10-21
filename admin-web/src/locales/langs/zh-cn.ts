@@ -228,6 +228,7 @@ const local: App.I18n.Schema = {
     items: '道具目录',
     activities: '活动设置',
     announcements: '公告管理',
+    'client-updates': '客户端更新',
     broadcast: '群发补偿',
     mail: '发送邮件',
     'daily-sign': '每日签到',

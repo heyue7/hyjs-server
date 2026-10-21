@@ -140,7 +140,7 @@ func (s *GameService) dispatch(ctx context.Context, r *model.GamePacket, peer st
 	ctx = context.WithValue(ctx, constUtil.GameServiceContextKey, s)
 	switch b := r.Body.(type) {
 	case *pb.CSCheckVersion:
-		return gameReply("SCCheckVersion", map[string]any{"serverAppVersion": b.GetAppVersion(), "serverResVersion": b.GetResVersoin(), "programMethod": 0, "resMethod": 0, "entry": []any{map[string]any{"key": "needActivation", "value": "0"}}})
+		return s.ClientCheckVersionReply(ctx, b.GetAppVersion(), b.GetResVersoin())
 	case *pb.CSGetServerList:
 		serverID := s.OriginalServerID()
 		realm, err := s.runtimeGameServer(ctx)
@@ -179,6 +179,9 @@ func (s *GameService) dispatch(ctx context.Context, r *model.GamePacket, peer st
 		}
 		if !realm.Enabled {
 			return nil, errors.New("当前区服维护中")
+		}
+		if err := s.CheckClientLogin(ctx, b.GetAppVersion()); err != nil {
+			return nil, err
 		}
 		username := b.GetPlatformUid()
 		event := model.SecurityEventInput{Actor: username, SourceIP: peer, Action: "game.login", Target: "account", Outcome: "failure", ReasonCode: "invalid_credentials"}
@@ -220,6 +223,10 @@ func (s *GameService) dispatch(ctx context.Context, r *model.GamePacket, peer st
 		}
 		if e := ClearGameLoginFailures(ctx, username); e != nil {
 			elog.Warn("login retry state reset unavailable")
+		}
+		// 在发会话前重新核对权威策略并绑定版本。
+		if err := s.BindClientLogin(ctx, row, b.GetAppVersion()); err != nil {
+			return nil, err
 		}
 		event.Outcome = "success"
 		event.ReasonCode = "authenticated"
@@ -279,6 +286,9 @@ func (s *GameService) dispatch(ctx context.Context, r *model.GamePacket, peer st
 		}
 		return gameReply("SCPlayerCreate", map[string]any{"player": p, "createTime": row.CreatedAt})
 	case *pb.CSSocketLogin:
+		if err := s.CheckClientReconnect(ctx, row); err != nil {
+			return nil, err
+		}
 		return gameReply("SCSocketLogin", map[string]any{"result": 100})
 	case *pb.CSRefreshGatewayIPAndPort:
 		return gameReply("SCRefreshGatewayIPAndPort", map[string]any{"ip": s.Host, "port": s.TCPPort})

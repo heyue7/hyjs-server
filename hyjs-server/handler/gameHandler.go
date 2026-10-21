@@ -1531,7 +1531,7 @@ func serveGameConnection(ctx context.Context, c net.Conn, s *service.GameService
 		}
 		// 原登录响应先完整写入，再允许私聊推送进入同一连接。
 		if registerClient {
-			unregister = s.RegisterP10Client(ctx, playerId, session, func(message proto.Message) error { return writeMessages([]proto.Message{message}) })
+			unregister = s.RegisterP10Client(ctx, playerId, session, func(message proto.Message) error { return writeMessages([]proto.Message{message}) }, func() { _ = c.Close() })
 		}
 	}
 }

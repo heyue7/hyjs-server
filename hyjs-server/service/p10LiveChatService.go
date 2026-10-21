@@ -15,6 +15,7 @@ type p10ClientKey struct {
 type p10ClientSink struct {
 	session []byte
 	send    func(proto.Message) error
+	close   func()
 }
 
 var p10ClientSinks sync.Map
@@ -28,15 +29,20 @@ func (s *GameService) p10ClientOwner() *GameService {
 }
 
 // RegisterP10Client 必须在原CSSocketLogin成功后调用；旧连接注销不会删除新会话。
-func (s *GameService) RegisterP10Client(ctx context.Context, id int64, session []byte, send func(proto.Message) error) func() {
+func (s *GameService) RegisterP10Client(ctx context.Context, id int64, session []byte, send func(proto.Message) error, closeConnection ...func()) func() {
 	key := p10ClientKey{s.p10ClientOwner(), id}
 	sink := &p10ClientSink{session: append([]byte(nil), session...), send: send}
+	if len(closeConnection) > 0 {
+		sink.close = closeConnection[0]
+	}
 	p10ClientSinks.Store(key, sink)
+	s.ClientUpdateConnected(ctx, id, session)
 	_ = s.SyncP10Scene(ctx, id, false)
 	return func() {
 		if p10ClientSinks.CompareAndDelete(key, sink) {
 			cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), constUtil.P10SceneCleanupTimeout)
 			defer cancel()
+			s.ClientUpdateDisconnected(cleanupCtx, id, sink.session)
 			s.DisconnectP10Scene(cleanupCtx, id, sink.session)
 		}
 	}

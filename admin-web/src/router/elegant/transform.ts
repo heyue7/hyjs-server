@@ -175,6 +175,7 @@ const routeMap: RouteMap = {
   "audit": "/audit",
   "broadcast": "/broadcast",
   "cdk": "/cdk",
+  "client-updates": "/client-updates",
   "daily-sign": "/daily-sign",
   "feedback": "/feedback",
   "fields": "/fields",
