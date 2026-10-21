@@ -32,6 +32,16 @@ type KingRecruitWorld struct {
 	EndAt int64 `json:"endAt"`
 }
 
+// KingRecruitRuntimeRule 是客户端展示的全局招募运行规则。
+type KingRecruitRuntimeRule struct {
+	// Kind 为2=强者招募，3=王者招募。
+	Kind int64 `json:"kind"`
+	// DailyLimit 是每日可抽数；强者招募0表示不限。
+	DailyLimit int64 `json:"dailyLimit"`
+	// GuaranteeEvery 是距下一次保底的抽数间隔。
+	GuaranteeEvery int64 `json:"guaranteeEvery"`
+}
+
 // KingRecruitWorldsResponse 返回当前开放世界与选择。
 type KingRecruitWorldsResponse struct {
 	// Worlds 仅包含当前可访问的开放世界。
@@ -40,6 +50,8 @@ type KingRecruitWorldsResponse struct {
 	SelectedPoolID string `json:"selectedPoolId"`
 	// Version 是当前世界目录摘要。
 	Version string `json:"version"`
+	// RecruitRules 固定返回当前有效的强者、王者全局规则，不含账号凭据。
+	RecruitRules []KingRecruitRuntimeRule `json:"recruitRules"`
 }
 
 // KingRecruitSelectResponse 返回服务端保存后的选择与当前开放世界。

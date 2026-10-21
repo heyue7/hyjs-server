@@ -84,7 +84,17 @@ func (s *GameService) InitializeGameplayPools(ctx context.Context) error {
 
 // loadGameplayPool 在当前资源事务中读取配置，非法配置会让整次操作失败而不扣费。
 func (s *GameService) loadGameplayPool(tx *gorm.DB, key string) (*db.GameplayPool, []db.GameplayPoolReward, error) {
-	kingRecruit := key == "recruit_3"
+	var (
+		kind        int32
+		kingRecruit bool
+	)
+	switch key {
+	case "recruit_2":
+		kind = constUtil.RecruitRuntimeKindStrong
+	case "recruit_3":
+		kind = constUtil.RecruitRuntimeKindKing
+		kingRecruit = true
+	}
 	if kingRecruit {
 		selected, _, err := s.adminScheduledKingRecruitPool(tx, LocalPlayNow(tx.Statement.Context).UnixMilli())
 		if err != nil {
@@ -129,6 +139,12 @@ func (s *GameService) loadGameplayPool(tx *gorm.DB, key string) (*db.GameplayPoo
 			return nil, nil, err
 		}
 	}
+	// 运行覆盖只作用于本次返回的副本，原奖池快照、奖励与价格保持。
+	if kind == constUtil.RecruitRuntimeKindStrong || kind == constUtil.RecruitRuntimeKindKing {
+		if err := s.applyRecruitRuntimeGuarantee(tx, kind, &cfg); err != nil {
+			return nil, nil, err
+		}
+	}
 	if !cfg.Enabled || cfg.MinLevel < 1 || cfg.CoinPerDraw < 0 || cfg.FreeSeconds < 1 || cfg.FreeSeconds > 31536000 || cfg.FreePerDay < -1 || cfg.GuaranteeEvery < 0 || cfg.GuaranteeEvery > 10000 || len(rewards) == 0 {
 		return nil, nil, errors.New("奖池未开放或运营配置无效")
 	}
@@ -156,8 +172,8 @@ func (s *GameService) validateRecruitClientPrices(cfg *db.GameplayPool, kind int
 	if kind != 2 && (cfg.SingleTicket != "" || cfg.TenTicket != "") {
 		return errors.New("普通招募券配置不匹配当前客户端")
 	}
-	if kind == 3 && (cfg.MinLevel != 20 || cfg.FreeSeconds != 172800 || cfg.FreePerDay != -1 || cfg.GuaranteeEvery != 10) {
-		return errors.New("王者招募门槛、免费冷却或保底间隔与原客户端不匹配")
+	if kind == 3 && (cfg.MinLevel != 20 || cfg.FreeSeconds != 172800 || cfg.FreePerDay != -1) {
+		return errors.New("王者招募门槛或免费冷却与原客户端不匹配")
 	}
 	return nil
 }
@@ -227,10 +243,17 @@ func (s *GameService) recruitInfo(ctx context.Context, id int64, b *pb.CSWarrior
 			if err != nil {
 				return err
 			}
+			// 强者招募的每日抽数独立维护，信息查询也推进日历归档但不改免费/保底。
+			if kind == constUtil.RecruitRuntimeKindStrong {
+				if _, err := growthRecruitDrawState(tx, id, g, kind, now); err != nil {
+					return err
+				}
+			}
 			num := int32(0)
 			if kind == 1 {
 				num = max(0, cfg.FreePerDay-st.FreeUsed)
-			} else if cfg.GuaranteeEvery > 0 {
+			} else if kind == constUtil.RecruitRuntimeKindStrong && cfg.GuaranteeEvery > 0 {
+				// 原橙卡界面用num展示距黄卡保底次数，不承载每日余量。
 				num = max(0, cfg.GuaranteeEvery-st.SinceGuarantee-1)
 			}
 			free := now.UnixMilli() >= st.NextFree && (cfg.FreePerDay < 0 || st.FreeUsed < cfg.FreePerDay)
@@ -274,7 +297,9 @@ func (s *GameService) recruitInfo(ctx context.Context, id int64, b *pb.CSWarrior
 					return err
 				}
 				entry.Luck = proto.Int32(luck)
-				entry.LeftTimes = proto.Int32(max(0, rules.DailyLimit-state.Draws))
+				// 原王者界面num显示每日余量，leftTimes显示距保底剩余次数。
+				entry.Num = proto.Int32(max(0, rules.DailyLimit-state.Draws))
+				entry.LeftTimes = proto.Int32(max(0, cfg.GuaranteeEvery-st.SinceGuarantee-1))
 				entry.Space = proto.Int32(space)
 				entry.ChangeTime = proto.Int64(change)
 				entry.RewardList = red
@@ -425,6 +450,21 @@ func (s *GameService) warriorRecruit(ctx context.Context, id int64, b *pb.CSWarr
 		if b.GetNumType() == 2 {
 			count = 10
 		}
+		// 强者招募在扣费与发奖前检查运行上限；免费抽同样计数，重试回执在前面已返回。
+		var strongState *model.RecruitState
+		if b.GetCostType() == constUtil.RecruitRuntimeKindStrong {
+			strongState, err = growthRecruitDrawState(tx, id, g, b.GetCostType(), now)
+			if err != nil {
+				return err
+			}
+			strongRule, err := s.recruitRuntimeRule(tx, constUtil.RecruitRuntimeKindStrong)
+			if err != nil {
+				return err
+			}
+			if strongRule != nil && strongRule.DailyLimit > constUtil.RecruitRuntimeDailyUnlimited && strongState.Draws > strongRule.DailyLimit-count {
+				return errors.New("今日强者招募次数不足")
+			}
+		}
 		var king *db.KingRecruitState
 		var kingRules *db.KingRecruitRules
 		var kingSpace, kingLuck int32
@@ -528,6 +568,9 @@ func (s *GameService) warriorRecruit(ctx context.Context, id int64, b *pb.CSWarr
 		st.Timestamp = stamp
 		st.Request = proto.Clone(b).(*pb.CSWarriorRecruit)
 		st.Response = proto.Clone(result).(*pb.SCWarriorRecruit)
+		if strongState != nil {
+			strongState.Draws += count
+		}
 		if king != nil {
 			king.Draws += count
 			g.KingRecruitLuck[kingSpace] = min(kingRules.LuckLimit, kingLuck+kingRules.LuckPerDraw*count)

@@ -126,9 +126,12 @@ func GameMessage(name string, fields any) (proto.Message, error) {
 
 // RecruitState 持久化免费次数、保底及最后一次原始请求回执。
 type RecruitState struct {
-	Day            string               `json:"day"`
-	FreeUsed       int32                `json:"free_used"`
-	NextFree       int64                `json:"next_free"`
+	Day      string `json:"day"`
+	FreeUsed int32  `json:"free_used"`
+	NextFree int64  `json:"next_free"`
+	// DrawDay/Draws 独立记录强者招募按本地日累计的抽数，不影响免费冷却和保底进度。
+	DrawDay        string               `json:"draw_day,omitempty"`
+	Draws          int32                `json:"draws,omitempty"`
 	SinceGuarantee int32                `json:"since_guarantee"`
 	Timestamp      int64                `json:"timestamp"`
 	Request        *pb.CSWarriorRecruit `json:"request,omitempty"`
@@ -144,22 +147,26 @@ type EquipmentStarReceipt struct {
 	Response  *pb.SCEquipStar `json:"response"`
 }
 type FieldState struct {
-	Scene       string                     `json:"scene"`
-	Monsters    []*pb.SideMonster          `json:"monsters"`
-	RespawnAt   map[string]int64           `json:"respawn_at"`
-	RewardDay   string                     `json:"reward_day"`
-	RewardKills int32                      `json:"reward_kills"`
-	Side        *pb.PlayerSide             `json:"side"`
-	Fight       *FieldFight                `json:"fight,omitempty"`
-	Areas       map[string]*FieldAreaState `json:"areas,omitempty"`
+	Scene       string                        `json:"scene"`
+	Monsters    []*pb.SideMonster             `json:"monsters"`
+	Bosses      []*pb.SideBoss                `json:"bosses,omitempty"`
+	BossHP      map[string]map[string]float64 `json:"boss_hp,omitempty"`
+	RespawnAt   map[string]int64              `json:"respawn_at"`
+	RewardDay   string                        `json:"reward_day"`
+	RewardKills int32                         `json:"reward_kills"`
+	Side        *pb.PlayerSide                `json:"side"`
+	Fight       *FieldFight                   `json:"fight,omitempty"`
+	Areas       map[string]*FieldAreaState    `json:"areas,omitempty"`
 }
 
 // FieldAreaState preserves local monsters and their respawn deadlines when
 // changing maps. HP, fatigue and daily rewards remain on the shared FieldState.
 type FieldAreaState struct {
-	Monsters  []*pb.SideMonster `json:"monsters"`
-	RespawnAt map[string]int64  `json:"respawn_at"`
-	Fight     *FieldFight       `json:"fight,omitempty"`
+	Monsters  []*pb.SideMonster             `json:"monsters"`
+	Bosses    []*pb.SideBoss                `json:"bosses,omitempty"`
+	BossHP    map[string]map[string]float64 `json:"boss_hp,omitempty"`
+	RespawnAt map[string]int64              `json:"respawn_at"`
+	Fight     *FieldFight                   `json:"fight,omitempty"`
 }
 type FieldFight struct {
 	StartedAt   int64                   `json:"started_at"`
@@ -167,4 +174,13 @@ type FieldFight struct {
 	Start       *pb.SCSidePveFightStart `json:"start"`
 	Result      *pb.SCSidePveFightEnd   `json:"result,omitempty"`
 	Settled     bool                    `json:"settled"`
+	// 普通野外首领复用同一 FieldFight 占用；小怪与首领互斥且共享断线恢复门卫。
+	BossUUID       string                      `json:"boss_uuid,omitempty"`
+	BossLeaderGUID string                      `json:"boss_leader_guid,omitempty"`
+	BossStart      *pb.SCSidePveBossFightStart `json:"boss_start,omitempty"`
+	BossResult     *pb.SCSidePveBossFightEnd   `json:"boss_result,omitempty"`
+	BossInput      *FrozenBattleInput          `json:"boss_input,omitempty"`
+	BossReward     string                      `json:"boss_reward,omitempty"`
+	BossKill       string                      `json:"boss_kill,omitempty"`
+	BossCooldownMS int64                       `json:"boss_cooldown_ms,omitempty"`
 }

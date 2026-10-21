@@ -23,7 +23,7 @@ func (s *GameService) InitializeP2(ctx context.Context) error {
 	if err := db.GetIns().WithContext(ctx).AutoMigrate(&db.KingRecruitActivitySnapshot{}, &db.KingRecruitRules{}, &db.KingRecruitState{}, &db.RedP2Receipt{}, &db.RedP2Exchange{}, &db.RedP2ExchangeState{}, &db.RedP2BoxReward{}, &db.TurntableGlobal{}, &db.TurntableRules{}, &db.TurntableState{}, &db.TurntableRecord{}); err != nil {
 		return err
 	}
-	return db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	if err := db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := ServerGameClockGuardTransaction(tx); err != nil {
 			return err
 		}
@@ -81,7 +81,11 @@ func (s *GameService) InitializeP2(ctx context.Context) error {
 			}
 		}
 		return s.initializeRedWheel(tx, zone)
-	})
+	}); err != nil {
+		return err
+	}
+	// P2规则与recruit_3此时已建立，按启动顺序在同一入口幂等补齐全局运行默认值。
+	return s.InitializeRecruitRuntime(ctx)
 }
 
 // redP2Mutation 在玩家锁内完成扣费、奖励、原始响应及回执，重放不会重复生成实例。
@@ -218,7 +222,17 @@ func (s *GameService) kingConfiguration(tx *gorm.DB, now time.Time) (*db.KingRec
 	} else if err := tx.First(&rules, 1).Error; err != nil {
 		return nil, 0, 0, err
 	}
-	if rules.DailyLimit != 50 || rules.LuckLimit != 500 || rules.LuckPerDraw != 10 || rules.RotationMillis != 172800000 {
+	override, err := s.recruitRuntimeRule(tx, constUtil.RecruitRuntimeKindKing)
+	if err != nil {
+		return nil, 0, 0, err
+	}
+	if override != nil {
+		// 运行覆盖只替换本次规则副本的每日次数，其余原客户端固定规则仍校验。
+		if rules.LuckLimit != 500 || rules.LuckPerDraw != 10 || rules.RotationMillis != 172800000 {
+			return nil, 0, 0, errors.New("王者运营规则与原客户端不匹配")
+		}
+		rules.DailyLimit = override.DailyLimit
+	} else if rules.DailyLimit != 50 || rules.LuckLimit != 500 || rules.LuckPerDraw != 10 || rules.RotationMillis != 172800000 {
 		return nil, 0, 0, errors.New("王者运营规则与原客户端不匹配")
 	}
 	if world, _ := tx.Statement.Context.Value(kingRecruitWorldScopeKey{}).(int64); world > 0 && world <= 3 {

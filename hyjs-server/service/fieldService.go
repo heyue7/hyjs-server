@@ -159,13 +159,13 @@ func (s *GameService) fieldSelectScene(g *model.GameState, scene string) error {
 		f.Areas = map[string]*model.FieldAreaState{}
 	}
 	if s.fieldSceneRow(f.Scene) != nil {
-		f.Areas[f.Scene] = &model.FieldAreaState{Monsters: f.Monsters, RespawnAt: f.RespawnAt, Fight: f.Fight}
+		f.Areas[f.Scene] = &model.FieldAreaState{Monsters: f.Monsters, Bosses: f.Bosses, BossHP: f.BossHP, RespawnAt: f.RespawnAt, Fight: f.Fight}
 	}
 	area := f.Areas[scene]
 	if area == nil {
 		area = &model.FieldAreaState{RespawnAt: map[string]int64{}}
 	}
-	f.Scene, f.Monsters, f.RespawnAt, f.Fight = scene, area.Monsters, area.RespawnAt, area.Fight
+	f.Scene, f.Monsters, f.Bosses, f.BossHP, f.RespawnAt, f.Fight = scene, area.Monsters, area.Bosses, area.BossHP, area.RespawnAt, area.Fight
 	delete(f.Areas, scene)
 	return nil
 }
@@ -220,7 +220,15 @@ func (s *GameService) refreshField(id int64, g *model.GameState) error {
 		version, _ := strconv.ParseInt(revision[:15], 16, 64)
 		if f.RespawnAt["__admin_revision"] != version {
 			f.Monsters = nil
-			f.RespawnAt = map[string]int64{"__admin_revision": version}
+			// Monster configuration revisions must preserve an independently
+			// defeated boss's original respawn deadline.
+			deadlines := map[string]int64{"__admin_revision": version}
+			for _, boss := range f.Bosses {
+				if due := f.RespawnAt[boss.GetUuid()]; due > 0 {
+					deadlines[boss.GetUuid()] = due
+				}
+			}
+			f.RespawnAt = deadlines
 		}
 	}
 	if len(f.Monsters) == 0 {
@@ -243,6 +251,7 @@ func (s *GameService) refreshField(id int64, g *model.GameState) error {
 		}
 		if now-f.Fight.StartedAt >= minutes*60*1000 {
 			// 超时仅释放战斗占用，旧 fightId 失效且不会产生战斗奖励。
+			releaseFieldBossFight(g)
 			if monster := fieldFind(g, f.Fight.MonsterUUID); monster != nil {
 				monster.State = proto.Int32(1)
 			}
@@ -262,7 +271,7 @@ func (s *GameService) refreshField(id int64, g *model.GameState) error {
 			f.Monsters[i] = replacement
 		}
 	}
-	return nil
+	return s.refreshFieldBosses(f, row)
 }
 
 func (s *GameService) fieldTransfer(ctx context.Context, id int64, b *pb.CSTransferScene) ([]proto.Message, error) {
@@ -412,6 +421,7 @@ func (s *GameService) fieldScene(ctx context.Context, id int64, login bool) ([]p
 			// 原客户端重连会重建野外房间，不会重放正在加载的小怪战斗。
 			// 释放未结算占用，保留战前HP/怒气/疲劳与奖励计数，旧fightId随之失效。
 			if login && g.Field.Fight != nil && !g.Field.Fight.Settled {
+				releaseFieldBossFight(g)
 				if monster := fieldFind(g, g.Field.Fight.MonsterUUID); monster != nil {
 					monster.State = proto.Int32(1)
 				}
@@ -460,6 +470,7 @@ func (s *GameService) fieldScene(ctx context.Context, id int64, login bool) ([]p
 		}
 		if isField {
 			messages = append(messages, &pb.SCSideMonster{Monsters: g.Field.Monsters}, &pb.SCFieldPlayerState{Player: []*pb.PlayerSide{side}})
+			messages = append(messages, s.fieldBossProjection(g)...)
 			boss, err := s.p12WorldBossFieldProjection(tx, g.Position.GetScene(), time.Now())
 			if err != nil {
 				return err
@@ -554,6 +565,7 @@ func (s *GameService) fieldHeartbeat(ctx context.Context, id int64) ([]proto.Mes
 		if before.String() != after.String() {
 			messages = append(messages, &pb.SCSideMonster{Monsters: g.Field.Monsters}, &pb.SCFieldPlayerState{Player: []*pb.PlayerSide{g.Field.Side}})
 		}
+		messages = append(messages, s.fieldBossProjection(g)...)
 		boss, err := s.p12WorldBossFieldProjection(tx, g.Position.GetScene(), time.Now())
 		if err != nil {
 			return err
@@ -578,6 +590,9 @@ func (s *GameService) fieldFightStart(ctx context.Context, id int64, b *pb.CSSid
 		}
 		f := g.Field
 		if f.Fight != nil && !f.Fight.Settled {
+			if f.Fight.BossStart != nil {
+				return errors.New("Another field boss battle is active")
+			}
 			if f.Fight.MonsterUUID != b.GetMonsterId() {
 				return errors.New("Another field battle is active")
 			}
@@ -760,6 +775,9 @@ func (s *GameService) fieldFightEnd(ctx context.Context, id int64, b *pb.CSSideP
 		}
 		if g.Field.Fight == nil || g.Field.Fight.Start.GetFightId() != b.GetFightId() {
 			return errors.New("Unknown field battle")
+		}
+		if g.Field.Fight.BossStart != nil {
+			return errors.New("Active field boss must be settled through boss endpoint")
 		}
 		f := g.Field
 		fight := f.Fight

@@ -85,7 +85,7 @@ func TestAdminKingRecruitScheduledNativeConsumersAndCold(t *testing.T) {
 	definition := adminKingDefinition(t, f, actor, form)
 	slot := reusePublish(t, f, actor, definition, 1, 1, "calendar")
 	info := adminKingInfo(t, f, bound)
-	if info.GetOn() != 1 || len(info.GetRewardList()) != 1 || info.GetLeftTimes() != 50 {
+	if info.GetOn() != 1 || len(info.GetRewardList()) != 1 || info.GetNum() != 50 || info.GetLeftTimes() != 9 {
 		t.Fatal("new native king header did not use scheduled pool", info)
 	}
 	preview, err := f.s.kingRecruitPreview(bound, f.id, &pb.CSWarriorRecruitGetPreview{CostType: proto.Int32(3)})
@@ -127,8 +127,8 @@ func TestAdminKingRecruitScheduledNativeConsumersAndCold(t *testing.T) {
 	}
 	reuseToggle(t, f, actor, slot.ID, true)
 	reopened := adminKingInfo(t, f, bound)
-	if reopened.GetLeftTimes() != 49 || reopened.GetLuck() != 10 {
-		t.Fatal("stop/start reset daily count or luck", reopened)
+	if reopened.GetNum() != 49 || reopened.GetLeftTimes() != 9 || reopened.GetLuck() != 10 {
+		t.Fatal("stop/start reset daily count, pity or luck", reopened)
 	}
 	f.restart(t)
 	bound = serverClockBindTest(t, f, f.id)
@@ -178,7 +178,7 @@ func TestAdminKingRecruitOnceRepeatOwnershipAndCounters(t *testing.T) {
 				t.Fatal(err)
 			}
 			info = adminKingInfo(t, f, bound)
-			if info.GetLuck() != wantLuck+10 || info.GetLeftTimes() != 49 {
+			if info.GetLuck() != wantLuck+10 || info.GetNum() != 49 || info.GetLeftTimes() != 9 {
 				t.Fatal("repeat date broke native global accounting", info)
 			}
 		})

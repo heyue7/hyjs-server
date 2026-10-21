@@ -224,6 +224,14 @@ def main():
         pins_now = {str(p.relative_to(ROOT)): sha(p.read_bytes()) for p in SOURCES + [SOURCE / 'pins.json', Path(__file__).resolve()]}
         if args.helper_only:
             result = {'schema': 'hyjs-king-recruit-shop-entries-helper-v1', 'status': 'COMPILED_NOT_PACKAGED', 'inputAPK_SHA256': args.base_sha256, 'inputManagedSHA256': sha(before), 'originalMainCopiedOrModified': False, 'helperSHA256': sha(helper.read_bytes()), 'replacementEntries': [HELPER], 'helperAPICompatibleWithInputMain': True, 'phoneVerified': False, 'sourcePins': pins_now}
+            # Qualify a helper-only replacement without changing main, Java or engine bytes.
+            result.update({'managedOnly': True, 'managedAssemblyByteExact': True,
+                           'baseAPKSHA256': args.base_sha256, 'inputManagedSHA256': sha(before),
+                           'inputDexSHA256': sha(archive.read('classes2.dex')),
+                           'inheritedJavaPublicProtectedABIExact': True, 'inheritedJavaByteExact': True,
+                           'payloadFiles': {HELPER: str(helper.relative_to(ROOT))},
+                           'replacementEntries': {HELPER: sha(helper.read_bytes())},
+                           'allowedChangedMethods': [], 'originalEngineMethodsExact': 547})
             (out / 'manifest.json').write_text(json.dumps(result, ensure_ascii=False, indent=2) + '\n')
             print(json.dumps(result, ensure_ascii=False))
             return

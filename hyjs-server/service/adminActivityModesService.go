@@ -109,7 +109,7 @@ func (s *GameService) AdminActivityModes() []model.AdminActivityMode {
 		}
 		if d.mode == "king-recruit" {
 			mode.DefaultForm.Options.KingWorld = 1
-			mode.FixedValues = map[string]int64{"dayLimit": 50, "luckyGoal": 500, "luckyPerDraw": 10, "freeHours": 48, "guaranteeEvery": 10}
+			mode.FixedValues = map[string]int64{"luckyGoal": 500, "luckyPerDraw": 10, "freeHours": 48}
 			mode.Notes = "各世界可独立排期并同时开放，玩家选择当前开放世界；沿用原价格，日限、保底与幸运进度跨世界保留。未排期前沿用现有常驻池，首次排期后由本服日历控制。"
 		}
 		if d.mode == "power-race" {

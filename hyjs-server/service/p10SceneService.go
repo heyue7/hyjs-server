@@ -291,7 +291,7 @@ func (s *GameService) AfterP10SceneRequest(ctx context.Context, id int64, reques
 	switch request.(type) {
 	case *pb.CSMove:
 		_ = s.SyncP10Scene(ctx, id, true)
-	case *pb.CSCurrentPosition, *pb.CSLoginScene, *pb.CSTransferScene, *pb.CSCopyEnter, *pb.CSCopyLeave, *pb.CSSidePveFightStart, *pb.CSSidePveFightEnd, *pb.CSPingTcp, *pb.CSFormationOn, *pb.CSFormationOff, *pb.CSFormationExChange:
+	case *pb.CSCurrentPosition, *pb.CSLoginScene, *pb.CSTransferScene, *pb.CSCopyEnter, *pb.CSCopyLeave, *pb.CSSidePveFightStart, *pb.CSSidePveFightEnd, *pb.CSSidePveBossFightStart, *pb.CSSidePveBossFightEnd, *pb.CSPingTcp, *pb.CSFormationOn, *pb.CSFormationOff, *pb.CSFormationExChange:
 		_ = s.SyncP10Scene(ctx, id, false)
 	}
 }

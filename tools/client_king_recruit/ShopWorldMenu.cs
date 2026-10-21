@@ -148,6 +148,8 @@ namespace HYJS.KingRecruit
 
         void OnEnable()
         {
+            // A reopened shop refreshes live limits while keeping the accepted world.
+            nextCatalog = 0f;
             if (shop != null) Apply();
         }
 
@@ -181,7 +183,7 @@ namespace HYJS.KingRecruit
             if (buttons == null || !buttons.ContainsKey(ShopType.KingsRecruit)) return;
             if (template == null || template.gameObject != buttons[ShopType.KingsRecruit]) { Reapply(shop); return; }
             if (DrawInFlight && Time.realtimeSinceStartup >= DrawDeadline) { DrawInFlight = false; Notice = "抽卡结果待确认，请重新打开王者招募"; }
-            if (!catalogLoaded && !loading && Time.realtimeSinceStartup >= nextCatalog) StartCoroutine(RefreshCatalog());
+            if (!loading && !Selecting && !DrawInFlight && Time.realtimeSinceStartup >= nextCatalog) StartCoroutine(RefreshCatalog());
             if (catalogLoaded) Highlight();
         }
 
@@ -260,6 +262,7 @@ namespace HYJS.KingRecruit
             float deadline = Time.realtimeSinceStartup + 15f;
             while (!request.isDone && Time.realtimeSinceStartup < deadline) yield return null;
             bool success = false;
+            bool rulesChanged = false;
             try
             {
                 if (request.isDone && String.IsNullOrEmpty(request.error) && OwnerCurrent() && Visible())
@@ -268,6 +271,7 @@ namespace HYJS.KingRecruit
                     if ((int)response["code"] == 0)
                     {
                         JsonData data = response["data"];
+                        rulesChanged = ApplyRecruitRules(data);
                         Version = (string)data["version"];
                         SelectedPool = (string)data["selectedPoolId"];
                         worlds.Clear();
@@ -293,6 +297,7 @@ namespace HYJS.KingRecruit
             if (!success) { Notice = "世界加载失败，点击重试"; yield break; }
             Notice = "";
             Apply();
+            if (rulesChanged) RefreshVisibleRecruit();
         }
 
         IEnumerator Select(int space)
@@ -316,6 +321,7 @@ namespace HYJS.KingRecruit
             float deadline = Time.realtimeSinceStartup + 15f;
             while (!request.isDone && Time.realtimeSinceStartup < deadline) yield return null;
             bool success = false;
+            bool rulesChanged = false;
             try
             {
                 if (request.isDone && String.IsNullOrEmpty(request.error) && OwnerCurrent() && Visible())
@@ -324,6 +330,7 @@ namespace HYJS.KingRecruit
                     if ((int)response["code"] == 0)
                     {
                         JsonData data = response["data"];
+                        rulesChanged = ApplyRecruitRules(data);
                         SelectedPool = (string)data["selectedPoolId"];
                         string version = (string)data["version"];
                         if (!String.IsNullOrEmpty(version)) Version = version;
@@ -342,6 +349,44 @@ namespace HYJS.KingRecruit
             Apply();
             // Only after the server accepted the world does the original tab reopen with the same king content.
             shop.OnTabBtn(ShopType.KingsRecruit);
+        }
+
+        // Prices and free cooldowns remain original. Only these server-owned
+        // limits replace the old dictionary defaults, after validating both rows.
+        static bool ApplyRecruitRules(JsonData data)
+        {
+            if (!((IDictionary)data).Contains("recruitRules")) return false;
+            JsonData rules = data["recruitRules"];
+            if (rules == null || !rules.IsArray) return false;
+            int kingLimit = 0, kingPity = 0, orangePity = 0;
+            bool kingSeen = false, orangeSeen = false;
+            foreach (JsonData row in rules)
+            {
+                int kind = (int)row["kind"];
+                int limit = (int)row["dailyLimit"];
+                int pity = (int)row["guaranteeEvery"];
+                if (pity < 1 || pity > 10000 || limit < 0 || limit > 100000) return false;
+                if (kind == 2 && !orangeSeen) { orangeSeen = true; orangePity = pity; }
+                else if (kind == 3 && !kingSeen && limit > 0) { kingSeen = true; kingLimit = limit; kingPity = pity; }
+                else return false;
+            }
+            if (!kingSeen || !orangeSeen) return false;
+            Dict.DataModel.TableGameConfigure config = Dict.DictDataManager.Instance.tableGameConfigureDao.currentData;
+            if (config == null) return false;
+            bool changed = config.WarriorRecruitCostType3MaxTimes != kingLimit ||
+                config.WarriorRecruitCostType3Must != kingPity || config.WarriorRecruitCostType2Must != orangePity;
+            config.WarriorRecruitCostType3MaxTimes = kingLimit;
+            config.WarriorRecruitCostType3Must = kingPity;
+            config.WarriorRecruitCostType2Must = orangePity;
+            return changed;
+        }
+
+        void RefreshVisibleRecruit()
+        {
+            if (shop == null || !Visible() || DrawInFlight || Selecting) return;
+            foreach (TabKingsRecruit tab in shop.GetComponentsInChildren<TabKingsRecruit>())
+                if (tab.backGround != null && tab.backGround.enabled) tab.UpdateAll(true);
+            foreach (TabRecruit tab in shop.GetComponentsInChildren<TabRecruit>()) tab.UpdateAll();
         }
 
         void Apply()

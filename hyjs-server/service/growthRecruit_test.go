@@ -230,11 +230,23 @@ func TestGrowthRecruitKingDailyCapSurvivesCalendarRevisit(t *testing.T) {
 		t.Fatal(err)
 	}
 	request := &pb.CSWarriorRecruit{CostType: proto.Int32(3), NumType: proto.Int32(1), Free: proto.Int32(0)}
-	if _, err := f.s.warriorRecruit(base, f.id, request, 8201); err != nil {
+	awarded, err := f.s.warriorRecruit(base, f.id, request, 8201)
+	if err != nil {
 		t.Fatal(err)
 	}
-	if growthRecruitInfo(t, f, base, 3).GetLeftTimes() != 0 || growthRecruitInfo(t, f, next, 3).GetLeftTimes() != 50 || growthRecruitInfo(t, f, base, 3).GetLeftTimes() != 0 {
-		t.Fatal("king calendar recreated original daily attempts")
+	// A naturally drawn red resets pity immediately; an orange advances one draw.
+	wantPity := int32(8)
+	if f.s.table("Hero", "id", awarded[0].(*pb.SCWarriorRecruit).GetGet().GetWars()[0].GetId())["quality"] == "23" {
+		wantPity = 9
+	}
+	if baseInfo := growthRecruitInfo(t, f, base, 3); baseInfo.GetNum() != 0 || baseInfo.GetLeftTimes() != wantPity {
+		t.Fatal("king calendar lost daily attempts or pity", baseInfo)
+	}
+	if nextInfo := growthRecruitInfo(t, f, next, 3); nextInfo.GetNum() != 50 || nextInfo.GetLeftTimes() != wantPity {
+		t.Fatal("king calendar recreated original daily attempts or reset pity", nextInfo)
+	}
+	if baseInfo := growthRecruitInfo(t, f, base, 3); baseInfo.GetNum() != 0 || baseInfo.GetLeftTimes() != wantPity {
+		t.Fatal("king calendar rewind changed daily attempts or pity", baseInfo)
 	}
 	before, beforeGame := f.profile(t)
 	if _, err := f.s.warriorRecruit(base, f.id, request, 8202); err == nil {

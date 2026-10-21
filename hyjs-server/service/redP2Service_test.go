@@ -87,7 +87,7 @@ func TestP2KingIdentityAndRotation(t *testing.T) {
 		t.Fatal(all)
 	}
 	king := all[2]
-	if king.GetOn() != 1 || king.GetLeftTimes() != 50 || king.GetLuck() != 0 || !king.GetFree() {
+	if king.GetOn() != 1 || king.GetNum() != 50 || king.GetLeftTimes() != 9 || king.GetLuck() != 0 || !king.GetFree() {
 		t.Fatal(king)
 	}
 	preview, e := s.kingRecruitPreview(ctx, id, &pb.CSWarriorRecruitGetPreview{CostType: proto.Int32(3)})
@@ -194,7 +194,7 @@ func TestP2KingInvalidSQLRollsBack(t *testing.T) {
 	id := dailyCopyTestPlayer(t, ctx, "p2-config", 20)
 	p2Funding(t, s, ctx, id, "diamond,10000")
 	p, g := p2Profile(t, id)
-	for _, change := range []map[string]any{{"single_cost": "diamond,1"}, {"min_level": 1}, {"guarantee_every": 1}, {"free_seconds": 1}} {
+	for _, change := range []map[string]any{{"single_cost": "diamond,1"}, {"min_level": 1}, {"free_seconds": 1}} {
 		var original db.GameplayPool
 		db.GetIns().First(&original, "id=?", "recruit_3")
 		db.GetIns().Model(&original).Updates(change)
@@ -203,10 +203,12 @@ func TestP2KingInvalidSQLRollsBack(t *testing.T) {
 		}
 		db.GetIns().Save(&original)
 	}
-	db.GetIns().Model(&db.KingRecruitRules{}).Where("id=1").Update("daily_limit", 1000)
+	// 运行表非法时同样在扣费前失败；恢复后原回执与进度保持。
+	db.GetIns().Model(&db.RecruitRuntimeRule{}).Where("kind=?", 3).Update("guarantee_every", 0)
 	if _, e := s.warriorRecruit(ctx, id, p2Recruit(1, 0), 1); e == nil {
 		t.Fatal("daily mismatch")
 	}
+	db.GetIns().Model(&db.RecruitRuntimeRule{}).Where("kind=?", 3).Update("guarantee_every", 10)
 	now, game := p2Profile(t, id)
 	if !proto.Equal(p, now) || len(game.Warriors) != len(g.Warriors) {
 		t.Fatal("failed draw mutated profile")

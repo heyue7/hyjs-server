@@ -3,10 +3,9 @@ package service
 
 import "hyjs-server/constUtil"
 
-// ApplyThreeOrangeSkillFactors corrects only the authored three orange partners before any game requests.
-// The original recovered TSVs remain source evidence; each runtime consumer uses the same 30-row projection.
-func (s *GameService) ApplyThreeOrangeSkillFactors() error {
-	specs := []struct{ id, skill, factor string }{
+// threeOrangeSkillFactorSpecs shares the exact authored projection with source validation.
+func threeOrangeSkillFactorSpecs() []struct{ id, skill, factor string } {
+	return []struct{ id, skill, factor string }{
 		{"1560", "069_1", "33"},
 		{"1561", "069_1", "33"},
 		{"1562", "069_1", "34"},
@@ -38,6 +37,12 @@ func (s *GameService) ApplyThreeOrangeSkillFactors() error {
 		{"1647", "073_2", "25"},
 		{"1648", "073_3", "620"},
 	}
+}
+
+// ApplyThreeOrangeSkillFactors corrects only the authored three orange partners before any game requests.
+// The original recovered TSVs remain source evidence; each runtime consumer uses the same 30-row projection.
+func (s *GameService) ApplyThreeOrangeSkillFactors() error {
+	specs := threeOrangeSkillFactorSpecs()
 	// Validate every original row before changing the startup configuration.
 	for _, spec := range specs {
 		row := s.table("SkillCast", "SkillCastId", spec.id)

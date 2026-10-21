@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, inject, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { api, errorMessage } from '@/service/operations';
 import { shopLabels } from '@/service/management-operations';
@@ -11,6 +11,7 @@ import RewardList from './reward-list.vue';
 const options = defineModel<ActivityGameplayOptions>({ required: true });
 const props = defineProps<{ mode: string; disabled?: boolean; fixedValues?: Record<string, string | number> }>();
 const router = useRouter();
+const openRecruitSettings = inject<(() => Promise<void>) | null>('hyjs:open-recruit-settings', null);
 const shopOptions = Object.entries(shopLabels).map(([value, label]) => ({ value, label }));
 const shopStatus = ref('');
 const shopLoading = ref(false);
@@ -103,7 +104,10 @@ const turntableNumbers = [
       <p v-if="!options.rankPlaces && rankRewards.length" class="ops-inline-note">奖励草稿已保留，当前不发放。</p>
     </template>
     <template v-else-if="mode === 'king-recruit'">
-      <p class="ops-inline-note">各世界可独立排期并同时开放；价格、每日次数和保底沿用原规则。</p>
+      <div class="recruit-settings-note">
+        <p>各世界可独立排期并同时开放；每日次数与保底在招募设置中调整。</p>
+        <NButton v-if="openRecruitSettings" text type="primary" @click="openRecruitSettings()">前往招募设置</NButton>
+      </div>
     </template>
     <template v-else-if="mode === 'shop-window'">
       <NFormItem label="对应商店" :validation-status="shopStatus ? 'warning' : undefined" :feedback="shopStatus || undefined">
@@ -300,3 +304,19 @@ const turntableNumbers = [
     >该模式按奖励与资格中的配置执行，无需额外玩法参数。</p>
   </div>
 </template>
+
+<style scoped>
+.recruit-settings-note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  margin-bottom: 18px;
+  color: rgb(var(--base-text-color) / 0.65);
+  font-size: 13px;
+  line-height: 1.65;
+}
+.recruit-settings-note p {
+  margin: 0;
+}
+</style>

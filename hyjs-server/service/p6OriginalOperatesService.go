@@ -152,7 +152,9 @@ func validateOriginalP6ProtocolInput(input *model.FrozenBattleInput, originalRec
 	// playback/automatic driver behavior; other mode wrappers need their own
 	// original SetData/SetFightEngineData proof before accepting a source record.
 	switch input.BattleType {
-	case 1, 4, 9, 10:
+	case 1, 4, 9, 10, 12:
+		// Original BattleData.SetData(SCSidePveBossFightStart) uses the
+		// same player/monster initialization and type12 attacker record.
 		if input.Monster == nil || input.Defender != nil {
 			return errors.New(constUtil.CombatUnsupported)
 		}

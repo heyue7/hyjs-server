@@ -133,6 +133,17 @@ func growthRecruitState(tx *gorm.DB, id int64, g *model.GameState, kind int32, n
 	return state, nil
 }
 
+// growthRecruitDrawState 单独归档强者招募每日抽数；键与免费次数、王者次数互不影响。
+func growthRecruitDrawState(tx *gorm.DB, id int64, g *model.GameState, kind int32, now time.Time) (*model.RecruitState, error) {
+	state := recruitStoredState(g, kind)
+	used, err := growthRecruitCalendarCount(tx, id, "growth-recruit-draws:"+strconv.FormatInt(int64(kind), 10), state.DrawDay, now, state.Draws)
+	if err != nil {
+		return nil, err
+	}
+	state.DrawDay, state.Draws = p1Day(now), used
+	return state, nil
+}
+
 // growthRecruitKingDay is called after the original king state is loaded. Luck,
 // guarantee and free-cooldown progress keep their original global lifecycle.
 func growthRecruitKingDay(tx *gorm.DB, state *db.KingRecruitState, now time.Time) error {

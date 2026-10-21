@@ -740,6 +740,12 @@ func (s *GameService) dispatch(ctx context.Context, r *model.GamePacket, peer st
 		return s.fieldScene(ctx, row.Id, false)
 	case *pb.CSSideMonsterCheck:
 		return s.fieldMonsterCheck(ctx, row.Id, b)
+	case *pb.CSSideBossCheck:
+		return s.fieldBossCheck(ctx, row.Id, b)
+	case *pb.CSSidePveBossFightStart:
+		return s.fieldBossFightStart(ctx, row.Id, b)
+	case *pb.CSSidePveBossFightEnd:
+		return s.fieldBossFightEnd(ctx, row.Id, b)
 	case *pb.CSSidePveFightStart:
 		return s.fieldFightStart(ctx, row.Id, b)
 	case *pb.CSSidePveFightEnd:

@@ -118,12 +118,17 @@ def emit_server(data):
 package service
 import "hyjs-server/constUtil"
 
+// threeOrangeSkillFactorSpecs shares the exact authored projection with source validation.
+func threeOrangeSkillFactorSpecs() []struct{id,skill,factor string} {
+    return []struct{id,skill,factor string}{
+%s
+    }
+}
+
 // ApplyThreeOrangeSkillFactors corrects only the authored three orange partners before any game requests.
 // The original recovered TSVs remain source evidence; each runtime consumer uses the same 30-row projection.
 func (s *GameService) ApplyThreeOrangeSkillFactors() error {
-    specs:=[]struct{id,skill,factor string}{
-%s
-    }
+    specs:=threeOrangeSkillFactorSpecs()
     // Validate every original row before changing the startup configuration.
     for _,spec:=range specs{
         row:=s.table("SkillCast","SkillCastId",spec.id)

@@ -34,6 +34,9 @@ func TestKingRecruitParallelWorldsNativeSelectionAndCold(t *testing.T) {
 	if err != nil || len(state.Worlds) != 3 {
 		t.Fatal("three simultaneous native worlds", state, err)
 	}
+	if len(state.RecruitRules) != 2 || state.RecruitRules[0].Kind != 2 || state.RecruitRules[0].DailyLimit != 0 || state.RecruitRules[0].GuaranteeEvery != 10 || state.RecruitRules[1].Kind != 3 || state.RecruitRules[1].DailyLimit != 50 || state.RecruitRules[1].GuaranteeEvery != 10 {
+		t.Fatal("world catalogue omitted global recruit rules", state.RecruitRules)
+	}
 	// A legacy balance belongs to the selected SAO world, even if the first operation switches elsewhere.
 	legacy, err := kingState(db.GetIns(), f.id, LocalPlayNow(bound))
 	if err != nil {
@@ -90,7 +93,7 @@ func TestKingRecruitParallelWorldsNativeSelectionAndCold(t *testing.T) {
 		t.Fatal("world switching changed price or duplicated retry")
 	}
 	info := adminKingInfo(t, f, bound)
-	if info.GetLuck() != 10 || info.GetLeftTimes() != 47 {
+	if info.GetLuck() != 10 || info.GetNum() != 47 || info.GetLeftTimes() != 9 {
 		t.Fatal("world lucky balance must stay independent", info)
 	}
 	if _, err = f.s.KingRecruitWorlds(bound, f.id, session, state.SelectedPoolID, "stale"); !errors.Is(err, constUtil.ErrAdminConfigConflict) {
@@ -119,6 +122,12 @@ func TestKingRecruitParallelWorldsNativeSelectionAndCold(t *testing.T) {
 	state, err = f.s.KingRecruitWorlds(bound, f.id, session, "", "")
 	if err != nil || len(state.Worlds) != 2 || adminKingInfo(t, f, bound).GetLuck() != 60 {
 		t.Fatal("cold selection and world luck", err)
+	}
+	// 全局运行规则保存在独立表，切换世界或冷启动后仍返回同一有效值。
+	db.GetIns().Model(&db.RecruitRuntimeRule{}).Where("kind=?", 3).Updates(map[string]any{"daily_limit": 7, "guarantee_every": 4})
+	state, err = f.s.KingRecruitWorlds(bound, f.id, session, "", "")
+	if err != nil || len(state.RecruitRules) != 2 || state.RecruitRules[1].Kind != 3 || state.RecruitRules[1].DailyLimit != 7 || state.RecruitRules[1].GuaranteeEvery != 4 {
+		t.Fatal("world catalogue ignored current global recruit rules", state, err)
 	}
 }
 

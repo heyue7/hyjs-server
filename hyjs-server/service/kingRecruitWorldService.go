@@ -164,6 +164,14 @@ func (s *GameService) KingRecruitWorlds(ctx context.Context, id int64, session [
 			return err
 		}
 		out.Version = adminVersion(candidates)
+		// 运行规则为全局配置，不随当前选区服或所选王者世界分叉。
+		runtimeRules, err := s.effectiveRecruitRuntimeRules(tx)
+		if err != nil {
+			return err
+		}
+		for _, rule := range runtimeRules {
+			out.RecruitRules = append(out.RecruitRules, model.KingRecruitRuntimeRule{Kind: int64(rule.Kind), DailyLimit: int64(rule.DailyLimit), GuaranteeEvery: int64(rule.GuaranteeEvery)})
+		}
 		selected := db.KingRecruitSelection{PlayerID: id}
 		err = tx.First(&selected, "player_id=?", id).Error
 		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
