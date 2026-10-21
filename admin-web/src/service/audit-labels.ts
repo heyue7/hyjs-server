@@ -10,6 +10,7 @@ const actionLabels: Readonly<Record<string, string>> = {
   'account.password.reset': '重置游戏密码',
   'player.create': '新增游戏角色',
   'player.rename': '修改角色名称',
+  'player.level': '编辑角色等级',
   'player.kick': '角色下线',
   'player.clock': '调整角色游戏日期',
   'user.bootstrap': '初始化后台账号',

@@ -224,3 +224,56 @@ func AdminKickGamePlayer(ctx context.Context, p *model.AdminPrincipal, id int64,
 	}
 	return AdminGamePlayer(ctx, id)
 }
+
+// AdminSetGamePlayerLevel 只调整等级和本级经验，同事务同步账号角色索引及审计。
+func AdminSetGamePlayerLevel(ctx context.Context, p *model.AdminPrincipal, id int64, req model.AdminGamePlayerLevelRequest) (*model.AdminGamePlayerDTO, error) {
+	err := db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := ServerGameClockGuardTransaction(tx); err != nil {
+			return err
+		}
+		if err := adminOperationUser(tx, p, true); err != nil {
+			return err
+		}
+		var row db.Profile
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&row, id).Error; err != nil {
+			return err
+		}
+		if err := AdminCheckProfileScope(ctx, row); err != nil {
+			return err
+		}
+		if adminPlayerVersion(row) != req.Version {
+			return constUtil.ErrAdminConfigConflict
+		}
+		// 在原JSON上只更新目标字段，避免重编码或补齐其它存档字段。
+		if row.Player == nil || row.Game == nil {
+			return constUtil.ErrAdminInput
+		}
+		var player map[string]json.RawMessage
+		if err := json.Unmarshal([]byte(*row.Player), &player); err != nil {
+			return err
+		}
+		before := string(player["level"])
+		if before == strconv.FormatInt(req.Level, 10) {
+			return nil
+		}
+		player["level"] = json.RawMessage(strconv.FormatInt(req.Level, 10))
+		player["exp"] = json.RawMessage("0")
+		encoded, err := json.Marshal(player)
+		if err != nil {
+			return err
+		}
+		if err := tx.Model(&row).Update("player", string(encoded)).Error; err != nil {
+			return err
+		}
+		updated := string(encoded)
+		row.Player = &updated
+		if err := syncGlobalAccountRole(tx, &row); err != nil {
+			return err
+		}
+		return adminAudit(tx, p, "player.level", strconv.FormatInt(id, 10), "server="+strconv.FormatInt(AdminProfileServerID(row), 10)+"; level "+before+" -> "+strconv.FormatInt(req.Level, 10)+"; "+req.Reason)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return AdminGamePlayer(ctx, id)
+}

@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"strconv"
 	"strings"
 	"unicode"
 	"unicode/utf16"
@@ -17,7 +18,45 @@ func RegisterAdminGamePlayerRoutes(a *gin.RouterGroup) {
 	a.GET("/game-players", AdminGamePlayersHandler)
 	a.GET("/game-players/:id", AdminGamePlayerHandler)
 	a.PUT("/game-players/:id/name", AdminGamePlayerNameHandler)
+	a.PUT("/game-players/:id/level", AdminGamePlayerLevelHandler)
 	a.POST("/game-players/:id/kick", AdminGamePlayerKickHandler)
+}
+
+// AdminGamePlayerLevelHandler 按原等级表校验并保存运营等级调整。
+// @Summary 编辑角色等级
+// @Description 等级变化时本级经验归零，保留其余资源和进度，拒绝过期版本及跨区操作
+// @Tags Admin
+// @Accept json
+// @Produce json
+// @Param id path integer true "角色ID"
+// @Param body body model.AdminGamePlayerLevelRequest true "版本、等级及原因"
+// @Success 200 {object} model.AdminGamePlayerDTO
+// @Router /admin/api/game-players/{id}/level [put]
+func AdminGamePlayerLevelHandler(c *gin.Context) {
+	id, ok := adminID(c)
+	var req model.AdminGamePlayerLevelRequest
+	if !ok || id < 1 || c.ShouldBindJSON(&req) != nil || len(req.Version) != 64 || req.Level < 1 || req.Level > 2147483647 || strings.TrimSpace(req.Reason) == "" || len(req.Reason) > 1000 {
+		adminError(c, constUtil.ErrAdminInput)
+		return
+	}
+	validLevel := false
+	for _, row := range gameService.Tables["UserExp"] {
+		if row["level"] == strconv.FormatInt(req.Level, 10) {
+			validLevel = true
+			break
+		}
+	}
+	if !validLevel {
+		adminError(c, constUtil.ErrAdminInput)
+		return
+	}
+	req.Reason = strings.TrimSpace(req.Reason)
+	out, err := service.AdminSetGamePlayerLevel(c.Request.Context(), adminPrincipal(c), id, req)
+	if err != nil {
+		adminError(c, err)
+		return
+	}
+	adminSuccess(c, out)
 }
 
 // AdminGamePlayersHandler 按昵称和ID分页检索游戏角色。

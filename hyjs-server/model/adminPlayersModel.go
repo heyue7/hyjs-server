@@ -57,3 +57,13 @@ type AdminGamePlayerKickRequest struct {
 	// Reason 是操作原因，写入审计。
 	Reason string `json:"reason" binding:"required"`
 }
+
+// AdminGamePlayerLevelRequest 按当前版本调整角色等级。
+type AdminGamePlayerLevelRequest struct {
+	// Version 是读取时的存档摘要。
+	Version string `json:"version" binding:"required"`
+	// Level 是原等级表中存在的目标等级，当前范围1至100。
+	Level int64 `json:"level" binding:"required"`
+	// Reason 是记录到审计的操作原因。
+	Reason string `json:"reason" binding:"required"`
+}

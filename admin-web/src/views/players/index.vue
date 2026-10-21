@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { useDraftGuard } from '@/composables/useDraftGuard';
 import { computed, h, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { useWindowSize } from '@vueuse/core';
 import { useRoute, useRouter } from 'vue-router';
 import { NButton, NSpace } from 'naive-ui';
 import type { DataTableColumns } from 'naive-ui';
-import { api, errorMessage, formatTime, json } from '@/service/operations';
+import { ApiError, api, errorMessage, formatTime, json } from '@/service/operations';
 import type { Item, ItemsResponse } from '@/service/operations';
 import type { GamePlayer, GamePlayerDetail, InventoryItem } from '@/service/player-operations';
 import { useOperations } from '@/composables/useOperations';
@@ -60,13 +61,15 @@ const activeTab = ref('overview');
 const inventoryQ = ref('');
 const catalogue = ref<Record<string, Item>>({});
 const inventoryPage = ref(1);
-const action = ref<'name' | 'kick' | ''>('');
-const actionTarget = ref<Pick<GamePlayerDetail, 'id' | 'name' | 'version'> | null>(null);
+const action = ref<'name' | 'level' | 'kick' | ''>('');
+const actionTarget = ref<Pick<GamePlayerDetail, 'id' | 'name' | 'level' | 'version'> | null>(null);
 const actionReason = ref('');
 const newName = ref('');
+const newLevel = ref<number | null>(null);
 const actionError = ref('');
+const actionConflict = ref(false);
 const acting = ref(false);
-const actionGuard = useDraftGuard({ active: () => Boolean(action.value), value: () => ({ name: newName.value, reason: actionReason.value }), busy: () => acting.value, writable: () => canWrite.value, label: '玩家修改', close: () => { action.value = ''; } });
+const actionGuard = useDraftGuard({ active: () => Boolean(action.value), value: () => ({ name: newName.value, level: newLevel.value, reason: actionReason.value }), busy: () => acting.value, writable: () => canWrite.value, label: '玩家修改', close: () => { action.value = ''; } });
 let detailRequest = 0;
 const inventoryRows = computed(
   () =>
@@ -130,14 +133,31 @@ async function loadDetail(id: number) {
   }
 }
 
-function edit(kind: 'name' | 'kick') {
+async function editPlayer(player: GamePlayer) {
+  await show(player);
+  if (open.value && detail.value?.id === player.id) edit('level');
+}
+function edit(kind: 'name' | 'level' | 'kick') {
   if (!detail.value) return;
-  actionTarget.value = { id: detail.value.id, name: detail.value.name, version: detail.value.version };
+  actionTarget.value = { id: detail.value.id, name: detail.value.name, level: detail.value.level, version: detail.value.version };
   action.value = kind;
   actionReason.value = '';
   newName.value = detail.value?.name || '';
+  newLevel.value = detail.value.level;
   actionError.value = '';
+  actionConflict.value = false;
   actionGuard.capture();
+}
+async function refreshAction() {
+  const target = actionTarget.value;
+  if (!target || acting.value) return;
+  await loadDetail(target.id);
+  if (detail.value?.id === target.id && !detailError.value) {
+    actionTarget.value = { id: detail.value.id, name: detail.value.name, level: detail.value.level, version: detail.value.version };
+    actionError.value = '';
+    actionConflict.value = false;
+    window.$message?.info('已读取最新数据，请核对后保存');
+  } else actionError.value = detailError.value;
 }
 async function submitAction() {
   if (!actionTarget.value || !canWrite.value || acting.value) return;
@@ -149,25 +169,32 @@ async function submitAction() {
     actionError.value = '请填写角色名称';
     return;
   }
+  if (action.value === 'level' && (!Number.isInteger(newLevel.value) || newLevel.value! < 1 || newLevel.value! > 100)) {
+    actionError.value = '请输入 1～100 的整数等级';
+    return;
+  }
   acting.value = true;
   actionError.value = '';
+  actionConflict.value = false;
   try {
     const target = actionTarget.value;
     const path = `/game-players/${target.id}/${action.value}`;
     const result = await api<GamePlayerDetail>(
       scope.serverQuery(path),
-      json(action.value === 'name' ? 'PUT' : 'POST', {
+      json(action.value === 'kick' ? 'POST' : 'PUT', {
         version: target.version,
         name: newName.value.trim(),
+        level: newLevel.value,
         reason: actionReason.value.trim()
       })
     );
     if (detail.value?.id === target.id) detail.value = result;
-    window.$message?.success(action.value === 'name' ? '角色名称已更新' : '角色已下线');
+    window.$message?.success(action.value === 'name' ? '角色名称已更新' : action.value === 'level' ? '角色等级已更新，重新登录游戏后可见' : '角色已下线');
     action.value = '';
     await load();
   } catch (e) {
-    actionError.value = errorMessage(e);
+    actionConflict.value = e instanceof ApiError && e.status === 409;
+    actionError.value = actionConflict.value ? '角色数据已更新，请读取最新数据后再次保存' : errorMessage(e);
   } finally {
     acting.value = false;
   }
@@ -190,7 +217,8 @@ const countNames: Record<string, string> = {
   gems: '宝石',
   cooking: '料理'
 };
-const columns: DataTableColumns<GamePlayer> = [
+const { width: viewportWidth } = useWindowSize();
+const columns = computed<DataTableColumns<GamePlayer>>(() => [
   {
     title: '游戏角色',
     key: 'name',
@@ -210,13 +238,15 @@ const columns: DataTableColumns<GamePlayer> = [
   {
     title: '操作',
     key: 'action',
-    width: 220,
+    width: viewportWidth.value < 768 ? 150 : 290,
+    fixed: 'right',
     render: row => h(NSpace, { size: 6 }, () => [
       h(NButton, { size: 'small', secondary: true, onClick: () => show(row) }, () => '查看角色'),
+      ...(canWrite.value ? [h(NButton, { size: 'small', type: 'primary', secondary: true, disabled: detailLoading.value, onClick: () => editPlayer(row) }, () => '编辑')] : []),
       h(NButton, { size: 'small', onClick: () => openWallet(row) }, () => '蓝绿钱包')
     ])
   }
-];
+]);
 watch(activeTab, value => {
   if (value === 'inventory' && detail.value)
     loadCatalogue(detail.value.inventory).catch(e => {
@@ -234,6 +264,7 @@ watch(() => route.query.wallet, requestedWallet);
 watch(() => scope.serverId, () => {
   detailRequest += 1;
   open.value = false; detail.value = null; walletTarget.value = null;
+  action.value = ''; actionTarget.value = null;
   page.value = 1; load();
 });
 </script>
@@ -266,7 +297,7 @@ watch(() => scope.serverId, () => {
         :loading="loading"
         :row-key="(row: GamePlayer) => row.id"
         :bordered="false"
-        :scroll-x="900"
+        :scroll-x="1020"
       />
       <div class="ops-pagination">
         <NPagination
@@ -300,6 +331,7 @@ watch(() => scope.serverId, () => {
                 <NButton :loading="detailLoading" @click="loadDetail(detail.id)">刷新</NButton>
                 <NButton @click="openWallet(detail)">蓝绿钱包</NButton>
                 <NButton v-if="canWrite" @click="edit('name')">修改名称</NButton>
+                <NButton v-if="canWrite" type="primary" secondary @click="edit('level')">编辑</NButton>
                 <NButton v-if="canWrite" @click="edit('kick')">踢下线</NButton>
               </NSpace>
             </div>
@@ -358,31 +390,36 @@ watch(() => scope.serverId, () => {
     <NModal
       :show="Boolean(action)"
       preset="card"
-      :title="action === 'name' ? '修改角色名称' : '踢下线'"
+      :title="action === 'name' ? '修改角色名称' : action === 'level' ? '编辑玩家' : '踢下线'"
       class="ops-modal"
       :mask-closable="!acting"
       :closable="!acting"
       @update:show="!$event && actionGuard.requestClose()"
     >
       <NAlert v-if="actionError" type="error" :title="actionError" class="mb-16px" />
+      <NButton v-if="actionConflict" :disabled="acting" :loading="detailLoading" class="mb-16px" @click="refreshAction">读取最新数据</NButton>
       <div class="grant-object">
         <strong>{{ actionTarget?.name }}</strong>
-        <span class="ops-muted">ID {{ actionTarget?.id }}</span>
+        <span class="ops-muted">{{ scope.currentServer?.name }} · ID {{ actionTarget?.id }}</span>
       </div>
       <NForm label-placement="top" :disabled="acting">
         <NFormItem v-if="action === 'name'" label="新名称" required>
           <NInput v-model:value="newName" :maxlength="40" />
         </NFormItem>
+        <NFormItem v-if="action === 'level'" label="角色等级" required>
+          <NInputNumber v-model:value="newLevel" :min="1" :max="100" :precision="0" :input-props="{ 'aria-label': '角色等级' }" class="w-full" />
+        </NFormItem>
+        <p v-if="action === 'level'" class="ops-muted mb-16px">当前 {{ actionTarget?.level }} 级。等级变化后本级经验归零，重新登录游戏后显示。</p>
         <NFormItem label="操作原因" required>
-          <NInput v-model:value="actionReason" type="textarea" :maxlength="200" />
+          <NInput v-model:value="actionReason" type="textarea" :maxlength="200" :input-props="{ 'aria-label': '操作原因' }" />
         </NFormItem>
       </NForm>
       <p v-if="action === 'kick'" class="ops-muted">将结束该角色当前登录会话，角色存档保留。</p>
       <template #footer>
         <div class="ops-drawer-actions">
           <NButton :disabled="acting" @click="actionGuard.requestClose()">取消</NButton>
-          <NButton type="primary" :loading="acting" @click="submitAction">
-            确认{{ action === 'name' ? '修改' : '下线' }}
+          <NButton type="primary" :loading="acting" :disabled="detailLoading" @click="submitAction">
+            {{ action === 'kick' ? '确认下线' : '保存修改' }}
           </NButton>
         </div>
       </template>
