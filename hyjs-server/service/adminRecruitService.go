@@ -125,3 +125,49 @@ func canonicalRecruitRuntimeItems(items []model.AdminRecruitSetting) ([]model.Ad
 	sort.Slice(out, func(i, j int) bool { return out[i].Kind < out[j].Kind })
 	return out, nil
 }
+
+// adminSaveActivityRecruitSettings 把当前活动的全局招募规则纳入调用者事务。
+// 双行固定顺序加锁并核全局版本；另一个招募类型必须与当前值完全一致。
+func (s *GameService) adminSaveActivityRecruitSettings(tx *gorm.DB, actor *model.AdminPrincipal, kind int32, req *model.AdminRecruitSettingsSaveRequest) error {
+	if req == nil {
+		return nil
+	}
+	if kind != constUtil.RecruitRuntimeKindStrong && kind != constUtil.RecruitRuntimeKindKing {
+		return constUtil.ErrAdminInput
+	}
+	items, err := canonicalRecruitRuntimeItems(req.Items)
+	if err != nil {
+		return err
+	}
+	if len(req.Version) != 64 || strings.TrimSpace(req.Reason) == "" || len(req.Reason) > 1000 {
+		return constUtil.ErrAdminInput
+	}
+	var locked []db.RecruitRuntimeRule
+	if err = tx.Clauses(clause.Locking{Strength: "UPDATE"}).Order("kind").Find(&locked).Error; err != nil {
+		return err
+	}
+	if len(locked) != 2 || locked[0].Kind != constUtil.RecruitRuntimeKindStrong || locked[1].Kind != constUtil.RecruitRuntimeKindKing {
+		return constUtil.ErrAdminConfiguration
+	}
+	current := make([]model.AdminRecruitSetting, 0, len(locked))
+	for _, row := range locked {
+		current = append(current, model.AdminRecruitSetting{Kind: int64(row.Kind), Name: constUtil.RecruitRuntimeName(row.Kind), DailyLimit: int64(row.DailyLimit), GuaranteeEvery: int64(row.GuaranteeEvery)})
+	}
+	if req.Version != adminVersion(current) {
+		return constUtil.ErrAdminConfigConflict
+	}
+	var selected model.AdminRecruitSetting
+	for i, item := range items {
+		if item.Kind != int64(kind) {
+			if item != current[i] {
+				return constUtil.ErrAdminInput
+			}
+			continue
+		}
+		selected = item
+	}
+	if err = tx.Model(&db.RecruitRuntimeRule{}).Where("kind=?", kind).Updates(map[string]any{"daily_limit": selected.DailyLimit, "guarantee_every": selected.GuaranteeEvery}).Error; err != nil {
+		return err
+	}
+	return adminAudit(tx, actor, constUtil.RecruitRuntimeAuditAction, constUtil.RecruitRuntimeAuditTarget, fmt.Sprintf("activity kind=%d daily=%d guarantee=%d; %s", kind, selected.DailyLimit, selected.GuaranteeEvery, strings.TrimSpace(req.Reason)))
+}

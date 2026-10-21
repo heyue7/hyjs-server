@@ -82,6 +82,10 @@ func adminActivityDefinitionWrite(c *gin.Context, update bool) {
 	if update {
 		id = c.Param("id")
 	}
+	if !adminRecruitSettingsValid(req.RecruitSettings) {
+		adminError(c, constUtil.ErrAdminInput)
+		return
+	}
 	out, err := gameService.AdminSaveActivityDefinition(c.Request.Context(), adminPrincipal(c), id, req)
 	if err != nil {
 		adminError(c, err)

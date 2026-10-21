@@ -2,7 +2,7 @@
 import { computed, nextTick, ref, watch } from 'vue';
 import { useWindowSize } from '@vueuse/core';
 
-defineProps<{ title: string; text?: string }>();
+withDefaults(defineProps<{ title: string; text?: string; iconOnly?: boolean }>(), { iconOnly: false });
 const open = ref(false);
 const trigger = ref<{ $el: HTMLButtonElement } | null>(null);
 const content = ref<HTMLElement | null>(null);
@@ -24,15 +24,29 @@ watch(open, async value => {
 <template>
   <NPopover v-if="!compact" v-model:show="open" trigger="click" placement="bottom-start" :show-arrow="false">
     <template #trigger>
-      <NButton ref="trigger" quaternary size="tiny" :aria-label="title" :aria-expanded="open" class="context-help-trigger" @keydown.esc.stop="close">
+      <NButton
+        ref="trigger"
+        quaternary
+        size="tiny"
+        :aria-label="title"
+        :aria-expanded="open"
+        class="context-help-trigger"
+        :class="{ 'context-help-icon-only': iconOnly }"
+        @keydown.esc.stop="close"
+      >
         <template #icon>
-          <svg viewBox="0 0 20 20" width="15" height="15" fill="none" aria-hidden="true">
+          <svg v-if="iconOnly" viewBox="0 0 20 20" width="15" height="15" fill="none" aria-hidden="true">
+            <circle cx="10" cy="10" r="7.5" stroke="currentColor" stroke-width="1.4" />
+            <path d="M10 9v4.6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
+            <circle cx="10" cy="6.6" r=".85" fill="currentColor" />
+          </svg>
+          <svg v-else viewBox="0 0 20 20" width="15" height="15" fill="none" aria-hidden="true">
             <circle cx="10" cy="10" r="7.5" stroke="currentColor" stroke-width="1.4" />
             <path d="M7.9 7.4a2.2 2.2 0 0 1 4.3.6c0 1.6-2.2 1.7-2.2 3.3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
             <circle cx="10" cy="13.8" r=".8" fill="currentColor" />
           </svg>
         </template>
-        说明
+        <template v-if="!iconOnly">说明</template>
       </NButton>
     </template>
     <section ref="content" class="context-help-content" :aria-label="title" tabindex="-1" @keydown.esc.stop="close">
@@ -44,7 +58,26 @@ watch(open, async value => {
     </section>
   </NPopover>
   <template v-else>
-    <NButton ref="trigger" quaternary size="tiny" :aria-label="title" :aria-expanded="open" class="context-help-trigger" @click="open = !open" @keydown.esc.stop="close">说明</NButton>
+    <NButton
+      ref="trigger"
+      quaternary
+      size="tiny"
+      :aria-label="title"
+      :aria-expanded="open"
+      class="context-help-trigger"
+      :class="{ 'context-help-icon-only': iconOnly }"
+      @click="open = !open"
+      @keydown.esc.stop="close"
+    >
+      <template v-if="iconOnly" #icon>
+        <svg viewBox="0 0 20 20" width="15" height="15" fill="none" aria-hidden="true">
+          <circle cx="10" cy="10" r="7.5" stroke="currentColor" stroke-width="1.4" />
+          <path d="M10 9v4.6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
+          <circle cx="10" cy="6.6" r=".85" fill="currentColor" />
+        </svg>
+      </template>
+      <template v-if="!iconOnly">说明</template>
+    </NButton>
     <NModal :show="open" preset="card" :title="title" class="context-help-dialog" @update:show="!$event && close()">
       <div ref="content" class="context-help-copy context-help-dialog-content" tabindex="-1" @keydown.esc.stop="close"><slot>{{ text }}</slot></div>
       <template #footer><NButton size="small" @click="close">关闭</NButton></template>
@@ -56,6 +89,11 @@ watch(open, async value => {
 .context-help-trigger {
   font-weight: 400;
   color: rgb(var(--base-text-color) / .6);
+}
+.context-help-icon-only {
+  width: 22px;
+  height: 22px;
+  padding: 0;
 }
 .context-help-content {
   width: min(350px, calc(100vw - 56px));

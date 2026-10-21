@@ -388,7 +388,7 @@ func (s *GameService) adminNativeLoad(tx *gorm.DB, id string, lock bool) (*admin
 		snap.dto.Form = form
 		snap.dto.Enabled = snap.rotation.Enabled
 		snap.dto.Frozen = len(snap.rotation.Frozen) > 0
-		snap.dto.Note = "橙卡招募；只编辑奖池与时间，原价格、免费次数和保底不变。冻结后仅允许启停和别名。"
+		snap.dto.Note = "橙卡轮换奖池与开放时间；费用和免费冷却沿用原规则。冻结后仅允许启停、别名和全局招募规则。"
 	case strings.HasPrefix(id, "celebration:"):
 		key := strings.TrimPrefix(id, "celebration:")
 		if !strings.HasPrefix(key, "celebrationActivity_") {
@@ -719,6 +719,15 @@ func (s *GameService) AdminSaveNativeActivity(ctx context.Context, p *model.Admi
 		}
 		if snap.dto.Version != req.Version {
 			return constUtil.ErrAdminConfigConflict
+		}
+		if req.RecruitSettings != nil {
+			kind := int32(0)
+			if snap.dto.Kind == "recruit-rotation" {
+				kind = constUtil.RecruitRuntimeKindStrong
+			}
+			if err := s.adminSaveActivityRecruitSettings(tx, p, kind, req.RecruitSettings); err != nil {
+				return err
+			}
 		}
 		same := adminNativeSameForm(snap.dto.Form, req.Form)
 		if snap.dto.Frozen {

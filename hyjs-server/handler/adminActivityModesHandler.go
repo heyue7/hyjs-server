@@ -61,6 +61,10 @@ func AdminTypedActivityCreateHandler(c *gin.Context) {
 		adminError(c, constUtil.ErrAdminInput)
 		return
 	}
+	if !adminRecruitSettingsValid(req.RecruitSettings) {
+		adminError(c, constUtil.ErrAdminInput)
+		return
+	}
 	out, err := gameService.AdminSaveTypedActivity(c.Request.Context(), adminPrincipal(c), "", req)
 	if err != nil {
 		adminError(c, err)
@@ -81,6 +85,10 @@ func AdminTypedActivityCreateHandler(c *gin.Context) {
 func AdminTypedActivitySaveHandler(c *gin.Context) {
 	var req model.AdminTypedActivityRequest
 	if len(c.Param("id")) > 160 || c.ShouldBindJSON(&req) != nil || len(req.Version) != 64 || len(req.Mode) > 64 || len(req.TemplateID) > 96 || len([]rune(req.Name)) > 80 || len([]rune(req.Alias)) > 80 || len(req.Source) > 1000 || req.StartAt <= 0 || req.EndAt <= req.StartAt || req.ClaimEndAt < req.EndAt || len(req.Products) > 100 || len(req.Milestones) > 31 || (len(req.Prizes) > 1000 || req.Mode != "king-recruit" && len(req.Prizes) > 9) {
+		adminError(c, constUtil.ErrAdminInput)
+		return
+	}
+	if !adminRecruitSettingsValid(req.RecruitSettings) {
 		adminError(c, constUtil.ErrAdminInput)
 		return
 	}

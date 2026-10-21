@@ -46,34 +46,7 @@ func AdminRecruitSettingsHandler(c *gin.Context) {
 // @Router /admin/api/recruit-settings [put]
 func AdminRecruitSettingsSaveHandler(c *gin.Context) {
 	var req model.AdminRecruitSettingsSaveRequest
-	if c.ShouldBindJSON(&req) != nil || len(req.Version) != 64 || strings.TrimSpace(req.Reason) == "" || len(req.Reason) > 1000 || len(req.Items) != 2 {
-		adminError(c, constUtil.ErrAdminInput)
-		return
-	}
-	seen := map[int64]bool{}
-	for _, item := range req.Items {
-		if seen[item.Kind] || item.Name != constUtil.RecruitRuntimeName(int32(item.Kind)) || item.GuaranteeEvery < int64(constUtil.RecruitRuntimeGuaranteeMin) || item.GuaranteeEvery > int64(constUtil.RecruitRuntimeGuaranteeMax) {
-			adminError(c, constUtil.ErrAdminInput)
-			return
-		}
-		switch item.Kind {
-		case int64(constUtil.RecruitRuntimeKindStrong):
-			if item.DailyLimit < int64(constUtil.RecruitRuntimeDailyUnlimited) || item.DailyLimit > int64(constUtil.RecruitRuntimeDailyMaximum) {
-				adminError(c, constUtil.ErrAdminInput)
-				return
-			}
-		case int64(constUtil.RecruitRuntimeKindKing):
-			if item.DailyLimit < 1 || item.DailyLimit > int64(constUtil.RecruitRuntimeDailyMaximum) {
-				adminError(c, constUtil.ErrAdminInput)
-				return
-			}
-		default:
-			adminError(c, constUtil.ErrAdminInput)
-			return
-		}
-		seen[item.Kind] = true
-	}
-	if !seen[int64(constUtil.RecruitRuntimeKindStrong)] || !seen[int64(constUtil.RecruitRuntimeKindKing)] {
+	if c.ShouldBindJSON(&req) != nil || !adminRecruitSettingsValid(&req) {
 		adminError(c, constUtil.ErrAdminInput)
 		return
 	}
@@ -83,4 +56,34 @@ func AdminRecruitSettingsSaveHandler(c *gin.Context) {
 		return
 	}
 	adminSuccess(c, out)
+}
+
+// adminRecruitSettingsValid 供独立兼容接口和活动内嵌保存共享完整入参校验。
+func adminRecruitSettingsValid(req *model.AdminRecruitSettingsSaveRequest) bool {
+	if req == nil {
+		return true
+	}
+	if len(req.Version) != 64 || strings.TrimSpace(req.Reason) == "" || len(req.Reason) > 1000 || len(req.Items) != 2 {
+		return false
+	}
+	seen := map[int64]bool{}
+	for _, item := range req.Items {
+		if seen[item.Kind] || item.Name != constUtil.RecruitRuntimeName(int32(item.Kind)) || item.GuaranteeEvery < int64(constUtil.RecruitRuntimeGuaranteeMin) || item.GuaranteeEvery > int64(constUtil.RecruitRuntimeGuaranteeMax) {
+			return false
+		}
+		switch item.Kind {
+		case int64(constUtil.RecruitRuntimeKindStrong):
+			if item.DailyLimit < int64(constUtil.RecruitRuntimeDailyUnlimited) || item.DailyLimit > int64(constUtil.RecruitRuntimeDailyMaximum) {
+				return false
+			}
+		case int64(constUtil.RecruitRuntimeKindKing):
+			if item.DailyLimit < 1 || item.DailyLimit > int64(constUtil.RecruitRuntimeDailyMaximum) {
+				return false
+			}
+		default:
+			return false
+		}
+		seen[item.Kind] = true
+	}
+	return seen[int64(constUtil.RecruitRuntimeKindStrong)] && seen[int64(constUtil.RecruitRuntimeKindKing)]
 }

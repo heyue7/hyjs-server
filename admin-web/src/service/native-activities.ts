@@ -1,6 +1,7 @@
 import { ApiError, api, json } from './operations';
 import type { ResourceAmount } from './operations';
 import type { ActivityForm, ActivityPrize } from './activity-operations';
+import type { RecruitSettingsSaveRequest } from './recruit-settings';
 
 export interface NativeMilestone { key: string; goal: number; rewards: ResourceAmount[] }
 export interface NativeVIPTier { vip: number; dailyRewards: ResourceAmount[]; weekCost: ResourceAmount; weekRewards: ResourceAmount[] }
@@ -18,9 +19,15 @@ export interface NativeActivity {
   enabled: boolean; frozen: boolean; note: string; form: NativeActivityForm;
 }
 export const getNativeActivities = () => api<{items: NativeActivity[]}>('/activity-native-settings');
-export const saveNativeActivity = (row: NativeActivity) => api<NativeActivity>(
+export const saveNativeActivity = (row: NativeActivity, recruitSettings?: RecruitSettingsSaveRequest) => api<NativeActivity>(
   `/activity-native-settings/${encodeURIComponent(row.id)}`,
-  json('PUT', { version: row.version, enabled: row.enabled, alias: row.alias, form: row.form })
+  json('PUT', {
+    version: row.version,
+    enabled: row.enabled,
+    alias: row.alias,
+    form: row.form,
+    ...(recruitSettings ? { recruitSettings } : {})
+  })
 );
 export async function removeNativeActivity(row: NativeActivity) {
   try {

@@ -16,12 +16,14 @@ type AdminActivityDefinitionDTO struct {
 
 // AdminActivityDefinitionSaveRequest saves global rules without scheduling an activity.
 type AdminActivityDefinitionSaveRequest struct {
-	Name        string            `json:"name" binding:"required"` // Name is the readable title.
-	Form        AdminActivityForm `json:"form" binding:"required"` // Form is the existing typed mode editor.
-	DefaultDays int64             `json:"defaultDays"`             // DefaultDays ranges from 1 through 366.
-	ClaimDays   int64             `json:"claimDays"`               // ClaimDays ranges from 0 through 90.
-	Enabled     bool              `json:"enabled"`                 // Enabled true requires a usable complete template.
-	Version     string            `json:"version"`                 // Version is empty for creation.
+	// RecruitSettings 随活动原子保存当前同类的全局招募次数和保底；未提交时保持原规则。
+	RecruitSettings *AdminRecruitSettingsSaveRequest `json:"recruitSettings,omitempty"`
+	Name            string                           `json:"name" binding:"required"` // Name is the readable title.
+	Form            AdminActivityForm                `json:"form" binding:"required"` // Form is the existing typed mode editor.
+	DefaultDays     int64                            `json:"defaultDays"`             // DefaultDays ranges from 1 through 366.
+	ClaimDays       int64                            `json:"claimDays"`               // ClaimDays ranges from 0 through 90.
+	Enabled         bool                             `json:"enabled"`                 // Enabled true requires a usable complete template.
+	Version         string                           `json:"version"`                 // Version is empty for creation.
 }
 
 // AdminActivityOccurrenceDTO is one realm calendar bar.

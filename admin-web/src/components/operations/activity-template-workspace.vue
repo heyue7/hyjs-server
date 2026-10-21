@@ -15,6 +15,7 @@ import ActivityPrizes from './activity-prizes.vue';
 import KingPrizes from './king-prizes.vue';
 import ActivityOptions from './activity-options.vue';
 import ActivitySummary from './activity-summary.vue';
+import RecruitSettings from './recruit-settings.vue';
 
 const props = defineProps<{ inline?: boolean }>();
 const emit = defineEmits<{ saved: [definition: ActivityDefinition]; deleted: [id: string]; closed: [] }>();
@@ -37,13 +38,19 @@ const deletingId = ref('');
 const busy = computed(() => saving.value || Boolean(deletingId.value));
 const saveError = ref('');
 const baseline = ref('');
+const recruitRules = ref<InstanceType<typeof RecruitSettings> | null>(null);
 const draft = computed(() => ({
   form: form.value,
   defaultDays: defaultDays.value,
   claimDays: claimDays.value,
   enabled: enabled.value
 }));
-const dirty = computed(() => editorOpen.value && !readOnly.value && JSON.stringify(draft.value) !== baseline.value);
+const formDirty = computed(() => editorOpen.value && !readOnly.value && JSON.stringify(draft.value) !== baseline.value);
+const isKingRecruit = computed(() => form.value?.mode === 'king-recruit');
+const ruleDirty = computed(() => isKingRecruit.value && Boolean(recruitRules.value?.dirty));
+const ruleLoading = computed(() => isKingRecruit.value && Boolean(recruitRules.value?.loading));
+const ruleInvalid = computed(() => isKingRecruit.value && (!recruitRules.value || Boolean(recruitRules.value.invalid)));
+const dirty = computed(() => formDirty.value || ruleDirty.value);
 const modeMap = computed(() => new Map(modes.value.map(mode => [mode.mode, mode])));
 const selectedMode = computed(() => modeMap.value.get(form.value?.mode || ''));
 const editorName = computed(() => (form.value ? activityFormName(form.value, selectedMode.value) : ''));
@@ -202,6 +209,12 @@ async function save() {
     activeSection.value = 'basics';
     return;
   }
+  if (isKingRecruit.value && (ruleLoading.value || ruleInvalid.value)) {
+    saveError.value = '请先修正或重新载入招募规则后再保存。';
+    activeSection.value = 'settings';
+    return;
+  }
+  const recruitSettings = isKingRecruit.value ? recruitRules.value?.request() : undefined;
   saving.value = true;
   saveError.value = '';
   try {
@@ -216,7 +229,8 @@ async function save() {
         defaultDays: defaultDays.value,
         claimDays: claimDays.value,
         enabled: enabled.value,
-        version: selected.value?.version || ''
+        version: selected.value?.version || '',
+        ...(recruitSettings ? { recruitSettings } : {})
       })
     );
     window.$message?.success('活动设置已保存');
@@ -413,7 +427,7 @@ onUnmounted(() => {
           </button>
         </nav>
         <NCard :bordered="false">
-          <NForm v-if="activeSection !== 'review'" label-placement="top" :disabled="busy || readOnly">
+          <NForm v-show="activeSection !== 'review'" label-placement="top" :disabled="busy || readOnly">
             <template v-if="activeSection === 'basics'">
               <NFormItem required>
                 <template #label><span class="ops-field-label">活动名称<ContextHelp title="正式名称" text="游戏内名称由客户端固定；需要区分批次请填写后台别名。" /></span></template>
@@ -519,8 +533,16 @@ onUnmounted(() => {
                 :disabled="busy || readOnly"
               />
             </template>
+            <RecruitSettings
+              v-if="isKingRecruit"
+              v-show="activeSection === 'settings'"
+              ref="recruitRules"
+              :key="selected?.id || 'new'"
+              :kind="3"
+              :disabled="busy || readOnly"
+            />
           </NForm>
-          <ActivitySummary v-else :form="form" :mode="selectedMode" hide-schedule />
+          <ActivitySummary v-if="activeSection === 'review'" :form="form" :mode="selectedMode" hide-schedule />
         </NCard>
       </div>
       <div class="template-footer">
@@ -528,7 +550,7 @@ onUnmounted(() => {
         <NSpace>
           <NButton v-if="canWrite && selected" quaternary type="error" :disabled="busy" :loading="deletingId === selected.id" @click="requestDelete(selected)">删除模板</NButton>
           <NButton :disabled="busy" @click="close">{{ inline ? '取消' : '返回' }}</NButton>
-          <NButton v-if="!readOnly" type="primary" :loading="saving" :disabled="busy" @click="save">保存活动设置</NButton>
+          <NButton v-if="!readOnly" type="primary" :loading="saving" :disabled="busy || ruleLoading || ruleInvalid" @click="save">保存活动设置</NButton>
         </NSpace>
       </div>
     </template>

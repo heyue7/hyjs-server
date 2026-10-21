@@ -56,6 +56,10 @@ func AdminSaveNativeActivityHandler(c *gin.Context) {
 		adminError(c, constUtil.ErrAdminInput)
 		return
 	}
+	if !adminRecruitSettingsValid(req.RecruitSettings) {
+		adminError(c, constUtil.ErrAdminInput)
+		return
+	}
 	req.Alias = strings.TrimSpace(req.Alias)
 	item, err := gameService.AdminSaveNativeActivity(c.Request.Context(), adminPrincipal(c), id, req)
 	if err != nil {

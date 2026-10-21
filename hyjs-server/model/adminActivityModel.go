@@ -121,10 +121,12 @@ type AdminActivityForm struct {
 
 // AdminTypedActivityRequest 创建或保存一份模式表单。
 type AdminTypedActivityRequest struct {
-	AdminActivityForm        // AdminActivityForm 的字段直接展开为业务表单。
-	Version           string `json:"version"`     // Version 是编辑时摘要，创建为空。
-	Enabled           bool   `json:"enabled"`     // Enabled 表示是否开放。
-	MakeCurrent       bool   `json:"makeCurrent"` // MakeCurrent 仅转盘可显式设为新全局期。
+	// RecruitSettings 随活动原子保存当前同类的全局招募次数和保底；未提交时保持原规则。
+	RecruitSettings   *AdminRecruitSettingsSaveRequest `json:"recruitSettings,omitempty"`
+	AdminActivityForm                                  // AdminActivityForm 的字段直接展开为业务表单。
+	Version           string                           `json:"version"`     // Version 是编辑时摘要，创建为空。
+	Enabled           bool                             `json:"enabled"`     // Enabled 表示是否开放。
+	MakeCurrent       bool                             `json:"makeCurrent"` // MakeCurrent 仅转盘可显式设为新全局期。
 }
 
 // AdminActivityStateRequest 按版本启停，转盘可显式切换全局源。

@@ -98,6 +98,8 @@ type AdminNativeActivityDTO struct {
 
 // AdminNativeActivitySaveRequest 只保存已有真实配置行，不提供新建、删除或跨类型转换。
 type AdminNativeActivitySaveRequest struct {
+	// RecruitSettings 随活动原子保存当前同类的全局招募次数和保底；未提交时保持原规则。
+	RecruitSettings *AdminRecruitSettingsSaveRequest `json:"recruitSettings,omitempty"`
 	// Version 是读取时获得的乐观锁摘要。
 	Version string `json:"version" binding:"required"`
 	// Enabled 是true开放，false关闭；空奖励不会因开启而自动生成。

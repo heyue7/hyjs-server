@@ -247,6 +247,15 @@ func (s *GameService) AdminSaveActivityDefinition(ctx context.Context, p *model.
 		if id == "" {
 			row.ID = "template_" + strings.ReplaceAll(uuid.NewString(), "-", "")[:24]
 		}
+		if req.RecruitSettings != nil {
+			kind := int32(0)
+			if req.Form.Mode == "king-recruit" {
+				kind = constUtil.RecruitRuntimeKindKing
+			}
+			if err := s.adminSaveActivityRecruitSettings(tx, p, kind, req.RecruitSettings); err != nil {
+				return err
+			}
+		}
 		form := req.Form
 		if form.Mode == "shop-window" {
 			canonical, err := s.adminShopScheduleSourceForm(tx, form.Options.ShopKey)

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import ContextHelp from './context-help.vue';
-import { computed, h, nextTick, onMounted, ref, watch } from 'vue';
+import { computed, h, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router';
 import { NButton, NDropdown, NImage, NMenu, NSpace, NTag } from 'naive-ui';
 import type { DataTableColumns, MenuOption, SelectOption } from 'naive-ui';
@@ -14,6 +14,7 @@ import KingPrizes from '@/components/operations/king-prizes.vue';
 import ActivityPrizes from '@/components/operations/activity-prizes.vue';
 import ActivityOptions from '@/components/operations/activity-options.vue';
 import ActivitySummary from '@/components/operations/activity-summary.vue';
+import RecruitSettings from '@/components/operations/recruit-settings.vue';
 const { canWrite, loading, error, run } = useOperations();
 const router = useRouter();
 const route = useRoute();
@@ -84,12 +85,22 @@ const editorKind = ref<'create' | 'edit' | 'view' | 'copy'>('create');
 const form = ref<ActivityForm | null>(null);
 const activeTab = ref('basics');
 const baseline = ref('');
-const dirty = computed(() => editable.value && JSON.stringify(form.value) !== baseline.value);
+const editable = computed(
+  () =>
+    canWrite.value && editorKind.value !== 'view' && (editorKind.value !== 'edit' || Boolean(selected.value?.editable))
+);
+const recruitRules = ref<InstanceType<typeof RecruitSettings> | null>(null);
+const isKingRecruit = computed(() => form.value?.mode === 'king-recruit');
+const ruleDirty = computed(() => isKingRecruit.value && Boolean(recruitRules.value?.dirty));
+const ruleLoading = computed(() => isKingRecruit.value && Boolean(recruitRules.value?.loading));
+const ruleInvalid = computed(() => isKingRecruit.value && (!recruitRules.value || Boolean(recruitRules.value.invalid)));
+const formDirty = computed(() => editable.value && JSON.stringify(form.value) !== baseline.value);
+const dirty = computed(() => formDirty.value || ruleDirty.value);
 const sectionOptions = computed(() => [
   { key: 'basics', title: '基本信息', detail: '模式、名称与游戏模板' },
   { key: 'content', title: '奖励内容', detail: '玩家获得什么、如何领取' },
   { key: 'schedule', title: '活动时间', detail: '开放时间与领奖期限' },
-  ...(showSettings.value ? [{ key: 'settings', title: '规则设置', detail: '排名、折扣与额外规则' }] : []),
+  ...(showSettings.value ? [{ key: 'settings', title: '规则设置', detail: '排名、折扣、招募次数与保底等规则' }] : []),
   { key: 'review', title: '检查配置', detail: '按玩家看到的内容核对' }
 ]);
 const currentSection = computed(() => sectionOptions.value.find(section => section.key === activeTab.value));
@@ -102,10 +113,6 @@ function requestClose() {
 }
 const selectedMode = computed(() => (form.value ? modeMap.value.get(form.value.mode) : undefined));
 const activityName = computed(() => (form.value ? activityFormName(form.value, selectedMode.value) : ''));
-const editable = computed(
-  () =>
-    canWrite.value && editorKind.value !== 'view' && (editorKind.value !== 'edit' || Boolean(selected.value?.editable))
-);
 const templateOptions = computed(
   () =>
     selectedMode.value?.templates.map(template => ({
@@ -120,7 +127,8 @@ const vipOptions = computed(
 const showSettings = computed(() =>
   Boolean(
     form.value &&
-    (['turntable', 'mystic-shop', 'continued-spend'].includes(form.value.mode) || Array.isArray(form.value.options.discounts))
+    (['turntable', 'mystic-shop', 'continued-spend', 'king-recruit'].includes(form.value.mode) ||
+      Array.isArray(form.value.options.discounts))
   )
 );
 function show(row?: ActivityInstance, copy = false, view = false) {
@@ -179,10 +187,21 @@ function validateForm() {
   if (form.value.endAt && form.value.claimEndAt && form.value.claimEndAt < form.value.endAt) { activeTab.value = 'schedule'; return '领奖截止不能早于结束时间'; }
   return '';
 }
+function recruitSaveRequest() {
+  if (!isKingRecruit.value) return undefined;
+  if (ruleLoading.value || ruleInvalid.value) {
+    saveError.value = '请先修正或重新载入招募规则后再保存。';
+    activeTab.value = 'settings';
+    return null;
+  }
+  return recruitRules.value?.request();
+}
 async function save() {
   if (!editable.value || !form.value || busy.value) return;
   saveError.value = validateForm();
   if (saveError.value) return;
+  const recruitSettings = recruitSaveRequest();
+  if (recruitSettings === null) return;
   saving.value = true;
   try {
     // 名称随模式固定，后台别名独立保存，防止保存时把别名写进游戏内名称。
@@ -195,7 +214,8 @@ async function save() {
         ...form.value,
         enabled: updating ? selected.value!.enabled : false,
         makeCurrent: false,
-        ...(updating ? { version: selected.value!.version } : {})
+        ...(updating ? { version: selected.value!.version } : {}),
+        ...(recruitSettings ? { recruitSettings } : {})
       })
     );
     window.$message?.success(updating ? '活动配置已保存' : '活动草稿已创建');
@@ -306,6 +326,12 @@ const columns = computed<DataTableColumns<ActivityInstance>>(() => [
     canWrite.value ? h(NButton, { size: 'small', quaternary: true, type: 'error', disabled: busy.value, loading: deletingId.value === row.id, onClick: () => requestDelete(row) }, () => '删除') : null
   ]) }
 ]);
+function beforeUnload(event: BeforeUnloadEvent) {
+  if (busy.value || dirty.value) {
+    event.preventDefault();
+    event.returnValue = '';
+  }
+}
 onBeforeRouteLeave(() => {
   if (busy.value) return false;
   if (!open.value || !dirty.value) return true;
@@ -314,7 +340,13 @@ onBeforeRouteLeave(() => {
     window.$dialog.warning({ title: '离开前放弃修改？', content: '此活动有未保存的修改。', positiveText: '放弃并离开', negativeText: '继续编辑', onPositiveClick: () => resolve(true), onNegativeClick: () => resolve(false), onClose: () => resolve(false), onMaskClick: () => resolve(false) });
   });
 });
-onMounted(load);
+onMounted(() => {
+  window.addEventListener('beforeunload', beforeUnload);
+  load();
+});
+onBeforeUnmount(() => {
+  window.removeEventListener('beforeunload', beforeUnload);
+});
 </script>
 
 <template>
@@ -355,8 +387,7 @@ onMounted(load);
           </button>
         </nav>
         <NCard :bordered="false" class="ops-panel activity-editor-body">
-          <ActivitySummary v-if="!editable || activeTab === 'review'" :form="form" :mode="selectedMode" />
-          <template v-else>
+          <div v-show="editable && activeTab !== 'review'">
             <div v-if="currentSection?.detail" class="activity-section-title"><ContextHelp :title="currentSection.title" :text="currentSection.detail" /></div>
             <NForm label-placement="top" :disabled="busy">
               <template v-if="activeTab === 'basics'">
@@ -386,14 +417,26 @@ onMounted(load);
                 <NFormItem label="运营备注"><NInput v-model:value="form.source" type="textarea" :maxlength="255" :disabled="busy" /></NFormItem>
               </template>
               <ActivityOptions v-if="activeTab === 'settings'" v-model="form.options" :mode="form.mode" :fixed-values="selectedMode?.fixedValues" :disabled="busy" />
+              <RecruitSettings
+                v-if="editable && isKingRecruit"
+                v-show="activeTab === 'settings'"
+                ref="recruitRules"
+                :key="selected?.id || 'new'"
+                :kind="3"
+                :disabled="busy || !editable"
+              />
             </NForm>
-          </template>
+          </div>
+          <ActivitySummary v-if="!editable || activeTab === 'review'" :form="form" :mode="selectedMode" />
+          <NForm v-if="!editable && isKingRecruit" label-placement="top" disabled class="activity-view-recruit-rules">
+            <RecruitSettings ref="recruitRules" :key="selected?.id || 'new'" :kind="3" disabled />
+          </NForm>
         </NCard>
 
       </div>
       <div class="activity-editor-footer">
         <span class="ops-muted">{{ dirty ? '有未保存的修改' : editable ? editorKind === 'create' || editorKind === 'copy' ? '草稿尚未创建' : '当前配置已保存' : '只读' }}</span>
-        <NSpace><NButton v-if="canWrite && selected && (editorKind === 'edit' || editorKind === 'view')" quaternary type="error" :disabled="busy" :loading="deletingId === selected.id" @click="requestDelete(selected)">删除活动</NButton><NButton :disabled="busy" @click="requestClose">{{ editable ? '取消并返回' : '返回列表' }}</NButton><NButton v-if="editable && activeTab !== 'review'" :disabled="busy" @click="activeTab = 'review'">检查配置</NButton><NButton v-if="editable" type="primary" :loading="saving" :disabled="busy" @click="save">{{ editorKind === 'edit' ? '保存配置' : '保存草稿' }}</NButton><NButton v-else-if="canWrite && selected?.availability?.usable" type="primary" :disabled="busy" @click="show(selected, true)">复制为新一期</NButton></NSpace>
+        <NSpace><NButton v-if="canWrite && selected && (editorKind === 'edit' || editorKind === 'view')" quaternary type="error" :disabled="busy" :loading="deletingId === selected.id" @click="requestDelete(selected)">删除活动</NButton><NButton :disabled="busy" @click="requestClose">{{ editable ? '取消并返回' : '返回列表' }}</NButton><NButton v-if="editable && activeTab !== 'review'" :disabled="busy" @click="activeTab = 'review'">检查配置</NButton><NButton v-if="editable" type="primary" :loading="saving" :disabled="busy || ruleLoading || ruleInvalid" @click="save">{{ editorKind === 'edit' ? '保存配置' : '保存草稿' }}</NButton><NButton v-else-if="canWrite && selected?.availability?.usable" type="primary" :disabled="busy" @click="show(selected, true)">复制为新一期</NButton></NSpace>
       </div>
     </template>
   </div>
@@ -412,6 +455,7 @@ onMounted(load);
 .activity-sections strong { font-size: 14px; font-weight: 500; }
 .activity-sections span { font-size: 12px; line-height: 1.5; color: rgb(var(--base-text-color) / .46); }
 .activity-section-title { margin-bottom: 12px; }
+.activity-view-recruit-rules { margin-top: 20px; }
 .activity-editor-body { min-width: 0; }
 .activity-context { padding: 10px 0 10px 10px; }
 .activity-context h3 { margin: 0 0 24px; font-size: 14px; font-weight: 500; }

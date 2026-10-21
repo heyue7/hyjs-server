@@ -12,6 +12,8 @@ import ActivityProducts from './activity-products.vue';
 import ActivityMilestones from './activity-milestones.vue';
 import RewardList from './reward-list.vue';
 import ResourceSelect from './resource-select.vue';
+import RecruitSettings from './recruit-settings.vue';
+import ContextHelp from './context-help.vue';
 
 const { canWrite } = useOperations();
 const rows = ref<NativeActivity[]>([]);
@@ -33,10 +35,16 @@ const selectedChild = ref(0);
 const maxAmount = 2147483647;
 let lastFocused: HTMLElement | null = null;
 const drawerWidth = ref('min(940px, calc(100vw - 48px))');
+const recruitRules = ref<InstanceType<typeof RecruitSettings> | null>(null);
 function syncDrawerWidth() {
   drawerWidth.value = window.innerWidth <= 800 ? '100vw' : 'min(940px, calc(100vw - 48px))';
 }
-const dirty = computed(() => Boolean(selected.value) && JSON.stringify(selected.value) !== original.value);
+const activityDirty = computed(() => Boolean(selected.value) && JSON.stringify(selected.value) !== original.value);
+const isRecruitRotation = computed(() => selected.value?.kind === 'recruit-rotation');
+const ruleDirty = computed(() => isRecruitRotation.value && Boolean(recruitRules.value?.dirty));
+const ruleLoading = computed(() => isRecruitRotation.value && Boolean(recruitRules.value?.loading));
+const ruleInvalid = computed(() => isRecruitRotation.value && (!recruitRules.value || Boolean(recruitRules.value.invalid)));
+const dirty = computed(() => activityDirty.value || ruleDirty.value);
 const disabled = computed(() => !canWrite.value || saving.value || loading.value);
 const rulesDisabled = computed(() => disabled.value || selected.value?.frozen);
 const busy = computed(() => loading.value || saving.value || Boolean(removingId.value));
@@ -311,13 +319,19 @@ async function load() {
 }
 async function save() {
   if (!selected.value || disabled.value) return;
+  if (isRecruitRotation.value && (ruleLoading.value || ruleInvalid.value)) {
+    saveError.value = '请先修正或重新载入招募规则后再保存。';
+    return;
+  }
+  const recruitSettings = isRecruitRotation.value ? recruitRules.value?.request() : undefined;
   saving.value = true;
   saveError.value = '';
   try {
-    const result = await saveNativeActivity(selected.value);
+    const result = await saveNativeActivity(selected.value, recruitSettings);
     rows.value = rows.value.map(row => row.id === result.id ? result : row);
     apply(result);
     window.$message?.success('活动配置已保存');
+    if (isRecruitRotation.value) await recruitRules.value?.accept();
   } catch (cause) {
     saveError.value = errorMessage(cause);
   } finally {
@@ -449,14 +463,20 @@ defineExpose({ beforeLeave: leaveWorkspace, confirmDiscard, dirty, saving });
             <NTag :bordered="false">{{ kindLabel(selected.kind) }}</NTag>
             <NTag :bordered="false" :type="selected.enabled ? 'success' : 'default'">{{ selected.enabled ? '已启用' : '已停用' }}</NTag>
             <NTag v-if="selected.frozen" :bordered="false" type="warning">规则冻结</NTag>
+            <ContextHelp
+              v-if="selected.kind === 'recruit-rotation'"
+              icon-only
+              title="橙卡轮换说明"
+              :text="'本页启停控制本期限时轮换。停用时仍可使用常驻强者招募；启用且处于开放时间时，抽取使用本期奖池。\n每日次数与保底适用于全部强者招募，停用轮换不会关闭这两项规则。' + (selected.frozen ? '\n本期奖池与开放时间已冻结，仍可调整启停、别名和全局招募规则。' : '')"
+            />
           </NSpace>
           <div class="qualification-line native-enable">
             <span>活动启用</span>
             <NSwitch v-model:value="selected.enabled" :disabled="disabled" aria-label="活动启用" />
           </div>
         </div>
-        <NAlert v-if="selected.note" type="info" :show-icon="false" class="mb-16px">{{ selected.note }}</NAlert>
-        <NAlert v-if="selected.frozen && selected.kind !== 'first-double'" type="warning" :show-icon="false" class="mb-16px">
+        <NAlert v-if="selected.note && selected.kind !== 'recruit-rotation'" type="info" :show-icon="false" class="mb-16px">{{ selected.note }}</NAlert>
+        <NAlert v-if="selected.frozen && !['first-double', 'recruit-rotation'].includes(selected.kind)" type="warning" :show-icon="false" class="mb-16px">
           本期规则已被使用并冻结，可以调整启停及后台别名。
         </NAlert>
         <NAlert v-if="saveError" type="error" :title="saveError" class="mb-16px" />
@@ -523,6 +543,13 @@ defineExpose({ beforeLeave: leaveWorkspace, confirmDiscard, dirty, saving });
             </NGrid>
           </template>
           <template v-if="selected.kind === 'recruit-rotation'">
+            <RecruitSettings
+              ref="recruitRules"
+              :key="selected.id"
+              :kind="2"
+              :disabled="disabled"
+              class="native-recruit-rules"
+            />
             <div class="native-section-label">橙卡招募角色</div>
             <NSelect v-model:value="selectedPrize" :options="prizeOptions" :render-label="renderActivityOption" aria-label="选择橙卡招募角色" class="mb-20px" />
             <section v-for="prize in currentPrize" :key="prize.id" class="activity-edit-section">
@@ -545,7 +572,7 @@ defineExpose({ beforeLeave: leaveWorkspace, confirmDiscard, dirty, saving });
           <div class="ops-drawer-actions">
             <span class="ops-muted">{{ saving ? '正在保存…' : dirty ? '有尚未保存的修改' : '配置已载入' }}</span>
             <NButton :disabled="saving" @click="closeDrawer">取消</NButton>
-            <NButton v-if="canWrite" type="primary" :loading="saving" :disabled="disabled || !dirty" @click="save">保存配置</NButton>
+            <NButton v-if="canWrite" type="primary" :loading="saving" :disabled="disabled || !dirty || ruleLoading || ruleInvalid" @click="save">保存配置</NButton>
           </div>
         </template>
       </NDrawerContent>
@@ -568,6 +595,7 @@ defineExpose({ beforeLeave: leaveWorkspace, confirmDiscard, dirty, saving });
 }
 .native-enable { margin: 0; gap: 12px; }
 .native-enable span { color: rgb(var(--base-text-color) / .65); font-size: 13px; }
+.native-recruit-rules { margin-bottom: 24px; }
 .native-section-label {
   margin: 4px 0 16px;
   font-size: 12px;

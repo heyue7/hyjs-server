@@ -594,6 +594,15 @@ func (s *GameService) AdminSaveTypedActivity(ctx context.Context, p *model.Admin
 		} else if req.Version != "" {
 			return constUtil.ErrAdminConfigConflict
 		}
+		if req.RecruitSettings != nil {
+			kind := int32(0)
+			if req.Mode == "king-recruit" {
+				kind = constUtil.RecruitRuntimeKindKing
+			}
+			if err := s.adminSaveActivityRecruitSettings(tx, p, kind, req.RecruitSettings); err != nil {
+				return err
+			}
+		}
 		if req.Mode == "king-recruit" {
 			form, err := s.adminKingRecruitCanonicalForm(tx, req.AdminActivityForm)
 			if err != nil {
