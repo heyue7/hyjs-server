@@ -20,6 +20,8 @@ func RegisterAdminGamePlayerRoutes(a *gin.RouterGroup) {
 	a.PUT("/game-players/:id/name", AdminGamePlayerNameHandler)
 	a.PUT("/game-players/:id/level", AdminGamePlayerLevelHandler)
 	a.POST("/game-players/:id/kick", AdminGamePlayerKickHandler)
+	RegisterAdminPlayerProfileRoutes(a)
+	RegisterAdminPlayerInventoryRoutes(a)
 }
 
 // AdminGamePlayerLevelHandler 按原等级表校验并保存运营等级调整。

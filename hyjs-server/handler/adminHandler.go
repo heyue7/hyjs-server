@@ -104,7 +104,11 @@ func RegisterAdminRoutes(r *gin.Engine, assets string) {
 func adminError(c *gin.Context, err error) {
 	status := http.StatusInternalServerError
 	message := "操作失败，请查看服务日志"
+	var playerEditError *constUtil.AdminPlayerEditError
 	switch {
+	case errors.As(err, &playerEditError):
+		status = http.StatusBadRequest
+		message = playerEditError.Error()
 	case errors.Is(err, constUtil.ErrAdminSession), errors.Is(err, constUtil.ErrAdminCredentials):
 		status = http.StatusUnauthorized
 		message = err.Error()

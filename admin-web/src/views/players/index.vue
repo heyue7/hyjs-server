@@ -6,42 +6,80 @@ import { useRoute, useRouter } from 'vue-router';
 import { NButton, NSpace } from 'naive-ui';
 import type { DataTableColumns } from 'naive-ui';
 import { ApiError, api, errorMessage, formatTime, json } from '@/service/operations';
-import type { Item, ItemsResponse } from '@/service/operations';
-import type { GamePlayer, GamePlayerDetail, InventoryItem } from '@/service/player-operations';
+import type { GamePlayer, GamePlayerDetail } from '@/service/player-operations';
 import { useOperations } from '@/composables/useOperations';
 import { useServerScopeStore } from '@/store/modules/server-scope';
 const scope = useServerScopeStore();
 const route = useRoute();
 const router = useRouter();
-const walletTarget = ref<Pick<GamePlayer, 'id' | 'name'> & { accountId?: number } | null>(null);
-function openWallet(player: Pick<GamePlayer, 'id' | 'name'> & { accountId?: number }) { walletTarget.value = { id: player.id, name: player.name, accountId: player.accountId }; }
+const walletTarget = ref<(Pick<GamePlayer, 'id' | 'name'> & { accountId?: number }) | null>(null);
+function openWallet(player: Pick<GamePlayer, 'id' | 'name'> & { accountId?: number }) {
+  walletTarget.value = {
+    id: player.id,
+    name: player.name,
+    accountId: player.accountId
+  };
+}
 function closeWallet() {
   walletTarget.value = null;
-  if (route.query.wallet) { const query = { ...route.query }; delete query.wallet; router.replace({ query }); }
+  if (route.query.wallet) {
+    const query = { ...route.query };
+    delete query.wallet;
+    router.replace({ query });
+  }
 }
 function requestedWallet() {
   const id = Number(route.query.wallet);
-  if (Number.isSafeInteger(id) && id > 0) openWallet(rows.value.find(row => row.id === id) || { id, name: `用户 #${id}` });
+  if (Number.isSafeInteger(id) && id > 0)
+    openWallet(rows.value.find(row => row.id === id) || { id, name: `用户 #${id}` });
 }
-import ResourceImage from '@/components/operations/resource-image.vue';
+import PlayerProfileEditor from '@/components/operations/player-profile-editor.vue';
+import PlayerInventory from '@/components/operations/player-inventory.vue';
+const profileOpen = ref(false);
+const inventoryRef = ref<InstanceType<typeof PlayerInventory> | null>(null);
+async function closeDetail(value: boolean) {
+  if (value || (await inventoryRef.value?.canLeave()) !== false) open.value = value;
+}
+async function profileSaved(value: GamePlayerDetail) {
+  detail.value = value;
+  await load();
+}
+async function inventoryChanged() {
+  if (detail.value) await loadDetail(detail.value.id);
+  await load();
+}
 import WalletLedger from '@/components/operations/wallet-ledger.vue';
 import GamePlayerCreate from '@/components/operations/game-player-create.vue';
 const { canWrite, loading, error, run } = useOperations();
 const createOpen = ref(false);
-async function createdPlayer(player: GamePlayerDetail) { await load(); await show(player); }
+async function createdPlayer(player: GamePlayerDetail) {
+  await load();
+  await show(player);
+}
 const q = ref('');
 const page = ref(1);
 const pageSize = ref(25);
 const total = ref(0);
 const rows = ref<GamePlayer[]>([]);
 function sceneLabel(scene: string) {
-  const names: Record<string, string> = { town: '主城', town_main: '主城', field_001: '森林野外', field_002: '雪原野外', field_003: '沙漠野外', field_004: '夜森林野外', field_005: '火山野外', field_006: '峡谷野外' };
+  const names: Record<string, string> = {
+    town: '主城',
+    town_main: '主城',
+    field_001: '森林野外',
+    field_002: '雪原野外',
+    field_003: '沙漠野外',
+    field_004: '夜森林野外',
+    field_005: '火山野外',
+    field_006: '峡谷野外'
+  };
   return names[scene] || (scene ? '其他场景' : '—');
 }
 async function load() {
   const data = await run(() =>
     api<{ items: GamePlayer[]; total: number }>(
-      scope.serverQuery(`/game-players?${new URLSearchParams({ q: q.value, page: String(page.value), pageSize: String(pageSize.value) })}`)
+      scope.serverQuery(
+        `/game-players?${new URLSearchParams({ q: q.value, page: String(page.value), pageSize: String(pageSize.value) })}`
+      )
     )
   );
   if (data) {
@@ -58,9 +96,6 @@ const detail = ref<GamePlayerDetail | null>(null);
 const detailLoading = ref(false);
 const detailError = ref('');
 const activeTab = ref('overview');
-const inventoryQ = ref('');
-const catalogue = ref<Record<string, Item>>({});
-const inventoryPage = ref(1);
 const action = ref<'name' | 'level' | 'kick' | ''>('');
 const actionTarget = ref<Pick<GamePlayerDetail, 'id' | 'name' | 'level' | 'version'> | null>(null);
 const actionReason = ref('');
@@ -69,52 +104,27 @@ const newLevel = ref<number | null>(null);
 const actionError = ref('');
 const actionConflict = ref(false);
 const acting = ref(false);
-const actionGuard = useDraftGuard({ active: () => Boolean(action.value), value: () => ({ name: newName.value, level: newLevel.value, reason: actionReason.value }), busy: () => acting.value, writable: () => canWrite.value, label: '玩家修改', close: () => { action.value = ''; } });
+const actionGuard = useDraftGuard({
+  active: () => Boolean(action.value),
+  value: () => ({
+    name: newName.value,
+    level: newLevel.value,
+    reason: actionReason.value
+  }),
+  busy: () => acting.value,
+  writable: () => canWrite.value,
+  label: '玩家修改',
+  close: () => {
+    action.value = '';
+  }
+});
 let detailRequest = 0;
-const inventoryRows = computed(
-  () =>
-    detail.value?.inventory.filter(
-      row =>
-        !inventoryQ.value ||
-        `${row.resourceId} ${catalogue.value[row.resourceId]?.name || ''} ${row.guid || ''}`
-          .toLowerCase()
-          .includes(inventoryQ.value.toLowerCase())
-    ) || []
-);
-const inventoryColumns: DataTableColumns<InventoryItem> = [
-  {
-    title: '资源',
-    key: 'resourceId',
-    minWidth: 250,
-    render: row => {
-      const item = catalogue.value[row.resourceId];
-      return h('div', { class: 'item-name' }, [
-        h(ResourceImage, { item, size: 40 }),
-        h('div', [h('strong', item?.name || row.resourceId), h('div', { class: 'ops-mono ops-muted' }, row.resourceId)])
-      ]);
-    }
-  },
-  { title: '数量', key: 'amount', width: 120, render: row => row.amount.toLocaleString() },
-  { title: '等级', key: 'level', width: 90, render: row => row.level || '—' },
-  { title: '实例', key: 'guid', minWidth: 210, ellipsis: { tooltip: true } }
-];
-async function loadCatalogue(inventory: InventoryItem[]) {
-  const ids = [...new Set(inventory.map(row => row.resourceId))].filter(id => !catalogue.value[id]);
-  const groups: string[][] = [];
-  for (let i = 0; i < ids.length; i += 100) groups.push(ids.slice(i, i + 100));
-  const results = await Promise.all(
-    groups.map(group => api<ItemsResponse>(`/items?ids=${encodeURIComponent(group.join(','))}&page=1&pageSize=100`))
-  );
-  for (const result of results) for (const item of result.items) catalogue.value[item.id] = item;
-}
 async function show(player: GamePlayer) {
   action.value = '';
   open.value = true;
   detail.value = null;
   detailError.value = '';
   activeTab.value = 'overview';
-  inventoryQ.value = '';
-  inventoryPage.value = 1;
   await loadDetail(player.id);
 }
 async function loadDetail(id: number) {
@@ -135,11 +145,16 @@ async function loadDetail(id: number) {
 
 async function editPlayer(player: GamePlayer) {
   await show(player);
-  if (open.value && detail.value?.id === player.id) edit('level');
+  if (open.value && detail.value?.id === player.id) profileOpen.value = true;
 }
 function edit(kind: 'name' | 'level' | 'kick') {
   if (!detail.value) return;
-  actionTarget.value = { id: detail.value.id, name: detail.value.name, level: detail.value.level, version: detail.value.version };
+  actionTarget.value = {
+    id: detail.value.id,
+    name: detail.value.name,
+    level: detail.value.level,
+    version: detail.value.version
+  };
   action.value = kind;
   actionReason.value = '';
   newName.value = detail.value?.name || '';
@@ -153,7 +168,12 @@ async function refreshAction() {
   if (!target || acting.value) return;
   await loadDetail(target.id);
   if (detail.value?.id === target.id && !detailError.value) {
-    actionTarget.value = { id: detail.value.id, name: detail.value.name, level: detail.value.level, version: detail.value.version };
+    actionTarget.value = {
+      id: detail.value.id,
+      name: detail.value.name,
+      level: detail.value.level,
+      version: detail.value.version
+    };
     actionError.value = '';
     actionConflict.value = false;
     window.$message?.info('已读取最新数据，请核对后保存');
@@ -189,7 +209,13 @@ async function submitAction() {
       })
     );
     if (detail.value?.id === target.id) detail.value = result;
-    window.$message?.success(action.value === 'name' ? '角色名称已更新' : action.value === 'level' ? '角色等级已更新，重新登录游戏后可见' : '角色已下线');
+    window.$message?.success(
+      action.value === 'name'
+        ? '角色名称已更新'
+        : action.value === 'level'
+          ? '角色等级已更新，重新登录游戏后可见'
+          : '角色已下线'
+    );
     action.value = '';
     await load();
   } catch (e) {
@@ -207,7 +233,9 @@ const balanceNames: Record<string, string> = {
   light: '滞留之光',
   point: '攻略点数',
   popularity: '声望',
-  score: '悬赏积分'
+  score: '悬赏积分',
+  coinpet: '精灵币',
+  contribution: '公会贡献'
 };
 const countNames: Record<string, string> = {
   characters: '角色',
@@ -226,57 +254,116 @@ const columns = computed<DataTableColumns<GamePlayer>>(() => [
     render: row => h('div', [h('strong', row.name), h('div', { class: 'ops-mono ops-muted' }, `ID ${row.id}`)])
   },
   {
-    title: '所属用户', key: 'username', minWidth: 180,
-    render: row => row.accountId
-      ? h(NButton, { text: true, type: 'primary', onClick: () => router.push({ path: '/game-accounts', query: { accountId: row.accountId, q: row.username || '' } }) }, () => `${row.nickname || '—'} · ${row.username || '用户 #' + row.accountId}`)
-      : `${row.nickname || '—'} · ${row.username || '—'}`
+    title: '所属用户',
+    key: 'username',
+    minWidth: 180,
+    render: row =>
+      row.accountId
+        ? h(
+            NButton,
+            {
+              text: true,
+              type: 'primary',
+              onClick: () =>
+                router.push({
+                  path: '/game-accounts',
+                  query: { accountId: row.accountId, q: row.username || '' }
+                })
+            },
+            () => `${row.nickname || '—'} · ${row.username || '用户 #' + row.accountId}`
+          )
+        : `${row.nickname || '—'} · ${row.username || '—'}`
   },
   { title: '等级', key: 'level', width: 100 },
-  { title: 'VIP', key: 'vip', width: 100, render: row => `VIP${row.vip || 0}` },
-  { title: '主线', key: 'chapter', width: 140, render: row => `${row.chapter || 0} - ${row.mission || 0}` },
-  { title: '所在场景', key: 'scene', minWidth: 170, render: row => sceneLabel(row.scene) },
+  {
+    title: 'VIP',
+    key: 'vip',
+    width: 100,
+    render: row => `VIP${row.vip || 0}`
+  },
+  {
+    title: '主线',
+    key: 'chapter',
+    width: 140,
+    render: row => `${row.chapter || 0} - ${row.mission || 0}`
+  },
+  {
+    title: '所在场景',
+    key: 'scene',
+    minWidth: 170,
+    render: row => sceneLabel(row.scene)
+  },
   {
     title: '操作',
     key: 'action',
     width: viewportWidth.value < 768 ? 150 : 290,
     fixed: 'right',
-    render: row => h(NSpace, { size: 6 }, () => [
-      h(NButton, { size: 'small', secondary: true, onClick: () => show(row) }, () => '查看角色'),
-      ...(canWrite.value ? [h(NButton, { size: 'small', type: 'primary', secondary: true, disabled: detailLoading.value, onClick: () => editPlayer(row) }, () => '编辑')] : []),
-      h(NButton, { size: 'small', onClick: () => openWallet(row) }, () => '蓝绿钱包')
-    ])
+    render: row =>
+      h(NSpace, { size: 6 }, () => [
+        h(NButton, { size: 'small', secondary: true, onClick: () => show(row) }, () => '查看角色'),
+        ...(canWrite.value
+          ? [
+              h(
+                NButton,
+                {
+                  size: 'small',
+                  type: 'primary',
+                  secondary: true,
+                  disabled: detailLoading.value,
+                  onClick: () => editPlayer(row)
+                },
+                () => '编辑'
+              )
+            ]
+          : []),
+        h(NButton, { size: 'small', onClick: () => openWallet(row) }, () => '蓝绿钱包')
+      ])
   }
 ]);
-watch(activeTab, value => {
-  if (value === 'inventory' && detail.value)
-    loadCatalogue(detail.value.inventory).catch(e => {
-      detailError.value = errorMessage(e);
-    });
-});
 onMounted(async () => {
- if (typeof route.query.q === 'string') q.value = route.query.q;
- await load(); requestedWallet();
- const id = Number(route.query.playerId);
- if (Number.isSafeInteger(id) && id > 0) { open.value = true; await loadDetail(id); }
+  if (typeof route.query.q === 'string') q.value = route.query.q;
+  await load();
+  requestedWallet();
+  const id = Number(route.query.playerId);
+  if (Number.isSafeInteger(id) && id > 0) {
+    open.value = true;
+    await loadDetail(id);
+  }
 });
-onBeforeUnmount(() => { detailRequest += 1; });
-watch(() => route.query.wallet, requestedWallet);
-watch(() => scope.serverId, () => {
+onBeforeUnmount(() => {
   detailRequest += 1;
-  open.value = false; detail.value = null; walletTarget.value = null;
-  action.value = ''; actionTarget.value = null;
-  page.value = 1; load();
 });
+watch(() => route.query.wallet, requestedWallet);
+watch(
+  () => scope.serverId,
+  () => {
+    detailRequest += 1;
+    open.value = false;
+    detail.value = null;
+    walletTarget.value = null;
+    action.value = '';
+    actionTarget.value = null;
+    profileOpen.value = false;
+    page.value = 1;
+    load();
+  }
+);
 </script>
 
 <template>
   <div class="ops-page">
-
     <NAlert v-if="!scope.currentServer?.runtimeBound" type="info" title="该区服尚未部署，绑定游戏服务后可新增角色。" />
     <NAlert v-if="error" type="error" :title="error" />
     <NCard :bordered="false" class="ops-panel">
       <div class="ops-filters">
-        <NInput v-model:value="q" placeholder="角色名称或 ID" clearable class="ops-search" @keydown.enter="search" />
+        <NInput
+          v-model:value="q"
+          placeholder="角色名称或 ID"
+          :input-props="{ 'aria-label': '角色搜索' }"
+          clearable
+          class="ops-search"
+          @keydown.enter="search"
+        />
         <NButton type="primary" @click="search">搜索</NButton>
         <span class="ops-muted">共 {{ total.toLocaleString() }} 个角色</span>
         <NSpace>
@@ -311,13 +398,24 @@ watch(() => scope.serverId, () => {
         />
       </div>
     </NCard>
-    <NDrawer :show="Boolean(walletTarget)" :width="1020" class="ops-editor-drawer" @update:show="!$event && closeWallet()">
+    <NDrawer
+      :show="Boolean(walletTarget)"
+      :width="1020"
+      class="ops-editor-drawer"
+      @update:show="!$event && closeWallet()"
+    >
       <NDrawerContent :title="`${walletTarget?.name || ''} · 蓝绿钱包`" closable>
-        <WalletLedger v-if="walletTarget" :key="`${scope.serverId}:${walletTarget.id}`" :account-id="walletTarget.accountId || undefined" :player-id="walletTarget.accountId ? undefined : walletTarget.id" />
+        <WalletLedger
+          v-if="walletTarget"
+          :key="`${scope.serverId}:${walletTarget.id}`"
+          :account-id="walletTarget.accountId || undefined"
+          :player-id="walletTarget.accountId ? undefined : walletTarget.id"
+        />
       </NDrawerContent>
     </NDrawer>
     <GamePlayerCreate v-model:show="createOpen" @created="createdPlayer" />
-    <NDrawer v-model:show="open" :width="980" class="ops-editor-drawer">
+    <PlayerProfileEditor v-model:show="profileOpen" :player="detail" @saved="profileSaved" />
+    <NDrawer :show="open" @update:show="closeDetail" :width="980" class="ops-editor-drawer">
       <NDrawerContent title="玩家管理" closable>
         <NAlert v-if="detailError" type="error" :title="detailError" class="mb-20px" />
         <NSpin :show="detailLoading">
@@ -330,8 +428,8 @@ watch(() => scope.serverId, () => {
               <NSpace>
                 <NButton :loading="detailLoading" @click="loadDetail(detail.id)">刷新</NButton>
                 <NButton @click="openWallet(detail)">蓝绿钱包</NButton>
-                <NButton v-if="canWrite" @click="edit('name')">修改名称</NButton>
-                <NButton v-if="canWrite" type="primary" secondary @click="edit('level')">编辑</NButton>
+
+                <NButton v-if="canWrite" type="primary" secondary @click="profileOpen = true">编辑</NButton>
                 <NButton v-if="canWrite" @click="edit('kick')">踢下线</NButton>
               </NSpace>
             </div>
@@ -339,6 +437,9 @@ watch(() => scope.serverId, () => {
               <NTabPane name="overview" tab="角色概况">
                 <NDescriptions :column="3" label-placement="top" class="mb-28px mt-20px">
                   <NDescriptionsItem label="角色等级">{{ detail.level }}</NDescriptionsItem>
+                  <NDescriptionsItem label="本级经验">{{ detail.exp }}</NDescriptionsItem>
+                  <NDescriptionsItem label="所属区服">{{ scope.currentServer?.name }}</NDescriptionsItem>
+                  <NDescriptionsItem label="账号归属">{{ detail.username }} · {{ detail.accountId }}</NDescriptionsItem>
                   <NDescriptionsItem label="会员等级">VIP{{ detail.vip }}</NDescriptionsItem>
                   <NDescriptionsItem label="主线进度">{{ detail.chapter }} - {{ detail.mission }}</NDescriptionsItem>
                   <NDescriptionsItem label="所在场景">{{ sceneLabel(detail.scene) }}</NDescriptionsItem>
@@ -366,22 +467,14 @@ watch(() => scope.serverId, () => {
                 </NDescriptions>
               </NTabPane>
               <NTabPane name="inventory" tab="背包">
-                <div class="ops-filters mt-16px">
-                  <NInput v-model:value="inventoryQ" clearable placeholder="搜索物品名称或编号" @update:value="inventoryPage = 1" />
-                </div>
-                <NDataTable
-                  :columns="inventoryColumns"
-                  :data="inventoryRows"
-                  :bordered="false"
-                  :scroll-x="750"
-                  :pagination="{
-                    page: inventoryPage,
-                    pageSize: 20,
-                    onChange: (value: number) => (inventoryPage = value)
-                  }"
+                <PlayerInventory
+                  ref="inventoryRef"
+                  :key="`${scope.serverId}:${detail.id}`"
+                  :player-id="detail.id"
+                  :player-name="detail.name"
+                  @changed="inventoryChanged"
                 />
               </NTabPane>
-
             </NTabs>
           </template>
         </NSpin>
@@ -397,7 +490,9 @@ watch(() => scope.serverId, () => {
       @update:show="!$event && actionGuard.requestClose()"
     >
       <NAlert v-if="actionError" type="error" :title="actionError" class="mb-16px" />
-      <NButton v-if="actionConflict" :disabled="acting" :loading="detailLoading" class="mb-16px" @click="refreshAction">读取最新数据</NButton>
+      <NButton v-if="actionConflict" :disabled="acting" :loading="detailLoading" class="mb-16px" @click="refreshAction"
+        >读取最新数据</NButton
+      >
       <div class="grant-object">
         <strong>{{ actionTarget?.name }}</strong>
         <span class="ops-muted">{{ scope.currentServer?.name }} · ID {{ actionTarget?.id }}</span>
@@ -407,11 +502,27 @@ watch(() => scope.serverId, () => {
           <NInput v-model:value="newName" :maxlength="40" />
         </NFormItem>
         <NFormItem v-if="action === 'level'" label="角色等级" required>
-          <NInputNumber v-model:value="newLevel" :min="1" :max="100" :precision="0" :input-props="{ 'aria-label': '角色等级' }" class="w-full" />
+          <NInputNumber
+            v-model:value="newLevel"
+            :min="1"
+            :max="100"
+            :precision="0"
+            :input-props="{ 'aria-label': '角色等级' }"
+            class="w-full"
+          />
         </NFormItem>
-        <p v-if="action === 'level'" class="ops-muted mb-16px">当前 {{ actionTarget?.level }} 级。等级变化后本级经验归零，重新登录游戏后显示。</p>
+        <p v-if="action === 'level'" class="ops-muted mb-16px">
+          当前
+          {{ actionTarget?.level }}
+          级。等级变化后本级经验归零，重新登录游戏后显示。
+        </p>
         <NFormItem label="操作原因" required>
-          <NInput v-model:value="actionReason" type="textarea" :maxlength="200" :input-props="{ 'aria-label': '操作原因' }" />
+          <NInput
+            v-model:value="actionReason"
+            type="textarea"
+            :maxlength="200"
+            :input-props="{ 'aria-label': '操作原因' }"
+          />
         </NFormItem>
       </NForm>
       <p v-if="action === 'kick'" class="ops-muted">将结束该角色当前登录会话，角色存档保留。</p>

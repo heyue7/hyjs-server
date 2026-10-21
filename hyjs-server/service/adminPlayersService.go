@@ -20,14 +20,15 @@ func adminPlayerVersion(row db.Profile) string {
 	return adminDigest(string(adminJSON(struct {
 		Player, Game *string
 		Session      string
-	}{row.Player, row.Game, hex.EncodeToString(row.Session)})))
+		CreatedAt    *int64
+	}{row.Player, row.Game, hex.EncodeToString(row.Session), row.CreatedAt})))
 }
 func adminPlayerProjection(row db.Profile, details bool) (model.AdminGamePlayerDTO, error) {
 	p, g, err := decodeProfile(&row)
 	if err != nil {
 		return model.AdminGamePlayerDTO{}, err
 	}
-	out := model.AdminGamePlayerDTO{AccountID: row.AccountID, Username: row.Uid, ID: row.Id, ServerID: AdminProfileServerID(row), Name: p.GetName(), Level: int64(p.GetLevel()), Vip: int64(p.GetVip()), Chapter: g.Copy.GetCurrentChapterId(), Mission: g.Copy.GetCurrentMissionId(), Scene: g.Position.GetScene(), Version: adminPlayerVersion(row), Balances: map[string]int64{"coin": p.GetCoin(), "diamond": int64(p.GetDiamond()), "energy": int64(p.GetEnergy()), "stamina": int64(p.GetStamina()), "light": int64(p.GetLight()), "point": int64(p.GetPoint()), "popularity": int64(p.GetPopularity()), "score": int64(p.GetScore())}, Counts: map[string]int64{"characters": int64(len(g.Warriors)), "equipment": int64(len(g.Equipment)), "accessories": int64(len(g.Treasures)), "items": int64(len(g.Items)), "gems": int64(len(g.Gems)), "cooking": int64(len(g.Cooking))}}
+	out := model.AdminGamePlayerDTO{AccountID: row.AccountID, Username: row.Uid, ID: row.Id, ServerID: AdminProfileServerID(row), Name: p.GetName(), Level: int64(p.GetLevel()), Exp: p.GetExp(), Vip: int64(p.GetVip()), Chapter: g.Copy.GetCurrentChapterId(), Mission: g.Copy.GetCurrentMissionId(), Scene: g.Position.GetScene(), Version: adminPlayerVersion(row), Balances: map[string]int64{"coin": p.GetCoin(), "diamond": p.GetDiamond(), "energy": int64(p.GetEnergy()), "stamina": int64(p.GetStamina()), "light": int64(p.GetLight()), "point": int64(p.GetPoint()), "popularity": int64(p.GetPopularity()), "score": int64(p.GetScore()), "coinpet": p.GetCoinpet(), "contribution": int64(p.GetContribution())}, Counts: map[string]int64{"characters": int64(len(g.Warriors)), "equipment": int64(len(g.Equipment)), "accessories": int64(len(g.Treasures)), "items": int64(len(g.Items)), "gems": int64(len(g.Gems)), "cooking": int64(len(g.Cooking))}}
 	if row.CreatedAt != nil {
 		out.CreatedAt = *row.CreatedAt
 	}

@@ -9,6 +9,7 @@ type AdminGamePlayerDTO struct {
 	ID        int64                      `json:"id"`                  // ID 是游戏角色ID。
 	Name      string                     `json:"name"`                // Name 是游戏昵称。
 	Level     int64                      `json:"level"`               // Level 是当前等级。
+	Exp       int64                      `json:"exp"`                 // Exp 是当前等级的经验。
 	Vip       int64                      `json:"vip"`                 // Vip 是当前VIP等级。
 	Chapter   string                     `json:"chapter"`             // Chapter 是当前主线章节。
 	Mission   string                     `json:"mission"`             // Mission 是当前主线关卡。
