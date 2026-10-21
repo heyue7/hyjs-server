@@ -125,7 +125,7 @@ const columns: DataTableColumns<GameAccount> = [
   { title: '登录状态', key: 'enabled', width: 110, render: row => h(NTag, { size: 'small', bordered: false, type: row.enabled ? 'success' : 'default' }, () => row.enabled ? '允许登录' : '已停用') },
   { title: '注册时间', key: 'createdAt', minWidth: 180, render: row => formatTime(row.createdAt) },
   { title: '操作', key: 'actions', minWidth: 260, render: row => h(NSpace, { size: 6 }, () => [
-    h(NButton, { size: 'small', secondary: true, disabled: row.protected, onClick: () => openWallet(row) }, () => '蓝绿钱包'),
+    h(NButton, { size: 'small', secondary: true, disabled: row.protected, onClick: () => openWallet(row) }, () => '蓝绿终端'),
     ...(canWrite.value ? [h(NButton, { size: 'small', secondary: true, disabled: row.protected, onClick: () => edit('edit', row) }, () => '编辑')] : []),
     ...(isAdmin.value ? [h(NButton, { size: 'small', quaternary: true, disabled: row.protected, onClick: () => edit('password', row) }, () => '重置密码')] : [])
   ]) }
@@ -170,7 +170,7 @@ onBeforeUnmount(() => { generation += 1; draft.password = ''; draft.confirmPassw
       </NForm>
       <template #footer><div class="ops-drawer-actions"><NButton :disabled="saving" @click="close">取消</NButton><NButton type="primary" :loading="saving" :disabled="conflict" @click="save">{{ modal === 'create' ? '创建用户' : modal === 'password' ? '重置密码' : '保存' }}</NButton></div></template>
     </NModal>
-    <NDrawer v-model:show="walletOpen" :width="1000"><NDrawerContent :title="`${walletAccount?.nickname || walletAccount?.username || ''} · 蓝绿钱包`" closable><WalletLedger v-if="walletOpen && walletAccount" :account-id="walletAccount.id" /></NDrawerContent></NDrawer>
+    <NDrawer v-model:show="walletOpen" :width="1000"><NDrawerContent :title="`${walletAccount?.nickname || walletAccount?.username || ''} · 蓝绿终端`" closable><WalletLedger v-if="walletOpen && walletAccount" :account-id="walletAccount.id" /></NDrawerContent></NDrawer>
     <NDrawer v-model:show="playersOpen" :width="760"><NDrawerContent :title="`${selected?.nickname || selected?.username || ''} · 游戏角色`" closable><p class="ops-inline-note">登录账号：{{ selected?.username }}。每个区服的角色与进度独立。</p><NDataTable :columns="playerColumns" :data="selected?.players || []" :bordered="false" :row-key="(row: AccountPlayer) => `${row.serverId}:${row.playerId}`" :scroll-x="550" /><template #footer><NButton @click="playersOpen = false">关闭</NButton></template></NDrawerContent></NDrawer>
   </div>
 </template>

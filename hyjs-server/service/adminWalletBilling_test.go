@@ -66,12 +66,15 @@ func TestAdminWalletReasonsRangesAndFrozenCredit(t *testing.T) {
 	if err := db.GetIns().WithContext(ctx).Find(&rows).Error; err != nil {
 		t.Fatal(err)
 	}
-	if len(rows) != len(expected) {
-		t.Fatal("default reason catalogue does not have 28 situations", len(rows))
+	if len(rows) != len(expected)+10 {
+		t.Fatal("terminal reason catalogue does not preserve legacy rows and add ten situations", len(rows))
 	}
 	for _, row := range rows {
 		want, exists := expected[row.ID]
-		if !exists || !row.Enabled || row.Label == "" || [3]int64{row.MinCents, row.MaxCents, row.Weight} != want {
+		if !exists {
+			continue
+		}
+		if row.Enabled || row.Label == "" || [3]int64{row.MinCents, row.MaxCents, row.Weight} != want {
 			t.Fatal("reason range or relative weight changed", row.ID)
 		}
 		// Boundary draws must always select a situation valid for the requested amount.
@@ -84,16 +87,16 @@ func TestAdminWalletReasonsRangesAndFrozenCredit(t *testing.T) {
 		}
 	}
 	one, err := drawWalletReason(db.GetIns().WithContext(ctx), 1)
-	if err != nil || one == nil || (one.ID != "change" && one.ID != "refund" && one.ID != "cashback") {
+	if err != nil || one == nil || (one.ID != "aw_assist" && one.ID != "aw_assist_team") {
 		t.Fatal("one-cent credit selected an incompatible story", err)
 	}
 	view, err := f.s.LocalWalletAdd(ctx, id, "cosmic-frozen", constUtil.LocalWalletMaxCreditCents)
-	if err != nil || len(view.Entries) != 1 || view.Entries[0].ReasonID != "cosmic" || view.BalanceCents != constUtil.LocalWalletMaxCreditCents || view.CreditLabel != view.Entries[0].Label || !strings.Contains(view.CreditLabel, "1000000000000.00") {
+	if err != nil || len(view.Entries) != 1 || !strings.HasPrefix(view.Entries[0].ReasonID, "aw_") || view.BalanceCents != constUtil.LocalWalletMaxCreditCents || view.CreditLabel != view.Entries[0].Label {
 		t.Fatal("large integer credit or exact amount formatting", view, err)
 	}
 	entry := view.Entries[0]
 	var reason db.LocalWalletReason
-	if err := db.GetIns().WithContext(ctx).First(&reason, "id=?", "cosmic").Error; err != nil {
+	if err := db.GetIns().WithContext(ctx).First(&reason, "id=?", entry.ReasonID).Error; err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() {

@@ -34,7 +34,10 @@ func (s *GameService) InitializeLocalWallet(ctx context.Context) error {
 	if err := db.GetIns().WithContext(ctx).Clauses(clause.OnConflict{DoNothing: true}).Create(&policy).Error; err != nil {
 		return err
 	}
-	return initializeWalletReasons(ctx)
+	if err := initializeWalletReasons(ctx); err != nil {
+		return err
+	}
+	return initializeTerminal(ctx)
 }
 
 func localWalletPolicy(tx *gorm.DB) (*db.LocalWalletPolicy, error) {
@@ -102,6 +105,14 @@ func localWalletProjection(tx *gorm.DB, owner *db.Profile, p *pb.Player, balance
 		}
 		view.PendingOrders = append(view.PendingOrders, LocalWalletPendingOrder{OrderID: order.ID, ProductName: product.Name, AmountCents: order.Cents, ExpiresAt: order.ExpiresAt})
 	}
+	terminal, err := terminalProjection(tx, owner, balance, now)
+	if err != nil {
+		return nil, err
+	}
+	if terminal != nil && !enabled {
+		terminal.CanBurst = false
+	}
+	view.Terminal = terminal
 	return view, nil
 }
 
@@ -122,7 +133,7 @@ func (s *GameService) LocalWalletSnapshot(ctx context.Context, id int64) (*Local
 		if err != nil {
 			return err
 		}
-		balance, err := walletReadBalance(tx, id, false)
+		balance, err := walletReadBalance(tx, id, true)
 		if err != nil {
 			return err
 		}
@@ -145,6 +156,7 @@ func validLocalWalletKey(key string) bool {
 	return true
 }
 
+// LocalWalletAdd remains available to legacy internal migration checks; the HTTP add route always rejects.
 func (s *GameService) LocalWalletAdd(ctx context.Context, id int64, requestKey string, cents int64) (*LocalWalletView, error) {
 	return s.localWalletAddAt(ctx, id, requestKey, cents, time.Now())
 }

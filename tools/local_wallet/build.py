@@ -47,13 +47,17 @@ def build(output, icon=None):
         stubs, classes, dex = temp / 'stubs', temp / 'classes', temp / 'dex'
         for directory in (stubs, classes, dex):
             directory.mkdir()
-        common = [jdk / 'bin/javac', '-encoding', 'UTF-8', '-source', '8', '-target', '8', '-bootclasspath', android]
-        run([*common, '-d', stubs, *sorted((HERE / 'stubs').rglob('*.java'))], env)
-        run([*common, '-classpath', stubs, '-d', classes, *sorted((HERE / 'src').rglob('*.java')), ROOT / 'tools/green_hero_compat/java/com/hyjs/wallet/LocalAssetOverlay.java'], env)
+        common = [jdk / 'bin/javac', '-encoding', 'UTF-8', '--release', '8', '-classpath', android]
+        # Existing APK supplies LoginCache; compile its unchanged public call as
+        # a classpath-only stub. Root rebuilds all native account classes together.
+        cache_stub = temp / 'LoginCache.java'
+        cache_stub.write_text('package com.hyjs.wallet; public final class LoginCache { public static void passwordChanged(String username,String password) {} }')
+        run([*common, '-d', stubs, *sorted((HERE / 'stubs').rglob('*.java')), cache_stub], env)
+        run([*common, '-classpath', str(android) + os.pathsep + str(stubs), '-d', classes, *sorted((HERE / 'src').rglob('*.java')), ROOT / 'tools/green_hero_compat/java/com/hyjs/wallet/LocalAssetOverlay.java'], env)
         wallet_classes = sorted(classes.rglob('*.class'))
         if not wallet_classes or any(not str(path.relative_to(classes)).startswith('com/hyjs/wallet/') for path in wallet_classes):
             raise ValueError('Only wallet classes may be input to D8')
-        run([d8, '--min-api', '23', '--lib', android, '--classpath', stubs, '--output', dex, *wallet_classes], env)
+        run([d8, '--release', '--min-api', '23', '--lib', android, '--classpath', stubs, '--output', dex, *wallet_classes], env)
         if sorted(p.name for p in dex.iterdir()) != ['classes.dex']:
             raise ValueError('Wallet must fit one isolated dex')
         original_manifest = (ROOT / 'tools/AndroidManifest.xml').read_text()

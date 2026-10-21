@@ -240,7 +240,7 @@ const local: App.I18n.Schema = {
     cdk: 'Redeem codes',
     'game-accounts': 'Game users',
     players: 'Players',
-    wallets: 'Wallets',
+    wallets: '蓝绿终端',
     'activities-unavailable': 'Unavailable activities',
     'shops': '商店管理',
     'achievements': '成就管理',

@@ -19,6 +19,7 @@ func init() {
 
 // RegisterAdminWalletRoutes 接入后台角色账单、理由与日期管理。
 func RegisterAdminWalletRoutes(a *gin.RouterGroup) {
+	RegisterAdminTerminalRoutes(a)
 	a.GET("/wallets", AdminWalletsHandler)
 	a.GET("/wallets/:id/ledger", AdminWalletLedgerHandler)
 	a.GET("/wallet-reasons", AdminWalletReasonsHandler)
@@ -27,7 +28,7 @@ func RegisterAdminWalletRoutes(a *gin.RouterGroup) {
 }
 
 // LocalWalletLedgerHandler 返回当前登录角色分页账单及真实时间范围汇总。
-// @Summary 查询蓝绿钱包完整账单
+// @Summary 查询蓝绿终端完整账单
 // @Description 以原游戏会话校验归属，服务器累计收支，使用真实账务时间。
 // @Tags LocalWallet
 // @Accept json
@@ -54,7 +55,7 @@ func LocalWalletLedgerHandler(c *gin.Context) error {
 		return model.NewErrParamsError()
 	}
 	if !testPaymentsEnabled || gameService == nil || !gameService.P3LocalWalletEnabled {
-		return model.NewErrBizCodeMsg(constUtil.TestPaymentAdapterDenied, "蓝绿钱包暂未开放")
+		return model.NewErrBizCodeMsg(constUtil.TestPaymentAdapterDenied, "蓝绿终端暂未开放")
 	}
 	if _, err = service.AuthorizeAccount(c.Request.Context(), req.PlayerID, session); err != nil {
 		return model.NewErrBizCodeMsg(constUtil.TestPaymentAdapterDenied, "登录已失效，请重新登录")

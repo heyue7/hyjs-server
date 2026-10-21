@@ -36,7 +36,7 @@ function edit(row: WalletReason) {
 async function save() {
   if (!canWrite.value || saving.value) return;
   if (!draft.label.trim() || draft.minCents <= 0 || draft.maxCents < draft.minCents || draft.weight < 1) {
-    saveError.value = '请填写理由、有效金额范围及正整数权重';
+    saveError.value = '请填写理由、有效点数范围及正整数权重';
     return;
   }
   saving.value = true;
@@ -55,7 +55,7 @@ async function save() {
 const columns: DataTableColumns<WalletReason> = [
   { title: '入账理由', key: 'label', minWidth: 240 },
   {
-    title: '金额范围（元）',
+    title: '范围（超频点数）',
     key: 'minCents',
     width: 200,
     render: row => `${money(row.minCents)} ～ ${money(row.maxCents)}`
@@ -84,7 +84,7 @@ onMounted(load);
 <template>
   <div>
     <div class="ops-filters">
-      <ContextHelp title="入账规则" text="添加余额时，在对应金额范围内随机选取理由。" />
+      <ContextHelp title="入账规则" text="运营投放时，在对应点数范围内随机选取理由。" />
       <NButton :loading="loading" @click="load">刷新</NButton>
     </div>
     <NAlert v-if="error" type="error" :title="error" class="mb-20px" />
@@ -109,10 +109,10 @@ onMounted(load);
       <NAlert v-if="saveError" type="error" :title="saveError" class="mb-20px" />
       <NForm label-placement="top" :disabled="!canWrite || saving">
         <NFormItem label="理由名称" required>
-          <NInput v-model:value="draft.label" :maxlength="100" placeholder="可用 {amount} 显示实际入账金额" />
+          <NInput v-model:value="draft.label" :maxlength="100" placeholder="可用 {amount} 显示实际入账点数" />
         </NFormItem>
         <div class="ops-date-grid">
-          <NFormItem label="最低金额（元）" required>
+          <NFormItem label="最低超频点数" required>
             <NInputNumber
               :value="draft.minCents / 100"
               :min="0.01"
@@ -121,7 +121,7 @@ onMounted(load);
               @update:value="draft.minCents = Math.round(($event || 0) * 100)"
             />
           </NFormItem>
-          <NFormItem label="最高金额（元）" required>
+          <NFormItem label="最高超频点数" required>
             <NInputNumber
               :value="draft.maxCents / 100"
               :min="0.01"

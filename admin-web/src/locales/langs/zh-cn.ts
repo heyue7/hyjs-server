@@ -236,7 +236,7 @@ const local: App.I18n.Schema = {
     cdk: '兑换码管理',
     'game-accounts': '用户管理',
     players: '玩家管理',
-    wallets: '蓝绿钱包',
+    wallets: '蓝绿终端',
     'activities-unavailable': '不可用活动',
     'shops': '商店管理',
     'achievements': '成就管理',

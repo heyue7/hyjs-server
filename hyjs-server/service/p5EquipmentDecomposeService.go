@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"google.golang.org/protobuf/proto"
 	"gorm.io/gorm"
 	"hyjs-server/constUtil"
@@ -16,7 +17,7 @@ func (s *GameService) p5EquipmentDecompose(ctx context.Context, id int64, b *pb.
 			return err
 		}
 		if len(b.GetGuid()) > 4 {
-			return p5Error()
+			return fmt.Errorf("装备分解每批最多选择4件：%w", p5Error())
 		}
 		gain := &pb.ResultObject{}
 		for _, guid := range b.GetGuid() {
@@ -30,12 +31,13 @@ func (s *GameService) p5EquipmentDecompose(ctx context.Context, id int64, b *pb.
 			if p5EquipmentProgressed(equip) {
 				refund, err := s.p5Refund(p, g, guid, equip)
 				if err != nil {
-					return err
+					// Keep untracked investment protected and identify the selected item that blocked the batch.
+					return fmt.Errorf("装备%s（%s）培养返还校验失败，请保留装备并核对投入记录：%w", equip.GetEquipId(), guid, err)
 				}
 				redMergeGain(gain, refund)
 				baseline, err := s.equipmentRecord(g, guid)
 				if err != nil || p5EquipmentProgressed(baseline) {
-					return p5Error()
+					return fmt.Errorf("装备%s（%s）返还后仍有培养进度，已保留整批装备：%w", equip.GetEquipId(), guid, p5Error())
 				}
 			}
 			equip, err = s.equipmentRecord(g, guid)

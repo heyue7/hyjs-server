@@ -87,7 +87,7 @@ const columns: DataTableColumns<WalletLedgerItem> = [
       )
   },
   {
-    title: '金额（元）',
+    title: '超频点数',
     key: 'amountCents',
     width: 140,
     align: 'right',
@@ -114,10 +114,10 @@ onBeforeUnmount(() => { generation += 1; });
   <div class="wallet-ledger">
     <div class="ops-toolbar mb-24px">
       <div>
-        <div class="ops-muted mb-6px">蓝绿钱包余额</div>
+        <div class="ops-muted mb-6px">蓝绿终端余额</div>
         <div class="wallet-balance">
           {{ data ? money(data.balanceCents) : '—' }}
-          <span class="wallet-currency">元</span>
+          <span class="wallet-currency">超频点数</span>
         </div>
       </div>
       <NButton :loading="loading" @click="load">刷新账单</NButton>
@@ -138,15 +138,15 @@ onBeforeUnmount(() => { generation += 1; });
       <div class="ledger-summary">
         <div>
           <span>收入</span>
-          <strong>¥ {{ money(data.summary.incomeCents) }}</strong>
+          <strong>{{ money(data.summary.incomeCents) }}</strong>
         </div>
         <div>
           <span>支出</span>
-          <strong>¥ {{ money(Math.abs(data.summary.expenseCents)) }}</strong>
+          <strong>{{ money(Math.abs(data.summary.expenseCents)) }}</strong>
         </div>
         <div>
           <span>净收入</span>
-          <strong>¥ {{ money(data.summary.netCents) }}</strong>
+          <strong>{{ money(data.summary.netCents) }}</strong>
         </div>
         <div>
           <span>交易笔数</span>

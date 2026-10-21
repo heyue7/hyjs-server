@@ -316,7 +316,7 @@ const columns = computed<DataTableColumns<GamePlayer>>(() => [
               )
             ]
           : []),
-        h(NButton, { size: 'small', onClick: () => openWallet(row) }, () => '蓝绿钱包')
+        h(NButton, { size: 'small', onClick: () => openWallet(row) }, () => '蓝绿终端')
       ])
   }
 ]);
@@ -404,7 +404,7 @@ watch(
       class="ops-editor-drawer"
       @update:show="!$event && closeWallet()"
     >
-      <NDrawerContent :title="`${walletTarget?.name || ''} · 蓝绿钱包`" closable>
+      <NDrawerContent :title="`${walletTarget?.name || ''} · 蓝绿终端`" closable>
         <WalletLedger
           v-if="walletTarget"
           :key="`${scope.serverId}:${walletTarget.id}`"
@@ -427,7 +427,7 @@ watch(
               </div>
               <NSpace>
                 <NButton :loading="detailLoading" @click="loadDetail(detail.id)">刷新</NButton>
-                <NButton @click="openWallet(detail)">蓝绿钱包</NButton>
+                <NButton @click="openWallet(detail)">蓝绿终端</NButton>
 
                 <NButton v-if="canWrite" type="primary" secondary @click="profileOpen = true">编辑</NButton>
                 <NButton v-if="canWrite" @click="edit('kick')">踢下线</NButton>

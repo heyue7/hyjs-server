@@ -64,7 +64,7 @@ import java.util.concurrent.Executors;
 /** A native wallet layered on the original Unity activity; the engine remains original. */
 public final class WalletActivity extends UnityPlayerActivity {
     private static final int BLUE=Color.rgb(22,119,255), INK=Color.rgb(17,17,17), GRAY=Color.rgb(128,128,128), LINE=Color.rgb(240,240,240);
-    private static final int HOME=0, ADD=3, BILLS=4, ORDERS=5, CASHIER=6, ACCOUNT=7, NICKNAME=8, PASSWORD=9;
+    private static final int HOME=0, BILLS=4, ORDERS=5, CASHIER=6, ACCOUNT=7, NICKNAME=8, PASSWORD=9;
     private static volatile WalletActivity current;
     private static volatile Credentials credentials=new Credentials(0,"",0);
 
@@ -85,6 +85,7 @@ public final class WalletActivity extends UnityPlayerActivity {
         if(a!=null)a.runOnUiThread(new Runnable(){public void run(){a.sessionChanged();}});
     }
 
+    private volatile HttpURLConnection activeConnection;
     private final ExecutorService network=Executors.newSingleThreadExecutor();
     private FrameLayout overlay;
     private View bubble;
@@ -96,19 +97,28 @@ public final class WalletActivity extends UnityPlayerActivity {
     private ValueAnimator bubbleDockAnimation;
     private Dialog panel;
     private LinearLayout shell;
-    private EditText amount;
+    private TextView unreadBadge;
     private TextView feedback;
     private JSONObject wallet, ledger, account;
     private EditText nicknameInput, oldPasswordInput, newPasswordInput, confirmationInput;
     private String nicknameDraft="";
     private JSONArray ledgerEntries=new JSONArray();
-    private String origin, creditRequestId, selectedOrderId;
-    private long creditAmount;
-    private String amountDraft="100", message="";
+    private String origin, burstRequestId, selectedOrderId;
+    private String message="";
     private boolean messageError, busy, destroyed, dockRight, dragging, keyboardBack, refreshQueued;
-    private int page=HOME, addReturn=HOME;
+    private int page=HOME;
     private int ledgerRange=2, ledgerKind=0, ledgerPage=1, ledgerScrollY=0;
-    private ScrollView ledgerScroll;
+    private ScrollView ledgerScroll, homeScroll;
+    private int homeScrollY;
+    private boolean foreground;
+    private long seenConfirmedRevision;
+    private JSONArray incomeEntries=new JSONArray();
+    private final android.os.Handler pollHandler=new android.os.Handler(android.os.Looper.getMainLooper());
+    private final Runnable statePoll=new Runnable(){public void run(){
+        if(destroyed || !foreground)return;
+        if(ready() && !busy)request("/local-wallet/state",new JSONObject(),false,true);
+        pollHandler.postDelayed(this,30000);
+    }};
     private final Runnable dimBubble=new Runnable(){public void run(){
         if(!destroyed && bubble!=null && !dragging && (panel==null || !panel.isShowing())){
             bubble.animate().cancel();bubble.animate().alpha(.40f).setDuration(180).start();
@@ -212,13 +222,14 @@ public final class WalletActivity extends UnityPlayerActivity {
         }catch(Exception error){origin=null;}
         getWindow().getDecorView().post(new Runnable(){public void run(){attachBubble();}});
     }
-    @Override protected void onResume(){super.onResume();current=this;if(panel!=null && panel.isShowing())refreshPage();}
+    @Override protected void onResume(){super.onResume();current=this;foreground=true;pollHandler.removeCallbacks(statePoll);pollHandler.post(statePoll);if(panel!=null && panel.isShowing())refreshPage();}
+    @Override protected void onPause(){foreground=false;pollHandler.removeCallbacks(statePoll);super.onPause();}
     @Override protected void onDestroy(){
-        destroyed=true;if(current==this)current=null;
+        destroyed=true;foreground=false;pollHandler.removeCallbacksAndMessages(null);if(current==this)current=null;
         if(bubble!=null){bubble.removeCallbacks(dimBubble);bubble.animate().cancel();}
         if(bubbleDockAnimation!=null)bubbleDockAnimation.cancel();
         removeBubbleWindow();bubbleWindowAnchors.clear();
-        if(panel!=null)panel.dismiss();network.shutdownNow();super.onDestroy();
+        if(panel!=null)panel.dismiss();HttpURLConnection connection=activeConnection;if(connection!=null)connection.disconnect();network.shutdownNow();super.onDestroy();
     }
     private int dp(float n){return Math.round(n*getResources().getDisplayMetrics().density);}
     private GradientDrawable shape(int color,float radius){GradientDrawable d=new GradientDrawable();d.setColor(color);d.setCornerRadius(dp(radius));return d;}
@@ -235,7 +246,7 @@ public final class WalletActivity extends UnityPlayerActivity {
     private void divider(LinearLayout parent){View line=new View(this);line.setBackgroundColor(LINE);parent.addView(line,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(1)));}
     private boolean ready(){return credentials.valid() && origin!=null;}
     private boolean active(){return ready() && !busy;}
-    private static String money(long cents){return BigDecimal.valueOf(cents,2).setScale(2).toPlainString();}
+    private static String money(long cents){return BigDecimal.valueOf(cents,2).stripTrailingZeros().toPlainString();}
     private static JSONArray array(JSONObject data,String key){JSONArray a=data==null?null:data.optJSONArray(key);return a==null?new JSONArray():a;}
     private static String date(long ms,String pattern){SimpleDateFormat f=new SimpleDateFormat(pattern,Locale.CHINA);f.setTimeZone(TimeZone.getTimeZone("Asia/Shanghai"));return f.format(new Date(ms));}
 
@@ -245,7 +256,7 @@ public final class WalletActivity extends UnityPlayerActivity {
         ViewGroup decor=(ViewGroup)getWindow().getDecorView();decor.setClipChildren(false);decor.setClipToPadding(false);
         overlay=new WalletOverlay();overlay.setClipChildren(false);overlay.setClipToPadding(false);overlay.setClickable(false);
         decor.addView(overlay,new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.MATCH_PARENT,Gravity.FILL));
-        ImageView icon=new CircularWalletIcon(this);icon.setContentDescription("蓝绿钱包，点击展开，拖动位置");icon.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        ImageView icon=new CircularWalletIcon(this);icon.setContentDescription("蓝绿终端，点击展开，拖动位置");icon.setScaleType(ImageView.ScaleType.CENTER_CROP);
         try{InputStream in=getAssets().open("local-wallet/icon.png");BitmapFactory.Options options=new BitmapFactory.Options();options.inSampleSize=4;Bitmap bitmap=BitmapFactory.decodeStream(in,null,options);in.close();if(bitmap!=null)icon.setImageBitmap(bitmap);}catch(Exception unavailable){icon.setImageResource(android.R.drawable.ic_menu_save);icon.setColorFilter(BLUE);}
         bubble=icon;bubble.setAlpha(.40f);
         bubbleX=0;bubbleY=dp(70);
@@ -256,6 +267,8 @@ public final class WalletActivity extends UnityPlayerActivity {
         // Unity's main Decor/RenderNode hierarchy and never takes keyboard focus.
         bubbleWindow.setClipChildren(true);bubbleWindow.setClipToPadding(true);
         bubbleWindow.addView(icon,new FrameLayout.LayoutParams(dp(48),dp(48),Gravity.TOP|Gravity.LEFT));
+        unreadBadge=center("",10,Color.WHITE);unreadBadge.setBackground(shape(Color.rgb(239,67,67),9));unreadBadge.setVisibility(View.GONE);
+        FrameLayout.LayoutParams badgeLayout=new FrameLayout.LayoutParams(dp(18),dp(18),Gravity.TOP|Gravity.LEFT);bubbleWindow.addView(unreadBadge,badgeLayout);updateUnreadBadge();
         bubbleWindowManager=(WindowManager)getSystemService(WINDOW_SERVICE);
         attachWalletWindow(getWindow().getDecorView());
         icon.addOnLayoutChangeListener(new View.OnLayoutChangeListener(){public void onLayoutChange(View v,int l,int t,int r,int b,int ol,int ot,int or,int ob){updateBubbleGestureExclusion();overlay.invalidate();}});
@@ -308,7 +321,7 @@ public final class WalletActivity extends UnityPlayerActivity {
         if(Build.VERSION.SDK_INT>=30)lp.setFitInsetsTypes(0);
         // Docked half stays clipped inside the safe 48dp handle; the handle itself
         // remains usable for a new DOWN over either the game or a native dialog.
-        bubble.setTranslationX(bubbleX-handle.left);bubble.setTranslationY(bubbleY-handle.top);
+        bubble.setTranslationX(bubbleX-handle.left);bubble.setTranslationY(bubbleY-handle.top);updateUnreadBadge();
         if(anchor!=bubbleWindowAnchor){
             removeBubbleWindow();
             try{bubbleWindowManager.addView(bubbleWindow,lp);bubbleWindowAnchor=anchor;}
@@ -318,6 +331,14 @@ public final class WalletActivity extends UnityPlayerActivity {
             catch(IllegalArgumentException detached){bubbleWindowAnchor=null;}
         }
         updateBubbleGestureExclusion();
+    }
+    private JSONObject terminal(){return wallet==null?null:wallet.optJSONObject("terminal");}
+    private void updateUnreadBadge(){
+        if(unreadBadge==null)return;JSONObject terminal=terminal();int count=terminal==null?0:terminal.optInt("unreadCount");
+        unreadBadge.setText(count>99?"99+":String.valueOf(count));unreadBadge.setVisibility(count>0?View.VISIBLE:View.GONE);
+        // Clamp the top-right marker to the visible icon half inside its real 48dp window.
+        Rect handle=bubbleTouchBounds();float x=bubbleX-handle.left+dp(30);unreadBadge.setTranslationX(Math.max(0,Math.min(dp(30),x)));unreadBadge.setTranslationY(dp(1));
+        unreadBadge.setContentDescription("未读到账 "+count+" 条");
     }
     private Rect bubbleBounds(){
         if(overlay==null)return new Rect();
@@ -381,7 +402,7 @@ public final class WalletActivity extends UnityPlayerActivity {
 
     private void openPanel(){
         if(destroyed || (panel!=null && panel.isShowing()))return;
-        revealBubble();page=HOME;message="";messageError=false;
+        revealBubble();homeScroll=null;homeScrollY=0;page=HOME;message="";messageError=false;
         panel=new Dialog(this);panel.requestWindowFeature(Window.FEATURE_NO_TITLE);
         shell=column();shell.setBackgroundColor(Color.WHITE);shell.setFocusableInTouchMode(true);panel.setContentView(shell);
         Window window=panel.getWindow();window.setBackgroundDrawableResource(android.R.color.white);window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);window.setDimAmount(.24f);
@@ -411,7 +432,6 @@ public final class WalletActivity extends UnityPlayerActivity {
         hideKeyboard();
         if(page==HOME){panel.dismiss();return;}
         if(page==NICKNAME || page==PASSWORD){navigate(ACCOUNT);return;}
-        if(page==ADD){navigate(addReturn==CASHIER && currentOrder()!=null?CASHIER:HOME);return;}
         if(page==CASHIER && array(wallet,"pendingOrders").length()>1){navigate(ORDERS);return;}
         navigate(HOME);
     }
@@ -422,36 +442,48 @@ public final class WalletActivity extends UnityPlayerActivity {
         if(panel==null)return;View focus=panel.getCurrentFocus();if(focus!=null){InputMethodManager ime=(InputMethodManager)getSystemService(INPUT_METHOD_SERVICE);if(ime!=null)ime.hideSoftInputFromWindow(focus.getWindowToken(),0);focus.clearFocus();}if(shell!=null)shell.requestFocus();
     }
     private void setMessage(String value,boolean error){message=value;messageError=error;if(feedback!=null){feedback.setText(value);feedback.setVisibility(value.isEmpty()?View.GONE:View.VISIBLE);feedback.setTextColor(error?Color.rgb(200,65,50):GRAY);}}
-    private String title(){switch(page){case ADD:return "增加余额";case BILLS:return "账单";case CASHIER:return "付款";case ORDERS:return "待支付订单";case ACCOUNT:return "账号设置";case NICKNAME:return "修改昵称";case PASSWORD:return "修改密码";default:return "蓝绿钱包";}}
+    private String title(){switch(page){case BILLS:return "账单";case CASHIER:return "付款";case ORDERS:return "待支付订单";case ACCOUNT:return "账号设置";case NICKNAME:return "修改昵称";case PASSWORD:return "修改密码";default:return "蓝绿终端";}}
     private void render(){
         if(panel==null || !panel.isShowing())return;
         fitPanel();
         rememberLedgerScroll();ledgerScroll=null;
-        boolean wasEditing=amount!=null && amount.hasFocus();amount=null;shell.removeAllViews();
+        if(homeScroll!=null && page==HOME)homeScrollY=homeScroll.getScrollY();homeScroll=null;shell.removeAllViews();
         FrameLayout nav=new FrameLayout(this);
         TextView title=center(title(),18,INK);nav.addView(title,new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(52)));
-        TextView back=center("‹",34,INK);back.setContentDescription(page==HOME?"收起蓝绿钱包":"返回");FrameLayout.LayoutParams left=new FrameLayout.LayoutParams(dp(56),dp(52),Gravity.LEFT);nav.addView(back,left);back.setOnClickListener(new View.OnClickListener(){public void onClick(View v){back();}});
-        if(page==HOME){TextView menu=center("⋯",28,INK);menu.setContentDescription("钱包菜单");FrameLayout.LayoutParams right=new FrameLayout.LayoutParams(dp(56),dp(52),Gravity.RIGHT);nav.addView(menu,right);menu.setOnClickListener(v->{PopupMenu popup=new PopupMenu(this,menu);popup.getMenu().add(0,1,0,"账单");popup.getMenu().add(0,2,1,"账号设置").setEnabled(ready());popup.setOnMenuItemClickListener(item->{navigate(item.getItemId()==1?BILLS:ACCOUNT);return true;});popup.show();});}
+        TextView back=center("‹",34,INK);back.setContentDescription(page==HOME?"收起蓝绿终端":"返回");FrameLayout.LayoutParams left=new FrameLayout.LayoutParams(dp(56),dp(52),Gravity.LEFT);nav.addView(back,left);back.setOnClickListener(new View.OnClickListener(){public void onClick(View v){back();}});
+        if(page==HOME){TextView menu=center("⋯",28,INK);menu.setContentDescription("终端菜单");FrameLayout.LayoutParams right=new FrameLayout.LayoutParams(dp(56),dp(52),Gravity.RIGHT);nav.addView(menu,right);menu.setOnClickListener(v->{PopupMenu popup=new PopupMenu(this,menu);popup.getMenu().add(0,1,0,"账单");popup.getMenu().add(0,2,1,"账号设置").setEnabled(ready());popup.setOnMenuItemClickListener(item->{navigate(item.getItemId()==1?BILLS:ACCOUNT);return true;});popup.show();});}
         else if(page==BILLS){TextView reload=center("刷新",14,BLUE);reload.setEnabled(!busy);nav.addView(reload,new FrameLayout.LayoutParams(dp(64),dp(52),Gravity.RIGHT));reload.setOnClickListener(new View.OnClickListener(){public void onClick(View v){refreshPage();}});}
         addFull(shell,nav,52);divider(shell);
         LinearLayout body=column();shell.addView(body,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,0,1));
-        switch(page){case ADD:renderAdd(body);break;case BILLS:renderBills(body);break;case ORDERS:renderOrders(body);break;case CASHIER:renderCashier(body);break;case ACCOUNT:renderAccount(body);break;case NICKNAME:case PASSWORD:renderAccountForm(body);break;default:renderHome(body);}
+        switch(page){case BILLS:renderBills(body);break;case ORDERS:renderOrders(body);break;case CASHIER:renderCashier(body);break;case ACCOUNT:renderAccount(body);break;case NICKNAME:case PASSWORD:renderAccountForm(body);break;default:renderHome(body);}
         feedback=center("",12,GRAY);feedback.setPadding(dp(20),dp(6),dp(20),dp(6));feedback.setMaxLines(2);shell.addView(feedback);
-        if(!credentials.valid())setMessage("登录游戏后可用",false);else if(origin==null)setMessage("蓝绿钱包连接未配置",true);else setMessage(message,messageError);
-        if(wasEditing && page==ADD && amount!=null && !busy){amount.requestFocus();amount.setSelection(amount.length());}
+        if(!credentials.valid())setMessage("登录游戏后可用",false);else if(origin==null)setMessage("蓝绿终端连接未配置",true);else setMessage(message,messageError);
     }
     private void renderHome(LinearLayout body){
-        body.setPadding(dp(24),0,dp(24),dp(14));space(body,.8f);
-        addFull(body,center("账户余额（元）",13,GRAY),24);
+        LinearLayout content=column();content.setPadding(dp(24),dp(18),dp(24),dp(18));
+        addFull(content,center("账户余额（超频点数）",13,GRAY),24);
         TextView balance=center(wallet==null?"—":money(wallet.optLong("balanceCents")),36,INK);
         balance.setSingleLine(true);if(Build.VERSION.SDK_INT>=26)balance.setAutoSizeTextTypeUniformWithConfiguration(18,36,1,android.util.TypedValue.COMPLEX_UNIT_SP);
-        addFull(body,balance,54);
-        space(body,1f);
+        addFull(content,balance,60);
         final JSONArray orders=array(wallet,"pendingOrders");
-        if(orders.length()>0){TextView entry=text("待支付订单  "+orders.length()+"  ›",14,BLUE);entry.setGravity(Gravity.CENTER_VERTICAL);addFull(body,entry,42);entry.setOnClickListener(new View.OnClickListener(){public void onClick(View v){if(orders.length()==1){selectedOrderId=orders.optJSONObject(0).optString("orderId");navigate(CASHIER);}else navigate(ORDERS);}});}
-        addFull(body,action("增加余额",true,active(),new Runnable(){public void run(){addReturn=HOME;navigate(ADD);}}),48);
-        TextView virtual=center("本地虚拟余额",11,GRAY);virtual.setPadding(0,dp(10),0,0);body.addView(virtual);
+        if(orders.length()>0){TextView entry=text("待支付订单  "+orders.length()+"  ›",14,BLUE);entry.setGravity(Gravity.CENTER_VERTICAL);addFull(content,entry,42);entry.setOnClickListener(v->{if(orders.length()==1){selectedOrderId=orders.optJSONObject(0).optString("orderId");navigate(CASHIER);}else navigate(ORDERS);});}
+        JSONObject terminal=terminal();boolean enabled=terminal!=null && terminal.optBoolean("burstEnabled");boolean can=enabled && terminal.optBoolean("canBurst");
+        String label=busy?"处理中…":burstRequestId!=null?"重试 Burst Link！":terminal==null?"读取每日状态…":!enabled?"Burst Link！暂未开放":can?"每日 Burst Link！":wallet.optLong("balanceCents")<terminal.optDouble("burstCostPoints")*100?"超频点数不足":"今日已完成 Burst Link！";
+        addFull(content,action(label,true,active() && (can || burstRequestId!=null),()->burst()),48);
+        TextView rule=text(terminal==null?"正在读取终端配置": "每日一次 · 消耗 "+pointNumber(terminal.optDouble("burstCostPoints"))+" 点，随机获得 "+pointNumber(terminal.optDouble("burstMinPoints"))+"–"+pointNumber(terminal.optDouble("burstMaxPoints"))+" 点",12,GRAY);rule.setPadding(0,dp(10),0,dp(18));rule.setLineSpacing(dp(3),1);content.addView(rule);
+        if(incomeEntries.length()>0){addFull(content,text("到账通知",14,INK),34);
+            for(int i=0;i<incomeEntries.length();i++){JSONObject entry=incomeEntries.optJSONObject(i);if(entry==null)continue;
+                LinearLayout card=column();card.setPadding(dp(14),dp(13),dp(14),dp(13));card.setBackground(shape(Color.rgb(243,248,255),8));
+                String source=entry.optString("source");String labelText="signup".equals(source)?"注册赠送":"burst".equals(source)?"每日 Burst Link！":"admin_manual".equals(source)||"admin_weekly".equals(source)?entry.optString("label","运营投放"):"终端收入";
+                TextView title=text(labelText,14,INK);title.setLineSpacing(dp(3),1);card.addView(title);
+                TextView points=text("+"+unsignedMoney(entry.optLong("amountCents"))+" 超频点数",22,BLUE);points.setPadding(0,dp(10),0,dp(8));card.addView(points);
+                card.addView(text("到账成功 · "+date(entry.optLong("createdAt"),"MM月dd日 HH:mm"),11,GRAY));
+                LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.bottomMargin=dp(10);content.addView(card,lp);
+            }
+        }
+        homeScroll=scrolling(body,content);final ScrollView viewport=homeScroll;final int restore=homeScrollY;viewport.post(()->{if(homeScroll==viewport)viewport.scrollTo(0,restore);});
     }
+    private static String pointNumber(double points){return BigDecimal.valueOf(points).stripTrailingZeros().toPlainString();}
     private void renderAccount(LinearLayout body){
         LinearLayout content=column();content.setPadding(dp(24),dp(18),dp(24),dp(20));scrolling(body,content);
         addFull(content,text("登录账号",13,GRAY),24);
@@ -461,7 +493,7 @@ public final class WalletActivity extends UnityPlayerActivity {
         content.addView(action("修改昵称  ›",false,active() && account!=null,()->navigate(NICKNAME)),gap);
         LinearLayout.LayoutParams next=new LinearLayout.LayoutParams(-1,dp(46));next.topMargin=dp(10);
         content.addView(action("修改密码  ›",false,active() && account!=null,()->navigate(PASSWORD)),next);
-        TextView note=text("账号与钱包在各区服通用，游戏角色按区服分别保存。",12,GRAY);note.setPadding(0,dp(22),0,0);content.addView(note);
+        TextView note=text("账号与超频点数在各区服通用，游戏角色按区服分别保存。",12,GRAY);note.setPadding(0,dp(22),0,0);content.addView(note);
     }
     private EditText accountField(LinearLayout parent,String label,String hint,boolean secret){
         TextView caption=text(label,13,GRAY);caption.setPadding(0,dp(10),0,0);addFull(parent,caption,30);
@@ -499,19 +531,6 @@ public final class WalletActivity extends UnityPlayerActivity {
             }
         }catch(Exception invalid){setMessage("填写内容无效，请重试",true);}
     }
-    private void renderAdd(LinearLayout body){
-        LinearLayout form=column();ScrollView viewport=new ScrollView(this);viewport.setFillViewport(true);viewport.addView(form);body.addView(viewport,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.MATCH_PARENT));body=form;
-        body.setPadding(dp(26),dp(16),dp(26),dp(18));
-        addFull(body,text("增加金额",14,GRAY),28);
-        LinearLayout row=new LinearLayout(this);row.setGravity(Gravity.CENTER_VERTICAL);
-        amount=new EditText(this);amount.setSingleLine(true);amount.setText(creditRequestId==null?amountDraft:money(creditAmount));amount.setTextSize(36);amount.setTextColor(INK);amount.setSelectAllOnFocus(true);amount.setPadding(0,0,0,0);amount.setBackgroundColor(Color.TRANSPARENT);amount.setInputType(InputType.TYPE_CLASS_NUMBER|InputType.TYPE_NUMBER_FLAG_DECIMAL);
-        amount.setImeOptions(EditorInfo.IME_FLAG_NO_EXTRACT_UI|EditorInfo.IME_FLAG_NO_FULLSCREEN|EditorInfo.IME_ACTION_DONE);amount.setContentDescription("增加金额，单位元");amount.setEnabled(ready() && creditRequestId==null);
-        amount.addTextChangedListener(new TextWatcher(){public void beforeTextChanged(CharSequence s,int a,int c,int f){}public void onTextChanged(CharSequence s,int start,int before,int count){amountDraft=s.toString();}public void afterTextChanged(Editable e){}});
-        amount.setOnEditorActionListener(new TextView.OnEditorActionListener(){public boolean onEditorAction(TextView v,int id,KeyEvent event){if(id==EditorInfo.IME_ACTION_DONE){hideKeyboard();return true;}return false;}});
-        row.addView(amount,new LinearLayout.LayoutParams(0,dp(58),1));row.addView(center("元",18,INK),new LinearLayout.LayoutParams(dp(36),dp(58)));addFull(body,row,58);divider(body);
-        TextView help=text(creditRequestId==null?"添一点底气，去享受游戏 · 本地虚拟余额":"上次增加结果待确认，重试会沿用原请求",12,GRAY);help.setPadding(0,dp(10),0,0);body.addView(help);
-        space(body,1);addFull(body,action(busy?"处理中…":creditRequestId==null?"确认增加":"重试增加",true,active(),new Runnable(){public void run(){addMoney();}}),48);
-    }
     private ScrollView scrolling(LinearLayout body,LinearLayout content){ScrollView scroll=new ScrollView(this);scroll.setFillViewport(false);scroll.addView(content);body.addView(scroll,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.MATCH_PARENT));return scroll;}
     private void changeLedgerFilter(int range,int kind){
         if(!active())return;ledgerRange=range;ledgerKind=kind;ledgerPage=1;ledgerScrollY=0;ledger=null;ledgerEntries=new JSONArray();message="";render();requestLedger(1);
@@ -519,7 +538,7 @@ public final class WalletActivity extends UnityPlayerActivity {
     private TextView ledgerChip(String label,boolean selected,final Runnable click){
         TextView chip=center(label,13,selected?BLUE:GRAY);chip.setPadding(dp(5),0,dp(5),0);chip.setBackground(shape(selected?Color.rgb(235,244,255):Color.WHITE,14));chip.setEnabled(active());chip.setAlpha(active()?1f:.5f);chip.setOnClickListener(new View.OnClickListener(){public void onClick(View v){click.run();}});return chip;
     }
-    private String unsignedMoney(long cents){return BigDecimal.valueOf(cents,2).abs().setScale(2).toPlainString();}
+    private String unsignedMoney(long cents){return BigDecimal.valueOf(cents,2).abs().stripTrailingZeros().toPlainString();}
     private String signedMoney(long cents){return (cents<0?"−":cents>0?"+":"")+unsignedMoney(cents);}
     private void renderBills(LinearLayout body){
         LinearLayout list=column();list.setPadding(dp(22),dp(10),dp(22),dp(14));
@@ -528,8 +547,8 @@ public final class WalletActivity extends UnityPlayerActivity {
         JSONObject summary=ledger==null?null:ledger.optJSONObject("summary");
         TextView rangeTitle=text(summary==null?"读取本期收支…":rangeLabels[ledgerRange]+" · "+summary.optLong("transactionCount")+"笔收支",12,GRAY);rangeTitle.setPadding(0,dp(20),0,dp(12));list.addView(rangeTitle);
         LinearLayout totals=new LinearLayout(this);
-        LinearLayout income=column();income.addView(text("收入",12,GRAY));TextView incomeAmount=text(summary==null?"—":money(summary.optLong("incomeCents")),21,INK);incomeAmount.setPadding(0,dp(8),0,0);income.addView(incomeAmount);totals.addView(income,new LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1));
-        LinearLayout expense=column();expense.addView(text("支出",12,GRAY));TextView expenseAmount=text(summary==null?"—":money(summary.optLong("expenseCents")),21,INK);expenseAmount.setPadding(0,dp(8),0,0);expense.addView(expenseAmount);totals.addView(expense,new LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1));list.addView(totals);
+        LinearLayout income=column();income.addView(text("收入（超频点数）",12,GRAY));TextView incomeAmount=text(summary==null?"—":money(summary.optLong("incomeCents")),21,INK);incomeAmount.setPadding(0,dp(8),0,0);income.addView(incomeAmount);totals.addView(income,new LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1));
+        LinearLayout expense=column();expense.addView(text("支出（超频点数）",12,GRAY));TextView expenseAmount=text(summary==null?"—":money(summary.optLong("expenseCents")),21,INK);expenseAmount.setPadding(0,dp(8),0,0);expense.addView(expenseAmount);totals.addView(expense,new LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1));list.addView(totals);
         TextView net=text(summary==null?"净变化 —":"净变化 "+signedMoney(summary.optLong("netCents")),12,GRAY);net.setPadding(0,dp(10),0,dp(18));list.addView(net);divider(list);
         LinearLayout kinds=new LinearLayout(this);final String[] kindLabels={"全部收支","收入","支出"};
         for(int i=0;i<kindLabels.length;i++){final int kind=i;kinds.addView(ledgerChip(kindLabels[i],ledgerKind==i,new Runnable(){public void run(){changeLedgerFilter(ledgerRange,kind);}}),new LinearLayout.LayoutParams(0,dp(38),1));}addFull(list,kinds,38);
@@ -549,8 +568,8 @@ public final class WalletActivity extends UnityPlayerActivity {
     private void showLedgerDetail(JSONObject item){
         final Dialog detail=new Dialog(this);detail.requestWindowFeature(Window.FEATURE_NO_TITLE);LinearLayout outer=column();outer.setPadding(dp(24),dp(20),dp(24),dp(16));outer.setBackgroundColor(Color.WHITE);
         addFull(outer,center("账单详情",18,INK),38);TextView title=center(item.optString("label","收支记录"),16,INK);title.setMaxLines(3);title.setLineSpacing(dp(4),1);outer.addView(title);
-        addFull(outer,center(signedMoney(item.optLong("amountCents")),30,INK),56);
-        LinearLayout content=column();ledgerDetailField(content,"交易时间",date(item.optLong("createdAt"),"yyyy年MM月dd日 HH:mm:ss"));ledgerDetailField(content,"流水号",item.optString("id"));ledgerDetailField(content,"关联订单",item.optString("orderId"));ledgerDetailField(content,"入账原因","credit".equals(item.optString("kind"))?item.optString("label"):"");ledgerDetailField(content,"原因编号",item.optString("reasonId"));ledgerDetailField(content,"交易后余额（元）",money(item.optLong("balanceCents")));
+        addFull(outer,center(signedMoney(item.optLong("amountCents"))+" 点",30,INK),56);
+        LinearLayout content=column();ledgerDetailField(content,"交易时间",date(item.optLong("createdAt"),"yyyy年MM月dd日 HH:mm:ss"));ledgerDetailField(content,"流水号",item.optString("id"));ledgerDetailField(content,"关联订单",item.optString("orderId"));ledgerDetailField(content,"入账原因","credit".equals(item.optString("kind"))?item.optString("label"):"");ledgerDetailField(content,"原因编号",item.optString("reasonId"));ledgerDetailField(content,"交易后余额（超频点数）",money(item.optLong("balanceCents")));
         ScrollView scroll=new ScrollView(this);scroll.addView(content);outer.addView(scroll,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,0,1));addFull(outer,action("完成",true,true,new Runnable(){public void run(){detail.dismiss();}}),46);detail.setContentView(outer);
         Window window=detail.getWindow();if(window!=null){window.setBackgroundDrawableResource(android.R.color.white);window.setDimAmount(.30f);}detail.show();window=detail.getWindow();if(window!=null)attachWalletWindow(window.getDecorView());if(window!=null){window.setLayout(Math.min(dp(430),getResources().getDisplayMetrics().widthPixels-dp(36)),Math.min(dp(560),getResources().getDisplayMetrics().heightPixels-dp(48)));window.setGravity(Gravity.CENTER);}
     }
@@ -558,35 +577,52 @@ public final class WalletActivity extends UnityPlayerActivity {
     private void renderOrders(LinearLayout body){
         LinearLayout list=column();list.setPadding(dp(22),dp(8),dp(22),dp(8));JSONArray orders=array(wallet,"pendingOrders");
         if(orders.length()==0)addFull(list,center("暂无待支付订单",15,GRAY),100);
-        for(int i=0;i<orders.length();i++){final JSONObject order=orders.optJSONObject(i);if(order==null)continue;TextView row=text(order.optString("productName","游戏商品")+"\n¥ "+money(order.optLong("amountCents"))+"    ›",16,INK);row.setLineSpacing(dp(7),1);row.setPadding(0,dp(18),0,dp(18));list.addView(row);divider(list);row.setOnClickListener(new View.OnClickListener(){public void onClick(View v){selectedOrderId=order.optString("orderId");navigate(CASHIER);}});}scrolling(body,list);
+        for(int i=0;i<orders.length();i++){final JSONObject order=orders.optJSONObject(i);if(order==null)continue;TextView row=text(order.optString("productName","游戏商品")+"\n"+money(order.optLong("amountCents"))+" 超频点数    ›",16,INK);row.setLineSpacing(dp(7),1);row.setPadding(0,dp(18),0,dp(18));list.addView(row);divider(list);row.setOnClickListener(new View.OnClickListener(){public void onClick(View v){selectedOrderId=order.optString("orderId");navigate(CASHIER);}});}scrolling(body,list);
     }
     private void renderCashier(LinearLayout body){
         body.setPadding(dp(26),dp(10),dp(26),dp(18));final JSONObject order=currentOrder();
-        if(order==null){space(body,1);addFull(body,center("暂无待支付订单",15,GRAY),50);space(body,1);addFull(body,action("返回钱包",true,true,new Runnable(){public void run(){navigate(HOME);}}),48);return;}
-        space(body,.5f);TextView product=center(order.optString("productName","游戏商品"),15,GRAY);product.setMaxLines(2);body.addView(product);addFull(body,center("¥ "+money(order.optLong("amountCents")),42,INK),68);space(body,.7f);
-        LinearLayout method=new LinearLayout(this);method.setGravity(Gravity.CENTER_VERTICAL);method.addView(text("付款方式",14,GRAY),new LinearLayout.LayoutParams(0,dp(36),1));TextView value=text("余额 ¥ "+(wallet==null?"—":money(wallet.optLong("balanceCents"))),14,INK);value.setGravity(Gravity.CENTER_VERTICAL);method.addView(value);addFull(body,method,36);divider(body);
+        if(order==null){space(body,1);addFull(body,center("暂无待支付订单",15,GRAY),50);space(body,1);addFull(body,action("返回终端",true,true,new Runnable(){public void run(){navigate(HOME);}}),48);return;}
+        space(body,.5f);TextView product=center(order.optString("productName","游戏商品"),15,GRAY);product.setMaxLines(2);body.addView(product);addFull(body,center(money(order.optLong("amountCents"))+" 点",36,INK),68);space(body,.7f);
+        LinearLayout method=new LinearLayout(this);method.setGravity(Gravity.CENTER_VERTICAL);method.addView(text("付款方式",14,GRAY),new LinearLayout.LayoutParams(0,dp(36),1));TextView value=text("超频点数 "+(wallet==null?"—":money(wallet.optLong("balanceCents"))),14,INK);value.setGravity(Gravity.CENTER_VERTICAL);method.addView(value);addFull(body,method,36);divider(body);
         final boolean enough=wallet!=null && wallet.optLong("balanceCents")>=order.optLong("amountCents");
-        if(!enough){TextView hint=text("余额不足，请先增加余额",12,Color.rgb(210,90,30));hint.setPadding(0,dp(8),0,dp(8));body.addView(hint);}
+        if(!enough){TextView hint=text("超频点数不足，请等待后台投放或参与每日 Burst Link！",12,Color.rgb(210,90,30));hint.setPadding(0,dp(8),0,dp(8));body.addView(hint);}
         LinearLayout.LayoutParams buttonSpace=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(48));buttonSpace.topMargin=dp(14);
-        body.addView(action(busy?"处理中…":enough?"确认付款":"增加余额",true,active(),new Runnable(){public void run(){if(enough)pay(order);else{addReturn=CASHIER;navigate(ADD);}}}),buttonSpace);
+        body.addView(action(busy?"处理中…":enough?"确认付款":"超频点数不足",true,active() && enough,new Runnable(){public void run(){pay(order);}}),buttonSpace);
     }
 
     private void renderRequestState(){render();}
     private void rememberLedgerScroll(){if(page==BILLS && ledgerScroll!=null)ledgerScrollY=ledgerScroll.getScrollY();}
 
-    private void sessionChanged(){wallet=null;ledger=null;account=null;nicknameDraft="";ledgerEntries=new JSONArray();ledgerPage=1;ledgerScrollY=0;busy=false;refreshQueued=false;page=HOME;message="";loadPendingRequests();if(panel!=null && panel.isShowing()){render();refreshPage();}}
+    private void sessionChanged(){wallet=null;incomeEntries=new JSONArray();seenConfirmedRevision=0;homeScrollY=0;updateUnreadBadge();ledger=null;account=null;nicknameDraft="";ledgerEntries=new JSONArray();ledgerPage=1;ledgerScrollY=0;busy=false;refreshQueued=false;page=HOME;message="";loadPendingRequests();if(panel!=null && panel.isShowing()){render();refreshPage();}pollHandler.removeCallbacks(statePoll);if(foreground)pollHandler.post(statePoll);}
     private SharedPreferences prefs(){return getSharedPreferences("local-wallet-pending",MODE_PRIVATE);}
     private void loadPendingRequests(){
-        creditRequestId=null;creditAmount=0;amountDraft="100";
-        // Retired operational requests never resume after this wallet update.
-        SharedPreferences.Editor retired=prefs().edit();
-        for(String key:prefs().getAll().keySet())if(key.startsWith("tool."))retired.remove(key);
-        retired.commit();
-        if(!credentials.valid())return;String key="add."+credentials.player;String id=prefs().getString(key+".id",null);long cents=prefs().getLong(key+".cents",0);
-        if(id!=null && id.matches("[a-fA-F0-9-]{36}") && cents>0 && cents<=100000000000000L){creditRequestId=id;creditAmount=cents;amountDraft=money(cents);}
+        burstRequestId=null;SharedPreferences.Editor retired=prefs().edit();
+        for(String key:prefs().getAll().keySet())if(key.startsWith("tool.") || key.startsWith("add."))retired.remove(key);retired.commit();
+        if(!credentials.valid())return;String id=prefs().getString("burst."+credentials.player,null);
+        if(id!=null && id.matches("[a-fA-F0-9-]{36}"))burstRequestId=id;
     }
-    private void persistCreditRequest()throws Exception{String key="add."+credentials.player;if(!prefs().edit().putString(key+".id",creditRequestId).putLong(key+".cents",creditAmount).commit())throw new Exception("保存请求失败，请重试");}
-    private void clearCreditRequest(long player){String key="add."+player;prefs().edit().remove(key+".id").remove(key+".cents").commit();creditRequestId=null;creditAmount=0;amountDraft="100";}
+    private void burst(){
+        if(!active())return;
+        try{if(burstRequestId==null)burstRequestId=UUID.randomUUID().toString();
+            if(!prefs().edit().putString("burst."+credentials.player,burstRequestId).commit())throw new Exception("保存请求失败，请重试");
+            JSONObject payload=new JSONObject();payload.put("requestId",burstRequestId);request("/local-wallet/burst",payload,true);
+        }catch(Exception failure){setMessage("保存请求失败，请重试",true);}
+    }
+    private void acceptTerminal(JSONObject result){
+        JSONObject terminal=result.optJSONObject("terminal");if(terminal==null)return;
+        JSONArray incoming=array(terminal,"incomeEntries");
+        // Keep cards received in this opening even if seen returns an empty unread list.
+        java.util.LinkedHashMap<String,JSONObject> retained=new java.util.LinkedHashMap<String,JSONObject>();
+        for(int i=0;i<incoming.length();i++){JSONObject e=incoming.optJSONObject(i);if(e!=null)retained.put(e.optString("id"),e);}
+        for(int i=0;i<incomeEntries.length();i++){JSONObject e=incomeEntries.optJSONObject(i);if(e!=null && !retained.containsKey(e.optString("id")))retained.put(e.optString("id"),e);}
+        incomeEntries=new JSONArray();for(JSONObject e:retained.values()){if(incomeEntries.length()>=20)break;incomeEntries.put(e);}
+    }
+    private void confirmSeen(){
+        if(panel==null || !panel.isShowing() || page!=HOME || !active())return;
+        long visibleRevision=0;for(int i=0;i<incomeEntries.length();i++){JSONObject e=incomeEntries.optJSONObject(i);if(e!=null)visibleRevision=Math.max(visibleRevision,e.optLong("revision"));}
+        if(visibleRevision<=seenConfirmedRevision)return;
+        try{JSONObject payload=new JSONObject();payload.put("seenRevision",visibleRevision);request("/local-wallet/seen",payload,false,true);}catch(Exception ignored){}
+    }
     private void refreshPage(){
         if(busy){refreshQueued=true;return;}
         if(!active())return;
@@ -605,13 +641,6 @@ public final class WalletActivity extends UnityPlayerActivity {
             request("/local-wallet/ledger",payload,false);
         }catch(Exception invalid){setMessage("账单筛选无效，请重试",true);}
     }
-    private void addMoney(){
-        if(!active())return;
-        try{
-            if(creditRequestId==null){BigDecimal value=new BigDecimal(amountDraft.trim());long cents=value.movePointRight(2).longValueExact();if(cents<=0 || cents>100000000000000L)throw new Exception();creditAmount=cents;creditRequestId=UUID.randomUUID().toString();}
-            persistCreditRequest();JSONObject payload=new JSONObject();payload.put("requestId",creditRequestId);payload.put("amountCents",creditAmount);hideKeyboard();request("/local-wallet/add",payload,true);
-        }catch(Exception invalid){setMessage("请输入 0.01 至 1,000,000,000,000 元，最多两位小数",true);}
-    }
     private void pay(JSONObject order){
         if(!active())return;
         try{JSONObject payload=new JSONObject();payload.put("orderId",order.getString("orderId"));request("/local-wallet/pay",payload,true);}catch(Exception invalid){setMessage("订单信息无效，请返回后重试",true);}
@@ -619,12 +648,13 @@ public final class WalletActivity extends UnityPlayerActivity {
 
     // Only authenticated server results update money, summaries and receipts.
     // Sessions remain memory-only and old-generation replies drop.
-    private void request(final String route,final JSONObject payload,final boolean mutation){
-        if(busy || destroyed || !ready())return;final Credentials auth=credentials;final String address=origin+route;final boolean accountRoute=route.startsWith("/game-account/");final String accountUsername=account==null?"":account.optString("username");busy=true;if(mutation)setMessage("处理中…",false);renderRequestState();
+    private void request(final String route,final JSONObject payload,final boolean mutation){request(route,payload,mutation,false);}
+    private void request(final String route,final JSONObject payload,final boolean mutation,final boolean quiet){
+        if(busy || destroyed || !ready())return;final Credentials auth=credentials;final String address=origin+route;final boolean accountRoute=route.startsWith("/game-account/");final String accountUsername=account==null?"":account.optString("username");busy=true;if(mutation)setMessage("处理中…",false);if(!quiet)renderRequestState();
         network.execute(new Runnable(){public void run(){JSONObject data=null;String error=null;HttpURLConnection connection=null;
             try{
                 payload.put("playerId",auth.player);payload.put("sessionHex",auth.session);
-                connection=(HttpURLConnection)new URL(address).openConnection();connection.setRequestMethod("POST");connection.setConnectTimeout(8000);connection.setReadTimeout(15000);connection.setInstanceFollowRedirects(false);connection.setDoOutput(true);connection.setRequestProperty("Content-Type","application/json; charset=utf-8");connection.setRequestProperty("Cache-Control","no-store");
+                connection=(HttpURLConnection)new URL(address).openConnection();activeConnection=connection;connection.setRequestMethod("POST");connection.setConnectTimeout(8000);connection.setReadTimeout(15000);connection.setInstanceFollowRedirects(false);connection.setDoOutput(true);connection.setRequestProperty("Content-Type","application/json; charset=utf-8");connection.setRequestProperty("Cache-Control","no-store");
                 byte[] body=payload.toString().getBytes("UTF-8");connection.setFixedLengthStreamingMode(body.length);OutputStream out=connection.getOutputStream();out.write(body);out.close();
                 int status=connection.getResponseCode();InputStream in=status>=400?connection.getErrorStream():connection.getInputStream();if(in==null)throw new Exception("连接失败，请重试");byte[] raw=readBounded(in,1048576);in.close();JSONObject reply=new JSONObject(new String(raw,"UTF-8"));
                 if(status!=200 || reply.optInt("code",-1)!=0)throw new Exception(reply.optString("msg","操作未完成，请重试"));data=reply.getJSONObject("data");
@@ -634,10 +664,12 @@ public final class WalletActivity extends UnityPlayerActivity {
                 }else{
                 if(!data.optBoolean("testOnly",false))throw new Exception("返回数据无效，请重试");
                 if(!"CNY".equals(data.optString("currency")) || !data.has("balanceCents") || data.getLong("balanceCents")<0)throw new Exception("余额数据无效，请重试");
+                if(("/local-wallet/state".equals(route) || "/local-wallet/burst".equals(route) || "/local-wallet/seen".equals(route)) && (data.optJSONObject("terminal")==null || data.getJSONObject("terminal").optJSONArray("incomeEntries")==null))throw new Exception("终端数据无效，请重试");
+                if("/local-wallet/burst".equals(route) && (!data.has("burstAwardPoints") || data.getDouble("burstAwardPoints")<0))throw new Exception("到账结果未确认，请重试");
                 if("/local-wallet/ledger".equals(route) && (data.optJSONObject("summary")==null || data.optJSONArray("entries")==null || data.optInt("page",0)<1))throw new Exception("账单数据无效，请重试");
                 }
             }catch(Exception failure){error=failure.getMessage();if(error==null || error.length()>120 || error.contains(auth.session))error="连接中断，请重试";}
-            finally{if(connection!=null)connection.disconnect();}
+            finally{if(connection!=null)connection.disconnect();if(activeConnection==connection)activeConnection=null;}
             final JSONObject result=data;final String failure=error;
             runOnUiThread(new Runnable(){public void run(){
                 if(destroyed || credentials.generation!=auth.generation)return;busy=false;
@@ -647,21 +679,22 @@ public final class WalletActivity extends UnityPlayerActivity {
                         if("/game-account/password".equals(route)){LoginCache.passwordChanged(accountUsername,payload.optString("password"));page=ACCOUNT;setMessage("密码已修改",false);}
                         else if("/game-account/nickname".equals(route)){nicknameDraft=result.optString("nickname");page=ACCOUNT;setMessage("昵称已更新",false);}
                     }else{
-                    wallet=result;
+                    if(result.optJSONObject("terminal")==null && terminal()!=null)try{result.put("terminal",terminal());}catch(Exception ignored){}
+                    wallet=result;acceptTerminal(result);updateUnreadBadge();
                     if("/local-wallet/ledger".equals(route)){
                         if(result.optInt("page",1)==1)ledgerEntries=new JSONArray();
                         JSONArray incoming=array(result,"entries");for(int i=0;i<incoming.length();i++)ledgerEntries.put(incoming.optJSONObject(i));
                         ledger=result;ledgerPage=result.optInt("page",1);
                     }
-                    if("/local-wallet/add".equals(route)){
-                        String label=result.optString("creditLabel","");
-                        if(label.isEmpty()){JSONArray rows=array(result,"entries");for(int i=0;i<rows.length();i++){JSONObject row=rows.optJSONObject(i);if(row!=null && ("add:"+creditRequestId).equals(row.optString("id"))){label=row.optString("label","");break;}}}
-                        clearCreditRequest(auth.player);ledger=null;ledgerEntries=new JSONArray();page=addReturn==CASHIER && currentOrder()!=null?CASHIER:HOME;setMessage(label.isEmpty()?"余额已增加":label,false);
+                    if("/local-wallet/seen".equals(route)){seenConfirmedRevision=Math.max(seenConfirmedRevision,payload.optLong("seenRevision"));}
+                    else if("/local-wallet/burst".equals(route)){
+                        prefs().edit().remove("burst."+auth.player).commit();burstRequestId=null;ledger=null;ledgerEntries=new JSONArray();setMessage("Burst Link！到账 +"+pointNumber(result.optDouble("burstAwardPoints"))+" 超频点数",false);
                     }else if("/local-wallet/pay".equals(route)){ledger=null;ledgerEntries=new JSONArray();UnityPlayer.UnitySendMessage("LocalWalletSession","RefreshAfterPayment","");page=HOME;setMessage("支付成功，去享受这一刻",false);}
                     }
-                }else setMessage(failure+(mutation?"；可重试原操作":""),true);
+                }else if(!quiet)setMessage(failure+(mutation?"；可重试原操作":""),true);
                 payload.remove("oldPassword");payload.remove("password");payload.remove("confirmPassword");
-                renderRequestState();
+                if(!quiet || (page==HOME && panel!=null && panel.isShowing()))renderRequestState();
+                if(failure==null && !quiet && !accountRoute && !"/local-wallet/seen".equals(route) && panel!=null && panel.isShowing() && page==HOME)shell.post(()->confirmSeen());
                 if(refreshQueued){refreshQueued=false;refreshPage();}
             }});
         }});

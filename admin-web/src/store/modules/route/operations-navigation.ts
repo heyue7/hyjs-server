@@ -62,10 +62,9 @@ export function organizeOperationsMenus(menus: App.Global.Menu[]) {
     take('shops', '商店管理'),
     take('announcements', '公告管理')
   ]);
-  // Wallet deep links remain valid; its entry lives on each user row.
-  take('wallets');
   const realms = group('server-operations', '区服运营', [
     take('servers'),
+    take('wallets', '蓝绿终端'),
     take('cdk', '兑换码管理'),
     take('activity-schedules'),
     take('fields', '野外地图与部署'),

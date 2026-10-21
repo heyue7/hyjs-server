@@ -1,30 +1,32 @@
 package model
 
-// LocalWalletView is the authenticated local wallet state used by the 蓝绿钱包 overlay.
+// LocalWalletView is the authenticated local wallet state used by the 蓝绿终端 overlay.
 type LocalWalletView struct {
-	Name           string                    `json:"name"`                     // 固定显示名：蓝绿钱包。
-	BalanceCents   int64                     `json:"balanceCents"`             // 当前余额，单位人民币分，非负整数。
-	Revision       int64                     `json:"revision"`                 // 同账号成功入账/支付的单调递增序号。
-	Currency       string                    `json:"currency"`                 // 枚举：CNY。
-	Enabled        bool                      `json:"enabled"`                  // 当前持久政策是否开放。
-	TestOnly       bool                      `json:"testOnly"`                 // 固定true，本地试玩余额。
-	Version        string                    `json:"version"`                  // 政策版本local-demo-wallet-v1。
-	AlreadyApplied bool                      `json:"alreadyApplied,omitempty"` // true表示该入账请求已执行，本次未重复加款。
-	CreditLabel    string                    `json:"creditLabel,omitempty"`    // CreditLabel为本次入账冻结的故事文案。
-	Summary        LocalWalletSummary        `json:"summary"`                  // Summary是实际账务时间范围汇总。
-	Total          int64                     `json:"total"`                    // Total是当前流水筛选总数。
-	Page           int64                     `json:"page"`                     // Page是一开始的页码。
-	PageSize       int64                     `json:"pageSize"`                 // PageSize是本页最多条数。
-	Entries        []LocalWalletEntryView    `json:"entries"`                  // 最近20条真实余额流水，最新在前。
-	PendingOrders  []LocalWalletPendingOrder `json:"pendingOrders"`            // 最近20条本角色原未过期待付订单。
+	Terminal         *TerminalState            `json:"terminal,omitempty"`         // Terminal contains account daily and income state.
+	BurstAwardPoints int64                     `json:"burstAwardPoints,omitempty"` // BurstAwardPoints is the frozen daily award.
+	Name             string                    `json:"name"`                       // 固定显示名：蓝绿终端。
+	BalanceCents     int64                     `json:"balanceCents"`               // 当前余额，100最小单位=1超频点数，非负整数。
+	Revision         int64                     `json:"revision"`                   // 同账号成功入账/支付的单调递增序号。
+	Currency         string                    `json:"currency"`                   // 枚举：CNY。
+	Enabled          bool                      `json:"enabled"`                    // 当前持久政策是否开放。
+	TestOnly         bool                      `json:"testOnly"`                   // 固定true，本地试玩余额。
+	Version          string                    `json:"version"`                    // 政策版本local-demo-wallet-v1。
+	AlreadyApplied   bool                      `json:"alreadyApplied,omitempty"`   // true表示该入账请求已执行，本次未重复加款。
+	CreditLabel      string                    `json:"creditLabel,omitempty"`      // CreditLabel为本次入账冻结的故事文案。
+	Summary          LocalWalletSummary        `json:"summary"`                    // Summary是实际账务时间范围汇总。
+	Total            int64                     `json:"total"`                      // Total是当前流水筛选总数。
+	Page             int64                     `json:"page"`                       // Page是一开始的页码。
+	PageSize         int64                     `json:"pageSize"`                   // PageSize是本页最多条数。
+	Entries          []LocalWalletEntryView    `json:"entries"`                    // 最近20条真实余额流水，最新在前。
+	PendingOrders    []LocalWalletPendingOrder `json:"pendingOrders"`              // 最近20条本角色原未过期待付订单。
 }
 
 // LocalWalletEntryView projects one immutable wallet ledger entry.
 type LocalWalletEntryView struct {
 	ID           string `json:"id"`                // 同账号唯一流水标识。
 	Kind         string `json:"kind"`              // 枚举：credit增加余额；payment原充值消费。
-	AmountCents  int64  `json:"amountCents"`       // 本次变动分数，credit正数、payment负数。
-	BalanceCents int64  `json:"balanceCents"`      // 此次成功变动后的余额分数。
+	AmountCents  int64  `json:"amountCents"`       // 本次变动最小单位，credit正数、payment负数。
+	BalanceCents int64  `json:"balanceCents"`      // 此次成功变动后的余额最小单位。
 	CreatedAt    int64  `json:"createdAt"`         // Unix毫秒时间戳。
 	ReasonID     string `json:"reasonId"`          // ReasonID为入账理由，老记录为空。
 	OrderID      string `json:"orderId,omitempty"` // OrderID为真实游戏充值订单。
@@ -43,9 +45,9 @@ type LocalWalletPendingOrder struct {
 type LocalWalletSummary struct {
 	StartAt          int64 `json:"startAt"`          // StartAt是包含的起始毫秒，0表示全部。
 	EndAt            int64 `json:"endAt"`            // EndAt是不包含的截止毫秒，0表示不限。
-	IncomeCents      int64 `json:"incomeCents"`      // IncomeCents是该时段收入分。
-	ExpenseCents     int64 `json:"expenseCents"`     // ExpenseCents是该时段消费分。
-	NetCents         int64 `json:"netCents"`         // NetCents是净变化分。
+	IncomeCents      int64 `json:"incomeCents"`      // IncomeCents是该时段收入最小单位。
+	ExpenseCents     int64 `json:"expenseCents"`     // ExpenseCents是该时段消费最小单位。
+	NetCents         int64 `json:"netCents"`         // NetCents是净变化最小单位。
 	TransactionCount int64 `json:"transactionCount"` // TransactionCount是收支总笔数。
 }
 

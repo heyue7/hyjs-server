@@ -494,7 +494,7 @@ export const generatedRoutes: GeneratedRoute[] = [
     path: '/wallets',
     component: 'layout.base$view.wallets',
     meta: {
-      title: '蓝绿钱包',
+      title: '蓝绿终端',
       i18nKey: 'route.wallets',
       icon: 'ph:treasure-chest',
       order: 5,

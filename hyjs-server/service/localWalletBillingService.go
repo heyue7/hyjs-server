@@ -49,10 +49,44 @@ func initializeWalletReasons(ctx context.Context) error {
 		{ID: "jackpot", Label: "超级联合奖池中奖 {amount} 元", MinCents: 1000000000, MaxCents: 1000000000000, Weight: 40, Enabled: true},
 		{ID: "cosmic", Label: "宇宙级幸运大奖：奖金 {amount} 元", MinCents: 100000000000, MaxCents: max, Weight: 100, Enabled: true},
 	}
-	return db.GetIns().WithContext(ctx).Clauses(clause.OnConflict{DoNothing: true}).Create(&rows).Error
+	if err := db.GetIns().WithContext(ctx).AutoMigrate(&db.TerminalSeedMigration{}); err != nil {
+		return err
+	}
+	return db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&rows).Error; err != nil {
+			return err
+		}
+		marker := db.TerminalSeedMigration{ID: "aw_seed_v1"}
+		created := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&marker)
+		if created.Error != nil {
+			return created.Error
+		}
+		if created.RowsAffected == 0 {
+			return nil
+		}
+		// Disable only untouched legacy defaults once; operator edits and immutable historical entries survive.
+		for _, row := range rows {
+			if err := tx.Model(&db.LocalWalletReason{}).Where("id=? AND label=? AND min_cents=? AND max_cents=? AND weight=? AND enabled=?", row.ID, row.Label, row.MinCents, row.MaxCents, row.Weight, true).Update("enabled", false).Error; err != nil {
+				return err
+			}
+		}
+		seeds := []db.LocalWalletReason{
+			{ID: "aw_assist", Label: "对战助攻点数结算", MinCents: 1, MaxCents: 999, Weight: 10, Enabled: true},
+			{ID: "aw_assist_team", Label: "小队对战协助回报", MinCents: 1, MaxCents: 999, Weight: 10, Enabled: true},
+			{ID: "aw_victory", Label: "对战胜利点数结算", MinCents: 1000, MaxCents: 9999, Weight: 10, Enabled: true},
+			{ID: "aw_victory_streak", Label: "连胜对战点数回报", MinCents: 1000, MaxCents: 9999, Weight: 10, Enabled: true},
+			{ID: "aw_enemy_hunt", Label: "公敌狩猎战利品结算", MinCents: 10000, MaxCents: 99999, Weight: 10, Enabled: true},
+			{ID: "aw_enemy_team", Label: "小队公敌狩猎贡献回报", MinCents: 10000, MaxCents: 99999, Weight: 10, Enabled: true},
+			{ID: "aw_behemoth", Label: "巨兽讨伐点数结算", MinCents: 100000, MaxCents: 999999, Weight: 10, Enabled: true},
+			{ID: "aw_territory", Label: "领土战贡献点数分配", MinCents: 100000, MaxCents: 999999, Weight: 10, Enabled: true},
+			{ID: "aw_legion", Label: "军团点数支援到账", MinCents: 1000000, MaxCents: max, Weight: 10, Enabled: true},
+			{ID: "aw_large_enemy", Label: "大型公敌战利品点数分配", MinCents: 1000000, MaxCents: max, Weight: 10, Enabled: true},
+		}
+		return tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&seeds).Error
+	})
 }
 func walletReasonLabel(label string, cents int64) string {
-	return strings.ReplaceAll(label, "{amount}", fmt.Sprintf("%d.%02d", cents/100, cents%100))
+	return strings.ReplaceAll(label, "{amount}", strings.TrimRight(strings.TrimRight(fmt.Sprintf("%d.%02d", cents/100, cents%100), "0"), "."))
 }
 
 // drawWalletReason 按实际金额选可用区间，再用密码学随机源按相对权重抽取。
@@ -60,6 +94,17 @@ func drawWalletReason(tx *gorm.DB, cents int64) (*db.LocalWalletReason, error) {
 	var rows []db.LocalWalletReason
 	if err := tx.Where("enabled=? AND min_cents<=? AND max_cents>=?", true, cents, cents).Order("id").Find(&rows).Error; err != nil {
 		return nil, err
+	}
+	return drawWalletReasonRows(rows, cents)
+}
+
+// drawWalletReasonRows reuses one immutable catalogue while selecting a valid weighted amount range.
+func drawWalletReasonRows(catalogue []db.LocalWalletReason, cents int64) (*db.LocalWalletReason, error) {
+	rows := make([]db.LocalWalletReason, 0, len(catalogue))
+	for _, row := range catalogue {
+		if row.Enabled && row.MinCents <= cents && row.MaxCents >= cents {
+			rows = append(rows, row)
+		}
 	}
 	var total int64
 	for _, r := range rows {

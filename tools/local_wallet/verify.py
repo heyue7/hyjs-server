@@ -28,7 +28,17 @@ def dex_classes(raw):
 
 
 def verify(dex, manifest):
-    classes = dex_classes(Path(dex).read_bytes())
+    raw = Path(dex).read_bytes()
+    classes = dex_classes(raw)
+    # This verifies packaged contract strings, not a live server or phone flow.
+    for route in [b'/local-wallet/state', b'/local-wallet/burst', b'/local-wallet/seen', b'/local-wallet/pay', b'/local-wallet/ledger']:
+        if route not in raw:
+            raise ValueError('Terminal route absent: ' + route.decode())
+    if b'/local-wallet/add' in raw:
+        raise ValueError('Retired unlimited credit route remains reachable')
+    for field in [b'seenRevision', b'burstCostPoints', b'burstMinPoints', b'burstMaxPoints', b'unreadCount', b'incomeEntries']:
+        if field not in raw:
+            raise ValueError('Terminal contract field absent: ' + field.decode())
     if not classes or any(not name.startswith('Lcom/hyjs/wallet/') for name in classes):
         raise ValueError('Wallet dex includes original Unity or unrelated class definitions')
     if 'Lcom/hyjs/wallet/WalletActivity;' not in classes:
@@ -44,4 +54,4 @@ def verify(dex, manifest):
             'unityStubAbsent': True, 'unrelatedClassesAbsent': True,
             'launcher': 'com.hyjs.wallet.WalletActivity', 'systemOverlayPermission': False,
             'dexSHA256': digest(dex), 'manifestProposalSHA256': digest(manifest),
-            'phoneUI': False, 'apiExecuted': False, 'originalAPKTouched': False}
+            'terminalContractStrings': True, 'unlimitedCreditRouteAbsent': True, 'phoneUI': False, 'apiExecuted': False, 'originalAPKTouched': False}

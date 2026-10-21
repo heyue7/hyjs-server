@@ -306,7 +306,10 @@ func registerGlobalGameAccount(ctx context.Context, username, password, nickname
 		if err := tx.Create(&profile).Error; err != nil {
 			return err
 		}
-		return syncGlobalAccountRole(tx, &profile)
+		if err := syncGlobalAccountRole(tx, &profile); err != nil {
+			return err
+		}
+		return terminalSignup(tx, account, serverID, profile.Id)
 	})
 	if err != nil {
 		return nil, err

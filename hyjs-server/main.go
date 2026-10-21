@@ -55,7 +55,7 @@ func run() error {
 	cfg := config.AppConfigIns.Game
 	autoDemo := *localWallet || cfg.EnableLocalWallet
 	if autoDemo && (!(*testPayments || cfg.EnableTestPayments) || (*env != "dev" && *env != "test")) {
-		return errors.New("蓝绿钱包仅允许dev/test并显式启用测试支付")
+		return errors.New("蓝绿终端仅允许dev/test并显式启用测试支付")
 	}
 	if *serverID != 0 {
 		cfg.ServerID = *serverID
@@ -474,12 +474,14 @@ func run() error {
 	handler.RegisterAdminRoutes(r, os.Getenv("HYJS_ADMIN_ASSETS"))
 	routes.RouteRegister(r)
 	server := &http.Server{Handler: r, ReadTimeout: 15 * time.Second, WriteTimeout: 30 * time.Second, IdleTimeout: 60 * time.Second, BaseContext: func(net.Listener) context.Context { return ctx }}
-	const serviceWorkerCount = 12
+	const serviceWorkerCount = 13
 	errs := make(chan error, serviceWorkerCount)
 	go func() { errs <- handler.ServeGameTCP(ctx, tcpListener, s) }()
 	go func() { errs <- server.Serve(httpListener) }()
 	go func() { errs <- s.ServeTurntableSettlement(ctx) }()
 	go func() { errs <- service.ServeBackgroundWorker(ctx, "p1-periods", s.ServeP1Periods) }()
+	// 终端每周投放与中断批次跟随区服生命周期恢复，使用真实账务日历。
+	go func() { errs <- service.ServeBackgroundWorker(ctx, "terminal-distributions", s.ServeTerminalDistributions) }()
 	// 公会战自动宣战与名单冻结沿同一服务ctx运行，退出时一并收口。
 	go func() { errs <- service.ServeBackgroundWorker(ctx, "p13-union-fight", s.ServeP13UnionFight) }()
 	// 同场位置与结束退场使用服务ctx，停启后恢复冻结实例和角色状态。
