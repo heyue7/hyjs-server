@@ -622,7 +622,7 @@ public final class WalletActivity extends UnityPlayerActivity {
         space(body,.5f);TextView product=center(order.optString("productName","游戏商品"),15,GRAY);product.setMaxLines(2);body.addView(product);addFull(body,center(money(order.optLong("amountCents"))+" 点",36,INK),68);space(body,.7f);
         LinearLayout method=new LinearLayout(this);method.setGravity(Gravity.CENTER_VERTICAL);method.addView(text("付款方式",14,GRAY),new LinearLayout.LayoutParams(0,dp(36),1));TextView value=text("超频点数 "+(wallet==null?"—":money(wallet.optLong("balanceCents"))),14,INK);value.setGravity(Gravity.CENTER_VERTICAL);method.addView(value);addFull(body,method,36);divider(body);
         final boolean enough=wallet!=null && wallet.optLong("balanceCents")>=order.optLong("amountCents");
-        if(!enough){TextView hint=text("超频点数不足，请等待后台投放或参与每日 Burst Link！",12,Color.rgb(210,90,30));hint.setPadding(0,dp(8),0,dp(8));body.addView(hint);}
+        if(!enough){TextView hint=text("超频点数不足",12,Color.rgb(210,90,30));hint.setPadding(0,dp(8),0,dp(8));body.addView(hint);}
         LinearLayout.LayoutParams buttonSpace=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(48));buttonSpace.topMargin=dp(14);
         body.addView(action(busy?"处理中…":enough?"确认付款":"超频点数不足",true,active() && enough,new Runnable(){public void run(){pay(order);}}),buttonSpace);
     }
