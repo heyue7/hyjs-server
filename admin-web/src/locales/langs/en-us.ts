@@ -232,6 +232,7 @@ const local: App.I18n.Schema = {
     items: 'Items',
     activities: 'Activities',
     announcements: 'Announcements',
+    'client-updates': 'Client updates',
     broadcast: 'Compensation',
     mail: 'Send mail',
     'daily-sign': 'Daily sign-in',

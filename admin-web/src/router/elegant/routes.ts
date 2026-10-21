@@ -150,6 +150,18 @@ export const generatedRoutes: GeneratedRoute[] = [
     }
   },
   {
+    name: 'client-updates',
+    path: '/client-updates',
+    component: 'layout.base$view.client-updates',
+    meta: {
+      title: '客户端更新',
+      i18nKey: 'route.client-updates',
+      icon: 'ph:device-mobile',
+      order: 8,
+      roles: ['viewer', 'operator', 'admin']
+    }
+  },
+  {
     name: 'daily-sign',
     path: '/daily-sign',
     component: 'layout.base$view.daily-sign',

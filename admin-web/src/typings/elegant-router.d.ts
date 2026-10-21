@@ -29,6 +29,7 @@ declare module "@elegant-router/types" {
     "audit": "/audit";
     "broadcast": "/broadcast";
     "cdk": "/cdk";
+    "client-updates": "/client-updates";
     "daily-sign": "/daily-sign";
     "feedback": "/feedback";
     "fields": "/fields";
@@ -101,6 +102,7 @@ declare module "@elegant-router/types" {
     | "audit"
     | "broadcast"
     | "cdk"
+    | "client-updates"
     | "daily-sign"
     | "feedback"
     | "fields"
@@ -150,6 +152,7 @@ declare module "@elegant-router/types" {
     | "audit"
     | "broadcast"
     | "cdk"
+    | "client-updates"
     | "daily-sign"
     | "feedback"
     | "fields"
