@@ -1,7 +1,7 @@
 """Produce the fixed batch40 isolated QA APK. Never install or promote it.
 Run using .analysis-venv/bin/python; no dependency downloads.
 """
-import copy,fcntl,hashlib,json,os,shutil,subprocess,sys,tempfile,zipfile
+import argparse,copy,fcntl,hashlib,json,os,shutil,subprocess,sys,tempfile,zipfile
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT))
@@ -12,16 +12,20 @@ from tools.awake_diff_rows.build import methods
 from tools.local_asset_ready.remove_gate import exact_body
 from dncil.cil.body.reader import read_method_body_from_bytes
 import dnfile
-BASE=ROOT/'apks/build/hyjs-terminal-recycle-r1.apk'
-BASE_SHA='864f2d2f82c2dec930f47f4d93260c0b65ba8d028a4f10bdd614f6b11a8242d1'
 ORIGIN='http://127.0.0.1:28935'
-OUT=ROOT/'build/b40-qa'
-RECORD=ROOT/'analysis/terminal-b40-20261021/qa-apk.json'
 DLL=common.DLL
 WALLET='assets/local-wallet.json'
 
 def sha(b):return hashlib.sha256(b).hexdigest()
 def main():
+ parser=argparse.ArgumentParser(description=__doc__)
+ parser.add_argument('--base-apk',type=Path,required=True)
+ parser.add_argument('--expected-sha',required=True)
+ parser.add_argument('--output-directory',type=Path,required=True)
+ parser.add_argument('--record',type=Path,required=True)
+ args=parser.parse_args()
+ BASE=args.base_apk.resolve();BASE_SHA=args.expected_sha;OUT=args.output_directory.resolve();RECORD=args.record.resolve()
+ require(all(p.is_relative_to(ROOT) for p in [BASE,OUT,RECORD]),'QA paths must remain in project')
  require(common.digest(BASE)==BASE_SHA,'Pinned formal base changed')
  require(not OUT.exists() and not RECORD.exists(),'Fresh QA output and record required')
  require(shutil.disk_usage(ROOT).free>BASE.stat().st_size*3+200_000_000,'Insufficient isolated packaging space')
