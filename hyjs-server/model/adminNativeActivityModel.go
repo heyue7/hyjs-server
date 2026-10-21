@@ -88,6 +88,8 @@ type AdminNativeActivityDTO struct {
 	Version string `json:"version"`
 	// Enabled 是true对玩家开放，false关闭入口或领取。
 	Enabled bool `json:"enabled"`
+	// Permanent 是true无活动到期时间，false按表单开放时间生效。
+	Permanent bool `json:"permanent"`
 	// Frozen 是true规则已被原消费者冻结，只能启停或修改别名。
 	Frozen bool `json:"frozen"`
 	// Note 是当前来源、生效边界及历史保留说明。

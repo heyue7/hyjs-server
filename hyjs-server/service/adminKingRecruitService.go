@@ -55,15 +55,15 @@ func (s *GameService) validateKingRecruitActivityPool(pool db.GameplayPool, rewa
 	total := int64(0)
 	for _, reward := range rewards {
 		hero := s.table("Hero", "id", reward.ResourceID)
-		if reward.ID < 1 || ids[reward.ID] || reward.Amount != 1 || reward.Stock != 0 || reward.Weight < 1 || reward.Weight > 1000000000000 || total > math.MaxInt64-reward.Weight || hero == nil || hero["heroClass"] != "0" || (hero["quality"] != "20" && hero["quality"] != "23") || (hero["space"] != "1" && hero["space"] != "2" && hero["space"] != "3") || reward.Guaranteed && hero["quality"] != "23" {
+		if reward.ID < 1 || ids[reward.ID] || reward.Amount != 1 || reward.Stock != 0 || reward.Weight < 1 || reward.Weight > 1000000000000 || total > math.MaxInt64-reward.Weight || hero == nil || hero["heroClass"] != "0" || (hero["quality"] != "12" && hero["quality"] != "13" && hero["quality"] != "18" && hero["quality"] != "20" && hero["quality"] != "23") || (hero["quality"] == "23" && hero["space"] != "1" && hero["space"] != "2" && hero["space"] != "3") || reward.Guaranteed && hero["quality"] != "20" && hero["quality"] != "23" {
 			return constUtil.ErrAdminInput
 		}
-		if world > 0 && hero["space"] != strconv.FormatInt(world, 10) {
+		if world > 0 && hero["quality"] == "23" && hero["space"] != strconv.FormatInt(world, 10) {
 			return constUtil.ErrAdminInput
 		}
 		ids[reward.ID] = true
 		total += reward.Weight
-		if reward.Guaranteed {
+		if reward.Guaranteed && hero["quality"] == "23" {
 			guaranteed[hero["space"]] = true
 		}
 	}
@@ -166,7 +166,7 @@ func (s *GameService) adminPersistKingRecruitActivity(tx *gorm.DB, key string, f
 		if prize.ID < 1 || prize.ID > math.MaxInt32 || prize.Amount != 1 || prize.Stock != 0 {
 			return constUtil.ErrAdminInput
 		}
-		rewards = append(rewards, db.GameplayPoolReward{PoolID: key, ID: int32(prize.ID), ResourceID: prize.ResourceID, Amount: 1, Weight: prize.Weight, Stock: 0, Guaranteed: prize.Guaranteed})
+		rewards = append(rewards, db.GameplayPoolReward{PoolID: key, ID: int32(prize.ID), ResourceID: prize.ResourceID, Amount: 1, Weight: prize.Weight, Stock: 0, Guaranteed: s.table("Hero", "id", prize.ResourceID)["quality"] == "20" || s.table("Hero", "id", prize.ResourceID)["quality"] == "23"})
 	}
 	if err := s.validateKingRecruitActivityPool(pool, rewards, source.World); err != nil {
 		return err
@@ -302,10 +302,13 @@ func (s *GameService) AdminKingRecruitResources(ctx context.Context, actor *mode
 	labels := map[int64]string{1: "SAO", 2: "ALO", 3: "GGO"}
 	for _, item := range all.Items {
 		hero := s.table("Hero", "id", item.ID)
-		if hero == nil || hero["heroClass"] != "0" || (hero["quality"] != "20" && hero["quality"] != "23") {
+		if hero == nil || hero["heroClass"] != "0" || (hero["quality"] != "12" && hero["quality"] != "13" && hero["quality"] != "18" && hero["quality"] != "20" && hero["quality"] != "23") {
 			continue
 		}
 		space, _ := strconv.ParseInt(hero["space"], 10, 64)
+		if space == 0 && hero["quality"] != "23" {
+			labels[0] = "通用"
+		}
 		if labels[space] == "" {
 			continue
 		}

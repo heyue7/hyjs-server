@@ -1,12 +1,15 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { api, errorMessage } from '@/service/operations';
 import type { ActivityPrize, KingRecruitResource } from '@/service/activity-operations';
 import ResourceSelect from './resource-select.vue';
 import RewardSummary from './reward-summary.vue';
+import ContextHelp from './context-help.vue';
 
 const rows = defineModel<ActivityPrize[]>({ required: true });
 const world = defineModel<number>('world', { default: 0 });
+const activeIndex = ref(0);
+const currentRows = computed(() => rows.value.slice(activeIndex.value, activeIndex.value + 1));
 const worldDrafts = new Map<number, ActivityPrize[]>();
 const worldOptions = [{ label: 'SAO', value: 1 }, { label: 'ALO', value: 2 }, { label: 'GGO', value: 3 }, { label: '原48小时轮换（三个世界）', value: 0 }];
 const props = defineProps<{ disabled?: boolean; readonly?: boolean }>();
@@ -16,15 +19,16 @@ const loadError = ref('');
 let generation = 0;
 let nextId = 1;
 const resourceMap = computed(() => new Map(resources.value.map(item => [item.id, item] as const)));
-const pickerResources = computed(() => resources.value.filter(item => !world.value || item.space === world.value).map(item => ({ ...item, applicableType: `king.world:${item.space}`, applicableTypes: [`king.world:${item.space}`], applicableTypeLabel: item.spaceLabel })));
+const pickerResources = computed(() => resources.value.filter(item => !world.value || Number(item.quality) !== 6 || item.space === world.value).map(item => ({ ...item, applicableType: `king.world:${item.space}`, applicableTypes: [`king.world:${item.space}`], applicableTypeLabel: item.spaceLabel })));
 const editingDisabled = computed(() => Boolean(props.disabled || props.readonly || loading.value || loadError.value));
-const worlds = computed(() => [...new Map(resources.value.map(item => [item.space, item.spaceLabel] as const)).entries()].sort(([a], [b]) => a - b));
+const worlds = computed(() => [[1, 'SAO'], [2, 'ALO'], [3, 'GGO']] as const);
 const missingGuarantees = computed(() => rows.value.length ? worlds.value.filter(([space]) => !world.value || space === world.value).filter(([space]) => !rows.value.some(row => row.guaranteed && Number(resourceMap.value.get(row.resourceId)?.quality) === 6 && resourceMap.value.get(row.resourceId)?.space === space)).map(([, label]) => label) : []);
 function changeWorld(value: number) {
   worldDrafts.set(world.value, rows.value.map(row => ({ ...row })));
   const source = [...rows.value, ...(worldDrafts.get(0) || [])];
-  rows.value = worldDrafts.get(value) || source.filter((row, index) => source.findIndex(item => item.id === row.id) === index && (!value || resourceMap.value.get(row.resourceId)?.space === value)).map(row => ({ ...row }));
+  rows.value = worldDrafts.get(value) || source.filter((row, index) => source.findIndex(item => item.id === row.id) === index && (!value || Number(resourceMap.value.get(row.resourceId)?.quality) !== 6 || resourceMap.value.get(row.resourceId)?.space === value)).map(row => ({ ...row }));
   world.value = value;
+  activeIndex.value = 0;
 }
 async function loadResources() {
   const current = ++generation;
@@ -43,6 +47,7 @@ function add() {
   if (editingDisabled.value) return;
   const id = Math.max(nextId, 1, ...rows.value.map(row => row.id + 1));
   nextId = id + 1;
+  activeIndex.value = rows.value.length;
   rows.value = [...rows.value, { id, resourceId: '', amount: 1, weight: 1, stock: 0, guaranteed: false }];
 }
 function changeResource(row: ActivityPrize, resourceId: string) {
@@ -50,14 +55,19 @@ function changeResource(row: ActivityPrize, resourceId: string) {
   row.resourceId = resourceId;
   row.amount = 1;
   row.stock = 0;
-  if (Number(resourceMap.value.get(resourceId)?.quality) !== 6) row.guaranteed = false;
+  row.guaranteed = [5, 6].includes(Number(resourceMap.value.get(resourceId)?.quality));
 }
 function share(row: ActivityPrize) {
   const resource = resourceMap.value.get(row.resourceId);
-  if (!resource) return '';
-  const total = rows.value.filter(prize => resourceMap.value.get(prize.resourceId)?.space === resource.space).reduce((sum, prize) => sum + (prize.weight || 0), 0);
-  return total > 0 ? `同世界权重占比 ${((row.weight || 0) * 100 / total).toFixed(2)}%` : '请设置正整数权重';
+  const values = world.value ? worlds.value.filter(([value]) => value === world.value) : Number(resource?.quality) === 6 ? worlds.value.filter(([value]) => value === resource?.space) : worlds.value;
+  return values.map(([value, label]) => {
+    const allowed = rows.value.filter(prize => Number(resourceMap.value.get(prize.resourceId)?.quality) !== 6 || resourceMap.value.get(prize.resourceId)?.space === value);
+    const total = allowed.reduce((sum, prize) => sum + (prize.weight || 0), 0);
+    return total > 0 ? `${world.value ? '基础概率' : label} ${((row.weight || 0) * 100 / total).toFixed(3)}%` : '请设置正整数权重';
+  }).join(' · ');
 }
+const prizeOptions = computed(() => rows.value.map((row, index) => ({ value: index, label: `${index + 1}. ${resourceMap.value.get(row.resourceId)?.name || row.resourceId || '请选择角色'} · ${share(row)}` })));
+watch(() => rows.value.length, length => { if (activeIndex.value >= length) activeIndex.value = Math.max(0, length - 1); });
 onMounted(loadResources);
 onBeforeUnmount(() => { generation += 1; });
 </script>
@@ -66,39 +76,39 @@ onBeforeUnmount(() => { generation += 1; });
   <div class="king-prizes">
     <div class="ops-section-heading">
       <h3>王者招募角色池</h3>
+      <ContextHelp icon-only title="角色池说明" text="红卡只在所属世界抽取；橙卡、紫卡、蓝卡、绿卡各世界通用。保底候选固定为全部橙卡和红卡，命中后重新累计；基础概率不含临近保底的递增加成。每日次数与保底进度由三个世界共用。" />
       <NButton v-if="!readonly" size="small" :disabled="editingDisabled || !resources.length" @click="add">添加角色</NButton>
     </div>
     <NFormItem label="开放世界" required>
       <NSelect :value="world" :options="worldOptions" :disabled="editingDisabled" @update:value="changeWorld" />
     </NFormItem>
-    <p class="ops-inline-note">每期可单独配置一个世界，不同世界可同时发布。玩家可在当前开放世界间切换；每日次数、幸运值和保底共用。</p>
-    <p class="ops-inline-note">每次获得 1 名角色，不限库存。按所属世界分别抽取，保底候选仅限红色角色。</p>
     <NAlert v-if="loadError" type="error" :title="loadError" class="mb-16px"><NButton size="small" @click="loadResources">重新加载角色</NButton></NAlert>
-    <p v-if="!loading && !loadError && missingGuarantees.length" class="ops-inline-note">尚缺红色保底候选：{{ missingGuarantees.join('、') }}。</p>
+    <p v-if="!loading && !loadError && missingGuarantees.length" class="ops-inline-note">尚缺橙色或红色保底候选：{{ missingGuarantees.join('、') }}。</p>
+    <NSelect v-if="rows.length" v-model:value="activeIndex" :options="prizeOptions" aria-label="选择王者招募角色" class="mb-20px" />
     <NSpin :show="loading">
       <NEmpty v-if="!rows.length" description="尚未配置招募角色" />
-      <section v-for="(row, index) in rows" :key="row.id" class="king-prize-row">
+      <section v-for="row in currentRows" :key="row.id" class="king-prize-row">
         <template v-if="readonly">
           <RewardSummary :rewards="row.resourceId ? [{ resourceId: row.resourceId, amount: row.amount }] : []" />
           <div class="king-prize-details">
             <NTag v-if="resourceMap.get(row.resourceId)" size="small" :bordered="false">{{ resourceMap.get(row.resourceId)?.spaceLabel }}</NTag>
-            <NTag v-if="row.guaranteed" size="small" :bordered="false" type="info">红色保底候选</NTag>
+            <NTag v-if="row.guaranteed" size="small" :bordered="false" type="info">橙色或红色保底候选</NTag>
             <span>权重 {{ row.weight }}</span><span>{{ share(row) }}</span>
           </div>
         </template>
         <template v-else>
-          <div class="king-prize-heading"><strong>角色 {{ index + 1 }}</strong><NButton size="small" quaternary :disabled="editingDisabled" @click="rows = rows.filter(prize => prize.id !== row.id)">移除</NButton></div>
+          <div class="king-prize-heading"><strong>角色 {{ activeIndex + 1 }}</strong><NButton size="small" quaternary :disabled="editingDisabled" @click="rows = rows.filter(prize => prize.id !== row.id)">移除</NButton></div>
           <div class="king-prize-fields">
             <NFormItem label="招募角色" required>
               <div class="king-prize-resource">
-                <ResourceSelect :value="row.resourceId" :resources="pickerResources" category="character" :disabled="editingDisabled" placeholder="搜索可招募的橙色或红色角色" @update:value="changeResource(row, $event)" />
+                <ResourceSelect :value="row.resourceId" :resources="pickerResources" category="character" :disabled="editingDisabled" placeholder="搜索可招募角色" @update:value="changeResource(row, $event)" />
                 <span v-if="resourceMap.get(row.resourceId)" class="ops-muted">{{ resourceMap.get(row.resourceId)?.spaceLabel }}</span>
                 <span v-else-if="row.resourceId && !loading && !loadError" class="ops-muted">当前角色不在可招募范围，请重新选择。</span>
               </div>
             </NFormItem>
             <NFormItem label="相对权重" required><NInputNumber v-model:value="row.weight" :min="1" :precision="0" :disabled="editingDisabled" class="w-full" /></NFormItem>
-            <NFormItem label="红色保底候选">
-              <NCheckbox v-model:checked="row.guaranteed" :disabled="editingDisabled || (Number(resourceMap.get(row.resourceId)?.quality) !== 6 && !row.guaranteed)">参与保底</NCheckbox>
+            <NFormItem label="保底候选">
+              <NCheckbox v-model:checked="row.guaranteed" :disabled="true">参与保底</NCheckbox>
             </NFormItem>
           </div>
           <p v-if="row.resourceId" class="ops-inline-note king-prize-share">{{ share(row) }}；不含保底规则。</p>

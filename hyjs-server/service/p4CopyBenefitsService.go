@@ -354,7 +354,7 @@ func (s *GameService) P4BoonInfo(ctx context.Context, request *pb.CSCopyBoonInfo
 			return err
 		}
 
-		pool, end, err := s.loadP4Rotation(tx, 2, now)
+		pool, err := s.loadPermanentStrongRecruit(tx)
 		if err != nil {
 			return err
 		}
@@ -368,7 +368,7 @@ func (s *GameService) P4BoonInfo(ctx context.Context, request *pb.CSCopyBoonInfo
 		if total <= 0 || orange <= 0 {
 			return errors.New(constUtil.P4NativeBoonRotationInvalid)
 		}
-		information = fmt.Sprintf("当前强者招募橙色角色组权重为%.0f%%。本期结束：%s。原招募费用、免费次数和保底保持，请在招募页面查看当前角色预览。", float64(orange)*100/float64(total), time.UnixMilli(end).In(time.FixedZone("UTC+8", 8*3600)).Format("2006-01-02 15:04"))
+		information = fmt.Sprintf("橙卡招募常驻开放，橙色角色组权重为%.0f%%。请在招募页面查看角色预览、每日次数和保底进度。", float64(orange)*100/float64(total))
 		return nil
 	})
 	// 原type31按钮直接打开招募ShopPage；单一导航值保留原前往按钮。

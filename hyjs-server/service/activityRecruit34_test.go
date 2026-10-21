@@ -100,8 +100,8 @@ func TestActivityRecruit34KingTypedSaveAndRollback(t *testing.T) {
 	}
 }
 
-// A stopped rotation leaves the permanent pool working; enabling it must drive real draws.
-func TestActivityRecruit34OrangeRotationProtocolAndAtomicSave(t *testing.T) {
+// A single permanent orange source atomically saves its pool and rules and drives real draws.
+func TestActivityRecruit34OrangePermanentProtocolAndAtomicSave(t *testing.T) {
 	f, actor := adminNativeFixture(t, false)
 	if err := f.s.InitializeP2(f.ctx); err != nil {
 		t.Fatal(err)
@@ -111,8 +111,8 @@ func TestActivityRecruit34OrangeRotationProtocolAndAtomicSave(t *testing.T) {
 		t.Fatal(err)
 	}
 	item := adminNativeFind(t, f, actor, "recruit-rotation")
-	if item.Enabled {
-		t.Fatal("fixture rotation unexpectedly enabled")
+	if !item.Enabled || !item.Permanent {
+		t.Fatal("permanent source not active")
 	}
 	// The base original message remains available while both seeded rotations are off.
 	if _, err := f.s.recruitInfo(f.ctx, f.id, &pb.CSWarriorRecruitGet{CostType: []int32{2}}); err != nil {
@@ -166,15 +166,14 @@ func TestActivityRecruit34OrangeRotationProtocolAndAtomicSave(t *testing.T) {
 	if !proto.Equal(before, after) {
 		t.Fatal("rejected draw deducted resources")
 	}
-	var rotation db.P4RecruitRotation
-	if err = db.GetIns().First(&rotation, "id=?", strings.TrimPrefix(item.ID, "recruit:")).Error; err != nil || len(rotation.Frozen) == 0 {
-		t.Fatal("actual draw did not freeze rotation", err)
-	}
-	// Frozen award content stays protected while shared future daily/pity rules remain editable.
+	// Permanent pool rules remain editable after drawing; daily/pity changes retain existing progress.
 	patch = activityRecruitPatch34(t, f, actor, 2, 2, 3)
-	frozen := adminNativeFind(t, f, actor, "recruit-rotation")
-	_, err = f.s.AdminSaveNativeActivity(f.ctx, actor, frozen.ID, model.AdminNativeActivitySaveRequest{Version: frozen.Version, Enabled: frozen.Enabled, Form: frozen.Form, RecruitSettings: patch})
+	live := adminNativeFind(t, f, actor, "recruit-rotation")
+	if live.Frozen {
+		t.Fatal("permanent base pool unexpectedly frozen")
+	}
+	_, err = f.s.AdminSaveNativeActivity(f.ctx, actor, live.ID, model.AdminNativeActivitySaveRequest{Version: live.Version, Enabled: live.Enabled, Form: live.Form, RecruitSettings: patch})
 	if err != nil {
-		t.Fatal("frozen pool blocked independent live rules", err)
+		t.Fatal("live pool blocked runtime rules", err)
 	}
 }

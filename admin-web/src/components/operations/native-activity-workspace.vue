@@ -189,7 +189,7 @@ const columns = computed<DataTableColumns<NativeActivity>>(() => [
     render: row =>
       h(NSpace, { size: 4 }, () => [
         h(NButton, { size: 'small', secondary: true, disabled: busy.value, 'aria-label': `配置${row.name}`, onClick: () => openRow(row) }, () => '配置'),
-        canWrite.value && !row.enabled
+        canWrite.value && !row.enabled && !row.permanent
           ? h(NButton, { size: 'small', quaternary: true, type: 'error', loading: removingId.value === row.id, disabled: busy.value, 'aria-label': `移除${row.name}`, onClick: () => requestRemove(row) }, () => '移除')
           : null
       ])
@@ -200,7 +200,7 @@ function kindLabel(kind: string) {
   return kindLabels[kind] || kind;
 }
 function isTimed(row: NativeActivity) {
-  return !['month-card', 'permanent-card', 'first-double', 'vip-benefits'].includes(row.kind);
+  return !row.permanent;
 }
 function openTimeText(row: NativeActivity) {
   if (!isTimed(row)) return '常驻开放';
@@ -462,12 +462,13 @@ defineExpose({ beforeLeave: leaveWorkspace, confirmDiscard, dirty, saving });
           <NSpace :size="6">
             <NTag :bordered="false">{{ kindLabel(selected.kind) }}</NTag>
             <NTag :bordered="false" :type="selected.enabled ? 'success' : 'default'">{{ selected.enabled ? '已启用' : '已停用' }}</NTag>
-            <NTag v-if="selected.frozen" :bordered="false" type="warning">规则冻结</NTag>
+            <NTag v-if="selected.permanent" :bordered="false">常驻开放</NTag>
+            <NTag v-if="selected.frozen && !['first-double'].includes(selected.kind)" :bordered="false" type="warning">规则冻结</NTag>
             <ContextHelp
-              v-if="selected.kind === 'recruit-rotation'"
+              v-if="selected.note"
               icon-only
-              title="橙卡轮换说明"
-              :text="'本页启停控制本期限时轮换。停用时仍可使用常驻强者招募；启用且处于开放时间时，抽取使用本期奖池。\n每日次数与保底适用于全部强者招募，停用轮换不会关闭这两项规则。' + (selected.frozen ? '\n本期奖池与开放时间已冻结，仍可调整启停、别名和全局招募规则。' : '')"
+              :title="`${selected.name}说明`"
+              :text="selected.note"
             />
           </NSpace>
           <div class="qualification-line native-enable">
@@ -475,7 +476,7 @@ defineExpose({ beforeLeave: leaveWorkspace, confirmDiscard, dirty, saving });
             <NSwitch v-model:value="selected.enabled" :disabled="disabled" aria-label="活动启用" />
           </div>
         </div>
-        <NAlert v-if="selected.note && selected.kind !== 'recruit-rotation'" type="info" :show-icon="false" class="mb-16px">{{ selected.note }}</NAlert>
+
         <NAlert v-if="selected.frozen && !['first-double', 'recruit-rotation'].includes(selected.kind)" type="warning" :show-icon="false" class="mb-16px">
           本期规则已被使用并冻结，可以调整启停及后台别名。
         </NAlert>
@@ -555,7 +556,7 @@ defineExpose({ beforeLeave: leaveWorkspace, confirmDiscard, dirty, saving });
             <section v-for="prize in currentPrize" :key="prize.id" class="activity-edit-section">
               <NFormItem label="角色"><ResourceSelect v-model:value="prize.resourceId" category="character" :disabled="rulesDisabled" /></NFormItem>
               <NFormItem label="相对权重"><NInputNumber v-model:value="prize.weight" :min="1" :max="1000000000000" :precision="0" :disabled="rulesDisabled" /></NFormItem>
-              <NFormItem label="橙色保底候选"><NSwitch v-model:value="prize.guaranteed" :disabled="rulesDisabled" /></NFormItem>
+              <NFormItem label="保底品质"><NInput value="橙卡（固定）" disabled /></NFormItem>
             </section>
           </template>
           <template v-if="['festival', 'update'].includes(selected.kind)">

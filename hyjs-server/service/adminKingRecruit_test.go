@@ -193,10 +193,12 @@ func TestAdminKingRecruitCharacterScheduleAndResources(t *testing.T) {
 	}
 	worlds := map[int64]bool{}
 	for _, item := range resources.Items {
-		if item.Space < 1 || item.Space > 3 || item.SpaceLabel == "" || f.s.table("Hero", "id", item.ID)["heroClass"] != "0" || (item.OriginalQuality != 20 && item.OriginalQuality != 23) {
+		if item.Space < 0 || item.Space > 3 || item.SpaceLabel == "" || f.s.table("Hero", "id", item.ID)["heroClass"] != "0" || (item.OriginalQuality != 12 && item.OriginalQuality != 13 && item.OriginalQuality != 18 && item.OriginalQuality != 20 && item.OriginalQuality != 23) {
 			t.Fatal("invalid selectable king resource", item.ID)
 		}
-		worlds[item.Space] = true
+		if item.Space > 0 {
+			worlds[item.Space] = true
+		}
 	}
 	if len(worlds) != 3 {
 		t.Fatal("native world selector incomplete")

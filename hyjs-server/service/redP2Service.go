@@ -280,9 +280,11 @@ func (s *GameService) kingRewards(rewards []db.GameplayPoolReward, space int32) 
 	var red []string
 	for _, row := range rewards {
 		hero := s.table("Hero", "id", row.ResourceID)
-		if hero["space"] != strconv.Itoa(int(space)) {
+		if hero["quality"] == "23" && hero["space"] != strconv.Itoa(int(space)) {
 			continue
 		}
+		// 橙卡与低品质角色跨世界共享；两种高品质都能结束本轮保底计数。
+		row.Guaranteed = hero["quality"] == "20" || hero["quality"] == "23"
 		eligible = append(eligible, row)
 		if hero["quality"] == "23" {
 			red = append(red, row.ResourceID)

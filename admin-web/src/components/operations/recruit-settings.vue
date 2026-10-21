@@ -24,24 +24,24 @@ const loading = ref(false);
 const error = ref('');
 const defaultReason = '调整招募规则';
 const maxDailyLimit = 100000;
-const maxGuaranteeEvery = 10000;
+const maxGuaranteeEvery = 20;
 let alive = true;
 let loadGeneration = 0;
 
-const kindName = computed(() => (props.kind === 2 ? '强者招募（橙卡）' : '王者招募'));
+const kindName = computed(() => (props.kind === 2 ? '橙卡招募' : '王者招募'));
 const helpText = computed(() =>
   props.kind === 2
     ? [
-        '所有强者招募（橙卡）活动通用，每日次数与王者招募分开计算。',
-        '每日次数填 0 表示不限；保底间隔 N 表示连续未命中时最多 N 次触发保底。',
+        '橙卡招募常驻开放，每日次数与王者招募分开计算。',
+        '每日次数填 0 表示不限；保底间隔 N 表示连续未出高品质时最多 N 次保底；最后20%的抽数逐步提高概率。',
         '保存后对之后的所有抽取生效，已累计次数与保底进度保留。',
-        '与模板配置不同：这里作用于全部同类活动，模板只影响新排期。'
+        '保底获得橙卡。保底间隔可设10或20抽，每日次数须为10的倍数。'
       ].join('\n')
     : [
-        '所有王者招募活动通用，三个世界共用每日次数与保底进度。',
-        '免费招募也占 1 次；保底间隔 N 表示连续未命中时最多 N 次触发保底。',
+        '所有王者招募活动通用，三个世界共用每日次数与保底进度，幸运值仍按世界累计，兑换单独计算。',
+        '免费招募也占 1 次；保底间隔 N 表示连续未出高品质时最多 N 次保底；最后20%的抽数逐步提高概率。',
         '保存后对之后的所有抽取生效，已累计次数与保底进度保留。',
-        '与模板配置不同：这里作用于全部同类活动，模板只影响新排期。'
+        '保底可能获得橙卡或红卡，不保证红卡。保底间隔可设10或20抽，每日次数须为10的倍数。'
       ].join('\n')
 );
 
@@ -58,18 +58,20 @@ const dirty = computed(() => Boolean(snapshot.value && row.value) && rowKey(row.
 const disabled = computed(() => props.disabled || !canWrite.value || loading.value || Boolean(error.value));
 
 function dailyLimitError(value: DraftRow) {
-  const min = value.kind === 2 ? 0 : 1;
+  const min = value.kind === 2 ? 0 : 10;
   if (value.dailyLimit === null || !Number.isInteger(value.dailyLimit))
     return `需为 ${min}–${maxDailyLimit.toLocaleString()} 的整数`;
   if (value.dailyLimit < min || value.dailyLimit > maxDailyLimit) return `范围 ${min}–${maxDailyLimit.toLocaleString()}`;
+  if (value.dailyLimit % 10 !== 0) return '请填写10的倍数';
   return '';
 }
 
 function guaranteeError(value: DraftRow) {
   if (value.guaranteeEvery === null || !Number.isInteger(value.guaranteeEvery))
-    return `需为 1–${maxGuaranteeEvery.toLocaleString()} 的整数`;
-  if (value.guaranteeEvery < 1 || value.guaranteeEvery > maxGuaranteeEvery)
-    return `范围 1–${maxGuaranteeEvery.toLocaleString()}`;
+    return `需为 10–${maxGuaranteeEvery.toLocaleString()} 的整数`;
+  if (value.guaranteeEvery < 10 || value.guaranteeEvery > maxGuaranteeEvery)
+    return `范围 10–${maxGuaranteeEvery.toLocaleString()}`;
+  if (value.guaranteeEvery % 10 !== 0) return '请填写10的倍数';
   return '';
 }
 
@@ -229,7 +231,8 @@ defineExpose({ dirty, loading, invalid, request, accept });
             >
               <NInputNumber
                 v-model:value="row.dailyLimit"
-                :min="kind === 2 ? 0 : 1"
+                :min="kind === 2 ? 0 : 10"
+                :step="10"
                 :max="maxDailyLimit"
                 :precision="0"
                 :show-button="false"
@@ -249,7 +252,8 @@ defineExpose({ dirty, loading, invalid, request, accept });
             >
               <NInputNumber
                 v-model:value="row.guaranteeEvery"
-                :min="1"
+                :min="10"
+                :step="10"
                 :max="maxGuaranteeEvery"
                 :precision="0"
                 :show-button="false"

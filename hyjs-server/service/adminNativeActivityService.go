@@ -36,6 +36,7 @@ type adminNativeSnapshot struct {
 	policyExists bool
 	copyRule     db.P4CopyBenefitRule
 	rotation     db.P4RecruitRotation
+	recruitPool  db.GameplayPool
 	firstDouble  db.FirstDoublePolicy
 	period       db.PeriodInstance
 	bundle       db.P15SeasonalBundle
@@ -78,6 +79,15 @@ func adminNativeKindName(kind string) string {
 		return "新版活动"
 	}
 	return ""
+}
+
+// adminNativePermanentKind 固定常驻活动没有排期；资格、领取周期和运营开关仍由各消费者管理。
+func adminNativePermanentKind(kind string) bool {
+	switch kind {
+	case "fund", "payment-first", "month-card", "permanent-card", "vip-benefits", "recruit-rotation", "first-double":
+		return true
+	}
+	return false
 }
 
 func adminNativePaymentKind(ruleKind string) (string, bool) {
@@ -360,6 +370,29 @@ func (s *GameService) adminNativeLoad(tx *gorm.DB, id string, lock bool) (*admin
 		snap.dto.Enabled = snap.copyRule.Enabled
 		snap.dto.Frozen = len(snap.copyRule.Frozen) > 0
 		snap.dto.Note = "副本福利；未冻结保存立即写入原表并生效，冻结后仅允许启停和别名。"
+	case id == "recruit:permanent":
+		query := tx
+		if lock {
+			query = query.Clauses(clause.Locking{Strength: "UPDATE"})
+		}
+		if err := query.First(&snap.recruitPool, "id = ?", "recruit_2").Error; err != nil {
+			return nil, adminNativeLookupError(err)
+		}
+		rewardsQuery := tx.Where("pool_id = ?", "recruit_2").Order("id")
+		if lock {
+			rewardsQuery = rewardsQuery.Clauses(clause.Locking{Strength: "UPDATE"})
+		}
+		var rewards []db.GameplayPoolReward
+		if err := rewardsQuery.Find(&rewards).Error; err != nil {
+			return nil, err
+		}
+		snap.dto.Kind = "recruit-rotation"
+		snap.dto.Form = model.AdminNativeActivityForm{Prizes: []model.AdminActivityPrize{}}
+		for _, reward := range rewards {
+			snap.dto.Form.Prizes = append(snap.dto.Form.Prizes, model.AdminActivityPrize{ID: int64(reward.ID), ResourceID: reward.ResourceID, Amount: int64(reward.Amount), Weight: reward.Weight, Stock: int64(reward.Stock), Guaranteed: reward.Guaranteed})
+		}
+		snap.dto.Enabled = snap.recruitPool.Enabled
+		snap.dto.Note = "常驻开放；奖池、每日次数和保底直接用于橙卡招募。费用、免费冷却和已有招募进度保持。"
 	case strings.HasPrefix(id, "recruit:"):
 		key := strings.TrimPrefix(id, "recruit:")
 		query := tx
@@ -467,6 +500,7 @@ func (s *GameService) adminNativeLoad(tx *gorm.DB, id string, lock bool) (*admin
 		return nil, err
 	}
 	snap.dto.Name = adminNativeKindName(snap.dto.Kind)
+	snap.dto.Permanent = adminNativePermanentKind(snap.dto.Kind) && (snap.dto.Kind != "recruit-rotation" || id == "recruit:permanent")
 	snap.dto.Alias = meta.Alias
 	snap.dto.Version = adminNativeVersion(snap.dto.Form, snap.dto.Enabled, snap.dto.Alias, snap.dto.Frozen)
 	return snap, nil
@@ -631,13 +665,13 @@ func (s *GameService) AdminNativeActivities(ctx context.Context, p *model.AdminP
 			ids = append(ids, "copy:"+row.ID)
 		}
 	}
-	if tx.Migrator().HasTable(&db.P4RecruitRotation{}) {
-		var rotations []db.P4RecruitRotation
-		if err := tx.Where("kind = ?", 2).Order("id").Find(&rotations).Error; err != nil {
+	// 橙卡只配置真实常驻基础池，旧轮换及冻结历史保留在原表，不占列表。
+	if tx.Migrator().HasTable(&db.GameplayPool{}) {
+		if err := tx.Model(&db.GameplayPool{}).Where("id = ?", "recruit_2").Count(&count).Error; err != nil {
 			return nil, err
 		}
-		for _, row := range rotations {
-			ids = append(ids, "recruit:"+row.ID)
+		if count > 0 {
+			ids = append(ids, "recruit:permanent")
 		}
 	}
 	if tx.Migrator().HasTable(&db.FirstDoublePolicy{}) {
@@ -950,6 +984,9 @@ func (s *GameService) adminNativeApplyCopy(tx *gorm.DB, snap *adminNativeSnapsho
 
 func (s *GameService) adminNativeApplyRecruit(tx *gorm.DB, snap *adminNativeSnapshot, req model.AdminNativeActivitySaveRequest) error {
 	form := req.Form
+	if snap.dto.ID == "recruit:permanent" {
+		return s.adminNativeApplyPermanentRecruit(tx, snap, req)
+	}
 	if form.StartAt <= 0 || form.EndAt <= form.StartAt || (len(form.Prizes) == 0 && req.Enabled) || len(form.Prizes) > 1000 {
 		return constUtil.ErrAdminInput
 	}
@@ -983,6 +1020,36 @@ func (s *GameService) adminNativeApplyRecruit(tx *gorm.DB, snap *adminNativeSnap
 		"rewards":  updated.Rewards,
 		"enabled":  updated.Enabled,
 	}).Error
+}
+
+// adminNativeApplyPermanentRecruit 修改实际常驻奖池，不生成新一期、不重置免费或累计保底进度。
+func (s *GameService) adminNativeApplyPermanentRecruit(tx *gorm.DB, snap *adminNativeSnapshot, req model.AdminNativeActivitySaveRequest) error {
+	if len(req.Form.Prizes) < 1 || len(req.Form.Prizes) > 1000 || req.Form.StartAt != 0 || req.Form.EndAt != 0 {
+		return constUtil.ErrAdminInput
+	}
+	rewards := make([]db.GameplayPoolReward, 0, len(req.Form.Prizes))
+	seenIDs := map[int64]bool{}
+	for _, prize := range req.Form.Prizes {
+		if prize.Amount != 1 || prize.Stock != 0 || prize.ID < 0 || prize.ID > math.MaxInt32 || seenIDs[prize.ID] || prize.ResourceID == "" || prize.Weight < 1 || prize.Weight > 1000000000000 {
+			return constUtil.ErrAdminInput
+		}
+		seenIDs[prize.ID] = true
+		hero := s.table("Hero", "id", prize.ResourceID)
+		rewards = append(rewards, db.GameplayPoolReward{PoolID: "recruit_2", ID: int32(prize.ID), ResourceID: prize.ResourceID, Amount: 1, Weight: prize.Weight, Guaranteed: hero["quality"] == "20"})
+	}
+	if _, _, err := s.p4RotationSnapshot(db.P4RecruitRotation{Rewards: adminJSON(rewards)}, 2); err != nil {
+		return constUtil.ErrAdminInput
+	}
+	if err := s.validateRecruitClientPrices(&snap.recruitPool, 2); err != nil {
+		return constUtil.ErrAdminInput
+	}
+	if err := tx.Where("pool_id = ?", "recruit_2").Delete(&db.GameplayPoolReward{}).Error; err != nil {
+		return err
+	}
+	if err := tx.Create(&rewards).Error; err != nil {
+		return err
+	}
+	return tx.Model(&db.GameplayPool{}).Where("id = ?", "recruit_2").Update("enabled", req.Enabled).Error
 }
 
 func (s *GameService) adminNativeApplyFirstDouble(tx *gorm.DB, snap *adminNativeSnapshot, req model.AdminNativeActivitySaveRequest) error {
@@ -1135,6 +1202,9 @@ func (s *GameService) adminNativeApplyFrozenState(tx *gorm.DB, snap *adminNative
 	case "copy-benefits":
 		return tx.Model(&db.P4CopyBenefitRule{}).Where("id = ?", snap.copyRule.ID).Update("enabled", enabled).Error
 	case "recruit-rotation":
+		if snap.dto.ID == "recruit:permanent" {
+			return tx.Model(&db.GameplayPool{}).Where("id = ?", "recruit_2").Update("enabled", enabled).Error
+		}
 		return tx.Model(&db.P4RecruitRotation{}).Where("id = ?", snap.rotation.ID).Update("enabled", enabled).Error
 	case "first-double":
 		return tx.Model(&db.FirstDoublePolicy{}).Where("id = ?", 1).Update("enabled", enabled).Error
@@ -1206,6 +1276,10 @@ func (s *GameService) adminNativeValidateEnable(tx *gorm.DB, snap *adminNativeSn
 			return err
 		}
 	case "recruit-rotation":
+		if snap.dto.ID == "recruit:permanent" {
+			_, err := s.loadPermanentStrongRecruit(tx)
+			return err
+		}
 		if _, _, err := s.p4RotationSnapshot(snap.rotation, 2); err != nil {
 			return constUtil.ErrAdminInput
 		}
@@ -1409,7 +1483,7 @@ func (s *GameService) AdminRemoveNativeActivity(ctx context.Context, p *model.Ad
 		if err != nil {
 			return err
 		}
-		if meta.Archived || snap.dto.Version != version || snap.dto.Enabled {
+		if meta.Archived || snap.dto.Version != version || snap.dto.Enabled || snap.dto.Permanent {
 			return constUtil.ErrAdminConfigConflict
 		}
 		meta.ActivityID, meta.Mode, meta.TemplateID = id, "native-"+snap.dto.Kind, "native-"+snap.dto.Kind

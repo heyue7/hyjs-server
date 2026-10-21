@@ -97,7 +97,7 @@ func TestActivityDirectoryAbsentWheelAndIncompleteEntriesKeepHealthyTabs(t *test
 		t.Fatal(err)
 	}
 	got := list()
-	if has(got, badPeriod.ID) || has(got, badCommerce.ID) || has(got, badSeasonal.ID) || !has(got, "openServerFund_local_20261011") || has(got, "warriorWeightImprove") {
+	if has(got, badPeriod.ID) || has(got, badCommerce.ID) || has(got, badSeasonal.ID) || !has(got, "openServerFund_local_20261011") || !has(got, "warriorWeightImprove") {
 		t.Fatal("invalid draft or disabled rotation leaked", got)
 	}
 	if _, err := f.s.P1Activity(f.ctx, f.id, &pb.CSActivityReward{ActivityId: proto.String(badPeriod.ID)}); err == nil {
@@ -120,7 +120,7 @@ func TestActivityDirectoryNoSeasonalContentAndBadRotationDoesNotBlock(t *testing
 		t.Fatal(err)
 	}
 	tabs, err := f.s.P4ActivityTabs(f.ctx, now)
-	if err != nil || slices.ContainsFunc(tabs, func(tab *pb.ActivityTab) bool { return tab.GetActivityId() == "warriorWeightImprove" }) {
+	if err != nil || !slices.ContainsFunc(tabs, func(tab *pb.ActivityTab) bool { return tab.GetActivityId() == "warriorWeightImprove" }) {
 		t.Fatal("bad rotation caused root list failure or exposure", err)
 	}
 	// 开放完整的原强者轮换后，仅该入口恢复；无额外活动奖励写入。

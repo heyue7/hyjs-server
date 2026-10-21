@@ -37,7 +37,7 @@ func AdminRecruitSettingsHandler(c *gin.Context) {
 
 // AdminRecruitSettingsSaveHandler 保存两项完整且唯一的全局招募运行规则。
 // @Summary 保存招募运行规则
-// @Description 按读取版本保存强者、王者两项规则；王者每日1至100000，强者每日0表示不限，保底1至10000。不改原奖励、价格、免费冷却和历史进度。
+// @Description 按读取版本保存强者、王者两项规则；王者每日10至100000，橙卡每日0表示不限，保底10或20；每日次数为10的倍数。不改原奖励、价格、免费冷却和历史进度。
 // @Tags AdminActivities
 // @Accept json
 // @Produce json
@@ -68,7 +68,7 @@ func adminRecruitSettingsValid(req *model.AdminRecruitSettingsSaveRequest) bool 
 	}
 	seen := map[int64]bool{}
 	for _, item := range req.Items {
-		if seen[item.Kind] || item.Name != constUtil.RecruitRuntimeName(int32(item.Kind)) || item.GuaranteeEvery < int64(constUtil.RecruitRuntimeGuaranteeMin) || item.GuaranteeEvery > int64(constUtil.RecruitRuntimeGuaranteeMax) {
+		if seen[item.Kind] || item.Name != constUtil.RecruitRuntimeName(int32(item.Kind)) || item.GuaranteeEvery < int64(constUtil.RecruitRuntimeGuaranteeMin) || item.GuaranteeEvery > 20 || item.GuaranteeEvery%10 != 0 || item.DailyLimit%10 != 0 {
 			return false
 		}
 		switch item.Kind {

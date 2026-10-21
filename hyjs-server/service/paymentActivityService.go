@@ -68,6 +68,14 @@ func loadP3Activity(tx *gorm.DB, id int64, activity string) (*db.PaymentActivity
 	if err != nil {
 		return nil, nil, err
 	}
+	// 首充保留奖励与已领快照，开放状态跟随当前运营开关。
+	if rule.Kind == "first" {
+		var live db.PaymentActivityRule
+		if err := tx.Select("id", "enabled").First(&live, "id = ?", activity).Error; err != nil {
+			return nil, nil, err
+		}
+		rule.Enabled = live.Enabled
+	}
 	if rule.ID != activity || !rule.Enabled || rule.StartAt <= 0 || rule.StartAt >= rule.EndAt || rule.EndAt > rule.RewardEndAt || rule.Threshold <= 0 || rule.Source == "" {
 		return nil, nil, errors.New(constUtil.P3PaymentConfigError)
 	}
@@ -83,7 +91,12 @@ func p3ActivityMetric(tx *gorm.DB, id int64, r *db.PaymentActivityRule, asOf ...
 		now = asOf[0]
 	}
 	end := min(r.EndAt, now.UnixMilli()+1)
-	start, err := localPlayActivityMetricStart(tx, r.ID, r.StartAt)
+	metricStart := r.StartAt
+	// 首充礼包按终身首笔确认订单计算，不再因旧活动窗口结束失去资格。
+	if r.Kind == "first" {
+		metricStart, end = 0, now.UnixMilli()+1
+	}
+	start, err := localPlayActivityMetricStart(tx, r.ID, metricStart)
 	if err != nil {
 		return 0, err
 	}
@@ -239,7 +252,7 @@ func (s *GameService) paymentActivity(ctx context.Context, id int64, request pro
 		if continued != (r.Kind == "continued") {
 			return p3Error()
 		}
-		if now.UnixMilli() < r.StartAt || now.UnixMilli() >= r.RewardEndAt {
+		if r.Kind != "first" && (now.UnixMilli() < r.StartAt || now.UnixMilli() >= r.RewardEndAt) {
 			return errors.New(constUtil.P3PaymentUnavailable)
 		}
 		items, value, err := s.p3ActivityItems(tx, p, state, r, now)
@@ -324,7 +337,7 @@ func (s *GameService) paymentActivity(ctx context.Context, id int64, request pro
 // PaymentActivityTabs 交由共享活动列表聚合，不覆盖已恢复累计登录等活动。
 func (s *GameService) PaymentActivityTabs(ctx context.Context, now time.Time) ([]*pb.ActivityTab, error) {
 	var rules []db.PaymentActivityRule
-	err := db.GetIns().WithContext(ctx).Where("enabled = ? AND start_at <= ? AND reward_end_at > ?", true, now.UnixMilli(), now.UnixMilli()).Order("id").Find(&rules).Error
+	err := db.GetIns().WithContext(ctx).Where("enabled = ? AND (kind = ? OR (start_at <= ? AND reward_end_at > ?))", true, "first", now.UnixMilli(), now.UnixMilli()).Order("id").Find(&rules).Error
 	result := []*pb.ActivityTab{{ActivityId: proto.String("monthCard_local_p3"), Status: proto.Int32(1), Order: proto.Int32(45)}, {ActivityId: proto.String("vipBoon_local_p3"), Status: proto.Int32(1), Order: proto.Int32(46)}}
 	for i, r := range rules {
 		allowed, accessErr := localPlayActivityVisible(db.GetIns().WithContext(ctx), r.ID)

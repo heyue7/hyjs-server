@@ -110,7 +110,7 @@ func (s *GameService) openServerFund(ctx context.Context, id int64, request prot
 			return errors.New("活动SQL配置无效")
 		}
 		now := LocalPlayNow(ctx).UnixMilli()
-		if !cfg.Enabled || now < cfg.StartAt || now >= cfg.RewardEndAt {
+		if !cfg.Enabled || (cfg.ID != "open_server_fund" && (now < cfg.StartAt || now >= cfg.RewardEndAt)) {
 			return errors.New("活动未开放或领取已截止")
 		}
 		var state db.ActivityState
@@ -156,9 +156,7 @@ func (s *GameService) openServerFund(ctx context.Context, id int64, request prot
 		switch req := request.(type) {
 		case *pb.CSOpenServerFundInfo:
 		case *pb.CSBuyOpenServerFund:
-			if now >= cfg.EndAt {
-				return errors.New("基金购买已结束")
-			}
+
 			if state.Bought {
 				return errors.New("基金已经购买")
 			}
@@ -440,7 +438,7 @@ func (s *GameService) legacyLoginActivityApply(tx *gorm.DB, id int64, player *pb
 	if cfg.StartAt >= cfg.EndAt || cfg.EndAt > cfg.RewardEndAt {
 		return nil, errors.New("登录活动周期无效")
 	}
-	if !cfg.Enabled || now < cfg.StartAt || now >= cfg.RewardEndAt {
+	if !cfg.Enabled || (cfg.ID != "open_server_fund" && (now < cfg.StartAt || now >= cfg.RewardEndAt)) {
 		return nil, errors.New("登录活动未开放或领取已截止")
 	}
 	var state db.ActivityLoginState
@@ -574,7 +572,7 @@ func (s *GameService) AvailableActivities(ctx context.Context, id int64) ([]*pb.
 	var result []*pb.ActivityTab
 	for _, key := range []string{"open_server_fund", "totalLogin_local_20261011"} {
 		for _, cfg := range rows {
-			if cfg.ID != key || !cfg.Enabled || now < cfg.StartAt || now >= cfg.RewardEndAt {
+			if cfg.ID != key || !cfg.Enabled || (key != "open_server_fund" && (now < cfg.StartAt || now >= cfg.RewardEndAt)) {
 				continue
 			}
 			if cfg.StartAt <= 0 || cfg.StartAt >= cfg.EndAt || cfg.EndAt > cfg.RewardEndAt {

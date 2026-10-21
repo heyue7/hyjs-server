@@ -16,7 +16,7 @@ export interface NativeActivityForm {
 }
 export interface NativeActivity {
   id: string; kind: string; name: string; alias: string; version: string;
-  enabled: boolean; frozen: boolean; note: string; form: NativeActivityForm;
+  enabled: boolean; permanent: boolean; frozen: boolean; note: string; form: NativeActivityForm;
 }
 export const getNativeActivities = () => api<{items: NativeActivity[]}>('/activity-native-settings');
 export const saveNativeActivity = (row: NativeActivity, recruitSettings?: RecruitSettingsSaveRequest) => api<NativeActivity>(

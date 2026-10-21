@@ -116,7 +116,7 @@ func (s *GameService) loadGameplayPool(tx *gorm.DB, key string) (*db.GameplayPoo
 	if err := tx.Where("pool_id = ?", key).Order("id").Find(&rewards).Error; err != nil {
 		return nil, nil, err
 	}
-	if s.P4Ready && (key == "recruit_1" || key == "recruit_2") {
+	if s.P4Ready && key == "recruit_1" {
 		kind := int32(1)
 		if key == "recruit_2" {
 			kind = 2
@@ -125,7 +125,7 @@ func (s *GameService) loadGameplayPool(tx *gorm.DB, key string) (*db.GameplayPoo
 		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil, err
 		}
-		// 限时轮换停用后继续使用常驻池，保留原招募入口和费用。
+		// 普通招募兼容原轮换，橙卡始终读取上方常驻池。
 		if err == nil {
 			rewards = rotation
 		}
@@ -496,8 +496,8 @@ func (s *GameService) warriorRecruit(ctx context.Context, id int64, b *pb.CSWarr
 			if hero == nil || hero["heroClass"] != "0" || r.Amount != 1 || r.Stock != 0 {
 				return errors.New("招募奖池仅支持真实可培养伙伴且不限库存")
 			}
-			if b.GetCostType() == 3 && (hero["quality"] != "20" && hero["quality"] != "23" || r.Guaranteed && hero["quality"] != "23") {
-				return errors.New("王者卡池与本地红卡保底规则不匹配")
+			if b.GetCostType() == 3 && (hero["quality"] != "12" && hero["quality"] != "13" && hero["quality"] != "18" && hero["quality"] != "20" && hero["quality"] != "23" || r.Guaranteed && hero["quality"] != "20" && hero["quality"] != "23") {
+				return errors.New("王者卡池与橙色或红色保底规则不匹配")
 			}
 			hasGuarantee = hasGuarantee || r.Guaranteed
 		}
@@ -535,7 +535,13 @@ func (s *GameService) warriorRecruit(ctx context.Context, id int64, b *pb.CSWarr
 			result.Cost = []*pb.BaseResource{cost}
 		}
 		for i := int32(0); i < count; i++ {
-			chosen, err := choosePoolReward(rewards, cfg.GuaranteeEvery > 0 && st.SinceGuarantee+1 >= cfg.GuaranteeEvery)
+			var chosen *db.GameplayPoolReward
+			var err error
+			if b.GetCostType() == 2 || b.GetCostType() == 3 {
+				chosen, err = chooseRecruitProbabilityReward(rewards, st.SinceGuarantee, cfg.GuaranteeEvery)
+			} else {
+				chosen, err = choosePoolReward(rewards, cfg.GuaranteeEvery > 0 && st.SinceGuarantee+1 >= cfg.GuaranteeEvery)
+			}
 			if err != nil {
 				return err
 			}

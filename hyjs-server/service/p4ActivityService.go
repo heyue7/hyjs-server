@@ -314,25 +314,13 @@ func (s *GameService) P4ActivityTabs(ctx context.Context, now time.Time) ([]*pb.
 		if doubleOpen {
 			returnTabs = append(returnTabs, &pb.ActivityTab{ActivityId: proto.String("RechangeDouble"), Name: proto.String("首笔充值双倍"), Order: proto.Int32(38), Status: proto.Int32(0)})
 		}
-		// 原31页只展示实际开放且完整的强者轮换；常驻招募池存在不代表限时轮换开放。
-		var rotations []db.P4RecruitRotation
-		if err := tx.Where("kind=? AND enabled=? AND start_at<=? AND end_at>?", 2, true, now.UnixMilli(), now.UnixMilli()).Order("start_at DESC,id DESC").Find(&rotations).Error; err != nil {
+		// 橙卡入口与实际常驻招募共用同一奖池和开关，目录读取不冻结任何历史轮换。
+		if _, err := s.loadPermanentStrongRecruit(tx); err == nil {
+			returnTabs = append(returnTabs, &pb.ActivityTab{ActivityId: proto.String("warriorWeightImprove"), Name: proto.String("橙卡招募"), Order: proto.Int32(39), Status: proto.Int32(0)})
+		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return err
 		}
-		for _, rotation := range rotations {
-			allowed, err := localPlayActivityVisible(tx, rotation.ID)
-			if err != nil {
-				return err
-			}
-			if !allowed {
-				continue
-			}
-			if _, _, err := s.p4RotationSnapshot(rotation, 2); err != nil {
-				continue
-			}
-			returnTabs = append(returnTabs, &pb.ActivityTab{ActivityId: proto.String("warriorWeightImprove"), Name: proto.String("强者招募轮换"), Order: proto.Int32(39), Status: proto.Int32(0)})
-			break
-		}
+
 		return nil
 	})
 	return returnTabs, err

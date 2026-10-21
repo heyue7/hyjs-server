@@ -2,7 +2,14 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
+	"math"
+	"sort"
+	"strconv"
+	"strings"
+	"time"
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -195,4 +202,265 @@ func (s *GameService) recruitRuntimeItems(tx *gorm.DB) ([]model.AdminRecruitSett
 		items = append(items, model.AdminRecruitSetting{Kind: int64(rule.Kind), Name: constUtil.RecruitRuntimeName(rule.Kind), DailyLimit: int64(rule.DailyLimit), GuaranteeEvery: int64(rule.GuaranteeEvery)})
 	}
 	return items, nil
+}
+
+// balancedRecruit35Rewards 按品质总概率分配整数权重，同品质各角色等概率，三世界橙卡概率与常驻橙池一致。
+func (s *GameService) balancedRecruit35Rewards(poolID string, world int64, king bool) ([]db.GameplayPoolReward, error) {
+	if world < 0 || world > 3 {
+		return nil, constUtil.ErrAdminConfiguration
+	}
+	groups := map[string][]string{}
+	ppm := map[string]int64{"12": 600000, "13": 343000, "18": 51000, "20": 6000}
+	order := []string{"12", "13", "18", "20"}
+	if king {
+		ppm["13"] -= constUtil.RecruitBalance35RedPPM
+		for _, space := range []int64{1, 2, 3} {
+			if world == 0 || world == space {
+				group := "23:" + strconv.FormatInt(space, 10)
+				ppm[group] = constUtil.RecruitBalance35RedPPM
+				order = append(order, group)
+			}
+		}
+	}
+	for _, hero := range s.Tables["Hero"] {
+		if hero["heroClass"] != "0" {
+			continue
+		}
+		group := hero["quality"]
+		if group == "23" {
+			group += ":" + hero["space"]
+		}
+		if _, ok := ppm[group]; ok {
+			groups[group] = append(groups[group], hero["id"])
+		}
+	}
+	// 每个红卡世界独立分配同一总权重；world=0是预筛选集合，过滤后每个世界的总量均为百万分母。
+	scale := int64(1)
+	for _, group := range order {
+		count := int64(len(groups[group]))
+		if count == 0 {
+			return nil, constUtil.ErrAdminConfiguration
+		}
+		a, b := scale, count
+		for b != 0 {
+			a, b = b, a%b
+		}
+		if scale/a > math.MaxInt64/count {
+			return nil, constUtil.ErrAdminConfiguration
+		}
+		scale = scale / a * count
+	}
+	out := []db.GameplayPoolReward{}
+	for _, group := range order {
+		sort.Strings(groups[group])
+		factor := scale / int64(len(groups[group]))
+		if ppm[group] < 1 || factor > 1000000000000/ppm[group] {
+			return nil, constUtil.ErrAdminConfiguration
+		}
+		for _, id := range groups[group] {
+			out = append(out, db.GameplayPoolReward{PoolID: poolID, ID: int32(len(out) + 1), ResourceID: id, Amount: 1, Weight: ppm[group] * factor, Guaranteed: group == "20" || strings.HasPrefix(group, "23:")})
+		}
+	}
+	return out, nil
+}
+
+// InitializeRecruitBalance35 一次性应用获授权的全品质奖池和软保底初值；重启保留后台后续改动。
+// 每个旧配置在同事务审计中完整留存，不改玩家资源、抽数、免费冷却、领取和订单回执。
+func (s *GameService) InitializeRecruitBalance35(ctx context.Context) error {
+	return db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := ServerGameClockGuardTransaction(tx); err != nil {
+			return err
+		}
+		// 先锁真实稳定基础池，再检查全局版本标记；同库各区服与并发启动共享这一互斥入口。
+		var stable db.GameplayPool
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&stable, "id=?", "recruit_2").Error; err != nil {
+			return err
+		}
+		target := constUtil.RecruitBalance35Version
+		var marker db.AdminAudit
+		// 锁定读使用当前已提交版本，避免MySQL旧读视图在等待基础池锁后再次迁移。
+		markerErr := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("action=? AND target=?", constUtil.RecruitBalance35ApplyAction, target).Take(&marker).Error
+		if markerErr == nil {
+			return nil
+		}
+		if !errors.Is(markerErr, gorm.ErrRecordNotFound) {
+			return markerErr
+		}
+		backup := func(kind, key string, value any) error {
+			raw := adminJSON(value)
+			if len(raw) > 60000 {
+				return fmt.Errorf("招募旧配置过大，保留原配置并中止升级: %s", key)
+			}
+			return tx.Create(&db.AdminAudit{Time: time.Now().UnixMilli(), Actor: "system", Action: constUtil.RecruitBalance35BeforeAction, Target: kind + ":" + key, Detail: string(raw)}).Error
+		}
+		// 按各区服已持久化的有效游戏日期选择当前和未来排期，保留虚拟日期中已经结束的历史。
+		realNow := time.Now()
+		offsets := map[int64]int64{}
+		if tx.Migrator().HasTable(&db.ServerGameClock{}) {
+			var clocks []db.ServerGameClock
+			if err := tx.Find(&clocks).Error; err != nil {
+				return err
+			}
+			for _, clock := range clocks {
+				if !serverGameClockValid(&clock) {
+					return constUtil.ErrAdminConfiguration
+				}
+				offsets[clock.ServerID] = clock.OffsetDays
+			}
+		}
+		var candidates []db.AdminActivityOccurrence
+		if err := tx.Where("mode=? AND archived=? AND enabled=?", constUtil.AdminKingRecruitMode, false, true).Order("id").Find(&candidates).Error; err != nil {
+			return err
+		}
+		occurrenceIDs := []string{}
+		poolIDs := []string{"recruit_2", "recruit_3"}
+		for _, row := range candidates {
+			if row.EndAt <= realNow.AddDate(0, 0, int(offsets[row.ServerID])).UnixMilli() {
+				continue
+			}
+			if !adminKingRecruitPoolID(row.ConsumerKey) {
+				return constUtil.ErrAdminConfiguration
+			}
+			occurrenceIDs = append(occurrenceIDs, row.ID)
+			poolIDs = append(poolIDs, row.ConsumerKey)
+		}
+		// 基础池入口锁之后按ID锁全体目标奖池，模板、排期和运行规则放在其后。
+		var pools []db.GameplayPool
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id IN ?", poolIDs).Order("id").Find(&pools).Error; err != nil {
+			return err
+		}
+		foundPools := make(map[string]bool, len(pools))
+		for _, pool := range pools {
+			foundPools[pool.ID] = true
+		}
+		for _, id := range poolIDs {
+			if !foundPools[id] {
+				return constUtil.ErrAdminConfiguration
+			}
+		}
+		for _, pool := range pools {
+			var before []db.GameplayPoolReward
+			if err := tx.Where("pool_id=?", pool.ID).Order("id").Find(&before).Error; err != nil {
+				return err
+			}
+			world := int64(0)
+			king := pool.ID != "recruit_2"
+			var snapshot db.KingRecruitActivitySnapshot
+			var source adminKingRecruitSource
+			hasSnapshot := false
+			if king {
+				err := tx.First(&snapshot, "pool_id=?", pool.ID).Error
+				if err == nil {
+					if json.Unmarshal(snapshot.Payload, &source) != nil {
+						return constUtil.ErrAdminConfiguration
+					}
+					world = source.World
+					hasSnapshot = true
+				} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+					return err
+				}
+			}
+			if err := backup("pool", pool.ID, map[string]any{"pool": pool, "rewards": before, "snapshot": map[string]any{"poolId": snapshot.PoolID, "frozen": snapshot.Frozen, "payload": json.RawMessage(snapshot.Payload)}}); err != nil {
+				return err
+			}
+			rewards, err := s.balancedRecruit35Rewards(pool.ID, world, king)
+			if err != nil {
+				return err
+			}
+			if err = tx.Where("pool_id=?", pool.ID).Delete(&db.GameplayPoolReward{}).Error; err != nil {
+				return err
+			}
+			if err = tx.Create(&rewards).Error; err != nil {
+				return err
+			}
+			if hasSnapshot {
+				// 原已冻结的价格、世界与时窗保持，仅更新本次明确调整的品质候选和权重来源。
+				source.Pool.Name = "王者招募"
+				source.Pool.Source = constUtil.RecruitBalance35Source
+				snapshot.Payload = adminJSON(source)
+				if err = tx.Save(&snapshot).Error; err != nil {
+					return err
+				}
+			}
+			if king {
+				if err = tx.Model(&db.GameplayPool{}).Where("id=?", pool.ID).Updates(map[string]any{"name": "王者招募", "source": constUtil.RecruitBalance35Source}).Error; err != nil {
+					return err
+				}
+			}
+		}
+		// 同步现存模板与排期的实际角色清单；旧FormJSON分别存审计，历史领奖身份和实例ID保持。
+		var templates []db.AdminActivityDefinition
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("mode=? AND archived=?", constUtil.AdminKingRecruitMode, false).Order("id").Find(&templates).Error; err != nil {
+			return err
+		}
+		for _, row := range templates {
+			var form model.AdminActivityForm
+			if json.Unmarshal(row.FormJSON, &form) != nil {
+				return constUtil.ErrAdminConfiguration
+			}
+			if err := backup("template", row.ID, json.RawMessage(row.FormJSON)); err != nil {
+				return err
+			}
+			rewards, err := s.balancedRecruit35Rewards("", form.Options.KingWorld, true)
+			if err != nil {
+				return err
+			}
+			form.Prizes = []model.AdminActivityPrize{}
+			for _, r := range rewards {
+				form.Prizes = append(form.Prizes, model.AdminActivityPrize{ID: int64(r.ID), ResourceID: r.ResourceID, Amount: 1, Weight: r.Weight, Guaranteed: r.Guaranteed})
+			}
+			form.Name = "王者招募"
+			form.Source = constUtil.RecruitBalance35Source
+			row.Name = "王者招募"
+			row.FormJSON = adminJSON(form)
+			row.Revision++
+			row.UpdatedAtMillis = time.Now().UnixMilli()
+			if err = tx.Save(&row).Error; err != nil {
+				return err
+			}
+		}
+		var occurrences []db.AdminActivityOccurrence
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id IN ?", occurrenceIDs).Order("id").Find(&occurrences).Error; err != nil {
+			return err
+		}
+		for _, row := range occurrences {
+			var form model.AdminActivityForm
+			if json.Unmarshal(row.FormJSON, &form) != nil {
+				return constUtil.ErrAdminConfiguration
+			}
+			if err := backup("occurrence", row.ID, json.RawMessage(row.FormJSON)); err != nil {
+				return err
+			}
+			rewards, err := s.balancedRecruit35Rewards("", form.Options.KingWorld, true)
+			if err != nil {
+				return err
+			}
+			form.Prizes = []model.AdminActivityPrize{}
+			for _, r := range rewards {
+				form.Prizes = append(form.Prizes, model.AdminActivityPrize{ID: int64(r.ID), ResourceID: r.ResourceID, Amount: 1, Weight: r.Weight, Guaranteed: r.Guaranteed})
+			}
+			form.Name = "王者招募"
+			form.Source = constUtil.RecruitBalance35Source
+			row.Name = "王者招募"
+			row.FormJSON = adminJSON(form)
+			row.Revision++
+			if err = tx.Save(&row).Error; err != nil {
+				return err
+			}
+		}
+		if err := s.seedRecruitRuntimeRules(tx); err != nil {
+			return err
+		}
+		var oldRules []db.RecruitRuntimeRule
+		if err := tx.Order("kind").Find(&oldRules).Error; err != nil {
+			return err
+		}
+		if err := backup("runtime", target, oldRules); err != nil {
+			return err
+		}
+		if err := tx.Model(&db.RecruitRuntimeRule{}).Where("kind IN ?", []int32{2, 3}).Updates(map[string]any{"daily_limit": constUtil.RecruitBalance35DailyLimit, "guarantee_every": constUtil.RecruitBalance35GuaranteeEvery}).Error; err != nil {
+			return err
+		}
+		return tx.Create(&db.AdminAudit{Time: time.Now().UnixMilli(), Actor: "system", Action: constUtil.RecruitBalance35ApplyAction, Target: target, Detail: "全品质招募、跨世界橙卡与递增软保底；原价格、抽数和领取历史保留"}).Error
+	})
 }

@@ -1,7 +1,6 @@
 package service
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -644,64 +643,33 @@ func TestAdminNativeCardUpdatesOnlyEconomicFields(t *testing.T) {
 	}
 }
 
-// TestAdminNativeRecruitBuildsOriginalRotation 验证橙卡招募奖池构造和冻结保护。
-func TestAdminNativeRecruitBuildsOriginalRotation(t *testing.T) {
+// TestAdminNativeRecruitBuildsPermanentPool 验证橙卡配置直接修改单一常驻池及拒绝非法伙伴。
+func TestAdminNativeRecruitBuildsPermanentPool(t *testing.T) {
 	f, operator := adminNativeFixture(t, false)
-	// 新服在任何玩家招募之前就能从后台配置已有的关闭轮换。
-	startup := context.WithValue(f.ctx, constUtil.GameServiceContextKey, f.s)
-	if err := InitializeAdminActivityModes(startup); err != nil {
-		t.Fatal(err)
-	}
 	item := adminNativeFind(t, f, operator, "recruit-rotation")
-	if item.Name != "橙卡招募" || len(item.Form.Prizes) == 0 || item.Enabled {
-		t.Fatalf("unexpected rotation dto %+v", item)
+	if item.ID != "recruit:permanent" || item.Name != "橙卡招募" || !item.Enabled || !item.Permanent || len(item.Form.Prizes) == 0 {
+		t.Fatal("unexpected permanent dto", item.ID)
 	}
-	form := item.Form
-	form.Prizes[0].Weight++
-	saved, err := f.s.AdminSaveNativeActivity(f.ctx, operator, item.ID, model.AdminNativeActivitySaveRequest{Version: item.Version, Enabled: item.Enabled, Form: form})
+	item.Form.Prizes[0].Weight++
+	saved, err := f.s.AdminSaveNativeActivity(f.ctx, operator, item.ID, model.AdminNativeActivitySaveRequest{Version: item.Version, Enabled: true, Form: item.Form})
 	if err != nil {
 		t.Fatal(err)
 	}
-	var live db.P4RecruitRotation
-	rotationID := strings.TrimPrefix(item.ID, "recruit:")
-	if err := db.GetIns().First(&live, "id = ?", rotationID).Error; err != nil {
-		t.Fatal(err)
-	}
 	var rewards []db.GameplayPoolReward
-	if err := json.Unmarshal(live.Rewards, &rewards); err != nil {
+	if err = db.GetIns().Where("pool_id=?", "recruit_2").Order("id").Find(&rewards).Error; err != nil {
 		t.Fatal(err)
 	}
-	for _, reward := range rewards {
-		if reward.PoolID != "recruit_2" || reward.Amount != 1 || reward.Stock != 0 {
-			t.Fatalf("rotation contract changed: %+v", reward)
-		}
-		hero := f.s.table("Hero", "id", reward.ResourceID)
-		if hero == nil || (hero["quality"] != "13" && hero["quality"] != "18" && hero["quality"] != "20") || hero["heroClass"] != "0" || reward.Guaranteed != (hero["quality"] == "20") {
-			t.Fatalf("rotation hero qualification changed: %+v", reward)
-		}
+	if rewards[0].Weight != saved.Form.Prizes[0].Weight {
+		t.Fatal("save did not update actual base")
 	}
-	invalid := form
+	invalid := saved.Form
+	invalid.Prizes = append([]model.AdminActivityPrize(nil), saved.Form.Prizes...)
 	invalid.Prizes[0].ResourceID = "item_005"
-	if _, err := f.s.AdminSaveNativeActivity(f.ctx, operator, item.ID, model.AdminNativeActivitySaveRequest{Version: saved.Version, Enabled: saved.Enabled, Form: invalid}); !errors.Is(err, constUtil.ErrAdminInput) {
-		t.Fatalf("invalid rotation hero accepted: %v", err)
+	if _, err = f.s.AdminSaveNativeActivity(f.ctx, operator, item.ID, model.AdminNativeActivitySaveRequest{Version: saved.Version, Enabled: true, Form: invalid}); !errors.Is(err, constUtil.ErrAdminInput) {
+		t.Fatal("invalid hero accepted", err)
 	}
-	frozenRaw := live.Rewards
-	if err := db.GetIns().Model(&db.P4RecruitRotation{}).Where("id = ?", live.ID).Update("frozen", frozenRaw).Error; err != nil {
-		t.Fatal(err)
-	}
-	frozen := adminNativeFind(t, f, operator, "recruit-rotation")
-	if !frozen.Frozen {
-		t.Fatal("frozen rotation not reported")
-	}
-	// 深拷贝奖池切片，避免改动候选表单时连带污染用于对照的原始表单。
-	changed := frozen.Form
-	changed.Prizes = append([]model.AdminActivityPrize(nil), frozen.Form.Prizes...)
-	changed.Prizes[0].Weight++
-	if _, err := f.s.AdminSaveNativeActivity(f.ctx, operator, item.ID, model.AdminNativeActivitySaveRequest{Version: frozen.Version, Enabled: true, Form: changed}); !errors.Is(err, constUtil.ErrAdminConfigConflict) {
-		t.Fatalf("frozen rotation change accepted: %v", err)
-	}
-	if _, err := f.s.AdminSaveNativeActivity(f.ctx, operator, item.ID, model.AdminNativeActivitySaveRequest{Version: frozen.Version, Enabled: true, Form: frozen.Form}); err != nil {
-		t.Fatalf("frozen rotation toggle/enable rejected: %v", err)
+	if _, err = f.s.AdminSaveNativeActivity(f.ctx, operator, item.ID, model.AdminNativeActivitySaveRequest{Version: item.Version, Enabled: false, Form: saved.Form}); !errors.Is(err, constUtil.ErrAdminConfigConflict) {
+		t.Fatal("stale save accepted", err)
 	}
 }
 

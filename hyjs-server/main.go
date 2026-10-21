@@ -424,6 +424,10 @@ func run() error {
 	if err = s.InitializeReActivityCatalogue(ctx); err != nil {
 		return err
 	}
+	// Apply the explicitly approved mixed-rarity balance once, preserving prior configurations in the audit.
+	if err = s.InitializeRecruitBalance35(ctx); err != nil {
+		return err
+	}
 	if err = s.InitializeAdminFields(ctx); err != nil {
 		return err
 	}

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
+import OnlinePlayers from '@/components/operations/online-players.vue';
 import { auditActionLabel, auditActorLabel } from '@/service/audit-labels';
 import { api, formatTime } from '@/service/operations';
 import type { Audit } from '@/service/operations';
@@ -38,6 +39,7 @@ onMounted(load);
             </div>
           </div>
         </div>
+        <OnlinePlayers />
         <NCard title="服务状态" :bordered="false" class="ops-panel">
           <NDescriptions :column="1" label-placement="left">
             <NDescriptionsItem label="运行状态">

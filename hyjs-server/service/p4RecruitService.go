@@ -11,12 +11,12 @@ import (
 	"time"
 )
 
-// seedP4Rotations 保留默认关闭的轮换模板；奖励池由运营确认后启用，常驻基础招募保持。
+// seedP4Rotations 只保留普通招募的默认关闭轮换；橙卡直接使用单一常驻池。
 func (s *GameService) seedP4Rotations(tx *gorm.DB, now time.Time) error {
 	local := now.In(time.FixedZone("UTC+8", 8*3600))
 	day := time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, local.Location())
 	monday := day.AddDate(0, 0, -(int(day.Weekday())+6)%7)
-	for kind := int32(1); kind <= 2; kind++ {
+	for kind := int32(1); kind <= 1; kind++ {
 		pool := fmt.Sprintf("recruit_%d", kind)
 		var base []db.GameplayPoolReward
 		if err := tx.Where("pool_id=?", pool).Order("id").Find(&base).Error; err != nil {
@@ -93,6 +93,11 @@ func (s *GameService) seedP4Rotations(tx *gorm.DB, now time.Time) error {
 }
 
 func (s *GameService) loadP4Rotation(tx *gorm.DB, kind int32, now time.Time) ([]db.GameplayPoolReward, int64, error) {
+	// 橙卡常驻池不受旧轮换日期和冻结快照覆盖，结束时间0表示无到期。
+	if kind == 2 {
+		rewards, err := s.loadPermanentStrongRecruit(tx)
+		return rewards, 0, err
+	}
 	if err := s.seedP4Rotations(tx, now); err != nil {
 		return nil, 0, err
 	}
@@ -141,7 +146,7 @@ func (s *GameService) p4RotationSnapshot(cfg db.P4RecruitRotation, kind int32) (
 	for _, p := range rewards {
 		hero := s.table("Hero", "id", p.ResourceID)
 		quality := hero["quality"]
-		allowed := kind == 1 && (quality == "12" || quality == "13" || quality == "18") || kind == 2 && (quality == "13" || quality == "18" || quality == "20")
+		allowed := kind == 1 && (quality == "12" || quality == "13" || quality == "18") || kind == 2 && (quality == "12" || quality == "13" || quality == "18" || quality == "20")
 		isGuarantee := kind == 1 && quality == "18" || kind == 2 && quality == "20"
 		if p.PoolID != fmt.Sprintf("recruit_%d", kind) || p.Amount != 1 || p.Weight < 1 || p.Weight > 1000000000000 || seen[p.ResourceID] || hero["heroClass"] != "0" || !allowed || p.Guaranteed != isGuarantee {
 			return nil, nil, errors.New("轮换概率或英雄配置无效")
@@ -153,4 +158,21 @@ func (s *GameService) p4RotationSnapshot(cfg db.P4RecruitRotation, kind int32) (
 		return nil, nil, errors.New("轮换缺少原保底组")
 	}
 	return rewards, raw, nil
+}
+
+// loadPermanentStrongRecruit 只读取实际启用的常驻池；旧轮换留作历史，不参与当前抽卡。
+func (s *GameService) loadPermanentStrongRecruit(tx *gorm.DB) ([]db.GameplayPoolReward, error) {
+	var pool db.GameplayPool
+	if err := tx.Select("id", "enabled").First(&pool, "id = ?", "recruit_2").Error; err != nil {
+		return nil, err
+	}
+	if !pool.Enabled {
+		return nil, gorm.ErrRecordNotFound
+	}
+	var rewards []db.GameplayPoolReward
+	if err := tx.Where("pool_id = ?", pool.ID).Order("id").Find(&rewards).Error; err != nil {
+		return nil, err
+	}
+	parsed, _, err := s.p4RotationSnapshot(db.P4RecruitRotation{Rewards: adminJSON(rewards)}, 2)
+	return parsed, err
 }
