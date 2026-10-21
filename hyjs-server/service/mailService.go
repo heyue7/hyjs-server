@@ -92,10 +92,33 @@ func (s *GameService) Mailbox(ctx context.Context, id int64, request proto.Messa
 			if err := active.Order("created_at DESC, id DESC").Find(&rows).Error; err != nil {
 				return err
 			}
+			// 邮件与领奖中心使用同一奖励快照文案；批量读取，保留原邮件标识和已读流程。
+			var rewardIDs []int64
+			for _, row := range rows {
+				if row.RewardID > 0 && strings.HasPrefix(row.SourceKey, "activity:") {
+					rewardIDs = append(rewardIDs, row.RewardID)
+				}
+			}
+			notices := map[int64]db.RewardDelivery{}
+			if len(rewardIDs) > 0 {
+				var rewards []db.RewardDelivery
+				if err := tx.Where("player_id=? AND id IN ?", id, rewardIDs).Find(&rewards).Error; err != nil {
+					return err
+				}
+				if err := projectPeriodRewardNotices(tx, id, rewards); err != nil {
+					return err
+				}
+				for _, reward := range rewards {
+					notices[reward.ID] = reward
+				}
+			}
 			result := &pb.SCMailList{}
 			indices := map[string]int{}
 			var unread []int64
 			for _, row := range rows {
+				if notice, ok := notices[row.RewardID]; ok {
+					row.Title, row.Content = notice.Title, notice.Content
+				}
 				index, ok := indices[row.Mailbox]
 				if !ok {
 					index = len(result.MailBoxList)

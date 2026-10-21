@@ -134,6 +134,9 @@ func (s *GameService) RewardCenter(ctx context.Context, id int64, request proto.
 			if err := tx.Where("player_id = ? AND claimed_at = 0 AND (expires_at = 0 OR expires_at > ?)", id, now).Order("id ASC").Limit(constUtil.P1RewardMaximumBatch).Find(&rows).Error; err != nil {
 				return err
 			}
+			if err := projectPeriodRewardNotices(tx, id, rows); err != nil {
+				return err
+			}
 			result := &pb.SCQueryUserReward{}
 			for _, row := range rows {
 				resources, err := p1RewardResources(row.Rewards)
