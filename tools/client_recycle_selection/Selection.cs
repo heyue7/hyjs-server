@@ -15,6 +15,8 @@ namespace HYJS.Recycle
         WWW pending;
         int generation;
         readonly List<UIButton> confirms = new List<UIButton>();
+        readonly List<Collider> blockedItems = new List<Collider>();
+        readonly List<bool> previousColliderState = new List<bool>();
 
         public static void Select(RecycleSelectPanel target)
         {
@@ -38,6 +40,23 @@ namespace HYJS.Recycle
                 foreach (UIButton button in panel.GetComponentsInChildren<UIButton>(true))
                     if (button.name == "ConfirmBtn") confirms.Add(button);
             foreach (UIButton button in confirms) if (button != null) button.isEnabled=enabled;
+            // Keep manual row taps from changing the original cache during the asynchronous read.
+            // The original checkbox remains usable to cancel this request.
+            if (!enabled && blockedItems.Count == 0 && panel.simpleGrid != null)
+                foreach (GameObject child in panel.simpleGrid.childs)
+                {
+                    if (child == null) continue;
+                    foreach (Collider collider in child.GetComponentsInChildren<Collider>(true))
+                    {
+                        blockedItems.Add(collider); previousColliderState.Add(collider.enabled); collider.enabled=false;
+                    }
+                }
+            if (enabled)
+            {
+                for (int index=0; index<blockedItems.Count; index++)
+                    if (blockedItems[index] != null) blockedItems[index].enabled=previousColliderState[index];
+                blockedItems.Clear(); previousColliderState.Clear();
+            }
         }
 
         void Clear()
