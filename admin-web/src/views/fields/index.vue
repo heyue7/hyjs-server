@@ -6,12 +6,18 @@ import type { FieldChannel, FieldDeployment, FieldDeployments, FieldPresentation
 import { useServerScopeStore } from '@/store/modules/server-scope';
 import { useOperations } from '@/composables/useOperations';
 import DropEditor from './drop-editor.vue';
+import FieldMap from './field-map.vue';
 import PointEditor from './point-editor.vue';
 
 const scope = useServerScopeStore();
 const route = useRoute();
 const { canWrite } = useOperations();
-const mode = ref<'templates' | 'deployments'>(route.query.mode === 'deployments' ? 'deployments' : 'templates');
+type FieldMode = 'templates' | 'map' | 'deployments';
+function parseMode(value: unknown): FieldMode {
+  if (value === 'deployments' || value === 'map') return value;
+  return 'templates';
+}
+const mode = ref<FieldMode>(parseMode(route.query.mode));
 const templates = ref<FieldTemplate[]>([]);
 const resources = ref<FieldResource[]>([]);
 const presentation = ref<Record<string, FieldPresentation>>({});
@@ -83,6 +89,10 @@ async function confirmLeave() {
     return false;
   }
   return !(dirty.value || channelsDirty.value) || (await confirmAction('有未保存的修改，确认放弃？'));
+}
+async function chooseMap(id: string) {
+  const row = templates.value.find(t => t.id === id);
+  if (row) await choose(row);
 }
 async function choose(row: FieldTemplate) {
   if (saving.value || loading.value || selected.value?.id === row.id) return;
@@ -233,7 +243,7 @@ watch(
 watch(
   () => route.query.mode,
   value => {
-    mode.value = value === 'deployments' ? 'deployments' : 'templates';
+    mode.value = parseMode(value);
   }
 );
 onMounted(load);
@@ -260,6 +270,7 @@ onMounted(load);
     <NAlert v-if="success" type="success" closable @close="success = ''">{{ success }}</NAlert>
     <NTabs v-model:value="mode" type="segment">
       <NTab name="templates">地图资源方案</NTab>
+      <NTab name="map">大地图分布</NTab>
       <NTab name="deployments">区服开放与分线</NTab>
     </NTabs>
     <template v-if="mode === 'templates'">
@@ -453,6 +464,25 @@ onMounted(load);
           </NTabs>
         </NCard>
       </div>
+    </template>
+    <template v-else-if="mode === 'map'">
+      <NCard size="small">
+        <div class="mb-3 flex flex-wrap items-center gap-3">
+          <NSelect
+            :value="selected?.id"
+            :options="templates.map(t => ({ label: t.name, value: t.id }))"
+            :disabled="loading"
+            placeholder="选择地图方案"
+            filterable
+            class="min-w-60 flex-1"
+            @update:value="chooseMap"
+          />
+          <NTag v-if="dirty" type="warning">当前方案有未保存修改</NTag>
+          <NTag>只读预览</NTag>
+        </div>
+        <p class="mb-3 text-sm text-gray-500">查看当前方案的地图候选点与首领出生点，预览不会修改配置。</p>
+        <FieldMap :template="selected" :presentation="presentation" />
+      </NCard>
     </template>
     <template v-else>
       <NAlert v-if="!scope.serverId" type="info">请先在顶部选择区服。</NAlert>

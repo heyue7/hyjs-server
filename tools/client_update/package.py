@@ -142,6 +142,7 @@ def main():
     for name in ('base-apk', 'overlay', 'output', 'record'):
         parser.add_argument('--' + name, type=Path, required=True)
     parser.add_argument('--qa-origin', help='Loopback-only update UI QA; original Unity endpoints remain inherited')
+    parser.add_argument('--gameplay-overlay', type=Path, help='Qualified gameplay45 input to the update layer')
     args = parser.parse_args()
     base, overlay, output, record = [path.resolve() for path in (args.base_apk, args.overlay, args.output, args.record)]
     require(output.is_relative_to(ROOT / 'build') and record.is_relative_to(ROOT / 'analysis'), 'Use owned project output paths')
@@ -149,6 +150,13 @@ def main():
     proof = json.loads((overlay / 'manifest.json').read_text())
     require(common.digest(base) == proof['baseAPKSHA256'], 'Fixed base changed')
     pins = {ROOT / name: value for name, value in proof['sourcePins'].items()}
+    gameplay = None
+    if args.gameplay_overlay:
+        gameplay_dir = args.gameplay_overlay.resolve()
+        require(gameplay_dir.is_relative_to(ROOT / 'build'), 'Use owned gameplay overlay')
+        gameplay = json.loads((gameplay_dir / 'manifest.json').read_text())
+        require(gameplay['schema'] == 'hyjs-gameplay45-v1' and gameplay['baseAPKSHA256'] == proof['baseAPKSHA256'], 'Gameplay base differs')
+        pins.update({ROOT / name: value for name, value in gameplay['sourcePins'].items()})
     pins[Path(__file__).resolve()] = common.digest(Path(__file__))
     for path, digest in pins.items():
         require(path.resolve().is_relative_to(ROOT) and common.digest(path) == digest, 'Build source changed')
@@ -164,8 +172,14 @@ def main():
         with zipfile.ZipFile(base) as incoming:
             before = incoming.read(common.DLL)
             after = (overlay / 'Assembly-CSharp.dll').read_bytes()
-            require(hashlib.sha256(before).hexdigest() == proof['inputManagedSHA256'] and hashlib.sha256(after).hexdigest() == proof['outputManagedSHA256'], 'Managed qualification differs')
-            verify_managed(before, after, proof['allowedChangedMethods'])
+            update_input = before
+            if gameplay is not None:
+                require(hashlib.sha256(before).hexdigest() == gameplay['inputManagedSHA256'], 'Gameplay managed base differs')
+                update_input = (gameplay_dir / 'Assembly-CSharp.dll').read_bytes()
+                require(hashlib.sha256(update_input).hexdigest() == gameplay['outputManagedSHA256'], 'Gameplay managed output differs')
+                verify_managed(before, update_input, [item['name'] for item in gameplay['allowedChangedMethods']])
+            require(hashlib.sha256(update_input).hexdigest() == proof['inputManagedSHA256'] and hashlib.sha256(after).hexdigest() == proof['outputManagedSHA256'], 'Managed qualification differs')
+            verify_managed(update_input, after, proof['allowedChangedMethods'])
             native, flag_offset = allow_wallet_subclass(incoming.read('classes2.dex'))
             dex_names = [name for name in incoming.namelist() if name.startswith('classes') and name.endswith('.dex')]
             update_dex = [name for name in dex_names if has_update_class(incoming.read(name))]
@@ -179,6 +193,12 @@ def main():
                 'classes2.dex': native,
                 dex_entry: (overlay / 'classes.dex').read_bytes()
             }
+            if gameplay is not None:
+                helper_entry = 'assets/bin/Data/Managed/HYJS.Gameplay.dll'
+                helper = ROOT / gameplay['payloadFiles'][helper_entry]
+                require(helper.resolve().is_relative_to(gameplay_dir), 'Gameplay helper outside qualified output')
+                payload[helper_entry] = helper.read_bytes()
+                require(hashlib.sha256(payload[helper_entry]).hexdigest() == gameplay['replacementEntries'][helper_entry], 'Gameplay helper changed')
             if args.qa_origin:
                 from urllib.parse import urlsplit
                 origin = urlsplit(args.qa_origin)

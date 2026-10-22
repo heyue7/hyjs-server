@@ -1,10 +1,12 @@
 package constUtil
 
 const (
-	P8FirstFieldScene         = "field_001"
-	P8FieldSceneUnavailable   = "原野外场景配置或资源尚未开放"
-	P8FieldSceneLevel         = "未达到该原野外场景开放等级"
-	P8FieldSceneStateConflict = "野外场景与未完成战斗不一致"
+	P8FirstFieldScene               = "field_001"
+	P8FieldSceneUnavailable         = "原野外场景配置或资源尚未开放"
+	P8FieldSceneLevel               = "未达到该原野外场景开放等级"
+	P8FieldSceneStateConflict       = "野外场景与未完成战斗不一致"
+	P8SnowBattleMinimumBuild  int64 = 2026102202
+	P8SnowBattleClientUpdate        = "请更新客户端后再挑战雪原怪物"
 )
 
 // P8OriginalFieldScene enumerates the six original APK field identities.

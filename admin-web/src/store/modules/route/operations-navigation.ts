@@ -51,6 +51,7 @@ export function organizeOperationsMenus(menus: App.Global.Menu[]) {
   const global = group('global-settings', '全局设置', [
     take('game-accounts', '用户管理'),
     take('items', '道具与资源'),
+    take('fields', '野外地图与部署'),
     take('activities', '活动设置'),
     take('guild-settings', '公会设置'),
     group('growth-settings', '成长配置', [take('achievements'), take('titles')]),
@@ -67,7 +68,6 @@ export function organizeOperationsMenus(menus: App.Global.Menu[]) {
     take('wallets', '蓝绿终端'),
     take('cdk', '兑换码管理'),
     take('activity-schedules'),
-    take('fields', '野外地图与部署'),
     take('players', '玩家管理'),
     take('guilds', '公会管理'),
     take('broadcast', '群发补偿'),

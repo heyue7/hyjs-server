@@ -16,7 +16,9 @@ type P13Guild struct {
 	// 建设开关仅由原建设事务授予，升级科技独立核实后保存。
 	HeroStatueOpen int32 `gorm:"not null;default:0" json:"heroStatueOpen"`
 	GuardTreeOpen  int32 `gorm:"not null;default:0" json:"guardTreeOpen"`
-	CreatedAt      int64 `gorm:"not null" json:"createdAt"`
+	// UnionFightAutoApply 保存原自动宣战选择；NULL 只作为旧库尚未回填的迁移哨兵，正式读取按 false 处理。
+	UnionFightAutoApply *bool `gorm:"index" json:"unionFightAutoApply"`
+	CreatedAt           int64 `gorm:"not null" json:"createdAt"`
 }
 
 func (P13Guild) TableName() string { return "p13_guilds" }

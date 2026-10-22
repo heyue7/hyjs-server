@@ -1,7 +1,8 @@
-"""Build isolated update dex and compose only two login appVersion call sites."""
+"""Build isolated update dex and compose four appVersion call sites: two login checks plus the login screen version label."""
 import argparse
 import hashlib
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -13,10 +14,24 @@ import dnfile
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 from tools.awake_diff_rows.build import methods
+from tools.client_branding.branding import chunks, elements, strings_from_pool
 from tools.local_asset_ready.remove_gate import exact_body, require
 ENTRY = 'assets/bin/Data/Managed/Assembly-CSharp.dll'
-ALLOWED = {'Login.LoginCheckVersion::CheckVersion', 'Login.LoginUserLogin::UserLogin'}
+ALLOWED = {'Login.LoginCheckVersion::CheckVersion', 'Login.LoginUserLogin::UserLogin',
+           'UI.LoginNormalUI::Start', 'UI.LoginNormalUI::Show'}
 def sha(value): return hashlib.sha256(value).hexdigest()
+
+def manifest_versions(raw):
+    """Read the base APK identity so the packaged manifest keeps increasing."""
+    parts = chunks(raw)
+    pools = [part for part in parts if part[0] == 1]
+    require(len(pools) == 1, 'Expected one manifest string pool')
+    values, _ = strings_from_pool(pools[0][2])
+    for tag, attributes in elements(parts, values):
+        if tag != 'manifest': continue
+        fields = {key: value for _, key, _, value in attributes}
+        return int(fields['versionCode']), str(fields['versionName'])
+    raise ValueError('Manifest identity missing')
 
 def build_java(out,build_code,version_name):
     import os
@@ -28,7 +43,10 @@ def build_java(out,build_code,version_name):
     with tempfile.TemporaryDirectory(prefix='hyjs-client-update-java-') as temp:
         temp=Path(temp);classes=temp/'classes';classes.mkdir();dex=temp/'dex';dex.mkdir()
         source=(Path(__file__).resolve().parent/'src/com/hyjs/wallet/ClientUpdate.java').read_text()
-        source=source.replace('2026102101L',str(build_code)+'L').replace('"1.0.41"',json.dumps(version_name))
+        # Compatibility for older sources that pinned BUILD/NAME; current Java reads
+        # PackageManager, so these patterns normally match nothing.
+        source=re.sub(r'(private static final long BUILD\s*=\s*)\d+L',lambda m:m.group(1)+str(build_code)+'L',source)
+        source=re.sub(r'(private static final String NAME\s*=\s*)"[^"]*"',lambda m:m.group(1)+json.dumps(version_name),source)
         java=temp/'ClientUpdate.java';java.write_text(source)
         stub=temp/'WalletActivity.java';stub.write_text('package com.hyjs.wallet; public class WalletActivity extends android.app.Activity {}')
         stubs=temp/'stubs';stubs.mkdir()
@@ -46,11 +64,15 @@ def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--base-apk',type=Path,required=True);p.add_argument('--base-sha256',required=True)
     p.add_argument('--input-managed',type=Path);p.add_argument('--output-directory',type=Path,required=True)
-    p.add_argument('--build-code',type=int,default=2026102101);p.add_argument('--version-name',default='1.0.41')
+    p.add_argument('--build-code',type=int,required=True);p.add_argument('--version-name',required=True)
     a=p.parse_args();out=a.output_directory.resolve();require(not out.exists(),'Fresh directory required')
     require(0<a.build_code<2147483648,'Android build code must fit signed int')
+    require(len(a.version_name.strip())>0,'Android version name required')
     allowed=ALLOWED
-    require(sha(a.base_apk.read_bytes())==a.base_sha256,'APK identity changed');out.mkdir(parents=True)
+    require(sha(a.base_apk.read_bytes())==a.base_sha256,'APK identity changed')
+    with zipfile.ZipFile(a.base_apk) as base_zip: base_code,base_name=manifest_versions(base_zip.read('AndroidManifest.xml'))
+    require(a.build_code>base_code,'Android build code must exceed the base manifest')
+    out.mkdir(parents=True)
     runtime=ROOT/'.tools/native-batch';dotnet=runtime/'dotnet/dotnet';compiler=next((runtime/'dotnet/sdk').glob('*/Roslyn/bincore/csc.dll'))
     source=Path(__file__).resolve().parent;dnlib=runtime/'injector/bin/Debug/net8.0/dnlib.dll'
     def run(name,cmd):
@@ -81,6 +103,6 @@ def main():
     require(not getattr(right.net.mdtables,'FieldPtr',None),'Unsupported FieldPtr')
     require(len(left.net.mdtables.ModuleRef.rows)==len(right.net.mdtables.ModuleRef.rows),'Unexpected ModuleRef')
     inputs=[source/'ClientUpdate.cs',source/'Injector.cs',source/'build.py',*sorted((source/'src').rglob('*.java'))]
-    report={'status':'STATIC_VERIFIED_NOT_PACKAGED','buildCode':a.build_code,'versionName':a.version_name,'baseAPKSHA256':a.base_sha256,'inputManagedSHA256':sha(before),'outputManagedSHA256':sha(after),'allowedChangedMethods':changes,'originalEngineMethodsExact':engine,'sourcePins':{str(f.relative_to(ROOT)):sha(f.read_bytes()) for f in inputs if f.is_file()}}
+    report={'status':'STATIC_VERIFIED_NOT_PACKAGED','buildCode':a.build_code,'versionName':a.version_name,'versionSource':'PackageManager','baseVersionCode':base_code,'baseVersionName':base_name,'baseAPKSHA256':a.base_sha256,'inputManagedSHA256':sha(before),'outputManagedSHA256':sha(after),'allowedChangedMethods':changes,'originalEngineMethodsExact':engine,'sourcePins':{str(f.relative_to(ROOT)):sha(f.read_bytes()) for f in inputs if f.is_file()}}
     (out/'manifest.json').write_text(json.dumps(report,ensure_ascii=False,indent=2)+'\n');print(json.dumps(report))
 if __name__=='__main__':main()

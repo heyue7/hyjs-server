@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"math"
 	"math/big"
 	"strconv"
@@ -131,6 +132,33 @@ func (s *GameService) fieldBossProjection(g *model.GameState) []proto.Message {
 	return []proto.Message{&pb.SCSideBoss{Monsters: g.Field.Bosses}}
 }
 
+// fieldBossCountdownProjection uses the original seconds-based UI countdown.
+// Clear absent nature slots too: the native labels survive map switches.
+func fieldBossCountdownProjection(field *model.FieldState, now time.Time) []proto.Message {
+	var deadlines [6]int64
+	if field != nil {
+		for _, boss := range field.Bosses {
+			nature := boss.GetNature()
+			if nature < 0 || nature >= int32(len(deadlines)) || boss.GetState() != 3 {
+				continue
+			}
+			due := field.RespawnAt[boss.GetUuid()]
+			if due > now.UnixMilli() && (deadlines[nature] == 0 || due < deadlines[nature]) {
+				deadlines[nature] = due
+			}
+		}
+	}
+	messages := make([]proto.Message, 0, len(deadlines))
+	for nature, due := range deadlines {
+		remaining := int64(0)
+		if due > now.UnixMilli() {
+			remaining = (due - now.UnixMilli() + 999) / 1000
+		}
+		messages = append(messages, &pb.SCSideBossCountdown{Nature: proto.Int32(int32(nature)), Time: proto.Int64(remaining)})
+	}
+	return messages
+}
+
 func (s *GameService) fieldBossCheck(ctx context.Context, id int64, b *pb.CSSideBossCheck) ([]proto.Message, error) {
 	if b.GetUuid() == "" {
 		return nil, errors.New("缺少野外首领实例")
@@ -212,6 +240,9 @@ func (s *GameService) fieldBossFightStart(ctx context.Context, id int64, b *pb.C
 	}
 	var result *pb.SCSidePveBossFightStart
 	err := updateProfileWithTx(ctx, id, func(tx *gorm.DB, player *pb.Player, g *model.GameState) error {
+		if err := checkFieldBattleClient(tx, id, g.Position.GetScene()); err != nil {
+			return err
+		}
 		if g.Run != nil && !g.Run.Complete {
 			return errors.New("请先完成当前副本")
 		}
@@ -313,8 +344,10 @@ func (s *GameService) fieldBossFightStart(ctx context.Context, id int64, b *pb.C
 // fieldBossFightEnd 只用原计算回放终局，客户端 result 仅作胜败映射校验。
 func (s *GameService) fieldBossFightEnd(ctx context.Context, id int64, b *pb.CSSidePveBossFightEnd) ([]proto.Message, error) {
 	var (
-		result *pb.SCSidePveBossFightEnd
-		side   *pb.PlayerSide
+		result     *pb.SCSidePveBossFightEnd
+		side       *pb.PlayerSide
+		countdowns []proto.Message
+		notice     *pb.SCPublicMessage
 	)
 	err := updateProfileWithTx(ctx, id, func(tx *gorm.DB, player *pb.Player, g *model.GameState) error {
 		if g.Field == nil {
@@ -324,6 +357,8 @@ func (s *GameService) fieldBossFightEnd(ctx context.Context, id int64, b *pb.CSS
 			return err
 		}
 		f := g.Field
+		// Retries project the saved deadline; they never restart the cooldown.
+		defer func() { countdowns = fieldBossCountdownProjection(f, time.Now()) }()
 		fight := f.Fight
 		if fight == nil || fight.BossStart == nil || fight.BossUUID != b.GetUuid() || fight.BossStart.GetFightId() != b.GetFightId() {
 			return errors.New("未知野外首领战斗")
@@ -450,6 +485,17 @@ func (s *GameService) fieldBossFightEnd(ctx context.Context, id int64, b *pb.CSS
 				return errors.New("缺少原野外首领重生配置")
 			}
 			f.RespawnAt[boss.GetUuid()] = now + fight.BossCooldownMS
+			name := "野外首领"
+			if s.AdminCatalogueData != nil {
+				hero := s.table("Hero", "id", boss.GetHeroId())
+				if localized := s.AdminCatalogueData.DisplayNames[hero["name"]]; localized != "" {
+					name = localized
+				}
+			}
+			notice = &pb.SCPublicMessage{Pubmsg: &pb.PublicMessage{
+				Type: proto.Int32(constUtil.P12WorldBossKillNoticeType), ScrollType: proto.Int32(constUtil.P12WorldBossKillNoticeScrollType),
+				Msg: proto.String(fmt.Sprintf(constUtil.FieldBossKillNoticeFormat, p12NoticeName(player.GetName()), p12NoticeName(name))),
+			}}
 		} else {
 			boss.State = proto.Int32(1)
 		}
@@ -490,7 +536,13 @@ func (s *GameService) fieldBossFightEnd(ctx context.Context, id int64, b *pb.CSS
 		}
 		return nil
 	})
-	return []proto.Message{result, &pb.SCFieldPlayerState{Player: []*pb.PlayerSide{side}}}, err
+	if err != nil {
+		return nil, err
+	}
+	// Only a newly committed kill publishes. Repeated/cold receipts return before
+	// constructing this message and preserve the single reward and deadline.
+	s.publishP12WorldBossKill(ctx, notice)
+	return append([]proto.Message{result, &pb.SCFieldPlayerState{Player: []*pb.PlayerSide{side}}}, countdowns...), nil
 }
 
 // fieldBossFrozenInput expands only the one battle being settled and checks the

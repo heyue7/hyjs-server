@@ -80,8 +80,8 @@ func TestP8FieldAvailableScenesPreserveAreaSideDailyLimitsAndCold(t *testing.T) 
 	if _, err = s.fieldMonsterCheck(ctx, account.Id, &pb.CSSideMonsterCheck{Uuid: proto.String(firstGUID)}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = s.fieldFightStart(ctx, account.Id, &pb.CSSidePveFightStart{MonsterId: snow.Field.Monsters[0].Uuid}); err == nil {
-		t.Fatal("missing original snow battle bundle silently enabled")
+	if !s.fieldBattleSceneAvailable("field_002") {
+		t.Fatal("packaged snow battle compatibility route is unavailable")
 	}
 	transfer("field_001")
 	_, restored := state()

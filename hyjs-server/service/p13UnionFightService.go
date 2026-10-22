@@ -15,10 +15,10 @@ import (
 	"time"
 )
 
-// InitializeP13UnionFight 迁移报名事实；已有配置保持，独立门禁默认关闭。
+// InitializeP13UnionFight 迁移报名事实；自动宣战选择已并入公会资产，不再创建旧 Setting 表。
 func (s *GameService) InitializeP13UnionFight(ctx context.Context) error {
 	tx := db.GetIns().WithContext(ctx)
-	if err := tx.AutoMigrate(&db.P13UnionFightPolicy{}, &db.P13UnionFightSetting{}, &db.P13UnionFightEntry{}, &db.P13UnionFightFighter{}, &db.P13UnionFightSchedule{}, &db.P13UnionFightGroup{}, &db.P13UnionFightMatch{}, &db.P13UnionFightLoadout{}); err != nil {
+	if err := tx.AutoMigrate(&db.P13UnionFightPolicy{}, &db.P13UnionFightEntry{}, &db.P13UnionFightFighter{}, &db.P13UnionFightSchedule{}, &db.P13UnionFightGroup{}, &db.P13UnionFightMatch{}, &db.P13UnionFightLoadout{}); err != nil {
 		return err
 	}
 	if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&db.P13UnionFightPolicy{ID: 1, Source: constUtil.P13UnionFightSource}).Error; err != nil {
@@ -203,19 +203,13 @@ func (s *GameService) TickP13UnionFight(ctx context.Context, now time.Time) erro
 		if stage != constUtil.P13UnionFightStageDeclare || !now.Before(start.Add(5*time.Minute)) {
 			return nil
 		}
-		var settings []db.P13UnionFightSetting
-		if err := tx.Where("auto_apply=1").Order("guild_id").Find(&settings).Error; err != nil {
+		// 一次取出开启自动宣战的公会资产，避免逐条回查 Setting 后形成 N+1。
+		var guilds []db.P13Guild
+		if err := tx.Where("union_fight_auto_apply = ?", true).Order("id").Find(&guilds).Error; err != nil {
 			return err
 		}
-		for _, setting := range settings {
-			var guild db.P13Guild
-			err := tx.First(&guild, "id=?", setting.GuildID).Error
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				continue
-			}
-			if err != nil {
-				return err
-			}
+		for i := range guilds {
+			guild := &guilds[i]
 			min, err := s.p10Setting("UnionFightApplyLevelLimit")
 			if err != nil {
 				return err
@@ -223,7 +217,7 @@ func (s *GameService) TickP13UnionFight(ctx context.Context, now time.Time) erro
 			if guild.Level < min {
 				continue
 			}
-			if err = s.p13UFDeclare(tx, &guild, now); err != nil {
+			if err = s.p13UFDeclare(tx, guild, now); err != nil {
 				return err
 			}
 		}
@@ -299,8 +293,8 @@ func (s *GameService) p13UFMutate(ctx context.Context, id int64, request proto.M
 			if err = p13GuildRole(member, constUtil.P13GuildVice); err != nil {
 				return err
 			}
-			setting := db.P13UnionFightSetting{GuildID: guild.ID, AutoApply: b.GetIsAuto() == 1}
-			return tx.Save(&setting).Error
+			// 只写独立开关列，避免用旧公会快照覆盖资产其他字段；重复设置保持幂等。
+			return tx.Model(&db.P13Guild{}).Where("id=?", guild.ID).Update("union_fight_auto_apply", b.GetIsAuto() == 1).Error
 		case *pb.CSUFUnionApply:
 			if err = p13GuildRole(member, constUtil.P13GuildVice); err != nil {
 				return err
@@ -553,12 +547,9 @@ func (s *GameService) p13UFQuery(ctx context.Context, id int64, request proto.Me
 			} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 				return err
 			}
-			var setting db.P13UnionFightSetting
-			err = tx.First(&setting, "guild_id=?", guild.ID).Error
-			if err == nil && setting.AutoApply {
+			// 公会资产已在成员门禁中加载；NULL 仅表示旧库尚未回填，按关闭处理。
+			if guild.UnionFightAutoApply != nil && *guild.UnionFightAutoApply {
 				reply.IsAutoApply = proto.Int32(1)
-			} else if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-				return err
 			}
 			for _, fighter := range fighters {
 				if fighter.PlayerID == id {

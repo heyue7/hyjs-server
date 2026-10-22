@@ -14,7 +14,16 @@ import (
 // p12WorldBossKillNotice只由共享HP首次归零的权威Finish事务构造。
 // 名称来自已认证玩家快照，去掉NGUI标签括号与控制符，避免名字改变全服提示的格式。
 func p12WorldBossKillNotice(playerName string) *pb.SCPublicMessage {
-	name := strings.Map(func(r rune) rune {
+	return &pb.SCPublicMessage{Pubmsg: &pb.PublicMessage{
+		Type:       proto.Int32(constUtil.P12WorldBossKillNoticeType),
+		ScrollType: proto.Int32(constUtil.P12WorldBossKillNoticeScrollType),
+		Msg:        proto.String(fmt.Sprintf(constUtil.P12WorldBossKillNoticeFormat, p12NoticeName(playerName))),
+	}}
+}
+
+// p12NoticeName keeps authenticated display names from changing NGUI markup.
+func p12NoticeName(value string) string {
+	return strings.Map(func(r rune) rune {
 		if unicode.IsControl(r) {
 			return -1
 		}
@@ -25,12 +34,7 @@ func p12WorldBossKillNotice(playerName string) *pb.SCPublicMessage {
 			return '】'
 		}
 		return r
-	}, playerName)
-	return &pb.SCPublicMessage{Pubmsg: &pb.PublicMessage{
-		Type:       proto.Int32(constUtil.P12WorldBossKillNoticeType),
-		ScrollType: proto.Int32(constUtil.P12WorldBossKillNoticeScrollType),
-		Msg:        proto.String(fmt.Sprintf(constUtil.P12WorldBossKillNoticeFormat, name)),
-	}}
+	}, value)
 }
 
 // publishP12WorldBossKill必须在结算提交成功后调用，包含最后一击玩家及本服全部当前会话。

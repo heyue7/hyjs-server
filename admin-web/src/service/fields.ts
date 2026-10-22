@@ -76,10 +76,26 @@ export interface FieldDeployments {
   items: FieldDeployment[];
 }
 
+export interface FieldMapPoint {
+  id: string;
+  name: string;
+  x: number;
+  z: number;
+}
+export interface FieldMap {
+  width: number;
+  height: number;
+  scale: number;
+  offsetX: number;
+  offsetY: number;
+  bossPoints?: FieldMapPoint[];
+  worldBossPoints?: FieldMapPoint[];
+}
 export interface FieldPresentation {
   name: string;
   iconUrl: string;
   detail: string;
+  map?: FieldMap;
 }
 export interface FieldChannel {
   scene: string;

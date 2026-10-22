@@ -205,6 +205,23 @@ func TestFieldBoss33RemnantVictoryRewardsOnceColdAndRespawn(t *testing.T) {
 	}
 	before, game := fieldBoss33State(t, f.id)
 	uuid := game.Field.Bosses[0].GetUuid()
+	var authenticated db.Profile
+	if err := db.GetIns().First(&authenticated, f.id).Error; err != nil {
+		t.Fatal(err)
+	}
+	notices := 0
+	p12NoticeSink(t, f.s, f.id, authenticated.Session, func(message proto.Message) error {
+		notice, ok := message.(*pb.SCPublicMessage)
+		if !ok || notice.GetPubmsg().GetType() != 1 || !strings.Contains(notice.GetPubmsg().GetMsg(), "击败") {
+			t.Fatal("missing native boss kill marquee")
+		}
+		_, committed := fieldBoss33State(t, f.id)
+		if !committed.Field.Fight.Settled || committed.Field.Bosses[0].GetState() != 3 || committed.Field.RespawnAt[uuid] <= time.Now().UnixMilli() {
+			t.Fatal("kill was published before committed result and respawn deadline")
+		}
+		notices++
+		return nil
+	})
 	if err := updateProfile(f.ctx, f.id, func(_ *pb.Player, g *model.GameState) error {
 		g.Field.BossHP = map[string]map[string]float64{}
 		g.Field.BossHP[uuid] = map[string]float64{}
@@ -238,6 +255,9 @@ func TestFieldBoss33RemnantVictoryRewardsOnceColdAndRespawn(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if notices != 1 || ended[2].(*pb.SCSideBossCountdown).GetTime() < 3598 {
+		t.Fatal("committed kill did not publish once with native refresh countdown")
+	}
 	after, game := fieldBoss33State(t, f.id)
 	if after.GetCoin()-before.GetCoin() != 51000 || after.GetDiamond()-before.GetDiamond() != 50 || game.Field.Bosses[0].GetState() != 3 {
 		t.Fatal("original participation and kill rewards were not granted")
@@ -252,7 +272,7 @@ func TestFieldBoss33RemnantVictoryRewardsOnceColdAndRespawn(t *testing.T) {
 		t.Fatal("cold retry changed frozen reward", err)
 	}
 	cold, game := fieldBoss33State(t, f.id)
-	if cold.GetCoin() != after.GetCoin() || cold.GetDiamond() != after.GetDiamond() {
+	if cold.GetCoin() != after.GetCoin() || cold.GetDiamond() != after.GetDiamond() || notices != 1 {
 		t.Fatal("cold retry granted again")
 	}
 	f.s.table("Field", "FieldId", "field_001")["adminRevision"] = "1234567890abcde0"

@@ -100,6 +100,10 @@ func (s *GameService) InitializeP13Guild(ctx context.Context) error {
 	if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&db.P13GuildPolicy{ID: 1, Source: constUtil.P13GuildSource}).Error; err != nil {
 		return err
 	}
+	// 监听和定时任务启动前完成旧自动宣战选择回填，运行期只读公会资产字段。
+	if err := s.p13GuildMigrateUnionFightAutoApply(ctx); err != nil {
+		return err
+	}
 	if err := s.InitializeP13GuildDonateBox(ctx); err != nil {
 		return err
 	}
@@ -107,6 +111,64 @@ func (s *GameService) InitializeP13Guild(ctx context.Context) error {
 		return err
 	}
 	return s.InitializeP13UnionFight(ctx)
+}
+
+// p13GuildMigrateUnionFightAutoApply folds legacy settings into their owning guild.
+// Each short batch commits independently; only NULL rows remain eligible after
+// interruption, and a new false value can never be overwritten by legacy true.
+func (s *GameService) p13GuildMigrateUnionFightAutoApply(ctx context.Context) error {
+	const batch = 500
+	d := db.GetIns().WithContext(ctx)
+	legacyExists := d.Migrator().HasTable(&db.P13UnionFightSetting{})
+	for {
+		more := false
+		err := d.Transaction(func(tx *gorm.DB) error {
+			var pending []string
+			if err := tx.Model(&db.P13Guild{}).Where("union_fight_auto_apply IS NULL").Order("id").Limit(batch).Pluck("id", &pending).Error; err != nil {
+				return err
+			}
+			if len(pending) == 0 {
+				return nil
+			}
+			more = true
+			legacy := make(map[string]bool, len(pending))
+			if legacyExists {
+				var rows []db.P13UnionFightSetting
+				if err := tx.Where("guild_id IN ?", pending).Find(&rows).Error; err != nil {
+					return err
+				}
+				for _, row := range rows {
+					legacy[row.GuildID] = row.AutoApply
+				}
+			}
+			var on, off []string
+			for _, id := range pending {
+				if legacy[id] {
+					on = append(on, id)
+				} else {
+					off = append(off, id)
+				}
+			}
+			for _, group := range []struct {
+				ids   []string
+				value bool
+			}{{on, true}, {off, false}} {
+				if len(group.ids) == 0 {
+					continue
+				}
+				if err := tx.Model(&db.P13Guild{}).Where("id IN ? AND union_fight_auto_apply IS NULL", group.ids).Update("union_fight_auto_apply", group.value).Error; err != nil {
+					return err
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			return err
+		}
+		if !more {
+			return nil
+		}
+	}
 }
 
 // P13GuildScope 每次读取当前真实成员关系，离会/解散后立即失去公会频道资格。
@@ -722,7 +784,9 @@ func (s *GameService) p13GuildCreate(ctx context.Context, id int64, b *pb.CSUnio
 		if err = deductPoolCost(p, state, cost); err != nil {
 			return err
 		}
-		guild := db.P13Guild{ID: uuid.NewString(), Name: b.GetName(), Level: 1, CreatedAt: now.UnixMilli()}
+		// 新公会明确关闭自动宣战，避免把 NULL 迁移哨兵带入新数据。
+		autoApply := false
+		guild := db.P13Guild{ID: uuid.NewString(), Name: b.GetName(), Level: 1, UnionFightAutoApply: &autoApply, CreatedAt: now.UnixMilli()}
 		if err = tx.Create(&guild).Error; err != nil {
 			return err
 		}

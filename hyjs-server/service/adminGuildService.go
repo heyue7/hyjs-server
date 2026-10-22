@@ -1222,7 +1222,7 @@ func adminGuildMemberDTO(member db.P13GuildMember, player *pb.Player) model.Admi
 	}
 }
 
-func adminGuildDetailFrom(s *GameService, tx *gorm.DB, owned *adminGuildOwned) (*model.AdminGuildDetail, error) {
+func adminGuildDetailFrom(s *GameService, owned *adminGuildOwned) (*model.AdminGuildDetail, error) {
 	out := &model.AdminGuildDetail{
 		ID:             owned.guild.ID,
 		Name:           owned.guild.Name,
@@ -1241,14 +1241,8 @@ func adminGuildDetailFrom(s *GameService, tx *gorm.DB, owned *adminGuildOwned) (
 		Version:        adminGuildVersion(owned.guild, owned.members),
 		Members:        []model.AdminGuildMemberDTO{},
 	}
-	if tx.Migrator().HasTable(&db.P13UnionFightSetting{}) {
-		var setting db.P13UnionFightSetting
-		if err := tx.First(&setting, "guild_id=?", owned.guild.ID).Error; err == nil {
-			out.UnionFightApply = setting.AutoApply
-		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, err
-		}
-	}
+	// 自动报名开关随公会资产一次读取；NULL 旧库哨兵按关闭展示。
+	out.UnionFightApply = owned.guild.UnionFightAutoApply != nil && *owned.guild.UnionFightAutoApply
 	for _, member := range owned.members {
 		out.Members = append(out.Members, adminGuildMemberDTO(member, owned.players[member.PlayerID]))
 	}
@@ -1356,7 +1350,7 @@ func (s *GameService) AdminGuildDetail(ctx context.Context, id string) (*model.A
 	if err != nil {
 		return nil, err
 	}
-	return adminGuildDetailFrom(s, d, owned)
+	return adminGuildDetailFrom(s, owned)
 }
 
 func adminGuildChangedFields(old, next db.P13Guild, reason string) string {

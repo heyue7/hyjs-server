@@ -1,2 +1,2 @@
--- 原宣战报名独立事实；不生成比赛结果或奖励。
-CREATE TABLE IF NOT EXISTS p13_union_fight_settings (guild_id VARCHAR(64) PRIMARY KEY,auto_apply BOOLEAN NOT NULL DEFAULT FALSE) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+-- 原自动宣战选择已并入 p13_guilds.union_fight_auto_apply，不再创建独立表。
+-- 兼容已有部署时本文件保持空结构说明；旧表只作为迁移暂存和回退依据，由上线核对后人工处理。

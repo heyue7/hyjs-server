@@ -8,6 +8,12 @@ namespace HYJS.ClientUpdate
     {
         static Gate gate;
         public static string Version(GameConfig original) { return Version(); }
+        public static string DisplayVersion(GameConfig original)
+        {
+            Version();
+            using (AndroidJavaClass java = new AndroidJavaClass("com.hyjs.wallet.ClientUpdate"))
+                return java.CallStatic<string>("displayVersion");
+        }
         public static string Version()
         {
             if (gate == null)

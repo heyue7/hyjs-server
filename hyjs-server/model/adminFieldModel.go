@@ -90,9 +90,29 @@ type AdminFieldListResponse struct {
 
 // AdminFieldPresentation 将稳定资源值转换为运营可读的名称和真实原图。
 type AdminFieldPresentation struct {
-	Name    string `json:"name"`    // Name 为原文或按用途命名的中文标签。
-	IconURL string `json:"iconUrl"` // IconURL 为原美术缩略图，无原图时为空。
-	Detail  string `json:"detail"`  // Detail 为地图或编队的简短用途说明。
+	Name    string         `json:"name"`          // Name 为原文或按用途命名的中文标签。
+	IconURL string         `json:"iconUrl"`       // IconURL 为原美术缩略图，无原图时为空。
+	Detail  string         `json:"detail"`        // Detail 为地图或编队的简短用途说明。
+	Map     *AdminFieldMap `json:"map,omitempty"` // Map 为原小地图参数与首领出生点，只读且不参与配置保存。
+}
+
+// AdminFieldMapPoint 表示原表中的一个首领候选出生点。
+type AdminFieldMapPoint struct {
+	ID   string  `json:"id"`   // ID 为原点位编号。
+	Name string  `json:"name"` // Name 为原表候选首领名称。
+	X    float64 `json:"x"`    // X 为原场景横坐标。
+	Z    float64 `json:"z"`    // Z 为原场景纵坐标。
+}
+
+// AdminFieldMap 为前端展示原大地图分布所需的只读参数。
+type AdminFieldMap struct {
+	Width           int64                `json:"width"`                     // Width 为原图宽度，当前为512。
+	Height          int64                `json:"height"`                    // Height 为原图高度，当前为512。
+	Scale           float64              `json:"scale"`                     // Scale 为原小地图缩放。
+	OffsetX         float64              `json:"offsetX"`                   // OffsetX 为原小地图水平偏移。
+	OffsetY         float64              `json:"offsetY"`                   // OffsetY 为原小地图纵向偏移。
+	BossPoints      []AdminFieldMapPoint `json:"bossPoints,omitempty"`      // BossPoints 为原野外普通首领出生点。
+	WorldBossPoints []AdminFieldMapPoint `json:"worldBossPoints,omitempty"` // WorldBossPoints 为原世界首领出生点。
 }
 
 // AdminFieldResource 限定掉落编辑器可选的真实道具和消费者。

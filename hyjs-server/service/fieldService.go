@@ -17,6 +17,7 @@ import (
 	"google.golang.org/protobuf/proto"
 	"gorm.io/gorm"
 	"hyjs-server/constUtil"
+	"hyjs-server/db"
 	"hyjs-server/elog"
 	"hyjs-server/model"
 	pb "hyjs-server/model/protocol"
@@ -340,7 +341,18 @@ func (s *GameService) fieldTransfer(ctx context.Context, id int64, b *pb.CSTrans
 			}
 		case "town", "town_main":
 			point = b.GetPoint()
-			if point == nil {
+			if s.fieldSceneRow(g.Position.GetScene()) != nil {
+				// 野外返城采用原城门的可站立传送点，避免沿用前线传送门坐标。
+				gate := s.table("Area", "areaId", "area_25")
+				if gate == nil || gate["sceneName"] != "town" || gate["canTransfer"] != "1" {
+					return errors.New("缺少城门返回位置")
+				}
+				var err error
+				point, err = fieldPoint(strings.Join([]string{gate["transferX"], gate["transferY"], gate["transferZ"]}, ","))
+				if err != nil {
+					return err
+				}
+			} else if point == nil {
 				point = &pb.PointNew{X: proto.Float32(0), Y: proto.Float32(0), Z: proto.Float32(0)}
 			}
 		default:
@@ -471,6 +483,7 @@ func (s *GameService) fieldScene(ctx context.Context, id int64, login bool) ([]p
 		if isField {
 			messages = append(messages, &pb.SCSideMonster{Monsters: g.Field.Monsters}, &pb.SCFieldPlayerState{Player: []*pb.PlayerSide{side}})
 			messages = append(messages, s.fieldBossProjection(g)...)
+			messages = append(messages, fieldBossCountdownProjection(g.Field, time.Now())...)
 			boss, err := s.p12WorldBossFieldProjection(tx, g.Position.GetScene(), time.Now())
 			if err != nil {
 				return err
@@ -566,6 +579,7 @@ func (s *GameService) fieldHeartbeat(ctx context.Context, id int64) ([]proto.Mes
 			messages = append(messages, &pb.SCSideMonster{Monsters: g.Field.Monsters}, &pb.SCFieldPlayerState{Player: []*pb.PlayerSide{g.Field.Side}})
 		}
 		messages = append(messages, s.fieldBossProjection(g)...)
+		messages = append(messages, fieldBossCountdownProjection(g.Field, time.Now())...)
 		boss, err := s.p12WorldBossFieldProjection(tx, g.Position.GetScene(), time.Now())
 		if err != nil {
 			return err
@@ -582,8 +596,11 @@ func (s *GameService) fieldFightStart(ctx context.Context, id int64, b *pb.CSSid
 		if !s.P8FieldSceneAvailable(g.Position.GetScene()) || g.Run != nil && !g.Run.Complete {
 			return errors.New("Enter the field before starting a battle")
 		}
-		if s.fieldSceneRow(g.Position.GetScene())["BattleMap"] != "map_forest_003" {
+		if !s.fieldBattleSceneAvailable(g.Position.GetScene()) {
 			return errors.New(constUtil.P8FieldSceneUnavailable)
+		}
+		if err := checkFieldBattleClient(tx, id, g.Position.GetScene()); err != nil {
+			return err
 		}
 		if err := s.refreshField(id, g); err != nil {
 			return err
@@ -676,6 +693,30 @@ func (s *GameService) fieldFightStart(ctx context.Context, id int64, b *pb.CSSid
 		return nil
 	})
 	return []proto.Message{result}, err
+}
+
+// fieldBattleSceneAvailable matches the two packaged native field battle routes.
+// Snow uses the existing snow-forest bundle through the client compatibility hook;
+// its source table remains intact so unrelated consumers retain original IDs.
+func (s *GameService) fieldBattleSceneAvailable(scene string) bool {
+	row := s.fieldSceneRow(scene)
+	return row != nil && (scene == "field_001" && row["BattleMap"] == "map_forest_003" ||
+		scene == "field_002" && row["BattleMap"] == "map_ice_001")
+}
+
+// checkFieldBattleClient keeps older packages out of the missing ice bundle.
+// This compatibility read is limited to snow battle starts; movement and other
+// maps retain their existing query budget. Isolated legacy fixtures omit updates.
+func checkFieldBattleClient(tx *gorm.DB, id int64, scene string) error {
+	if scene != "field_002" || !clientUpdatesEnabled() {
+		return nil
+	}
+	var binding db.ClientUpdateSession
+	err := tx.Select("build_code").First(&binding, "player_id=?", id).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) || err == nil && binding.BuildCode < constUtil.P8SnowBattleMinimumBuild {
+		return errors.New(constUtil.P8SnowBattleClientUpdate)
+	}
+	return err
 }
 
 // fieldReward 每次整群胜利抽取队长的奖励一次，这是本地服结算规则。
@@ -922,7 +963,7 @@ func (s *GameService) fieldMove(ctx context.Context, id int64, b *pb.CSMove) err
 		if g.PositionLoading {
 			return nil
 		}
-		if s.P8LifeReady && g.Position.GetScene() == "field_001" && g.Field != nil && g.Field.Side != nil && (g.Field.Side.GetState() == 5 || g.Field.Side.GetCurHp() <= 0) {
+		if s.P8LifeReady && s.fieldSceneRow(g.Position.GetScene()) != nil && g.Field != nil && g.Field.Side != nil && (g.Field.Side.GetState() == 5 || g.Field.Side.GetCurHp() <= 0) {
 			return errors.New("死亡状态不能移动，请先复活")
 		}
 		if s.P8LifeReady {
