@@ -9,9 +9,22 @@ using var module = ModuleDefMD.Load(args[0]);
 using var helper = ModuleDefMD.Load(args[1]);
 TypeDef T(string name) => module.GetTypes().Single(t => t.FullName == name);
 MethodDef M(string type, string method) => T(type).Methods.Single(m => m.Name == method);
-var importer = new Importer(module);
+var importer = new Importer(module, ImporterOptions.TryToUseDefs | ImporterOptions.TryToUseExistingAssemblyRefs);
 var helperType = helper.GetTypes().Single(t => t.FullName == "HYJS.GGO.GGOShop");
-IMethod H(string name) => importer.Import(helperType.Methods.Single(m => m.Name == name));
+IMethod H(string name) {
+ // Build signatures from native definitions. The helper's Assembly-CSharp
+ // backlinks must never be imported as ModuleRefs to the helper module.
+ MethodSig signature;
+ if (name == "InventoryItems") {
+  var list = M("UI.UIPlayerData", "AddSimpleItem").MethodSig.Params[0];
+  signature = MethodSig.CreateStatic(list, list);
+ } else if (name == "Ensure") {
+  signature = MethodSig.CreateStatic(module.CorLibTypes.Void, T("UI.ShopPage").ToTypeSig());
+ } else if (name == "TrySelect") {
+  signature = MethodSig.CreateStatic(module.CorLibTypes.Boolean, T("UI.ShopPage").ToTypeSig(), T("UI.ShopType").ToTypeSig());
+ } else throw new InvalidOperationException("Unexpected helper import " + name);
+ return new MemberRefUser(module, name, signature, importer.Import(helperType));
+}
 void Check(MethodDef method) {
  if (method.Body.Instructions.Any(i => i.Operand is IMethod m && m.DeclaringType.FullName == "HYJS.GGO.GGOShop")) throw new InvalidOperationException("already hooked " + method.FullName);
  method.Body.MaxStack = Math.Max(method.Body.MaxStack, (ushort)8); method.Body.KeepOldMaxStack = true;

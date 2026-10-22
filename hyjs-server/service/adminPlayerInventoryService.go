@@ -635,6 +635,11 @@ func (s *GameService) adminApplyPlayerInventory(tx *gorm.DB, actor *model.AdminP
 		p.FightPower = proto.Int32(power)
 	}
 	p5SetKV(g, "admin.inventory.revision", uuid.NewString())
+	// Admin edits deliberately keep their delta-only saver. Convert immediate
+	// terminal items here so add/update/batch share its existing atomic receipt.
+	if err = ConvertGGOOverclockItem(tx, &row, p, g); err != nil {
+		return err
+	}
 	if err = adminSavePlayerChanges(tx, &row, beforeP, beforeG, p, g); err != nil {
 		return err
 	}

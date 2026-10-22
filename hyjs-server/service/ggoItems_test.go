@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
@@ -513,4 +514,145 @@ func TestGGOFullActivityInitializationPreservesShop(t *testing.T) {
 			t.Fatal("GGO activity alias imported", imported, err)
 		}
 	}
+}
+
+func TestGGOAdminInventoryImmediateCreditAtomicReplay(t *testing.T) {
+	f, id, ctx, actor := terminalFixture(t)
+	if err := f.s.InstallGGOItems(); err != nil {
+		t.Fatal(err)
+	}
+	read := func() *model.AdminPlayerInventoryResponse {
+		t.Helper()
+		out, err := f.s.AdminPlayerInventory(ctx, id, "", "", nil, 1, 100)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return out
+	}
+	var owner db.Profile
+	if err := db.GetIns().First(&owner, id).Error; err != nil {
+		t.Fatal(err)
+	}
+	initial, err := accountWalletBalance(db.GetIns(), owner.AccountID, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertState := func(delta int64) {
+		t.Helper()
+		out := read()
+		for _, item := range out.Items {
+			if item.ResourceID == constUtil.GGOOverclockID {
+				t.Fatal("admin result kept overclock inventory")
+			}
+		}
+		wallet, e := accountWalletBalance(db.GetIns(), owner.AccountID, false)
+		if e != nil || wallet.BalanceCents != initial.BalanceCents+delta {
+			t.Fatal("admin terminal delta", wallet, e)
+		}
+	}
+	req := model.AdminInventoryBatchRequest{Version: read().Version, RequestID: uuid.NewString(), Reason: "isolated immediate terminal item batch", Resources: []model.AdminInventoryBatchResource{{Category: "item", ResourceID: constUtil.GGOOverclockID, Amount: 2}, {Category: "item", ResourceID: constUtil.GGOCurrencyID, Amount: 3}}}
+	result, err := f.s.AdminInventoryBatch(ctx, actor, id, req)
+	if err != nil || result.Version != read().Version {
+		t.Fatal("actual admin batch", err)
+	}
+	assertState(200)
+	var receipt db.AdminAudit
+	target := strconv.FormatInt(id, 10) + ":batch:" + req.RequestID
+	if err = db.GetIns().First(&receipt, "action=? AND target=?", constUtil.AdminInventoryBatchAuditAction, target).Error; err != nil {
+		t.Fatal(err)
+	}
+	frozenReceipt := receipt.Detail
+	if _, err = f.s.AdminInventoryBatch(ctx, actor, id, req); err != nil {
+		t.Fatal("admin batch replay", err)
+	}
+	assertState(200)
+	changed := req
+	changed.Resources = append([]model.AdminInventoryBatchResource{}, req.Resources...)
+	changed.Resources[0].Amount = 3
+	if _, err = f.s.AdminInventoryBatch(ctx, actor, id, changed); !errors.Is(err, constUtil.ErrAdminConfigConflict) {
+		t.Fatal("batch request mutation accepted", err)
+	}
+	var before db.Profile
+	db.GetIns().First(&before, id)
+	bad := model.AdminInventoryBatchRequest{Version: read().Version, RequestID: uuid.NewString(), Reason: "isolated late failure rollback", Resources: []model.AdminInventoryBatchResource{{Category: "item", ResourceID: constUtil.GGOOverclockID, Amount: 1}, {Category: "item", ResourceID: "item_missing_ggo", Amount: 1}}}
+	if _, err = f.s.AdminInventoryBatch(ctx, actor, id, bad); err == nil {
+		t.Fatal("late batch failure accepted")
+	}
+	assertState(200)
+	var after db.Profile
+	db.GetIns().First(&after, id)
+	if *before.Game != *after.Game || *before.Player != *after.Player {
+		t.Fatal("failed batch persisted profile")
+	}
+	var count int64
+	db.GetIns().Model(&db.AdminAudit{}).Where("target LIKE ?", strconv.FormatInt(id, 10)+":%"+bad.RequestID+"%").Count(&count)
+	if count != 0 {
+		t.Fatal("failed batch persisted audit", count)
+	}
+	amount := int64(1)
+	single := model.AdminPlayerInventoryRequest{Version: read().Version, RequestID: uuid.NewString(), Operation: "add", Category: "item", ResourceID: constUtil.GGOOverclockID, Amount: &amount, Reason: "isolated single immediate terminal item"}
+	if _, err = f.s.AdminUpdatePlayerInventory(ctx, actor, id, single); err != nil {
+		t.Fatal(err)
+	}
+	assertState(300)
+	if _, err = f.s.AdminUpdatePlayerInventory(ctx, actor, id, single); err != nil {
+		t.Fatal(err)
+	}
+	assertState(300)
+	// Simulate a legacy pending ticket plus an unknown saved field. Quantity
+	// editing must convert the resulting whole owned stack while preserving JSON.
+	if err = db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var row db.Profile
+		if e := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&row, id).Error; e != nil {
+			return e
+		}
+		var saved map[string]json.RawMessage
+		if e := json.Unmarshal([]byte(*row.Game), &saved); e != nil {
+			return e
+		}
+		var items []*pb.SimpleItem
+		if e := json.Unmarshal(saved["items"], &items); e != nil {
+			return e
+		}
+		items = append(items, &pb.SimpleItem{Id: proto.String(constUtil.GGOOverclockID), Num: proto.Int32(2)})
+		saved["items"] = adminJSON(items)
+		saved["ggo_admin_unknown"] = json.RawMessage(`{"keep":true}`)
+		return tx.Model(&row).Update("game", string(adminJSON(saved))).Error
+	}); err != nil {
+		t.Fatal(err)
+	}
+	amount = 5
+	edit := model.AdminPlayerInventoryRequest{Version: read().Version, RequestID: uuid.NewString(), Operation: "update", Category: "item", Key: constUtil.GGOOverclockID, Amount: &amount, Reason: "isolated legacy quantity conversion"}
+	if _, err = f.s.AdminUpdatePlayerInventory(ctx, actor, id, edit); err != nil {
+		t.Fatal(err)
+	}
+	assertState(800)
+	if _, err = f.s.AdminUpdatePlayerInventory(ctx, actor, id, edit); err != nil {
+		t.Fatal("removed stack replay", err)
+	}
+	assertState(800)
+	f.restart(t)
+	if _, err = f.s.AdminInventoryBatch(ctx, actor, id, req); err != nil {
+		t.Fatal("cold batch replay", err)
+	}
+	assertState(800)
+	db.GetIns().First(&after, id)
+	var final map[string]json.RawMessage
+	if json.Unmarshal([]byte(*after.Game), &final) != nil || string(final["ggo_admin_unknown"]) != `{"keep":true}` {
+		t.Fatal("admin delta saver lost unknown field")
+	}
+	var coldReceipt db.AdminAudit
+	db.GetIns().First(&coldReceipt, receipt.ID)
+	if coldReceipt.Detail != frozenReceipt {
+		t.Fatal("immutable admin receipt changed")
+	}
+	db.AccountsTable(db.GetIns(), "account_wallet_entries").Where("account_id=? AND source=?", owner.AccountID, constUtil.GGOIncomeSource).Count(&count)
+	if count != 3 {
+		t.Fatal("admin ledger count", count)
+	}
+	db.AccountsTable(db.GetIns(), "terminal_incomes").Where("account_id=? AND source=?", owner.AccountID, constUtil.GGOIncomeSource).Count(&count)
+	if count != 3 {
+		t.Fatal("admin income count", count)
+	}
+	t.Log("Actual AdminInventoryBatch and single add/update convert immediately; replay/cold exactly once, late failure rolls back wallet/profile/audit, unknown saved fields preserved")
 }

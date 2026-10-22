@@ -58,6 +58,24 @@ def verify(before, after):
     for table in ['TypeDef', 'Field', 'MethodDef']:
         require(len(getattr(a.net.mdtables, table).rows) == len(getattr(b.net.mdtables, table).rows), 'ABI inventory changed ' + table)
     require(not getattr(b.net.mdtables, 'FieldPtr', None), 'Old Unity FieldPtr forbidden')
+    original_types = {str(t.TypeNamespace) + '.' + str(t.TypeName) for t in a.net.mdtables.TypeDef.rows}
+    before_type_refs = len(a.net.mdtables.TypeRef.rows)
+    for reference in b.net.mdtables.TypeRef.rows[before_type_refs:]:
+        name = str(reference.TypeNamespace) + '.' + str(reference.TypeName)
+        scope = reference.ResolutionScope.row
+        require(not (name in original_types and ('ModuleRef' in type(scope).__name__ or str(getattr(scope, 'Name', '')) == 'SoulFlowerGGOShop')),
+                'Own type incorrectly imported through helper/module: ' + name)
+    native = next(row for name, _, row in left if name == 'UI.UIPlayerData::AddSimpleItem')
+    native_signature = bytes(native.Signature.value)
+    require(native_signature[:3] == bytes([0x20, 1, 1]), 'Native inventory signature changed')
+    native_list = native_signature[3:]
+    imported = [r for r in b.net.mdtables.MemberRef.rows if str(r.Name) == 'InventoryItems']
+    require(len(imported) == 1, 'InventoryItems import count differs')
+    require(bytes(imported[0].Signature.value) == bytes([0, 1]) + native_list + native_list,
+            'InventoryItems must reuse native List<SimpleItem> TypeDef signature')
+    helper_scope = imported[0].Class.row.ResolutionScope.row
+    require('AssemblyRef' in type(helper_scope).__name__ and str(helper_scope.Name) == 'SoulFlowerGGOShop',
+            'InventoryItems owner must resolve through helper AssemblyRef')
     changed, engine = [], 0
     for (name, rid, old), (name2, rid2, new) in zip(left, right):
         require((name, rid, old.Signature.value, old.struct.Flags, old.struct.ImplFlags) == (name2, rid2, new.Signature.value, new.struct.Flags, new.struct.ImplFlags), 'Original ABI/token changed ' + name)
@@ -86,7 +104,7 @@ def verify(before, after):
     require(len(changed) == 3, 'Expected exactly three hooks')
     for old, new in zip(a.net.mdtables.AssemblyRef.rows, b.net.mdtables.AssemblyRef.rows):
         require((str(old.Name), old.struct.Flags, old.PublicKey.value) == (str(new.Name), new.struct.Flags, new.PublicKey.value), 'Inherited assembly reference changed')
-    return {'allowedChangedMethods': changed, 'originalEngineMethodsExact': engine, 'originalABITokensExact': True, 'allOtherOriginalBodiesByteExact': True}
+    return {'allowedChangedMethods': changed, 'originalEngineMethodsExact': engine, 'originalABITokensExact': True, 'allOtherOriginalBodiesByteExact': True, 'noNewOwnTypesViaModuleOrHelper': True, 'inventoryItemsNativeTypeDefSignatureExact': True, 'inventoryItemsSignatureHex': bytes(imported[0].Signature.value).hex()}
 
 
 def main():
