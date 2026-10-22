@@ -189,11 +189,12 @@ func TestP10WorshipModelFollowsFirstFormationSlotAfterReload(t *testing.T) {
 		hero.Id = proto.String("hero_001")
 		hero.Guid = proto.String("rank-model-first")
 		g.Warriors = append(g.Warriors, hero)
+		g.Equipment = append(g.Equipment, &pb.Equipment{EquipId: proto.String("equip_005"), Guid: proto.String("rank-first-weapon"), Level: proto.Int32(1)})
 		// Store the list out of order to prove the protocol's formatPos owns the first place.
 		g.Formation = []*pb.FormationItem{
 			{FormatPos: proto.Int32(3), Things: []*pb.FormationThing{{Pos: proto.Int32(0)}}},
 			{FormatPos: proto.Int32(2), Things: []*pb.FormationThing{{Pos: proto.Int32(0), Id: g.Warriors[0].Id, Guid: g.Warriors[0].Guid}}},
-			{FormatPos: proto.Int32(1), Things: []*pb.FormationThing{{Pos: proto.Int32(0), Id: hero.Id, Guid: hero.Guid}}},
+			{FormatPos: proto.Int32(1), Things: []*pb.FormationThing{{Pos: proto.Int32(0), Id: hero.Id, Guid: hero.Guid}, {Pos: proto.Int32(1), Id: proto.String("equip_005"), Guid: proto.String("rank-first-weapon")}}},
 		}
 		return nil
 	}); err != nil {
@@ -211,6 +212,9 @@ func TestP10WorshipModelFollowsFirstFormationSlotAfterReload(t *testing.T) {
 				found = true
 				if row.GetHeroWarId() != "hero_001" {
 					t.Fatalf("rank tab %d uses %s", kind, row.GetHeroWarId())
+				}
+				if row.GetWeaponId() != "equip_005" {
+					t.Fatalf("rank tab %d lost actual first-slot weapon: %s", kind, row.GetWeaponId())
 				}
 			}
 		}

@@ -68,7 +68,16 @@ func (s *GameService) p10WorshipRanks(tx *gorm.DB, kind int32) ([]*pb.SimplePlay
 			}
 		}
 		if first != nil {
-			info.HeroWarId = proto.String(formationHero(first).GetId())
+			hero, err := p5Warrior(g, formationHero(first).GetGuid())
+			if err != nil {
+				return nil, err
+			}
+			weapon, err := s.battleWeaponID(g, first)
+			if err != nil {
+				return nil, err
+			}
+			info.HeroWarId = hero.Id
+			info.WeaponId = proto.String(weapon)
 		}
 		ranked = append(ranked, info)
 	}

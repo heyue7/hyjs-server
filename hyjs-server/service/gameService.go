@@ -95,7 +95,7 @@ func (s *GameService) Dispatch(ctx context.Context, request *model.GamePacket, p
 	}()
 	// Keep failures and slow requests observable without writing every movement tick.
 	switch request.Body.(type) {
-	case *pb.CSMove, *pb.CSPingTcp, *pb.CSPingAckTcp, *pb.CSSpeedCheck:
+	case *pb.CSMove, *pb.CSMoveConfirm, *pb.CSPingTcp, *pb.CSPingAckTcp, *pb.CSSpeedCheck:
 	default:
 		elog.Info("game request", zap.String("message", name), zap.Int64("playerId", request.PlayerId))
 	}
@@ -139,6 +139,16 @@ func (s *GameService) Dispatch(ctx context.Context, request *model.GamePacket, p
 	}
 	if !failed {
 		s.AfterP10SceneRequest(ctx, request.PlayerId, request.Body)
+		if current, ok := request.Body.(*pb.CSCurrentPosition); ok && current.GetShowArround() != 0 {
+			peers, snapshotErr := s.p10CurrentScenePeers(ctx, request.PlayerId)
+			if snapshotErr != nil {
+				return GameError(constUtil.ErrGameRequest, snapshotErr.Error())
+			}
+			if len(peers) > 0 {
+				// Keep the rebuilt self frame ahead of peers on the same TCP write.
+				result = append(result, &pb.SCPlayerAppear{Player: peers})
+			}
+		}
 		s.afterInventoryMailRequest(ctx, request.PlayerId, request.Body, result)
 		s.afterWelfareAchievementRequest(ctx, request.PlayerId, request.Body, result)
 	}
@@ -261,6 +271,11 @@ func (s *GameService) dispatch(ctx context.Context, r *model.GamePacket, peer st
 	}
 	if int64(r.ZoneId) != s.OriginalServerID() || AdminProfileServerID(*row) != s.OriginalServerID() {
 		return nil, errors.New("请求区服与当前部署不一致")
+	}
+	if _, ok := r.Body.(*pb.CSMoveConfirm); ok {
+		// Original SCMovePush ends with this empty one-way acknowledgement.
+		// It must not start another scene handshake or mutate player state.
+		return nil, nil
 	}
 	ctx, err = s.BindLocalPlayContext(ctx, row)
 	if err != nil {

@@ -50,12 +50,10 @@ func p10SceneScope(g *model.GameState) string {
 	switch g.Position.GetScene() {
 	case "town", "town_main":
 		return "town_main"
-	case "field_001":
-		return "field_001"
-	case "field_002":
-		// 第二张原地图已有完整客户端资源；转场握手完成后才进入其公共同屏。
+	case "field_001", "field_002":
+		// Both public fields join only after the original CurrentPosition handshake.
 		if !g.PositionLoading {
-			return "field_002"
+			return g.Position.GetScene()
 		}
 	}
 	return ""
@@ -105,7 +103,40 @@ func (s *GameService) p10SceneMovePlayer(p *pb.Player, g *model.GameState, proje
 		}
 	}
 	// 同屏身份沿可信启动区服，保持与公开资料/组队的实际归属一致。
-	return &pb.MovePlayer{Position: proto.Clone(g.Position).(*pb.Position), Info: &pb.MovePlayerInfo{ServerId: proto.Int32(int32(s.OriginalServerID())), PlayerId: p.PlayerId, PlayerName: p.Name, Level: p.Level, WarId: proto.String(heroID), EquipId: proto.String(weaponID), Power: proto.Int64(int64(power)), PlayerSide: side, ServerName: proto.String("本地测试"), AwakeStage: proto.Int32(awake), PetId: proto.String(pet.GetPetId())}}, nil
+	position := proto.Clone(g.Position).(*pb.Position)
+	if constUtil.P8OriginalFieldScene(fieldScope) {
+		// RoomNetBase.SolveRoleAppear accepts town_side_<StaticData.fieldId>.
+		// Keep the persisted scene and line scope canonical; only project the wire frame.
+		position.Scene = proto.String(constUtil.P10FieldPlayerScenePrefix + fieldScope)
+	}
+	return &pb.MovePlayer{Position: position, Info: &pb.MovePlayerInfo{ServerId: proto.Int32(int32(s.OriginalServerID())), PlayerId: p.PlayerId, PlayerName: p.Name, Level: p.Level, WarId: proto.String(heroID), EquipId: proto.String(weaponID), Power: proto.Int64(int64(power)), PlayerSide: side, ServerName: proto.String("本地测试"), AwakeStage: proto.Int32(awake), PetId: proto.String(pet.GetPetId())}}, nil
+}
+
+// p10CurrentScenePeers restores actors cleared by the client during room reload,
+// including stationary peers whose presence identity has not changed.
+func (s *GameService) p10CurrentScenePeers(ctx context.Context, id int64) ([]*pb.MovePlayer, error) {
+	p10SceneMutation.Lock()
+	defer p10SceneMutation.Unlock()
+	tx := db.GetIns().WithContext(ctx)
+	cfg, err := p10SceneConfig(tx)
+	if err != nil || cfg == nil {
+		return nil, err
+	}
+	var own db.P10ScenePresence
+	err = tx.First(&own, "player_id=?", id).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if own.Scene != "town_main" && !constUtil.P8OriginalFieldScene(own.Scene) {
+		return nil, nil
+	}
+	if _, live := s.p10SceneLive(tx, own); !live {
+		return nil, nil
+	}
+	return s.p10ScenePeers(tx, own.Scene, own.Line, id)
 }
 func (s *GameService) p10SceneLive(tx *gorm.DB, row db.P10ScenePresence) (*pb.MovePlayer, bool) {
 	value, ok := p10ClientSinks.Load(p10ClientKey{s.p10ClientOwner(), row.PlayerID})

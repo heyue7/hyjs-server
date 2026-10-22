@@ -6,6 +6,8 @@ type GameGuideSkipRequest struct {
 	PlayerID int64 `json:"playerId" binding:"required"`
 	// SessionHex 当前登录会话的 16 字节十六进制表示。
 	SessionHex string `json:"sessionHex" binding:"required"`
+	// GuideID 当前原表引导ID；省略时兼容旧版跳过初始教学。
+	GuideID string `json:"guideId"`
 }
 
 // GameGuideSkipResponse 返回已提交的教学跳过状态，不包含奖励或功能解锁。
@@ -14,4 +16,6 @@ type GameGuideSkipResponse struct {
 	Skipped bool `json:"skipped"`
 	// NoviceGuideSchedule 原协议的教学进度，保留已经超过初始教学的后续指引进度。
 	NoviceGuideSchedule int32 `json:"noviceGuideSchedule"`
+	// GuideID 本次已确认跳过的原表引导ID；旧版初始教学请求省略。
+	GuideID string `json:"guideId,omitempty"`
 }

@@ -144,6 +144,7 @@ def main():
     parser.add_argument('--qa-origin', help='Loopback-only update UI QA; original Unity endpoints remain inherited')
     parser.add_argument('--gameplay-overlay', type=Path, help='Qualified gameplay45 input to the update layer')
     parser.add_argument('--pet-equip-overlay', type=Path, help='Qualified pet equipment input to the update layer')
+    parser.add_argument('--guide-overlay', type=Path, help='Qualified per-guide skip input to the update layer')
     args = parser.parse_args()
     base, overlay, output, record = [path.resolve() for path in (args.base_apk, args.overlay, args.output, args.record)]
     require(output.is_relative_to(ROOT / 'build') and record.is_relative_to(ROOT / 'analysis'), 'Use owned project output paths')
@@ -151,7 +152,7 @@ def main():
     proof = json.loads((overlay / 'manifest.json').read_text())
     require(common.digest(base) == proof['baseAPKSHA256'], 'Fixed base changed')
     pins = {ROOT / name: value for name, value in proof['sourcePins'].items()}
-    require(not (args.gameplay_overlay and args.pet_equip_overlay), 'Choose one qualified managed input')
+    require(sum(bool(x) for x in [args.gameplay_overlay, args.pet_equip_overlay, args.guide_overlay]) <= 1, 'Choose one qualified managed input')
     gameplay = None
     if args.gameplay_overlay:
         gameplay_dir = args.gameplay_overlay.resolve()
@@ -168,6 +169,14 @@ def main():
         require(pet['originalEngineMethodsUnchanged'] == 547 and pet['originalMetadataABIAndTokensPreserved'] is True, 'Pet equipment qualification missing')
         require({item['method'] for item in pet['changes']} == {'UI.PetEquipAwakeTab::SetCost', 'UI.PetEquipStrengthTab::isCanStrength'}, 'Unexpected pet equipment method scope')
         pins.update({ROOT / name: value for name, value in pet['sourcePins'].items()})
+    guide = None
+    if args.guide_overlay:
+        guide_dir = args.guide_overlay.resolve()
+        require(guide_dir.is_relative_to(ROOT / 'build'), 'Use owned guide overlay')
+        guide = json.loads((guide_dir / 'manifest.json').read_text())
+        require(guide['baseAPKSHA256'] == proof['baseAPKSHA256'] and guide['originalEngineMethodsExact'] == 547, 'Guide base/engine differs')
+        require({item['method'] for item in guide['changes']} == {'GuideManager::CheckGuideCanStart', 'Login.LoginPlayerLogin::KVInfoCallBack'}, 'Unexpected guide method scope')
+        pins.update({ROOT / name: value for name, value in guide['sourcePins'].items()})
     pins[Path(__file__).resolve()] = common.digest(Path(__file__))
     for path, digest in pins.items():
         require(path.resolve().is_relative_to(ROOT) and common.digest(path) == digest, 'Build source changed')
@@ -194,6 +203,11 @@ def main():
                 update_input = (pet_dir / 'Assembly-CSharp.dll').read_bytes()
                 require(hashlib.sha256(update_input).hexdigest() == pet['outputManagedSHA256'], 'Pet equipment managed output differs')
                 verify_managed(before, update_input, [item['method'] for item in pet['changes']])
+            if guide is not None:
+                require(hashlib.sha256(before).hexdigest() == guide['inputManagedSHA256'], 'Guide managed base differs')
+                update_input = (guide_dir / 'Assembly-CSharp.dll').read_bytes()
+                require(hashlib.sha256(update_input).hexdigest() == guide['outputManagedSHA256'], 'Guide managed output differs')
+                verify_managed(before, update_input, [item['method'] for item in guide['changes']])
             require(hashlib.sha256(update_input).hexdigest() == proof['inputManagedSHA256'] and hashlib.sha256(after).hexdigest() == proof['outputManagedSHA256'], 'Managed qualification differs')
             verify_managed(update_input, after, proof['allowedChangedMethods'])
             native, flag_offset = allow_wallet_subclass(incoming.read('classes2.dex'))
@@ -224,6 +238,10 @@ def main():
                 origin = urlsplit(args.qa_origin)
                 require(origin.scheme == 'http' and origin.hostname == '127.0.0.1' and origin.port and origin.path in ('', '/') and not origin.query and not origin.fragment and not origin.username, 'QA origin must be explicit loopback HTTP')
                 payload['assets/local-wallet.json'] = json.dumps({'origin': args.qa_origin.rstrip('/')}, separators=(',', ':')).encode()
+            if guide is not None:
+                helper_entry = 'assets/bin/Data/Managed/LocalPlayability.dll'
+                payload[helper_entry] = (guide_dir / 'LocalPlayability.dll').read_bytes()
+                require(hashlib.sha256(payload[helper_entry]).hexdigest() == guide['helperSHA256'], 'Guide helper changed')
         with tempfile.TemporaryDirectory(prefix='hyjs-client-update-', dir=ROOT / 'build') as directory:
             temp = Path(directory)
             unsigned, aligned, signed = [temp / name for name in ('unsigned.apk', 'aligned.apk', 'signed.apk')]

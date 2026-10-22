@@ -7,12 +7,58 @@ using LitJson;
 using UI;
 using UnityEngine;
 
-// The original guide keeps every level unlock and normal quest/reward rule.
-// Only an explicit, server-confirmed click stops the initial teaching overlay.
+// Explicit, server-confirmed skips retire teaching only; game actions and unlocks stay authoritative.
 namespace HYJS.Playability
 {
     public static class NoviceSkipUI
     {
+        const string Prefix = "client.guideSkipped.";
+        static readonly HashSet<string> skipped = new HashSet<string>();
+        static long owner;
+        static string ownerSession = "";
+        static bool initialSkipped;
+
+        static string SessionIdentity()
+        {
+            return StaticData.sessionKey == null ? "" : BitConverter.ToString(StaticData.sessionKey);
+        }
+        static bool CurrentOwner()
+        {
+            return StaticData.playerData != null && owner == StaticData.playerData.playerId && ownerSession == SessionIdentity();
+        }
+        public static void ObserveKV(object packet, bool success)
+        {
+            if (!success || StaticData.playerData == null) return;
+            NetWork.Packets.Packet frame = packet as NetWork.Packets.Packet;
+            ProtoBuf.Message.SCKVInfo info = frame == null ? null : frame.kBody as ProtoBuf.Message.SCKVInfo;
+            if (info == null) return;
+            skipped.Clear(); initialSkipped = false;
+            owner = StaticData.playerData.playerId; ownerSession = SessionIdentity();
+            foreach (ProtoBuf.Message.KeyValueEntry entry in info.entry)
+            {
+                if (entry.value != "1") continue;
+                if (entry.key == "client.noviceGuideSkipped") initialSkipped = true;
+                if (entry.key != null && entry.key.StartsWith(Prefix)) skipped.Add(entry.key.Substring(Prefix.Length));
+            }
+        }
+        public static bool ShouldStart(string id)
+        {
+            if (!CurrentOwner()) return true;
+            if (skipped.Contains(id)) return false;
+            Dict.DataModel.TableGuide row = Dict.DictDataManager.Instance.tableGuideDao.GetById(id);
+            return !(initialSkipped && row != null && row.order >= 0 && row.order <= 12);
+        }
+        internal static void Confirm(string id)
+        {
+            if (!CurrentOwner())
+            {
+                skipped.Clear(); initialSkipped = false;
+                owner = StaticData.playerData.playerId; ownerSession = SessionIdentity();
+            }
+            skipped.Add(id);
+            Dict.DataModel.TableGuide row = Dict.DictDataManager.Instance.tableGuideDao.GetById(id);
+            if (row != null && row.order >= 0 && row.order <= 12) initialSkipped = true;
+        }
         public static void Ensure(GuideManager guide)
         {
             try
@@ -39,14 +85,14 @@ namespace HYJS.Playability
         object Get(string name) { return typeof(GuideManager).GetField(name, Fields).GetValue(guide); }
         void Set(string name, object value) { typeof(GuideManager).GetField(name, Fields).SetValue(guide, value); }
 
-        bool InitialRunning()
+        bool GuideRunning()
         {
             if (guide == null || StaticData.playerData == null || StaticData.playerData.playerId < 1 ||
                 StaticData.sessionKey == null || StaticData.sessionKey.Length != 16) return false;
             string current = Get("curGuideId") as string;
             if (!(bool)Get("running") || String.IsNullOrEmpty(current)) return false;
             Dict.DataModel.TableGuide row = Dict.DictDataManager.Instance.tableGuideDao.GetById(current);
-            return row != null && row.order >= 0 && row.order <= 12;
+            return row != null;
         }
 
         void CreateButton()
@@ -58,7 +104,7 @@ namespace HYJS.Playability
             foreach (UILabel label in labels)
                 if (label.bitmapFont != null || label.trueTypeFont != null) { theme = label; break; }
             if (theme == null) return;
-            button = new GameObject("InitialTutorialSkip");
+            button = new GameObject("TutorialSkip");
             button.layer = mask.gameObject.layer;
             button.transform.parent = mask.transform;
             button.transform.localScale = Vector3.one;
@@ -95,7 +141,7 @@ namespace HYJS.Playability
             try
             {
                 ResumeEmptyPopularityReward();
-                bool visible = InitialRunning();
+                bool visible = GuideRunning();
                 if (button == null && visible) CreateButton();
                 if (button == null) return;
                 button.SetActive(visible);
@@ -190,7 +236,7 @@ namespace HYJS.Playability
 
         void Click()
         {
-            if (busy || !InitialRunning()) return;
+            if (busy || !GuideRunning()) return;
             StartCoroutine(Skip());
         }
 
@@ -204,6 +250,7 @@ namespace HYJS.Playability
         IEnumerator Skip()
         {
             UIPlayerData player = StaticData.playerData;
+            string guideId = Get("curGuideId") as string;
             byte[] session = (byte[])StaticData.sessionKey.Clone();
             busy = true; if (caption != null) caption.text = "确认中…";
             string origin = null;
@@ -214,7 +261,7 @@ namespace HYJS.Playability
                 busy = false; if (caption != null) caption.text = "跳过 >>";
                 BoxManager.CreatePopupTextBox("教学跳过尚未保存，请重试", 0f); yield break;
             }
-            string body = "{\"playerId\":" + player.playerId + ",\"sessionHex\":\"" + Hex(session) + "\"}";
+            string body = "{\"playerId\":" + player.playerId + ",\"sessionHex\":\"" + Hex(session) + "\",\"guideId\":" + JsonMapper.ToJson(guideId) + "}";
             var headers = new Dictionary<string, string>(); headers.Add("Content-Type", "application/json");
             WWW request = new WWW(origin + "/game-guide/skip", Encoding.UTF8.GetBytes(body), headers);
             float deadline = Time.realtimeSinceStartup + 15f;
@@ -226,7 +273,7 @@ namespace HYJS.Playability
                 {
                     JsonData result = JsonMapper.ToObject(request.text);
                     confirmed = (int)result["code"] == 0 && (bool)result["data"]["skipped"] &&
-                        (int)result["data"]["noviceGuideSchedule"] >= 12;
+                        (string)result["data"]["guideId"] == guideId;
                 }
             }
             catch (Exception) { }
@@ -237,14 +284,14 @@ namespace HYJS.Playability
             {
                 BoxManager.CreatePopupTextBox("教学跳过尚未确认，请重试", 0f); yield break;
             }
-            StopInitialGuide(player);
+            NoviceSkipUI.Confirm(guideId);
+            StopGuide(player, guideId);
         }
 
-        void StopInitialGuide(UIPlayerData player)
+        void StopGuide(UIPlayerData player, string guideId)
         {
-            // Only stop initial teaching. A normal action may have completed it
-            // while the network request was pending; leave any later guide alone.
-            if (!InitialRunning()) return;
+            // A delayed confirmation must not stop a different guide started in the meantime.
+            if (!GuideRunning() || (Get("curGuideId") as string) != guideId) return;
             guide.StopAllCoroutines();
             List<EventDelegate> delegates = Get("lastEventDelegates") as List<EventDelegate>;
             string originalMethod = Get("lastDelegateMethodName") as string;
@@ -256,11 +303,20 @@ namespace HYJS.Playability
                     if (delegates[i].target == guide) delegates.RemoveAt(i);
             }
             Set("lastEventDelegates", null); Set("lastDelegateMethodName", null);
+            Component mask = Get("guideMask") as Component;
+            if (mask != null)
+            {
+                FieldInfo click = mask.GetType().GetField("onClickCallback", Fields);
+                if (click != null) click.SetValue(mask, null);
+            }
+            if ((bool)Get("lastEasyTouchState")) EasyTouchTool.Instance.ShowJoystick();
             guide.Clear();
             // Retain a real original guide row for subsequent level-based guides.
-            player.currentGuideId = "guide_equip_strengthen";
-            Set("curGuideId", "guide_equip_strengthen"); Set("isCopyBattleGuide", false);
-            BoxManager.CreatePopupTextBox("已跳过新手教学，等级功能指引仍会正常出现", 0f);
+            Dict.DataModel.TableGuide row = Dict.DictDataManager.Instance.tableGuideDao.GetById(guideId);
+            string completed = row != null && row.order >= 0 && row.order <= 12 ? "guide_equip_strengthen" : guideId;
+            player.currentGuideId = completed;
+            Set("curGuideId", completed); Set("isCopyBattleGuide", false);
+            BoxManager.CreatePopupTextBox("已跳过当前引导", 0f);
         }
     }
 }

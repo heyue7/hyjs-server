@@ -1,0 +1,25 @@
+using System;
+using System.Linq;
+using dnlib.DotNet;
+using dnlib.DotNet.Emit;
+using dnlib.DotNet.Writer;
+
+using var module = ModuleDefMD.Load(args[0]);
+MethodDef M(string type, string name) => module.GetTypes().Single(t => t.FullName == type).Methods.Single(m => m.Name == name);
+var assembly = module.GetAssemblyRefs().Single(a => a.Name == "LocalPlayability");
+var helper = new TypeRefUser(module, "HYJS.Playability", "NoviceSkipUI", assembly);
+var should = new MemberRefUser(module, "ShouldStart", MethodSig.CreateStatic(module.CorLibTypes.Boolean, module.CorLibTypes.String), helper);
+var observe = new MemberRefUser(module, "ObserveKV", MethodSig.CreateStatic(module.CorLibTypes.Void, module.CorLibTypes.Object, module.CorLibTypes.Boolean), helper);
+var guard = M("GuideManager", "CheckGuideCanStart");
+var first = guard.Body.Instructions[0];
+var prefix = new[] { Instruction.Create(OpCodes.Ldarg_1), Instruction.Create(OpCodes.Call, should), Instruction.Create(OpCodes.Brtrue, first), Instruction.Create(OpCodes.Ldc_I4_0), Instruction.Create(OpCodes.Ret) };
+for (int i = 0; i < prefix.Length; i++) guard.Body.Instructions.Insert(i, prefix[i]);
+guard.Body.KeepOldMaxStack = true;
+var login = M("Login.LoginPlayerLogin", "KVInfoCallBack");
+var capture = new[] { Instruction.Create(OpCodes.Ldarg_1), Instruction.Create(OpCodes.Ldarg_2), Instruction.Create(OpCodes.Call, observe) };
+for (int i = 0; i < capture.Length; i++) login.Body.Instructions.Insert(i, capture[i]);
+login.Body.KeepOldMaxStack = true;
+var options = new ModuleWriterOptions(module);
+options.MetadataOptions.Flags |= MetadataFlags.PreserveAll | MetadataFlags.KeepOldMaxStack;
+module.Write(args[1], options);
+Console.WriteLine("Per-character confirmed guide skip restored from login KV; original predicates retained");
