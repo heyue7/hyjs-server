@@ -82,7 +82,7 @@ func adminActivityDefinitionWrite(c *gin.Context, update bool) {
 	if update {
 		id = c.Param("id")
 	}
-	if !adminRecruitSettingsValid(req.RecruitSettings) {
+	if !model.TurntablePrizePityValid(req.Form.Options.PrizePityRules, req.Form.Options.JackpotPerMillion) || !adminRecruitSettingsValid(req.RecruitSettings) {
 		adminError(c, constUtil.ErrAdminInput)
 		return
 	}

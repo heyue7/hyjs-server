@@ -411,6 +411,12 @@ func TestP4OriginalRecruitGiftAndRealPowerCutoff(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	key := "warriorRescruitTimes_p4_" + time.Now().In(time.FixedZone("UTC+8", 8*3600)).Format("200601")
+	// 本测试显式开启这一有限月实例，使真实招募事实进入活动进度。
+	publication := db.GetIns().Model(&db.PeriodInstance{}).Where("id=?", key).Update("enabled", true)
+	if publication.Error != nil || publication.RowsAffected != 1 {
+		t.Fatal("finite recruit gift publication", publication.Error, publication.RowsAffected)
+	}
 	request := &pb.CSWarriorRecruit{CostType: proto.Int32(2), NumType: proto.Int32(2)}
 	ctx := context.WithValue(f.ctx, constUtil.GameServiceContextKey, f.s)
 	ctx = context.WithValue(ctx, constUtil.GameRequestContextKey, request)
@@ -420,7 +426,6 @@ func TestP4OriginalRecruitGiftAndRealPowerCutoff(t *testing.T) {
 	if _, err := f.s.warriorRecruit(ctx, f.id, request, 100); err != nil {
 		t.Fatal(err)
 	}
-	key := "warriorRescruitTimes_p4_" + time.Now().In(time.FixedZone("UTC+8", 8*3600)).Format("200601")
 	rows, err := f.s.P1Activity(f.ctx, f.id, &pb.CSActivityInfo{ActivityId: proto.String(key)})
 	if err != nil {
 		t.Fatal(err)
@@ -471,7 +476,7 @@ func TestP4OriginalRecruitGiftAndRealPowerCutoff(t *testing.T) {
 	if err = f.s.SettleP1Periods(f.ctx); err != nil {
 		t.Fatal(err)
 	}
-	if p1Count(t, &db.RewardDelivery{}, "player_id=? AND source_key=?", f.id, "rank:"+cfg.ID) != 1 || p1Count(t, &db.MailMessage{}, "player_id=? AND source_key=?", f.id, "rank:"+cfg.ID) != 1 {
+	if p1Count(t, &db.RewardDelivery{}, "player_id=? AND source_key=?", f.id, "rank:"+cfg.ID) != 1 || p1Count(t, &db.MailMessage{}, "player_id=? AND source_key=?", f.id, "rank:"+cfg.ID) != 0 {
 		t.Fatal("actual CP cutoff delivery missing")
 	}
 }

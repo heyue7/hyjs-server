@@ -8,7 +8,11 @@ export function deleteActivityInstance(id: string, version: string) {
   return api<{ ok: boolean; archived: boolean }>(`/activity-instances/${encodeURIComponent(id)}`, json('DELETE', { version }));
 }
 
+export interface TurntablePityRule {
+  prizeId: number; enabled: boolean; hardPity: number; softStart: number; basePPM: number; softMaxPPM: number;
+}
 export interface ActivityGameplayOptions extends Record<string, any> {
+  prizePityRules?: TurntablePityRule[];
   dailySpend?: number;
   rankPlaces?: number;
   rankRewards?: Reward[];

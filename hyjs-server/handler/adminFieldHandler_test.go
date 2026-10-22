@@ -95,11 +95,99 @@ func TestAdminFieldHTTP(t *testing.T) {
 			t.Fatal("original reference rejected", scheme.Configuration.Scene, w.Code, w.Body.String())
 		}
 	}
-	invalid := model.AdminFieldSaveRequest{Name: "非法点位", Configuration: catalog.Data.Items[0].Configuration}
+	copyConfiguration := func() model.AdminFieldConfiguration {
+		raw, err := json.Marshal(catalog.Data.Items[0].Configuration)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var cfg model.AdminFieldConfiguration
+		if err := json.Unmarshal(raw, &cfg); err != nil {
+			t.Fatal(err)
+		}
+		return cfg
+	}
+	invalid := model.AdminFieldSaveRequest{Name: "非法点位", Configuration: copyConfiguration()}
 	invalid.Configuration.MinePoints[0].ID = "invented-point"
 	raw, _ := json.Marshal(invalid)
 	if w := call("POST", "/fields/templates", string(raw), session.Data.CSRF, cookies); w.Code != 400 {
 		t.Fatal("nonexistent client point accepted", w.Code)
+	}
+	badMember := model.AdminFieldSaveRequest{Name: "非法成员", Configuration: copyConfiguration()}
+	badMember.Configuration.MonsterGroups[0].Members[0].Hp = -1
+	raw, _ = json.Marshal(badMember)
+	if w := call("POST", "/fields/templates", string(raw), session.Data.CSRF, cookies); w.Code != 400 {
+		t.Fatal("negative monster HP accepted", w.Code)
+	}
+	badMember = model.AdminFieldSaveRequest{Name: "非法成员身份", Configuration: copyConfiguration()}
+	badMember.Configuration.MonsterGroups[0].Members[0].HeroID = "invented-hero"
+	raw, _ = json.Marshal(badMember)
+	if w := call("POST", "/fields/templates", string(raw), session.Data.CSRF, cookies); w.Code != 400 {
+		t.Fatal("replaced monster identity accepted", w.Code)
+	}
+	badBoss := model.AdminFieldSaveRequest{Name: "非法普通首领", Configuration: copyConfiguration()}
+	badBoss.Configuration.OrdinaryBossGroups[0].RebornHours = 0
+	raw, _ = json.Marshal(badBoss)
+	if w := call("POST", "/fields/templates", string(raw), session.Data.CSRF, cookies); w.Code != 400 {
+		t.Fatal("invalid ordinary boss cooldown accepted", w.Code)
+	}
+	badWorld := model.AdminFieldSaveRequest{Name: "非法世界首领", Configuration: copyConfiguration()}
+	level := int64(51)
+	badWorld.Configuration.WorldBossLevel = &level
+	raw, _ = json.Marshal(badWorld)
+	if w := call("POST", "/fields/templates", string(raw), session.Data.CSRF, cookies); w.Code != 400 {
+		t.Fatal("invalid world boss level accepted", w.Code)
+	}
+	for _, check := range []struct {
+		name   string
+		mutate func(*model.AdminFieldConfiguration)
+	}{
+		{"空小怪成员", func(c *model.AdminFieldConfiguration) { c.MonsterGroups[0].Members = []model.AdminFieldCombatMember{} }},
+		{"缺少小怪成员", func(c *model.AdminFieldConfiguration) { c.MonsterGroups[0].Members = c.MonsterGroups[0].Members[:1] }},
+		{"重复小怪成员", func(c *model.AdminFieldConfiguration) { c.MonsterGroups[0].Members[1] = c.MonsterGroups[0].Members[0] }},
+		{"小怪攻击越界", func(c *model.AdminFieldConfiguration) { c.MonsterGroups[0].Members[0].Attack = 1e12 + 1 }},
+		{"普通首领组清空", func(c *model.AdminFieldConfiguration) { c.OrdinaryBossGroups = []model.AdminFieldBossGroup{} }},
+		{"普通首领成员清空", func(c *model.AdminFieldConfiguration) {
+			c.OrdinaryBossGroups[0].Members = []model.AdminFieldCombatMember{}
+		}},
+		{"普通首领刷新越界", func(c *model.AdminFieldConfiguration) { c.OrdinaryBossGroups[0].RebornHours = 169 }},
+		{"世界首领成员清空", func(c *model.AdminFieldConfiguration) { c.WorldBossMembers = []model.AdminFieldCombatMember{} }},
+		{"世界首领阵位改变", func(c *model.AdminFieldConfiguration) { c.WorldBossMembers[0].Location++ }},
+		{"世界首领概率越界", func(c *model.AdminFieldConfiguration) { c.WorldBossMembers[0].Hit = 10001 }},
+	} {
+		t.Run(check.name, func(t *testing.T) {
+			req := model.AdminFieldSaveRequest{Name: check.name, Configuration: copyConfiguration()}
+			check.mutate(&req.Configuration)
+			raw, _ := json.Marshal(req)
+			// omitempty fields are explicitly present to exercise removal rather than legacy omission.
+			var body map[string]any
+			json.Unmarshal(raw, &body)
+			cfg := body["configuration"].(map[string]any)
+			if req.Configuration.MonsterGroups[0].Members != nil {
+				cfg["monsterGroups"].([]any)[0].(map[string]any)["members"] = req.Configuration.MonsterGroups[0].Members
+			}
+			if req.Configuration.OrdinaryBossGroups != nil {
+				cfg["ordinaryBossGroups"] = req.Configuration.OrdinaryBossGroups
+			}
+			if req.Configuration.WorldBossMembers != nil {
+				cfg["worldBossMembers"] = req.Configuration.WorldBossMembers
+			}
+			if req.Configuration.OrdinaryBossGroups != nil && len(req.Configuration.OrdinaryBossGroups) > 0 {
+				cfg["ordinaryBossGroups"] = []any{}
+				for _, g := range req.Configuration.OrdinaryBossGroups {
+					r, _ := json.Marshal(g)
+					var group map[string]any
+					json.Unmarshal(r, &group)
+					if g.Members != nil {
+						group["members"] = g.Members
+					}
+					cfg["ordinaryBossGroups"] = append(cfg["ordinaryBossGroups"].([]any), group)
+				}
+			}
+			raw, _ = json.Marshal(body)
+			if w := call("POST", "/fields/templates", string(raw), session.Data.CSRF, cookies); w.Code != 400 {
+				t.Fatal("invalid combat configuration accepted", w.Code, w.Body.String())
+			}
+		})
 	}
 	if w := call("GET", "/fields/deployments", "", "", cookies); w.Code != 400 {
 		t.Fatal("missing realm fell back to all realms", w.Code)

@@ -62,7 +62,7 @@ func AdminTypedActivityCreateHandler(c *gin.Context) {
 		adminError(c, constUtil.ErrAdminInput)
 		return
 	}
-	if !adminRecruitSettingsValid(req.RecruitSettings) {
+	if !model.TurntablePrizePityValid(req.Options.PrizePityRules, req.Options.JackpotPerMillion) || !adminRecruitSettingsValid(req.RecruitSettings) {
 		adminError(c, constUtil.ErrAdminInput)
 		return
 	}
@@ -89,7 +89,7 @@ func AdminTypedActivitySaveHandler(c *gin.Context) {
 		adminError(c, constUtil.ErrAdminInput)
 		return
 	}
-	if !adminRecruitSettingsValid(req.RecruitSettings) {
+	if !model.TurntablePrizePityValid(req.Options.PrizePityRules, req.Options.JackpotPerMillion) || !adminRecruitSettingsValid(req.RecruitSettings) {
 		adminError(c, constUtil.ErrAdminInput)
 		return
 	}

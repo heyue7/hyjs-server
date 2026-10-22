@@ -63,7 +63,7 @@ func (s *GameService) buildAdminFieldRuntimeTables(deployments []db.AdminFieldDe
 	for k, v := range s.Tables {
 		tables[k] = v
 	}
-	for _, name := range []string{"Field", "FieldResource", "FieldResourcePos", "FieldMonster", "FieldMonsterPos", "WorldBossReward"} {
+	for _, name := range []string{"Field", "FieldResource", "FieldResourcePos", "FieldMonster", "FieldMonsterPos", "FieldBoss", "FieldBossPos", "WorldBossReward"} {
 		rows := []map[string]string{}
 		for _, r := range s.Tables[name] {
 			copy := map[string]string{}
@@ -82,6 +82,37 @@ func (s *GameService) buildAdminFieldRuntimeTables(deployments []db.AdminFieldDe
 		}
 		return nil
 	}
+	// 共享原编队在地图之间复制内部场景行，未发布地图继续使用原表；先按全部地图点位统计引用。
+	monsterUsage, bossUsage := map[string]int{}, map[string]int{}
+	for _, field := range s.Tables["Field"] {
+		monsterSeen, bossSeen := map[string]bool{}, map[string]bool{}
+		for _, posID := range strings.Split(field["monsterPosIds"], ";") {
+			if posID == "" {
+				continue
+			}
+			if pos := lookup("FieldMonsterPos", "monsterPosId", posID); pos != nil {
+				for _, choice := range adminFieldWeights(pos["monsterIdProbs"]) {
+					if !monsterSeen[choice.ID] {
+						monsterUsage[choice.ID]++
+						monsterSeen[choice.ID] = true
+					}
+				}
+			}
+		}
+		for _, posID := range strings.Split(field["bossPosIds"], ";") {
+			if posID == "" {
+				continue
+			}
+			if pos := lookup("FieldBossPos", "BoxxPosId", posID); pos != nil {
+				for _, choice := range adminFieldWeights(pos["bossIdProbs"]) {
+					if !bossSeen[choice.ID] {
+						bossUsage[choice.ID]++
+						bossSeen[choice.ID] = true
+					}
+				}
+			}
+		}
+	}
 	for _, deployment := range deployments {
 		var cfg model.AdminFieldConfiguration
 		if json.Unmarshal([]byte(deployment.Configuration), &cfg) != nil || cfg.Scene != deployment.Scene {
@@ -99,6 +130,11 @@ func (s *GameService) buildAdminFieldRuntimeTables(deployments []db.AdminFieldDe
 			field["allSafe"] = "1"
 		}
 		field["adminBossEnabled"] = strconv.FormatBool(cfg.BossEnabled)
+		ordinaryEnabled := true
+		if cfg.OrdinaryBossEnabled != nil {
+			ordinaryEnabled = *cfg.OrdinaryBossEnabled
+		}
+		field["adminOrdinaryBossEnabled"] = strconv.FormatBool(ordinaryEnabled)
 		field["adminRevision"] = adminVersion(deployment)
 		field["levelLimit"] = fmt.Sprint(cfg.MinLevel)
 		field["MineMax"], field["FishGroupMax"] = fmt.Sprint(cfg.MineCount), fmt.Sprint(cfg.FishCount)
@@ -116,6 +152,9 @@ func (s *GameService) buildAdminFieldRuntimeTables(deployments []db.AdminFieldDe
 						for i := range choices {
 							choices[i].ID = choices[i].ID + "__" + cfg.Scene
 						}
+					}
+					if spec.table == "FieldMonsterPos" {
+						row["adminScene"] = cfg.Scene
 					}
 					row[spec.weights] = adminFieldWeightText(choices)
 				}
@@ -135,15 +174,89 @@ func (s *GameService) buildAdminFieldRuntimeTables(deployments []db.AdminFieldDe
 			}
 		}
 		for _, g := range cfg.MonsterGroups {
-			for _, row := range tables["FieldMonster"] {
-				if row["MonId"] == g.ID {
-					row["RebornTime"], row["rewardGroupId"] = fmt.Sprint(g.CooldownMS), adminFieldDropText(g.Drops)
+			if monsterUsage[g.ID] > 1 {
+				for _, original := range s.Tables["FieldMonster"] {
+					if original["MonId"] != g.ID {
+						continue
+					}
+					row := map[string]string{}
+					for k, v := range original {
+						row[k] = v
+					}
+					row["adminScene"] = cfg.Scene
+					tables["FieldMonster"] = append(tables["FieldMonster"], row)
 				}
 			}
+			for _, row := range tables["FieldMonster"] {
+				if row["MonId"] != g.ID || monsterUsage[g.ID] > 1 && row["adminScene"] != cfg.Scene {
+					continue
+				}
+				row["RebornTime"], row["rewardGroupId"] = fmt.Sprint(g.CooldownMS), adminFieldDropText(g.Drops)
+				if err := adminFieldApplyGroupMembers(row, g.Members, "MonsterId"); err != nil {
+					return nil, err
+				}
+			}
+		}
+		for _, posID := range strings.Split(field["bossPosIds"], ";") {
+			if pos := lookup("FieldBossPos", "BoxxPosId", posID); pos != nil {
+				pos["adminScene"] = cfg.Scene
+			}
+		}
+		for _, g := range cfg.OrdinaryBossGroups {
+			if bossUsage[g.ID] > 1 {
+				for _, original := range s.Tables["FieldBoss"] {
+					if original["BossId"] != g.ID || int64(tableNumber(original, "GroupIndex")) != g.GroupIndex {
+						continue
+					}
+					row := map[string]string{}
+					for k, v := range original {
+						row[k] = v
+					}
+					row["adminScene"] = cfg.Scene
+					tables["FieldBoss"] = append(tables["FieldBoss"], row)
+				}
+			}
+			for _, row := range tables["FieldBoss"] {
+				if row["BossId"] != g.ID || int64(tableNumber(row, "GroupIndex")) != g.GroupIndex || bossUsage[g.ID] > 1 && row["adminScene"] != cfg.Scene {
+					continue
+				}
+				if row["TeamLeader"] == "1" {
+					row["RebornTime"] = fmt.Sprint(g.RebornHours)
+					row["rewardGroupId"], row["KillReward"] = adminFieldDropText(g.Drops), adminFieldDropText(g.KillDrops)
+				}
+				if err := adminFieldApplyGroupMembers(row, g.Members, "Id"); err != nil {
+					return nil, err
+				}
+			}
+		}
+		// 世界首领配置随出生地图方案保存；当前策略未选该地图时保留原值。
+		worldMembers, _ := json.Marshal(cfg.WorldBossMembers)
+		field["adminWorldBossMembers"] = string(worldMembers)
+		field["adminWorldBossLevel"] = ""
+		if cfg.WorldBossLevel != nil {
+			field["adminWorldBossLevel"] = fmt.Sprint(*cfg.WorldBossLevel)
 		}
 		// Boss definitions are supplied separately per original scene to new cycles.
 		raw, _ := json.Marshal(cfg.BossRewards)
 		field["adminBossRewards"] = string(raw)
 	}
 	return tables, nil
+}
+
+// adminFieldApplyGroupMembers 在成员集合存在时按原行ID写入数值；缺省成员继承原表。
+func adminFieldApplyGroupMembers(row map[string]string, members []model.AdminFieldCombatMember, idKey string) error {
+	if len(members) == 0 {
+		return nil
+	}
+	for _, member := range members {
+		if member.ID != row[idKey] {
+			continue
+		}
+		if !AdminFieldCombatMemberAllowed(member) {
+			return constUtil.ErrAdminConfiguration
+		}
+		adminFieldApplyCombatMember(row, member)
+		return nil
+	}
+	return constUtil.ErrAdminConfiguration
 }

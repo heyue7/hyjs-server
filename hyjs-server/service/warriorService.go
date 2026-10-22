@@ -397,8 +397,9 @@ func (s *GameService) warriorStrengthenApply(player *pb.Player, g *model.GameSta
 			active[thing.GetGuid()] = true
 		}
 	}
-	if len(b.GetCost()) < 1 || len(b.GetCost()) > 5 {
-		return errors.New("请添加 1-5 个升级材料角色")
+	// 原多选页可提交超过五个材料；数量上限来自实际拥有的实例，逐项校验归属和重复。
+	if len(b.GetCost()) < 1 || len(b.GetCost()) >= len(owned) {
+		return errors.New("升级材料数量无效")
 	}
 	for _, cost := range b.GetCost() {
 		material := owned[cost.GetGuid()]

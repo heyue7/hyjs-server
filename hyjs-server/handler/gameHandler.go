@@ -1232,7 +1232,8 @@ func ValidateGameRequest(p *model.GamePacket) error {
 			}
 		}
 	case *pb.CSWarriorStrengthen:
-		if b.GetGuid() == "" || len(b.GetCost()) < 1 || len(b.GetCost()) > 5 {
+		// 原选择页会提交整批材料；实际数量与归属由角色存档校验，传输沿用MaxPacket边界。
+		if b.GetGuid() == "" || len(b.GetCost()) < 1 {
 			return errors.New("Invalid strengthen request")
 		}
 		for _, resource := range b.GetCost() {

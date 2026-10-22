@@ -25,12 +25,42 @@ export interface GatherGroup {
   fatigue: number;
   drops: FieldDrop[];
 }
+/** 原表完整战斗成员。身份、阵位和组号只读，数值随发布快照用于新战斗。 */
+export interface CombatMember {
+  id: string;
+  heroId: string;
+  location: number;
+  groupIndex: number;
+  level: number;
+  hp: number;
+  attack: number;
+  phyDefend: number;
+  magicDefend: number;
+  hit: number;
+  dodge: number;
+  cri: number;
+  antiCri: number;
+  criFactor: number;
+  damageAdd: number;
+  damageReduce: number;
+}
 export interface MonsterGroup {
   id: string;
   heroId: string;
   level: number;
   cooldownMs: number;
+  members?: CombatMember[];
   drops: FieldDrop[];
+}
+/** 本地图普通首领组；刷新单位为小时，两类奖励沿用原消费者。 */
+export interface BossGroup {
+  id: string;
+  groupIndex: number;
+  heroId: string;
+  rebornHours: number;
+  members?: CombatMember[];
+  drops: FieldDrop[];
+  killDrops: FieldDrop[];
 }
 export interface BossReward {
   type: number;
@@ -51,8 +81,16 @@ export interface FieldConfiguration {
   monsterPoints: FieldPoint[];
   gatherGroups: GatherGroup[];
   monsterGroups: MonsterGroup[];
+  /** 缺省时普通首领沿用原启用状态。 */
+  ordinaryBossEnabled?: boolean;
+  ordinaryBossGroups?: BossGroup[];
+  /** 世界首领开关，保留既有接口字段。 */
   bossEnabled: boolean;
   bossRewards: BossReward[];
+  /** 世界首领基础成员数值，缺省时继承原表。 */
+  worldBossMembers?: CombatMember[];
+  /** 新建周期等级；已生成周期使用已冻结的等级和系数。 */
+  worldBossLevel?: number;
 }
 export interface FieldTemplate {
   id: string;
@@ -61,6 +99,15 @@ export interface FieldTemplate {
   unavailableReason: string;
   version: string;
   configuration: FieldConfiguration;
+}
+/** 现有全服策略的只读出生配置，读取不会生成周期。 */
+export interface FieldWorldBossStatus {
+  enabled: boolean;
+  level: number;
+  positionId: number;
+  scene: string;
+  sceneName: string;
+  bossId: string;
 }
 export interface FieldDeployment {
   scene: string;

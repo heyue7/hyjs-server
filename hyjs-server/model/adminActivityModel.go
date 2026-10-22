@@ -59,13 +59,15 @@ type AdminCoinPrize struct {
 
 // AdminActivityOptions 只包含当前模式原消费者可读的运营参数。
 type AdminActivityOptions struct {
-	KingWorld      int64                 `json:"kingWorld,omitempty"`      // KingWorld selects SAO=1, ALO=2, GGO=3; 0 preserves legacy rotation.
-	DailySpend     int64                 `json:"dailySpend,omitempty"`     // DailySpend 是连续消费每个实际消费日的钻石门槛。
-	KingPoolSource string                `json:"kingPoolSource,omitempty"` // KingPoolSource is a server-generated costType3 fixed-price and rotation snapshot; not an editable reward field.
-	RankPlaces     int64                 `json:"rankPlaces,omitempty"`     // RankPlaces is the power-race award range, 0 disables ranking, 1..1000 enables equal awards within that range.
-	RankRewards    []AdminResourceAmount `json:"rankRewards,omitempty"`    // RankRewards is the actual same-tier power-race deadline award, separate from the goal reward.
-	ShopKey        string                `json:"shopKey,omitempty"`        // ShopKey references an actual ordinary shop, not an activity sale.
-	ShopSource     string                `json:"shopSource,omitempty"`     // ShopSource is the server-generated immutable native catalogue snapshot.
+	// PrizePityRules 按奖位独立配置递增概率与最迟抽数，9为钻石大奖。
+	PrizePityRules []TurntablePrizePityRule `json:"prizePityRules,omitempty"`
+	KingWorld      int64                    `json:"kingWorld,omitempty"`      // KingWorld selects SAO=1, ALO=2, GGO=3; 0 preserves legacy rotation.
+	DailySpend     int64                    `json:"dailySpend,omitempty"`     // DailySpend 是连续消费每个实际消费日的钻石门槛。
+	KingPoolSource string                   `json:"kingPoolSource,omitempty"` // KingPoolSource is a server-generated costType3 fixed-price and rotation snapshot; not an editable reward field.
+	RankPlaces     int64                    `json:"rankPlaces,omitempty"`     // RankPlaces is the power-race award range, 0 disables ranking, 1..1000 enables equal awards within that range.
+	RankRewards    []AdminResourceAmount    `json:"rankRewards,omitempty"`    // RankRewards is the actual same-tier power-race deadline award, separate from the goal reward.
+	ShopKey        string                   `json:"shopKey,omitempty"`        // ShopKey references an actual ordinary shop, not an activity sale.
+	ShopSource     string                   `json:"shopSource,omitempty"`     // ShopSource is the server-generated immutable native catalogue snapshot.
 	// RebateBps 是返利比例基点，1至10000。
 	RebateBps int64 `json:"rebateBps,omitempty"`
 	// RebateCap 是每日钻石返利上限。
@@ -235,4 +237,59 @@ type AdminActivityMode struct {
 	DefaultForm AdminActivityForm `json:"defaultForm"`
 	// FixedValues 是当前原客户端固定数值，仅展示。
 	FixedValues map[string]int64 `json:"fixedValues,omitempty"`
+}
+
+// TurntablePrizePityRule 保存一个奖位的百万分概率曲线。
+type TurntablePrizePityRule struct {
+	PrizeID    int32 `json:"prizeId"`    // PrizeID 为普通奖位0至8，9为钻石池最终大奖。
+	Enabled    bool  `json:"enabled"`    // Enabled 为false保留原权重或固定概率，true开启本奖位递增保底。
+	HardPity   int32 `json:"hardPity"`   // HardPity 是库存可用期间最迟命中抽数，范围3至10000。
+	SoftStart  int32 `json:"softStart"`  // SoftStart 是开始二次提升的抽数，至少早于保底2抽。
+	BasePPM    int32 `json:"basePPM"`    // BasePPM 是前段概率的百万分整数。
+	SoftMaxPPM int32 `json:"softMaxPPM"` // SoftMaxPPM 是保底前一抽概率的百万分整数。
+}
+
+// TurntablePrizePityValid 校验HTTP和持久化规则的独立及组合边界。
+func TurntablePrizePityValid(rules []TurntablePrizePityRule, jackpot int64) bool {
+	if len(rules) > 10 || jackpot < 0 || jackpot > 1000000 {
+		return false
+	}
+	seen := map[int32]bool{}
+	enabled := 0
+	ordinary := 0
+	sum := int64(0)
+	diamond := false
+	for _, r := range rules {
+		if r.PrizeID < 0 || r.PrizeID > 9 || seen[r.PrizeID] {
+			return false
+		}
+		seen[r.PrizeID] = true
+		if !r.Enabled && r.HardPity == 0 && r.SoftStart == 0 && r.BasePPM == 0 && r.SoftMaxPPM == 0 {
+			continue
+		}
+		if r.HardPity < 3 || r.HardPity > 10000 || r.SoftStart < 1 || r.SoftStart > r.HardPity-2 || r.BasePPM <= 0 || r.BasePPM > r.SoftMaxPPM || r.SoftMaxPPM >= 1000000 {
+			return false
+		}
+		if r.Enabled {
+			enabled++
+			sum += int64(r.SoftMaxPPM)
+			if r.PrizeID == 9 {
+				diamond = true
+			} else {
+				ordinary++
+			}
+		}
+	}
+	if !diamond {
+		sum += jackpot
+	}
+	if ordinary >= 9 || sum > 1000000 {
+		return false
+	}
+	for _, r := range rules {
+		if r.Enabled && r.HardPity < int32(enabled) {
+			return false
+		}
+	}
+	return true
 }

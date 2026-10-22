@@ -7,6 +7,7 @@ import type { ShopSnapshot } from '@/service/management-operations';
 import { activityFixedLabels } from '@/service/activity-operations';
 import type { ActivityGameplayOptions } from '@/service/activity-operations';
 import type { ResourceAmount } from '@/service/operations';
+import TurntableProbability from './turntable-probability.vue';
 import RewardList from './reward-list.vue';
 const options = defineModel<ActivityGameplayOptions>({ required: true });
 const props = defineProps<{ mode: string; disabled?: boolean; fixedValues?: Record<string, string | number> }>();
@@ -227,6 +228,8 @@ const turntableNumbers = [
       </div>
     </template>
     <template v-else-if="mode === 'turntable'">
+      <div class="ops-muted mb-16px">各开启奖位的最高概率，加上未开启递增的钻石大奖固定概率，合计须不超过100%。最迟抽数须不少于开启奖位数。钻石池为空暂停计数，返池后待保底奖位依次兑现。</div>
+      <TurntableProbability v-model="options" :prize-id="9" :disabled="disabled" />
       <NGrid :cols="2" :x-gap="16">
         <NGi v-for="field in turntableNumbers" :key="field.key">
           <NFormItem :label="field.label">
@@ -240,7 +243,7 @@ const turntableNumbers = [
           </NFormItem>
         </NGi>
         <NGi>
-          <NFormItem label="超级大奖概率">
+          <NFormItem label="钻石池最终大奖固定概率（未开递增时）">
             <NInputNumber
               :value="(options.jackpotPerMillion || 0) / 10000"
               :min="0"

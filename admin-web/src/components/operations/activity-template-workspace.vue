@@ -501,7 +501,7 @@ onUnmounted(() => {
                 v-model="form.prizes"
                 :disabled="busy || readOnly"
               />
-              <ActivityPrizes
+              <ActivityPrizes v-model:options="form.options"
                 v-else-if="selectedMode?.supportsPrizes"
                 v-model="form.prizes"
                 :disabled="busy || readOnly"

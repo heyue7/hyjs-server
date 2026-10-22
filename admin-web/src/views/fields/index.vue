@@ -2,9 +2,10 @@
 import { computed, onBeforeUnmount, onMounted, ref, toRaw, watch } from 'vue';
 import { onBeforeRouteLeave, useRoute } from 'vue-router';
 import { ApiError, api, errorMessage, json } from '@/service/operations';
-import type { FieldChannel, FieldDeployment, FieldDeployments, FieldPresentation, FieldResource, FieldTemplate } from '@/service/fields';
+import type { CombatMember, FieldChannel, FieldDeployment, FieldDeployments, FieldPresentation, FieldResource, FieldTemplate, FieldWorldBossStatus } from '@/service/fields';
 import { useServerScopeStore } from '@/store/modules/server-scope';
 import { useOperations } from '@/composables/useOperations';
+import CombatEditor from './combat-editor.vue';
 import DropEditor from './drop-editor.vue';
 import FieldMap from './field-map.vue';
 import PointEditor from './point-editor.vue';
@@ -19,6 +20,7 @@ function parseMode(value: unknown): FieldMode {
 }
 const mode = ref<FieldMode>(parseMode(route.query.mode));
 const templates = ref<FieldTemplate[]>([]);
+const worldBoss = ref<FieldWorldBossStatus>();
 const resources = ref<FieldResource[]>([]);
 const presentation = ref<Record<string, FieldPresentation>>({});
 const channels = ref<FieldChannel[]>([]);
@@ -42,7 +44,7 @@ const success = ref('');
 const conflict = ref(false);
 const search = ref('');
 const activeTab = ref('overview');
-const bossLevel = ref(1);
+const rewardLevel = ref(1);
 const dirty = computed(() => Boolean(selected.value) && JSON.stringify(selected.value) !== original.value);
 const filtered = computed(() =>
   templates.value.filter(t => `${t.name} ${t.configuration.scene}`.includes(search.value))
@@ -54,15 +56,35 @@ const gatherOptions = (kind: string) =>
     .filter(g => g.id.includes(`group_${kind}_`))
     .map(g => ({ label: label(g.id, `${g.level} 级${kind === 'mine' ? '矿脉' : '鱼群'}`), value: g.id, iconUrl: icon(g.id) }));
 const monsterOptions = computed(() =>
-  (cfg.value?.monsterGroups || []).map(g => ({ label: `${label(g.id, '野外怪物')} · 等级 ${g.level}`, value: g.id, iconUrl: icon(g.id) }))
+  (cfg.value?.monsterGroups || []).map(g => ({ label: `${label(g.id, '野外怪物')} · 等级 ${memberLevel(g)}`, value: g.id, iconUrl: icon(g.id) }))
 );
-const selectedBossRewards = computed(() => cfg.value?.bossRewards.filter(r => r.level === bossLevel.value) || []);
+const selectedBossRewards = computed(() => cfg.value?.bossRewards.filter(r => r.level === rewardLevel.value) || []);
+const ordinaryBossGroups = computed(() => cfg.value?.ordinaryBossGroups || []);
+const worldBossMembers = computed(() => cfg.value?.worldBossMembers || []);
+const worldSceneMatches = computed(() => Boolean(worldBoss.value?.scene && worldBoss.value.scene === cfg.value?.scene));
+const worldBossLabel = computed(() => label(`world:${worldBoss.value?.bossId || ''}`, '世界首领'));
+const worldBossSceneText = computed(() => {
+  if (!worldBoss.value) return '未读取到全服首领策略';
+  return `${worldBoss.value.sceneName || worldBoss.value.scene || '未知地图'} · 出生编号 ${worldBoss.value.positionId}`;
+});
+type CombatSummary = { level?: number; heroId?: string; members?: CombatMember[] };
+function groupLeader(group: CombatSummary) {
+  const members = group.members || [];
+  return members.find(member => member.heroId === group.heroId) || members[0];
+}
+function memberLevel(group: CombatSummary) {
+  return groupLeader(group)?.level ?? group.level ?? 1;
+}
+function memberHp(group: CombatSummary) {
+  const hp = groupLeader(group)?.hp;
+  return hp ? Math.round(hp).toLocaleString('zh-CN') : '-';
+}
 const bossLabels = ['参与奖励', '伤害第 11 名以后', '伤害第 4～10 名', '伤害第 2～3 名', '伤害第 1 名', '最后一击奖励'];
 function accept(row: FieldTemplate) {
   selected.value = structuredClone(toRaw(row));
   original.value = JSON.stringify(selected.value);
   conflict.value = false;
-  bossLevel.value = 1;
+  rewardLevel.value = 1;
 }
 function confirmAction(content: string): Promise<boolean> {
   return new Promise(resolve => {
@@ -102,8 +124,9 @@ async function choose(row: FieldTemplate) {
   accept(row);
 }
 async function loadTemplates() {
-  const data = await api<{ items: FieldTemplate[]; resources: FieldResource[]; presentation: Record<string, FieldPresentation> }>('/fields/templates');
+  const data = await api<{ items: FieldTemplate[]; resources: FieldResource[]; presentation: Record<string, FieldPresentation>; worldBoss?: FieldWorldBossStatus }>('/fields/templates');
   templates.value = data.items;
+  worldBoss.value = data.worldBoss;
   resources.value = data.resources || [];
   presentation.value = data.presentation || {};
   if (!dirty.value) {
@@ -414,7 +437,8 @@ onMounted(load);
                   <template #header>
                     <div class="flex items-center gap-3">
                       <NImage v-if="icon(group.id)" :src="icon(group.id)" width="40" height="40" object-fit="contain" @click.stop />
-                      <span class="font-medium">{{ label(group.id, '野外怪物') }}</span><span class="text-sm text-gray-500">等级 {{ group.level }}</span>
+                      <span class="font-medium">{{ label(group.id, '野外怪物') }}</span>
+                      <span class="text-sm text-gray-500">等级 {{ memberLevel(group) }} · 生命 {{ memberHp(group) }}</span>
                     </div>
                   </template>
                   <label class="mb-4 block">
@@ -427,23 +451,91 @@ onMounted(load);
                       class="mt-1 w-60"
                     />
                   </label>
+                  <h4 class="mb-2 font-medium">成员数值</h4>
+                  <CombatEditor :members="group.members" :presentation="presentation" :readonly="readonly" />
+                  <h4 class="mb-2 mt-5 font-medium">击杀掉落</h4>
                   <DropEditor v-model:value="group.drops" :disabled="readonly" :resources="monsterResources" />
                 </NCollapseItem>
               </NCollapse>
             </NTabPane>
-            <NTabPane name="boss" tab="首领与掉落">
-              <div class="mb-4 flex items-center gap-3">
+            <NTabPane name="ordinaryBoss" tab="普通首领">
+              <div class="mb-2 flex flex-wrap items-center gap-3">
+                <span>开放普通首领</span>
+                <NSwitch v-model:value="cfg.ordinaryBossEnabled" :disabled="readonly" />
+                <span class="text-sm text-gray-500">{{ cfg.ordinaryBossEnabled ? '按下方刷新间隔出现' : '停止新的刷新与开战，已接受的战斗继续结算' }}</span>
+              </div>
+              <p class="mb-4 text-sm text-gray-500">普通首领使用本地图的出生点和候选组，成员等级与数值随方案保存。</p>
+              <NCollapse>
+                <NCollapseItem
+                  v-for="group in ordinaryBossGroups"
+                  :key="`${group.id}-${group.groupIndex}`"
+                  :name="`${group.id}-${group.groupIndex}`"
+                >
+                  <template #header>
+                    <div class="flex items-center gap-3">
+                      <NImage v-if="icon(group.id)" :src="icon(group.id)" width="40" height="40" object-fit="contain" @click.stop />
+                      <span class="font-medium">{{ label(group.id, '普通首领') }}</span>
+                      <span class="text-sm text-gray-500">等级 {{ memberLevel(group) }} · 生命 {{ memberHp(group) }} · 第 {{ group.groupIndex }} 组</span>
+                    </div>
+                  </template>
+                  <label class="mb-4 block">
+                    刷新间隔（小时）
+                    <NInputNumber v-model:value="group.rebornHours" :min="1" :max="168" :precision="0" :disabled="readonly" class="mt-1 w-44" />
+                  </label>
+                  <h4 class="mb-2 font-medium">成员数值</h4>
+                  <CombatEditor :members="group.members" :presentation="presentation" :readonly="readonly" />
+                  <h4 class="mb-2 mt-5 font-medium">每次胜利奖励</h4>
+                  <DropEditor v-model:value="group.drops" :disabled="readonly" :resources="bossResources" />
+                  <h4 class="mb-2 mt-5 font-medium">击杀奖励</h4>
+                  <DropEditor v-model:value="group.killDrops" :disabled="readonly" :resources="bossResources" />
+                </NCollapseItem>
+              </NCollapse>
+            </NTabPane>
+            <NTabPane name="worldBoss" tab="世界首领">
+              <div v-if="worldBoss" class="world-state">
+                <div class="flex flex-wrap items-center gap-x-4 gap-y-1">
+                  <strong>{{ worldBossLabel }} · {{ worldBoss.enabled ? '全服策略已开启' : '全服策略已关闭' }}</strong>
+                  <span>策略等级 {{ worldBoss.level }}</span>
+                  <span>{{ worldBossSceneText }}</span>
+                  <NTag size="small">全服共享</NTag>
+                </div>
+                <p v-if="!worldSceneMatches" class="mt-1 text-sm text-gray-500">
+                  当前方案地图不是世界首领出生地图；以下设置在本方案成为出生地图后生效。
+                </p>
+              </div>
+              <div v-else class="mb-4 text-sm text-gray-500">未读取到全服首领策略。</div>
+              <div class="mb-2 mt-4 flex flex-wrap items-center gap-3">
                 <span>开放世界首领</span>
                 <NSwitch v-model:value="cfg.bossEnabled" :disabled="readonly" />
-                <span class="text-xs text-gray-500">世界首领出生于雪原，其余地图暂不投放。</span>
-              </div>
-              <div class="mb-4 flex items-center gap-3">
-                <NImage v-if="icon('boss_001')" :src="icon('boss_001')" width="48" height="48" object-fit="contain" />
-                <div><strong>{{ label('boss_001', '世界首领') }}</strong><p class="text-sm text-gray-500">奖励调整从下一轮刷新生效。</p></div>
+                <span class="text-sm text-gray-500">{{ cfg.bossEnabled ? '按原全服时段开启' : '关闭后隐藏首领并停止新挑战，已接受战斗继续结算' }}</span>
               </div>
               <label class="mb-4 block">
-                首领等级
-                <NInputNumber v-model:value="bossLevel" :min="1" :max="50" class="mt-1 w-48" />
+                新建周期等级
+                <NInputNumber
+                  :value="cfg.worldBossLevel ?? worldBoss?.level"
+                  :min="1"
+                  :max="50"
+                  :precision="0"
+                  :disabled="readonly"
+                  class="mt-1 w-44"
+                  @update:value="cfg.worldBossLevel = $event ?? undefined"
+                />
+                <span class="mt-1 block text-xs text-gray-500">新建周期生效；已生成的待开启或进行中周期保留原等级。</span>
+              </label>
+              <h4 class="mb-2 font-medium">成员基础数值</h4>
+              <CombatEditor
+                :members="worldBossMembers"
+                :presentation="presentation"
+                :readonly="readonly"
+                :level-editable="false"
+                level-hint="等级随周期等级与系数生效"
+              />
+              <p class="mt-2 text-sm text-gray-500">基础数值会乘以原等级系数。数值和奖励调整在新建周期生效，已生成周期保留原配置。</p>
+              <h4 class="mb-2 mt-5 font-medium">奖励档</h4>
+              <label class="mb-3 block">
+                奖励档位等级
+                <NInputNumber v-model:value="rewardLevel" :min="1" :max="50" class="mt-1 w-44" />
+                <span class="mt-1 block text-xs text-gray-500">只筛选下方奖励档，不改变世界首领战斗等级。</span>
               </label>
               <NCollapse>
                 <NCollapseItem
@@ -540,6 +632,16 @@ onMounted(load);
   grid-template-columns: 260px minmax(0, 1fr);
   gap: 16px;
   align-items: start;
+}
+.world-state {
+  padding: 10px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: #fafafa;
+}
+.dark .world-state {
+  border-color: #374151;
+  background: #1f2937;
 }
 @media (max-width: 1000px) {
   .field-workspace {

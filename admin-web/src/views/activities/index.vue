@@ -11,10 +11,8 @@ const personalWorkspace = ref<InstanceType<typeof PersonalOpeningActivities> | n
 const templateWorkspace = ref<InstanceType<typeof ActivityTemplateWorkspace> | null>(null);
 
 async function beforeTabLeave(_name: string | number, oldName: string | number | null) {
-  if (oldName === 'native') {
-    if (!(await (personalWorkspace.value?.beforeLeave() ?? true))) return false;
-    return nativeWorkspace.value?.beforeLeave() ?? true;
-  }
+  if (oldName === 'native') return nativeWorkspace.value?.beforeLeave() ?? true;
+  if (oldName === 'personal') return personalWorkspace.value?.beforeLeave() ?? true;
   if (oldName === 'template') return templateWorkspace.value?.beforeTabLeave() ?? true;
   return true;
 }
@@ -22,7 +20,8 @@ async function beforeTabLeave(_name: string | number, oldName: string | number |
 
 <template>
   <NTabs v-model:value="activeTab" type="line" class="activity-settings-tabs" :theme-overrides="{ tabGapMediumLine: '20px' }" :on-before-leave="beforeTabLeave">
-    <NTabPane name="native" tab="常驻与精彩活动"><PersonalOpeningActivities ref="personalWorkspace" /><NativeActivityWorkspace ref="nativeWorkspace" /></NTabPane>
+    <NTabPane name="native" tab="常驻与精彩活动"><NativeActivityWorkspace ref="nativeWorkspace" /></NTabPane>
+    <NTabPane name="personal" tab="个人开服活动" display-directive="show:lazy"><PersonalOpeningActivities ref="personalWorkspace" /></NTabPane>
     <NTabPane name="template" tab="排期模板" display-directive="show:lazy"><ActivityTemplateWorkspace ref="templateWorkspace" /></NTabPane>
     <NTabPane name="daily-sign" tab="每日签到" display-directive="show:lazy"><DailySign /></NTabPane>
   </NTabs>

@@ -296,6 +296,9 @@ func (s *GameService) validateTurntableConfiguration(cfg *db.GameplayPool, rewar
 			return errors.New("转盘必须配置0至8九个有效奖位")
 		}
 	}
+	if _, err := turntablePityRules(rules.PrizePityRules, cfg.JackpotPerMillion); err != nil {
+		return err
+	}
 	if !hasLegacyRanking {
 		return nil
 	}
@@ -824,9 +827,36 @@ func (s *GameService) playBigTurnOnce(ctx context.Context, id int64, b *pb.CSPla
 			}
 			result.Rewards.Simps = append(result.Rewards.Simps, gain.Simps...)
 		}
+
+		pityRules, err := turntablePityRules(rules.PrizePityRules, cfg.JackpotPerMillion)
+		if err != nil {
+			return err
+		}
+		pityEnabled := false
+		for _, rule := range pityRules {
+			pityEnabled = pityEnabled || rule.Enabled
+		}
+		pityProgress := map[int32]turntablePityProgress{}
+		if st.PrizePityState != "" {
+			if err = json.Unmarshal([]byte(st.PrizePityState), &pityProgress); err != nil || pityProgress == nil {
+				return errors.New(constUtil.TurntablePityStateInvalid)
+			}
+		}
+		turntablePityPauseDisabled(pityRules, pityProgress)
 		for n := int32(0); n < count; n++ {
-			jackpot := false
-			if global.DiamondPool > 0 && cfg.JackpotPerMillion > 0 {
+			selectedPity := int32(-1)
+			if pityEnabled {
+				dice, e := rand.Int(rand.Reader, big.NewInt(1000000))
+				if e != nil {
+					return e
+				}
+				selectedPity, e = turntablePityDraw(pityRules, pityProgress, rewards, stock, global.DiamondPool, cfg.JackpotPerMillion, dice.Int64())
+				if e != nil {
+					return e
+				}
+			}
+			jackpot := selectedPity == 9
+			if !pityEnabled && global.DiamondPool > 0 && cfg.JackpotPerMillion > 0 {
 				dice, e := rand.Int(rand.Reader, big.NewInt(1000000))
 				if e != nil {
 					return e
@@ -848,7 +878,15 @@ func (s *GameService) playBigTurnOnce(ctx context.Context, id int64, b *pb.CSPla
 					if used < 0 {
 						return errors.New("转盘库存存档无效")
 					}
-					if r.Stock == 0 || used < r.Stock {
+					excluded := false
+					if pityEnabled {
+						for _, rule := range pityRules {
+							if rule.Enabled && rule.PrizeID == r.ID {
+								excluded = true
+							}
+						}
+					}
+					if (r.Stock == 0 || used < r.Stock) && (!excluded || selectedPity == r.ID) && (selectedPity < 0 || selectedPity == r.ID) {
 						available = append(available, r)
 					}
 				}
@@ -884,6 +922,13 @@ func (s *GameService) playBigTurnOnce(ctx context.Context, id int64, b *pb.CSPla
 			if e = tx.Create(&db.TurntableRecord{PoolID: cfg.ID, PlayerID: id, PlayerName: player.GetName(), ResourceID: resource, Amount: amount, Jackpot: jackpot, CreatedAtMillis: now.UnixMilli()}).Error; e != nil {
 				return e
 			}
+		}
+		if pityEnabled || len(pityProgress) > 0 {
+			raw, e := json.Marshal(pityProgress)
+			if e != nil {
+				return e
+			}
+			st.PrizePityState = string(raw)
 		}
 		st.PlayerName = player.GetName()
 		st.Score += rules.ScorePerDraw * count

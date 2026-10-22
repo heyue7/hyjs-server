@@ -406,7 +406,7 @@ onBeforeUnmount(() => {
                 <ActivityProducts v-if="selectedMode?.supportsProducts" v-model="form.products" :vip-options="vipOptions" :disabled="busy" />
                 <ActivityMilestones v-if="selectedMode?.supportsMilestones" v-model="form.milestones" :mode="form.mode" :disabled="busy" :single="selectedMode?.maxMilestones === 1" :max="selectedMode?.maxMilestones" :day-based="['login-rewards', 'limited-sign'].includes(form.mode)" :choice="form.mode === 'login-rewards'" />
                 <KingPrizes v-model:world="form.options.kingWorld" v-if="form.mode === 'king-recruit' && selectedMode?.supportsPrizes" v-model="form.prizes" :disabled="busy" />
-                <ActivityPrizes v-else-if="selectedMode?.supportsPrizes" v-model="form.prizes" :disabled="busy" />
+                <ActivityPrizes v-model:options="form.options" v-else-if="selectedMode?.supportsPrizes" v-model="form.prizes" :disabled="busy" />
                 <ActivityOptions v-if="!selectedMode?.supportsProducts && !selectedMode?.supportsMilestones && !selectedMode?.supportsPrizes" v-model="form.options" :mode="form.mode" :fixed-values="selectedMode?.fixedValues" :disabled="busy" />
               </template>
               <template v-if="activeTab === 'schedule'">

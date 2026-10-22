@@ -161,7 +161,7 @@ func TestCopyOverflowOriginalWireFullBagColdReplayAndClaim(t *testing.T) {
 	if err := db.GetIns().Where("player_id=? AND source_key LIKE ?", f.id, "copy-overflow:%").Order("id").Find(&rewards).Error; err != nil {
 		t.Fatal(err)
 	}
-	if len(rewards) != 5 || p1Count(t, &db.MailMessage{}, "player_id=? AND source_key LIKE ?", f.id, "copy-overflow:%") != 5 {
+	if len(rewards) != 5 || p1Count(t, &db.MailMessage{}, "player_id=? AND source_key LIKE ?", f.id, "copy-overflow:%") != 0 {
 		t.Fatal("first/ordinary/bonus deliveries were lost or replayed", len(rewards))
 	}
 	var ids []int64

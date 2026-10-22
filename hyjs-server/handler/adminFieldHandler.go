@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -132,7 +133,7 @@ func AdminFieldSaveHandler(c *gin.Context) {
 	}
 	for _, g := range cfg.MonsterGroups {
 		source := originalMonsters[g.ID]
-		if !monsterIDs[g.ID] || seen[g.ID] || g.HeroID != source.HeroID || g.Level != source.Level || g.CooldownMS < 1 || g.CooldownMS > 86400000 || !adminFieldValidDrops(g.Drops, "monster") {
+		if !monsterIDs[g.ID] || seen[g.ID] || g.HeroID != source.HeroID || g.Level != source.Level || g.CooldownMS < 1 || g.CooldownMS > 86400000 || !adminFieldValidDrops(g.Drops, "monster") || !adminFieldCombatMembersValid(g.Members, source.Members) {
 			adminError(c, constUtil.ErrAdminInput)
 			return
 		}
@@ -143,6 +144,35 @@ func AdminFieldSaveHandler(c *gin.Context) {
 			adminError(c, constUtil.ErrAdminInput)
 			return
 		}
+	}
+	// 普通首领沿用本地图原候选与组号；旧方案缺省该字段时继承原表。
+	if cfg.OrdinaryBossGroups != nil {
+		sourceGroups := map[string]model.AdminFieldBossGroup{}
+		for _, g := range original.OrdinaryBossGroups {
+			sourceGroups[fmt.Sprintf("%s:%d", g.ID, g.GroupIndex)] = g
+		}
+		if len(cfg.OrdinaryBossGroups) != len(sourceGroups) {
+			adminError(c, constUtil.ErrAdminInput)
+			return
+		}
+		seen = map[string]bool{}
+		for _, g := range cfg.OrdinaryBossGroups {
+			key := fmt.Sprintf("%s:%d", g.ID, g.GroupIndex)
+			source, ok := sourceGroups[key]
+			if !ok || seen[key] || g.HeroID != source.HeroID || g.RebornHours < 1 || g.RebornHours > constUtil.AdminFieldBossMaxRebornHours || !adminFieldCombatMembersValid(g.Members, source.Members) || !adminFieldValidBossDrops(g.Drops) || !adminFieldValidBossDrops(g.KillDrops) {
+				adminError(c, constUtil.ErrAdminInput)
+				return
+			}
+			seen[key] = true
+		}
+	}
+	if cfg.WorldBossLevel != nil && (*cfg.WorldBossLevel < 1 || *cfg.WorldBossLevel > constUtil.AdminFieldWorldBossMaxLevel) {
+		adminError(c, constUtil.ErrAdminInput)
+		return
+	}
+	if !adminFieldCombatMembersValid(cfg.WorldBossMembers, original.WorldBossMembers) {
+		adminError(c, constUtil.ErrAdminInput)
+		return
 	}
 	if len(cfg.BossRewards) != len(original.BossRewards) {
 		adminError(c, constUtil.ErrAdminInput)
@@ -196,6 +226,57 @@ func adminFieldValidDrops(drops []model.AdminFieldDrop, kind string) bool {
 			total += q.Weight
 		}
 		if total > 2147483647 {
+			return false
+		}
+	}
+	return true
+}
+
+func adminFieldCombatMembersValid(members, source []model.AdminFieldCombatMember) bool {
+	if members == nil {
+		return true
+	}
+	if len(members) != len(source) {
+		return false
+	}
+	allowed := map[string]model.AdminFieldCombatMember{}
+	for _, member := range source {
+		allowed[member.ID] = member
+	}
+	seen := map[string]bool{}
+	for _, member := range members {
+		original, ok := allowed[member.ID]
+		if !ok || seen[member.ID] || member.HeroID != original.HeroID || member.Location != original.Location || member.GroupIndex != original.GroupIndex || !service.AdminFieldCombatMemberAllowed(member) {
+			return false
+		}
+		seen[member.ID] = true
+	}
+	return true
+}
+
+func adminFieldValidBossDrops(drops []model.AdminFieldDrop) bool {
+	if len(drops) < 1 || len(drops) > 32 {
+		return false
+	}
+	seen := map[string]bool{}
+	for _, d := range drops {
+		if seen[d.ResourceID] || len(d.ResourceID) > 128 || !gameService.AdminFieldBossDropAllowed(d.ResourceID) || len(d.Quantities) < 1 || len(d.Quantities) > 32 {
+			return false
+		}
+		seen[d.ResourceID] = true
+		amounts := map[int64]bool{}
+		var total, positive int64
+		for _, q := range d.Quantities {
+			if q.Amount < 0 || q.Amount > 2147483647 || amounts[q.Amount] || !gameService.AdminFieldBossAmountAllowed(d.ResourceID, q.Amount) || q.Weight < 0 || q.Weight > 1000000 {
+				return false
+			}
+			amounts[q.Amount] = true
+			total += q.Weight
+			if q.Weight > 0 {
+				positive++
+			}
+		}
+		if total < 1 || total > 2147483647 || positive == 0 {
 			return false
 		}
 	}

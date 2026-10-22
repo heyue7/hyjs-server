@@ -42,7 +42,7 @@ func TestBigClientRewardOriginalOnceClaimAndCold(t *testing.T) {
 	if !proto.Equal(before, after) || !game.FullClientVerified {
 		t.Fatal("notification must only enqueue, not change balances")
 	}
-	if p1Count(t, &db.RewardDelivery{}, "player_id = ? AND source_key = ?", f.id, constUtil.BigClientRewardSource) != 1 || p1Count(t, &db.MailMessage{}, "player_id = ? AND source_key = ?", f.id, constUtil.BigClientRewardSource) != 1 {
+	if p1Count(t, &db.RewardDelivery{}, "player_id = ? AND source_key = ?", f.id, constUtil.BigClientRewardSource) != 1 || p1Count(t, &db.MailMessage{}, "player_id = ? AND source_key = ?", f.id, constUtil.BigClientRewardSource) != 0 {
 		t.Fatal("notification created duplicate reward or mail")
 	}
 	f.restart(t)

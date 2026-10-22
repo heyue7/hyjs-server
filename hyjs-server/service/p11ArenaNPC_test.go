@@ -165,12 +165,19 @@ func TestP11ArenaVirtualOriginalGuideFightSlotConflictAndColdReceipt(t *testing.
 	if response.GetWinPlayerId() == f.id && response.GetMyrank().GetPvpRank() != 24576 {
 		t.Fatal("NPC winner rank not moved", response)
 	}
-	if response.GetWinPlayerId() != f.id || current.GetDiamond() != before.GetDiamond()+8192 {
+	if response.GetWinPlayerId() != f.id || current.GetDiamond() != before.GetDiamond() {
 		t.Fatal("first NPC historical rank diamonds", current.GetDiamond(), before.GetDiamond())
 	}
 	var rankAward db.P11ArenaPrizeAward
 	if err := db.GetIns().First(&rankAward, "fight_id=?", response.GetFightId()).Error; err != nil || rankAward.RankBestBefore != 32768 || rankAward.RankBestAfter != 24576 || rankAward.RankDiamond != 8192 {
 		t.Fatal("rank reward facts", rankAward, err)
+	}
+	var rankDelivery db.RewardDelivery
+	if err := db.GetIns().First(&rankDelivery, "player_id=? AND source_key=?", f.id, p11ArenaRankRewardCenterKey(response.GetFightId())).Error; err != nil || rankDelivery.Rewards != "diamond,8192" || rankDelivery.Title != "竞技场新纪录" || rankDelivery.Content != "历史最高排名提升至第24576名。" || rankAward.RankSource != constUtil.P11ArenaRankRewardCenterSource {
+		t.Fatal("rank attachment", rankDelivery, err)
+	}
+	if p1Count(t, &db.MailMessage{}, "player_id=?", f.id) != 0 {
+		t.Fatal("automatic rank mail")
 	}
 	if len(game.Warriors) != 1 {
 		t.Fatal("NPC granted fake characters")
@@ -213,6 +220,21 @@ func TestP11ArenaVirtualOriginalGuideFightSlotConflictAndColdReceipt(t *testing.
 	final, finalGame := p10LuckyProfile(t, f.id)
 	if !proto.Equal(final, current) || len(finalGame.Warriors) != len(game.Warriors) {
 		t.Fatal("retry/cold charged or generated state")
+	}
+	for i := 0; i < 2; i++ {
+		if _, err = f.s.RewardCenter(f.ctx, f.id, &pb.CSAddRewardsToPlayer{RewardIds: []int64{rankDelivery.ID}}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	dbConn, _ = db.GetIns().DB()
+	dbConn.Close()
+	f.open(t)
+	if _, err = f.s.p11ArenaGuideAt(f.ctx, f.id, request, 991004, now); err != nil {
+		t.Fatal("claimed cold receipt", err)
+	}
+	claimed, _ := p10LuckyProfile(t, f.id)
+	if claimed.GetDiamond() != before.GetDiamond()+8192 || p1Count(t, &db.RewardDelivery{}, "player_id=? AND source_key=?", f.id, rankDelivery.SourceKey) != 1 {
+		t.Fatal("rank claim duplicated")
 	}
 	var records, virtualMembers int64
 	db.GetIns().Model(&db.P11ArenaFightSettlement{}).Where("player_id=?", f.id).Count(&records)

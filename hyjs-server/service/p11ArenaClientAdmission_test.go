@@ -63,8 +63,12 @@ func TestP11ArenaOriginalClientSelectedNPCWithMainOffFormation(t *testing.T) {
 	if response.GetWinPlayerId() == f.id {
 		expectedDiamond = 32768 - response.GetMyrank().GetPvpRank()
 	}
-	if current.GetHeroWarId() != before.GetHeroWarId() || current.GetEnergy() != before.GetEnergy()-2 || current.GetDiamond() != before.GetDiamond()+expectedDiamond {
+	if current.GetHeroWarId() != before.GetHeroWarId() || current.GetEnergy() != before.GetEnergy()-2 || current.GetDiamond() != before.GetDiamond() {
 		t.Fatal("avatar/cost/rank reward changed", before, current)
+	}
+	var award db.P11ArenaPrizeAward
+	if err := db.GetIns().First(&award, "fight_id=?", response.GetFightId()).Error; err != nil || award.RankDiamond != expectedDiamond {
+		t.Fatal("rank reward facts", award, err)
 	}
 	raw, _ := proto.Marshal(response)
 	sql, _ := db.GetIns().DB()

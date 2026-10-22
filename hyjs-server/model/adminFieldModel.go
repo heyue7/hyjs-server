@@ -36,13 +36,46 @@ type AdminFieldGatherGroup struct {
 	Drops      []AdminFieldDrop `json:"drops"`      // Drops 为独立掉落。
 }
 
-// AdminFieldMonsterGroup 配置原怪物编队的刷新和队长奖励，战斗阵容继续使用原表。
+// AdminFieldCombatMember 是一款原战斗成员的受限数值配置。
+// ID、HeroID、Location 和 GroupIndex 绑定原表行，只读；其余字段是该行实际参与战斗的数值。
+type AdminFieldCombatMember struct {
+	ID           string  `json:"id"`           // ID 为原行主键：FieldMonster 使用 MonsterId，FieldBoss 使用 Id，WorldBoss 使用 Id。
+	HeroID       string  `json:"heroId"`       // HeroID 为只读原英雄/怪物模型。
+	Location     int64   `json:"location"`     // Location 为只读原阵位。
+	GroupIndex   int64   `json:"groupIndex"`   // GroupIndex 为只读原波次/组号；WorldBoss 固定为1。
+	Level        int64   `json:"level"`        // Level 为成员等级1至1000；世界首领成员等级由 WorldBossLevel 与等级系数决定，此值仅回显。
+	Hp           float64 `json:"hp"`           // Hp 为生命，须大于0。
+	Attack       float64 `json:"attack"`       // Attack 为攻击，须大于0。
+	PhyDefend    float64 `json:"phyDefend"`    // PhyDefend 为物理防御，须大于等于0。
+	MagicDefend  float64 `json:"magicDefend"`  // MagicDefend 为魔法防御，须大于等于0。
+	Hit          float64 `json:"hit"`          // Hit 为命中，须大于等于0。
+	Dodge        float64 `json:"dodge"`        // Dodge 为闪避，须大于等于0。
+	Cri          float64 `json:"cri"`          // Cri 为暴击，须大于等于0。
+	AntiCri      float64 `json:"antiCri"`      // AntiCri 为抗暴，须大于等于0。
+	CriFactor    float64 `json:"criFactor"`    // CriFactor 为暴击系数，须大于等于0。
+	DamageAdd    float64 `json:"damageAdd"`    // DamageAdd 为伤害加成，须大于等于0。
+	DamageReduce float64 `json:"damageReduce"` // DamageReduce 为伤害减免，须大于等于0。
+}
+
+// AdminFieldMonsterGroup 配置原怪物编队的刷新、实际成员数值和队长奖励。
 type AdminFieldMonsterGroup struct {
-	ID         string           `json:"id"`         // ID 为原怪物编队编号。
-	HeroID     string           `json:"heroId"`     // HeroID 为只读队长模型。
-	Level      int64            `json:"level"`      // Level 为只读原等级。
-	CooldownMS int64            `json:"cooldownMs"` // CooldownMS 为重生毫秒。
-	Drops      []AdminFieldDrop `json:"drops"`      // Drops 为击杀掉落。
+	ID         string                   `json:"id"`                // ID 为原怪物编队编号。
+	HeroID     string                   `json:"heroId"`            // HeroID 为只读队长模型。
+	Level      int64                    `json:"level"`             // Level 为只读原队长等级快照，战斗等级以 Members 为准。
+	CooldownMS int64                    `json:"cooldownMs"`        // CooldownMS 为重生毫秒。
+	Members    []AdminFieldCombatMember `json:"members,omitempty"` // Members 为原编队完整成员；旧方案缺省时继承原表。
+	Drops      []AdminFieldDrop         `json:"drops"`             // Drops 为击杀掉落。
+}
+
+// AdminFieldBossGroup 配置本地图普通首领一组的刷新、成员数值和原奖励。
+type AdminFieldBossGroup struct {
+	ID          string                   `json:"id"`                // ID 为原 FieldBoss.BossId。
+	GroupIndex  int64                    `json:"groupIndex"`        // GroupIndex 为只读原组号。
+	HeroID      string                   `json:"heroId"`            // HeroID 为只读原队长模型。
+	RebornHours int64                    `json:"rebornHours"`       // RebornHours 为原 RebornTime 小时，取值1至168。
+	Members     []AdminFieldCombatMember `json:"members,omitempty"` // Members 为原组完整成员；旧方案缺省时继承原表。
+	Drops       []AdminFieldDrop         `json:"drops"`             // Drops 为每次胜利的原 rewardGroupId 奖励。
+	KillDrops   []AdminFieldDrop         `json:"killDrops"`         // KillDrops 为最后一击击杀的原 KillReward 奖励。
 }
 
 // AdminFieldBossReward 为首领一个原奖励档的固定奖励。
@@ -67,8 +100,18 @@ type AdminFieldConfiguration struct {
 	MonsterPoints  []AdminFieldPoint        `json:"monsterPoints"`  // MonsterPoints 为怪物候选点。
 	GatherGroups   []AdminFieldGatherGroup  `json:"gatherGroups"`   // GatherGroups 为采集组。
 	MonsterGroups  []AdminFieldMonsterGroup `json:"monsterGroups"`  // MonsterGroups 为怪物组。
-	BossEnabled    bool                     `json:"bossEnabled"`    // BossEnabled 为false不显示首领、true沿用原首领周期。
-	BossRewards    []AdminFieldBossReward   `json:"bossRewards"`    // BossRewards 为原首领奖励档。
+	// OrdinaryBossEnabled 控制本地图普通首领；nil表示旧方案未配置，运行时继承原行为。
+	OrdinaryBossEnabled *bool `json:"ordinaryBossEnabled,omitempty"`
+	// OrdinaryBossGroups 为本地图 FieldBossPos 候选对应的全部普通首领组；缺省时继承原表。
+	OrdinaryBossGroups []AdminFieldBossGroup `json:"ordinaryBossGroups,omitempty"`
+	// BossEnabled 为世界首领开关，保留旧字段名以兼容既有方案。
+	BossEnabled bool `json:"bossEnabled"`
+	// BossRewards 为世界首领原奖励档，保留旧字段名以兼容既有方案。
+	BossRewards []AdminFieldBossReward `json:"bossRewards"`
+	// WorldBossMembers 覆盖世界首领四成员基础数值；缺省时继承原表。
+	WorldBossMembers []AdminFieldCombatMember `json:"worldBossMembers,omitempty"`
+	// WorldBossLevel 为世界首领新建周期等级1至50；nil表示不修改当前配置。
+	WorldBossLevel *int64 `json:"worldBossLevel,omitempty"`
 }
 
 // AdminFieldTemplateDTO 为一个完整全局方案。
@@ -84,8 +127,19 @@ type AdminFieldTemplateDTO struct {
 // AdminFieldListResponse 为全局方案目录。
 type AdminFieldListResponse struct {
 	Items        []AdminFieldTemplateDTO           `json:"items"`
-	Resources    []AdminFieldResource              `json:"resources"`    // Resources 为实际消费者支持的原道具目录。
-	Presentation map[string]AdminFieldPresentation `json:"presentation"` // Presentation 为地图、资源组及怪物的名称和原图，不参与配置保存。
+	Resources    []AdminFieldResource              `json:"resources"`           // Resources 为实际消费者支持的原道具目录。
+	Presentation map[string]AdminFieldPresentation `json:"presentation"`        // Presentation 为地图、资源组及怪物的名称和原图，不参与配置保存。
+	WorldBoss    *AdminFieldWorldBossStatus        `json:"worldBoss,omitempty"` // WorldBoss 为当前全服世界首领只读配置，不创建周期。
+}
+
+// AdminFieldWorldBossStatus 为现有全服策略中世界首领的只读当前事实。
+type AdminFieldWorldBossStatus struct {
+	Enabled    bool   `json:"enabled"`    // Enabled 为现有世界首领策略开关。
+	Level      int64  `json:"level"`      // Level 为策略给下一周期使用的原等级1至50。
+	PositionID int64  `json:"positionId"` // PositionID 为策略当前选择的原出生编号。
+	Scene      string `json:"scene"`      // Scene 为当前出生编号对应的原野外地图。
+	SceneName  string `json:"sceneName"`  // SceneName 为当前出生地图的运营名称。
+	BossID     string `json:"bossId"`     // BossID 为当前世界首领原BossId，用于区分普通首领同名展示。
 }
 
 // AdminFieldPresentation 将稳定资源值转换为运营可读的名称和真实原图。

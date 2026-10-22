@@ -191,7 +191,7 @@ func TestP1OfflineRewardConcurrencyReplayAndRestart(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if p1Count(t, &db.RewardDelivery{}, "player_id = ?", f.id) != 1 || p1Count(t, &db.MailMessage{}, "player_id = ?", f.id) != 1 {
+	if p1Count(t, &db.RewardDelivery{}, "player_id = ?", f.id) != 1 || p1Count(t, &db.MailMessage{}, "player_id = ?", f.id) != 0 {
 		t.Fatal("source duplicated")
 	}
 	f.restart(t)
@@ -288,6 +288,17 @@ func TestP1BatchOwnershipExpiryOverflowAndRollback(t *testing.T) {
 func TestP1MailUnreadDeleteTombstoneAndExpiry(t *testing.T) {
 	f := p1Setup(t)
 	reward := f.reward(t, "mail:linked", "coin,1", 0)
+	// 显式邮件保留历史附件关联，验证既有邮件的读取与删除合同。
+	if err := updateProfileWithTx(f.ctx, f.id, func(tx *gorm.DB, _ *pb.Player, _ *model.GameState) error {
+		mail, err := f.s.EnqueueMail(tx, f.id, "mail:linked", constUtil.P1MailboxSystem, "回归奖励", "隔离回归", fmt.Sprint(reward.ID), constUtil.P1MailSystemType, 0)
+		if err != nil {
+			return err
+		}
+		return tx.Model(mail).Update("reward_id", reward.ID).Error
+	}); err != nil {
+		t.Fatal(err)
+	}
+
 	messages, err := f.s.Mailbox(f.ctx, f.id, &pb.CSCheckNewMail{})
 	if err != nil || messages[0].(*pb.SCCheckNewMail).GetHasNew() != 1 {
 		t.Fatal("unread missing")

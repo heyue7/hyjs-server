@@ -182,7 +182,7 @@ func TestAdminOperationsCRUDAndDelivery(t *testing.T) {
 		t.Fatal("idempotent payload overwritten", err)
 	}
 	pendingP, _ := f.profile(t)
-	if pendingP.GetCoin() != beforeP.GetCoin() || p1Count(t, &db.RewardDelivery{}, "source_key = ?", "admin-grant:"+grant.RequestID) != 1 || p1Count(t, &db.MailMessage{}, "player_id = ?", f.id) != 1 {
+	if pendingP.GetCoin() != beforeP.GetCoin() || p1Count(t, &db.RewardDelivery{}, "source_key = ?", "admin-grant:"+grant.RequestID) != 1 || p1Count(t, &db.MailMessage{}, "player_id = ?", f.id) != 0 {
 		t.Fatal("grant bypassed original mail or duplicated")
 	}
 	f.restart(t)

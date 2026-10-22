@@ -115,7 +115,7 @@ func (s *GameService) adminFieldMapMetadata(field map[string]string, scenes map[
 		if !ok {
 			continue
 		}
-		name := presentation[row["BossId"]].Name
+		name := presentation["world:"+row["BossId"]].Name
 		if name == "" {
 			name = row["BossId"]
 		}
@@ -179,6 +179,17 @@ func (s *GameService) adminFieldPresentation() map[string]model.AdminFieldPresen
 		v.Detail = strings.Join(names, "、")
 		out[r["id"]] = v
 	}
+	// 成员编辑器按原HeroID展示名称与头像，覆盖非队长成员，不改动配置或协议身份。
+	for _, table := range []string{"FieldMonster", "FieldBoss", "WorldBoss"} {
+		for _, row := range s.Tables[table] {
+			id := row["HeroId"]
+			if id == "" {
+				continue
+			}
+			hero := s.table("Hero", "id", id)
+			out[id] = model.AdminFieldPresentation{Name: text(hero["name"], id), IconURL: heroIcon(hero, id)}
+		}
+	}
 	for _, r := range s.Tables["FieldMonster"] {
 		if r["TeamLeader"] != "1" {
 			continue
@@ -199,7 +210,8 @@ func (s *GameService) adminFieldPresentation() map[string]model.AdminFieldPresen
 			continue
 		}
 		hero := s.table("Hero", "id", r["HeroId"])
-		out[r["BossId"]] = model.AdminFieldPresentation{Name: text(r["name"], text(hero["name"], "世界首领")), IconURL: heroIcon(hero, r["HeroId"]), Detail: "全服共享首领周期"}
+		// 世界首领与普通首领可能复用原BossId，投影键加前缀避免覆盖普通首领名称。
+		out["world:"+r["BossId"]] = model.AdminFieldPresentation{Name: text(r["name"], text(hero["name"], "世界首领")), IconURL: heroIcon(hero, r["HeroId"]), Detail: "全服共享首领周期"}
 	}
 	// 首领名称先完成投影，再汇总每张地图的原小地图参数与出生点。
 	scenes := s.adminFieldSceneRows()

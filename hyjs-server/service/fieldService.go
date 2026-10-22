@@ -108,7 +108,7 @@ func (s *GameService) fieldSpawn(posID string) (*pb.SideMonster, error) {
 	if err != nil {
 		return nil, err
 	}
-	leader := s.fieldLeader(monID)
+	leader := s.fieldLeaderInScene(monID, row["adminScene"])
 	if leader == nil {
 		return nil, errors.New("Missing field monster leader")
 	}
@@ -644,7 +644,7 @@ func (s *GameService) fieldFightStart(ctx context.Context, id int64, b *pb.CSSid
 		}
 		party.Inst.Anger = proto.Float64(f.Side.GetAnger())
 		groups := map[int32][]*pb.BattleHero{}
-		for _, row := range s.Tables["FieldMonster"] {
+		for _, row := range s.adminFieldCombatRows("FieldMonster", "MonId", monster.GetMonId(), f.Scene) {
 			if row["MonId"] == monster.GetMonId() {
 				hero, err := s.actor(row, "field-"+monster.GetUuid()+"-"+row["MonsterId"], int32(tableNumber(row, "Location")), true)
 				if err != nil {
@@ -729,7 +729,7 @@ func (s *GameService) fieldReward(id int64, player *pb.Player, g *model.GameStat
 	if int64(g.Field.RewardKills) >= limit {
 		return gain, nil
 	}
-	leader := s.fieldLeader(monster.GetMonId())
+	leader := s.fieldLeaderInScene(monster.GetMonId(), g.Field.Scene)
 	for _, part := range strings.Split(leader["rewardGroupId"], "|") {
 		pair := strings.Split(part, ":")
 		if len(pair) != 2 {
@@ -887,7 +887,7 @@ func (s *GameService) fieldFightEnd(ctx context.Context, id int64, b *pb.CSSideP
 				frozenTables[k] = v
 			}
 			frozenRows := []map[string]string{}
-			for _, r := range s.Tables["FieldMonster"] {
+			for _, r := range s.adminFieldCombatRows("FieldMonster", "MonId", monster.GetMonId(), f.Scene) {
 				clone := map[string]string{}
 				for k, v := range r {
 					clone[k] = v

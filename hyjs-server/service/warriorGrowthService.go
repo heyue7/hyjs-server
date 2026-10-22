@@ -176,7 +176,8 @@ func growthRule(tx *gorm.DB, key string) (*db.WarriorGrowthRule, error) {
 
 func (s *GameService) growthLevel(player *pb.Player, w *pb.Warrior, key string) error {
 	level := w.GetLevel()
-	if w.GetGuid() == player.GetHeroWarId() {
+	// 原角色页的训练与突破入口按玩家等级开放；伙伴等级另用于训练数值上限。
+	if key == "HeroTrainLevel" || key == "HeroBreachedLevel" || w.GetGuid() == player.GetHeroWarId() {
 		level = player.GetLevel()
 	}
 	limit, err := strconv.ParseInt(s.table("GameConfigure", "StaticName", key)["NameValue"], 10, 32)

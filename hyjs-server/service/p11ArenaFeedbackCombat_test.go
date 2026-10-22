@@ -129,7 +129,7 @@ func TestP11ArenaFeedbackStartupThreeActorsOriginalRequestAndCold(t *testing.T) 
 	if response.GetWinPlayerId() == f.id {
 		diamonds = 32768 - response.GetMyrank().GetPvpRank()
 	}
-	if current.GetHeroWarId() != before.GetHeroWarId() || current.GetEnergy() != before.GetEnergy()-2 || current.GetDiamond() != before.GetDiamond()+diamonds {
+	if current.GetHeroWarId() != before.GetHeroWarId() || current.GetEnergy() != before.GetEnergy()-2 || current.GetDiamond() != before.GetDiamond() {
 		t.Fatal("cost/avatar/rank reward", current)
 	}
 	var row db.P11ArenaFightSettlement

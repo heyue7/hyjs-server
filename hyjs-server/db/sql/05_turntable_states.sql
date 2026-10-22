@@ -1,4 +1,5 @@
 CREATE TABLE IF NOT EXISTS turntable_states (
+  prize_pity_state TEXT,
   pool_id VARCHAR(64) NOT NULL,
   player_id BIGINT NOT NULL,
   player_name VARCHAR(128) NOT NULL,

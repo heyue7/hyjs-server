@@ -2,14 +2,13 @@ package service
 
 import (
 	"errors"
+	"fmt"
 	"strconv"
 
-	"google.golang.org/protobuf/proto"
 	"gorm.io/gorm"
 	"hyjs-server/constUtil"
 	"hyjs-server/db"
 	"hyjs-server/model"
-	pb "hyjs-server/model/protocol"
 )
 
 // Zero is the legacy migration marker. Trust the better existing witnessed rank
@@ -66,28 +65,72 @@ func p11ArenaRankRewardFacts(tx *gorm.DB, row *db.P11ArenaFightSettlement) (befo
 	return
 }
 
-func (s *GameService) applyP11ArenaRankReward(tx *gorm.DB, row *db.P11ArenaFightSettlement, award *db.P11ArenaPrizeAward, player *pb.Player, game *model.GameState, response *pb.SCPvpFightResult) error {
+// p11ArenaRankRewardCenterKey is the reward-centre source identity of one
+// accepted fight, so a settlement retry returns the original unclaimed or
+// already claimed attachment instead of paying twice.
+func p11ArenaRankRewardCenterKey(fightID string) string {
+	return constUtil.P11ArenaRankRewardCenterSourceKey + fightID
+}
+
+func p11ArenaRankRewardCenterRewards(diamond int64) string {
+	return "diamond," + strconv.FormatInt(diamond, 10)
+}
+
+// p11ArenaRankRewardPaysDirectly selects the receipt shape from the persisted
+// award marker. Awards settled before the split keep the direct settlement
+// balance; awards settled after it only have a reward-centre attachment.
+func p11ArenaRankRewardPaysDirectly(source string) (bool, error) {
+	switch source {
+	case constUtil.P11ArenaRankRewardSource:
+		return true, nil
+	case constUtil.P11ArenaRankRewardCenterSource:
+		return false, nil
+	}
+	return false, errors.New(constUtil.P11ArenaPrizeConflict)
+}
+
+// applyP11ArenaRankReward advances the paid best-rank boundary and freezes the
+// diamond attachment in the caller's settlement transaction. The response and
+// the character balance stay untouched; the original reward centre pays once.
+func (s *GameService) applyP11ArenaRankReward(tx *gorm.DB, row *db.P11ArenaFightSettlement, award *db.P11ArenaPrizeAward) error {
 	before, after, diamond, current, err := p11ArenaRankRewardFacts(tx, row)
 	if err != nil || !current {
 		return err
 	}
-	award.RankSource = constUtil.P11ArenaRankRewardSource
+	award.RankSource = constUtil.P11ArenaRankRewardCenterSource
 	award.RankBestBefore, award.RankBestAfter, award.RankDiamond = before, after, diamond
-	// This boundary, the balance and the original response commit atomically.
+	// This boundary, the attachment and the fight receipt commit atomically.
 	if err = tx.Model(&db.P11ArenaMember{}).Where("player_id=?", row.PlayerID).Update("rank_reward_best", after).Error; err != nil {
 		return err
 	}
 	if diamond == 0 {
 		return nil
 	}
-	gain, err := s.GrantFixedReward(player, game, "diamond,"+strconv.FormatInt(diamond, 10))
+	_, err = s.EnqueueReward(tx, row.PlayerID, p11ArenaRankRewardCenterKey(row.FightID), constUtil.P11ArenaRankRewardCenterTitle, fmt.Sprintf(constUtil.P11ArenaRankRewardCenterBodyFormat, after), p11ArenaRankRewardCenterRewards(diamond), 0)
+	return err
+}
+
+// validateP11ArenaRankRewardCenterReceipt checks the attachment identity of a
+// split award. A claimed row keeps satisfying the receipt; the claim itself is
+// the original reward centre's idempotent step and never re-runs here.
+func validateP11ArenaRankRewardCenterReceipt(tx *gorm.DB, row *db.P11ArenaFightSettlement, award *db.P11ArenaPrizeAward) error {
+	bad := errors.New(constUtil.P11ArenaPrizeConflict)
+	var delivery db.RewardDelivery
+	err := tx.First(&delivery, "player_id=? AND source_key=?", row.PlayerID, p11ArenaRankRewardCenterKey(row.FightID)).Error
+	if award.RankDiamond == 0 {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		return bad
+	}
 	if err != nil {
 		return err
 	}
-	expected := &pb.ResultObject{Simps: []*pb.SimpleItem{{Id: proto.String("diamond"), Num: proto.Int32(int32(diamond))}}}
-	if !proto.Equal(gain, expected) {
-		return errors.New(constUtil.P11ArenaPrizeConflict)
+	if delivery.Rewards != p11ArenaRankRewardCenterRewards(award.RankDiamond) || delivery.Title != constUtil.P11ArenaRankRewardCenterTitle || delivery.Content != fmt.Sprintf(constUtil.P11ArenaRankRewardCenterBodyFormat, award.RankBestAfter) || delivery.ExpiresAt != 0 {
+		return bad
 	}
-	p1AppendGain(response.Result, gain)
 	return nil
 }

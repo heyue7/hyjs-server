@@ -47,6 +47,14 @@ func TestPeriodRewardNoticeHistoryBothListsPreserveReceipt(t *testing.T) {
 	if err := db.GetIns().First(&saved, "player_id=? AND source_key=?", f.id, "activity:"+cfg.ID).Error; err != nil {
 		t.Fatal(err)
 	}
+	// 显式保留旧历史邮件，后续列表投影继续支持旧附件关联。
+	mail, err := f.s.EnqueueMail(db.GetIns(), f.id, saved.SourceKey, constUtil.P1MailboxSystem, saved.Title, saved.Content, "", constUtil.P1MailSystemType, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = db.GetIns().Model(mail).Update("reward_id", saved.ID).Error; err != nil {
+		t.Fatal(err)
+	}
 	// 后续编辑门槛和标题，旧奖励继续解释当时的真实达标条件。
 	if err := db.GetIns().Model(&db.PeriodInstance{}).Where("id=?", cfg.ID).Updates(map[string]any{"title": "Re未来配置", "goal": 99}).Error; err != nil {
 		t.Fatal(err)

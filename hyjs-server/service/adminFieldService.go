@@ -100,9 +100,25 @@ func (s *GameService) adminOriginalField(scene string) (model.AdminFieldConfigur
 	if row == nil {
 		return model.AdminFieldConfiguration{}, constUtil.ErrAdminInput
 	}
-	cfg := model.AdminFieldConfiguration{Scene: scene, SceneResource: row["FieldMap"], BattleResource: row["BattleMap"], MinLevel: int64(tableNumber(row, "levelLimit")), AllowPK: row["allSafe"] != "1", MineCount: int64(tableNumber(row, "MineMax")), FishCount: int64(tableNumber(row, "FishGroupMax")), MinePoints: []model.AdminFieldPoint{}, FishPoints: []model.AdminFieldPoint{}, MonsterPoints: []model.AdminFieldPoint{}, GatherGroups: []model.AdminFieldGatherGroup{}, MonsterGroups: []model.AdminFieldMonsterGroup{}, BossEnabled: true, BossRewards: []model.AdminFieldBossReward{}}
+	ordinaryEnabled := true
+	cfg := model.AdminFieldConfiguration{Scene: scene, SceneResource: row["FieldMap"], BattleResource: row["BattleMap"], MinLevel: int64(tableNumber(row, "levelLimit")), AllowPK: row["allSafe"] != "1", MineCount: int64(tableNumber(row, "MineMax")), FishCount: int64(tableNumber(row, "FishGroupMax")), MinePoints: []model.AdminFieldPoint{}, FishPoints: []model.AdminFieldPoint{}, MonsterPoints: []model.AdminFieldPoint{}, GatherGroups: []model.AdminFieldGatherGroup{}, MonsterGroups: []model.AdminFieldMonsterGroup{}, OrdinaryBossEnabled: &ordinaryEnabled, OrdinaryBossGroups: []model.AdminFieldBossGroup{}, BossEnabled: true, BossRewards: []model.AdminFieldBossReward{}, WorldBossMembers: s.adminFieldWorldBossMembers()}
 	groups := map[string]bool{}
 	monsters := map[string]bool{}
+	bosses := map[string]bool{}
+	for _, id := range strings.Split(row["bossPosIds"], ";") {
+		if id == "" {
+			continue
+		}
+		pos := s.table("FieldBossPos", "BoxxPosId", id)
+		if pos == nil {
+			return cfg, fmt.Errorf("野外首领出生点缺失: %s", id)
+		}
+		for _, choice := range adminFieldWeights(pos["bossIdProbs"]) {
+			if choice.Weight > 0 {
+				bosses[choice.ID] = true
+			}
+		}
+	}
 	for _, spec := range []struct {
 		key    string
 		target *[]model.AdminFieldPoint
@@ -144,9 +160,10 @@ func (s *GameService) adminOriginalField(scene string) (model.AdminFieldConfigur
 	}
 	for _, r := range s.Tables["FieldMonster"] {
 		if monsters[r["MonId"]] && r["TeamLeader"] == "1" {
-			cfg.MonsterGroups = append(cfg.MonsterGroups, model.AdminFieldMonsterGroup{ID: r["MonId"], HeroID: r["HeroId"], Level: int64(tableNumber(r, "Level")), CooldownMS: int64(tableNumber(r, "RebornTime")), Drops: adminFieldDrops(r["rewardGroupId"])})
+			cfg.MonsterGroups = append(cfg.MonsterGroups, model.AdminFieldMonsterGroup{ID: r["MonId"], HeroID: r["HeroId"], Level: int64(tableNumber(r, "Level")), CooldownMS: int64(tableNumber(r, "RebornTime")), Members: adminFieldMonsterMembers(s.Tables["FieldMonster"], r["MonId"]), Drops: adminFieldDrops(r["rewardGroupId"])})
 		}
 	}
+	cfg.OrdinaryBossGroups = s.adminFieldBossGroups(bosses)
 	for _, r := range s.Tables["WorldBossReward"] {
 		reward := model.AdminFieldBossReward{Type: int64(tableNumber(r, "type")), Level: int64(tableNumber(r, "level")), Weighted: strings.Contains(r["reward"], ":"), Drops: []model.AdminFieldDrop{}}
 		if reward.Weighted {
@@ -164,10 +181,14 @@ func (s *GameService) adminOriginalField(scene string) (model.AdminFieldConfigur
 	}
 	return cfg, nil
 }
-func adminFieldTemplateDTO(row db.AdminFieldTemplate) (model.AdminFieldTemplateDTO, error) {
+func (s *GameService) adminFieldTemplateDTO(row db.AdminFieldTemplate) (model.AdminFieldTemplateDTO, error) {
 	var cfg model.AdminFieldConfiguration
 	if json.Unmarshal([]byte(row.Configuration), &cfg) != nil {
 		return model.AdminFieldTemplateDTO{}, constUtil.ErrAdminConfiguration
+	}
+	// 旧方案只保存了新增字段之前的内容；读取时按原表补齐供编辑器展示，不改写数据库。
+	if source, err := s.adminOriginalField(row.Scene); err == nil {
+		adminFieldNormalizeConfiguration(&cfg, source)
 	}
 	available := constUtil.P8PackagedFieldScene(row.Scene)
 	reason := ""
@@ -188,6 +209,17 @@ func (s *GameService) AdminFields(ctx context.Context, actor *model.AdminPrincip
 		return nil, err
 	}
 	out := &model.AdminFieldListResponse{Items: []model.AdminFieldTemplateDTO{}, Resources: []model.AdminFieldResource{}, Presentation: s.adminFieldPresentation()}
+	// 现有全服首领策略只读展示；缺失表或策略时保持未配置，不生成周期。
+	if tx.Migrator().HasTable(&db.P12WorldBossPolicy{}) {
+		var policy db.P12WorldBossPolicy
+		switch err := tx.First(&policy, 1).Error; {
+		case err == nil:
+			out.WorldBoss = s.adminFieldWorldBossStatus(policy)
+		case errors.Is(err, gorm.ErrRecordNotFound):
+		default:
+			return nil, err
+		}
+	}
 	if s.AdminCatalogueData != nil {
 		for _, item := range s.AdminCatalogueData.Items {
 			kinds := []string{}
@@ -210,7 +242,7 @@ func (s *GameService) AdminFields(ctx context.Context, actor *model.AdminPrincip
 		}
 	}
 	for _, r := range rows {
-		v, err := adminFieldTemplateDTO(r)
+		v, err := s.adminFieldTemplateDTO(r)
 		if err != nil {
 			return nil, err
 		}
@@ -251,7 +283,7 @@ func (s *GameService) AdminSaveField(ctx context.Context, actor *model.AdminPrin
 			return err
 		}
 		var err error
-		out, err = adminFieldTemplateDTO(row)
+		out, err = s.adminFieldTemplateDTO(row)
 		return err
 	})
 	return &out, err
@@ -446,11 +478,11 @@ func (s *GameService) adminFieldFreezeBattle(tx *gorm.DB, id int64, scene, fight
 	if !tx.Migrator().HasTable(&db.AdminFieldBattleSnapshot{}) {
 		return nil
 	}
-	leader := s.fieldLeader(monsterID)
+	leader := s.fieldLeaderInScene(monsterID, scene)
 	return tx.Create(&db.AdminFieldBattleSnapshot{FightID: fightID, PlayerID: id, Scene: scene, Reward: leader["rewardGroupId"], CooldownMS: int64(tableNumber(leader, "RebornTime"))}).Error
 }
 func (s *GameService) adminFieldBattleReward(tx *gorm.DB, id int64, scene, fightID, monsterID string) (string, int64, error) {
-	leader := s.fieldLeader(monsterID)
+	leader := s.fieldLeaderInScene(monsterID, scene)
 	reward, cooldown := leader["rewardGroupId"], int64(tableNumber(leader, "RebornTime"))
 	if !tx.Migrator().HasTable(&db.AdminFieldBattleSnapshot{}) {
 		return reward, cooldown, nil
@@ -480,7 +512,7 @@ func (s *GameService) adminFieldBossConfiguration(cfg *db.P12WorldBossPolicy, de
 		}
 	}
 	row := s.table("Field", "FieldId", scene)
-	if row["adminBossEnabled"] == "" {
+	if row == nil || row["adminBossEnabled"] == "" {
 		return nil
 	}
 	if row["adminEnabled"] == "false" || row["adminBossEnabled"] == "false" {
@@ -491,16 +523,55 @@ func (s *GameService) adminFieldBossConfiguration(cfg *db.P12WorldBossPolicy, de
 	if json.Unmarshal([]byte(row["adminBossRewards"]), &rewards) != nil {
 		return constUtil.ErrAdminConfiguration
 	}
+	var members []model.AdminFieldCombatMember
+	if row["adminWorldBossMembers"] != "" {
+		if json.Unmarshal([]byte(row["adminWorldBossMembers"]), &members) != nil {
+			return constUtil.ErrAdminConfiguration
+		}
+	}
+	level := cfg.Level
+	if row["adminWorldBossLevel"] != "" {
+		parsed, err := strconv.ParseInt(row["adminWorldBossLevel"], 10, 64)
+		if err != nil || parsed < 1 || parsed > constUtil.AdminFieldWorldBossMaxLevel {
+			return constUtil.ErrAdminConfiguration
+		}
+		level = parsed
+	}
+	// 深拷贝本周期表行后再覆盖；已开始周期仍使用自己的DefinitionJSON和战斗实例。
 	copied := make(map[string][]map[string]string, len(def.Tables))
 	for key, rows := range def.Tables {
-		copied[key] = rows
+		clones := make([]map[string]string, 0, len(rows))
+		for _, source := range rows {
+			clone := make(map[string]string, len(source))
+			for k, v := range source {
+				clone[k] = v
+			}
+			clones = append(clones, clone)
+		}
+		copied[key] = clones
+	}
+	if len(members) != 0 && len(copied["WorldBoss"]) != 0 {
+		seen := map[string]bool{}
+		for _, member := range copied["WorldBoss"] {
+			for _, value := range members {
+				if value.ID != member["Id"] {
+					continue
+				}
+				if seen[value.ID] || !AdminFieldCombatMemberAllowed(value) {
+					return constUtil.ErrAdminConfiguration
+				}
+				seen[value.ID] = true
+				adminFieldApplyCombatMember(member, value)
+				break
+			}
+		}
+		if len(seen) != len(members) {
+			return constUtil.ErrAdminConfiguration
+		}
 	}
 	rows := []map[string]string{}
-	for _, r := range def.Tables["WorldBossReward"] {
-		clone := map[string]string{}
-		for k, v := range r {
-			clone[k] = v
-		}
+	for _, r := range copied["WorldBossReward"] {
+		clone := r
 		for _, reward := range rewards {
 			if fmt.Sprint(reward.Type) == r["type"] && fmt.Sprint(reward.Level) == r["level"] {
 				if reward.Weighted {
@@ -519,6 +590,7 @@ func (s *GameService) adminFieldBossConfiguration(cfg *db.P12WorldBossPolicy, de
 	}
 	copied["WorldBossReward"] = rows
 	def.Tables = copied
+	cfg.Level = level
 	raw, _ := json.Marshal(def)
 	cfg.DefinitionJSON, cfg.DefinitionHash = string(raw), p6Digest(raw)
 	return nil

@@ -339,7 +339,8 @@ func (s *GameService) adminActivityAvailability(tx *gorm.DB, raw model.AdminActi
 			if options.AdvancePrize.ResourceID != "" {
 				advance = fmt.Sprintf("%s,%d", options.AdvancePrize.ResourceID, options.AdvancePrize.Amount)
 			}
-			rules := db.TurntableRules{PoolID: cfg.Pool.ID, ScorePerDraw: int32(options.ScorePerDraw), AdvancePlaces: int32(options.AdvancePlaces), TopPrize: top, AdvancePrize: advance}
+			pityRaw, _ := json.Marshal(options.PrizePityRules)
+			rules := db.TurntableRules{PrizePityRules: string(pityRaw), PoolID: cfg.Pool.ID, ScorePerDraw: int32(options.ScorePerDraw), AdvancePlaces: int32(options.AdvancePlaces), TopPrize: top, AdvancePrize: advance}
 			problem = s.validateTurntableConfiguration(&cfg.Pool, cfg.Rewards, &rules)
 		}
 	}
@@ -447,6 +448,11 @@ func (s *GameService) adminActivityTypedProjection(tx *gorm.DB, raw model.AdminA
 		}
 		if err == nil {
 			kind = "turntable"
+			if wheel.PrizePityRules != "" {
+				if err := json.Unmarshal([]byte(wheel.PrizePityRules), &form.Options.PrizePityRules); err != nil {
+					return model.AdminActivityInstance{}, err
+				}
+			}
 			form.Options.ScorePerDraw = int64(wheel.ScorePerDraw)
 			form.Options.TopPrize = adminTypedResourceOne(wheel.TopPrize)
 			form.Options.AdvancePrize = adminTypedResourceOne(wheel.AdvancePrize)
@@ -659,6 +665,9 @@ func (s *GameService) adminPersistTypedActivity(tx *gorm.DB, d adminActivityDefi
 	if f.RepeatPolicy != "" && f.RepeatPolicy != "once" && f.RepeatPolicy != "repeat" {
 		return constUtil.ErrAdminInput
 	}
+	if !model.TurntablePrizePityValid(f.Options.PrizePityRules, f.Options.JackpotPerMillion) {
+		return constUtil.ErrAdminInput
+	}
 	if f.Options.DayLimit < 0 || f.Options.DayLimit > math.MaxInt32 || f.Options.TotalLimit < 0 || f.Options.TotalLimit > math.MaxInt32 || f.Options.ScorePerDraw < 0 || f.Options.ScorePerDraw > math.MaxInt32 || f.Options.AdvancePlaces < 0 || f.Options.AdvancePlaces > 1000 || f.Options.InitialDiamondPool < 0 || f.Options.InitialDiamondPool > math.MaxInt32 || f.Options.JackpotPerMillion < 0 || f.Options.JackpotPerMillion > 1000000 || f.Options.PoolContributionBps < 0 || f.Options.PoolContributionBps > 10000 {
 		return constUtil.ErrAdminInput
 	}
@@ -841,7 +850,8 @@ func (s *GameService) adminPersistTypedActivity(tx *gorm.DB, d adminActivityDefi
 		if f.Options.AdvancePrize.ResourceID != "" {
 			advance = fmt.Sprintf("%s,%d", f.Options.AdvancePrize.ResourceID, f.Options.AdvancePrize.Amount)
 		}
-		wheel := db.TurntableRules{PoolID: key, ScorePerDraw: int32(f.Options.ScorePerDraw), TopPrize: top, AdvancePrize: advance, AdvancePlaces: int32(f.Options.AdvancePlaces), Description: f.Source}
+		pityRaw, _ := json.Marshal(f.Options.PrizePityRules)
+		wheel := db.TurntableRules{PrizePityRules: string(pityRaw), PoolID: key, ScorePerDraw: int32(f.Options.ScorePerDraw), TopPrize: top, AdvancePrize: advance, AdvancePlaces: int32(f.Options.AdvancePlaces), Description: f.Source}
 		if err := save(&cfg); err != nil {
 			return err
 		}

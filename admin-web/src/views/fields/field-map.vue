@@ -22,8 +22,8 @@ const kinds: { key: Kind; label: string; glyph: string; candidateLabel: string }
   { key: 'fish', label: '钓鱼', glyph: '钓', candidateLabel: '候选鱼群' },
   { key: 'mine', label: '矿物', glyph: '矿', candidateLabel: '候选矿脉' },
   { key: 'monster', label: '小怪', glyph: '怪', candidateLabel: '候选小怪' },
-  { key: 'boss', label: '普通首领', glyph: '首', candidateLabel: '候选首领' },
-  { key: 'worldBoss', label: '世界首领', glyph: '世', candidateLabel: '世界首领' }
+  { key: 'boss', label: '普通首领出生点', glyph: '首', candidateLabel: '出生点候选首领' },
+  { key: 'worldBoss', label: '世界首领候选点', glyph: '世', candidateLabel: '候选出生位置' }
 ];
 const kindMap = Object.fromEntries(kinds.map(kind => [kind.key, kind])) as Record<Kind, (typeof kinds)[number]>;
 const visibleKinds = ref<Kind[]>(kinds.map(kind => kind.key));
@@ -100,7 +100,7 @@ function monsterPoints(points: FieldPoint[] | undefined): DisplayPoint[] {
 function bossPoints(points: FieldMapPoint[] | undefined, kind: 'boss' | 'worldBoss'): DisplayPoint[] {
   return (points || []).flatMap((point, index) => {
     const label =
-      kind === 'boss' ? point.name || `普通首领候选 ${index + 1}` : point.name || `世界首领候选 ${index + 1}`;
+      kind === 'boss' ? point.name || `普通首领出生点 ${index + 1}` : point.name || `世界首领候选点 ${index + 1}`;
     return [
       {
         key: `${kind}-${point.id}`,
@@ -227,7 +227,9 @@ watch(
           </button>
         </div>
       </div>
-      <p class="mt-2 text-xs text-gray-500">候选点按原小地图参数投影，标记位置不代表实时刷新状态。</p>
+      <p class="mt-2 text-xs text-gray-500">
+        候选点按原小地图参数投影，标记位置不代表实时刷新状态；世界首领候选点属于同一全服周期，不会同时出现多只。
+      </p>
       <div class="map-detail" aria-live="polite">
         <template v-if="activePoint">
           <div class="flex flex-wrap items-center gap-2">
@@ -235,7 +237,7 @@ watch(
               {{ kindMap[activePoint.kind].glyph }}
             </span>
             <strong>{{ kindMap[activePoint.kind].label }}</strong>
-            <NTag size="small" type="warning">候选点 · 非实时</NTag>
+            <NTag size="small" type="warning">{{ activePoint.kind === 'boss' ? '出生点 · 非实时' : '候选点 · 非实时' }}</NTag>
             <span class="text-sm text-gray-500">{{ activePoint.label }}</span>
           </div>
           <div class="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-sm">
@@ -243,6 +245,9 @@ watch(
             <span class="text-gray-500">原点位 {{ activePoint.id }}</span>
             <span>{{ kindMap[activePoint.kind].candidateLabel }}：{{ activePoint.candidates }}</span>
           </div>
+          <p v-if="activePoint.kind === 'worldBoss'" class="mt-2 text-sm text-gray-500">
+            同一世界首领周期只会在其中一个候选点出现。
+          </p>
         </template>
         <p v-else class="text-sm text-gray-500">选择地图标记查看类别、坐标和候选资源。</p>
       </div>

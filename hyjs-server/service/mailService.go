@@ -3,13 +3,11 @@ package service
 import (
 	"context"
 	"errors"
-	"strconv"
 	"strings"
 	"time"
 
 	"google.golang.org/protobuf/proto"
 	"gorm.io/gorm"
-	"hyjs-server/constUtil"
 	"hyjs-server/db"
 	"hyjs-server/model"
 	pb "hyjs-server/model/protocol"
@@ -45,22 +43,9 @@ func (s *GameService) EnqueueMail(tx *gorm.DB, playerID int64, sourceKey, mailbo
 	return &row, nil
 }
 
-// EnqueueRewardNotice 让系统通知与领奖中心附件共享冻结来源，附件通过原领奖中心领取。
+// EnqueueRewardNotice 保留兼容入口，仅投递领奖中心；业务邮件由调用方显式 EnqueueMail。
 func (s *GameService) EnqueueRewardNotice(tx *gorm.DB, playerID int64, sourceKey, title, body, rewards string, expiresAt int64) (*db.RewardDelivery, error) {
-	reward, err := s.EnqueueReward(tx, playerID, sourceKey, title, body, rewards, expiresAt)
-	if err != nil {
-		return nil, err
-	}
-	mail, err := s.EnqueueMail(tx, playerID, sourceKey, constUtil.P1MailboxSystem, reward.Title, reward.Content, strconv.FormatInt(reward.ID, 10), constUtil.P1MailSystemType, reward.ExpiresAt)
-	if err != nil {
-		return nil, err
-	}
-	if mail.RewardID == 0 {
-		if err = tx.Model(mail).Update("reward_id", reward.ID).Error; err != nil {
-			return nil, err
-		}
-	}
-	return reward, nil
+	return s.EnqueueReward(tx, playerID, sourceKey, title, body, rewards, expiresAt)
 }
 
 // Mailbox 读取原协议邮箱；取列表视为已读，未领附件的邮件不得删除。

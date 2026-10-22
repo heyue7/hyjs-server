@@ -143,6 +143,7 @@ def main():
         parser.add_argument('--' + name, type=Path, required=True)
     parser.add_argument('--qa-origin', help='Loopback-only update UI QA; original Unity endpoints remain inherited')
     parser.add_argument('--gameplay-overlay', type=Path, help='Qualified gameplay45 input to the update layer')
+    parser.add_argument('--pet-equip-overlay', type=Path, help='Qualified pet equipment input to the update layer')
     args = parser.parse_args()
     base, overlay, output, record = [path.resolve() for path in (args.base_apk, args.overlay, args.output, args.record)]
     require(output.is_relative_to(ROOT / 'build') and record.is_relative_to(ROOT / 'analysis'), 'Use owned project output paths')
@@ -150,6 +151,7 @@ def main():
     proof = json.loads((overlay / 'manifest.json').read_text())
     require(common.digest(base) == proof['baseAPKSHA256'], 'Fixed base changed')
     pins = {ROOT / name: value for name, value in proof['sourcePins'].items()}
+    require(not (args.gameplay_overlay and args.pet_equip_overlay), 'Choose one qualified managed input')
     gameplay = None
     if args.gameplay_overlay:
         gameplay_dir = args.gameplay_overlay.resolve()
@@ -157,6 +159,15 @@ def main():
         gameplay = json.loads((gameplay_dir / 'manifest.json').read_text())
         require(gameplay['schema'] == 'hyjs-gameplay45-v1' and gameplay['baseAPKSHA256'] == proof['baseAPKSHA256'], 'Gameplay base differs')
         pins.update({ROOT / name: value for name, value in gameplay['sourcePins'].items()})
+    pet = None
+    if args.pet_equip_overlay:
+        pet_dir = args.pet_equip_overlay.resolve()
+        require(pet_dir.is_relative_to(ROOT / 'build'), 'Use owned pet equipment overlay')
+        pet = json.loads((pet_dir / 'manifest.json').read_text())
+        require(pet['schema'] == 'hyjs-pet-equip48-overlay-v1' and pet['inputAPK_SHA256'] == proof['baseAPKSHA256'], 'Pet equipment base differs')
+        require(pet['originalEngineMethodsUnchanged'] == 547 and pet['originalMetadataABIAndTokensPreserved'] is True, 'Pet equipment qualification missing')
+        require({item['method'] for item in pet['changes']} == {'UI.PetEquipAwakeTab::SetCost', 'UI.PetEquipStrengthTab::isCanStrength'}, 'Unexpected pet equipment method scope')
+        pins.update({ROOT / name: value for name, value in pet['sourcePins'].items()})
     pins[Path(__file__).resolve()] = common.digest(Path(__file__))
     for path, digest in pins.items():
         require(path.resolve().is_relative_to(ROOT) and common.digest(path) == digest, 'Build source changed')
@@ -178,6 +189,11 @@ def main():
                 update_input = (gameplay_dir / 'Assembly-CSharp.dll').read_bytes()
                 require(hashlib.sha256(update_input).hexdigest() == gameplay['outputManagedSHA256'], 'Gameplay managed output differs')
                 verify_managed(before, update_input, [item['name'] for item in gameplay['allowedChangedMethods']])
+            if pet is not None:
+                require(hashlib.sha256(before).hexdigest() == pet['inputManagedSHA256'], 'Pet equipment managed base differs')
+                update_input = (pet_dir / 'Assembly-CSharp.dll').read_bytes()
+                require(hashlib.sha256(update_input).hexdigest() == pet['outputManagedSHA256'], 'Pet equipment managed output differs')
+                verify_managed(before, update_input, [item['method'] for item in pet['changes']])
             require(hashlib.sha256(update_input).hexdigest() == proof['inputManagedSHA256'] and hashlib.sha256(after).hexdigest() == proof['outputManagedSHA256'], 'Managed qualification differs')
             verify_managed(update_input, after, proof['allowedChangedMethods'])
             native, flag_offset = allow_wallet_subclass(incoming.read('classes2.dex'))
@@ -199,6 +215,10 @@ def main():
                 require(helper.resolve().is_relative_to(gameplay_dir), 'Gameplay helper outside qualified output')
                 payload[helper_entry] = helper.read_bytes()
                 require(hashlib.sha256(payload[helper_entry]).hexdigest() == gameplay['replacementEntries'][helper_entry], 'Gameplay helper changed')
+            if pet is not None:
+                helper_entry = 'assets/bin/Data/Managed/SoulFlowerPetEquip48.dll'
+                payload[helper_entry] = (pet_dir / 'SoulFlowerPetEquip48.dll').read_bytes()
+                require(hashlib.sha256(payload[helper_entry]).hexdigest() == pet['helperSHA256'], 'Pet equipment helper changed')
             if args.qa_origin:
                 from urllib.parse import urlsplit
                 origin = urlsplit(args.qa_origin)

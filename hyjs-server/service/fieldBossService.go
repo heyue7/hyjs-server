@@ -21,8 +21,12 @@ import (
 
 // fieldBossRows 只取原首领第一组；当前两张原图的首领各为一组四人。
 func (s *GameService) fieldBossRows(bossID string) []map[string]string {
+	return s.fieldBossRowsInScene(bossID, "")
+}
+
+func (s *GameService) fieldBossRowsInScene(bossID, scene string) []map[string]string {
 	var rows []map[string]string
-	for _, row := range s.Tables["FieldBoss"] {
+	for _, row := range s.adminFieldCombatRows("FieldBoss", "BossId", bossID, scene) {
 		if row["BossId"] == bossID && row["GroupIndex"] == "1" {
 			rows = append(rows, row)
 		}
@@ -31,7 +35,11 @@ func (s *GameService) fieldBossRows(bossID string) []map[string]string {
 }
 
 func (s *GameService) fieldBossLeader(bossID string) map[string]string {
-	for _, row := range s.fieldBossRows(bossID) {
+	return s.fieldBossLeaderInScene(bossID, "")
+}
+
+func (s *GameService) fieldBossLeaderInScene(bossID, scene string) map[string]string {
+	for _, row := range s.fieldBossRowsInScene(bossID, scene) {
 		if row["TeamLeader"] == "1" {
 			return row
 		}
@@ -49,8 +57,8 @@ func (s *GameService) fieldBossSpawn(posID string) (*pb.SideBoss, error) {
 	if err != nil {
 		return nil, err
 	}
-	rows := s.fieldBossRows(bossID)
-	leader := s.fieldBossLeader(bossID)
+	rows := s.fieldBossRowsInScene(bossID, pos["adminScene"])
+	leader := s.fieldBossLeaderInScene(bossID, pos["adminScene"])
 	if len(rows) != 4 || leader == nil {
 		return nil, errors.New("原野外首领第一组必须为四成员")
 	}
@@ -76,6 +84,20 @@ func (s *GameService) refreshFieldBosses(f *model.FieldState, row map[string]str
 		if id != "" {
 			positions = append(positions, id)
 		}
+	}
+	// 关闭普通首领只撤下未进入战斗的实例，已接受战斗保留冻结输入与结算。
+	if row["adminOrdinaryBossEnabled"] == "false" {
+		kept := f.Bosses[:0]
+		for _, boss := range f.Bosses {
+			if boss.GetState() == 2 {
+				kept = append(kept, boss)
+				continue
+			}
+			delete(f.RespawnAt, boss.GetUuid())
+			delete(f.BossHP, boss.GetUuid())
+		}
+		f.Bosses = kept
+		return nil
 	}
 	if len(positions) == 0 {
 		f.Bosses = nil
@@ -185,7 +207,7 @@ func (s *GameService) fieldBossCheck(ctx context.Context, id int64, b *pb.CSSide
 
 // fieldBossMonster 以冻结的等级/表行重建第一组，跨次战斗从 BossHP 恢复每槽血量。
 func (s *GameService) fieldBossMonster(uuid string, def *model.GameState, boss *pb.SideBoss) (*pb.BattleMonster, error) {
-	rows := s.fieldBossRows(boss.GetBossId())
+	rows := s.fieldBossRowsInScene(boss.GetBossId(), def.Field.Scene)
 	if len(rows) != 4 {
 		return nil, errors.New("原野外首领第一组必须为四成员")
 	}
@@ -260,6 +282,10 @@ func (s *GameService) fieldBossFightStart(ctx context.Context, id int64, b *pb.C
 			}
 			return errors.New("请先完成当前野外战斗")
 		}
+		// 关闭后只拒绝新的开战；上面已接受的同一战斗仍可重取冻结输入。
+		if scene := s.fieldSceneRow(g.Position.GetScene()); scene == nil || scene["adminOrdinaryBossEnabled"] == "false" {
+			return errors.New("普通首领已关闭刷新与开战")
+		}
 		boss := fieldBossFind(f, b.GetUuid())
 		if boss == nil || boss.GetState() != 1 {
 			return errors.New("野外首领不存在或已被击败")
@@ -294,7 +320,7 @@ func (s *GameService) fieldBossFightStart(ctx context.Context, id int64, b *pb.C
 		if err != nil {
 			return err
 		}
-		leader := s.fieldBossLeader(boss.GetBossId())
+		leader := s.fieldBossLeaderInScene(boss.GetBossId(), f.Scene)
 		if leader == nil {
 			return errors.New("原野外首领缺少队长行")
 		}
@@ -452,7 +478,7 @@ func (s *GameService) fieldBossFightEnd(ctx context.Context, id int64, b *pb.CSS
 		allDead := true
 		leaderGUID := fight.BossLeaderGUID
 		if leaderGUID == "" {
-			for _, row := range s.fieldBossRows(boss.GetBossId()) {
+			for _, row := range s.fieldBossRowsInScene(boss.GetBossId(), f.Scene) {
 				if row["TeamLeader"] == "1" {
 					leaderGUID = "field-boss-" + boss.GetUuid() + "-" + row["Id"]
 				}

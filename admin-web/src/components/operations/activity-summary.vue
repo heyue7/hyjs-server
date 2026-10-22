@@ -10,7 +10,8 @@ const options = computed(() => props.form.options || {});
 const rows = computed(() => props.form.products || []);
 const milestones = computed(() => props.form.milestones || []);
 const prizes = computed(() => props.form.prizes || []);
-const totalWeight = computed(() => prizes.value.reduce((sum, row) => sum + row.weight, 0));
+function hasPity(id: number) { return props.form.options.prizePityRules?.some(rule => rule.prizeId === id && rule.enabled) || false; }
+const totalWeight = computed(() => prizes.value.filter(row => !hasPity(row.id)).reduce((sum, row) => sum + row.weight, 0));
 const numberFields = [
   ['dailySpend', '每日消费钻石门槛'], ['scorePerDraw', '每次抽取积分'], ['initialDiamondPool', '初始大奖钻石池'],
   ['rebateCap', '返还钻石上限'], ['dayLimit', '每日探索次数'], ['totalLimit', '累计探索次数上限'], ['cooldownSeconds', '探索间隔（秒）']
@@ -69,13 +70,14 @@ function minuteText(value: number) { return value === 1440 ? '24:00' : `${String
     <section v-else-if="prizes.length" class="activity-summary-section">
       <h3>转盘奖位</h3>
       <div class="activity-summary-prizes">
-        <article v-for="(row, index) in prizes" :key="row.id" class="activity-summary-entry">
-          <h4>奖位 {{ index + 1 }}<NTag v-if="row.guaranteed" size="small" :bordered="false">保底候选</NTag></h4>
+        <article v-for="row in prizes" :key="row.id" class="activity-summary-entry">
+          <h4>{{ row.id === 0 ? '0 左上角' : `奖位 ${row.id}` }}<NTag v-if="options.prizePityRules?.some(rule => rule.prizeId === row.id && rule.enabled)" size="small" :bordered="false">递增保底</NTag></h4>
           <RewardSummary :rewards="row.resourceId ? [{ resourceId: row.resourceId, amount: row.amount }] : []" />
-          <p class="ops-muted mt-12px">权重 {{ row.weight }}<template v-if="totalWeight"> · 占比 {{ (row.weight * 100 / totalWeight).toFixed(2) }}%</template> · 库存 {{ row.stock || '不限' }}</p>
+          <p class="ops-muted mt-12px">{{ hasPity(row.id) ? '关闭递增时权重' : '相对权重' }} {{ row.weight }}<template v-if="totalWeight && !hasPity(row.id)"> · 承接奖位占比 {{ (row.weight * 100 / totalWeight).toFixed(2) }}%</template> · 库存 {{ row.stock || '不限' }}</p>
         </article>
       </div>
-      <p class="ops-muted mt-12px">权重占比不包含保底及超级大奖规则。</p>
+      <div v-for="rule in options.prizePityRules?.filter(row => row.enabled) || []" :key="rule.prizeId" class="ops-muted mt-12px">{{ rule.prizeId === 9 ? '钻石池最终大奖' : `奖位 ${rule.prizeId}` }}：前段 {{ rule.basePPM / 10000 }}%，从第 {{ rule.softStart }} 抽提升至保底前 {{ rule.softMaxPPM / 10000 }}%，最迟 {{ rule.hardPity }} 抽。命中后重计。</div>
+      <p class="ops-muted mt-12px">开启递增的奖位使用独立概率；其权重仅在关闭递增时生效。</p>
     </section>
     <section v-if="hasRules" class="activity-summary-section">
       <h3>规则与额外奖励</h3>
@@ -86,7 +88,7 @@ function minuteText(value: number) { return value === 1440 ? '24:00' : `${String
           <NDescriptionsItem v-if="options[field[0]] !== undefined" :label="field[1]">{{ Number(options[field[0]]).toLocaleString() }}</NDescriptionsItem>
         </template>
         <NDescriptionsItem v-if="options.rebateBps !== undefined" label="返钻比例">{{ options.rebateBps / 100 }}%</NDescriptionsItem>
-        <NDescriptionsItem v-if="options.jackpotPerMillion !== undefined" label="超级大奖概率">{{ options.jackpotPerMillion / 10000 }}%</NDescriptionsItem>
+        <NDescriptionsItem v-if="options.jackpotPerMillion !== undefined" label="钻石池最终大奖固定概率（未开递增时）">{{ options.jackpotPerMillion / 10000 }}%</NDescriptionsItem>
         <NDescriptionsItem v-if="options.poolContributionBps !== undefined" label="消费计入大奖池比例">{{ options.poolContributionBps / 100 }}%</NDescriptionsItem>
         <NDescriptionsItem v-if="options.discounts" label="可用折扣">{{ options.discounts.map((value: number) => `${value / 100}%`).join('、') || '未配置' }}</NDescriptionsItem>
       </NDescriptions>
