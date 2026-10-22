@@ -38,6 +38,15 @@ foreach (var target in new[]{"GetHeroUpgradeAvailableListInOrder","HeroBreakupAu
     }
     changed.Add(method);
 }
+foreach (var page in new[]{"UI.RecycleBreakupSelectHeroPanel","UI.RecycleBreakupSelectEquipPanel"}) {
+    var method = M(page,"GetCanSelectItems");
+    if (method.MethodSig.RetType.FullName != "System.Collections.Generic.List`1<System.Object>") throw new InvalidOperationException("Recycle list signature changed");
+    foreach (var ret in method.Body.Instructions.Where(i=>i.OpCode==OpCodes.Ret).ToArray()) {
+        ret.OpCode=OpCodes.Call; ret.Operand=H("FilterObjects");
+        method.Body.Instructions.Insert(method.Body.Instructions.IndexOf(ret)+1,Instruction.Create(OpCodes.Ret));
+    }
+    changed.Add(method);
+}
 foreach (var method in new[]{M("UI.UIInstPlayerData","GetHeroUpgradeAvailableListInOrder"),M("UI.HeroSelectPage","OnOneKeySelect")}) {
     int anchors=0;
     var ins=method.Body.Instructions;

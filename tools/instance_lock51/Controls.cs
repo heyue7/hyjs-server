@@ -42,6 +42,7 @@ namespace HYJS.InstanceProtection
             return f == null ? null : f.GetValue(value);
         }
         internal static string GuidOf(object value) { return Field(value, "guid") as string; }
+        public static List<object> FilterObjects(List<object> source) { return source == null ? new List<object>() : source.FindAll(delegate(object v) { return Ready && v != null && !IsLocked(GuidOf(v)); }); }
         public static List<string> FilterGuids(List<string> source) { return source == null ? new List<string>() : source.FindAll(delegate(string id) { return Ready && !IsLocked(id); }); }
         public static List<UIHero> FilterHeroes(List<UIHero> source) { return source == null ? new List<UIHero>() : source.FindAll(delegate(UIHero v) { return Ready && v != null && !IsLocked(v.guid); }); }
         public static List<UIEquipment> FilterEquips(List<UIEquipment> source) { return source == null ? new List<UIEquipment>() : source.FindAll(delegate(UIEquipment v) { return Ready && v != null && !IsLocked(v.guid); }); }
@@ -157,6 +158,7 @@ namespace HYJS.InstanceProtection
             if (main == null) { UnityEngine.Object.Destroy(button); button = null; return; }
             foreach (UISprite s in button.GetComponentsInChildren<UISprite>(true)) if (s != main) s.enabled = false;
             // Keep the native background dimensions, scale and hit region.
+            // The original bag caption is a 44x28 two-character atlas sprite; its glyph size is 22.
             UILabel nativeLabel = original.GetComponentInChildren<UILabel>();
             UISprite nativeGlyph = null;
             foreach (UISprite s in original.GetComponentsInChildren<UISprite>(true))
@@ -169,7 +171,7 @@ namespace HYJS.InstanceProtection
             collider.size = nativeCollider == null ? new Vector3(main.width, main.height, 1f) : nativeCollider.size;
             GameObject text = new GameObject("LockCaption"); text.layer = button.layer; text.transform.parent = button.transform; text.transform.localScale = Vector3.one; text.transform.localPosition = Vector3.zero;
             caption = text.AddComponent<UILabel>(); caption.bitmapFont = theme.bitmapFont; caption.trueTypeFont = theme.trueTypeFont;
-            caption.fontSize = nativeLabel != null ? nativeLabel.finalFontSize : nativeGlyph != null ? nativeGlyph.height : theme.fontSize;
+            caption.fontSize = nativeLabel != null ? nativeLabel.finalFontSize : nativeGlyph != null ? (Page is BagMemberDetail ? nativeGlyph.width / 2 : nativeGlyph.height) : theme.fontSize;
             caption.width = main.width; caption.height = main.height; caption.pivot = UIWidget.Pivot.Center; caption.alignment = NGUIText.Alignment.Center;
             if (nativeLabel != null) { caption.bitmapFont = nativeLabel.bitmapFont; caption.trueTypeFont = nativeLabel.trueTypeFont; caption.fontStyle = nativeLabel.fontStyle; caption.transform.localScale = nativeLabel.transform.localScale; }
             else if (nativeGlyph != null) caption.transform.localScale = nativeGlyph.transform.localScale;
