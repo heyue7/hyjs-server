@@ -33,10 +33,19 @@ func TestP9EquipFiveOriginalAll76BoundaryMatrix(t *testing.T) {
 				t.Fatalf("%s pet%d equip%d: steps=%d err=%v", row["id"], v.level, v.current, steps, err)
 			}
 		}
-		for _, v := range []struct{ level, current int32 }{{20, 10}, {9, 9}, {100, 100}, {100, 98}} {
+		// 最终进阶后，总最高级前1～4阶按实际剩余阶数执行。
+		for remaining := int32(1); remaining <= 4; remaining++ {
+			pet.Level, equip.StrengthLevel, equip.AdvanceLevel = proto.Int32(100), proto.Int32(100-remaining), proto.Int32(12)
+			steps, err := s.p9EquipFiveSteps(pet, equip)
+			if err != nil || steps != remaining {
+				t.Fatalf("%s final remaining%d: steps=%d err=%v", row["id"], remaining, steps, err)
+			}
+		}
+		equip.AdvanceLevel = proto.Int32(0)
+		for _, v := range []struct{ level, current int32 }{{20, 10}, {9, 9}, {100, 100}} {
 			pet.Level, equip.StrengthLevel = proto.Int32(v.level), proto.Int32(v.current)
 			if _, err := s.p9EquipFiveSteps(pet, equip); err == nil {
-				t.Fatalf("%s admitted no progress or native total-maximum rejection", row["id"])
+				t.Fatalf("%s admitted no-progress request", row["id"])
 			}
 		}
 	}
@@ -243,4 +252,46 @@ func TestP9EquipFiveActualCostsBoundaryReceiptAndAtomicFailure(t *testing.T) {
 	if p1Count(t, &db.P9PetReceipt{}, "player_id=? AND operation=? AND timestamp=?", f.id, constUtil.P9PetEquipStrengthOperation, stamp) != 0 {
 		t.Fatal("failed batch saved receipt")
 	}
+	// 有限顶级前置夹具，只验最终1～4阶的真实扣费、回执及满级拒绝。
+	if err = updateProfileWithTx(f.ctx, f.id, func(tx *gorm.DB, p *pb.Player, g *model.GameState) error {
+		p.Level, p.Coin = proto.Int32(100), proto.Int64(30000000)
+		current, err := p9OwnedPet(tx, f.id, pet.GetGuid())
+		if err != nil {
+			return err
+		}
+		current.Level = proto.Int32(100)
+		for index, equip := range current.GetPetEquipList() {
+			equip.AdvanceLevel, equip.StrengthLevel = proto.Int32(12), proto.Int32(96+int32(index))
+		}
+		pet = current
+		return p9SavePet(tx, f.id, g, current)
+	}); err != nil {
+		t.Fatal(err)
+	}
+	for index, equip := range pet.GetPetEquipList() {
+		before, _ := f.profile(t)
+		out := call(equip.GetEquipId(), 5)
+		after, _ := f.profile(t)
+		if out.GetPetEquip().GetStrengthLevel() != 100 || len(out.GetCost()) != 4-index || before.GetCoin()-after.GetCoin() != costFor(equip.GetEquipId(), 97+int32(index), 100) {
+			t.Fatal("final boundary did not charge actual remaining steps", index, out)
+		}
+		request := &pb.CSPetEquipStrengthOne{PetGuid: pet.Guid, EquipId: equip.EquipId, Num: proto.Int32(5)}
+		messages, _, err := f.s.DispatchP9PetEquip(f.ctx, f.id, request, stamp)
+		if err != nil || !proto.Equal(out, messages[0]) {
+			t.Fatal("final boundary receipt differs", err)
+		}
+		replayed, _ := f.profile(t)
+		if replayed.GetCoin() != after.GetCoin() {
+			t.Fatal("final boundary replay charged twice")
+		}
+		stamp++
+		if _, _, err = f.s.DispatchP9PetEquip(f.ctx, f.id, request, stamp); err == nil {
+			t.Fatal("final maximum accepted no-progress request")
+		}
+		full, _ := f.profile(t)
+		if full.GetCoin() != after.GetCoin() {
+			t.Fatal("final maximum rejection charged coins")
+		}
+	}
+
 }

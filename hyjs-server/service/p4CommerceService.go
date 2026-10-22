@@ -664,7 +664,11 @@ func (s *GameService) p4Projection(tx *gorm.DB, p *pb.Player, cfg db.P4CommerceR
 			// fields; stock/total caps must not masquerade as purchased units.
 			dayTotal = max(int32(0), left) + bought
 		}
-		shop = append(shop, &pb.ShopItem{Id: proto.String(publicID), Item: rewards, Price: []*pb.BaseResource{price}, ExchangeList: []*pb.BaseResource{price}, Priority: proto.Int32(product.Priority), CanBuy: proto.Int32(max(0, can)), DayLeftTimes: proto.Int32(max(0, left)), DayTotalTimes: proto.Int32(dayTotal), TotalLeftTimes: proto.Int32(max(0, allLeft)), TotalTimes: proto.Int32(max(product.TotalLimit, allLeft)), PerDiscount: proto.String(strconv.Itoa(int(bps / 100))), Condition: condition})
+		priority := product.Priority
+		if cfg.ShopType == 5 {
+			priority = s.pointShop48Priority(priority, rewards)
+		}
+		shop = append(shop, &pb.ShopItem{Id: proto.String(publicID), Item: rewards, Price: []*pb.BaseResource{price}, ExchangeList: []*pb.BaseResource{price}, Priority: proto.Int32(priority), CanBuy: proto.Int32(max(0, can)), DayLeftTimes: proto.Int32(max(0, left)), DayTotalTimes: proto.Int32(dayTotal), TotalLeftTimes: proto.Int32(max(0, allLeft)), TotalTimes: proto.Int32(max(product.TotalLimit, allLeft)), PerDiscount: proto.String(strconv.Itoa(int(bps / 100))), Condition: condition})
 		status := int32(0)
 		if can > 0 {
 			status = 1

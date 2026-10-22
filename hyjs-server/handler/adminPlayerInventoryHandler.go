@@ -15,6 +15,8 @@ import (
 
 // RegisterAdminPlayerInventoryRoutes 注册独立背包管理入口。
 func RegisterAdminPlayerInventoryRoutes(a *gin.RouterGroup) {
+	a.POST("/grants/batch", AdminBatchGrantHandler)
+	a.PUT("/game-players/:id/inventory/batch", AdminInventoryBatchHandler)
 	a.GET("/game-players/:id/inventory", AdminPlayerInventoryHandler)
 	a.GET("/game-players/:id/inventory/catalogue", AdminPlayerInventoryCatalogueHandler)
 	a.PUT("/game-players/:id/inventory", AdminPlayerInventoryMutationHandler)

@@ -426,229 +426,235 @@ func (s *GameService) AdminPlayerInventory(ctx context.Context, id int64, catego
 func (s *GameService) AdminUpdatePlayerInventory(ctx context.Context, actor *model.AdminPrincipal, id int64, req model.AdminPlayerInventoryRequest) (*model.AdminPlayerInventoryMutationResponse, error) {
 	out := &model.AdminPlayerInventoryMutationResponse{}
 	err := db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := ServerGameClockGuardTransaction(tx); err != nil {
-			return err
+		return s.adminApplyPlayerInventory(tx, actor, id, req, out)
+	})
+	return out, err
+}
+
+// adminApplyPlayerInventory lets batch additions share one transaction and the existing edit guards.
+func (s *GameService) adminApplyPlayerInventory(tx *gorm.DB, actor *model.AdminPrincipal, id int64, req model.AdminPlayerInventoryRequest, out *model.AdminPlayerInventoryMutationResponse) error {
+	ctx := tx.Statement.Context
+	if err := ServerGameClockGuardTransaction(tx); err != nil {
+		return err
+	}
+	if err := adminOperationUser(tx, actor, true); err != nil {
+		return err
+	}
+	var row db.Profile
+	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&row, id).Error; err != nil {
+		return err
+	}
+	if err := AdminCheckProfileScope(ctx, row); err != nil {
+		return err
+	}
+	p, g, err := decodeProfile(&row)
+	if err != nil {
+		return err
+	}
+	rows, pets, err := s.adminInventoryRows(tx, row, p, g)
+	if err != nil {
+		return err
+	}
+	action := "player.inventory." + req.Operation
+	target := strconv.FormatInt(id, 10) + ":" + req.RequestID
+	hashReq := req
+	hashReq.Version = ""
+	bodyHash := p3Hash(adminJSON(hashReq))
+	var audit db.AdminAudit
+	lookup := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("target=? AND action LIKE ?", target, "player.inventory.%").First(&audit).Error
+	if lookup == nil {
+		var receipt struct {
+			BodyHash string `json:"bodyHash"`
 		}
-		if err := adminOperationUser(tx, actor, true); err != nil {
-			return err
-		}
-		var row db.Profile
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&row, id).Error; err != nil {
-			return err
-		}
-		if err := AdminCheckProfileScope(ctx, row); err != nil {
-			return err
-		}
-		p, g, err := decodeProfile(&row)
-		if err != nil {
-			return err
-		}
-		rows, pets, err := s.adminInventoryRows(tx, row, p, g)
-		if err != nil {
-			return err
-		}
-		action := "player.inventory." + req.Operation
-		target := strconv.FormatInt(id, 10) + ":" + req.RequestID
-		hashReq := req
-		hashReq.Version = ""
-		bodyHash := p3Hash(adminJSON(hashReq))
-		var audit db.AdminAudit
-		lookup := tx.Where("target=? AND action LIKE ?", target, "player.inventory.%").First(&audit).Error
-		if lookup == nil {
-			var receipt struct {
-				BodyHash string `json:"bodyHash"`
-			}
-			if json.Unmarshal([]byte(audit.Detail), &receipt) != nil || audit.Actor != actor.Username || receipt.BodyHash != bodyHash || audit.Action != action {
-				return adminInventoryError("请求编号已经用于其他操作")
-			}
-			out.Version = adminInventoryVersion(row, pets)
-			return nil
-		}
-		if !errors.Is(lookup, gorm.ErrRecordNotFound) {
-			return lookup
-		}
-		if adminInventoryVersion(row, pets) != req.Version {
-			return constUtil.ErrAdminConfigConflict
-		}
-		if err := s.adminInventoryActivityGuard(tx, id, g); err != nil {
-			return err
-		}
-		beforeP := proto.Clone(p).(*pb.Player)
-		beforeG := &model.GameState{}
-		raw, err := json.Marshal(g)
-		if err != nil {
-			return err
-		}
-		if err = json.Unmarshal(raw, beforeG); err != nil {
-			return err
-		}
-		var selected *model.AdminInventoryRow
-		for i := range rows {
-			if rows[i].Category == req.Category && rows[i].Key == req.Key {
-				if selected != nil {
-					return adminInventoryError("背包身份重复，请先修复存档")
-				}
-				selected = &rows[i]
-			}
-		}
-		if req.Operation == "add" {
-			if s.adminInventoryCategory(req.ResourceID) != req.Category {
-				return adminInventoryError("该资源不属于可添加的背包分类")
-			}
-			if req.Category == "pet" {
-				if !s.P9PetsReady {
-					return adminInventoryError("精灵功能尚未就绪")
-				}
-				if _, err = s.P9GrantPet(tx, p, req.ResourceID, int32(*req.Amount)); err != nil {
-					return adminInventoryError(err.Error())
-				}
-			} else {
-				if _, err = s.GrantFixedReward(p, g, fmt.Sprintf("%s,%d", req.ResourceID, *req.Amount)); err != nil {
-					return adminInventoryError(err.Error())
-				}
-			}
-		} else {
-			if selected == nil {
-				return adminInventoryError("背包资源不存在或身份不匹配")
-			}
-			if req.Operation == "remove" && !selected.Removable {
-				return adminInventoryError(selected.BlockedReason)
-			}
-			if req.Operation == "update" && !selected.Editable {
-				return adminInventoryError(selected.BlockedReason)
-			}
-			if selected.GUID == "" {
-				if len(req.Attributes) != 0 {
-					return adminInventoryError("堆叠道具仅支持数量修改")
-				}
-				var list *[]*pb.SimpleItem
-				switch req.Category {
-				case "item":
-					list = &g.Items
-				case "gem":
-					list = &g.Gems
-				case "cooking":
-					list = &g.Cooking
-				default:
-					return adminInventoryError("该分类不支持堆叠修改")
-				}
-				next := []*pb.SimpleItem{}
-				for _, v := range *list {
-					if v.GetId() != req.Key {
-						next = append(next, v)
-					} else if req.Operation == "update" {
-						v.Num = proto.Int32(int32(*req.Amount))
-						next = append(next, v)
-					}
-				}
-				*list = next
-			} else {
-				if req.Amount != nil {
-					return adminInventoryError("实例数量不可修改")
-				}
-				var current proto.Message
-				if req.Category == "pet" {
-					current, err = p9OwnedPet(tx, id, req.Key)
-				} else {
-					current, err = p5OwnedInstance(g, req.Key)
-				}
-				if err != nil {
-					return err
-				}
-				if req.Operation == "remove" {
-					switch req.Category {
-					case "warrior":
-						for i, v := range g.Warriors {
-							if v.GetGuid() == req.Key {
-								g.Warriors = append(g.Warriors[:i], g.Warriors[i+1:]...)
-								break
-							}
-						}
-					case "equipment":
-						for i, v := range g.Equipment {
-							if v.GetGuid() == req.Key {
-								g.Equipment = append(g.Equipment[:i], g.Equipment[i+1:]...)
-								break
-							}
-						}
-					case "accessory":
-						for i, v := range g.Treasures {
-							if v.GetGuid() == req.Key {
-								g.Treasures = append(g.Treasures[:i], g.Treasures[i+1:]...)
-								break
-							}
-						}
-					case "pet":
-						pet := current.(*pb.Pet)
-						data, e := proto.Marshal(pet)
-						if e != nil {
-							return e
-						}
-						if e = tx.Create(&db.P9PetRetired{GUID: req.Key, PlayerID: id, PetID: pet.GetId(), Data: data, Operation: "admin.inventory.remove", Timestamp: time.Now().UnixMilli(), Source: "后台移除，无卖出返还；投入历史保留"}).Error; e != nil {
-							return e
-						}
-						if e = tx.Delete(&db.P9PetInstance{}, "player_id=? AND guid=?", id, req.Key).Error; e != nil {
-							return e
-						}
-						p5SetKV(g, "p9.pet:"+req.Key, "")
-					}
-				} else {
-					before := proto.Clone(current)
-					if err = s.adminInventoryApplyAttributes(tx, p, current, req.Attributes); err != nil {
-						return err
-					}
-					if req.Category == "pet" {
-						if err = p9SavePet(tx, id, g, current.(*pb.Pet)); err != nil {
-							return err
-						}
-					} else if p5KV(g, "p5.invest:"+req.Key) != "" {
-						state, e := p5InvestmentState(beforeG, req.Key, before)
-						if e != nil {
-							return adminInventoryError("实例投入历史与当前状态不一致，请先核查")
-						}
-						state.Expected, e = p5InvestmentFingerprint(current)
-						if e != nil {
-							return e
-						}
-						data, e := json.Marshal(state)
-						if e != nil {
-							return e
-						}
-						p5SetKV(g, "p5.invest:"+req.Key, string(data))
-					}
-				}
-			}
-		}
-		if s.P5Ready {
-			power, e := s.formationFightPower(p, g)
-			if e != nil {
-				return adminInventoryError(e.Error())
-			}
-			p.FightPower = proto.Int32(power)
-		}
-		p5SetKV(g, "admin.inventory.revision", uuid.NewString())
-		if err = adminSavePlayerChanges(tx, &row, beforeP, beforeG, p, g); err != nil {
-			return err
-		}
-		detail := struct {
-			BodyHash string                            `json:"bodyHash"`
-			Request  model.AdminPlayerInventoryRequest `json:"request"`
-			Before   *model.AdminInventoryRow          `json:"before,omitempty"`
-		}{bodyHash, req, selected}
-		detail.Request.Version = ""
-		if err = adminAudit(tx, actor, action, target, string(adminJSON(detail))); err != nil {
-			return err
-		}
-		if s.P9PetsReady {
-			pets, err = P9PetList(tx, id)
-			if err != nil {
-				return err
-			}
+		if json.Unmarshal([]byte(audit.Detail), &receipt) != nil || audit.Actor != actor.Username || receipt.BodyHash != bodyHash || audit.Action != action {
+			return adminInventoryError("请求编号已经用于其他操作")
 		}
 		out.Version = adminInventoryVersion(row, pets)
 		return nil
-	})
-	return out, err
+	}
+	if !errors.Is(lookup, gorm.ErrRecordNotFound) {
+		return lookup
+	}
+	if adminInventoryVersion(row, pets) != req.Version {
+		return constUtil.ErrAdminConfigConflict
+	}
+	if err := s.adminInventoryActivityGuard(tx, id, g); err != nil {
+		return err
+	}
+	beforeP := proto.Clone(p).(*pb.Player)
+	beforeG := &model.GameState{}
+	raw, err := json.Marshal(g)
+	if err != nil {
+		return err
+	}
+	if err = json.Unmarshal(raw, beforeG); err != nil {
+		return err
+	}
+	var selected *model.AdminInventoryRow
+	for i := range rows {
+		if rows[i].Category == req.Category && rows[i].Key == req.Key {
+			if selected != nil {
+				return adminInventoryError("背包身份重复，请先修复存档")
+			}
+			selected = &rows[i]
+		}
+	}
+	if req.Operation == "add" {
+		if s.adminInventoryCategory(req.ResourceID) != req.Category {
+			return adminInventoryError("该资源不属于可添加的背包分类")
+		}
+		if req.Category == "pet" {
+			if !s.P9PetsReady {
+				return adminInventoryError("精灵功能尚未就绪")
+			}
+			if _, err = s.P9GrantPet(tx, p, req.ResourceID, int32(*req.Amount)); err != nil {
+				return adminInventoryError(err.Error())
+			}
+		} else {
+			if _, err = s.GrantFixedReward(p, g, fmt.Sprintf("%s,%d", req.ResourceID, *req.Amount)); err != nil {
+				return adminInventoryError(err.Error())
+			}
+		}
+	} else {
+		if selected == nil {
+			return adminInventoryError("背包资源不存在或身份不匹配")
+		}
+		if req.Operation == "remove" && !selected.Removable {
+			return adminInventoryError(selected.BlockedReason)
+		}
+		if req.Operation == "update" && !selected.Editable {
+			return adminInventoryError(selected.BlockedReason)
+		}
+		if selected.GUID == "" {
+			if len(req.Attributes) != 0 {
+				return adminInventoryError("堆叠道具仅支持数量修改")
+			}
+			var list *[]*pb.SimpleItem
+			switch req.Category {
+			case "item":
+				list = &g.Items
+			case "gem":
+				list = &g.Gems
+			case "cooking":
+				list = &g.Cooking
+			default:
+				return adminInventoryError("该分类不支持堆叠修改")
+			}
+			next := []*pb.SimpleItem{}
+			for _, v := range *list {
+				if v.GetId() != req.Key {
+					next = append(next, v)
+				} else if req.Operation == "update" {
+					v.Num = proto.Int32(int32(*req.Amount))
+					next = append(next, v)
+				}
+			}
+			*list = next
+		} else {
+			if req.Amount != nil {
+				return adminInventoryError("实例数量不可修改")
+			}
+			var current proto.Message
+			if req.Category == "pet" {
+				current, err = p9OwnedPet(tx, id, req.Key)
+			} else {
+				current, err = p5OwnedInstance(g, req.Key)
+			}
+			if err != nil {
+				return err
+			}
+			if req.Operation == "remove" {
+				switch req.Category {
+				case "warrior":
+					for i, v := range g.Warriors {
+						if v.GetGuid() == req.Key {
+							g.Warriors = append(g.Warriors[:i], g.Warriors[i+1:]...)
+							break
+						}
+					}
+				case "equipment":
+					for i, v := range g.Equipment {
+						if v.GetGuid() == req.Key {
+							g.Equipment = append(g.Equipment[:i], g.Equipment[i+1:]...)
+							break
+						}
+					}
+				case "accessory":
+					for i, v := range g.Treasures {
+						if v.GetGuid() == req.Key {
+							g.Treasures = append(g.Treasures[:i], g.Treasures[i+1:]...)
+							break
+						}
+					}
+				case "pet":
+					pet := current.(*pb.Pet)
+					data, e := proto.Marshal(pet)
+					if e != nil {
+						return e
+					}
+					if e = tx.Create(&db.P9PetRetired{GUID: req.Key, PlayerID: id, PetID: pet.GetId(), Data: data, Operation: "admin.inventory.remove", Timestamp: time.Now().UnixMilli(), Source: "后台移除，无卖出返还；投入历史保留"}).Error; e != nil {
+						return e
+					}
+					if e = tx.Delete(&db.P9PetInstance{}, "player_id=? AND guid=?", id, req.Key).Error; e != nil {
+						return e
+					}
+					p5SetKV(g, "p9.pet:"+req.Key, "")
+				}
+			} else {
+				before := proto.Clone(current)
+				if err = s.adminInventoryApplyAttributes(tx, p, current, req.Attributes); err != nil {
+					return err
+				}
+				if req.Category == "pet" {
+					if err = p9SavePet(tx, id, g, current.(*pb.Pet)); err != nil {
+						return err
+					}
+				} else if p5KV(g, "p5.invest:"+req.Key) != "" {
+					state, e := p5InvestmentState(beforeG, req.Key, before)
+					if e != nil {
+						return adminInventoryError("实例投入历史与当前状态不一致，请先核查")
+					}
+					state.Expected, e = p5InvestmentFingerprint(current)
+					if e != nil {
+						return e
+					}
+					data, e := json.Marshal(state)
+					if e != nil {
+						return e
+					}
+					p5SetKV(g, "p5.invest:"+req.Key, string(data))
+				}
+			}
+		}
+	}
+	if s.P5Ready {
+		power, e := s.formationFightPower(p, g)
+		if e != nil {
+			return adminInventoryError(e.Error())
+		}
+		p.FightPower = proto.Int32(power)
+	}
+	p5SetKV(g, "admin.inventory.revision", uuid.NewString())
+	if err = adminSavePlayerChanges(tx, &row, beforeP, beforeG, p, g); err != nil {
+		return err
+	}
+	detail := struct {
+		BodyHash string                            `json:"bodyHash"`
+		Request  model.AdminPlayerInventoryRequest `json:"request"`
+		Before   *model.AdminInventoryRow          `json:"before,omitempty"`
+	}{bodyHash, req, selected}
+	detail.Request.Version = ""
+	if err = adminAudit(tx, actor, action, target, string(adminJSON(detail))); err != nil {
+		return err
+	}
+	if s.P9PetsReady {
+		pets, err = P9PetList(tx, id)
+		if err != nil {
+			return err
+		}
+	}
+	out.Version = adminInventoryVersion(row, pets)
+	return nil
 }
 
 func (s *GameService) adminInventoryApplyAttributes(tx *gorm.DB, p *pb.Player, current proto.Message, attrs map[string]int64) error {

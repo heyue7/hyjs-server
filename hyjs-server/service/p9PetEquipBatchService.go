@@ -6,7 +6,7 @@ import (
 	pb "hyjs-server/model/protocol"
 )
 
-// p9EquipFiveSteps 保留原总最高级门槛，在本地策略内截到当前精灵或进阶上限。
+// p9EquipFiveSteps 按总最高级、当前精灵和进阶上限截取剩余强化阶数。
 func (s *GameService) p9EquipFiveSteps(pet *pb.Pet, equip *pb.PetEquip) (int32, error) {
 	var maximum int32
 	for _, row := range s.Tables["PetEquipStrength"] {
@@ -14,8 +14,7 @@ func (s *GameService) p9EquipFiveSteps(pet *pb.Pet, equip *pb.PetEquip) (int32, 
 			maximum = int32(tableNumber(row, "level"))
 		}
 	}
-	// 原isCanStrength先检查current+5不超过GetMaxLevel全表最高阶。
-	if maximum < 1 || int64(equip.GetStrengthLevel())+5 > int64(maximum) {
+	if maximum < 1 {
 		return 0, errors.New(constUtil.P9PetEquipFiveNativeLimit)
 	}
 	cap, err := s.p9EquipStrengthCap(pet, equip)

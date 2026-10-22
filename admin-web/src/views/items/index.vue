@@ -3,10 +3,12 @@ import { useDraftGuard } from '@/composables/useDraftGuard';
 import { computed, h, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 import { NButton, NTag } from 'naive-ui';
 import type { DataTableColumns, SelectOption } from 'naive-ui';
-import { api, errorMessage, json } from '@/service/operations';
+import { api, ApiError, errorMessage, json } from '@/service/operations';
 import type { Item, ItemFacets, ItemsResponse } from '@/service/operations';
 import { useOperations } from '@/composables/useOperations';
 import ResourceImage from '@/components/operations/resource-image.vue';
+import ResourceBatchLines from '@/components/operations/resource-batch-lines.vue';
+import { validResourceBatch, type ResourceBatchLine } from '@/service/resource-batch';
 import ItemQuality from '@/components/operations/item-quality.vue';
 import { getItemDetail } from '@/service/item-details';
 import type { ItemDetail } from '@/service/item-details';
@@ -75,9 +77,24 @@ function clearFilters() {
 const grantOpen = ref(false);
 const granting = ref(false);
 const grantError = ref('');
-const selectedItem = ref<Item | null>(null);
+const checkedItems = ref<Item[]>([]);
+const batch = ref<ResourceBatchLine[]>([]);
+const checkedKeys = computed(() => checkedItems.value.map(item => item.id));
+function updateChecked(keys: (string | number)[]) {
+  const selected = new Set(keys);
+  const next = [...checkedItems.value.filter(item => selected.has(item.id)), ...rows.value.filter(item => selected.has(item.id) && !checkedItems.value.some(old => old.id === item.id))];
+  if (next.length > 20) window.$message?.warning('每批最多选择20项道具');
+  checkedItems.value = next.slice(0, 20);
+}
+function changeAmount(id: string, value: number | null) {
+  const line = batch.value.find(line => line.item.id === id);
+  if (line) line.amount = value;
+}
+function removeItem(id: string) { batch.value = batch.value.filter(line => line.item.id !== id); }
+const grantPending = ref<Record<string, unknown> | null>(null);
+const grantUncertain = ref(false);
 const grant = reactive({ playerId: null as number | null, amount: 1, reason: '', requestId: '' });
-const grantGuard = useDraftGuard({ active: () => grantOpen.value, value: () => grant, busy: () => granting.value, writable: () => canWrite.value, label: '发放草稿', close: () => { grantOpen.value = false; } });
+const grantGuard = useDraftGuard({ active: () => grantOpen.value, value: () => ({ ...grant, resources: batch.value }), busy: () => granting.value, writable: () => canWrite.value, label: '发放草稿', close: () => { grantOpen.value = false; } });
 const playerOptions = ref<{ label: string; value: number }[]>([]);
 const playerLoading = ref(false);
 let playerTimer: ReturnType<typeof setTimeout>;
@@ -104,27 +121,43 @@ function findPlayers(value: string) {
     }
   }, 250);
 }
-function openGrant(item: Item) {
-  selectedItem.value = item;
+function openGrant(item?: Item) {
+  if (grantOpen.value) { window.$message?.warning('请先完成当前发放草稿'); return; }
+  playerRequest += 1;
+  clearTimeout(playerTimer);
+  playerLoading.value = false;
+  batch.value = (item ? [item] : checkedItems.value).map(resource => ({ item: resource, amount: 1 }));
   Object.assign(grant, { playerId: null, amount: 1, reason: '', requestId: createRequestId() });
+  grantPending.value = null;
+  grantUncertain.value = false;
   playerOptions.value = [];
   grantError.value = '';
-  grantGuard.capture();
   grantOpen.value = true;
+  grantGuard.capture();
 }
 async function submitGrant() {
-  if (granting.value || !canWrite.value || !selectedItem.value) return;
-  if (!grant.playerId || !Number.isInteger(grant.amount) || grant.amount <= 0 || !grant.reason.trim()) {
-    grantError.value = '请选择角色、填写正整数数量及发放原因';
-    return;
+  if (granting.value || !canWrite.value) return;
+  if (!grantPending.value) {
+    if (!grant.playerId || !validResourceBatch(batch.value) || !grant.reason.trim()) {
+      grantError.value = '请选择角色、填写发放原因并核对各项数量';
+      return;
+    }
+    grantPending.value = {
+      playerId: grant.playerId,
+      resources: batch.value.map(line => ({ resourceId: line.item.id, amount: line.amount })),
+      reason: grant.reason.trim(), requestId: grant.requestId
+    };
   }
   granting.value = true;
   grantError.value = '';
   try {
-    await api('/grants', json('POST', { ...grant, resourceId: selectedItem.value!.id }));
+    await api<{ deliveryId: string; requestId: string }>('/grants/batch', json('POST', grantPending.value));
     window.$message?.success('发放成功，请在游戏领奖中心领取');
+    checkedItems.value = checkedItems.value.filter(item => !batch.value.some(line => line.item.id === item.id));
     grantOpen.value = false;
   } catch (e) {
+    grantUncertain.value = !(e instanceof ApiError) || e.status >= 500 || e.status < 400;
+    if (!grantUncertain.value) { grantPending.value = null; grant.requestId = createRequestId(); }
     grantError.value = errorMessage(e);
   } finally {
     granting.value = false;
@@ -148,6 +181,7 @@ onBeforeUnmount(() => { detailGeneration += 1; playerRequest += 1; clearTimeout(
 const qualityColors: NonNullable<Item['qualityColor']>[] = ['gray', 'white', 'green', 'blue', 'purple', 'orange', 'red'];
 function renderQuality(option: SelectOption) { return h(ItemQuality, { label: String(option.label), color: qualityColors[Number(option.value)] || 'gray' }); }
 const columns: DataTableColumns<Item> = [
+  { type: 'selection', disabled: item => !canWrite.value || (checkedItems.value.length >= 20 && !checkedKeys.value.includes(item.id)) },
   {
     title: '道具',
     key: 'name',
@@ -248,8 +282,12 @@ onMounted(load);
         <NButton quaternary @click="clearFilters">重置</NButton>
         <span class="ops-muted">共 {{ total.toLocaleString() }} 项资源</span>
         <NButton :loading="loading" @click="load">刷新</NButton>
+        <NButton v-if="canWrite" type="primary" :disabled="!checkedItems.length" @click="openGrant()">批量发放{{ checkedItems.length ? `（${checkedItems.length}）` : '' }}</NButton>
+        <NButton v-if="checkedItems.length" quaternary @click="checkedItems = []">清空选择</NButton>
       </div>
       <NDataTable
+        :checked-row-keys="checkedKeys"
+        @update:checked-row-keys="updateChecked"
         :columns="columns"
         :data="rows"
         :loading="loading"
@@ -284,17 +322,16 @@ onMounted(load);
       @update:show="!$event && grantGuard.requestClose()"
       preset="card"
       title="发放道具"
-      class="ops-modal"
+      class="ops-modal grant-modal"
+      :style="{ width: 'min(680px, calc(100vw - 24px))', maxHeight: 'calc(100dvh - 32px)' }"
+      :content-style="{ overflowY: 'auto' }"
       :mask-closable="!granting"
       :closable="!granting"
     >
-      <div class="grant-object">
-        <ResourceImage :item="selectedItem" :size="60" />
-        <strong>{{ selectedItem?.name }}</strong>
-        <span class="ops-mono ops-muted">{{ selectedItem?.id }}</span>
-      </div>
       <NAlert v-if="grantError" type="error" :title="grantError" class="mb-16px" />
-      <NForm label-placement="top" :disabled="granting">
+      <NAlert v-if="grantUncertain" type="warning" title="提交结果待确认，请重试原请求。" class="mb-16px" />
+      <ResourceBatchLines :lines="batch" :disabled="granting || grantUncertain" @amount="changeAmount" @remove="removeItem" />
+      <NForm label-placement="top" :disabled="granting || grantUncertain">
         <NFormItem label="目标角色" required>
           <NSelect
             v-model:value="grant.playerId"
@@ -305,9 +342,6 @@ onMounted(load);
             placeholder="输入角色名或 ID 查找"
             @search="findPlayers"
           />
-        </NFormItem>
-        <NFormItem label="数量" required>
-          <NInputNumber v-model:value="grant.amount" :min="1" :max="1000000" :precision="0" class="w-full" />
         </NFormItem>
         <NFormItem label="发放原因" required>
           <NInput
@@ -323,13 +357,13 @@ onMounted(load);
       <template #footer>
         <div class="ops-drawer-actions">
           <NButton :disabled="granting" @click="grantGuard.requestClose()">取消</NButton>
-          <NPopconfirm :disabled="!grant.playerId || !grant.reason.trim() || granting" @positive-click="submitGrant">
+          <NPopconfirm :disabled="!grant.playerId || !grant.reason.trim() || !validResourceBatch(batch) || granting" @positive-click="submitGrant">
             <template #trigger>
-              <NButton type="primary" :disabled="!grant.playerId || !grant.reason.trim()" :loading="granting">
-                确认发放
+              <NButton type="primary" :disabled="!grant.playerId || !grant.reason.trim() || !validResourceBatch(batch)" :loading="granting">
+                {{ grantUncertain ? '重试原请求' : '确认发放' }}
               </NButton>
             </template>
-            向角色 ID {{ grant.playerId }} 发放 {{ selectedItem?.name }} × {{ grant.amount }}？
+            向角色 ID {{ grant.playerId }} 发放 {{ batch.length }} 项道具？
           </NPopconfirm>
         </div>
       </template>
@@ -338,6 +372,8 @@ onMounted(load);
 </template>
 
 <style scoped>
+.grant-modal{display:flex;flex-direction:column}.grant-modal :deep(.n-card__content){min-height:0;overflow-y:auto}.grant-modal :deep(.n-card__footer){flex-shrink:0}
+@media(max-width:600px){.ops-drawer-actions{flex-wrap:wrap}.ops-drawer-actions :deep(.n-button){flex:1}}
 .item-actions{display:flex;gap:6px}.item-detail-heading{display:flex;gap:20px;align-items:center;margin-bottom:28px}.item-detail-heading h2{font-size:20px;margin:0 0 10px}.item-detail-section{padding:20px 0;border-top:1px solid rgb(var(--base-text-color)/.08)}.item-detail-section h3{font-size:15px;margin:0 0 16px}.item-detail-section dl{display:grid;grid-template-columns:160px minmax(0,1fr);gap:12px 20px;margin:0}.item-detail-section dt{color:rgb(var(--base-text-color)/.6)}.item-detail-section dd{margin:0;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.7}
 @media(max-width:600px){.item-detail-section dl{grid-template-columns:1fr;gap:6px}.item-detail-section dd{margin-bottom:10px}}
 </style>

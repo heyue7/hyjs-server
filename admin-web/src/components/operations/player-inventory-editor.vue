@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, h, ref, watch } from 'vue';
+import { h, ref, watch } from 'vue';
 import { NButton } from 'naive-ui';
 import type { DataTableColumns } from 'naive-ui';
 import { api, ApiError, errorMessage, json, type Item } from '@/service/operations';
@@ -14,6 +14,8 @@ import { useServerScopeStore } from '@/store/modules/server-scope';
 import { useDraftGuard } from '@/composables/useDraftGuard';
 import { createRequestId } from '@/utils/request-id';
 import ResourceImage from './resource-image.vue';
+import ResourceBatchLines from './resource-batch-lines.vue';
+import { validResourceBatch, type ResourceBatchLine } from '@/service/resource-batch';
 const props = defineProps<{
   show: boolean;
   playerId: number;
@@ -35,7 +37,18 @@ const quality = ref<number | null>(null);
 const page = ref(1);
 const items = ref<Item[]>([]);
 const total = ref(0);
-const selected = ref<Item | null>(null);
+const batch = ref<ResourceBatchLine[]>([]);
+function toggleItem(item: Item) {
+  if (busy.value || uncertain.value) return;
+  if (batch.value.some(line => line.item.id === item.id)) batch.value = batch.value.filter(line => line.item.id !== item.id);
+  else if (batch.value.length < 20) batch.value.push({ item, amount: 1 });
+  else error.value = '每批最多选择20项资源';
+}
+function changeAmount(id: string, value: number | null) {
+  const line = batch.value.find(line => line.item.id === id);
+  if (line) line.amount = value;
+}
+function removeItem(id: string) { batch.value = batch.value.filter(line => line.item.id !== id); }
 const amount = ref<number | null>(1);
 const attributes = ref<Record<string, number>>({});
 const reason = ref('');
@@ -47,13 +60,13 @@ const error = ref('');
 const conflict = ref(false);
 const latest = ref<PlayerInventoryRow | null>(null);
 const refreshed = ref(false);
-const refreshedTotal = ref(0);
+const refreshedResources = ref<{ id: string; name: string; total: number; amount: number }[]>([]);
 let sequence = 0;
 let catalogueSequence = 0;
 const guard = useDraftGuard({
   active: () => props.show,
   value: () => ({
-    selected: selected.value,
+    batch: batch.value,
     amount: amount.value,
     attributes: attributes.value,
     reason: reason.value
@@ -64,11 +77,6 @@ const guard = useDraftGuard({
   label: '背包操作'
 });
 defineExpose({ canLeave: guard.canLeave });
-const instance = computed(() =>
-  ['warrior', 'equipment', 'accessory', 'pet'].includes(
-    selected.value?.category || currentRow.value?.category || category.value
-  )
-);
 const columns: DataTableColumns<Item> = [
   {
     title: '资源',
@@ -97,11 +105,11 @@ const columns: DataTableColumns<Item> = [
         NButton,
         {
           size: 'small',
-          type: selected.value?.id === r.id ? 'primary' : 'default',
-          disabled: busy.value || uncertain.value,
-          onClick: () => !uncertain.value && (selected.value = r)
+          type: batch.value.some(line => line.item.id === r.id) ? 'primary' : 'default',
+          disabled: busy.value || uncertain.value || !canWrite.value,
+          onClick: () => toggleItem(r)
         },
-        () => (selected.value?.id === r.id ? '已选' : '选择')
+        () => (batch.value.some(line => line.item.id === r.id) ? '取消' : '选择')
       )
   }
 ];
@@ -147,7 +155,7 @@ watch(
     q.value = '';
     quality.value = null;
     page.value = 1;
-    selected.value = null;
+    batch.value = [];
     items.value = [];
     amount.value = props.row?.amount || 1;
     attributes.value = Object.fromEntries((props.row?.attributes || []).map(a => [a.key, a.value]));
@@ -158,6 +166,7 @@ watch(
     conflict.value = false;
     latest.value = null;
     refreshed.value = false;
+    refreshedResources.value = [];
     guard.capture();
     if (props.operation === 'add') catalogue();
   }
@@ -168,18 +177,25 @@ async function refresh() {
     server = scope.serverId;
   loading.value = true;
   try {
+    const summaries: { id: string; name: string; total: number; amount: number }[] = [];
+    if (props.operation === 'add') {
+      for (const line of batch.value) {
+        const result = await api<PlayerInventoryResponse>(scope.serverQuery(`/game-players/${id}/inventory?${new URLSearchParams({ category: line.item.category, q: line.item.id, page: '1', pageSize: '100' })}`));
+        if (seq !== sequence || server !== scope.serverId || id !== props.playerId) return;
+        summaries.push({ id: line.item.id, name: line.item.name, total: result.total, amount: result.items.filter(item => item.resourceId === line.item.id).reduce((sum, item) => sum + item.amount, 0) });
+      }
+    }
     const data = await api<PlayerInventoryResponse>(
       scope.serverQuery(
-        `/game-players/${id}/inventory?${new URLSearchParams({ category: currentRow.value?.category || selected.value?.category || '', q: currentRow.value?.guid || currentRow.value?.resourceId || selected.value?.id || '', page: '1', pageSize: '100' })}`
+        `/game-players/${id}/inventory?${new URLSearchParams({ category: currentRow.value?.category || '', q: currentRow.value?.guid || currentRow.value?.resourceId || '', page: '1', pageSize: '100' })}`
       )
     );
     if (seq !== sequence || server !== scope.serverId || id !== props.playerId) return;
     const found =
       data.items.find(r => r.key === currentRow.value?.key) ||
-      (props.operation === 'add' ? data.items.find(r => r.resourceId === selected.value?.id) : undefined) ||
       null;
     latest.value = found;
-    refreshedTotal.value = data.total;
+    refreshedResources.value = summaries;
     version.value = data.version;
     refreshed.value = true;
     conflict.value = false;
@@ -221,16 +237,16 @@ async function save() {
       error.value = '请填写操作原因';
       return;
     }
-    if (props.operation === 'add' && !selected.value) {
-      error.value = '请选择实际资源';
+    if (props.operation === 'add' && !validResourceBatch(batch.value)) {
+      error.value = '请选择1至20项资源，并核对每项整数数量';
       return;
     }
     if (
-      props.operation !== 'remove' &&
-      !(row?.attributes.length && props.operation === 'update') &&
+      props.operation === 'update' &&
+      !row?.attributes.length &&
       (!Number.isSafeInteger(amount.value) ||
         amount.value! < 1 ||
-        amount.value! > (props.operation === 'add' && instance.value ? 100 : 2147483647))
+        amount.value! > 2147483647)
     ) {
       error.value = '请输入范围内的整数数量';
       return;
@@ -251,12 +267,13 @@ async function save() {
       version: version.value,
       requestId: requestId.value,
       operation: props.operation,
-      category: props.operation === 'add' ? selected.value?.category : row?.category,
+      category: row?.category,
       reason: reason.value.trim()
     };
     if (props.operation === 'add') {
-      body.resourceId = selected.value?.id;
-      body.amount = amount.value;
+      delete body.operation;
+      delete body.category;
+      body.resources = batch.value.map(line => ({ category: line.item.category, resourceId: line.item.id, amount: line.amount }));
     } else {
       body.key = row?.key;
       if (props.operation === 'update') {
@@ -269,7 +286,7 @@ async function save() {
   const seq = sequence,
     id = props.playerId,
     server = scope.serverId,
-    path = scope.serverQuery(`/game-players/${id}/inventory`);
+    path = scope.serverQuery(`/game-players/${id}/inventory${props.operation === 'add' ? '/batch' : ''}`);
   busy.value = true;
   error.value = '';
   try {
@@ -281,8 +298,11 @@ async function save() {
   } catch (e) {
     if (seq !== sequence || server !== scope.serverId || id !== props.playerId) return;
     conflict.value = e instanceof ApiError && e.status === 409;
-    uncertain.value = !(e instanceof ApiError) || e.status >= 500;
-    if (!uncertain.value && !conflict.value) pendingBody.value = null;
+    uncertain.value = !(e instanceof ApiError) || e.status >= 500 || e.status < 400;
+    if (!uncertain.value && !conflict.value) {
+      pendingBody.value = null;
+      requestId.value = createRequestId();
+    }
     error.value = conflict.value ? '背包已更新，请读取最新版本并核对后保存' : errorMessage(e);
   } finally {
     if (seq === sequence) busy.value = false;
@@ -313,8 +333,8 @@ async function save() {
     /><NButton v-if="conflict || uncertain" :loading="loading" @click="refresh">读取最新版本并保留草稿</NButton>
     <NAlert v-if="refreshed" type="info" title="已读取最新版本，请核对草稿后保存" class="mb-16px"
       ><template v-if="operation === 'add'"
-        >该资源当前匹配 {{ refreshedTotal }} 项。请核对列表及数量后决定是否再次添加。
-        <div v-if="latest">{{ latest.name }} · 数量 {{ latest.amount }}</div></template
+        >请核对各项资源当前数量。
+        <div v-for="resource in refreshedResources" :key="resource.id">{{ resource.name }} · 当前{{ resource.total > 100 ? '前100行' : '' }}数量 {{ resource.amount }}</div></template
       ><template v-else-if="latest"
         >当前 {{ latest.name }} · 数量 {{ latest.amount }} · {{ latest.guid }}
         <div v-for="a in latest.attributes" :key="a.key">{{ a.label }}：{{ a.value }}</div></template
@@ -352,10 +372,7 @@ async function save() {
       <div class="ops-pagination">
         <NPagination v-model:page="page" :page-size="10" :item-count="total" :page-slot="5" @update:page="catalogue" />
       </div>
-      <p v-if="selected">
-        已选：{{ selected.name }} · {{ selected.id }} ·
-        {{ inventoryCategories.find(c => c.value === selected?.category)?.label || '资源' }}
-      </p></template
+      <ResourceBatchLines :lines="batch" :disabled="busy || uncertain || !canWrite" @amount="changeAmount" @remove="removeItem" /></template
     >
     <template v-else
       ><p>
@@ -376,11 +393,11 @@ async function save() {
             class="w-full"
         /></NFormItem>
       </div>
-      <NFormItem v-else-if="operation !== 'remove'" label="数量" required
+      <NFormItem v-else-if="operation === 'update'" label="数量" required
         ><NInputNumber
           v-model:value="amount"
           :min="1"
-          :max="operation === 'add' && instance ? 100 : 2147483647"
+          :max="2147483647"
           :precision="0"
           :input-props="{ 'aria-label': '资源数量' }"
           class="w-full" /></NFormItem
@@ -398,9 +415,9 @@ async function save() {
           v-if="canWrite"
           :type="operation === 'remove' ? 'error' : 'primary'"
           :loading="busy"
-          :disabled="loading || conflict || (!uncertain && refreshed && operation !== 'add' && !latest)"
+          :disabled="loading || conflict || (operation === 'add' && !uncertain && !validResourceBatch(batch)) || (!uncertain && refreshed && operation !== 'add' && !latest)"
           @click="save"
-          >{{ uncertain ? '重试原请求' : operation === 'remove' ? '确认移除' : '保存修改' }}</NButton
+          >{{ uncertain ? '重试原请求' : operation === 'remove' ? '确认移除' : operation === 'add' ? '添加资源' : '保存修改' }}</NButton
         >
       </div></template
     >

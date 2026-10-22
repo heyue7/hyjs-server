@@ -557,6 +557,9 @@ func (s *GameService) p10Social(ctx context.Context, id int64, request proto.Mes
 }
 func (s *GameService) DispatchP10Social(ctx context.Context, id int64, request proto.Message, stamp int64) ([]proto.Message, bool, error) {
 	switch b := request.(type) {
+	case *pb.CSRank:
+		messages, err := s.playerRank48(ctx, id, b.GetType(), p13UFNow(ctx))
+		return messages, true, err
 	case *pb.CSSendMassageToFriend:
 		messages, fresh, err := s.p10Social(ctx, id, b, stamp, time.Now())
 		if err != nil {
