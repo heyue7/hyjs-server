@@ -694,14 +694,19 @@ func (s *GameService) dispatch(ctx context.Context, r *model.GamePacket, peer st
 		if specialty.Enabled {
 			specialtySwitch = "on"
 		}
-		entries := make([]*pb.KeyValueEntry, 0, len(game.KV)+4)
+		petEquipSwitch := "off"
+		if s.P9PetsReady {
+			petEquipSwitch = "on"
+		}
+		entries := make([]*pb.KeyValueEntry, 0, len(game.KV)+5)
 		for _, entry := range game.KV {
-			if entry.GetKey() != "taticalSwitch" && entry.GetKey() != "skillSpecialtySwitch" && (!s.P10VoiceReady || (entry.GetKey() != "audiosystem" && entry.GetKey() != "audioautoget")) {
+			if entry.GetKey() != "taticalSwitch" && entry.GetKey() != "skillSpecialtySwitch" && entry.GetKey() != "petEquipSwitch" && (!s.P10VoiceReady || (entry.GetKey() != "audiosystem" && entry.GetKey() != "audioautoget")) {
 				entries = append(entries, entry)
 			}
 		}
 		entries = append(entries, &pb.KeyValueEntry{Key: proto.String("taticalSwitch"), Value: proto.String("on")})
 		entries = append(entries, &pb.KeyValueEntry{Key: proto.String("skillSpecialtySwitch"), Value: proto.String(specialtySwitch)})
+		entries = append(entries, &pb.KeyValueEntry{Key: proto.String("petEquipSwitch"), Value: proto.String(petEquipSwitch)})
 		if s.P10VoiceReady {
 			voiceEntries, err := s.P10VoiceKVInfo(ctx, row.Id, session)
 			if err != nil {
