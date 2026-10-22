@@ -108,25 +108,27 @@ namespace HYJS.GGO
         void CreateHeader()
         {
             ShopScoreItem template = layout.shopItemPrefab.GetComponent<ShopScoreItem>();
-            balanceLabel = CloneLabel(template.labName, "GGO Balance", new Vector3(155.85f, 102f, 0f));
-            balanceLabel.width = 520; balanceLabel.height = 26; balanceLabel.fontSize = 22; balanceLabel.maxLineCount = 1; balanceLabel.overflowMethod = UILabel.Overflow.ShrinkContent; balanceLabel.text = "荒野兑换所";
-            noticeLabel = CloneLabel(template.labName, "GGO Notice", new Vector3(155.85f, 70f, 0f));
-            noticeLabel.fontSize = 20; noticeLabel.width = 580; noticeLabel.height = 24; noticeLabel.maxLineCount = 2; noticeLabel.overflowMethod = UILabel.Overflow.ShrinkContent;
+            balanceLabel = CloneLabel(template.labName, "GGO Balance", new Vector3(235f, 235f, 0f), 22);
+            balanceLabel.text = "荒野兑换所";
+            noticeLabel = CloneLabel(template.labName, "GGO Notice", new Vector3(235f, 200f, 0f), 20);
             BoxCollider box = noticeLabel.gameObject.GetComponent<BoxCollider>();
             if (box == null) box = noticeLabel.gameObject.AddComponent<BoxCollider>();
-            box.size = new Vector3(580, 42, 1);
+            box.center = new Vector3(-275f, -14f, 0f); box.size = new Vector3(550f, 28f, 1f);
             UIEventListener.Get(noticeLabel.gameObject).onClick = delegate(GameObject ignored) { Retry(); };
-            balanceIcon = CommonMethod.CreateCommonIcon(balanceLabel.transform);
-            balanceIcon.transform.localPosition = new Vector3(-290, 0, 0); balanceIcon.transform.localScale = Vector3.one * .25f;
+            balanceIcon = CommonMethod.CreateCommonIcon(content.transform);
+            balanceIcon.transform.localPosition = new Vector3(265f, 220f, 0f); balanceIcon.transform.localScale = Vector3.one * .25f;
             balanceIcon.SetData("item_9710", true, -1, null);
         }
-        UILabel CloneLabel(UILabel source, string name, Vector3 offset)
+        UILabel CloneLabel(UILabel source, string name, Vector3 position, int fontSize)
         {
             GameObject clone = (GameObject)UnityEngine.Object.Instantiate(source.gameObject);
             clone.name = name; clone.transform.parent = content.transform;
             clone.transform.localScale = Vector3.one; clone.transform.localRotation = Quaternion.identity;
-            clone.transform.localPosition = layout.simpleGrid.transform.parent.localPosition + layout.simpleGrid.transform.localPosition + offset;
-            UILabel label = clone.GetComponent<UILabel>(); label.pivot = UIWidget.Pivot.Center; label.alignment = NGUIText.Alignment.Center; clone.SetActive(true); return label;
+            UILabel label = clone.GetComponent<UILabel>();
+            label.pivot = UIWidget.Pivot.TopRight; label.alignment = NGUIText.Alignment.Right;
+            label.fontSize = fontSize; label.width = 550; label.height = 28; label.maxLineCount = 1; label.overflowMethod = UILabel.Overflow.ShrinkContent;
+            // Setting NGUI pivot moves its transform; apply the fixed content position last.
+            clone.transform.localPosition = position; clone.SetActive(true); return label;
         }
         void SetNotice(string text) { if (noticeLabel != null) noticeLabel.text = text; }
         void Hide()
@@ -298,15 +300,17 @@ namespace HYJS.GGO
             original.discountRoot.SetActive(false); original.twoCostRoot.SetActive(false); original.oneCostRoot.SetActive(true);
             original.labCostName.text = currencyName; original.labPrice.text = data["price"].ToString();
             soldLabel = original.labBuyed;
-            UILabel soldText = soldLabel.GetComponent<UILabel>(); if (soldText != null) soldText.text = "已兑换";
-            buttonLabel = button.GetComponentInChildren<UILabel>();
+            UILabel soldText = soldLabel.GetComponent<UILabel>(); RemoveTextKit(soldText); if (soldText != null) soldText.text = "已兑换";
+            buttonLabel = button.GetComponentInChildren<UILabel>(); RemoveTextKit(buttonLabel);
             long remaining = Int64.Parse(data["remaining"].ToString()); available = remaining != 0;
             GameObject limitObject = (GameObject)UnityEngine.Object.Instantiate(original.labName.gameObject);
             limitObject.name = "GGORemaining"; limitObject.transform.parent = transform;
             limitObject.transform.localScale = Vector3.one; limitObject.transform.localRotation = Quaternion.identity;
-            limitObject.transform.localPosition = new Vector3(-142f, -48f, 0f);
-            UILabel limit = limitObject.GetComponent<UILabel>(); limit.fontSize = 18; limit.width = 150;
-            limit.text = remaining < 0 ? "不限购" : "剩余 " + remaining; limitObject.SetActive(true);
+            UILabel limit = limitObject.GetComponent<UILabel>();
+            limit.pivot = UIWidget.Pivot.Left; limit.alignment = NGUIText.Alignment.Left;
+            limit.fontSize = 18; limit.width = 150; limit.height = 24; limit.maxLineCount = 1; limit.overflowMethod = UILabel.Overflow.ShrinkContent;
+            limit.text = remaining < 0 ? "不限购" : "剩余 " + remaining;
+            limitObject.transform.localPosition = new Vector3(-142f, -48f, 0f); limitObject.SetActive(true);
             NGUITools.DestroyChildren(original.iconRoot.transform);
             CommonIcon reward = CommonMethod.CreateCommonIcon(original.iconRoot.transform);
             reward.SetData((string)data["resourceId"], true, Int32.Parse(data["amount"].ToString()), null);
@@ -320,6 +324,13 @@ namespace HYJS.GGO
             if (uiButton != null) { uiButton.onClick.Clear(); EventDelegate.Set(uiButton.onClick, OnBuyBtn); }
             else UIEventListener.Get(button).onClick = delegate(GameObject ignored) { OnBuyBtn(); };
             SetBusy(false);
+        }
+        static void RemoveTextKit(UILabel label)
+        {
+            if (label == null) return;
+            // Original prefab localization would replace our owned row text during Start.
+            foreach (MonoBehaviour component in label.GetComponents<MonoBehaviour>())
+                if (component != null && component.GetType().Name == "TextKit") UnityEngine.Object.DestroyImmediate(component);
         }
         public void OnBuyBtn() { if (available && shop != null) shop.Buy(product); }
         public void SetBusy(bool value)

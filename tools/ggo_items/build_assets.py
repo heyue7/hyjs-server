@@ -54,12 +54,25 @@ def icon_bundle(template, image, name):
     assert len(tree["m_Container"]) == 1
     _, info = tree["m_Container"][0]
     tree["m_Container"] = [("assets/outputbundle/itemicons/" + name + ".png", info)]
+    tree["m_AssetBundleName"] = "itemicons/" + name
     bundle.save_typetree(tree)
+    # Unity 5.3 identifies serialized files by CAB name across loaded bundles.
+    # A cloned template must not reuse its CAB or collide with another icon.
+    assert len(env.file.files) == 1, "Expected one self-contained icon serialized file"
+    old_cab, serialized = next(iter(env.file.files.items()))
+    cab = "CAB-" + hashlib.sha256(("hyjs-ggo-icon:" + name).encode() + image.tobytes()).hexdigest()[:32]
+    assert cab != old_cab
+    serialized.name = cab
+    env.file.files = {cab: serialized}
     raw = env.file.save(packer="lz4")
     check = UnityPy.load(raw)
     tex = next(o.read() for o in check.objects if o.type.name == "Texture2D")
     assert tex.m_Name == name and tex.image.convert("RGBA").tobytes() == image.tobytes()
     assert not next(o for o in check.objects if o.type.name == "Texture2D").assets_file.externals
+    assert list(check.file.files) == [cab]
+    verified_bundle = next(o for o in check.objects if o.type.name == "AssetBundle").read_typetree()
+    assert verified_bundle["m_AssetBundleName"] == "itemicons/" + name
+    assert list(verified_bundle["m_Container"])[0][0] == "assets/outputbundle/itemicons/" + name + ".png"
     return raw
 
 
