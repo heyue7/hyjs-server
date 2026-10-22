@@ -7,6 +7,7 @@ import { api, ApiError, errorMessage, formatTime, json } from '@/service/operati
 import type { TerminalSettings, TerminalDistribution, TerminalDistributionResult } from '@/service/wallet-operations';
 import { useOperations } from '@/composables/useOperations';
 import { useDraftGuard } from '@/composables/useDraftGuard';
+import { createRequestId } from '@/utils/request-id';
 import { useServerScopeStore } from '@/store/modules/server-scope';
 const scope = useServerScopeStore();
 const { canWrite } = useOperations();
@@ -41,7 +42,7 @@ const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value));
 const busy = computed(() => saving.value || distributing.value);
 const settingsDirty = computed(() => JSON.stringify(draft.value) !== JSON.stringify(saved.value));
 const guard = useDraftGuard({ active: () => Boolean(draft.value || pending.value), value: () => ({ settings: draft.value, pending: pending.value, points: points.value, reason: reason.value }), busy: () => busy.value || Boolean(pending.value), writable: () => canWrite.value, label: '终端设置或投放', close: () => { draft.value = saved.value ? clone(saved.value) : null; pending.value = null; points.value = null; reason.value = ''; } });
-function addWeekly() { draft.value?.weekly.push({ id: crypto.randomUUID(), weekday: 1, points: 1, enabled: true }); }
+function addWeekly() { draft.value?.weekly.push({ id: createRequestId(), weekday: 1, points: 1, enabled: true }); }
 const weekdays = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'].map((label, i) => ({ label, value: i + 1 }));
 const locked = computed(() => loading.value || busy.value || !canWrite.value || Boolean(pending.value));
 async function loadSettings() {
@@ -78,7 +79,7 @@ async function loadRecords() {
 }
 function confirmDistribution() {
   if (locked.value || conflict.value || !draft.value || !saved.value || settingsDirty.value || !points.value || !Number.isSafeInteger(points.value) || points.value <= 0 || !reason.value.trim() || !scope.currentServer || !window.$dialog) return;
-  const request = { requestId: crypto.randomUUID(), points: points.value, reason: reason.value.trim(), version: saved.value.version, serverId: scope.currentServer.id, serverName: scope.currentServer.name };
+  const request = { requestId: createRequestId(), points: points.value, reason: reason.value.trim(), version: saved.value.version, serverId: scope.currentServer.id, serverName: scope.currentServer.name };
   window.$dialog.warning({ title: '确认向当前区服投放', content: `区服：${request.serverName}（${request.serverId}）。每个符合条件的账号到账 ${request.points} 超频点数。原因：${request.reason}。包含离线角色，同账号去重，保护账号不参与。`, positiveText: '确认投放', negativeText: '取消', onPositiveClick: () => { if (scope.serverId !== request.serverId || busy.value || !canWrite.value) return; pending.value = request; void distribute(); } });
 }
 async function distribute() {

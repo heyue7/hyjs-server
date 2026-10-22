@@ -12,6 +12,7 @@ import {
 import { useOperations } from '@/composables/useOperations';
 import { useServerScopeStore } from '@/store/modules/server-scope';
 import { useDraftGuard } from '@/composables/useDraftGuard';
+import { createRequestId } from '@/utils/request-id';
 import ResourceImage from './resource-image.vue';
 const props = defineProps<{
   show: boolean;
@@ -152,7 +153,7 @@ watch(
     attributes.value = Object.fromEntries((props.row?.attributes || []).map(a => [a.key, a.value]));
     reason.value = '';
     version.value = props.version;
-    requestId.value = crypto.randomUUID();
+    requestId.value = createRequestId();
     error.value = '';
     conflict.value = false;
     latest.value = null;
@@ -196,7 +197,7 @@ async function refresh() {
     }
     if (!uncertain.value) {
       pendingBody.value = null;
-      requestId.value = crypto.randomUUID();
+      requestId.value = createRequestId();
     }
   } catch (e) {
     if (seq === sequence) error.value = errorMessage(e);
@@ -208,7 +209,7 @@ function newIntent() {
   if (!refreshed.value || busy.value) return;
   pendingBody.value = null;
   uncertain.value = false;
-  requestId.value = crypto.randomUUID();
+  requestId.value = createRequestId();
   refreshed.value = false;
   error.value = '';
 }
