@@ -168,6 +168,12 @@ func decodeProfile(row *db.Profile) (*pb.Player, *model.GameState, error) {
 }
 
 func saveProfile(tx *gorm.DB, row *db.Profile, player *pb.Player, game *model.GameState) error {
+	return saveProfileAgainst(tx, row, player, game, nil)
+}
+
+// saveProfileAgainst compares hot-path output with the actual persisted row,
+// before resource recovery rewrites the transaction's consumption baseline.
+func saveProfileAgainst(tx *gorm.DB, row *db.Profile, player *pb.Player, game *model.GameState, persisted *db.Profile) error {
 	// 业务在恢复后的余额上执行；从满值扣到未满时重开计时，其他消费保留余数。
 	nowMS := time.Now().UnixMilli()
 	accountRoleChanged := row.Player == nil || row.Game == nil
@@ -214,6 +220,9 @@ func saveProfile(tx *gorm.DB, row *db.Profile, player *pb.Player, game *model.Ga
 			}
 		}
 	}
+	if err := compactFieldBossState(game); err != nil {
+		return err
+	}
 	var (
 		p, err = json.Marshal(player)
 		g      []byte
@@ -225,8 +234,17 @@ func saveProfile(tx *gorm.DB, row *db.Profile, player *pb.Player, game *model.Ga
 	if err != nil {
 		return err
 	}
-	if err := tx.Model(row).Updates(map[string]any{"player": string(p), "game": string(g)}).Error; err != nil {
-		return err
+	updates := map[string]any{}
+	if persisted == nil || persisted.Player == nil || *persisted.Player != string(p) {
+		updates["player"] = string(p)
+	}
+	if persisted == nil || persisted.Game == nil || *persisted.Game != string(g) {
+		updates["game"] = string(g)
+	}
+	if len(updates) != 0 {
+		if err := tx.Model(row).Updates(updates).Error; err != nil {
+			return err
+		}
 	}
 	if accountRoleChanged && row.AccountID > 0 {
 		snapshot := *row
@@ -254,6 +272,7 @@ func updateProfileWithTx(ctx context.Context, id int64, fn func(*gorm.DB, *pb.Pl
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&row, id).Error; err != nil {
 			return err
 		}
+		persisted := row
 		player, game, err := decodeProfileForUpdate(&row)
 		if err != nil {
 			return err
@@ -280,7 +299,7 @@ func updateProfileWithTx(ctx context.Context, id int64, fn func(*gorm.DB, *pb.Pl
 		if err = fn(tx, player, game); err != nil {
 			return err
 		}
-		return saveProfile(tx, &row, player, game)
+		return saveProfileAgainst(tx, &row, player, game, &persisted)
 	}, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
 }
 

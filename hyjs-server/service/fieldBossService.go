@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"crypto/rand"
+	"encoding/json"
 	"errors"
 	"math"
 	"math/big"
@@ -345,7 +346,11 @@ func (s *GameService) fieldBossFightEnd(ctx context.Context, id int64, b *pb.CSS
 		if b.GetResult() != 0 && b.GetResult() != 1 || b.GetOptRecord() == nil {
 			return errors.New("野外首领结算参数无效")
 		}
-		if _, err := s.ValidateP6GenericMechanisms(ctx, fight.BossInput); err != nil {
+		input, err := fieldBossFrozenInput(fight)
+		if err != nil {
+			return err
+		}
+		if _, err := s.ValidateP6GenericMechanisms(ctx, input); err != nil {
 			return err
 		}
 		// Type12 records real player commands, just like the existing original
@@ -354,11 +359,11 @@ func (s *GameService) fieldBossFightEnd(ctx context.Context, id int64, b *pb.CSS
 		// source-record contract: command identity/order, automatic NPC clocks,
 		// final round and both HP totals are validated by the original driver.
 		// The exact supplied record is also bound into the calculation digest.
-		terminal, err := s.ComputeOriginalP6ProtocolFinalHP(ctx, fight.BossInput, b.GetOptRecord())
+		terminal, err := s.ComputeOriginalP6ProtocolFinalHP(ctx, input, b.GetOptRecord())
 		if err != nil {
 			return err
 		}
-		if err = validateP6GenericMechanismTerminal(fight.BossInput, terminal); err != nil {
+		if err = validateP6GenericMechanismTerminal(input, terminal); err != nil {
 			return err
 		}
 		if terminal == nil || terminal.Outcome == nil || terminal.Outcome.Winner != 0 && terminal.Outcome.Winner != 1 {
@@ -373,7 +378,7 @@ func (s *GameService) fieldBossFightEnd(ctx context.Context, id int64, b *pb.CSS
 		}
 
 		expectedAttackers := map[string]*pb.BattleHero{}
-		for _, hero := range fight.BossInput.Attacker.GetFormation() {
+		for _, hero := range input.Attacker.GetFormation() {
 			expectedAttackers[hero.GetGuid()] = hero
 		}
 		seen := map[string]bool{}
@@ -396,7 +401,7 @@ func (s *GameService) fieldBossFightEnd(ctx context.Context, id int64, b *pb.CSS
 		if len(seen) != len(expectedAttackers) || maximum <= 0 {
 			return errors.New("野外首领己方终局成员不完整")
 		}
-		anger := fight.BossInput.Attacker.Inst.GetAnger()
+		anger := input.Attacker.Inst.GetAnger()
 		if terminal.Outcome.Attacker != nil && terminal.Outcome.Attacker.Inst != nil {
 			anger = terminal.Outcome.Attacker.Inst.GetAnger()
 		}
@@ -486,6 +491,80 @@ func (s *GameService) fieldBossFightEnd(ctx context.Context, id int64, b *pb.CSS
 		return nil
 	})
 	return []proto.Message{result, &pb.SCFieldPlayerState{Player: []*pb.PlayerSide{side}}}, err
+}
+
+// fieldBossFrozenInput expands only the one battle being settled and checks the
+// canonical bytes. Historical uncompressed saves retain the same validation.
+func fieldBossFrozenInput(fight *model.FieldFight) (*model.FrozenBattleInput, error) {
+	if fight == nil {
+		return nil, errors.New(constUtil.P6ReplayConflict)
+	}
+	if fight.BossInput != nil {
+		if len(fight.BossInputStored) != 0 {
+			return nil, errors.New(constUtil.P6ReplayConflict)
+		}
+		return fight.BossInput, nil
+	}
+	if len(fight.BossInputStored) == 0 || fight.BossInputHash == "" {
+		return nil, errors.New(constUtil.P6ReplayConflict)
+	}
+	raw, err := decodeP6StoredInput(fight.BossInputStored)
+	if err != nil || p6Digest(raw) != fight.BossInputHash {
+		return nil, errors.New(constUtil.P6ReplayConflict)
+	}
+	var input model.FrozenBattleInput
+	if json.Unmarshal(raw, &input) != nil {
+		return nil, errors.New(constUtil.P6ReplayConflict)
+	}
+	return &input, nil
+}
+
+// compactFieldBossState keeps only the input needed for pending settlement.
+// Completed replies retain their original idempotent result and saved Boss HP.
+func compactFieldBossState(game *model.GameState) error {
+	if game.Field == nil {
+		return nil
+	}
+	compact := func(fight *model.FieldFight) error {
+		if fight == nil {
+			return nil
+		}
+		if fight.Settled && fight.BossResult != nil {
+			fight.BossInput = nil
+			fight.BossInputStored = nil
+			fight.BossInputHash = ""
+			return nil
+		}
+		if fight.BossInput == nil {
+			return nil
+		}
+		if len(fight.BossInputStored) != 0 {
+			return errors.New(constUtil.P6ReplayConflict)
+		}
+		raw, err := json.Marshal(fight.BossInput)
+		if err != nil {
+			return err
+		}
+		stored, err := encodeP6StoredInput(raw)
+		if err != nil {
+			return err
+		}
+		fight.BossInputStored = stored
+		fight.BossInputHash = p6Digest(raw)
+		fight.BossInput = nil
+		return nil
+	}
+	if err := compact(game.Field.Fight); err != nil {
+		return err
+	}
+	for _, area := range game.Field.Areas {
+		if area != nil {
+			if err := compact(area.Fight); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 // releaseFieldBossFight 在断线/超时丢弃未提交战斗时恢复首领可见状态，不结算伤害或奖励。

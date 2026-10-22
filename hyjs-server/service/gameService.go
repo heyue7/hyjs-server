@@ -87,7 +87,18 @@ func (s *GameService) Dispatch(ctx context.Context, request *model.GamePacket, p
 		return GameError(constUtil.ErrGameRequest, err.Error())
 	}
 	name := model.OpcodeNames[request.Opcode]
-	elog.Info("game request", zap.String("message", name), zap.Int64("playerId", request.PlayerId))
+	started := time.Now()
+	defer func() {
+		if elapsed := time.Since(started); elapsed >= constUtil.GameSlowRequestThreshold {
+			elog.Warn("slow game request", zap.String("message", name), zap.Int64("playerId", request.PlayerId), zap.Int64("elapsedMs", elapsed.Milliseconds()))
+		}
+	}()
+	// Keep failures and slow requests observable without writing every movement tick.
+	switch request.Body.(type) {
+	case *pb.CSMove, *pb.CSPingTcp, *pb.CSPingAckTcp, *pb.CSSpeedCheck:
+	default:
+		elog.Info("game request", zap.String("message", name), zap.Int64("playerId", request.PlayerId))
+	}
 	ctx = context.WithValue(ctx, constUtil.GameServiceContextKey, s)
 	ctx = context.WithValue(ctx, constUtil.GameRequestContextKey, request.Body)
 	var (
@@ -255,8 +266,14 @@ func (s *GameService) dispatch(ctx context.Context, r *model.GamePacket, peer st
 	if err != nil {
 		return nil, err
 	}
-	// Create this role's configured relative activity instances before their original consumers run.
-	if row.Player != nil {
+	// Transport packets keep authentication and clock binding; materialize personal
+	// activities before the next gameplay consumer instead of every movement tick.
+	prepareActivities := true
+	switch r.Body.(type) {
+	case *pb.CSMove, *pb.CSPingTcp, *pb.CSPingAckTcp, *pb.CSSpeedCheck, *pb.CSEnterBackgroud:
+		prepareActivities = false
+	}
+	if row.Player != nil && prepareActivities {
 		if err = s.PrepareAdminCharacterActivitySchedules(ctx, row.Id); err != nil {
 			return nil, err
 		}
@@ -271,6 +288,9 @@ func (s *GameService) dispatch(ctx context.Context, r *model.GamePacket, peer st
 	}
 	ctx = bindFieldRuntime(ctx, s)
 	switch b := r.Body.(type) {
+	case *pb.CSMove:
+		// The movement transaction already recovers resources under its role lock.
+		return nil, s.fieldMove(ctx, row.Id, b)
 	case *pb.CSRefreshSideHp:
 		return s.formationSideHPRefresh(ctx, row.Id, b)
 	case *pb.CSGenerateName:
@@ -702,46 +722,6 @@ func (s *GameService) dispatch(ctx context.Context, r *model.GamePacket, peer st
 		return s.shopBuy(ctx, row.Id, b, r.Timestamp)
 	case *pb.CSBigClientReward:
 		return s.bigClientReward(ctx, row.Id)
-	case *pb.CSMove:
-		return nil, updateProfileWithTx(ctx, row.Id, func(tx *gorm.DB, p *pb.Player, g *model.GameState) error {
-			if s.P12FieldPVPReady {
-				allowed, err := ShouldAllowP12PrisonTransfer(tx, row.Id, g.Position.GetScene(), b.GetPointNew(), time.Now())
-				if err != nil {
-					return err
-				}
-				if !allowed {
-					if err = CheckP12FieldPVPAction(tx, row.Id, time.Now()); err != nil {
-						return err
-					}
-				}
-				if s.fieldSceneRow(g.Position.GetScene()) != nil && g.Field != nil && g.Field.Side != nil && (g.Field.Side.GetState() == constUtil.P8FieldDead || g.Field.Side.GetCurHp() <= 0) {
-					return errors.New("死亡状态不能移动，请先完成原复活")
-				}
-			}
-			if g.PositionLoading {
-				return nil
-			}
-			if s.P8LifeReady && g.Position.GetScene() == "field_001" && g.Field != nil && g.Field.Side != nil && (g.Field.Side.GetState() == 5 || g.Field.Side.GetCurHp() <= 0) {
-				return errors.New("死亡状态不能移动，请先复活")
-			}
-			if s.P8LifeReady {
-				if _, err := s.RefreshP8Survival(tx, p, g, time.Now()); err != nil {
-					return err
-				}
-			}
-			if s.P8GatherReady {
-				if err := s.P8ObserveGatherMove(tx, row.Id, g, b.GetPointNew()); err != nil {
-					return err
-				}
-			}
-			g.Position.Current = b.GetPointNew()
-			if s.P8LifeReady {
-				if _, err := s.RefreshP8Survival(tx, p, g, time.Now()); err != nil {
-					return err
-				}
-			}
-			return nil
-		})
 	case *pb.CSTransferScene:
 		return s.fieldTransfer(ctx, row.Id, b)
 	case *pb.CSLoginScene:

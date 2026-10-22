@@ -40,6 +40,36 @@ def mysql(query):
                'MYSQL_PWD="$MYSQL_PASSWORD" exec mysql -uhyjs --batch --raw --skip-column-names hyjs',
                input=query.encode()).stdout.decode()
 
+
+def backup_existing_database():
+    # Keep historical snapshots untouched; new snapshots are authenticated-encrypted.
+    backup_dir = ROOT / 'backups'
+    assert backup_dir.is_dir() and not backup_dir.is_symlink()
+    os.chmod(backup_dir, 0o700)
+    key_file = ROOT / '.backup-encryption.key'
+    if not key_file.exists():
+        fd = os.open(key_file, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, 'wb') as target:
+            target.write(os.urandom(32))
+    assert not key_file.is_symlink() and key_file.stat().st_mode & 0o777 == 0o600 and key_file.stat().st_size == 32
+    name = 'pre-deploy-' + manifest['revision'][:12] + '-' + str(time.time_ns()) + '.sql.gz'
+    plain = backup_dir / (name + '.pending')
+    encrypted = backup_dir / (name + '.aesgcm')
+    process = subprocess.Popen(['docker', 'exec', 'hyjs-mysql', 'sh', '-c',
+                                'MYSQL_PWD="$MYSQL_PASSWORD" exec mysqldump -uhyjs --single-transaction --hex-blob --no-tablespaces --set-gtid-purged=OFF hyjs'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    with gzip.open(plain, 'xb') as target:
+        shutil.copyfileobj(process.stdout, target)
+    assert process.wait() == 0, 'Backup failed; pending snapshot retained privately'
+    run(str(stage / 'app/hyjs-backupseal'), '--input', str(plain), '--output', str(encrypted), '--key-file', str(key_file))
+    # Authenticate the encrypted snapshot before deleting this task's temporary plaintext.
+    verified = backup_dir / (name + '.verified')
+    run(str(stage / 'app/hyjs-backupseal'), '--decrypt', '--input', str(encrypted), '--output', str(verified), '--key-file', str(key_file))
+    assert sha(verified) == sha(plain), 'Encrypted backup verification failed'
+    plain.unlink()
+    verified.unlink()
+    (ROOT / 'backup-latest.json').write_text(json.dumps({'file': encrypted.name, 'sha256': sha(encrypted), 'format': 'HYJSBK01-AES256GCM', 'revisionBefore': 'preserved running image'}, indent=2))
+
+
 for name, digest in manifest['files'].items():
     path = stage / name
     assert path.resolve().is_relative_to(stage) and sha(path) == digest, name
@@ -58,6 +88,9 @@ with os.fdopen(fd, 'w') as output:
     output.write('\n'.join(kept) + '\n' + ''.join(key + '=' + value + '\n' for key, value in runtime.items()))
 os.chmod(temporary_env, 0o600)
 os.replace(temporary_env, private_env)
+# Verify the encrypted snapshot before Compose can restart MySQL for new limits.
+if (ROOT / 'migration.json').exists():
+    backup_existing_database()
 shutil.copy2(stage / 'compose.yaml', ROOT / 'compose.yaml')
 compose('up', '-d', 'mysql')
 for _ in range(80):
@@ -115,33 +148,6 @@ if args.initial_db and not already_imported:
     (ROOT / '.incoming/initial-verification.json').unlink()
 elif not (ROOT / 'migration.json').exists():
     raise SystemExit('Initial data must be explicitly imported before application start')
-else:
-    # Keep historical snapshots untouched; new snapshots are authenticated-encrypted.
-    backup_dir = ROOT / 'backups'
-    assert backup_dir.is_dir() and not backup_dir.is_symlink()
-    os.chmod(backup_dir, 0o700)
-    key_file = ROOT / '.backup-encryption.key'
-    if not key_file.exists():
-        fd = os.open(key_file, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-        with os.fdopen(fd, 'wb') as target:
-            target.write(os.urandom(32))
-    assert not key_file.is_symlink() and key_file.stat().st_mode & 0o777 == 0o600 and key_file.stat().st_size == 32
-    name = 'pre-deploy-' + manifest['revision'][:12] + '-' + str(time.time_ns()) + '.sql.gz'
-    plain = backup_dir / (name + '.pending')
-    encrypted = backup_dir / (name + '.aesgcm')
-    process = subprocess.Popen(['docker', 'exec', 'hyjs-mysql', 'sh', '-c',
-                                'MYSQL_PWD="$MYSQL_PASSWORD" exec mysqldump -uhyjs --single-transaction --hex-blob --no-tablespaces --set-gtid-purged=OFF hyjs'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    with gzip.open(plain, 'xb') as target:
-        shutil.copyfileobj(process.stdout, target)
-    assert process.wait() == 0, 'Backup failed; pending snapshot retained privately'
-    run(str(stage / 'app/hyjs-backupseal'), '--input', str(plain), '--output', str(encrypted), '--key-file', str(key_file))
-    # Authenticate the encrypted snapshot before deleting this task's temporary plaintext.
-    verified = backup_dir / (name + '.verified')
-    run(str(stage / 'app/hyjs-backupseal'), '--decrypt', '--input', str(encrypted), '--output', str(verified), '--key-file', str(key_file))
-    assert sha(verified) == sha(plain), 'Encrypted backup verification failed'
-    plain.unlink()
-    verified.unlink()
-    (ROOT / 'backup-latest.json').write_text(json.dumps({'file': encrypted.name, 'sha256': sha(encrypted), 'format': 'HYJSBK01-AES256GCM', 'revisionBefore': 'preserved running image'}, indent=2))
 
 shutil.copy2('/etc/ssl/certs/ca-certificates.crt', stage / 'ca-certificates.crt')
 old_image = subprocess.run(['docker', 'inspect', '--format={{.Image}}', 'hyjs-game'], capture_output=True, text=True).stdout.strip()

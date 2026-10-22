@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 	"testing"
 	"time"
@@ -22,6 +23,7 @@ func fieldBoss33State(t *testing.T, id int64) (*pb.Player, *model.GameState) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	return player, game
 }
 
@@ -110,7 +112,15 @@ func TestFieldBoss33OriginalDataSpawnCheckColdAndOriginalReplay(t *testing.T) {
 	}
 	start = started[0].(*pb.SCSidePveBossFightStart)
 	_, replayState := fieldBoss33State(t, f.id)
-	frozen := replayState.Field.Fight.BossInput
+	frozen, err := fieldBossFrozenInput(replayState.Field.Fight)
+	if err != nil {
+		t.Fatal(err)
+	}
+	canonical, err := json.Marshal(frozen)
+	if err != nil || replayState.Field.Fight.BossInput != nil || len(replayState.Field.Fight.BossInputStored)*3 >= len(canonical) {
+		t.Fatal("pending input was not compacted losslessly", err)
+	}
+	t.Logf("pending boss input canonical=%d stored=%d", len(canonical), len(replayState.Field.Fight.BossInputStored))
 	terminal, _, err := f.s.ComputeP6GenericMechanismBattle(f.ctx, frozen, nil)
 	if err != nil || terminal.OriginalOperates == nil {
 		t.Fatal("original type12 replay failed", err)
@@ -215,7 +225,11 @@ func TestFieldBoss33RemnantVictoryRewardsOnceColdAndRespawn(t *testing.T) {
 	}
 	start := started[0].(*pb.SCSidePveBossFightStart)
 	_, game = fieldBoss33State(t, f.id)
-	terminal, err := f.s.ComputeOriginalP6ProtocolFinalHP(f.ctx, game.Field.Fight.BossInput, nil)
+	input, err := fieldBossFrozenInput(game.Field.Fight)
+	if err != nil {
+		t.Fatal(err)
+	}
+	terminal, err := f.s.ComputeOriginalP6ProtocolFinalHP(f.ctx, input, nil)
 	if err != nil || terminal.Outcome.Winner != 0 {
 		t.Fatal("actual engine must kill remnant", err)
 	}

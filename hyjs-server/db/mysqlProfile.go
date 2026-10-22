@@ -63,6 +63,15 @@ func OpenGameMySQL(ctx context.Context, cfg MySQLConfig, applySchema bool) (*gor
 	return d, nil
 }
 
+// InitExistingGameMySQL connects a maintenance command without creating or migrating tables.
+func InitExistingGameMySQL(ctx context.Context, cfg MySQLConfig) error {
+	d, err := OpenGameMySQL(ctx, cfg, false)
+	if err == nil {
+		dbIns = d
+	}
+	return err
+}
+
 // InitGameMySQL 使用 InnoDB 行锁承载所有账号存档事务。
 func InitGameMySQL(ctx context.Context, cfg MySQLConfig) error {
 	d, err := OpenGameMySQL(ctx, cfg, true)

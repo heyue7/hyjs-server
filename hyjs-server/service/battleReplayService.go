@@ -19,6 +19,7 @@ import (
 	"google.golang.org/protobuf/proto"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
+	"gorm.io/gorm/logger"
 	"hyjs-server/constUtil"
 	"hyjs-server/db"
 	"hyjs-server/model"
@@ -82,6 +83,119 @@ func decodeP6StoredInput(stored []byte) ([]byte, error) {
 		return nil, errors.New(constUtil.P6ReplayConflict)
 	}
 	return raw, nil
+}
+
+// CompactLegacyP6BattleInputs rewrites historical plaintext P6 inputs to the same gzip
+// representation used for new records. The primary-key cursor reads at most eight rows per
+// batch, and each eligible row is rechecked under a short row lock before only input changes.
+// Invalid or unknown payloads stay untouched; repeated calls make no further changes.
+func (s *GameService) CompactLegacyP6BattleInputs(ctx context.Context) (*model.P6StorageCompactionResult, error) {
+	if ctx == nil {
+		return nil, errors.New(constUtil.CombatInvalid)
+	}
+	const batchSize = 8
+	stats := &model.P6StorageCompactionResult{}
+	cursor := ""
+	for {
+		// Stop before issuing the next batch so cancellation does not wait for a full scan.
+		if err := ctx.Err(); err != nil {
+			return stats, err
+		}
+		rows := make([]db.P6BattleRecord, 0, batchSize)
+		query := db.GetIns().WithContext(ctx).Select("id, input, input_hash").Order("id ASC").Limit(batchSize)
+		if cursor != "" {
+			query = query.Where("id > ?", cursor)
+		}
+		if err := query.Find(&rows).Error; err != nil {
+			return stats, err
+		}
+		if len(rows) == 0 {
+			return stats, nil
+		}
+		for i := range rows {
+			if err := ctx.Err(); err != nil {
+				return stats, err
+			}
+			stats.Scanned++
+			compacted, eligible, invalid := compactP6LegacyInput(&rows[i])
+			if invalid {
+				stats.SkippedInvalid++
+				continue
+			}
+			if !eligible {
+				continue
+			}
+			changed, err := persistP6CompactedInput(ctx, &rows[i], compacted)
+			if err != nil {
+				return stats, err
+			}
+			if !changed {
+				continue
+			}
+			stats.Compacted++
+			stats.BytesBefore += int64(len(rows[i].Input))
+			stats.BytesAfter += int64(len(compacted))
+		}
+		cursor = rows[len(rows)-1].ID
+		if len(rows) < batchSize {
+			return stats, nil
+		}
+	}
+}
+
+// compactP6LegacyInput only accepts a larger plaintext JSON blob whose canonical hash matches
+// the stored identity. Existing gzip and small records are never decode candidates.
+func compactP6LegacyInput(row *db.P6BattleRecord) ([]byte, bool, bool) {
+	if row == nil || len(row.Input) <= constUtil.P6StoredInputCompressionThreshold || (len(row.Input) >= 2 && row.Input[0] == 0x1f && row.Input[1] == 0x8b) {
+		return nil, false, false
+	}
+	raw, err := decodeP6StoredInput(row.Input)
+	if err != nil {
+		return nil, false, true
+	}
+	if !json.Valid(raw) || p6Digest(raw) != row.InputHash {
+		return nil, false, true
+	}
+	stored, err := encodeP6StoredInput(raw)
+	if err != nil || len(stored) >= len(row.Input) {
+		return nil, false, false
+	}
+	// Verify the exact stored bytes decode back to the original canonical JSON before writing.
+	restored, err := decodeP6StoredInput(stored)
+	if err != nil || !bytes.Equal(restored, raw) {
+		return nil, false, true
+	}
+	return stored, true, false
+}
+
+// persistP6CompactedInput locks one primary key and confirms the scanned hash and input bytes
+// still match before updating only the input column. Concurrent changes leave the row untouched.
+func persistP6CompactedInput(ctx context.Context, row *db.P6BattleRecord, compacted []byte) (bool, error) {
+	changed := false
+	// Suppress the per-row SQL echo because the bound input blob is large and must stay out of logs.
+	err := db.GetIns().WithContext(ctx).Session(&gorm.Session{Logger: logger.Discard}).Transaction(func(tx *gorm.DB) error {
+		var current db.P6BattleRecord
+		err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Select("id, input, input_hash").Where("id=?", row.ID).First(&current).Error
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		if current.InputHash != row.InputHash || !bytes.Equal(current.Input, row.Input) {
+			return nil
+		}
+		if err = ctx.Err(); err != nil {
+			return err
+		}
+		result := tx.Model(&db.P6BattleRecord{}).Where("id=? AND input_hash=?", row.ID, row.InputHash).Update("input", compacted)
+		if result.Error != nil {
+			return result.Error
+		}
+		changed = result.RowsAffected == 1
+		return nil
+	})
+	return changed, err
 }
 
 // decodeP6Record verifies both immutable content and its persisted identity before reuse.

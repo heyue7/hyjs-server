@@ -9,7 +9,14 @@ services:
       MYSQL_USER: hyjs
       MYSQL_PASSWORD: ${HYJS_MYSQL_PASSWORD:?required}
       MYSQL_ROOT_PASSWORD: ${HYJS_MYSQL_ROOT_PASSWORD:?required}
-    command: [--innodb-buffer-pool-size=128M, --max-connections=100]
+    # Bound MySQL's independently allocated caches below the 768 MiB container.
+    # Keep the existing data directory and InnoDB durability settings intact.
+    command:
+      - --innodb-buffer-pool-size=128M
+      - --max-connections=40
+      - --table-open-cache=1024
+      - --table-definition-cache=800
+      - --temptable-max-ram=64M
     volumes:
       - ./data/mysql:/var/lib/mysql
     healthcheck:

@@ -180,7 +180,10 @@ type FieldFight struct {
 	BossStart      *pb.SCSidePveBossFightStart `json:"boss_start,omitempty"`
 	BossResult     *pb.SCSidePveBossFightEnd   `json:"boss_result,omitempty"`
 	BossInput      *FrozenBattleInput          `json:"boss_input,omitempty"`
-	BossReward     string                      `json:"boss_reward,omitempty"`
-	BossKill       string                      `json:"boss_kill,omitempty"`
-	BossCooldownMS int64                       `json:"boss_cooldown_ms,omitempty"`
+	// Keep the pending canonical input compressed; movement never expands it.
+	BossInputStored []byte `json:"boss_input_stored,omitempty"`
+	BossInputHash   string `json:"boss_input_hash,omitempty"`
+	BossReward      string `json:"boss_reward,omitempty"`
+	BossKill        string `json:"boss_kill,omitempty"`
+	BossCooldownMS  int64  `json:"boss_cooldown_ms,omitempty"`
 }

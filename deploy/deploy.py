@@ -73,7 +73,7 @@ run('go', 'test', './middleware', '-run', '^TestCORSExactOriginsAndNativeCompati
 run('go', 'vet', './...', cwd=ROOT / 'hyjs-server')
 run('go', 'build', '-trimpath', '-buildvcs=false', '-o', str(app / 'hyjs-server'), '.', cwd=ROOT / 'hyjs-server', env=environment)
 run('go', 'build', '-trimpath', '-buildvcs=false', '-o', str(app / 'hyjs-backupseal'), './cmd/backupseal', cwd=ROOT / 'hyjs-server', env=environment)
-run('python3', ROOT / 'deploy/build_auth_rollback.py', '--output', app / 'hyjs-server-auth-compatible-rollback', cwd=ROOT)
+run('python3', ROOT / 'deploy/build_storage_rollback.py', '--output', app / 'hyjs-server-auth-compatible-rollback', cwd=ROOT)
 run('pnpm', 'typecheck', cwd=ROOT / 'admin-web')
 run('pnpm', 'build', cwd=ROOT / 'admin-web')
 assert not run('git', 'status', '--porcelain'), 'Build unexpectedly modified tracked source'

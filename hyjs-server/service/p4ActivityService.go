@@ -128,6 +128,10 @@ func (s *GameService) RecordP4Save(tx *gorm.DB, row *db.Profile, p *pb.Player, g
 			return err
 		}
 	}
+	// The event/entry checks above still run; unchanged statistics need no SQL write.
+	if state.PlayerID == p.GetPlayerId() && state.Period == period && state.LastPower == power {
+		return nil
+	}
 	state.PlayerID = p.GetPlayerId()
 	state.Period = period
 	state.LastPower = power
@@ -141,13 +145,6 @@ func (s *GameService) recordP4PowerEntry(tx *gorm.DB, id int64, power int32, now
 		return err
 	}
 	for _, live := range instances {
-		allowed, err := localPlayActivityVisible(tx, live.ID)
-		if err != nil {
-			return err
-		}
-		if !allowed {
-			continue
-		}
 		if !live.Enabled {
 			continue
 		}
@@ -156,6 +153,15 @@ func (s *GameService) recordP4PowerEntry(tx *gorm.DB, id int64, power int32, now
 			return err
 		}
 		if cfg.Kind != constUtil.P4KindPower || cfg.Mode != "single" || now.UnixMilli() < cfg.StartAt || now.UnixMilli() >= cfg.EndAt {
+			continue
+		}
+		// Only a live power window needs calendar ownership and template checks.
+		// Freeze first so an issued window keeps its original kind and timing.
+		allowed, err := localPlayActivityVisible(tx, live.ID)
+		if err != nil {
+			return err
+		}
+		if !allowed {
 			continue
 		}
 		var count int64

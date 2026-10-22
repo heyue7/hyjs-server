@@ -2,12 +2,12 @@ port: ${HYJS_HTTP_PORT}
 logConfig:
   logFile: logs/app.log
   gormLogFile: logs/sql.log
-  maxSize: 10
-  maxBackups: 3
-  maxAge: 7
+  maxSize: 5
+  maxBackups: 2
+  maxAge: 3
   compress: true
   logLevel: info
-  gormLogLevel: warn
+  gormLogLevel: silent
   gormSlowThresholdMs: 200
 # Game/admin authentication uses its own persisted credential/session contracts.
 jwtKey: ""

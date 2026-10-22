@@ -901,3 +901,46 @@ func (s *GameService) fieldFightEnd(ctx context.Context, id int64, b *pb.CSSideP
 	// CopyBalance 在展示结束时通过 AddResultObj 增加奖励，避免提前覆盖 Player 后再次加币。
 	return []proto.Message{result, &pb.SCFieldPlayerState{Player: []*pb.PlayerSide{side}}}, err
 }
+
+// fieldMove keeps movement, survival and gather updates in the original profile transaction.
+func (s *GameService) fieldMove(ctx context.Context, id int64, b *pb.CSMove) error {
+	return updateProfileWithTx(ctx, id, func(tx *gorm.DB, p *pb.Player, g *model.GameState) error {
+		if s.P12FieldPVPReady {
+			allowed, err := ShouldAllowP12PrisonTransfer(tx, id, g.Position.GetScene(), b.GetPointNew(), time.Now())
+			if err != nil {
+				return err
+			}
+			if !allowed {
+				if err = CheckP12FieldPVPAction(tx, id, time.Now()); err != nil {
+					return err
+				}
+			}
+			if s.fieldSceneRow(g.Position.GetScene()) != nil && g.Field != nil && g.Field.Side != nil && (g.Field.Side.GetState() == constUtil.P8FieldDead || g.Field.Side.GetCurHp() <= 0) {
+				return errors.New("死亡状态不能移动，请先完成原复活")
+			}
+		}
+		if g.PositionLoading {
+			return nil
+		}
+		if s.P8LifeReady && g.Position.GetScene() == "field_001" && g.Field != nil && g.Field.Side != nil && (g.Field.Side.GetState() == 5 || g.Field.Side.GetCurHp() <= 0) {
+			return errors.New("死亡状态不能移动，请先复活")
+		}
+		if s.P8LifeReady {
+			if _, err := s.RefreshP8Survival(tx, p, g, time.Now()); err != nil {
+				return err
+			}
+		}
+		if s.P8GatherReady {
+			if err := s.P8ObserveGatherMove(tx, id, g, b.GetPointNew()); err != nil {
+				return err
+			}
+		}
+		g.Position.Current = b.GetPointNew()
+		if s.P8LifeReady {
+			if _, err := s.RefreshP8Survival(tx, p, g, time.Now()); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
