@@ -145,6 +145,8 @@ def main():
     parser.add_argument('--gameplay-overlay', type=Path, help='Qualified gameplay45 input to the update layer')
     parser.add_argument('--pet-equip-overlay', type=Path, help='Qualified pet equipment input to the update layer')
     parser.add_argument('--guide-overlay', type=Path, help='Qualified per-guide skip input to the update layer')
+    parser.add_argument('--pet-follow-overlay', type=Path, help='Audited original pet follow resource repair')
+    parser.add_argument('--instance-lock-overlay', type=Path, help='Qualified instance protection and blue selection input')
     args = parser.parse_args()
     base, overlay, output, record = [path.resolve() for path in (args.base_apk, args.overlay, args.output, args.record)]
     require(output.is_relative_to(ROOT / 'build') and record.is_relative_to(ROOT / 'analysis'), 'Use owned project output paths')
@@ -152,7 +154,7 @@ def main():
     proof = json.loads((overlay / 'manifest.json').read_text())
     require(common.digest(base) == proof['baseAPKSHA256'], 'Fixed base changed')
     pins = {ROOT / name: value for name, value in proof['sourcePins'].items()}
-    require(sum(bool(x) for x in [args.gameplay_overlay, args.pet_equip_overlay, args.guide_overlay]) <= 1, 'Choose one qualified managed input')
+    require(sum(bool(x) for x in [args.gameplay_overlay, args.pet_equip_overlay, args.guide_overlay, args.instance_lock_overlay]) <= 1, 'Choose one qualified managed input')
     gameplay = None
     if args.gameplay_overlay:
         gameplay_dir = args.gameplay_overlay.resolve()
@@ -178,6 +180,22 @@ def main():
         require({item['method'] for item in guide['changes']} == {'GuideManager::CheckGuideCanStart', 'Login.LoginPlayerLogin::KVInfoCallBack'}, 'Unexpected guide method scope')
         pins.update({ROOT / name: value for name, value in guide['sourcePins'].items()})
     pins[Path(__file__).resolve()] = common.digest(Path(__file__))
+    protection = None
+    if args.instance_lock_overlay:
+        protection_dir = args.instance_lock_overlay.resolve()
+        require(protection_dir.is_relative_to(ROOT / 'build'), 'Use owned instance lock overlay')
+        protection = json.loads((protection_dir / 'manifest.json').read_text())
+        require(protection['schema'] == 'hyjs-instance-lock51-v1' and protection['baseAPKSHA256'] == proof['baseAPKSHA256'] and protection['originalEngineMethodsExact'] == 547, 'Instance protection qualification differs')
+        pins.update({ROOT / name: value for name, value in protection['sourcePins'].items()})
+    follow = None
+    if args.pet_follow_overlay:
+        follow_dir = args.pet_follow_overlay.resolve()
+        require(follow_dir.is_relative_to(ROOT / 'build'), 'Use owned pet follow overlay')
+        follow = json.loads((follow_dir / 'manifest.json').read_text())
+        require(follow['schema'] == 'hyjs-pet-follow50-assets-v1' and follow['baseAPKSHA256'] == proof['baseAPKSHA256'], 'Pet follow base differs')
+        require(follow['all78FollowStandRunAndSkeletonsVerified'] and len(follow['petsAudited']) == 78 and follow['allOriginalObjectsExceptAnimationAndPreloadExact'] and follow['samePrefabPreloadAppendedClipCount'] == 2 and not follow['managedCodeChanged'], 'Pet follow audit missing')
+        require({f['entry'] for f in follow['files']} == {'assets/android/model/pet_028_low', 'assets/android/smallassetmanifest'}, 'Unexpected pet follow resource scope')
+        pins.update({ROOT / name: value for name, value in follow['sourcePins'].items()})
     for path, digest in pins.items():
         require(path.resolve().is_relative_to(ROOT) and common.digest(path) == digest, 'Build source changed')
     sdk = Path.home() / 'Library/Android/sdk/build-tools/33.0.0'
@@ -208,6 +226,11 @@ def main():
                 update_input = (guide_dir / 'Assembly-CSharp.dll').read_bytes()
                 require(hashlib.sha256(update_input).hexdigest() == guide['outputManagedSHA256'], 'Guide managed output differs')
                 verify_managed(before, update_input, [item['method'] for item in guide['changes']])
+            if protection is not None:
+                require(hashlib.sha256(before).hexdigest() == protection['inputManagedSHA256'], 'Instance protection managed base differs')
+                update_input = (protection_dir / 'Assembly-CSharp.dll').read_bytes()
+                require(hashlib.sha256(update_input).hexdigest() == protection['outputManagedSHA256'], 'Instance protection output differs')
+                verify_managed(before, update_input, [item['method'] for item in protection['changes']])
             require(hashlib.sha256(update_input).hexdigest() == proof['inputManagedSHA256'] and hashlib.sha256(after).hexdigest() == proof['outputManagedSHA256'], 'Managed qualification differs')
             verify_managed(update_input, after, proof['allowedChangedMethods'])
             native, flag_offset = allow_wallet_subclass(incoming.read('classes2.dex'))
@@ -242,6 +265,16 @@ def main():
                 helper_entry = 'assets/bin/Data/Managed/LocalPlayability.dll'
                 payload[helper_entry] = (guide_dir / 'LocalPlayability.dll').read_bytes()
                 require(hashlib.sha256(payload[helper_entry]).hexdigest() == guide['helperSHA256'], 'Guide helper changed')
+            if follow is not None:
+                for item in follow['files']:
+                    name = item['entry']
+                    value = (follow_dir / name).read_bytes()
+                    require(hashlib.sha256(incoming.read(name)).hexdigest() == item['beforeSHA256'] and hashlib.sha256(value).hexdigest() == item['sha256'], 'Pet follow input/output changed')
+                    payload[name] = value
+            if protection is not None:
+                helper_entry = 'assets/bin/Data/Managed/InstanceProtection.dll'
+                payload[helper_entry] = (protection_dir / 'InstanceProtection.dll').read_bytes()
+                require(hashlib.sha256(payload[helper_entry]).hexdigest() == protection['helperSHA256'], 'Instance protection helper changed')
         with tempfile.TemporaryDirectory(prefix='hyjs-client-update-', dir=ROOT / 'build') as directory:
             temp = Path(directory)
             unsigned, aligned, signed = [temp / name for name in ('unsigned.apk', 'aligned.apk', 'signed.apk')]
