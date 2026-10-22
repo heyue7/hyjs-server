@@ -143,7 +143,7 @@ def main():
             target.write_bytes(archive.read('assets/bin/Data/Managed/' + name))
             references.append(target)
         helper = out / 'SoulFlowerGGOShop.dll'
-        run('compile-helper', [dotnet, compiler, '/nologo', '/target:library', '/nostdlib+', '/langversion:3', '/deterministic+', '/out:' + str(helper), *['/reference:' + str(x) for x in references], SOURCE / 'GGOShop.cs'])
+        run('compile-helper', [dotnet, compiler, '/nologo', '/target:library', '/nostdlib+', '/langversion:3', '/deterministic+', '/out:' + str(helper), *['/reference:' + str(x) for x in references], SOURCE / 'GGOShop.cs', SOURCE / 'GGOIconManifest.cs'])
         shutil.copy2(SOURCE / 'Injector.cs', work / 'Program.cs')
         project = work / 'Patch.csproj'
         project.write_text('<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable></PropertyGroup><ItemGroup><Reference Include="dnlib"><HintPath>' + str(dnlib) + '</HintPath></Reference></ItemGroup></Project>')
@@ -164,7 +164,7 @@ def main():
                     'replacementEntries': {MAIN: sha(after), HELPER: sha(helper.read_bytes()), 'assets/bin/Data/Managed/SoulFlowerKingRecruit.dll': sha(king_helper.read_bytes())},
                     'payloadFiles': {MAIN: str(out / 'Assembly-CSharp.dll'), HELPER: str(helper), 'assets/bin/Data/Managed/SoulFlowerKingRecruit.dll': str(king_helper)},
                     'inheritedKingAPICompatible': True, 'kingHelperSourcePins': king_manifest['sourcePins'],
-                    'phoneVerified': False, 'sourcePins': {str(p.relative_to(ROOT)): sha(p.read_bytes()) for p in [SOURCE / 'GGOShop.cs', SOURCE / 'Injector.cs', Path(__file__).resolve()]}, **verify(before, after)}
+                    'phoneVerified': False, 'sourcePins': {str(p.relative_to(ROOT)): sha(p.read_bytes()) for p in [SOURCE / 'GGOShop.cs', SOURCE / 'GGOIconManifest.cs', SOURCE / 'Injector.cs', Path(__file__).resolve()]}, **verify(before, after)}
         manifest['sourcePins'].update(king_manifest['sourcePins'])
         require(sha(args.base_apk.read_bytes()) == input_apk_hash, 'Input APK changed during compilation')
         (out / 'manifest.json').write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + '\n')

@@ -43,8 +43,38 @@ namespace HYJS.GGO
         bool Visible() { return selected && shop != null && shop.isOpen && gameObject.activeInHierarchy && content != null && content.activeInHierarchy && SameOwner(); }
         string PreferenceKey() { return "hyjs.ggo.pending." + Uri.EscapeDataString(origin) + "." + owner; }
 
+        static bool assetRegistrationErrorLogged;
+        // Old user manifests take precedence over APK manifests. Admit only our ten missing
+        // bundle keys in memory, through the native parser; never persist or replace entries.
+        static void RegisterIcons()
+        {
+            try
+            {
+                Type managerType = typeof(StaticData).Assembly.GetType("AssetLoad.AssetBundleManager", true);
+                PropertyInfo instance = managerType.GetProperty("Instance", Flags | BindingFlags.Static | BindingFlags.FlattenHierarchy);
+                object manager = instance == null ? null : instance.GetValue(null, null);
+                if (manager == null) return;
+                FieldInfo fullField = Field(managerType, "assetFileTool"), smallField = Field(managerType, "smallAssetFileTool");
+                AssetFileTool full = fullField == null ? null : fullField.GetValue(manager) as AssetFileTool;
+                AssetFileTool small = smallField == null ? null : smallField.GetValue(manager) as AssetFileTool;
+                if (full == null || small == null || full.assetCells == null || small.assetCells == null) return;
+                AssetFileTool additions = AssetFileTool.LoadFromString(GGOIconManifest.Text);
+                if (additions == null || additions.assetCells.Count != 10) return;
+                foreach (KeyValuePair<string, AssetCell> pair in additions.assetCells)
+                {
+                    if (!full.assetCells.ContainsKey(pair.Key)) full.assetCells.Add(pair.Key, pair.Value);
+                    if (!small.assetCells.ContainsKey(pair.Key)) small.assetCells.Add(pair.Key, pair.Value);
+                }
+            }
+            catch (Exception error)
+            {
+                if (!assetRegistrationErrorLogged) { assetRegistrationErrorLogged = true; Debug.LogWarning("GGO icon registration: " + error.GetType().FullName); }
+            }
+        }
+
         public static void Ensure(ShopPage page)
         {
+            RegisterIcons();
             if (page == null || page.simpleGrid == null) return;
             GGOShop control = page.GetComponent<GGOShop>();
             if (control == null) control = page.gameObject.AddComponent<GGOShop>();
@@ -77,6 +107,7 @@ namespace HYJS.GGO
         }
         void Select()
         {
+            RegisterIcons();
             Hide();
             if (!Current(out owner, out session) || String.IsNullOrEmpty(origin = Origin())) return;
             LoadPending(); version = ""; enabledShop = false; confirmedNotice = "";
@@ -280,6 +311,7 @@ namespace HYJS.GGO
         // Filter only positive terminal tickets at the real inventory merge. The caller's result list remains untouched.
         public static List<SimpleItem> InventoryItems(List<SimpleItem> source)
         {
+            RegisterIcons();
             if (source == null) return source;
             List<SimpleItem> result = null;
             foreach (SimpleItem item in source)

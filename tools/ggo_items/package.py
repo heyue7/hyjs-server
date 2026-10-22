@@ -38,6 +38,7 @@ def main():
     base_sha = common.digest(base)
     require(base_sha == asset['baseAPKSHA256'] == client['baseAPKSHA256'], 'Overlay base differs')
     require(asset['schema'] == 'hyjs-ggo-image-assets-v1' and client['schema'] == 'hyjs-ggo-shop-overlay-v1', 'Overlay schema differs')
+    require(asset.get('generatedIconManifestSHA256') and asset['generatedIconManifestSHA256'] == client['sourcePins'].get('tools/ggo_items/client/GGOIconManifest.cs'), 'Client runtime icon index differs from packaged assets')
     pins = {ROOT / name: digest for name, digest in client['sourcePins'].items()}
     pins[Path(__file__)] = common.digest(Path(__file__))
     for path, digest in pins.items():
