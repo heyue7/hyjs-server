@@ -1,6 +1,7 @@
 package constUtil
 
 const (
+	PlayerRank48ReadPageSize            = 128
 	PlayerRank48Copy              int32 = 1
 	PlayerRank48Power             int32 = 2
 	PlayerRank48Level             int32 = 3
