@@ -13,14 +13,17 @@ const scope = useServerScopeStore();
 const route = useRoute();
 const router = useRouter();
 const walletTarget = ref<(Pick<GamePlayer, 'id' | 'name'> & { accountId?: number }) | null>(null);
-function openWallet(player: Pick<GamePlayer, 'id' | 'name'> & { accountId?: number }) {
+const walletRef = ref<InstanceType<typeof WalletLedger> | null>(null);
+async function openWallet(player: Pick<GamePlayer, 'id' | 'name'> & { accountId?: number }) {
+  if (walletTarget.value && (await walletRef.value?.canLeave()) === false) return;
   walletTarget.value = {
     id: player.id,
     name: player.name,
     accountId: player.accountId
   };
 }
-function closeWallet() {
+async function closeWallet() {
+  if ((await walletRef.value?.canLeave()) === false) return;
   walletTarget.value = null;
   if (route.query.wallet) {
     const query = { ...route.query };
@@ -407,9 +410,11 @@ watch(
       <NDrawerContent :title="`${walletTarget?.name || ''} · 蓝绿终端`" closable>
         <WalletLedger
           v-if="walletTarget"
+          ref="walletRef"
           :key="`${scope.serverId}:${walletTarget.id}`"
           :account-id="walletTarget.accountId || undefined"
-          :player-id="walletTarget.accountId ? undefined : walletTarget.id"
+          :player-id="walletTarget.id"
+          :player-name="walletTarget.name"
         />
       </NDrawerContent>
     </NDrawer>

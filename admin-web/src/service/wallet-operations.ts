@@ -16,6 +16,7 @@ export interface WalletLedgerItem {
 }
 export interface WalletLedger {
   balanceCents: number;
+  revision: number;
   summary: {
     startAt: number;
     endAt: number;
@@ -26,6 +27,19 @@ export interface WalletLedger {
   };
   items: WalletLedgerItem[];
   total: number;
+}
+export interface WalletAdjustmentRequest {
+  requestId: string;
+  action: 'credit' | 'debit';
+  points: number;
+  reason: string;
+  revision: number;
+}
+export interface WalletAdjustmentResult {
+  balanceCents: number;
+  revision: number;
+  amountCents: number;
+  alreadyApplied: boolean;
 }
 export interface WalletReason {
   id: string;

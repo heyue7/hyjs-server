@@ -22,6 +22,7 @@ func RegisterAdminWalletRoutes(a *gin.RouterGroup) {
 	RegisterAdminTerminalRoutes(a)
 	a.GET("/wallets", AdminWalletsHandler)
 	a.GET("/wallets/:id/ledger", AdminWalletLedgerHandler)
+	a.POST("/wallets/:id/adjust", AdminWalletAdjustHandler)
 	a.GET("/wallet-reasons", AdminWalletReasonsHandler)
 	a.PUT("/wallet-reasons/:id", AdminWalletReasonUpdateHandler)
 	// 日期入口由独立的全服时间管理提供。
@@ -134,7 +135,7 @@ func AdminWalletLedgerHandler(c *gin.Context) {
 		adminError(c, err)
 		return
 	}
-	adminSuccess(c, gin.H{"balanceCents": result.BalanceCents, "summary": result.Summary, "items": result.Entries, "total": result.Total, "page": result.Page, "pageSize": result.PageSize})
+	adminSuccess(c, gin.H{"balanceCents": result.BalanceCents, "revision": result.Revision, "summary": result.Summary, "items": result.Entries, "total": result.Total, "page": result.Page, "pageSize": result.PageSize})
 }
 
 // AdminWalletReasonsHandler 返回实际入账情境和相对权重。
