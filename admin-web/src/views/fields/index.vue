@@ -9,6 +9,7 @@ import CombatEditor from './combat-editor.vue';
 import DropEditor from './drop-editor.vue';
 import FieldMap from './field-map.vue';
 import PointEditor from './point-editor.vue';
+import GgoConfigEditor from './ggo-config-editor.vue';
 
 const scope = useServerScopeStore();
 const route = useRoute();
@@ -175,7 +176,7 @@ async function save(asNew = false) {
     const data = await api<FieldTemplate>('/fields/templates', json('POST', body));
     accept(data);
     await loadTemplates();
-    success.value = '方案已保存，发布到区服后生效';
+    success.value = activeTab.value === 'ggo' ? '搜打撤配置已保存' : '方案已保存，发布到区服后生效';
   } catch (e) {
     error.value = errorMessage(e);
     conflict.value = e instanceof ApiError && e.status === 409;
@@ -379,6 +380,10 @@ onMounted(load);
                 </NFormItem>
               </NForm>
               <p class="text-sm text-gray-500">矿物和鱼群从候选位置随机刷新，同一轮不会占用重复位置。</p>
+            </NTabPane>
+            <NTabPane v-if="cfg.scene === 'field_003'" name="ggo" tab="搜打撤配置">
+              <GgoConfigEditor v-if="cfg.ggo" v-model:value="cfg.ggo" :disabled="readonly" />
+              <NAlert v-else type="info">搜打撤配置待初始化。</NAlert>
             </NTabPane>
             <NTabPane name="gather" tab="矿物与钓鱼">
               <NCollapse>
@@ -592,6 +597,7 @@ onMounted(load);
               <NTag :type="row.available ? 'success' : 'warning'">
                 {{ row.available ? '资源齐备' : '暂未开放 · 场景缺失' }}
               </NTag>
+              <NTag v-if="row.scene === 'field_003' && templates.find(t => t.id === row.templateId)?.configuration.ggo" type="info">搜打撤 · 配置准备</NTag>
               <NTag v-if="row.templateChanged" type="warning">全局方案有更新</NTag>
             </div>
             <div class="flex flex-wrap items-center gap-3">

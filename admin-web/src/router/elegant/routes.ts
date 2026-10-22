@@ -344,6 +344,18 @@ export const generatedRoutes: GeneratedRoute[] = [
     },
     children: [
       {
+        name: 'shops_ggo',
+        path: '/shops/ggo',
+        component: 'view.shops_ggo',
+        meta: {
+          title: '荒野兑换所',
+          i18nKey: 'route.shops_ggo',
+          icon: 'ph:cpu',
+          order: 11,
+          roles: ['viewer', 'operator', 'admin']
+        }
+      },
+      {
         name: 'shops_guild',
         path: '/shops/guild',
         component: 'view.shops_guild',

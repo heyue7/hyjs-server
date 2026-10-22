@@ -174,6 +174,9 @@ func saveProfile(tx *gorm.DB, row *db.Profile, player *pb.Player, game *model.Ga
 // saveProfileAgainst compares hot-path output with the actual persisted row,
 // before resource recovery rewrites the transaction's consumption baseline.
 func saveProfileAgainst(tx *gorm.DB, row *db.Profile, player *pb.Player, game *model.GameState, persisted *db.Profile) error {
+	if err := ConvertGGOOverclockItem(tx, row, player, game); err != nil {
+		return err
+	}
 	// 业务在恢复后的余额上执行；从满值扣到未满时重开计时，其他消费保留余数。
 	nowMS := time.Now().UnixMilli()
 	accountRoleChanged := row.Player == nil || row.Game == nil

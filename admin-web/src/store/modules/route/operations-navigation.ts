@@ -14,7 +14,7 @@ export function organizeOperationsMenus(menus: App.Global.Menu[]) {
     cdk: 'ph:gift', 'redeem-codes': 'ph:ticket', broadcast: 'ph:envelope-open', mail: 'ph:paper-plane-tilt',
     shops_ordinary: 'ph:shopping-bag', shops_memory: 'ph:sparkle', shops_popularity: 'ph:star',
     'shops_popularity-rank': 'ph:ranking', shops_point: 'ph:compass', shops_score: 'ph:coins',
-    shops_guild: 'ph:flag', 'shops_pet-market': 'ph:paw-print', 'shops_union-fight': 'ph:sword', shops_vip: 'ph:crown'
+    shops_ggo: 'ph:cpu', shops_guild: 'ph:flag', 'shops_pet-market': 'ph:paw-print', 'shops_union-fight': 'ph:sword', shops_vip: 'ph:crown'
   };
   function withIcons(row: App.Global.Menu): App.Global.Menu {
     return { ...row, icon: useSvgIcon().SvgIconVNode({ icon: pageIcons[row.key] || 'ph:squares-four', fontSize: 20 }), children: row.children?.map(withIcons) };

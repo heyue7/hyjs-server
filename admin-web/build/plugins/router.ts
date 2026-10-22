@@ -62,6 +62,7 @@ export function setupElegantRouter() {
           order: 5
         },
         shops_score: { title: '积分商店', icon: 'ph:treasure-chest', order: 6 },
+        shops_ggo: { title: '荒野兑换所', icon: 'ph:cpu', order: 11 },
         'guild-settings': { title: '公会设置', icon: 'ph:flag', order: 4 },
         guilds: { title: '公会管理', icon: 'ph:users-three', order: 5 },
         shops_guild: { title: '公会商店', icon: 'ph:treasure-chest', order: 7 },

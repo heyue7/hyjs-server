@@ -1,0 +1,554 @@
+{
+  "UI_kuang_big_bian_blue": {
+    "iconUrl": "/admin/media/items/UI_kuang_big_bian_blue.png",
+    "previewUrl": "/admin/media/items/UI_kuang_big_bian_blue.png",
+    "source": {
+      "apk": "10056262.apk",
+      "apkSHA256": "b1d99496c7ffe17c45ab7646c72023be406924997d471e3f18db169fb0dfd641",
+      "entry": "assets/bin/Data/457c3cf065e4db5428e935ac6f29619b",
+      "entrySHA256": "c51ae78a7879233abc54bfdf87142c7cd0e08aa1bb4f1269bb227c1273c0650b",
+      "objectPathID": 3,
+      "objectType": "MonoBehaviour",
+      "extraction": "original NGUI UIAtlas serialized mSprites",
+      "atlasName": "FrameAtlas",
+      "materialPathID": 1,
+      "texturePathID": 1,
+      "textureName": "FrameAtlas",
+      "textureSize": [
+        1024,
+        512
+      ],
+      "pixelSize": 1.0,
+      "coordinateOrigin": "top-left",
+      "packedRotation": "not present in original UISpriteData",
+      "spriteRect": {
+        "x": 0,
+        "y": 315,
+        "width": 96,
+        "height": 96
+      },
+      "border": {
+        "left": 47,
+        "right": 47,
+        "top": 47,
+        "bottom": 47
+      },
+      "padding": {
+        "left": 0,
+        "right": 0,
+        "top": 0,
+        "bottom": 0
+      }
+    },
+    "sha256": "ac4e14f6f34393c1ffe7cedb5ee7b6d2cbb6b6f9a09c715630f9e13785d735c0",
+    "sha": "ac4e14f6f34393c1ffe7cedb5ee7b6d2cbb6b6f9a09c715630f9e13785d735c0",
+    "width": 96,
+    "height": 96
+  },
+  "UI_kuang_big_bian_green": {
+    "iconUrl": "/admin/media/items/UI_kuang_big_bian_green.png",
+    "previewUrl": "/admin/media/items/UI_kuang_big_bian_green.png",
+    "source": {
+      "apk": "10056262.apk",
+      "apkSHA256": "b1d99496c7ffe17c45ab7646c72023be406924997d471e3f18db169fb0dfd641",
+      "entry": "assets/bin/Data/457c3cf065e4db5428e935ac6f29619b",
+      "entrySHA256": "c51ae78a7879233abc54bfdf87142c7cd0e08aa1bb4f1269bb227c1273c0650b",
+      "objectPathID": 3,
+      "objectType": "MonoBehaviour",
+      "extraction": "original NGUI UIAtlas serialized mSprites",
+      "atlasName": "FrameAtlas",
+      "materialPathID": 1,
+      "texturePathID": 1,
+      "textureName": "FrameAtlas",
+      "textureSize": [
+        1024,
+        512
+      ],
+      "pixelSize": 1.0,
+      "coordinateOrigin": "top-left",
+      "packedRotation": "not present in original UISpriteData",
+      "spriteRect": {
+        "x": 101,
+        "y": 319,
+        "width": 96,
+        "height": 96
+      },
+      "border": {
+        "left": 47,
+        "right": 47,
+        "top": 47,
+        "bottom": 47
+      },
+      "padding": {
+        "left": 0,
+        "right": 0,
+        "top": 0,
+        "bottom": 0
+      }
+    },
+    "sha256": "0c0e30e3ae8c47cb4e811dc40ca72d4bb9e89037b46efb21d2c482af3339014a",
+    "sha": "0c0e30e3ae8c47cb4e811dc40ca72d4bb9e89037b46efb21d2c482af3339014a",
+    "width": 96,
+    "height": 96
+  },
+  "UI_kuang_big_bian_red": {
+    "iconUrl": "/admin/media/items/UI_kuang_big_bian_red.png",
+    "previewUrl": "/admin/media/items/UI_kuang_big_bian_red.png",
+    "source": {
+      "apk": "10056262.apk",
+      "apkSHA256": "b1d99496c7ffe17c45ab7646c72023be406924997d471e3f18db169fb0dfd641",
+      "entry": "assets/bin/Data/457c3cf065e4db5428e935ac6f29619b",
+      "entrySHA256": "c51ae78a7879233abc54bfdf87142c7cd0e08aa1bb4f1269bb227c1273c0650b",
+      "objectPathID": 3,
+      "objectType": "MonoBehaviour",
+      "extraction": "original NGUI UIAtlas serialized mSprites",
+      "atlasName": "FrameAtlas",
+      "materialPathID": 1,
+      "texturePathID": 1,
+      "textureName": "FrameAtlas",
+      "textureSize": [
+        1024,
+        512
+      ],
+      "pixelSize": 1.0,
+      "coordinateOrigin": "top-left",
+      "packedRotation": "not present in original UISpriteData",
+      "spriteRect": {
+        "x": 101,
+        "y": 222,
+        "width": 96,
+        "height": 96
+      },
+      "border": {
+        "left": 47,
+        "right": 47,
+        "top": 47,
+        "bottom": 47
+      },
+      "padding": {
+        "left": 0,
+        "right": 0,
+        "top": 0,
+        "bottom": 0
+      }
+    },
+    "sha256": "fb81780b43a338833cbdefce3f21700ed91967de380d1c2684ce6936c952e078",
+    "sha": "fb81780b43a338833cbdefce3f21700ed91967de380d1c2684ce6936c952e078",
+    "width": 96,
+    "height": 96
+  },
+  "UI_kuang_big_bian_white": {
+    "iconUrl": "/admin/media/items/UI_kuang_big_bian_white.png",
+    "previewUrl": "/admin/media/items/UI_kuang_big_bian_white.png",
+    "source": {
+      "apk": "10056262.apk",
+      "apkSHA256": "b1d99496c7ffe17c45ab7646c72023be406924997d471e3f18db169fb0dfd641",
+      "entry": "assets/bin/Data/457c3cf065e4db5428e935ac6f29619b",
+      "entrySHA256": "c51ae78a7879233abc54bfdf87142c7cd0e08aa1bb4f1269bb227c1273c0650b",
+      "objectPathID": 3,
+      "objectType": "MonoBehaviour",
+      "extraction": "original NGUI UIAtlas serialized mSprites",
+      "atlasName": "FrameAtlas",
+      "materialPathID": 1,
+      "texturePathID": 1,
+      "textureName": "FrameAtlas",
+      "textureSize": [
+        1024,
+        512
+      ],
+      "pixelSize": 1.0,
+      "coordinateOrigin": "top-left",
+      "packedRotation": "not present in original UISpriteData",
+      "spriteRect": {
+        "x": 101,
+        "y": 125,
+        "width": 96,
+        "height": 96
+      },
+      "border": {
+        "left": 47,
+        "right": 47,
+        "top": 47,
+        "bottom": 47
+      },
+      "padding": {
+        "left": 0,
+        "right": 0,
+        "top": 0,
+        "bottom": 0
+      }
+    },
+    "sha256": "51ed6802d6bf6c014514e939c5e0f49933289a678405484f11c37d1137d1356d",
+    "sha": "51ed6802d6bf6c014514e939c5e0f49933289a678405484f11c37d1137d1356d",
+    "width": 96,
+    "height": 96
+  },
+  "UI_kuang_big_bian_yellow": {
+    "iconUrl": "/admin/media/items/UI_kuang_big_bian_yellow.png",
+    "previewUrl": "/admin/media/items/UI_kuang_big_bian_yellow.png",
+    "source": {
+      "apk": "10056262.apk",
+      "apkSHA256": "b1d99496c7ffe17c45ab7646c72023be406924997d471e3f18db169fb0dfd641",
+      "entry": "assets/bin/Data/457c3cf065e4db5428e935ac6f29619b",
+      "entrySHA256": "c51ae78a7879233abc54bfdf87142c7cd0e08aa1bb4f1269bb227c1273c0650b",
+      "objectPathID": 3,
+      "objectType": "MonoBehaviour",
+      "extraction": "original NGUI UIAtlas serialized mSprites",
+      "atlasName": "FrameAtlas",
+      "materialPathID": 1,
+      "texturePathID": 1,
+      "textureName": "FrameAtlas",
+      "textureSize": [
+        1024,
+        512
+      ],
+      "pixelSize": 1.0,
+      "coordinateOrigin": "top-left",
+      "packedRotation": "not present in original UISpriteData",
+      "spriteRect": {
+        "x": 101,
+        "y": 28,
+        "width": 96,
+        "height": 96
+      },
+      "border": {
+        "left": 47,
+        "right": 47,
+        "top": 47,
+        "bottom": 47
+      },
+      "padding": {
+        "left": 0,
+        "right": 0,
+        "top": 0,
+        "bottom": 0
+      }
+    },
+    "sha256": "05d1443a14156689d57fe9629cf180c57a9e8956ca35212e2ec4c7f1cbf9c6e5",
+    "sha": "05d1443a14156689d57fe9629cf180c57a9e8956ca35212e2ec4c7f1cbf9c6e5",
+    "width": 96,
+    "height": 96
+  },
+  "UI_kuang_big_bian_zi": {
+    "iconUrl": "/admin/media/items/UI_kuang_big_bian_zi.png",
+    "previewUrl": "/admin/media/items/UI_kuang_big_bian_zi.png",
+    "source": {
+      "apk": "10056262.apk",
+      "apkSHA256": "b1d99496c7ffe17c45ab7646c72023be406924997d471e3f18db169fb0dfd641",
+      "entry": "assets/bin/Data/457c3cf065e4db5428e935ac6f29619b",
+      "entrySHA256": "c51ae78a7879233abc54bfdf87142c7cd0e08aa1bb4f1269bb227c1273c0650b",
+      "objectPathID": 3,
+      "objectType": "MonoBehaviour",
+      "extraction": "original NGUI UIAtlas serialized mSprites",
+      "atlasName": "FrameAtlas",
+      "materialPathID": 1,
+      "texturePathID": 1,
+      "textureName": "FrameAtlas",
+      "textureSize": [
+        1024,
+        512
+      ],
+      "pixelSize": 1.0,
+      "coordinateOrigin": "top-left",
+      "packedRotation": "not present in original UISpriteData",
+      "spriteRect": {
+        "x": 101,
+        "y": 416,
+        "width": 96,
+        "height": 96
+      },
+      "border": {
+        "left": 47,
+        "right": 47,
+        "top": 47,
+        "bottom": 47
+      },
+      "padding": {
+        "left": 0,
+        "right": 0,
+        "top": 0,
+        "bottom": 0
+      }
+    },
+    "sha256": "c566b948db64fac2fe8b8d7dd3efe786b82f659ed4608c39893400e011fecbaa",
+    "sha": "c566b948db64fac2fe8b8d7dd3efe786b82f659ed4608c39893400e011fecbaa",
+    "width": 96,
+    "height": 96
+  },
+  "UI_kuang_big_di_blue": {
+    "iconUrl": "/admin/media/items/UI_kuang_big_di_blue.png",
+    "previewUrl": "/admin/media/items/UI_kuang_big_di_blue.png",
+    "source": {
+      "apk": "10056262.apk",
+      "apkSHA256": "b1d99496c7ffe17c45ab7646c72023be406924997d471e3f18db169fb0dfd641",
+      "entry": "assets/bin/Data/457c3cf065e4db5428e935ac6f29619b",
+      "entrySHA256": "c51ae78a7879233abc54bfdf87142c7cd0e08aa1bb4f1269bb227c1273c0650b",
+      "objectPathID": 3,
+      "objectType": "MonoBehaviour",
+      "extraction": "original NGUI UIAtlas serialized mSprites",
+      "atlasName": "FrameAtlas",
+      "materialPathID": 1,
+      "texturePathID": 1,
+      "textureName": "FrameAtlas",
+      "textureSize": [
+        1024,
+        512
+      ],
+      "pixelSize": 1.0,
+      "coordinateOrigin": "top-left",
+      "packedRotation": "not present in original UISpriteData",
+      "spriteRect": {
+        "x": 485,
+        "y": 323,
+        "width": 94,
+        "height": 94
+      },
+      "border": {
+        "left": 0,
+        "right": 0,
+        "top": 0,
+        "bottom": 0
+      },
+      "padding": {
+        "left": 0,
+        "right": 0,
+        "top": 0,
+        "bottom": 0
+      }
+    },
+    "sha256": "52cadf821ed6a180720d379127142459052ad1b207dec1553215d246b9c82239",
+    "sha": "52cadf821ed6a180720d379127142459052ad1b207dec1553215d246b9c82239",
+    "width": 94,
+    "height": 94
+  },
+  "UI_kuang_big_di_green": {
+    "iconUrl": "/admin/media/items/UI_kuang_big_di_green.png",
+    "previewUrl": "/admin/media/items/UI_kuang_big_di_green.png",
+    "source": {
+      "apk": "10056262.apk",
+      "apkSHA256": "b1d99496c7ffe17c45ab7646c72023be406924997d471e3f18db169fb0dfd641",
+      "entry": "assets/bin/Data/457c3cf065e4db5428e935ac6f29619b",
+      "entrySHA256": "c51ae78a7879233abc54bfdf87142c7cd0e08aa1bb4f1269bb227c1273c0650b",
+      "objectPathID": 3,
+      "objectType": "MonoBehaviour",
+      "extraction": "original NGUI UIAtlas serialized mSprites",
+      "atlasName": "FrameAtlas",
+      "materialPathID": 1,
+      "texturePathID": 1,
+      "textureName": "FrameAtlas",
+      "textureSize": [
+        1024,
+        512
+      ],
+      "pixelSize": 1.0,
+      "coordinateOrigin": "top-left",
+      "packedRotation": "not present in original UISpriteData",
+      "spriteRect": {
+        "x": 485,
+        "y": 228,
+        "width": 94,
+        "height": 94
+      },
+      "border": {
+        "left": 0,
+        "right": 0,
+        "top": 0,
+        "bottom": 0
+      },
+      "padding": {
+        "left": 0,
+        "right": 0,
+        "top": 0,
+        "bottom": 0
+      }
+    },
+    "sha256": "ec8b703e5cb3197f234731fe75e4c0efa165fcdb466d3c632cdaa01008cc0fbd",
+    "sha": "ec8b703e5cb3197f234731fe75e4c0efa165fcdb466d3c632cdaa01008cc0fbd",
+    "width": 94,
+    "height": 94
+  },
+  "UI_kuang_big_di_red": {
+    "iconUrl": "/admin/media/items/UI_kuang_big_di_red.png",
+    "previewUrl": "/admin/media/items/UI_kuang_big_di_red.png",
+    "source": {
+      "apk": "10056262.apk",
+      "apkSHA256": "b1d99496c7ffe17c45ab7646c72023be406924997d471e3f18db169fb0dfd641",
+      "entry": "assets/bin/Data/457c3cf065e4db5428e935ac6f29619b",
+      "entrySHA256": "c51ae78a7879233abc54bfdf87142c7cd0e08aa1bb4f1269bb227c1273c0650b",
+      "objectPathID": 3,
+      "objectType": "MonoBehaviour",
+      "extraction": "original NGUI UIAtlas serialized mSprites",
+      "atlasName": "FrameAtlas",
+      "materialPathID": 1,
+      "texturePathID": 1,
+      "textureName": "FrameAtlas",
+      "textureSize": [
+        1024,
+        512
+      ],
+      "pixelSize": 1.0,
+      "coordinateOrigin": "top-left",
+      "packedRotation": "not present in original UISpriteData",
+      "spriteRect": {
+        "x": 295,
+        "y": 418,
+        "width": 94,
+        "height": 94
+      },
+      "border": {
+        "left": 0,
+        "right": 0,
+        "top": 0,
+        "bottom": 0
+      },
+      "padding": {
+        "left": 0,
+        "right": 0,
+        "top": 0,
+        "bottom": 0
+      }
+    },
+    "sha256": "9f5c2408cd9430259c664997770b04572d06df60a6c2e4f2ed771df55fadae69",
+    "sha": "9f5c2408cd9430259c664997770b04572d06df60a6c2e4f2ed771df55fadae69",
+    "width": 94,
+    "height": 94
+  },
+  "UI_kuang_big_di_white": {
+    "iconUrl": "/admin/media/items/UI_kuang_big_di_white.png",
+    "previewUrl": "/admin/media/items/UI_kuang_big_di_white.png",
+    "source": {
+      "apk": "10056262.apk",
+      "apkSHA256": "b1d99496c7ffe17c45ab7646c72023be406924997d471e3f18db169fb0dfd641",
+      "entry": "assets/bin/Data/457c3cf065e4db5428e935ac6f29619b",
+      "entrySHA256": "c51ae78a7879233abc54bfdf87142c7cd0e08aa1bb4f1269bb227c1273c0650b",
+      "objectPathID": 3,
+      "objectType": "MonoBehaviour",
+      "extraction": "original NGUI UIAtlas serialized mSprites",
+      "atlasName": "FrameAtlas",
+      "materialPathID": 1,
+      "texturePathID": 1,
+      "textureName": "FrameAtlas",
+      "textureSize": [
+        1024,
+        512
+      ],
+      "pixelSize": 1.0,
+      "coordinateOrigin": "top-left",
+      "packedRotation": "not present in original UISpriteData",
+      "spriteRect": {
+        "x": 295,
+        "y": 323,
+        "width": 94,
+        "height": 94
+      },
+      "border": {
+        "left": 0,
+        "right": 0,
+        "top": 0,
+        "bottom": 0
+      },
+      "padding": {
+        "left": 0,
+        "right": 0,
+        "top": 0,
+        "bottom": 0
+      }
+    },
+    "sha256": "ebb272eac26a8b3145e334a8c80a49b437462644f7c1180ed85d7aff4f4a8831",
+    "sha": "ebb272eac26a8b3145e334a8c80a49b437462644f7c1180ed85d7aff4f4a8831",
+    "width": 94,
+    "height": 94
+  },
+  "UI_kuang_big_di_yellow": {
+    "iconUrl": "/admin/media/items/UI_kuang_big_di_yellow.png",
+    "previewUrl": "/admin/media/items/UI_kuang_big_di_yellow.png",
+    "source": {
+      "apk": "10056262.apk",
+      "apkSHA256": "b1d99496c7ffe17c45ab7646c72023be406924997d471e3f18db169fb0dfd641",
+      "entry": "assets/bin/Data/457c3cf065e4db5428e935ac6f29619b",
+      "entrySHA256": "c51ae78a7879233abc54bfdf87142c7cd0e08aa1bb4f1269bb227c1273c0650b",
+      "objectPathID": 3,
+      "objectType": "MonoBehaviour",
+      "extraction": "original NGUI UIAtlas serialized mSprites",
+      "atlasName": "FrameAtlas",
+      "materialPathID": 1,
+      "texturePathID": 1,
+      "textureName": "FrameAtlas",
+      "textureSize": [
+        1024,
+        512
+      ],
+      "pixelSize": 1.0,
+      "coordinateOrigin": "top-left",
+      "packedRotation": "not present in original UISpriteData",
+      "spriteRect": {
+        "x": 295,
+        "y": 228,
+        "width": 94,
+        "height": 94
+      },
+      "border": {
+        "left": 0,
+        "right": 0,
+        "top": 0,
+        "bottom": 0
+      },
+      "padding": {
+        "left": 0,
+        "right": 0,
+        "top": 0,
+        "bottom": 0
+      }
+    },
+    "sha256": "b0e0af54dfcad7265c60e9bc02b80e0f6a88fce31822cf33de0314a3344e946c",
+    "sha": "b0e0af54dfcad7265c60e9bc02b80e0f6a88fce31822cf33de0314a3344e946c",
+    "width": 94,
+    "height": 94
+  },
+  "UI_kuang_big_di_zi": {
+    "iconUrl": "/admin/media/items/UI_kuang_big_di_zi.png",
+    "previewUrl": "/admin/media/items/UI_kuang_big_di_zi.png",
+    "source": {
+      "apk": "10056262.apk",
+      "apkSHA256": "b1d99496c7ffe17c45ab7646c72023be406924997d471e3f18db169fb0dfd641",
+      "entry": "assets/bin/Data/457c3cf065e4db5428e935ac6f29619b",
+      "entrySHA256": "c51ae78a7879233abc54bfdf87142c7cd0e08aa1bb4f1269bb227c1273c0650b",
+      "objectPathID": 3,
+      "objectType": "MonoBehaviour",
+      "extraction": "original NGUI UIAtlas serialized mSprites",
+      "atlasName": "FrameAtlas",
+      "materialPathID": 1,
+      "texturePathID": 1,
+      "textureName": "FrameAtlas",
+      "textureSize": [
+        1024,
+        512
+      ],
+      "pixelSize": 1.0,
+      "coordinateOrigin": "top-left",
+      "packedRotation": "not present in original UISpriteData",
+      "spriteRect": {
+        "x": 390,
+        "y": 228,
+        "width": 94,
+        "height": 94
+      },
+      "border": {
+        "left": 0,
+        "right": 0,
+        "top": 0,
+        "bottom": 0
+      },
+      "padding": {
+        "left": 0,
+        "right": 0,
+        "top": 0,
+        "bottom": 0
+      }
+    },
+    "sha256": "5b60c41c785240fe686c78fd9f85a263665e32c299d6e5a957d62601bfffa933",
+    "sha": "5b60c41c785240fe686c78fd9f85a263665e32c299d6e5a957d62601bfffa933",
+    "width": 94,
+    "height": 94
+  }
+}

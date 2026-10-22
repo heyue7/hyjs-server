@@ -253,6 +253,7 @@ const local: App.I18n.Schema = {
     'shops_popularity-rank': '声望商店奖励',
     'shops_point': '攻略点商店',
     'shops_score': '积分商店',
+    'shops_ggo': '荒野兑换所',
     'guild-settings': 'Guild settings',
     guilds: 'Guild management',
     'shops_guild': '公会商店',

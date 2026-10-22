@@ -88,18 +88,19 @@ type AdminFieldBossReward struct {
 
 // AdminFieldConfiguration 定义一张野外地图的资源组合。
 type AdminFieldConfiguration struct {
-	Scene          string                   `json:"scene"`          // Scene 为原地图身份。
-	SceneResource  string                   `json:"sceneResource"`  // SceneResource 为原场景资源，只读。
-	BattleResource string                   `json:"battleResource"` // BattleResource 为原战斗地图资源，只读。
-	MinLevel       int64                    `json:"minLevel"`       // MinLevel 为进入等级。
-	AllowPK        bool                     `json:"allowPk"`        // AllowPK 为false禁止PK、true允许原PK政策。
-	MineCount      int64                    `json:"mineCount"`      // MineCount 为同时刷新的矿点数量。
-	FishCount      int64                    `json:"fishCount"`      // FishCount 为同时刷新的钓鱼点数量。
-	MinePoints     []AdminFieldPoint        `json:"minePoints"`     // MinePoints 为矿物候选点。
-	FishPoints     []AdminFieldPoint        `json:"fishPoints"`     // FishPoints 为钓鱼候选点。
-	MonsterPoints  []AdminFieldPoint        `json:"monsterPoints"`  // MonsterPoints 为怪物候选点。
-	GatherGroups   []AdminFieldGatherGroup  `json:"gatherGroups"`   // GatherGroups 为采集组。
-	MonsterGroups  []AdminFieldMonsterGroup `json:"monsterGroups"`  // MonsterGroups 为怪物组。
+	GGO            *AdminFieldGGOConfiguration `json:"ggo,omitempty"`  // GGO 为沙漠搜打撤配置，尚未放置场景。
+	Scene          string                      `json:"scene"`          // Scene 为原地图身份。
+	SceneResource  string                      `json:"sceneResource"`  // SceneResource 为原场景资源，只读。
+	BattleResource string                      `json:"battleResource"` // BattleResource 为原战斗地图资源，只读。
+	MinLevel       int64                       `json:"minLevel"`       // MinLevel 为进入等级。
+	AllowPK        bool                        `json:"allowPk"`        // AllowPK 为false禁止PK、true允许原PK政策。
+	MineCount      int64                       `json:"mineCount"`      // MineCount 为同时刷新的矿点数量。
+	FishCount      int64                       `json:"fishCount"`      // FishCount 为同时刷新的钓鱼点数量。
+	MinePoints     []AdminFieldPoint           `json:"minePoints"`     // MinePoints 为矿物候选点。
+	FishPoints     []AdminFieldPoint           `json:"fishPoints"`     // FishPoints 为钓鱼候选点。
+	MonsterPoints  []AdminFieldPoint           `json:"monsterPoints"`  // MonsterPoints 为怪物候选点。
+	GatherGroups   []AdminFieldGatherGroup     `json:"gatherGroups"`   // GatherGroups 为采集组。
+	MonsterGroups  []AdminFieldMonsterGroup    `json:"monsterGroups"`  // MonsterGroups 为怪物组。
 	// OrdinaryBossEnabled 控制本地图普通首领；nil表示旧方案未配置，运行时继承原行为。
 	OrdinaryBossEnabled *bool `json:"ordinaryBossEnabled,omitempty"`
 	// OrdinaryBossGroups 为本地图 FieldBossPos 候选对应的全部普通首领组；缺省时继承原表。

@@ -47,6 +47,10 @@ func (s *GameService) AdminItemDetail(ctx context.Context, req model.AdminItemDe
 		basic = append(basic, model.AdminItemDetailField{Label: "适用类型", Value: strings.Join(types, "、")})
 	}
 	add("基本信息", basic)
+	if item.ID == constUtil.GGOCurrencyID || item.ID == constUtil.GGOOverclockID || strings.HasPrefix(item.ID, "item_970") && len(item.ID) == 9 && item.ID >= "item_9701" && item.ID <= "item_9706" {
+		add("道具说明", []model.AdminItemDetailField{{Label: "来源", Value: "本服新增 GGO 道具"}})
+		return out, nil
+	}
 	var (
 		tableName string
 		key       = "id"

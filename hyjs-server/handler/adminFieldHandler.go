@@ -60,6 +60,10 @@ func AdminFieldSaveHandler(c *gin.Context) {
 		return
 	}
 	cfg := &req.Configuration
+	if !adminFieldValidGGO(cfg) {
+		adminError(c, constUtil.ErrAdminInput)
+		return
+	}
 	original, err := gameService.AdminFieldOriginalReference(cfg.Scene)
 	if err != nil || cfg.MinLevel < 1 || cfg.MinLevel > 1000 || cfg.SceneResource != original.SceneResource || cfg.BattleResource != original.BattleResource || cfg.MineCount < 0 || cfg.MineCount > int64(len(cfg.MinePoints)) || cfg.FishCount < 0 || cfg.FishCount > int64(len(cfg.FishPoints)) {
 		adminError(c, constUtil.ErrAdminInput)

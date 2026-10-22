@@ -74,6 +74,11 @@ func adminActivityRedundantSource(id string) bool {
 	if strings.Contains(id, "lp-") || id == "pool:recruit_1" || id == "pool:recruit_2" {
 		return true
 	}
+	// GGO exchanges own their player menu. Generated commerce aliases must
+	// never be imported or disabled by the legacy activity catalogue cleanup.
+	if strings.HasPrefix(id, "commerce:"+constUtil.GGOShopKey+":") {
+		return true
+	}
 	if !strings.HasPrefix(id, "commerce:p4:") {
 		return false
 	}

@@ -20,6 +20,7 @@ namespace HYJS.KingRecruit
             public int Space;
         }
 
+        static readonly FieldInfo CurTypeField = typeof(ShopPage).GetField("curType", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
         static readonly FieldInfo TabBtnsField = typeof(ShopPage).GetField("tabBtns", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
 
         ShopPage shop;
@@ -480,6 +481,7 @@ namespace HYJS.KingRecruit
         void Highlight()
         {
             int active = ResolvedWorld;
+            bool kingActive = shop != null && CurTypeField != null && Convert.ToInt32(CurTypeField.GetValue(shop)) == (int)ShopType.KingsRecruit;
             if (entries.Count < 3) return;
             for (int space = 1; space <= 3; space++)
             {
@@ -487,7 +489,7 @@ namespace HYJS.KingRecruit
                 if (entry == null) continue;
                 ShopTabButton button = entry.GetComponent<ShopTabButton>();
                 if (button == null) continue;
-                bool on = space == active;
+                bool on = kingActive && space == active;
                 if (button.chosedBg != null) button.chosedBg.SetActive(on);
                 if (button.objPointer != null) button.objPointer.SetActive(on);
             }

@@ -307,7 +307,7 @@ onMounted(load);
         />
       </div>
     </NCard>
-    <NDrawer :show="detailOpen" :width="780" @update:show="!$event && closeDetail()">
+    <NDrawer :show="detailOpen" width="min(780px, 100vw)" @update:show="!$event && closeDetail()">
       <NDrawerContent :title="(detail?.item.name || detailItem?.name || '道具') + ' · 详情'" closable>
         <NSpin :show="detailLoading">
           <div class="item-detail-heading"><ResourceImage :item="detail?.item || detailItem" :size="100" /><div><h2>{{ detail?.item.name || detailItem?.name }}</h2><ItemQuality :item="detail?.item || detailItem || undefined" /><div class="ops-mono ops-muted mt-8px">{{ detailItem?.id }}</div></div></div>

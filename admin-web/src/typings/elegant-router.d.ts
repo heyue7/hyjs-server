@@ -45,6 +45,7 @@ declare module "@elegant-router/types" {
     "server-clock": "/server-clock";
     "servers": "/servers";
     "shops": "/shops";
+    "shops_ggo": "/shops/ggo";
     "shops_guild": "/shops/guild";
     "shops_memory": "/shops/memory";
     "shops_ordinary": "/shops/ordinary";
@@ -165,6 +166,7 @@ declare module "@elegant-router/types" {
     | "players"
     | "server-clock"
     | "servers"
+    | "shops_ggo"
     | "shops_guild"
     | "shops_memory"
     | "shops_ordinary"

@@ -118,6 +118,7 @@ export const shopLabels: Record<string, string> = {
   'popularity-rank': '声望商店奖励',
   point: '攻略点商店',
   score: '积分商店',
+  ggo: '荒野兑换所',
   guild: '公会商店',
   'pet-market': '精灵商店',
   'union-fight': '公会战商店',

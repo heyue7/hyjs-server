@@ -42,6 +42,7 @@ export const views: Record<LastLevelRouteKey, RouteComponent | (() => Promise<Ro
   players: () => import("@/views/players/index.vue"),
   "server-clock": () => import("@/views/server-clock/index.vue"),
   servers: () => import("@/views/servers/index.vue"),
+  shops_ggo: () => import("@/views/shops/ggo/index.vue"),
   shops_guild: () => import("@/views/shops/guild/index.vue"),
   shops_memory: () => import("@/views/shops/memory/index.vue"),
   shops_ordinary: () => import("@/views/shops/ordinary/index.vue"),

@@ -69,6 +69,7 @@ export interface BossReward {
   drops: FieldDrop[];
 }
 export interface FieldConfiguration {
+  ggo?: FieldGGOConfiguration;
   scene: string;
   sceneResource: string;
   battleResource: string;
@@ -151,4 +152,41 @@ export interface FieldChannel {
   maxPlayers: number;
   version: string;
   lines: { line: number; online: number }[];
+}
+
+export interface FieldGGONPC {
+  id: string;
+  name: string;
+  heroId: string;
+  role: 'guide' | 'settlement';
+  pointLabel: string;
+  dialogue: string;
+  position: { x: number | null; y: number | null; z: number | null } | null;
+  settlesChips: boolean;
+}
+export interface FieldGGOEnemy {
+  id: string;
+  name: string;
+  heroId: string;
+  respawnMs: number;
+}
+export interface FieldGGOConfiguration {
+  title: string;
+  modeName: string;
+  currencyId: string;
+  shopKey: string;
+  carryIcon: string;
+  sproutIcon: string;
+  npcs: FieldGGONPC[];
+  monsters: FieldGGOEnemy[];
+  bosses: FieldGGOEnemy[];
+  chips: { itemId: string; name: string; exchangeValue: number | null }[];
+  extraction: {
+    arrival: string;
+    confirmation: string;
+    confirmButton: string;
+    continueButton: string;
+    countdown: string;
+    cancelled: string;
+  };
 }

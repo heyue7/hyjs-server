@@ -1,0 +1,61 @@
+{
+  "schema": "hyjs-ggo-items-v1",
+  "items": [
+    {
+      "id": "item_9701",
+      "name": "残损芯片",
+      "quality": 1,
+      "icon": "ggo_chip_white",
+      "description": "外壳受损，仍保存少量旧世数据。沙漠中收集后交给接应人员，结算为回收信用点。"
+    },
+    {
+      "id": "item_9702",
+      "name": "标准芯片",
+      "quality": 2,
+      "icon": "ggo_chip_green",
+      "description": "保存完整的通用设备资料。沙漠中收集后交给接应人员，结算为回收信用点。"
+    },
+    {
+      "id": "item_9703",
+      "name": "军用芯片",
+      "quality": 3,
+      "icon": "ggo_chip_blue",
+      "description": "储存旧世军用设备参数，具有较高回收价值。交给沙漠接应人员可结算为回收信用点。"
+    },
+    {
+      "id": "item_9704",
+      "name": "机密芯片",
+      "quality": 4,
+      "icon": "ggo_chip_purple",
+      "description": "储存受限技术档案的数据芯片。交给沙漠接应人员可结算为回收信用点。"
+    },
+    {
+      "id": "item_9705",
+      "name": "核心芯片",
+      "quality": 5,
+      "icon": "ggo_chip_orange",
+      "description": "保存大型旧世设备的核心控制资料。交给沙漠接应人员可结算为回收信用点。"
+    },
+    {
+      "id": "item_9706",
+      "name": "原型芯片",
+      "quality": 6,
+      "icon": "ggo_chip_red",
+      "description": "记录未量产旧世技术的稀有芯片。交给沙漠接应人员可结算为回收信用点。"
+    },
+    {
+      "id": "item_9710",
+      "name": "回收信用点",
+      "quality": 5,
+      "icon": "ggo_salvage_credit",
+      "description": "沙漠接应人员结算遗迹芯片后获得的货币，可在荒野兑换所兑换物品。"
+    },
+    {
+      "id": "item_9711",
+      "name": "超频点数",
+      "quality": 6,
+      "icon": "ggo_overclock_point",
+      "description": "获得后自动存入所属账号的蓝绿终端。每个道具增加1超频点数，不占用背包。"
+    }
+  ]
+}

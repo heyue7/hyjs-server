@@ -21,9 +21,11 @@ import (
 func AdminShopDefinitions() []model.AdminShopDefinition {
 	base := []string{"rewards", "cost", "dailyLimit", "totalLimit", "stock", "minLevel", "minVip", "priority", "weight", "discountBps", "enabled"}
 	out := []model.AdminShopDefinition{}
-	for _, v := range []struct{ id, label string }{{"ordinary", "普通商店"}, {"memory", "记忆圣坛"}, {"popularity", "声望商店商品"}, {"popularity-rank", "声望商店奖励"}, {"point", "攻略点商店"}, {"score", "积分商店"}, {"guild", "公会商店"}, {"pet-market", "精灵商店"}, {"union-fight", "公会战商店"}, {"vip", "会员礼包"}} {
+	for _, v := range []struct{ id, label string }{{"ggo", "荒野兑换所"}, {"ordinary", "普通商店"}, {"memory", "记忆圣坛"}, {"popularity", "声望商店商品"}, {"popularity-rank", "声望商店奖励"}, {"point", "攻略点商店"}, {"score", "积分商店"}, {"guild", "公会商店"}, {"pet-market", "精灵商店"}, {"union-fight", "公会战商店"}, {"vip", "会员礼包"}} {
 		d := model.AdminShopDefinition{ID: v.id, Label: v.label, Fields: append([]string{}, base...), SettingsFields: []string{"unlimited", "enabled", "startAt", "endAt", "claimEndAt", "source"}, CanCreate: true, Notes: "保存后立即用于后续购买；历史交易、库存使用和限购保留。"}
 		switch v.id {
+		case "ggo":
+			d.Notes = "荒野兑换所使用回收信用点；初始测试参数为1回收信用点兑换1超频道具、每日1次，可编辑价格和限购。超频道具自动存入账号蓝绿终端。"
 		case "ordinary":
 			d.Notes = "商品、价格与材料保存后生效；原阶梯价格保留到该商品被显式修改。"
 		case "memory":
@@ -290,6 +292,12 @@ func (s *GameService) AdminSaveShopProduct(ctx context.Context, actor *model.Adm
 			if err != nil {
 				return err
 			}
+		}
+		if !ggoShopCostAllowed(key, p.Cost.ResourceID) {
+			return constUtil.ErrAdminInput
+		}
+		if key == constUtil.GGOShopKey && (len(p.Rewards) != 1 || s.table("Item", "itemId", p.Rewards[0].ResourceID) == nil) {
+			return constUtil.ErrAdminInput
 		}
 		cost := fmt.Sprintf("%s,%d", p.Cost.ResourceID, p.Cost.Amount)
 		switch key {
@@ -579,7 +587,7 @@ func (s *GameService) AdminSaveShopSettings(ctx context.Context, actor *model.Ad
 		row := raw.Period
 		create := row == nil
 		if row == nil {
-			shopType := map[string]int32{"ordinary": 1, "memory": 3, "popularity": 4, "popularity-rank": 4, "point": 5, "score": 7, "guild": 8}[key]
+			shopType := map[string]int32{"ggo": 970, "ordinary": 1, "memory": 3, "popularity": 4, "popularity-rank": 4, "point": 5, "score": 7, "guild": 8}[key]
 			rules := p4CommerceRules{Products: []p4Product{}}
 			if key == "memory" {
 				rules.FreeCap = 10

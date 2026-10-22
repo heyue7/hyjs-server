@@ -52,7 +52,7 @@ const productReadonly = (_row: ShopProduct | null) => !canWrite.value;
 const readonly = computed(() => productReadonly(selected.value));
 const isLegacyProduct = computed(() => props.shopId === 'ordinary' && Boolean(selected.value?.id.startsWith('legacy:')));
 const recommendedCosts = computed(() => {
-  const original = ({ ordinary: ['coin', 'diamond'], memory: ['light'], popularity: ['popularity'], 'popularity-rank': ['popularity'], point: ['point'], score: ['score'], vip: ['diamond'], 'pet-market': ['coinpet', 'diamond'], 'union-fight': ['unionFightToken'] } as Record<string, string[]>)[props.shopId] || [];
+  const original = ({ ordinary: ['coin', 'diamond'], memory: ['light'], popularity: ['popularity'], 'popularity-rank': ['popularity'], point: ['point'], score: ['score'], ggo: ['item_9710'], vip: ['diamond'], 'pet-market': ['coinpet', 'diamond'], 'union-fight': ['unionFightToken'] } as Record<string, string[]>)[props.shopId] || [];
   return [...new Set([...original, ...(snapshot.value?.items || []).map(row => row.cost?.resourceId).filter(Boolean)])].slice(0, 20);
 });
 const vipOptions = computed(() =>

@@ -37796,6 +37796,136 @@
       "sha256": "8ea2bc3f941ffbdd9ede428021b1de3d81db2ee0ca4048f40e3b9f02133493c3",
       "width": 512,
       "height": 512
+    },
+    "ggo_chip_white": {
+      "iconUrl": "/admin/media/items/ggo_chip_white.png",
+      "previewUrl": "/admin/media/items/ggo_chip_white.png",
+      "sha256": "3e08c152138f3145614692fa3ca79eb13980e1d0d45c9f4a29d9d2512c64f771",
+      "sha": "3e08c152138f3145614692fa3ca79eb13980e1d0d45c9f4a29d9d2512c64f771",
+      "width": 128,
+      "height": 128,
+      "source": {
+        "kind": "built-in imagegen; original quality frame reused for inventory icons",
+        "promptFile": "tools/ggo_items/prompts.json",
+        "frameProvenance": "tools/ggo_items/frames/provenance.json"
+      }
+    },
+    "ggo_chip_green": {
+      "iconUrl": "/admin/media/items/ggo_chip_green.png",
+      "previewUrl": "/admin/media/items/ggo_chip_green.png",
+      "sha256": "5d091e412c54822a5c1a2de7131856518749d7ce1e832f89e140b131aeb4b4b9",
+      "sha": "5d091e412c54822a5c1a2de7131856518749d7ce1e832f89e140b131aeb4b4b9",
+      "width": 128,
+      "height": 128,
+      "source": {
+        "kind": "built-in imagegen; original quality frame reused for inventory icons",
+        "promptFile": "tools/ggo_items/prompts.json",
+        "frameProvenance": "tools/ggo_items/frames/provenance.json"
+      }
+    },
+    "ggo_chip_blue": {
+      "iconUrl": "/admin/media/items/ggo_chip_blue.png",
+      "previewUrl": "/admin/media/items/ggo_chip_blue.png",
+      "sha256": "83e77bf6421214f2fb43027cc43b28b5b4c4a1df5ec073171204ed1341245a22",
+      "sha": "83e77bf6421214f2fb43027cc43b28b5b4c4a1df5ec073171204ed1341245a22",
+      "width": 128,
+      "height": 128,
+      "source": {
+        "kind": "built-in imagegen; original quality frame reused for inventory icons",
+        "promptFile": "tools/ggo_items/prompts.json",
+        "frameProvenance": "tools/ggo_items/frames/provenance.json"
+      }
+    },
+    "ggo_chip_purple": {
+      "iconUrl": "/admin/media/items/ggo_chip_purple.png",
+      "previewUrl": "/admin/media/items/ggo_chip_purple.png",
+      "sha256": "012ff923e9f8acdd4343b0d73f761ee39a3034c61c78f88827b2b6c959931558",
+      "sha": "012ff923e9f8acdd4343b0d73f761ee39a3034c61c78f88827b2b6c959931558",
+      "width": 128,
+      "height": 128,
+      "source": {
+        "kind": "built-in imagegen; original quality frame reused for inventory icons",
+        "promptFile": "tools/ggo_items/prompts.json",
+        "frameProvenance": "tools/ggo_items/frames/provenance.json"
+      }
+    },
+    "ggo_chip_orange": {
+      "iconUrl": "/admin/media/items/ggo_chip_orange.png",
+      "previewUrl": "/admin/media/items/ggo_chip_orange.png",
+      "sha256": "22397a1be58cdd9ce9b70fb6f638243ff954d93aa1a1f8aa3dd49a7da1fb23ea",
+      "sha": "22397a1be58cdd9ce9b70fb6f638243ff954d93aa1a1f8aa3dd49a7da1fb23ea",
+      "width": 128,
+      "height": 128,
+      "source": {
+        "kind": "built-in imagegen; original quality frame reused for inventory icons",
+        "promptFile": "tools/ggo_items/prompts.json",
+        "frameProvenance": "tools/ggo_items/frames/provenance.json"
+      }
+    },
+    "ggo_chip_red": {
+      "iconUrl": "/admin/media/items/ggo_chip_red.png",
+      "previewUrl": "/admin/media/items/ggo_chip_red.png",
+      "sha256": "47ab091f5421727e369fd7f7769b8a04fdc6af6106b5ec22021aef04096074cf",
+      "sha": "47ab091f5421727e369fd7f7769b8a04fdc6af6106b5ec22021aef04096074cf",
+      "width": 128,
+      "height": 128,
+      "source": {
+        "kind": "built-in imagegen; original quality frame reused for inventory icons",
+        "promptFile": "tools/ggo_items/prompts.json",
+        "frameProvenance": "tools/ggo_items/frames/provenance.json"
+      }
+    },
+    "ggo_salvage_credit": {
+      "iconUrl": "/admin/media/items/ggo_salvage_credit.png",
+      "previewUrl": "/admin/media/items/ggo_salvage_credit.png",
+      "sha256": "5476a2462e7c01d7d44a67eebb52a53e6f099cfef474d98e238277026b50302f",
+      "sha": "5476a2462e7c01d7d44a67eebb52a53e6f099cfef474d98e238277026b50302f",
+      "width": 128,
+      "height": 128,
+      "source": {
+        "kind": "built-in imagegen; original quality frame reused for inventory icons",
+        "promptFile": "tools/ggo_items/prompts.json",
+        "frameProvenance": "tools/ggo_items/frames/provenance.json"
+      }
+    },
+    "ggo_overclock_point": {
+      "iconUrl": "/admin/media/items/ggo_overclock_point.png",
+      "previewUrl": "/admin/media/items/ggo_overclock_point.png",
+      "sha256": "88ebd21920fc291f58aaf9b3bde189e33e2743a16467c9d350723275e50c629b",
+      "sha": "88ebd21920fc291f58aaf9b3bde189e33e2743a16467c9d350723275e50c629b",
+      "width": 128,
+      "height": 128,
+      "source": {
+        "kind": "built-in imagegen; original quality frame reused for inventory icons",
+        "promptFile": "tools/ggo_items/prompts.json",
+        "frameProvenance": "tools/ggo_items/frames/provenance.json"
+      }
+    },
+    "ggo_chip_marker": {
+      "iconUrl": "/admin/media/items/ggo_chip_marker.png",
+      "previewUrl": "/admin/media/items/ggo_chip_marker.png",
+      "sha256": "4579945a9bce3cb777b4e287cdb6452566dc26c1d859908879f9f5054a912e67",
+      "sha": "4579945a9bce3cb777b4e287cdb6452566dc26c1d859908879f9f5054a912e67",
+      "width": 64,
+      "height": 64,
+      "source": {
+        "kind": "built-in imagegen; original quality frame reused for inventory icons",
+        "promptFile": "tools/ggo_items/prompts.json",
+        "frameProvenance": "tools/ggo_items/frames/provenance.json"
+      }
+    },
+    "ggo_sprout": {
+      "iconUrl": "/admin/media/items/ggo_sprout.png",
+      "previewUrl": "/admin/media/items/ggo_sprout.png",
+      "sha256": "4256285738fbddda555a6fa83937b8ed30a20284e2350df5ead6bdf2ad22d4aa",
+      "sha": "4256285738fbddda555a6fa83937b8ed30a20284e2350df5ead6bdf2ad22d4aa",
+      "width": 64,
+      "height": 64,
+      "source": {
+        "kind": "built-in imagegen; original quality frame reused for inventory icons",
+        "promptFile": "tools/ggo_items/prompts.json",
+        "frameProvenance": "tools/ggo_items/frames/provenance.json"
+      }
     }
   },
   "activityPrefabs": {
@@ -130876,7 +131006,15 @@
     "FishItem_048": "FishItem_048",
     "FishItem_049": "FishItem_049",
     "FishItem_050": "FishItem_050",
-    "FishItem_051": "FishItem_051"
+    "FishItem_051": "FishItem_051",
+    "item_9701": "ggo_chip_white",
+    "item_9702": "ggo_chip_green",
+    "item_9703": "ggo_chip_blue",
+    "item_9704": "ggo_chip_purple",
+    "item_9705": "ggo_chip_orange",
+    "item_9706": "ggo_chip_red",
+    "item_9710": "ggo_salvage_credit",
+    "item_9711": "ggo_overclock_point"
   },
   "atlases": [
     {

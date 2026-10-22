@@ -39,23 +39,27 @@ func (s *GameService) LoadAdminCatalogue(rootTables, mediaManifest string) error
 		tables[name] = rows
 	}
 	// 启动兼容已经补齐的角色/碎片覆盖同ID字段，并纳入六绿新碎片；只建立目录副本。
-	for _, name := range []string{"Hero", "Frag"} {
+	for _, name := range []string{"Hero", "Frag", "Item"} {
+		identity := "id"
+		if name == "Item" {
+			identity = "itemId"
+		}
 		merged := map[string]map[string]string{}
 		for _, row := range tables[name] {
 			copyRow := map[string]string{}
 			for key, value := range row {
 				copyRow[key] = value
 			}
-			merged[row["id"]] = copyRow
+			merged[row[identity]] = copyRow
 		}
 		for _, row := range s.Tables[name] {
-			if row["id"] == "" {
+			if row[identity] == "" {
 				continue
 			}
-			copyRow := merged[row["id"]]
+			copyRow := merged[row[identity]]
 			if copyRow == nil {
 				copyRow = map[string]string{}
-				merged[row["id"]] = copyRow
+				merged[row[identity]] = copyRow
 			}
 			for key, value := range row {
 				copyRow[key] = value
@@ -302,6 +306,9 @@ func adminCatalogueBuild(tables map[string][]map[string]string, media adminCatal
 	for _, row := range tables["Item"] {
 		quality := adminCatalogueNumber(row["star"])
 		item := model.AdminItemDTO{ID: row["itemId"], Category: "item", Quality: quality}
+		if item.ID == "item_9710" {
+			item.Category = "currency"
+		}
 		if quality > 0 {
 			item.QualityLabel = fmt.Sprintf("%d星", quality)
 		}

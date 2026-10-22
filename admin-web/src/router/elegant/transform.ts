@@ -191,6 +191,7 @@ const routeMap: RouteMap = {
   "server-clock": "/server-clock",
   "servers": "/servers",
   "shops": "/shops",
+  "shops_ggo": "/shops/ggo",
   "shops_guild": "/shops/guild",
   "shops_memory": "/shops/memory",
   "shops_ordinary": "/shops/ordinary",

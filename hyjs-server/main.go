@@ -118,6 +118,9 @@ func run() error {
 	if err = s.LoadTables(cfg.Tables); err != nil {
 		return err
 	}
+	if err = s.InstallGGOItems(); err != nil {
+		return err
+	}
 	// 全服日历独立于钱包；启动ctx也提供给后台业务定时器。
 	if err = s.InitializeServerGameClock(ctx); err != nil {
 		return err
@@ -235,6 +238,9 @@ func run() error {
 	}
 	// P4独立福利和交易目录在原协议开放前完成持久化初始化。
 	if err = s.InitializeP4(ctx); err != nil {
+		return err
+	}
+	if err = s.InitializeGGO(ctx); err != nil {
 		return err
 	}
 	// 副本福利新域先完成迁移，默认运营开关保持关闭。
@@ -437,6 +443,9 @@ func run() error {
 	if err = s.InitializeAdminFields(ctx); err != nil {
 		return err
 	}
+	if err = s.InitializeGGOFieldConfiguration(ctx); err != nil {
+		return err
+	}
 	if err = s.InitializeAdminShopAvailability(ctx); err != nil {
 		return err
 	}
@@ -491,7 +500,9 @@ func run() error {
 	go func() { errs <- s.ServeTurntableSettlement(ctx) }()
 	go func() { errs <- service.ServeBackgroundWorker(ctx, "p1-periods", s.ServeP1Periods) }()
 	// 终端每周投放与中断批次跟随区服生命周期恢复，使用真实账务日历。
-	go func() { errs <- service.ServeBackgroundWorker(ctx, "terminal-distributions", s.ServeTerminalDistributions) }()
+	go func() {
+		errs <- service.ServeBackgroundWorker(ctx, "terminal-distributions", s.ServeTerminalDistributions)
+	}()
 	// 公会战自动宣战与名单冻结沿同一服务ctx运行，退出时一并收口。
 	go func() { errs <- service.ServeBackgroundWorker(ctx, "p13-union-fight", s.ServeP13UnionFight) }()
 	// 同场位置与结束退场使用服务ctx，停启后恢复冻结实例和角色状态。
