@@ -484,6 +484,8 @@ func run() error {
 	defer tcpListener.Close()
 	s.HTTPPort = httpListener.Addr().(*net.TCPAddr).Port
 	s.TCPPort = tcpListener.Addr().(*net.TCPAddr).Port
+	s.InitializeGameTableLookup()
+	s.InitializeRedPointSchemaReady()
 	handler.ConfigureGame(s)
 	handler.ConfigureTestPayments(*testPayments || cfg.EnableTestPayments)
 	gin.SetMode(gin.ReleaseMode)

@@ -23,7 +23,9 @@ import (
 // GameService 编排账号、主城和当前已恢复的副本协议。
 type GameService struct {
 	// RuntimeBase preserves live socket ownership across request-local table overlays.
-	RuntimeBase *GameService
+	RuntimeBase    *GameService
+	tableLookup    *gameTableLookup
+	redPointSchema atomic.Pointer[redPointSchemaSnapshot]
 	// ServerID 由启动配置注入；同一数据库中的本地ID归属该区服。
 	ServerID int64
 	Host     string
@@ -150,8 +152,7 @@ func (s *GameService) Dispatch(ctx context.Context, request *model.GamePacket, p
 				result = append(result, &pb.SCPlayerAppear{Player: peers})
 			}
 		}
-		s.afterInventoryMailRequest(ctx, request.PlayerId, request.Body, result)
-		s.afterWelfareAchievementRequest(ctx, request.PlayerId, request.Body, result)
+		s.afterRedPointRequest(ctx, request.PlayerId, request.Body, result)
 	}
 	SanitizePlayerDisplay(result)
 	return result

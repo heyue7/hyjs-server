@@ -11,57 +11,62 @@ import (
 	"gorm.io/gorm"
 	"hyjs-server/constUtil"
 	"hyjs-server/db"
+	"hyjs-server/model"
 	pb "hyjs-server/model/protocol"
 )
 
 // InventoryMailRedPoints 从原合成门槛和实际待领附件读取状态，零值也下发以清除旧点。
 func (s *GameService) InventoryMailRedPoints(ctx context.Context, id int64) (*pb.SCRedPoint, error) {
-	values := map[string]bool{}
+	var out *pb.SCRedPoint
 	err := db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		var profile db.Profile
-		if err := tx.First(&profile, id).Error; err != nil {
+		var row db.Profile
+		if err := tx.First(&row, id).Error; err != nil {
 			return err
 		}
-		_, game, err := decodeProfile(&profile)
+		player, game, err := decodeProfile(&row)
 		if err != nil {
 			return err
 		}
-		// UIFragItem 与 CSCombine 均用 Frag.num；未知或不完整行不生成可合成提示。
-		for _, item := range game.Items {
-			row := s.table("Frag", "id", item.GetId())
-			need, parseErr := strconv.ParseInt(row["num"], 10, 32)
-			if parseErr != nil || need < 1 || int64(item.GetNum()) < need {
-				continue
-			}
-			switch target := row["target"]; {
-			case strings.HasPrefix(target, "hero_"):
-				values[constUtil.RedPointWarriorFrag] = true
-			case strings.HasPrefix(target, "equip_"):
-				values[constUtil.RedPointEquipmentFrag] = true
-			case strings.HasPrefix(target, "pet_"):
-				values[constUtil.RedPointPetFrag] = true
-			}
-		}
-		values[constUtil.RedPointBackpack] = values[constUtil.RedPointWarriorFrag] || values[constUtil.RedPointEquipmentFrag] || values[constUtil.RedPointPetFrag]
-		if tx.Migrator().HasTable(&db.RewardDelivery{}) {
-			var count int64
-			if err = tx.Model(&db.RewardDelivery{}).Where("player_id=? AND claimed_at=0 AND (expires_at=0 OR expires_at>?)", id, LocalPlayNow(ctx).UnixMilli()).Limit(1).Count(&count).Error; err != nil {
-				return err
-			}
-			values[constUtil.RedPointRewardCenter] = count > 0
-		}
-		if tx.Migrator().HasTable(&db.MailMessage{}) {
-			var count int64
-			// 邮件已读/过期沿原邮箱实际时间；附件沿领奖中心的游戏日历。
-			if err = tx.Model(&db.MailMessage{}).Where("player_id=? AND read_at=0 AND deleted_at=0 AND (expires_at=0 OR expires_at>?)", id, time.Now().UnixMilli()).Limit(1).Count(&count).Error; err != nil {
-				return err
-			}
-			values[constUtil.RedPointMessage] = count > 0
-		}
-		return nil
+		out, err = s.inventoryMailRedPoints(ctx, tx, id, player, game)
+		return err
 	})
-	if err != nil {
-		return nil, err
+	return out, err
+}
+
+func (s *GameService) inventoryMailRedPoints(ctx context.Context, tx *gorm.DB, id int64, player *pb.Player, game *model.GameState) (*pb.SCRedPoint, error) {
+	values := map[string]bool{}
+	var err error
+	// UIFragItem 与 CSCombine 均用 Frag.num；未知或不完整行不生成可合成提示。
+	for _, item := range game.Items {
+		row := s.table("Frag", "id", item.GetId())
+		need, parseErr := strconv.ParseInt(row["num"], 10, 32)
+		if parseErr != nil || need < 1 || int64(item.GetNum()) < need {
+			continue
+		}
+		switch target := row["target"]; {
+		case strings.HasPrefix(target, "hero_"):
+			values[constUtil.RedPointWarriorFrag] = true
+		case strings.HasPrefix(target, "equip_"):
+			values[constUtil.RedPointEquipmentFrag] = true
+		case strings.HasPrefix(target, "pet_"):
+			values[constUtil.RedPointPetFrag] = true
+		}
+	}
+	values[constUtil.RedPointBackpack] = values[constUtil.RedPointWarriorFrag] || values[constUtil.RedPointEquipmentFrag] || values[constUtil.RedPointPetFrag]
+	if s.redPointHasTable(tx, &db.RewardDelivery{}) {
+		var count int64
+		if err = tx.Model(&db.RewardDelivery{}).Where("player_id=? AND claimed_at=0 AND (expires_at=0 OR expires_at>?)", id, LocalPlayNow(ctx).UnixMilli()).Limit(1).Count(&count).Error; err != nil {
+			return nil, err
+		}
+		values[constUtil.RedPointRewardCenter] = count > 0
+	}
+	if s.redPointHasTable(tx, &db.MailMessage{}) {
+		var count int64
+		// 邮件已读/过期沿原邮箱实际时间；附件沿领奖中心的游戏日历。
+		if err = tx.Model(&db.MailMessage{}).Where("player_id=? AND read_at=0 AND deleted_at=0 AND (expires_at=0 OR expires_at>?)", id, time.Now().UnixMilli()).Limit(1).Count(&count).Error; err != nil {
+			return nil, err
+		}
+		values[constUtil.RedPointMessage] = count > 0
 	}
 	out := &pb.SCRedPoint{}
 	for _, kind := range []string{constUtil.RedPointRewardCenter, constUtil.RedPointMessage, constUtil.RedPointBackpack, constUtil.RedPointWarriorFrag, constUtil.RedPointEquipmentFrag, constUtil.RedPointPetFrag} {
@@ -111,17 +116,22 @@ func inventoryResourceResponse(message protoreflect.Message, depth int) bool {
 }
 
 func (s *GameService) afterInventoryMailRequest(ctx context.Context, id int64, request proto.Message, responses []proto.Message) {
+	if inventoryMailRequestRefresh(request, responses) {
+		s.publishInventoryMailRedPoints(ctx, id)
+	}
+}
+
+func inventoryMailRequestRefresh(request proto.Message, responses []proto.Message) bool {
 	switch request.(type) {
 	case *pb.CSAddRewardsToPlayer, *pb.CSMailList, *pb.CSDeleteMail, *pb.CSCombine, *pb.CSItemUse, *pb.CSWarriorFragSell, *pb.CSEquipmentFragSell, *pb.CSPetFragSell:
-		s.publishInventoryMailRedPoints(ctx, id)
-		return
+		return true
 	}
 	// 购买、掉落、活动和邮件等奖励共用原资源容器。实际回包存在资源字段时
 	// 统一刷新，覆盖新来源且避开不含资源的移动/心跳等高频请求。
 	for _, response := range responses {
 		if response != nil && inventoryResourceResponse(response.ProtoReflect(), 0) {
-			s.publishInventoryMailRedPoints(ctx, id)
-			return
+			return true
 		}
 	}
+	return false
 }

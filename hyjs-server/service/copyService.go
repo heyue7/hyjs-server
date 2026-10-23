@@ -64,6 +64,9 @@ func (s *GameService) LoadTables(root string) error {
 }
 
 func (s *GameService) table(name, key, value string) map[string]string {
+	if row, indexed := s.indexedTable(name, key, value); indexed {
+		return row
+	}
 	for _, row := range s.Tables[name] {
 		if row[key] == value {
 			return row

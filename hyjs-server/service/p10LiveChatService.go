@@ -48,6 +48,14 @@ func (s *GameService) RegisterP10Client(ctx context.Context, id int64, session [
 	}
 }
 func (s *GameService) publishP10Private(ctx context.Context, id int64, message proto.Message) {
+	s.publishP10PrivateBatch(ctx, id, []proto.Message{message})
+}
+
+// publishP10PrivateBatch rechecks current authorization once before synchronous ordered frames.
+func (s *GameService) publishP10PrivateBatch(ctx context.Context, id int64, messages []proto.Message) {
+	if len(messages) == 0 {
+		return
+	}
 	key := p10ClientKey{s.p10ClientOwner(), id}
 	value, ok := p10ClientSinks.Load(key)
 	if !ok {
@@ -65,13 +73,16 @@ func (s *GameService) publishP10Private(ctx context.Context, id int64, message p
 		}
 		return
 	}
-	if err := sink.send(proto.Clone(message)); err != nil {
-		if p10ClientSinks.CompareAndDelete(key, sink) {
-			go func() {
-				cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), constUtil.P10SceneCleanupTimeout)
-				defer cancel()
-				s.DisconnectP10Scene(cleanupCtx, id, sink.session)
-			}()
+	for _, message := range messages {
+		if err := sink.send(proto.Clone(message)); err != nil {
+			if p10ClientSinks.CompareAndDelete(key, sink) {
+				go func() {
+					cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), constUtil.P10SceneCleanupTimeout)
+					defer cancel()
+					s.DisconnectP10Scene(cleanupCtx, id, sink.session)
+				}()
+			}
+			return
 		}
 	}
 }

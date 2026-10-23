@@ -1,0 +1,39 @@
+[
+  {
+    "token": "0x6004b1c",
+    "type": "NetMaskBoxController",
+    "method": "Init",
+    "helper": "Init",
+    "helperType": "HYJS.Latency62.NetworkFeedback",
+    "mode": "replace",
+    "inputCILSHA256": "62a74f2a00bdfbcdaea57ccc413dc55600f2cae03ebf65988ab6694c5749b592"
+  },
+  {
+    "token": "0x6004b1b",
+    "type": "NetMaskBoxController",
+    "method": "Update",
+    "helper": "Update",
+    "helperType": "HYJS.Latency62.NetworkFeedback",
+    "mode": "replace",
+    "inputCILSHA256": "de9efe5f6ab38d44fd21c9d398c0f957f5abf978bc64d1666c6eaab512b9eb01"
+  },
+  {
+    "token": "0x6003de5",
+    "type": "NetWork.Layer.ShortWebClient",
+    "method": "GetWebRequest",
+    "helper": "Configure",
+    "helperType": "HYJS.Latency62.NetworkParameters",
+    "mode": "postfix",
+    "inputCILSHA256": "00c2f2facaf73fa869ab8f8c833c2292d1ebb4a0a31fc534a600d0379bdaa6dd"
+  },
+  {
+    "token": "0x06004ad4",
+    "type": "BoxManager",
+    "method": "CreateNetTimeOut",
+    "helper": "BringFront",
+    "helperType": "HYJS.Latency62.NetworkFeedback",
+    "mode": "postfix",
+    "local": 0,
+    "inputCILSHA256": "479096478181ea5d73f9cb8483b9656bfe30f8757c1dd5fdeb99873e005357d1"
+  }
+]

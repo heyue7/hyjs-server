@@ -18,7 +18,7 @@ import (
 // WelfareAchievementRedPoints 只读真实达标与领取状态，不因菜单查询冻结规则或生成奖品。
 // 每个负责的原类型均返回零值，以便最后一项领取后清除旧红点。
 func (s *GameService) WelfareAchievementRedPoints(ctx context.Context, id int64) (*pb.SCRedPoint, error) {
-	values := map[string]bool{}
+	var out *pb.SCRedPoint
 	err := db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var row db.Profile
 		if err := tx.First(&row, id).Error; err != nil {
@@ -28,89 +28,93 @@ func (s *GameService) WelfareAchievementRedPoints(ctx context.Context, id int64)
 		if err != nil {
 			return err
 		}
-		// 日卡和会员提示复用实际支付及领取资格，查询本身不创建领取行。
-		if tx.Migrator().HasTable(&db.PaymentOrder{}) && tx.Migrator().HasTable(&db.MembershipClaim{}) {
-			now := LocalPlayNow(ctx)
-			for _, kind := range []string{"month", "permanent"} {
-				status, _, e := s.cardStatus(tx, player, kind, now)
-				if e != nil {
-					return e
-				}
-				values["monthCardReward"] = values["monthCardReward"] || status == "canClaim"
-			}
-			daily, _, e := s.vipBoon(tx, player, now)
-			if e != nil {
-				return e
-			}
-			for _, item := range daily {
-				values["vipBoon"] = values["vipBoon"] || item.GetStatus() == 1
-			}
-		}
-		if tx.Migrator().HasTable(&db.P5Achievement{}) {
-			ready, e := s.achievementReady(tx, id, player, game)
-			if e != nil {
-				return e
-			}
-			values["achievement"] = ready
-		}
-		if tx.Migrator().HasTable(&db.PeriodInstance{}) {
-			if err = s.periodReadyPoints(tx, id, values); err != nil {
-				return err
-			}
-		}
-		if tx.Migrator().HasTable(&db.P4WelfareRule{}) {
-			if err = s.welfareReadyPoints(tx, id, values); err != nil {
-				return err
-			}
-		}
-		if tx.Migrator().HasTable(&db.PaymentActivityRule{}) {
-			var rules []db.PaymentActivityRule
-			now := LocalPlayNow(ctx)
-			if err = tx.Where("enabled=? AND start_at<=? AND reward_end_at>?", true, now.UnixMilli(), now.UnixMilli()).Find(&rules).Error; err != nil {
-				return err
-			}
-			for _, cfg := range rules {
-				allowed, e := localPlayActivityVisible(tx, cfg.ID)
-				if e != nil {
-					return e
-				}
-				if !allowed {
-					continue
-				}
-				var state db.PaymentActivityState
-				e = tx.First(&state, "player_id=? AND activity_id=?", id, cfg.ID).Error
-				if e != nil && !errors.Is(e, gorm.ErrRecordNotFound) {
-					return e
-				}
-				if state.Claimed {
-					continue
-				}
-				if state.Snapshot != "" {
-					if json.Unmarshal([]byte(state.Snapshot), &cfg) != nil {
-						continue
-					}
-				}
-				value, e := p3ActivityMetric(tx, id, &cfg, now)
-				if e != nil {
-					return e
-				}
-				if value >= cfg.Threshold {
-					kind := map[string]string{"first": "firstRechargeGift", "single": "rechargeSingle", "total": "rechargeTotal", "consume": "costTotal", "continued": "continuedRecharge"}[cfg.Kind]
-					if kind != "" {
-						values[kind] = true
-					}
-				}
-			}
-		}
-		if tx.Migrator().HasTable(&db.ActivityRules{}) {
-			if err = fundReadyPoints(tx, id, player, values); err != nil {
-				return err
-			}
-		}
-		return nil
+		out, err = s.welfareAchievementRedPoints(ctx, tx, id, player, game)
+		return err
 	})
-	if err != nil {
-		return nil, err
+	return out, err
+}
+
+func (s *GameService) welfareAchievementRedPoints(ctx context.Context, tx *gorm.DB, id int64, player *pb.Player, game *model.GameState) (*pb.SCRedPoint, error) {
+	values := map[string]bool{}
+	var err error
+	// 日卡和会员提示复用实际支付及领取资格，查询本身不创建领取行。
+	if s.redPointHasTable(tx, &db.PaymentOrder{}) && s.redPointHasTable(tx, &db.MembershipClaim{}) {
+		now := LocalPlayNow(ctx)
+		for _, kind := range []string{"month", "permanent"} {
+			status, _, e := s.cardStatus(tx, player, kind, now)
+			if e != nil {
+				return nil, e
+			}
+			values["monthCardReward"] = values["monthCardReward"] || status == "canClaim"
+		}
+		daily, _, e := s.vipBoon(tx, player, now)
+		if e != nil {
+			return nil, e
+		}
+		for _, item := range daily {
+			values["vipBoon"] = values["vipBoon"] || item.GetStatus() == 1
+		}
+	}
+	if s.redPointHasTable(tx, &db.P5Achievement{}) {
+		ready, e := s.achievementReady(tx, id, player, game)
+		if e != nil {
+			return nil, e
+		}
+		values["achievement"] = ready
+	}
+	if s.redPointHasTable(tx, &db.PeriodInstance{}) {
+		if err = s.periodReadyPoints(tx, id, values); err != nil {
+			return nil, err
+		}
+	}
+	if s.redPointHasTable(tx, &db.P4WelfareRule{}) {
+		if err = s.welfareReadyPoints(tx, id, values); err != nil {
+			return nil, err
+		}
+	}
+	if s.redPointHasTable(tx, &db.PaymentActivityRule{}) {
+		var rules []db.PaymentActivityRule
+		now := LocalPlayNow(ctx)
+		if err = tx.Where("enabled=? AND start_at<=? AND reward_end_at>?", true, now.UnixMilli(), now.UnixMilli()).Find(&rules).Error; err != nil {
+			return nil, err
+		}
+		for _, cfg := range rules {
+			allowed, e := localPlayActivityVisible(tx, cfg.ID)
+			if e != nil {
+				return nil, e
+			}
+			if !allowed {
+				continue
+			}
+			var state db.PaymentActivityState
+			e = tx.First(&state, "player_id=? AND activity_id=?", id, cfg.ID).Error
+			if e != nil && !errors.Is(e, gorm.ErrRecordNotFound) {
+				return nil, e
+			}
+			if state.Claimed {
+				continue
+			}
+			if state.Snapshot != "" {
+				if json.Unmarshal([]byte(state.Snapshot), &cfg) != nil {
+					continue
+				}
+			}
+			value, e := p3ActivityMetric(tx, id, &cfg, now)
+			if e != nil {
+				return nil, e
+			}
+			if value >= cfg.Threshold {
+				kind := map[string]string{"first": "firstRechargeGift", "single": "rechargeSingle", "total": "rechargeTotal", "consume": "costTotal", "continued": "continuedRecharge"}[cfg.Kind]
+				if kind != "" {
+					values[kind] = true
+				}
+			}
+		}
+	}
+	if s.redPointHasTable(tx, &db.ActivityRules{}) {
+		if err = fundReadyPoints(tx, id, player, values); err != nil {
+			return nil, err
+		}
 	}
 	out := &pb.SCRedPoint{}
 	keys := []string{"monthCardReward", "vipBoon", "achievement", "totalLogin", "rechargeSingle", "firstRechargeGift", "rechargeTotal", "fightRedNameTimes", "killRedNameTimes", "robTreasureTimes", "pvpWinTimes", "mainCopyWinTimes", "aincradStars", "costTotal", "continuedRecharge", "warriorRescruitTimes", "warriorGetSpecial", "kaiGongActivity", "limitSignOpen", "moonlightRestaurant", "openServerFund", "openServerFundChild", "allPeopleBoon"}
@@ -386,8 +390,17 @@ func fundReadyPoints(tx *gorm.DB, id int64, p *pb.Player, values map[string]bool
 
 // afterWelfareAchievementRequest 在原事务提交后刷新资格，涵盖进度、领取和目录初次打开。
 func (s *GameService) afterWelfareAchievementRequest(ctx context.Context, id int64, request proto.Message, responses []proto.Message) {
-	if request == nil {
+	if !welfareAchievementRequestRefresh(request, responses) {
 		return
+	}
+	if points, err := s.WelfareAchievementRedPoints(ctx, id); err == nil {
+		s.publishP10Private(ctx, id, points)
+	}
+}
+
+func welfareAchievementRequestRefresh(request proto.Message, responses []proto.Message) bool {
+	if request == nil {
+		return false
 	}
 	refresh := false
 	switch string(request.ProtoReflect().Descriptor().Name()) {
@@ -402,10 +415,5 @@ func (s *GameService) afterWelfareAchievementRequest(ctx context.Context, id int
 			}
 		}
 	}
-	if !refresh {
-		return
-	}
-	if points, err := s.WelfareAchievementRedPoints(ctx, id); err == nil {
-		s.publishP10Private(ctx, id, points)
-	}
+	return refresh
 }
