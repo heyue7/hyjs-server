@@ -46,15 +46,30 @@ func (s *GameService) LoadP11ArenaDailyTables(root string) error {
 	return nil
 }
 
-// InitializeP11ArenaDaily creates only this optional source and leaves its local
-// publication disabled. Existing operator values and accepted facts are retained.
+// InitializeP11ArenaDaily publishes the user-authorized permanent midnight source
+// only for the untouched default. Existing operator windows and accepted facts are retained.
 func (s *GameService) InitializeP11ArenaDaily(ctx context.Context) error {
 	tx := db.GetIns().WithContext(ctx)
 	if err := tx.AutoMigrate(&db.P11ArenaDailyPolicy{}, &db.P11ArenaDailyOffer{}, &db.P11ArenaDailySnapshot{}, &db.P11ArenaDailyAward{}, &db.P11ArenaDailyChallenge{}); err != nil {
 		return err
 	}
 	policy := db.P11ArenaDailyPolicy{ID: constUtil.P11ArenaDailyPolicyID, Version: "local-arena-daily-rank-v1", Source: constUtil.P11ArenaDailySource, MinChallenges: 1}
-	return tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&policy).Error
+	if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&policy).Error; err != nil {
+		return err
+	}
+	return tx.Transaction(func(tx *gorm.DB) error {
+		var current db.P11ArenaDailyPolicy
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&current, 1).Error; err != nil {
+			return err
+		}
+		// Only the untouched historical default adopts the newly authorized midnight source.
+		if current.Permanent || current.Enabled || current.Version != "local-arena-daily-rank-v1" || current.Source != constUtil.P11ArenaDailySource || current.PublishedAt != 0 || current.StartAt != 0 || current.EndAt != 0 || current.CutoffSecond != 0 || current.MinChallenges != 1 {
+			return nil
+		}
+		now := time.Now()
+		start, _ := p11ArenaDailyWindow(now, 0)
+		return tx.Model(&current).Updates(map[string]any{"enabled": true, "permanent": true, "version": constUtil.P11ArenaDailyPermanentVersion, "source": constUtil.P11ArenaDailyPermanentSource, "published_at": now.UnixMilli(), "start_at": start.UnixMilli(), "end_at": int64(0), "cutoff_second": int64(0)}).Error
+	})
 }
 
 func p11ArenaDailyNow(ctx context.Context, requested time.Time) time.Time {
@@ -76,6 +91,14 @@ func p11ArenaDailyWindow(at time.Time, cutoff int64) (time.Time, time.Time) {
 	return start, start.AddDate(0, 0, 1)
 }
 func p11ArenaDailyPolicyValid(p *db.P11ArenaDailyPolicy) bool {
+	if p != nil && p.Permanent {
+		if p.ID != 1 || p.Version != constUtil.P11ArenaDailyPermanentVersion || p.Source != constUtil.P11ArenaDailyPermanentSource || p.PublishedAt <= 0 || p.EndAt != 0 || p.CutoffSecond != 0 || p.MinChallenges < 1 || p.MinChallenges > 100 {
+			return false
+		}
+		start, end := p11ArenaDailyWindow(time.UnixMilli(p.PublishedAt), 0)
+		return p.StartAt == start.UnixMilli() && p.PublishedAt >= p.StartAt && p.PublishedAt < end.UnixMilli()
+	}
+
 	if p == nil || p.ID != 1 || strings.TrimSpace(p.Version) == "" || len(p.Version) > 64 || p.Source != constUtil.P11ArenaDailySource || p.PublishedAt <= 0 || p.PublishedAt > p.StartAt || p.StartAt >= p.EndAt || p.CutoffSecond < 0 || p.CutoffSecond >= 86400 || p.MinChallenges < 1 || p.MinChallenges > 100 {
 		return false
 	}
@@ -111,7 +134,7 @@ func p11ArenaDailyOfferRules(o *db.P11ArenaDailyOffer) (*p11ArenaDailyRules, err
 		return nil, errors.New(constUtil.P11ArenaDailyConflict)
 	}
 	start, end := p11ArenaDailyWindow(time.UnixMilli(o.StartAt), r.Policy.CutoffSecond)
-	if o.Day != start.Format("20060102") || start.UnixMilli() != o.StartAt || end.UnixMilli() != o.EndAt || o.StartAt < r.Policy.StartAt || o.EndAt > r.Policy.EndAt || o.CapturedAt < o.StartAt || o.CapturedAt >= o.EndAt {
+	if o.Day != start.Format("20060102") || start.UnixMilli() != o.StartAt || end.UnixMilli() != o.EndAt || o.StartAt < r.Policy.StartAt || (!r.Policy.Permanent && o.EndAt > r.Policy.EndAt) || o.CapturedAt < max(o.StartAt, r.Policy.PublishedAt) || o.CapturedAt >= o.EndAt {
 		return nil, errors.New(constUtil.P11ArenaDailyConflict)
 	}
 	return &r, nil
@@ -162,7 +185,7 @@ func (s *GameService) PrepareP11ArenaDailyMutation(ctx context.Context, tx *gorm
 		return now, errors.New(constUtil.P11ArenaDailyConfigError)
 	}
 	start, end := p11ArenaDailyWindow(now, policy.CutoffSecond)
-	if start.UnixMilli() < policy.StartAt || end.UnixMilli() > policy.EndAt {
+	if start.UnixMilli() < policy.StartAt || (!policy.Permanent && end.UnixMilli() > policy.EndAt) || now.UnixMilli() < policy.PublishedAt {
 		return now, nil
 	}
 	var prior db.P11ArenaDailyOffer

@@ -584,7 +584,7 @@ func (s *GameService) warriorRecruit(ctx context.Context, id int64, b *pb.CSWarr
 			if nextLuck > math.MaxInt32 {
 				return errors.New(constUtil.P2KingLuckInvalid)
 			}
-			g.KingRecruitLuck[kingSpace] = int32(nextLuck)
+			*g.KingRecruitSharedLuck = int32(nextLuck)
 			if err := tx.Save(king).Error; err != nil {
 				return err
 			}

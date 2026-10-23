@@ -202,6 +202,7 @@ const routeMap: RouteMap = {
   "shops_score": "/shops/score",
   "shops_union-fight": "/shops/union-fight",
   "shops_vip": "/shops/vip",
+  "sprout-settings": "/sprout-settings",
   "titles": "/titles",
   "users": "/users",
   "wallet-reasons": "/wallet-reasons",

@@ -178,37 +178,17 @@ func (s *GameService) KingRecruitWorlds(ctx context.Context, id int64, session [
 		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 			return err
 		}
-		// 切换前把旧共享幸运值归入原选择世界，防止首次切换复制或转移余额。
-		if g.KingRecruitLuck == nil {
-			_, world, _, err := s.kingConfiguration(tx, LocalPlayNow(ctx))
-			if err != nil {
-				return err
-			}
-			if selected.PoolID != "" && tx.Migrator().HasTable(&db.KingRecruitActivitySnapshot{}) {
-				var snapshot db.KingRecruitActivitySnapshot
-				loadErr := tx.First(&snapshot, "pool_id=?", selected.PoolID).Error
-				if loadErr == nil {
-					var source adminKingRecruitSource
-					if json.Unmarshal(snapshot.Payload, &source) != nil {
-						return constUtil.ErrAdminConfiguration
-					}
-					if source.World > 0 {
-						world = int32(source.World)
-					}
-				} else if !errors.Is(loadErr, gorm.ErrRecordNotFound) {
-					return loadErr
-				}
-			} else if selected.PoolID == "" && len(candidates) > 0 && candidates[0].World > 0 {
-				world = int32(candidates[0].World)
-			}
+		// 选择前在角色事务内完成永久共享余额迁移。
+		if g.KingRecruitSharedLuck == nil {
 			legacy, err := kingState(tx, id, LocalPlayNow(ctx))
 			if err != nil {
 				return err
 			}
-			if _, err := kingWorldLuck(g, world, legacy.Luck); err != nil {
+			if _, err := kingWorldLuck(g, 1, legacy.Luck); err != nil {
 				return err
 			}
 		}
+
 		present := false
 		for _, candidate := range candidates {
 			label := map[int64]string{0: "轮换世界", 1: "SAO", 2: "ALO", 3: "GGO"}[candidate.World]

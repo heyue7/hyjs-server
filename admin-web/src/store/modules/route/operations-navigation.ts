@@ -6,7 +6,7 @@ export function organizeOperationsMenus(menus: App.Global.Menu[]) {
   const used = new Set<string>();
   const pageIcons: Record<string, string> = {
     home: 'ph:chart-line-up', 'game-accounts': 'ph:identification-card', items: 'ph:treasure-chest',
-    'guild-settings': 'ph:flag', guilds: 'ph:users-three', activities: 'ph:calendar-blank', achievements: 'ph:medal', titles: 'ph:crown',
+    'sprout-settings': 'ph:plant', 'guild-settings': 'ph:flag', guilds: 'ph:users-three', activities: 'ph:calendar-blank', achievements: 'ph:medal', titles: 'ph:crown',
     'arena-prizes': 'ph:cards-three', 'wallet-reasons': 'ph:wallet', 'server-clock': 'ph:clock-counter-clockwise',
     shops: 'ph:storefront', announcements: 'ph:megaphone', 'client-updates': 'ph:device-mobile', servers: 'ph:hard-drives',
     'activity-schedules': 'ph:calendar-dots', fields: 'ph:map-trifold', players: 'ph:users-three',
@@ -52,6 +52,7 @@ export function organizeOperationsMenus(menus: App.Global.Menu[]) {
     take('game-accounts', '用户管理'),
     take('items', '道具与资源'),
     take('fields', '野外地图与部署'),
+    take('sprout-settings', '小芽设置'),
     take('activities', '活动设置'),
     take('guild-settings', '公会设置'),
     group('growth-settings', '成长配置', [take('achievements'), take('titles')]),

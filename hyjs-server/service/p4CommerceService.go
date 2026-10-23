@@ -23,22 +23,23 @@ import (
 )
 
 type p4Product struct {
-	Enabled     *bool  `json:"enabled,omitempty"` // nil preserves enabled legacy catalogues; false suspends new purchases.
-	ID          string `json:"id"`
-	MaxRank     int64  `json:"maxRank,omitempty"`
-	Name        string `json:"name,omitempty"`
-	Index       int32  `json:"index"`
-	Rewards     string `json:"rewards"`
-	Cost        string `json:"cost"`
-	TierID      bool   `json:"tierId,omitempty"`
-	Priority    int32  `json:"priority"`
-	DailyLimit  int32  `json:"dailyLimit"`
-	TotalLimit  int32  `json:"totalLimit"`
-	Stock       int32  `json:"stock"`
-	MinLevel    int32  `json:"minLevel"`
-	MinVIP      int32  `json:"minVip"`
-	DiscountBps int32  `json:"discountBps"`
-	Weight      int64  `json:"weight"`
+	SourceProductID string `json:"-"`
+	Enabled         *bool  `json:"enabled,omitempty"` // nil preserves enabled legacy catalogues; false suspends new purchases.
+	ID              string `json:"id"`
+	MaxRank         int64  `json:"maxRank,omitempty"`
+	Name            string `json:"name,omitempty"`
+	Index           int32  `json:"index"`
+	Rewards         string `json:"rewards"`
+	Cost            string `json:"cost"`
+	TierID          bool   `json:"tierId,omitempty"`
+	Priority        int32  `json:"priority"`
+	DailyLimit      int32  `json:"dailyLimit"`
+	TotalLimit      int32  `json:"totalLimit"`
+	Stock           int32  `json:"stock"`
+	MinLevel        int32  `json:"minLevel"`
+	MinVIP          int32  `json:"minVip"`
+	DiscountBps     int32  `json:"discountBps"`
+	Weight          int64  `json:"weight"`
 }
 
 func (p p4Product) isEnabled() bool {
@@ -46,22 +47,24 @@ func (p p4Product) isEnabled() bool {
 }
 
 type p4CommerceRules struct {
-	LiveEditable       bool        `json:"liveEditable,omitempty"`
-	Products           []p4Product `json:"products"`
-	RankPublishedAt    int64       `json:"rankPublishedAt,omitempty"`
-	FreeCap            int32       `json:"freeCap,omitempty"`
-	FreeSeconds        int64       `json:"freeSeconds,omitempty"`
-	ResourceRefreshCap int32       `json:"resourceRefreshCap,omitempty"`
-	RefreshItem        string      `json:"refreshItem,omitempty"`
-	RefreshCost        string      `json:"refreshCost,omitempty"`
-	Slots              int         `json:"slots,omitempty"`
-	Discounts          []int32     `json:"discounts,omitempty"`
+	MemoryPolicyVersion int         `json:"memoryPolicyVersion,omitempty"`
+	LiveEditable        bool        `json:"liveEditable,omitempty"`
+	Products            []p4Product `json:"products"`
+	RankPublishedAt     int64       `json:"rankPublishedAt,omitempty"`
+	FreeCap             int32       `json:"freeCap,omitempty"`
+	FreeSeconds         int64       `json:"freeSeconds,omitempty"`
+	ResourceRefreshCap  int32       `json:"resourceRefreshCap,omitempty"`
+	RefreshItem         string      `json:"refreshItem,omitempty"`
+	RefreshCost         string      `json:"refreshCost,omitempty"`
+	Slots               int         `json:"slots,omitempty"`
+	Discounts           []int32     `json:"discounts,omitempty"`
 }
 type p4CommerceProgress struct {
 	Day          string           `json:"day"`
 	Bought       map[string]int32 `json:"bought"`
 	Total        map[string]int32 `json:"total"`
 	Version      int64            `json:"version"`
+	Offers       []memoryOffer55  `json:"offers,omitempty"`
 	Slots        []string         `json:"slots,omitempty"`
 	FreeLeft     int32            `json:"freeLeft"`
 	FreeAt       int64            `json:"freeAt"`
@@ -91,12 +94,13 @@ func (s *GameService) seedP4Commerce(tx *gorm.DB, now time.Time) error {
 		product.TierID = true
 		ordinary.Products = append(ordinary.Products, product)
 	}
-	memory := p4CommerceRules{FreeCap: 10, FreeSeconds: 7200, ResourceRefreshCap: 15, RefreshItem: "item_013,1", RefreshCost: "diamond,20", Slots: 4}
+	memory := p4CommerceRules{FreeCap: 10, FreeSeconds: 7200, ResourceRefreshCap: 15, RefreshItem: "item_013,1", RefreshCost: "diamond,20", Slots: 6}
 	for i, spec := range []struct{ reward, cost string }{{"frag_hero_001,1", "light,20"}, {"frag_hero_025,1", "light,20"}, {"item_005,5", "light,15"}, {"hero_exp_002,1", "light,30"}, {"item_006,1", "light,30"}, {"item_013,1", "light,10"}} {
 		p := p4BaseProduct(fmt.Sprintf("p4Memory_%d", i+1), spec.reward, spec.cost, int32(i+1), 16)
 		p.DailyLimit = 1
 		memory.Products = append(memory.Products, p)
 	}
+	memory = s.memoryCatalogue55(memory)
 	popularity := p4CommerceRules{Products: []p4Product{p4BaseProduct("p4Popularity_1", "item_001,1", "popularity,20", 1, 10), p4BaseProduct("p4Popularity_2", "frag_hero_001,1", "popularity,100", 2, 10)}}
 	score := p4CommerceRules{Products: []p4Product{p4BaseProduct("p4Score_1", "item_005,5", "score,50", 1, 35), p4BaseProduct("p4Score_2", "item_004,1", "score,100", 2, 35)}}
 	half := p4CommerceRules{Products: []p4Product{p4BaseProduct("p4Half_1", "item_006,2", "diamond,40", 1, 1)}}
@@ -234,6 +238,9 @@ func (s *GameService) validateP4Commerce(cfg db.P4CommerceRule) (p4CommerceRules
 		}
 	}
 	if cfg.Kind == "memory" {
+		if err := s.validateMemoryShrine55(rules); err != nil {
+			return rules, err
+		}
 		if rules.FreeCap != 10 || rules.FreeSeconds != 7200 || rules.ResourceRefreshCap < 1 || rules.Slots < 1 || rules.Slots > len(rules.Products) || rules.RefreshItem != "item_013,1" || rules.RefreshCost != "diamond,20" {
 			return rules, errors.New("圣坛刷新不匹配原客户端规则")
 		}
@@ -450,40 +457,8 @@ func (s *GameService) loadP4Commerce(tx *gorm.DB, id int64, key string, shopType
 				state.FreeLeft = int32(min(int64(rules.FreeCap), int64(state.FreeLeft)+elapsed))
 				state.FreeAt += elapsed * seconds
 			}
-			// Keep purchased-slot keys and refresh counters when an operator changes
-			// the catalogue. Only deleted slots disappear; vacancies use new offers.
-			if rules.LiveEditable && len(state.Slots) > 0 {
-				available := map[string]bool{}
-				for _, product := range rules.Products {
-					available[product.ID] = true
-				}
-				kept := []string{}
-				for _, id := range state.Slots {
-					if available[id] && len(kept) < rules.Slots {
-						kept = append(kept, id)
-						delete(available, id)
-					}
-				}
-				if len(kept) < rules.Slots {
-					vacant := rules
-					vacant.Slots = rules.Slots - len(kept)
-					vacant.Products = nil
-					for _, product := range rules.Products {
-						if available[product.ID] {
-							vacant.Products = append(vacant.Products, product)
-						}
-					}
-					fill, e := p4SampleSlots(vacant)
-					if e != nil {
-						return cfg, rules, nil, nil, e
-					}
-					kept = append(kept, fill...)
-				}
-				state.Slots = kept
-			}
-			if len(state.Slots) == 0 {
-				state.Slots, err = p4SampleSlots(rules)
-				if err != nil {
+			if len(state.Slots) == 0 && len(state.Offers) == 0 {
+				if err := memoryRefresh55(rules, state); err != nil {
 					return cfg, rules, nil, nil, err
 				}
 			}
@@ -551,6 +526,11 @@ func p4Visible(cfg db.P4CommerceRule, state *p4CommerceProgress, p p4Product) bo
 	if cfg.Kind != "memory" {
 		return true
 	}
+	for _, offer := range state.Offers {
+		if offer.ID == p.ID {
+			return true
+		}
+	}
 	for _, id := range state.Slots {
 		if id == p.ID {
 			return true
@@ -593,13 +573,13 @@ func (s *GameService) p4Projection(tx *gorm.DB, p *pb.Player, cfg db.P4CommerceR
 			return nil, nil, err
 		}
 	}
-	for _, product := range rules.Products {
+	for _, product := range memoryProducts55(cfg, rules, state) {
 		if shopHasDirectStamina(product.Rewards) || !p4Visible(cfg, state, product) {
 			continue
 		}
 		key := p4SlotKey(cfg, state, product)
 		bought := state.Bought[key]
-		if state.Total[product.ID] < 0 {
+		if state.Total[memorySource55(product)] < 0 {
 			return nil, nil, errors.New("商品总限购存档无效")
 		}
 		if bought < 0 || !rules.LiveEditable && bought > product.DailyLimit {
@@ -608,12 +588,12 @@ func (s *GameService) p4Projection(tx *gorm.DB, p *pb.Player, cfg db.P4CommerceR
 		left := max(int32(0), product.DailyLimit-bought)
 		allLeft := int32(math.MaxInt32)
 		if product.TotalLimit > 0 {
-			allLeft = product.TotalLimit - state.Total[product.ID]
+			allLeft = product.TotalLimit - state.Total[memorySource55(product)]
 			left = min(left, allLeft)
 		}
 		if product.Stock >= 0 {
 			var stock db.P4CommerceStock
-			err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("rule_id = ? AND product_id = ?", cfg.ID, product.ID).First(&stock).Error
+			err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("rule_id = ? AND product_id = ?", cfg.ID, memorySource55(product)).First(&stock).Error
 			if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 				return nil, nil, err
 			}
@@ -644,7 +624,7 @@ func (s *GameService) p4Projection(tx *gorm.DB, p *pb.Player, cfg db.P4CommerceR
 			if can > 0 {
 				can = 1
 			}
-			if product.TotalLimit > 0 && state.Total[product.ID] >= product.TotalLimit {
+			if product.TotalLimit > 0 && state.Total[memorySource55(product)] >= product.TotalLimit {
 				can = 2
 			}
 			if cfg.Kind == constUtil.P4PopularityRankKind {
@@ -1027,7 +1007,7 @@ func (s *GameService) p4Commerce(ctx context.Context, id int64, request proto.Me
 				state.ResourceUsed++
 			}
 			state.Version++
-			state.Slots, err = p4SampleSlots(rules)
+			err = memoryRefresh55(rules, state)
 			if err != nil {
 				return err
 			}
@@ -1036,8 +1016,9 @@ func (s *GameService) p4Commerce(ctx context.Context, id int64, request proto.Me
 				return errors.New("交易数量无效")
 			}
 			var selected *p4Product
-			for i := range rules.Products {
-				product := &rules.Products[i]
+			offers := memoryProducts55(cfg, rules, state)
+			for i := range offers {
+				product := &offers[i]
 				if (productID != "" && product.ID == productID) || (index > 0 && product.Index == index) {
 					selected = product
 					break
@@ -1048,7 +1029,7 @@ func (s *GameService) p4Commerce(ctx context.Context, id int64, request proto.Me
 			}
 			selectedKey := p4SlotKey(cfg, state, *selected)
 			bought := state.Bought[selectedKey]
-			if state.Total[selected.ID] < 0 || state.Total[selected.ID] > math.MaxInt32-count || bought < 0 || bought > selected.DailyLimit-count || p.GetLevel() < selected.MinLevel || p.GetVip() < selected.MinVIP || (selected.TotalLimit > 0 && state.Total[selected.ID] > selected.TotalLimit-count) {
+			if state.Total[memorySource55(*selected)] < 0 || state.Total[memorySource55(*selected)] > math.MaxInt32-count || bought < 0 || bought > selected.DailyLimit-count || p.GetLevel() < selected.MinLevel || p.GetVip() < selected.MinVIP || (selected.TotalLimit > 0 && state.Total[memorySource55(*selected)] > selected.TotalLimit-count) {
 				return errors.New("商品资格或限购不足")
 			}
 			cost, err = s.p4Price(*selected, state, bought+1, count)
@@ -1082,8 +1063,8 @@ func (s *GameService) p4Commerce(ctx context.Context, id int64, request proto.Me
 			}
 			var stock db.P4CommerceStock
 			if selected.Stock >= 0 {
-				stock = db.P4CommerceStock{RuleID: cfg.ID, ProductID: selected.ID}
-				e := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("rule_id = ? AND product_id = ?", cfg.ID, selected.ID).First(&stock).Error
+				stock = db.P4CommerceStock{RuleID: cfg.ID, ProductID: memorySource55(*selected)}
+				e := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("rule_id = ? AND product_id = ?", cfg.ID, memorySource55(*selected)).First(&stock).Error
 				if e != nil && !errors.Is(e, gorm.ErrRecordNotFound) {
 					return e
 				}
@@ -1103,7 +1084,7 @@ func (s *GameService) p4Commerce(ctx context.Context, id int64, request proto.Me
 				return err
 			}
 			state.Bought[selectedKey] += count
-			state.Total[selected.ID] += count
+			state.Total[memorySource55(*selected)] += count
 			if err = s.RecordP1Event(tx, id, source, constUtil.P1EventPurchase, int64(count), now); err != nil {
 				return err
 			}

@@ -8,7 +8,7 @@ type P12FieldPVPState struct {
 	Day         string `gorm:"size:10;not null" json:"day"`
 	DailyKills  int32  `gorm:"not null" json:"dailyKills"`
 	LootCoin    int64  `gorm:"not null" json:"lootCoin"`
-	BusyUntil   int64  `gorm:"not null" json:"busyUntil"`
+	BusyUntil   int64  `gorm:"not null;index:idx_p12_field_pvp_busy" json:"busyUntil"`
 	LastFightID string `gorm:"size:64;not null" json:"lastFightId"`
 	JailUntil   int64  `gorm:"not null" json:"jailUntil"`
 	RedeemCount int64  `gorm:"not null" json:"redeemCount"`

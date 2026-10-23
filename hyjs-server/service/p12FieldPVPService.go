@@ -326,7 +326,7 @@ func (s *GameService) p12FieldPVPParty(p *pb.Player, g *model.GameState, first i
 	return party, nil
 }
 func p12FieldPVPApplyTerminal(party *pb.BattlePlayer, side *pb.PlayerSide, out *model.CombatFinalHPOutcome, camp int32) error {
-	if party == nil || side == nil || out == nil || out.Outcome == nil || camp < 0 || camp > 1 || len(party.Formation) < 1 || len(party.Formation) > 4 {
+	if party == nil || side == nil || out == nil || out.Outcome == nil || camp < 0 || camp > 1 || len(party.Formation) < 1 || len(party.Formation) > constUtil.P12FieldPVPMaxHeroes {
 		return errors.New(constUtil.P12FieldPVPConflict)
 	}
 	next := proto.Clone(side).(*pb.PlayerSide)
@@ -434,6 +434,8 @@ func (s *GameService) p12FieldPVPFightAt(ctx context.Context, id int64, session 
 	var response *pb.SCSidePvpFightResult
 	fresh := false
 	var sidePush *pb.SCFieldPlayerState
+	var presentationScene string
+	var presentationLine int32
 	// Presence writers use this mutex. Profiles then lock by ascending ID, before
 	// any consistent snapshot or domain row is read, including zero-stamp replay.
 	p10SceneMutation.Lock()
@@ -575,6 +577,10 @@ func (s *GameService) p12FieldPVPFightAt(ctx context.Context, id int64, session 
 		if err != nil {
 			return err
 		}
+		// New field PK freezes the initiating player as the first acting camp.
+		if err = SetP6FirstOrder(attacker, defender, false); err != nil {
+			return err
+		}
 		seed, err := rand.Int(rand.Reader, big.NewInt(math.MaxInt32+1))
 		if err != nil {
 			return err
@@ -610,6 +616,12 @@ func (s *GameService) p12FieldPVPFightAt(ctx context.Context, id int64, session 
 		if err = p12FieldPVPStoreRecord(tx, &record, terminal, now); err != nil {
 			return err
 		}
+		// Keep the original pre-fight side on the wire during the presentation lease.
+		attackView := proto.Clone(g.Field.Side).(*pb.PlayerSide)
+		defendView := proto.Clone(pg.Field.Side).(*pb.PlayerSide)
+		attackView.State = proto.Int32(constUtil.P12FieldPVPAttackingState)
+		defendView.State = proto.Int32(constUtil.P12FieldPVPDefendingState)
+		sidePush = &pb.SCFieldPlayerState{Player: []*pb.PlayerSide{attackView, defendView}}
 		if err = p12FieldPVPApplyTerminal(frozen.Attacker, g.Field.Side, terminal, 0); err != nil {
 			return err
 		}
@@ -726,6 +738,13 @@ func (s *GameService) p12FieldPVPFightAt(ctx context.Context, id int64, session 
 		if err = saveProfile(tx, &peerRow, peer, pg); err != nil {
 			return err
 		}
+		var presentationPresence db.P10ScenePresence
+		if e := tx.First(&presentationPresence, "player_id=?", id).Error; e == nil {
+			presentationScene = presentationPresence.Scene
+			presentationLine = presentationPresence.Line
+		} else if !errors.Is(e, gorm.ErrRecordNotFound) {
+			return e
+		}
 		fresh = true
 		return nil
 	})
@@ -737,18 +756,20 @@ func (s *GameService) p12FieldPVPFightAt(ctx context.Context, id int64, session 
 	// current SCPlayer follows old deltas, preventing retry balance duplication.
 	if fresh {
 		s.publishP10Private(ctx, b.GetPlayerId(), response)
-		sides := []*pb.PlayerSide{}
-		for _, pid := range []int64{id, b.GetPlayerId()} {
-			var row db.Profile
-			if db.GetIns().WithContext(ctx).First(&row, pid).Error == nil {
-				_, g, e := decodeProfile(&row)
-				if e == nil && g.Field != nil && g.Field.Side != nil {
-					sides = append(sides, proto.Clone(g.Field.Side).(*pb.PlayerSide))
+
+		s.publishP10Private(ctx, b.GetPlayerId(), sidePush)
+		if presentationScene != "" {
+			peers, e := s.p10ScenePeers(db.GetIns().WithContext(ctx), presentationScene, presentationLine, id)
+			if e == nil {
+				for _, peer := range peers {
+					pid := peer.GetInfo().GetPlayerId()
+					if pid != b.GetPlayerId() {
+						s.publishP10Private(ctx, pid, sidePush)
+					}
 				}
 			}
 		}
-		sidePush = &pb.SCFieldPlayerState{Player: sides}
-		s.publishP10Private(ctx, b.GetPlayerId(), sidePush)
+
 	}
 
 	own, _, err := s.resourceProfile(ctx, id)
@@ -816,7 +837,7 @@ func (s *GameService) p12FieldPVPReadReceipt(tx *gorm.DB, row *db.P12FieldPVPRec
 	bad := func() (*pb.SCSidePvpFightResult, *pb.SidePvpFightData, error) {
 		return nil, nil, errors.New(constUtil.P12FieldPVPConflict)
 	}
-	if row.PolicyHash != p6Digest([]byte(constUtil.P12FieldPVPSource)) || row.ScopeProof != constUtil.P12FieldPVPNativeProof || p6Digest(row.Response) != row.ResponseHash || p6Digest(row.Terminal) != row.TerminalHash || p6Digest(row.Replay) != row.ReplayHash || p6Digest(row.MV) != row.MVHash || row.BusyUntil != row.CreatedAt+constUtil.P12FieldPVPBusyMS {
+	if row.PolicyHash != p6Digest([]byte(constUtil.P12FieldPVPSource)) || p6Digest(row.Response) != row.ResponseHash || p6Digest(row.Terminal) != row.TerminalHash || p6Digest(row.Replay) != row.ReplayHash || p6Digest(row.MV) != row.MVHash || row.BusyUntil != row.CreatedAt+constUtil.P12FieldPVPBusyMS {
 		return bad()
 	}
 	var record db.P6BattleRecord
@@ -834,6 +855,10 @@ func (s *GameService) p12FieldPVPReadReceipt(tx *gorm.DB, row *db.P12FieldPVPRec
 	}
 	if err = ValidateP12FieldPVPCertifiedReceipt(input, &out); err != nil {
 		return nil, nil, err
+	}
+	// Bind the persisted proof to the fully validated native or mechanism outcome.
+	if row.ScopeProof != out.Outcome.CapabilityHash {
+		return bad()
 	}
 	winner := row.PlayerID
 	if out.Outcome.Winner == 1 {

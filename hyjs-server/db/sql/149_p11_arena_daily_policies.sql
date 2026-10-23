@@ -1,4 +1,5 @@
 CREATE TABLE IF NOT EXISTS p11_arena_daily_policies (
+ permanent BOOLEAN NOT NULL DEFAULT FALSE,
  id BIGINT NOT NULL,
  enabled BOOLEAN NOT NULL,
  version VARCHAR(64) NOT NULL,

@@ -865,7 +865,18 @@ func (s *GameService) p7Expedition(ctx context.Context, id int64, request proto.
 	if err != nil {
 		return nil, err
 	}
-	return []proto.Message{result}, nil
+	replies := []proto.Message{result}
+	switch request.(type) {
+	case *pb.CSAcceptMission, *pb.CSInterExpedition:
+		// Publish the current absolute balance after commit, including receipt replay.
+		// The original UI resets its recovery countdown from SCPlayer, without a local debit.
+		current, _, readErr := s.resourceProfile(ctx, id)
+		if readErr != nil {
+			return nil, readErr
+		}
+		replies = append(replies, &pb.SCPlayer{Player: current})
+	}
+	return replies, nil
 }
 
 func (s *GameService) DispatchP7Expedition(ctx context.Context, id int64, request proto.Message, stamp int64) ([]proto.Message, bool, error) {

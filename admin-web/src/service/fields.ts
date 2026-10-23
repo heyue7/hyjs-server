@@ -212,7 +212,6 @@ export interface FieldGGOConfiguration {
   currencyId: string;
   shopKey: string;
   carryIcon: string;
-  sproutIcon: string;
   npcs: FieldGGONPC[];
   monsters: FieldGGOEnemy[];
   bosses: FieldGGOEnemy[];

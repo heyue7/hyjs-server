@@ -176,7 +176,7 @@ func AdminShopSettingsSaveHandler(c *gin.Context) {
 		adminError(c, constUtil.ErrAdminInput)
 		return
 	}
-	if (key == "pet-market" || key == "memory") && req.Slots < 1 {
+	if key == "pet-market" && req.Slots < 1 {
 		adminError(c, constUtil.ErrAdminInput)
 		return
 	}

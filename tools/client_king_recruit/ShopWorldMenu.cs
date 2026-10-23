@@ -107,6 +107,15 @@ namespace HYJS.KingRecruit
                 entry.Menu = this;
                 entry.Space = 1;
                 entries.Add(entry);
+                // Original OnTabBtn only clears the single king template in tabBtns.
+                // Complete its selection update immediately for the cloned worlds too.
+                foreach (KeyValuePair<ShopType, GameObject> pair in buttons)
+                {
+                    if (pair.Key == ShopType.KingsRecruit || pair.Value == null) continue;
+                    ShopTabButton ordinary = pair.Value.GetComponent<ShopTabButton>();
+                    if (ordinary == null) continue;
+                    ordinary.m_callback = delegate(ShopType type) { shop.OnTabBtn(type); Highlight(); };
+                }
             }
             if (!catalogLoaded && !loading && Visible()) StartCoroutine(RefreshCatalog());
             Apply();
@@ -350,6 +359,7 @@ namespace HYJS.KingRecruit
             Apply();
             // Only after the server accepted the world does the original tab reopen with the same king content.
             shop.OnTabBtn(ShopType.KingsRecruit);
+            Highlight();
         }
 
         // Prices and free cooldowns remain original. Only these server-owned
@@ -415,8 +425,6 @@ namespace HYJS.KingRecruit
                     button.labName.maxLineCount = 1;
                     button.labName.overflowMethod = UILabel.Overflow.ShrinkContent;
                 }
-                if (button != null && button.chosedBg != null) button.chosedBg.SetActive(false);
-                if (button != null && button.objPointer != null) button.objPointer.SetActive(false);
             }
             Order();
             Highlight();
@@ -478,22 +486,33 @@ namespace HYJS.KingRecruit
             shop.simpleGrid.Reposition();
         }
 
+        static void SetSelected(ShopTabButton button, bool selected)
+        {
+            if (button == null) return;
+            // Do not restart original UI activation/animation every frame.
+            if (button.chosedBg != null && button.chosedBg.activeSelf != selected) button.chosedBg.SetActive(selected);
+            if (button.objPointer != null && button.objPointer.activeSelf != selected) button.objPointer.SetActive(selected);
+        }
+
         void Highlight()
         {
-            int active = ResolvedWorld;
-            bool kingActive = shop != null && CurTypeField != null && Convert.ToInt32(CurTypeField.GetValue(shop)) == (int)ShopType.KingsRecruit;
-            if (entries.Count < 3) return;
-            for (int space = 1; space <= 3; space++)
+            if (shop == null || CurTypeField == null) return;
+            ShopType current = (ShopType)CurTypeField.GetValue(shop);
+            // A pending/failed request never becomes the current page's accepted world.
+            int active = WorldOfPool(SelectedPool);
+            bool kingActive = current == ShopType.KingsRecruit;
+            Dictionary<ShopType, GameObject> buttons = TabBtns();
+            if (buttons != null)
+                foreach (KeyValuePair<ShopType, GameObject> pair in buttons)
+                    if (pair.Value != null && pair.Key != ShopType.KingsRecruit)
+                        SetSelected(pair.Value.GetComponent<ShopTabButton>(), pair.Key == current);
+            for (int space = 1; space <= entries.Count; space++)
             {
                 ShopWorldEntry entry = entries[space - 1];
-                if (entry == null) continue;
-                ShopTabButton button = entry.GetComponent<ShopTabButton>();
-                if (button == null) continue;
-                bool on = kingActive && space == active;
-                if (button.chosedBg != null) button.chosedBg.SetActive(on);
-                if (button.objPointer != null) button.objPointer.SetActive(on);
+                if (entry != null) SetSelected(entry.GetComponent<ShopTabButton>(), kingActive && space == active);
             }
         }
+
     }
 
     public sealed class ShopWorldEntry : MonoBehaviour

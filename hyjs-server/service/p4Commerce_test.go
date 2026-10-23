@@ -91,11 +91,14 @@ func TestP4OrdinaryOriginalTierPriceAndReceiptLimits(t *testing.T) {
 }
 func TestP4MemoryRefreshFreeTicketDiamondAndWindow(t *testing.T) {
 	f := p4Setup(t)
+	if err := db.GetIns().Model(&db.P4CommerceRule{}).Where("kind = ?", "memory").Update("enabled", true).Error; err != nil {
+		t.Fatal(err)
+	}
 	p4Fund(t, f)
 	now := time.Now().Add(-6 * time.Hour)
 	q := &pb.CSRefreshShopQuery{ShopType: proto.Int32(3)}
 	r := p4Trade(t, f, q, 0, now).(*pb.SCRefreshShopQuery)
-	if len(r.GetShopItemList()) != 4 || r.GetFreeLeftTimes() != 1 {
+	if len(r.GetShopItemList()) != 6 || r.GetFreeLeftTimes() != 1 {
 		t.Fatal("initial memory catalogue")
 	}
 	refresh := &pb.CSRefreshShopRefresh{ShopType: proto.Int32(3)}

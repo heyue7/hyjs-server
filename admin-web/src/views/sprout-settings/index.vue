@@ -1,0 +1,107 @@
+<script setup lang="ts">
+import { computed, onMounted, reactive, ref } from 'vue';
+import { useDraftGuard } from '@/composables/useDraftGuard';
+import { useOperations } from '@/composables/useOperations';
+import { ApiError, api, errorMessage, json } from '@/service/operations';
+import type { SproutSettings } from '@/service/sprout-settings';
+
+const { canWrite } = useOperations();
+const sproutIcon = `${import.meta.env.BASE_URL}media/items/ggo_sprout.png`;
+const saved = ref<SproutSettings | null>(null);
+const draft = reactive({ enabled: false, days: null as number | null, reason: '' });
+const loading = ref(false);
+const saving = ref(false);
+const error = ref('');
+const conflict = ref(false);
+const guard = useDraftGuard({
+  active: () => Boolean(saved.value), value: () => draft, busy: () => loading.value || saving.value,
+  writable: () => canWrite.value, label: '小芽设置', scope: false, close: () => reset()
+});
+const eligible = computed(() => draft.days === null ? '请填写小芽有效天数' : `角色创建后的前 ${draft.days} 天内显示小芽标识`);
+const valid = computed(() => !draft.enabled || (Number.isInteger(draft.days) && (draft.days ?? 0) >= 1 && (draft.days ?? 0) <= 3650));
+function reset() {
+  if (!saved.value) return;
+  draft.enabled = saved.value.enabled;
+  draft.days = saved.value.days;
+  draft.reason = '';
+  error.value = '';
+  guard.capture();
+}
+async function load() {
+  if (loading.value || saving.value || !await guard.canLeave()) return;
+  loading.value = true;
+  error.value = '';
+  try {
+    saved.value = await api<SproutSettings>('/sprout-settings');
+    conflict.value = false;
+    reset();
+  } catch (e) { error.value = errorMessage(e); }
+  finally { loading.value = false; }
+}
+async function save() {
+  if (!saved.value || saving.value || loading.value || conflict.value || !canWrite.value || !guard.dirty.value) return;
+  if (!valid.value) { error.value = '启用小芽标识前，请填写 1～3650 的整数天数'; return; }
+  if (!draft.reason.trim()) { error.value = '请填写修改原因'; return; }
+  saving.value = true;
+  error.value = '';
+  try {
+    saved.value = await api<SproutSettings>('/sprout-settings', json('PUT', {
+      enabled: draft.enabled, days: draft.days, version: saved.value.version, reason: draft.reason.trim()
+    }));
+    reset();
+    window.$message?.success('小芽设置已保存');
+  } catch (e) {
+    error.value = errorMessage(e);
+    if (e instanceof ApiError && e.status === 409) conflict.value = true;
+  } finally { saving.value = false; }
+}
+onMounted(load);
+</script>
+
+<template>
+  <div class="ops-page sprout-page">
+    <div class="ops-filters"><NButton :loading="loading" :disabled="saving" @click="load">刷新</NButton></div>
+    <NAlert v-if="error && !conflict" type="error" :title="error" />
+    <NAlert v-if="conflict" type="warning" title="配置已更新，当前输入已保留。请记录修改内容后刷新，再重新保存。" />
+    <NCard :bordered="false" class="ops-panel">
+      <NSpin :show="loading">
+        <template v-if="saved">
+          <div class="sprout-preview">
+            <img :src="sproutIcon" alt="小芽标识" width="44" height="44" />
+            <div><strong>小芽标识</strong><p class="ops-muted">按角色创建天数判定，全区服共用。</p></div>
+            <NTag :bordered="false" :type="draft.enabled ? 'success' : 'default'">{{ draft.enabled ? '规则已启用' : '规则未启用' }}</NTag>
+          </div>
+          <NAlert type="info" :bordered="false" class="mb-24px">当前保存资格规则，客户端小芽显示待后续接入。</NAlert>
+          <NForm label-placement="top" :disabled="saving || !canWrite" @submit.prevent="save">
+            <NFormItem label="启用小芽规则"><NSwitch v-model:value="draft.enabled" aria-label="启用小芽规则" /></NFormItem>
+            <NFormItem label="小芽有效天数" :feedback="eligible">
+              <NInputNumber v-model:value="draft.days" :min="1" :max="3650" :precision="0" clearable placeholder="待设定" :input-props="{ 'aria-label': '小芽有效天数' }" class="sprout-days">
+                <template #suffix>天</template>
+              </NInputNumber>
+            </NFormItem>
+            <NFormItem v-if="canWrite" label="修改原因"><NInput v-model:value="draft.reason" placeholder="填写本次调整原因" :maxlength="500" type="textarea" :autosize="{ minRows: 2, maxRows: 4 }" :input-props="{ 'aria-label': '修改原因' }" /></NFormItem>
+            <div v-if="canWrite" class="sprout-actions">
+              <NButton :disabled="saving || loading || !guard.dirty.value" @click="reset">还原修改</NButton>
+              <NButton type="primary" :loading="saving" :disabled="loading || conflict || !guard.dirty.value" attr-type="submit">保存</NButton>
+            </div>
+            <p v-else class="ops-muted">当前账号可查看设置。</p>
+          </NForm>
+        </template>
+        <NEmpty v-else-if="!loading" description="小芽设置读取失败，请刷新重试" />
+      </NSpin>
+    </NCard>
+  </div>
+</template>
+
+<style scoped>
+.sprout-page { max-width: 900px; }
+.sprout-preview { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; align-items: center; gap: 14px; margin-bottom: 24px; }
+.sprout-preview > div { min-width: 0; }
+.sprout-preview img { object-fit: contain; flex-shrink: 0; }
+.sprout-preview strong { font-size: 16px; font-weight: 600; }
+.sprout-preview p { margin: 4px 0 0; line-height: 1.6; }
+.sprout-preview .n-tag { margin-left: auto; }
+.sprout-days { width: 260px; max-width: 100%; }
+.sprout-actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 8px; }
+@media (max-width: 640px) { .sprout-preview { grid-template-columns: 36px minmax(0, 1fr); gap: 10px 12px; } .sprout-preview img { width: 36px; height: 36px; } .sprout-preview .n-tag { grid-column: 2; justify-self: start; margin-left: 0; } .sprout-days { width: 100%; } }
+</style>

@@ -55,7 +55,22 @@ func addGGOFieldConfiguration(raw string) (string, bool, error) {
 			return raw, false, err
 		}
 		if ggo.SchemaVersion >= constUtil.AdminFieldGGOSchemaVersion {
-			return raw, false, nil
+			// 小芽迁到全局设置；只移除此字段，保留当前沙漠规则及未知配置。
+			var existing map[string]json.RawMessage
+			if err := json.Unmarshal(value, &existing); err != nil {
+				return raw, false, err
+			}
+			if _, exists := existing["sproutIcon"]; !exists {
+				return raw, false, nil
+			}
+			delete(existing, "sproutIcon")
+			updated, err := json.Marshal(existing)
+			if err != nil {
+				return raw, false, err
+			}
+			cfg["ggo"] = updated
+			result, err := json.Marshal(cfg)
+			return string(result), err == nil, err
 		}
 		migrateGGOConfiguration(ggo)
 	} else {
@@ -230,7 +245,7 @@ func defaultGGORules() model.AdminFieldGGORules {
 func defaultGGOFieldConfiguration() *model.AdminFieldGGOConfiguration {
 	return &model.AdminFieldGGOConfiguration{
 		SchemaVersion: constUtil.AdminFieldGGOSchemaVersion,
-		Title:         "GGO·残响沙域", ModeName: "遗迹回收行动", CurrencyID: "item_9710", ShopKey: "ggo", CarryIcon: "ggo_chip_marker", SproutIcon: "ggo_sprout",
+		Title:         "GGO·残响沙域", ModeName: "遗迹回收行动", CurrencyID: "item_9710", ShopKey: "ggo", CarryIcon: "ggo_chip_marker",
 		Rules: defaultGGORules(),
 		NPCs: []model.AdminFieldGGONPC{
 			{ID: "shino", Name: "行动向导·诗乃", HeroID: "hero_005", Role: "teleport", PointLabel: "入口", Dialogue: "先记住接应点的位置。拿到好东西以后，你会需要它。"},

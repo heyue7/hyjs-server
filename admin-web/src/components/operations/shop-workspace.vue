@@ -159,6 +159,8 @@ function discard() {
   });
 }
 function validate() {
+  if (draft.value.rewards.some(r => r.resourceId === 'stamina'))
+    return '体力通过体力药剂补充，请选择体力药剂（item_002）';
   if (
     !draft.value.rewards.length ||
     draft.value.rewards.some(r => !r.resourceId || !Number.isInteger(r.amount) || r.amount < 1 || r.amount > 10000)
@@ -246,7 +248,7 @@ async function saveSettings() {
   try {
     await api(
       `/shops/${encodeURIComponent(props.shopId)}/settings`,
-      json('PUT', { ...settingsDraft.value, version: snapshot.value.version })
+      json('PUT', { ...settingsDraft.value, ...(props.shopId === 'memory' ? { slots: 6 } : {}), version: snapshot.value.version })
     );
     settingsOpen.value = false;
     editing.value = false;
@@ -321,11 +323,11 @@ const columns = computed<DataTableColumns<ShopProduct>>(() => [
     ])
   },
   {
-    title: '获得数量', key: 'rewardAmounts', width: 110,
+    title: '获得数量', key: 'rewardAmounts', width: props.shopId === 'memory' ? 88 : 110,
     render: row => h('div', { class: 'shop-cell-stack shop-number-cell' }, row.rewards.map(reward => h('span', Number(reward.amount).toLocaleString())))
   },
   {
-    title: '消耗资源', key: 'costResource', minWidth: 180,
+    title: '消耗资源', key: 'costResource', minWidth: props.shopId === 'memory' ? 130 : 180,
     render: row => h('div', { class: 'shop-cell-stack' }, [
       ...(row.cost?.resourceId ? [h('div', { class: 'shop-cost-resource', title: row.cost.resourceId }, [h(ResourceImage, { item: catalogue.value[row.cost.resourceId], size: 28 }), h('span', resourceName(row.cost.resourceId))])] : []),
       ...(row.contributionCost > 0 ? [h('span', '公会贡献')] : []),
@@ -333,14 +335,15 @@ const columns = computed<DataTableColumns<ShopProduct>>(() => [
     ])
   },
   {
-    title: '消耗数量', key: 'costAmount', width: 110,
+    title: '消耗数量', key: 'costAmount', width: props.shopId === 'memory' ? 88 : 110,
     render: row => h('div', { class: 'shop-cell-stack shop-number-cell' }, [
       ...(row.cost?.resourceId ? [h('span', Number(row.cost.amount).toLocaleString())] : []),
       ...(row.contributionCost > 0 ? [h('span', row.contributionCost.toLocaleString())] : [])
     ])
   },
-  { title: '限购与库存', key: 'limits', minWidth: 125, render: row => renderLines(limitLines(row)) },
-  { title: '购买资格', key: 'qualifications', minWidth: 140, render: row => renderLines(qualificationLines(row)) },
+  ...(props.shopId === 'memory' ? [{ title: '刷新权重', key: 'weight', width: 88, render: (row: ShopProduct) => h('span', { class: 'shop-number-cell' }, row.weight.toLocaleString()) }] : []),
+  { title: '限购与库存', key: 'limits', minWidth: props.shopId === 'memory' ? 108 : 125, render: row => renderLines(limitLines(row)) },
+  { title: '购买资格', key: 'qualifications', minWidth: props.shopId === 'memory' ? 108 : 140, render: row => renderLines(qualificationLines(row)) },
   {
     title: '状态', key: 'enabled', width: 85,
     render: row => h('div', { class: 'shop-cell-stack' }, [h(NSwitch, {
@@ -353,7 +356,7 @@ const columns = computed<DataTableColumns<ShopProduct>>(() => [
     }), h('span', { class: 'ops-muted' }, row.enabled ? '已启用' : '已停用')])
   },
   {
-    title: '操作', key: 'action', width: 135, fixed: 'right',
+    title: '操作', key: 'action', width: props.shopId === 'memory' ? 120 : 135, fixed: 'right',
     render: row => h(NSpace, { size: 4, wrap: false }, () => [
       h(NButton, { size: 'small', secondary: true, onClick: () => edit(row) }, () => productReadonly(row) ? '查看' : '编辑'),
       ...(!productReadonly(row) ? [h(NButton, { size: 'small', quaternary: true, type: 'error', onClick: () => remove(row) }, () => '移除')] : [])
@@ -472,7 +475,7 @@ watch(
             :row-key="(row: ShopProduct) => row.id"
             :bordered="false"
             :pagination="{ pageSize: 20 }"
-            :scroll-x="1285"
+            :scroll-x="shopId === 'memory' ? 1112 : 1285"
           />
         </NCard>
       </template>
@@ -601,8 +604,8 @@ watch(
                 <NFormItem label="展示优先级"><NInputNumber v-model:value="draft.priority" :precision="0" /></NFormItem>
               </NGi>
               <NGi v-if="supports('weight')">
-                <NFormItem label="刷新权重">
-                  <NInputNumber v-model:value="draft.weight" :min="1" :precision="0" />
+                <NFormItem label="刷新权重" :feedback="props.shopId === 'memory' ? '在所属的碎片池或材料池内计算；数值越大，出现机会越高。' : undefined">
+                  <NInputNumber v-model:value="draft.weight" :min="1" :precision="0" :input-props="{ 'aria-label': '刷新权重' }" />
                 </NFormItem>
               </NGi>
             </NGrid>
@@ -672,11 +675,12 @@ watch(
         title="保存商店设置后即可添加商品。"
         class="mb-20px"
       />
+      <p v-if="props.shopId === 'memory'" class="ops-inline-note mb-20px">固定 6 个位置，碎片占 1～4 个；其余为材料，允许重复，每格独立购买。</p>
       <NForm label-placement="top" :disabled="settingsSaving || !canWrite">
         <NFormItem v-if="settingSupports('enabled') && !needsPeriod" label="营业状态">
           <NSwitch v-model:value="settingsDraft.enabled" aria-label="营业状态" />
         </NFormItem>
-        <NFormItem v-if="settingSupports('slots')" label="展示槽位">
+        <NFormItem v-if="props.shopId !== 'memory' && settingSupports('slots')" label="展示槽位">
           <NInputNumber
             v-model:value="settingsDraft.slots"
             :min="1"

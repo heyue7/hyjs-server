@@ -2,6 +2,7 @@ package db
 
 // P11ArenaDailyPolicy stores the independently published local daily reward source.
 type P11ArenaDailyPolicy struct {
+	Permanent     bool   `gorm:"not null;default:false" json:"permanent"`
 	ID            int64  `gorm:"primaryKey;autoIncrement:false" json:"id"`
 	Enabled       bool   `gorm:"not null" json:"enabled"`
 	Version       string `gorm:"type:varchar(64);not null" json:"version"`

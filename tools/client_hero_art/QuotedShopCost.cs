@@ -104,6 +104,11 @@ namespace HYJS.Shop
             result.count = ordinal.ToString(CultureInfo.InvariantCulture);
             result.price = wire.id + "," + wire.num.ToString(CultureInfo.InvariantCulture);
             if (!tier) return result;
+            // A sold-out quote is the server's final purchasable unit for display.
+            // Inventory use can redraw this page; there is no next sale to validate.
+            if (product.dayLeftTimes == 0 && product.dayTotalTimes > 0 && product.canBuy == 0 &&
+                (long)ordinal == (long)product.dayTotalTimes + 1)
+                return result;
 
             // The server emits p4qt only for an unchanged original tier curve.
             // Confirm the visible next unit before using that original curve

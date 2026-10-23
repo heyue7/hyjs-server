@@ -60,7 +60,15 @@ func adminReadArenaPrize(tx *gorm.DB, nowMonth string) (*model.AdminArenaPrizeRe
 		return nil, nil, err
 	}
 	allowed := append([]string{"coin", "popularity"}, strings.Split(constUtil.P11ArenaPrizeOriginalItems, ",")...)
-	return &model.AdminArenaPrizeResponse{Version: adminVersion(policy), RegularCoin: model.AdminArenaCoinRange{Min: minimum, Max: maximum}, OperatorPool: pool, OperatorPoolFrozen: frozen > 0, Notes: constUtil.AdminArenaPrizeNotes, AllowedResourceIDs: allowed}, &policy, nil
+	out := &model.AdminArenaPrizeResponse{Version: adminVersion(policy), RegularCoin: model.AdminArenaCoinRange{Min: minimum, Max: maximum}, OperatorPool: pool, OperatorPoolFrozen: frozen > 0, Notes: constUtil.AdminArenaPrizeNotes, AllowedResourceIDs: allowed}
+	if tx.Migrator().HasTable(&db.P11ArenaDailyPolicy{}) {
+		var daily db.P11ArenaDailyPolicy
+		if err := tx.Session(&gorm.Session{}).First(&daily, constUtil.P11ArenaDailyPolicyID).Error; err != nil {
+			return nil, nil, err
+		}
+		out.DailyRank = &model.AdminArenaDailyRankStatus{Enabled: daily.Enabled && p11ArenaDailyPolicyValid(&daily), CutoffSecond: daily.CutoffSecond, MinChallenges: daily.MinChallenges}
+	}
+	return out, &policy, nil
 }
 
 // Admin requests do not carry an authenticated character calendar context.

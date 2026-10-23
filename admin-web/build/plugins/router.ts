@@ -42,7 +42,7 @@ export function setupElegantRouter() {
           order: 1
         },
         shops_memory: {
-          title: '记忆圣坛',
+          title: '回忆圣坛',
           icon: 'ph:treasure-chest',
           order: 2
         },
@@ -63,6 +63,7 @@ export function setupElegantRouter() {
         },
         shops_score: { title: '积分商店', icon: 'ph:treasure-chest', order: 6 },
         shops_ggo: { title: '信用商店', icon: 'ph:cpu', order: 11 },
+        'sprout-settings': { title: '小芽设置', icon: 'ph:plant', order: 5 },
         'guild-settings': { title: '公会设置', icon: 'ph:flag', order: 4 },
         guilds: { title: '公会管理', icon: 'ph:users-three', order: 5 },
         shops_guild: { title: '公会商店', icon: 'ph:treasure-chest', order: 7 },

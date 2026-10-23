@@ -102,6 +102,16 @@ func (s *GameService) p10SceneMovePlayer(p *pb.Player, g *model.GameState, proje
 			side = prison
 		}
 	}
+	if s.P12FieldPVPReady {
+		tx := db.GetIns()
+		if len(projectionTx) == 1 {
+			tx = projectionTx[0]
+		}
+		side, err = s.ProjectP12FieldPVPSide(tx, p.GetPlayerId(), side, LocalPlayNow(tx.Statement.Context))
+		if err != nil {
+			return nil, err
+		}
+	}
 	// 同屏身份沿可信启动区服，保持与公开资料/组队的实际归属一致。
 	position := proto.Clone(g.Position).(*pb.Position)
 	if constUtil.P8OriginalFieldScene(fieldScope) {

@@ -10,7 +10,8 @@ from tools.local_asset_ready.remove_gate import exact_body
 import dnfile
 
 def main():
- p=argparse.ArgumentParser(description=__doc__);p.add_argument("--base-apk",type=Path,required=True);p.add_argument("--overlay",type=Path,required=True);p.add_argument("--output",type=Path,required=True);p.add_argument("--record",type=Path,required=True);p.add_argument("--opening-font-overlay",type=Path);p.add_argument("--font-fallback-overlay",type=Path);a=p.parse_args()
+ p=argparse.ArgumentParser(description=__doc__);p.add_argument("--base-apk",type=Path,required=True);p.add_argument("--overlay",type=Path,required=True);p.add_argument("--output",type=Path,required=True);p.add_argument("--record",type=Path,required=True);p.add_argument("--opening-font-overlay",type=Path);p.add_argument("--font-fallback-overlay",type=Path);p.add_argument("--build-code",type=int);p.add_argument("--version-name");a=p.parse_args()
+ require((a.build_code is None)==(a.version_name is None),"Build code and version name must be supplied together")
  base,overlay,output,record=[x.resolve()for x in (a.base_apk,a.overlay,a.output,a.record)]
  proof=json.loads((overlay/"manifest.json").read_text());require(proof["inheritedJavaPublicProtectedABIExact"],"Qualified native ABI required")
  require(not output.exists() and not record.exists(),"Fresh output required");require(common.digest(base)==proof["baseAPKSHA256"],"Base changed")
@@ -25,6 +26,12 @@ def main():
  for name,file in proof.get("payloadFiles",{}).items():
   require(name.startswith("assets/bin/Data/Managed/") and name.endswith(".dll"),"Unexpected overlay entry")
   f=ROOT/file;require(f.resolve().is_relative_to(ROOT),"Overlay file outside project");payload[name]=f.read_bytes()
+ if a.build_code is not None:
+  from tools.client_update.package import patch_manifest
+  require(a.build_code>0 and bool(a.version_name.strip()),"Invalid Android release version")
+  with zipfile.ZipFile(base) as z:payload["AndroidManifest.xml"]=patch_manifest(z.read("AndroidManifest.xml"),a.build_code,a.version_name)
+  pins[ROOT/"tools/client_update/package.py"]=common.digest(ROOT/"tools/client_update/package.py")
+ pins[Path(__file__).resolve()]=common.digest(Path(__file__).resolve())
  # This optional resource overlay has an exact pinned UILabel-font byte scope.
  # Rebuild expected bytes from the pinned base rather than trusting its manifest.
  font_changes=[]
@@ -102,6 +109,7 @@ def main():
    for f,h in pins.items():require(common.digest(f)==h,"Source changed while packaging")
    require(common.digest(base)==proof["baseAPKSHA256"],"Base changed while packaging")
    result={"status":"PASS_SIGN_ALIGN_SCOPED_OVERLAY_NOT_INSTALLED","binarySHA256":common.digest(signed),"baseAPKSHA256":proof["baseAPKSHA256"],"replacementEntries":hashes,"openingFontChanges":font_changes,"fontFallbackProof":fallback_report,"allOtherEntriesAndCompressedPayloadsExact":True,"managedAssemblyByteExact":common.DLL not in payload,"signatureVerified":True,"zipalignVerified":True,"originalEngineMethodsExact":547,"outputAPK":str(output.relative_to(ROOT))}
+   if a.build_code is not None:result.update({"buildCode":a.build_code,"versionName":a.version_name})
    signed.replace(output)
    if signed.with_suffix(".apk.idsig").exists():signed.with_suffix(".apk.idsig").replace(output.with_suffix(".apk.idsig"))
  record.parent.mkdir(parents=True,exist_ok=True);record.write_text(json.dumps(result,indent=2)+"\n");print(json.dumps({k:v for k,v in result.items() if k != "fontFallbackProof"}))

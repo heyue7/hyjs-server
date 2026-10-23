@@ -26,12 +26,20 @@ type AdminArenaPrizePoolSettings struct {
 
 // AdminArenaPrizeResponse is the versioned concrete arena reward editor snapshot.
 type AdminArenaPrizeResponse struct {
-	Version            string                      `json:"version"`            // Last-read optimistic concurrency digest.
-	RegularCoin        AdminArenaCoinRange         `json:"regularCoin"`        // Persistent regular coin range.
-	OperatorPool       AdminArenaPrizePoolSettings `json:"operatorPool"`       // Optional existing operator pool.
-	OperatorPoolFrozen bool                        `json:"operatorPoolFrozen"` // Current month has an immutable source offer.
-	Notes              string                      `json:"notes"`              // Chinese guidance for future versus accepted rewards.
-	AllowedResourceIDs []string                    `json:"allowedResourceIds"` // IDs searchable through the existing catalog API.
+	Version            string                      `json:"version"`             // Last-read optimistic concurrency digest.
+	RegularCoin        AdminArenaCoinRange         `json:"regularCoin"`         // Persistent regular coin range.
+	OperatorPool       AdminArenaPrizePoolSettings `json:"operatorPool"`        // Optional existing operator pool.
+	OperatorPoolFrozen bool                        `json:"operatorPoolFrozen"`  // Current month has an immutable source offer.
+	Notes              string                      `json:"notes"`               // Chinese guidance for future versus accepted rewards.
+	AllowedResourceIDs []string                    `json:"allowedResourceIds"`  // IDs searchable through the existing catalog API.
+	DailyRank          *AdminArenaDailyRankStatus  `json:"dailyRank,omitempty"` // Read-only daily rank settlement source.
+}
+
+// AdminArenaDailyRankStatus describes the independent daily rank reward source.
+type AdminArenaDailyRankStatus struct {
+	Enabled       bool  `json:"enabled"`       // Whether the daily rank source is enabled.
+	CutoffSecond  int64 `json:"cutoffSecond"`  // Settlement time in seconds after midnight, UTC+8.
+	MinChallenges int64 `json:"minChallenges"` // Minimum accepted challenges during the reward day.
 }
 
 // AdminArenaPrizeSaveRequest saves the regular range and optionally the custom pool.

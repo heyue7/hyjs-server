@@ -160,10 +160,6 @@ function durationText(ms: number) {
           <span>携带标识</span>
           <strong>GGO 芯片标记</strong>
         </div>
-        <div class="ggo-fixed">
-          <span>小芽标识</span>
-          <strong>GGO 小芽</strong>
-        </div>
       </div>
     </section>
 

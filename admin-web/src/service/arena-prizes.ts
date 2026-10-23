@@ -21,6 +21,7 @@ export interface ArenaPrizeSnapshot {
   operatorPoolFrozen: boolean;
   notes: string;
   allowedResourceIds: string[];
+  dailyRank?: { enabled: boolean; cutoffSecond: number; minChallenges: number };
 }
 
 export interface ArenaPrizeSaveRequest {

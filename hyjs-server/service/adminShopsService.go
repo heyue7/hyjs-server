@@ -21,7 +21,7 @@ import (
 func AdminShopDefinitions() []model.AdminShopDefinition {
 	base := []string{"rewards", "cost", "dailyLimit", "totalLimit", "stock", "minLevel", "minVip", "priority", "weight", "discountBps", "enabled"}
 	out := []model.AdminShopDefinition{}
-	for _, v := range []struct{ id, label string }{{"ggo", "信用商店"}, {"ordinary", "普通商店"}, {"memory", "记忆圣坛"}, {"popularity", "声望商店商品"}, {"popularity-rank", "声望商店奖励"}, {"point", "攻略点商店"}, {"score", "积分商店"}, {"guild", "公会商店"}, {"pet-market", "精灵商店"}, {"union-fight", "公会战商店"}, {"vip", "会员礼包"}} {
+	for _, v := range []struct{ id, label string }{{"ggo", "信用商店"}, {"ordinary", "普通商店"}, {"memory", "回忆圣坛"}, {"popularity", "声望商店商品"}, {"popularity-rank", "声望商店奖励"}, {"point", "攻略点商店"}, {"score", "积分商店"}, {"guild", "公会商店"}, {"pet-market", "精灵商店"}, {"union-fight", "公会战商店"}, {"vip", "会员礼包"}} {
 		d := model.AdminShopDefinition{ID: v.id, Label: v.label, Fields: append([]string{}, base...), SettingsFields: []string{"unlimited", "enabled", "startAt", "endAt", "claimEndAt", "source"}, CanCreate: true, Notes: "保存后立即用于后续购买；历史交易、库存使用和限购保留。"}
 		switch v.id {
 		case "ggo":
@@ -29,7 +29,7 @@ func AdminShopDefinitions() []model.AdminShopDefinition {
 		case "ordinary":
 			d.Notes = "商品、价格与材料保存后生效；原阶梯价格保留到该商品被显式修改。"
 		case "memory":
-			d.SettingsFields = append(d.SettingsFields, "slots")
+			d.Notes = "每次刷新固定6个位置：先随机决定1～4个碎片位置，再在碎片池内按权重抽取；其余从四种材料中按权重抽取。材料可重复出现，每格独立购买。"
 		case "popularity-rank":
 			d.Fields = append(d.Fields, "maxRank")
 			d.Notes = "对应游戏声望商店的“奖励”页签。配置奖励道具、声望价格与最高排名门槛；每日/整期各1次，保留原排名证明。保存后生效，历史购买和排名资格保留。"
@@ -116,6 +116,9 @@ func (s *GameService) adminReadShop(tx *gorm.DB, key string) (*model.AdminShopRe
 			return nil, nil, err
 		}
 		for _, p := range raw.Legacy {
+			if p.ResourceID == "stamina" {
+				continue
+			}
 			v := adminShopBaseProduct("legacy:"+p.ID, fmt.Sprintf("%s,%d", p.ResourceID, p.Amount), p.Cost)
 			v.DailyLimit = int64(p.DailyLimit)
 			v.MinLevel = int64(p.MinLevel)
@@ -189,6 +192,11 @@ func (s *GameService) adminReadShop(tx *gorm.DB, key string) (*model.AdminShopRe
 			}
 			out.Settings.Slots = int64(rules.Slots)
 			for _, p := range rules.Products {
+				// Direct stamina was retired in favor of the original potion. Keep
+				// its stored terms and receipts, without offering an unusable switch.
+				if key == "ordinary" && shopHasDirectStamina(p.Rewards) {
+					continue
+				}
 				out.Items = append(out.Items, adminShopP4Product(p))
 			}
 			if key == "guild" {
@@ -595,7 +603,8 @@ func (s *GameService) AdminSaveShopSettings(ctx context.Context, actor *model.Ad
 				rules.ResourceRefreshCap = 15
 				rules.RefreshItem = "item_013,1"
 				rules.RefreshCost = "diamond,20"
-				rules.Slots = 1
+				rules.Slots = constUtil.MemoryShrine55Slots
+				rules = s.memoryCatalogue55(rules)
 			}
 			row = &db.P4CommerceRule{Kind: key, ShopType: shopType, Rules: adminJSON(rules)}
 		}
@@ -626,7 +635,7 @@ func (s *GameService) AdminSaveShopSettings(ctx context.Context, actor *model.Ad
 		_ = json.Unmarshal(row.Rules, &document)
 		document["liveEditable"] = adminJSON(true)
 		if key == "memory" {
-			document["slots"] = adminJSON(req.Slots)
+			document["slots"] = adminJSON(6)
 		}
 		if key == "popularity-rank" && (create || len(document["rankPublishedAt"]) == 0) {
 			document["rankPublishedAt"] = adminJSON(min(time.Now().UnixMilli(), row.StartAt-1))

@@ -8,5 +8,6 @@ CREATE TABLE IF NOT EXISTS p12_field_pvp_states (
  last_fight_id VARCHAR(64) NOT NULL,
  jail_until BIGINT NOT NULL,
  redeem_count BIGINT NOT NULL,
- source LONGTEXT NOT NULL
+ source LONGTEXT NOT NULL,
+ INDEX idx_p12_field_pvp_busy (busy_until)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

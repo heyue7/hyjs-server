@@ -372,7 +372,7 @@ export const generatedRoutes: GeneratedRoute[] = [
         path: '/shops/memory',
         component: 'view.shops_memory',
         meta: {
-          title: '记忆圣坛',
+          title: '回忆圣坛',
           i18nKey: 'route.shops_memory',
           icon: 'ph:treasure-chest',
           order: 2,
@@ -476,6 +476,18 @@ export const generatedRoutes: GeneratedRoute[] = [
         }
       }
     ]
+  },
+  {
+    name: 'sprout-settings',
+    path: '/sprout-settings',
+    component: 'layout.base$view.sprout-settings',
+    meta: {
+      title: '小芽设置',
+      i18nKey: 'route.sprout-settings',
+      icon: 'ph:plant',
+      order: 5,
+      roles: ['viewer', 'operator', 'admin']
+    }
   },
   {
     name: 'titles',

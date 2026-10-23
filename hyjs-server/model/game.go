@@ -37,7 +37,9 @@ type GameState struct {
 	Gems                   []*pb.SimpleItem                  `json:"gems,omitempty"`
 	Cooking                []*pb.SimpleItem                  `json:"cooking,omitempty"`
 	Recruit                map[int32]*RecruitState           `json:"recruit,omitempty"`
-	// KingRecruitLuck 保存三个世界各自的幸运值；nil 仅用于一次性迁移旧共享余额。
+	// KingRecruitSharedLuck 保存永久共享余额；非nil同时标记遗留迁移完成。
+	KingRecruitSharedLuck *int32 `json:"king_recruit_shared_luck,omitempty"`
+	// KingRecruitLuck 仅保留旧分世界余额的迁移来源。
 	KingRecruitLuck         map[int32]int32                    `json:"king_recruit_luck,omitempty"`
 	EquipmentRefineReceipts map[string]*EquipmentRefineReceipt `json:"equipment_refine_receipts,omitempty"`
 	EquipmentStarReceipts   map[string]*EquipmentStarReceipt   `json:"equipment_star_receipts,omitempty"`

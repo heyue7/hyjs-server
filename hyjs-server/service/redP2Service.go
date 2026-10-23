@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -259,21 +260,33 @@ func kingState(tx *gorm.DB, id int64, now time.Time) (*db.KingRecruitState, erro
 	return state, nil
 }
 
-// 在持有角色锁的事务内迁移一次旧余额，其他世界从零开始，保留原领取回执。
+// 在持有角色锁的事务内合并遗留余额；指针同时记录迁移已经完成。
 func kingWorldLuck(g *model.GameState, world, legacy int32) (int32, error) {
-	if world < 1 || world > 3 || legacy < 0 {
+	if world < 1 || world > 3 {
 		return 0, errors.New(constUtil.P2KingLuckInvalid)
 	}
-	if g.KingRecruitLuck == nil {
-		g.KingRecruitLuck = map[int32]int32{1: 0, 2: 0, 3: 0}
-		g.KingRecruitLuck[world] = legacy
-	}
-	for key, value := range g.KingRecruitLuck {
-		if key < 1 || key > 3 || value < 0 {
+	if g.KingRecruitSharedLuck == nil {
+		total := int64(legacy)
+		if g.KingRecruitLuck != nil {
+			total = 0
+			for key, value := range g.KingRecruitLuck {
+				if key < 1 || key > 3 || value < 0 {
+					return 0, errors.New(constUtil.P2KingLuckInvalid)
+				}
+				total += int64(value)
+			}
+		}
+		if total < 0 || total > math.MaxInt32 {
 			return 0, errors.New(constUtil.P2KingLuckInvalid)
 		}
+		value := int32(total)
+		g.KingRecruitSharedLuck = &value
+		g.KingRecruitLuck = nil
 	}
-	return g.KingRecruitLuck[world], nil
+	if *g.KingRecruitSharedLuck < 0 {
+		return 0, errors.New(constUtil.P2KingLuckInvalid)
+	}
+	return *g.KingRecruitSharedLuck, nil
 }
 
 func (s *GameService) kingRewards(rewards []db.GameplayPoolReward, space int32) ([]db.GameplayPoolReward, []string) {
@@ -358,7 +371,7 @@ func (s *GameService) kingRecruitLucky(ctx context.Context, id int64, b *pb.CSWa
 			return err
 		}
 		result.Get = gain
-		g.KingRecruitLuck[space] = luck - rules.LuckLimit
+		*g.KingRecruitSharedLuck = luck - rules.LuckLimit
 		return tx.Save(state).Error
 	})
 	return []proto.Message{result}, err

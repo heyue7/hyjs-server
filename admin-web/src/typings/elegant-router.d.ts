@@ -56,6 +56,7 @@ declare module "@elegant-router/types" {
     "shops_score": "/shops/score";
     "shops_union-fight": "/shops/union-fight";
     "shops_vip": "/shops/vip";
+    "sprout-settings": "/sprout-settings";
     "titles": "/titles";
     "users": "/users";
     "wallet-reasons": "/wallet-reasons";
@@ -119,6 +120,7 @@ declare module "@elegant-router/types" {
     | "server-clock"
     | "servers"
     | "shops"
+    | "sprout-settings"
     | "titles"
     | "users"
     | "wallet-reasons"
@@ -177,6 +179,7 @@ declare module "@elegant-router/types" {
     | "shops_score"
     | "shops_union-fight"
     | "shops_vip"
+    | "sprout-settings"
     | "titles"
     | "users"
     | "wallet-reasons"

@@ -1180,10 +1180,10 @@ func (s *GameService) seedP7StarActivity(tx *gorm.DB, now time.Time, enabled boo
 func (s *GameService) DispatchP7(ctx context.Context, id int64, request proto.Message, stamp int64) ([]proto.Message, bool, error) {
 	switch request.(type) {
 	case *pb.CSGetRushEliteBossInfo, *pb.CSGetRushInfo, *pb.CSRushCurrentInfo, *pb.CSRushGetTopSweepInfo:
-		r, e := s.P7RushQuery(ctx, id, request, time.Now())
+		r, e := s.P7RushQuery(p7WithRushReadRequestCache(ctx), id, request, time.Now())
 		return r, true, e
 	case *pb.CSRushFightStart, *pb.CSRushFightEnd, *pb.CSRushEliteBossBuyTime, *pb.CSRushResetChallengeCount, *pb.CSRushAddition, *pb.CSRushAdditionView, *pb.CSRush3Hit, *pb.CSRushToTop, *pb.CSRushMazeTrader, *pb.CSRushMazeTraderBuy, *pb.CSRushRewardPreview, *pb.CSRushGetSectionReward, *pb.CSRushGetSectionAddition:
-		r, e := s.P7RushMutation(ctx, id, request, stamp)
+		r, e := s.P7RushMutation(p7WithRushReadRequestCache(ctx), id, request, stamp)
 		return r, true, e
 	}
 	return nil, false, nil

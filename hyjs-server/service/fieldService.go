@@ -296,6 +296,9 @@ func (s *GameService) fieldTransfer(ctx context.Context, id int64, b *pb.CSTrans
 			if err := s.refreshField(id, g); err != nil {
 				return err
 			}
+			if err := s.refreshSharedFieldBosses55(tx, g); err != nil {
+				return err
+			}
 		}
 		if g.Run != nil && !g.Run.Complete {
 			return errors.New("Leave the active copy before changing scene")
@@ -328,6 +331,9 @@ func (s *GameService) fieldTransfer(ctx context.Context, id int64, b *pb.CSTrans
 			}
 			g.Position = &pb.Position{PlayerId: proto.Int64(id), Scene: proto.String(b.GetTarget()), Current: point}
 			if err := s.refreshField(id, g); err != nil {
+				return err
+			}
+			if err := s.refreshSharedFieldBosses55(tx, g); err != nil {
 				return err
 			}
 		case constUtil.P13GuildRoomTarget:
@@ -430,6 +436,9 @@ func (s *GameService) fieldScene(ctx context.Context, id int64, login bool) ([]p
 			if err := s.refreshField(id, g); err != nil {
 				return err
 			}
+			if err := s.refreshSharedFieldBosses55(tx, g); err != nil {
+				return err
+			}
 			// 原客户端重连会重建野外房间，不会重放正在加载的小怪战斗。
 			// 释放未结算占用，保留战前HP/怒气/疲劳与奖励计数，旧fightId随之失效。
 			if login && g.Field.Fight != nil && !g.Field.Fight.Settled {
@@ -447,6 +456,13 @@ func (s *GameService) fieldScene(ctx context.Context, id int64, login bool) ([]p
 		if s.P12FieldPVPReady {
 			if prison, ok := P12FieldPVPPrisonSide(player, g, time.Now()); ok {
 				side = prison
+			}
+		}
+		if s.P12FieldPVPReady {
+			var projectionErr error
+			side, projectionErr = s.ProjectP12FieldPVPSide(tx, id, side, LocalPlayNow(tx.Statement.Context))
+			if projectionErr != nil {
+				return projectionErr
 			}
 		}
 		heroID, err := P5WorldHeroID(player, g)
@@ -522,11 +538,14 @@ func fieldFind(g *model.GameState, uuid string) *pb.SideMonster {
 
 func (s *GameService) fieldMonsterCheck(ctx context.Context, id int64, b *pb.CSSideMonsterCheck) ([]proto.Message, error) {
 	var result *pb.SCSideMonsterCheck
-	err := updateProfile(ctx, id, func(_ *pb.Player, g *model.GameState) error {
+	err := updateProfileWithTx(ctx, id, func(tx *gorm.DB, _ *pb.Player, g *model.GameState) error {
 		if s.fieldSceneRow(g.Position.GetScene()) == nil || !s.P8FieldSceneAvailable(g.Position.GetScene()) {
 			return errors.New(constUtil.P8FieldSceneUnavailable)
 		}
 		if err := s.refreshField(id, g); err != nil {
+			return err
+		}
+		if err := s.refreshSharedFieldBosses55(tx, g); err != nil {
 			return err
 		}
 		monster := fieldFind(g, b.GetUuid())
@@ -557,6 +576,9 @@ func (s *GameService) fieldHeartbeat(ctx context.Context, id int64) ([]proto.Mes
 		if err := s.refreshField(id, g); err != nil {
 			return err
 		}
+		if err := s.refreshSharedFieldBosses55(tx, g); err != nil {
+			return err
+		}
 		if s.P8GatherReady {
 			resources, err := s.RefreshP8Resources(tx, player, g, time.Now(), false)
 			if err != nil {
@@ -577,6 +599,19 @@ func (s *GameService) fieldHeartbeat(ctx context.Context, id int64) ([]proto.Mes
 		}
 		if before.String() != after.String() {
 			messages = append(messages, &pb.SCSideMonster{Monsters: g.Field.Monsters}, &pb.SCFieldPlayerState{Player: []*pb.PlayerSide{g.Field.Side}})
+		}
+		if s.P12FieldPVPReady {
+			for _, message := range messages {
+				if state, ok := message.(*pb.SCFieldPlayerState); ok {
+					for i, side := range state.Player {
+						view, err := s.ProjectP12FieldPVPSide(tx, side.GetPlayerId(), side, LocalPlayNow(tx.Statement.Context))
+						if err != nil {
+							return err
+						}
+						state.Player[i] = view
+					}
+				}
+			}
 		}
 		messages = append(messages, s.fieldBossProjection(g)...)
 		messages = append(messages, fieldBossCountdownProjection(g.Field, time.Now())...)
@@ -603,6 +638,9 @@ func (s *GameService) fieldFightStart(ctx context.Context, id int64, b *pb.CSSid
 			return err
 		}
 		if err := s.refreshField(id, g); err != nil {
+			return err
+		}
+		if err := s.refreshSharedFieldBosses55(tx, g); err != nil {
 			return err
 		}
 		f := g.Field
@@ -814,6 +852,9 @@ func (s *GameService) fieldFightEnd(ctx context.Context, id int64, b *pb.CSSideP
 		if err := s.refreshField(id, g); err != nil {
 			return err
 		}
+		if err := s.refreshSharedFieldBosses55(tx, g); err != nil {
+			return err
+		}
 		if g.Field.Fight == nil || g.Field.Fight.Start.GetFightId() != b.GetFightId() {
 			return errors.New("Unknown field battle")
 		}
@@ -837,6 +878,9 @@ func (s *GameService) fieldFightEnd(ctx context.Context, id int64, b *pb.CSSideP
 			return errors.New("Field battle scene mismatch")
 		}
 		if err := s.refreshField(id, g); err != nil {
+			return err
+		}
+		if err := s.refreshSharedFieldBosses55(tx, g); err != nil {
 			return err
 		}
 		monster := fieldFind(g, fight.MonsterUUID)

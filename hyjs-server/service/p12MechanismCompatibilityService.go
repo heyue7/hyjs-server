@@ -96,8 +96,12 @@ func p12MechanismScope(input *model.FrozenBattleInput, mode int32) error {
 			}
 		}
 	}
+	maxHeroes := 4
+	if mode == 5 {
+		maxHeroes = constUtil.P12FieldPVPMaxHeroes
+	}
 	for _, party := range players {
-		if party == nil || party.Inst == nil || party.GetPlayerId() <= 0 || party.GetServerId() <= 0 || len(party.Formation) < 1 || len(party.Formation) > 4 || len(party.Inst.ExtBattleAdds) != 0 || !combatFinite(party.Inst.GetAnger()) || party.Inst.GetAnger() < 0 || party.Inst.GetAnger() > 300 || p6ScopedUnknown(party) || p6ScopedUnknown(party.Inst) {
+		if party == nil || party.Inst == nil || party.GetPlayerId() <= 0 || party.GetServerId() <= 0 || len(party.Formation) < 1 || len(party.Formation) > maxHeroes || len(party.Inst.ExtBattleAdds) != 0 || !combatFinite(party.Inst.GetAnger()) || party.Inst.GetAnger() < 0 || party.Inst.GetAnger() > 300 || p6ScopedUnknown(party) || p6ScopedUnknown(party.Inst) {
 			return reject()
 		}
 		if mode != 5 && party.Inst.GetFirstOrder() != 0 {

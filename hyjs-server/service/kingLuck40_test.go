@@ -60,6 +60,7 @@ func TestKingLuck40AccumulateExchangeAndReplay(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err = updateProfile(ctx, id, func(_ *pb.Player, g *model.GameState) error {
+		g.KingRecruitSharedLuck = nil
 		g.KingRecruitLuck = map[int32]int32{world: 490, world%3 + 1: 730}
 		return nil
 	}); err != nil {
@@ -73,7 +74,7 @@ func TestKingLuck40AccumulateExchangeAndReplay(t *testing.T) {
 	if err != nil || !proto.Equal(first[0], replay[0]) {
 		t.Fatal("draw replay", err)
 	}
-	if info := recruitRuntimeInfo(t, s, ctx, id, 3); info.GetLuck() != 590 {
+	if info := recruitRuntimeInfo(t, s, ctx, id, 3); info.GetLuck() != 1320 {
 		t.Fatal("balance clipped at exchange threshold", info)
 	}
 	if err = AdminInitialize(ctx, ""); err != nil {
@@ -111,11 +112,11 @@ func TestKingLuck40AccumulateExchangeAndReplay(t *testing.T) {
 		t.Fatal("exchange replay", err)
 	}
 	_, game := p2Profile(t, id)
-	if game.KingRecruitLuck[world] != 290 || game.KingRecruitLuck[world%3+1] != 730 {
+	if game.KingRecruitSharedLuck == nil || *game.KingRecruitSharedLuck != 1020 {
 		t.Fatal("threshold deducted or worlds mixed", game.KingRecruitLuck)
 	}
-	if _, err = s.kingRecruitLucky(ctx, id, request, 40003); err == nil {
-		t.Fatal("exchange accepted insufficient balance")
+	if _, err = s.kingRecruitLucky(ctx, id, request, 40003); err != nil {
+		t.Fatal("shared remainder exchange", err)
 	}
 	if err = s.InitializeRecruitRuntime(ctx); err != nil {
 		t.Fatal(err)
@@ -136,6 +137,7 @@ func TestKingLuck40OverflowRollsBack(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err = updateProfile(ctx, id, func(_ *pb.Player, g *model.GameState) error {
+		g.KingRecruitSharedLuck = nil
 		g.KingRecruitLuck = map[int32]int32{world: math.MaxInt32 - 5}
 		return nil
 	}); err != nil {

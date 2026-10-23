@@ -409,6 +409,9 @@ func run() error {
 	if err = s.InitializePlunderPermanent40(ctx); err != nil {
 		return err
 	}
+	if err = s.InitializeAdminSproutSettings(ctx); err != nil {
+		return err
+	}
 	if err = s.InitializeAdminGuildSettings(ctx); err != nil {
 		return err
 	}
@@ -447,6 +450,12 @@ func run() error {
 		return err
 	}
 	if err = s.InitializeAdminShopAvailability(ctx); err != nil {
+		return err
+	}
+	if err = s.InitializeMemoryShrine55(ctx); err != nil {
+		return err
+	}
+	if err = s.InitializeSharedFieldBoss55(ctx); err != nil {
 		return err
 	}
 	if err = s.InitializeAdminCDK(ctx); err != nil {
@@ -493,7 +502,7 @@ func run() error {
 	handler.RegisterAdminRoutes(r, os.Getenv("HYJS_ADMIN_ASSETS"))
 	routes.RouteRegister(r)
 	server := &http.Server{Handler: r, ReadTimeout: 15 * time.Second, WriteTimeout: 30 * time.Second, IdleTimeout: 60 * time.Second, BaseContext: func(net.Listener) context.Context { return ctx }}
-	const serviceWorkerCount = 13
+	const serviceWorkerCount = 14
 	errs := make(chan error, serviceWorkerCount)
 	go func() { errs <- handler.ServeGameTCP(ctx, tcpListener, s) }()
 	go func() { errs <- server.Serve(httpListener) }()
@@ -509,6 +518,9 @@ func run() error {
 	go func() { errs <- service.ServeBackgroundWorker(ctx, "p13-union-fight-field", s.ServeP13UnionFightField) }()
 	go func() { errs <- service.ServeBackgroundWorker(ctx, "p14-delivery", s.ServeP14Delivery) }()
 	go func() { errs <- service.ServeBackgroundWorker(ctx, "p10-voice", s.ServeP10Voice) }()
+	go func() {
+		errs <- service.ServeBackgroundWorker(ctx, "p12-pk-presentation", s.RunP12FieldPVPPresentation)
+	}()
 	go func() { errs <- service.ServeBackgroundWorker(ctx, "p14-qualification", s.ServeP14Qualification) }()
 	// 晋级榜版本投递随服务ctx退出，停启后恢复尚未确认的版本。
 	go func() { errs <- service.ServeBackgroundWorker(ctx, "p14-promotion-rank", s.ServeP14PromotionRank) }()

@@ -56,7 +56,7 @@ func TestGGOLegacySchemaMigration(t *testing.T) {
 	position := func(value float64) *float64 { return &value }
 	exchange := int64(25)
 	legacy := model.AdminFieldGGOConfiguration{
-		Title: "GGO·残响沙域", ModeName: "遗迹回收行动", CurrencyID: "item_9710", ShopKey: "ggo", CarryIcon: "ggo_chip_marker", SproutIcon: "ggo_sprout",
+		Title: "GGO·残响沙域", ModeName: "遗迹回收行动", CurrencyID: "item_9710", ShopKey: "ggo", CarryIcon: "ggo_chip_marker",
 		NPCs: []model.AdminFieldGGONPC{
 			{ID: "shino", Name: "自定义诗乃", HeroID: "hero_005", Role: "guide", PointLabel: "入口", Dialogue: "先记住接应点的位置。拿到好东西以后，你会需要它。"},
 			{ID: "dane", Name: "荒原接应人·戴恩", HeroID: "hero_029", Role: "settlement", PointLabel: "断桥接应点", Dialogue: "货带来了？交给我，剩下的路我来安排。", Position: &model.AdminFieldGGOPosition{X: position(1), Y: position(2), Z: position(3)}, SettlesChips: true},
@@ -133,5 +133,28 @@ func TestGGOLegacySchemaMigration(t *testing.T) {
 	repeated, changed, err := addGGOFieldConfiguration(migrated)
 	if err != nil || changed || repeated != migrated {
 		t.Fatal("migration is not idempotent")
+	}
+}
+
+func TestGGOSproutMovesWithoutReset55(t *testing.T) {
+	raw := `{"scene":"field_003","opaque":{"keep":true},"ggo":{"schemaVersion":2,"sproutIcon":"ggo_sprout","rules":{"deathLossPercent":42},"opaque":{"keep":true}}}`
+	updated, changed, err := addGGOFieldConfiguration(raw)
+	if err != nil || !changed {
+		t.Fatal(changed, err)
+	}
+	var doc map[string]interface{}
+	if err := json.Unmarshal([]byte(updated), &doc); err != nil {
+		t.Fatal(err)
+	}
+	g := doc["ggo"].(map[string]interface{})
+	if _, ok := g["sproutIcon"]; ok {
+		t.Fatal("sprout remained in desert")
+	}
+	if g["rules"].(map[string]interface{})["deathLossPercent"] != float64(42) || g["opaque"] == nil || doc["opaque"] == nil {
+		t.Fatal("unrelated data changed")
+	}
+	again, changed, err := addGGOFieldConfiguration(updated)
+	if err != nil || changed || again != updated {
+		t.Fatal("migration repeated", changed, err)
 	}
 }

@@ -101,7 +101,7 @@ func validGGOFieldConfiguration() *model.AdminFieldConfiguration {
 		Scene: "field_003",
 		GGO: &model.AdminFieldGGOConfiguration{
 			SchemaVersion: constUtil.AdminFieldGGOSchemaVersion,
-			Title:         "GGO·残响沙域", ModeName: "遗迹回收行动", CurrencyID: "item_9710", ShopKey: "ggo", CarryIcon: "ggo_chip_marker", SproutIcon: "ggo_sprout",
+			Title:         "GGO·残响沙域", ModeName: "遗迹回收行动", CurrencyID: "item_9710", ShopKey: "ggo", CarryIcon: "ggo_chip_marker",
 			Rules: model.AdminFieldGGORules{
 				EntryMethod: "npc_random", ProtectionSeconds: 30, TerminalName: "临时终端", UnlimitedCapacity: true,
 				InitialSource: "monsters", PvpTransfer: "winner_terminal", DeathReturn: "safe_area", PveLossMode: "pending",

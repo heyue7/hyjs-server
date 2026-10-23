@@ -8,7 +8,6 @@ type AdminFieldGGOConfiguration struct {
 	CurrencyID    string                  `json:"currencyId"`
 	ShopKey       string                  `json:"shopKey"`
 	CarryIcon     string                  `json:"carryIcon"`
-	SproutIcon    string                  `json:"sproutIcon"`
 	NPCs          []AdminFieldGGONPC      `json:"npcs"`
 	Monsters      []AdminFieldGGOEnemy    `json:"monsters"`
 	Bosses        []AdminFieldGGOEnemy    `json:"bosses"`

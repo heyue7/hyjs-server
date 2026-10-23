@@ -53,6 +53,7 @@ export const views: Record<LastLevelRouteKey, RouteComponent | (() => Promise<Ro
   shops_score: () => import("@/views/shops/score/index.vue"),
   "shops_union-fight": () => import("@/views/shops/union-fight/index.vue"),
   shops_vip: () => import("@/views/shops/vip/index.vue"),
+  "sprout-settings": () => import("@/views/sprout-settings/index.vue"),
   titles: () => import("@/views/titles/index.vue"),
   users: () => import("@/views/users/index.vue"),
   "wallet-reasons": () => import("@/views/wallet-reasons/index.vue"),

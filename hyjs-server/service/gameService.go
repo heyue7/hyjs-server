@@ -61,7 +61,8 @@ type GameService struct {
 	// P12WorldBossBattleReady 在本地首领结束回执表初始化后启用互斥检查和场景投影。
 	P12WorldBossBattleReady bool
 	// P12FieldPVPReady marks initialized tables; its operational policy stays off.
-	P12FieldPVPReady bool
+	P12FieldPVPReady       bool
+	SharedFieldBoss55Ready bool
 	// P12WantedReady 在原表与领域事务表初始化后启用入口；发布政策独立默认关闭。
 	P12WantedReady bool
 	// P3AutoConfirmDemoPayments is immutable startup configuration for the local

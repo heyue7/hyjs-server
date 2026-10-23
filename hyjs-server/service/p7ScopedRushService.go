@@ -170,7 +170,7 @@ func (s *GameService) p7ComputeScopedRush(ctx context.Context, tx *gorm.DB, id i
 
 // Accepted paid runs use their immutable source after policy/roster changes.
 // Diagnostic records and malformed partial rows cannot fall back to global mode.
-func p7ReadScopedRush(tx *gorm.DB, fight *db.P7RushFight, request *pb.CSRushFightEnd) (*model.CombatOutcome, bool, error) {
+func p7ReadScopedRushUncached(tx *gorm.DB, fight *db.P7RushFight, request *pb.CSRushFightEnd) (*model.CombatOutcome, bool, error) {
 	if out, handled, err := p7ReadManualRush(tx, fight, request); handled || err != nil {
 		return out, handled, err
 	}

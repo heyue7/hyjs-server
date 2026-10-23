@@ -13,7 +13,7 @@ func adminFieldValidGGO(cfg *model.AdminFieldConfiguration) bool {
 	if g == nil {
 		return true
 	}
-	if cfg.Scene != "field_003" || g.SchemaVersion != constUtil.AdminFieldGGOSchemaVersion || g.CurrencyID != "item_9710" || g.ShopKey != "ggo" || g.CarryIcon != "ggo_chip_marker" || g.SproutIcon != "ggo_sprout" || !ggoText(g.Title, 80) || !ggoText(g.ModeName, 80) {
+	if cfg.Scene != "field_003" || g.SchemaVersion != constUtil.AdminFieldGGOSchemaVersion || g.CurrencyID != "item_9710" || g.ShopKey != "ggo" || g.CarryIcon != "ggo_chip_marker" || !ggoText(g.Title, 80) || !ggoText(g.ModeName, 80) {
 		return false
 	}
 	if !adminFieldValidGGORules(g.Rules) {

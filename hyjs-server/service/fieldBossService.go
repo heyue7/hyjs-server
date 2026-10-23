@@ -186,11 +186,14 @@ func (s *GameService) fieldBossCheck(ctx context.Context, id int64, b *pb.CSSide
 		return nil, errors.New("缺少野外首领实例")
 	}
 	var result *pb.SCSideBossCheck
-	err := updateProfile(ctx, id, func(_ *pb.Player, g *model.GameState) error {
+	err := updateProfileWithTx(ctx, id, func(tx *gorm.DB, _ *pb.Player, g *model.GameState) error {
 		if s.fieldSceneRow(g.Position.GetScene()) == nil || !s.P8FieldSceneAvailable(g.Position.GetScene()) {
 			return errors.New(constUtil.P8FieldSceneUnavailable)
 		}
 		if err := s.refreshField(id, g); err != nil {
+			return err
+		}
+		if err := s.refreshSharedFieldBosses55(tx, g); err != nil {
 			return err
 		}
 		boss := fieldBossFind(g.Field, b.GetUuid())
@@ -272,6 +275,9 @@ func (s *GameService) fieldBossFightStart(ctx context.Context, id int64, b *pb.C
 			return errors.New(constUtil.P8FieldSceneUnavailable)
 		}
 		if err := s.refreshField(id, g); err != nil {
+			return err
+		}
+		if err := s.refreshSharedFieldBosses55(tx, g); err != nil {
 			return err
 		}
 		f := g.Field
@@ -380,6 +386,9 @@ func (s *GameService) fieldBossFightEnd(ctx context.Context, id int64, b *pb.CSS
 			return errors.New("未知野外首领战斗")
 		}
 		if err := s.refreshField(id, g); err != nil {
+			return err
+		}
+		if err := s.refreshSharedFieldBosses55(tx, g); err != nil {
 			return err
 		}
 		f := g.Field
@@ -504,31 +513,44 @@ func (s *GameService) fieldBossFightEnd(ctx context.Context, id int64, b *pb.CSS
 			return errors.New("野外首领敌方终局成员不完整")
 		}
 		boss.CurHp = proto.Float64(leaderRatio)
+		killReward := allDead
+		sharedApplied, sharedKilled, err := s.applySharedFieldBoss55(tx, id, f, boss, input, f.BossHP[boss.GetUuid()], fight.BossCooldownMS)
+		if err != nil {
+			return err
+		}
+		if sharedApplied {
+			killReward = sharedKilled
+			allDead = boss.GetState() == 3
+		}
 		now := time.Now().UnixMilli()
 		if allDead {
 			boss.State = proto.Int32(3)
 			if fight.BossCooldownMS <= 0 {
 				return errors.New("缺少原野外首领重生配置")
 			}
-			f.RespawnAt[boss.GetUuid()] = now + fight.BossCooldownMS
-			name := "野外首领"
-			if s.AdminCatalogueData != nil {
-				hero := s.table("Hero", "id", boss.GetHeroId())
-				if localized := s.AdminCatalogueData.DisplayNames[hero["name"]]; localized != "" {
-					name = localized
-				}
+			if !sharedApplied {
+				f.RespawnAt[boss.GetUuid()] = now + fight.BossCooldownMS
 			}
-			notice = &pb.SCPublicMessage{Pubmsg: &pb.PublicMessage{
-				Type: proto.Int32(constUtil.P12WorldBossKillNoticeType), ScrollType: proto.Int32(constUtil.P12WorldBossKillNoticeScrollType),
-				Msg: proto.String(fmt.Sprintf(constUtil.FieldBossKillNoticeFormat, p12NoticeName(player.GetName()), p12NoticeName(name))),
-			}}
+			if sharedKilled || !s.SharedFieldBoss55Ready {
+				name := "野外首领"
+				if s.AdminCatalogueData != nil {
+					hero := s.table("Hero", "id", boss.GetHeroId())
+					if localized := s.AdminCatalogueData.DisplayNames[hero["name"]]; localized != "" {
+						name = localized
+					}
+				}
+				notice = &pb.SCPublicMessage{Pubmsg: &pb.PublicMessage{
+					Type: proto.Int32(constUtil.P12WorldBossKillNoticeType), ScrollType: proto.Int32(constUtil.P12WorldBossKillNoticeScrollType),
+					Msg: proto.String(fmt.Sprintf(constUtil.FieldBossKillNoticeFormat, p12NoticeName(player.GetName()), p12NoticeName(name))),
+				}}
+			}
 		} else {
 			boss.State = proto.Int32(1)
 		}
 
 		gain := &pb.ResultObject{}
 		content := fight.BossReward
-		if allDead && fight.BossKill != "" {
+		if killReward && fight.BossKill != "" {
 			if content != "" {
 				content += ";"
 			}

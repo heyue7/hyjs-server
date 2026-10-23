@@ -113,7 +113,7 @@ export interface FeedbackTicket {
 }
 export const shopLabels: Record<string, string> = {
   ordinary: '普通商店',
-  memory: '记忆圣坛',
+  memory: '回忆圣坛',
   popularity: '声望商店商品',
   'popularity-rank': '声望商店奖励',
   point: '攻略点商店',

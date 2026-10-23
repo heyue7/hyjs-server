@@ -183,6 +183,13 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload));
     <NAlert v-if="conflict" type="warning" title="配置已被其他操作更新，请先刷新后重新编辑。当前输入已保留。" />
     <NSpin :show="loading">
       <template v-if="snapshot">
+        <div v-if="snapshot.dailyRank" class="daily-rank-summary mb-20px">
+          <strong>每日排名奖</strong>
+          <NTag :type="snapshot.dailyRank.enabled ? 'success' : 'default'" :bordered="false">
+            {{ snapshot.dailyRank.enabled ? `每天 ${String(Math.floor(snapshot.dailyRank.cutoffSecond / 3600)).padStart(2, '0')}:${String(Math.floor(snapshot.dailyRank.cutoffSecond % 3600 / 60)).padStart(2, '0')} 结算` : '未启用' }}
+          </NTag>
+          <span class="ops-muted">当日完成至少 {{ snapshot.dailyRank.minChallenges }} 次挑战；奖励发至领奖中心，领取后到账。</span>
+        </div>
         <NCard :bordered="false" class="ops-panel mb-20px">
           <h3 class="prize-section-title">常规金币</h3>
           <p class="ops-muted mb-20px">
@@ -314,6 +321,13 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload));
 <style scoped>
 .arena-prizes-page {
   max-width: 1200px;
+}
+.daily-rank-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  line-height: 1.6;
 }
 .prize-section-title {
   margin: 0 0 12px;
