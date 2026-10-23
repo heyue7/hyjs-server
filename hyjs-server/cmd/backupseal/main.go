@@ -6,12 +6,113 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
+	"encoding/binary"
 	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"os"
 )
+
+const (
+	streamMagic = "HYJSBK02"
+	streamChunk = 4 * 1024 * 1024
+	streamLimit = int64(8 * 1024 * 1024 * 1024)
+)
+
+// Each file has a random 128-bit nonce prefix. Record counters make every
+// nonce unique within that file; the authenticated empty record seals EOF.
+func streamRecord(prefix, header []byte, counter uint64, length uint32) ([]byte, []byte) {
+	nonce := append([]byte(nil), prefix...)
+	nonce = binary.BigEndian.AppendUint64(nonce, counter)
+	aad := append([]byte(nil), header...)
+	aad = binary.BigEndian.AppendUint64(aad, counter)
+	aad = binary.BigEndian.AppendUint32(aad, length)
+	return nonce, aad
+}
+
+func streamTransform(input io.Reader, output io.Writer, key []byte, decrypt bool) error {
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return err
+	}
+	gcm, err := cipher.NewGCMWithNonceSize(block, 24)
+	if err != nil {
+		return err
+	}
+	header := make([]byte, 28)
+	copy(header, streamMagic)
+	if decrypt {
+		if _, err = io.ReadFull(input, header); err != nil || string(header[:8]) != streamMagic || binary.BigEndian.Uint32(header[24:]) != streamChunk {
+			return errors.New("invalid streaming backup header")
+		}
+	} else {
+		if _, err = rand.Read(header[8:24]); err != nil {
+			return err
+		}
+		binary.BigEndian.PutUint32(header[24:], streamChunk)
+		if _, err = output.Write(header); err != nil {
+			return err
+		}
+	}
+	plain := make([]byte, streamChunk)
+	sealed := make([]byte, streamChunk+gcm.Overhead())
+	var length [4]byte
+	var total int64
+	for counter := uint64(0); ; counter++ {
+		var n int
+		if decrypt {
+			if _, err = io.ReadFull(input, length[:]); err != nil {
+				return errors.New("streaming backup has no authenticated end")
+			}
+			n = int(binary.BigEndian.Uint32(length[:]))
+			if n > streamChunk {
+				return errors.New("invalid streaming backup record size")
+			}
+		} else {
+			n, err = io.ReadFull(input, plain)
+			if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
+				return err
+			}
+			binary.BigEndian.PutUint32(length[:], uint32(n))
+		}
+		total += int64(n)
+		if total > streamLimit {
+			return errors.New("backup exceeds 8 GiB streaming limit")
+		}
+		nonce, aad := streamRecord(header[8:24], header, counter, uint32(n))
+		if decrypt {
+			if _, err = io.ReadFull(input, sealed[:n+gcm.Overhead()]); err != nil {
+				return errors.New("truncated streaming backup record")
+			}
+			opened, e := gcm.Open(plain[:0], nonce, sealed[:n+gcm.Overhead()], aad)
+			if e != nil {
+				return errors.New("backup authentication failed")
+			}
+			if n == 0 {
+				var trailing [1]byte
+				if count, e := input.Read(trailing[:]); count != 0 || e != io.EOF {
+					return errors.New("data follows authenticated backup end")
+				}
+				return nil
+			}
+			if _, err = output.Write(opened); err != nil {
+				return err
+			}
+		} else {
+			ciphertext := gcm.Seal(sealed[:0], nonce, plain[:n], aad)
+			if _, err = output.Write(length[:]); err != nil {
+				return err
+			}
+			if _, err = output.Write(ciphertext); err != nil {
+				return err
+			}
+			if n == 0 {
+				return nil
+			}
+		}
+	}
+}
 
 func transform(input, key []byte, decrypt bool) ([]byte, error) {
 	block, err := aes.NewCipher(key)
@@ -56,19 +157,6 @@ func run(inputPath, outputPath, keyPath string, decrypt bool) error {
 		return err
 	}
 	defer file.Close()
-	// Explicit operational bound: large snapshots require a reviewed streaming tool.
-	const maximum = 256 * 1024 * 1024
-	raw, err := io.ReadAll(io.LimitReader(file, maximum+1))
-	if err != nil {
-		return err
-	}
-	if len(raw) > maximum {
-		return errors.New("backup exceeds 256 MiB limit; original snapshot retained")
-	}
-	out, err := transform(raw, key, decrypt)
-	if err != nil {
-		return errors.New("backup encryption/authentication failed")
-	}
 	destination, err := os.OpenFile(outputPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
 	if err != nil {
 		return err
@@ -80,7 +168,33 @@ func run(inputPath, outputPath, keyPath string, decrypt bool) error {
 			os.Remove(outputPath)
 		}
 	}()
-	if _, err = destination.Write(out); err != nil {
+	if decrypt {
+		var magic [8]byte
+		if _, err = io.ReadFull(file, magic[:]); err != nil {
+			return errors.New("invalid encrypted backup")
+		}
+		if _, err = file.Seek(0, io.SeekStart); err != nil {
+			return err
+		}
+		if string(magic[:]) == "HYJSBK01" {
+			// Existing authenticated backups remain readable; new writes stream.
+			const maximum = 256*1024*1024 + 64
+			raw, e := io.ReadAll(io.LimitReader(file, maximum+1))
+			if e != nil || len(raw) > maximum {
+				return errors.New("invalid legacy backup size")
+			}
+			opened, e := transform(raw, key, true)
+			if e != nil {
+				return errors.New("backup authentication failed")
+			}
+			_, err = destination.Write(opened)
+		} else {
+			err = streamTransform(file, destination, key, true)
+		}
+	} else {
+		err = streamTransform(file, destination, key, false)
+	}
+	if err != nil {
 		return err
 	}
 	if err = destination.Sync(); err != nil {

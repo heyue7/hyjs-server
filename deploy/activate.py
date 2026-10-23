@@ -67,7 +67,7 @@ def backup_existing_database():
     assert sha(verified) == sha(plain), 'Encrypted backup verification failed'
     plain.unlink()
     verified.unlink()
-    (ROOT / 'backup-latest.json').write_text(json.dumps({'file': encrypted.name, 'sha256': sha(encrypted), 'format': 'HYJSBK01-AES256GCM', 'revisionBefore': 'preserved running image'}, indent=2))
+    (ROOT / 'backup-latest.json').write_text(json.dumps({'file': encrypted.name, 'sha256': sha(encrypted), 'format': 'HYJSBK02-AES256GCM-CHUNKED', 'revisionBefore': 'preserved running image'}, indent=2))
 
 
 for name, digest in manifest['files'].items():
