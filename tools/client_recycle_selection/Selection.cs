@@ -14,6 +14,14 @@ namespace HYJS.Recycle
         RecycleSelectPanel panel;
         WWW pending;
         int generation;
+        bool reading;
+        public const int Maximum = 100;
+
+        internal static bool IsReading(RecycleSelectPanel target)
+        {
+            SelectionControl control = target == null ? null : target.GetComponent<SelectionControl>();
+            return control != null && control.reading;
+        }
         readonly List<UIButton> confirms = new List<UIButton>();
         readonly List<Collider> blockedItems = new List<Collider>();
         readonly List<bool> previousColliderState = new List<bool>();
@@ -23,6 +31,7 @@ namespace HYJS.Recycle
             if (target == null) return;
             SelectionControl control = target.GetComponent<SelectionControl>();
             if (control == null) control = target.gameObject.AddComponent<SelectionControl>();
+            if (!HYJS.Recycle61.Flow.AllowSelection()) return;
             control.Begin(target);
         }
 
@@ -78,11 +87,11 @@ namespace HYJS.Recycle
             StopAllCoroutines();
             if (pending != null) { pending.Dispose(); pending=null; }
             panel=target;
-            Clear(); SetConfirm(true);
+            reading=false; SetConfirm(true);
             UIToggle toggle=Toggle();
-            if (toggle == null || !toggle.value) return;
+            if (toggle == null || !toggle.value) { Clear(); return; }
             if (StaticData.playerData == null || StaticData.sessionKey == null || StaticData.sessionKey.Length != 16) return;
-            SetConfirm(false);
+            reading=true; SetConfirm(false);
             StartCoroutine(ReadSelection(generation,StaticData.playerData.playerId,Session()));
         }
 
@@ -99,14 +108,14 @@ namespace HYJS.Recycle
             string kind=panel is RecycleBreakupSelectEquipPanel ? "equipment" : panel is RecycleBreakupSelectPetPanel ? "pet" : "hero";
             string origin=null;
             try { origin=new Uri(ServerConfig.GetServerUrl()).GetLeftPart(UriPartial.Authority); } catch(Exception) { }
-            if(origin==null) { SetConfirm(true); BoxManager.CreatePopupTextBox("连接未就绪，请重新勾选一键选择",0f); yield break; }
-            string body="{\"playerId\":"+owner+",\"sessionHex\":\""+session+"\",\"kind\":\""+kind+"\",\"limit\":"+Math.Min(4,StaticData.recycleMax)+"}";
+            if(origin==null) { reading=false; SetConfirm(true); BoxManager.CreatePopupTextBox("连接未就绪，请重新勾选一键选择",0f); yield break; }
+            string body="{\"playerId\":"+owner+",\"sessionHex\":\""+session+"\",\"kind\":\""+kind+"\",\"limit\":"+Maximum+"}";
             Dictionary<string,string> headers=new Dictionary<string,string>(); headers.Add("Content-Type","application/json");
             WWW request=new WWW(origin+"/recycle/selection",Encoding.UTF8.GetBytes(body),headers);
             pending=request;
             float deadline=Time.realtimeSinceStartup+20f;
             while(!request.isDone && Time.realtimeSinceStartup<deadline) yield return null;
-            bool success=false; string message="一键选择失败，请重新勾选重试";
+            string message="一键选择失败，请重新勾选重试";
             try
             {
                 if(Current(current,owner,session) && request.isDone && String.IsNullOrEmpty(request.error))
@@ -115,7 +124,7 @@ namespace HYJS.Recycle
                     if((int)reply["code"]==0)
                     {
                         JsonData guids=reply["data"]["guids"];
-                        if(guids.Count<=Math.Min(4,StaticData.recycleMax))
+                        if(guids.Count<=Maximum)
                         {
                             // Validate the entire server selection before touching either original cache.
                             var visible = new Dictionary<string, RecycleSelectItemBase>();
@@ -138,8 +147,10 @@ namespace HYJS.Recycle
                             }
                             var requested = new List<string>();
                             for (int index = 0; index < guids.Count; index++) requested.Add((string)guids[index]);
-                            var selected = ValidateSelection(requested, visible.Keys, Math.Min(4, StaticData.recycleMax),
+                            var selected = ValidateSelection(requested, visible.Keys, Maximum,
                                 StaticData.recycleBreakupSelect == null ? 0 : StaticData.recycleBreakupSelect.Length);
+                            // Keep both complete old caches until the entire reply has passed validation.
+                            Clear();
                             // Original panel cache and original slot array commit only after complete validation.
                             for (int index = 0; index < selected.Count; index++)
                             {
@@ -170,7 +181,6 @@ namespace HYJS.Recycle
                                 UIScrollView scroll = panel.scrollView == null ? null : panel.scrollView.GetComponent<UIScrollView>();
                                 if (scroll != null) scroll.ResetPosition();
                             }
-                            success=true;
                             if(guids.Count==0) message="没有可分解的闲置材料";
                             else message="";
                         }
@@ -182,14 +192,14 @@ namespace HYJS.Recycle
             catch(Exception) { }
             request.Dispose(); if(pending==request) pending=null;
             if(!Current(current,owner,session)) yield break;
-            SetConfirm(true);
-            if(!success) Clear();
+            reading=false; SetConfirm(true);
+            // Read-only selection failures leave the previous complete selection untouched.
             if(!String.IsNullOrEmpty(message)) BoxManager.CreatePopupTextBox(message,0f);
         }
 
         internal static List<string> ValidateSelection(List<string> requested, ICollection<string> visible, int maximum, int slots)
         {
-            if (maximum < 1 || maximum > 4 || slots < maximum || requested == null || requested.Count > maximum)
+            if (maximum < 1 || maximum > Maximum || slots < maximum || requested == null || requested.Count > maximum)
                 throw new InvalidOperationException("Invalid original selection slots");
             var result = new List<string>(); var unique = new HashSet<string>();
             foreach (string guid in requested)
@@ -201,7 +211,7 @@ namespace HYJS.Recycle
             return result;
         }
 
-        void OnDisable() { generation++; StopAllCoroutines(); if(pending!=null) {pending.Dispose();pending=null;} if(panel!=null) SetConfirm(true); }
+        void OnDisable() { reading=false; generation++; StopAllCoroutines(); if(pending!=null) {pending.Dispose();pending=null;} if(panel!=null) SetConfirm(true); }
         void OnDestroy() { if(pending!=null) pending.Dispose(); }
     }
 }

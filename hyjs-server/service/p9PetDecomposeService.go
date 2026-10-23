@@ -64,7 +64,7 @@ func (s *GameService) p9DecomposeRefund(tx *gorm.DB, id int64, pet *pb.Pet) (map
 func (s *GameService) p9PetDecompose(ctx context.Context, id int64, request *pb.CSPetDecompose, stamp int64) ([]proto.Message, error) {
 	out := &pb.SCPetDecompose{Get: &pb.ResultObject{}}
 	return s.p9NextMutation(ctx, id, constUtil.P9DecomposeOperation, stamp, request, out, func(tx *gorm.DB, p *pb.Player, g *model.GameState) error {
-		if len(request.GetGuids()) < 1 || len(request.GetGuids()) > 100 || p.GetCoinpet() < 0 {
+		if len(request.GetGuids()) < 1 || len(request.GetGuids()) > constUtil.RecycleDecomposeMaxBatch || p.GetCoinpet() < 0 {
 			return p5Error()
 		}
 		if float64(p.GetLevel()) < tableNumber(s.table("GameConfigure", "StaticName", "RecycleRoomLevel"), "NameValue") {
@@ -87,6 +87,9 @@ func (s *GameService) p9PetDecompose(ctx context.Context, id int64, request *pb.
 			}
 			if p9Guarded(g, guid) {
 				return errors.New("守护中的精灵不能分解")
+			}
+			if err := P5GuardInstance(p, g, guid); err != nil {
+				return err
 			}
 			value := cfg.Decompose[s.table("Pet", "id", pet.GetId())["quality"]]
 			if value < 1 || total > math.MaxInt32-int64(value) {

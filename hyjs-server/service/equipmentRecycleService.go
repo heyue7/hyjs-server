@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"database/sql"
 	"errors"
+	"fmt"
 	"math"
 	"math/big"
 	"strconv"
@@ -96,7 +97,7 @@ func (s *GameService) equipmentMutation(ctx context.Context, id int64, opcode in
 	}, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
 }
 
-// equipmentDecompose 每批最多四件，按原资质表发放威名和金币，拒绝任何阵容挂载。
+// equipmentDecompose 每批最多100件，按原资质表发放威名和金币，拒绝任何阵容挂载。
 func (s *GameService) equipmentDecompose(ctx context.Context, id int64, request *pb.CSEquipDecompose, stamp int64) ([]proto.Message, error) {
 	result := &pb.SCEquipDecompose{}
 	err := s.equipmentMutation(ctx, id, constUtil.EquipmentDecomposeOpcode, stamp, request, result, func(tx *gorm.DB, player *pb.Player, game *model.GameState) error {
@@ -119,7 +120,7 @@ func (s *GameService) equipmentDecompose(ctx context.Context, id int64, request 
 
 func (s *GameService) equipmentDecomposeApply(player *pb.Player, game *model.GameState, request *pb.CSEquipDecompose, policy string) (*pb.ResultObject, []*pb.BaseResource, error) {
 	if len(request.GetGuid()) < 1 || len(request.GetGuid()) > constUtil.EquipmentDecomposeMaxBatch {
-		return nil, nil, errors.New("装备分解必须选择1至4件")
+		return nil, nil, fmt.Errorf("装备分解必须选择1至%d件", constUtil.EquipmentDecomposeMaxBatch)
 	}
 	selected := map[string]bool{}
 	amounts := map[string]int64{}

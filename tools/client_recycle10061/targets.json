@@ -1,0 +1,295 @@
+{
+  "targets": [
+    {
+      "token": "0x060038cf",
+      "type": "StaticData",
+      "method": ".cctor",
+      "inputCILSHA256": "c14ac48f6948e6ea14b0a00b96d39b3fbaf315488fa72e4e99e3b98d4a9cf295",
+      "mode": "capacity"
+    },
+    {
+      "token": "0x060038eb",
+      "type": "StaticData",
+      "method": "GetRecycleBreakupSelectNum",
+      "inputCILSHA256": "ca09ce35ad6bfd7f2afcece16dea079f56d698e6266b46c2fdb749010d68f0b2",
+      "mode": "loop100"
+    },
+    {
+      "token": "0x060038ec",
+      "type": "StaticData",
+      "method": "ClearRecycleBreakupSelect",
+      "inputCILSHA256": "6105562426eac947cc2dd981f4f6096b6579a8837e061403218760817577354f",
+      "mode": "replace",
+      "helper": "ClearGlobal",
+      "args": []
+    },
+    {
+      "token": "0x06005746",
+      "type": "UI.RecycleBreakupSelectEquipPanel",
+      "method": "IsItemSelected",
+      "inputCILSHA256": "0bd338d52477da08d6941105fd5423aa57e4813e9f713a77ed5560bf05acde69",
+      "mode": "loop100"
+    },
+    {
+      "token": "0x0600574e",
+      "type": "UI.RecycleBreakupSelectHeroPanel",
+      "method": "OnConfirmButtonClick",
+      "inputCILSHA256": "716d367cd3c3f431c8fa894aa228daa7a71ec61186636f59d65fcdf4caad23a4",
+      "mode": "loop100",
+      "gate": "AllowPanel",
+      "args": [
+        0
+      ]
+    },
+    {
+      "token": "0x0600574f",
+      "type": "UI.RecycleBreakupSelectHeroPanel",
+      "method": "ClearSelectCache",
+      "inputCILSHA256": "19fa2b8542db7f7c464a9afdb0969dfcbe131a76a4bfafdef476809c2df425a2",
+      "mode": "loop100"
+    },
+    {
+      "token": "0x06005750",
+      "type": "UI.RecycleBreakupSelectHeroPanel",
+      "method": "InitSelectCache",
+      "inputCILSHA256": "0ab8f6112cbd0d46ff6159187a09e871bc0c68ded88c4595a3b597270272f2f8",
+      "mode": "loop100"
+    },
+    {
+      "token": "0x06005752",
+      "type": "UI.RecycleBreakupSelectHeroPanel",
+      "method": "IsSelectMax",
+      "inputCILSHA256": "c51a4cfc686bf59dd90ab51ad40964fcc40d7296baef855ba1b8cbd9f408c824",
+      "mode": "loop100"
+    },
+    {
+      "token": "0x06005753",
+      "type": "UI.RecycleBreakupSelectHeroPanel",
+      "method": "AddSelectCache",
+      "inputCILSHA256": "7c4987b788172d3f162eca49a620947a0e3bf2a12fd260ee0d18556ebda145e0",
+      "mode": "loop100"
+    },
+    {
+      "token": "0x06005754",
+      "type": "UI.RecycleBreakupSelectHeroPanel",
+      "method": "RemoveSelectCache",
+      "inputCILSHA256": "fe55a0bdf08fd5c54bca6b49d6804a07b0c6857c37f2490993e47907cfe477a0",
+      "mode": "loop100"
+    },
+    {
+      "token": "0x06005755",
+      "type": "UI.RecycleBreakupSelectHeroPanel",
+      "method": "IsItemSelected",
+      "inputCILSHA256": "862bd516dd970f5bf8c93047242f3419bb9fab2d572ec5a814e14fe826ea7faf",
+      "mode": "loop100"
+    },
+    {
+      "token": "0x06005765",
+      "type": "UI.RecycleBreakupSelectPetPanel",
+      "method": "OnConfirmButtonClick",
+      "inputCILSHA256": "0de5f97b7c8194d011e3d85be115f9c760e3a9474b1c828e74e9c2797cc863bb",
+      "mode": "loop100",
+      "gate": "AllowPanel",
+      "args": [
+        0
+      ]
+    },
+    {
+      "token": "0x06005766",
+      "type": "UI.RecycleBreakupSelectPetPanel",
+      "method": "ClearSelectCache",
+      "inputCILSHA256": "f1146803939bb1a97ad0aa790a73fadc8eaa652f0e52745c9f9fbd8121358f4f",
+      "mode": "loop100"
+    },
+    {
+      "token": "0x06005767",
+      "type": "UI.RecycleBreakupSelectPetPanel",
+      "method": "InitSelectCache",
+      "inputCILSHA256": "27a470b82f93f03b7a2ba5e5699138a0a1fbe12d842f60aa7339ef10b62718e5",
+      "mode": "loop100"
+    },
+    {
+      "token": "0x06005769",
+      "type": "UI.RecycleBreakupSelectPetPanel",
+      "method": "IsSelectMax",
+      "inputCILSHA256": "b22dee4af833af5efb962b9a0c8a84d410f7a8ee626d4caf1b759437fd854c5c",
+      "mode": "loop100"
+    },
+    {
+      "token": "0x0600576a",
+      "type": "UI.RecycleBreakupSelectPetPanel",
+      "method": "AddSelectCache",
+      "inputCILSHA256": "46c6b6ab46d42c4c4fd24dc25a9ff29d9b14c968d2abe3aacfca87d42d7ca0fa",
+      "mode": "loop100"
+    },
+    {
+      "token": "0x0600576b",
+      "type": "UI.RecycleBreakupSelectPetPanel",
+      "method": "RemoveSelectCache",
+      "inputCILSHA256": "4a278112b53d75bb06d4e14ac685bc1211405a77e3fd1349c9c0438e7578dd9f",
+      "mode": "loop100"
+    },
+    {
+      "token": "0x0600576c",
+      "type": "UI.RecycleBreakupSelectPetPanel",
+      "method": "IsItemSelected",
+      "inputCILSHA256": "2f42149460747f9ceeaf845724dacdaa2d47efeffb202cbeda3f1436247de7a2",
+      "mode": "loop100"
+    },
+    {
+      "token": "0x0600572e",
+      "type": "UI.RecycleBreakupPanel",
+      "method": "OnPetBreakupButtionClick",
+      "inputCILSHA256": "083cf1abf96fc6fb5adf335031b3150432ccf2aad144bce14230cf24055850eb",
+      "mode": "replace",
+      "helper": "QuickOpen",
+      "args": [
+        0
+      ],
+      "kind": 2
+    },
+    {
+      "token": "0x0600572f",
+      "type": "UI.RecycleBreakupPanel",
+      "method": "OnPetBreakupAutoButtionClick",
+      "inputCILSHA256": "de7eb0a5f439c8f4e8b6208a9f64358078ca406a1e2e7ef23b78aa791538209c",
+      "mode": "replace",
+      "helper": "QuickOpen",
+      "args": [
+        0
+      ],
+      "kind": 2
+    },
+    {
+      "token": "0x06005730",
+      "type": "UI.RecycleBreakupPanel",
+      "method": "OnEquipBreakupButtonClick",
+      "inputCILSHA256": "702da5d8d50a5be70bd1e006dfa21042591a0bccce1a251bd4251b8c4401811d",
+      "mode": "replace",
+      "helper": "QuickOpen",
+      "args": [
+        0
+      ],
+      "kind": 1
+    },
+    {
+      "token": "0x06005731",
+      "type": "UI.RecycleBreakupPanel",
+      "method": "OnHeroBreakupButtonClick",
+      "inputCILSHA256": "b293290b117afbc4fc8870a56aa56dfbbdb1fc52639642d1ff755f9f96bb7442",
+      "mode": "replace",
+      "helper": "QuickOpen",
+      "args": [
+        0
+      ],
+      "kind": 0
+    },
+    {
+      "token": "0x06005732",
+      "type": "UI.RecycleBreakupPanel",
+      "method": "OnBreakupConfirmButtonClick",
+      "inputCILSHA256": "618a1e7254c8fc0fad00ed937b0874b7cc691b0b4e88c6de56c9261253577237",
+      "mode": "quality100",
+      "helper": "AllowSelection",
+      "args": []
+    },
+    {
+      "token": "0x06005734",
+      "type": "UI.RecycleBreakupPanel",
+      "method": "ComfirmBreakup",
+      "inputCILSHA256": "5148e29ad55bf145d7c7424b88f8538978153e717bfc153910034a4a0b81e19d",
+      "mode": "replace",
+      "helper": "Submit",
+      "args": [
+        0
+      ]
+    },
+    {
+      "token": "0x06005736",
+      "type": "UI.RecycleBreakupPanel",
+      "method": "Refresh",
+      "inputCILSHA256": "fcf4a918964a6114f8a86d56366198dacd2f2aedf072ae8d7c45ba8aa2e4de08",
+      "mode": "postfix",
+      "helper": "DrawMain",
+      "args": [
+        0
+      ]
+    },
+    {
+      "token": "0x06005749",
+      "type": "UI.RecycleBreakupSelectEquipPanel",
+      "method": "ShowSelectMaxTip",
+      "inputCILSHA256": "355b58d1987060caa18c6b7e44fe1a695059a886150a8749a334905e7875c66d",
+      "mode": "replace",
+      "helper": "Limit",
+      "args": []
+    },
+    {
+      "token": "0x06005757",
+      "type": "UI.RecycleBreakupSelectHeroPanel",
+      "method": "ShowSelectMaxTip",
+      "inputCILSHA256": "e74438ce7cb923b9003d3c00c9ffa94867f1a6e65ddde94a910c08430472eb80",
+      "mode": "replace",
+      "helper": "Limit",
+      "args": []
+    },
+    {
+      "token": "0x0600576e",
+      "type": "UI.RecycleBreakupSelectPetPanel",
+      "method": "ShowSelectMaxTip",
+      "inputCILSHA256": "229b748fb659d98923282b94d5eae81385b296067895336965756ae00a14f3f4",
+      "mode": "replace",
+      "helper": "Limit",
+      "args": []
+    },
+    {
+      "token": "0x0600575e",
+      "type": "UI.RecycleBreakupSelectPage",
+      "method": "OnHeroTabClick",
+      "inputCILSHA256": "2976d2748089e7cdf66239ef1f84f57603c6798847be374e64fac937ffd7a8d7",
+      "mode": "gate",
+      "helper": "AllowSelection",
+      "args": []
+    },
+    {
+      "token": "0x0600575f",
+      "type": "UI.RecycleBreakupSelectPage",
+      "method": "OnEquipTabClick",
+      "inputCILSHA256": "c40a0231ab080fcd730b120c9cbb2883b695c2855edc36a4d6f97fc6f038524b",
+      "mode": "gate",
+      "helper": "AllowSelection",
+      "args": []
+    },
+    {
+      "token": "0x06005760",
+      "type": "UI.RecycleBreakupSelectPage",
+      "method": "OnPetTabClick",
+      "inputCILSHA256": "f977d34ab5e12a8471d60b2a02aca895f0be3f2f736eb383f7a3cdb0e49bec42",
+      "mode": "gate",
+      "helper": "AllowSelection",
+      "args": []
+    },
+    {
+      "token": "0x060057aa",
+      "type": "UI.RecycleSelectPanel",
+      "method": "ShowTab0",
+      "inputCILSHA256": "b594afb6bd761fde92f3a52257fd4f4b81a1697521e1ca9393aa5872c240e971",
+      "mode": "postfix",
+      "helper": "DrawPanel",
+      "args": [
+        0
+      ]
+    },
+    {
+      "token": "0x060057b3",
+      "type": "UI.RecycleSelectPanel",
+      "method": "OnRecycleResetSelectItemClick",
+      "inputCILSHA256": "c6c1f30589f984faabf3fb9c6888fe74fe34b8d20db9f53a50ec82a917758cd3",
+      "mode": "gate",
+      "helper": "AllowPanel",
+      "args": [
+        0
+      ]
+    }
+  ]
+}

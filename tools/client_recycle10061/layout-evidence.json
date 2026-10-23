@@ -1,0 +1,3740 @@
+{
+  "baseAPK": "build/hyjs-feedback59-r4.apk",
+  "entry": "assets/bin/Data/740df7924ac23b043b94e592923938e6",
+  "allHierarchy": [
+    {
+      "path": "/RecycleBreakupSelectPage",
+      "go": 39,
+      "transform": {
+        "m_GameObject": {
+          "m_FileID": 0,
+          "m_PathID": 39
+        },
+        "m_LocalRotation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        },
+        "m_LocalPosition": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "m_LocalScale": {
+          "x": 1.0,
+          "y": 1.0,
+          "z": 1.0
+        },
+        "m_Children": [
+          {
+            "m_FileID": 0,
+            "m_PathID": 119
+          }
+        ],
+        "m_Father": {
+          "m_FileID": 0,
+          "m_PathID": 0
+        }
+      },
+      "components": [
+        {
+          "class": "UIPanel",
+          "component": 235
+        },
+        {
+          "class": "UI.RecycleBreakupSelectPage",
+          "component": 244
+        }
+      ]
+    },
+    {
+      "path": "/RecycleBreakupSelectPage/MainPage",
+      "go": 11,
+      "transform": {
+        "m_GameObject": {
+          "m_FileID": 0,
+          "m_PathID": 11
+        },
+        "m_LocalRotation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        },
+        "m_LocalPosition": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 1900.0
+        },
+        "m_LocalScale": {
+          "x": 1.0,
+          "y": 1.0,
+          "z": 1.0
+        },
+        "m_Children": [
+          {
+            "m_FileID": 0,
+            "m_PathID": 113
+          },
+          {
+            "m_FileID": 0,
+            "m_PathID": 100
+          },
+          {
+            "m_FileID": 0,
+            "m_PathID": 83
+          },
+          {
+            "m_FileID": 0,
+            "m_PathID": 126
+          },
+          {
+            "m_FileID": 0,
+            "m_PathID": 91
+          },
+          {
+            "m_FileID": 0,
+            "m_PathID": 129
+          },
+          {
+            "m_FileID": 0,
+            "m_PathID": 124
+          }
+        ],
+        "m_Father": {
+          "m_FileID": 0,
+          "m_PathID": 90
+        }
+      },
+      "components": []
+    },
+    {
+      "path": "/RecycleBreakupSelectPage/MainPage/Top",
+      "go": 38,
+      "transform": {
+        "m_GameObject": {
+          "m_FileID": 0,
+          "m_PathID": 38
+        },
+        "m_LocalRotation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        },
+        "m_LocalPosition": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "m_LocalScale": {
+          "x": 1.0,
+          "y": 1.0,
+          "z": 1.0
+        },
+        "m_Children": [
+          {
+            "m_FileID": 0,
+            "m_PathID": 93
+          }
+        ],
+        "m_Father": {
+          "m_FileID": 0,
+          "m_PathID": 119
+        }
+      },
+      "components": [
+        {
+          "class": "UIPanel",
+          "component": 192
+        }
+      ]
+    },
+    {
+      "path": "/RecycleBreakupSelectPage/MainPage/Top/TopLeft",
+      "go": 60,
+      "transform": {
+        "m_GameObject": {
+          "m_FileID": 0,
+          "m_PathID": 60
+        },
+        "m_LocalRotation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        },
+        "m_LocalPosition": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "m_LocalScale": {
+          "x": 1.0,
+          "y": 1.0,
+          "z": 1.0
+        },
+        "m_Children": [
+          {
+            "m_FileID": 0,
+            "m_PathID": 154
+          }
+        ],
+        "m_Father": {
+          "m_FileID": 0,
+          "m_PathID": 113
+        }
+      },
+      "components": []
+    },
+    {
+      "path": "/RecycleBreakupSelectPage/MainPage/Top/TopLeft/TitleTween",
+      "go": 16,
+      "transform": {
+        "m_GameObject": {
+          "m_FileID": 0,
+          "m_PathID": 16
+        },
+        "m_LocalRotation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        },
+        "m_LocalPosition": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "m_LocalScale": {
+          "x": 1.0,
+          "y": 1.0,
+          "z": 1.0
+        },
+        "m_Children": [
+          {
+            "m_FileID": 0,
+            "m_PathID": 152
+          }
+        ],
+        "m_Father": {
+          "m_FileID": 0,
+          "m_PathID": 93
+        }
+      },
+      "components": [
+        {
+          "class": "TweenPosition",
+          "component": 231
+        }
+      ]
+    },
+    {
+      "path": "/RecycleBreakupSelectPage/MainPage/Top/TopLeft/TitleTween/TopTitle",
+      "go": 32,
+      "transform": {
+        "m_GameObject": {
+          "m_FileID": 0,
+          "m_PathID": 32
+        },
+        "m_LocalRotation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        },
+        "m_LocalPosition": {
+          "x": -387.0,
+          "y": 287.0,
+          "z": 0.0
+        },
+        "m_LocalScale": {
+          "x": 1.0,
+          "y": 1.0,
+          "z": 1.0
+        },
+        "m_Children": [
+          {
+            "m_FileID": 0,
+            "m_PathID": 109
+          },
+          {
+            "m_FileID": 0,
+            "m_PathID": 125
+          }
+        ],
+        "m_Father": {
+          "m_FileID": 0,
+          "m_PathID": 154
+        }
+      },
+      "components": [
+        {
+          "class": "UISprite",
+          "component": 271,
+          "pivotWidthHeightDepth": [
+            4,
+            228,
+            50,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "path": "/RecycleBreakupSelectPage/MainPage/Top/TopLeft/TitleTween/TopTitle/Label",
+      "go": 66,
+      "transform": {
+        "m_GameObject": {
+          "m_FileID": 0,
+          "m_PathID": 66
+        },
+        "m_LocalRotation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        },
+        "m_LocalPosition": {
+          "x": 14.0,
+          "y": 5.0,
+          "z": 0.0
+        },
+        "m_LocalScale": {
+          "x": 1.0,
+          "y": 1.0,
+          "z": 1.0
+        },
+        "m_Children": [],
+        "m_Father": {
+          "m_FileID": 0,
+          "m_PathID": 152
+        }
+      },
+      "components": [
+        {
+          "class": "UILabel",
+          "component": 281,
+          "pivotWidthHeightDepth": [
+            4,
+            190,
+            30,
+            2
+          ],
+          "text": "选择重置材料"
+        },
+        {
+          "class": "TextKit",
+          "component": 191
+        }
+      ]
+    },
+    {
+      "path": "/RecycleBreakupSelectPage/MainPage/Top/TopLeft/TitleTween/TopTitle/Sprite",
+      "go": 48,
+      "transform": {
+        "m_GameObject": {
+          "m_FileID": 0,
+          "m_PathID": 48
+        },
+        "m_LocalRotation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        },
+        "m_LocalPosition": {
+          "x": -84.0,
+          "y": 6.0,
+          "z": 0.0
+        },
+        "m_LocalScale": {
+          "x": 1.0,
+          "y": 1.0,
+          "z": 1.0
+        },
+        "m_Children": [],
+        "m_Father": {
+          "m_FileID": 0,
+          "m_PathID": 152
+        }
+      },
+      "components": [
+        {
+          "class": "UISprite",
+          "component": 207,
+          "pivotWidthHeightDepth": [
+            4,
+            26,
+            26,
+            3
+          ]
+        }
+      ]
+    },
+    {
+      "path": "/RecycleBreakupSelectPage/MainPage/Left",
+      "go": 24,
+      "transform": {
+        "m_GameObject": {
+          "m_FileID": 0,
+          "m_PathID": 24
+        },
+        "m_LocalRotation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        },
+        "m_LocalPosition": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "m_LocalScale": {
+          "x": 1.0,
+          "y": 1.0,
+          "z": 1.0
+        },
+        "m_Children": [
+          {
+            "m_FileID": 0,
+            "m_PathID": 135
+          }
+        ],
+        "m_Father": {
+          "m_FileID": 0,
+          "m_PathID": 119
+        }
+      },
+      "components": [
+        {
+          "class": "UIPanel",
+          "component": 223
+        }
+      ]
+    },
+    {
+      "path": "/RecycleBreakupSelectPage/MainPage/Left/LeftTween",
+      "go": 75,
+      "transform": {
+        "m_GameObject": {
+          "m_FileID": 0,
+          "m_PathID": 75
+        },
+        "m_LocalRotation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        },
+        "m_LocalPosition": {
+          "x": -474.0,
+          "y": 269.0,
+          "z": 0.0
+        },
+        "m_LocalScale": {
+          "x": 1.0,
+          "y": 1.0,
+          "z": 1.0
+        },
+        "m_Children": [
+          {
+            "m_FileID": 0,
+            "m_PathID": 132
+          }
+        ],
+        "m_Father": {
+          "m_FileID": 0,
+          "m_PathID": 100
+        }
+      },
+      "components": [
+        {
+          "class": "UISprite",
+          "component": 179,
+          "pivotWidthHeightDepth": [
+            0,
+            140,
+            213,
+            1
+          ]
+        },
+        {
+          "class": "TweenAlpha",
+          "component": 249
+        },
+        {
+          "class": "TweenScale",
+          "component": 208
+        }
+      ]
+    },
+    {
+      "path": "/RecycleBreakupSelectPage/MainPage/Left/LeftTween/LeftMain",
+      "go": 6,
+      "transform": {
+        "m_GameObject": {
+          "m_FileID": 0,
+          "m_PathID": 6
+        },
+        "m_LocalRotation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        },
+        "m_LocalPosition": {
+          "x": 70.0,
+          "y": -106.0,
+          "z": 0.0
+        },
+        "m_LocalScale": {
+          "x": 1.0,
+          "y": 1.0,
+          "z": 1.0
+        },
+        "m_Children": [
+          {
+            "m_FileID": 0,
+            "m_PathID": 144
+          },
+          {
+            "m_FileID": 0,
+            "m_PathID": 120
+          },
+          {
+            "m_FileID": 0,
+            "m_PathID": 86
+          },
+          {
+            "m_FileID": 0,
+            "m_PathID": 147
+          }
+        ],
+        "m_Father": {
+          "m_FileID": 0,
+          "m_PathID": 135
+        }
+      },
+      "components": [
+        {
+          "class": "UIWidget",
+          "component": 227
+        },
+        {
+          "class": "TweenAlpha",
+          "component": 224
+        }
+      ]
+    },
+    {
+      "path": "/RecycleBreakupSelectPage/MainPage/Left/LeftTween/LeftMain/Di",
+      "go": 50,
+      "transform": {
+        "m_GameObject": {
+          "m_FileID": 0,
+          "m_PathID": 50
+        },
+        "m_LocalRotation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        },
+        "m_LocalPosition": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "m_LocalScale": {
+          "x": 1.0,
+          "y": 1.0,
+          "z": 1.0
+        },
+        "m_Children": [
+          {
+            "m_FileID": 0,
+            "m_PathID": 115
+          },
+          {
+            "m_FileID": 0,
+            "m_PathID": 103
+          },
+          {
+            "m_FileID": 0,
+            "m_PathID": 79
+          },
+          {
+            "m_FileID": 0,
+            "m_PathID": 105
+          },
+          {
+            "m_FileID": 0,
+            "m_PathID": 116
+          }
+        ],
+        "m_Father": {
+          "m_FileID": 0,
+          "m_PathID": 132
+        }
+      },
+      "components": []
+    },
+    {
+      "path": "/RecycleBreakupSelectPage/MainPage/Left/LeftTween/LeftMain/Di/Sprite",
+      "go": 53,
+      "transform": {
+        "m_GameObject": {
+          "m_FileID": 0,
+          "m_PathID": 53
+        },
+        "m_LocalRotation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        },
+        "m_LocalPosition": {
+          "x": -41.0,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "m_LocalScale": {
+          "x": 1.0,
+          "y": 1.0,
+          "z": 1.0
+        },
+        "m_Children": [],
+        "m_Father": {
+          "m_FileID": 0,
+          "m_PathID": 144
+        }
+      },
+      "components": [
+        {
+          "class": "UISprite",
+          "component": 176,
+          "pivotWidthHeightDepth": [
+            4,
+            48,
+            177,
+            2
+          ]
+        }
+      ]
+    },
+    {
+      "path": "/RecycleBreakupSelectPage/MainPage/Left/LeftTween/LeftMain/Di/line",
+      "go": 76,
+      "transform": {
+        "m_GameObject": {
+          "m_FileID": 0,
+          "m_PathID": 76
+        },
+        "m_LocalRotation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        },
+        "m_LocalPosition": {
+          "x": 1.0,
+          "y": -86.0,
+          "z": 0.0
+        },
+        "m_LocalScale": {
+          "x": 1.0,
+          "y": 1.0,
+          "z": 1.0
+        },
+        "m_Children": [],
+        "m_Father": {
+          "m_FileID": 0,
+          "m_PathID": 144
+        }
+      },
+      "components": [
+        {
+          "class": "UISprite",
+          "component": 182,
+          "pivotWidthHeightDepth": [
+            4,
+            133,
+            4,
+            3
+          ]
+        }
+      ]
+    },
+    {
+      "path": "/RecycleBreakupSelectPage/MainPage/Left/LeftTween/LeftMain/Di/line",
+      "go": 65,
+      "transform": {
+        "m_GameObject": {
+          "m_FileID": 0,
+          "m_PathID": 65
+        },
+        "m_LocalRotation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        },
+        "m_LocalPosition": {
+          "x": 1.0,
+          "y": 86.0,
+          "z": 0.0
+        },
+        "m_LocalScale": {
+          "x": 1.0,
+          "y": 1.0,
+          "z": 1.0
+        },
+        "m_Children": [],
+        "m_Father": {
+          "m_FileID": 0,
+          "m_PathID": 144
+        }
+      },
+      "components": [
+        {
+          "class": "UISprite",
+          "component": 251,
+          "pivotWidthHeightDepth": [
+            4,
+            133,
+            4,
+            3
+          ]
+        }
+      ]
+    },
+    {
+      "path": "/RecycleBreakupSelectPage/MainPage/Left/LeftTween/LeftMain/Di/line",
+      "go": 14,
+      "transform": {
+        "m_GameObject": {
+          "m_FileID": 0,
+          "m_PathID": 14
+        },
+        "m_LocalRotation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        },
+        "m_LocalPosition": {
+          "x": 1.0,
+          "y": 28.0,
+          "z": 0.0
+        },
+        "m_LocalScale": {
+          "x": 1.0,
+          "y": 1.0,
+          "z": 1.0
+        },
+        "m_Children": [],
+        "m_Father": {
+          "m_FileID": 0,
+          "m_PathID": 144
+        }
+      },
+      "components": [
+        {
+          "class": "UISprite",
+          "component": 178,
+          "pivotWidthHeightDepth": [
+            4,
+            133,
+            4,
+            3
+          ]
+        }
+      ]
+    },
+    {
+      "path": "/RecycleBreakupSelectPage/MainPage/Left/LeftTween/LeftMain/Di/line (1)",
+      "go": 47,
+      "transform": {
+        "m_GameObject": {
+          "m_FileID": 0,
+          "m_PathID": 47
+        },
+        "m_LocalRotation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        },
+        "m_LocalPosition": {
+          "x": 1.0,
+          "y": -30.0,
+          "z": 0.0
+        },
+        "m_LocalScale": {
+          "x": 1.0,
+          "y": 1.0,
+          "z": 1.0
+        },
+        "m_Children": [],
+        "m_Father": {
+          "m_FileID": 0,
+          "m_PathID": 144
+        }
+      },
+      "components": [
+        {
+          "class": "UISprite",
+          "component": 200,
+          "pivotWidthHeightDepth": [
+            4,
+            133,
+            4,
+            3
+          ]
+        }
+      ]
+    },
+    {
+      "path": "/RecycleBreakupSelectPage/MainPage/Left/LeftTween/LeftMain/HeroTab",
+      "go": 59,
+      "transform": {
+        "m_GameObject": {
+          "m_FileID": 0,
+          "m_PathID": 59
+        },
+        "m_LocalRotation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        },
+        "m_LocalPosition": {
+          "x": 35.0,
+          "y": 55.5,
+          "z": 0.0
+        },
+        "m_LocalScale": {
+          "x": 1.0,
+          "y": 1.0,
+          "z": 1.0
+        },
+        "m_Children": [
+          {
+            "m_FileID": 0,
+            "m_PathID": 95
+          },
+          {
+            "m_FileID": 0,
+            "m_PathID": 131
+          },
+          {
+            "m_FileID": 0,
+            "m_PathID": 88
+          }
+        ],
+        "m_Father": {
+          "m_FileID": 0,
+          "m_PathID": 132
+        }
+      },
+      "components": [
+        {
+          "class": "UIEventTrigger",
+          "component": 172
+        },
+        {
+          "class": "UITriggerTab",
+          "component": 173
+        },
+        {
+          "class": "PlayBtnAudio",
+          "component": 220
+        }
+      ]
+    },
+    {
+      "path": "/RecycleBreakupSelectPage/MainPage/Left/LeftTween/LeftMain/HeroTab/Sprite (1)",
+      "go": 27,
+      "transform": {
+        "m_GameObject": {
+          "m_FileID": 0,
+          "m_PathID": 27
+        },
+        "m_LocalRotation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        },
+        "m_LocalPosition": {
+          "x": -35.0,
+          "y": 1.0,
+          "z": 0.0
+        },
+        "m_LocalScale": {
+          "x": 1.0,
+          "y": 1.0,
+          "z": 1.0
+        },
+        "m_Children": [],
+        "m_Father": {
+          "m_FileID": 0,
+          "m_PathID": 120
+        }
+      },
+      "components": [
+        {
+          "class": "UISprite",
+          "component": 202,
+          "pivotWidthHeightDepth": [
+            4,
+            128,
+            54,
+            4
+          ]
+        }
+      ]
+    },
+    {
+      "path": "/RecycleBreakupSelectPage/MainPage/Left/LeftTween/LeftMain/HeroTab/Sprite",
+      "go": 70,
+      "transform": {
+        "m_GameObject": {
+          "m_FileID": 0,
+          "m_PathID": 70
+        },
+        "m_LocalRotation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        },
+        "m_LocalPosition": {
+          "x": -76.0,
+          "y": 3.0,
+          "z": 0.0
+        },
+        "m_LocalScale": {
+          "x": 1.0,
+          "y": 1.0,
+          "z": 1.0
+        },
+        "m_Children": [],
+        "m_Father": {
+          "m_FileID": 0,
+          "m_PathID": 120
+        }
+      },
+      "components": [
+        {
+          "class": "UISprite",
+          "component": 236,
+          "pivotWidthHeightDepth": [
+            4,
+            26,
+            26,
+            5
+          ]
+        }
+      ]
+    },
+    {
+      "path": "/RecycleBreakupSelectPage/MainPage/Left/LeftTween/LeftMain/HeroTab/Label",
+      "go": 45,
+      "transform": {
+        "m_GameObject": {
+          "m_FileID": 0,
+          "m_PathID": 45
+        },
+        "m_LocalRotation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        },
+        "m_LocalPosition": {
+          "x": -10.0,
+          "y": 2.0,
+          "z": 0.0
+        },
+        "m_LocalScale": {
+          "x": 1.0,
+          "y": 1.0,
+          "z": 1.0
+        },
+        "m_Children": [],
+        "m_Father": {
+          "m_FileID": 0,
+          "m_PathID": 120
+        }
+      },
+      "components": [
+        {
+          "class": "UILabel",
+          "component": 177,
+          "pivotWidthHeightDepth": [
+            4,
+            72,
+            18,
+            6
+          ],
+          "text": "重置英雄"
+        },
+        {
+          "class": "TextKit",
+          "component": 186
+        }
+      ]
+    },
+    {
+      "path": "/RecycleBreakupSelectPage/MainPage/Left/LeftTween/LeftMain/EquipTab",
+      "go": 49,
+      "transform": {
+        "m_GameObject": {
+          "m_FileID": 0,
+          "m_PathID": 49
+        },
+        "m_LocalRotation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        },
+        "m_LocalPosition": {
+          "x": 35.0,
+          "y": -1.5,
+          "z": 0.0
+        },
+        "m_LocalScale": {
+          "x": 1.0,
+          "y": 1.0,
+          "z": 1.0
+        },
+        "m_Children": [
+          {
+            "m_FileID": 0,
+            "m_PathID": 143
+          },
+          {
+            "m_FileID": 0,
+            "m_PathID": 139
+          },
+          {
+            "m_FileID": 0,
+            "m_PathID": 114
+          }
+        ],
+        "m_Father": {
+          "m_FileID": 0,
+          "m_PathID": 132
+        }
+      },
+      "components": [
+        {
+          "class": "UIEventTrigger",
+          "component": 276
+        },
+        {
+          "class": "UITriggerTab",
+          "component": 216
+        },
+        {
+          "class": "PlayBtnAudio",
+          "component": 239
+        }
+      ]
+    },
+    {
+      "path": "/RecycleBreakupSelectPage/MainPage/Left/LeftTween/LeftMain/EquipTab/Sprite (1)",
+      "go": 29,
+      "transform": {
+        "m_GameObject": {
+          "m_FileID": 0,
+          "m_PathID": 29
+        },
+        "m_LocalRotation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        },
+        "m_LocalPosition": {
+          "x": -35.0,
+          "y": 2.0,
+          "z": 0.0
+        },
+        "m_LocalScale": {
+          "x": 1.0,
+          "y": 1.0,
+          "z": 1.0
+        },
+        "m_Children": [],
+        "m_Father": {
+          "m_FileID": 0,
+          "m_PathID": 86
+        }
+      },
+      "components": [
+        {
+          "class": "UISprite",
+          "component": 272,
+          "pivotWidthHeightDepth": [
+            4,
+            128,
+            54,
+            4
+          ]
+        }
+      ]
+    },
+    {
+      "path": "/RecycleBreakupSelectPage/MainPage/Left/LeftTween/LeftMain/EquipTab/Sprite",
+      "go": 44,
+      "transform": {
+        "m_GameObject": {
+          "m_FileID": 0,
+          "m_PathID": 44
+        },
+        "m_LocalRotation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        },
+        "m_LocalPosition": {
+          "x": -77.0,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "m_LocalScale": {
+          "x": 1.0,
+          "y": 1.0,
+          "z": 1.0
+        },
+        "m_Children": [],
+        "m_Father": {
+          "m_FileID": 0,
+          "m_PathID": 86
+        }
+      },
+      "components": [
+        {
+          "class": "UISprite",
+          "component": 225,
+          "pivotWidthHeightDepth": [
+            4,
+            26,
+            26,
+            5
+          ]
+        }
+      ]
+    },
+    {
+      "path": "/RecycleBreakupSelectPage/MainPage/Left/LeftTween/LeftMain/EquipTab/Label",
+      "go": 21,
+      "transform": {
+        "m_GameObject": {
+          "m_FileID": 0,
+          "m_PathID": 21
+        },
+        "m_LocalRotation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        },
+        "m_LocalPosition": {
+          "x": -10.0,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "m_LocalScale": {
+          "x": 1.0,
+          "y": 1.0,
+          "z": 1.0
+        },
+        "m_Children": [],
+        "m_Father": {
+          "m_FileID": 0,
+          "m_PathID": 86
+        }
+      },
+      "components": [
+        {
+          "class": "UILabel",
+          "component": 218,
+          "pivotWidthHeightDepth": [
+            4,
+            72,
+            18,
+            6
+          ],
+          "text": "重置装备"
+        },
+        {
+          "class": "TextKit",
+          "component": 258
+        }
+      ]
+    },
+    {
+      "path": "/RecycleBreakupSelectPage/MainPage/Left/LeftTween/LeftMain/PetTab",
+      "go": 28,
+      "transform": {
+        "m_GameObject": {
+          "m_FileID": 0,
+          "m_PathID": 28
+        },
+        "m_LocalRotation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        },
+        "m_LocalPosition": {
+          "x": 35.0,
+          "y": -57.5,
+          "z": 0.0
+        },
+        "m_LocalScale": {
+          "x": 1.0,
+          "y": 1.0,
+          "z": 1.0
+        },
+        "m_Children": [
+          {
+            "m_FileID": 0,
+            "m_PathID": 85
+          },
+          {
+            "m_FileID": 0,
+            "m_PathID": 123
+          },
+          {
+            "m_FileID": 0,
+            "m_PathID": 130
+          }
+        ],
+        "m_Father": {
+          "m_FileID": 0,
+          "m_PathID": 132
+        }
+      },
+      "components": [
+        {
+          "class": "UIEventTrigger",
+          "component": 241
+        },
+        {
+          "class": "UITriggerTab",
+          "component": 209
+        },
+        {
+          "class": "PlayBtnAudio",
+          "component": 284
+        }
+      ]
+    },
+    {
+      "path": "/RecycleBreakupSelectPage/MainPage/Left/LeftTween/LeftMain/PetTab/Sprite (1)",
+      "go": 5,
+      "transform": {
+        "m_GameObject": {
+          "m_FileID": 0,
+          "m_PathID": 5
+        },
+        "m_LocalRotation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        },
+        "m_LocalPosition": {
+          "x": -35.0,
+          "y": 1.0,
+          "z": 0.0
+        },
+        "m_LocalScale": {
+          "x": 1.0,
+          "y": 1.0,
+          "z": 1.0
+        },
+        "m_Children": [],
+        "m_Father": {
+          "m_FileID": 0,
+          "m_PathID": 147
+        }
+      },
+      "components": [
+        {
+          "class": "UISprite",
+          "component": 214,
+          "pivotWidthHeightDepth": [
+            4,
+            128,
+            54,
+            4
+          ]
+        }
+      ]
+    },
+    {
+      "path": "/RecycleBreakupSelectPage/MainPage/Left/LeftTween/LeftMain/PetTab/Sprite",
+      "go": 20,
+      "transform": {
+        "m_GameObject": {
+          "m_FileID": 0,
+          "m_PathID": 20
+        },
+        "m_LocalRotation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        },
+        "m_LocalPosition": {
+          "x": -76.0,
+          "y": 3.0,
+          "z": 0.0
+        },
+        "m_LocalScale": {
+          "x": 1.0,
+          "y": 1.0,
+          "z": 1.0
+        },
+        "m_Children": [],
+        "m_Father": {
+          "m_FileID": 0,
+          "m_PathID": 147
+        }
+      },
+      "components": [
+        {
+          "class": "UISprite",
+          "component": 215,
+          "pivotWidthHeightDepth": [
+            4,
+            26,
+            26,
+            5
+          ]
+        }
+      ]
+    },
+    {
+      "path": "/RecycleBreakupSelectPage/MainPage/Left/LeftTween/LeftMain/PetTab/Label",
+      "go": 68,
+      "transform": {
+        "m_GameObject": {
+          "m_FileID": 0,
+          "m_PathID": 68
+        },
+        "m_LocalRotation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        },
+        "m_LocalPosition": {
+          "x": -10.0,
+          "y": 2.0,
+          "z": 0.0
+        },
+        "m_LocalScale": {
+          "x": 1.0,
+          "y": 1.0,
+          "z": 1.0
+        },
+        "m_Children": [],
+        "m_Father": {
+          "m_FileID": 0,
+          "m_PathID": 147
+        }
+      },
+      "components": [
+        {
+          "class": "UILabel",
+          "component": 205,
+          "pivotWidthHeightDepth": [
+            4,
+            72,
+            18,
+            6
+          ],
+          "text": "重置宠物"
+        },
+        {
+          "class": "TextKit",
+          "component": 274
+        }
+      ]
+    },
+    {
+      "path": "/RecycleBreakupSelectPage/MainPage/RecycleSelectHeroPanel",
+      "go": 42,
+      "transform": {
+        "m_GameObject": {
+          "m_FileID": 0,
+          "m_PathID": 42
+        },
+        "m_LocalRotation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        },
+        "m_LocalPosition": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "m_LocalScale": {
+          "x": 1.0,
+          "y": 1.0,
+          "z": 1.0
+        },
+        "m_Children": [
+          {
+            "m_FileID": 0,
+            "m_PathID": 141
+          }
+        ],
+        "m_Father": {
+          "m_FileID": 0,
+          "m_PathID": 119
+        }
+      },
+      "components": [
+        {
+          "class": "UIPanel",
+          "component": 275
+        },
+        {
+          "class": "UI.RecycleBreakupSelectHeroPanel",
+          "component": 266
+        }
+      ]
+    },
+    {
+      "path": "/RecycleBreakupSelectPage/MainPage/RecycleSelectHeroPanel/Main",
+      "go": 74,
+      "transform": {
+        "m_GameObject": {
+          "m_FileID": 0,
+          "m_PathID": 74
+        },
+        "m_LocalRotation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        },
+        "m_LocalPosition": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "m_LocalScale": {
+          "x": 1.0,
+          "y": 1.0,
+          "z": 1.0
+        },
+        "m_Children": [
+          {
+            "m_FileID": 0,
+            "m_PathID": 81
+          },
+          {
+            "m_FileID": 0,
+            "m_PathID": 78
+          },
+          {
+            "m_FileID": 0,
+            "m_PathID": 138
+          },
+          {
+            "m_FileID": 0,
+            "m_PathID": 153
+          },
+          {
+            "m_FileID": 0,
+            "m_PathID": 84
+          },
+          {
+            "m_FileID": 0,
+            "m_PathID": 96
+          }
+        ],
+        "m_Father": {
+          "m_FileID": 0,
+          "m_PathID": 83
+        }
+      },
+      "components": [
+        {
+          "class": "TweenPosition",
+          "component": 288
+        },
+        {
+          "class": "TweenAlpha",
+          "component": 242
+        },
+        {
+          "class": "UIWidget",
+          "component": 185
+        }
+      ]
+    },
+    {
+      "path": "/RecycleBreakupSelectPage/MainPage/RecycleSelectHeroPanel/Main/Di",
+      "go": 71,
+      "transform": {
+        "m_GameObject": {
+          "m_FileID": 0,
+          "m_PathID": 71
+        },
+        "m_LocalRotation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        },
+        "m_LocalPosition": {
+          "x": -313.0,
+          "y": 268.0,
+          "z": -0.0001220703125
+        },
+        "m_LocalScale": {
+          "x": 1.0,
+          "y": 1.0,
+          "z": 1.0
+        },
+        "m_Children": [],
+        "m_Father": {
+          "m_FileID": 0,
+          "m_PathID": 141
+        }
+      },
+      "components": [
+        {
+          "class": "UISprite",
+          "component": 240,
+          "pivotWidthHeightDepth": [
+            0,
+            780,
+            540,
+            5
+          ]
+        },
+        {
+          "class": "BackInputReceiver",
+          "component": 282
+        },
+        {
+          "class": "UIDragScrollView",
+          "component": 197
+        }
+      ]
+    },
+    {
+      "path": "/RecycleBreakupSelectPage/MainPage/RecycleSelectHeroPanel/Main/PointerAndLine",
+      "go": 54,
+      "transform": {
+        "m_GameObject": {
+          "m_FileID": 0,
+          "m_PathID": 54
+        },
+        "m_LocalRotation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        },
+        "m_LocalPosition": {
+          "x": -320.0,
+          "y": 0.0,
+          "z": -0.0001220703125
+        },
+        "m_LocalScale": {
+          "x": 1.0,
+          "y": 1.0,
+          "z": 1.0
+        },
+        "m_Children": [
+          {
+            "m_FileID": 0,
+            "m_PathID": 94
+          },
+          {
+            "m_FileID": 0,
+            "m_PathID": 146
+          }
+        ],
+        "m_Father": {
+          "m_FileID": 0,
+          "m_PathID": 141
+        }
+      },
+      "components": [
+        {
+          "class": "UIWidget",
+          "component": 233
+        }
+      ]
+    },
+    {
+      "path": "/RecycleBreakupSelectPage/MainPage/RecycleSelectHeroPanel/Main/PointerAndLine/Pointer",
+      "go": 62,
+      "transform": {
+        "m_GameObject": {
+          "m_FileID": 0,
+          "m_PathID": 62
+        },
+        "m_LocalRotation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        },
+        "m_LocalPosition": {
+          "x": -7.0,
+          "y": 216.00003051757812,
+          "z": 0.0
+        },
+        "m_LocalScale": {
+          "x": 1.0,
+          "y": 1.0,
+          "z": 1.0
+        },
+        "m_Children": [],
+        "m_Father": {
+          "m_FileID": 0,
+          "m_PathID": 78
+        }
+      },
+      "components": [
+        {
+          "class": "UISprite",
+          "component": 268,
+          "pivotWidthHeightDepth": [
+            4,
+            34,
+            34,
+            2
+          ]
+        }
+      ]
+    },
+    {
+      "path": "/RecycleBreakupSelectPage/MainPage/RecycleSelectHeroPanel/Main/PointerAndLine/PointerLine",
+      "go": 41,
+      "transform": {
+        "m_GameObject": {
+          "m_FileID": 0,
+          "m_PathID": 41
+        },
+        "m_LocalRotation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        },
+        "m_LocalPosition": {
+          "x": 9.0,
+          "y": 8.0,
+          "z": 0.0
+        },
+        "m_LocalScale": {
+          "x": 1.0,
+          "y": 1.0,
+          "z": 1.0
+        },
+        "m_Children": [],
+        "m_Father": {
+          "m_FileID": 0,
+          "m_PathID": 78
+        }
+      },
+      "components": [
+        {
+          "class": "UISprite",
+          "component": 217,
+          "pivotWidthHeightDepth": [
+            4,
+            2,
+            500,
+            10
+          ]
+        }
+      ]
+    },
+    {
+      "path": "/RecycleBreakupSelectPage/MainPage/RecycleSelectHeroPanel/Main/Scroll View",
+      "go": 23,
+      "transform": {
+        "m_GameObject": {
+          "m_FileID": 0,
+          "m_PathID": 23
+        },
+        "m_LocalRotation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        },
+        "m_LocalPosition": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "m_LocalScale": {
+          "x": 1.0,
+          "y": 1.0,
+          "z": 1.0
+        },
+        "m_Children": [
+          {
+            "m_FileID": 0,
+            "m_PathID": 134
+          }
+        ],
+        "m_Father": {
+          "m_FileID": 0,
+          "m_PathID": 141
+        }
+      },
+      "components": [
+        {
+          "class": "UIPanel",
+          "component": 273
+        },
+        {
+          "class": "UIScrollView",
+          "component": 261
+        }
+      ]
+    },
+    {
+      "path": "/RecycleBreakupSelectPage/MainPage/RecycleSelectHeroPanel/Main/Scroll View/SimpleGrid",
+      "go": 72,
+      "transform": {
+        "m_GameObject": {
+          "m_FileID": 0,
+          "m_PathID": 72
+        },
+        "m_LocalRotation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        },
+        "m_LocalPosition": {
+          "x": -120.0,
+          "y": 185.0,
+          "z": 0.0
+        },
+        "m_LocalScale": {
+          "x": 1.0,
+          "y": 1.0,
+          "z": 1.0
+        },
+        "m_Children": [],
+        "m_Father": {
+          "m_FileID": 0,
+          "m_PathID": 138
+        }
+      },
+      "components": [
+        {
+          "class": "SimpleGrid",
+          "component": 250
+        }
+      ]
+    },
+    {
+      "path": "/RecycleBreakupSelectPage/MainPage/RecycleSelectHeroPanel/Main/ConfirmBtn",
+      "go": 34,
+      "transform": {
+        "m_GameObject": {
+          "m_FileID": 0,
+          "m_PathID": 34
+        },
+        "m_LocalRotation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        },
+        "m_LocalPosition": {
+          "x": 86.0,
+          "y": -228.0,
+          "z": -0.0001220703125
+        },
+        "m_LocalScale": {
+          "x": 1.0,
+          "y": 1.0,
+          "z": 1.0
+        },
+        "m_Children": [
+          {
+            "m_FileID": 0,
+            "m_PathID": 145
+          }
+        ],
+        "m_Father": {
+          "m_FileID": 0,
+          "m_PathID": 141
+        }
+      },
+      "components": [
+        {
+          "class": "UISprite",
+          "component": 256,
+          "pivotWidthHeightDepth": [
+            4,
+            128,
+            70,
+            25
+          ]
+        },
+        {
+          "class": "UIButton",
+          "component": 248
+        }
+      ]
+    },
+    {
+      "path": "/RecycleBreakupSelectPage/MainPage/RecycleSelectHeroPanel/Main/ConfirmBtn/Sprite",
+      "go": 1,
+      "transform": {
+        "m_GameObject": {
+          "m_FileID": 0,
+          "m_PathID": 1
+        },
+        "m_LocalRotation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        },
+        "m_LocalPosition": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "m_LocalScale": {
+          "x": 1.0,
+          "y": 1.0,
+          "z": 1.0
+        },
+        "m_Children": [],
+        "m_Father": {
+          "m_FileID": 0,
+          "m_PathID": 153
+        }
+      },
+      "components": [
+        {
+          "class": "UISprite",
+          "component": 245,
+          "pivotWidthHeightDepth": [
+            4,
+            44,
+            28,
+            26
+          ]
+        }
+      ]
+    },
+    {
+      "path": "/RecycleBreakupSelectPage/MainPage/RecycleSelectHeroPanel/Main/cache",
+      "go": 10,
+      "transform": {
+        "m_GameObject": {
+          "m_FileID": 0,
+          "m_PathID": 10
+        },
+        "m_LocalRotation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        },
+        "m_LocalPosition": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "m_LocalScale": {
+          "x": 1.0,
+          "y": 1.0,
+          "z": 1.0
+        },
+        "m_Children": [],
+        "m_Father": {
+          "m_FileID": 0,
+          "m_PathID": 141
+        }
+      },
+      "components": []
+    },
+    {
+      "path": "/RecycleBreakupSelectPage/MainPage/RecycleSelectHeroPanel/Main/OneKeyChose",
+      "go": 2,
+      "transform": {
+        "m_GameObject": {
+          "m_FileID": 0,
+          "m_PathID": 2
+        },
+        "m_LocalRotation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        },
+        "m_LocalPosition": {
+          "x": -227.39999389648438,
+          "y": -229.8000030517578,
+          "z": -1900.0
+        },
+        "m_LocalScale": {
+          "x": 1.0,
+          "y": 1.0,
+          "z": 1.0
+        },
+        "m_Children": [
+          {
+            "m_FileID": 0,
+            "m_PathID": 104
+          },
+          {
+            "m_FileID": 0,
+            "m_PathID": 108
+          }
+        ],
+        "m_Father": {
+          "m_FileID": 0,
+          "m_PathID": 141
+        }
+      },
+      "components": [
+        {
+          "class": "UIWidget",
+          "component": 289
+        },
+        {
+          "class": "TweenAlpha",
+          "component": 255
+        }
+      ]
+    },
+    {
+      "path": "/RecycleBreakupSelectPage/MainPage/RecycleSelectHeroPanel/Main/OneKeyChose/CheckBox",
+      "go": 37,
+      "transform": {
+        "m_GameObject": {
+          "m_FileID": 0,
+          "m_PathID": 37
+        },
+        "m_LocalRotation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        },
+        "m_LocalPosition": {
+          "x": -30.0,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "m_LocalScale": {
+          "x": 1.0,
+          "y": 1.0,
+          "z": 1.0
+        },
+        "m_Children": [
+          {
+            "m_FileID": 0,
+            "m_PathID": 101
+          }
+        ],
+        "m_Father": {
+          "m_FileID": 0,
+          "m_PathID": 96
+        }
+      },
+      "components": [
+        {
+          "class": "UISprite",
+          "component": 295,
+          "pivotWidthHeightDepth": [
+            4,
+            30,
+            30,
+            302
+          ]
+        },
+        {
+          "class": "UIToggle",
+          "component": 219
+        },
+        {
+          "class": "UIEventTrigger",
+          "component": 257
+        },
+        {
+          "class": "PlayBtnAudio",
+          "component": 226
+        }
+      ]
+    },
+    {
+      "path": "/RecycleBreakupSelectPage/MainPage/RecycleSelectHeroPanel/Main/OneKeyChose/CheckBox/Sprite",
+      "go": 33,
+      "transform": {
+        "m_GameObject": {
+          "m_FileID": 0,
+          "m_PathID": 33
+        },
+        "m_LocalRotation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        },
+        "m_LocalPosition": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "m_LocalScale": {
+          "x": 1.0,
+          "y": 1.0,
+          "z": 1.0
+        },
+        "m_Children": [],
+        "m_Father": {
+          "m_FileID": 0,
+          "m_PathID": 104
+        }
+      },
+      "components": [
+        {
+          "class": "UISprite",
+          "component": 254,
+          "pivotWidthHeightDepth": [
+            4,
+            46,
+            36,
+            303
+          ]
+        }
+      ]
+    },
+    {
+      "path": "/RecycleBreakupSelectPage/MainPage/RecycleSelectHeroPanel/Main/OneKeyChose/Label",
+      "go": 52,
+      "transform": {
+        "m_GameObject": {
+          "m_FileID": 0,
+          "m_PathID": 52
+        },
+        "m_LocalRotation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        },
+        "m_LocalPosition": {
+          "x": -5.0,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "m_LocalScale": {
+          "x": 1.0,
+          "y": 1.0,
+          "z": 1.0
+        },
+        "m_Children": [],
+        "m_Father": {
+          "m_FileID": 0,
+          "m_PathID": 96
+        }
+      },
+      "components": [
+        {
+          "class": "UILabel",
+          "component": 171,
+          "pivotWidthHeightDepth": [
+            3,
+            54,
+            18,
+            304
+          ],
+          "text": "onekey"
+        },
+        {
+          "class": "TextKit",
+          "component": 175
+        }
+      ]
+    },
+    {
+      "path": "/RecycleBreakupSelectPage/MainPage/Sprite",
+      "go": 58,
+      "transform": {
+        "m_GameObject": {
+          "m_FileID": 0,
+          "m_PathID": 58
+        },
+        "m_LocalRotation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        },
+        "m_LocalPosition": {
+          "x": -277.0,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "m_LocalScale": {
+          "x": 1.0,
+          "y": 1.0,
+          "z": 1.0
+        },
+        "m_Children": [],
+        "m_Father": {
+          "m_FileID": 0,
+          "m_PathID": 119
+        }
+      },
+      "components": [
+        {
+          "class": "UISprite",
+          "component": 264,
+          "pivotWidthHeightDepth": [
+            4,
+            3000,
+            3000,
+            -1
+          ]
+        }
+      ]
+    },
+    {
+      "path": "/RecycleBreakupSelectPage/MainPage/ClostBtn",
+      "go": 77,
+      "transform": {
+        "m_GameObject": {
+          "m_FileID": 0,
+          "m_PathID": 77
+        },
+        "m_LocalRotation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        },
+        "m_LocalPosition": {
+          "x": 438.4800109863281,
+          "y": 290.0,
+          "z": -0.0001220703125
+        },
+        "m_LocalScale": {
+          "x": 1.0,
+          "y": 1.0,
+          "z": 1.0
+        },
+        "m_Children": [
+          {
+            "m_FileID": 0,
+            "m_PathID": 110
+          }
+        ],
+        "m_Father": {
+          "m_FileID": 0,
+          "m_PathID": 119
+        }
+      },
+      "components": [
+        {
+          "class": "UIButton",
+          "component": 211
+        },
+        {
+          "class": "UIPlaySound",
+          "component": 285
+        },
+        {
+          "class": "UIWidget",
+          "component": 213
+        },
+        {
+          "class": "PlayBtnAudio",
+          "component": 267
+        },
+        {
+          "class": "TweenAlpha",
+          "component": 188
+        }
+      ]
+    },
+    {
+      "path": "/RecycleBreakupSelectPage/MainPage/ClostBtn/Background",
+      "go": 3,
+      "transform": {
+        "m_GameObject": {
+          "m_FileID": 0,
+          "m_PathID": 3
+        },
+        "m_LocalRotation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        },
+        "m_LocalPosition": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "m_LocalScale": {
+          "x": 1.0,
+          "y": 1.0,
+          "z": 1.0
+        },
+        "m_Children": [],
+        "m_Father": {
+          "m_FileID": 0,
+          "m_PathID": 91
+        }
+      },
+      "components": [
+        {
+          "class": "UISprite",
+          "component": 280,
+          "pivotWidthHeightDepth": [
+            4,
+            56,
+            56,
+            4
+          ]
+        }
+      ]
+    },
+    {
+      "path": "/RecycleBreakupSelectPage/MainPage/RecycleSelectEquipPanel",
+      "go": 15,
+      "transform": {
+        "m_GameObject": {
+          "m_FileID": 0,
+          "m_PathID": 15
+        },
+        "m_LocalRotation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        },
+        "m_LocalPosition": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": -0.0001220703125
+        },
+        "m_LocalScale": {
+          "x": 1.0,
+          "y": 1.0,
+          "z": 1.0
+        },
+        "m_Children": [
+          {
+            "m_FileID": 0,
+            "m_PathID": 117
+          }
+        ],
+        "m_Father": {
+          "m_FileID": 0,
+          "m_PathID": 119
+        }
+      },
+      "components": [
+        {
+          "class": "UIPanel",
+          "component": 279
+        },
+        {
+          "class": "UI.RecycleBreakupSelectEquipPanel",
+          "component": 247
+        }
+      ]
+    },
+    {
+      "path": "/RecycleBreakupSelectPage/MainPage/RecycleSelectEquipPanel/Main",
+      "go": 30,
+      "transform": {
+        "m_GameObject": {
+          "m_FileID": 0,
+          "m_PathID": 30
+        },
+        "m_LocalRotation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        },
+        "m_LocalPosition": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "m_LocalScale": {
+          "x": 1.0,
+          "y": 1.0,
+          "z": 1.0
+        },
+        "m_Children": [
+          {
+            "m_FileID": 0,
+            "m_PathID": 149
+          },
+          {
+            "m_FileID": 0,
+            "m_PathID": 140
+          },
+          {
+            "m_FileID": 0,
+            "m_PathID": 151
+          },
+          {
+            "m_FileID": 0,
+            "m_PathID": 128
+          },
+          {
+            "m_FileID": 0,
+            "m_PathID": 150
+          },
+          {
+            "m_FileID": 0,
+            "m_PathID": 99
+          }
+        ],
+        "m_Father": {
+          "m_FileID": 0,
+          "m_PathID": 129
+        }
+      },
+      "components": [
+        {
+          "class": "TweenPosition",
+          "component": 180
+        },
+        {
+          "class": "TweenAlpha",
+          "component": 286
+        },
+        {
+          "class": "UIWidget",
+          "component": 187
+        }
+      ]
+    },
+    {
+      "path": "/RecycleBreakupSelectPage/MainPage/RecycleSelectEquipPanel/Main/Di",
+      "go": 25,
+      "transform": {
+        "m_GameObject": {
+          "m_FileID": 0,
+          "m_PathID": 25
+        },
+        "m_LocalRotation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        },
+        "m_LocalPosition": {
+          "x": -313.0,
+          "y": 268.0,
+          "z": -0.0001220703125
+        },
+        "m_LocalScale": {
+          "x": 1.0,
+          "y": 1.0,
+          "z": 1.0
+        },
+        "m_Children": [],
+        "m_Father": {
+          "m_FileID": 0,
+          "m_PathID": 117
+        }
+      },
+      "components": [
+        {
+          "class": "UISprite",
+          "component": 199,
+          "pivotWidthHeightDepth": [
+            0,
+            780,
+            540,
+            5
+          ]
+        },
+        {
+          "class": "BackInputReceiver",
+          "component": 263
+        },
+        {
+          "class": "UIDragScrollView",
+          "component": 283
+        }
+      ]
+    },
+    {
+      "path": "/RecycleBreakupSelectPage/MainPage/RecycleSelectEquipPanel/Main/PointerAndLine",
+      "go": 7,
+      "transform": {
+        "m_GameObject": {
+          "m_FileID": 0,
+          "m_PathID": 7
+        },
+        "m_LocalRotation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        },
+        "m_LocalPosition": {
+          "x": -320.0,
+          "y": 0.0,
+          "z": -0.0001220703125
+        },
+        "m_LocalScale": {
+          "x": 1.0,
+          "y": 1.0,
+          "z": 1.0
+        },
+        "m_Children": [
+          {
+            "m_FileID": 0,
+            "m_PathID": 92
+          },
+          {
+            "m_FileID": 0,
+            "m_PathID": 127
+          }
+        ],
+        "m_Father": {
+          "m_FileID": 0,
+          "m_PathID": 117
+        }
+      },
+      "components": [
+        {
+          "class": "UIWidget",
+          "component": 183
+        }
+      ]
+    },
+    {
+      "path": "/RecycleBreakupSelectPage/MainPage/RecycleSelectEquipPanel/Main/PointerAndLine/Pointer",
+      "go": 43,
+      "transform": {
+        "m_GameObject": {
+          "m_FileID": 0,
+          "m_PathID": 43
+        },
+        "m_LocalRotation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        },
+        "m_LocalPosition": {
+          "x": -7.0,
+          "y": 160.0,
+          "z": 0.0
+        },
+        "m_LocalScale": {
+          "x": 1.0,
+          "y": 1.0,
+          "z": 1.0
+        },
+        "m_Children": [],
+        "m_Father": {
+          "m_FileID": 0,
+          "m_PathID": 140
+        }
+      },
+      "components": [
+        {
+          "class": "UISprite",
+          "component": 243,
+          "pivotWidthHeightDepth": [
+            4,
+            34,
+            34,
+            2
+          ]
+        }
+      ]
+    },
+    {
+      "path": "/RecycleBreakupSelectPage/MainPage/RecycleSelectEquipPanel/Main/PointerAndLine/PointerLine",
+      "go": 19,
+      "transform": {
+        "m_GameObject": {
+          "m_FileID": 0,
+          "m_PathID": 19
+        },
+        "m_LocalRotation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        },
+        "m_LocalPosition": {
+          "x": 9.0,
+          "y": 8.0,
+          "z": 0.0
+        },
+        "m_LocalScale": {
+          "x": 1.0,
+          "y": 1.0,
+          "z": 1.0
+        },
+        "m_Children": [],
+        "m_Father": {
+          "m_FileID": 0,
+          "m_PathID": 140
+        }
+      },
+      "components": [
+        {
+          "class": "UISprite",
+          "component": 222,
+          "pivotWidthHeightDepth": [
+            4,
+            2,
+            500,
+            3
+          ]
+        }
+      ]
+    },
+    {
+      "path": "/RecycleBreakupSelectPage/MainPage/RecycleSelectEquipPanel/Main/Scroll View",
+      "go": 18,
+      "transform": {
+        "m_GameObject": {
+          "m_FileID": 0,
+          "m_PathID": 18
+        },
+        "m_LocalRotation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        },
+        "m_LocalPosition": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "m_LocalScale": {
+          "x": 1.0,
+          "y": 1.0,
+          "z": 1.0
+        },
+        "m_Children": [
+          {
+            "m_FileID": 0,
+            "m_PathID": 122
+          }
+        ],
+        "m_Father": {
+          "m_FileID": 0,
+          "m_PathID": 117
+        }
+      },
+      "components": [
+        {
+          "class": "UIPanel",
+          "component": 253
+        },
+        {
+          "class": "UIScrollView",
+          "component": 206
+        }
+      ]
+    },
+    {
+      "path": "/RecycleBreakupSelectPage/MainPage/RecycleSelectEquipPanel/Main/Scroll View/SimpleGrid",
+      "go": 61,
+      "transform": {
+        "m_GameObject": {
+          "m_FileID": 0,
+          "m_PathID": 61
+        },
+        "m_LocalRotation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        },
+        "m_LocalPosition": {
+          "x": -120.0,
+          "y": 185.0,
+          "z": 0.0
+        },
+        "m_LocalScale": {
+          "x": 1.0,
+          "y": 1.0,
+          "z": 1.0
+        },
+        "m_Children": [],
+        "m_Father": {
+          "m_FileID": 0,
+          "m_PathID": 151
+        }
+      },
+      "components": [
+        {
+          "class": "SimpleGrid",
+          "component": 212
+        }
+      ]
+    },
+    {
+      "path": "/RecycleBreakupSelectPage/MainPage/RecycleSelectEquipPanel/Main/ConfirmBtn",
+      "go": 22,
+      "transform": {
+        "m_GameObject": {
+          "m_FileID": 0,
+          "m_PathID": 22
+        },
+        "m_LocalRotation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        },
+        "m_LocalPosition": {
+          "x": 86.0,
+          "y": -228.0,
+          "z": 0.0
+        },
+        "m_LocalScale": {
+          "x": 1.0,
+          "y": 1.0,
+          "z": 1.0
+        },
+        "m_Children": [
+          {
+            "m_FileID": 0,
+            "m_PathID": 111
+          }
+        ],
+        "m_Father": {
+          "m_FileID": 0,
+          "m_PathID": 117
+        }
+      },
+      "components": [
+        {
+          "class": "UISprite",
+          "component": 265,
+          "pivotWidthHeightDepth": [
+            4,
+            128,
+            70,
+            25
+          ]
+        },
+        {
+          "class": "UIButton",
+          "component": 291
+        }
+      ]
+    },
+    {
+      "path": "/RecycleBreakupSelectPage/MainPage/RecycleSelectEquipPanel/Main/ConfirmBtn/Sprite",
+      "go": 31,
+      "transform": {
+        "m_GameObject": {
+          "m_FileID": 0,
+          "m_PathID": 31
+        },
+        "m_LocalRotation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        },
+        "m_LocalPosition": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "m_LocalScale": {
+          "x": 1.0,
+          "y": 1.0,
+          "z": 1.0
+        },
+        "m_Children": [],
+        "m_Father": {
+          "m_FileID": 0,
+          "m_PathID": 128
+        }
+      },
+      "components": [
+        {
+          "class": "UISprite",
+          "component": 262,
+          "pivotWidthHeightDepth": [
+            4,
+            44,
+            28,
+            26
+          ]
+        }
+      ]
+    },
+    {
+      "path": "/RecycleBreakupSelectPage/MainPage/RecycleSelectEquipPanel/Main/cache",
+      "go": 46,
+      "transform": {
+        "m_GameObject": {
+          "m_FileID": 0,
+          "m_PathID": 46
+        },
+        "m_LocalRotation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        },
+        "m_LocalPosition": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "m_LocalScale": {
+          "x": 1.0,
+          "y": 1.0,
+          "z": 1.0
+        },
+        "m_Children": [],
+        "m_Father": {
+          "m_FileID": 0,
+          "m_PathID": 117
+        }
+      },
+      "components": []
+    },
+    {
+      "path": "/RecycleBreakupSelectPage/MainPage/RecycleSelectEquipPanel/Main/OneKeyChose",
+      "go": 51,
+      "transform": {
+        "m_GameObject": {
+          "m_FileID": 0,
+          "m_PathID": 51
+        },
+        "m_LocalRotation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        },
+        "m_LocalPosition": {
+          "x": -227.39999389648438,
+          "y": -229.79998779296875,
+          "z": -1899.9998779296875
+        },
+        "m_LocalScale": {
+          "x": 1.0,
+          "y": 1.0,
+          "z": 1.0
+        },
+        "m_Children": [
+          {
+            "m_FileID": 0,
+            "m_PathID": 112
+          },
+          {
+            "m_FileID": 0,
+            "m_PathID": 142
+          }
+        ],
+        "m_Father": {
+          "m_FileID": 0,
+          "m_PathID": 117
+        }
+      },
+      "components": [
+        {
+          "class": "UIWidget",
+          "component": 190
+        },
+        {
+          "class": "TweenAlpha",
+          "component": 221
+        }
+      ]
+    },
+    {
+      "path": "/RecycleBreakupSelectPage/MainPage/RecycleSelectEquipPanel/Main/OneKeyChose/CheckBox",
+      "go": 17,
+      "transform": {
+        "m_GameObject": {
+          "m_FileID": 0,
+          "m_PathID": 17
+        },
+        "m_LocalRotation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        },
+        "m_LocalPosition": {
+          "x": -30.0,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "m_LocalScale": {
+          "x": 1.0,
+          "y": 1.0,
+          "z": 1.0
+        },
+        "m_Children": [
+          {
+            "m_FileID": 0,
+            "m_PathID": 102
+          }
+        ],
+        "m_Father": {
+          "m_FileID": 0,
+          "m_PathID": 99
+        }
+      },
+      "components": [
+        {
+          "class": "UISprite",
+          "component": 270,
+          "pivotWidthHeightDepth": [
+            4,
+            30,
+            30,
+            302
+          ]
+        },
+        {
+          "class": "UIToggle",
+          "component": 193
+        },
+        {
+          "class": "UIEventTrigger",
+          "component": 269
+        },
+        {
+          "class": "PlayBtnAudio",
+          "component": 293
+        }
+      ]
+    },
+    {
+      "path": "/RecycleBreakupSelectPage/MainPage/RecycleSelectEquipPanel/Main/OneKeyChose/CheckBox/Sprite",
+      "go": 8,
+      "transform": {
+        "m_GameObject": {
+          "m_FileID": 0,
+          "m_PathID": 8
+        },
+        "m_LocalRotation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        },
+        "m_LocalPosition": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "m_LocalScale": {
+          "x": 1.0,
+          "y": 1.0,
+          "z": 1.0
+        },
+        "m_Children": [],
+        "m_Father": {
+          "m_FileID": 0,
+          "m_PathID": 112
+        }
+      },
+      "components": [
+        {
+          "class": "UISprite",
+          "component": 277,
+          "pivotWidthHeightDepth": [
+            4,
+            46,
+            36,
+            303
+          ]
+        }
+      ]
+    },
+    {
+      "path": "/RecycleBreakupSelectPage/MainPage/RecycleSelectEquipPanel/Main/OneKeyChose/Label",
+      "go": 35,
+      "transform": {
+        "m_GameObject": {
+          "m_FileID": 0,
+          "m_PathID": 35
+        },
+        "m_LocalRotation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        },
+        "m_LocalPosition": {
+          "x": -5.0,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "m_LocalScale": {
+          "x": 1.0,
+          "y": 1.0,
+          "z": 1.0
+        },
+        "m_Children": [],
+        "m_Father": {
+          "m_FileID": 0,
+          "m_PathID": 99
+        }
+      },
+      "components": [
+        {
+          "class": "UILabel",
+          "component": 194,
+          "pivotWidthHeightDepth": [
+            3,
+            54,
+            18,
+            304
+          ],
+          "text": "onekey"
+        },
+        {
+          "class": "TextKit",
+          "component": 292
+        }
+      ]
+    },
+    {
+      "path": "/RecycleBreakupSelectPage/MainPage/RecycleSelectPetPanel",
+      "go": 9,
+      "transform": {
+        "m_GameObject": {
+          "m_FileID": 0,
+          "m_PathID": 9
+        },
+        "m_LocalRotation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        },
+        "m_LocalPosition": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "m_LocalScale": {
+          "x": 1.0,
+          "y": 1.0,
+          "z": 1.0
+        },
+        "m_Children": [
+          {
+            "m_FileID": 0,
+            "m_PathID": 89
+          }
+        ],
+        "m_Father": {
+          "m_FileID": 0,
+          "m_PathID": 119
+        }
+      },
+      "components": [
+        {
+          "class": "UIPanel",
+          "component": 228
+        },
+        {
+          "class": "UI.RecycleBreakupSelectPetPanel",
+          "component": 237
+        }
+      ]
+    },
+    {
+      "path": "/RecycleBreakupSelectPage/MainPage/RecycleSelectPetPanel/Main",
+      "go": 40,
+      "transform": {
+        "m_GameObject": {
+          "m_FileID": 0,
+          "m_PathID": 40
+        },
+        "m_LocalRotation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        },
+        "m_LocalPosition": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "m_LocalScale": {
+          "x": 1.0,
+          "y": 1.0,
+          "z": 1.0
+        },
+        "m_Children": [
+          {
+            "m_FileID": 0,
+            "m_PathID": 118
+          },
+          {
+            "m_FileID": 0,
+            "m_PathID": 107
+          },
+          {
+            "m_FileID": 0,
+            "m_PathID": 82
+          },
+          {
+            "m_FileID": 0,
+            "m_PathID": 137
+          },
+          {
+            "m_FileID": 0,
+            "m_PathID": 133
+          },
+          {
+            "m_FileID": 0,
+            "m_PathID": 148
+          }
+        ],
+        "m_Father": {
+          "m_FileID": 0,
+          "m_PathID": 124
+        }
+      },
+      "components": [
+        {
+          "class": "TweenAlpha",
+          "component": 195
+        },
+        {
+          "class": "TweenPosition",
+          "component": 204
+        },
+        {
+          "class": "UIWidget",
+          "component": 287
+        }
+      ]
+    },
+    {
+      "path": "/RecycleBreakupSelectPage/MainPage/RecycleSelectPetPanel/Main/Di",
+      "go": 67,
+      "transform": {
+        "m_GameObject": {
+          "m_FileID": 0,
+          "m_PathID": 67
+        },
+        "m_LocalRotation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        },
+        "m_LocalPosition": {
+          "x": -313.0,
+          "y": 268.0,
+          "z": -0.0001220703125
+        },
+        "m_LocalScale": {
+          "x": 1.0,
+          "y": 1.0,
+          "z": 1.0
+        },
+        "m_Children": [],
+        "m_Father": {
+          "m_FileID": 0,
+          "m_PathID": 89
+        }
+      },
+      "components": [
+        {
+          "class": "UISprite",
+          "component": 201,
+          "pivotWidthHeightDepth": [
+            0,
+            780,
+            540,
+            5
+          ]
+        },
+        {
+          "class": "BackInputReceiver",
+          "component": 260
+        },
+        {
+          "class": "UIDragScrollView",
+          "component": 203
+        }
+      ]
+    },
+    {
+      "path": "/RecycleBreakupSelectPage/MainPage/RecycleSelectPetPanel/Main/PointerAndLine",
+      "go": 13,
+      "transform": {
+        "m_GameObject": {
+          "m_FileID": 0,
+          "m_PathID": 13
+        },
+        "m_LocalRotation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        },
+        "m_LocalPosition": {
+          "x": -320.0,
+          "y": 0.0,
+          "z": -0.0001220703125
+        },
+        "m_LocalScale": {
+          "x": 1.0,
+          "y": 1.0,
+          "z": 1.0
+        },
+        "m_Children": [
+          {
+            "m_FileID": 0,
+            "m_PathID": 87
+          },
+          {
+            "m_FileID": 0,
+            "m_PathID": 106
+          }
+        ],
+        "m_Father": {
+          "m_FileID": 0,
+          "m_PathID": 89
+        }
+      },
+      "components": [
+        {
+          "class": "UIWidget",
+          "component": 229
+        }
+      ]
+    },
+    {
+      "path": "/RecycleBreakupSelectPage/MainPage/RecycleSelectPetPanel/Main/PointerAndLine/Pointer",
+      "go": 69,
+      "transform": {
+        "m_GameObject": {
+          "m_FileID": 0,
+          "m_PathID": 69
+        },
+        "m_LocalRotation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        },
+        "m_LocalPosition": {
+          "x": -7.0,
+          "y": 104.0,
+          "z": 0.0
+        },
+        "m_LocalScale": {
+          "x": 1.0,
+          "y": 1.0,
+          "z": 1.0
+        },
+        "m_Children": [],
+        "m_Father": {
+          "m_FileID": 0,
+          "m_PathID": 107
+        }
+      },
+      "components": [
+        {
+          "class": "UISprite",
+          "component": 259,
+          "pivotWidthHeightDepth": [
+            4,
+            34,
+            34,
+            2
+          ]
+        }
+      ]
+    },
+    {
+      "path": "/RecycleBreakupSelectPage/MainPage/RecycleSelectPetPanel/Main/PointerAndLine/PointerLine",
+      "go": 55,
+      "transform": {
+        "m_GameObject": {
+          "m_FileID": 0,
+          "m_PathID": 55
+        },
+        "m_LocalRotation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        },
+        "m_LocalPosition": {
+          "x": 9.0,
+          "y": 8.0,
+          "z": 0.0
+        },
+        "m_LocalScale": {
+          "x": 1.0,
+          "y": 1.0,
+          "z": 1.0
+        },
+        "m_Children": [],
+        "m_Father": {
+          "m_FileID": 0,
+          "m_PathID": 107
+        }
+      },
+      "components": [
+        {
+          "class": "UISprite",
+          "component": 234,
+          "pivotWidthHeightDepth": [
+            4,
+            2,
+            500,
+            3
+          ]
+        }
+      ]
+    },
+    {
+      "path": "/RecycleBreakupSelectPage/MainPage/RecycleSelectPetPanel/Main/Scroll View",
+      "go": 26,
+      "transform": {
+        "m_GameObject": {
+          "m_FileID": 0,
+          "m_PathID": 26
+        },
+        "m_LocalRotation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        },
+        "m_LocalPosition": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "m_LocalScale": {
+          "x": 1.0,
+          "y": 1.0,
+          "z": 1.0
+        },
+        "m_Children": [
+          {
+            "m_FileID": 0,
+            "m_PathID": 97
+          }
+        ],
+        "m_Father": {
+          "m_FileID": 0,
+          "m_PathID": 89
+        }
+      },
+      "components": [
+        {
+          "class": "UIPanel",
+          "component": 210
+        },
+        {
+          "class": "UIScrollView",
+          "component": 189
+        }
+      ]
+    },
+    {
+      "path": "/RecycleBreakupSelectPage/MainPage/RecycleSelectPetPanel/Main/Scroll View/SimpleGrid",
+      "go": 56,
+      "transform": {
+        "m_GameObject": {
+          "m_FileID": 0,
+          "m_PathID": 56
+        },
+        "m_LocalRotation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        },
+        "m_LocalPosition": {
+          "x": -120.0,
+          "y": 185.0,
+          "z": 0.0
+        },
+        "m_LocalScale": {
+          "x": 1.0,
+          "y": 1.0,
+          "z": 1.0
+        },
+        "m_Children": [],
+        "m_Father": {
+          "m_FileID": 0,
+          "m_PathID": 82
+        }
+      },
+      "components": [
+        {
+          "class": "SimpleGrid",
+          "component": 294
+        }
+      ]
+    },
+    {
+      "path": "/RecycleBreakupSelectPage/MainPage/RecycleSelectPetPanel/Main/ConfirmBtn",
+      "go": 12,
+      "transform": {
+        "m_GameObject": {
+          "m_FileID": 0,
+          "m_PathID": 12
+        },
+        "m_LocalRotation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        },
+        "m_LocalPosition": {
+          "x": 86.0,
+          "y": -228.0,
+          "z": -0.0001220703125
+        },
+        "m_LocalScale": {
+          "x": 1.0,
+          "y": 1.0,
+          "z": 1.0
+        },
+        "m_Children": [
+          {
+            "m_FileID": 0,
+            "m_PathID": 98
+          }
+        ],
+        "m_Father": {
+          "m_FileID": 0,
+          "m_PathID": 89
+        }
+      },
+      "components": [
+        {
+          "class": "UISprite",
+          "component": 238,
+          "pivotWidthHeightDepth": [
+            4,
+            128,
+            70,
+            25
+          ]
+        },
+        {
+          "class": "UIButton",
+          "component": 184
+        }
+      ]
+    },
+    {
+      "path": "/RecycleBreakupSelectPage/MainPage/RecycleSelectPetPanel/Main/ConfirmBtn/Sprite",
+      "go": 64,
+      "transform": {
+        "m_GameObject": {
+          "m_FileID": 0,
+          "m_PathID": 64
+        },
+        "m_LocalRotation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        },
+        "m_LocalPosition": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "m_LocalScale": {
+          "x": 1.0,
+          "y": 1.0,
+          "z": 1.0
+        },
+        "m_Children": [],
+        "m_Father": {
+          "m_FileID": 0,
+          "m_PathID": 137
+        }
+      },
+      "components": [
+        {
+          "class": "UISprite",
+          "component": 252,
+          "pivotWidthHeightDepth": [
+            4,
+            44,
+            28,
+            26
+          ]
+        }
+      ]
+    },
+    {
+      "path": "/RecycleBreakupSelectPage/MainPage/RecycleSelectPetPanel/Main/cache",
+      "go": 57,
+      "transform": {
+        "m_GameObject": {
+          "m_FileID": 0,
+          "m_PathID": 57
+        },
+        "m_LocalRotation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        },
+        "m_LocalPosition": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "m_LocalScale": {
+          "x": 1.0,
+          "y": 1.0,
+          "z": 1.0
+        },
+        "m_Children": [],
+        "m_Father": {
+          "m_FileID": 0,
+          "m_PathID": 89
+        }
+      },
+      "components": []
+    },
+    {
+      "path": "/RecycleBreakupSelectPage/MainPage/RecycleSelectPetPanel/Main/OneKeyChose",
+      "go": 36,
+      "transform": {
+        "m_GameObject": {
+          "m_FileID": 0,
+          "m_PathID": 36
+        },
+        "m_LocalRotation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        },
+        "m_LocalPosition": {
+          "x": -227.39999389648438,
+          "y": -229.79998779296875,
+          "z": -1900.0
+        },
+        "m_LocalScale": {
+          "x": 1.0,
+          "y": 1.0,
+          "z": 1.0
+        },
+        "m_Children": [
+          {
+            "m_FileID": 0,
+            "m_PathID": 121
+          },
+          {
+            "m_FileID": 0,
+            "m_PathID": 80
+          }
+        ],
+        "m_Father": {
+          "m_FileID": 0,
+          "m_PathID": 89
+        }
+      },
+      "components": [
+        {
+          "class": "UIWidget",
+          "component": 290
+        },
+        {
+          "class": "TweenAlpha",
+          "component": 174
+        }
+      ]
+    },
+    {
+      "path": "/RecycleBreakupSelectPage/MainPage/RecycleSelectPetPanel/Main/OneKeyChose/CheckBox",
+      "go": 73,
+      "transform": {
+        "m_GameObject": {
+          "m_FileID": 0,
+          "m_PathID": 73
+        },
+        "m_LocalRotation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        },
+        "m_LocalPosition": {
+          "x": -30.0,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "m_LocalScale": {
+          "x": 1.0,
+          "y": 1.0,
+          "z": 1.0
+        },
+        "m_Children": [
+          {
+            "m_FileID": 0,
+            "m_PathID": 136
+          }
+        ],
+        "m_Father": {
+          "m_FileID": 0,
+          "m_PathID": 148
+        }
+      },
+      "components": [
+        {
+          "class": "UISprite",
+          "component": 198,
+          "pivotWidthHeightDepth": [
+            4,
+            30,
+            30,
+            302
+          ]
+        },
+        {
+          "class": "UIToggle",
+          "component": 246
+        },
+        {
+          "class": "UIEventTrigger",
+          "component": 181
+        },
+        {
+          "class": "PlayBtnAudio",
+          "component": 196
+        }
+      ]
+    },
+    {
+      "path": "/RecycleBreakupSelectPage/MainPage/RecycleSelectPetPanel/Main/OneKeyChose/CheckBox/Sprite",
+      "go": 63,
+      "transform": {
+        "m_GameObject": {
+          "m_FileID": 0,
+          "m_PathID": 63
+        },
+        "m_LocalRotation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        },
+        "m_LocalPosition": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "m_LocalScale": {
+          "x": 1.0,
+          "y": 1.0,
+          "z": 1.0
+        },
+        "m_Children": [],
+        "m_Father": {
+          "m_FileID": 0,
+          "m_PathID": 121
+        }
+      },
+      "components": [
+        {
+          "class": "UISprite",
+          "component": 230,
+          "pivotWidthHeightDepth": [
+            4,
+            46,
+            36,
+            303
+          ]
+        }
+      ]
+    },
+    {
+      "path": "/RecycleBreakupSelectPage/MainPage/RecycleSelectPetPanel/Main/OneKeyChose/Label",
+      "go": 4,
+      "transform": {
+        "m_GameObject": {
+          "m_FileID": 0,
+          "m_PathID": 4
+        },
+        "m_LocalRotation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        },
+        "m_LocalPosition": {
+          "x": -5.0,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "m_LocalScale": {
+          "x": 1.0,
+          "y": 1.0,
+          "z": 1.0
+        },
+        "m_Children": [],
+        "m_Father": {
+          "m_FileID": 0,
+          "m_PathID": 148
+        }
+      },
+      "components": [
+        {
+          "class": "UILabel",
+          "component": 232,
+          "pivotWidthHeightDepth": [
+            3,
+            54,
+            18,
+            304
+          ],
+          "text": "onekey"
+        },
+        {
+          "class": "TextKit",
+          "component": 278
+        }
+      ]
+    }
+  ],
+  "baseAPKSHA256": "957ca6dd731e5d87d1d103f6fe1c76081f8491dc331581437eaffcdf3cdd265b",
+  "entrySHA256": "e6802f688908c2dac3748739291d5ba4fbe0810db7b1a1a8630ef15f5f1719f8",
+  "footerPlacement": [
+    {
+      "panel": "RecycleSelectHeroPanel",
+      "confirmPath": "/RecycleBreakupSelectPage/MainPage/RecycleSelectHeroPanel/Main/ConfirmBtn",
+      "stylePath": "/RecycleBreakupSelectPage/MainPage/RecycleSelectHeroPanel/Main/OneKeyChose/Label",
+      "backdropPath": "/RecycleBreakupSelectPage/MainPage/RecycleSelectHeroPanel/Main/Di",
+      "sameNativeMainParent": true,
+      "confirmCenter": [
+        86,
+        -228
+      ],
+      "confirmSize": [
+        128,
+        70
+      ],
+      "backdropTopLeft": [
+        -313,
+        268
+      ],
+      "backdropSize": [
+        780,
+        540
+      ],
+      "buttonRight": 150,
+      "backdropRight": 467,
+      "resultY": -228,
+      "positionPolicy": "X midpoint of actual right blank bounds after native font-size insets; Y/Z from actual ConfirmBtn; parent ConfirmBtn.parent",
+      "confirmCaptionUsesSprite": true
+    },
+    {
+      "panel": "RecycleSelectEquipPanel",
+      "confirmPath": "/RecycleBreakupSelectPage/MainPage/RecycleSelectEquipPanel/Main/ConfirmBtn",
+      "stylePath": "/RecycleBreakupSelectPage/MainPage/RecycleSelectEquipPanel/Main/OneKeyChose/Label",
+      "backdropPath": "/RecycleBreakupSelectPage/MainPage/RecycleSelectEquipPanel/Main/Di",
+      "sameNativeMainParent": true,
+      "confirmCenter": [
+        86,
+        -228
+      ],
+      "confirmSize": [
+        128,
+        70
+      ],
+      "backdropTopLeft": [
+        -313,
+        268
+      ],
+      "backdropSize": [
+        780,
+        540
+      ],
+      "buttonRight": 150,
+      "backdropRight": 467,
+      "resultY": -228,
+      "positionPolicy": "X midpoint of actual right blank bounds after native font-size insets; Y/Z from actual ConfirmBtn; parent ConfirmBtn.parent",
+      "confirmCaptionUsesSprite": true
+    },
+    {
+      "panel": "RecycleSelectPetPanel",
+      "confirmPath": "/RecycleBreakupSelectPage/MainPage/RecycleSelectPetPanel/Main/ConfirmBtn",
+      "stylePath": "/RecycleBreakupSelectPage/MainPage/RecycleSelectPetPanel/Main/OneKeyChose/Label",
+      "backdropPath": "/RecycleBreakupSelectPage/MainPage/RecycleSelectPetPanel/Main/Di",
+      "sameNativeMainParent": true,
+      "confirmCenter": [
+        86,
+        -228
+      ],
+      "confirmSize": [
+        128,
+        70
+      ],
+      "backdropTopLeft": [
+        -313,
+        268
+      ],
+      "backdropSize": [
+        780,
+        540
+      ],
+      "buttonRight": 150,
+      "backdropRight": 467,
+      "resultY": -228,
+      "positionPolicy": "X midpoint of actual right blank bounds after native font-size insets; Y/Z from actual ConfirmBtn; parent ConfirmBtn.parent",
+      "confirmCaptionUsesSprite": true
+    }
+  ],
+  "evidenceScope": "Static fixed59 prefab hierarchy and widget bounds; r3 rendered UI pending parent device validation"
+}

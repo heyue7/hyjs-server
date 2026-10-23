@@ -5,7 +5,7 @@ type RecycleSelectionRequest struct {
 	PlayerID   int64  `json:"playerId" binding:"required"`   // PlayerID is the current role.
 	SessionHex string `json:"sessionHex" binding:"required"` // SessionHex is the current 16-byte session encoded as hex.
 	Kind       string `json:"kind" binding:"required"`       // Kind is hero, equipment or pet.
-	Limit      int64  `json:"limit" binding:"required"`      // Limit is the original selection capacity, 1 through 4.
+	Limit      int64  `json:"limit" binding:"required"`      // Limit is the decomposition selection capacity, 1 through 100.
 }
 
 // RecycleSelectionResponse contains only currently eligible original instance GUIDs.

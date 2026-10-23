@@ -28,6 +28,9 @@ type recycleSelectionCandidate struct {
 // Only detached snapshots are mutated while validating the original decomposition rules.
 func (s *GameService) RecycleSelection(ctx context.Context, id int64, session []byte, kind string, limit int) (*model.RecycleSelectionResponse, error) {
 	out := &model.RecycleSelectionResponse{GUIDs: []string{}}
+	if limit < 1 || limit > constUtil.RecycleDecomposeMaxBatch || (kind != "hero" && kind != "equipment" && kind != "pet") {
+		return out, model.NewErrParamsError()
+	}
 	err := db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var profile db.Profile
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&profile, id).Error; err != nil {
@@ -141,6 +144,12 @@ func (s *GameService) RecycleSelection(ctx context.Context, id int64, session []
 		for _, candidate := range candidates {
 			if len(out.GUIDs) >= limit {
 				break
+			}
+			// Reject existing read-only guards before cloning a large inventory.
+			// The detached trial still runs all original checks and refund simulation.
+			if holds[candidate.guid] || P5GuardInstance(p, g, candidate.guid) != nil || kind == "pet" && p9Guarded(g, candidate.guid) {
+				out.Skipped++
+				continue
 			}
 			trialP, trialG, err := recycleSelectionClone(p, g)
 			if err != nil {

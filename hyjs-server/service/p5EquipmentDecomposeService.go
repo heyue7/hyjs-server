@@ -16,8 +16,8 @@ func (s *GameService) p5EquipmentDecompose(ctx context.Context, id int64, b *pb.
 		if err := p5ListValid(b.GetGuid()); err != nil {
 			return err
 		}
-		if len(b.GetGuid()) > 4 {
-			return fmt.Errorf("装备分解每批最多选择4件：%w", p5Error())
+		if len(b.GetGuid()) > constUtil.RecycleDecomposeMaxBatch {
+			return fmt.Errorf("装备分解每批最多选择%d件：%w", constUtil.RecycleDecomposeMaxBatch, p5Error())
 		}
 		gain := &pb.ResultObject{}
 		for _, guid := range b.GetGuid() {

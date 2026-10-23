@@ -3,7 +3,8 @@ package constUtil
 const (
 	EquipmentDecomposeOpcode        int32 = 21009
 	EquipmentForgeOpcode            int32 = 20215
-	EquipmentDecomposeMaxBatch            = 4
+	RecycleDecomposeMaxBatch              = 100
+	EquipmentDecomposeMaxBatch            = RecycleDecomposeMaxBatch
 	EquipmentRefundBaseOnly               = "base_only"
 	EquipmentRefundRejectProgressed       = "reject_progressed"
 )

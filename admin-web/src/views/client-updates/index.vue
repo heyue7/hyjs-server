@@ -20,13 +20,24 @@ function applyModeDefaults() {
   if (draft.mode !== 'maintenance') { draft.maintenanceStartAt = 0; draft.maintenanceEndAt = 0; }
 }
 watch(() => [draft.mode, draft.buildCode], applyModeDefaults, { flush: 'sync' });
-function emptyDraft(): ClientUpdateDraft { return { id: 0, version: '', buildCode: 2026102101, versionName: '', title: '', content: '', mode: 'notice', minLoginBuild: 0, minRunBuild: 0, maintenanceStartAt: 0, maintenanceEndAt: 0, reason: '' }; }
+function emptyDraft(): ClientUpdateDraft { return { id: 0, version: '', buildCode: 0, versionName: '', title: '', content: '', mode: 'notice', minLoginBuild: 0, minRunBuild: 0, maintenanceStartAt: 0, maintenanceEndAt: 0, reason: '' }; }
 const dirty = computed(() => editor.value && JSON.stringify(draft) !== baseline.value);
 const canEdit = computed(() => Boolean(overview.value?.canEdit));
 const canPublish = computed(() => Boolean(overview.value?.canPublish));
 const blocked = computed(() => busy.value || loading.value || conflict.value || Boolean(pending.value));
 const modes = [{ label: '仅提醒更新', value: 'notice' }, { label: '下次登录要求更新', value: 'next_login' }, { label: '维护更新', value: 'maintenance' }];
 const modeName = (mode: UpdateMode) => modes.find(item => item.value === mode)?.label || '未发布';
+const buildThreshold = (value: number) => value > 0 ? String(value) : '不限';
+const deliveryMetrics = computed(() => {
+  if (!overview.value) return [];
+  const { policy, stats } = overview.value;
+  return [
+    { label: '在线连接', value: stats.online },
+    { label: '已展示', value: policy.noticeEnabled ? stats.shown : '—' },
+    { label: '已确认', value: policy.noticeEnabled ? stats.acknowledged : '—' },
+    { label: '待送达', value: policy.noticeEnabled ? stats.pending : '—' }
+  ];
+});
 const stateName = (state: string) => ({ draft: '草稿', published: '已发布', withdrawn: '已撤回提醒' })[state] || state;
 async function loadHistory() {
   historyError.value = '';
@@ -47,7 +58,7 @@ function edit(row?: ClientRelease) {
   for (const key of Object.keys(values) as (keyof ClientUpdateDraft)[]) {
     if (row && key in row) Object.assign(values, { [key]: row[key as keyof ClientRelease] });
   }
-  if (!row) { values.minLoginBuild = policy.minLoginBuild; values.minRunBuild = policy.minRunBuild; }
+  if (!row) { values.buildCode = policy.latestBuild; values.minLoginBuild = policy.minLoginBuild; values.minRunBuild = policy.minRunBuild; }
   preparingDraft = true;
   Object.assign(draft, values, { version: overview.value!.version, reason: '' });
   preparingDraft = false;
@@ -132,80 +143,171 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload));
 
 <template>
   <div class="ops-page update-page">
-    <div class="ops-filters"><span class="ops-muted">更新策略针对同一 APK；维护仅作用于当前接入运行区服。</span><NSpace><NButton :loading="loading" :disabled="busy || !!pending" @click="load">刷新</NButton><NButton v-if="canEdit" type="primary" :disabled="blocked" @click="edit()">新建草稿</NButton></NSpace></div>
+    <div class="update-toolbar">
+      <p class="ops-muted">更新策略适用于同一客户端；维护仅影响当前接入区服。</p>
+      <NSpace :wrap="false">
+        <NButton :loading="loading" :disabled="busy || !!pending" @click="load">刷新</NButton>
+        <NButton v-if="canEdit" type="primary" :disabled="blocked" @click="edit()">新建草稿</NButton>
+      </NSpace>
+    </div>
     <NAlert v-if="error" type="error" :title="error" />
-    <NAlert v-if="conflict" type="warning" title="策略已被其他操作更新。请关闭编辑或确认窗口，刷新后重新核对；当前输入仍保留。" />
+    <NAlert v-if="conflict" type="warning" title="策略已更新，请关闭窗口后刷新。当前输入已保留。" />
     <NSpin :show="loading">
-      <template v-if="overview">
-        <NCard title="当前生效策略" :bordered="false" class="ops-panel">
-          <div class="policy-heading"><div><strong class="version-name">{{ overview.policy.versionName || '尚未发布更新' }}</strong><p class="ops-muted">最新构建 {{ overview.policy.latestBuild }} · 策略修订 {{ overview.policy.revision }}</p></div><NSpace><NTag :type="overview.policy.maintenance ? 'error' : 'success'">{{ overview.policy.maintenance ? '维护中' : '开放中' }}</NTag><NTag>{{ overview.policy.noticeEnabled ? '提醒已开启' : '提醒已关闭' }}</NTag></NSpace></div>
-          <div class="policy-details"><div><span>更新方式</span><strong>{{ modeName(overview.policy.mode) }}</strong></div><div><span>最低登录构建</span><strong>{{ overview.policy.minLoginBuild }}</strong></div><div><span>最低运行构建</span><strong>{{ overview.policy.minRunBuild }}</strong></div><div><span>提醒批次</span><strong>{{ overview.policy.noticeBatch || '—' }}</strong></div></div>
-          <p v-if="overview.policy.maintenanceStartAt" class="ops-muted">维护开始 {{ formatTime(overview.policy.maintenanceStartAt) }} · 预计结束 {{ formatTime(overview.policy.maintenanceEndAt) }}（须手动开放）</p>
-          <NSpace v-if="canPublish && overview.policy.releaseId" class="mt-16px"><NButton :disabled="blocked" @click="prepareAction('remind')">再次提醒</NButton><NButton :disabled="blocked || !overview.policy.noticeEnabled" @click="prepareAction('withdraw')">撤回提醒</NButton><NButton v-if="!overview.policy.maintenance" type="warning" :disabled="blocked || overview.policy.mode !== 'maintenance'" @click="prepareAction('start_maintenance')">开始维护</NButton><NButton v-else type="warning" :disabled="blocked" @click="prepareAction('end_maintenance')">结束维护</NButton></NSpace>
-          <p v-if="!canPublish" class="ops-muted">发布、提醒和维护操作需要管理员权限。</p>
-        </NCard>
-        <NCard title="当前提醒送达" :bordered="false" class="ops-panel mt-16px"><div class="delivery-grid"><div v-for="metric in [{ label: '在线连接', value: overview.stats.online }, { label: '旧版', value: overview.stats.older }, { label: '版本未知', value: overview.stats.unknown }, { label: '已展示', value: overview.stats.shown }, { label: '已确认', value: overview.stats.acknowledged }, { label: '待送达', value: overview.stats.pending }]" :key="metric.label"><span>{{ metric.label }}</span><strong>{{ metric.value }}</strong></div></div><p class="ops-muted">当前本服务连接快照 · {{ formatTime(overview.stats.observedAt) }}。展示和确认按当前提醒批次统计，未接入区服不在统计范围。</p></NCard>
-        <NCard title="草稿与发布历史" :bordered="false" class="ops-panel mt-16px">
+      <div v-if="overview" class="update-content">
+        <section class="update-panel" aria-labelledby="current-policy-title">
+          <div class="section-heading">
+            <h2 id="current-policy-title">当前版本</h2>
+            <NSpace size="small">
+              <NTag size="small" :type="overview.policy.maintenance ? 'error' : 'success'">{{ overview.policy.maintenance ? '维护中' : '开放中' }}</NTag>
+              <NTag size="small" :type="overview.policy.noticeEnabled ? 'info' : 'default'">{{ overview.policy.noticeEnabled ? '提醒已开启' : '提醒已关闭' }}</NTag>
+            </NSpace>
+          </div>
+          <div class="policy-heading">
+            <div class="policy-version">
+              <strong class="version-name">{{ overview.policy.versionName || '尚未发布更新' }}</strong>
+              <p v-if="overview.policy.releaseId" class="ops-muted">构建 {{ overview.policy.latestBuild }} · {{ modeName(overview.policy.mode) }}</p>
+              <p v-else class="ops-muted">保存草稿并确认发布后，玩家才会收到更新提醒。</p>
+            </div>
+            <NSpace v-if="canPublish && overview.policy.releaseId" class="policy-actions">
+              <NButton :disabled="blocked" @click="prepareAction('remind')">再次提醒</NButton>
+              <NButton :disabled="blocked || !overview.policy.noticeEnabled" @click="prepareAction('withdraw')">撤回提醒</NButton>
+              <NButton v-if="!overview.policy.maintenance && overview.policy.mode === 'maintenance'" type="warning" :disabled="blocked" @click="prepareAction('start_maintenance')">开始维护</NButton>
+              <NButton v-if="overview.policy.maintenance" type="warning" :disabled="blocked" @click="prepareAction('end_maintenance')">结束维护</NButton>
+            </NSpace>
+          </div>
+          <dl class="policy-summary">
+            <div><dt>最低登录构建</dt><dd>{{ buildThreshold(overview.policy.minLoginBuild) }}</dd></div>
+            <div><dt>最低运行构建</dt><dd>{{ buildThreshold(overview.policy.minRunBuild) }}</dd></div>
+            <div><dt>提醒批次</dt><dd>{{ overview.policy.noticeBatch || '—' }}</dd></div>
+            <div><dt>策略修订</dt><dd>{{ overview.policy.revision }}</dd></div>
+          </dl>
+          <p v-if="overview.policy.maintenanceStartAt" class="maintenance-note">维护 {{ formatTime(overview.policy.maintenanceStartAt) }} 至 {{ formatTime(overview.policy.maintenanceEndAt) }}（预计）；结束后须手动开放。</p>
+          <p v-if="!canPublish" class="ops-muted permission-note">发布、提醒和维护操作需要管理员权限。</p>
+        </section>
+        <section class="update-panel delivery-panel" aria-labelledby="delivery-title">
+          <div class="section-heading delivery-heading"><h2 id="delivery-title">提醒送达</h2><span class="ops-muted">{{ overview.policy.noticeEnabled ? '当前提醒批次' : '提醒未开启' }}</span></div>
+          <dl class="delivery-grid"><div v-for="metric in deliveryMetrics" :key="metric.label"><dt>{{ metric.label }}</dt><dd>{{ metric.value }}</dd></div></dl>
+          <div class="delivery-footer"><span>旧版 {{ overview.policy.releaseId ? overview.stats.older : '—' }} · 版本未知 {{ overview.stats.unknown }}</span><span>本服连接快照 · {{ formatTime(overview.stats.observedAt) }}</span></div>
+        </section>
+        <section class="update-panel history-panel" aria-labelledby="history-title">
+          <div class="section-heading"><h2 id="history-title">草稿与发布记录 <span v-if="total" class="record-count">{{ total }}</span></h2></div>
           <NAlert v-if="historyError" type="error" :title="historyError" class="mb-16px"><NButton size="small" @click="loadHistory">重试加载历史</NButton></NAlert>
-          <NEmpty v-if="!history.length && !historyError" description="暂无草稿或发布记录" />
-          <div v-for="row in history" :key="row.id" class="release-row"><div class="release-copy"><div class="release-title"><strong>{{ row.versionName }} · {{ row.title }}</strong><NTag size="small" :type="row.state === 'draft' ? 'default' : 'info'">{{ stateName(row.state) }}</NTag></div><p>{{ modeName(row.mode) }} · 构建 {{ row.buildCode }} · 登录 ≥ {{ row.minLoginBuild }} · 运行 ≥ {{ row.minRunBuild }}</p><p class="ops-muted">{{ row.state === 'draft' ? '更新' : '发布' }}于 {{ formatTime(row.publishedAt || row.updatedAt) }} <span v-if="row.publishedBy">· {{ row.publishedBy }}</span></p><details><summary>查看玩家文案及维护时间</summary><h4>{{ row.title }}</h4><p class="player-content">{{ row.content }}</p><p>请前往QQ群下载最新版</p><p v-if="row.mode === 'maintenance'">{{ formatTime(row.maintenanceStartAt) }} 至 {{ formatTime(row.maintenanceEndAt) }}（预计）</p></details></div><NSpace v-if="row.state === 'draft'"><NButton v-if="canEdit" size="small" :disabled="blocked" @click="edit(row)">编辑</NButton><NButton v-if="canPublish" size="small" type="primary" :disabled="blocked" @click="prepareAction('publish', row)">预览发布</NButton></NSpace></div>
-          <div class="ops-pagination"><NPagination v-model:page="page" :page-size="20" :item-count="total" simple @update:page="loadHistory" /></div>
-        </NCard>
-      </template>
+          <NEmpty v-if="!history.length && !historyError" description="暂无更新记录" class="history-empty"><template #extra><span class="ops-muted">新建草稿，预览后再发布。</span></template></NEmpty>
+          <article v-for="row in history" :key="row.id" class="release-row">
+            <div class="release-copy">
+              <div class="release-title"><h3>{{ row.versionName }}</h3><NTag size="small" :type="row.state === 'draft' ? 'default' : 'info'">{{ stateName(row.state) }}</NTag><span class="ops-muted">{{ modeName(row.mode) }}</span></div>
+              <p class="release-caption">{{ row.title }}</p>
+              <p class="release-meta">构建 {{ row.buildCode }} · 登录 {{ buildThreshold(row.minLoginBuild) }} · 运行 {{ buildThreshold(row.minRunBuild) }}</p>
+              <p class="ops-muted">{{ row.state === 'draft' ? '更新' : '发布' }}于 {{ formatTime(row.publishedAt || row.updatedAt) }} <span v-if="row.publishedBy">· {{ row.publishedBy }}</span></p>
+              <details class="release-details"><summary>查看更新说明{{ row.mode === 'maintenance' ? '与维护时间' : '' }}</summary><div class="release-preview"><h4>{{ row.title }}</h4><p class="player-content">{{ row.content }}</p><p class="ops-muted">请前往QQ群下载最新版</p><p v-if="row.mode === 'maintenance'">{{ formatTime(row.maintenanceStartAt) }} 至 {{ formatTime(row.maintenanceEndAt) }}（预计）</p></div></details>
+            </div>
+            <NSpace v-if="row.state === 'draft'" :wrap="false"><NButton v-if="canEdit" size="small" :disabled="blocked" @click="edit(row)">编辑</NButton><NButton v-if="canPublish" size="small" type="primary" :disabled="blocked" @click="prepareAction('publish', row)">预览发布</NButton></NSpace>
+          </article>
+          <div v-if="total > 20" class="ops-pagination"><NPagination v-model:page="page" :page-size="20" :item-count="total" simple @update:page="loadHistory" /></div>
+        </section>
+      </div>
     </NSpin>
     <NModal :show="editor" preset="card" :title="preview ? '草稿预览' : draft.id ? '编辑更新草稿' : '新建更新草稿'" class="update-modal" :mask-closable="false" :closable="!busy" @update:show="!$event && closeEditor()">
       <NAlert v-if="formError" type="error" :title="formError" class="mb-16px" />
       <NForm v-if="!preview" label-placement="top" :show-feedback="false" :disabled="busy" class="update-form">
-        <div class="form-grid"><NFormItem label="版本名称" required><NInput v-model:value="draft.versionName" :maxlength="80" placeholder="例如 1.0.41" /></NFormItem><NFormItem label="最新构建号" required><NInputNumber v-model:value="draft.buildCode" :min="1" :max="2100000000" :precision="0" :show-button="false" /></NFormItem></div>
+        <div class="form-grid"><NFormItem label="版本名称" required><NInput v-model:value="draft.versionName" :maxlength="80" placeholder="例如 1.0.0" :input-props="{ 'aria-label': '版本名称' }" /></NFormItem><NFormItem label="最新构建号" required><NInputNumber v-model:value="draft.buildCode" :input-props="{ 'aria-label': '最新构建号' }" :min="1" :max="2100000000" :precision="0" :show-button="false" /></NFormItem></div>
         <NFormItem label="更新方式"><NSelect v-model:value="draft.mode" :options="modes" /></NFormItem>
-        <div class="form-grid"><NFormItem label="最低登录构建"><NInputNumber v-model:value="draft.minLoginBuild" :min="0" :precision="0" :show-button="false" /></NFormItem><NFormItem label="最低运行构建"><NInputNumber v-model:value="draft.minRunBuild" :min="0" :precision="0" :show-button="false" /></NFormItem></div>
-        <p class="ops-muted">切换方式或构建号后自动填写门槛，可按兼容范围调整。仅提醒不能提高门槛；下次登录更新保留当前运行门槛。发布不会降低已生效门槛。</p>
+        <div class="form-grid"><NFormItem label="最低登录构建"><NInputNumber v-model:value="draft.minLoginBuild" :input-props="{ 'aria-label': '最低登录构建' }" :min="0" :precision="0" :show-button="false" /></NFormItem><NFormItem label="最低运行构建"><NInputNumber v-model:value="draft.minRunBuild" :input-props="{ 'aria-label': '最低运行构建' }" :min="0" :precision="0" :show-button="false" /></NFormItem></div>
+        <p class="ops-muted">0 表示不限。仅提醒保留当前门槛；其他方式会自动填入对应构建号。发布不会降低已有门槛。</p>
         <div v-if="draft.mode === 'maintenance'" class="form-grid"><NFormItem label="维护开始时间" required><NDatePicker :value="draft.maintenanceStartAt || null" type="datetime" @update:value="draft.maintenanceStartAt = $event || 0" /></NFormItem><NFormItem label="预计结束时间" required><NDatePicker :value="draft.maintenanceEndAt || null" type="datetime" @update:value="draft.maintenanceEndAt = $event || 0" /></NFormItem></div>
-        <NFormItem label="提醒标题" required><NInput v-model:value="draft.title" :maxlength="80" /></NFormItem><NFormItem label="更新说明" required><NInput v-model:value="draft.content" type="textarea" :maxlength="4000" :autosize="{ minRows: 4, maxRows: 10 }" /></NFormItem>
+        <NFormItem label="提醒标题" required><NInput v-model:value="draft.title" :input-props="{ 'aria-label': '提醒标题' }" :maxlength="80" /></NFormItem><NFormItem label="更新说明" required><NInput v-model:value="draft.content" :input-props="{ 'aria-label': '更新说明' }" type="textarea" :maxlength="4000" :autosize="{ minRows: 4, maxRows: 10 }" /></NFormItem>
         <div class="fixed-message">玩家固定提示：请前往QQ群下载最新版</div>
-        <NFormItem label="操作原因" required><NInput v-model:value="draft.reason" :maxlength="300" placeholder="仅供后台审计记录" /></NFormItem>
+        <NFormItem label="操作原因" required><NInput v-model:value="draft.reason" :input-props="{ 'aria-label': '操作原因' }" :maxlength="300" placeholder="仅供后台审计记录" /></NFormItem>
       </NForm>
       <template v-else><div class="player-preview"><h3>{{ draft.title }}</h3><p class="player-content">{{ draft.content }}</p><p>请前往QQ群下载最新版</p></div><p>{{ draft.versionName }} · {{ modeName(draft.mode) }} · 构建 {{ draft.buildCode }}</p><p>登录 ≥ {{ draft.minLoginBuild }} · 运行 ≥ {{ draft.minRunBuild }}</p><p v-if="draft.mode === 'maintenance'">维护 {{ formatTime(draft.maintenanceStartAt) }} 至 {{ formatTime(draft.maintenanceEndAt) }}（预计，须手动开放）</p><NAlert type="info" title="保存后仅生成草稿。管理员预览并确认发布后，玩家才会收到提醒。" /></template>
       <template #footer><div class="modal-actions"><NButton :disabled="busy" @click="closeEditor">取消</NButton><NButton v-if="preview" :disabled="busy" @click="preview = false">返回修改</NButton><NButton v-if="!preview" type="primary" @click="showPreview">预览草稿</NButton><NButton v-else type="primary" :loading="busy" :disabled="conflict || !canEdit" @click="save">保存草稿</NButton></div></template>
     </NModal>
     <NModal :show="actionOpen" preset="card" :title="actionNames[action]" class="update-modal" :mask-closable="false" :closable="!busy && !pending" @update:show="!$event && closeAction()">
       <NAlert v-if="actionError" type="error" :title="actionError" class="mb-16px" />
-      <template v-if="selected"><div class="player-preview"><h3>{{ selected.title }}</h3><p class="player-content">{{ selected.content }}</p><p>请前往QQ群下载最新版</p></div><p>{{ selected.versionName }} · 构建 {{ selected.buildCode }}</p><NAlert :type="action === 'start_maintenance' || action === 'end_maintenance' ? 'warning' : 'info'" :title="actionEffect" class="mb-16px" /><NFormItem label="操作原因" required><NInput v-model:value="actionReason" :disabled="busy || !!pending" :maxlength="300" placeholder="填写本次操作原因" /></NFormItem><NCheckbox v-model:checked="confirmed" :disabled="busy || !!pending">已核对上述版本、玩家文案和操作后果</NCheckbox><p v-if="pending" class="ops-muted">结果尚未确认。重试沿用原请求，不会重复执行；请保留此窗口。</p></template>
+      <template v-if="selected"><div class="player-preview"><h3>{{ selected.title }}</h3><p class="player-content">{{ selected.content }}</p><p>请前往QQ群下载最新版</p></div><p>{{ selected.versionName }} · 构建 {{ selected.buildCode }}</p><NAlert :type="action === 'start_maintenance' || action === 'end_maintenance' ? 'warning' : 'info'" :title="actionEffect" class="mb-16px" /><NFormItem label="操作原因" required><NInput v-model:value="actionReason" :input-props="{ 'aria-label': '操作原因' }" :disabled="busy || !!pending" :maxlength="300" placeholder="填写本次操作原因" /></NFormItem><NCheckbox v-model:checked="confirmed" :disabled="busy || !!pending">已核对上述版本、玩家文案和操作后果</NCheckbox><p v-if="pending" class="ops-muted">结果尚未确认。重试沿用原请求，不会重复执行；请保留此窗口。</p></template>
       <template #footer><div class="modal-actions"><NButton :disabled="busy || !!pending" @click="closeAction">取消</NButton><NButton :type="action === 'start_maintenance' ? 'warning' : 'primary'" :loading="busy" :disabled="!confirmed || conflict || !canPublish" @click="execute">{{ pending ? '重试原请求' : `确认${actionNames[action]}` }}</NButton></div></template>
     </NModal>
   </div>
 </template>
 
 <style scoped>
-.update-page { padding-bottom: 24px; }
-.policy-heading, .release-row, .release-title { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
-.version-name { font-size: 21px; line-height: 1.4; }
-.policy-details, .delivery-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 20px; }
-.policy-details > div, .delivery-grid > div { display: flex; flex-direction: column; gap: 6px; overflow-wrap: anywhere; }
-.policy-details span, .delivery-grid span { font-size: 13px; color: rgb(var(--base-text-color) / .65); }
-.delivery-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); }
-.delivery-grid strong { font-size: 23px; font-variant-numeric: tabular-nums; }
-.release-row { align-items: flex-start; padding: 18px 0; border-bottom: 1px solid rgb(var(--base-text-color) / .1); }
-.release-row:first-child { padding-top: 0; }
+.update-page { padding-bottom: 24px; color: rgb(var(--base-text-color)); }
+.update-page :deep(.n-button--default-type) { color: rgb(var(--base-text-color)); }
+.update-toolbar, .section-heading, .policy-heading, .delivery-footer, .release-row, .release-title { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.update-toolbar { min-height: 36px; }
+.update-toolbar p { margin: 0; line-height: 1.6; }
+.update-content { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(360px, 1fr); gap: 16px; align-items: stretch; }
+.history-panel { grid-column: 1 / -1; }
+.delivery-panel { display: flex; flex-direction: column; }
+.update-panel { padding: 22px 24px; border-radius: 10px; background: rgb(var(--container-bg-color)); }
+.section-heading { margin-bottom: 18px; gap: 12px; }
+.section-heading h2 { margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600; }
+.policy-heading { align-items: flex-start; }
+.version-name { font-size: 23px; font-weight: 600; line-height: 1.4; }
+.policy-version p { margin: 6px 0 0; }
+.policy-actions { flex-shrink: 0; }
+.policy-summary, .delivery-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 24px; margin: 20px 0 0; }
+.policy-summary { padding-top: 18px; border-top: 1px solid rgb(var(--base-text-color) / .08); }
+.policy-summary > div, .delivery-grid > div { min-width: 0; overflow-wrap: anywhere; }
+.policy-summary dt, .delivery-grid dt { font-size: 13px; line-height: 1.5; color: rgb(var(--base-text-color) / .65); }
+.policy-summary dd, .delivery-grid dd { margin: 6px 0 0; line-height: 1.4; font-weight: 500; font-variant-numeric: tabular-nums; }
+.delivery-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 0; gap: 16px 0; }
+.delivery-grid > div:nth-child(3) { padding-left: 0; border-left: 0; }
+.delivery-grid > div { padding: 0 22px; border-left: 1px solid rgb(var(--base-text-color) / .08); }
+.delivery-grid > div:first-child { padding-left: 0; border-left: 0; }
+.delivery-grid dd { font-size: 25px; font-weight: 600; }
+.delivery-footer { padding-top: 18px; margin-top: auto; font-size: 12px; line-height: 1.6; color: rgb(var(--base-text-color) / .65); flex-wrap: wrap; gap: 6px 16px; }
+.maintenance-note { margin: 16px 0 0; line-height: 1.7; color: rgb(var(--warning-color)); }
+.permission-note { margin-bottom: 0; }
+.record-count { margin-left: 6px; color: rgb(var(--base-text-color) / .5); font-size: 13px; font-weight: 400; }
+.history-empty { padding: 18px 0 20px; }
+.release-row { align-items: flex-start; padding: 18px 0; border-bottom: 1px solid rgb(var(--base-text-color) / .08); }
+.release-row:last-of-type { padding-bottom: 0; border-bottom: 0; }
+.release-row:first-of-type { padding-top: 0; }
 .release-copy { min-width: 0; flex: 1; overflow-wrap: anywhere; }
 .release-title { justify-content: flex-start; flex-wrap: wrap; gap: 8px; }
-.release-copy p { margin: 7px 0; }
-.release-copy summary { cursor: pointer; padding: 6px 0; }
+.release-title h3 { margin: 0; font-size: 16px; font-weight: 600; }
+.release-copy p { margin: 6px 0; }
+.release-caption { font-size: 14px; }
+.release-meta { font-size: 12px; color: rgb(var(--base-text-color) / .65); }
+.release-details { margin-top: 10px; font-size: 13px; }
+.release-details summary { width: fit-content; cursor: pointer; padding: 4px 0; line-height: 1.6; }
+.release-details summary:focus-visible { outline: 2px solid rgb(var(--primary-color)); outline-offset: 3px; border-radius: 2px; }
+.release-preview { padding: 12px 16px; margin-top: 8px; border-left: 2px solid rgb(var(--primary-color) / .3); background: rgb(var(--base-text-color) / .025); }
+.release-preview h4 { margin: 0 0 8px; font-weight: 500; }
 :global(.n-card.update-modal) { width: 720px; max-width: calc(100vw - 28px); }
 .update-form { display: flex; flex-direction: column; gap: 18px; }
-.update-form p { margin: -6px 0 0; }
+.update-form p { margin: -6px 0 0; line-height: 1.65; }
 .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
 .form-grid :deep(.n-input-number), .form-grid :deep(.n-date-picker) { width: 100%; }
 .fixed-message, .player-preview { background: rgb(var(--base-text-color) / .04); padding: 16px; border-radius: 8px; }
+.fixed-message { font-size: 13px; line-height: 1.6; color: rgb(var(--base-text-color) / .65); }
 .player-preview { margin-bottom: 16px; }
 .player-preview h3 { margin-top: 0; font-size: 17px; }
 .player-content { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.7; }
 .modal-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+@media (max-width: 1200px) {
+  .update-content { grid-template-columns: minmax(0, 1fr); }
+  .delivery-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; }
+  .delivery-grid > div:nth-child(3) { border-left: 1px solid rgb(var(--base-text-color) / .08); padding-left: 22px; }
+}
+@media (max-width: 800px) {
+  .policy-heading { flex-direction: column; }
+  .update-panel { padding: 18px; }
+  .delivery-grid > div { padding: 0 12px; }
+}
 @media (max-width: 640px) {
-  .update-page .ops-filters, .policy-heading, .release-row { flex-direction: column; align-items: stretch; }
-  .policy-details, .delivery-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+  .update-toolbar { flex-direction: column; align-items: stretch; gap: 10px; }
+  .update-toolbar > :deep(.n-space) { align-self: flex-end; }
+  .section-heading { align-items: flex-start; flex-wrap: wrap; margin-bottom: 14px; }
+  .section-heading > :deep(.n-space) { gap: 6px !important; }
+  .policy-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+  .delivery-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 0; }
+  .delivery-grid > div:nth-child(3) { border-left: 0; padding-left: 0; }
+  .version-name { font-size: 21px; }
+  .release-row { flex-direction: column; gap: 12px; }
+  .release-row > :deep(.n-space) { align-self: flex-end; }
   .form-grid { grid-template-columns: minmax(0, 1fr); }
-  .version-name { font-size: 19px; }
   .modal-actions .n-button { flex: 1 0 auto; }
 }
 </style>

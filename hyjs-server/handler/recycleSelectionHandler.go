@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/hex"
 	"github.com/gin-gonic/gin"
+	"hyjs-server/constUtil"
 	"hyjs-server/model"
 	"hyjs-server/routes"
 	"hyjs-server/service"
@@ -20,12 +21,12 @@ func init() {
 // @Tags Recycle
 // @Accept json
 // @Produce json
-// @Param body body model.RecycleSelectionRequest true "当前会话、原类型与1至4件上限"
+// @Param body body model.RecycleSelectionRequest true "当前会话、原类型与1至100件上限"
 // @Success 200 {object} model.RecycleSelectionResponse
 // @Router /recycle/selection [post]
 func RecycleSelectionHandler(c *gin.Context) error {
 	var req model.RecycleSelectionRequest
-	if err := c.ShouldBindJSON(&req); err != nil || req.PlayerID < 1 || len(req.SessionHex) != 32 || req.Limit < 1 || req.Limit > 4 || (req.Kind != "hero" && req.Kind != "equipment" && req.Kind != "pet") {
+	if err := c.ShouldBindJSON(&req); err != nil || req.PlayerID < 1 || len(req.SessionHex) != 32 || req.Limit < 1 || req.Limit > constUtil.RecycleDecomposeMaxBatch || (req.Kind != "hero" && req.Kind != "equipment" && req.Kind != "pet") {
 		return model.NewErrParamsError()
 	}
 	session, err := hex.DecodeString(req.SessionHex)
