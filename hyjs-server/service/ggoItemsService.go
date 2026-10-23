@@ -256,6 +256,13 @@ func (s *GameService) GGOShopCatalogue(ctx context.Context, playerID int64, sess
 
 // GGOShopBuy 锁角色后核对UUID回执、目录版本、限购和余额，原子扣费发奖存档。
 func (s *GameService) GGOShopBuy(ctx context.Context, req model.GGOShopBuyRequest, session []byte) (*model.GGOShopBuyResponse, error) {
+	count := int64(1)
+	if req.Count != nil {
+		count = *req.Count
+	}
+	if count < 1 || count > 100 {
+		return nil, errors.New("信用商店购买数量须为1至100")
+	}
 	ctx = context.WithValue(ctx, constUtil.GameServiceContextKey, s)
 	authorized, err := AuthorizeAccount(ctx, req.PlayerID, session)
 	if err != nil {
@@ -284,8 +291,12 @@ func (s *GameService) GGOShopBuy(ctx context.Context, req model.GGOShopBuyReques
 		var prior db.GGOShopReceipt
 		err := tx.First(&prior, "player_id=? AND request_id=?", req.PlayerID, req.RequestID).Error
 		if err == nil {
-			if prior.ProductID != req.ProductID || prior.Version != req.Version {
-				return errors.New("购买请求编号已用于其他商品或版本")
+			priorCount := prior.Count
+			if priorCount == 0 {
+				priorCount = 1
+			}
+			if prior.ProductID != req.ProductID || prior.Version != req.Version || priorCount != count {
+				return errors.New("购买请求编号已用于其他商品、版本或数量")
 			}
 			return json.Unmarshal(prior.Response, &out)
 		}
@@ -313,10 +324,14 @@ func (s *GameService) GGOShopBuy(ctx context.Context, req model.GGOShopBuyReques
 				break
 			}
 		}
-		if offer == nil || offer.Remaining < 1 {
+		if offer == nil || offer.Remaining < count {
 			return errors.New("商品已下架或达到限购")
 		}
-		cost, err := s.p4ParseCost(fmt.Sprintf("%s,%d", constUtil.GGOCurrencyID, offer.Price))
+		if offer.Price < 1 || offer.Amount < 1 || offer.Price > math.MaxInt32/count || offer.Amount > math.MaxInt32/count {
+			return errors.New("批量信用商店价格或奖励溢出")
+		}
+		totalPrice, totalReward := offer.Price*count, offer.Amount*count
+		cost, err := s.p4ParseCost(fmt.Sprintf("%s,%d", constUtil.GGOCurrencyID, totalPrice))
 		if err != nil {
 			return err
 		}
@@ -324,7 +339,7 @@ func (s *GameService) GGOShopBuy(ctx context.Context, req model.GGOShopBuyReques
 		if err = s.p4Deduct(tx, row.Id, player, game, cost, "ggo-shop:"+req.RequestID, now); err != nil {
 			return err
 		}
-		if _, err = s.GrantFixedReward(player, game, fmt.Sprintf("%s,%d", offer.ResourceID, offer.Amount)); err != nil {
+		if _, err = s.GrantFixedReward(player, game, fmt.Sprintf("%s,%d", offer.ResourceID, totalReward)); err != nil {
 			return err
 		}
 		// Shared save hook converts the reward before serializing the inventory.
@@ -335,10 +350,10 @@ func (s *GameService) GGOShopBuy(ctx context.Context, req model.GGOShopBuyReques
 		if err = tx.FirstOrCreate(&state).Error; err != nil {
 			return err
 		}
-		if state.Bought == math.MaxInt32 {
+		if state.Bought < 0 || int64(state.Bought)+count > math.MaxInt32 {
 			return errors.New("购买次数溢出")
 		}
-		state.Bought++
+		state.Bought += int32(count)
 		if err = tx.Save(&state).Error; err != nil {
 			return err
 		}
@@ -350,10 +365,10 @@ func (s *GameService) GGOShopBuy(ctx context.Context, req model.GGOShopBuyReques
 		if err = tx.FirstOrCreate(&stock).Error; err != nil {
 			return err
 		}
-		if stock.Used == math.MaxInt32 {
+		if stock.Used < 0 || int64(stock.Used)+count > math.MaxInt32 {
 			return errors.New("商品库存计数溢出")
 		}
-		stock.Used++
+		stock.Used += int32(count)
 		if err = tx.Save(&stock).Error; err != nil {
 			return err
 		}
@@ -361,15 +376,15 @@ func (s *GameService) GGOShopBuy(ctx context.Context, req model.GGOShopBuyReques
 		if err != nil {
 			return err
 		}
-		out = model.GGOShopBuyResponse{Catalogue: after, RewardID: offer.ResourceID, RewardAmount: offer.Amount, RequestID: req.RequestID}
+		out = model.GGOShopBuyResponse{Catalogue: after, RewardID: offer.ResourceID, RewardAmount: totalReward, RequestID: req.RequestID}
 		if offer.ResourceID == constUtil.GGOOverclockID {
-			out.TerminalPointsAdded = offer.Amount
+			out.TerminalPointsAdded = totalReward
 		}
 		payload, err := json.Marshal(out)
 		if err != nil {
 			return err
 		}
-		return tx.Create(&db.GGOShopReceipt{PlayerID: row.Id, RequestID: req.RequestID, ProductID: req.ProductID, Version: req.Version, Response: payload, CreatedAt: now.UnixMilli()}).Error
+		return tx.Create(&db.GGOShopReceipt{PlayerID: row.Id, RequestID: req.RequestID, ProductID: req.ProductID, Version: req.Version, Count: count, Response: payload, CreatedAt: now.UnixMilli()}).Error
 	})
 	return &out, err
 }

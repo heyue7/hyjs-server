@@ -1,0 +1,22 @@
+using System.Reflection;
+using System.Runtime.Loader;
+using System.Text.Json;
+AssemblyLoadContext.Default.Resolving+=(c,n)=>{var f=Path.Combine(args[0],n.Name+".dll");return File.Exists(f)?c.LoadFromAssemblyPath(f):null;};
+var helper=AssemblyLoadContext.Default.LoadFromAssemblyPath(Path.Combine(args[0],"HYJS.OneKey59.dll"));
+var apply=helper.GetType("HYJS.OneKey59.Selection")!.GetMethod("ApplyIds",BindingFlags.NonPublic|BindingFlags.Static)!;
+bool Apply(Dictionary<string,string> selected,List<string> ids,bool yes)=>(bool)apply.Invoke(null,new object[]{selected,ids,yes})!;
+var ids=Enumerable.Range(1,320).Select(n=>"g"+n).ToList();var selected=new Dictionary<string,string>{{"existing","existing"}};
+if(!Apply(selected,ids,true)||selected.Count!=100||selected["existing"]!="existing")throw new Exception("full inventory100 cap failed");
+if(Apply(selected,new List<string>{"g1","g1"},true)||selected.Count!=100)throw new Exception("existing selection changed at cap");
+Apply(selected,ids,false);if(selected.Count!=1||!selected.ContainsKey("existing"))throw new Exception("cross page cancel failed");
+Apply(selected,new List<string>{"afterPage160"},true);if(!selected.ContainsKey("afterPage160"))throw new Exception("unrendered candidate missing");
+var recycle=AssemblyLoadContext.Default.LoadFromAssemblyPath(Path.Combine(args[0],"SoulFlowerRecycle.dll"));
+var validate=recycle.GetType("HYJS.Recycle.SelectionControl")!.GetMethod("ValidateSelection",BindingFlags.NonPublic|BindingFlags.Static)!;
+var visible=new HashSet<string>{"a","b","c","d"};
+List<string> Validate(List<string> list,int max=4,int slots=4)=>(List<string>)validate.Invoke(null,new object[]{list,visible,max,slots})!;
+if(!Validate(new List<string>{"a","b","c","d"}).SequenceEqual(new[]{"a","b","c","d"}))throw new Exception("valid recycle selection differs");
+if(Validate(new List<string>()).Count!=0)throw new Exception("empty server selection differs");
+bool Reject(List<string> list,int max=4,int slots=4){try{Validate(list,max,slots);return false;}catch(TargetInvocationException e){return e.InnerException is InvalidOperationException;}}
+if(!Reject(new List<string>{"a","a"})||!Reject(new List<string>{"hidden"})||!Reject(new List<string>{""})||!Reject(new List<string>{"a","b","c","d","e"})||!Reject(new List<string>{"a"},4,3)||!Reject(new List<string>(),0,4))throw new Exception("invalid recycle selection accepted");
+File.WriteAllText(args[1],JsonSerializer.Serialize(new{saleFullCandidate320=true,capIncludesExisting100=true,duplicateNoExtraSlot=true,cancelAcrossPages=true,unrenderedCandidateSelected=true,recycleFourAccepted=true,recycleDuplicatesHiddenOverLimitEmptyGuidBadSlotsRejected=true,unityUIExecuted=false},new JsonSerializerOptions{WriteIndented=true}));
+Console.WriteLine("Actual helper selection policy regression passed");

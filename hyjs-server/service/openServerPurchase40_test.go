@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"google.golang.org/protobuf/encoding/protowire"
 	"google.golang.org/protobuf/proto"
 	"hyjs-server/db"
 	"hyjs-server/model"
@@ -12,6 +13,14 @@ import (
 
 // TestOpenServerPurchase40NativeRemaining 对照原 HalfPriceBg 的总量减已购算法，验证查询、交易及冷恢复。
 func TestOpenServerPurchase40NativeRemaining(t *testing.T) {
+	runOpenServerPurchaseNativeRemaining(t, 1)
+}
+
+func TestBulk58OpenServerQuantityReceiptAndRemaining(t *testing.T) {
+	runOpenServerPurchaseNativeRemaining(t, 10)
+}
+
+func runOpenServerPurchaseNativeRemaining(t *testing.T, batchSize int32) {
 	f := feedback40Database(t, "purchase40.db")
 	ctx := f.ctx
 	sqlDB, _ := db.GetIns().DB()
@@ -109,13 +118,19 @@ func TestOpenServerPurchase40NativeRemaining(t *testing.T) {
 				request.HeroId = proto.String(test.selection)
 			}
 			firstStamp := stamp + 1
-			for n := int32(1); n <= test.total; n++ {
+			for bought := int32(0); bought < test.total; {
+				count := min(batchSize, test.total-bought)
+				n := bought + count
+				if batchSize > 1 {
+					raw := protowire.AppendTag(nil, 100, protowire.VarintType)
+					request.ProtoReflect().SetUnknown(protowire.AppendVarint(raw, uint64(count)))
+				}
 				stamp++
 				messages, err := s.openServerActivityAt(ctx, row.Id, request, stamp, now)
 				if err != nil {
 					t.Fatalf("purchase %d: %v", n, err)
 				}
-				if n == 1 {
+				if bought == 0 {
 					first = proto.Clone(messages[0])
 				}
 				query(n)
@@ -132,6 +147,15 @@ func TestOpenServerPurchase40NativeRemaining(t *testing.T) {
 				if gotDiamond != diamond || gotResource != resource || gotClaims != claims {
 					t.Fatal("receipt changed persisted balances")
 				}
+				if batchSize > 1 {
+					conflict := proto.Clone(request).(*pb.CSGetOpenServerReward)
+					raw := protowire.AppendTag(nil, 100, protowire.VarintType)
+					conflict.ProtoReflect().SetUnknown(protowire.AppendVarint(raw, uint64(count+1)))
+					if _, err := s.openServerActivityAt(ctx, row.Id, conflict, stamp, now); err == nil {
+						t.Fatal("same stamp accepted a different batch count")
+					}
+				}
+				bought = n
 			}
 			stamp++
 			if _, err := s.openServerActivityAt(ctx, row.Id, request, stamp, now); err == nil {

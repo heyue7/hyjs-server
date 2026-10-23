@@ -1,0 +1,72 @@
+{
+  "targets": [
+    {
+      "type": "UI.BagSellPage",
+      "method": "OnQuickSelect",
+      "helper": "QueueQuick",
+      "mode": "replace",
+      "args": [
+        0,
+        1
+      ],
+      "token": "0x6004c25",
+      "inputCILSHA256": "18859d93421198dcee81c0e6b55b8c14cb334c2a9df0ca82e4c0d95c96c89c46"
+    },
+    {
+      "type": "UI.BagSellPage",
+      "method": "OnPetIconClick",
+      "helper": "GateString",
+      "mode": "prefix",
+      "args": [
+        0,
+        1
+      ],
+      "token": "0x6004c2b",
+      "inputCILSHA256": "d6ebde000c19a177084d9197553ebe8ce429de47a36fb53c635023695aca20cb"
+    },
+    {
+      "type": "UI.BagSellPage",
+      "method": "OnHeroIconClick",
+      "helper": "GateString",
+      "mode": "prefix",
+      "args": [
+        0,
+        1
+      ],
+      "token": "0x6004c2c",
+      "inputCILSHA256": "0f78f99ae293d19c607be266764a08b9e920289fd17e5f401fb20eb0b87bee75"
+    },
+    {
+      "type": "UI.BagSellPage",
+      "method": "OnEquipIconClick",
+      "helper": "GateEquip",
+      "mode": "prefix",
+      "args": [
+        0,
+        1
+      ],
+      "token": "0x6004c2d",
+      "inputCILSHA256": "1d4487b7e7566c2eff3fe07580b36a8be10cf108538a73c3230c9045ace53571"
+    },
+    {
+      "type": "UI.BagSellPage/<UpdateScrollView>c__IteratorD5",
+      "method": "MoveNext",
+      "helper": "Draw",
+      "mode": "iterator-tail",
+      "args": [],
+      "token": "0x6006904",
+      "inputCILSHA256": "2a527bfa1cd198ee912fae4679e5418b3f83148103151a11df0d4d492fc7a4e7"
+    },
+    {
+      "type": "UI.BagSellPage",
+      "method": "SellCallback",
+      "helper": "BeforeSuccessfulRefresh",
+      "mode": "success-prefix",
+      "args": [
+        0
+      ],
+      "token": "0x6004c24",
+      "inputCILSHA256": "6b7c48418f39a7f03837eec9ab2b9a53e58c1280cd7954f4c47967b395dd94ba"
+    }
+  ]
+}

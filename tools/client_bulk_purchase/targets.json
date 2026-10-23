@@ -1,0 +1,317 @@
+{
+  "schema": "hyjs-bulk58-targets-v1",
+  "baseAPKSHA256": "b7ad3c7c8ba53cc7990f3f3590642aa405e9a554135916a468668f0c7fdbdbbd",
+  "mainSHA256": "c575957a4d2615be7d25cc926d2dea1b8910925ee5f8b1b11880517f0b6c6d19",
+  "helperAssembly": "HYJS.BulkPurchase",
+  "helperType": "HYJS.BulkPurchase.BulkPurchase",
+  "targets": [
+    {
+      "type": "UI.BuyShopItem",
+      "method": "UpdatePrice",
+      "helper": "QuantityPrice",
+      "mode": "prefix",
+      "args": [
+        0
+      ],
+      "token": "0x60052ba",
+      "signatureBlobHex": "200001",
+      "inputCILSHA256": "37d7f8b15dcd6cbf689c88bb2f874c76483d07401639e39a7829b6fc45672501"
+    },
+    {
+      "type": "UI.BuyShopItem",
+      "method": "Show",
+      "helper": "Shown",
+      "mode": "tail",
+      "args": [
+        0
+      ],
+      "token": "0x60052b6",
+      "signatureBlobHex": "2002011282f408",
+      "inputCILSHA256": "a64c03d37cf28a57ba81ae3f41f6b69312a656a5dc063a18e621c795e4577cb6"
+    },
+    {
+      "type": "UI.BuyShopItem",
+      "method": "OnBuyBtn",
+      "helper": "QuantitySubmit",
+      "mode": "prefix",
+      "args": [
+        0
+      ],
+      "token": "0x60052bf",
+      "signatureBlobHex": "200001",
+      "inputCILSHA256": "c873fa54999dbab8d192ffdc2c9bbda3595cdffd15e3138f98062a26529e4e2d"
+    },
+    {
+      "type": "UI.BuyShopItem",
+      "method": "BuyCallback",
+      "helper": "QuantityDone",
+      "mode": "tail",
+      "args": [
+        0,
+        1,
+        2
+      ],
+      "token": "0x60052c0",
+      "signatureBlobHex": "20020112a83c02",
+      "inputCILSHA256": "82ffda3a2a77cecffa8e5adb9e01141108d34ea75c7032fc9ff9d900beb808f7"
+    },
+    {
+      "type": "UI.ShopBatchBuy",
+      "method": "UpdateAll",
+      "helper": "OrdinaryClamp",
+      "mode": "tail",
+      "args": [
+        0
+      ],
+      "token": "0x60052ff",
+      "signatureBlobHex": "200001",
+      "inputCILSHA256": "da2b7e9ef09f9ab36401a0874bdb90342cc653c25c4e1571af487df326019c68"
+    },
+    {
+      "type": "UI.ShopBatchBuy",
+      "method": "UpdatePrice",
+      "helper": "OrdinaryClamp",
+      "mode": "tail",
+      "args": [
+        0
+      ],
+      "token": "0x6005300",
+      "signatureBlobHex": "200001",
+      "inputCILSHA256": "12cfe128a9d25fb09fed9b6134c61893fb100af112e092b80d9beb76b67365af"
+    },
+    {
+      "type": "UI.ShopBatchBuy",
+      "method": "OnBuyBtn",
+      "helper": "OrdinarySubmit",
+      "mode": "prefix",
+      "args": [
+        0
+      ],
+      "token": "0x60052f9",
+      "signatureBlobHex": "200001",
+      "inputCILSHA256": "1e40792428291aeb6334a41c405ac50468102bebff4c8bdb32e8a208544a5785"
+    },
+    {
+      "type": "UI.ShopBatchBuy",
+      "method": "BuyCallback",
+      "helper": "OrdinaryDone",
+      "mode": "tail",
+      "args": [
+        0
+      ],
+      "token": "0x60052fa",
+      "signatureBlobHex": "20020112a83c02",
+      "inputCILSHA256": "b710ea225329fd72c83b21fb73a2c2624b1d6cbc3725252c65c8f2f918609194"
+    },
+    {
+      "type": "UI.ShopPointItem",
+      "method": "OnBuyBtnClick",
+      "helper": "Point",
+      "mode": "prefix",
+      "args": [
+        0
+      ],
+      "token": "0x6005335",
+      "signatureBlobHex": "200001",
+      "inputCILSHA256": "53719142813e95c7c85762575290976023d546e288fea17fa1ca09d0212f3766"
+    },
+    {
+      "type": "UI.ShopPopularityItem",
+      "method": "OnBuyBtn",
+      "helper": "Popularity",
+      "mode": "prefix",
+      "args": [
+        0
+      ],
+      "token": "0x6005338",
+      "signatureBlobHex": "200001",
+      "inputCILSHA256": "9f36ad18f87f5735796b9efadc9ddfa9f63a5039c5a283bd5846977e4220f260"
+    },
+    {
+      "type": "UI.ShopPetItem",
+      "method": "OnBuyBtn",
+      "helper": "Pet",
+      "mode": "prefix",
+      "args": [
+        0
+      ],
+      "token": "0x600532f",
+      "signatureBlobHex": "200001",
+      "inputCILSHA256": "e03ee2180e9e11bb4b1a59eff8505d6aae2fe24a343fe62a5462b9cea47ea1d6"
+    },
+    {
+      "type": "UI.UnionShopTabItem",
+      "method": "OnBuyClick",
+      "helper": "Guild",
+      "mode": "prefix",
+      "args": [
+        0
+      ],
+      "token": "0x60055a9",
+      "signatureBlobHex": "200001",
+      "inputCILSHA256": "25a72d0915ca8d40795e50cd0a57df06d0890c2934800db88ceb20c3b8816b62"
+    },
+    {
+      "type": "UI.ActivityItemBatchBuyPage",
+      "method": "UpdatePrice",
+      "helper": "ActivityPrice",
+      "mode": "replace",
+      "args": [
+        0,
+        1
+      ],
+      "token": "0x6004b85",
+      "signatureBlobHex": "20010108",
+      "inputCILSHA256": "e2853d6467c76728726a47762212db9f30cc731e03e4cd04ffd995e67eca54bc"
+    },
+    {
+      "type": "UI.ActivityItemBatchBuyPage",
+      "method": "OnBuyBtn",
+      "helper": "ActivitySubmit",
+      "mode": "prefix",
+      "args": [
+        0
+      ],
+      "token": "0x6004b7e",
+      "signatureBlobHex": "200001",
+      "inputCILSHA256": "ff85066cea5e2dff884094d0623d51426defdc79b8ce031b4364f76219765bd9"
+    },
+    {
+      "type": "UI.OnSailItem",
+      "method": "BuyItem",
+      "helper": "OnSail",
+      "mode": "prefix",
+      "args": [
+        0
+      ],
+      "token": "0x6005994",
+      "signatureBlobHex": "200001",
+      "inputCILSHA256": "3cbd0ebccaf81d2072ace65da775057075544475f178a811f5fff7712a16e2ae"
+    },
+    {
+      "type": "UI.OnSailItem",
+      "method": "SelectAcAward",
+      "helper": "OnSailChoice",
+      "mode": "prefix",
+      "args": [
+        0,
+        1
+      ],
+      "token": "0x6005995",
+      "signatureBlobHex": "200101128158",
+      "inputCILSHA256": "658ec6144bc2dd00631009dc72227be470d0e70f73149ac8e97bfb27993ef58f"
+    },
+    {
+      "type": "UI.ActivityAwardItem",
+      "method": "Receive",
+      "helper": "OpenAward",
+      "mode": "prefix",
+      "args": [
+        0,
+        1
+      ],
+      "token": "0x6005251",
+      "signatureBlobHex": "2001010e",
+      "inputCILSHA256": "5a9f5a463f019c563a24000d2e044e55d658ad651d219b24aa1b13f945f9003e"
+    },
+    {
+      "type": "HalfPrice",
+      "method": "OnReceiveClick",
+      "helper": "OpenHalf",
+      "mode": "prefix",
+      "args": [
+        0
+      ],
+      "token": "0x6005277",
+      "signatureBlobHex": "200001",
+      "inputCILSHA256": "e96948185ed8b7f1dc1feb3d6fee28ed0109ac97d52fe1a5a9e7c8492256396c"
+    },
+    {
+      "type": "UI.NPCUIShopItem",
+      "method": "OnBuyClick",
+      "helper": "UnionFight",
+      "mode": "prefix",
+      "args": [
+        0
+      ],
+      "token": "0x6004554",
+      "signatureBlobHex": "200001",
+      "inputCILSHA256": "7e9e6f5ff19b0c4821524042f036a3180fbb3fcb807d7d273c13e4e858927931"
+    },
+    {
+      "type": "UI.NPCUIShopItem",
+      "method": "SetItem",
+      "helper": "UnionFightListed",
+      "mode": "tail",
+      "args": [
+        0
+      ],
+      "token": "0x6004550",
+      "signatureBlobHex": "20020112821c12ab5c",
+      "inputCILSHA256": "e0d5fcab7e78a4841a1ae02f7a391fd152e6d4269dfe598f152a00f312b6ba33"
+    },
+    {
+      "type": "Room.RoomNetUnionFight",
+      "method": "SCUFPlayerBuyItem",
+      "helper": "UnionFightDone",
+      "mode": "tail",
+      "args": [
+        1
+      ],
+      "token": "0x60042cd",
+      "signatureBlobHex": "2001011c",
+      "inputCILSHA256": "b54e49a23d4cf05c04f49d4a187f24698accb69c504233d2a07f25c935e5768c"
+    },
+    {
+      "type": "UI.OnSailItem",
+      "method": "OnBuyBtn",
+      "helper": "OnSail",
+      "mode": "prefix",
+      "args": [
+        0
+      ],
+      "token": "0x6005993",
+      "signatureBlobHex": "200001",
+      "inputCILSHA256": "cefaf19787f97c6a059718e4e25fb11c077acb552323b09c06da0dff47f39264"
+    },
+    {
+      "type": "UI.ShopBatchBuy",
+      "method": "DoOpen",
+      "helper": "OrdinaryOpened",
+      "mode": "tail",
+      "args": [
+        0
+      ],
+      "token": "0x6005301",
+      "signatureBlobHex": "200001",
+      "inputCILSHA256": "f8e5b3c622368f722fc0be574d812c48b5954b0bb5e504ea74924de0680004e8"
+    }
+  ],
+  "addedFields": [],
+  "protobufExtensions": [
+    {
+      "type": "CSGetOpenServerReward",
+      "tag": 100,
+      "storage": "original IExtensible unknown fields",
+      "value": "int32 count"
+    },
+    {
+      "type": "CSUFPlayerBuyItem",
+      "tag": 100,
+      "storage": "original IExtensible unknown fields",
+      "value": "int32 count"
+    },
+    {
+      "type": "ActivityShopItem",
+      "tag": 100,
+      "storage": "original IExtensible unknown fields",
+      "value": "repeated BaseResource authoritative curve"
+    },
+    {
+      "type": "ShopItem",
+      "tag": 100,
+      "storage": "original IExtensible unknown fields",
+      "value": "repeated BaseResource authoritative curve"
+    }
+  ]
+}

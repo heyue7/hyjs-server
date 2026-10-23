@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"strings"
 	"time"
 
@@ -148,8 +149,8 @@ func (s *GameService) p4GuildShop(ctx context.Context, id int64, request proto.M
 		domain := "commerce:8:" + p6Digest([]byte(member.GuildID))[:32]
 		buy, purchasing := request.(*pb.CSShopBuy)
 		if purchasing {
-			if buy.GetShopType() != constUtil.P4GuildShopType || buy.GetBuyCount() != 1 {
-				return errors.New("原公会商店每次购买一份")
+			if buy.GetShopType() != constUtil.P4GuildShopType || buy.GetBuyCount() < 1 || buy.GetBuyCount() > 100 {
+				return errors.New("原公会商店购买数量须为1至100")
 			}
 			// An earlier purchase belongs to its actual guild; a delayed old request cannot buy again after changing guild.
 			var other int64
@@ -203,8 +204,9 @@ func (s *GameService) p4GuildShop(ctx context.Context, id int64, request proto.M
 			}{product.ContributionCost, product.GuildLevel}) {
 				return errors.New("商品已调整，请刷新商店后重新购买")
 			}
+			count := buy.GetBuyCount()
 			key := p4SlotKey(cfg, state, product.p4Product)
-			if state.Bought[key] < 0 || state.Total[product.ID] < 0 || state.Bought[key] >= product.DailyLimit || product.TotalLimit > 0 && state.Total[product.ID] >= product.TotalLimit {
+			if state.Bought[key] < 0 || state.Total[product.ID] < 0 || int64(state.Bought[key])+int64(count) > int64(product.DailyLimit) || int64(state.Total[product.ID])+int64(count) > math.MaxInt32 || product.TotalLimit > 0 && int64(state.Total[product.ID])+int64(count) > int64(product.TotalLimit) {
 				return errors.New("原公会商店日或月限购已用完")
 			}
 			if product.Stock >= 0 {
@@ -213,10 +215,10 @@ func (s *GameService) p4GuildShop(ctx context.Context, id int64, request proto.M
 				if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 					return err
 				}
-				if stock.Used < 0 || stock.Used >= product.Stock {
+				if stock.Used < 0 || int64(stock.Used)+int64(count) > int64(product.Stock) {
 					return errors.New("共享库存不足")
 				}
-				stock.RuleID, stock.ProductID, stock.Used = cfg.ID, product.ID, stock.Used+1
+				stock.RuleID, stock.ProductID, stock.Used = cfg.ID, product.ID, stock.Used+count
 				if err := tx.Save(&stock).Error; err != nil {
 					return err
 				}
@@ -225,7 +227,12 @@ func (s *GameService) p4GuildShop(ctx context.Context, id int64, request proto.M
 			if err != nil {
 				return err
 			}
-			requiredContribution := int64(product.ContributionCost)
+			if int64(badge.GetNum())*int64(count) > math.MaxInt32 || int64(product.ContributionCost)*int64(count) > math.MaxInt32 {
+				return errors.New("批量公会商店成本溢出")
+			}
+			badge.Num = proto.Int32(badge.GetNum() * count)
+			contributionCost := product.ContributionCost * count
+			requiredContribution := int64(contributionCost)
 			if badge.GetId() == "contribution" {
 				requiredContribution += int64(badge.GetNum())
 			}
@@ -236,20 +243,24 @@ func (s *GameService) p4GuildShop(ctx context.Context, id int64, request proto.M
 			if err = s.p4Deduct(tx, id, player, game, badge, source, now); err != nil {
 				return err
 			}
-			player.Contribution = proto.Int32(player.GetContribution() - product.ContributionCost)
+			player.Contribution = proto.Int32(player.GetContribution() - contributionCost)
 			// Member.Contribution is the original cumulative ranking value and remains unchanged.
-			if product.ContributionCost > 0 {
-				if err = s.RecordP1Event(tx, id, source+":contribution", "spend:contribution", int64(product.ContributionCost), now); err != nil {
+			if contributionCost > 0 {
+				if err = s.RecordP1Event(tx, id, source+":contribution", "spend:contribution", int64(contributionCost), now); err != nil {
 					return err
 				}
 			}
-			gain, err = s.GrantFixedReward(player, game, product.Rewards)
+			rewards, err := p4ScaleRewards(product.Rewards, count)
 			if err != nil {
 				return err
 			}
-			costs = []*pb.BaseResource{badge, {Id: proto.String("contribution"), Num: proto.Int32(product.ContributionCost)}}
-			state.Bought[key]++
-			state.Total[product.ID]++
+			gain, err = s.GrantFixedReward(player, game, rewards)
+			if err != nil {
+				return err
+			}
+			costs = []*pb.BaseResource{badge, {Id: proto.String("contribution"), Num: proto.Int32(contributionCost)}}
+			state.Bought[key] += count
+			state.Total[product.ID] += count
 		}
 		items, err := s.p4GuildShopProjection(tx, player, cfg, rules, state, guild)
 		if err != nil {

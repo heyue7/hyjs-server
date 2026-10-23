@@ -21,9 +21,11 @@ namespace HYJS.GGO
         UILabel balanceLabel, noticeLabel;
         CommonIcon balanceIcon;
         long owner;
-        string session = "", origin = "", version = "", currency = "item_9710", currencyName = "回收信用点";
+        string session = "", origin = "", version = "", currency = "item_9710", currencyName = "信用点";
         string pendingId = "", pendingProduct = "", pendingVersion = "", confirmedNotice = "";
         bool selected, busy, enabledShop, restoreTop, pendingUnreadable;
+        int pendingCount = 1;
+        long balance, catalogueRevision;
         WWW request;
         readonly List<GGOProductRow> rows = new List<GGOProductRow>();
 
@@ -86,7 +88,7 @@ namespace HYJS.GGO
             button.SetType(ShopType.ScoreShop);
             Field(typeof(ShopTabButton), "m_type").SetValue(button, (ShopType)GGOType);
             button.m_callback = page.OnTabBtn;
-            button.labName.text = "荒野兑换所"; button.labName.fontSize = 22; button.labName.width = 108;
+            button.labName.text = "信用商店"; button.labName.fontSize = 22; button.labName.width = 108;
             button.labName.maxLineCount = 1; button.labName.overflowMethod = UILabel.Overflow.ShrinkContent;
             UIDragScrollView drag = buttonObject.GetComponent<UIDragScrollView>(); if (drag != null) drag.scrollView = page.scrollView;
             buttonObject.SetActive(true); page.simpleGrid.AddChild(buttonObject, 1f); page.simpleGrid.Reposition();
@@ -140,7 +142,7 @@ namespace HYJS.GGO
         {
             ShopScoreItem template = layout.shopItemPrefab.GetComponent<ShopScoreItem>();
             balanceLabel = CloneLabel(template.labName, "GGO Balance", new Vector3(235f, 235f, 0f), 22);
-            balanceLabel.text = "荒野兑换所";
+            balanceLabel.text = "信用商店";
             noticeLabel = CloneLabel(template.labName, "GGO Notice", new Vector3(235f, 200f, 0f), 20);
             BoxCollider box = noticeLabel.gameObject.GetComponent<BoxCollider>();
             if (box == null) box = noticeLabel.gameObject.AddComponent<BoxCollider>();
@@ -188,25 +190,89 @@ namespace HYJS.GGO
         }
         void LoadPending()
         {
-            pendingId = pendingProduct = pendingVersion = ""; pendingUnreadable = false;
+            pendingId = pendingProduct = pendingVersion = ""; pendingCount = 1; pendingUnreadable = false;
             string raw = PlayerPrefs.GetString(PreferenceKey(), "");
             if (String.IsNullOrEmpty(raw)) return;
-            try { JsonData value = JsonMapper.ToObject(raw); pendingId = (string)value["id"]; pendingProduct = (string)value["product"]; pendingVersion = (string)value["version"]; if (String.IsNullOrEmpty(pendingId) || String.IsNullOrEmpty(pendingProduct) || String.IsNullOrEmpty(pendingVersion)) throw new Exception("invalid receipt"); new Guid(pendingId); }
+            try
+            {
+                JsonData value = JsonMapper.ToObject(raw);
+                pendingId = (string)value["id"]; pendingProduct = (string)value["product"]; pendingVersion = (string)value["version"];
+                if (String.IsNullOrEmpty(pendingId) || String.IsNullOrEmpty(pendingProduct) || String.IsNullOrEmpty(pendingVersion)) throw new Exception("invalid receipt");
+                if (new Guid(pendingId) == Guid.Empty) throw new Exception("invalid UUID");
+                if (((IDictionary)value).Contains("count"))
+                {
+                    JsonData stored = value["count"];
+                    if ((!stored.IsInt && !stored.IsLong) || !Int32.TryParse(stored.ToString(), out pendingCount) || pendingCount < 1 || pendingCount > 100)
+                        throw new Exception("invalid purchase count");
+                }
+            }
             catch { pendingUnreadable = true; }
         }
         void SavePending()
         {
-            JsonData value = new JsonData(); value["id"] = pendingId; value["product"] = pendingProduct; value["version"] = pendingVersion;
+            JsonData value = new JsonData(); value["id"] = pendingId; value["product"] = pendingProduct; value["version"] = pendingVersion; value["count"] = pendingCount;
             PlayerPrefs.SetString(PreferenceKey(), JsonMapper.ToJson(value)); PlayerPrefs.Save();
         }
+        // Preserve the inherited helper API; existing callers now enter the same scoped quantity selector.
         public void Buy(string product)
         {
-            if (!Visible() || busy) return;
-            if (pendingUnreadable) { SetNotice("兑换记录无法读取，请联系管理员核对"); return; }
-            if (!String.IsNullOrEmpty(pendingId)) { SetNotice("上次兑换待确认，点击提示重试"); return; }
-            if (!enabledShop || String.IsNullOrEmpty(version)) return;
-            confirmedNotice = ""; pendingId = Guid.NewGuid().ToString(); pendingProduct = product; pendingVersion = version;
-            SavePending(); StartCoroutine(Fetch(true));
+            foreach (GGOProductRow row in rows) if (row != null && row.ProductID == product) { row.OnBuyBtn(); return; }
+        }
+        bool CanStartPurchase()
+        {
+            if (!Visible() || busy) return false;
+            if (pendingUnreadable) { SetNotice("兑换记录无法读取，请联系管理员核对"); return false; }
+            if (!String.IsNullOrEmpty(pendingId)) { SetNotice("上次兑换待确认，点击提示重试"); return false; }
+            return enabledShop && !String.IsNullOrEmpty(version);
+        }
+        int Maximum(long remaining, long unitCost, int rewardAmount)
+        {
+            if (unitCost < 1 || rewardAmount < 1 || balance < 0) return 0;
+            long max = remaining < 0 ? 100 : Math.Min(100, remaining);
+            max = Math.Min(max, balance / unitCost);
+            max = Math.Min(max, Int32.MaxValue / unitCost);
+            max = Math.Min(max, Int32.MaxValue / rewardAmount);
+            return (int)Math.Max(0, max);
+        }
+        public void ChooseQuantity(Component chooser, string product, string rewardID, int rewardAmount, long price, long remaining)
+        {
+            if (!CanStartPurchase() || chooser == null) return;
+            int max = Maximum(remaining, price, rewardAmount);
+            if (max < 1)
+            {
+                string message = remaining == 0 ? "商品已达到限购次数" : "信用点不足，无法兑换该商品";
+                SetNotice(message); BoxManager.CreatePopupTextBox(message, 0f); return;
+            }
+            long selectedOwner = owner, selectedRevision = catalogueRevision;
+            string selectedSession = session, selectedOrigin = origin, selectedVersion = version;
+            bool submitted = false;
+            Action<int> confirm = delegate(int count)
+            {
+                if (submitted) return;
+                if (chooser == null || !Visible() || owner != selectedOwner || session != selectedSession || origin != selectedOrigin ||
+                    version != selectedVersion || catalogueRevision != selectedRevision)
+                {
+                    if (Visible() && !busy) { SetNotice("目录已更新，正在重新加载…"); StartCoroutine(Fetch(false)); }
+                    return;
+                }
+                if (!CanStartPurchase() || count < 1 || count > Maximum(remaining, price, rewardAmount)) return;
+                submitted = true;
+                confirmedNotice = ""; pendingId = Guid.NewGuid().ToString(); pendingProduct = product; pendingVersion = selectedVersion; pendingCount = count;
+                SavePending(); StartCoroutine(Fetch(true));
+            };
+            try
+            {
+                Type type = Type.GetType("HYJS.BulkPurchase.BulkPurchase, HYJS.BulkPurchase", true);
+                MethodInfo selector = type.GetMethod("SelectQuantity", BindingFlags.Public | BindingFlags.Static, null,
+                    new Type[] { typeof(Component), typeof(string), typeof(int), typeof(string), typeof(long), typeof(int), typeof(Action<int>) }, null);
+                if (selector == null || selector.ReturnType != typeof(bool) || !(bool)selector.Invoke(null, new object[] { chooser, rewardID, rewardAmount, currency, price, max, confirm }))
+                    throw new Exception("quantity selector unavailable");
+            }
+            catch (Exception)
+            {
+                SetNotice("数量选择暂不可用，请重新打开商店");
+                BoxManager.CreatePopupTextBox("数量选择暂不可用，请重新打开商店", 0f);
+            }
         }
         public void Retry() { if (!Visible() || busy) return; if (pendingUnreadable) { SetNotice("兑换记录无法读取，请联系管理员核对"); return; } StartCoroutine(Fetch(!String.IsNullOrEmpty(pendingId))); }
         IEnumerator Fetch(bool buy)
@@ -214,7 +280,10 @@ namespace HYJS.GGO
             if (busy || !Visible()) yield break;
             busy = true; RefreshButtons();
             JsonData body = new JsonData(); body["playerId"] = owner; body["sessionHex"] = session;
-            if (buy) { body["productId"] = pendingProduct; body["version"] = pendingVersion; body["requestId"] = pendingId; }
+            string sentId = pendingId, sentProduct = pendingProduct, sentVersion = pendingVersion;
+            int sentCount = pendingCount;
+            long sentOwner = owner; string sentSession = session, sentOrigin = origin;
+            if (buy) { body["productId"] = sentProduct; body["version"] = sentVersion; body["requestId"] = sentId; body["count"] = sentCount; }
             Dictionary<string,string> headers = new Dictionary<string,string>(); headers.Add("Content-Type", "application/json");
             WWW current = new WWW(origin + (buy ? "/ggo-shop/buy" : "/ggo-shop/catalogue"), Encoding.UTF8.GetBytes(JsonMapper.ToJson(body)), headers);
             request = current; float deadline = Time.realtimeSinceStartup + 15f;
@@ -223,15 +292,16 @@ namespace HYJS.GGO
             string message = buy ? "兑换结果待确认，点击此处重试" : "加载失败，点击此处重试";
             try
             {
-                if (Visible() && current.isDone && String.IsNullOrEmpty(current.error))
+                if (Visible() && owner == sentOwner && session == sentSession && origin == sentOrigin && current.isDone && String.IsNullOrEmpty(current.error))
                 {
+                    if (buy && (pendingId != sentId || pendingProduct != sentProduct || pendingVersion != sentVersion || pendingCount != sentCount)) throw new Exception("pending identity changed");
                     JsonData response = JsonMapper.ToObject(current.text);
                     if ((int)response["code"] == 0)
                     {
                         JsonData data = response["data"];
                         if (buy)
                         {
-                            if ((string)data["requestId"] != pendingId) throw new Exception("receipt differs");
+                            if ((string)data["requestId"] != sentId || pendingId != sentId || pendingProduct != sentProduct || pendingVersion != sentVersion || pendingCount != sentCount) throw new Exception("receipt differs");
                             string reward = (string)data["rewardId"];
                             string points = data["terminalPointsAdded"].ToString();
                             message = "兑换成功：" + TableTextBlo.GetText(CommonMethod.GetObjectNameTextId(reward)) + " ×" + data["rewardAmount"].ToString();
@@ -239,7 +309,7 @@ namespace HYJS.GGO
                             // A receipt may be replayed long after purchase; its catalogue is historical.
                             // Settle the UUID once, then obtain live balances and limits through catalogue.
                             confirmedNotice = message;
-                            PlayerPrefs.DeleteKey(PreferenceKey()); PlayerPrefs.Save(); pendingId = pendingProduct = pendingVersion = "";
+                            PlayerPrefs.DeleteKey(PreferenceKey()); PlayerPrefs.Save(); pendingId = pendingProduct = pendingVersion = ""; pendingCount = 1;
                             enabledShop = false; version = "";
                             balanceLabel.text = currencyName + "：余额刷新中…";
                         }
@@ -247,7 +317,7 @@ namespace HYJS.GGO
                         {
                             Render(data);
                             message = !String.IsNullOrEmpty(confirmedNotice) ? confirmedNotice :
-                                (String.IsNullOrEmpty(pendingId) ? (enabledShop ? "选择道具查看详情，每次兑换 1 份" : "荒野兑换所暂未开放") : "上次兑换待确认，点击此处重试");
+                                (String.IsNullOrEmpty(pendingId) ? (enabledShop ? "选择道具和兑换份数" : "信用商店暂未开放") : "上次兑换待确认，点击此处重试");
                         }
                         success = true;
                     }
@@ -255,7 +325,7 @@ namespace HYJS.GGO
                     {
                         // A rejected response is definitive: no debit occurred; a new catalogue can be requested.
                         message = ((IDictionary)response).Contains("msg") ? response["msg"].ToString() : "兑换未完成，请刷新后重试";
-                        if (buy) { PlayerPrefs.DeleteKey(PreferenceKey()); PlayerPrefs.Save(); pendingId = pendingProduct = pendingVersion = ""; }
+                        if (buy) { PlayerPrefs.DeleteKey(PreferenceKey()); PlayerPrefs.Save(); pendingId = pendingProduct = pendingVersion = ""; pendingCount = 1; }
                     }
                 }
             }
@@ -286,7 +356,7 @@ namespace HYJS.GGO
                 credit = new UISimpleItem(itemData); inventory["item_9710"] = credit;
             }
             // Catalogue is authoritative; absolute assignment is safe for repeated receipts.
-            credit.num = absoluteBalance;
+            credit.num = absoluteBalance; balance = absoluteBalance; catalogueRevision++;
             version = (string)catalogue["version"]; enabledShop = (bool)catalogue["enabled"];
             currency = (string)catalogue["currencyId"]; currencyName = (string)catalogue["currencyName"];
             balanceLabel.text = (string)catalogue["name"] + " · " + currencyName + "：" + catalogue["balance"].ToString();
@@ -324,7 +394,9 @@ namespace HYJS.GGO
 
     public sealed class GGOProductRow : MonoBehaviour
     {
-        GGOShop shop; string product; GameObject button, soldLabel; UILabel buttonLabel; bool available;
+        GGOShop shop; string product, rewardID; int rewardAmount; long price, remaining;
+        public string ProductID { get { return product; } }
+        GameObject button, soldLabel; UILabel buttonLabel; bool available;
         public void Bind(GGOShop owner, ShopScoreItem original, JsonData data, string currency, string currencyName)
         {
             shop = owner; product = (string)data["id"]; button = original.btnBuy;
@@ -334,7 +406,8 @@ namespace HYJS.GGO
             soldLabel = original.labBuyed;
             UILabel soldText = soldLabel.GetComponent<UILabel>(); RemoveTextKit(soldText); if (soldText != null) soldText.text = "已兑换";
             buttonLabel = button.GetComponentInChildren<UILabel>(); RemoveTextKit(buttonLabel);
-            long remaining = Int64.Parse(data["remaining"].ToString()); available = remaining != 0;
+            remaining = Int64.Parse(data["remaining"].ToString()); price = Int64.Parse(data["price"].ToString());
+            rewardID = (string)data["resourceId"]; rewardAmount = Int32.Parse(data["amount"].ToString()); available = remaining != 0 && price > 0 && rewardAmount > 0;
             GameObject limitObject = (GameObject)UnityEngine.Object.Instantiate(original.labName.gameObject);
             limitObject.name = "GGORemaining"; limitObject.transform.parent = transform;
             limitObject.transform.localScale = Vector3.one; limitObject.transform.localRotation = Quaternion.identity;
@@ -364,7 +437,7 @@ namespace HYJS.GGO
             foreach (MonoBehaviour component in label.GetComponents<MonoBehaviour>())
                 if (component != null && component.GetType().Name == "TextKit") UnityEngine.Object.DestroyImmediate(component);
         }
-        public void OnBuyBtn() { if (available && shop != null) shop.Buy(product); }
+        public void OnBuyBtn() { if (available && shop != null) shop.ChooseQuantity(this, product, rewardID, rewardAmount, price, remaining); }
         public void SetBusy(bool value)
         {
             if (button == null) return;

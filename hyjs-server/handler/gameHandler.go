@@ -381,6 +381,9 @@ func ValidateGameRequest(p *model.GamePacket) error {
 			return errors.New("公会战商店NPC无效")
 		}
 	case *pb.CSUFPlayerBuyItem:
+		if _, err := model.GamePurchaseCount(b); err != nil {
+			return err
+		}
 		if p.Timestamp < 0 || (b.GetNpcId() != "3" && b.GetNpcId() != "6") || b.GetShopItemId() == "" || strings.TrimSpace(b.GetShopItemId()) != b.GetShopItemId() || len(b.GetShopItemId()) > 256 {
 			return errors.New("公会战商店商品、NPC或请求时间戳无效")
 		}
@@ -854,7 +857,7 @@ func ValidateGameRequest(p *model.GamePacket) error {
 			}
 		}
 	case *pb.CSShopBuy:
-		if (b.GetShopType() != 1 && b.GetShopType() != 2 && b.GetShopType() != 4 && b.GetShopType() != 5 && b.GetShopType() != 7 && b.GetShopType() != 8) || b.GetShopItemId() == "" || len(b.GetShopItemId()) > 256 || b.GetBuyCount() < 1 || b.GetBuyCount() > 100 || ((b.GetShopType() == 2 || b.GetShopType() == 8) && b.GetBuyCount() != 1) || p.Timestamp <= 0 {
+		if (b.GetShopType() != 1 && b.GetShopType() != 2 && b.GetShopType() != 4 && b.GetShopType() != 5 && b.GetShopType() != 7 && b.GetShopType() != 8) || b.GetShopItemId() == "" || len(b.GetShopItemId()) > 256 || b.GetBuyCount() < 1 || b.GetBuyCount() > 100 || (b.GetShopType() == 2 && b.GetBuyCount() != 1) || p.Timestamp <= 0 {
 			return errors.New("Invalid shop purchase")
 		}
 	case *pb.CSShopProductList:

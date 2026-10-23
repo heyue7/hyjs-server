@@ -62,7 +62,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /** A native wallet layered on the original Unity activity; the engine remains original. */
-public final class WalletActivity extends UnityPlayerActivity {
+public class WalletActivity extends UnityPlayerActivity {
     private static final int BLUE=Color.rgb(22,119,255), INK=Color.rgb(17,17,17), GRAY=Color.rgb(128,128,128), LINE=Color.rgb(240,240,240);
     private static final int HOME=0, BILLS=4, ORDERS=5, CASHIER=6, ACCOUNT=7, NICKNAME=8, PASSWORD=9;
     private static volatile WalletActivity current;
@@ -83,6 +83,45 @@ public final class WalletActivity extends UnityPlayerActivity {
         credentials=new Credentials(playerId,session,old.generation+1);
         final WalletActivity a=current;
         if(a!=null)a.runOnUiThread(new Runnable(){public void run(){a.sessionChanged();}});
+    }
+
+    /** Read-only preflight for the original recharge entry; payment stays server-authoritative. */
+    public static void checkRechargeBalance(final String attemptId,final long amountCents){
+        if(attemptId==null || !attemptId.matches("[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}"))return;
+        final WalletActivity activity=current;
+        if(activity==null){sendRechargeBalance(attemptId,"error");return;}
+        activity.runOnUiThread(()->activity.startRechargeBalance(attemptId,amountCents));
+    }
+    private static void sendRechargeBalance(String attemptId,String status){
+        try{UnityPlayer.UnitySendMessage("HYJSPaymentFeedback","OnRechargeBalance",attemptId+"|"+status);}catch(Exception ignored){}
+    }
+    private volatile HttpURLConnection rechargeConnection;
+    private long rechargeGeneration;
+    private void startRechargeBalance(final String attemptId,final long amountCents){
+        final Credentials auth=credentials;
+        if(destroyed || !ready() || amountCents<1 || amountCents>9007199254740991L){sendRechargeBalance(attemptId,"error");return;}
+        final long requestGeneration=++rechargeGeneration;
+        final String address=origin+"/local-wallet/state";
+        HttpURLConnection previous=rechargeConnection;if(previous!=null)previous.disconnect();
+        try{network.execute(()->{
+            String result="error";HttpURLConnection connection=null;
+            try{
+                JSONObject payload=new JSONObject();payload.put("playerId",auth.player);payload.put("sessionHex",auth.session);
+                connection=(HttpURLConnection)new URL(address).openConnection();rechargeConnection=connection;
+                connection.setRequestMethod("POST");connection.setConnectTimeout(8000);connection.setReadTimeout(15000);
+                connection.setInstanceFollowRedirects(false);connection.setDoOutput(true);connection.setRequestProperty("Content-Type","application/json; charset=utf-8");connection.setRequestProperty("Cache-Control","no-store");
+                byte[] body=payload.toString().getBytes("UTF-8");connection.setFixedLengthStreamingMode(body.length);
+                OutputStream out=connection.getOutputStream();out.write(body);out.close();
+                int status=connection.getResponseCode();InputStream in=status>=400?connection.getErrorStream():connection.getInputStream();
+                if(in==null)throw new Exception();byte[] raw;try{raw=readBounded(in,1048576);}finally{in.close();}
+                JSONObject reply=new JSONObject(new String(raw,"UTF-8"));JSONObject data=reply.optJSONObject("data");
+                if(status!=200 || reply.optInt("code",-1)!=0 || data==null || !data.optBoolean("testOnly") || !data.optBoolean("enabled") || !"CNY".equals(data.optString("currency")) || !data.has("balanceCents") || data.getLong("balanceCents")<0)throw new Exception();
+                result=data.getLong("balanceCents")<amountCents?"insufficient":"ready";
+            }catch(Exception ignored){result="error";}
+            finally{if(connection!=null)connection.disconnect();if(rechargeConnection==connection)rechargeConnection=null;}
+            final String response=result;
+            runOnUiThread(()->{if(!destroyed && credentials.generation==auth.generation && requestGeneration==rechargeGeneration)sendRechargeBalance(attemptId,response);});
+        });}catch(java.util.concurrent.RejectedExecutionException unavailable){sendRechargeBalance(attemptId,"error");}
     }
 
     private volatile HttpURLConnection activeConnection;
@@ -229,7 +268,7 @@ public final class WalletActivity extends UnityPlayerActivity {
         if(bubble!=null){bubble.removeCallbacks(dimBubble);bubble.animate().cancel();}
         if(bubbleDockAnimation!=null)bubbleDockAnimation.cancel();
         removeBubbleWindow();bubbleWindowAnchors.clear();
-        if(panel!=null)panel.dismiss();HttpURLConnection connection=activeConnection;if(connection!=null)connection.disconnect();network.shutdownNow();super.onDestroy();
+        if(panel!=null)panel.dismiss();HttpURLConnection connection=activeConnection;if(connection!=null)connection.disconnect();HttpURLConnection preflight=rechargeConnection;if(preflight!=null)preflight.disconnect();rechargeGeneration++;network.shutdownNow();super.onDestroy();
     }
     private int dp(float n){return Math.round(n*getResources().getDisplayMetrics().density);}
     private GradientDrawable shape(int color,float radius){GradientDrawable d=new GradientDrawable();d.setColor(color);d.setCornerRadius(dp(radius));return d;}

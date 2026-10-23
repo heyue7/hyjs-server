@@ -47,19 +47,26 @@ func GGOShopCatalogueHandler(c *gin.Context) error {
 	return nil
 }
 
-// GGOShopBuyHandler 购买一份商品。
+// GGOShopBuyHandler 购买指定份数商品。
 // @Summary 信用商店兑换
 // @Description 使用当前目录版本和UUID购买，服务端校验价格与限购，超频道具到账账号终端；重试返回原回执。
 // @Tags GGOShop
 // @Accept json
 // @Produce json
-// @Param body body model.GGOShopBuyRequest true "角色、会话、商品、版本及UUID"
+// @Param body body model.GGOShopBuyRequest true "角色、会话、商品、份数、版本及UUID"
 // @Success 200 {object} model.GGOShopBuyResponse
 // @Router /ggo-shop/buy [post]
 func GGOShopBuyHandler(c *gin.Context) error {
 	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 2048)
 	var req model.GGOShopBuyRequest
 	if c.ShouldBindJSON(&req) != nil || req.PlayerID < 1 || len(req.SessionHex) != 32 || gameService == nil || req.ProductID == "" || len(req.ProductID) > 64 || strings.TrimSpace(req.ProductID) != req.ProductID || strings.IndexFunc(req.ProductID, unicode.IsControl) >= 0 || req.Version == "" || len(req.Version) > 64 || len(req.RequestID) != 36 {
+		return model.NewErrParamsError()
+	}
+	if req.Count == nil {
+		count := int64(1)
+		req.Count = &count
+	}
+	if *req.Count < 1 || *req.Count > 100 {
 		return model.NewErrParamsError()
 	}
 	id, err := uuid.Parse(req.RequestID)

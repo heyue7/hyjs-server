@@ -6,8 +6,9 @@ type GGOShopCatalogueRequest struct {
 	SessionHex string `json:"sessionHex" binding:"required"` // 当前16字节会话的十六进制字符串。
 }
 
-// GGOShopBuyRequest 购买一份当前版本商品；requestId为UUID。
+// GGOShopBuyRequest 购买指定份数的当前版本商品；requestId为UUID。
 type GGOShopBuyRequest struct {
+	Count      *int64 `json:"count,omitempty"`               // 购买份数，省略为1；范围1至100。
 	PlayerID   int64  `json:"playerId" binding:"required"`   // 角色ID。
 	SessionHex string `json:"sessionHex" binding:"required"` // 当前16字节会话的十六进制字符串。
 	ProductID  string `json:"productId" binding:"required"`  // 目录中的商品ID。

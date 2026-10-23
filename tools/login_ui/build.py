@@ -21,6 +21,24 @@ ENTRY='assets/bin/Data/Managed/Assembly-CSharp.dll'
 TARGET='UserInput::OnLoginButton'
 def sha(raw):return hashlib.sha256(raw).hexdigest()
 
+def dex_class_headers(raw):
+    """Read class inheritance and access flags, including classes in another DEX."""
+    ns,so,nt,to=struct.unpack_from('<4I',raw,56)
+    count,offset=struct.unpack_from('<2I',raw,96)
+    def descriptor(type_index):
+        require(type_index<nt,'Invalid class type index')
+        string_index=struct.unpack_from('<I',raw,to+4*type_index)[0]
+        require(string_index<ns,'Invalid class descriptor string')
+        at=struct.unpack_from('<I',raw,so+4*string_index)[0]
+        while raw[at]&128:at+=1
+        at+=1
+        return raw[at:raw.index(b'\0',at)].decode('utf-8')
+    result={}
+    for i in range(count):
+        cls,flags,parent=struct.unpack_from('<3I',raw,offset+32*i)
+        result[descriptor(cls)]=(flags,None if parent==0xffffffff else descriptor(parent))
+    return result
+
 def dex_abi(raw):
     """Read actual DEX class data and public/protected method/field descriptors."""
     def uleb(at):
@@ -140,6 +158,11 @@ def main():
         checks={'managedAssemblyByteExact':True,'originalEngineMethodsExact':547}
     else:checks=verify_managed(before,after)
     new_dex=(out/'classes2.dex').read_bytes();old_api,new_api=dex_abi(before_dex),dex_abi(new_dex)
+    old_headers,new_headers=dex_class_headers(before_dex),dex_class_headers(new_dex)
+    for cls,(flags,parent) in old_headers.items():
+        if cls in new_headers:
+            require(new_headers[cls][1]==parent,'Inherited Java superclass changed: '+cls)
+            require(not (new_headers[cls][0]&16 and not flags&16),'Inherited Java class became final: '+cls)
     missing=[]
     for cls,abi in old_api.items():
         if cls not in new_api:missing.append([cls,'CLASS']);continue

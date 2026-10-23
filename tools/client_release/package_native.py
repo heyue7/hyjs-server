@@ -10,7 +10,7 @@ from tools.local_asset_ready.remove_gate import exact_body
 import dnfile
 
 def main():
- p=argparse.ArgumentParser(description=__doc__);p.add_argument("--base-apk",type=Path,required=True);p.add_argument("--overlay",type=Path,required=True);p.add_argument("--output",type=Path,required=True);p.add_argument("--record",type=Path,required=True);p.add_argument("--opening-font-overlay",type=Path);p.add_argument("--font-fallback-overlay",type=Path);p.add_argument("--build-code",type=int);p.add_argument("--version-name");a=p.parse_args()
+ p=argparse.ArgumentParser(description=__doc__);p.add_argument("--base-apk",type=Path,required=True);p.add_argument("--overlay",type=Path,required=True);p.add_argument("--output",type=Path,required=True);p.add_argument("--record",type=Path,required=True);p.add_argument("--opening-font-overlay",type=Path);p.add_argument("--font-fallback-overlay",type=Path);p.add_argument("--dungeon-resource-overlay",type=Path);p.add_argument("--qa-wallet-origin");p.add_argument("--build-code",type=int);p.add_argument("--version-name");a=p.parse_args()
  require((a.build_code is None)==(a.version_name is None),"Build code and version name must be supplied together")
  base,overlay,output,record=[x.resolve()for x in (a.base_apk,a.overlay,a.output,a.record)]
  proof=json.loads((overlay/"manifest.json").read_text());require(proof["inheritedJavaPublicProtectedABIExact"],"Qualified native ABI required")
@@ -32,6 +32,9 @@ def main():
   with zipfile.ZipFile(base) as z:payload["AndroidManifest.xml"]=patch_manifest(z.read("AndroidManifest.xml"),a.build_code,a.version_name)
   pins[ROOT/"tools/client_update/package.py"]=common.digest(ROOT/"tools/client_update/package.py")
  pins[Path(__file__).resolve()]=common.digest(Path(__file__).resolve())
+ if a.qa_wallet_origin:
+  require(proof.get("qaOnly") is True and proof.get("neverPromote") is True and proof.get("qaOrigin")==a.qa_wallet_origin=="http://127.0.0.1:28979","Unqualified QA wallet origin")
+  payload["assets/local-wallet.json"]=json.dumps({"origin":a.qa_wallet_origin},separators=(",",":")).encode()
  # This optional resource overlay has an exact pinned UILabel-font byte scope.
  # Rebuild expected bytes from the pinned base rather than trusting its manifest.
  font_changes=[]
@@ -63,6 +66,23 @@ def main():
    f=fallback_dir/name
    require(f.resolve().is_relative_to(fallback_dir) and f.read_bytes()==raw,"Font fallback payload differs: "+name)
    payload[name]=raw
+ dungeon_report=None
+ dungeon_infos={}
+ if a.dungeon_resource_overlay:
+  from tools.client_dungeon_access import build_resources as dungeon_resources
+  directory=a.dungeon_resource_overlay.resolve();require(directory.is_relative_to(ROOT),"Dungeon overlay outside project")
+  resource=json.loads((directory/"manifest.json").read_text());require(resource["baseAPKSHA256"]==proof["baseAPKSHA256"],"Dungeon resource base differs")
+  expected,dependencies=dungeon_resources.verify(base,Path(resource["donorAPK"]))
+  with zipfile.ZipFile(resource["donorAPK"]) as donor:
+   dungeon_infos[dungeon_resources.ENTRY]=copy.copy(donor.getinfo(dungeon_resources.ENTRY))
+  require(set(expected)==set(resource["payloadFiles"]),"Dungeon resource entries differ")
+  for name,data in expected.items():
+   require(name not in payload,"Overlapping dungeon payload")
+   file=ROOT/resource["payloadFiles"][name];require(file.resolve().is_relative_to(directory)and file.read_bytes()==data,"Dungeon resource payload differs")
+   require(hashlib.sha256(data).hexdigest()==resource["replacementEntries"][name],"Dungeon resource hash differs")
+   payload[name]=data
+  pins[Path(dungeon_resources.__file__).resolve()]=common.digest(Path(dungeon_resources.__file__))
+  dungeon_report={"originalMapByteIdentical":True,"onlyRootDependencyDeclarationChanged":True,"previousDeclaredClosureBundles":len(dependencies),"entries":resource["replacementEntries"]}
  require(bool(payload),"Empty overlay is not a release")
  hashes={n:hashlib.sha256(v).hexdigest()for n,v in payload.items()}
  for n,h in proof.get("replacementEntries",{}).items():require(hashes[n]==h,"Overlay payload differs: "+n)
@@ -74,10 +94,21 @@ def main():
   with tempfile.TemporaryDirectory(prefix="hyjs-native-only-",dir=ROOT/"build") as temporary:
    temp=Path(temporary);unsigned,aligned,signed=[temp/n for n in ("unsigned.apk","aligned.apk","signed.apk")]
    with zipfile.ZipFile(base) as z,base.open("rb") as stream:
+    from tools.login_ui.build import dex_class_headers
+    headers={}
+    for name in z.namelist():
+     if name.startswith('classes') and name.endswith('.dex'):
+      current=dex_class_headers(payload.get(name,z.read(name)))
+      require(not (set(headers)&set(current)),"Duplicate Java class across DEX entries")
+      headers.update(current)
+    for name,(flags,parent) in headers.items():
+     require(parent not in headers or not headers[parent][0]&16,"Java superclass is final: "+name+" -> "+str(parent))
     require(common._hash_entry(z,common.DLL)==proof["inputManagedSHA256"],"Managed base differs")
     require(common._hash_entry(z,"classes2.dex")==proof["inputDexSHA256"],"Native base differs")
     if common.DLL in payload:
-     before,after=[dnfile.dnPE(data=b)for b in (z.read(common.DLL),payload[common.DLL])];allowed=set(proof["allowedChangedMethods"]);changed=set();engine=0
+     before,after=[dnfile.dnPE(data=b)for b in (z.read(common.DLL),payload[common.DLL])]
+     require(not getattr(after.net.mdtables,"FieldPtr",None) and not getattr(after.net.mdtables,"MethodPtr",None),"Legacy Unity pointer tables are forbidden")
+     allowed=set(proof["allowedChangedMethods"]);changed=set();engine=0
      require(len(methods(before))==len(methods(after)),"Managed method inventory differs")
      for (n,i,x),(m,j,y)in zip(methods(before),methods(after)):
       require((n,i,x.Signature.value,x.struct.Flags)==(m,j,y.Signature.value,y.struct.Flags),"Managed ABI differs")
@@ -98,6 +129,7 @@ def main():
        # New split parts inherit the original part's APK storage method.
        info=copy.copy(z.getinfo(font_fallback.PREFIX+"10"));info.filename=name;info.orig_filename=name
        target.writestr(info,payload[name])
+      elif name in dungeon_infos:target.writestr(copy.copy(dungeon_infos[name]),payload[name])
       else:target.writestr(name,payload[name],compress_type=zipfile.ZIP_DEFLATED)
    common.run([sdk/"zipalign","-f","-p","4",unsigned,aligned],env);unsigned.unlink()
    common.run([sdk/"apksigner","sign","--ks",ROOT/".local-signing/debug.keystore","--ks-pass","pass:android","--key-pass","pass:android","--out",signed,aligned],env);aligned.unlink()
@@ -106,9 +138,10 @@ def main():
     require(len(z.namelist())==len(set(z.namelist())) and {n for n in z.namelist()if not common._signature(n)}==set(inherited)|set(payload),"Entry inventory differs")
     for n,h in {**inherited,**hashes}.items():require(common._hash_entry(z,n)==h,"Entry differs: "+n)
     for n,h in compressed.items():require(compressed_hash(stream,z.getinfo(n))==h,"Compressed inherited entry differs: "+n)
+    for name,info in dungeon_infos.items():require(z.getinfo(name).compress_type==info.compress_type,"Original bundle ZIP storage changed")
    for f,h in pins.items():require(common.digest(f)==h,"Source changed while packaging")
    require(common.digest(base)==proof["baseAPKSHA256"],"Base changed while packaging")
-   result={"status":"PASS_SIGN_ALIGN_SCOPED_OVERLAY_NOT_INSTALLED","binarySHA256":common.digest(signed),"baseAPKSHA256":proof["baseAPKSHA256"],"replacementEntries":hashes,"openingFontChanges":font_changes,"fontFallbackProof":fallback_report,"allOtherEntriesAndCompressedPayloadsExact":True,"managedAssemblyByteExact":common.DLL not in payload,"signatureVerified":True,"zipalignVerified":True,"originalEngineMethodsExact":547,"outputAPK":str(output.relative_to(ROOT))}
+   result={"status":"PASS_SIGN_ALIGN_SCOPED_OVERLAY_NOT_INSTALLED","binarySHA256":common.digest(signed),"baseAPKSHA256":proof["baseAPKSHA256"],"replacementEntries":hashes,"openingFontChanges":font_changes,"fontFallbackProof":fallback_report,"dungeonResourceProof":dungeon_report,"allOtherEntriesAndCompressedPayloadsExact":True,"managedAssemblyByteExact":common.DLL not in payload,"qaOnly":bool(a.qa_wallet_origin),"neverPromote":bool(a.qa_wallet_origin),"signatureVerified":True,"zipalignVerified":True,"originalEngineMethodsExact":547,"outputAPK":str(output.relative_to(ROOT))}
    if a.build_code is not None:result.update({"buildCode":a.build_code,"versionName":a.version_name})
    signed.replace(output)
    if signed.with_suffix(".apk.idsig").exists():signed.with_suffix(".apk.idsig").replace(output.with_suffix(".apk.idsig"))

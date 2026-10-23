@@ -648,7 +648,11 @@ func (s *GameService) p4Projection(tx *gorm.DB, p *pb.Player, cfg db.P4CommerceR
 		if cfg.ShopType == 5 {
 			priority = s.pointShop48Priority(priority, rewards)
 		}
-		shop = append(shop, &pb.ShopItem{Id: proto.String(publicID), Item: rewards, Price: []*pb.BaseResource{price}, ExchangeList: []*pb.BaseResource{price}, Priority: proto.Int32(priority), CanBuy: proto.Int32(max(0, can)), DayLeftTimes: proto.Int32(max(0, left)), DayTotalTimes: proto.Int32(dayTotal), TotalLeftTimes: proto.Int32(max(0, allLeft)), TotalTimes: proto.Int32(max(product.TotalLimit, allLeft)), PerDiscount: proto.String(strconv.Itoa(int(bps / 100))), Condition: condition})
+		shopItem := &pb.ShopItem{Id: proto.String(publicID), Item: rewards, Price: []*pb.BaseResource{price}, ExchangeList: []*pb.BaseResource{price}, Priority: proto.Int32(priority), CanBuy: proto.Int32(max(0, can)), DayLeftTimes: proto.Int32(max(0, left)), DayTotalTimes: proto.Int32(dayTotal), TotalLeftTimes: proto.Int32(max(0, allLeft)), TotalTimes: proto.Int32(max(product.TotalLimit, allLeft)), PerDiscount: proto.String(strconv.Itoa(int(bps / 100))), Condition: condition}
+		if err := s.p4BatchPurchasePrices(shopItem, product, state, min(bought+1, product.DailyLimit), max(0, left)); err != nil {
+			return nil, nil, err
+		}
+		shop = append(shop, shopItem)
 		status := int32(0)
 		if can > 0 {
 			status = 1
@@ -668,7 +672,11 @@ func (s *GameService) p4Projection(tx *gorm.DB, p *pb.Player, cfg db.P4CommerceR
 				}
 			}
 		}
-		activity = append(activity, &pb.ActivityShopItem{Index: proto.Int32(product.Index), GetResource: rewards, CostResource: []*pb.BaseResource{price}, Total: proto.Int32(product.DailyLimit), Left: proto.Int32(max(0, left)), Discount: proto.String(strconv.FormatFloat(float64(bps)/10000, 'f', 2, 64)), PickOneOrGetAll: proto.Int32(1), Status: proto.Int32(status), Name: proto.String(name)})
+		activityItem := &pb.ActivityShopItem{Index: proto.Int32(product.Index), GetResource: rewards, CostResource: []*pb.BaseResource{price}, Total: proto.Int32(product.DailyLimit), Left: proto.Int32(max(0, left)), Discount: proto.String(strconv.FormatFloat(float64(bps)/10000, 'f', 2, 64)), PickOneOrGetAll: proto.Int32(1), Status: proto.Int32(status), Name: proto.String(name)}
+		if err := s.p4BatchPurchasePrices(activityItem, product, state, min(bought+1, product.DailyLimit), max(0, left)); err != nil {
+			return nil, nil, err
+		}
+		activity = append(activity, activityItem)
 	}
 	return shop, activity, nil
 }

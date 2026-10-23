@@ -12,6 +12,7 @@ import (
 	"gorm.io/gorm/clause"
 	"hyjs-server/constUtil"
 	"hyjs-server/db"
+	"hyjs-server/model"
 	pb "hyjs-server/model/protocol"
 	"math"
 	"strconv"
@@ -339,6 +340,10 @@ func p13UFShopAddItem(frame *pb.InstUFPlayer, id int64, itemID string, quantity,
 
 // p13UFShopBuy 把真实战争贡献消费、个人购买余量和原UF道具背包同事务保存；HTTP同stamp回执不重复消费。
 func (s *GameService) p13UFShopBuy(ctx context.Context, id int64, request *pb.CSUFPlayerBuyItem, stamp int64, now time.Time) ([]proto.Message, error) {
+	count, countErr := model.GamePurchaseCount(request)
+	if countErr != nil {
+		return nil, countErr
+	}
 	var reply *pb.SCUFPlayerBuyItemDetail
 	var broadcast *pb.SCUFPlayerBuyItem
 	var scope string
@@ -354,6 +359,10 @@ func (s *GameService) p13UFShopBuy(ctx context.Context, id int64, request *pb.CS
 		}
 		scope = match.ID
 		raw := []byte(scope + "\x00" + request.GetShopItemId() + "\x00" + request.GetNpcId())
+		// Keep old single-purchase receipt bytes exact; quantities bind the same stamp.
+		if count > 1 {
+			raw = append(raw, []byte("\x00batch:"+strconv.Itoa(int(count)))...)
+		}
 		if stamp > 0 {
 			var receipt db.P13GuildReceipt
 			err = tx.First(&receipt, "player_id=? AND operation=? AND stamp=?", id, constUtil.P13UnionFightShopBuyOperation, stamp).Error
@@ -423,11 +432,16 @@ func (s *GameService) p13UFShopBuy(ctx context.Context, id int64, request *pb.CS
 		if err != nil {
 			return err
 		}
-		if stock.LeftCount <= 0 {
+		if stock.LeftCount < int64(count) {
 			return errors.New("原个人购买次数尚未恢复")
 		}
+		if item.GetPrice() < 0 || int64(item.GetPrice()) > math.MaxInt32/int64(count) || item.GetNum() < 1 || int64(item.GetNum()) > math.MaxInt32/int64(count) {
+			return errors.New("批量价格或数量超限")
+		}
+		totalPrice := int64(item.GetPrice()) * int64(count)
+		totalQuantity := item.GetNum() * count
 		owned := frame.GetOwnToken()
-		if costResource == constUtil.UnionFightShopTokenResource && (owned < 0 || math.IsNaN(owned) || math.IsInf(owned, 0) || owned != math.Trunc(owned) || owned > 9007199254740991 || owned < float64(item.GetPrice())) {
+		if costResource == constUtil.UnionFightShopTokenResource && (owned < 0 || math.IsNaN(owned) || math.IsInf(owned, 0) || owned != math.Trunc(owned) || owned > 9007199254740991 || owned < float64(totalPrice)) {
 			return errors.New("原战争贡献余额不足或损坏")
 		}
 		original, err := s.p13UFFieldOriginal(match, tx)
@@ -439,20 +453,20 @@ func (s *GameService) p13UFShopBuy(ctx context.Context, id int64, request *pb.CS
 		if err != nil || maximum <= 0 {
 			return errors.New("原物品携带上限缺失")
 		}
-		if err = p13UFShopAddItem(frame, id, item.GetItemId(), item.GetNum(), int32(maximum)); err != nil {
+		if err = p13UFShopAddItem(frame, id, item.GetItemId(), totalQuantity, int32(maximum)); err != nil {
 			return err
 		}
 		if stock.LeftCount == int64(item.GetTotalBuyCount()) {
 			stock.LastRefreshAt = now.UnixMilli()
 		}
-		stock.LeftCount--
+		stock.LeftCount -= int64(count)
 		if err = tx.Save(stock).Error; err != nil {
 			return err
 		}
 		if costResource == constUtil.UnionFightShopTokenResource {
-			frame.OwnToken = proto.Float64(owned - float64(item.GetPrice()))
+			frame.OwnToken = proto.Float64(owned - float64(totalPrice))
 		} else {
-			cost, err := s.p4ParseCost(fmt.Sprintf("%s,%d", costResource, item.GetPrice()))
+			cost, err := s.p4ParseCost(fmt.Sprintf("%s,%d", costResource, totalPrice))
 			if err != nil {
 				return err
 			}

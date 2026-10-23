@@ -1,0 +1,151 @@
+{
+  "schema": "hyjs-dungeon-targets-v1",
+  "inputManagedSHA256": "c575957a4d2615be7d25cc926d2dea1b8910925ee5f8b1b11880517f0b6c6d19",
+  "helperAssembly": "HYJS.DungeonContent",
+  "targets": [
+    {
+      "type": "AssetLoad.AssetBundleManager",
+      "method": "GetReplaceSceneName",
+      "fullName": "AssetLoad.AssetBundleManager::GetReplaceSceneName",
+      "token": "0x600320e",
+      "inputCILSHA256": "3ae4978817bd81069da2e391697e1f41512a7f9f0e06036fb7f585749d749163",
+      "signatureBlobHex": "20010e0e",
+      "helperType": "HYJS.DungeonContent.DungeonContent",
+      "helperMethod": "Scene",
+      "helperSignature": "string(string)",
+      "hook": "Prefix return only changed explicit alias; otherwise original body"
+    },
+    {
+      "type": "Room.RCAIMonster",
+      "method": "Init",
+      "fullName": "Room.RCAIMonster::Init",
+      "token": "0x6003ec0",
+      "inputCILSHA256": "7fcd92e32e3b9b64949121f40fbfc0815a41acca49cde074921c8a7bb4305ba9",
+      "signatureBlobHex": "20010112a298",
+      "helperType": "HYJS.DungeonContent.DungeonContent",
+      "helperMethod": "AlignMonster",
+      "helperSignature": "void(Room.RCAIMonster)",
+      "hook": "Single TableCopyTask overload tail only"
+    },
+    {
+      "type": "Room.RCMoveNavigation",
+      "method": "CalculatePath",
+      "fullName": "Room.RCMoveNavigation::CalculatePath",
+      "token": "0x6004414",
+      "inputCILSHA256": "723ef5a5701aafce02aab5cd467e8bccddfe47d1bdcfd686fee28e719ddcc890",
+      "signatureBlobHex": "2001011109",
+      "helperType": "HYJS.DungeonContent.DungeonContent",
+      "helperMethod": "ProjectTarget",
+      "helperSignature": "UnityEngine.Vector3(UnityEngine.Vector3)",
+      "hook": "Prefix ldarg1/call/starg1; original onmesh point unchanged"
+    },
+    {
+      "type": "Room.RoomBase",
+      "method": "LoadAreaDataFromTable",
+      "fullName": "Room.RoomBase::LoadAreaDataFromTable",
+      "token": "0x6004448",
+      "inputCILSHA256": "948f297fa8c3d3fab684321eae011d6467876bb14947ae34216ca18d50bc2eca",
+      "signatureBlobHex": "2001010e",
+      "helperType": "HYJS.DungeonContent.DungeonContent",
+      "helperMethod": "SkipArea",
+      "helperSignature": "bool(string)",
+      "hook": "Scoped prefix return only for replaced current mission area"
+    },
+    {
+      "type": "Room.RoomCopy",
+      "method": "StartLoad",
+      "fullName": "Room.RoomCopy::StartLoad",
+      "token": "0x6004495",
+      "inputCILSHA256": "a4ced815d31a224f2b19935d97580782898052875fc5d2a8c655c7288aacb7e1",
+      "signatureBlobHex": "200001",
+      "helperType": "HYJS.DungeonContent.DungeonContent",
+      "helperMethod": "AdaptMission",
+      "helperSignature": "void(Room.RoomCopy)",
+      "hook": "After server override before ShowMiniMap"
+    },
+    {
+      "type": "Room.RoomCopy",
+      "method": "OnLoadComplete",
+      "fullName": "Room.RoomCopy::OnLoadComplete",
+      "token": "0x6004497",
+      "inputCILSHA256": "6e8e61e2b58ecf09bd9f9c2753b979fd08c6f55bbce9fd583962ed5e2dd6d6df",
+      "signatureBlobHex": "200001",
+      "helperType": "HYJS.DungeonContent.DungeonContent",
+      "helperMethod": "Prepare",
+      "helperSignature": "void(Room.RoomCopy)",
+      "hook": "First-load branch before LoadPlayer after scene guard"
+    },
+    {
+      "type": "Room.RoomCopy",
+      "method": "LoadPlayer",
+      "fullName": "Room.RoomCopy::LoadPlayer",
+      "token": "0x600449d",
+      "inputCILSHA256": "5f77a8158f4b862c7b81182deec0848fa1ae1197e4698280b459e4ecff8e7659",
+      "signatureBlobHex": "200001",
+      "helperType": "HYJS.DungeonContent.DungeonContent",
+      "helperMethod": "AlignPlayer",
+      "helperSignature": "void(Room.RoomCopy)",
+      "hook": "All returns after original position"
+    },
+    {
+      "type": "UI.UICopyEvent",
+      "method": "_OnChallengeClick",
+      "fullName": "UI.UICopyEvent::_OnChallengeClick",
+      "token": "0x6005beb",
+      "inputCILSHA256": "343788be4176e832e18b61588888a76528db4a973d5c2db41e6c4866bd1b36f4",
+      "signatureBlobHex": "200001",
+      "helperType": "HYJS.DungeonContent.DungeonContent",
+      "helperMethod": "MainEntryReady",
+      "helperSignature": "bool()",
+      "hook": "Replace 10-byte full expression with call plus five nop bytes; retain original branch/qualifications"
+    },
+    {
+      "type": "Room.RoomChallenge",
+      "method": "StartLoad",
+      "fullName": "Room.RoomChallenge::StartLoad",
+      "token": "0x600445a",
+      "inputCILSHA256": "f97185fd15d0b5c485ecfe0d05b9dfeba7e8b5cc58f011db6fc34333c450dbb9",
+      "signatureBlobHex": "200001",
+      "helperType": "HYJS.DungeonContent.DungeonContent",
+      "helperMethod": "AwakeAdapt",
+      "helperSignature": "void(Room.RoomChallenge)",
+      "hook": "Prefix maps only known chapter sceneId/BattleMap aliases before native scene lookup"
+    },
+    {
+      "type": "Room.RoomChallenge",
+      "method": "OnLoadComplete",
+      "fullName": "Room.RoomChallenge::OnLoadComplete",
+      "token": "0x6004460",
+      "inputCILSHA256": "e54e485fbbfe61b24ebd33f1402293ba027d98b92848da8f19c7ba55039f21d4",
+      "signatureBlobHex": "200001",
+      "helperType": "HYJS.DungeonContent.DungeonContent",
+      "helperMethod": "AwakePrepare",
+      "helperSignature": "void(Room.RoomChallenge)",
+      "hook": "Before native first-load LoadPlayer: validate and commit server entry visual coordinate projection"
+    },
+    {
+      "type": "Room.RoomChallenge",
+      "method": "LoadPlayer",
+      "fullName": "Room.RoomChallenge::LoadPlayer",
+      "token": "0x6004462",
+      "inputCILSHA256": "46a18b438c99b07d5f635c0ead937bea030b434251b9a0cac54b707a88830622",
+      "signatureBlobHex": "200001",
+      "helperType": "HYJS.DungeonContent.DungeonContent",
+      "helperMethod": "AwakeAlignPlayer",
+      "helperSignature": "void(Room.RoomChallenge)",
+      "hook": "Original single return tail aligns actual NavMesh Y"
+    },
+    {
+      "type": "UI.FallItem",
+      "method": "OnGoSailClick",
+      "fullName": "UI.FallItem::OnGoSailClick",
+      "token": "0x6004c4b",
+      "inputCILSHA256": "e75f5760e4a71f06f9001df4fea5d184da42e3fdca3809071c0509f57a6cade8",
+      "signatureBlobHex": "200001",
+      "helperType": "HYJS.DungeonContent.DungeonContent",
+      "helperMethod": "AwakeEntryReady",
+      "helperSignature": "bool()",
+      "hook": "Replace only original AwakeCopyResourceUpdate full expression; all original branches retained"
+    }
+  ]
+}

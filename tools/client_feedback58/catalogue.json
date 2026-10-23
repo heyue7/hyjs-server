@@ -1,0 +1,15 @@
+{
+  "baseAPK": "build/hyjs-feedback55.apk",
+  "baseAPKSHA256": "b7ad3c7c8ba53cc7990f3f3590642aa405e9a554135916a468668f0c7fdbdbbd",
+  "managedChain": [
+    "analysis/dungeon56-20261023/newbie-reference-fix",
+    "analysis/wallet57-20261023/managed-overlay-r4",
+    "analysis/dungeon56-20261023/content-overlay-r2",
+    "build/bulk58-presentation-r2"
+  ],
+  "javaOverlay": "analysis/wallet57-20261023/native-overlay-r2",
+  "ggoOverlay": "analysis/bulk58-20261023/ggo-quantity-overlay-r2",
+  "resourceOverlay": "analysis/dungeon56-20261023/original-map-overlay",
+  "plannedVersionName": "1.0.58",
+  "plannedBuildCode": 2026102308
+}

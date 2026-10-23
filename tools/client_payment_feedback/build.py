@@ -1,0 +1,83 @@
+"""Compile and verify one recharge entry bridge; never package/install."""
+import argparse, hashlib, json, shutil, subprocess, sys, tempfile, zipfile
+from pathlib import Path
+import dnfile
+from dncil.cil.body.reader import read_method_body_from_bytes
+ROOT=Path(__file__).resolve().parents[2]
+sys.path.insert(0,str(ROOT))
+from tools.client_arena_state.build import exact_body, methods, decode, instruction_value, member_reference
+SOURCE=Path(__file__).resolve().parent
+ENTRY="assets/bin/Data/Managed/Assembly-CSharp.dll"
+HELPER="SoulFlowerPaymentFeedback.dll"
+TARGETS={"UI.ChargeData::ChargeBegin":("66dff0974b9ee8c08f63b0f4994633861741d76bfc59dab7455cd29f0f7caa42","Begin")}
+def sha(raw):return hashlib.sha256(raw).hexdigest()
+def require(ok,message):
+ if not ok:raise ValueError(message)
+def il(pe,m):
+ raw=exact_body(pe,m);body=read_method_body_from_bytes(raw)
+ return raw[body.header_size:body.header_size+body.code_size]
+def verify(before,after,helper):
+ left,right=dnfile.dnPE(data=before),dnfile.dnPE(data=after)
+ old,new=methods(left),methods(right);require(len(old)==len(new),"Method count changed")
+ unchanged=engine=0;changed=[]
+ for (name,rid,a),(other,rid2,b) in zip(old,new):
+  require(name==other and rid==rid2 and a.Signature.value==b.Signature.value,"Original ABI/token changed")
+  require(bool(a.Rva)==bool(b.Rva),"Body presence changed")
+  if not a.Rva:continue
+  if name not in TARGETS:
+   require(exact_body(left,a)==exact_body(right,b),"Unrelated raw body changed: "+name)
+   unchanged+=1;engine+=name.startswith("Battle.Engine");continue
+  y=decode(right,b)
+  require([v.opcode.name for v in y]==["ldarg.0","ldarg.1","ldarg.2","ldarg.3","call","ret"],"Entry hook differs")
+  ref=member_reference(right,instruction_value(y[4]));owner=ref.Class.row
+  require(str(owner.TypeNamespace)+"."+str(owner.TypeName)=="HYJS.PaymentFeedback.PaymentFeedback" and str(ref.Name)=="Begin","Entry destination differs")
+  changed.append(name)
+ require(engine==547 and len(changed)==1,"Engine/target coverage differs")
+ for label in ("TypeDef","Field"):
+  aa=getattr(left.net.mdtables,label).rows;bb=getattr(right.net.mdtables,label).rows
+  require(len(aa)==len(bb),label+" count changed")
+  for a,b in zip(aa,bb):
+   require(str(a.TypeName if label=="TypeDef" else a.Name)==str(b.TypeName if label=="TypeDef" else b.Name),label+" token changed")
+   if label=="Field":require(a.Signature.value==b.Signature.value,"Field ABI changed")
+ return dict(allowedChangedMethods=changed,originalEngineMethodsUnchanged=engine,unrelatedRawMethodBodiesUnchanged=unchanged,originalMetadataABIAndTokensPreserved=True)
+
+def main():
+ if "--qa-diagnostics" in sys.argv:
+  from qa_diagnostics import main as qa_main
+  return qa_main()
+ ap=argparse.ArgumentParser(description=__doc__)
+ ap.add_argument("--base-apk",type=Path,required=True);ap.add_argument("--input-managed",type=Path);ap.add_argument("--expected-sha256",required=True)
+ ap.add_argument("--output-directory",type=Path,required=True);ap.add_argument("--tool-root",type=Path,required=True)
+ args=ap.parse_args();base=args.base_apk.resolve();out=args.output_directory.resolve()
+ require(sha(base.read_bytes())==args.expected_sha256,"Input APK SHA mismatch")
+ require(not out.exists() and out.is_relative_to(ROOT),"Fresh project output required")
+ pins={name:target[0] for name,target in TARGETS.items()}
+ out.mkdir(parents=True)
+ runtime=args.tool_root.resolve()/".tools/native-batch";dotnet=runtime/"dotnet/dotnet"
+ compiler=next((runtime/"dotnet/sdk").glob("*/Roslyn/bincore/csc.dll"));dnlib=runtime/"injector/bin/Debug/net8.0/dnlib.dll"
+ def run(name,cmd):
+  r=subprocess.run(["rtk","proxy",*map(str,cmd)],capture_output=True,text=True,timeout=180)
+  (out/(name+".log")).write_text(r.stdout+r.stderr);require(r.returncode==0,name+" failed; see log")
+ with zipfile.ZipFile(base) as archive,tempfile.TemporaryDirectory(prefix="hyjs-newbie-sign-") as temp:
+  w=Path(temp);before=args.input_managed.read_bytes() if args.input_managed else archive.read(ENTRY);host=w/"Assembly-CSharp.dll";host.write_bytes(before)
+  pe=dnfile.dnPE(data=before)
+  for name,_,m in methods(pe):
+   if name in TARGETS:require(sha(il(pe,m))==pins[name],"Target original CIL changed: "+name)
+  refs=[host]
+  for n in ["mscorlib.dll","UnityEngine.dll"]:
+   file=w/n;file.write_bytes(archive.read("assets/bin/Data/Managed/"+n));refs.append(file)
+  helper=out/HELPER
+  run("compile-helper",[dotnet,compiler,"/nologo","/target:library","/nostdlib+","/langversion:3","/deterministic+","/codepage:65001","/out:"+str(helper),*["/reference:"+str(r) for r in refs],SOURCE/"PaymentFeedback.cs"])
+  shutil.copy2(SOURCE/"Injector.cs",w/"Program.cs")
+  project=w/"Patch.csproj";project.write_text('<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings></PropertyGroup><ItemGroup><Reference Include="dnlib"><HintPath>'+str(dnlib)+'</HintPath></Reference></ItemGroup></Project>')
+  run("compile-injector",[dotnet,"build",project,"--nologo","--verbosity","quiet","-p:NuGetAudit=false"])
+  run("inject",[dotnet,w/"bin/Debug/net8.0/Patch.dll",host,helper,out/"Assembly-CSharp.dll"])
+ after=(out/"Assembly-CSharp.dll").read_bytes();proof=verify(before,after,helper.read_bytes())
+ metadata=dnfile.dnPE(data=after)
+ require(not any(x.ResolutionScope.table.name=="ModuleRef" and str(x.ResolutionScope.row.Name)==HELPER for x in metadata.net.mdtables.TypeRef.rows),"Helper imported original types under an invalid module scope")
+ run("verify-logic",[sys.executable,SOURCE/"verify_logic.py","--tool-root",args.tool_root.resolve()])
+ proof.update(actualSourceLogicCases="see verify-logic.log",logicRuntime="net8 minimal Unity/network doubles; not Unity/device")
+ report=dict(schema="hyjs-client-payment-feedback-v1",status="STATIC_VERIFIED_NOT_PACKAGED",managedOnly=True,inputAPKSHA256=args.expected_sha256,baseAPKSHA256=args.expected_sha256,inheritedJavaPublicProtectedABIExact=True,inheritedJavaByteExact=True,inputManagedSHA256=sha(before),replacementEntries={ENTRY:sha(after),"assets/bin/Data/Managed/"+HELPER:sha(helper.read_bytes())},outputManagedSHA256=sha(after),helperSHA256=sha(helper.read_bytes()),targetOriginalCILSHA256=pins,payloadFiles={ENTRY:str((out/"Assembly-CSharp.dll").relative_to(ROOT)),"assets/bin/Data/Managed/"+HELPER:str(helper.relative_to(ROOT))},sourcePins={str(p.relative_to(ROOT)):sha(p.read_bytes()) for p in SOURCE.iterdir() if p.is_file()},deviceExecuted=False,serverMutated=False,**proof)
+ (out/"manifest.json").write_text(json.dumps(report,ensure_ascii=False,indent=2)+"\n")
+ print(json.dumps(proof,ensure_ascii=False))
+if __name__=="__main__":main()

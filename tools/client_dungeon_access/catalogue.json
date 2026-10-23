@@ -1,0 +1,153 @@
+{
+  "schema": "hyjs-dungeon-scene-policy-v1",
+  "fixedInputAPKSHA256": "b7ad3c7c8ba53cc7990f3f3590642aa405e9a554135916a468668f0c7fdbdbbd",
+  "source": "RE and BT OfflineCopyRecovery scene-only mapping; no offline game logic",
+  "whitelist": [
+    "map_arena_001",
+    "map_cave_001",
+    "map_caverun_001",
+    "map_city_001",
+    "map_desert_001",
+    "map_desertrun_002",
+    "map_forest_002",
+    "map_forest_003",
+    "map_forestfield_001",
+    "map_forestrun_001",
+    "map_forestrun_002",
+    "map_grass_001",
+    "map_grass_002",
+    "map_grasslandrun_001",
+    "map_grassrun_002",
+    "map_guild_001",
+    "map_maze_001",
+    "map_maze_003",
+    "map_mazerun_001",
+    "map_mazerun_002",
+    "map_nightforest_001",
+    "map_nightforestrun_001",
+    "map_portal_001",
+    "map_portal_002",
+    "map_portal_003",
+    "map_portal_004",
+    "map_portal_005",
+    "map_select_001",
+    "map_snowfield_001",
+    "map_snowforest_001",
+    "map_snowforestrun_001",
+    "map_startscenes_001",
+    "map_stonerelics_002",
+    "map_stonerelicsrun_002",
+    "map_street_001",
+    "map_streetrun_001",
+    "map_nightforestfield_001"
+  ],
+  "sceneMappings": {
+    "map_forest_001": {
+      "run": "map_forestrun_002",
+      "battle": "map_forest_002"
+    },
+    "map_forestrun_003": {
+      "run": "map_forestrun_002",
+      "battle": "map_forest_002"
+    },
+    "map_stonerelics_001": {
+      "run": "map_stonerelicsrun_002",
+      "battle": "map_stonerelics_002"
+    },
+    "map_stonerelicsrun_001": {
+      "run": "map_stonerelicsrun_002",
+      "battle": "map_stonerelics_002"
+    },
+    "map_cave_004": {
+      "run": "map_caverun_001",
+      "battle": "map_cave_001"
+    },
+    "map_caverun_002": {
+      "run": "map_caverun_001",
+      "battle": "map_cave_001"
+    },
+    "map_desertrun_001": {
+      "run": "map_desertrun_002",
+      "battle": "map_desert_001"
+    },
+    "map_wasteland_001": {
+      "run": "map_nightforestrun_001",
+      "battle": "map_nightforest_001"
+    },
+    "map_wastelandrun_001": {
+      "run": "map_nightforestrun_001",
+      "battle": "map_nightforest_001"
+    },
+    "map_forestrun_004": {
+      "run": "map_forestrun_002",
+      "battle": "map_forest_002"
+    },
+    "map_grasslandrun_003": {
+      "run": "map_grassrun_002",
+      "battle": "map_grass_001"
+    },
+    "map_stonerelicsrun_003": {
+      "run": "map_stonerelicsrun_002",
+      "battle": "map_stonerelics_002"
+    },
+    "map_wastelandrun_002": {
+      "run": "map_nightforestrun_001",
+      "battle": "map_nightforest_001"
+    },
+    "map_grassrun_001": {
+      "run": "map_grassrun_002",
+      "battle": "map_grass_001"
+    },
+    "map_mazerun_004": {
+      "run": "map_mazerun_001",
+      "battle": "map_maze_001"
+    },
+    "map_grassrun_004": {
+      "run": "map_grassrun_002",
+      "battle": "map_grass_001"
+    },
+    "map_valley_001": {
+      "run": "map_forestrun_002",
+      "battle": "map_forest_002"
+    },
+    "map_valleyrun_001": {
+      "run": "map_forestrun_002",
+      "battle": "map_forest_002"
+    },
+    "map_bridge_001": {
+      "run": "map_forestrun_002",
+      "battle": "map_forest_002"
+    },
+    "map_mazerun_003": {
+      "run": "map_mazerun_001",
+      "battle": "map_maze_001"
+    },
+    "map_valleyrun_002": {
+      "run": "map_forestrun_002",
+      "battle": "map_forest_002"
+    },
+    "map_ice_001": {
+      "battle": "map_snowforest_001",
+      "run": "map_snowforest_001"
+    },
+    "map_volcano_001": {
+      "battle": "map_cave_001",
+      "run": "map_cave_001"
+    },
+    "map_volcanofield_001": {
+      "run": "map_forestfield_001",
+      "battle": "map_forestfield_001"
+    },
+    "map_desertfield_001": {
+      "run": "map_desertrun_002",
+      "battle": "map_desertrun_002"
+    }
+  },
+  "mainMissionCount": 161,
+  "mainChapterCount": 27,
+  "replacedMainMissionCount": 68,
+  "missingOriginalLayoutsPreserved": false,
+  "globalDownloadFlagsUnchanged": true,
+  "gameplayIDsAndRewardsUnchanged": true,
+  "mainMissionsWithAnySceneAlias": 72
+}

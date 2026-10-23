@@ -117,18 +117,36 @@ namespace HYJS.Recycle
                         JsonData guids=reply["data"]["guids"];
                         if(guids.Count<=Math.Min(4,StaticData.recycleMax))
                         {
-                            // A response fills the original cache and visible marks; the original confirm owns every mutation.
-                            for(int index=0;index<guids.Count;index++)
+                            // Validate the entire server selection before touching either original cache.
+                            var visible = new Dictionary<string, RecycleSelectItemBase>();
+                            var eligible = new HashSet<string>();
+                            foreach (object candidate in panel.GetCanSelectItems())
                             {
-                                string guid=(string)guids[index];
-                                StaticData.recycleBreakupSelect[index]=guid;
+                                var field = candidate == null ? null : candidate.GetType().GetField("guid");
+                                string id = field == null ? null : field.GetValue(candidate) as string;
+                                if (!String.IsNullOrEmpty(id)) eligible.Add(id);
+                            }
+                            foreach (GameObject child in panel.simpleGrid.childs)
+                            {
+                                if (child == null) continue;
+                                RecycleSelectItemBase item = child.GetComponent<RecycleSelectItemBase>();
+                                if (item == null) continue;
+                                string id = item.GetItemGUID();
+                                if (String.IsNullOrEmpty(id) || !eligible.Contains(id)) continue;
+                                if (visible.ContainsKey(id)) throw new InvalidOperationException("Duplicate visible selection");
+                                visible.Add(id, item);
+                            }
+                            var requested = new List<string>();
+                            for (int index = 0; index < guids.Count; index++) requested.Add((string)guids[index]);
+                            var selected = ValidateSelection(requested, visible.Keys, Math.Min(4, StaticData.recycleMax),
+                                StaticData.recycleBreakupSelect == null ? 0 : StaticData.recycleBreakupSelect.Length);
+                            // Original panel cache and original slot array commit only after complete validation.
+                            for (int index = 0; index < selected.Count; index++)
+                            {
+                                string guid = selected[index];
+                                StaticData.recycleBreakupSelect[index] = guid;
                                 panel.AddSelectCache(guid);
-                                foreach(GameObject child in panel.simpleGrid.childs)
-                                {
-                                    if(child==null) continue;
-                                    RecycleSelectItemBase item=child.GetComponent<RecycleSelectItemBase>();
-                                    if(item!=null && item.GetItemGUID()==guid) item.Select(true);
-                                }
+                                visible[guid].Select(true);
                             }
                             success=true;
                             if(guids.Count==0) message="没有可分解的闲置材料";
@@ -145,6 +163,20 @@ namespace HYJS.Recycle
             SetConfirm(true);
             if(!success) Clear();
             if(!String.IsNullOrEmpty(message)) BoxManager.CreatePopupTextBox(message,0f);
+        }
+
+        internal static List<string> ValidateSelection(List<string> requested, ICollection<string> visible, int maximum, int slots)
+        {
+            if (maximum < 1 || maximum > 4 || slots < maximum || requested == null || requested.Count > maximum)
+                throw new InvalidOperationException("Invalid original selection slots");
+            var result = new List<string>(); var unique = new HashSet<string>();
+            foreach (string guid in requested)
+            {
+                if (String.IsNullOrEmpty(guid) || !unique.Add(guid) || !visible.Contains(guid))
+                    throw new InvalidOperationException("Selection list changed");
+                result.Add(guid);
+            }
+            return result;
         }
 
         void OnDisable() { generation++; StopAllCoroutines(); if(pending!=null) {pending.Dispose();pending=null;} if(panel!=null) SetConfirm(true); }

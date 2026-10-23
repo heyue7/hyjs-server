@@ -586,6 +586,10 @@ func (s *GameService) openServerActivityAt(ctx context.Context, id int64, reques
 			}
 			result = &pb.SCNewOpenSevenDayByTitle{ItemList: list, RedTap: taps}
 		case *pb.CSGetOpenServerReward:
+			count, e := model.GamePurchaseCount(req)
+			if e != nil {
+				return e
+			}
 			task, e := openServerReadTask(tx, req.GetItemId())
 			if e != nil {
 				return e
@@ -600,6 +604,12 @@ func (s *GameService) openServerActivityAt(ctx context.Context, id int64, reques
 			}
 			if item.GetState() != 1 {
 				return errors.New("开服任务未达成、已领取或库存不足")
+			}
+			if count > 1 && task.TaskType != 107 && task.TaskType != 108 {
+				return errors.New("该开服奖励每次限购一份")
+			}
+			if (task.TaskType == 107 || task.TaskType == 108) && count > task.Target-state.Claims {
+				return errors.New("开服剩余购买次数不足")
 			}
 			content := task.Reward
 			if openServerChoice(task.TaskType) {
@@ -618,22 +628,29 @@ func (s *GameService) openServerActivityAt(ctx context.Context, id int64, reques
 			} else if req.GetHeroId() != "" {
 				return errors.New("当前开服任务不接受选奖励ID")
 			}
+			totalPrice := task.NewPrice * int64(count)
 			if openServerPurchase(task.TaskType) {
-				if task.NewPrice > math.MaxInt32 || player.GetDiamond() < task.NewPrice {
+				if task.NewPrice < 0 || task.NewPrice > math.MaxInt32/int64(count) || player.GetDiamond() < totalPrice {
 					return errors.New("开服抢购钻石不足或SQL价格超限")
 				}
-				player.Diamond = proto.Int64(player.GetDiamond() - task.NewPrice)
+				player.Diamond = proto.Int64(player.GetDiamond() - totalPrice)
+			}
+			if count > 1 {
+				content, e = p4ScaleRewards(content, count)
+				if e != nil {
+					return e
+				}
 			}
 			gain, e := s.openServerGain(player, g, content)
 			if e != nil {
 				return e
 			}
 			if openServerPurchase(task.TaskType) {
-				gain.Simps = append(gain.Simps, &pb.SimpleItem{Id: proto.String("diamond"), Num: proto.Int32(-int32(task.NewPrice))})
+				gain.Simps = append(gain.Simps, &pb.SimpleItem{Id: proto.String("diamond"), Num: proto.Int32(-int32(totalPrice))})
 			}
 			state.PlayerID = id
 			state.TaskID = task.ID
-			state.Claims++
+			state.Claims += count
 			if e := openServerSaveState(tx, &state); e != nil {
 				return e
 			}

@@ -7,11 +7,22 @@ if(args.Length!=3)throw new ArgumentException("input, helper, output DLL require
 using var module=ModuleDefMD.Load(args[0]);
 using var helper=ModuleDefMD.Load(args[1]);
 var type=helper.GetTypes().Single(t=>t.FullName=="HYJS.NewbieSign.NewbieSignGuard");
-var importer=new Importer(module);
+var importer=new Importer(module, ImporterOptions.TryToUseTypeDefs);
+void Normalize(TypeSig signature) {
+ if(signature == null) return;
+ if(signature is TypeDefOrRefSig named && named.TypeDefOrRef is TypeRef reference && reference.ResolutionScope is ModuleRef scope && scope.Name == helper.Name) {
+  if(!module.GetTypes().Any(t => t.FullName == reference.FullName)) throw new Exception("Unexpected helper signature: " + reference.FullName);
+  reference.ResolutionScope = module;
+ }
+ if(signature is GenericInstSig generic) { Normalize(generic.GenericType); foreach(var arg in generic.GenericArguments) Normalize(arg); }
+ Normalize(signature.Next);
+}
+void NormalizeCall(IMethod call) { Normalize(call.MethodSig.RetType); foreach(var arg in call.MethodSig.Params) Normalize(arg); }
 void Prefix(string owner,string name,string guard,bool instance){
  var method=module.GetTypes().Single(t=>t.FullName==owner).Methods.Single(m=>m.Name==name);
  if(method.Body==null||method.Body.ExceptionHandlers.Count!=(instance?2:0))throw new Exception("Original target body/exception regions differ");
  var call=importer.Import(type.Methods.Single(m=>m.Name==guard));
+ NormalizeCall(call);
  var body=method.Body;var first=body.Instructions[0];
  var prefix=new[]{Instruction.Create(OpCodes.Ldarg_0),Instruction.Create(OpCodes.Ldarg_1),Instruction.Create(OpCodes.Call,call),Instruction.Create(OpCodes.Brtrue,first),Instruction.Create(OpCodes.Ret)};
  foreach(var ins in prefix.Reverse())body.Instructions.Insert(0,ins);
@@ -19,6 +30,12 @@ void Prefix(string owner,string name,string guard,bool instance){
 }
 Prefix("UI.ShowRight","<OnTenDaySignClick>m__154","CanOpen",false);
 Prefix("UI.TenDaySignPage","UpdateLoginReward","CanRender",true);
+foreach (var reference in module.GetTypeRefs()) {
+ if (reference.ResolutionScope is ModuleRef scope && scope.Name == helper.Name) {
+  if (!module.GetTypes().Any(t => t.FullName == reference.FullName)) throw new Exception("Unexpected helper-module type: " + reference.FullName);
+  reference.ResolutionScope = module;
+ }
+}
 var options=new ModuleWriterOptions(module);options.MetadataOptions.Flags|=MetadataFlags.PreserveAll|MetadataFlags.KeepOldMaxStack;
 module.Write(args[2],options);
 Console.WriteLine("Injected two conditional newbie-sign guards; all original valid-list instructions retained");

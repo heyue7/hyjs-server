@@ -52,6 +52,9 @@ def verify(before,after,helper):
    if label=="Field":require(a.Signature.value==b.Signature.value,"Original field signature changed")
  return dict(allowedChangedMethods=changed,originalEngineMethodsUnchanged=engine,unrelatedRawMethodBodiesUnchanged=unchanged,originalMetadataABIAndTokensPreserved=True,guardSuccessRunsUntouchedOriginalBody=True,guardFalseReturnsBeforePageOpenOrTemplateRender=True)
 def main():
+ if "--qa-diagnostics" in sys.argv:
+  from qa_diagnostics import main as qa_main
+  return qa_main()
  ap=argparse.ArgumentParser(description=__doc__)
  ap.add_argument("--base-apk",type=Path,required=True);ap.add_argument("--expected-sha256",required=True)
  ap.add_argument("--output-directory",type=Path,required=True);ap.add_argument("--tool-root",type=Path,required=True)
