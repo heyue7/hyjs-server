@@ -383,6 +383,12 @@ onMounted(load);
             </NTabPane>
             <NTabPane v-if="cfg.scene === 'field_003'" name="ggo" tab="搜打撤配置">
               <GgoConfigEditor v-if="cfg.ggo" v-model:value="cfg.ggo" :disabled="readonly" />
+              <div v-if="cfg.ggo" class="ggo-save-bar">
+                <span class="text-sm text-gray-500">{{ dirty ? '当前方案有未保存修改' : '当前方案已保存' }}</span>
+                <NButton :disabled="readonly || !dirty" :loading="saving" type="primary" @click="save()">
+                  保存搜打撤配置
+                </NButton>
+              </div>
               <NAlert v-else type="info">搜打撤配置待初始化。</NAlert>
             </NTabPane>
             <NTabPane name="gather" tab="矿物与钓鱼">
@@ -638,6 +644,16 @@ onMounted(load);
   grid-template-columns: 260px minmax(0, 1fr);
   gap: 16px;
   align-items: start;
+}
+.ggo-save-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 20px;
+  padding-top: 12px;
+  border-top: 1px solid var(--n-border-color);
 }
 .world-state {
   padding: 10px 12px;

@@ -19,9 +19,9 @@ func init() {
 	routes.RegisterPostRouter("/ggo-shop/buy", wrapper.Wrapper(GGOShopBuyHandler))
 }
 
-// GGOShopCatalogueHandler 查询荒野兑换所。
-// @Summary 查询荒野兑换所
-// @Description 返回当前目录版本、回收信用点余额、价格和剩余次数。
+// GGOShopCatalogueHandler 查询信用商店。
+// @Summary 查询信用商店
+// @Description 返回当前目录版本、信用点余额、价格和剩余次数。
 // @Tags GGOShop
 // @Accept json
 // @Produce json
@@ -48,7 +48,7 @@ func GGOShopCatalogueHandler(c *gin.Context) error {
 }
 
 // GGOShopBuyHandler 购买一份商品。
-// @Summary 荒野兑换所兑换
+// @Summary 信用商店兑换
 // @Description 使用当前目录版本和UUID购买，服务端校验价格与限购，超频道具到账账号终端；重试返回原回执。
 // @Tags GGOShop
 // @Accept json

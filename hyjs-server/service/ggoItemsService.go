@@ -26,13 +26,13 @@ func (s *GameService) InstallGGOItems() error {
 		s.Tables = map[string][]map[string]string{}
 	}
 	rows := []map[string]string{
-		{"itemId": "item_9701", "name": "残损芯片", "star": "1", "icon": "ggo_chip_white", "desc": "外壳受损，仍保存少量旧世数据。沙漠中收集后交给接应人员，结算为回收信用点。", "category": "11"},
-		{"itemId": "item_9702", "name": "标准芯片", "star": "2", "icon": "ggo_chip_green", "desc": "保存完整的通用设备资料。沙漠中收集后交给接应人员，结算为回收信用点。", "category": "11"},
-		{"itemId": "item_9703", "name": "军用芯片", "star": "3", "icon": "ggo_chip_blue", "desc": "储存旧世军用设备参数，具有较高回收价值。交给沙漠接应人员可结算为回收信用点。", "category": "11"},
-		{"itemId": "item_9704", "name": "机密芯片", "star": "4", "icon": "ggo_chip_purple", "desc": "储存受限技术档案的数据芯片。交给沙漠接应人员可结算为回收信用点。", "category": "11"},
-		{"itemId": "item_9705", "name": "核心芯片", "star": "5", "icon": "ggo_chip_orange", "desc": "保存大型旧世设备的核心控制资料。交给沙漠接应人员可结算为回收信用点。", "category": "11"},
-		{"itemId": "item_9706", "name": "原型芯片", "star": "6", "icon": "ggo_chip_red", "desc": "记录未量产旧世技术的稀有芯片。交给沙漠接应人员可结算为回收信用点。", "category": "11"},
-		{"itemId": "item_9710", "name": "回收信用点", "star": "5", "icon": "ggo_salvage_credit", "desc": "沙漠接应人员结算遗迹芯片后获得的货币，可在荒野兑换所兑换物品。", "category": "11"},
+		{"itemId": "item_9701", "name": "残损芯片", "star": "1", "icon": "ggo_chip_white", "desc": "外壳受损，仍保存少量旧世数据。沙漠中收集后，可在安全区交给终端结算员兑换信用点。", "category": "11"},
+		{"itemId": "item_9702", "name": "标准芯片", "star": "2", "icon": "ggo_chip_green", "desc": "保存完整的通用设备资料。沙漠中收集后，可在安全区交给终端结算员兑换信用点。", "category": "11"},
+		{"itemId": "item_9703", "name": "军用芯片", "star": "3", "icon": "ggo_chip_blue", "desc": "储存旧世军用设备参数，具有较高回收价值。在安全区交给终端结算员可兑换信用点。", "category": "11"},
+		{"itemId": "item_9704", "name": "机密芯片", "star": "4", "icon": "ggo_chip_purple", "desc": "储存受限技术档案的数据芯片。在安全区交给终端结算员可兑换信用点。", "category": "11"},
+		{"itemId": "item_9705", "name": "核心芯片", "star": "5", "icon": "ggo_chip_orange", "desc": "保存大型旧世设备的核心控制资料。在安全区交给终端结算员可兑换信用点。", "category": "11"},
+		{"itemId": "item_9706", "name": "原型芯片", "star": "6", "icon": "ggo_chip_red", "desc": "记录未量产旧世技术的稀有芯片。在安全区交给终端结算员可兑换信用点。", "category": "11"},
+		{"itemId": "item_9710", "name": "信用点", "star": "5", "icon": "ggo_salvage_credit", "desc": "在安全区结算遗迹芯片后获得的货币，可在信用商店兑换物品。", "category": "11"},
 		{"itemId": "item_9711", "name": "超频点数", "star": "6", "icon": "ggo_overclock_point", "desc": "获得后自动存入所属账号的蓝绿终端。每个道具增加1超频点数，不占用背包。", "category": "11"},
 	}
 	for _, next := range rows {
@@ -97,12 +97,13 @@ func (s *GameService) InitializeGGO(ctx context.Context) error {
 		return err
 	}
 	if count > 0 {
-		return nil
+		// 只改旧测试条目的默认说明，保留运营自行填写的来源及商品参数。
+		return tx.Model(&db.P4CommerceRule{}).Where("id=? AND kind=? AND source=?", constUtil.GGOSeedRuleID, constUtil.GGOShopKey, "GGO测试参数：1回收信用点兑换1超频道具，每日1次，可后台调整").Update("source", "GGO样式测试：1信用点兑换1超频道具，每日1次；正式周限购待配置").Error
 	}
 	p := p4BaseProduct(constUtil.GGOSeedProductID, constUtil.GGOOverclockID+",1", constUtil.GGOCurrencyID+",1", 1, 1)
 	p.Name = "超频点数"
 	p.DailyLimit = 1
-	row := db.P4CommerceRule{ID: constUtil.GGOSeedRuleID, Kind: constUtil.GGOShopKey, ShopType: 970, Enabled: true, StartAt: 1, EndAt: 253402214400000, ClaimEndAt: 253402214400000, Rules: adminJSON(p4CommerceRules{LiveEditable: true, Products: []p4Product{p}}), Source: "GGO测试参数：1回收信用点兑换1超频道具，每日1次，可后台调整"}
+	row := db.P4CommerceRule{ID: constUtil.GGOSeedRuleID, Kind: constUtil.GGOShopKey, ShopType: 970, Enabled: true, StartAt: 1, EndAt: 253402214400000, ClaimEndAt: 253402214400000, Rules: adminJSON(p4CommerceRules{LiveEditable: true, Products: []p4Product{p}}), Source: "GGO样式测试：1信用点兑换1超频道具，每日1次；正式周限购待配置"}
 	return tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&row).Error
 }
 
@@ -122,7 +123,7 @@ func (s *GameService) ggoCatalogue(tx *gorm.DB, player *pb.Player, game *model.G
 	if err != nil {
 		return nil, err
 	}
-	out := &model.GGOShopCatalogueResponse{Name: constUtil.GGOShopName, CurrencyID: constUtil.GGOCurrencyID, CurrencyName: "回收信用点", CurrencyIcon: "ggo_salvage_credit", Balance: p4ResourceBalance(player, game, constUtil.GGOCurrencyID), Version: managed.Version, Enabled: managed.Settings.Enabled, Items: []model.GGOShopItem{}}
+	out := &model.GGOShopCatalogueResponse{Name: constUtil.GGOShopName, CurrencyID: constUtil.GGOCurrencyID, CurrencyName: "信用点", CurrencyIcon: "ggo_salvage_credit", Balance: p4ResourceBalance(player, game, constUtil.GGOCurrencyID), Version: managed.Version, Enabled: managed.Settings.Enabled, Items: []model.GGOShopItem{}}
 	if raw.Period == nil {
 		out.Enabled = false
 		return out, nil

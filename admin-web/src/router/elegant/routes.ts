@@ -348,7 +348,7 @@ export const generatedRoutes: GeneratedRoute[] = [
         path: '/shops/ggo',
         component: 'view.shops_ggo',
         meta: {
-          title: '荒野兑换所',
+          title: '信用商店',
           i18nKey: 'route.shops_ggo',
           icon: 'ph:cpu',
           order: 11,

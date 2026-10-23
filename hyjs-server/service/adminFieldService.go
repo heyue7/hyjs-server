@@ -39,6 +39,9 @@ func (s *GameService) InitializeAdminFields(ctx context.Context) error {
 			return err
 		}
 	}
+	if err := s.initializeDesertFieldName(ctx); err != nil {
+		return err
+	}
 	// 全部表与策略初始化成功后标记本服务，正式高频请求可跳过表存在检查。
 	s.adminFieldRuntimeReady.Store(true)
 	return nil
@@ -272,7 +275,24 @@ func (s *GameService) AdminSaveField(ctx context.Context, actor *model.AdminPrin
 		} else {
 			row.ID = uuid.NewString()
 		}
-		raw, _ := json.Marshal(req.Configuration)
+		raw, err := json.Marshal(req.Configuration)
+		if err != nil {
+			return err
+		}
+		if row.Configuration != "" {
+			// 编辑器只认识当前DTO；保留其他会话写入的扩展字段。
+			var existing, edited map[string]json.RawMessage
+			if json.Unmarshal([]byte(row.Configuration), &existing) != nil || existing == nil || json.Unmarshal(raw, &edited) != nil {
+				return constUtil.ErrAdminConfiguration
+			}
+			for key, value := range edited {
+				existing[key] = value
+			}
+			raw, err = json.Marshal(existing)
+			if err != nil {
+				return err
+			}
+		}
 		row.Name, row.Scene, row.Configuration = req.Name, req.Configuration.Scene, string(raw)
 		row.Revision++
 		row.UpdatedAt = time.Now().UnixMilli()
@@ -282,7 +302,6 @@ func (s *GameService) AdminSaveField(ctx context.Context, actor *model.AdminPrin
 		if err := adminAudit(tx, actor, "field.template.save", row.ID, fmt.Sprintf("scene=%s revision=%d", row.Scene, row.Revision)); err != nil {
 			return err
 		}
-		var err error
 		out, err = s.adminFieldTemplateDTO(row)
 		return err
 	})

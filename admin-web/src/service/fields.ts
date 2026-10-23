@@ -154,13 +154,16 @@ export interface FieldChannel {
   lines: { line: number; online: number }[];
 }
 
+/** NPC 职责固定：随机传送入口、撤离接应或安全区结算。 */
+export type FieldGGONPCRole = 'teleport' | 'extraction' | 'settlement';
 export interface FieldGGONPC {
   id: string;
   name: string;
   heroId: string;
-  role: 'guide' | 'settlement';
+  role: FieldGGONPCRole;
   pointLabel: string;
   dialogue: string;
+  /** 坐标沿用旧配置；本版后台不提供坐标编辑。 */
   position: { x: number | null; y: number | null; z: number | null } | null;
   settlesChips: boolean;
 }
@@ -170,7 +173,40 @@ export interface FieldGGOEnemy {
   heroId: string;
   respawnMs: number;
 }
+/** schemaVersion 2 的 GGO 规则。固定字符串与布尔值只读，可空数值 null 表示待定。 */
+export interface FieldGGORules {
+  entryMethod: 'npc_random';
+  protectionSeconds: number;
+  terminalName: string;
+  unlimitedCapacity: true;
+  searchEnabled: false;
+  initialSource: 'monsters';
+  pvpTransfer: 'winner_terminal';
+  deathReturn: 'safe_area';
+  deathLossPercent: number | null;
+  pveLossMode: 'pending' | 'destroy';
+  extractionReturn: 'safe_area';
+  extractionSeconds: number | null;
+  settlementMode: 'safe_npc_or_confirm_leave';
+  retainAfterDeath: true;
+  safeTradeEnabled: boolean;
+  tradeAssets: 'pending' | 'chips_only';
+  allowGift: boolean | null;
+  creditCap: 'none';
+  shopLimitScope: 'account_weekly';
+  weeklyLimit: number | null;
+  /** 1 为周一，7 为周日。 */
+  weeklyResetDay: number | null;
+  weeklyResetHour: number | null;
+  weeklyResetMinute: number | null;
+  weeklyResetTimezone: 'Asia/Shanghai';
+  weeklyServerScope: 'pending' | 'current_server' | 'all_servers';
+  leaveConfirmation: string;
+  leaveConfirmButton: string;
+  leaveCancelButton: string;
+}
 export interface FieldGGOConfiguration {
+  schemaVersion: 2;
   title: string;
   modeName: string;
   currencyId: string;
@@ -180,7 +216,15 @@ export interface FieldGGOConfiguration {
   npcs: FieldGGONPC[];
   monsters: FieldGGOEnemy[];
   bosses: FieldGGOEnemy[];
-  chips: { itemId: string; name: string; exchangeValue: number | null }[];
+  /** 六品质芯片；掉落权重、数量与兑换值可为 null（待定）。 */
+  chips: {
+    itemId: string;
+    name: string;
+    exchangeValue: number | null;
+    dropWeight: number | null;
+    dropAmount: number | null;
+  }[];
+  rules: FieldGGORules;
   extraction: {
     arrival: string;
     confirmation: string;

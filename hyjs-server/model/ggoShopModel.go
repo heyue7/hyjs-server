@@ -1,6 +1,6 @@
 package model
 
-// GGOShopCatalogueRequest 查询荒野兑换所。
+// GGOShopCatalogueRequest 查询信用商店。
 type GGOShopCatalogueRequest struct {
 	PlayerID   int64  `json:"playerId" binding:"required"`   // 角色ID。
 	SessionHex string `json:"sessionHex" binding:"required"` // 当前16字节会话的十六进制字符串。
@@ -21,7 +21,7 @@ type GGOShopItem struct {
 	Name        string `json:"name"`        // 展示名称。
 	ResourceID  string `json:"resourceId"`  // 奖励道具ID。
 	Amount      int64  `json:"amount"`      // 每份奖励数量。
-	Price       int64  `json:"price"`       // 每份所需回收信用点。
+	Price       int64  `json:"price"`       // 每份所需信用点。
 	Remaining   int64  `json:"remaining"`   // 当前角色剩余可购买次数。
 	Description string `json:"description"` // 道具说明。
 	Icon        string `json:"icon"`        // 原客户端图标资源名。

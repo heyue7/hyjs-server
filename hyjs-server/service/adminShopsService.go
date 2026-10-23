@@ -21,11 +21,11 @@ import (
 func AdminShopDefinitions() []model.AdminShopDefinition {
 	base := []string{"rewards", "cost", "dailyLimit", "totalLimit", "stock", "minLevel", "minVip", "priority", "weight", "discountBps", "enabled"}
 	out := []model.AdminShopDefinition{}
-	for _, v := range []struct{ id, label string }{{"ggo", "荒野兑换所"}, {"ordinary", "普通商店"}, {"memory", "记忆圣坛"}, {"popularity", "声望商店商品"}, {"popularity-rank", "声望商店奖励"}, {"point", "攻略点商店"}, {"score", "积分商店"}, {"guild", "公会商店"}, {"pet-market", "精灵商店"}, {"union-fight", "公会战商店"}, {"vip", "会员礼包"}} {
+	for _, v := range []struct{ id, label string }{{"ggo", "信用商店"}, {"ordinary", "普通商店"}, {"memory", "记忆圣坛"}, {"popularity", "声望商店商品"}, {"popularity-rank", "声望商店奖励"}, {"point", "攻略点商店"}, {"score", "积分商店"}, {"guild", "公会商店"}, {"pet-market", "精灵商店"}, {"union-fight", "公会战商店"}, {"vip", "会员礼包"}} {
 		d := model.AdminShopDefinition{ID: v.id, Label: v.label, Fields: append([]string{}, base...), SettingsFields: []string{"unlimited", "enabled", "startAt", "endAt", "claimEndAt", "source"}, CanCreate: true, Notes: "保存后立即用于后续购买；历史交易、库存使用和限购保留。"}
 		switch v.id {
 		case "ggo":
-			d.Notes = "荒野兑换所使用回收信用点；初始测试参数为1回收信用点兑换1超频道具、每日1次，可编辑价格和限购。超频道具自动存入账号蓝绿终端。"
+			d.Notes = "使用信用点兑换超频点数，获得后自动存入账号蓝绿终端。当前商品仅供样式测试：1信用点兑换1个，每日1次。正式账号周限购参数在沙漠搜打撤配置中准备，尚未接入购买规则。"
 		case "ordinary":
 			d.Notes = "商品、价格与材料保存后生效；原阶梯价格保留到该商品被显式修改。"
 		case "memory":
