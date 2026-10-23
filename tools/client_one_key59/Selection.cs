@@ -54,6 +54,16 @@ namespace HYJS.OneKey59
             return true;
         }
         static Dictionary<string, string> Selected(BagSellPage page) { return (Dictionary<string, string>)Field(page, "selectedGuids"); }
+        public static void OpenBreakupSelection()
+        {
+            int kind = (int)StaticData.curRecycleBreakSelectType;
+            if (kind < 0 || kind > 2)
+            {
+                BoxManager.CreatePopupTextBox("分解类型已变化，请重新选择材料类型", 0f);
+                return;
+            }
+            PageManager.Instance.OpenPage("RecycleBreakupSelectPage", "type=" + kind);
+        }
         public static void BeforeSuccessfulRefresh(BagSellPage page)
         {
             // Called only after original SellCallback has accepted its success branch.

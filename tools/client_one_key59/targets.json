@@ -67,6 +67,15 @@
       ],
       "token": "0x6004c24",
       "inputCILSHA256": "6b7c48418f39a7f03837eec9ab2b9a53e58c1280cd7954f4c47967b395dd94ba"
+    },
+    {
+      "type": "UI.RecycleBreakupPanel",
+      "method": "OnBreakupIconClick",
+      "helper": "OpenBreakupSelection",
+      "mode": "replace",
+      "args": [],
+      "token": "0x600572d",
+      "inputCILSHA256": "060c7d0bb456adc48153417770849455c1048eadb7272c2aec327a18ed18116a"
     }
   ]
 }

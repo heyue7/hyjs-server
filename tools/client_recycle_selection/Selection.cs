@@ -148,6 +148,28 @@ namespace HYJS.Recycle
                                 panel.AddSelectCache(guid);
                                 visible[guid].Select(true);
                             }
+                            // Keep the confirmed selection visible without changing any candidate or slot.
+                            if (selected.Count > 0)
+                            {
+                                var ordered = new List<GameObject>();
+                                foreach (GameObject child in panel.simpleGrid.childs)
+                                {
+                                    if (child == null) continue;
+                                    RecycleSelectItemBase item = child.GetComponent<RecycleSelectItemBase>();
+                                    if (item != null && selected.Contains(item.GetItemGUID())) ordered.Add(child);
+                                }
+                                foreach (GameObject child in panel.simpleGrid.childs)
+                                {
+                                    if (child == null) { ordered.Add(child); continue; }
+                                    RecycleSelectItemBase item = child.GetComponent<RecycleSelectItemBase>();
+                                    if (item == null || !selected.Contains(item.GetItemGUID())) ordered.Add(child);
+                                }
+                                panel.simpleGrid.childs.Clear();
+                                panel.simpleGrid.childs.AddRange(ordered);
+                                panel.simpleGrid.Reposition();
+                                UIScrollView scroll = panel.scrollView == null ? null : panel.scrollView.GetComponent<UIScrollView>();
+                                if (scroll != null) scroll.ResetPosition();
+                            }
                             success=true;
                             if(guids.Count==0) message="没有可分解的闲置材料";
                             else message="";

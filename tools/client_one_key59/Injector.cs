@@ -51,7 +51,7 @@ foreach(var plan in targets.EnumerateArray()) {
  added.Add(Instruction.Create(OpCodes.Call,call));
  string mode=plan.GetProperty("mode").GetString()!;
  if(mode=="replace") {
-  m.Body.ExceptionHandlers.Clear(); // Reviewed complete replacement of OnQuickSelect enumeration body.
+  m.Body.ExceptionHandlers.Clear(); // Reviewed complete replacement of selection enumeration or typed page opening.
   m.Body.Instructions.Clear();foreach(var i in added)m.Body.Instructions.Add(i);m.Body.Instructions.Add(Instruction.Create(OpCodes.Ret));
  } else if(mode=="prefix") {
   var original=m.Body.Instructions[0];added.Add(Instruction.Create(OpCodes.Brfalse,original));added.Add(Instruction.Create(OpCodes.Ret));
