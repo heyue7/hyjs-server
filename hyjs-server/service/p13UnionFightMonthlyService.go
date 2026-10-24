@@ -177,7 +177,7 @@ func p13UFMonthlyCutoffHash(row *db.P13UnionFightMonthlyCutoff) string {
 // any post-boundary membership, chairman, join or dissolution mutation. The same
 // hook at the worker boundary covers idle/offline accounts without moving cutoff.
 func (s *GameService) P13MonthlyBeforeGuildMutation(tx *gorm.DB, now time.Time) error {
-	if !tx.Migrator().HasTable(&db.P13UnionFightMonthlyOffer{}) {
+	if !gameSchemaHasTable(tx, &db.P13UnionFightMonthlyOffer{}) {
 		return nil
 	}
 	if err := s.p13UFMonthlyArm(tx, now); err != nil {
@@ -667,7 +667,7 @@ func (s *GameService) P13UnionFightMonthlyRank(ctx context.Context, _ int64, b *
 // p13UFMonthlyTitle reads only a delivered immutable cutoff entitlement. Current
 // membership and current operator policy cannot move or revoke the earned award.
 func p13UFMonthlyTitle(tx *gorm.DB, id int64, title string, now time.Time) (*db.P13UnionFightMonthlyTitle, error) {
-	if !tx.Migrator().HasTable(&db.P13UnionFightMonthlyTitle{}) {
+	if !gameSchemaHasTable(tx, &db.P13UnionFightMonthlyTitle{}) {
 		return nil, nil
 	}
 	var row db.P13UnionFightMonthlyTitle

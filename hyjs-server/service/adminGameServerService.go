@@ -128,7 +128,7 @@ func AdminCreateGameServer(ctx context.Context, p *model.AdminPrincipal, req mod
 			return err
 		}
 		// A newly planned realm starts with an explicit empty calendar; legacy running realms retain migration compatibility.
-		if tx.Migrator().HasTable(&db.AdminActivityScheduleRevision{}) {
+		if gameSchemaHasTable(tx, &db.AdminActivityScheduleRevision{}) {
 			if err := tx.Create(&db.AdminActivityScheduleRevision{ServerID: row.ID, Revision: 1}).Error; err != nil {
 				return err
 			}
@@ -177,7 +177,7 @@ func AdminUpdateGameServer(ctx context.Context, p *model.AdminPrincipal, id int6
 // runtimeGameServer uses the process identity; user-provided zone IDs never select another database.
 func (s *GameService) runtimeGameServer(ctx context.Context) (*db.AdminGameServer, error) {
 	d := db.GetIns().WithContext(ctx)
-	if !d.Migrator().HasTable(&db.AdminGameServer{}) {
+	if !gameSchemaHasTable(d, &db.AdminGameServer{}) {
 		return &db.AdminGameServer{ID: s.OriginalServerID(), Name: "灵魂之花", Enabled: true, RuntimeBound: true}, nil
 	}
 	var row db.AdminGameServer

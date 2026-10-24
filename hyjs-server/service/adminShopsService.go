@@ -275,7 +275,7 @@ func (s *GameService) adminShopMutation(ctx context.Context, actor *model.AdminP
 	var out *model.AdminShopResponse
 	err := db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		// All shop editors share one server row lock, including initially empty catalogs.
-		if tx.Migrator().HasTable(&db.ServerGameClock{}) {
+		if gameSchemaHasTable(tx, &db.ServerGameClock{}) {
 			var clock db.ServerGameClock
 			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&clock, "server_id=?", s.serverGameClockID()).Error; err != nil {
 				return err

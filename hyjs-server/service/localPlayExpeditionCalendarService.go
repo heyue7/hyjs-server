@@ -19,7 +19,7 @@ type localPlayExpeditionQuota struct {
 
 // 日账本仅由已持有角色锁的本玩法事务维护，等级经验不参与回拨。
 func expeditionDayArchive(tx *gorm.DB, id int64, day string) (*localPlayExpeditionQuota, error) {
-	if !tx.Migrator().HasTable(&db.LocalPlayActivityOperation{}) {
+	if !gameSchemaHasTable(tx, &db.LocalPlayActivityOperation{}) {
 		return nil, errLocalPlayActivitiesInvalid
 	}
 	var row db.LocalPlayActivityOperation
@@ -125,7 +125,7 @@ func freezeP7ExpeditionCalendar(tx *gorm.DB, m db.P7ExpeditionMission, real time
 	if !GameCalendarContextBound(tx.Statement.Context) {
 		return nil
 	}
-	if !tx.Migrator().HasTable(&db.LocalPlayActivityOperation{}) {
+	if !gameSchemaHasTable(tx, &db.LocalPlayActivityOperation{}) {
 		return errLocalPlayActivitiesInvalid
 	}
 	offset := GameCalendarOffsetDays(tx.Statement.Context)
@@ -151,7 +151,7 @@ func freezeP7ExpeditionCalendar(tx *gorm.DB, m db.P7ExpeditionMission, real time
 // P10传入的是帮助者ctx；所有时钟查询都明确使用任务主人，不能借帮助者偏移推进任务。
 // 未启动或未建表的旧服务保持原行为，不查询缺失表；不增加逆序Profile行锁。
 func (s *GameService) expeditionOwnerOffset(tx *gorm.DB, id int64) (int64, error) {
-	if !s.LocalPlayToolsEnabled || !tx.Migrator().HasTable(&db.LocalPlayPolicy{}) || !tx.Migrator().HasTable(&db.LocalPlayClockState{}) {
+	if !s.LocalPlayToolsEnabled || !gameSchemaHasTable(tx, &db.LocalPlayPolicy{}) || !gameSchemaHasTable(tx, &db.LocalPlayClockState{}) {
 		return 0, nil
 	}
 	enabled, err := localPlayPolicyEnabled(tx)
@@ -180,7 +180,7 @@ func (s *GameService) expeditionOwnerOffset(tx *gorm.DB, id int64) (int64, error
 }
 
 func (s *GameService) expeditionClock(tx *gorm.DB, m db.P7ExpeditionMission) (*localPlayExpeditionClock, error) {
-	if !s.LocalPlayToolsEnabled || !tx.Migrator().HasTable(&db.LocalPlayActivityOperation{}) {
+	if !s.LocalPlayToolsEnabled || !gameSchemaHasTable(tx, &db.LocalPlayActivityOperation{}) {
 		return nil, nil
 	}
 	var row db.LocalPlayActivityOperation

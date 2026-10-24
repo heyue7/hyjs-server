@@ -20,7 +20,7 @@ type localPlayWheelReceipt struct {
 // Keep original draw stamps unique across private refreshes. Administrative
 // request IDs cannot contain ':', so this receipt namespace cannot collide.
 func localPlayTurntableReplay(tx *gorm.DB, id int64, request *pb.CSPlayBigTurn, stamp int64) (*pb.SCPlayBigTurn, error) {
-	if localPlayActivityOwner(tx) != id || !tx.Migrator().HasTable(&db.LocalPlayActivityOperation{}) {
+	if localPlayActivityOwner(tx) != id || !gameSchemaHasTable(tx, &db.LocalPlayActivityOperation{}) {
 		return nil, nil
 	}
 	if stamp <= 0 {

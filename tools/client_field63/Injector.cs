@@ -11,6 +11,7 @@ var importer=new Importer(main,ImporterOptions.TryToUseTypeDefs);
 foreach(var target in JsonDocument.Parse(File.ReadAllText(args[3])).RootElement.EnumerateArray()) {
  var method=(MethodDef)main.ResolveToken(Convert.ToUInt32(target.GetProperty("token").GetString()![2..],16));
  if(method.DeclaringType.FullName!=target.GetProperty("type").GetString() || method.Name!=target.GetProperty("method").GetString())throw new Exception("Wrong pinned target");
+ if(target.TryGetProperty("retained",out var retained) && retained.GetBoolean())continue;
  var helperMethod=helper.GetTypes().Single(t=>t.FullName=="HYJS.Field63.Runtime").Methods.Single(m=>m.Name==target.GetProperty("helper").GetString());
  if(helperMethod.MethodSig.Params.Any(p=>p.ElementType!=ElementType.Object))throw new Exception("Hook boundary must use object parameters");
  var hook=importer.Import(helperMethod);

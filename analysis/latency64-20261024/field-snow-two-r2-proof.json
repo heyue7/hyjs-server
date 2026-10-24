@@ -1,0 +1,21 @@
+{
+  "status": "MANAGED_COMPILED_STATIC_VERIFIED_NOT_DEVICE_TESTED",
+  "overlay": "build/field64-overlay-r2/manifest.json",
+  "MainSameAsR1": true,
+  "inputAPK": "4a85ed009e86c649b5954e8d1f02165e9d1951ec89256196f3dccd9076e6183d",
+  "MainSHA256": "57f12e1c1aaa0ee46bc00d12be6b06bba5fda16533b47cc50a02c19c5e5e4f22",
+  "helperSHA256": "2f27e72fca3642b3ea94fa58745539e9235a1f256f8c99d1cafcb61fba5056f0",
+  "allowedChangedMethods": [
+    "Room.RCUIFieldBoss::Tick"
+  ],
+  "originalEngineMethodsExact": 547,
+  "unrelatedRawMethodBodiesExact": 26945,
+  "metadataABIAndTokensPreserved": true,
+  "scope": [
+    "field_002 anchorXZ=(66,62) R=2",
+    "field_002 anchorXZ=(62,49) R=2"
+  ],
+  "runtimeVerified": false,
+  "apkBuilt": false,
+  "phoneOperated": false
+}

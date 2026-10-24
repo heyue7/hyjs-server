@@ -143,7 +143,7 @@ func (s *GameService) P13GuildPrayerProperties(ctx context.Context, tx *gorm.DB,
 	owner := s.p10ClientOwner()
 	if !owner.guildCoreSchemaReady.Load() || !owner.guildPrayerSchemaReady.Load() {
 		for _, table := range []any{&db.P13GuildPrayerRoll{}, &db.P13GuildMember{}, &db.P13Guild{}} {
-			if !tx.Migrator().HasTable(table) {
+			if !gameSchemaHasTable(tx, table) {
 				return &pb.BaseProp{}, "", 0, nil
 			}
 		}

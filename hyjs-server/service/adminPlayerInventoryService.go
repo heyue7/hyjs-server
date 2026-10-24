@@ -829,7 +829,7 @@ func (s *GameService) adminInventoryActivityGuard(tx *gorm.DB, id int64, g *mode
 		table any
 		where string
 	}{{&db.DailyCopyFight{}, "player_id=? AND settled=false"}, {&db.P7RushFight{}, "player_id=? AND status IN ('captured','computed') AND diagnostic=false"}, {&db.P12WorldBossBattleReceipt{}, "player_id=? AND committed=false AND abandoned_at=0"}} {
-		if tx.Migrator().HasTable(check.table) {
+		if gameSchemaHasTable(tx, check.table) {
 			var count int64
 			if err := tx.Model(check.table).Where(check.where, id).Count(&count).Error; err != nil {
 				return err

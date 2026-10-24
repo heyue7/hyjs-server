@@ -23,9 +23,9 @@ import (
 // GameService 编排账号、主城和当前已恢复的副本协议。
 type GameService struct {
 	// RuntimeBase preserves live socket ownership across request-local table overlays.
-	RuntimeBase    *GameService
-	tableLookup    *gameTableLookup
-	redPointSchema atomic.Pointer[redPointSchemaSnapshot]
+	RuntimeBase  *GameService
+	tableLookup  *gameTableLookup
+	gameSchema64 atomic.Pointer[gameSchema64Snapshot]
 	// ServerID 由启动配置注入；同一数据库中的本地ID归属该区服。
 	ServerID int64
 	Host     string

@@ -112,7 +112,7 @@ func (s *GameService) p7CaptureRushAdditionOffer(tx *gorm.DB, fight *db.P7RushFi
 
 func p7ReadRushAdditionOffer(tx *gorm.DB, state *db.P7RushState) (*db.P7RushAdditionOffer, *db.P7RushAdditionPolicy, error) {
 	// 早期独立scoped fixture只建原战斗表，未迁移加成时保留无加成行为。
-	if !tx.Migrator().HasTable(&db.P7RushAdditionOffer{}) {
+	if !gameSchemaHasTable(tx, &db.P7RushAdditionOffer{}) {
 		return nil, nil, nil
 	}
 	offer := &db.P7RushAdditionOffer{}
@@ -205,7 +205,7 @@ func (s *GameService) p7CompletedLocalSectionResetAllowed(tx *gorm.DB, state *db
 	if state.ActiveFight != "" || state.Floor < 4 {
 		return false, nil
 	}
-	if tx.Migrator().HasTable(&db.P7SectionRewardOffer{}) {
+	if gameSchemaHasTable(tx, &db.P7SectionRewardOffer{}) {
 		section, policy, err := s.p7ReadSectionOffer(tx, state)
 		if err != nil {
 			return false, err

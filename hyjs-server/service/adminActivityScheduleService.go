@@ -77,7 +77,7 @@ func adminActivitySchemaHasTable(tx *gorm.DB, table any) bool {
 			return true
 		}
 	}
-	return tx.Migrator().HasTable(table)
+	return gameSchemaHasTable(tx, table)
 }
 
 // adminActivityRedundantSource identifies generated aliases, never operator
@@ -449,7 +449,7 @@ func (s *GameService) AdminScheduledTurntablePool(tx *gorm.DB, now int64, fallba
 func AdminScheduledOpeningRule(tx *gorm.DB, cfg *db.OpenServerActivityRule, now int64, playerIDs ...int64) error {
 	// The authenticated deployment's realm date controls the fourteen unlock
 	// tiers. It never replaces the already-projected role participation age.
-	if service, ok := tx.Statement.Context.Value(constUtil.GameServiceContextKey).(*GameService); ok && tx.Migrator().HasTable(&db.AdminGameServer{}) {
+	if service, ok := tx.Statement.Context.Value(constUtil.GameServiceContextKey).(*GameService); ok && gameSchemaHasTable(tx, &db.AdminGameServer{}) {
 		var realm db.AdminGameServer
 		if err := tx.First(&realm, "id=?", service.OriginalServerID()).Error; err != nil {
 			return err
@@ -509,7 +509,7 @@ func (s *GameService) adminActivityOccurrenceFrozen(tx *gorm.DB, row db.AdminAct
 	// Use a current read after consumer locking. A prior permission SELECT may already
 	// have established an older InnoDB repeatable-read snapshot in this transaction.
 	_, frozen, err := adminActivityRaw(tx.Clauses(clause.Locking{Strength: "SHARE"}), row.ConsumerID)
-	if err == nil && row.Mode == "turntable" && !frozen && tx.Migrator().HasTable(&db.TurntableState{}) {
+	if err == nil && row.Mode == "turntable" && !frozen && gameSchemaHasTable(tx, &db.TurntableState{}) {
 		var state []db.TurntableState
 		if err = tx.Clauses(clause.Locking{Strength: "SHARE"}).Select("pool_id", "player_id").Where("pool_id=?", row.ConsumerKey).Limit(1).Find(&state).Error; err == nil {
 			frozen = len(state) > 0
@@ -532,7 +532,7 @@ func (s *GameService) adminActivityOccurrenceDTO(tx *gorm.DB, row db.AdminActivi
 	return model.AdminActivityOccurrenceDTO{Timing: timing, StartDay: startDay, DurationDays: durationDays, ClaimDays: claimDays, Form: form, ID: row.ID, TemplateID: row.TemplateID, TemplateVersion: row.TemplateVersion, Name: form.Name, Mode: row.Mode, StartAt: row.StartAt, EndAt: row.EndAt, ClaimEndAt: row.ClaimEndAt, Lane: row.Lane, Enabled: row.Enabled, Frozen: frozen, Version: adminVersion(row), ConsumerID: row.ConsumerID}, err
 }
 func adminRequireActivityServer(tx *gorm.DB, id int64) error {
-	if !tx.Migrator().HasTable("admin_game_servers") {
+	if !gameSchemaHasTable(tx, "admin_game_servers") {
 		return constUtil.ErrAdminConfiguration
 	}
 	var count int64
@@ -1132,7 +1132,7 @@ func (s *GameService) AdoptAdminActivityCalendar(ctx context.Context) error {
 		// The previous selector exposed only the configured current wheel. Old
 		// enabled pool archives must not become extra simultaneous live wheels.
 		wheel := "turntable_20261011"
-		if tx.Migrator().HasTable(&db.KingRecruitRules{}) {
+		if gameSchemaHasTable(tx, &db.KingRecruitRules{}) {
 			var king db.KingRecruitRules
 			err := tx.First(&king, 1).Error
 			if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
@@ -1188,7 +1188,7 @@ func (s *GameService) AdoptAdminActivityCalendar(ctx context.Context) error {
 		}
 		// The original task rows and each character's Day 1 remain in their
 		// existing domain. This calendar row controls only the realm entrance.
-		if tx.Migrator().HasTable(&db.OpenServerActivityRule{}) {
+		if gameSchemaHasTable(tx, &db.OpenServerActivityRule{}) {
 			var opening db.OpenServerActivityRule
 			err := tx.First(&opening, "id=?", constUtil.OpenServerActivityID).Error
 			if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {

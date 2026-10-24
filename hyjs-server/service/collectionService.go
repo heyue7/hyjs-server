@@ -22,7 +22,7 @@ import (
 // ObserveP5Collection is an optional save hook: old databases retain their migration scope.
 // It records real ownership, never a client-supplied handbook ID; removal preserves history.
 func (s *GameService) ObserveP5Collection(tx *gorm.DB, id int64, g *model.GameState) error {
-	if !tx.Migrator().HasTable(&db.P5Collection{}) {
+	if !gameSchemaHasTable(tx, &db.P5Collection{}) {
 		return nil
 	}
 	// Preserve the first original Hero row's existing eligibility rule. A
@@ -93,7 +93,7 @@ func (s *GameService) p5AchievementValue(tx *gorm.DB, p *pb.Player, g *model.Gam
 	case "fight":
 		return p.GetFightPower(), nil
 	case "trial":
-		if !tx.Migrator().HasTable(&db.P7RushState{}) {
+		if !gameSchemaHasTable(tx, &db.P7RushState{}) {
 			return 0, nil
 		}
 		var progress db.P7RushState
@@ -115,7 +115,7 @@ func (s *GameService) p5AchievementValue(tx *gorm.DB, p *pb.Player, g *model.Gam
 	case "equipped-heroes", "treasure-heroes", "formation-level", "formation-breach", constUtil.ReAchievementFormationKind:
 		return s.p5AchievementFormation(g, r.Kind), nil
 	case "expedition-hours":
-		if !tx.Migrator().HasTable(&db.P7ExpeditionMission{}) {
+		if !gameSchemaHasTable(tx, &db.P7ExpeditionMission{}) {
 			return 0, nil
 		}
 		var missions []db.P7ExpeditionMission
@@ -140,21 +140,21 @@ func (s *GameService) p5AchievementValue(tx *gorm.DB, p *pb.Player, g *model.Gam
 		}
 		return int32(min(total, int64(math.MaxInt32))), nil
 	case "wanted-kills":
-		if !tx.Migrator().HasTable(&db.P12WantedInstance{}) {
+		if !gameSchemaHasTable(tx, &db.P12WantedInstance{}) {
 			return 0, nil
 		}
 		var count int64
 		err := tx.Model(&db.P12WantedInstance{}).Where("killer_id=? AND killed_at>0", p.GetPlayerId()).Count(&count).Error
 		return int32(min(count, int64(math.MaxInt32))), err
 	case "friend-disaster-help":
-		if !tx.Migrator().HasTable(&db.P10ExpeditionHelpAction{}) {
+		if !gameSchemaHasTable(tx, &db.P10ExpeditionHelpAction{}) {
 			return 0, nil
 		}
 		var count int64
 		err := tx.Model(&db.P10ExpeditionHelpAction{}).Where("helper_id=? AND owner_id<>?", p.GetPlayerId(), p.GetPlayerId()).Count(&count).Error
 		return int32(min(count, int64(math.MaxInt32))), err
 	case "pet-recruit":
-		if !tx.Migrator().HasTable(&db.P9PetRecruitProgress{}) {
+		if !gameSchemaHasTable(tx, &db.P9PetRecruitProgress{}) {
 			return 0, nil
 		}
 		var row db.P9PetRecruitProgress
@@ -437,7 +437,7 @@ func (s *GameService) p5TitleQualification(tx *gorm.DB, p *pb.Player, g *model.G
 		if target < 1 {
 			return 0, 0, p5Error()
 		}
-		if !tx.Migrator().HasTable(&db.P7RushState{}) {
+		if !gameSchemaHasTable(tx, &db.P7RushState{}) {
 			return 0, target, nil
 		}
 		var state db.P7RushState
@@ -463,7 +463,7 @@ func (s *GameService) p5TitleQualification(tx *gorm.DB, p *pb.Player, g *model.G
 		if target < 1 || target > maximum {
 			return 0, 0, p5Error()
 		}
-		if !tx.Migrator().HasTable(model) {
+		if !gameSchemaHasTable(tx, model) {
 			return 0, target, nil
 		}
 		if err := tx.Model(model).Select("level", "exp").Where("player_id=?", p.GetPlayerId()).Scan(&state).Error; err != nil {
@@ -489,7 +489,7 @@ func (s *GameService) p5TitleListTx(tx *gorm.DB, p *pb.Player, g *model.GameStat
 		arenaProof  string
 	)
 	overrides := map[string]db.AdminTitleOverride{}
-	if tx.Migrator().HasTable(&db.AdminTitleOverride{}) {
+	if gameSchemaHasTable(tx, &db.AdminTitleOverride{}) {
 		var values []db.AdminTitleOverride
 		if err := tx.Find(&values).Error; err != nil {
 			return nil, err
@@ -772,7 +772,7 @@ func p5AchievementPets(tx *gorm.DB, owner int64) ([]*pb.Pet, error) {
 		out = append(out, pet)
 		return nil
 	}
-	if tx.Migrator().HasTable(&db.P9PetInstance{}) {
+	if gameSchemaHasTable(tx, &db.P9PetInstance{}) {
 		var rows []db.P9PetInstance
 		if err := tx.Where("player_id=?", owner).Find(&rows).Error; err != nil {
 			return nil, err
@@ -783,7 +783,7 @@ func p5AchievementPets(tx *gorm.DB, owner int64) ([]*pb.Pet, error) {
 			}
 		}
 	}
-	if tx.Migrator().HasTable(&db.P9PetRetired{}) {
+	if gameSchemaHasTable(tx, &db.P9PetRetired{}) {
 		var rows []db.P9PetRetired
 		if err := tx.Where("player_id=?", owner).Find(&rows).Error; err != nil {
 			return nil, err
@@ -794,7 +794,7 @@ func p5AchievementPets(tx *gorm.DB, owner int64) ([]*pb.Pet, error) {
 			}
 		}
 	}
-	if tx.Migrator().HasTable(&db.P9PetInvestment{}) {
+	if gameSchemaHasTable(tx, &db.P9PetInvestment{}) {
 		var rows []db.P9PetInvestment
 		if err := tx.Where("player_id=?", owner).Find(&rows).Error; err != nil {
 			return nil, err
@@ -857,7 +857,7 @@ func (s *GameService) p5AchievementPetValue(tx *gorm.DB, owner int64, kind strin
 	return value, nil
 }
 func (s *GameService) p5AchievementAwake(tx *gorm.DB, owner int64) (int32, error) {
-	if !tx.Migrator().HasTable(&db.P7AwakeRun{}) || !tx.Migrator().HasTable(&db.P7AwakeExploration{}) {
+	if !gameSchemaHasTable(tx, &db.P7AwakeRun{}) || !gameSchemaHasTable(tx, &db.P7AwakeExploration{}) {
 		return 0, nil
 	}
 	var runs []db.P7AwakeRun

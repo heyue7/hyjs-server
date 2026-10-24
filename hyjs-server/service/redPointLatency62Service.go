@@ -6,33 +6,17 @@ import (
 	"gorm.io/gorm"
 	"hyjs-server/db"
 	pb "hyjs-server/model/protocol"
-	"reflect"
 )
 
-// redPointSchemaSnapshot belongs to one initialized database and base service.
-type redPointSchemaSnapshot struct {
-	database *gorm.DB
-	tables   map[reflect.Type]bool
-}
-
-// InitializeRedPointSchemaReady records startup schema availability without changing it.
-// Uninitialized services and alternate test databases retain dynamic compatibility checks.
+// InitializeRedPointSchemaReady preserves the legacy fixture API.
+// Initialization failures leave no snapshot and retain dynamic compatibility checks;
+// production startup calls InitializeGameSchema64 directly to return its error.
 func (s *GameService) InitializeRedPointSchemaReady() {
-	database := db.GetIns()
-	snapshot := &redPointSchemaSnapshot{database: database, tables: map[reflect.Type]bool{}}
-	for _, table := range []any{&db.RewardDelivery{}, &db.MailMessage{}, &db.PaymentOrder{}, &db.MembershipClaim{}, &db.P5Achievement{}, &db.PeriodInstance{}, &db.P4WelfareRule{}, &db.PaymentActivityRule{}, &db.ActivityRules{}} {
-		snapshot.tables[reflect.TypeOf(table)] = database.Migrator().HasTable(table)
-	}
-	s.p10ClientOwner().redPointSchema.Store(snapshot)
+	_ = s.InitializeGameSchema64(context.Background())
 }
 
 func (s *GameService) redPointHasTable(tx *gorm.DB, table any) bool {
-	if snapshot := s.p10ClientOwner().redPointSchema.Load(); snapshot != nil && snapshot.database == db.GetIns() {
-		if present, ok := snapshot.tables[reflect.TypeOf(table)]; ok {
-			return present
-		}
-	}
-	return tx.Migrator().HasTable(table)
+	return gameSchemaHasTable(tx.WithContext(bindFieldRuntime(tx.Statement.Context, s)), table)
 }
 
 // afterRedPointRequest retains the existing frame selection and synchronous post-commit order.

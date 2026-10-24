@@ -222,7 +222,7 @@ func (s *GameService) P13GuildTechProperties(ctx context.Context, tx *gorm.DB, i
 	owner := s.p10ClientOwner()
 	if !owner.guildCoreSchemaReady.Load() || !owner.guildTechSchemaReady.Load() {
 		for _, table := range []any{&db.P13GuildTechOffer{}, &db.P13GuildTechUpgrade{}, &db.P13GuildMember{}, &db.P13Guild{}} {
-			if !tx.Migrator().HasTable(table) {
+			if !gameSchemaHasTable(tx, table) {
 				return &pb.BaseProp{}, "", nil
 			}
 		}

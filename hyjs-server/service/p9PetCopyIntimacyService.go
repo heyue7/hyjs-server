@@ -106,7 +106,7 @@ func (s *GameService) p9DrainDeferredIntimacy(tx *gorm.DB, id int64, g *model.Ga
 	if g.Run != nil && !g.Run.Complete || g.Field != nil && g.Field.Fight != nil && !g.Field.Fight.Settled {
 		return nil
 	}
-	if tx.Migrator().HasTable(&db.DailyCopyFight{}) {
+	if gameSchemaHasTable(tx, &db.DailyCopyFight{}) {
 		if err := s.ensureNoActiveDailyCopy(tx, id, time.Now()); err != nil {
 			return nil
 		}

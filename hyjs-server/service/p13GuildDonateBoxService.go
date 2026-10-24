@@ -92,7 +92,7 @@ func p13GuildDonateBoxSourceHash(source db.P13GuildDonateBoxSource) string {
 
 func p13GuildDonateBoxPolicy(tx *gorm.DB, now time.Time) (*db.P13GuildDonateBoxPolicy, error) {
 	// Isolated legacy domains can omit this optional schema; the main initializer creates it.
-	if !tx.Migrator().HasTable(&db.P13GuildDonateBoxPolicy{}) {
+	if !gameSchemaHasTable(tx, &db.P13GuildDonateBoxPolicy{}) {
 		return nil, nil
 	}
 	var policy db.P13GuildDonateBoxPolicy
@@ -150,7 +150,7 @@ func (s *GameService) RecordP13GuildDonateBox(tx *gorm.DB, member *db.P13GuildMe
 
 // p13GuildDonateBoxDayRead verifies the score against immutable original donation facts.
 func p13GuildDonateBoxDayRead(tx *gorm.DB, member *db.P13GuildMember, now time.Time) (*db.P13GuildDonateBoxDay, bool, error) {
-	if !tx.Migrator().HasTable(&db.P13GuildDonateBoxPolicy{}) {
+	if !gameSchemaHasTable(tx, &db.P13GuildDonateBoxPolicy{}) {
 		return nil, false, nil
 	}
 	var day db.P13GuildDonateBoxDay

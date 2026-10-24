@@ -183,7 +183,7 @@ func (s *GameService) luxuryOfferMission(chapter string, stage int32) (string, e
 
 // luxurySignReward 读取后台配置；缺少原奖励时保持关闭，不补设钻石奖励。
 func luxurySignReward(tx *gorm.DB, now time.Time) (string, error) {
-	if !tx.Migrator().HasTable(&db.ActivityRules{}) || !tx.Migrator().HasTable(&db.ActivityReward{}) {
+	if !gameSchemaHasTable(tx, &db.ActivityRules{}) || !gameSchemaHasTable(tx, &db.ActivityReward{}) {
 		return "", nil
 	}
 	var rule db.ActivityRules
@@ -218,7 +218,7 @@ func (s *GameService) luxurySignStatus(tx *gorm.DB, id int64, now time.Time) (in
 		return 0, err
 	}
 	// 旧版本及独立月签到测试尚未启用支付域时保留关闭状态；缺表不能产生付费资格。
-	if !tx.Migrator().HasTable(&db.PaymentOrder{}) || !tx.Migrator().HasTable(&db.MembershipClaim{}) {
+	if !gameSchemaHasTable(tx, &db.PaymentOrder{}) || !gameSchemaHasTable(tx, &db.MembershipClaim{}) {
 		return 0, nil
 	}
 	local := now.In(time.FixedZone("UTC+8", 8*3600))

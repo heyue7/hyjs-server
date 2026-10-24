@@ -658,14 +658,14 @@ func (s *GameService) RecoverFrozenBattle(ctx context.Context, tx *gorm.DB, play
 // OriginalCopyReplay only captures original single-group playback, whose original response
 // has exactly one defender2. Multi-group playback requires separate native protocol audit.
 func (s *GameService) CaptureOriginalCopyReplay(ctx context.Context, tx *gorm.DB, id int64, start *pb.SCCopyFightStart) error {
-	if !tx.Migrator().HasTable(&db.P6BattleRecord{}) || start == nil || len(start.GetBattleMonsterList()) != 1 {
+	if !gameSchemaHasTable(tx, &db.P6BattleRecord{}) || start == nil || len(start.GetBattleMonsterList()) != 1 {
 		return nil
 	}
 	_, err := s.CaptureBattleReplay(ctx, tx, id, "copy", start.GetFightId(), model.FrozenBattleInput{Attacker: start.GetBattlePlayer(), Monster: start.GetBattleMonsterList()[0], Seed: start.GetRandSeed(), MaxRound: start.GetMaxRound(), BattleType: 1})
 	return err
 }
 func (s *GameService) FinishOriginalCopyReplay(ctx context.Context, tx *gorm.DB, id int64, start *pb.SCCopyFightStart, end *pb.CSCopyFightEnd) error {
-	if !tx.Migrator().HasTable(&db.P6BattleRecord{}) || start == nil || len(start.GetBattleMonsterList()) != 1 || end.GetOptRecord() == nil {
+	if !gameSchemaHasTable(tx, &db.P6BattleRecord{}) || start == nil || len(start.GetBattleMonsterList()) != 1 || end.GetOptRecord() == nil {
 		return nil
 	}
 	// A pre-P6 saved fight may survive the server restart; keep its original P0 settlement.
@@ -679,7 +679,7 @@ func (s *GameService) FinishOriginalCopyReplay(ctx context.Context, tx *gorm.DB,
 	return s.FinishObservedBattleReplay(ctx, tx, id, "copy", start.GetFightId(), end.GetOptRecord(), end.GetResult() == 1)
 }
 func (s *GameService) CancelOriginalCopyReplay(ctx context.Context, tx *gorm.DB, id int64, start *pb.SCCopyFightStart) error {
-	if !tx.Migrator().HasTable(&db.P6BattleRecord{}) || start == nil || len(start.GetBattleMonsterList()) != 1 {
+	if !gameSchemaHasTable(tx, &db.P6BattleRecord{}) || start == nil || len(start.GetBattleMonsterList()) != 1 {
 		return nil
 	}
 	var count int64

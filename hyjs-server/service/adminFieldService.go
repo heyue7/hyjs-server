@@ -213,7 +213,7 @@ func (s *GameService) AdminFields(ctx context.Context, actor *model.AdminPrincip
 	}
 	out := &model.AdminFieldListResponse{Items: []model.AdminFieldTemplateDTO{}, Resources: []model.AdminFieldResource{}, Presentation: s.adminFieldPresentation()}
 	// 现有全服首领策略只读展示；缺失表或策略时保持未配置，不生成周期。
-	if tx.Migrator().HasTable(&db.P12WorldBossPolicy{}) {
+	if gameSchemaHasTable(tx, &db.P12WorldBossPolicy{}) {
 		var policy db.P12WorldBossPolicy
 		switch err := tx.First(&policy, 1).Error; {
 		case err == nil:
@@ -431,7 +431,7 @@ func (s *GameService) AdminFieldRuntimeTables(ctx context.Context, serverID int6
 	database := db.GetIns()
 	tx := database.WithContext(ctx)
 	// 正式启动完成初始化后直接查已提交行；未初始化的隔离兼容调用保留原表缺失回退。
-	if !base.adminFieldRuntimeReady.Load() && !tx.Migrator().HasTable(&db.AdminFieldDeployment{}) {
+	if !base.adminFieldRuntimeReady.Load() && !gameSchemaHasTable(tx, &db.AdminFieldDeployment{}) {
 		return base.Tables, nil
 	}
 	var deployments []db.AdminFieldDeployment
@@ -494,7 +494,7 @@ func adminFieldSortedIDs(v []model.AdminFieldPoint) []string {
 
 // adminFieldFreezeBattle stores accepted settings before a later operator edit.
 func (s *GameService) adminFieldFreezeBattle(tx *gorm.DB, id int64, scene, fightID, monsterID string) error {
-	if !tx.Migrator().HasTable(&db.AdminFieldBattleSnapshot{}) {
+	if !gameSchemaHasTable(tx, &db.AdminFieldBattleSnapshot{}) {
 		return nil
 	}
 	leader := s.fieldLeaderInScene(monsterID, scene)
@@ -503,7 +503,7 @@ func (s *GameService) adminFieldFreezeBattle(tx *gorm.DB, id int64, scene, fight
 func (s *GameService) adminFieldBattleReward(tx *gorm.DB, id int64, scene, fightID, monsterID string) (string, int64, error) {
 	leader := s.fieldLeaderInScene(monsterID, scene)
 	reward, cooldown := leader["rewardGroupId"], int64(tableNumber(leader, "RebornTime"))
-	if !tx.Migrator().HasTable(&db.AdminFieldBattleSnapshot{}) {
+	if !gameSchemaHasTable(tx, &db.AdminFieldBattleSnapshot{}) {
 		return reward, cooldown, nil
 	}
 	var row db.AdminFieldBattleSnapshot

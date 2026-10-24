@@ -1,0 +1,232 @@
+[
+  {
+    "uuid": "853410cc30450cbbb0161463",
+    "monId": "mon_003",
+    "PatrolStarts": 26,
+    "PatrolArrivals": 25,
+    "PatrolFailures": 0,
+    "PatrolStatus": "moving",
+    "displacementFromFirst": 1.9740321166567918,
+    "samples": 355
+  },
+  {
+    "uuid": "ba00618e3a1dfdf52cb07618",
+    "monId": "mon_004",
+    "PatrolStarts": 24,
+    "PatrolArrivals": 24,
+    "PatrolFailures": 0,
+    "PatrolStatus": "arrived",
+    "displacementFromFirst": 1.9785401738239872,
+    "samples": 355
+  },
+  {
+    "uuid": "7e6010fa2f3155234f7d6df8",
+    "monId": "mon_009",
+    "PatrolStarts": 24,
+    "PatrolArrivals": 24,
+    "PatrolFailures": 0,
+    "PatrolStatus": "arrived",
+    "displacementFromFirst": 2.0080318503326526,
+    "samples": 355
+  },
+  {
+    "uuid": "ef1e34e48b8b77d5123db36c",
+    "monId": "mon_010",
+    "PatrolStarts": 29,
+    "PatrolArrivals": 28,
+    "PatrolFailures": 50,
+    "PatrolStatus": "moving",
+    "displacementFromFirst": 2.018909917221873,
+    "samples": 355
+  },
+  {
+    "uuid": "d01a0f101b3e2e0ef8d76c90",
+    "monId": "mon_002",
+    "PatrolStarts": 25,
+    "PatrolArrivals": 25,
+    "PatrolFailures": 0,
+    "PatrolStatus": "arrived",
+    "displacementFromFirst": 1.906279448176333,
+    "samples": 355
+  },
+  {
+    "uuid": "6622479fde181fb6ceb091ea",
+    "monId": "mon_007",
+    "PatrolStarts": 24,
+    "PatrolArrivals": 23,
+    "PatrolFailures": 0,
+    "PatrolStatus": "moving",
+    "displacementFromFirst": 1.9717883329132841,
+    "samples": 355
+  },
+  {
+    "uuid": "5bc1688a4fd4a1f86602790c",
+    "monId": "mon_009",
+    "PatrolStarts": 25,
+    "PatrolArrivals": 25,
+    "PatrolFailures": 1,
+    "PatrolStatus": "arrived",
+    "displacementFromFirst": 2.0042306477866507,
+    "samples": 355
+  },
+  {
+    "uuid": "67541657665a89fadad90588",
+    "monId": "mon_006",
+    "PatrolStarts": 24,
+    "PatrolArrivals": 23,
+    "PatrolFailures": 0,
+    "PatrolStatus": "moving",
+    "displacementFromFirst": 2.016149758260067,
+    "samples": 355
+  },
+  {
+    "uuid": "3641ca61dd8e0d72f12801d3",
+    "monId": "mon_003",
+    "PatrolStarts": 24,
+    "PatrolArrivals": 24,
+    "PatrolFailures": 1,
+    "PatrolStatus": "arrived",
+    "displacementFromFirst": 2.0060090807882442,
+    "samples": 355
+  },
+  {
+    "uuid": "bf6108e4c6421623f43144a0",
+    "monId": "mon_008",
+    "PatrolStarts": 26,
+    "PatrolArrivals": 25,
+    "PatrolFailures": 1,
+    "PatrolStatus": "moving",
+    "displacementFromFirst": 1.963795667079176,
+    "samples": 355
+  },
+  {
+    "uuid": "9a1075472c5a09058ecd2be3",
+    "monId": "mon_003",
+    "PatrolStarts": 26,
+    "PatrolArrivals": 25,
+    "PatrolFailures": 0,
+    "PatrolStatus": "moving",
+    "displacementFromFirst": 1.9586456632152154,
+    "samples": 355
+  },
+  {
+    "uuid": "b26913718dc790977c53f4dd",
+    "monId": "mon_010",
+    "PatrolStarts": 26,
+    "PatrolArrivals": 25,
+    "PatrolFailures": 0,
+    "PatrolStatus": "moving",
+    "displacementFromFirst": 1.9550125271743903,
+    "samples": 355
+  },
+  {
+    "uuid": "aec5d4159b3677f70c383443",
+    "monId": "mon_006",
+    "PatrolStarts": 25,
+    "PatrolArrivals": 25,
+    "PatrolFailures": 1,
+    "PatrolStatus": "arrived",
+    "displacementFromFirst": 1.8597522227954042,
+    "samples": 355
+  },
+  {
+    "uuid": "a794c9ae01cbb3a8c66b7905",
+    "monId": "mon_004",
+    "PatrolStarts": 24,
+    "PatrolArrivals": 24,
+    "PatrolFailures": 0,
+    "PatrolStatus": "arrived",
+    "displacementFromFirst": 1.9668655301563505,
+    "samples": 355
+  },
+  {
+    "uuid": "dc2419bd348270ac091e2345",
+    "monId": "mon_004",
+    "PatrolStarts": 24,
+    "PatrolArrivals": 23,
+    "PatrolFailures": 0,
+    "PatrolStatus": "moving",
+    "displacementFromFirst": 1.9252795811813526,
+    "samples": 355
+  },
+  {
+    "uuid": "108145e5c3ae506a225762a7",
+    "monId": "mon_008",
+    "PatrolStarts": 26,
+    "PatrolArrivals": 25,
+    "PatrolFailures": 0,
+    "PatrolStatus": "moving",
+    "displacementFromFirst": 1.911967047493756,
+    "samples": 355
+  },
+  {
+    "uuid": "9ee49e8abc2671bd9c45628f",
+    "monId": "mon_001",
+    "PatrolStarts": 24,
+    "PatrolArrivals": 24,
+    "PatrolFailures": 0,
+    "PatrolStatus": "arrived",
+    "displacementFromFirst": 3.8509464001613947,
+    "samples": 355
+  },
+  {
+    "uuid": "ce29a33c26a0a493d7659146",
+    "monId": "mon_010",
+    "PatrolStarts": 24,
+    "PatrolArrivals": 23,
+    "PatrolFailures": 0,
+    "PatrolStatus": "moving",
+    "displacementFromFirst": 3.9562423295616242,
+    "samples": 355
+  },
+  {
+    "uuid": "e19366e90472164033fe6dcb",
+    "monId": "mon_004",
+    "PatrolStarts": 25,
+    "PatrolArrivals": 24,
+    "PatrolFailures": 0,
+    "PatrolStatus": "moving",
+    "displacementFromFirst": 3.9365550343525877,
+    "samples": 355
+  },
+  {
+    "uuid": "8109b4a1132e9b0bfcfbafa0",
+    "monId": "mon_006",
+    "PatrolStarts": 25,
+    "PatrolArrivals": 24,
+    "PatrolFailures": 0,
+    "PatrolStatus": "moving",
+    "displacementFromFirst": 2.214564371430295,
+    "samples": 355
+  },
+  {
+    "uuid": "a7f3cfe3e2850bd1e39beb08",
+    "monId": "mon_003",
+    "PatrolStarts": 25,
+    "PatrolArrivals": 24,
+    "PatrolFailures": 0,
+    "PatrolStatus": "moving",
+    "displacementFromFirst": 1.9262735628209093,
+    "samples": 355
+  },
+  {
+    "uuid": "ffdb5526e5f15f19b841aad0",
+    "monId": "mon_004",
+    "PatrolStarts": 23,
+    "PatrolArrivals": 23,
+    "PatrolFailures": 0,
+    "PatrolStatus": "arrived",
+    "displacementFromFirst": 2.0425784776115825,
+    "samples": 355
+  },
+  {
+    "uuid": "840292167619d84a8e0815ab",
+    "monId": "mon_008",
+    "PatrolStarts": 23,
+    "PatrolArrivals": 23,
+    "PatrolFailures": 0,
+    "PatrolStatus": "arrived",
+    "displacementFromFirst": 2.036800116654565,
+    "samples": 355
+  }
+]

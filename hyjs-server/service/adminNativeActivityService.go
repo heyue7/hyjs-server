@@ -216,7 +216,7 @@ func adminNativeLookupError(err error) error {
 
 func adminNativeMeta(tx *gorm.DB, id string, lock bool) (db.AdminActivityPresentation, error) {
 	var meta db.AdminActivityPresentation
-	if !tx.Migrator().HasTable(&db.AdminActivityPresentation{}) {
+	if !gameSchemaHasTable(tx, &db.AdminActivityPresentation{}) {
 		return meta, nil
 	}
 	query := tx.Where("activity_id = ?", id)
@@ -231,7 +231,7 @@ func adminNativeMeta(tx *gorm.DB, id string, lock bool) (db.AdminActivityPresent
 }
 
 func adminNativeSavePresentation(tx *gorm.DB, id, kind, alias string) error {
-	if !tx.Migrator().HasTable(&db.AdminActivityPresentation{}) {
+	if !gameSchemaHasTable(tx, &db.AdminActivityPresentation{}) {
 		return constUtil.ErrAdminInput
 	}
 	meta := db.AdminActivityPresentation{ActivityID: id, Mode: "native-" + kind, TemplateID: "native-" + kind, Name: adminNativeKindName(kind), Alias: alias, UpdatedAtMillis: time.Now().UnixMilli()}
@@ -612,7 +612,7 @@ func adminNativeP15Effective(live db.P15SeasonalBundle) (db.P15SeasonalBundle, e
 	return cfg, nil
 }
 
-// AdminNativeActivities 列出九类真实后台配置；没有真实来源的ID不会凭空出现。
+// AdminNativeActivities 列出真实后台配置；没有真实来源的ID不会凭空出现。
 func (s *GameService) AdminNativeActivities(ctx context.Context, p *model.AdminPrincipal) ([]model.AdminNativeActivityDTO, error) {
 	tx := db.GetIns().WithContext(ctx)
 	// 列表与保存使用同一权限口径，读取也要求有效后台账号。
@@ -621,7 +621,7 @@ func (s *GameService) AdminNativeActivities(ctx context.Context, p *model.AdminP
 	}
 	ids := []string{}
 	var count int64
-	if tx.Migrator().HasTable(&db.ActivityRules{}) {
+	if gameSchemaHasTable(tx, &db.ActivityRules{}) {
 		if err := tx.Model(&db.ActivityRules{}).Where("id = ?", "open_server_fund").Count(&count).Error; err != nil {
 			return nil, err
 		}
@@ -629,7 +629,7 @@ func (s *GameService) AdminNativeActivities(ctx context.Context, p *model.AdminP
 			ids = append(ids, "fund:open_server_fund")
 		}
 	}
-	if tx.Migrator().HasTable(&db.PaymentActivityRule{}) {
+	if gameSchemaHasTable(tx, &db.PaymentActivityRule{}) {
 		var payments []db.PaymentActivityRule
 		if err := tx.Order("id").Find(&payments).Error; err != nil {
 			return nil, err
@@ -640,7 +640,7 @@ func (s *GameService) AdminNativeActivities(ctx context.Context, p *model.AdminP
 			}
 		}
 	}
-	if tx.Migrator().HasTable(&db.PaymentProduct{}) {
+	if gameSchemaHasTable(tx, &db.PaymentProduct{}) {
 		var products []db.PaymentProduct
 		if err := tx.Where("kind IN ?", []string{"month", "permanent"}).Order("id").Find(&products).Error; err != nil {
 			return nil, err
@@ -656,7 +656,7 @@ func (s *GameService) AdminNativeActivities(ctx context.Context, p *model.AdminP
 		}
 	}
 	ids = append(ids, "vip-benefits")
-	if tx.Migrator().HasTable(&db.P4CopyBenefitRule{}) {
+	if gameSchemaHasTable(tx, &db.P4CopyBenefitRule{}) {
 		var copies []db.P4CopyBenefitRule
 		if err := tx.Order("id").Find(&copies).Error; err != nil {
 			return nil, err
@@ -666,7 +666,7 @@ func (s *GameService) AdminNativeActivities(ctx context.Context, p *model.AdminP
 		}
 	}
 	// 橙卡只配置真实常驻基础池，旧轮换及冻结历史保留在原表，不占列表。
-	if tx.Migrator().HasTable(&db.GameplayPool{}) {
+	if gameSchemaHasTable(tx, &db.GameplayPool{}) {
 		if err := tx.Model(&db.GameplayPool{}).Where("id = ?", "recruit_2").Count(&count).Error; err != nil {
 			return nil, err
 		}
@@ -674,7 +674,7 @@ func (s *GameService) AdminNativeActivities(ctx context.Context, p *model.AdminP
 			ids = append(ids, "recruit:permanent")
 		}
 	}
-	if tx.Migrator().HasTable(&db.FirstDoublePolicy{}) {
+	if gameSchemaHasTable(tx, &db.FirstDoublePolicy{}) {
 		if err := tx.Model(&db.FirstDoublePolicy{}).Where("id = ?", 1).Count(&count).Error; err != nil {
 			return nil, err
 		}
@@ -682,7 +682,7 @@ func (s *GameService) AdminNativeActivities(ctx context.Context, p *model.AdminP
 			ids = append(ids, "first-double")
 		}
 	}
-	if tx.Migrator().HasTable(&db.PeriodInstance{}) {
+	if gameSchemaHasTable(tx, &db.PeriodInstance{}) {
 		var periods []db.PeriodInstance
 		if err := tx.Where("id LIKE ?", "celebrationActivity%").Order("id").Find(&periods).Error; err != nil {
 			return nil, err
@@ -693,7 +693,7 @@ func (s *GameService) AdminNativeActivities(ctx context.Context, p *model.AdminP
 			}
 		}
 	}
-	if tx.Migrator().HasTable(&db.P15SeasonalBundle{}) {
+	if gameSchemaHasTable(tx, &db.P15SeasonalBundle{}) {
 		var bundles []db.P15SeasonalBundle
 		if err := tx.Order("id").Find(&bundles).Error; err != nil {
 			return nil, err
@@ -706,7 +706,7 @@ func (s *GameService) AdminNativeActivities(ctx context.Context, p *model.AdminP
 	}
 	// 一次读取移除标记，原配置和所有奖励历史继续留在各业务表。
 	archived := map[string]bool{}
-	if tx.Migrator().HasTable(&db.AdminActivityPresentation{}) {
+	if gameSchemaHasTable(tx, &db.AdminActivityPresentation{}) {
 		var hidden []db.AdminActivityPresentation
 		if err := tx.Select("activity_id").Where("archived = ?", true).Find(&hidden).Error; err != nil {
 			return nil, err
@@ -726,6 +726,23 @@ func (s *GameService) AdminNativeActivities(ctx context.Context, p *model.AdminP
 			return nil, err
 		}
 		out = append(out, snap.dto)
+	}
+
+	if gameSchemaHasTable(tx, &db.MonthSignRule{}) {
+		month, err := adminMonthSignView(tx)
+		if err == nil {
+			enabled := month.Enabled
+			if gameSchemaHasTable(tx, &db.ActivityRules{}) && gameSchemaHasTable(tx, &db.ActivityReward{}) {
+				luxury, luxuryErr := s.adminLuxurySignView(tx)
+				if luxuryErr != nil {
+					return nil, luxuryErr
+				}
+				enabled = enabled || luxury.Enabled && luxury.StartAt <= time.Now().UnixMilli() && luxury.EndAt > time.Now().UnixMilli()
+			}
+			out = append([]model.AdminNativeActivityDTO{{ID: "month-sign", Kind: "daily-sign", Name: "每日签到", Enabled: enabled, Permanent: true, Version: month.Version}}, out...)
+		} else if !errors.Is(err, constUtil.ErrAdminConfiguration) {
+			return nil, err
+		}
 	}
 	return out, nil
 }
@@ -1359,7 +1376,7 @@ func adminNativeDefaultVIPForm() model.AdminNativeActivityForm {
 
 // adminNativeVIPPolicy 读取已保存会员福利；缺行或未建表时继续使用当前默认策略。
 func (s *GameService) adminNativeVIPPolicy(tx *gorm.DB, lock bool) (model.AdminNativeActivityForm, bool, bool, error) {
-	if !tx.Migrator().HasTable(&db.AdminNativeActivityPolicy{}) {
+	if !gameSchemaHasTable(tx, &db.AdminNativeActivityPolicy{}) {
 		return adminNativeDefaultVIPForm(), true, false, nil
 	}
 	var policy db.AdminNativeActivityPolicy

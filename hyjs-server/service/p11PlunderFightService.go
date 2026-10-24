@@ -546,7 +546,7 @@ func (s *GameService) p11PlunderFightTx(ctx context.Context, tx *gorm.DB, id int
 		if err = s.recordP4VerifiedPlunderAttempt(tx, &row, response, now); err != nil {
 			return err
 		}
-		if len(s.Tables["ActivityNewOpen7Day"]) == 249 && tx.Migrator().HasTable(&db.OpenServerActivityRule{}) {
+		if len(s.Tables["ActivityNewOpen7Day"]) == 249 && gameSchemaHasTable(tx, &db.OpenServerActivityRule{}) {
 			if err = RecordOpenServerCounter(tx, id, constUtil.OpenServerActivityCounterPredatory+p1Day(LocalPlayNow(tx.Statement.Context)), 1); err != nil {
 				return err
 			}

@@ -108,7 +108,7 @@ func (s *GameService) adminKingRecruitActivityForm(tx *gorm.DB, cfg db.GameplayP
 	var snapshot db.KingRecruitActivitySnapshot
 	var source adminKingRecruitSource
 	err := gorm.ErrRecordNotFound
-	if tx.Migrator().HasTable(&db.KingRecruitActivitySnapshot{}) {
+	if gameSchemaHasTable(tx, &db.KingRecruitActivitySnapshot{}) {
 		err = tx.First(&snapshot, "pool_id=?", cfg.ID).Error
 	}
 	if err == nil {
@@ -202,7 +202,7 @@ func adminKingRecruitActivityFrozen(tx *gorm.DB, key string) (bool, error) {
 	if !adminKingRecruitPoolID(key) {
 		return false, nil
 	}
-	if tx.Migrator().HasTable(&db.KingRecruitActivitySnapshot{}) {
+	if gameSchemaHasTable(tx, &db.KingRecruitActivitySnapshot{}) {
 		var snapshot db.KingRecruitActivitySnapshot
 		err := tx.Clauses(clause.Locking{Strength: "SHARE"}).First(&snapshot, "pool_id=?", key).Error
 		if err == nil {
@@ -212,7 +212,7 @@ func adminKingRecruitActivityFrozen(tx *gorm.DB, key string) (bool, error) {
 			return false, err
 		}
 	}
-	if key == "recruit_3" && tx.Migrator().HasTable(&db.KingRecruitState{}) {
+	if key == "recruit_3" && gameSchemaHasTable(tx, &db.KingRecruitState{}) {
 		var count int64
 		err := tx.Model(&db.KingRecruitState{}).Count(&count).Error
 		return count > 0, err
@@ -224,7 +224,7 @@ func (s *GameService) bindKingRecruitActivityRules(tx *gorm.DB, key string) erro
 	tx.Statement.Context = context.WithValue(tx.Statement.Context, kingRecruitRulesScopeKey{}, (*db.KingRecruitRules)(nil))
 	tx.Statement.Context = context.WithValue(tx.Statement.Context, kingRecruitWorldScopeKey{}, int64(0))
 	if key == "recruit_3" {
-		if !tx.Migrator().HasTable(&db.KingRecruitActivitySnapshot{}) {
+		if !gameSchemaHasTable(tx, &db.KingRecruitActivitySnapshot{}) {
 			return nil
 		}
 		var count int64
@@ -270,7 +270,7 @@ func (s *GameService) adminScheduledKingRecruitPool(tx *gorm.DB, now int64) (str
 		return "", scheduled, err
 	}
 	owner := GameCalendarOwner(tx.Statement.Context)
-	if owner > 0 && tx.Migrator().HasTable(&db.KingRecruitSelection{}) {
+	if owner > 0 && gameSchemaHasTable(tx, &db.KingRecruitSelection{}) {
 		var selected db.KingRecruitSelection
 		err := tx.First(&selected, "player_id=?", owner).Error
 		if err == nil {
@@ -321,7 +321,7 @@ func (s *GameService) AdminKingRecruitResources(ctx context.Context, actor *mode
 // 原客户端会把缺失或关闭的heroRecuritKing入口等级设为99999。
 func (s *GameService) kingRecruitOpenState(ctx context.Context, id int64, now time.Time) (*pb.OpenState, error) {
 	result := &pb.OpenState{Type: proto.String(constUtil.KingRecruitNativeOpenState), IsOpen: proto.Int32(0)}
-	if !s.P1Ready || !db.GetIns().Migrator().HasTable(&db.KingRecruitRules{}) {
+	if !s.P1Ready || !gameSchemaHasTable(db.GetIns(), &db.KingRecruitRules{}) {
 		return result, nil
 	}
 	err := db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {

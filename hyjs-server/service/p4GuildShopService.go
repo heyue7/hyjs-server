@@ -127,7 +127,7 @@ func (s *GameService) p4GuildShop(ctx context.Context, id int64, request proto.M
 			return err
 		}
 
-		if !tx.Migrator().HasTable(&db.P13GuildPolicy{}) {
+		if !gameSchemaHasTable(tx, &db.P13GuildPolicy{}) {
 			return errors.New(constUtil.P13GuildClosed)
 		}
 		var policy db.P13GuildPolicy

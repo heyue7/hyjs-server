@@ -74,7 +74,7 @@ func (s *GameService) p10FormationProfile(tx *gorm.DB, id int64) (*pb.FormationS
 				}
 				item.TreaInfoList = append(item.TreaInfoList, &pb.TreasureSimpleInfo{Pos: thing.Pos, TreasureId: owned.TreasureId, StrengthLevel: owned.StrengthLevel, RefineLevel: owned.RefineLevel})
 			case pos == 7:
-				if !tx.Migrator().HasTable(&db.P9PetInstance{}) {
+				if !gameSchemaHasTable(tx, &db.P9PetInstance{}) {
 					return nil, errors.New("公开宠物实例域尚未初始化")
 				}
 				var owned db.P9PetInstance

@@ -15,7 +15,7 @@ func adminNativePaymentAccess(tx *gorm.DB, key string) (bool, bool, error) {
 	for _, prefix := range []string{"firstRecharge_", "rechargeSingle_", "rechargeTotal_", "continuedRecharge_", "costTotal_"} {
 		matched = matched || strings.HasPrefix(key, prefix)
 	}
-	if !matched || !tx.Migrator().HasTable(&db.AdminActivityPresentation{}) {
+	if !matched || !gameSchemaHasTable(tx, &db.AdminActivityPresentation{}) {
 		return false, false, nil
 	}
 	var meta db.AdminActivityPresentation

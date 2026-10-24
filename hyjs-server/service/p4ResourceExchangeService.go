@@ -112,7 +112,7 @@ func (s *GameService) p4ExchangeDirectory(tx *gorm.DB, key string, now time.Time
 			}
 		}
 		// Red P2 retains its own mutable operator catalog, period, daily state and stock.
-		if tx.Migrator().HasTable(&db.RedP2Exchange{}) {
+		if gameSchemaHasTable(tx, &db.RedP2Exchange{}) {
 			var red []db.RedP2Exchange
 			if err := tx.Order("id").Find(&red).Error; err != nil {
 				return nil, nil, err
@@ -336,7 +336,7 @@ func (s *GameService) P4ResourceExchangeCoversRed(ctx context.Context, id int64,
 		if e == nil && (!directory.Enabled || now.UnixMilli() < directory.StartAt || now.UnixMilli() >= directory.EndAt) {
 			return nil
 		}
-		if !tx.Migrator().HasTable(&db.RedP2Exchange{}) {
+		if !gameSchemaHasTable(tx, &db.RedP2Exchange{}) {
 			return nil
 		}
 		var period db.GameplayPool
@@ -389,7 +389,7 @@ func (s *GameService) P4ResourceExchangeCoversRed(ctx context.Context, id int64,
 }
 
 func (s *GameService) p4ExchangeRedOpen(tx *gorm.DB, now time.Time) (bool, error) {
-	if !tx.Migrator().HasTable(&db.RedP2Exchange{}) {
+	if !gameSchemaHasTable(tx, &db.RedP2Exchange{}) {
 		return false, nil
 	}
 	var count int64

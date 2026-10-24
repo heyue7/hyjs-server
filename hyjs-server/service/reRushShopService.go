@@ -35,7 +35,7 @@ func (s *GameService) seedReRushShop(tx *gorm.DB, now time.Time) error {
 	if err == nil && strings.Contains(source.Source, constUtil.ReRushShopPolicy) {
 		return nil
 	}
-	if tx.Migrator().HasTable(&db.AdminAudit{}) {
+	if gameSchemaHasTable(tx, &db.AdminAudit{}) {
 		var edits int64
 		if e := tx.Model(&db.AdminAudit{}).Where("target=? AND action LIKE ?", "point", "shop.%").Count(&edits).Error; e != nil {
 			return e

@@ -54,7 +54,7 @@ func (s *GameService) copyDropInput(tx *gorm.DB, content string) (*copyDropInput
 func (s *GameService) copyDropInputForRule(tx *gorm.DB, content, ruleID string) (*copyDropInput, error) {
 	input := &copyDropInput{}
 	// 旧隔离夹具和升级前战斗没有该表时，保持已有确定首通行为。
-	if !tx.Migrator().HasTable(&db.CopyDropRule{}) {
+	if !gameSchemaHasTable(tx, &db.CopyDropRule{}) {
 		return input, nil
 	}
 	var rule db.CopyDropRule
@@ -109,7 +109,7 @@ func (s *GameService) copyDropInputForRule(tx *gorm.DB, content, ruleID string) 
 
 // captureCopyDrops 与原开始帧同事务保存配置，旧实例不从重启后的表重新抽配置。
 func (s *GameService) captureCopyDrops(tx *gorm.DB, id int64, fightID string, task map[string]string) error {
-	if !tx.Migrator().HasTable(&db.CopyDropSnapshot{}) {
+	if !gameSchemaHasTable(tx, &db.CopyDropSnapshot{}) {
 		return nil
 	}
 	input, err := s.copyDropInput(tx, task["DropOdds"])
@@ -179,7 +179,7 @@ func (s *GameService) applyCopyDropInputWithGrant(player *pb.Player, game *model
 
 // settleCopyDrops 仅在未结算胜利分支执行；Profile锁与原Fight回执保证并发一次入库。
 func (s *GameService) settleCopyDrops(tx *gorm.DB, id int64, player *pb.Player, game *model.GameState, fight *model.CopyFight) (*pb.ResultObject, []*pb.BaseResource, error) {
-	if !tx.Migrator().HasTable(&db.CopyDropSnapshot{}) {
+	if !gameSchemaHasTable(tx, &db.CopyDropSnapshot{}) {
 		return &pb.ResultObject{}, nil, nil
 	}
 	var saved db.CopyDropSnapshot

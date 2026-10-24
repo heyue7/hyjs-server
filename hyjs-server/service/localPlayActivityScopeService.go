@@ -182,7 +182,7 @@ func localPlayActivityVisible(tx *gorm.DB, key string) (bool, error) {
 	}
 	owner := localPlayActivityOwner(tx)
 	activity := localPlayActivityIDForConfig(key)
-	if owner <= 1 || activity == "" || !tx.Migrator().HasTable(&db.LocalPlayActivityBinding{}) {
+	if owner <= 1 || activity == "" || !gameSchemaHasTable(tx, &db.LocalPlayActivityBinding{}) {
 		return true, nil
 	}
 	var count int64
@@ -257,7 +257,7 @@ func localPlayWelfareActivityKey(tx *gorm.DB, kind string, legacy string) (strin
 // cycles cannot make a disabled offering available for another refresh.
 func localPlayActivitySourceReady(tx *gorm.DB, def localPlayActivityDefinition) bool {
 	exists := func(table interface{}, condition string, args ...interface{}) bool {
-		if !tx.Migrator().HasTable(table) {
+		if !gameSchemaHasTable(tx, table) {
 			return false
 		}
 		var count int64
@@ -272,9 +272,9 @@ func localPlayActivitySourceReady(tx *gorm.DB, def localPlayActivityDefinition) 
 	case "entry":
 		return true
 	case "open-server":
-		return tx.Migrator().HasTable(&db.OpenServerActivityTask{})
+		return gameSchemaHasTable(tx, &db.OpenServerActivityTask{})
 	case "turntable":
-		return tx.Migrator().HasTable(&db.GameplayPool{})
+		return gameSchemaHasTable(tx, &db.GameplayPool{})
 	case "period":
 		prefix := map[string]string{"OpenServerRace": "kaiFuJingSai", "MainCopy": "mainCopyWinTimes", "AincradStars": "aincradStars", "WarriorRescruitTimes": "warriorRescruitTimes", "CollectionWarrior": "warriorGetSpecial", "KaiGongActivity": "kaiGongActivity", "Congratulation": "celebrationActivity"}[def.ID]
 		return periodReady(prefix)
@@ -286,7 +286,7 @@ func localPlayActivitySourceReady(tx *gorm.DB, def localPlayActivityDefinition) 
 			return periodReady("totalLogin_p1")
 		}
 		if def.ID == "EveryDaySign" {
-			if !tx.Migrator().HasTable(&db.MonthSignRule{}) {
+			if !gameSchemaHasTable(tx, &db.MonthSignRule{}) {
 				return false
 			}
 			var count int64
@@ -532,7 +532,7 @@ func (s *GameService) localPlayCreateScopedCycle(tx *gorm.DB, id int64, def loca
 			}
 			// Legacy red-currency goods retain their original independent quota and
 			// stock. Refreshing this directory never resets those global goods.
-			if tx.Migrator().HasTable(&db.RedP2Exchange{}) {
+			if gameSchemaHasTable(tx, &db.RedP2Exchange{}) {
 				var red []db.RedP2Exchange
 				if err := tx.Order("id").Find(&red).Error; err != nil {
 					return nil, err

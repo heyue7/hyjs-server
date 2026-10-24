@@ -171,7 +171,7 @@ func (s *GameService) redExchangeApply(tx *gorm.DB, id int64, b *pb.CSGetActivit
 			return e
 		}
 	}
-	if tx.Migrator().HasTable(&db.EventFact{}) {
+	if gameSchemaHasTable(tx, &db.EventFact{}) {
 		if e = s.RecordP1Cost(tx, id, fmt.Sprintf("p2:exchange:%d", stamp), []*pb.BaseResource{cost}, LocalPlayNow(tx.Statement.Context)); e != nil {
 			return e
 		}
@@ -185,7 +185,7 @@ func (s *GameService) redExchangeApply(tx *gorm.DB, id int64, b *pb.CSGetActivit
 // 原 UIActivity 通过下划线前缀 limitExchange 进入23号兑换页，OnSailItem 使用原买入协议。
 func (s *GameService) redExchangeTab(ctx context.Context, id int64) (*pb.ActivityTab, error) {
 	tx := db.GetIns().WithContext(ctx)
-	if !tx.Migrator().HasTable(&db.RedP2Exchange{}) {
+	if !gameSchemaHasTable(tx, &db.RedP2Exchange{}) {
 		return nil, nil
 	}
 	var count int64

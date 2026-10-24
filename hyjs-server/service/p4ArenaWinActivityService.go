@@ -89,7 +89,7 @@ func (s *GameService) p4ReconcileArenaWinProgress(tx *gorm.DB, progress *db.Peri
 	if !p4ArenaWinFrozenIdentity(cfg) {
 		return errors.New(constUtil.P4ArenaWinConflict)
 	}
-	if !tx.Migrator().HasTable(&db.P11ArenaFightSettlement{}) || !tx.Migrator().HasTable(&db.P6BattleRecord{}) {
+	if !gameSchemaHasTable(tx, &db.P11ArenaFightSettlement{}) || !gameSchemaHasTable(tx, &db.P6BattleRecord{}) {
 		return nil
 	}
 	var settled int64

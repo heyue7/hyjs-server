@@ -156,7 +156,7 @@ func (s *GameService) p5GoldEggUse(ctx context.Context, id int64, b *pb.CSItemUs
 
 // seedP5GoldEggSupply uses a separate child rule; existing books/gems never gain new limits.
 func (s *GameService) seedP5GoldEggSupply(tx *gorm.DB, now time.Time) error {
-	if !tx.Migrator().HasTable(&db.P5GoldEggRule{}) {
+	if !gameSchemaHasTable(tx, &db.P5GoldEggRule{}) {
 		return nil
 	}
 	local := now.In(time.FixedZone("UTC+8", 8*3600))

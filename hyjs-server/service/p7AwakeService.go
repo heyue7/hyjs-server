@@ -757,7 +757,7 @@ func (s *GameService) p7AwakeExplore(ctx context.Context, id int64, request prot
 			if err = s.ensureNoActiveDailyCopy(tx, id, now); err != nil {
 				return err
 			}
-			if tx.Migrator().HasTable(&db.P7RushState{}) {
+			if gameSchemaHasTable(tx, &db.P7RushState{}) {
 				var active int64
 				if err = tx.Model(&db.P7RushState{}).Where("player_id=? AND active_fight<>?", id, "").Count(&active).Error; err != nil {
 					return err
@@ -1009,7 +1009,7 @@ func (s *GameService) p7AwakeExplore(ctx context.Context, id int64, request prot
 // p7AwakeRequireIdle 供共享战斗所有权入口使用；老隔离fixture未建本域表时维持原行为。
 // 到期实例仍需经原目录/结算入口发放已得箱奖，不能在创建其他战斗时静默丢弃。
 func p7AwakeRequireIdle(tx *gorm.DB, id int64) error {
-	if !tx.Migrator().HasTable(&db.P7AwakeExploration{}) {
+	if !gameSchemaHasTable(tx, &db.P7AwakeExploration{}) {
 		return nil
 	}
 	var count int64

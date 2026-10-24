@@ -29,7 +29,7 @@ func (s *GameService) InitializeAdminShopAvailability(ctx context.Context) error
 
 // AdminShopAvailability returns the shop-level hours; nil retains legacy isolated-database behavior.
 func AdminShopAvailability(tx *gorm.DB, key string) (*db.AdminShopAvailability, error) {
-	if !tx.Migrator().HasTable(&db.AdminShopAvailability{}) {
+	if !gameSchemaHasTable(tx, &db.AdminShopAvailability{}) {
 		return nil, nil
 	}
 	var row db.AdminShopAvailability

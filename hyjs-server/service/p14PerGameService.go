@@ -183,7 +183,7 @@ func (s *GameService) p14PerGameQueueTX(tx *gorm.DB, body p14PerGameSnapshot, no
 // Original81030 remains unchanged. A live series and current server slot select
 // the independent next-game row. Game1/old purpose3 signing is left untouched.
 func (s *GameService) P14FinalFormationUploadCurrent(ctx context.Context, tx *gorm.DB, season *db.P14SeasonPolicy, player *pb.Player, state *model.GameState, now time.Time) (int32, error) {
-	if !tx.Migrator().HasTable(&db.P14PerGamePolicy{}) {
+	if !gameSchemaHasTable(tx, &db.P14PerGamePolicy{}) {
 		old, err := s.p14FinalFormationUpload(ctx, tx, season, player, state, now)
 		if err != nil {
 			return 0, err
@@ -725,7 +725,7 @@ func (s *GameService) p14PerGameReadySourceTX(ctx context.Context, tx *gorm.DB, 
 // exists, including its locked window. With no such upload, the old first-game
 // display remains a read-only fallback and is never sealed as a next-game input.
 func (s *GameService) P14FinalFormationQueryCurrent(ctx context.Context, tx *gorm.DB, season *db.P14SeasonPolicy, server, player int64, now time.Time) (*pb.FormationSimpleInfo, error) {
-	if tx.Migrator().HasTable(&db.P14PerGameFormation{}) {
+	if gameSchemaHasTable(tx, &db.P14PerGameFormation{}) {
 		var rows []db.P14FinalSeries
 		if err := tx.Where("season_index=? AND round_stage=?", season.SeasonIndex, constUtil.P14Final16Stage).Find(&rows).Error; err != nil {
 			return nil, err

@@ -36,7 +36,7 @@ func (s *GameService) copySpecialInput(tx *gorm.DB, task map[string]string) (*co
 	if strings.TrimSpace(task["SpecialOdds"]) == "" {
 		return nil, nil
 	}
-	if !tx.Migrator().HasTable(&db.CopySpecialRule{}) {
+	if !gameSchemaHasTable(tx, &db.CopySpecialRule{}) {
 		return nil, nil
 	}
 	var cfg db.CopySpecialRule

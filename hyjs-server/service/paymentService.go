@@ -450,7 +450,7 @@ func (s *GameService) confirmTestPaymentAt(ctx context.Context, orderID, eventID
 // refreshP3OpenServer projects confirmed orders and evaluates original opening
 // tasks in the payment transaction. Page reads use the same fact-only helper.
 func (s *GameService) refreshP3OpenServer(tx *gorm.DB, p *pb.Player, g *model.GameState, now time.Time) error {
-	if !tx.Migrator().HasTable(&db.OpenServerActivityRule{}) {
+	if !gameSchemaHasTable(tx, &db.OpenServerActivityRule{}) {
 		return nil
 	}
 	return s.refreshOpenServerProgressAt(tx, p, g, now)
@@ -459,7 +459,7 @@ func (s *GameService) refreshP3OpenServer(tx *gorm.DB, p *pb.Player, g *model.Ga
 // refreshP3OpenServerCounters rechecks actual paid orders within the accepted
 // activity window; daily maximums never combine two small orders into one.
 func (s *GameService) refreshP3OpenServerCounters(tx *gorm.DB, id int64, cfg *db.OpenServerActivityRule, now time.Time) error {
-	if !tx.Migrator().HasTable(&db.PaymentOrder{}) {
+	if !gameSchemaHasTable(tx, &db.PaymentOrder{}) {
 		return nil
 	}
 	paymentStart := cfg.StartAt

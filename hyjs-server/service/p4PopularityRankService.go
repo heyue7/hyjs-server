@@ -142,7 +142,7 @@ func (s *GameService) p4PopularityRankHistoricalClaim(tx *gorm.DB, claim db.P4Po
 			break
 		}
 	}
-	if !allowed || !tx.Migrator().HasTable(&db.P11ArenaFightSettlement{}) {
+	if !allowed || !gameSchemaHasTable(tx, &db.P11ArenaFightSettlement{}) {
 		return false, nil
 	}
 	var settlements []db.P11ArenaFightSettlement

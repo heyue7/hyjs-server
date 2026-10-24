@@ -137,7 +137,7 @@ func p11LimitDailyBonus(rank int64) int64 {
 // the operator has since closed or replaced the live publication.
 func (s *GameService) PrepareP11LimitDailyMutation(ctx context.Context, tx *gorm.DB, period *db.P11LimitPeriod, requested time.Time) (time.Time, error) {
 	now := p11LimitDailyNow(ctx, requested)
-	if !tx.Migrator().HasTable(&db.P11LimitDailyPolicy{}) {
+	if !gameSchemaHasTable(tx, &db.P11LimitDailyPolicy{}) {
 		return now, nil
 	}
 	var cfg db.P11LimitDailyPolicy
@@ -194,7 +194,7 @@ func (s *GameService) PrepareP11LimitDailyMutation(ctx context.Context, tx *gorm
 // RecordP11LimitDailyChallenge journals only a newly accepted mode20 settlement
 // in the same serialized transaction, after its immutable original reply exists.
 func (s *GameService) RecordP11LimitDailyChallenge(ctx context.Context, tx *gorm.DB, row *db.P11LimitFightSettlement, admitted time.Time) error {
-	if !tx.Migrator().HasTable(&db.P11LimitDailyPolicy{}) {
+	if !gameSchemaHasTable(tx, &db.P11LimitDailyPolicy{}) {
 		return nil
 	}
 	if row == nil || row.PlayerID <= 0 || row.FightID == "" || row.PeriodID == "" || row.ScopeProof == "" || row.ResponseHash != p6Digest(row.Response) || row.TerminalHash != p6Digest(row.Terminal) || admitted.UnixMilli() < row.CreatedAt {

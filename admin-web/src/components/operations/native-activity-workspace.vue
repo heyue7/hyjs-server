@@ -14,6 +14,8 @@ import RewardList from './reward-list.vue';
 import ResourceSelect from './resource-select.vue';
 import RecruitSettings from './recruit-settings.vue';
 import ContextHelp from './context-help.vue';
+import DailySign from '@/views/daily-sign/index.vue';
+import LuxurySignSettings from './luxury-sign-settings.vue';
 
 const { canWrite } = useOperations();
 const rows = ref<NativeActivity[]>([]);
@@ -35,6 +37,20 @@ const selectedChild = ref(0);
 const maxAmount = 2147483647;
 let lastFocused: HTMLElement | null = null;
 const drawerWidth = ref('min(940px, calc(100vw - 48px))');
+const signTab = ref('daily');
+const dailySign = ref<InstanceType<typeof DailySign> | null>(null);
+const luxurySign = ref<InstanceType<typeof LuxurySignSettings> | null>(null);
+const isDailySign = computed(() => selected.value?.kind === 'daily-sign');
+const signBusy = computed(() => isDailySign.value && Boolean(dailySign.value?.busy || luxurySign.value?.busy));
+async function beforeSignTabLeave(_name: string | number, oldName: string | number | null) {
+  if (signBusy.value) return false;
+  return oldName === 'daily' ? dailySign.value?.beforeLeave() ?? true : luxurySign.value?.beforeLeave() ?? true;
+}
+async function beforeSignLeave() {
+  if (signBusy.value) return false;
+  if (!await (dailySign.value?.beforeLeave() ?? true)) return false;
+  return luxurySign.value?.beforeLeave() ?? true;
+}
 const recruitRules = ref<InstanceType<typeof RecruitSettings> | null>(null);
 function syncDrawerWidth() {
   drawerWidth.value = window.innerWidth <= 800 ? '100vw' : 'min(940px, calc(100vw - 48px))';
@@ -44,10 +60,10 @@ const isRecruitRotation = computed(() => selected.value?.kind === 'recruit-rotat
 const ruleDirty = computed(() => isRecruitRotation.value && Boolean(recruitRules.value?.dirty));
 const ruleLoading = computed(() => isRecruitRotation.value && Boolean(recruitRules.value?.loading));
 const ruleInvalid = computed(() => isRecruitRotation.value && (!recruitRules.value || Boolean(recruitRules.value.invalid)));
-const dirty = computed(() => activityDirty.value || ruleDirty.value);
+const dirty = computed(() => activityDirty.value || ruleDirty.value || Boolean(isDailySign.value && (dailySign.value?.dirty || luxurySign.value?.dirty)));
 const disabled = computed(() => !canWrite.value || saving.value || loading.value);
 const rulesDisabled = computed(() => disabled.value || selected.value?.frozen);
-const busy = computed(() => loading.value || saving.value || Boolean(removingId.value));
+const busy = computed(() => loading.value || saving.value || Boolean(removingId.value) || signBusy.value);
 const timed = computed(() => Boolean(selected.value) && isTimed(selected.value!));
 const payment = computed(() => selected.value?.kind.startsWith('payment-'));
 const card = computed(() => ['month-card', 'permanent-card'].includes(selected.value?.kind || ''));
@@ -56,6 +72,7 @@ const currentPrize = computed(() => selected.value?.form.prizes.slice(selectedPr
 const currentMilestone = computed(() => selected.value?.form.milestones.slice(selectedMilestone.value, selectedMilestone.value + 1) || []);
 const currentChild = computed(() => selected.value?.form.children.slice(selectedChild.value, selectedChild.value + 1) || []);
 const kindOrder = [
+  'daily-sign',
   'fund',
   'payment-first',
   'payment-single',
@@ -73,6 +90,7 @@ const kindOrder = [
   'update'
 ];
 const kindLabels: Record<string, string> = {
+  'daily-sign': '每日签到',
   fund: '开服基金',
   'payment-first': '首充礼包',
   'payment-single': '单充送礼',
@@ -228,6 +246,7 @@ function apply(row: NativeActivity) {
   draft.form.children ||= [];
   selected.value = draft;
   original.value = JSON.stringify(draft);
+  signTab.value = 'daily';
   selectedPrize.value = 0;
   selectedMilestone.value = 0;
   selectedChild.value = 0;
@@ -279,9 +298,10 @@ async function openRow(row: NativeActivity) {
   await nextTick();
 }
 async function closeDrawer() {
-  if (saving.value) return;
-  if (!(await confirmDiscard())) return;
+  if (saving.value || signBusy.value) return;
+  if (isDailySign.value ? !await beforeSignLeave() : !await confirmDiscard()) return;
   drawerOpen.value = false;
+  await load();
   await nextTick();
   if (!drawerOpen.value) lastFocused?.focus?.();
 }
@@ -295,8 +315,8 @@ function afterDrawerLeave() {
   saveError.value = '';
 }
 async function leaveWorkspace() {
-  if (saving.value) return false;
-  if (!(await confirmDiscard())) return false;
+  if (saving.value || signBusy.value) return false;
+  if (isDailySign.value ? !await beforeSignLeave() : !await confirmDiscard()) return false;
   if (drawerOpen.value) {
     drawerOpen.value = false;
     selected.value = undefined;
@@ -318,7 +338,7 @@ async function load() {
   }
 }
 async function save() {
-  if (!selected.value || disabled.value) return;
+  if (!selected.value || disabled.value || isDailySign.value) return;
   if (isRecruitRotation.value && (ruleLoading.value || ruleInvalid.value)) {
     saveError.value = '请先修正或重新载入招募规则后再保存。';
     return;
@@ -382,7 +402,7 @@ function weekday(day: number, on: boolean) {
   selected.value.form.weekdayMask = on ? mask | (1 << day) : mask & ~(1 << day);
 }
 function beforeUnload(event: BeforeUnloadEvent) {
-  if (dirty.value || saving.value) {
+  if (dirty.value || saving.value || signBusy.value) {
     event.preventDefault();
     event.returnValue = '';
   }
@@ -450,14 +470,19 @@ defineExpose({ beforeLeave: leaveWorkspace, confirmDiscard, dirty, saving });
       :width="drawerWidth"
       placement="right"
       class="native-activity-drawer"
-      :mask-closable="!saving"
-      :close-on-esc="!saving"
+      :mask-closable="!saving && !signBusy"
+      :close-on-esc="!saving && !signBusy"
       :trap-focus="true"
       :auto-focus="true"
       @update:show="drawerShow"
       @after-leave="afterDrawerLeave"
     >
       <NDrawerContent v-if="selected" :title="selected.name" closable :native-scrollbar="false">
+        <NTabs v-if="isDailySign" v-model:value="signTab" type="line" :on-before-leave="beforeSignTabLeave">
+          <NTabPane name="daily" tab="每日签到"><DailySign ref="dailySign" embedded /></NTabPane>
+          <NTabPane name="luxury" tab="豪华签到" display-directive="show:lazy"><LuxurySignSettings ref="luxurySign" /></NTabPane>
+        </NTabs>
+        <template v-else>
         <div class="native-drawer-head">
           <NSpace :size="6">
             <NTag :bordered="false">{{ kindLabel(selected.kind) }}</NTag>
@@ -569,7 +594,8 @@ defineExpose({ beforeLeave: leaveWorkspace, confirmDiscard, dirty, saving });
             </section>
           </template>
         </NForm>
-        <template #footer>
+        </template>
+        <template v-if="!isDailySign" #footer>
           <div class="ops-drawer-actions">
             <span class="ops-muted">{{ saving ? '正在保存…' : dirty ? '有尚未保存的修改' : '配置已载入' }}</span>
             <NButton :disabled="saving" @click="closeDrawer">取消</NButton>

@@ -121,7 +121,7 @@ func (s *GameService) InitializeP13Guild(ctx context.Context) error {
 func (s *GameService) p13GuildMigrateUnionFightAutoApply(ctx context.Context) error {
 	const batch = 500
 	d := db.GetIns().WithContext(ctx)
-	legacyExists := d.Migrator().HasTable(&db.P13UnionFightSetting{})
+	legacyExists := gameSchemaHasTable(d, &db.P13UnionFightSetting{})
 	for {
 		more := false
 		err := d.Transaction(func(tx *gorm.DB) error {
@@ -175,7 +175,7 @@ func (s *GameService) p13GuildMigrateUnionFightAutoApply(ctx context.Context) er
 
 // P13GuildScope 每次读取当前真实成员关系，离会/解散后立即失去公会频道资格。
 func P13GuildScope(tx *gorm.DB, id int64) (string, int32, error) {
-	if !tx.Migrator().HasTable(&db.P13GuildMember{}) {
+	if !gameSchemaHasTable(tx, &db.P13GuildMember{}) {
 		return "", 0, nil
 	}
 	var member db.P13GuildMember
@@ -198,7 +198,7 @@ func P13GuildScope(tx *gorm.DB, id int64) (string, int32, error) {
 
 // P13GuildChannelEnabled 公会文字使用单独门禁，关闭不影响实际成员历史。
 func P13GuildChannelEnabled(tx *gorm.DB) (bool, error) {
-	if !tx.Migrator().HasTable(&db.P13GuildPolicy{}) {
+	if !gameSchemaHasTable(tx, &db.P13GuildPolicy{}) {
 		return false, nil
 	}
 	var cfg db.P13GuildPolicy
@@ -219,7 +219,7 @@ func (s *GameService) p13GuildLoginAt(ctx context.Context, id int64, now time.Ti
 	}
 	s = s.withRuntimeTables(tables)
 	// 旧独立域测试没有本域迁移；正式main初始化失败会在监听前返回错误。
-	if !db.GetIns().WithContext(ctx).Migrator().HasTable(&db.P13GuildPolicy{}) {
+	if !gameSchemaHasTable(db.GetIns().WithContext(ctx), &db.P13GuildPolicy{}) {
 		return nil
 	}
 	return db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
@@ -1271,7 +1271,7 @@ func (s *GameService) P13GuildBuildingState(tx *gorm.DB, id int64) (*pb.SCUnionB
 // AfterP13GuildBuildingChange 在事务提交后广播给当前已认证本会领地成员，失败推送可由原刷新恢复。
 func (s *GameService) AfterP13GuildBuildingChange(ctx context.Context, id int64) {
 	tx := db.GetIns().WithContext(ctx)
-	if !tx.Migrator().HasTable(&db.P10ScenePresence{}) {
+	if !gameSchemaHasTable(tx, &db.P10ScenePresence{}) {
 		return
 	}
 	member, _, err := p13GuildNeedMember(tx, id)

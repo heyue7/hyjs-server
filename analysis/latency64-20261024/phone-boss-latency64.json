@@ -1,0 +1,14 @@
+{
+  "qaAPK": "91e5690dc9158073bb756a9c1c0bdcfae0cf89f93ee5b2fd055136f8fb1202ad",
+  "helper": "2f27e72fca3642b3ea94fa58745539e9235a1f256f8c99d1cafcb61fba5056f0",
+  "transport": "owned USB reverse original game HTTP/TCP; shared isolated MySQL; actual native MoveTo across radius; original start/end",
+  "lastSampleOutside": 1110.59558,
+  "firstSampleInside": 1110.71411,
+  "firstBattleRoom": 1111.607,
+  "contactToRoomMs": 892.89,
+  "contactToRoomUpperMs": 1011.42,
+  "samplingBoundMs": 118.53,
+  "resourceReady": 1117.43311,
+  "coldLoadAfterRoomMs": 5826.11,
+  "scope": "one grass Boss original phone sample; same RCUIFieldBoss hook shared, no production/network-wide guarantee; user explicitly deferred cold resource warmup"
+}

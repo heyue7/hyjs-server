@@ -200,7 +200,7 @@ func (s *GameService) navigationLife(tx *gorm.DB, p *pb.Player, g *model.GameSta
 }
 
 func (s *GameService) navigationDaily(tx *gorm.DB, p *pb.Player, now time.Time, flags map[int32]bool) error {
-	if !tx.Migrator().HasTable(&db.DailyCopyPolicy{}) {
+	if !gameSchemaHasTable(tx, &db.DailyCopyPolicy{}) {
 		return nil
 	}
 	info, err := s.dailyCopyInfo(tx, p, now)
@@ -219,7 +219,7 @@ func (s *GameService) navigationDaily(tx *gorm.DB, p *pb.Player, now time.Time, 
 	return nil
 }
 func (s *GameService) navigationAwake(tx *gorm.DB, p *pb.Player, now time.Time, flags map[int32]bool) error {
-	if !tx.Migrator().HasTable(&db.P7AwakePolicy{}) {
+	if !gameSchemaHasTable(tx, &db.P7AwakePolicy{}) {
 		return nil
 	}
 	var policy db.P7AwakePolicy
@@ -253,7 +253,7 @@ func (s *GameService) navigationAwake(tx *gorm.DB, p *pb.Player, now time.Time, 
 	return nil
 }
 func (s *GameService) navigationRush(tx *gorm.DB, p *pb.Player, g *model.GameState, now time.Time, flags map[int32]bool) error {
-	if !tx.Migrator().HasTable(&db.P7RushPolicy{}) {
+	if !gameSchemaHasTable(tx, &db.P7RushPolicy{}) {
 		return nil
 	}
 	cfg, err := s.p7Policy(tx)
@@ -327,7 +327,7 @@ func (s *GameService) navigationRush(tx *gorm.DB, p *pb.Player, g *model.GameSta
 }
 
 func (s *GameService) navigationExpedition(tx *gorm.DB, p *pb.Player, g *model.GameState, now time.Time, flags map[int32]bool) error {
-	if !tx.Migrator().HasTable(&db.P7ExpeditionPolicy{}) {
+	if !gameSchemaHasTable(tx, &db.P7ExpeditionPolicy{}) {
 		return nil
 	}
 	var missions []db.P7ExpeditionMission
@@ -449,7 +449,7 @@ func (s *GameService) navigationMemory(tx *gorm.DB, p *pb.Player, now time.Time,
 // Guild welfare hints use the existing policy and authoritative membership.
 // No donation, stamina or box claim is performed by this projection.
 func (s *GameService) navigationGuild(tx *gorm.DB, p *pb.Player, now time.Time, flags map[int32]bool) error {
-	if !tx.Migrator().HasTable(&db.P13GuildPolicy{}) {
+	if !gameSchemaHasTable(tx, &db.P13GuildPolicy{}) {
 		return nil
 	}
 	var policy db.P13GuildPolicy
@@ -493,7 +493,7 @@ func (s *GameService) navigationGuild(tx *gorm.DB, p *pb.Player, now time.Time, 
 		return err
 	}
 	flags[16] = amount > 0 && p.GetCoin() >= int64(amount) && spent+int64(amount) <= int64(limit)
-	if tx.Migrator().HasTable(&db.P13GuildDonateBoxPolicy{}) {
+	if gameSchemaHasTable(tx, &db.P13GuildDonateBoxPolicy{}) {
 		boxes, _, _, err := s.ProjectP13GuildDonateBoxes(tx, &member, LocalPlayAt(tx.Statement.Context, now))
 		if err != nil {
 			return err
@@ -509,7 +509,7 @@ func (s *GameService) navigationGuild(tx *gorm.DB, p *pb.Player, now time.Time, 
 }
 
 func (s *GameService) navigationFriendHelp(tx *gorm.DB, p *pb.Player, now time.Time, flags map[int32]bool) error {
-	if !s.P10VoiceReady || !tx.Migrator().HasTable(&db.P10ExpeditionHelpPolicy{}) {
+	if !s.P10VoiceReady || !gameSchemaHasTable(tx, &db.P10ExpeditionHelpPolicy{}) {
 		return nil
 	}
 	var policy db.P10ExpeditionHelpPolicy

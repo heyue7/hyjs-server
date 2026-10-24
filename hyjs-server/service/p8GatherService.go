@@ -222,7 +222,7 @@ func (s *GameService) p8Nodes(tx *gorm.DB, id int64, scene string, now int64) ([
 		}
 		if stale {
 			var active int64
-			if tx.Migrator().HasTable(&db.P8GatherAttempt{}) {
+			if gameSchemaHasTable(tx, &db.P8GatherAttempt{}) {
 				if err := tx.Model(&db.P8GatherAttempt{}).Where("player_id=? AND active=?", id, true).Count(&active).Error; err != nil {
 					return nil, false, err
 				}

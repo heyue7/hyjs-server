@@ -30,7 +30,7 @@ func (s *GameService) kingRecruitAvailablePools(tx *gorm.DB, now int64) ([]kingR
 	owner := GameCalendarOwner(tx.Statement.Context)
 	keys := []string{}
 	scheduled := false
-	if tx.Migrator().HasTable(&db.AdminActivityOccurrence{}) {
+	if gameSchemaHasTable(tx, &db.AdminActivityOccurrence{}) {
 		var count int64
 		if err := tx.Model(&db.AdminActivityOccurrence{}).Where("server_id=? AND mode=?", s.OriginalServerID(), constUtil.AdminKingRecruitMode).Count(&count).Error; err != nil {
 			return nil, false, err
@@ -53,7 +53,7 @@ func (s *GameService) kingRecruitAvailablePools(tx *gorm.DB, now int64) ([]kingR
 					keys = append(keys, row.ConsumerKey)
 				}
 			}
-			if tx.Migrator().HasTable(&db.AdminCharacterActivityInstance{}) {
+			if gameSchemaHasTable(tx, &db.AdminCharacterActivityInstance{}) {
 				var rows []db.AdminCharacterActivityInstance
 				if err := tx.Where("player_id=? AND server_id=? AND mode=? AND start_at<=? AND end_at>?", owner, s.OriginalServerID(), constUtil.AdminKingRecruitMode, now, now).Order("start_at,occurrence_id").Find(&rows).Error; err != nil {
 					return nil, true, err
@@ -95,7 +95,7 @@ func (s *GameService) kingRecruitAvailablePools(tx *gorm.DB, now int64) ([]kingR
 			continue
 		}
 		world := int64(0)
-		if tx.Migrator().HasTable(&db.KingRecruitActivitySnapshot{}) {
+		if gameSchemaHasTable(tx, &db.KingRecruitActivitySnapshot{}) {
 			var snapshot db.KingRecruitActivitySnapshot
 			err := tx.First(&snapshot, "pool_id=?", key).Error
 			if err == nil {

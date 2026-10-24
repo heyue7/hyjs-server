@@ -93,7 +93,7 @@ func (s *GameService) adminShopScheduleSourceForm(tx *gorm.DB, key string) (mode
 // Refresh reusable scheduling inputs only. Existing issued occurrences keep
 // their immutable form/source bytes and historical native consumers.
 func (s *GameService) syncAdminShopScheduleDefinitions(tx *gorm.DB) error {
-	if !tx.Migrator().HasTable(&db.AdminShopAvailability{}) {
+	if !gameSchemaHasTable(tx, &db.AdminShopAvailability{}) {
 		return nil
 	}
 	for _, shop := range AdminShopDefinitions() {
@@ -229,7 +229,7 @@ func (s *GameService) adminScheduledShopConsumer(tx *gorm.DB, shopKey string, no
 		return "", managed, err
 	}
 	owner := GameCalendarOwner(tx.Statement.Context)
-	if owner > 0 && tx.Migrator().HasTable(&db.AdminCharacterActivityInstance{}) {
+	if owner > 0 && gameSchemaHasTable(tx, &db.AdminCharacterActivityInstance{}) {
 		var issued []db.AdminCharacterActivityInstance
 		if err = tx.Where("server_id=? AND player_id=? AND mode=? AND start_at<=? AND end_at>?", s.OriginalServerID(), owner, "shop-window", now, now).Find(&issued).Error; err != nil {
 			return "", true, err

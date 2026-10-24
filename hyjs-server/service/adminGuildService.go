@@ -491,7 +491,7 @@ func adminGuildPolicyState(tx *gorm.DB) (model.AdminGuildPolicyState, []model.Ad
 		{Key: "unionTechOverride", Label: "UnionTech 分级覆盖", Implemented: true, Editable: true, Detail: "修改用于新的科技报价；已发出的报价保持原成本。"},
 	}
 	read := func(table any, first bool, assign func(*gorm.DB) error) error {
-		if !tx.Migrator().HasTable(table) {
+		if !gameSchemaHasTable(tx, table) {
 			return nil
 		}
 		if first {
@@ -593,7 +593,7 @@ func adminGuildPolicyState(tx *gorm.DB) (model.AdminGuildPolicyState, []model.Ad
 	}); err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		return state, capabilities, err
 	}
-	if tx.Migrator().HasTable(&db.P13UnionFightPlayerBattlePolicy{}) {
+	if gameSchemaHasTable(tx, &db.P13UnionFightPlayerBattlePolicy{}) {
 		var rows []db.P13UnionFightPlayerBattlePolicy
 		if err := tx.Order("id").Find(&rows).Error; err != nil {
 			return state, capabilities, err
@@ -658,7 +658,7 @@ func adminGuildUpdatePolicy(tx *gorm.DB, s *GameService, save *model.AdminGuildP
 		return nil
 	}
 	if save.Guild != nil {
-		if !tx.Migrator().HasTable(&db.P13GuildPolicy{}) {
+		if !gameSchemaHasTable(tx, &db.P13GuildPolicy{}) {
 			return constUtil.ErrAdminConfiguration
 		}
 		var row db.P13GuildPolicy
@@ -674,7 +674,7 @@ func adminGuildUpdatePolicy(tx *gorm.DB, s *GameService, save *model.AdminGuildP
 		}
 	}
 	if save.Prayer != nil {
-		if !tx.Migrator().HasTable(&db.P13GuildPrayerPolicy{}) {
+		if !gameSchemaHasTable(tx, &db.P13GuildPrayerPolicy{}) {
 			return constUtil.ErrAdminConfiguration
 		}
 		var row db.P13GuildPrayerPolicy
@@ -706,7 +706,7 @@ func adminGuildUpdatePolicy(tx *gorm.DB, s *GameService, save *model.AdminGuildP
 		}
 	}
 	if save.Tech != nil {
-		if !tx.Migrator().HasTable(&db.P13GuildTechPolicy{}) {
+		if !gameSchemaHasTable(tx, &db.P13GuildTechPolicy{}) {
 			return constUtil.ErrAdminConfiguration
 		}
 		var row db.P13GuildTechPolicy
@@ -738,7 +738,7 @@ func adminGuildUpdatePolicy(tx *gorm.DB, s *GameService, save *model.AdminGuildP
 		}
 	}
 	if save.DonateBox != nil {
-		if !tx.Migrator().HasTable(&db.P13GuildDonateBoxPolicy{}) {
+		if !gameSchemaHasTable(tx, &db.P13GuildDonateBoxPolicy{}) {
 			return constUtil.ErrAdminConfiguration
 		}
 		var row db.P13GuildDonateBoxPolicy
@@ -779,7 +779,7 @@ func adminGuildUpdatePolicy(tx *gorm.DB, s *GameService, save *model.AdminGuildP
 		}
 	}
 	if save.DonationBadge != nil {
-		if !tx.Migrator().HasTable(&db.P13GuildDonationBadgePolicy{}) {
+		if !gameSchemaHasTable(tx, &db.P13GuildDonationBadgePolicy{}) {
 			return constUtil.ErrAdminConfiguration
 		}
 		var row db.P13GuildDonationBadgePolicy
@@ -824,7 +824,7 @@ func adminGuildUpdatePolicy(tx *gorm.DB, s *GameService, save *model.AdminGuildP
 	}
 	if uf := save.UnionFight; uf != nil {
 		if uf.Enrollment != nil {
-			if !tx.Migrator().HasTable(&db.P13UnionFightPolicy{}) {
+			if !gameSchemaHasTable(tx, &db.P13UnionFightPolicy{}) {
 				return constUtil.ErrAdminConfiguration
 			}
 			var row db.P13UnionFightPolicy
@@ -839,7 +839,7 @@ func adminGuildUpdatePolicy(tx *gorm.DB, s *GameService, save *model.AdminGuildP
 			}
 		}
 		if uf.Chat != nil {
-			if !tx.Migrator().HasTable(&db.P13UnionFightChatPolicy{}) {
+			if !gameSchemaHasTable(tx, &db.P13UnionFightChatPolicy{}) {
 				return constUtil.ErrAdminConfiguration
 			}
 			if uf.Chat.TalkCooldownMillis < 1000 || uf.Chat.TalkCooldownMillis > 3600000 {
@@ -858,7 +858,7 @@ func adminGuildUpdatePolicy(tx *gorm.DB, s *GameService, save *model.AdminGuildP
 			}
 		}
 		if uf.Item != nil {
-			if !tx.Migrator().HasTable(&db.P13UnionFightItemPolicy{}) {
+			if !gameSchemaHasTable(tx, &db.P13UnionFightItemPolicy{}) {
 				return constUtil.ErrAdminConfiguration
 			}
 			var row db.P13UnionFightItemPolicy
@@ -872,7 +872,7 @@ func adminGuildUpdatePolicy(tx *gorm.DB, s *GameService, save *model.AdminGuildP
 			}
 		}
 		if uf.Field != nil {
-			if !tx.Migrator().HasTable(&db.P13UnionFightFieldPolicy{}) {
+			if !gameSchemaHasTable(tx, &db.P13UnionFightFieldPolicy{}) {
 				return constUtil.ErrAdminConfiguration
 			}
 			if uf.Field.Enabled {
@@ -911,7 +911,7 @@ func adminGuildUpdatePolicy(tx *gorm.DB, s *GameService, save *model.AdminGuildP
 			}
 		}
 		if len(uf.PlayerBattle) > 0 {
-			if !tx.Migrator().HasTable(&db.P13UnionFightPlayerBattlePolicy{}) {
+			if !gameSchemaHasTable(tx, &db.P13UnionFightPlayerBattlePolicy{}) {
 				return constUtil.ErrAdminConfiguration
 			}
 			seen := map[int64]bool{}
@@ -1049,7 +1049,7 @@ func AdminGuildRuntimeTables(ctx context.Context, baseTables map[string][]map[st
 	}
 	tx := db.GetIns().WithContext(ctx)
 	// 正式初始化成功后不再逐请求检查表；隔离测试未初始化时才回退原表。
-	if !adminGuildSettingsReady.Load() && !tx.Migrator().HasTable(&db.AdminGuildSetting{}) {
+	if !adminGuildSettingsReady.Load() && !gameSchemaHasTable(tx, &db.AdminGuildSetting{}) {
 		return baseTables, nil
 	}
 	var row db.AdminGuildSetting
@@ -1273,7 +1273,7 @@ func (s *GameService) AdminGuilds(ctx context.Context, q string, page, size int6
 	}
 	d := db.GetIns().WithContext(ctx)
 	out := &model.AdminGuildListResponse{Items: []model.AdminGuildSummary{}, Page: page, PageSize: size}
-	if !d.Migrator().HasTable(&db.P13Guild{}) || !d.Migrator().HasTable(&db.P13GuildMember{}) {
+	if !gameSchemaHasTable(d, &db.P13Guild{}) || !gameSchemaHasTable(d, &db.P13GuildMember{}) {
 		return out, nil
 	}
 	sub := adminGuildOwnershipSubquery(d, selected)
@@ -1343,7 +1343,7 @@ func (s *GameService) AdminGuildDetail(ctx context.Context, id string) (*model.A
 		return nil, fmt.Errorf("%w：请先选择区服", constUtil.ErrAdminInput)
 	}
 	d := db.GetIns().WithContext(ctx)
-	if !d.Migrator().HasTable(&db.P13Guild{}) || !d.Migrator().HasTable(&db.P13GuildMember{}) {
+	if !gameSchemaHasTable(d, &db.P13Guild{}) || !gameSchemaHasTable(d, &db.P13GuildMember{}) {
 		return nil, constUtil.ErrAdminConfiguration
 	}
 	owned, err := adminGuildLoadOwned(d, id, selected, false)

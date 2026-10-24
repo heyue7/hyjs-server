@@ -1,0 +1,254 @@
+[
+  {
+    "uuid": "947a622189262505388e9900",
+    "monId": "mon_016",
+    "samples": 253,
+    "maxDisplacement": 3.2835565031833633,
+    "PatrolStarts": 41,
+    "PatrolFailures": 0,
+    "PatrolStatus": "arrived"
+  },
+  {
+    "uuid": "3c142576fbd1a77d3f1cc048",
+    "monId": "mon_013",
+    "samples": 253,
+    "maxDisplacement": 3.074512868225659,
+    "PatrolStarts": 40,
+    "PatrolFailures": 0,
+    "PatrolStatus": "moving"
+  },
+  {
+    "uuid": "1915efe602958e8488e883be",
+    "monId": "mon_019",
+    "samples": 253,
+    "maxDisplacement": 3.295989947444279,
+    "PatrolStarts": 44,
+    "PatrolFailures": 1,
+    "PatrolStatus": "arrived"
+  },
+  {
+    "uuid": "7ab435a1df9c146d5d37d8d8",
+    "monId": "mon_020",
+    "samples": 253,
+    "maxDisplacement": 1.8702960783426894,
+    "PatrolStarts": 40,
+    "PatrolFailures": 0,
+    "PatrolStatus": "arrived"
+  },
+  {
+    "uuid": "ff2a40b5eed53aa531b632a9",
+    "monId": "mon_020",
+    "samples": 253,
+    "maxDisplacement": 2.0413666088512854,
+    "PatrolStarts": 41,
+    "PatrolFailures": 1,
+    "PatrolStatus": "moving"
+  },
+  {
+    "uuid": "d38f47570ae8cef7b47d58fd",
+    "monId": "mon_011",
+    "samples": 253,
+    "maxDisplacement": 3.3280796389198093,
+    "PatrolStarts": 41,
+    "PatrolFailures": 0,
+    "PatrolStatus": "arrived"
+  },
+  {
+    "uuid": "976a7ef5fcb82050b8edee4d",
+    "monId": "mon_014",
+    "samples": 253,
+    "maxDisplacement": 3.2486669874011525,
+    "PatrolStarts": 41,
+    "PatrolFailures": 0,
+    "PatrolStatus": "arrived"
+  },
+  {
+    "uuid": "6c0bdbd206c642cdc0cfb0bd",
+    "monId": "mon_017",
+    "samples": 253,
+    "maxDisplacement": 3.2898587999582225,
+    "PatrolStarts": 41,
+    "PatrolFailures": 0,
+    "PatrolStatus": "moving"
+  },
+  {
+    "uuid": "00e87a069f726ff69f7cc0da",
+    "monId": "mon_016",
+    "samples": 253,
+    "maxDisplacement": 2.891703121969463,
+    "PatrolStarts": 40,
+    "PatrolFailures": 0,
+    "PatrolStatus": "arrived"
+  },
+  {
+    "uuid": "03526c027a85a1c98760e748",
+    "monId": "mon_020",
+    "samples": 253,
+    "maxDisplacement": 2.4825318897926416,
+    "PatrolStarts": 43,
+    "PatrolFailures": 0,
+    "PatrolStatus": "moving"
+  },
+  {
+    "uuid": "4df7a8601b7b5ab2358cb290",
+    "monId": "mon_019",
+    "samples": 253,
+    "maxDisplacement": 3.4139295403091943,
+    "PatrolStarts": 42,
+    "PatrolFailures": 0,
+    "PatrolStatus": "moving"
+  },
+  {
+    "uuid": "9d25190bc6b4213faeaf184f",
+    "monId": "mon_011",
+    "samples": 253,
+    "maxDisplacement": 2.838767493487209,
+    "PatrolStarts": 39,
+    "PatrolFailures": 0,
+    "PatrolStatus": "arrived"
+  },
+  {
+    "uuid": "0f194330ae513a6352d4f5fa",
+    "monId": "mon_014",
+    "samples": 253,
+    "maxDisplacement": 2.898432531747453,
+    "PatrolStarts": 42,
+    "PatrolFailures": 1,
+    "PatrolStatus": "arrived"
+  },
+  {
+    "uuid": "d53316a2f549a75bcbb46f94",
+    "monId": "mon_020",
+    "samples": 253,
+    "maxDisplacement": 2.2227234261685993,
+    "PatrolStarts": 42,
+    "PatrolFailures": 0,
+    "PatrolStatus": "moving"
+  },
+  {
+    "uuid": "2e4eaad7dfb44874439a6569",
+    "monId": "mon_018",
+    "samples": 253,
+    "maxDisplacement": 3.455223766892907,
+    "PatrolStarts": 41,
+    "PatrolFailures": 1,
+    "PatrolStatus": "arrived"
+  },
+  {
+    "uuid": "02dc9110d8eedc49f1e7bd9b",
+    "monId": "mon_013",
+    "samples": 253,
+    "maxDisplacement": 2.96847465987031,
+    "PatrolStarts": 40,
+    "PatrolFailures": 1,
+    "PatrolStatus": "arrived"
+  },
+  {
+    "uuid": "f273b176b1b905b94e9427b3",
+    "monId": "mon_019",
+    "samples": 253,
+    "maxDisplacement": 2.882546630703085,
+    "PatrolStarts": 41,
+    "PatrolFailures": 0,
+    "PatrolStatus": "arrived"
+  },
+  {
+    "uuid": "5881a0a35655979b40721213",
+    "monId": "mon_016",
+    "samples": 253,
+    "maxDisplacement": 2.8201181874633163,
+    "PatrolStarts": 41,
+    "PatrolFailures": 1,
+    "PatrolStatus": "arrived"
+  },
+  {
+    "uuid": "779fe04d7d7d555e5da31549",
+    "monId": "mon_015",
+    "samples": 253,
+    "maxDisplacement": 3.4915634165104468,
+    "PatrolStarts": 43,
+    "PatrolFailures": 0,
+    "PatrolStatus": "arrived"
+  },
+  {
+    "uuid": "dfc1a3f972f2b24c6699259d",
+    "monId": "mon_016",
+    "samples": 253,
+    "maxDisplacement": 2.8056761168647655,
+    "PatrolStarts": 42,
+    "PatrolFailures": 0,
+    "PatrolStatus": "arrived"
+  },
+  {
+    "uuid": "411364f51499c89bf29b03c3",
+    "monId": "mon_017",
+    "samples": 253,
+    "maxDisplacement": 3.4349759459160665,
+    "PatrolStarts": 40,
+    "PatrolFailures": 0,
+    "PatrolStatus": "arrived"
+  },
+  {
+    "uuid": "1217041cf97fdf8fa6c18ca8",
+    "monId": "mon_018",
+    "samples": 253,
+    "maxDisplacement": 3.0102678049673353,
+    "PatrolStarts": 40,
+    "PatrolFailures": 0,
+    "PatrolStatus": "arrived"
+  },
+  {
+    "uuid": "48c62e998abb8a4223065cdf",
+    "monId": "mon_013",
+    "samples": 253,
+    "maxDisplacement": 3.426591436326369,
+    "PatrolStarts": 45,
+    "PatrolFailures": 0,
+    "PatrolStatus": "arrived"
+  },
+  {
+    "uuid": "5e8d0ab8f55ddf64b6191a60",
+    "monId": "mon_015",
+    "samples": 253,
+    "maxDisplacement": 2.9611140633077815,
+    "PatrolStarts": 41,
+    "PatrolFailures": 0,
+    "PatrolStatus": "arrived"
+  },
+  {
+    "uuid": "3cf6c7edc4cbc531a6ffeef8",
+    "monId": "mon_019",
+    "samples": 253,
+    "maxDisplacement": 3.6322050729075284,
+    "PatrolStarts": 43,
+    "PatrolFailures": 0,
+    "PatrolStatus": "arrived"
+  },
+  {
+    "uuid": "9eab69d71b36f29d6c0402d0",
+    "monId": "mon_011",
+    "samples": 253,
+    "maxDisplacement": 3.5316854190850844,
+    "PatrolStarts": 42,
+    "PatrolFailures": 1,
+    "PatrolStatus": "arrived"
+  },
+  {
+    "uuid": "df2d0c35d39f4abd46e6085b",
+    "monId": "mon_013",
+    "samples": 253,
+    "maxDisplacement": 3.693568557689813,
+    "PatrolStarts": 42,
+    "PatrolFailures": 0,
+    "PatrolStatus": "moving"
+  },
+  {
+    "uuid": "b9433fefc017af14e7bf4ba5",
+    "monId": "mon_017",
+    "samples": 253,
+    "maxDisplacement": 2.951738690668122,
+    "PatrolStarts": 42,
+    "PatrolFailures": 0,
+    "PatrolStatus": "moving"
+  }
+]

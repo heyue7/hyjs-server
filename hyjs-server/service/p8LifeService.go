@@ -24,7 +24,7 @@ func (s *GameService) InitializeP8Life(ctx context.Context) error {
 
 // P8HasLifeSkill 只接受实际消耗原技能书后保存的资格，沿调用方事务与上下文读取。
 func P8HasLifeSkill(tx *gorm.DB, id int64, skill string) (bool, error) {
-	if tx == nil || !tx.Migrator().HasTable(&db.P8LifeSkill{}) {
+	if tx == nil || !gameSchemaHasTable(tx, &db.P8LifeSkill{}) {
 		return false, nil
 	}
 	var row db.P8LifeSkill

@@ -729,7 +729,7 @@ func (s *GameService) p10VoiceHistory(ctx context.Context, id int64, session []b
 	outside := db.GetIns().WithContext(ctx)
 	// 候选查询只确定锁集合；不向调用者返回任何未经当前授权的帧或字节。
 	scopes := []string{"world/1"}
-	if (kind == 0 || kind == 2) && outside.Migrator().HasTable(&db.P13GuildMember{}) {
+	if (kind == 0 || kind == 2) && gameSchemaHasTable(outside, &db.P13GuildMember{}) {
 		if guild, _, err := P13GuildScope(outside, id); err == nil && guild != "" {
 			scopes = append(scopes, "guild/"+guild)
 		}
@@ -738,7 +738,7 @@ func (s *GameService) p10VoiceHistory(ctx context.Context, id int64, session []b
 	if (kind == 0 || kind == 5) && outside.First(&presence, "player_id=?", id).Error == nil && presence.Scene == "field_001" {
 		scopes = append(scopes, fmt.Sprintf("field/%s/%d", presence.Scene, presence.Line))
 	}
-	if (kind == 0 || kind == 6) && outside.Migrator().HasTable(&db.P13UnionFightFieldPlayer{}) {
+	if (kind == 0 || kind == 6) && gameSchemaHasTable(outside, &db.P13UnionFightFieldPlayer{}) {
 		var actor db.P13UnionFightFieldPlayer
 		if outside.First(&actor, "player_id=? AND left_at=0", id).Error == nil {
 			scopes = append(scopes, "war/"+actor.MatchID+"/"+actor.GuildID)

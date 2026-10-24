@@ -428,7 +428,7 @@ func p7ExpeditionPreviewIDs(reward string) (string, error) {
 
 // GuardP7ExpeditionSave 由主代理共享保存钩子调用，派遣中伙伴不能被成长/装备变更或回收绕过。
 func (s *GameService) GuardP7ExpeditionSave(tx *gorm.DB, id int64, g *model.GameState) error {
-	if !tx.Migrator().HasTable(&db.P7ExpeditionHero{}) {
+	if !gameSchemaHasTable(tx, &db.P7ExpeditionHero{}) {
 		return nil
 	}
 	var holds []db.P7ExpeditionHero

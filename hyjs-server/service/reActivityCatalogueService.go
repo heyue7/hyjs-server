@@ -30,7 +30,7 @@ func adminActivityAutomaticImport(row db.AdminActivityDefinition) bool {
 	return row.SourceActivityID != "" && row.ID == "import_"+p6Digest([]byte(row.SourceActivityID))[:24]
 }
 func adminReActivityCatalogueStarted(tx *gorm.DB) (bool, error) {
-	if !tx.Migrator().HasTable(&db.AdminAudit{}) {
+	if !gameSchemaHasTable(tx, &db.AdminAudit{}) {
 		return false, nil
 	}
 	var n int64
@@ -125,25 +125,25 @@ func (s *GameService) InitializeReActivityCatalogue(ctx context.Context) error {
 			}
 		}
 		// These two legacy catalogue domains are absent from the typed template list.
-		if tx.Migrator().HasTable(&db.ActivityRules{}) {
+		if gameSchemaHasTable(tx, &db.ActivityRules{}) {
 			if err = tx.Model(&db.ActivityRules{}).Where("id=?", constUtil.P1LegacyLoginID).Update("enabled", false).Error; err != nil {
 				return err
 			}
 		}
-		if tx.Migrator().HasTable(&db.P15SeasonalBundle{}) {
+		if gameSchemaHasTable(tx, &db.P15SeasonalBundle{}) {
 			if err = tx.Model(&db.P15SeasonalBundle{}).Where("enabled=?", true).Update("enabled", false).Error; err != nil {
 				return err
 			}
 		}
 		// Stop legacy payment placeholders without deleting their order, claim or membership history.
-		if tx.Migrator().HasTable(&db.PaymentActivityRule{}) {
+		if gameSchemaHasTable(tx, &db.PaymentActivityRule{}) {
 			if err = tx.Model(&db.PaymentActivityRule{}).Where("kind IN ?", []string{"single", "total", "continued", "consume"}).Update("enabled", false).Error; err != nil {
 				return err
 			}
 		}
 		now := LocalPlayNow(tx.Statement.Context)
 		// Startup has no bound request clock; read the saved realm offset under the existing clock guard.
-		if tx.Migrator().HasTable(&db.ServerGameClock{}) {
+		if gameSchemaHasTable(tx, &db.ServerGameClock{}) {
 			var clock db.ServerGameClock
 			e := tx.First(&clock, "server_id=?", s.serverGameClockID()).Error
 			if e != nil && !errors.Is(e, gorm.ErrRecordNotFound) {

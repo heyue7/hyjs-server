@@ -62,7 +62,7 @@ func (s *GameService) PublishP7ReRush(ctx context.Context) error {
 }
 
 func p7ReRushEnabled(tx *gorm.DB) (bool, error) {
-	if !tx.Migrator().HasTable(&db.P7ReRushPolicy{}) {
+	if !gameSchemaHasTable(tx, &db.P7ReRushPolicy{}) {
 		return false, nil
 	}
 	var policy db.P7ReRushPolicy

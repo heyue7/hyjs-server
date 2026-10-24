@@ -35,7 +35,7 @@ func (s *GameService) InitializeReRestaurant(ctx context.Context) error {
 			return err
 		}
 		now := time.Now()
-		if tx.Migrator().HasTable(&db.ServerGameClock{}) {
+		if gameSchemaHasTable(tx, &db.ServerGameClock{}) {
 			var clock db.ServerGameClock
 			if err := tx.First(&clock, "server_id=?", s.serverGameClockID()).Error; err != nil {
 				return err

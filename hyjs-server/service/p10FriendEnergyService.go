@@ -53,7 +53,7 @@ func p10EnergyDaily(tx *gorm.DB, id int64, day string) (*db.P10FriendEnergyDaily
 
 // P10FriendEnergyFlags 与原FriendList共享真实赠送/领取按钮状态，不制造可领取余额。
 func (s *GameService) P10FriendEnergyClaimed(tx *gorm.DB, id int64, now time.Time) (int32, error) {
-	if !tx.Migrator().HasTable(&db.P10FriendEnergyDaily{}) {
+	if !gameSchemaHasTable(tx, &db.P10FriendEnergyDaily{}) {
 		return 0, nil
 	}
 	daily, err := p10EnergyDaily(tx, id, p1Day(now))
@@ -73,7 +73,7 @@ func (s *GameService) P10FriendEnergyFlags(tx *gorm.DB, id, target int64, now ti
 	return give, get, claimed, err
 }
 func (s *GameService) P10FriendEnergyFlagsWithCount(tx *gorm.DB, id, target int64, claimed int32, now time.Time) (int32, int32, error) {
-	if !tx.Migrator().HasTable(&db.P10FriendEnergyPolicy{}) {
+	if !gameSchemaHasTable(tx, &db.P10FriendEnergyPolicy{}) {
 		return 0, 0, nil
 	}
 	var cfg db.P10FriendEnergyPolicy
@@ -295,7 +295,7 @@ func (s *GameService) DispatchP10FriendEnergy(ctx context.Context, id int64, req
 
 // InvalidateP10FriendEnergy 关系删除/拉黑和失效同事务，防止同毫秒重新加好友恢复旧赠送。
 func (s *GameService) InvalidateP10FriendEnergy(tx *gorm.DB, a, b int64) error {
-	if !tx.Migrator().HasTable(&db.P10FriendEnergyGift{}) {
+	if !gameSchemaHasTable(tx, &db.P10FriendEnergyGift{}) {
 		return nil
 	}
 	return tx.Model(&db.P10FriendEnergyGift{}).Where("(sender_id=? AND receiver_id=?) OR (sender_id=? AND receiver_id=?)", a, b, b, a).Update("invalidated", true).Error

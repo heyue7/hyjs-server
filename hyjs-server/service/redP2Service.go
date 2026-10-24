@@ -203,7 +203,7 @@ func (s *GameService) p2TurntablePoolID(tx *gorm.DB) string {
 		return scoped
 	}
 	fallback := "turntable_20261011"
-	if tx.Migrator().HasTable(&db.KingRecruitRules{}) {
+	if gameSchemaHasTable(tx, &db.KingRecruitRules{}) {
 		var cfg db.KingRecruitRules
 		if tx.First(&cfg, 1).Error == nil && (cfg.WheelPool == constUtil.P2RedWheelPool || cfg.WheelPool == constUtil.TurntableScreenshotPool) {
 			fallback = cfg.WheelPool

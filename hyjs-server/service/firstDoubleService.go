@@ -28,7 +28,7 @@ func (s *GameService) InitializeFirstDouble(ctx context.Context) error {
 
 func firstDoubleEnabled(tx *gorm.DB) (bool, error) {
 	// An older fixed deployment without this optional table stays closed.
-	if !tx.Migrator().HasTable(&db.FirstDoublePolicy{}) {
+	if !gameSchemaHasTable(tx, &db.FirstDoublePolicy{}) {
 		return false, nil
 	}
 	var policy db.FirstDoublePolicy

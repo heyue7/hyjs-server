@@ -9,6 +9,8 @@ import (
 
 // RegisterAdminMonthSignRoutes 注册全局每日签到奖历。
 func RegisterAdminMonthSignRoutes(a *gin.RouterGroup) {
+	a.GET("/luxury-sign-rules", AdminLuxurySignRulesHandler)
+	a.PUT("/luxury-sign-rules", AdminSaveLuxurySignRulesHandler)
 	a.GET("/month-sign-rules", AdminMonthSignRulesHandler)
 	a.PUT("/month-sign-rules", AdminSaveMonthSignRulesHandler)
 }

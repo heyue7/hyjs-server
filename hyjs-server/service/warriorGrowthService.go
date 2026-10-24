@@ -124,7 +124,7 @@ func (s *GameService) growthOperation(ctx context.Context, id int64, guid, kind 
 			}
 		}
 		// 养成事实使用当前已绑定的个人游玩日；请求回执与金融账本仍保留各自原时钟。
-		if _, ok := request.(*pb.CSWarriorTraining); ok && tx.Migrator().HasTable(&db.EventFact{}) {
+		if _, ok := request.(*pb.CSWarriorTraining); ok && gameSchemaHasTable(tx, &db.EventFact{}) {
 			if err = s.RecordP1Event(tx, id, fmt.Sprintf("p5:training:%s:%d", guid, stamp), "warrior_training", 1, LocalPlayNow(ctx)); err != nil {
 				return err
 			}

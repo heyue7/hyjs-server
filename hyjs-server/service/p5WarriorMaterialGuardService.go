@@ -12,7 +12,7 @@ import (
 // releases the row, including the finished-but-unclaimed state.
 func p5WarriorMaterialHolds(tx *gorm.DB, id int64) (map[string]bool, error) {
 	held := map[string]bool{}
-	if !tx.Migrator().HasTable(&db.P7ExpeditionHero{}) {
+	if !gameSchemaHasTable(tx, &db.P7ExpeditionHero{}) {
 		return held, nil
 	}
 	var rows []db.P7ExpeditionHero

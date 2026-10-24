@@ -3,7 +3,6 @@ import { ref } from 'vue';
 import ActivityTemplateWorkspace from '@/components/operations/activity-template-workspace.vue';
 import NativeActivityWorkspace from '@/components/operations/native-activity-workspace.vue';
 import PersonalOpeningActivities from '@/components/operations/personal-opening-activities.vue';
-import DailySign from '@/views/daily-sign/index.vue';
 
 const activeTab = ref('native');
 const nativeWorkspace = ref<InstanceType<typeof NativeActivityWorkspace> | null>(null);
@@ -23,7 +22,6 @@ async function beforeTabLeave(_name: string | number, oldName: string | number |
     <NTabPane name="native" tab="常驻与精彩活动"><NativeActivityWorkspace ref="nativeWorkspace" /></NTabPane>
     <NTabPane name="personal" tab="个人开服活动" display-directive="show:lazy"><PersonalOpeningActivities ref="personalWorkspace" /></NTabPane>
     <NTabPane name="template" tab="排期模板" display-directive="show:lazy"><ActivityTemplateWorkspace ref="templateWorkspace" /></NTabPane>
-    <NTabPane name="daily-sign" tab="每日签到" display-directive="show:lazy"><DailySign /></NTabPane>
   </NTabs>
 </template>
 

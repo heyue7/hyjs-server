@@ -38,7 +38,7 @@ func p13GuildDonationBadgeSourceHash(row db.P13GuildDonationBadgeSource) string 
 // delayed retry from creating another delivery after reopening the policy.
 func (s *GameService) RecordP13GuildDonationBadge(tx *gorm.DB, member *db.P13GuildMember, request *pb.CSUnionDonate, stamp int64, amount int32, now time.Time) error {
 	// Badge donations deliberately do not produce badges, preventing a costless cycle.
-	if request.GetDonateType() != "coin" || !tx.Migrator().HasTable(&db.P13GuildDonationBadgePolicy{}) {
+	if request.GetDonateType() != "coin" || !gameSchemaHasTable(tx, &db.P13GuildDonationBadgePolicy{}) {
 		return nil
 	}
 	var policy db.P13GuildDonationBadgePolicy

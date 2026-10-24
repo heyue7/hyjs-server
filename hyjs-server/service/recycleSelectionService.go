@@ -87,7 +87,7 @@ func (s *GameService) RecycleSelection(ctx context.Context, id int64, session []
 			if g.Run != nil && !g.Run.Complete || g.Field != nil && g.Field.Fight != nil && !g.Field.Fight.Settled {
 				return model.NewErrBizCode("战斗中不能修改精灵守护或成长")
 			}
-			if tx.Migrator().HasTable(&db.DailyCopyFight{}) {
+			if gameSchemaHasTable(tx, &db.DailyCopyFight{}) {
 				if err := s.ensureNoActiveDailyCopy(tx, id, time.Now()); err != nil {
 					return err
 				}

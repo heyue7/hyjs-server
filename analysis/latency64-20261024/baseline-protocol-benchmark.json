@@ -1,0 +1,228 @@
+{
+  "label": "baseline",
+  "runtime": {
+    "origin": "http://127.0.0.1:28979",
+    "database": "hyjs_test_latency64_a791a0032c",
+    "pid": 31821,
+    "wrapperPid": 31816,
+    "binarySHA256": "555469b1d8773906af3a6ed078641016e726a1bc9002a338459d310e8b96c74a"
+  },
+  "playerId": 1,
+  "transport": "original binary HTTP /sao/; same isolated database/role/session; no concurrent benchmark",
+  "items": [
+    {
+      "request": "CSPlayer",
+      "fields": {},
+      "samplesMs": [
+        146.413,
+        53.862,
+        48.685,
+        63.54,
+        60.399
+      ],
+      "medianMs": 60.399,
+      "maxMs": 146.413,
+      "responseTypes": [
+        "SCPlayer"
+      ]
+    },
+    {
+      "request": "CSWarriorList",
+      "fields": {},
+      "samplesMs": [
+        104.385,
+        88.74,
+        77.165,
+        76.172,
+        98.061
+      ],
+      "medianMs": 88.74,
+      "maxMs": 104.385,
+      "responseTypes": [
+        "SCWarriorList"
+      ]
+    },
+    {
+      "request": "CSEquipmentTreasureList",
+      "fields": {},
+      "samplesMs": [
+        75.85,
+        93.882,
+        76.419,
+        86.704,
+        77.553
+      ],
+      "medianMs": 77.553,
+      "maxMs": 93.882,
+      "responseTypes": [
+        "SCEquipmentTreasureList"
+      ]
+    },
+    {
+      "request": "CSFormationList",
+      "fields": {},
+      "samplesMs": [
+        76.719,
+        94.588,
+        84.215,
+        82.624,
+        83.474
+      ],
+      "medianMs": 83.474,
+      "maxMs": 94.588,
+      "responseTypes": [
+        "SCFormationList"
+      ]
+    },
+    {
+      "request": "CSQuestList",
+      "fields": {},
+      "samplesMs": [
+        52.037,
+        50.965,
+        59.874,
+        53.996,
+        54.163
+      ],
+      "medianMs": 53.996,
+      "maxMs": 59.874,
+      "responseTypes": [
+        "SCQuestList"
+      ]
+    },
+    {
+      "request": "CSTaskList",
+      "fields": {},
+      "samplesMs": [
+        68.894,
+        57.36,
+        71.977,
+        57.863,
+        52.24
+      ],
+      "medianMs": 57.863,
+      "maxMs": 71.977,
+      "responseTypes": [
+        "SCTaskList"
+      ]
+    },
+    {
+      "request": "CSMailList",
+      "fields": {
+        "mailType": "all"
+      },
+      "samplesMs": [
+        4.437,
+        1.883,
+        1.037,
+        3.052,
+        3.339
+      ],
+      "medianMs": 3.052,
+      "maxMs": 4.437,
+      "responseTypes": [
+        "ErrorMessage"
+      ]
+    },
+    {
+      "request": "CSShopProductList",
+      "fields": {
+        "shopType": 1
+      },
+      "samplesMs": [
+        269.69,
+        223.928,
+        206.347,
+        214.717,
+        223.026
+      ],
+      "medianMs": 223.026,
+      "maxMs": 269.69,
+      "responseTypes": [
+        "SCShopProductList"
+      ]
+    },
+    {
+      "request": "CSRefreshShopQuery",
+      "fields": {
+        "shopType": 1
+      },
+      "samplesMs": [
+        1.248,
+        2.616,
+        0.629,
+        1.031,
+        0.598
+      ],
+      "medianMs": 1.031,
+      "maxMs": 2.616,
+      "responseTypes": [
+        "ErrorMessage"
+      ]
+    },
+    {
+      "request": "CSRewardMonthSignList",
+      "fields": {},
+      "samplesMs": [
+        78.462,
+        72.394,
+        86.748,
+        76.831,
+        101.151
+      ],
+      "medianMs": 78.462,
+      "maxMs": 101.151,
+      "responseTypes": [
+        "SCRewardMonthSignList"
+      ]
+    },
+    {
+      "request": "CSActivityList",
+      "fields": {},
+      "samplesMs": [
+        394.456,
+        295.673,
+        309.164,
+        357.3,
+        395.702
+      ],
+      "medianMs": 357.3,
+      "maxMs": 395.702,
+      "responseTypes": [
+        "SCActivityList"
+      ]
+    },
+    {
+      "request": "CSRushCurrentInfo",
+      "fields": {},
+      "samplesMs": [
+        78.902,
+        75.806,
+        71.622,
+        68.062,
+        96.789
+      ],
+      "medianMs": 75.806,
+      "maxMs": 96.789,
+      "responseTypes": [
+        "ErrorMessage"
+      ]
+    },
+    {
+      "request": "CSIsCardClaimed",
+      "fields": {},
+      "samplesMs": [
+        168.31,
+        181.678,
+        181.078,
+        152.266,
+        140.021
+      ],
+      "medianMs": 168.31,
+      "maxMs": 181.678,
+      "responseTypes": [
+        "SCIsCardClaimed"
+      ]
+    }
+  ]
+}

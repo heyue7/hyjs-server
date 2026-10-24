@@ -17,7 +17,7 @@ type localPlayLoginCycleKey struct{}
 // date counts once in each current private period, including a same-day fresh
 // period. Opening a tool never calls this producer.
 func (s *GameService) RecordLocalPlayLogin(tx *gorm.DB, id int64, now time.Time) error {
-	if localPlayActivityOwner(tx) != id || !tx.Migrator().HasTable(&db.LocalPlayActivityBinding{}) {
+	if localPlayActivityOwner(tx) != id || !gameSchemaHasTable(tx, &db.LocalPlayActivityBinding{}) {
 		return nil
 	}
 	var bindings []db.LocalPlayActivityBinding

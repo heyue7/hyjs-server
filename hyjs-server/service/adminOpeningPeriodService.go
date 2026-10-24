@@ -36,7 +36,7 @@ func adminResolveOpeningSchedule(tx *gorm.DB, cfg *db.OpenServerActivityRule, no
 	// share its InnoDB gap. The profile lock and unique insert/current read
 	// below serialize each actual acceptance without that cross-role cycle.
 	var accepted []db.AdminCharacterActivityInstance
-	if playerID > 0 && tx.Migrator().HasTable(&db.AdminCharacterActivityInstance{}) {
+	if playerID > 0 && gameSchemaHasTable(tx, &db.AdminCharacterActivityInstance{}) {
 		if err := tx.Where("player_id=? AND server_id=? AND mode=?", playerID, rows[0].ServerID, "opening-14").Order("start_at,occurrence_id").Find(&accepted).Error; err != nil {
 			return err
 		}

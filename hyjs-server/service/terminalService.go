@@ -152,7 +152,7 @@ func terminalCredit(tx *gorm.DB, accountID, serverID, playerID int64, key, sourc
 }
 func terminalSignup(tx *gorm.DB, account *db.GameAccount, serverID, playerID int64) error {
 	// Legacy isolated consumers that have not enabled the terminal retain their original registration path.
-	if !tx.Migrator().HasTable(&db.TerminalSetting{}) {
+	if !gameSchemaHasTable(tx, &db.TerminalSetting{}) {
 		return nil
 	}
 	cfg, err := terminalSettings(tx, serverID, false)

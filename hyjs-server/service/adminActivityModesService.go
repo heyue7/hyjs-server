@@ -235,7 +235,7 @@ func adminActivityRaw(tx *gorm.DB, id string) (model.AdminActivityDTO, bool, err
 			return model.AdminActivityDTO{}, false, err
 		}
 		var count int64
-		if tx.Migrator().HasTable(&db.TurntableState{}) {
+		if gameSchemaHasTable(tx, &db.TurntableState{}) {
 			// The already locked pool identifies this archive; aggregate history reads need no FOR UPDATE.
 			if err := tx.Session(&gorm.Session{NewDB: true}).Model(&db.TurntableState{}).Where("pool_id=?", key).Count(&count).Error; err != nil {
 				return model.AdminActivityDTO{}, false, err
@@ -443,7 +443,7 @@ func (s *GameService) adminActivityTypedProjection(tx *gorm.DB, raw model.AdminA
 		}
 		var wheel db.TurntableRules
 		err := gorm.ErrRecordNotFound
-		if tx.Migrator().HasTable(&db.TurntableRules{}) {
+		if gameSchemaHasTable(tx, &db.TurntableRules{}) {
 			err = tx.First(&wheel, "pool_id=?", cfg.Pool.ID).Error
 		}
 		if err == nil {
@@ -814,7 +814,7 @@ func (s *GameService) adminPersistTypedActivity(tx *gorm.DB, d adminActivityDefi
 				return err
 			}
 			cfg.RewardSourceID = persisted.RewardSourceID
-			if tx.Migrator().HasTable(&db.AdminCharacterActivityInstance{}) {
+			if gameSchemaHasTable(tx, &db.AdminCharacterActivityInstance{}) {
 				var issued int64
 				if err := tx.Model(&db.AdminCharacterActivityInstance{}).Where("consumer_key=?", key).Count(&issued).Error; err != nil {
 					return err
@@ -994,7 +994,7 @@ func (s *GameService) AdminDeleteTypedActivity(ctx context.Context, p *model.Adm
 // AdminCurrentWelfareRuleKey 让没有个人绑定的原无实例协议找到当前有效的运营福利期。
 // 调用方应先保留既有localPlayWelfareRuleID结果；当前个人期继续使用自己的冻结规则。
 func AdminCurrentWelfareRuleKey(tx *gorm.DB, kind string, now int64, fallback string) (string, error) {
-	if !tx.Migrator().HasTable(&db.AdminActivityPresentation{}) {
+	if !gameSchemaHasTable(tx, &db.AdminActivityPresentation{}) {
 		return adminActivityScheduleFallback(tx, fallback)
 	}
 	var meta []db.AdminActivityPresentation
@@ -1030,7 +1030,7 @@ func AdminCurrentWelfareRuleKey(tx *gorm.DB, kind string, now int64, fallback st
 
 // AdminCurrentCommerceRuleKey 让原神秘小屋等无实例查询选择已启用运营期，保持个人期优先。
 func AdminCurrentCommerceRuleKey(tx *gorm.DB, kind string, now int64, fallback string) (string, error) {
-	if !tx.Migrator().HasTable(&db.AdminActivityPresentation{}) {
+	if !gameSchemaHasTable(tx, &db.AdminActivityPresentation{}) {
 		return adminActivityScheduleFallback(tx, fallback)
 	}
 	var meta []db.AdminActivityPresentation
@@ -1066,7 +1066,7 @@ func AdminCurrentCommerceRuleKey(tx *gorm.DB, kind string, now int64, fallback s
 
 // AdminActivityDisplayName 只覆盖运营新实例标题，不更换原UI prefab或原协议ID。
 func AdminActivityDisplayName(tx *gorm.DB, id, fallback string) string {
-	if !tx.Migrator().HasTable(&db.AdminActivityPresentation{}) {
+	if !gameSchemaHasTable(tx, &db.AdminActivityPresentation{}) {
 		return fallback
 	}
 	var row db.AdminActivityPresentation

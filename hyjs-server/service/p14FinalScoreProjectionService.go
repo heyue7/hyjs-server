@@ -20,7 +20,7 @@ func (s *GameService) P14FinalScoreProjection(ctx context.Context, tx *gorm.DB, 
 	if body == nil || list == nil {
 		return errors.New(constUtil.P14FinalSeriesCorrupt)
 	}
-	if !tx.Migrator().HasTable(&db.P14FinalSeries{}) {
+	if !gameSchemaHasTable(tx, &db.P14FinalSeries{}) {
 		return nil
 	}
 	raw, err := json.Marshal(body)

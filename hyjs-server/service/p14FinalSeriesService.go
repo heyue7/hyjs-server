@@ -189,7 +189,7 @@ func (s *GameService) TickP14FinalSeries(ctx context.Context, now time.Time) err
 // Existing158/160 offers keep their original frozen end. New pair offers may
 // bind the same real first-input start; a missing series never manufactures it.
 func (s *GameService) P14FinalSeriesGuessBoundary(ctx context.Context, tx *gorm.DB, season int32, pairHash string) (int64, string, error) {
-	if !tx.Migrator().HasTable(&db.P14FinalSeries{}) {
+	if !gameSchemaHasTable(tx, &db.P14FinalSeries{}) {
 		return 0, "", nil
 	}
 	var row db.P14FinalSeries

@@ -117,7 +117,7 @@ func (s *GameService) P13GuildRoomRevoke(tx *gorm.DB, id int64) error {
 // SyncP13GuildRoom 不依赖世界/野外分线开关，复用原同屏帧但按真实guildId建立专属实例。
 func (s *GameService) SyncP13GuildRoom(ctx context.Context, id int64, movement bool) (bool, error) {
 	tx := db.GetIns().WithContext(ctx)
-	if !tx.Migrator().HasTable(&db.P10ScenePresence{}) {
+	if !gameSchemaHasTable(tx, &db.P10ScenePresence{}) {
 		return false, nil
 	}
 	var initial db.Profile
@@ -230,7 +230,7 @@ func (s *GameService) SyncP13GuildRoom(ctx context.Context, id int64, movement b
 }
 func (s *GameService) DisconnectP13GuildRoom(ctx context.Context, id int64, session []byte) bool {
 	tx := db.GetIns().WithContext(ctx)
-	if !tx.Migrator().HasTable(&db.P10ScenePresence{}) {
+	if !gameSchemaHasTable(tx, &db.P10ScenePresence{}) {
 		return false
 	}
 	var row db.P10ScenePresence
@@ -246,7 +246,7 @@ func (s *GameService) DisconnectP13GuildRoom(ctx context.Context, id int64, sess
 }
 func (s *GameService) AfterP13GuildRoomRevoke(ctx context.Context, ids []int64) {
 	tx := db.GetIns().WithContext(ctx)
-	if !tx.Migrator().HasTable(&db.P10ScenePresence{}) {
+	if !gameSchemaHasTable(tx, &db.P10ScenePresence{}) {
 		return
 	}
 	for _, id := range ids {

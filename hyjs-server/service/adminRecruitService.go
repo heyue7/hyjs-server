@@ -20,7 +20,7 @@ func (s *GameService) AdminRecruitSettings(ctx context.Context, actor *model.Adm
 	if err := adminOperationUser(tx, actor, false); err != nil {
 		return nil, err
 	}
-	if !tx.Migrator().HasTable(&db.RecruitRuntimeRule{}) {
+	if !gameSchemaHasTable(tx, &db.RecruitRuntimeRule{}) {
 		if err := s.InitializeRecruitRuntime(ctx); err != nil {
 			return nil, err
 		}
@@ -45,7 +45,7 @@ func (s *GameService) AdminSaveRecruitSettings(ctx context.Context, actor *model
 	if err = adminOperationUser(db.GetIns().WithContext(ctx), actor, true); err != nil {
 		return nil, err
 	}
-	if !db.GetIns().Migrator().HasTable(&db.RecruitRuntimeRule{}) {
+	if !gameSchemaHasTable(db.GetIns(), &db.RecruitRuntimeRule{}) {
 		if err = s.InitializeRecruitRuntime(ctx); err != nil {
 			return nil, err
 		}

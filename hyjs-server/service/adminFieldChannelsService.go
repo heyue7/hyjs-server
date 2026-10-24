@@ -14,7 +14,7 @@ import (
 // initializeAdminFieldChannelPolicy activates the verified original mechanism once, without undoing later operator shutdown.
 func (s *GameService) initializeAdminFieldChannelPolicy(ctx context.Context) error {
 	tx := db.GetIns().WithContext(ctx)
-	if !tx.Migrator().HasTable(&db.P10ScenePolicy{}) {
+	if !gameSchemaHasTable(tx, &db.P10ScenePolicy{}) {
 		return nil
 	}
 	return tx.Transaction(func(tx *gorm.DB) error {
@@ -44,7 +44,7 @@ func (s *GameService) initializeAdminFieldChannelPolicy(ctx context.Context) err
 
 // adminFieldSceneConfig overlays only this map's line capacity onto the existing original presence policy.
 func (s *GameService) adminFieldSceneConfig(tx *gorm.DB, scene string, base *db.P10ScenePolicy) (*db.P10ScenePolicy, error) {
-	if base == nil || !constUtil.P8OriginalFieldScene(scene) || !tx.Migrator().HasTable(&db.AdminFieldChannel{}) {
+	if base == nil || !constUtil.P8OriginalFieldScene(scene) || !gameSchemaHasTable(tx, &db.AdminFieldChannel{}) {
 		return base, nil
 	}
 	var row db.AdminFieldChannel

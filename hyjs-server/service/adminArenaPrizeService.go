@@ -61,7 +61,7 @@ func adminReadArenaPrize(tx *gorm.DB, nowMonth string) (*model.AdminArenaPrizeRe
 	}
 	allowed := append([]string{"coin", "popularity"}, strings.Split(constUtil.P11ArenaPrizeOriginalItems, ",")...)
 	out := &model.AdminArenaPrizeResponse{Version: adminVersion(policy), RegularCoin: model.AdminArenaCoinRange{Min: minimum, Max: maximum}, OperatorPool: pool, OperatorPoolFrozen: frozen > 0, Notes: constUtil.AdminArenaPrizeNotes, AllowedResourceIDs: allowed}
-	if tx.Migrator().HasTable(&db.P11ArenaDailyPolicy{}) {
+	if gameSchemaHasTable(tx, &db.P11ArenaDailyPolicy{}) {
 		var daily db.P11ArenaDailyPolicy
 		if err := tx.Session(&gorm.Session{}).First(&daily, constUtil.P11ArenaDailyPolicyID).Error; err != nil {
 			return nil, nil, err

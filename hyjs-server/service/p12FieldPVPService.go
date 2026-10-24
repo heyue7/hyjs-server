@@ -48,7 +48,7 @@ func p12FieldPVPPolicy(tx *gorm.DB) (*db.P12FieldPVPPolicy, error) {
 // p12FieldPVPIdentityPolicy retains the original rule identity independently
 // from its legacy global switch. An operational map cannot replace these rules.
 func p12FieldPVPIdentityPolicy(tx *gorm.DB) (*db.P12FieldPVPPolicy, error) {
-	if !tx.Migrator().HasTable(&db.P12FieldPVPPolicy{}) {
+	if !gameSchemaHasTable(tx, &db.P12FieldPVPPolicy{}) {
 		return nil, errors.New(constUtil.P12FieldPVPClosed)
 	}
 	var policy db.P12FieldPVPPolicy
@@ -69,7 +69,7 @@ func (s *GameService) p12FieldPVPMapPolicy(tx *gorm.DB, scene string) (*db.P12Fi
 	if err != nil {
 		return nil, err
 	}
-	if tx.Migrator().HasTable(&db.AdminFieldDeployment{}) {
+	if gameSchemaHasTable(tx, &db.AdminFieldDeployment{}) {
 		var deployment db.AdminFieldDeployment
 		err = tx.Clauses(clause.Locking{Strength: "SHARE"}).First(&deployment, "server_id=? AND scene=?", s.OriginalServerID(), scene).Error
 		if err == nil {
@@ -117,7 +117,7 @@ func p12FieldPVPState(tx *gorm.DB, p *pb.Player, g *model.GameState, now time.Ti
 // P12FieldPVPRequireIdle runs under the caller's profile lock and covers other
 // battle modes without reading disabled-policy tables on legacy installations.
 func P12FieldPVPRequireIdle(tx *gorm.DB, id int64, now time.Time) error {
-	if !tx.Migrator().HasTable(&db.P12FieldPVPState{}) {
+	if !gameSchemaHasTable(tx, &db.P12FieldPVPState{}) {
 		return nil
 	}
 	var row db.P12FieldPVPState
@@ -142,7 +142,7 @@ func CheckP12FieldPVPAction(tx *gorm.DB, id int64, now time.Time) error {
 // Existing penalties survive policy disablement; no current source profile is
 // overwritten by a second decode/save inside this helper.
 func (s *GameService) SyncP12FieldPVPPenalty(tx *gorm.DB, p *pb.Player, g *model.GameState, now time.Time) error {
-	if !tx.Migrator().HasTable(&db.P12FieldPVPState{}) {
+	if !gameSchemaHasTable(tx, &db.P12FieldPVPState{}) {
 		return nil
 	}
 	var row db.P12FieldPVPState
@@ -187,7 +187,7 @@ func (s *GameService) SyncP12FieldPVPPenalty(tx *gorm.DB, p *pb.Player, g *model
 // destination after presentation ends. Ordinary action eligibility remains in
 // CheckP12FieldPVPAction; callers must never interpret false as permission.
 func ShouldAllowP12PrisonTransfer(tx *gorm.DB, id int64, scene string, point *pb.PointNew, now time.Time) (bool, error) {
-	if !tx.Migrator().HasTable(&db.P12FieldPVPState{}) {
+	if !gameSchemaHasTable(tx, &db.P12FieldPVPState{}) {
 		return false, nil
 	}
 	var row db.P12FieldPVPState
@@ -477,7 +477,7 @@ func (s *GameService) p12FieldPVPFightAt(ctx context.Context, id int64, session 
 		} else {
 			q = q.Where("busy_until>?", now.UnixMilli())
 		}
-		if !tx.Migrator().HasTable(&db.P12FieldPVPReceipt{}) {
+		if !gameSchemaHasTable(tx, &db.P12FieldPVPReceipt{}) {
 			return errors.New(constUtil.P12FieldPVPClosed)
 		}
 		err = q.Order("created_at DESC").First(&previous).Error
@@ -953,7 +953,7 @@ func (s *GameService) p12FieldPVPRedeemAt(ctx context.Context, id int64, session
 		if err != nil {
 			return err
 		}
-		if !tx.Migrator().HasTable(&db.P12FieldPVPState{}) {
+		if !gameSchemaHasTable(tx, &db.P12FieldPVPState{}) {
 			return errors.New(constUtil.P12FieldPVPClosed)
 		}
 		if err = s.SyncP12FieldPVPPenalty(tx, p, g, now); err != nil {
@@ -1043,7 +1043,7 @@ func (s *GameService) p12FieldPVPMV(ctx context.Context, id int64, session []byt
 		if _, _, err := p10VoiceAuth(tx, id, session); err != nil {
 			return err
 		}
-		if !tx.Migrator().HasTable(&db.P12FieldPVPReceipt{}) {
+		if !gameSchemaHasTable(tx, &db.P12FieldPVPReceipt{}) {
 			return errors.New(constUtil.P12FieldPVPClosed)
 		}
 		q := tx.Where("(player_id=? OR opponent_id=?)", id, id)

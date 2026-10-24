@@ -12,6 +12,7 @@ namespace HYJS.Field63 {
 // continue through the original protocol and server.
 public static class Runtime {
  static readonly MethodInfo click=typeof(RCUIServerMonster).GetMethod("OnClick",BindingFlags.Instance|BindingFlags.Public|BindingFlags.NonPublic);
+ static readonly MethodInfo bossClick=typeof(RCUIFieldBoss).GetMethod("OnClick",BindingFlags.Instance|BindingFlags.Public|BindingFlags.NonPublic);
  static readonly Dictionary<string,FieldInfo> fields=new Dictionary<string,FieldInfo>();
  internal static object Get(object value,string name) {
   if(value==null)return null;
@@ -29,7 +30,14 @@ public static class Runtime {
   return motion;
  }
  public static void CollisionTick(object value) {
-  RCUIServerMonster ui=value as RCUIServerMonster;if(ui==null)return;
+  RCUIServerMonster ui=value as RCUIServerMonster;
+  if(ui!=null)Contact(ui,click,1.3f);
+ }
+ public static void BossCollisionTick(object value) {
+  RCUIFieldBoss ui=value as RCUIFieldBoss;
+  if(ui!=null)Contact(ui,bossClick,3f);
+ }
+ static void Contact(object ui,MethodInfo onClick,float distance) {
   if(!(RoomManager.currentRoom is RoomField) || Time.timeScale<=0)return;
   RoomCharactor owner=Get(ui,"owner") as RoomCharactor;
   FieldMotion motion=Motion(owner);if(motion==null)return;
@@ -41,12 +49,11 @@ public static class Runtime {
   if(self==null)return;
   RCAISelf ai=self.ai as RCAISelf;
   if(ai==null || ai.AutoPathFinding)return;
-  if(Vector3.Distance(owner.transform.position,self.transform.position)>=1.3f)return;
-  // Original OnClick retains normal/death/invincibility and fight checks.
+  if(Vector3.Distance(owner.transform.position,self.transform.position)>=distance)return;
+  // Original OnClick retains normal/death/invincibility, HP and fight gates.
   // Retry at the original one-second cadence while a response is in flight.
   motion.NextRetry=now+1f;
-  Debug.Log("[HYJS63 field] contact-check t="+now);
-  if(click!=null)click.Invoke(ui,null);
+  if(onClick!=null)onClick.Invoke(ui,null);
  }
  public static void PatrolTick(object value) {
   RCAIServerMonster ai=value as RCAIServerMonster;if(ai==null)return;
@@ -103,6 +110,15 @@ public static class Runtime {
 }
 public sealed class FieldMotion:MonoBehaviour {
  public float NextCollision,NextRetry;
+ // Fixed-size, local QA diagnostics only; never sent or persisted. Counts
+ // saturate, and no per-frame logging or per-monster history is retained.
+ public int PatrolAttempts,PatrolStarts,PatrolArrivals,PatrolFailures;
+ public string PatrolStatus="unbound";
+ public Vector3 LastSource,LastTarget,VisualAnchor;
+ public string VisualAnchorStatus="unbound";
+ bool visualResolved;
+ static int Increment(int value){return value<int.MaxValue?value+1:value;}
+ void Failure(string reason){PatrolFailures=Increment(PatrolFailures);PatrolStatus=reason;}
  RoomCharactor owner;
  Vector3 anchor;
  string uuid,monId;
@@ -116,6 +132,11 @@ public sealed class FieldMotion:MonoBehaviour {
   if(!changed)return;
   Halt();uuid=monster.uuid;monId=monster.monId;anchor=point;
   configured=Runtime.Config(monster,out radius,out speed);
+  // A new identity/authoritative correction begins a new diagnostic/binding
+  // epoch. Same-anchor pushes, pauses and failures never recenter patrol.
+  VisualAnchor=anchor;visualResolved=false;VisualAnchorStatus="authoritative";
+  PatrolAttempts=PatrolStarts=PatrolArrivals=PatrolFailures=0;
+  PatrolStatus=configured?"bound":"missing-config";
   nextMove=Time.unscaledTime+1f;
   NextRetry=0;
   // Keep authoritative position correction. Running navigation queues the
@@ -131,32 +152,67 @@ public sealed class FieldMotion:MonoBehaviour {
   if(!configured || owner==null)return;
   // Running also covers room pause/background; keep original animations and
   // state transitions. No positional changes are made during fights/death.
-  if(!(RoomManager.currentRoom is RoomField) || !owner.Running || ai.curState!=1 || Time.timeScale<=0) {Halt();return;}
+  if(!(RoomManager.currentRoom is RoomField) || !owner.Running || ai.curState!=1 || Time.timeScale<=0) {Halt();PatrolStatus="paused-or-state";return;}
   float now=Time.unscaledTime;
   if(moving) {
    if(owner.IsMoving())return;
-   moving=false;nextMove=now+1f;return;
+   moving=false;nextMove=now+1f;PatrolArrivals=Increment(PatrolArrivals);PatrolStatus="arrived";return;
   }
   if(now<nextMove)return;
   nextMove=now+1f;
   // Field move type 2 is RCMoveNavigation. Its agent is lazy and may be
   // absent/disabled while the original corner queue still handles movement.
   // Follow the original navigation's all-area sampling, without requiring it.
-  if(!(owner.move is RCMoveNavigation))return;
+  if(!(owner.move is RCMoveNavigation)){Failure("move-type");return;}
+  PatrolAttempts=Increment(PatrolAttempts);
+  Vector3 actual=owner.transform.position;NavMeshHit source;
+  // The original server AI preserves the rendered ground Y. The server's
+  // anchor Y can describe another elevation; retain its XZ and identity.
+  // Read-only projection uses the original navigation's ten-metre search.
+  // A source on another floor or across a wall is rejected, never warped.
+  if(!NavMesh.SamplePosition(actual,out source,10f,-1)){Failure("source-sample");return;}
+  Vector3 sourceDelta=source.position-actual;
+  if(sourceDelta.x*sourceDelta.x+sourceDelta.z*sourceDelta.z>0.25f || Mathf.Abs(sourceDelta.y)>1f){Failure("source-offset");return;}
+  LastSource=source.position;
+  if(!visualResolved) {
+   // Compatibility is limited to the two original snowfield table points
+   // whose original first navigation Tick projects outside the R2 circle.
+   // Reproduce that projection read-only; bind only before any patrol starts.
+   bool projectedSpawn=StaticData.fieldId=="field_002" && radius==2f &&
+    ((anchor.x==66f&&anchor.z==62f)||(anchor.x==62f&&anchor.z==49f));
+   Vector3 fromAnchor=source.position-anchor;fromAnchor.y=0;
+   if(projectedSpawn && fromAnchor.sqrMagnitude>radius*radius) {
+    object first=Runtime.Get(owner.move,"first");
+    if(!(first is bool)||(bool)first||owner.IsMoving()||PatrolStarts!=0){VisualAnchorStatus="waiting-original-spawn";Failure("visual-anchor-wait");return;}
+    NavMeshHit originalSpawn;
+    if(!NavMesh.SamplePosition(anchor,out originalSpawn,100f,-1) || (originalSpawn.position-source.position).sqrMagnitude>0.01f){VisualAnchorStatus="original-spawn-mismatch";Failure("visual-anchor-mismatch");return;}
+    VisualAnchor=source.position;VisualAnchorStatus="original-snow-spawn";
+   }
+   visualResolved=true;
+  }
   for(int i=0;i<8;i++) {
    Vector2 disk=UnityEngine.Random.insideUnitCircle*radius;
-   Vector3 wanted=anchor+new Vector3(disk.x,0,disk.y);NavMeshHit hit;
-   if(!NavMesh.SamplePosition(wanted,out hit,1f,-1))continue;
-   Vector3 delta=hit.position-anchor;delta.y=0;
-   if(delta.sqrMagnitude>radius*radius || (hit.position-owner.transform.position).sqrMagnitude<0.04f)continue;
+   Vector3 wanted=new Vector3(VisualAnchor.x+disk.x,actual.y,VisualAnchor.z+disk.y);NavMeshHit hit;
+   if(!NavMesh.SamplePosition(wanted,out hit,10f,-1)){Failure("target-sample");continue;}
+   // The projected target must stay on the nearby elevation and inside the
+   // fixed visual XZ radius. Full path validation prevents wall shortcuts.
+   Vector3 delta=hit.position-VisualAnchor;delta.y=0;
+   if(delta.sqrMagnitude>radius*radius || Mathf.Abs(hit.position.y-source.position.y)>2f || (hit.position-actual).sqrMagnitude<0.04f){Failure("target-range");continue;}
    NavMeshPath path=new NavMeshPath();
-   if(!NavMesh.CalculatePath(owner.transform.position,hit.position,-1,path) || path.status!=NavMeshPathStatus.PathComplete)continue;
-   bool inside=true;
-   foreach(Vector3 corner in path.corners) {Vector3 d=corner-anchor;d.y=0;if(d.sqrMagnitude>radius*radius){inside=false;break;}}
-   if(!inside)continue;
-   // Original MonsterAIStateRest uses StopTo; for a running navigation
-   // component it calculates/enqueues the full route and Tick walks it.
-   owner.SetSpeed(speed);owner.StopTo(hit.position);moving=owner.IsMoving();return;
+   if(!NavMesh.CalculatePath(source.position,hit.position,-1,path) || path.status!=NavMeshPathStatus.PathComplete){Failure("path-incomplete");continue;}
+   bool inside=path.corners.Length>0;
+   foreach(Vector3 corner in path.corners) {
+    Vector3 d=corner-VisualAnchor;d.y=0;
+    if(d.sqrMagnitude>radius*radius || Mathf.Abs(corner.y-source.position.y)>2f){inside=false;break;}
+   }
+   if(!inside){Failure("path-range");continue;}
+   // Original StopTo calculates/enqueues the route from the actual owner.
+   // Keep its collision/navigation implementation and movement animation.
+   LastTarget=hit.position;
+   owner.SetSpeed(speed);owner.StopTo(hit.position);moving=owner.IsMoving();
+   if(moving){PatrolStarts=Increment(PatrolStarts);PatrolStatus="moving";}
+   else Failure("navigation-not-started");
+   return;
   }
  }
  void Update() {

@@ -434,7 +434,7 @@ func p11ReadArenaFightReceipt(tx *gorm.DB, row *db.P11ArenaFightSettlement) (*pb
 // accepted real winner fact. Initial or manually populated rank fields alone
 // never unlock a title. The call only reads; it never migrates or computes.
 func P11ArenaVerifiedBestWonRank(tx *gorm.DB, id int64) (int64, string, error) {
-	if !tx.Migrator().HasTable(&db.P11ArenaMember{}) || !tx.Migrator().HasTable(&db.P11ArenaFightSettlement{}) {
+	if !gameSchemaHasTable(tx, &db.P11ArenaMember{}) || !gameSchemaHasTable(tx, &db.P11ArenaFightSettlement{}) {
 		return 0, "", nil
 	}
 	var member db.P11ArenaMember

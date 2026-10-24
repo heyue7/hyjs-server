@@ -351,11 +351,8 @@ func (s *GameService) fieldBossFightStart(ctx context.Context, id int64, b *pb.C
 		if err != nil {
 			return err
 		}
-		frozen, err := s.FreezeBattleInput(model.FrozenBattleInput{Attacker: party, Monster: monster, Seed: seed.Int64(), MaxRound: int32(rounds), BattleType: constUtil.FieldBossBattleType, AttackerDamageFactor: proto.Float64(1), DefenderDamageFactor: proto.Float64(1)})
+		frozen, err := s.freezeAndQualifyP6GenericMechanisms(ctx, model.FrozenBattleInput{Attacker: party, Monster: monster, Seed: seed.Int64(), MaxRound: int32(rounds), BattleType: constUtil.FieldBossBattleType, AttackerDamageFactor: proto.Float64(1), DefenderDamageFactor: proto.Float64(1)})
 		if err != nil {
-			return err
-		}
-		if _, err = s.ValidateP6GenericMechanisms(ctx, frozen); err != nil {
 			return err
 		}
 		token, err := fieldToken()

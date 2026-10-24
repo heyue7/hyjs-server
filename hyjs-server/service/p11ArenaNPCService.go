@@ -81,7 +81,7 @@ func p11ArenaHasHistory(tx *gorm.DB, id int64) (bool, error) {
 		{&db.P11ArenaPrizeAward{}, "player_id=?"},
 	}
 	for _, check := range checks {
-		if !tx.Migrator().HasTable(check.model) {
+		if !gameSchemaHasTable(tx, check.model) {
 			continue
 		}
 		args := []any{id}

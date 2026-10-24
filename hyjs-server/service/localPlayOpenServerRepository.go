@@ -215,13 +215,13 @@ func openServerReadReceipt(tx *gorm.DB, id, stamp int64) (db.OpenServerActivityR
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return row, err
 	}
-	if tx.Migrator().HasTable(&db.AdminOpeningReceipt{}) {
+	if gameSchemaHasTable(tx, &db.AdminOpeningReceipt{}) {
 		period, e := adminOpeningReadReceipt(tx, id, stamp)
 		if !errors.Is(e, gorm.ErrRecordNotFound) {
 			return period, e
 		}
 	}
-	if localPlayActivityOwner(tx) != id || !tx.Migrator().HasTable(&db.LocalPlayOpenServerReceipt{}) {
+	if localPlayActivityOwner(tx) != id || !gameSchemaHasTable(tx, &db.LocalPlayOpenServerReceipt{}) {
 		return row, err
 	}
 	var scoped db.LocalPlayOpenServerReceipt

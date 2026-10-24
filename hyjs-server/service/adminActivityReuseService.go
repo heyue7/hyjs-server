@@ -144,7 +144,7 @@ func adminActivityNativeParticipation(tx *gorm.DB, playerID int64, source db.Adm
 		proofs = append(proofs, proof{&db.TurntablePersonal{}, "player_id=? AND pool_id=?", []any{playerID, key}}, proof{&db.TurntableState{}, "player_id=? AND pool_id=?", []any{playerID, key}}, proof{&db.TurntableDrawReceipt{}, "player_id=? AND pool_id=?", []any{playerID, key}})
 	}
 	for _, p := range proofs {
-		if !tx.Migrator().HasTable(p.table) {
+		if !gameSchemaHasTable(tx, p.table) {
 			continue
 		}
 		var n int64

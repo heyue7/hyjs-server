@@ -161,7 +161,7 @@ func p11ArenaDailyReward(rank int64) string {
 func (s *GameService) PrepareP11ArenaDailyMutation(ctx context.Context, tx *gorm.DB, requested time.Time) (time.Time, error) {
 	now := p11ArenaDailyNow(ctx, requested)
 	tx = tx.WithContext(ctx)
-	if !tx.Migrator().HasTable(&db.P11ArenaDailyPolicy{}) {
+	if !gameSchemaHasTable(tx, &db.P11ArenaDailyPolicy{}) {
 		return now, nil
 	}
 	var policy db.P11ArenaDailyPolicy
@@ -221,7 +221,7 @@ func (s *GameService) PrepareP11ArenaDailyMutation(ctx context.Context, tx *gorm
 // The caller already validated the accepted P6 source in that same transaction.
 func (s *GameService) RecordP11ArenaDailyChallenge(ctx context.Context, tx *gorm.DB, row *db.P11ArenaFightSettlement, admitted time.Time) error {
 	tx = tx.WithContext(ctx)
-	if !tx.Migrator().HasTable(&db.P11ArenaDailyPolicy{}) {
+	if !gameSchemaHasTable(tx, &db.P11ArenaDailyPolicy{}) {
 		return nil
 	}
 	if row == nil || row.FightID == "" || row.PlayerID <= 0 || row.OpponentID <= 0 || admitted.UnixMilli() <= 0 || row.ResponseHash != p6Digest(row.Response) || row.TerminalHash != p6Digest(row.Terminal) || row.ScopeProof == "" || row.P6RecordID == "" {

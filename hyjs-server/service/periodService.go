@@ -448,7 +448,7 @@ func p1LoginDirectoryIndex(tx *gorm.DB, key string, child int32) (int32, error) 
 }
 
 func p1LegacyLoginVisible(tx *gorm.DB, now int64) (bool, error) {
-	if !tx.Migrator().HasTable(&db.ActivityRules{}) {
+	if !gameSchemaHasTable(tx, &db.ActivityRules{}) {
 		return false, nil
 	}
 	var cfg db.ActivityRules

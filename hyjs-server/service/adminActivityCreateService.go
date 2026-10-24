@@ -146,7 +146,7 @@ func (s *GameService) AdminCreateActivity(ctx context.Context, p *model.AdminPri
 			}
 			var wheel db.TurntableRules
 			wheelErr := gorm.ErrRecordNotFound
-			if tx.Migrator().HasTable(&db.TurntableRules{}) {
+			if gameSchemaHasTable(tx, &db.TurntableRules{}) {
 				wheelErr = tx.First(&wheel, "pool_id = ?", template).Error
 			}
 			if wheelErr != nil && !errors.Is(wheelErr, gorm.ErrRecordNotFound) {

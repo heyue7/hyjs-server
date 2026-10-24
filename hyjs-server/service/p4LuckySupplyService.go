@@ -65,7 +65,7 @@ func (s *GameService) seedP4LuckySupply(tx *gorm.DB, now time.Time) error {
 // This only reads operator switches; it never enables P10 or changes its original reward pool.
 func p4LuckySupplyReady(tx *gorm.DB) (bool, error) {
 	for _, table := range []any{&db.P10LuckyPolicy{}, &db.P10ScenePolicy{}, &db.P10ChannelPolicy{}} {
-		if !tx.Migrator().HasTable(table) {
+		if !gameSchemaHasTable(tx, table) {
 			return false, nil
 		}
 	}

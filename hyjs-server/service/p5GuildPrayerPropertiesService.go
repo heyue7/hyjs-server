@@ -61,7 +61,7 @@ func (s *GameService) RefreshP5GuildPrayerPower(ctx context.Context, tx *gorm.DB
 	}
 	if game.GuildPrayerProjection.SourceHash == "" && game.GuildPrayerProjection.TechSourceHash == "" && !previousTech {
 		owner := s.p10ClientOwner()
-		if (!owner.guildCoreSchemaReady.Load() || !owner.guildPrayerSchemaReady.Load()) && !tx.Migrator().HasTable(&db.P13GuildPrayerRoll{}) {
+		if (!owner.guildCoreSchemaReady.Load() || !owner.guildPrayerSchemaReady.Load()) && !gameSchemaHasTable(tx, &db.P13GuildPrayerRoll{}) {
 			return nil
 		}
 		var existed int64

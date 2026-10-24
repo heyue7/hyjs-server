@@ -122,7 +122,7 @@ func (s *GameService) p4ReconcilePlunderActivityProgress(tx *gorm.DB, progress *
 	if !p4PlunderActivityIdentity(cfg) {
 		return errors.New(constUtil.P4PlunderActivityConflict)
 	}
-	if !tx.Migrator().HasTable(&db.P11PlunderFightSettlement{}) || !tx.Migrator().HasTable(&db.P6BattleRecord{}) {
+	if !gameSchemaHasTable(tx, &db.P11PlunderFightSettlement{}) || !gameSchemaHasTable(tx, &db.P6BattleRecord{}) {
 		return nil
 	}
 	var settled int64

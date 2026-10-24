@@ -104,7 +104,7 @@ func (s *GameService) recruitRuntimeRule(tx *gorm.DB, kind int32) (*db.RecruitRu
 	if kind != constUtil.RecruitRuntimeKindStrong && kind != constUtil.RecruitRuntimeKindKing {
 		return nil, nil
 	}
-	if !tx.Migrator().HasTable(&db.RecruitRuntimeRule{}) {
+	if !gameSchemaHasTable(tx, &db.RecruitRuntimeRule{}) {
 		return nil, nil
 	}
 	var row db.RecruitRuntimeRule
@@ -312,7 +312,7 @@ func (s *GameService) InitializeRecruitBalance35(ctx context.Context) error {
 		// 按各区服已持久化的有效游戏日期选择当前和未来排期，保留虚拟日期中已经结束的历史。
 		realNow := time.Now()
 		offsets := map[int64]int64{}
-		if tx.Migrator().HasTable(&db.ServerGameClock{}) {
+		if gameSchemaHasTable(tx, &db.ServerGameClock{}) {
 			var clocks []db.ServerGameClock
 			if err := tx.Find(&clocks).Error; err != nil {
 				return err

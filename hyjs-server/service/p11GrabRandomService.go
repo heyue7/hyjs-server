@@ -36,7 +36,7 @@ func (s *GameService) InitializeP11GrabRandom(ctx context.Context) error {
 }
 
 func p11GrabRandomSchema(tx *gorm.DB) bool {
-	return tx.Migrator().HasTable(&db.P11GrabRandomPolicy{}) && tx.Migrator().HasTable(&db.P11GrabRandomOffer{}) && tx.Migrator().HasTable(&db.P11GrabRandomAward{})
+	return gameSchemaHasTable(tx, &db.P11GrabRandomPolicy{}) && gameSchemaHasTable(tx, &db.P11GrabRandomOffer{}) && gameSchemaHasTable(tx, &db.P11GrabRandomAward{})
 }
 
 func (s *GameService) p11GrabRandomPool(cfg *db.P11GrabRandomPolicy) ([]p11GrabRandomOption, error) {

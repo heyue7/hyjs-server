@@ -69,7 +69,7 @@ func (s *GameService) dailyPlayback(ctx context.Context, id int64, fightID strin
 			return err
 		}
 
-		if !tx.Migrator().HasTable(&db.DailyCopyFight{}) || !tx.Migrator().HasTable(&db.DailyCopyStartReceipt{}) {
+		if !gameSchemaHasTable(tx, &db.DailyCopyFight{}) || !gameSchemaHasTable(tx, &db.DailyCopyStartReceipt{}) {
 			return errors.New(constUtil.P6ReplayUnavailable)
 		}
 		var row db.DailyCopyFight

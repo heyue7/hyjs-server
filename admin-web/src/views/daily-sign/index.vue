@@ -2,7 +2,7 @@
 import { computed, h, onBeforeUnmount, onMounted, ref } from 'vue';
 import { onBeforeRouteLeave } from 'vue-router';
 import { NButton } from 'naive-ui';
-import type { DataTableColumns } from 'naive-ui';
+import type { DataTableColumns, DialogReactive } from 'naive-ui';
 import ContextHelp from '@/components/operations/context-help.vue';
 import RewardList from '@/components/operations/reward-list.vue';
 import RewardSummary from '@/components/operations/reward-summary.vue';
@@ -12,6 +12,7 @@ import type { DailySignRow, DailySignRules } from '@/service/daily-sign';
 import { ApiError, api, errorMessage } from '@/service/operations';
 import type { Item, ItemsResponse } from '@/service/operations';
 
+const props = defineProps<{ embedded?: boolean }>();
 const { canWrite } = useOperations();
 const snapshot = ref<DailySignRules>();
 const rows = ref<DailySignRow[]>([]);
@@ -88,20 +89,41 @@ async function load() {
   }
 }
 
+let pendingDiscard: { promise: Promise<boolean>; dispose: () => void } | null = null;
 function confirmDiscard(title: string): Promise<boolean> {
+  if (pendingDiscard) return pendingDiscard.promise;
   if (!window.$dialog) return Promise.resolve(false);
-  return new Promise(resolve => {
-    window.$dialog!.warning({
-      title,
-      content: '尚未保存的修改将丢失。',
-      positiveText: '放弃修改',
-      negativeText: '继续编辑',
-      onPositiveClick: () => resolve(true),
-      onNegativeClick: () => resolve(false),
-      onClose: () => resolve(false),
-      onMaskClick: () => resolve(false)
-    });
+  let resolveConfirmation!: (value: boolean) => void;
+  const promise = new Promise<boolean>(resolve => { resolveConfirmation = resolve; });
+  let accepted = false;
+  let decided = false;
+  let settled = false;
+  let dialog: DialogReactive;
+  const settle = (value: boolean) => {
+    if (settled) return;
+    settled = true;
+    pendingDiscard = null;
+    resolveConfirmation(value);
+  };
+  const dismiss = (value: boolean) => {
+    if (!decided) { accepted = value; decided = true; }
+    dialog.destroy();
+    return false;
+  };
+  dialog = window.$dialog.warning({
+    title,
+    content: '尚未保存的修改将丢失。',
+    positiveText: '放弃修改',
+    negativeText: '继续编辑',
+    onPositiveClick: () => dismiss(true),
+    onNegativeClick: () => dismiss(false),
+    onEsc: () => dismiss(false),
+    onClose: () => dismiss(false),
+    onMaskClick: () => dismiss(false),
+    onAfterLeave: () => settle(accepted)
   });
+  pendingDiscard = { promise, dispose: () => { dialog.destroy(); settle(false); } };
+  return promise;
 }
 
 async function refresh() {
@@ -174,11 +196,20 @@ const columns = computed<DataTableColumns<DailySignRow>>(() => [
   { title: '操作', key: 'action', width: 90, fixed: 'right', render: row => h(NButton, { size: 'small', disabled: loading.value || saving.value || conflict.value, onClick: () => edit(row) }, () => canWrite.value ? '编辑' : '查看') }
 ]);
 
-onBeforeRouteLeave(async () => {
+async function beforeLeave() {
   if (saving.value) return false;
-  if (canWrite.value && (dirty.value || editorDirty.value)) return confirmDiscard('离开每日签到配置？');
+  if (canWrite.value && (dirty.value || editorDirty.value)) {
+    if (!await confirmDiscard('离开每日签到配置？')) return false;
+    const wasConflict = conflict.value;
+    if (snapshot.value) apply(snapshot.value);
+    conflict.value = wasConflict;
+  }
+  editorOpen.value = false;
   return true;
-});
+}
+onBeforeRouteLeave(() => props.embedded ? true : beforeLeave());
+const busy = computed(() => loading.value || saving.value);
+defineExpose({ beforeLeave, dirty: computed(() => dirty.value || editorDirty.value), busy });
 function beforeUnload(event: BeforeUnloadEvent) {
   if (saving.value || canWrite.value && (dirty.value || editorDirty.value)) {
     event.preventDefault();
@@ -186,7 +217,7 @@ function beforeUnload(event: BeforeUnloadEvent) {
   }
 }
 onMounted(() => { load(); window.addEventListener('beforeunload', beforeUnload); });
-onBeforeUnmount(() => { alive = false; resourceGeneration += 1; window.removeEventListener('beforeunload', beforeUnload); });
+onBeforeUnmount(() => { pendingDiscard?.dispose(); alive = false; resourceGeneration += 1; window.removeEventListener('beforeunload', beforeUnload); });
 </script>
 
 <template>

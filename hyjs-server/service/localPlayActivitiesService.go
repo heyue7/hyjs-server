@@ -61,7 +61,7 @@ func localPlayBoundCycle(tx *gorm.DB, id int64, activityID string) (*db.LocalPla
 	if !LocalPlayContextBound(tx.Statement.Context) {
 		return nil, nil
 	}
-	if id <= 1 || localPlayActivityOwner(tx) != id || !tx.Migrator().HasTable(&db.LocalPlayActivityBinding{}) {
+	if id <= 1 || localPlayActivityOwner(tx) != id || !gameSchemaHasTable(tx, &db.LocalPlayActivityBinding{}) {
 		return nil, nil
 	}
 	var binding db.LocalPlayActivityBinding
@@ -264,7 +264,7 @@ func (s *GameService) localPlayCreateCycle(tx *gorm.DB, id int64, def localPlayA
 	start := time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, local.Location())
 	cycle := &db.LocalPlayActivityCycle{ID: cycleID, PlayerID: id, ActivityID: def.ID, CreatedAt: now.UnixMilli(), StartAt: start.UnixMilli(), Source: constUtil.LocalPlayActivitiesVersion}
 	cycle.RealCreatedAt = time.Now().UnixMilli()
-	if tx.Migrator().HasTable(&db.EventFact{}) {
+	if gameSchemaHasTable(tx, &db.EventFact{}) {
 		if err := tx.Model(&db.EventFact{}).Select("COALESCE(MAX(id),0)").Where("player_id=?", id).Scan(&cycle.EventAfterID).Error; err != nil {
 			return nil, err
 		}

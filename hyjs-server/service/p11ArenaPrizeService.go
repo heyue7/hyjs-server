@@ -441,7 +441,7 @@ func ValidateP11ArenaFightPrizeReceipt(tx *gorm.DB, row *db.P11ArenaFightSettlem
 		}
 		return bad
 	}
-	if !tx.Migrator().HasTable(&db.P11ArenaPrizeAward{}) {
+	if !gameSchemaHasTable(tx, &db.P11ArenaPrizeAward{}) {
 		return legacy()
 	}
 	var award db.P11ArenaPrizeAward

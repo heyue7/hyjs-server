@@ -346,25 +346,25 @@ func serverGameClockPendingBattles(tx *gorm.DB, real time.Time, offset int64) er
 		}
 		return nil
 	}
-	if tx.Migrator().HasTable(&db.P12WantedFight{}) && tx.Migrator().HasTable(&db.P12WantedInstance{}) {
+	if gameSchemaHasTable(tx, &db.P12WantedFight{}) && gameSchemaHasTable(tx, &db.P12WantedInstance{}) {
 		q := tx.Table("p12_wanted_fights AS fight").Joins("JOIN p12_wanted_instances AS instance ON instance.id=fight.instance_id").Where("fight.committed=? AND fight.abandoned_at=0 AND instance.state=? AND instance.expires_at>? AND instance.current_hp>0", false, constUtil.P12WantedActive, gameMS)
 		if err := busy(q); err != nil {
 			return err
 		}
 	}
-	if tx.Migrator().HasTable(&db.P12WorldBossBattleReceipt{}) && tx.Migrator().HasTable(&db.P12WorldBossCycle{}) {
+	if gameSchemaHasTable(tx, &db.P12WorldBossBattleReceipt{}) && gameSchemaHasTable(tx, &db.P12WorldBossCycle{}) {
 		q := tx.Table("p12_world_boss_battle_receipts AS fight").Joins("JOIN p12_world_boss_cycles AS cycle ON cycle.id=fight.instance_id").Where("fight.committed=? AND fight.abandoned_at=0 AND cycle.ends_at>?", false, gameMS)
 		if err := busy(q); err != nil {
 			return err
 		}
 	}
-	if tx.Migrator().HasTable(&db.P12FieldPVPReceipt{}) {
+	if gameSchemaHasTable(tx, &db.P12FieldPVPReceipt{}) {
 		if err := busy(tx.Model(&db.P12FieldPVPReceipt{}).Where("busy_until>?", gameMS)); err != nil {
 			return err
 		}
 	}
 	// P11对手报价尚未接纳战斗，不阻挡调日；实际结算与日期变更共享事务锁序。
-	if tx.Migrator().HasTable(&db.P13UnionFightPlayerBattleAttempt{}) && tx.Migrator().HasTable(&db.P13UnionFightMatch{}) {
+	if gameSchemaHasTable(tx, &db.P13UnionFightPlayerBattleAttempt{}) && gameSchemaHasTable(tx, &db.P13UnionFightMatch{}) {
 		q := tx.Table("p13_union_fight_player_battle_attempts AS fight").Joins("JOIN p13_union_fight_matches AS battle ON battle.id=fight.match_id").Where("fight.status=? AND battle.end_at>?", constUtil.P13UFPlayerBattlePending, gameMS)
 		if err := busy(q); err != nil {
 			return err

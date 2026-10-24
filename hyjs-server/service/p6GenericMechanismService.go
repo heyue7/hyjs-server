@@ -40,6 +40,33 @@ func (s *GameService) ValidateP6GenericMechanisms(ctx context.Context, input *mo
 	if err != nil || p6Digest(raw) != input.ConfigurationHash || canonical.ConfigurationHash != input.ConfigurationHash {
 		return nil, errors.New(constUtil.P6ReplayConflict)
 	}
+	return qualifyP6GenericMechanisms(s, input, canonical)
+}
+
+// freezeAndQualifyP6GenericMechanisms admits a new server-built fight before its
+// frozen input escapes. The source tables come directly from FreezeBattleInput;
+// persisted or caller-provided snapshots still use the full public verifier.
+func (s *GameService) freezeAndQualifyP6GenericMechanisms(ctx context.Context, source model.FrozenBattleInput) (*model.FrozenBattleInput, error) {
+	if ctx == nil {
+		return nil, errors.New(constUtil.CombatInvalid)
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	frozen, err := s.FreezeBattleInput(source)
+	if err != nil {
+		return nil, err
+	}
+	if frozen.EngineVersion != constUtil.P6EngineVersion || frozen.ClientVersion != constUtil.P6OriginalClientHash {
+		return nil, errors.New(constUtil.P6ReplayConflict)
+	}
+	if _, err := qualifyP6GenericMechanisms(s, frozen, frozen); err != nil {
+		return nil, err
+	}
+	return frozen, nil
+}
+
+func qualifyP6GenericMechanisms(s *GameService, input, canonical *model.FrozenBattleInput) (*model.P6MechanismQualification, error) {
 	engine := &combatRoundEngine{service: &GameService{Tables: canonical.Tables}, input: canonical, rng: NewCombatRandom(canonical.Seed), operate: &pb.BattleOperate{}, round: 1, originalRecordMode: true}
 	if canonical.DefenderFirst {
 		engine.camp = 1

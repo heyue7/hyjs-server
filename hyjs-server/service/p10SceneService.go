@@ -28,7 +28,7 @@ func (s *GameService) InitializeP10Scene(ctx context.Context) error {
 	return tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&cfg).Error
 }
 func p10SceneConfig(tx *gorm.DB) (*db.P10ScenePolicy, error) {
-	if !tx.Migrator().HasTable(&db.P10ScenePolicy{}) {
+	if !gameSchemaHasTable(tx, &db.P10ScenePolicy{}) {
 		return nil, nil
 	}
 	var cfg db.P10ScenePolicy
@@ -428,7 +428,7 @@ func (s *GameService) DispatchP10Scene(ctx context.Context, id int64, request pr
 			if game.Run != nil && !game.Run.Complete || game.Field != nil && game.Field.Fight != nil && !game.Field.Fight.Settled {
 				return errors.New("请先结束当前战斗再换线")
 			}
-			if tx.Migrator().HasTable(&db.P8GatherAttempt{}) {
+			if gameSchemaHasTable(tx, &db.P8GatherAttempt{}) {
 				var attempt db.P8GatherAttempt
 				gatherErr := tx.First(&attempt, "player_id=? AND active=?", id, true).Error
 				if gatherErr == nil {

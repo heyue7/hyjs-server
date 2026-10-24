@@ -25,7 +25,7 @@ func (s *GameService) InitializeGrowthRecruit(ctx context.Context) error {
 
 // growthRecruitPublication keeps pre-policy deployments compatible and rejects malformed registered policy.
 func growthRecruitPublication(tx *gorm.DB) (enabled, registered bool, err error) {
-	if !tx.Migrator().HasTable(&db.GrowthRecruitPolicy{}) {
+	if !gameSchemaHasTable(tx, &db.GrowthRecruitPolicy{}) {
 		return false, false, nil
 	}
 	var policy db.GrowthRecruitPolicy

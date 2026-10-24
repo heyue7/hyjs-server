@@ -1,0 +1,38 @@
+{
+  "status": "PASS_SIGN_ALIGN_SCOPED_OVERLAY_NOT_INSTALLED",
+  "binarySHA256": "f3ce73cc1f2e41bb45873c64f01e9a6ec81d84d1e41f18482c27d62c42ace3f9",
+  "baseAPKSHA256": "4a85ed009e86c649b5954e8d1f02165e9d1951ec89256196f3dccd9076e6183d",
+  "replacementEntries": {
+    "assets/bin/Data/Managed/Assembly-CSharp.dll": "57f12e1c1aaa0ee46bc00d12be6b06bba5fda16533b47cc50a02c19c5e5e4f22",
+    "assets/bin/Data/Managed/HYJS.Field63.dll": "2f27e72fca3642b3ea94fa58745539e9235a1f256f8c99d1cafcb61fba5056f0",
+    "AndroidManifest.xml": "1304ecc106fdc5765dfe7b328e8fd701d9b634e39f605bef3838fb8d8be6668b"
+  },
+  "openingFontChanges": [],
+  "fontFallbackProof": null,
+  "dungeonResourceProof": null,
+  "compatibilityProof": null,
+  "javaClassInventory": {
+    "DEXEntries": [
+      "classes.dex",
+      "classes2.dex",
+      "classes3.dex",
+      "classes4.dex",
+      "classes5.dex"
+    ],
+    "classCount": 4604,
+    "noDuplicateClass": true,
+    "noFinalSuperclass": true
+  },
+  "inheritedJavaByteExact": true,
+  "javaByteExact": true,
+  "allOtherEntriesAndCompressedPayloadsExact": true,
+  "managedAssemblyByteExact": false,
+  "qaOnly": false,
+  "neverPromote": false,
+  "signatureVerified": true,
+  "zipalignVerified": true,
+  "originalEngineMethodsExact": 547,
+  "outputAPK": "build/hyjs-feedback64-formal-r2.apk",
+  "buildCode": 2026102404,
+  "versionName": "1.0.64"
+}

@@ -395,7 +395,7 @@ func createPlayerLocked(tx *gorm.DB, id int64, name, heroId string) (*db.Profile
 			return err
 		}
 		realCreatedAt := time.Now()
-		if tx.Migrator().HasTable(&db.PlayerOpeningCalendar{}) {
+		if gameSchemaHasTable(tx, &db.PlayerOpeningCalendar{}) {
 			if err := insertPlayerOpeningCalendar(tx, id, LocalPlayAt(tx.Statement.Context, realCreatedAt), realCreatedAt); err != nil {
 				return err
 			}

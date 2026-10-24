@@ -588,7 +588,7 @@ func (s *GameService) p9NextMutation(ctx context.Context, id int64, op string, s
 		if g.Run != nil && !g.Run.Complete || g.Field != nil && g.Field.Fight != nil && !g.Field.Fight.Settled {
 			return errors.New("战斗中不能修改精灵守护或成长")
 		}
-		if tx.Migrator().HasTable(&db.DailyCopyFight{}) {
+		if gameSchemaHasTable(tx, &db.DailyCopyFight{}) {
 			if err := s.ensureNoActiveDailyCopy(tx, id, time.Now()); err != nil {
 				return err
 			}

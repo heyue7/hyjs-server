@@ -116,6 +116,7 @@ func (s *GameService) resourceProfile(ctx context.Context, id int64) (*pb.Player
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&row, id).Error; err != nil {
 			return err
 		}
+		persisted := row
 		var err error
 		player, game, err = decodeProfile(&row)
 		if err != nil {
@@ -136,7 +137,7 @@ func (s *GameService) resourceProfile(ctx context.Context, id int64) (*pb.Player
 		if err != nil || !changed && !penaltyChanged && !clockChanged {
 			return err
 		}
-		return saveProfile(tx, &row, player, game)
+		return saveProfileAgainst(tx, &row, player, game, &persisted)
 	})
 	return player, game, err
 }

@@ -53,7 +53,7 @@ func loadPlayerOpenServerRule(tx *gorm.DB, id int64) (*db.OpenServerActivityRule
 	if err != nil {
 		return nil, err
 	}
-	if cycle != nil || GameAccountProtectedProfile(tx, id) || !tx.Migrator().HasTable(&db.PlayerOpeningCalendar{}) {
+	if cycle != nil || GameAccountProtectedProfile(tx, id) || !gameSchemaHasTable(tx, &db.PlayerOpeningCalendar{}) {
 		return cfg, nil
 	}
 	var anchor db.PlayerOpeningCalendar

@@ -219,7 +219,7 @@ func p14ReadPromotionFight(tx *gorm.DB, row *db.P14PromotionFight) (*pb.SCKuafuM
 
 func p14PromotionFightRows(tx *gorm.DB, state *db.P14PromotionState, now time.Time) ([]db.P14PromotionFight, error) {
 	var rows []db.P14PromotionFight
-	if !tx.Migrator().HasTable(&db.P14PromotionFight{}) {
+	if !gameSchemaHasTable(tx, &db.P14PromotionFight{}) {
 		return rows, nil
 	}
 	if err := tx.Where("season_index=? AND server_id=? AND player_id=?", state.SeasonIndex, state.ServerID, state.PlayerID).Order("match_index").Find(&rows).Error; err != nil {

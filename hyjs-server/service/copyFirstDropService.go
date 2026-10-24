@@ -30,7 +30,7 @@ func (s *GameService) settleCopyFirstDrops(tx *gorm.DB, id int64, player *pb.Pla
 	if slices.Contains(game.CopyFirstPassedTasks, fight.Task) || copyMissionPassed(game, game.Run.Chapter, game.Run.Mission) {
 		return &pb.ResultObject{}, nil, nil
 	}
-	if !tx.Migrator().HasTable(&db.CopyDropSnapshot{}) {
+	if !gameSchemaHasTable(tx, &db.CopyDropSnapshot{}) {
 		return s.copyFirstDrops(tx, id, player, game, fight)
 	}
 	var saved db.CopyDropSnapshot

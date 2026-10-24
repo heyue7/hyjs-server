@@ -372,7 +372,7 @@ func (s *GameService) turntableRanks(tx *gorm.DB, global *db.TurntableGlobal, ru
 		return nil, err
 	}
 	// Frozen legacy scores prevent subsequent private draws from entering the retired shared contest.
-	if tx.Migrator().HasTable(&db.TurntablePersonal{}) {
+	if gameSchemaHasTable(tx, &db.TurntablePersonal{}) {
 		for i := range states {
 			var personal db.TurntablePersonal
 			err := tx.First(&personal, "pool_id=? AND player_id=?", global.PoolID, states[i].PlayerID).Error
@@ -946,7 +946,7 @@ func (s *GameService) playBigTurnOnce(ctx context.Context, id int64, b *pb.CSPla
 			return err
 		}
 		// 记录回执中的实际钻石费用；同次大奖返钻不能缩减消费事实。
-		if len(result.Cost) > 0 && tx.Migrator().HasTable(&db.EventFact{}) {
+		if len(result.Cost) > 0 && gameSchemaHasTable(tx, &db.EventFact{}) {
 			if err = s.RecordP1Cost(tx, id, fmt.Sprintf("p2:wheel:%s:%d", cfg.ID, stamp), result.Cost, now); err != nil {
 				return err
 			}

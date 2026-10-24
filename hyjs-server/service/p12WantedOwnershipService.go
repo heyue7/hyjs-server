@@ -14,7 +14,7 @@ import (
 // Accepted receipt recovery must run before this helper. Closing the policy does
 // not erase an accepted pending fight or prevent its authenticated End.
 func P12WantedRequireIdle(tx *gorm.DB, id int64, now time.Time) error {
-	if !tx.Migrator().HasTable(&db.P12WantedFight{}) {
+	if !gameSchemaHasTable(tx, &db.P12WantedFight{}) {
 		return nil
 	}
 	var pending []db.P12WantedFight
