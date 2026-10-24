@@ -374,6 +374,7 @@ public class WalletActivity extends UnityPlayerActivity {
     private void setBubblePosition(float x,float y){bubbleX=x;bubbleY=y;updateBubbleWindow();}
     private void updateBubbleWindow(){
         if(destroyed || bubbleWindow==null || overlay==null || overlay.getWidth()==0)return;
+        if(panel!=null && panel.isShowing() && accountPage()){removeBubbleWindow();return;}
         View anchor=null;
         for(int i=bubbleWindowAnchors.size()-1;i>=0;i--){View candidate=bubbleWindowAnchors.get(i);if(candidate.isAttachedToWindow() && candidate.getWindowToken()!=null){anchor=candidate;break;}}
         if(anchor==null){removeBubbleWindow();return;}
@@ -520,7 +521,7 @@ public class WalletActivity extends UnityPlayerActivity {
     private String title(){switch(page){case BILLS:return "账单";case CASHIER:return "付款";case ORDERS:return "待支付订单";case ACCOUNT_HOME:case ACCOUNT:return "Brain Burst 2039";case NICKNAME:return "修改名称";case PASSWORD:return "修改密码";default:return "蓝绿终端";}}
     private void render(){
         if(panel==null || !panel.isShowing())return;
-        fitPanel();
+        fitPanel();updateBubbleWindow();
         rememberLedgerScroll();ledgerScroll=null;
         if(homeScroll!=null && page==HOME)homeScrollY=homeScroll.getScrollY();homeScroll=null;shell.removeAllViews();
         boolean accountStyle=accountPage();
