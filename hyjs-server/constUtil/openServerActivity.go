@@ -14,3 +14,6 @@ const OpenServerActivityMaximumInstances = 100
 
 const OpenServerActivitySevenDayType = "ActivityNewOpen7Day"
 const OpenServerActivityFourteenDayType = "ActivityNewOpen14Day"
+
+// OpenServerActivityCounterRushStars 仅投影已确认试炼状态，不接受客户端计数。
+const OpenServerActivityCounterRushStars = "rush_record_stars"

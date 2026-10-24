@@ -671,7 +671,12 @@ func (s *GameService) p4Projection(tx *gorm.DB, p *pb.Player, cfg db.P4CommerceR
 		if cfg.ShopType == 5 {
 			priority = s.pointShop48Priority(priority, rewards)
 		}
-		shopItem := &pb.ShopItem{Id: proto.String(publicID), Item: rewards, Price: []*pb.BaseResource{price}, ExchangeList: []*pb.BaseResource{price}, Priority: proto.Int32(priority), CanBuy: proto.Int32(max(0, can)), DayLeftTimes: proto.Int32(max(0, left)), DayTotalTimes: proto.Int32(dayTotal), TotalLeftTimes: proto.Int32(max(0, allLeft)), TotalTimes: proto.Int32(max(product.TotalLimit, allLeft)), PerDiscount: proto.String(strconv.Itoa(int(bps / 100))), Condition: condition}
+		shopCanBuy := max(int32(0), can)
+		// 原悬赏积分商品将canBuy作为状态枚举，剩余数量继续由dayLeftTimes携带。
+		if cfg.ShopType == 7 && shopCanBuy > 0 {
+			shopCanBuy = 1
+		}
+		shopItem := &pb.ShopItem{Id: proto.String(publicID), Item: rewards, Price: []*pb.BaseResource{price}, ExchangeList: []*pb.BaseResource{price}, Priority: proto.Int32(priority), CanBuy: proto.Int32(shopCanBuy), DayLeftTimes: proto.Int32(max(0, left)), DayTotalTimes: proto.Int32(dayTotal), TotalLeftTimes: proto.Int32(max(0, allLeft)), TotalTimes: proto.Int32(max(product.TotalLimit, allLeft)), PerDiscount: proto.String(strconv.Itoa(int(bps / 100))), Condition: condition}
 		if err := s.p4BatchPurchasePrices(shopItem, product, state, min(bought+1, product.DailyLimit), max(0, left)); err != nil {
 			return nil, nil, err
 		}

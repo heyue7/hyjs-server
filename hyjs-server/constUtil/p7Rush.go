@@ -15,3 +15,6 @@ const (
 	P7RushStarEvent             = "rush_star_total"
 	P7RushPolicySource          = "原VipPerks numPerk2/numPerk23和numPerks24/numPerks25定义免费/付费日次数；本地未开放策略将每次精英购买/试炼付费重置暂定50钻，原价格未知。原楼层/敌人/条件和P6原生对照未齐，不允许实际扣费和发奖。"
 )
+
+// P7RejectedEndLogMaxBytes 限制单次拒绝录像日志大小，保留既有文件轮转上限。
+const P7RejectedEndLogMaxBytes = 128 * 1024

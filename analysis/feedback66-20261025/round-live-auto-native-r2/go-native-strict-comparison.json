@@ -1,0 +1,34 @@
+{
+  "schema": "feedback66-round-live-auto-strict-native-go-phone-v1",
+  "cases": [
+    {
+      "index": 0,
+      "nativeSHA256": "fdfeeda0c4e46a164fa6819b5237fc49e3e03aad00c95cb0845eddaefc8acd71",
+      "goSHA256": "21593769ec340616d3065b7d83a44ecb62ba8cc566698280531b28e1d1c49311",
+      "phoneEndSHA256": "e4ec7c314a06aba1211b8f1fd2bc713eff637b800f93ba45913528989e42dd33",
+      "exactPressEvents": 29,
+      "exactBeginTargetsAndClocks": 28,
+      "exactFinalActors": 4,
+      "protocolBytesExact": true,
+      "roundWinnerHPExact": true
+    },
+    {
+      "index": 1,
+      "nativeSHA256": "4f5b6a8b035b3322b02c959bb8a1d513f11b85198fb5d70c6b8fbd3a74662124",
+      "goSHA256": "34f0871b929b869b0d1d5c2d9b228ef5a3b99c52769a39058975ffc480cb9b77",
+      "phoneEndSHA256": "eb2b0e1774ddbef0e7f6cc090e8336f0574d955fef792f97983dec65ff59ca4f",
+      "exactPressEvents": 29,
+      "exactBeginTargetsAndClocks": 28,
+      "exactFinalActors": 4,
+      "protocolBytesExact": true,
+      "roundWinnerHPExact": true
+    }
+  ],
+  "numericTolerance": 0,
+  "arrayOrderingChanged": false,
+  "sourceFilesRewritten": false,
+  "fullSchemaCompared": false,
+  "scope": "two actual typed9 records, original547 live-AI driver; excludes platform stack identity and unobserved UI control timeline",
+  "nativeManifestSHA256": "a59d33604b795d0f1a27012de7948292bfa250f54ee94f6d9b0ba6a0c2e1343e",
+  "newPhoneExecutionPerformed": false
+}

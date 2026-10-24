@@ -15,11 +15,13 @@ import (
 	"strconv"
 	"time"
 
+	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 	"hyjs-server/constUtil"
 	"hyjs-server/db"
+	"hyjs-server/elog"
 	"hyjs-server/model"
 	pb "hyjs-server/model/protocol"
 )
@@ -1069,6 +1071,17 @@ func (s *GameService) p7End(ctx context.Context, id int64, request *pb.CSRushFig
 		return nil
 	})
 	if err != nil {
+		// 仅在交易回滚后留有界原始失败帧，供下次按同一冻结输入定位精确差异。
+		// 帧不含登录凭据；沿现有容量/轮转策略，不写成功高频日志。
+		if request != nil && err.Error() == constUtil.P6ReplayConflict {
+			if raw, encodeErr := proto.Marshal(request); encodeErr == nil {
+				fields := []zap.Field{zap.Int64("playerId", id), zap.String("fightId", request.GetFightId()), zap.String("requestSHA256", p6Digest(raw)), zap.Int("requestBytes", len(raw))}
+				if len(raw) <= constUtil.P7RejectedEndLogMaxBytes {
+					fields = append(fields, zap.Binary("endProtobuf", raw))
+				}
+				elog.Warn("trial rejected End evidence", fields...)
+			}
+		}
 		return nil, err
 	}
 	if warmKey.database != nil && len(warmBody) > 0 {

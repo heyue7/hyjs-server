@@ -864,6 +864,11 @@ func (s *GameService) PurchaseP12WorldBossProp(ctx context.Context, id int64, pr
 			return err
 		}
 		player.Diamond = proto.Int64(player.GetDiamond() - 150)
+		// 同轮同属性只有一笔真实购买，重开页面或重复请求保留原消费事实。
+		source := "worldboss:boost:" + cycle.ID + ":" + strconv.FormatInt(id, 10) + ":" + propertyID
+		if err = s.RecordP1Cost(tx, id, source, []*pb.BaseResource{{Id: proto.String("diamond"), Num: proto.Int32(int32(owned.Paid))}}, now); err != nil {
+			return err
+		}
 		if err = saveProfile(tx, &profile, player, game); err != nil {
 			return err
 		}

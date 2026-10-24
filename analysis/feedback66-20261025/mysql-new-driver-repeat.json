@@ -1,0 +1,28 @@
+{
+  "database": "hyjs_test_feedback66_c120c36a76",
+  "passed": true,
+  "sameActualEndSHA256": "fa0e4a8c71b252897d9bc1cfd8b0d1d677b62c5473c24545a0e4c70eb8529438",
+  "beforeAndAfter": {
+    "coin": 1034000,
+    "diamond": 100000,
+    "stars": "9\t8\t8",
+    "instanceCount": "1"
+  },
+  "repeatedEnd": [
+    {
+      "milliseconds": 786.254,
+      "responseSHA256": "36317be64c3ceb90f322dfeef2bb5e229c28843ad67177c12b20b2879da51981"
+    },
+    {
+      "milliseconds": 777.54,
+      "responseSHA256": "36317be64c3ceb90f322dfeef2bb5e229c28843ad67177c12b20b2879da51981"
+    }
+  ],
+  "productionAccess": false,
+  "coldRestartReplay": {
+    "passed": true,
+    "milliseconds": 1142.04,
+    "responseSHA256": "36317be64c3ceb90f322dfeef2bb5e229c28843ad67177c12b20b2879da51981",
+    "noNewReward": true
+  }
+}

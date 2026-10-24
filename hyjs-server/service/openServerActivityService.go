@@ -251,6 +251,22 @@ func (s *GameService) refreshOpenServerProgressAt(tx *gorm.DB, player *pb.Player
 	for _, state := range states {
 		saved[state.TaskID] = state
 	}
+	// 原第六天任务按历史最高星数达标，重置挑战不会清除已取得的星数纪录。
+	// 只在当前已开放且未达成的试炼任务存在时读一次；不创建轮次或逐档回放历史战斗。
+	for _, task := range tasks {
+		if task.Visible && task.TaskType == 24 && !saved[task.ID].Achieved {
+			var rush db.P7RushState
+			err := tx.Select("total_stars", "record_stars").Where("player_id=?", player.GetPlayerId()).First(&rush).Error
+			if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+				return err
+			}
+			if rush.TotalStars < 0 || rush.RecordStars < 0 {
+				return errors.New("试炼星数存档无效")
+			}
+			values[constUtil.OpenServerActivityCounterRushStars] = max(rush.TotalStars, rush.RecordStars)
+			break
+		}
+	}
 	for _, t := range tasks {
 		if e := validateOpenServerTask(t); e != nil {
 			return e
@@ -356,6 +372,8 @@ func (s *GameService) openServerCurrent(player *pb.Player, g *model.GameState, c
 		return value(constUtil.OpenServerActivityCounterCopyWin, true), nil
 	case 106:
 		return value(constUtil.OpenServerActivityCounterPredatory, true), nil
+	case 24:
+		return values[constUtil.OpenServerActivityCounterRushStars], nil
 	case 27:
 		return s.formationFightPower(player, g)
 	case 5, 6, 14, 15, 16, 17, 25, 26:
@@ -634,6 +652,13 @@ func (s *GameService) openServerActivityAt(ctx context.Context, id int64, reques
 					return errors.New("开服抢购钻石不足或SQL价格超限")
 				}
 				player.Diamond = proto.Int64(player.GetDiamond() - totalPrice)
+				// 实际总价在本次购买事务记账，后续返奖/保存失败与回执一起回滚。
+				if totalPrice > 0 {
+					source := "opening:purchase:" + strconv.FormatInt(id, 10) + ":" + strconv.FormatInt(stamp, 10) + ":" + strconv.Itoa(int(task.ID))
+					if e = s.RecordP1Cost(tx, id, source, []*pb.BaseResource{{Id: proto.String("diamond"), Num: proto.Int32(int32(totalPrice))}}, now); e != nil {
+						return e
+					}
+				}
 			}
 			if count > 1 {
 				content, e = p4ScaleRewards(content, count)

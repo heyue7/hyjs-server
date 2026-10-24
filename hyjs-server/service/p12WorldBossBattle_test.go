@@ -117,6 +117,9 @@ func p12WorldBossBattleFullBuild(t *testing.T, f *p1Fixture, id int64) {
 func p12WorldBossBattleSetup(t *testing.T, unboosted ...bool) (*p1Fixture, int64, string, time.Time) {
 	t.Helper()
 	f, other := p12WorldBossSetup(t)
+	if err := f.s.InitializeP1(f.ctx); err != nil {
+		t.Fatal(err)
+	}
 	// P6 original-test cache包含BuffInfExtend等实际引擎表；保留额外首领域表。
 	for name, rows := range p6OriginalTables(t).Tables {
 		if len(rows) > 0 {

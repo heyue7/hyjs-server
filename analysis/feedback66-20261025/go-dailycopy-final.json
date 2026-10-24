@@ -1,0 +1,11 @@
+{
+  "selection": "TestFeedback66DailyCopyPrepaidStaminaProjectionAndCold$|TestDailyCopyNativeZeroDefaults|TestDailyPlayback",
+  "status": "PASS",
+  "leaseOwner": "Root feedback66 existing QA wrapper",
+  "qaAppPaused": true,
+  "exitCode": 0,
+  "seconds": 59.868,
+  "qaAppResumed": true,
+  "managedSchemas": 0,
+  "managedAccounts": 0
+}

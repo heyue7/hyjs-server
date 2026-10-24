@@ -24,6 +24,10 @@ func TestMonthSignCalendar(t *testing.T) {
 	if err := s.InitializeMonthSign(ctx); err != nil {
 		t.Fatal(err)
 	}
+	// 固定金币夹具只验日历、VIP补差和冷回执；默认RE奖励另由VideoMonthSign测试核对。
+	if err := db.GetIns().Model(&db.MonthSignRule{}).Where("day>0").Updates(map[string]any{"reward": "coin,1000", "double_vip": 2}).Error; err != nil {
+		t.Fatal(err)
+	}
 	row, err := LoginAccount(ctx, "isolated-sign", "test-password")
 	if err != nil {
 		t.Fatal(err)

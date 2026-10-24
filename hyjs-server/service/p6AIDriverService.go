@@ -56,5 +56,8 @@ func (e *combatRoundEngine) usesCopyEnemyAI(camp int32) bool {
 // The engine's existing ordered actor/buff ticks and repeated time additions
 // remain active; this never offsets emitted actions or rewrites a source record.
 func (e *combatRoundEngine) originalManualAutoWaiting() bool {
+	if len(e.roundLiveAutoControls) != 0 && e.camp == 0 && !e.roundLiveAutoStarted {
+		return true
+	}
 	return e.input.DiagnosticAIDriverPolicy == constUtil.P6DiagnosticManualAutoStart && e.input.DiagnosticManualAutoStartRoundTime != nil && e.round == 1 && e.camp == 0 && e.time < *e.input.DiagnosticManualAutoStartRoundTime
 }

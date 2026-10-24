@@ -321,6 +321,19 @@ func (s *GameService) dailyCopyAt(ctx context.Context, id int64, request proto.M
 	if err != nil {
 		return nil, err
 	}
+	if end, ok := response.(*pb.SCDailyCopyFightEnd); ok {
+		// Start已经扣费且SCPlayer提供权威余额；原结果页稍后会Delete(cost)。
+		// 只投影尚待客户端应用的成本，保留冻结回执的真实体力成本供重放校验。
+		projected := proto.Clone(end).(*pb.SCDailyCopyFightEnd)
+		costs := projected.Cost
+		projected.Cost = nil
+		for _, cost := range costs {
+			if cost.GetId() != "stamina" {
+				projected.Cost = append(projected.Cost, cost)
+			}
+		}
+		response = projected
+	}
 	messages := []proto.Message{response}
 	if updated != nil {
 		messages = append(messages, &pb.SCPlayer{Player: updated})

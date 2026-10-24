@@ -174,6 +174,10 @@ func (s *GameService) openServerFund(ctx context.Context, id int64, request prot
 			count++
 			buyStatus = 2
 			cost = []*pb.BaseResource{{Id: proto.String("diamond"), Num: proto.Int32(cfg.DiamondCost)}}
+			// 原基金购买计入消费；稳定购买键随钱包和资格一起提交。
+			if err := s.RecordP1Cost(tx, id, "fund:"+cfg.ID+":"+strconv.FormatInt(id, 10), cost, time.UnixMilli(now)); err != nil {
+				return err
+			}
 		case *pb.CSOpenServerFundReward:
 			kind := req.GetRewardType()
 			if kind != "openServerFund" && kind != "everyoneBenefit" {

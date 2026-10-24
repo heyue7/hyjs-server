@@ -117,6 +117,8 @@ type combatRoundEngine struct {
 	originalFormationApplied       bool
 	roundOneLiveAutoFormation      *pb.BattleTransOperate
 	roundOneLiveAutoStarted        bool
+	roundLiveAutoControls          []p6RoundAutoControl
+	roundLiveAutoStarted           bool
 	originalRecordMode             bool
 	tableIndexes                   map[combatRoundTableIndexKey]combatRoundTableIndex
 	service                        *GameService
@@ -295,6 +297,10 @@ func (s *GameService) computeFrozenBattleRecordObserved(ctx context.Context, inp
 // Only the new round1/time0 live driver supplies formation here. Existing public
 // and original-record entrypoints pass nil and preserve their execution order.
 func (s *GameService) computeFrozenBattleRecordControlled(ctx context.Context, input *model.FrozenBattleInput, supplied *pb.BattleOperate, observer, terminalObserver func(*combatRoundEngine), originalRecordMode bool, formation *pb.BattleTransOperate) (*model.CombatOutcome, error) {
+	return s.computeFrozenBattleRecordRoundControlled(ctx, input, supplied, observer, terminalObserver, originalRecordMode, formation, nil)
+}
+
+func (s *GameService) computeFrozenBattleRecordRoundControlled(ctx context.Context, input *model.FrozenBattleInput, supplied *pb.BattleOperate, observer, terminalObserver func(*combatRoundEngine), originalRecordMode bool, formation *pb.BattleTransOperate, controls []p6RoundAutoControl) (*model.CombatOutcome, error) {
 	if ctx == nil || input == nil {
 		return nil, errors.New(constUtil.CombatInvalid)
 	}
@@ -333,6 +339,15 @@ func (s *GameService) computeFrozenBattleRecordControlled(ctx context.Context, i
 		return nil, err
 	}
 	e := &combatRoundEngine{service: &GameService{Tables: frozen.Tables}, input: &frozen, rng: NewCombatRandom(frozen.Seed), operate: &pb.BattleOperate{}, supplied: supplied, captureTicks: observer != nil, round: 1, originalRecordMode: originalRecordMode}
+	if len(controls) != 0 {
+		if supplied != nil || formation != nil || !originalRecordMode {
+			return nil, errors.New(constUtil.P6ReplayConflict)
+		}
+		if err = validateP6RoundLiveAutoControls(&frozen, controls); err != nil {
+			return nil, err
+		}
+		e.roundLiveAutoControls = append([]p6RoundAutoControl(nil), controls...)
+	}
 	if formation != nil {
 		e.roundOneLiveAutoFormation = proto.Clone(formation).(*pb.BattleTransOperate)
 	}
@@ -797,6 +812,7 @@ func (e *combatRoundEngine) initialize() error {
 }
 
 func (e *combatRoundEngine) beginRound() error {
+	e.roundLiveAutoStarted = false
 	e.time = 0
 	e.aiDelay = 0
 	e.commandIndex = 0
@@ -904,6 +920,9 @@ func (e *combatRoundEngine) beginRound() error {
 	// Original live Auto is enabled after the explicit round1 DoTrans. Its Run
 	// must build the queue from the changed runtime positions, not old slots.
 	if e.roundOneLiveAutoFormation != nil && e.round == 1 && e.camp == 0 {
+		return nil
+	}
+	if len(e.roundLiveAutoControls) != 0 && e.camp == 0 {
 		return nil
 	}
 	return e.buildOriginalRoundAICommands()
@@ -1039,6 +1058,9 @@ func (e *combatRoundEngine) beginSkill(skill *combatRoundSkill) {
 }
 
 func (e *combatRoundEngine) step() error {
+	if err := e.applyRoundLiveAutoControl(); err != nil {
+		return err
+	}
 	if e.roundOneLiveAutoFormation != nil && !e.roundOneLiveAutoStarted {
 		if e.round != 1 || e.camp != 0 || e.time != 0 || !e.originalFormationApplied {
 			return errors.New(constUtil.P6ReplayConflict)

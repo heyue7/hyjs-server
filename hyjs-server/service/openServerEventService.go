@@ -23,7 +23,7 @@ func openServerTracksRequest(ctx context.Context) bool {
 		*pb.CSItemUse, *pb.CSCombine, *pb.CSTreasureStrengthen, *pb.CSTreasureRefine,
 		*pb.CSEquipStrengthen, *pb.CSEquipRefine, *pb.CSEquipStar, *pb.CSEquipForge,
 		*pb.CSEquipDecompose, *pb.CSCopyFightEnd, *pb.CSGetOpenServerReward,
-		*pb.CSShopBuy, *pb.CSQuestReward, *pb.CSOpenServerFundReward, *pb.CSActivityReward:
+		*pb.CSRushFightEnd, *pb.CSShopBuy, *pb.CSQuestReward, *pb.CSOpenServerFundReward, *pb.CSActivityReward:
 		return true
 	default:
 		return false

@@ -37,6 +37,10 @@ func (s *GameService) computeFrozenBattleFinalHP(ctx context.Context, input *mod
 // The explicit formation control is opt-in; all existing callers retain their
 // original supplied-record driver and exact source digest with nil control.
 func (s *GameService) computeFrozenBattleFinalHPControlled(ctx context.Context, input *model.FrozenBattleInput, supplied *pb.BattleOperate, originalRecordMode bool, formation *pb.BattleTransOperate) (*model.CombatFinalHPOutcome, error) {
+	return s.computeFrozenBattleFinalHPRoundControlled(ctx, input, supplied, originalRecordMode, formation, nil)
+}
+
+func (s *GameService) computeFrozenBattleFinalHPRoundControlled(ctx context.Context, input *model.FrozenBattleInput, supplied *pb.BattleOperate, originalRecordMode bool, formation *pb.BattleTransOperate, controls []p6RoundAutoControl) (*model.CombatFinalHPOutcome, error) {
 	if ctx == nil || input == nil {
 		return nil, errors.New(constUtil.CombatInvalid)
 	}
@@ -103,7 +107,7 @@ func (s *GameService) computeFrozenBattleFinalHPControlled(ctx context.Context, 
 		// Keep the full expected record bound above; live AI does not consume it.
 		driverRecord = nil
 	}
-	result.Outcome, err = s.computeFrozenBattleRecordControlled(ctx, frozen, driverRecord, nil, terminal, originalRecordMode, formation)
+	result.Outcome, err = s.computeFrozenBattleRecordRoundControlled(ctx, frozen, driverRecord, nil, terminal, originalRecordMode, formation, controls)
 	if err != nil {
 		return nil, err
 	}

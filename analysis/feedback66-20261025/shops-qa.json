@@ -1,0 +1,78 @@
+{
+  "database": "hyjs_test_feedback66_c120c36a76",
+  "playerId": 1,
+  "passed": true,
+  "elapsedSeconds": 8.654,
+  "productionAccess": false,
+  "fixtureNote": "popularity fragment37 is an isolated QA value; product default unchanged",
+  "checks": [
+    {
+      "check": "admin-readback",
+      "popularityFragmentDailyLimit": 37,
+      "scoreDailyLimits": [
+        20,
+        20
+      ],
+      "fixtureOnly": true
+    },
+    {
+      "check": "original-buy-and-reopen",
+      "shopType": 4,
+      "reward": "frag_hero_001",
+      "count": 20,
+      "cost": 2000,
+      "currencyBalance": 98000,
+      "dayLeft": 17,
+      "dayTotal": 37,
+      "canBuy": 1,
+      "sameStampNoDoubleCharge": true,
+      "requestMs": 162.586,
+      "reopenMs": 156.077
+    },
+    {
+      "check": "original-buy-and-reopen",
+      "shopType": 4,
+      "reward": "frag_hero_001",
+      "count": 1,
+      "cost": 100,
+      "currencyBalance": 97900,
+      "dayLeft": 16,
+      "dayTotal": 37,
+      "canBuy": 1,
+      "sameStampNoDoubleCharge": true,
+      "requestMs": 153.687,
+      "reopenMs": 169.494
+    },
+    {
+      "check": "original-buy-and-reopen",
+      "shopType": 7,
+      "reward": "item_005",
+      "count": 1,
+      "cost": 50,
+      "currencyBalance": 99950,
+      "dayLeft": 19,
+      "dayTotal": 20,
+      "canBuy": 1,
+      "sameStampNoDoubleCharge": true,
+      "requestMs": 174.207,
+      "reopenMs": 157.166
+    },
+    {
+      "check": "original-buy-and-reopen",
+      "shopType": 7,
+      "reward": "item_005",
+      "count": 2,
+      "cost": 100,
+      "currencyBalance": 99850,
+      "dayLeft": 17,
+      "dayTotal": 20,
+      "canBuy": 1,
+      "sameStampNoDoubleCharge": true,
+      "requestMs": 182.305,
+      "reopenMs": 172.192
+    }
+  ],
+  "resourcesReleased": false,
+  "resourceOwner": "Root retains app/schema lease for phone verification",
+  "trialConfigOrProgressChanged": false
+}

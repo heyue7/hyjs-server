@@ -1,0 +1,33 @@
+{
+  "passed": true,
+  "serverAlreadyCommittedBeforeRetry": true,
+  "nativeMainButtonUsed": true,
+  "noNewReadyStart": true,
+  "beforeAfter": {
+    "coin": 1040500,
+    "diamond": 100000,
+    "stars": "10\t9\t9",
+    "starts": "9",
+    "fight9": "p7-6607abf7462c07864d64878cfef8a7b0\tsettled",
+    "gameSHA256": "d56fca46a9a7e53066f2d6a9deda10ceeed74b35f63c857272b9e830ac219f33"
+  },
+  "actualEndSHA256": "fc011e21e0d10987bfe8363e97a58b616a52df3904552f61a2020126af5ad363",
+  "finalAPKHelper": "same final formal-r7 Trial66 and Commerce66; QA only4 origins",
+  "note": "Verified after the original mandatory perk selection dialog. Exact End forwarded from original main Challenge; no new Ready/Start, wallet/game unchanged.",
+  "proxySequence": [
+    {
+      "at": 1792870407.3640692,
+      "fightId": "p7-6607abf7462c07864d64878cfef8a7b0",
+      "mode": "commit-drop",
+      "endSHA256": "fc011e21e0d10987bfe8363e97a58b616a52df3904552f61a2020126af5ad363",
+      "endBytes": 1140
+    },
+    {
+      "at": 1792871003.457581,
+      "fightId": "p7-6607abf7462c07864d64878cfef8a7b0",
+      "mode": "forward",
+      "endSHA256": "fc011e21e0d10987bfe8363e97a58b616a52df3904552f61a2020126af5ad363",
+      "endBytes": 1140
+    }
+  ]
+}

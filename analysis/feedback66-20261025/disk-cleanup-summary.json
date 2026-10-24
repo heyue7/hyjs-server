@@ -1,0 +1,9 @@
+{
+  "scope": "Only old >6h HYJS-specific Go compiler archives; validated archive header and hyjs-server imports; no active compilers, open files protected; latest12 and all recent outputs retained",
+  "deletedCount": 681,
+  "deletedBytes": 53324231658,
+  "protectedCount": 63,
+  "globalCleanOrPrune": false,
+  "availableBytes": 52826198016,
+  "fullLocalAudit": "go-cache-project-cleanup.json"
+}

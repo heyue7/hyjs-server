@@ -1,0 +1,12 @@
+{
+  "progress": "9\t8\t8",
+  "coin": 1034000,
+  "stamina": 100,
+  "fight": "p7-eeedb4b521a57c1ecc33b789e37cfc8b\tsettled",
+  "receipts": [
+    "re-rush:CSRushAddition\t2",
+    "re-rush:CSRushGetSectionReward\t2",
+    "start\t8"
+  ],
+  "sameActualEndSHA256": "fa0e4a8c71b252897d9bc1cfd8b0d1d677b62c5473c24545a0e4c70eb8529438"
+}

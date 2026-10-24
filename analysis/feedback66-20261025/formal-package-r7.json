@@ -1,0 +1,39 @@
+{
+  "status": "PASS_SIGN_ALIGN_SCOPED_OVERLAY_NOT_INSTALLED",
+  "binarySHA256": "60be20022b95530882b9197d1e9a37c5c8659c061f71e5386938e117262885b4",
+  "baseAPKSHA256": "f26942c80a6b39d2b83eeed63a0775dff7e84147db815f553256e09c06026ba7",
+  "replacementEntries": {
+    "assets/bin/Data/Managed/Assembly-CSharp.dll": "7c72ca4372728c49fd26617660a3bc1538b32715743d116bf02abf3d6aa191cd",
+    "assets/bin/Data/Managed/HYJS.Trial66.dll": "5c5b845af00552ceea9a4a94331b1ea4c80ff499cdc6955b226e0d48f8aa04d3",
+    "assets/bin/Data/Managed/HYJS.Commerce66.dll": "897b6c1d0ad8e5b9231fd3988819f5227b9aed0dca20dcee71914edceac8d96e",
+    "AndroidManifest.xml": "96aebf207a11c702bc967f3184400bfc76a05277a9dedcc086ce3519de1ce17c"
+  },
+  "openingFontChanges": [],
+  "fontFallbackProof": null,
+  "dungeonResourceProof": null,
+  "compatibilityProof": null,
+  "javaClassInventory": {
+    "DEXEntries": [
+      "classes.dex",
+      "classes2.dex",
+      "classes3.dex",
+      "classes4.dex",
+      "classes5.dex"
+    ],
+    "classCount": 4604,
+    "noDuplicateClass": true,
+    "noFinalSuperclass": true
+  },
+  "inheritedJavaByteExact": true,
+  "javaByteExact": true,
+  "allOtherEntriesAndCompressedPayloadsExact": true,
+  "managedAssemblyByteExact": false,
+  "qaOnly": false,
+  "neverPromote": false,
+  "signatureVerified": true,
+  "zipalignVerified": true,
+  "originalEngineMethodsExact": 547,
+  "outputAPK": "build/hyjs-feedback66-formal-r7.apk",
+  "buildCode": 2026102501,
+  "versionName": "1.0.66"
+}

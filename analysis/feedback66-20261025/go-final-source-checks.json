@@ -1,0 +1,24 @@
+{
+  "status": "PASS",
+  "compiledAllPackages": true,
+  "vetAllPackages": true,
+  "binarySHA256": "0e9b27e2c1962c570ad0f89ea60c96424ede111fba29380378a3c86b81690805",
+  "dailyCopyRegression": "go-dailycopy-final.json",
+  "priorIntegratedRegression": "go-integrated-r7.json",
+  "sourceBase": "dd6de171ec83341c9bd0d7405a92a852cef939f0",
+  "QAStillRunning": true,
+  "originalDailyCopyRegression": {
+    "selection": "TestDailyCopyNativeDefaultZeroFieldsSettleAndReplay|TestDailyCopyOriginalCampUID|TestDailyCopyExhaustedNativeRecovery",
+    "status": "PASS",
+    "seconds": 2.47
+  },
+  "roundLiveAutoRegression": {
+    "selection": "TestP7RoundLiveAuto66|TestP7GenericMechanism|TestP6RushManual",
+    "status": "PASS",
+    "seconds": 16.905
+  },
+  "native547TwoPhoneCases": "round-live-auto-native-r2/go-native-strict-comparison.json",
+  "actualMySQLRepeatAndCold": "mysql-new-driver-repeat.json",
+  "originalPhoneConflictRetry": "phone-actual-conflict-retry-passed.json",
+  "originalPhoneCommittedDrop": "phone-committed-drop-retry-passed.json"
+}
