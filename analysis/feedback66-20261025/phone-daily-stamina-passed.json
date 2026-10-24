@@ -1,0 +1,10 @@
+{
+  "passed": true,
+  "phoneBeforeStamina": 100,
+  "phoneReturnedStamina": 90,
+  "databaseStamina": 90,
+  "fightMetadata": "07b003dd-3768-4f60-ad9d-d917bd95126d\t1\tHeroExp\t10\t1",
+  "nativeVictoryReward": "4 original gold EXP items; original balance then ActivityCopy page returned",
+  "QAOnly": true,
+  "originalNativeBattleAndLateResultCallback": true
+}

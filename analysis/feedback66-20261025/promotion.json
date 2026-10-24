@@ -1,0 +1,27 @@
+{
+  "version": "1.0.66",
+  "buildCode": 2026102501,
+  "qualifiedSource": "/Users/lirui/.codex/worktrees/feedback63-field-trial-copy/hyjs/build/hyjs-feedback66-formal-r7.apk",
+  "binarySHA256": "60be20022b95530882b9197d1e9a37c5c8659c061f71e5386938e117262885b4",
+  "installedFormalSHA256Matches": true,
+  "aliases": [
+    {
+      "path": "/Users/lirui/.codex/worktrees/feedback63-field-trial-copy/hyjs/build/hyjs-local.apk",
+      "sha256": "60be20022b95530882b9197d1e9a37c5c8659c061f71e5386938e117262885b4",
+      "previousSHA256": "f26942c80a6b39d2b83eeed63a0775dff7e84147db815f553256e09c06026ba7",
+      "hardlinked": true
+    },
+    {
+      "path": "/Users/lirui/LR/hyjs/build/hyjs-local.apk",
+      "sha256": "60be20022b95530882b9197d1e9a37c5c8659c061f71e5386938e117262885b4",
+      "previousSHA256": "f26942c80a6b39d2b83eeed63a0775dff7e84147db815f553256e09c06026ba7",
+      "hardlinked": true
+    },
+    {
+      "path": "/Users/lirui/LR/hyjs/build/hyjs-feedback66-formal-r7.apk",
+      "sha256": "60be20022b95530882b9197d1e9a37c5c8659c061f71e5386938e117262885b4",
+      "previousSHA256": null,
+      "hardlinked": true
+    }
+  ]
+}

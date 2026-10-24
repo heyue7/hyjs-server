@@ -1,0 +1,11 @@
+{
+  "removedOwnedObsolete65Backup": "pre-deploy-8219a2f774cb-1792853191775145558.sql.gz.aesgcm",
+  "bytesRemoved": 477959588,
+  "sha256BeforeRemoval": "611741b4066457291e8c989a66b4121ab6456c17b33e85c04c79a213e9e95249",
+  "keptVerifiedBackup": "pre-deploy-92995a79ff48-1792871339450011148.sql.gz.aesgcm",
+  "hostOpenDescriptorsAndAllContainerMountsChecked": true,
+  "remainingEncryptedBackups": [
+    "pre-deploy-92995a79ff48-1792871339450011148.sql.gz.aesgcm"
+  ],
+  "freeBytes": 2920624128
+}

@@ -1,0 +1,13 @@
+{
+  "recordedAt": "2026-10-25T04:07:32.648597+08:00",
+  "localOwnedIntermediatesRemovedBytes": 6958454918,
+  "oldHyjsGoCacheRemovedBytes": 53324231658,
+  "localTotalRemovedBytes": 60282686576,
+  "remoteObsoleteBackupRemovedBytes": 956168771,
+  "currentFormalSHA256": "60be20022b95530882b9197d1e9a37c5c8659c061f71e5386938e117262885b4",
+  "localAvailableBytes": 55399825408,
+  "remoteEncryptedBackupCount": 1,
+  "QAIsolatedAppSchemaAccountReleased": true,
+  "phonePreferencesCallerReverseDisplayRestored": true,
+  "globalPruneOrFlush": false
+}
