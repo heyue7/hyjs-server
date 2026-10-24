@@ -1,0 +1,86 @@
+[
+  {
+    "path": "build/hyjs-feedback64-qa.apk",
+    "bytes": 689089062,
+    "reason": "owned superseded r1 package; active QA and formal r2 preserved",
+    "sha256": "442bf19703a54b7503457eea761eb03c70db89dd2cd288cafa2a41509e035096"
+  },
+  {
+    "path": "build/hyjs-feedback64-formal.apk",
+    "bytes": 689089062,
+    "reason": "owned superseded r1 package; active QA and formal r2 preserved",
+    "sha256": "d00b8397f4d751f4b710af833664724a32ba2402f793dd5d69b8b0086c72abac"
+  },
+  {
+    "path": "build/hyjs-feedback64-qa-r2.apk",
+    "bytes": 689093158,
+    "reason": "QA r2 fully evidenced; formal r2 installed and current",
+    "sha256": "91e5690dc9158073bb756a9c1c0bdcfae0cf89f93ee5b2fd055136f8fb1202ad"
+  },
+  {
+    "path": "analysis/latency64-20261024/qa_probe/HYJS64QA_2de317d1e9d9c91c.dll",
+    "bytes": 29184,
+    "reason": "Owned only-read QA helper removed from phone; reproducible source retained"
+  },
+  {
+    "path": "analysis/latency64-20261024/qa_probe/HYJS64QA_5ec37ef3c62c95e7.dll",
+    "bytes": 27648,
+    "reason": "Owned only-read QA helper removed from phone; reproducible source retained"
+  },
+  {
+    "path": "analysis/latency64-20261024/qa_probe/HYJS64QA_8fa9f85f9371a2f1.dll",
+    "bytes": 29184,
+    "reason": "Owned only-read QA helper removed from phone; reproducible source retained"
+  },
+  {
+    "path": "analysis/latency64-20261024/qa_probe/HYJS64QA_b4c8289eb8c7b457.dll",
+    "bytes": 26624,
+    "reason": "Owned only-read QA helper removed from phone; reproducible source retained"
+  },
+  {
+    "path": "analysis/latency64-20261024/re-luxury64/OfflineBootstrap.dll",
+    "bytes": 19486208,
+    "reason": "Read-only extracted duplicate; pinned original RE APK and focused IL/report preserved",
+    "sha256": "b26c6b453e5a534bcdfa7da5d302f9266c9ade88e813129d6ecd321ebe59179b"
+  },
+  {
+    "path": "build/hyjs-latency64-before",
+    "bytes": 61205890,
+    "reason": "Owned completed QA/baseline/obsolete r1 intermediate; final field r2/formal current preserved"
+  },
+  {
+    "path": "build/hyjs-latency64-final",
+    "bytes": 61223410,
+    "reason": "Owned completed QA/baseline/obsolete r1 intermediate; final field r2/formal current preserved"
+  },
+  {
+    "path": "build/hyjs-latency64-current",
+    "bytes": 61223410,
+    "reason": "Owned completed QA/baseline/obsolete r1 intermediate; final field r2/formal current preserved"
+  },
+  {
+    "path": "build/latency64-baseline-source",
+    "bytes": 14430473,
+    "reason": "Owned completed QA/baseline/obsolete r1 intermediate; final field r2/formal current preserved"
+  },
+  {
+    "path": "build/feedback64-qa-managed",
+    "bytes": 4603102,
+    "reason": "Owned completed QA/baseline/obsolete r1 intermediate; final field r2/formal current preserved"
+  },
+  {
+    "path": "build/feedback64-qa-managed-r2",
+    "bytes": 4603108,
+    "reason": "Owned completed QA/baseline/obsolete r1 intermediate; final field r2/formal current preserved"
+  },
+  {
+    "path": "build/field64-overlay",
+    "bytes": 4611766,
+    "reason": "Owned completed QA/baseline/obsolete r1 intermediate; final field r2/formal current preserved"
+  },
+  {
+    "path": ".local-env/latency64",
+    "bytes": 94521,
+    "reason": "Owned temporary credentials, logs and verified restored phone backups; API before/after config record preserved"
+  }
+]

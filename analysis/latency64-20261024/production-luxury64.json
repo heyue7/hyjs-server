@@ -1,0 +1,28 @@
+{
+  "approvedByHuman": true,
+  "sourceRevision": "f7c2be940bfc0692907123a38288a28590f68cf4",
+  "endpoint": "/admin/api/luxury-sign-rules",
+  "before": {
+    "version": "cb668acbfc874c82a71d8bd332770175911efc4f997399d016c311ab27740166",
+    "enabled": false,
+    "rewards": [],
+    "rechargeCents": 600,
+    "startAt": 0,
+    "endAt": 0
+  },
+  "after": {
+    "version": "7a119dca53dab394bd400906c76991df68ecbd05f89a14206f25b7f71b287e16",
+    "enabled": true,
+    "rewards": [
+      {
+        "resourceId": "diamond",
+        "amount": 1500
+      }
+    ],
+    "rechargeCents": 600,
+    "startAt": 1,
+    "endAt": 253402214400000
+  },
+  "readbackExact": true,
+  "noGrantOrPayment": true
+}

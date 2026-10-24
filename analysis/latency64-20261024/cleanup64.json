@@ -1,0 +1,15 @@
+{
+  "appStopped": true,
+  "ownedMySQLReleased": true,
+  "portsClosed": {
+    "28979": true,
+    "28980": true
+  },
+  "bothLeasesReleased": true,
+  "browserClosed": true,
+  "originalPhoneRestored": true,
+  "reclaimedLocalBytes": 2298865810,
+  "freeDiskBytes": 13503262720,
+  "productionBackupCount": 1,
+  "noGlobalPrune": true
+}

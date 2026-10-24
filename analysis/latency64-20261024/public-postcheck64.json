@@ -1,0 +1,22 @@
+{
+  "http://134.175.127.249:28861/health": {
+    "status": 200,
+    "sha256": "99f26c440246771f4630f097db4a8108ac3874e31144b3118caae858c8854278"
+  },
+  "http://134.175.127.249:28860/admin/": {
+    "status": 200,
+    "sha256": "28bb4245c278edab6f6a854960cdb6b09cd10d44bee0c01c8acc63a7295f1c14"
+  },
+  "http://134.175.127.249:28860/admin/assets/index-CJCdfk0x.js": {
+    "status": 200,
+    "sha256": "94509ae90ba56bc78586e0f7146c91ed6ea111fe80c4ca0bb32ff9419df966d0"
+  },
+  "http://134.175.127.249:28860/admin/assets/index-6eebTWhh.css": {
+    "status": 200,
+    "sha256": "0d60b80a3299c436b14d72ffe9be01b88d5a3c01f6bd6bff9d750f520bd58998"
+  },
+  "cors": {
+    "status": 204,
+    "allowOrigin": "http://134.175.127.249:28860"
+  }
+}

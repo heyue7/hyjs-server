@@ -1,0 +1,209 @@
+{
+  "label": "final",
+  "runtime": {
+    "origin": "http://127.0.0.1:28979",
+    "database": "hyjs_test_latency64_a791a0032c",
+    "pid": 53823,
+    "wrapperPid": 31816,
+    "binarySHA256": "7c7495782b339d6802cdf5a0e1d056a6369ee0afd33802338b58d6acaebd3989"
+  },
+  "playerId": 1,
+  "level": 100,
+  "originalBinaryHTTP": true,
+  "quietNoPhoneOrBrowser": true,
+  "warmupPerRequest": 1,
+  "repeat": 9,
+  "items": [
+    {
+      "request": "CSPlayer",
+      "fields": {},
+      "response": "SCPlayer",
+      "medianMs": 51.694,
+      "samplesMs": [
+        52.237,
+        43.633,
+        45.408,
+        51.694,
+        62.858,
+        49.211,
+        55.14,
+        54.914,
+        50.859
+      ]
+    },
+    {
+      "request": "CSWarriorList",
+      "fields": {},
+      "response": "SCWarriorList",
+      "medianMs": 121.707,
+      "samplesMs": [
+        125.1,
+        196.828,
+        163.119,
+        94.289,
+        99.893,
+        103.391,
+        129.669,
+        85.461,
+        121.707
+      ]
+    },
+    {
+      "request": "CSEquipmentTreasureList",
+      "fields": {},
+      "response": "SCEquipmentTreasureList",
+      "medianMs": 69.222,
+      "samplesMs": [
+        66.045,
+        61.193,
+        64.121,
+        78.053,
+        73.607,
+        69.222,
+        99.671,
+        64.094,
+        88.547
+      ]
+    },
+    {
+      "request": "CSFormationList",
+      "fields": {},
+      "response": "SCFormationList",
+      "medianMs": 69.764,
+      "samplesMs": [
+        64.3,
+        69.764,
+        79.712,
+        78.154,
+        63.9,
+        85.3,
+        81.682,
+        68.861,
+        64.035
+      ]
+    },
+    {
+      "request": "CSQuestList",
+      "fields": {},
+      "response": "SCQuestList",
+      "medianMs": 51.901,
+      "samplesMs": [
+        40.409,
+        70.106,
+        51.868,
+        47.36,
+        56.59,
+        53.705,
+        63.657,
+        50.546,
+        51.901
+      ]
+    },
+    {
+      "request": "CSTaskList",
+      "fields": {},
+      "response": "SCTaskList",
+      "medianMs": 58.074,
+      "samplesMs": [
+        60.175,
+        58.074,
+        55.276,
+        54.402,
+        61.195,
+        80.282,
+        56.185,
+        59.479,
+        57.906
+      ]
+    },
+    {
+      "request": "CSMailList",
+      "fields": {
+        "mailType": "allMail"
+      },
+      "response": "SCMailList",
+      "medianMs": 76.483,
+      "samplesMs": [
+        67.88,
+        68.717,
+        72.022,
+        73.298,
+        77.246,
+        81.459,
+        76.483,
+        137.197,
+        103.01
+      ]
+    },
+    {
+      "request": "CSShopProductList",
+      "fields": {
+        "shopType": 1
+      },
+      "response": "SCShopProductList",
+      "medianMs": 182.08,
+      "samplesMs": [
+        232.493,
+        193.532,
+        161.432,
+        175.715,
+        266.854,
+        175.239,
+        242.122,
+        182.08,
+        152.692
+      ]
+    },
+    {
+      "request": "CSRewardMonthSignList",
+      "fields": {},
+      "response": "SCRewardMonthSignList",
+      "medianMs": 70.989,
+      "samplesMs": [
+        76.171,
+        74.57,
+        68.625,
+        67.46,
+        75.754,
+        70.989,
+        59.964,
+        60.805,
+        78.744
+      ]
+    },
+    {
+      "request": "CSActivityList",
+      "fields": {},
+      "response": "SCActivityList",
+      "medianMs": 270.292,
+      "samplesMs": [
+        222.152,
+        1134.307,
+        234.71,
+        428.133,
+        274.417,
+        255.656,
+        266.629,
+        322.538,
+        270.292
+      ]
+    },
+    {
+      "request": "CSIsCardClaimed",
+      "fields": {},
+      "response": "SCIsCardClaimed",
+      "medianMs": 105.716,
+      "samplesMs": [
+        105.716,
+        100.189,
+        92.539,
+        114.409,
+        90.11,
+        91.122,
+        114.163,
+        152.664,
+        117.855
+      ]
+    }
+  ]
+}

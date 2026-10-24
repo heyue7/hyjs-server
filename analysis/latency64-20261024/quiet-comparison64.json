@@ -1,0 +1,68 @@
+[
+  {
+    "request": "CSPlayer",
+    "beforeMs": 53.477,
+    "afterMs": 51.694,
+    "changeMs": -1.783
+  },
+  {
+    "request": "CSWarriorList",
+    "beforeMs": 91.262,
+    "afterMs": 121.707,
+    "changeMs": 30.445
+  },
+  {
+    "request": "CSEquipmentTreasureList",
+    "beforeMs": 85.172,
+    "afterMs": 69.222,
+    "changeMs": -15.95
+  },
+  {
+    "request": "CSFormationList",
+    "beforeMs": 83.782,
+    "afterMs": 69.764,
+    "changeMs": -14.018
+  },
+  {
+    "request": "CSQuestList",
+    "beforeMs": 54.521,
+    "afterMs": 51.901,
+    "changeMs": -2.62
+  },
+  {
+    "request": "CSTaskList",
+    "beforeMs": 58.731,
+    "afterMs": 58.074,
+    "changeMs": -0.657
+  },
+  {
+    "request": "CSMailList",
+    "beforeMs": 126.524,
+    "afterMs": 76.483,
+    "changeMs": -50.041
+  },
+  {
+    "request": "CSShopProductList",
+    "beforeMs": 174.353,
+    "afterMs": 182.08,
+    "changeMs": 7.727
+  },
+  {
+    "request": "CSRewardMonthSignList",
+    "beforeMs": 77.633,
+    "afterMs": 70.989,
+    "changeMs": -6.644
+  },
+  {
+    "request": "CSActivityList",
+    "beforeMs": 290.865,
+    "afterMs": 270.292,
+    "changeMs": -20.573
+  },
+  {
+    "request": "CSIsCardClaimed",
+    "beforeMs": 116.64,
+    "afterMs": 105.716,
+    "changeMs": -10.924
+  }
+]

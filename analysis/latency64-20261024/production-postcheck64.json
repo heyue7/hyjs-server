@@ -1,0 +1,26 @@
+{
+  "revision": "f7c2be940bfc0692907123a38288a28590f68cf4",
+  "runningGoSHA256": "c1467464247a30867042036ccb220674401b309f3812ecbeb0bb0b32d68762f6",
+  "gameRunning": true,
+  "mysqlRunning": true,
+  "mysqlOOMKilled": false,
+  "mysqlRestarts": 0,
+  "scheduleCounts": [
+    "1\t0\t35",
+    "0\t1\t18"
+  ],
+  "backupName": "pre-deploy-f7c2be940bfc-1792833338400665742.sql.gz.aesgcm",
+  "backupBytes": 432216493,
+  "backupSHA256": "b0dce9ebcf505db3f6f0687a3914e8989dad6efd5c1c48cf307b7f9f098a0437",
+  "backupRecordedSHA256": "b0dce9ebcf505db3f6f0687a3914e8989dad6efd5c1c48cf307b7f9f098a0437",
+  "backups": [
+    {
+      "name": "pre-deploy-795a1f53485a-1792826615769638663.sql.gz.aesgcm",
+      "size": 431932812
+    },
+    {
+      "name": "pre-deploy-f7c2be940bfc-1792833338400665742.sql.gz.aesgcm",
+      "size": 432216493
+    }
+  ]
+}
