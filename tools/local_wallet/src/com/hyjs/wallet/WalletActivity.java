@@ -682,7 +682,9 @@ public class WalletActivity extends UnityPlayerActivity {
             confirmationInput.setImeOptions(EditorInfo.IME_FLAG_NO_EXTRACT_UI|EditorInfo.IME_FLAG_NO_FULLSCREEN|EditorInfo.IME_ACTION_DONE);
         }
         TextView note=text(page==PASSWORD?"其他设备需用新密码重新登录":"不会更改角色名",12,GRAY);note.setPadding(0,dp(12),0,dp(10));content.addView(note);
-        addFull(content,accountAction(busy?"保存中…":"保存",true,active(),()->saveAccount()),44);
+        TextView save=accountAction(busy?"保存中…":"保存",true,active(),()->saveAccount());
+        LinearLayout.LayoutParams saveLayout=new LinearLayout.LayoutParams(dp(160),dp(44));saveLayout.gravity=Gravity.RIGHT;
+        content.addView(save,saveLayout);
     }
     private void saveAccount(){
         if(!active())return;
