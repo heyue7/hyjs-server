@@ -1,0 +1,133 @@
+{
+  "scope": "only >=16MiB cache -d embedding exact task worktree; latest6 protected",
+  "noActiveGoCompiler": true,
+  "openFilesProtected": true,
+  "latestSixOwnedOutputsPreserved": true,
+  "deletedCount": 19,
+  "deletedBytes": 1779306302,
+  "deleted": [
+    {
+      "path": "/Users/lirui/Library/Caches/go-build/6b/6bec5930f7926a53a5866f0d67613dcb65919ef06fa3b704506e4c2055ba8194-d",
+      "bytes": 111838290,
+      "mtimeNs": 1792845290213988000,
+      "links": 1
+    },
+    {
+      "path": "/Users/lirui/Library/Caches/go-build/96/961e43b9f0574939c5c9ea5ee7b457808579afc935a9de20a85ff7f060331d3e-d",
+      "bytes": 55102104,
+      "mtimeNs": 1792845129766308000,
+      "links": 1
+    },
+    {
+      "path": "/Users/lirui/Library/Caches/go-build/ed/ed460de039f7e34741156041e365f927213b3d95d1ac98c436a9f8aee76710ca-d",
+      "bytes": 111770542,
+      "mtimeNs": 1792844939265046000,
+      "links": 1
+    },
+    {
+      "path": "/Users/lirui/Library/Caches/go-build/94/947cfc6d578b65c7140b5cf01463e28e6a688f07e4ad1d24c06b305021f52b39-d",
+      "bytes": 111684768,
+      "mtimeNs": 1792844491056152000,
+      "links": 1
+    },
+    {
+      "path": "/Users/lirui/Library/Caches/go-build/eb/eb2b457fb91e90de35e1e139e745252a8a9f7b797bcc0ffa46dab7e1ace29e78-d",
+      "bytes": 55035094,
+      "mtimeNs": 1792843642469375000,
+      "links": 1
+    },
+    {
+      "path": "/Users/lirui/Library/Caches/go-build/9e/9e22e4df84f1f474a0743463a9762e7f2fb90f9d12a715e5107c4b89632e0099-d",
+      "bytes": 111564372,
+      "mtimeNs": 1792833056977841000,
+      "links": 1
+    },
+    {
+      "path": "/Users/lirui/Library/Caches/go-build/83/83f863f29c88bddfcb5eb63c301e55785b4488e924107a4e0a6884a59021a0bb-d",
+      "bytes": 111507412,
+      "mtimeNs": 1792831750909298000,
+      "links": 1
+    },
+    {
+      "path": "/Users/lirui/Library/Caches/go-build/eb/ebaa0c1a95dc9042982c95cf390c2d8052bee522c321877fe9fe9693a9e89510-d",
+      "bytes": 55035654,
+      "mtimeNs": 1792830899219940000,
+      "links": 1
+    },
+    {
+      "path": "/Users/lirui/Library/Caches/go-build/75/75efdaefebd72ff5f290769e2439ccf6462d594897736a7d5ef110a3cf8be90f-d",
+      "bytes": 111504212,
+      "mtimeNs": 1792830435697964000,
+      "links": 1
+    },
+    {
+      "path": "/Users/lirui/Library/Caches/go-build/51/5187cdf6f9a7126c8c0a9fa4301caad9f60e4185c3421d6871d393e1cb1691b2-d",
+      "bytes": 111503630,
+      "mtimeNs": 1792829595411287000,
+      "links": 1
+    },
+    {
+      "path": "/Users/lirui/Library/Caches/go-build/b5/b56c3a88d6fae793b98a5c6f8f81b051475ee9e12d6a37de7f79c6304a3cc503-d",
+      "bytes": 111472502,
+      "mtimeNs": 1792829422850010000,
+      "links": 1
+    },
+    {
+      "path": "/Users/lirui/Library/Caches/go-build/66/6619eaf9678239d49fdaa774c53e1ec5d4d29014f03ae3bbc1e0d5c167bc962f-d",
+      "bytes": 111406118,
+      "mtimeNs": 1792828582688086000,
+      "links": 1
+    },
+    {
+      "path": "/Users/lirui/Library/Caches/go-build/ae/ae73c1996b1647c5fdeae5e4f17a42e861bb695c4b8cc6c471c364320658857f-d",
+      "bytes": 111446758,
+      "mtimeNs": 1792828476362880000,
+      "links": 1
+    },
+    {
+      "path": "/Users/lirui/Library/Caches/go-build/d5/d56271d07bde61c267eed961b5c902094c71fd634c6a508a07924a9a7d3d876c-d",
+      "bytes": 111160914,
+      "mtimeNs": 1792828428504749000,
+      "links": 1
+    },
+    {
+      "path": "/Users/lirui/Library/Caches/go-build/af/af2c7c4f1f12334924ebf03dafc11c3fad5f449f1264fe1a39e5e3cf1601be06-d",
+      "bytes": 54971670,
+      "mtimeNs": 1792826153043270000,
+      "links": 1
+    },
+    {
+      "path": "/Users/lirui/Library/Caches/go-build/3c/3c528bfdcad1467cf919dc46c1f560639e567dfc2dcf64a496f7daf867a83570-d",
+      "bytes": 55094346,
+      "mtimeNs": 1792826114001022000,
+      "links": 1
+    },
+    {
+      "path": "/Users/lirui/Library/Caches/go-build/e6/e66cd77bd2a19f315926c18c39ab99e13c63a6e95adcb16eeaecd34634f646d1-d",
+      "bytes": 111074894,
+      "mtimeNs": 1792826085925151000,
+      "links": 1
+    },
+    {
+      "path": "/Users/lirui/Library/Caches/go-build/be/beac26f7b43b9d5342377dc697ce29d89b3923a2af4e79e3e91b8518562cca0f-d",
+      "bytes": 111057170,
+      "mtimeNs": 1792826034929909000,
+      "links": 1
+    },
+    {
+      "path": "/Users/lirui/Library/Caches/go-build/6e/6e28e572f6d560c8139e0dd8cf45ff786019f041458df93db3a4d62b4c395c18-d",
+      "bytes": 55075852,
+      "mtimeNs": 1792825694694207000,
+      "links": 1
+    }
+  ],
+  "retained": [
+    "/Users/lirui/Library/Caches/go-build/22/222fb744f92f0299fcf4bf06e514eb7422a387b712ac9d451a336a59d6aeb25f-d",
+    "/Users/lirui/Library/Caches/go-build/b0/b0c4e0bbeee5eedebdbdcf44b2e1418d3fb7097e9cf233f074363a20cc7eb0e7-d",
+    "/Users/lirui/Library/Caches/go-build/68/68e9751be7be94412de42d4af65684ca439c9313583159688519b7aaf2953e6e-d",
+    "/Users/lirui/Library/Caches/go-build/a2/a29c6f93b5a15aef0a82b35e8be46a602a2d29c6066525686bb2b0def6a0df1d-d",
+    "/Users/lirui/Library/Caches/go-build/c5/c55527e0e8e92b02b1161680011566580e7356e1a48e08ba73dbab6c614e7c26-d",
+    "/Users/lirui/Library/Caches/go-build/46/4658dd5dea4a25e84b91606c62b7635c23c77ae3ffd33107a56962ff2e935d65-d"
+  ],
+  "freeGiB": 6.17
+}
