@@ -85,18 +85,19 @@ func (s *GameService) RecordP1Event(tx *gorm.DB, playerID int64, sourceKey, kind
 		if !live.Enabled {
 			continue
 		}
-		cfg, err := s.freezeP1Period(tx, live, false)
+		cfg, err := p1PeriodSnapshot(live)
 		if err != nil {
 			return err
 		}
 		if cfg.Kind != kind {
 			continue
 		}
-		if err = s.validateP1Period(cfg); err != nil {
-			return err
-		}
 		if fact.OccurredAt < cfg.StartAt || fact.OccurredAt >= cfg.EndAt || acceptedAt < cfg.StartAt || acceptedAt >= cfg.EndAt {
 			continue
+		}
+		cfg, err = s.freezeP1Period(tx, live, false)
+		if err != nil {
+			return err
 		}
 		// Calendar checks belong only to windows that can consume this fact.
 		// Use the frozen kind and interval before selecting the actual owner.

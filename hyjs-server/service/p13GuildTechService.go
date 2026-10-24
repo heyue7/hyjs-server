@@ -210,6 +210,8 @@ func (s *GameService) InitializeP13GuildTech(ctx context.Context) error {
 	if err := tx.AutoMigrate(&db.P13GuildTechPolicy{}, &db.P13GuildTechOffer{}, &db.P13GuildTechUpgrade{}); err != nil {
 		return err
 	}
+	// Fixed source schema is ready only after the complete migration succeeds.
+	s.p10ClientOwner().guildTechSchemaReady.Store(true)
 	return tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&db.P13GuildTechPolicy{ID: 1, DirectoryJSON: "{}", DirectoryHash: p6Digest([]byte("{}")), Source: constUtil.P13GuildTechSource}).Error
 }
 
@@ -217,9 +219,12 @@ func (s *GameService) InitializeP13GuildTech(ctx context.Context) error {
 // member. It never writes, migrates, locks guild/profile rows, or grants a level.
 func (s *GameService) P13GuildTechProperties(ctx context.Context, tx *gorm.DB, id int64, now time.Time) (*pb.BaseProp, string, error) {
 	tx = tx.WithContext(ctx)
-	for _, table := range []any{&db.P13GuildTechOffer{}, &db.P13GuildTechUpgrade{}, &db.P13GuildMember{}, &db.P13Guild{}} {
-		if !tx.Migrator().HasTable(table) {
-			return &pb.BaseProp{}, "", nil
+	owner := s.p10ClientOwner()
+	if !owner.guildCoreSchemaReady.Load() || !owner.guildTechSchemaReady.Load() {
+		for _, table := range []any{&db.P13GuildTechOffer{}, &db.P13GuildTechUpgrade{}, &db.P13GuildMember{}, &db.P13Guild{}} {
+			if !tx.Migrator().HasTable(table) {
+				return &pb.BaseProp{}, "", nil
+			}
 		}
 	}
 	member, err := p13GuildMember(tx, id)

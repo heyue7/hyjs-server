@@ -42,6 +42,11 @@ type GameService struct {
 	ServerClockState atomic.Pointer[model.ServerGameClockView]
 	// adminFieldRuntimeReady 在野外管理表初始化成功后置位，正式高频路径跳过表存在检查。
 	adminFieldRuntimeReady atomic.Bool
+	// 已完成迁移的固定schema无需在每次属性读取时查询元数据。
+	guildCoreSchemaReady     atomic.Bool
+	guildPrayerSchemaReady   atomic.Bool
+	guildTechSchemaReady     atomic.Bool
+	adminActivitySchemaReady atomic.Bool
 	// adminFieldRuntimeCache 只保存该基础服务当前区服与数据库连接的一份不可变覆盖表快照。
 	adminFieldRuntimeCache atomic.Pointer[adminFieldRuntimeSnapshot]
 	// 同一服务冷启动或发布后只构建一份覆盖表，避免并发请求重复分配整表。

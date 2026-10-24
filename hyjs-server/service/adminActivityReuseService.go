@@ -44,7 +44,7 @@ func adminAcceptActivityTemplate(tx *gorm.DB, playerID int64, row db.AdminActivi
 	if playerID < 1 {
 		return false, constUtil.ErrAdminInput
 	}
-	if !tx.Migrator().HasTable(&db.AdminActivityTemplateOwner{}) {
+	if !adminActivitySchemaHasTable(tx, &db.AdminActivityTemplateOwner{}) {
 		if policy == "repeat" {
 			return true, nil
 		}
@@ -84,7 +84,7 @@ func adminRecoverActivityFirstOwner(tx *gorm.DB, playerID int64, current db.Admi
 	}
 	candidates := []evidence{}
 	for _, source := range sources {
-		if tx.Migrator().HasTable(&db.AdminCharacterActivityInstance{}) {
+		if adminActivitySchemaHasTable(tx, &db.AdminCharacterActivityInstance{}) {
 			var issued db.AdminCharacterActivityInstance
 			err := tx.Where("player_id=? AND server_id=? AND occurrence_id=?", playerID, source.ServerID, source.ID).Take(&issued).Error
 			if err == nil {

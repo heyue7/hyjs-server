@@ -75,7 +75,7 @@ func adminActivityWindowsOverlap(a, b model.AdminActivityOccurrenceDTO, mode str
 // native consumer or participates in the retired local-demo tool permissions.
 func (s *GameService) PrepareAdminCharacterActivitySchedules(ctx context.Context, playerID int64) error {
 	d := db.GetIns().WithContext(ctx)
-	if playerID < 1 || !d.Migrator().HasTable(&db.AdminCharacterActivityInstance{}) {
+	if playerID < 1 || !adminActivitySchemaHasTable(d, &db.AdminCharacterActivityInstance{}) {
 		return nil
 	}
 	var count int64
@@ -197,7 +197,7 @@ func (s *GameService) PrepareAdminCharacterActivitySchedules(ctx context.Context
 // adminCharacterActivityAccess retains historical receipts but prevents a role
 // from guessing another role's native instance or using a disabled realm plan.
 func adminCharacterActivityAccess(tx *gorm.DB, key string) (bool, error) {
-	if !tx.Migrator().HasTable(&db.AdminCharacterActivityInstance{}) {
+	if !adminActivitySchemaHasTable(tx, &db.AdminCharacterActivityInstance{}) {
 		return false, nil
 	}
 	owner := GameCalendarOwner(tx.Statement.Context)
@@ -232,7 +232,7 @@ func adminCharacterActivityAccess(tx *gorm.DB, key string) (bool, error) {
 	return allowed && occurrence.Enabled && !occurrence.Archived, nil
 }
 func adminCharacterActivityCurrentKey(tx *gorm.DB, mode string, now int64, claim bool) (string, error) {
-	if !tx.Migrator().HasTable(&db.AdminCharacterActivityInstance{}) {
+	if !adminActivitySchemaHasTable(tx, &db.AdminCharacterActivityInstance{}) {
 		return "", nil
 	}
 	owner := GameCalendarOwner(tx.Statement.Context)

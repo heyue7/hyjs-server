@@ -34,16 +34,28 @@ func (s *GameService) seedP4Periods(tx *gorm.DB, now time.Time) error {
 		{"kaiGongActivity", "攻略福利", constUtil.P1EventCopyWin, "cumulative", "item_139,5;item_150,1", 10, 0},
 		{"kaiFuJingSai", "开服战力竞赛", constUtil.P4KindPower, "single", "coin,1", math.MaxInt32, 10},
 	}
+	// 同月已有模板一次读取；缺失项继续幂等插入，运营修改保持原值。
+	ids := make([]string, 0, len(specs)+2)
+	for _, v := range specs {
+		ids = append(ids, v.prefix+"_p4_"+start.Format("200601"))
+	}
+	plunder := p4PlunderActivityPeriod(now)
+	arena := p4ArenaWinPeriod(now)
+	ids = append(ids, plunder.ID, arena.ID)
+	var existing []string
+	if err := tx.Model(&db.PeriodInstance{}).Where("id IN ?", ids).Pluck("id", &existing).Error; err != nil {
+		return err
+	}
+	present := make(map[string]bool, len(existing))
+	for _, id := range existing {
+		present[id] = true
+	}
 	for _, v := range specs {
 		cfg := db.PeriodInstance{ID: v.prefix + "_p4_" + start.Format("200601"), Enabled: false, Title: v.title, Kind: v.kind, Mode: v.mode, Goal: v.goal, Rewards: v.reward, StartAt: start.UnixMilli(), EndAt: end.UnixMilli(), RewardEndAt: end.AddDate(0, 0, 7).UnixMilli(), RankPlaces: v.rank, RankRewards: "coin,10000;item_021,1", Source: "P4本地兼容服月实例：只累计成功招募/主线通关、已真实拥有的不同英雄类型和服务器阵容战力；战力取期内峰值，截止后前10名同档奖励通过P1邮件/领奖中心发放。重复回执、重复登录及客户端战力值不参与计数。"}
 		if v.prefix == "kaiGongActivity" {
 			cfg.Source = constUtil.P15KaiGongSource
 		}
-		var exists int64
-		if err := tx.Model(&db.PeriodInstance{}).Where("id=?", cfg.ID).Count(&exists).Error; err != nil {
-			return err
-		}
-		if exists > 0 {
+		if present[cfg.ID] {
 			continue
 		}
 		if err := s.validateP1Period(cfg); err != nil {
@@ -53,11 +65,15 @@ func (s *GameService) seedP4Periods(tx *gorm.DB, now time.Time) error {
 			return err
 		}
 	}
-	if err := s.seedP4PlunderActivityPeriod(tx, now); err != nil {
-		return err
+	if !present[plunder.ID] {
+		if err := s.seedP4PlunderActivityPeriod(tx, now); err != nil {
+			return err
+		}
 	}
-	if err := s.seedP4ArenaWinPeriod(tx, now); err != nil {
-		return err
+	if !present[arena.ID] {
+		if err := s.seedP4ArenaWinPeriod(tx, now); err != nil {
+			return err
+		}
 	}
 	return s.seedP15Seasonal(tx, now)
 }
@@ -148,12 +164,16 @@ func (s *GameService) recordP4PowerEntry(tx *gorm.DB, id int64, power int32, now
 		if !live.Enabled {
 			continue
 		}
-		cfg, err := s.freezeP1Period(tx, live, false)
+		cfg, err := p1PeriodSnapshot(live)
 		if err != nil {
 			return err
 		}
 		if cfg.Kind != constUtil.P4KindPower || cfg.Mode != "single" || now.UnixMilli() < cfg.StartAt || now.UnixMilli() >= cfg.EndAt {
 			continue
+		}
+		cfg, err = s.freezeP1Period(tx, live, false)
+		if err != nil {
+			return err
 		}
 		// Only a live power window needs calendar ownership and template checks.
 		// Freeze first so an issued window keeps its original kind and timing.

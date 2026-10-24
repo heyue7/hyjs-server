@@ -23,6 +23,7 @@ func (s *GameService) InitializeAdminActivitySchedules(ctx context.Context) erro
 	if err := tx.AutoMigrate(&db.AdminActivityDefinition{}, &db.AdminActivityOccurrence{}, &db.AdminActivityPattern{}, &db.AdminActivityScheduleRevision{}, &db.AdminCharacterActivityInstance{}, &db.AdminActivityTemplateOwner{}, &db.AdminOpeningState{}, &db.AdminOpeningCounter{}, &db.AdminOpeningStock{}, &db.AdminOpeningReceipt{}); err != nil {
 		return err
 	}
+	s.adminActivitySchemaReady.Store(true)
 	rows, err := s.AdminActivityInstances(ctx)
 	if err != nil {
 		return err
@@ -65,6 +66,18 @@ func (s *GameService) InitializeAdminActivitySchedules(ctx context.Context) erro
 		return err
 	}
 	return s.reconcileAdminActivityCatalogue(ctx, rows)
+}
+
+// adminActivitySchemaHasTable skips metadata only after this service migrated the fixed calendar schema.
+// Optional fixtures keep checking their own database; business rows remain live reads.
+func adminActivitySchemaHasTable(tx *gorm.DB, table any) bool {
+	if service, ok := tx.Statement.Context.Value(constUtil.GameServiceContextKey).(*GameService); ok && service.p10ClientOwner().adminActivitySchemaReady.Load() {
+		switch table.(type) {
+		case *db.AdminActivityOccurrence, *db.AdminActivityScheduleRevision, *db.AdminCharacterActivityInstance, *db.AdminActivityTemplateOwner:
+			return true
+		}
+	}
+	return tx.Migrator().HasTable(table)
 }
 
 // adminActivityRedundantSource identifies generated aliases, never operator
@@ -335,7 +348,7 @@ func (s *GameService) AdminSaveActivityDefinition(ctx context.Context, p *model.
 // Legacy and personal-cycle identifiers retain their existing access rules.
 func adminActivityCalendarManaged(tx *gorm.DB) (bool, error) {
 	service, ok := tx.Statement.Context.Value(constUtil.GameServiceContextKey).(*GameService)
-	if !ok || !tx.Migrator().HasTable(&db.AdminActivityScheduleRevision{}) {
+	if !ok || !adminActivitySchemaHasTable(tx, &db.AdminActivityScheduleRevision{}) {
 		return false, nil
 	}
 	var revision db.AdminActivityScheduleRevision
@@ -364,7 +377,7 @@ func adminActivityScheduleAccess(tx *gorm.DB, key string) (bool, error) {
 	if localPlayPrivateCycleID(key) != "" {
 		return true, nil
 	}
-	if !tx.Migrator().HasTable(&db.AdminActivityOccurrence{}) {
+	if !adminActivitySchemaHasTable(tx, &db.AdminActivityOccurrence{}) {
 		return !strings.Contains(key, "_schedule_"), nil
 	}
 	// Adopted legacy consumers retain their original IDs so existing claims and
@@ -405,7 +418,7 @@ func adminActivityScheduleAccess(tx *gorm.DB, key string) (bool, error) {
 // AdminScheduledTurntablePool selects only this trusted realm's active pool.
 // A player's already-created personal wheel remains frozen by the caller.
 func (s *GameService) AdminScheduledTurntablePool(tx *gorm.DB, now int64, fallback string) (string, error) {
-	if !tx.Migrator().HasTable(&db.AdminActivityOccurrence{}) {
+	if !adminActivitySchemaHasTable(tx, &db.AdminActivityOccurrence{}) {
 		return fallback, nil
 	}
 	if key, err := adminCharacterActivityCurrentKey(tx, "turntable", now, false); err != nil || key != "" {
@@ -448,7 +461,7 @@ func AdminScheduledOpeningRule(tx *gorm.DB, cfg *db.OpenServerActivityRule, now 
 		local := time.UnixMilli(realm.OpenAt).In(zone)
 		cfg.UnlockStartAt = time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, zone).UnixMilli()
 	}
-	if !tx.Migrator().HasTable(&db.AdminActivityOccurrence{}) {
+	if !adminActivitySchemaHasTable(tx, &db.AdminActivityOccurrence{}) {
 		return nil
 	}
 	service, ok := tx.Statement.Context.Value(constUtil.GameServiceContextKey).(*GameService)
@@ -481,7 +494,7 @@ func (s *GameService) adminActivityOccurrenceFrozen(tx *gorm.DB, row db.AdminAct
 		return true, nil
 	}
 	if adminActivityTiming(row) == "character-day" && row.Mode != "opening-14" {
-		if !tx.Migrator().HasTable(&db.AdminCharacterActivityInstance{}) {
+		if !adminActivitySchemaHasTable(tx, &db.AdminCharacterActivityInstance{}) {
 			return false, nil
 		}
 		var issued []db.AdminCharacterActivityInstance

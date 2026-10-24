@@ -97,6 +97,8 @@ func (s *GameService) InitializeP13Guild(ctx context.Context) error {
 	if err := tx.AutoMigrate(&db.P13GuildPolicy{}, &db.P13Guild{}, &db.P13GuildMember{}, &db.P13GuildApply{}, &db.P13GuildReceipt{}); err != nil {
 		return err
 	}
+	// Fixed source schema is ready only after the complete migration succeeds.
+	s.p10ClientOwner().guildCoreSchemaReady.Store(true)
 	if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&db.P13GuildPolicy{ID: 1, Source: constUtil.P13GuildSource}).Error; err != nil {
 		return err
 	}

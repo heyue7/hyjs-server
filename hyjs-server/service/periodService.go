@@ -71,8 +71,8 @@ func (s *GameService) validateP1Period(cfg db.PeriodInstance) error {
 	return nil
 }
 
-// freezeP1Period 在第一次事实写入或截止结算时冻结整个实例，修改未来规则须创建新ID。
-func (s *GameService) freezeP1Period(tx *gorm.DB, live db.PeriodInstance, freeze bool) (db.PeriodInstance, error) {
+// p1PeriodSnapshot 先读取已冻结的种类和时间，供事件筛选；实际消费仍校验来源与奖励。
+func p1PeriodSnapshot(live db.PeriodInstance) (db.PeriodInstance, error) {
 	cfg := live
 	if len(live.Frozen) > 0 {
 		if err := json.Unmarshal(live.Frozen, &cfg); err != nil {
@@ -82,7 +82,20 @@ func (s *GameService) freezeP1Period(tx *gorm.DB, live db.PeriodInstance, freeze
 			return cfg, errors.New("活动实例冻结ID不符")
 		}
 		cfg.Enabled = live.Enabled
-	} else if freeze {
+	}
+	if cfg.RewardSourceID != live.RewardSourceID {
+		return cfg, constUtil.ErrAdminConfiguration
+	}
+	return cfg, nil
+}
+
+// freezeP1Period 在第一次事实写入或截止结算时冻结整个实例，修改未来规则须创建新ID。
+func (s *GameService) freezeP1Period(tx *gorm.DB, live db.PeriodInstance, freeze bool) (db.PeriodInstance, error) {
+	cfg, err := p1PeriodSnapshot(live)
+	if err != nil {
+		return cfg, err
+	}
+	if len(live.Frozen) == 0 && freeze {
 		if err := s.validateP1Period(cfg); err != nil {
 			return cfg, err
 		}
@@ -93,9 +106,6 @@ func (s *GameService) freezeP1Period(tx *gorm.DB, live db.PeriodInstance, freeze
 		if err = tx.Model(&db.PeriodInstance{}).Where("id = ?", live.ID).Update("frozen", blob).Error; err != nil {
 			return cfg, err
 		}
-	}
-	if cfg.RewardSourceID != live.RewardSourceID {
-		return cfg, constUtil.ErrAdminConfiguration
 	}
 	if err := personalOpening40ValidateSource(tx, cfg, 0); err != nil {
 		return cfg, err

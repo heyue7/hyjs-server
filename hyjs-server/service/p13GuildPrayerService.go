@@ -109,6 +109,8 @@ func (s *GameService) InitializeP13GuildPrayer(ctx context.Context) error {
 	if err := tx.AutoMigrate(&db.P13GuildPrayerPolicy{}, &db.P13GuildPrayerRoll{}); err != nil {
 		return err
 	}
+	// Fixed source schema is ready only after the complete migration succeeds.
+	s.p10ClientOwner().guildPrayerSchemaReady.Store(true)
 	return tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&db.P13GuildPrayerPolicy{ID: 1, Source: constUtil.P13GuildPrayerSource, PoolJSON: "[]", PoolHash: p6Digest([]byte("[]"))}).Error
 }
 
@@ -138,9 +140,12 @@ func (s *GameService) P13GuildPrayerProperties(ctx context.Context, tx *gorm.DB,
 	tx = tx.WithContext(ctx)
 	// P5-only fixtures and optional deployments can omit the entire guild schema.
 	// These metadata reads never create tables or acquire guild mutation locks.
-	for _, table := range []any{&db.P13GuildPrayerRoll{}, &db.P13GuildMember{}, &db.P13Guild{}} {
-		if !tx.Migrator().HasTable(table) {
-			return &pb.BaseProp{}, "", 0, nil
+	owner := s.p10ClientOwner()
+	if !owner.guildCoreSchemaReady.Load() || !owner.guildPrayerSchemaReady.Load() {
+		for _, table := range []any{&db.P13GuildPrayerRoll{}, &db.P13GuildMember{}, &db.P13Guild{}} {
+			if !tx.Migrator().HasTable(table) {
+				return &pb.BaseProp{}, "", 0, nil
+			}
 		}
 	}
 	member, err := p13GuildMember(tx, id)
