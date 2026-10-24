@@ -13,10 +13,21 @@ services:
     # Keep the existing data directory and InnoDB durability settings intact.
     command:
       - --innodb-buffer-pool-size=128M
+      - --innodb-log-buffer-size=16M
+      - --key-buffer-size=1M
       - --max-connections=40
       - --table-open-cache=1024
       - --table-definition-cache=800
       - --temptable-max-ram=64M
+      # Autosized instrumentation also retains memory after peak traffic.
+      # Keep diagnostics available within the same fixed container budget.
+      - --performance-schema-digests-size=1000
+      - --performance-schema-events-statements-history-long-size=1000
+      - --performance-schema-max-thread-instances=128
+      - --performance-schema-hosts-size=16
+      - --performance-schema-users-size=16
+      - --performance-schema-accounts-size=32
+      - --performance-schema-max-table-handles=2048
     volumes:
       - ./data/mysql:/var/lib/mysql
     healthcheck:
