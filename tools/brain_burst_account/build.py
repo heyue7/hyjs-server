@@ -40,6 +40,7 @@ def main():
     parser.add_argument('--base-apk', type=Path, required=True)
     parser.add_argument('--base-sha256', required=True)
     parser.add_argument('--output-directory', type=Path, required=True)
+    parser.add_argument('--sign-redpoint-overlay', type=Path)
     args = parser.parse_args()
     base, out = args.base_apk.resolve(), args.output_directory.resolve()
     require(sha(base.read_bytes()) == args.base_sha256, 'Base APK changed')
@@ -87,9 +88,30 @@ def main():
                  managedAssemblyByteExact=True, apkPackaged=False, phoneVerified=False)
     proof['replacementEntries']['classes2.dex'] = proof['outputDexSHA256']
     proof['sourcePins'].update({str(p.relative_to(ROOT)): sha(p.read_bytes()) for p in inputs})
+    if args.sign_redpoint_overlay:
+        from tools.client_sign_redpoint.build import verify as verify_sign
+        directory = args.sign_redpoint_overlay.resolve()
+        require(directory.is_relative_to(ROOT), 'Sign proof outside project')
+        sign = json.loads((directory / 'manifest.json').read_text())
+        with zipfile.ZipFile(base) as archive:
+            original = archive.read(managed + 'Assembly-CSharp.dll')
+        patched = (directory / 'Assembly-CSharp.dll').read_bytes()
+        require(sign['inputManagedSHA256'] == sha(original) and sign['outputManagedSHA256'] == sha(patched), 'Sign proof input/output differs')
+        verified = verify_sign(original, patched)
+        for name, expected in sign['sourcePins'].items():
+            require(sha((ROOT / name).read_bytes()) == expected, 'Sign source changed')
+        (out / 'Assembly-CSharp.dll').write_bytes(patched)
+        entry = managed + 'Assembly-CSharp.dll'
+        proof['payloadFiles'][entry] = str((out / 'Assembly-CSharp.dll').relative_to(ROOT))
+        proof['replacementEntries'][entry] = sha(patched)
+        proof['outputManagedSHA256'] = sha(patched)
+        proof['managedAssemblyByteExact'] = False
+        proof['allowedChangedMethods'] = [change['method'] for change in verified['changes']]
+        proof['signRedpointProof'] = verified
+        proof['sourcePins'].update(sign['sourcePins'])
     (out / 'manifest.json').write_text(json.dumps(proof, ensure_ascii=False, indent=2) + '\n')
     print(json.dumps({'status': 'QUALIFIED_ACCOUNT_HELPERS_AND_DEX',
-                      'managedAssemblyByteExact': True, 'replacementEntries': proof['replacementEntries']}))
+                      'managedAssemblyByteExact': proof['managedAssemblyByteExact'], 'replacementEntries': proof['replacementEntries']}))
 
 
 if __name__ == '__main__':

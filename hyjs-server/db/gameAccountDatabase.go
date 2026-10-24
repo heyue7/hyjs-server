@@ -36,6 +36,7 @@ func InitializeGameAccountsSchema(ctx context.Context) error {
 	if d.Dialector.Name() == "mysql" {
 		// The configured database must already exist and be granted to the application account; no CREATE DATABASE privileges are required.
 		statements := []string{
+			"CREATE TABLE IF NOT EXISTS " + AccountsTableName("game_account_sessions") + " (token_hash VARCHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL PRIMARY KEY, account_id BIGINT NOT NULL, auth_revision BIGINT NOT NULL, created_at BIGINT NOT NULL, expires_at BIGINT NOT NULL, KEY game_account_sessions_account (account_id), KEY game_account_sessions_expiry (expires_at)) ENGINE=InnoDB",
 			"CREATE TABLE IF NOT EXISTS " + AccountsTableName("game_accounts") + " (id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY, username VARBINARY(1024) NOT NULL, nickname VARCHAR(96) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_bin NOT NULL, password_salt LONGBLOB NOT NULL, password_hash LONGBLOB NOT NULL, enabled BOOLEAN NOT NULL, protected BOOLEAN NOT NULL, auth_revision BIGINT NOT NULL DEFAULT 0, revision BIGINT NOT NULL, created_at BIGINT NOT NULL, UNIQUE KEY game_accounts_username (username)) ENGINE=InnoDB",
 			"CREATE TABLE IF NOT EXISTS " + AccountsTableName("game_account_roles") + " (account_id BIGINT NOT NULL, server_id BIGINT NOT NULL, player_id BIGINT NOT NULL, name VARCHAR(96) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_bin NOT NULL, level BIGINT NOT NULL, PRIMARY KEY (account_id, server_id)) ENGINE=InnoDB",
 		}
@@ -46,5 +47,5 @@ func InitializeGameAccountsSchema(ctx context.Context) error {
 		}
 		return nil
 	}
-	return d.AutoMigrate(&GameAccount{}, &GameAccountRole{})
+	return d.AutoMigrate(&GameAccount{}, &GameAccountRole{}, &GameAccountSession{})
 }

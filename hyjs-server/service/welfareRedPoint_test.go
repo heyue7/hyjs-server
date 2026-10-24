@@ -1,10 +1,12 @@
 package service
 
 import (
+	"context"
 	"google.golang.org/protobuf/proto"
 	"hyjs-server/constUtil"
 	"hyjs-server/db"
 	pb "hyjs-server/model/protocol"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -121,5 +123,72 @@ func TestWelfareRedPointGuideEarnedThenCleared(t *testing.T) {
 	points, err = f.s.WelfareAchievementRedPoints(f.ctx, f.id)
 	if err != nil || welfarePoint(points, "kaiGongActivity") != 0 {
 		t.Fatal("claimed guide red retained", points, err)
+	}
+}
+
+func TestWelfareMonthSignReadOnlyAndSnapshot(t *testing.T) {
+	ctx := context.Background()
+	if err := db.InitGame(ctx, filepath.Join(t.TempDir(), "sign-redpoint.db")); err != nil {
+		t.Fatal(err)
+	}
+	sqlDB, _ := db.GetIns().DB()
+	t.Cleanup(func() { sqlDB.Close() })
+	s := &GameService{}
+	if err := s.InitializeMonthSign(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.GetIns().Model(&db.MonthSignRule{}).Where("day>0").Updates(map[string]any{"reward": "coin,1000", "double_vip": 2}).Error; err != nil {
+		t.Fatal(err)
+	}
+	account, err := LoginAccount(ctx, "isolated-sign-redpoint", "test-password")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = CreatePlayer(ctx, account.Id, "签到红点", "hero_043"); err != nil {
+		t.Fatal(err)
+	}
+	points, err := s.WelfareAchievementRedPoints(ctx, account.Id)
+	if err != nil || welfarePoint(points, "dailySignOrdinary") != 1 || welfarePoint(points, "dailySign") != 1 || welfarePoint(points, "wonderfulActivity") != 1 || welfarePoint(points, "dailySignLuxury") != 0 {
+		t.Fatal("initial ordinary-only eligibility", points, err)
+	}
+	var count int64
+	if err := db.GetIns().Model(&db.MonthSignState{}).Count(&count).Error; err != nil || count != 0 {
+		t.Fatal("redpoint query wrote sign state", count, err)
+	}
+	now := LocalPlayNow(ctx)
+	if _, err := s.monthSignAt(ctx, account.Id, &pb.CSReceiveMonthSign{}, now); err != nil {
+		t.Fatal(err)
+	}
+	points, err = s.WelfareAchievementRedPoints(ctx, account.Id)
+	if err != nil || welfarePoint(points, "dailySignOrdinary") != 0 || welfarePoint(points, "dailySign") != 0 || welfarePoint(points, "wonderfulActivity") != 0 {
+		t.Fatal("unqualified VIP remainder must stay dark", points, err)
+	}
+	// Later live rule edits must not lower the same-day saved VIP threshold.
+	if err := db.GetIns().Model(&db.MonthSignRule{}).Where("day=1").Update("double_vip", 1).Error; err != nil {
+		t.Fatal(err)
+	}
+	at := now.In(time.FixedZone("UTC+8", 8*3600))
+	var state db.MonthSignState
+	if err := db.GetIns().First(&state, "player_id=? AND month=?", account.Id, at.Format("2006-01")).Error; err != nil {
+		t.Fatal(err)
+	}
+	if monthSignStateReadyPoint(&state, 1, at.Format("2006-01-02"), 31) || !monthSignStateReadyPoint(&state, 2, at.Format("2006-01-02"), 31) {
+		t.Fatal("VIP remainder must use saved threshold", state)
+	}
+	state.Doubled = true
+	if monthSignStateReadyPoint(&state, 12, at.Format("2006-01-02"), 31) {
+		t.Fatal("completed remainder relit")
+	}
+	state.Days = 31
+	if monthSignStateReadyPoint(&state, 12, at.AddDate(0, 0, 1).Format("2006-01-02"), 31) {
+		t.Fatal("completed month relit")
+	}
+}
+
+func TestWelfareMonthSignRefreshRequests(t *testing.T) {
+	for _, request := range []proto.Message{&pb.CSRewardMonthSignList{}, &pb.CSReceiveMonthSign{}, &pb.CSReceiveLuxurySign{}} {
+		if !welfareAchievementRequestRefresh(request, nil) {
+			t.Fatalf("missing sign refresh: %T", request)
+		}
 	}
 }

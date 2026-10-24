@@ -120,6 +120,7 @@ def main():
     with zipfile.ZipFile(args.base_apk) as z:
         base=z.read(ENTRY);before_dex=z.read('classes2.dex')
         original_dex={name:sha(z.read(name)) for name in ['classes.dex','classes3.dex'] if name in z.namelist()}
+        external_parents={parent for name in z.namelist() if name.startswith('classes') and name.endswith('.dex') and name!='classes2.dex' for _,parent in dex_class_headers(z.read(name)).values() if parent}
     require(not args.dex_only or (args.input_managed is None and args.reuse_managed is None),'DEX-only mode preserves the exact APK managed assembly')
     before=args.input_managed.read_bytes() if args.input_managed else base
     if args.input_managed:require(args.input_managed_sha256 and sha(before)==args.input_managed_sha256,'Explicit managed input SHA required')
@@ -159,8 +160,12 @@ def main():
     else:checks=verify_managed(before,after)
     new_dex=(out/'classes2.dex').read_bytes();old_api,new_api=dex_abi(before_dex),dex_abi(new_dex)
     old_headers,new_headers=dex_class_headers(before_dex),dex_class_headers(new_dex)
+    # javac renumbers private anonymous classes when a UI lambda changes.
+    # Preserve named/public ABI and every parent referenced by another DEX;
+    # package_native also validates the complete resulting inheritance graph.
     for cls,(flags,parent) in old_headers.items():
-        if cls in new_headers:
+        internal_anonymous=cls.rsplit('$',1)[-1].rstrip(';').isdigit() and cls not in old_api and cls not in external_parents
+        if cls in new_headers and not internal_anonymous:
             require(new_headers[cls][1]==parent,'Inherited Java superclass changed: '+cls)
             require(not (new_headers[cls][0]&16 and not flags&16),'Inherited Java class became final: '+cls)
     missing=[]

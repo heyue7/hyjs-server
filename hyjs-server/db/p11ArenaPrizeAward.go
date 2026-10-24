@@ -28,6 +28,13 @@ type P11ArenaPrizeAward struct {
 	RankBestAfter     int64  `gorm:"not null;default:0" json:"rankBestAfter,omitempty"`
 	RankDiamond       int64  `gorm:"not null;default:0" json:"rankDiamond,omitempty"`
 	RankSource        string `gorm:"type:varchar(128);not null;default:''" json:"rankSource,omitempty"`
+	// VictoryRewardSource and the three facts below freeze the user-confirmed
+	// victory popularity/experience grant. Zero values keep the historical award
+	// hash and receipt unchanged and never trigger a backfill.
+	VictoryRewardSource     string `gorm:"type:varchar(128);not null;default:''" json:"victoryRewardSource,omitempty"`
+	VictoryRewardLevel      int64  `gorm:"not null;default:0" json:"victoryRewardLevel,omitempty"`
+	VictoryRewardPopularity int64  `gorm:"not null;default:0" json:"victoryRewardPopularity,omitempty"`
+	VictoryRewardExp        int64  `gorm:"not null;default:0" json:"victoryRewardExp,omitempty"`
 }
 
 func (P11ArenaPrizeAward) TableName() string { return "p11_arena_prize_awards" }

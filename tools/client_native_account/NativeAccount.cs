@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using Login;
 using UnityEngine;
 
 namespace HYJS.NativeAccount
@@ -57,6 +58,7 @@ namespace HYJS.NativeAccount
         static readonly Color Ink = new Color(0.19f, 0.28f, 0.33f, 1f);
         static AndroidJavaClass Cache() { return new AndroidJavaClass("com.hyjs.wallet.LoginCache"); }
         static AndroidJavaClass Registration() { return new AndroidJavaClass("com.hyjs.wallet.GameRegistration"); }
+        static AndroidJavaClass AccountLogin() { return new AndroidJavaClass("com.hyjs.wallet.GameAccountLogin"); }
         UIButton Find(string method)
         {
             foreach (UIButton button in owner.GetComponentsInChildren<UIButton>(true))
@@ -236,7 +238,7 @@ namespace HYJS.NativeAccount
                 confirmation.UpdateLabel();
             }
             ApplyTitle();
-            if (loginLabel != null) loginLabel.text = busy ? "注册中…" : registering ? "注册" : "登录";
+            if (loginLabel != null) loginLabel.text = busy ? (registering ? "注册中…" : "登录中…") : registering ? "注册" : "登录";
             if (registerLabel != null) registerLabel.text = registering ? "返回登录" : "注册账号";
             if (login != null) login.isEnabled = !busy;
             if (register != null) register.isEnabled = !busy;
@@ -272,10 +274,16 @@ namespace HYJS.NativeAccount
         void Error(string message) { BoxManager.CreatePopupTextBox(message, 0f); }
         public bool Submit()
         {
-            if (!registering) return false;
             if (busy) return true;
             string name = owner.nameInput.GetComponent<UIInput>().value;
             string password = owner.passWordInput.GetComponent<UIInput>().value;
+            if (!registering)
+            {
+                if (String.IsNullOrEmpty(name) || String.IsNullOrEmpty(password)) { Error("请输入账号和密码"); return true; }
+                busy = true; Apply();
+                using (AndroidJavaClass bridge = AccountLogin()) request = bridge.CallStatic<int>("submitNative", ServerConfig.GetServerUrl(), name, password);
+                StartCoroutine(WaitForLogin(name, password, request)); return true;
+            }
             string confirm = confirmation.value;
             if (!System.Text.RegularExpressions.Regex.IsMatch(name, "^[A-Za-z0-9_-]{3,32}$")) { Error("账号需为3至32位字母、数字、下划线或短横线"); return true; }
             if (password.Length < 6 || System.Text.Encoding.UTF8.GetByteCount(password) > 72) { Error("密码至少6个字符，最多72字节"); return true; }
@@ -283,6 +291,37 @@ namespace HYJS.NativeAccount
             busy = true; Apply();
             using (AndroidJavaClass bridge = Registration()) request = bridge.CallStatic<int>("submitNative", ServerConfig.GetServerUrl(), name, password, confirm);
             StartCoroutine(WaitForRegistration(name, password, request)); return true;
+        }
+        IEnumerator WaitForLogin(string name, string password, int identity)
+        {
+            float deadline = Time.realtimeSinceStartup + 25f;
+            while (busy && identity == request && gameObject.activeInHierarchy)
+            {
+                int state; string message = "";
+                using (AndroidJavaClass bridge = AccountLogin())
+                {
+                    state = bridge.CallStatic<int>("nativeStatus", identity);
+                    if (state == 2) message = bridge.CallStatic<string>("nativeError", identity);
+                }
+                if (state != 0 || Time.realtimeSinceStartup >= deadline)
+                {
+                    bool accepted = false;
+                    using (AndroidJavaClass bridge = AccountLogin())
+                    {
+                        if (state == 1) accepted = bridge.CallStatic<bool>("acceptNative", identity, name, password);
+                        if (!accepted) bridge.CallStatic("cancelNative");
+                    }
+                    busy = false; Apply();
+                    if (!accepted) { Error(message == "" ? "登录未完成，请重试" : message); yield break; }
+                    // Keep the original realm selection and 20009 role login after account authentication.
+                    StaticData.UserName = name; StaticData.PassWord = password;
+                    owner.loginUI.manager.isAuthPassed = true;
+                    owner.gameObject.SetActive(false);
+                    owner.loginUI.manager.SwitchState(LoginState.GetServerList);
+                    yield break;
+                }
+                yield return null;
+            }
         }
         IEnumerator WaitForRegistration(string name, string password, int identity)
         {
@@ -311,6 +350,7 @@ namespace HYJS.NativeAccount
         {
             busy = false; ++request; StopAllCoroutines();
             using (AndroidJavaClass bridge = Registration()) bridge.CallStatic("cancelNative");
+            using (AndroidJavaClass bridge = AccountLogin()) bridge.CallStatic("cancelNative");
             if (confirmation != null) confirmation.value = "";
         }
     }

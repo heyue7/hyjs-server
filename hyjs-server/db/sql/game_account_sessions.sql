@@ -1,0 +1,1 @@
+CREATE TABLE IF NOT EXISTS game_account_sessions (token_hash VARCHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL PRIMARY KEY, account_id BIGINT NOT NULL, auth_revision BIGINT NOT NULL, created_at BIGINT NOT NULL, expires_at BIGINT NOT NULL, KEY game_account_sessions_account (account_id), KEY game_account_sessions_expiry (expires_at)) ENGINE=InnoDB;

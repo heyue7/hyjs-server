@@ -55,6 +55,17 @@ func (s *GameService) welfareAchievementRedPoints(ctx context.Context, tx *gorm.
 			values["vipBoon"] = values["vipBoon"] || item.GetStatus() == 1
 		}
 	}
+	ordinary, e := s.monthSignReadyPoint(tx, id, player, LocalPlayNow(ctx))
+	if e != nil {
+		return nil, e
+	}
+	luxury, e := s.luxurySignStatus(tx, id, LocalPlayNow(ctx))
+	if e != nil {
+		return nil, e
+	}
+	values["dailySignOrdinary"] = ordinary
+	values["dailySignLuxury"] = luxury == 1
+	values["dailySign"] = ordinary || luxury == 1
 	if s.redPointHasTable(tx, &db.P5Achievement{}) {
 		ready, e := s.achievementReady(tx, id, player, game)
 		if e != nil {
@@ -117,7 +128,7 @@ func (s *GameService) welfareAchievementRedPoints(ctx context.Context, tx *gorm.
 		}
 	}
 	out := &pb.SCRedPoint{}
-	keys := []string{"monthCardReward", "vipBoon", "achievement", "totalLogin", "rechargeSingle", "firstRechargeGift", "rechargeTotal", "fightRedNameTimes", "killRedNameTimes", "robTreasureTimes", "pvpWinTimes", "mainCopyWinTimes", "aincradStars", "costTotal", "continuedRecharge", "warriorRescruitTimes", "warriorGetSpecial", "kaiGongActivity", "limitSignOpen", "moonlightRestaurant", "openServerFund", "openServerFundChild", "allPeopleBoon"}
+	keys := []string{"dailySign", "dailySignOrdinary", "dailySignLuxury", "monthCardReward", "vipBoon", "achievement", "totalLogin", "rechargeSingle", "firstRechargeGift", "rechargeTotal", "fightRedNameTimes", "killRedNameTimes", "robTreasureTimes", "pvpWinTimes", "mainCopyWinTimes", "aincradStars", "costTotal", "continuedRecharge", "warriorRescruitTimes", "warriorGetSpecial", "kaiGongActivity", "limitSignOpen", "moonlightRestaurant", "openServerFund", "openServerFundChild", "allPeopleBoon"}
 	for _, key := range keys {
 		value := int32(0)
 		if values[key] {
@@ -135,6 +146,69 @@ func (s *GameService) welfareAchievementRedPoints(ctx context.Context, tx *gorm.
 	}
 	out.RedPointList = append(out.RedPointList, &pb.RedPoint{Type: proto.String("wonderfulActivity"), Value: proto.Int32(activityReady)})
 	return out, nil
+}
+
+// monthSignReadyPoint reads the same calendar and scoped state as the claim path.
+// Polling never creates a sign row, freezes a reward or changes a receipt.
+func (s *GameService) monthSignReadyPoint(tx *gorm.DB, id int64, player *pb.Player, now time.Time) (bool, error) {
+	if !s.redPointHasTable(tx, &db.MonthSignRule{}) || !s.redPointHasTable(tx, &db.MonthSignState{}) || !s.redPointHasTable(tx, &db.MonthSignCalendar{}) {
+		return false, nil
+	}
+	local := now.In(time.FixedZone("UTC+8", 8*3600))
+	month, day := local.Format("2006-01"), local.Format("2006-01-02")
+	calendarDays := time.Date(local.Year(), local.Month()+1, 0, 0, 0, 0, 0, local.Location()).Day()
+	rules, configured, err := monthSignCalendarRules(tx, month)
+	if err != nil {
+		return false, err
+	}
+	if !configured {
+		rules, err = localPlayMonthSignRules(tx)
+		if err != nil {
+			return false, err
+		}
+		if rules == nil {
+			if err = tx.Order("day").Find(&rules).Error; err != nil {
+				return false, err
+			}
+		}
+	}
+	if !validMonthSignRows(rules) {
+		return false, nil
+	}
+	for _, rule := range rules[:calendarDays] {
+		if !rule.Enabled {
+			return false, nil
+		}
+		supported, err := s.openServerRewardSupported(rule.Reward)
+		if err != nil {
+			return false, err
+		}
+		if !supported {
+			return false, nil
+		}
+	}
+	state, err := localPlayMonthSignState(tx, id, month)
+	if err != nil {
+		return false, err
+	}
+	if state == nil {
+		state = &db.MonthSignState{PlayerID: id, Month: month}
+		err = tx.Where("player_id=? AND month=?", id, month).First(state).Error
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			return false, err
+		}
+	}
+	return monthSignStateReadyPoint(state, player.GetVip(), day, int32(calendarDays)), nil
+}
+
+func monthSignStateReadyPoint(state *db.MonthSignState, vip int32, day string, calendarDays int32) bool {
+	if state.Days < 0 || state.Days > calendarDays || state.LastDay > day || (state.Days > 0 && (state.LastDay == "" || state.LastReward == "" || state.LastDoubleVIP < 0)) {
+		return false
+	}
+	if state.LastDay == day {
+		return !state.Doubled && state.LastDoubleVIP > 0 && vip >= state.LastDoubleVIP
+	}
+	return state.Days < calendarDays
 }
 
 func (s *GameService) achievementReady(tx *gorm.DB, id int64, p *pb.Player, g *model.GameState) (bool, error) {
@@ -404,7 +478,7 @@ func welfareAchievementRequestRefresh(request proto.Message, responses []proto.M
 	}
 	refresh := false
 	switch string(request.ProtoReflect().Descriptor().Name()) {
-	case "CSIsCardClaimed", "CSClaimCard", "CSGetVipBoonInfo", "CSGetVipDailyBoonReward", "CSGetVipWeekBoonReward", "CSAchievementList", "CSGetAchievementReward", "CSActivityList", "CSActivityInfo", "CSActivityReward", "CSLoginRewardInfo", "CSGetLoginReward", "CSRewardLimitSignList", "CSReceiveLimitMonthSign", "CSStaminaRefill", "CSStaminaGet", "CSContinuedRechargeInfo", "CSContinuedRechargeReward", "CSOpenServerFundInfo", "CSBuyOpenServerFund", "CSOpenServerFundReward":
+	case "CSRewardMonthSignList", "CSReceiveMonthSign", "CSReceiveLuxurySign", "CSIsCardClaimed", "CSClaimCard", "CSGetVipBoonInfo", "CSGetVipDailyBoonReward", "CSGetVipWeekBoonReward", "CSAchievementList", "CSGetAchievementReward", "CSActivityList", "CSActivityInfo", "CSActivityReward", "CSLoginRewardInfo", "CSGetLoginReward", "CSRewardLimitSignList", "CSReceiveLimitMonthSign", "CSStaminaRefill", "CSStaminaGet", "CSContinuedRechargeInfo", "CSContinuedRechargeReward", "CSOpenServerFundInfo", "CSBuyOpenServerFund", "CSOpenServerFundReward":
 		refresh = true
 	}
 	if !refresh {

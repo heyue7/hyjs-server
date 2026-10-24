@@ -399,6 +399,9 @@ func (s *GameService) ApplyP11ArenaFightPrize(ctx context.Context, tx *gorm.DB, 
 	if err = s.applyP11ArenaRankReward(tx, row, &award); err != nil {
 		return err
 	}
+	if err = s.applyP11ArenaVictoryReward(row, &award, player, game, response); err != nil {
+		return err
+	}
 	boxes, err := json.Marshal(response.BoxList)
 	if err != nil {
 		return err
@@ -565,6 +568,9 @@ func ValidateP11ArenaFightPrizeReceipt(tx *gorm.DB, row *db.P11ArenaFightSettlem
 		}
 	} else if award.RankSource != "" || award.RankBestBefore != 0 || award.RankBestAfter != 0 || award.RankDiamond != 0 {
 		return bad
+	}
+	if err = p11ArenaVictoryRewardFacts(row, &award, expected); err != nil {
+		return err
 	}
 	if !proto.Equal(response.Result, expected) {
 		return bad

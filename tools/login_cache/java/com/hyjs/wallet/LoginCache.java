@@ -116,11 +116,17 @@ public final class LoginCache {
     }
     private static void toast(String message){UI.post(()->{try{Toast.makeText(activity(),message,Toast.LENGTH_SHORT).show();}catch(Exception ignored){}});}
     private static void fail(){boolean wasAutomatic=autoAttempt;autoAttempt=false;suppressed=true;hide();if(wasAutomatic)toast("自动登录未完成，请手动登录");UI.post(()->send(loginOwner,"OnSwitchAccountButtonClick"));}
+    /** Save only credentials accepted by the independent global account login. */
+    public static synchronized void accountAuthenticated(String username,String password){
+        load();transientUser=username;transientPassword=password;
+        if(remember){savedUser=username;savedPassword=password;save();}else clear();
+    }
     /** Only after the authenticated server accepted a password change; system autofill stays under the user's control. */
     public static synchronized void passwordChanged(String username,String password){
         load();
+        if(transientUser.equals(username))transientPassword=password;
         if(remember && savedUser.equals(username)){savedPassword=password;save();}
-        pendingPassword="";transientPassword="";returnPass="";
+        pendingPassword="";returnPass="";
     }
     /** Explicit confirmed logout invalidates pending attempts and every credential source. */
     public static synchronized void logout(){
@@ -128,5 +134,8 @@ public final class LoginCache {
         active=0;++serial;pendingUser="";pendingPassword="";transientUser="";transientPassword="";returnUser="";returnPass="";formUser="";formPass="";formVisible=false;
         clear();hide();
     }
-    public static synchronized void pause(){suppressed=true;autoAttempt=false;active=0;++serial;pendingUser="";pendingPassword="";hide();}
+    public static void pause(){
+        synchronized(LoginCache.class){suppressed=true;autoAttempt=false;active=0;++serial;pendingUser="";pendingPassword="";hide();}
+        GameAccountLogin.clearAccount();
+    }
 }

@@ -18,6 +18,7 @@ import (
 )
 
 func init() {
+	routes.RegisterPostRouter("/game-account/login", wrapper.Wrapper(GameAccountLoginHandler))
 	routes.RegisterPostRouter("/game-account/profile", wrapper.Wrapper(GameAccountProfileHandler))
 	routes.RegisterPostRouter("/game-account/nickname", wrapper.Wrapper(GameAccountNicknameHandler))
 	routes.RegisterPostRouter("/game-account/password", wrapper.Wrapper(GameAccountPasswordHandler))
@@ -35,14 +36,14 @@ func init() {
 // @Router /game-account/logout [post]
 func GameAccountLogoutHandler(c *gin.Context) error {
 	var req model.GameAccountLogoutRequest
-	if c.ShouldBindJSON(&req) != nil || req.PlayerID < 1 || len(req.SessionHex) != 32 {
+	if c.ShouldBindJSON(&req) != nil || !gameAccountCredentialsValid(req.AccountSession, req.PlayerID, req.SessionHex) {
 		return model.NewErrParamsError()
 	}
 	session, err := hex.DecodeString(req.SessionHex)
-	if err != nil || len(session) != 16 {
+	if err != nil || (req.PlayerID > 0 && len(session) != 16) {
 		return model.NewErrParamsError()
 	}
-	out, err := service.LogoutCurrentGlobalGameAccount(c.Request.Context(), req.PlayerID, session)
+	out, err := service.LogoutGlobalGameAccountSession(c.Request.Context(), req.AccountSession, req.PlayerID, session)
 	if err != nil {
 		return err
 	}
@@ -184,14 +185,14 @@ func AdminGameAccountPasswordHandler(c *gin.Context) {
 // @Router /game-account/profile [post]
 func GameAccountProfileHandler(c *gin.Context) error {
 	var req model.GameAccountProfileRequest
-	if c.ShouldBindJSON(&req) != nil || req.PlayerID < 1 || len(req.SessionHex) != 32 {
+	if c.ShouldBindJSON(&req) != nil || !gameAccountCredentialsValid(req.AccountSession, req.PlayerID, req.SessionHex) {
 		return model.NewErrParamsError()
 	}
 	session, err := hex.DecodeString(req.SessionHex)
-	if err != nil || len(session) != 16 {
+	if err != nil || (req.PlayerID > 0 && len(session) != 16) {
 		return model.NewErrParamsError()
 	}
-	out, err := service.CurrentGlobalGameAccount(c.Request.Context(), req.PlayerID, session)
+	out, err := service.CurrentGlobalGameAccountSession(c.Request.Context(), req.AccountSession, req.PlayerID, session)
 	if err != nil {
 		return model.NewErrBizCodeMsg(constUtil.TestPaymentAdapterDenied, err.Error())
 	}
@@ -211,14 +212,14 @@ func GameAccountProfileHandler(c *gin.Context) error {
 // @Router /game-account/nickname [post]
 func GameAccountNicknameHandler(c *gin.Context) error {
 	var req model.GameAccountNicknameRequest
-	if c.ShouldBindJSON(&req) != nil || req.PlayerID < 1 || len(req.SessionHex) != 32 || !gameAccountNicknameValid(req.Nickname) {
+	if c.ShouldBindJSON(&req) != nil || !gameAccountCredentialsValid(req.AccountSession, req.PlayerID, req.SessionHex) || !gameAccountNicknameValid(req.Nickname) {
 		return model.NewErrParamsError()
 	}
 	session, err := hex.DecodeString(req.SessionHex)
-	if err != nil || len(session) != 16 {
+	if err != nil || (req.PlayerID > 0 && len(session) != 16) {
 		return model.NewErrParamsError()
 	}
-	out, err := service.UpdateCurrentGlobalGameAccount(c.Request.Context(), req.PlayerID, session, req.Nickname, "", "")
+	out, err := service.UpdateGlobalGameAccountSession(c.Request.Context(), req.AccountSession, req.PlayerID, session, req.Nickname, "", "")
 	if err != nil {
 		return model.NewErrBizCodeMsg(constUtil.TestPaymentAdapterRejected, err.Error())
 	}
@@ -238,14 +239,14 @@ func GameAccountNicknameHandler(c *gin.Context) error {
 // @Router /game-account/password [post]
 func GameAccountPasswordHandler(c *gin.Context) error {
 	var req model.GameAccountPasswordRequest
-	if c.ShouldBindJSON(&req) != nil || req.PlayerID < 1 || len(req.SessionHex) != 32 || len(req.OldPassword) > constUtil.GameAccountPasswordMaxBytes || !gameAccountPasswordValid(req.Password) || req.Password != req.ConfirmPassword {
+	if c.ShouldBindJSON(&req) != nil || !gameAccountCredentialsValid(req.AccountSession, req.PlayerID, req.SessionHex) || len(req.OldPassword) > constUtil.GameAccountPasswordMaxBytes || !gameAccountPasswordValid(req.Password) || req.Password != req.ConfirmPassword {
 		return model.NewErrParamsError()
 	}
 	session, err := hex.DecodeString(req.SessionHex)
-	if err != nil || len(session) != 16 {
+	if err != nil || (req.PlayerID > 0 && len(session) != 16) {
 		return model.NewErrParamsError()
 	}
-	out, err := service.UpdateCurrentGlobalGameAccount(c.Request.Context(), req.PlayerID, session, "", req.OldPassword, req.Password)
+	out, err := service.UpdateGlobalGameAccountSession(c.Request.Context(), req.AccountSession, req.PlayerID, session, "", req.OldPassword, req.Password)
 	if err != nil {
 		return model.NewErrBizCodeMsg(constUtil.TestPaymentAdapterRejected, err.Error())
 	}
@@ -304,4 +305,41 @@ func gameAccountAdminError(c *gin.Context, err error) {
 		return
 	}
 	adminError(c, err)
+}
+
+func gameAccountCredentialsValid(token string, id int64, session string) bool {
+	if token != "" {
+		raw, e := hex.DecodeString(token)
+		if e != nil || len(raw) != 32 || token != strings.ToLower(token) {
+			return false
+		}
+	}
+	if id == 0 && session == "" {
+		return token != ""
+	}
+	raw, e := hex.DecodeString(session)
+	return id > 0 && e == nil && len(raw) == 16
+}
+
+// GameAccountLoginHandler authenticates an account before selecting a realm.
+// @Summary 登录全局账号
+// @Description 验证账号密码，返回全局账号会话和角色列表，不创建区服角色。
+// @Tags Game
+// @Accept json
+// @Produce json
+// @Param body body model.GameAccountLoginRequest true "账号密码"
+// @Success 200 {object} model.GameAccountLoginResponse
+// @Router /game-account/login [post]
+func GameAccountLoginHandler(c *gin.Context) error {
+	var req model.GameAccountLoginRequest
+	if c.ShouldBindJSON(&req) != nil || len(req.Username) < 1 || len(req.Username) > 1024 || !utf8.ValidString(req.Password) || utf8.RuneCountInString(req.Password) < 6 || utf8.RuneCountInString(req.Password) > 128 || len(req.Password) > constUtil.PasswordCredentialMaxBytes {
+		return model.NewErrParamsError()
+	}
+	out, err := service.LoginGlobalGameAccount(c.Request.Context(), req.Username, req.Password, c.ClientIP())
+	if err != nil {
+		return model.NewErrBizCodeMsg(constUtil.TestPaymentAdapterDenied, err.Error())
+	}
+	c.Header("Cache-Control", "no-store")
+	c.JSON(http.StatusOK, model.NewBizCodeData(out))
+	return nil
 }

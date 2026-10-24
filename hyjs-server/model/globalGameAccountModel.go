@@ -56,21 +56,24 @@ type AdminGameAccountPasswordRequest struct {
 
 // GameAccountProfileRequest authorizes a global identity through the current real role session.
 type GameAccountProfileRequest struct {
-	PlayerID   int64  `json:"playerId" binding:"required"`   // 当前区服的角色编号。
-	SessionHex string `json:"sessionHex" binding:"required"` // 当前角色的16字节会话，以32位十六进制传入。
+	AccountSession string `json:"accountSession"` // 64位全局账号会话，可独立于角色使用。
+	PlayerID       int64  `json:"playerId"`       // 当前区服的角色编号。
+	SessionHex     string `json:"sessionHex"`     // 当前角色的16字节会话，以32位十六进制传入。
 }
 
 // GameAccountNicknameRequest changes only the global nickname.
 type GameAccountNicknameRequest struct {
-	PlayerID   int64  `json:"playerId" binding:"required"`   // 当前区服的角色编号。
-	SessionHex string `json:"sessionHex" binding:"required"` // 当前角色的16字节会话，以32位十六进制传入。
-	Nickname   string `json:"nickname" binding:"required"`   // 全局账号昵称，1至24个可见字符，与角色名独立。
+	AccountSession string `json:"accountSession"`              // 64位全局账号会话，可独立于角色使用。
+	PlayerID       int64  `json:"playerId"`                    // 当前区服的角色编号。
+	SessionHex     string `json:"sessionHex"`                  // 当前角色的16字节会话，以32位十六进制传入。
+	Nickname       string `json:"nickname" binding:"required"` // 全局账号昵称，1至24个可见字符，与角色名独立。
 }
 
 // GameAccountPasswordRequest verifies the old password before changing the global credential.
 type GameAccountPasswordRequest struct {
-	PlayerID        int64  `json:"playerId" binding:"required"`        // 当前区服的角色编号。
-	SessionHex      string `json:"sessionHex" binding:"required"`      // 当前角色的16字节会话，以32位十六进制传入。
+	AccountSession  string `json:"accountSession"`                     // 64位全局账号会话，可独立于角色使用。
+	PlayerID        int64  `json:"playerId"`                           // 当前区服的角色编号。
+	SessionHex      string `json:"sessionHex"`                         // 当前角色的16字节会话，以32位十六进制传入。
 	OldPassword     string `json:"oldPassword" binding:"required"`     // 用户当前原密码，只用于验证，不保存明文。
 	Password        string `json:"password" binding:"required"`        // 新密码，至少6字符且最多72字节，绝不返回。
 	ConfirmPassword string `json:"confirmPassword" binding:"required"` // 与新密码完全相同的确认值。
@@ -78,11 +81,24 @@ type GameAccountPasswordRequest struct {
 
 // GameAccountLogoutRequest releases the current role session of a Brain Burst 2039 account.
 type GameAccountLogoutRequest struct {
-	PlayerID   int64  `json:"playerId" binding:"required"`   // 当前区服的角色编号。
-	SessionHex string `json:"sessionHex" binding:"required"` // 当前会话的32位十六进制值。
+	AccountSession string `json:"accountSession"` // 64位全局账号会话，可独立于角色使用。
+	PlayerID       int64  `json:"playerId"`       // 当前区服的角色编号。
+	SessionHex     string `json:"sessionHex"`     // 当前会话的32位十六进制值。
 }
 
 // GameAccountLogoutResponse also acknowledges a session already released by a retry.
 type GameAccountLogoutResponse struct {
 	LoggedOut bool `json:"loggedOut"` // true表示客户端可以清除当前登录状态。
+}
+
+// GameAccountLoginRequest authenticates the account before a realm is selected.
+type GameAccountLoginRequest struct {
+	Username string `json:"username" binding:"required"` // 全局登录账号。
+	Password string `json:"password" binding:"required"` // 登录密码。
+}
+
+// GameAccountLoginResponse returns the one-time plain token and public account projection.
+type GameAccountLoginResponse struct {
+	AccountSession string         `json:"accountSession"` // 仅客户端内存保存的全局会话。
+	Account        GameAccountDTO `json:"account"`        // 全局账号及完整角色索引。
 }

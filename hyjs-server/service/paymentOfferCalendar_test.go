@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"google.golang.org/protobuf/proto"
+	"hyjs-server/constUtil"
 	"hyjs-server/db"
 	"hyjs-server/model"
 	pb "hyjs-server/model/protocol"
@@ -19,6 +20,19 @@ func TestLocalPlayPaymentOfferAsOfConfirmedTime(t *testing.T) {
 	p3DemoProviderFund(t, f, id, "offer-as-of", 28800)
 	local := time.Now().In(time.FixedZone("UTC+8", 8*3600))
 	paidAt := local.Add(-2 * time.Second)
+	// This test opts into a configured daily reward; production keeps missing rewards closed.
+	tx := db.GetIns().WithContext(ctx)
+	if err := tx.AutoMigrate(&db.ActivityRules{}, &db.ActivityReward{}); err != nil {
+		t.Fatal(err)
+	}
+	for _, row := range []any{
+		&db.ActivityRules{ID: constUtil.P3LuxurySignActivityID, Enabled: true, StartAt: paidAt.Add(-2 * time.Hour).UnixMilli(), EndAt: paidAt.Add(2 * time.Hour).UnixMilli(), RewardEndAt: paidAt.Add(2 * time.Hour).UnixMilli(), Source: "isolated as-of payment test"},
+		&db.ActivityReward{ActivityID: constUtil.P3LuxurySignActivityID, RewardType: constUtil.P3LuxurySignRewardType, Reward: "coin,1"},
+	} {
+		if err := tx.Create(row).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
 	// 隔离历史通关资格沿现有神装测试；不声称自然打通原6-1。
 	if err := updateProfile(ctx, id, func(p *pb.Player, g *model.GameState) error {
 		g.Copy.PassedCopyInfo = append(g.Copy.PassedCopyInfo, &pb.CopySimpleInfo{ChapterId: proto.String("6"), MissionId: proto.String("30"), Star: proto.Int32(5)})
