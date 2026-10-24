@@ -1,0 +1,20 @@
+{
+  "readOnly": true,
+  "deleted": false,
+  "candidates": [
+    {
+      "path": "/Users/lirui/LR/hyjs/apks/build/hyjs-brain-burst-2039-candidate.apk",
+      "bytes": 683640057,
+      "decision": "safe_delete",
+      "sha256": "43b09115f2d90560c4661d3fe7d15a6056ec4d3588651effd74f6fde7a245a87",
+      "basis": "67前未安装未晋升候选；67正式r5已替代；独立inode；plans/20261025-brain-burst-2039.md及67记录"
+    },
+    {
+      "path": "/Users/lirui/LR/hyjs/build/hyjs-server",
+      "bytes": 58255890,
+      "decision": "conditional_delete",
+      "sha256": "6fbda836569285b7c43190866070173baf7529cbcb34ab2da22c95aaee86e0cc",
+      "basis": "非当前67部署二进制；无进程/容器引用；deploy/deploy.py从源码独立构建。删除前主代理确认无必要本地回退用途。"
+    }
+  ]
+}
