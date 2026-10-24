@@ -2,7 +2,9 @@ package main
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/binary"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -191,5 +193,63 @@ func TestBackupSealPrivateFiles(t *testing.T) {
 	}
 	if err := run(plain, filepath.Join(dir, "unsafe"), key, false); err == nil {
 		t.Fatal("public key permissions accepted")
+	}
+}
+
+func TestVerifyBackupWithoutPlaintextCopy(t *testing.T) {
+	dir := t.TempDir()
+	key := bytes.Repeat([]byte{3}, 32)
+	keyPath, input := filepath.Join(dir, "key"), filepath.Join(dir, "sealed")
+	if err := os.WriteFile(keyPath, key, 0600); err != nil {
+		t.Fatal(err)
+	}
+	raw := bytes.Repeat([]byte("private compressed snapshot"), streamChunk/20)
+	wanted := fmt.Sprintf("%x", sha256.Sum256(raw))
+	for _, legacy := range []bool{false, true} {
+		var sealed []byte
+		if legacy {
+			var err error
+			sealed, err = transform(raw, key, false)
+			if err != nil {
+				t.Fatal(err)
+			}
+		} else {
+			var out bytes.Buffer
+			if err := streamTransform(bytes.NewReader(raw), &out, key, false); err != nil {
+				t.Fatal(err)
+			}
+			sealed = out.Bytes()
+		}
+		if err := os.WriteFile(input, sealed, 0600); err != nil {
+			t.Fatal(err)
+		}
+		if err := verify(input, keyPath, wanted); err != nil {
+			t.Fatal("valid snapshot", legacy, err)
+		}
+		if err := verify(input, keyPath, fmt.Sprintf("%x", sha256.Sum256([]byte("wrong")))); err == nil {
+			t.Fatal("wrong digest accepted")
+		}
+		for _, changed := range [][]byte{sealed[:len(sealed)-1], append(append([]byte(nil), sealed...), 1)} {
+			os.WriteFile(input, changed, 0600)
+			if err := verify(input, keyPath, wanted); err == nil {
+				t.Fatal("invalid EOF accepted")
+			}
+		}
+		sealed[32] ^= 1
+		os.WriteFile(input, sealed, 0600)
+		if err := verify(input, keyPath, wanted); err == nil {
+			t.Fatal("tampered record accepted")
+		}
+	}
+	if err := verify(input, keyPath, "bad"); err == nil {
+		t.Fatal("malformed digest accepted")
+	}
+	os.Chmod(keyPath, 0644)
+	if err := verify(input, keyPath, wanted); err == nil {
+		t.Fatal("unsafe key accepted")
+	}
+	files, err := os.ReadDir(dir)
+	if err != nil || len(files) != 2 {
+		t.Fatal("verification created a plaintext file", err)
 	}
 }

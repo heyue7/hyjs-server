@@ -113,7 +113,7 @@ const columns: DataTableColumns<MailBatch> = [
     <div class="ops-filters">
       <ContextHelp
         title="发送范围"
-        text="仅向当前所选区服、预览时冻结的角色发送游戏内邮件。可选全部玩家（跨分页）或勾选部分玩家；冻结账号和保护账号自动排除，预览后新建角色不追加。邮件只写入游戏内邮箱，不创建领奖中心附件。预览15分钟有效，失败重试沿用原批次。"
+        text="仅向当前所选区服、预览时冻结的角色发送游戏内邮件。可选全部玩家（跨分页）或勾选部分玩家；冻结账号和保护账号自动排除。邮件只写入游戏内邮箱，不创建领奖中心附件。预览15分钟有效，失败重试沿用原批次。"
       />
       <NSpace :size="8">
         <NButton :loading="loading" @click="load">刷新</NButton>
@@ -148,6 +148,7 @@ const columns: DataTableColumns<MailBatch> = [
         <div class="mail-reason"><span>操作原因</span><p>{{ batch.reason }}</p></div>
         <NAlert v-if="stage === 'preview' && batch.recipientCount < 1" type="warning" title="当前没有可发送的角色，本批次不能发送。" />
         <NAlert v-else-if="stage === 'preview'" type="info" title="确认后只写入游戏内邮箱，不会创建领奖中心附件。" />
+        <p v-if="stage === 'preview'" class="ops-muted">收件角色已按本次预览固定，之后新建的角色不追加；失败时请重试原批次。</p>
         <NCheckbox v-if="stage === 'preview'" v-model:checked="confirmed" :disabled="busy || batch.recipientCount < 1">确认向以上 {{ batch.recipientCount }} 个角色发送同一封邮件。</NCheckbox>
       </template>
       <template #footer><div class="ops-drawer-actions">

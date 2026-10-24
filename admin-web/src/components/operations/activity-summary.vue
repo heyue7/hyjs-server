@@ -42,7 +42,6 @@ function minuteText(value: number) { return value === 1440 ? '24:00' : `${String
         <NDescriptionsItem v-if="!hideSchedule" label="领奖截止">{{ formatTime(form.claimEndAt) }}</NDescriptionsItem>
 
       </NDescriptions>
-      <details v-if="form.source" class="activity-source"><summary>配置来源与备注</summary><p>{{ form.source }}</p></details>
     </section>
     <section v-if="rows.length" class="activity-summary-section">
       <h3>商品与兑换项目 <span class="ops-muted">{{ rows.length }} 项</span></h3>
@@ -82,7 +81,7 @@ function minuteText(value: number) { return value === 1440 ? '24:00' : `${String
     <section v-if="hasRules" class="activity-summary-section">
       <h3>规则与额外奖励</h3>
       <NDescriptions :column="2" label-placement="top">
-        <NDescriptionsItem v-for="(value, key) in mode?.fixedValues || {}" :key="key" :label="activityFixedLabels[String(key)] || '原版固定规则'">{{ typeof value === 'number' ? value.toLocaleString() : value }}</NDescriptionsItem>
+        <NDescriptionsItem v-for="(value, key) in mode?.fixedValues || {}" :key="key" :label="activityFixedLabels[String(key)] || '固定规则'">{{ typeof value === 'number' ? value.toLocaleString() : value }}</NDescriptionsItem>
         <NDescriptionsItem v-if="form.mode === 'power-race'" label="排名奖励范围">{{ options.rankPlaces ? `前 ${options.rankPlaces} 名，同档奖励` : '不发排名奖励' }}</NDescriptionsItem>
         <template v-for="field in numberFields" :key="field[0]">
           <NDescriptionsItem v-if="options[field[0]] !== undefined" :label="field[1]">{{ Number(options[field[0]]).toLocaleString() }}</NDescriptionsItem>
@@ -105,13 +104,9 @@ function minuteText(value: number) { return value === 1440 ? '24:00' : `${String
 </template>
 
 <style scoped>
-.activity-source { margin-top: 14px; color: rgb(var(--base-text-color) / .65); font-size: 13px; }
-.activity-source summary { cursor: pointer; }
-.activity-source p { line-height: 1.7; overflow-wrap: anywhere; }
-
 .activity-summary-section + .activity-summary-section { margin-top: 20px; padding-top: 16px; border-top: 1px solid rgb(var(--base-text-color) / .09); }
 .activity-summary h3 { margin: 0 0 12px; font-size: 17px; font-weight: 600; }
-.activity-summary h4 { display: flex; align-items: center; gap: 10px; margin: 0 0 10px; font-size: 14px; font-weight: 600; }
+.activity-summary h4 { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 0 0 10px; font-size: 14px; font-weight: 600; }
 .activity-summary h3 span { margin-left: 8px; font-size: 13px; font-weight: 400; }
 .activity-summary-entry { padding: 12px 0; }
 .activity-summary-entry + .activity-summary-entry { border-top: 1px solid rgb(var(--base-text-color) / .07); }

@@ -138,9 +138,11 @@ const columns: DataTableColumns<GamePlayer> = [
 </template>
 
 <style scoped>
-.audience-select { display: flex; flex-direction: column; gap: 10px; }
+.audience-select { display: flex; flex-direction: column; gap: 10px; width: 100%; min-width: 0; }
 .audience-hint { margin: 0; color: rgb(var(--base-text-color) / .65); font-size: 13px; line-height: 1.6; }
 .audience-toolbar { display: flex; gap: 8px; }
+.audience-toolbar :deep(.n-input) { flex: 1; min-width: 0; }
+.audience-toolbar > .n-button { flex-shrink: 0; }
 .audience-summary { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; color: rgb(var(--base-text-color) / .75); font-size: 13px; }
 .audience-summary strong { color: rgb(var(--base-text-color)); }
 .audience-pagination { display: flex; justify-content: flex-end; max-width: 100%; overflow-x: auto; }

@@ -6,7 +6,7 @@ import { NButton, NSpace, NTag } from 'naive-ui';
 import type { DataTableColumns, DialogReactive } from 'naive-ui';
 import { api, errorMessage, json } from '@/service/operations';
 import type { ActivityDefinition } from '@/service/activity-schedules';
-import { activityCopyAlias, activityFormName, activityRepeatLabel, activityRepeatPolicy, deleteActivityTemplate, newActivityForm, normalizeActivityForm } from '@/service/activity-operations';
+import { activityCopyAlias, formatActivityModeNotes, activityFormName, activityRepeatLabel, activityRepeatPolicy, deleteActivityTemplate, newActivityForm, normalizeActivityForm } from '@/service/activity-operations';
 import type { ActivityForm, ActivityMode } from '@/service/activity-operations';
 import { useOperations } from '@/composables/useOperations';
 import ActivityProducts from './activity-products.vue';
@@ -328,7 +328,7 @@ const columns = computed<DataTableColumns<ActivityDefinition>>(() => [
     width: 300,
     fixed: 'right',
     render: row =>
-      h(NSpace, { size: 6 }, () => [
+      h('div', { class: 'ops-table-actions' }, [
         h(NButton, { size: 'small', disabled: busy.value, 'aria-label': `查看${definitionName(row)}`, onClick: () => openEditor(row, true) }, () => '查看'),
         canWrite.value && modeMap.value.has(row.mode)
           ? h(NButton, { size: 'small', disabled: busy.value, 'aria-label': `编辑${definitionName(row)}`, onClick: () => openEditor(row) }, () => '编辑')
@@ -437,7 +437,7 @@ onUnmounted(() => {
                 <NInput v-model:value="form.alias" :maxlength="80" clearable placeholder="仅后台列表与排期显示，不改游戏内名称" />
               </NFormItem>
               <NFormItem required>
-                <template #label><span class="ops-field-label">活动模式<ContextHelp v-if="selectedMode?.notes" title="活动模式说明" :text="selectedMode.notes" /></span></template>
+                <template #label><span class="ops-field-label">活动模式<ContextHelp v-if="formatActivityModeNotes(selectedMode)" title="活动模式说明" :text="formatActivityModeNotes(selectedMode)" /></span></template>
                 <NSelect
                   :value="form.mode"
                   :options="modeOptions"
@@ -473,9 +473,6 @@ onUnmounted(() => {
               <NFormItem label="允许新增排期">
                 <NSwitch v-model:value="enabled" />
                 <span class="ops-muted ml-12px">关闭后不能新增排期，已发布活动不变</span>
-              </NFormItem>
-              <NFormItem label="运营备注">
-                <NInput v-model:value="form.source" type="textarea" :maxlength="1000" />
               </NFormItem>
             </template>
             <template v-if="activeSection === 'content'">
@@ -546,7 +543,7 @@ onUnmounted(() => {
         </NCard>
       </div>
       <div class="template-footer">
-        <span class="ops-muted">{{ dirty ? '未保存' : '开放日期在活动排期中设置' }}</span>
+        <span class="ops-muted">{{ dirty ? '未保存 · ' : '' }}修改用于新排期，已发布活动不变。</span>
         <NSpace>
           <NButton v-if="canWrite && selected" quaternary type="error" :disabled="busy" :loading="deletingId === selected.id" @click="requestDelete(selected)">删除模板</NButton>
           <NButton :disabled="busy" @click="close">{{ inline ? '取消' : '返回' }}</NButton>

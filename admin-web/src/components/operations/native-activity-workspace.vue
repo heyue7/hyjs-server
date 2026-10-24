@@ -13,7 +13,6 @@ import ActivityMilestones from './activity-milestones.vue';
 import RewardList from './reward-list.vue';
 import ResourceSelect from './resource-select.vue';
 import RecruitSettings from './recruit-settings.vue';
-import ContextHelp from './context-help.vue';
 import DailySign from '@/views/daily-sign/index.vue';
 import LuxurySignSettings from './luxury-sign-settings.vue';
 
@@ -205,7 +204,7 @@ const columns = computed<DataTableColumns<NativeActivity>>(() => [
     width: 150,
     fixed: 'right',
     render: row =>
-      h(NSpace, { size: 4 }, () => [
+      h('div', { class: 'ops-table-actions' }, [
         h(NButton, { size: 'small', secondary: true, disabled: busy.value, 'aria-label': `配置${row.name}`, onClick: () => openRow(row) }, () => '配置'),
         canWrite.value && !row.enabled && !row.permanent
           ? h(NButton, { size: 'small', quaternary: true, type: 'error', loading: removingId.value === row.id, disabled: busy.value, 'aria-label': `移除${row.name}`, onClick: () => requestRemove(row) }, () => '移除')
@@ -213,6 +212,25 @@ const columns = computed<DataTableColumns<NativeActivity>>(() => [
       ])
   }
 ]);
+
+const activityNotes: Record<string, string> = {
+  'vip-benefits': '需有已确认订单且VIP大于0；每日与每周领取周期保留。关闭后停止领取。',
+  'first-double': '仅可调整启停和后台别名；首单资格、已生成订单与终身领取记录保留。',
+  fund: '包含全民福利；已领取档位保留，未领取档位使用新配置。',
+  'payment-first': '金额单位为人民币分；修改用于首次参与的玩家，已参与玩家保留原规则与领取记录。',
+  'payment-single': '金额单位为人民币分；修改用于首次参与的玩家，已参与玩家保留原规则与领取记录。',
+  'payment-total': '金额单位为人民币分；修改用于首次参与的玩家，已参与玩家保留原规则与领取记录。',
+  'payment-continued': '连充按天数计算；修改用于首次参与的玩家，已参与玩家保留原规则与领取记录。',
+  'payment-consume': '累计消费按钻石计算；修改用于首次参与的玩家，已参与玩家保留原规则与领取记录。',
+  'month-card': '修改用于新订单，已确认与待支付订单的价格及奖励保留。',
+  'permanent-card': '修改用于新订单，已确认与待支付订单的价格及奖励保留。',
+  'copy-benefits': '未冻结时保存即生效，冻结后仅可调整启停和后台别名。',
+  'recruit-rotation': '奖池、每日次数与保底用于橙卡招募，费用、免费冷却与已有进度保留；轮换冻结后仅可调整启停、别名及全局招募规则。',
+  celebration: '按本期累计进度与领奖周期执行，冻结后仅可调整启停和后台别名。',
+  festival: '子活动类型固定，父子开放时间一致，全部配置完整后可启用。父或任一子活动冻结后仅可调整启停和别名；父子启停同步。',
+  update: '子活动类型固定，父子开放时间一致，全部配置完整后可启用。父或任一子活动冻结后仅可调整启停和别名；父子启停同步。'
+};
+const selectedNote = computed(() => selected.value ? activityNotes[selected.value.kind] || selected.value.note : '');
 
 function kindLabel(kind: string) {
   return kindLabels[kind] || kind;
@@ -489,12 +507,6 @@ defineExpose({ beforeLeave: leaveWorkspace, confirmDiscard, dirty, saving });
             <NTag :bordered="false" :type="selected.enabled ? 'success' : 'default'">{{ selected.enabled ? '已启用' : '已停用' }}</NTag>
             <NTag v-if="selected.permanent" :bordered="false">常驻开放</NTag>
             <NTag v-if="selected.frozen && !['first-double'].includes(selected.kind)" :bordered="false" type="warning">规则冻结</NTag>
-            <ContextHelp
-              v-if="selected.note"
-              icon-only
-              :title="`${selected.name}说明`"
-              :text="selected.note"
-            />
           </NSpace>
           <div class="qualification-line native-enable">
             <span>活动启用</span>
@@ -596,6 +608,7 @@ defineExpose({ beforeLeave: leaveWorkspace, confirmDiscard, dirty, saving });
         </NForm>
         </template>
         <template v-if="!isDailySign" #footer>
+          <p v-if="selectedNote" class="native-save-note">{{ selectedNote }}</p>
           <div class="ops-drawer-actions">
             <span class="ops-muted">{{ saving ? '正在保存…' : dirty ? '有尚未保存的修改' : '配置已载入' }}</span>
             <NButton :disabled="saving" @click="closeDrawer">取消</NButton>
@@ -609,7 +622,7 @@ defineExpose({ beforeLeave: leaveWorkspace, confirmDiscard, dirty, saving });
 
 <style scoped>
 .native-count { margin-left: auto; font-variant-numeric: tabular-nums; }
-.native-kind-period { display: flex; flex-direction: column; gap: 2px; font-variant-numeric: tabular-nums; }
+:deep(.native-kind-period) { display: flex; flex-direction: column; gap: 2px; font-variant-numeric: tabular-nums; }
 .native-drawer-head {
   display: flex;
   align-items: center;
@@ -622,6 +635,7 @@ defineExpose({ beforeLeave: leaveWorkspace, confirmDiscard, dirty, saving });
 }
 .native-enable { margin: 0; gap: 12px; }
 .native-enable span { color: rgb(var(--base-text-color) / .65); font-size: 13px; }
+.native-save-note { margin: 0 0 12px; line-height: 1.6; overflow-wrap: anywhere; color: rgb(var(--base-text-color) / .65); font-size: 13px; }
 .native-recruit-rules { margin-bottom: 24px; }
 .native-section-label {
   margin: 4px 0 16px;

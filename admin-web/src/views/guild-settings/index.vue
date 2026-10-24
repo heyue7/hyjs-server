@@ -274,7 +274,6 @@ function reset() {
                 <NFormItem label="开放公会聊天">
                   <NSwitch v-model:value="form.policies.guild.chatEnabled" />
                 </NFormItem>
-                <ContextHelp title="公会配置来源" :text="form.policies.guild.source" />
               </NForm>
             </NCard>
 
@@ -334,7 +333,7 @@ function reset() {
                 <NFormItem label="开放场内文字">
                   <NSwitch v-model:value="form.policies.unionFight.chat.textEnabled" />
                 </NFormItem>
-                <NFormItem label="开放原十八条指挥">
+                <NFormItem label="开放十八条指挥">
                   <NSwitch v-model:value="form.policies.unionFight.chat.talkEnabled" />
                 </NFormItem>
                 <NFormItem label="指挥冷却（毫秒）">
@@ -356,7 +355,6 @@ function reset() {
                 <NFormItem label="位置容差">
                   <NInputNumber v-model:value="form.policies.unionFight.field.moveTolerance" :min="0" :max="50" />
                 </NFormItem>
-                <details class="ops-help"><summary>场景来源记录</summary><NInput v-model:value="form.policies.unionFight.field.source" :disabled="!canWrite || saving" type="textarea" :autosize="{ minRows: 2, maxRows: 4 }" /></details>
               </NForm>
             </NCard>
 

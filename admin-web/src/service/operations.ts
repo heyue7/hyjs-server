@@ -112,6 +112,8 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
 }
 export const json = (method: string, body: unknown): RequestInit => ({ method, body: JSON.stringify(body) });
 export function errorMessage(error: unknown) {
+  if (error instanceof TypeError && error.message === 'Failed to fetch')
+    return '网络连接异常，未能确认操作结果。请检查连接后重试。';
   return error instanceof Error ? error.message : '操作失败，请重试';
 }
 export function formatTime(value: number | string | undefined) {

@@ -204,8 +204,9 @@ onMounted(load);
     @back="back"
     @save="save"
   >
-    <template #title-extra><ContextHelp v-if="draft" title="称号配置说明" :text="`称号编号：${draft.id}\n条件和属性仅影响新获得的称号，已持有称号保持原属性和到期时间。`" /></template>
+    <template #title-extra><ContextHelp v-if="draft" title="称号配置说明" :text="`称号编号：${draft.id}`" /></template>
     <template v-if="!draft" #actions><NButton :loading="loading" @click="load">刷新</NButton></template>
+    <template #status>仅影响新获得的称号；已持有称号的属性和到期时间保留。</template>
     <template #alert><NAlert v-if="error || saveError" type="error" :title="saveError || error" /></template>
     <NCard v-if="!draft" :bordered="false" class="ops-panel">
       <div class="ops-filters">
@@ -238,7 +239,6 @@ onMounted(load);
         </NFormItem>
         <div class="title-requirement"><span class="ops-muted">获得条件</span><p>{{ currentRequirement }}</p></div>
         <p v-if="seasonal" class="ops-inline-note">赛季结果确认后发放。</p>
-        <p class="ops-inline-note">修改仅影响新获得的称号，已持有称号保持原属性和期限。</p>
       </section>
       <section v-show="section === 'effects'">
         <NAlert
@@ -303,7 +303,7 @@ onMounted(load);
 </template>
 
 <style scoped>
-.title-list-art { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; padding-block: 6px; }
+:deep(.title-list-art) { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; padding-block: 6px; }
 .title-art-preview { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; margin-bottom: 20px; }
 .title-art-preview :deep(img) { max-width: min(100%, 360px); }
 .title-target-field :deep(.n-input-number) { width: min(100%, 320px); }

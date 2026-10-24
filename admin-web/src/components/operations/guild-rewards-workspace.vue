@@ -15,6 +15,9 @@ const open = ref(false);
 const draft = ref(emptyGuildReward('settlement'));
 const original = ref('');
 const create = ref(false);
+// Exact backend publication marker; operator-entered or unknown sources remain editable.
+const internalSettlementSource = 'local-published-zero-fight-settlement-v1: original timed zero-kill/simultaneous tie lower frozen total power; no combat intent/audit/P6/current HP change; explicit archived/local reward publication; original day2330 inbox; equal power/withdrawal/absent side unresolved';
+const internalSettlementPublication = computed(() => !create.value && draft.value.kind === 'settlement' && draft.value.source === internalSettlementSource);
 const reason = ref('');
 const saveError = ref('');
 const saving = ref(false);
@@ -90,7 +93,7 @@ defineExpose({ hasUnsavedChanges: () => dirty.value, discardChanges: () => { ope
             <NFormItem label="启用"><NSwitch v-model:value="draft.enabled" /></NFormItem>
             <NFormItem label="版本名称"><NInput v-model:value="draft.version" maxlength="64" /></NFormItem>
           </div>
-          <NFormItem label="发布依据"><NInput v-model:value="draft.source" type="textarea" maxlength="2048" /></NFormItem>
+          <NFormItem v-if="!internalSettlementPublication" label="发布依据"><NInput v-model:value="draft.source" type="textarea" maxlength="2048" /></NFormItem>
           <template v-if="draft.kind === 'settlement'">
             <NFormItem label="参与奖励"><RewardList v-model:value="draft.participationRewards" :disabled="locked" /></NFormItem>
             <NFormItem label="胜利奖励"><RewardList v-model:value="draft.victoryRewards" :disabled="locked" /></NFormItem>
@@ -128,6 +131,7 @@ defineExpose({ hasUnsavedChanges: () => dirty.value, discardChanges: () => { ope
         </NForm>
         <NAlert v-if="saveError" type="error">{{ saveError }}</NAlert>
         <template #footer>
+          <p v-if="internalSettlementPublication" class="settlement-rules">当前仅支持无战斗记录、无击杀或死亡、生命未变化的到时结算，双方均须有人实际入场。比赛结束后，开战前冻结的报名总战力较低方胜出。奖励按本场开战前发布的奖档，于比赛当日北京时间 23:30 起通过邮件发放。同战力、撤回或一方缺席的胜负规则尚未确定，暂不结算。</p>
           <NSpace justify="end"><NButton :disabled="saving" @click="close">关闭</NButton><NButton v-if="draft.editable && canWrite" type="primary" :loading="saving" :disabled="!dirty" @click="save">保存本项</NButton></NSpace>
         </template>
       </NDrawerContent>
@@ -138,6 +142,7 @@ defineExpose({ hasUnsavedChanges: () => dirty.value, discardChanges: () => { ope
 <style scoped>
 .guild-rewards { display: flex; flex-direction: column; gap: 16px; }
 .reward-kind { width: 180px; }
+.settlement-rules { margin: 0 0 12px; font-size: 13px; line-height: 1.7; color: rgb(var(--base-text-color) / .65); overflow-wrap: anywhere; }
 .mission-list { width: 100%; }
 .reward-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 0 20px; }
 .rank-line { padding: 16px 0; border-bottom: 1px solid var(--n-border-color); }

@@ -98,6 +98,8 @@ const numberFields = [
 }
 .member-level {
   display: flex;
+  flex-wrap: wrap;
+  max-width: 100%;
   align-items: center;
   gap: 6px;
   margin-left: auto;
@@ -120,14 +122,15 @@ const numberFields = [
   color: #4b5563;
   font-size: 12px;
 }
-.dark .combat-member {
+:global(.dark) .combat-member {
   border-color: #374151;
   background: #1f2937;
 }
-.dark .member-title span,
-.dark .member-grid label,
-.dark .member-level,
-.dark .level-hint {
+:global(.dark) .member-title span,
+:global(.dark) .member-grid label,
+:global(.dark) .member-level,
+:global(.dark) .level-hint {
   color: #9ca3af;
 }
+@media (max-width: 600px) { .member-level { margin-left: 0; } .member-grid { grid-template-columns: minmax(0, 1fr); } }
 </style>

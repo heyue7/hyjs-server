@@ -6,7 +6,9 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/binary"
+	"encoding/hex"
 	"errors"
 	"flag"
 	"fmt"
@@ -169,28 +171,7 @@ func run(inputPath, outputPath, keyPath string, decrypt bool) error {
 		}
 	}()
 	if decrypt {
-		var magic [8]byte
-		if _, err = io.ReadFull(file, magic[:]); err != nil {
-			return errors.New("invalid encrypted backup")
-		}
-		if _, err = file.Seek(0, io.SeekStart); err != nil {
-			return err
-		}
-		if string(magic[:]) == "HYJSBK01" {
-			// Existing authenticated backups remain readable; new writes stream.
-			const maximum = 256*1024*1024 + 64
-			raw, e := io.ReadAll(io.LimitReader(file, maximum+1))
-			if e != nil || len(raw) > maximum {
-				return errors.New("invalid legacy backup size")
-			}
-			opened, e := transform(raw, key, true)
-			if e != nil {
-				return errors.New("backup authentication failed")
-			}
-			_, err = destination.Write(opened)
-		} else {
-			err = streamTransform(file, destination, key, true)
-		}
+		err = decryptBackup(file, destination, key)
 	} else {
 		err = streamTransform(file, destination, key, false)
 	}
@@ -207,13 +188,81 @@ func run(inputPath, outputPath, keyPath string, decrypt bool) error {
 	return nil
 }
 
+// Verification authenticates every record and EOF before comparing the original
+// compressed snapshot digest, without writing another plaintext copy.
+func decryptBackup(file *os.File, output io.Writer, key []byte) error {
+	var magic [8]byte
+	if _, err := io.ReadFull(file, magic[:]); err != nil {
+		return errors.New("invalid encrypted backup")
+	}
+	if _, err := file.Seek(0, io.SeekStart); err != nil {
+		return err
+	}
+	if string(magic[:]) != "HYJSBK01" {
+		return streamTransform(file, output, key, true)
+	}
+	const maximum = 256*1024*1024 + 64
+	raw, err := io.ReadAll(io.LimitReader(file, maximum+1))
+	if err != nil || len(raw) > maximum {
+		return errors.New("invalid legacy backup size")
+	}
+	opened, err := transform(raw, key, true)
+	if err != nil {
+		return errors.New("backup authentication failed")
+	}
+	_, err = output.Write(opened)
+	return err
+}
+
+func verify(inputPath, keyPath, expected string) error {
+	wanted, err := hex.DecodeString(expected)
+	if err != nil || len(wanted) != sha256.Size {
+		return errors.New("verify-sha256 must be a SHA256 digest")
+	}
+	info, err := os.Lstat(keyPath)
+	if err != nil {
+		return err
+	}
+	if !info.Mode().IsRegular() || info.Mode().Perm() != 0600 || info.Size() != 32 {
+		return errors.New("key must be a private 32-byte regular file")
+	}
+	key, err := os.ReadFile(keyPath)
+	if err != nil {
+		return err
+	}
+	file, err := os.Open(inputPath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	digest := sha256.New()
+	if err := decryptBackup(file, digest, key); err != nil {
+		return err
+	}
+	if !bytes.Equal(digest.Sum(nil), wanted) {
+		return errors.New("verified backup digest differs from original snapshot")
+	}
+	return nil
+}
+
 func main() {
 	input := flag.String("input", "", "owned input file")
 	output := flag.String("output", "", "new output file")
 	key := flag.String("key-file", "", "private 32-byte key file")
 	decrypt := flag.Bool("decrypt", false, "authenticate and decrypt without restoring a database")
+	verifySHA := flag.String("verify-sha256", "", "authenticate without writing plaintext and compare its SHA256")
 	flag.Parse()
-	if err := run(*input, *output, *key, *decrypt); err != nil {
+	var err error
+	if *verifySHA != "" {
+		if *output != "" || *decrypt {
+			err = errors.New("verify-sha256 cannot be combined with output or decrypt")
+		} else {
+			err = verify(*input, *key, *verifySHA)
+		}
+	} else {
+		err = run(*input, *output, *key, *decrypt)
+	}
+	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}

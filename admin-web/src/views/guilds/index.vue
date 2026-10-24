@@ -1,6 +1,6 @@
 <script setup lang="ts">
+import { useWindowSize } from '@vueuse/core';
 import { useDraftGuard } from '@/composables/useDraftGuard';
-import ContextHelp from '@/components/operations/context-help.vue';
 import { computed, h, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { onBeforeRouteLeave } from 'vue-router';
 import { NButton, NInput, NInputNumber, NSelect, NSpace, NSwitch } from 'naive-ui';
@@ -19,6 +19,8 @@ import type { GuildDetail, GuildMember, GuildSummary, GuildUpdate } from '@/serv
 import { useOperations } from '@/composables/useOperations';
 import { useServerScopeStore } from '@/store/modules/server-scope';
 
+const { width: viewportWidth } = useWindowSize();
+const formLabelPlacement = computed(() => viewportWidth.value < 600 ? 'top' : 'left');
 const scope = useServerScopeStore();
 const { canWrite, loading, error, run } = useOperations();
 const q = ref('');
@@ -284,7 +286,7 @@ async function submitRemove() {
     });
     setDetail(result);
     removeTarget.value = null;
-    window.$message?.success('成员已按原离会流程移出');
+    window.$message?.success('成员已移出公会');
     await load();
   } catch (e) {
     removeError.value = errorMessage(e);
@@ -297,7 +299,7 @@ function beginDissolve() {
   if (!detail.value || !canWrite.value || !checkClean()) return;
   window.$dialog?.warning({
     title: `解散「${detail.value.name}」？`,
-    content: '全体成员会按原离会流程离开并立即失去公会频道与公会战资格，24小时退会冷却生效；历史回执、祈祷、战争结算和已发奖励保留。下一步还需要输入精确公会名。',
+    content: '全体成员会离开公会并立即失去公会频道与公会战资格，24小时退会冷却生效；历史回执、祈祷、战争结算和已发奖励保留。下一步还需要输入精确公会名。',
     positiveText: '继续确认',
     negativeText: '取消',
     onPositiveClick: () => {
@@ -475,7 +477,7 @@ onMounted(async () => {
           <template v-if="detail && form">
             <div class="guild-detail-header">
               <div>
-                <ContextHelp title="公会记录" :text="`ID ${detail.id}；版本 ${detail.version.slice(0, 12)}`" />
+                <span class="ops-mono ops-muted">ID {{ detail.id }}</span>
               </div>
               <NSpace>
                 <NButton :loading="detailLoading" @click="refreshDetail" :disabled="busy">刷新</NButton>
@@ -485,7 +487,7 @@ onMounted(async () => {
 
             <NCard :bordered="false" class="ops-panel mb-16px">
               <template #header>公会共享数值</template>
-              <NForm label-placement="left" label-width="140" :disabled="!canWrite || busy">
+              <NForm :label-placement="formLabelPlacement" :label-width="viewportWidth < 600 ? undefined : 140" :disabled="!canWrite || busy">
                 <div class="guild-form-grid">
                   <NFormItem label="公会名称"><NInput v-model:value="form.name" maxlength="64" /></NFormItem>
                   <NFormItem label="等级"><NInputNumber v-model:value="form.level" :min="1" :max="20" /></NFormItem>
@@ -546,11 +548,11 @@ onMounted(async () => {
 
     <NModal :show="addOpen" :closable="!busy" :mask-closable="!busy" @update:show="!$event && addGuard.requestClose()" preset="card" title="添加已有玩家" style="width: min(560px, calc(100vw - 32px))">
       <NAlert v-if="addError" type="error" :title="addError" class="mb-12px" />
-      <NForm label-placement="left" label-width="110" :disabled="busy || !canWrite">
+      <NForm :label-placement="formLabelPlacement" :label-width="viewportWidth < 600 ? undefined : 110" :disabled="busy || !canWrite">
         <NFormItem label="同区角色" required><NSelect v-model:value="addDraft.playerId" :options="playerOptions" :loading="playerLoading" filterable remote clearable placeholder="搜索角色名称或 ID" @search="searchPlayers" /></NFormItem>
         <NFormItem label="加入原因" required><NInput v-model:value="addDraft.reason" maxlength="500" /></NFormItem>
       </NForm>
-      <NAlert type="info" title="后台会再次校验同区归属、原公会开放等级、退会冷却、人数上限和已有公会。" />
+      <NAlert type="info" title="仅可添加本区服、达到公会开放等级且未加入公会的角色；退会冷却和人数上限仍生效。" />
       <template #footer>
         <NSpace justify="end"><NButton :disabled="busy" @click="addGuard.requestClose()">取消</NButton><NButton type="primary" :loading="addSaving" :disabled="!canWrite || busy" @click="submitAdd">加入公会</NButton></NSpace>
       </template>
@@ -558,7 +560,7 @@ onMounted(async () => {
 
     <NModal :show="Boolean(removeTarget)" preset="card" title="移除公会成员" style="width: min(540px, calc(100vw - 32px))" :closable="!busy" :mask-closable="!busy" @update:show="!$event && removeGuard.requestClose()">
       <NAlert v-if="removeError" type="error" :title="removeError" class="mb-12px" />
-      <p>将 <strong>{{ removeTarget?.playerName }}</strong> 按原离会流程移出，24小时退会冷却和房间/公会战撤权立即生效；历史记录与奖励保留。</p>
+      <p>将 <strong>{{ removeTarget?.playerName }}</strong> 移出公会，24小时退会冷却和房间/公会战撤权立即生效；历史记录与奖励保留。</p>
       <NForm label-placement="left" label-width="100" :disabled="busy || !canWrite">
         <NFormItem label="移除原因" required><NInput v-model:value="removeReason" maxlength="500" /></NFormItem>
       </NForm>
@@ -584,7 +586,7 @@ onMounted(async () => {
 <style scoped>
 .guild-detail-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; margin-bottom: 16px; }
 .guild-detail-header h2 { margin: 0 0 4px; font-size: 18px; }
-.guild-form-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 0 16px; }
+.guild-form-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr)); gap: 0 16px; }
 @media (max-width: 720px) {
   .guild-detail-header { flex-direction: column; }
 }

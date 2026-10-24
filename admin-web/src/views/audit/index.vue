@@ -233,7 +233,7 @@ onMounted(load);
         </div>
       </NCard>
     </template>
-    <NDrawer v-model:show="open" :width="680">
+    <NDrawer v-model:show="open" width="min(680px, 100vw)">
       <NDrawerContent title="操作详情" closable>
         <template v-if="selected">
           <NDescriptions :column="1" label-placement="left" class="mb-24px">
@@ -248,7 +248,7 @@ onMounted(load);
         </template>
       </NDrawerContent>
     </NDrawer>
-    <NDrawer v-model:show="securityOpen" :width="680">
+    <NDrawer v-model:show="securityOpen" width="min(680px, 100vw)">
       <NDrawerContent title="安全事件详情" closable>
         <template v-if="securitySelected">
           <NDescriptions :column="1" label-placement="left" class="mb-24px">

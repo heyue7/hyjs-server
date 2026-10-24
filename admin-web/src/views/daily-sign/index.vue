@@ -262,7 +262,7 @@ onBeforeUnmount(() => { pendingDiscard?.dispose(); alive = false; loadGeneration
         <NDatePicker type="month" :formatted-value="selectedMonth" value-format="yyyy-MM" format="yyyy年MM月" :clearable="false" :disabled="saving || loading || editorOpen" aria-label="签到月份" @update:formatted-value="changeMonth" />
         <NButton :disabled="saving || loading || editorOpen" @click="changeMonth(currentMonth)">本月</NButton>
         <NButton :disabled="saving || loading || editorOpen" @click="changeMonth(nextMonth)">下个月</NButton>
-        <ContextHelp title="签到规则" :text="snapshot?.source || '每月按累计签到天数依次领取，每天限领一档。已领取奖励保留原记录。'" />
+        <ContextHelp title="签到规则" text="每月按累计签到天数依次领取，每天限领一档。已领取奖励保留原记录。" />
         <NTag v-if="dirty && canWrite" type="warning" :bordered="false">未保存</NTag>
         <NTag v-if="!canWrite" :bordered="false">只读</NTag>
         <NButton :loading="loading" :disabled="saving || editorOpen" @click="refresh">刷新</NButton>
@@ -330,7 +330,7 @@ onBeforeUnmount(() => { pendingDiscard?.dispose(); alive = false; loadGeneration
 .daily-sign-enabled { display: flex; align-items: center; gap: 10px; }
 .daily-sign-settings { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px; margin-bottom: 20px; }
 .daily-sign-caption { color: rgb(var(--base-text-color) / .6); font-size: 13px; }
-.daily-sign-resource-error { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; color: rgb(var(--base-text-color) / .65); }
+.daily-sign-resource-error { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 16px; color: rgb(var(--base-text-color) / .65); }
 .daily-sign-footer { position: sticky; z-index: 20; bottom: 0; display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-top: 16px; padding: 12px 16px; border: 1px solid rgb(var(--base-text-color) / .08); border-radius: 6px; background: rgb(var(--container-bg-color)); }
 .daily-sign-loading { display: block; margin: 24px auto; }
 :global(.n-card.daily-sign-editor) { width: 720px; max-width: calc(100vw - 32px); }

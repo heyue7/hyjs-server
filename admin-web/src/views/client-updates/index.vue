@@ -119,12 +119,12 @@ const actionNames: Record<UpdateAction, string> = { publish: '发布并提醒', 
 const actionEffect = computed(() => {
   const row = selected.value;
   if (action.value === 'withdraw') return '停止当前提醒。已生效的登录和运行门槛保持，维护计划和维护状态也保持。';
-  if (action.value === 'remind') return '创建新提醒批次，已看过上一批次的玩家也会再次收到提醒。';
+  if (action.value === 'remind') return '向同一客户端创建新提醒批次，已看过上一批次的玩家也会再次收到提醒。';
   if (action.value === 'start_maintenance') return '当前接入运行区服立即进入维护，在线玩家将退出，业务请求受到拦截。';
   if (action.value === 'end_maintenance') return `当前接入运行区服恢复开放，并启用此发布的登录门槛 ${row?.minLoginBuild ?? 0}、运行门槛 ${row?.minRunBuild ?? 0}。预计结束时间不会自动开放。`;
-  if (row?.mode === 'maintenance') return `保存维护计划并提醒玩家。开始时间 ${formatTime(row.maintenanceStartAt)} 到达后拦截登录和业务，预计结束时间后仍须手动结束维护。`;
-  if (row?.mode === 'next_login') return `提醒玩家更新。构建号低于 ${row.minLoginBuild} 的客户端下次登录受限；已在线且达到运行门槛的合法会话继续运行。运行门槛为 ${row.minRunBuild}。`;
-  return `提醒玩家更新，登录门槛 ${row?.minLoginBuild ?? 0}，运行门槛 ${row?.minRunBuild ?? 0}。发布不会降低已生效门槛。`;
+  if (row?.mode === 'maintenance') return `保存当前接入区服的维护计划，并向同一客户端提醒更新。开始时间 ${formatTime(row.maintenanceStartAt)} 到达后拦截登录和业务，预计结束时间后仍须手动结束维护。`;
+  if (row?.mode === 'next_login') return `向同一客户端提醒更新。构建号低于 ${row.minLoginBuild} 的客户端下次登录受限；已在线且达到运行门槛的合法会话继续运行。运行门槛为 ${row.minRunBuild}。`;
+  return `向同一客户端提醒更新，登录门槛 ${row?.minLoginBuild ?? 0}，运行门槛 ${row?.minRunBuild ?? 0}。发布不会降低已生效门槛。`;
 });
 function prepareAction(value: UpdateAction, row?: ClientRelease) {
   if (!canPublish.value || blocked.value) return;
@@ -159,7 +159,6 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload));
 <template>
   <div class="ops-page update-page">
     <div class="update-toolbar">
-      <p class="ops-muted">更新策略适用于同一客户端；维护仅影响当前接入区服。</p>
       <NSpace :wrap="false">
         <NButton :loading="loading" :disabled="busy || !!pending" @click="load">刷新</NButton>
         <NButton v-if="canEdit" type="primary" :disabled="blocked" @click="edit()">新建草稿</NButton>
@@ -181,7 +180,6 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload));
             <div class="policy-version">
               <strong class="version-name">{{ overview.policy.versionName || '尚未发布更新' }}</strong>
               <p v-if="overview.policy.releaseId" class="ops-muted">构建 {{ overview.policy.latestBuild }} · {{ modeName(overview.policy.mode) }}</p>
-              <p v-else class="ops-muted">保存草稿并确认发布后，玩家才会收到更新提醒。</p>
             </div>
             <NSpace v-if="canPublish && overview.policy.releaseId" class="policy-actions">
               <NButton :disabled="blocked" @click="prepareAction('remind')">再次提醒</NButton>
@@ -258,8 +256,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload));
 .update-page { padding-bottom: 24px; color: rgb(var(--base-text-color)); }
 .update-page :deep(.n-button--default-type) { color: rgb(var(--base-text-color)); }
 .update-toolbar, .section-heading, .policy-heading, .delivery-footer, .release-row, .release-title { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
-.update-toolbar { min-height: 36px; }
-.update-toolbar p { margin: 0; line-height: 1.6; }
+.update-toolbar { justify-content: flex-end; }
 .update-content { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(360px, 1fr); gap: 16px; align-items: stretch; }
 .history-panel { grid-column: 1 / -1; }
 .delivery-panel { display: flex; flex-direction: column; }

@@ -5,7 +5,7 @@ import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router';
 import { NButton, NDropdown, NImage, NMenu, NSpace, NTag } from 'naive-ui';
 import type { DataTableColumns, MenuOption, SelectOption } from 'naive-ui';
 import { api, errorMessage, formatTime, json } from '@/service/operations';
-import { activityCopyAlias, activityFormName, deleteActivityInstance, newActivityForm, normalizeActivityForm } from '@/service/activity-operations';
+import { activityCopyAlias, formatActivityModeNotes, activityFormName, deleteActivityInstance, newActivityForm, normalizeActivityForm } from '@/service/activity-operations';
 import type { ActivityForm, ActivityInstance, ActivityMode } from '@/service/activity-operations';
 import { useOperations } from '@/composables/useOperations';
 import ActivityProducts from '@/components/operations/activity-products.vue';
@@ -318,7 +318,7 @@ const columns = computed<DataTableColumns<ActivityInstance>>(() => [
   { title: unavailableOnly.value ? '不可用原因' : '状态', key: 'enabled', minWidth: unavailableOnly.value ? 230 : 150,
     render: row => unavailableOnly.value ? h('div', [h('div', row.availability?.reason || '暂不可运营'), h('span', { class: 'ops-muted' }, row.editable ? '可补齐配置' : '仅供查看')]) : h(NSpace, { size: 6 }, () => [h(NTag, { type: row.enabled ? 'success' : 'default', size: 'small', bordered: false }, () => row.enabled ? '已开启' : '已关闭'), row.frozen ? h(NTag, { size: 'small', bordered: false }, () => '已冻结') : null]) },
   { title: '结束时间', key: 'endAt', width: 185, render: row => formatTime(row.form.endAt) },
-  { title: '操作', key: 'action', width: 310, render: row => h(NSpace, { size: 6 }, () => [
+  { title: '操作', key: 'action', width: 310, render: row => h('div', { class: 'ops-table-actions' }, [
     h(NButton, { size: 'small', disabled: busy.value, secondary: true, onClick: () => show(row, false, true) }, () => '查看'),
     canWrite.value && row.editable ? h(NButton, { size: 'small', disabled: busy.value, onClick: () => show(row) }, () => row.availability?.usable ? '编辑' : '补齐配置') : null,
     activityActions(row).length ? h(NDropdown, { trigger: 'click', options: activityActions(row), onSelect: (key: string) => selectAction(key, row) }, { default: () => h(NButton, { size: 'small', disabled: busy.value, quaternary: true }, () => '更多') }) : null,
@@ -396,7 +396,7 @@ onBeforeUnmount(() => {
                 <NFormItem label="后台别名">
                   <NInput v-model:value="form.alias" :maxlength="80" clearable placeholder="仅后台列表与排期显示，不改游戏内名称" :disabled="busy" />
                 </NFormItem>
-                <NFormItem required><template #label><span class="ops-field-label">活动模式<ContextHelp v-if="selectedMode?.notes" title="活动模式说明" :text="selectedMode.notes" /></span></template><NSelect :value="form.mode" :options="modeOptions" :disabled="busy || editorKind === 'edit'" @update:value="changeMode" /></NFormItem>
+                <NFormItem required><template #label><span class="ops-field-label">活动模式<ContextHelp v-if="formatActivityModeNotes(selectedMode)" title="活动模式说明" :text="formatActivityModeNotes(selectedMode)" /></span></template><NSelect :value="form.mode" :options="modeOptions" :disabled="busy || editorKind === 'edit'" @update:value="changeMode" /></NFormItem>
                 <NFormItem label="游戏界面模板" required><NSelect v-model:value="form.templateId" :options="templateOptions" :render-label="renderTemplate" :disabled="busy" /></NFormItem>
                 <div v-if="chosenTemplate?.preview" class="activity-template-preview"><NImage :src="chosenTemplate.preview" :width="180" :height="110" object-fit="contain" /><span class="ops-muted">界面预览</span></div>
               </template>
@@ -412,7 +412,6 @@ onBeforeUnmount(() => {
                 <NFormItem label="结束时间" required><NDatePicker :value="form.endAt || null" type="datetime" class="w-full" :disabled="busy" @update:value="form.endAt = $event || 0" /></NFormItem>
                 <NFormItem label="领奖截止时间" required><NDatePicker :value="form.claimEndAt || null" type="datetime" class="w-full" :disabled="busy" @update:value="form.claimEndAt = $event || 0" /></NFormItem>
                 <p class="ops-muted mb-24px">时间采用北京时间，领奖截止不能早于活动结束。</p>
-                <NFormItem label="运营备注"><NInput v-model:value="form.source" type="textarea" :maxlength="255" :disabled="busy" /></NFormItem>
               </template>
               <ActivityOptions v-if="activeTab === 'settings'" v-model="form.options" :mode="form.mode" :fixed-values="selectedMode?.fixedValues" :disabled="busy" />
               <RecruitSettings

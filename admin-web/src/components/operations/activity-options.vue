@@ -86,7 +86,7 @@ const turntableNumbers = [
       <NDescriptionsItem
         v-for="(value, key) in fixedValues"
         :key="key"
-        :label="activityFixedLabels[String(key)] || '原版固定规则'"
+        :label="activityFixedLabels[String(key)] || '固定规则'"
       >
         {{ typeof value === 'number' ? value.toLocaleString() : value }}
       </NDescriptionsItem>

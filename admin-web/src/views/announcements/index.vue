@@ -108,7 +108,7 @@ onMounted(load);
       />
       <div class="ops-section-footer ops-muted">所有时间均为北京时间</div>
     </NCard>
-    <NDrawer :show="open" @update:show="!$event && editorGuard.requestClose()" :width="680" :mask-closable="!saving">
+    <NDrawer :show="open" @update:show="!$event && editorGuard.requestClose()" width="min(680px, 100vw)" :mask-closable="!saving">
       <NDrawerContent :title="selected ? '编辑公告' : '新建公告'" :closable="!saving">
         <NAlert v-if="saveError" type="error" :title="saveError" class="mb-20px" />
         <NForm label-placement="top" :disabled="!canWrite || saving">

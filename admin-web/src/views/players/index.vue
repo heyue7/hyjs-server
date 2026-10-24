@@ -419,7 +419,7 @@ watch(
     </NDrawer>
     <GamePlayerCreate v-model:show="createOpen" @created="createdPlayer" />
     <PlayerProfileEditor v-model:show="profileOpen" :player="detail" @saved="profileSaved" />
-    <NDrawer :show="open" @update:show="closeDetail" :width="980" class="ops-editor-drawer">
+    <NDrawer :show="open" @update:show="closeDetail" width="min(980px, 100vw)" class="ops-editor-drawer">
       <NDrawerContent title="玩家管理" closable>
         <NAlert v-if="detailError" type="error" :title="detailError" class="mb-20px" />
         <NSpin :show="detailLoading">
