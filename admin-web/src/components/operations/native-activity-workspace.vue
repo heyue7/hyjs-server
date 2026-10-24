@@ -545,7 +545,7 @@ defineExpose({ beforeLeave: leaveWorkspace, confirmDiscard, dirty, saving });
             <div class="native-section-label">档位奖励</div>
             <NSelect v-model:value="selectedMilestone" :options="milestoneOptions" :render-label="renderActivityOption" aria-label="选择固定奖励档" class="mb-20px" />
             <section v-for="tier in currentMilestone" :key="tier.key" class="activity-edit-section">
-              <NFormItem :label="tier.key.startsWith('everyoneBenefit:') ? '真实购买人数' : selected.kind === 'fund' ? '角色等级' : '登录日数'"><NInputNumber v-model:value="tier.goal" :min="1" :max="maxAmount" :precision="0" :disabled="rulesDisabled || selected.kind === 'fund' && !tier.key.startsWith('everyoneBenefit:')" /></NFormItem>
+              <NFormItem :label="tier.key.startsWith('everyoneBenefit:') ? '购买人数' : selected.kind === 'fund' ? '角色等级' : '登录日数'"><NInputNumber v-model:value="tier.goal" :min="1" :max="maxAmount" :precision="0" :disabled="rulesDisabled || selected.kind === 'fund' && !tier.key.startsWith('everyoneBenefit:')" /></NFormItem>
               <NFormItem label="奖励"><RewardList v-model:value="tier.rewards" :disabled="rulesDisabled" /></NFormItem>
             </section>
           </template>
@@ -625,21 +625,14 @@ defineExpose({ beforeLeave: leaveWorkspace, confirmDiscard, dirty, saving });
 .native-recruit-rules { margin-bottom: 24px; }
 .native-section-label {
   margin: 4px 0 16px;
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: .04em;
+  font-size: 13px;
+  font-weight: 500;
   color: rgb(var(--base-text-color) / .55);
 }
 :global(.n-drawer.native-activity-drawer) { max-width: 100vw; }
-:global(.native-activity-drawer .n-drawer-body-content-wrapper) { padding: 24px 28px; }
-:global(.native-activity-drawer .n-drawer-header) { padding: 20px 28px 16px; }
-:global(.native-activity-drawer .n-drawer-footer) { padding: 16px 28px; }
 @media (max-width: 800px) {
   .native-count { margin-left: 0; }
   :global(.n-drawer.native-activity-drawer) { width: 100vw !important; }
-  :global(.native-activity-drawer .n-drawer-body-content-wrapper) { padding: 18px 16px; }
-  :global(.native-activity-drawer .n-drawer-header),
-  :global(.native-activity-drawer .n-drawer-footer) { padding-left: 16px; padding-right: 16px; }
   .native-drawer-head { align-items: flex-start; }
 }
 </style>

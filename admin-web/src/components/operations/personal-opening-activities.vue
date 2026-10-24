@@ -281,7 +281,7 @@ defineExpose({ beforeLeave: leaveWorkspace, dirty, saving });
   display: grid;
   grid-template-columns: minmax(0, 1fr) 128px 112px 132px auto;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
   width: 100%;
 }
 .personal-identity { display: flex; align-items: center; gap: 10px; min-width: 0; flex-wrap: wrap; }

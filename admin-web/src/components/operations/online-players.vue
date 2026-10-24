@@ -343,7 +343,7 @@ onBeforeUnmount(() => {
 .online-time {
   margin-top: 12px;
   margin-bottom: 12px;
-  font-size: 12px;
+  font-size: 13px;
 }
 .online-error {
   margin-bottom: 12px;

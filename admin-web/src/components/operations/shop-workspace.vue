@@ -454,7 +454,7 @@ watch(
           </NSpace>
         </div>
         <NAlert v-if="shopId === 'vip' && snapshot && !snapshot.items.some(item => item.enabled)" type="info" title="暂无开放的会员礼包" class="mb-16px">
-          下方保留全部 {{ snapshot.items.length }} 件已停用商品，可查看和编辑内容、价格与购买资格。商品启用后才会在游戏中显示。
+          {{ snapshot.items.length }} 件商品均已停用，启用后在游戏中显示。
         </NAlert>
         <NCard :bordered="false" class="ops-panel">
           <NTabs v-if="isPopularityShop" :value="shopId" type="line" class="mb-20px" @update:value="router.push(`/shops/${$event}`)">

@@ -146,7 +146,7 @@ onBeforeUnmount(() => { removeGuard(); listGeneration += 1; claimsGeneration += 
     <p class="ops-inline-note cdk-note">同一码每个角色限兑一次。</p>
     <p v-if="!scope.currentServer?.runtimeBound" class="ops-inline-note cdk-note">本区服尚未部署，部署后可生成和使用兑换码。</p>
     <NAlert v-if="error" type="error" :title="error" />
-    <NCard :bordered="false" class="cdk-list">
+    <NCard :bordered="false" class="ops-panel cdk-list">
       <div class="ops-filters">
         <NInput
           v-model:value="q"
@@ -169,7 +169,7 @@ onBeforeUnmount(() => { removeGuard(); listGeneration += 1; claimsGeneration += 
       </div>
     </NCard>
 
-    <NModal :show="editorOpen" preset="card" :title="selected ? '编辑兑换码 · ' + selected.codeHint : '生成兑换码'" class="cdk-editor" :mask-closable="!saving" :closable="!saving" @update:show="!$event && closeEditor()">
+    <NModal :show="editorOpen" preset="card" :title="selected ? '编辑兑换码 · ' + selected.codeHint : '生成兑换码'" class="ops-modal cdk-editor" :mask-closable="!saving" :closable="!saving" @update:show="!$event && closeEditor()">
       <NAlert v-if="saveError" type="error" :title="saveError" class="mb-16px" />
       <NForm label-placement="top" :disabled="saving" :show-feedback="false" class="cdk-form">
         <NFormItem label="名称" required><NInput v-model:value="draft.name" placeholder="例如：开服感谢礼" :maxlength="80" /></NFormItem>
@@ -214,7 +214,7 @@ onBeforeUnmount(() => { removeGuard(); listGeneration += 1; claimsGeneration += 
       </template>
     </NModal>
 
-    <NModal :show="codesOpen" preset="card" title="保存兑换码" class="cdk-codes" :mask-closable="false" :closable="false">
+    <NModal :show="codesOpen" preset="card" title="保存兑换码" class="ops-modal cdk-codes" :mask-closable="false" :closable="false">
       <div class="cdk-result-meta"><span>{{ codesServerName }}</span><span>已生成 {{ generatedCodes.length }} 枚</span></div>
       <p class="ops-inline-note cdk-result-warning">完整码仅显示这一次，关闭后无法再查看。</p>
       <NSpace :size="8" class="mb-12px"><NButton @click="copyCodes">复制全部</NButton><NButton @click="downloadCodes">下载文本</NButton></NSpace>
@@ -238,26 +238,26 @@ onBeforeUnmount(() => { removeGuard(); listGeneration += 1; claimsGeneration += 
 :global(.n-card.cdk-editor), :global(.n-card.cdk-codes) { width: 760px; max-width: calc(100vw - 32px); }
 :global(.n-drawer.cdk-claims) { max-width: 100vw; }
 .cdk-page { gap: 14px; }
-.cdk-note { margin: -6px 0 0; }
-.cdk-list :deep(.n-card__content) { padding: 20px; }
-.cdk-list :deep(.ops-filters) { margin-bottom: 16px; gap: 8px; }
+.cdk-note { margin: 0; }
+
+.cdk-list :deep(.ops-filters) { margin-bottom: 16px; }
 .cdk-list :deep(.ops-pagination) { margin-top: 18px; }
 :deep(.cdk-name), :deep(.cdk-usage) { display: flex; flex-direction: column; gap: 3px; line-height: 1.5; }
 :deep(.cdk-name strong) { font-weight: 600; }
 :deep(.cdk-usage) { font-variant-numeric: tabular-nums; }
-.cdk-form { display: flex; flex-direction: column; gap: 18px; }
+.cdk-form { display: flex; flex-direction: column; gap: 16px; }
 .cdk-pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
 .cdk-pair :deep(.n-input-number), .cdk-pair :deep(.n-date-picker), .cdk-rewards, .cdk-limit { width: 100%; }
 .cdk-limit { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
 .cdk-limit-input { display: flex; align-items: center; gap: 8px; width: 100%; }
 .cdk-limit-input > span { white-space: nowrap; color: rgb(var(--base-text-color) / .65); font-size: 13px; }
-.cdk-field-note { margin: 0; font-size: 12px; }
+.cdk-field-note { margin: 0; font-size: 13px; }
 .cdk-rewards .cdk-field-note { margin-top: 8px; }
-.cdk-result-meta { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; font-size: 13px; color: rgb(var(--base-text-color) / .65); }
+.cdk-result-meta { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 8px; font-size: 13px; color: rgb(var(--base-text-color) / .65); }
 .cdk-result-warning { margin-bottom: 16px; color: rgb(var(--base-text-color) / .85); }
 .cdk-code-input :deep(textarea) { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; line-height: 1.7; }
 @media (max-width: 600px) {
-  .cdk-pair { grid-template-columns: minmax(0, 1fr); gap: 18px; }
+  .cdk-pair { grid-template-columns: minmax(0, 1fr); gap: 16px; }
   .cdk-page .ops-toolbar { flex-wrap: wrap; }
   .cdk-list :deep(.n-card__content) { padding: 16px; }
 }

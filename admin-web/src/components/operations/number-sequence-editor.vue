@@ -122,7 +122,7 @@ function reset() {
 
 <style scoped>
 .number-sequence-editor { display: grid; gap: 10px; min-width: 0; width: 100%; }
-.number-sequence-row { display: grid; grid-template-columns: 70px minmax(120px, 1fr) auto; gap: 10px; align-items: center; }
+.number-sequence-row { display: grid; grid-template-columns: 70px minmax(0, 1fr) auto; gap: 10px; align-items: center; }
 .number-sequence-label { font-size: 13px; overflow-wrap: anywhere; }
 .number-sequence-error { margin: 0; color: var(--n-feedback-text-color-error, #d03050); font-size: 13px; line-height: 1.6; }
 .number-sequence-editor > .n-button { justify-self: start; }

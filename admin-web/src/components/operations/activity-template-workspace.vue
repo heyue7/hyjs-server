@@ -579,11 +579,11 @@ onUnmounted(() => {
   border: 0;
   background: transparent;
   appearance: none;
-  padding: 12px 14px;
+  padding: 10px 12px;
   text-align: left;
   color: inherit;
   cursor: pointer;
-  border-radius: 8px;
+  border-radius: 6px;
 }
 .template-editor nav button.active {
   color: rgb(var(--primary-color));
@@ -601,7 +601,7 @@ onUnmounted(() => {
   gap: 16px;
   position: sticky;
   bottom: 0;
-  padding: 18px 20px;
+  padding: 12px 16px;
   background: rgb(var(--container-bg-color));
   margin-top: 20px;
   border-top: 1px solid rgb(var(--base-text-color) / 0.08);

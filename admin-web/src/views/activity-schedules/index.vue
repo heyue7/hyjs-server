@@ -1008,7 +1008,7 @@ onUnmounted(() => {
       <span>{{ !managed ? '本服排期尚未启用' : '本服排期有未发布修改' }} · {{ items.length }} 项活动</span>
       <NButton type="primary" :disabled="!canPublish" :loading="saving" @click="publish">检查并发布</NButton>
     </div>
-    <NDrawer :show="Boolean(selected)" :width="480" @update:show="selectedKey = $event ? selectedKey : null">
+    <NDrawer :show="Boolean(selected)" width="min(480px, 100vw)" @update:show="selectedKey = $event ? selectedKey : null">
       <NDrawerContent v-if="selected" :title="selected.name" closable>
         <NForm label-placement="top" :disabled="!canWrite || busy">
           <NSpace :size="6" class="mb-12px">
@@ -1212,8 +1212,8 @@ onUnmounted(() => {
   flex-direction: column;
   gap: 8px;
   border: 1px solid rgb(var(--base-text-color) / 0.1);
-  border-radius: 9px;
-  padding: 12px 10px;
+  border-radius: 6px;
+  padding: 10px;
   margin-top: 10px;
   cursor: grab;
 }
@@ -1230,8 +1230,8 @@ onUnmounted(() => {
   line-height: 1.5;
 }
 .library-card > span {
-  font-size: 12px;
-  color: rgb(var(--base-text-color) / 0.5);
+  font-size: 13px;
+  color: rgb(var(--base-text-color) / 0.65);
 }
 .library-card > .library-alias {
   color: rgb(var(--base-text-color) / 0.42);
@@ -1250,7 +1250,7 @@ onUnmounted(() => {
   overflow: auto;
   max-height: 650px;
   border: 1px solid rgb(var(--base-text-color) / 0.09);
-  border-radius: 8px;
+  border-radius: 6px;
 }
 .calendar-disabled {
   opacity: 0.5;
@@ -1444,13 +1444,13 @@ onUnmounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 16px 20px;
+  padding: 12px 16px;
   margin-top: 16px;
   position: sticky;
   bottom: 0;
   background: rgb(var(--container-bg-color));
   border: 1px solid rgb(var(--primary-color) / 0.15);
-  border-radius: 8px;
+  border-radius: 6px;
   z-index: 8;
 }
 :global(.n-card.pattern-modal) {

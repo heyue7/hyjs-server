@@ -45,7 +45,7 @@ async function handleSubmit() {
 </script>
 
 <template>
-  <NForm ref="formRef" :model="model" :rules="rules" size="large" :show-label="false" @keyup.enter="handleSubmit">
+  <NForm ref="formRef" :model="model" :rules="rules" size="medium" :show-label="false" @keyup.enter="handleSubmit">
     <NFormItem path="phone">
       <NInput v-model:value="model.phone" :placeholder="$t('page.login.common.phonePlaceholder')" />
     </NFormItem>
@@ -69,10 +69,10 @@ async function handleSubmit() {
       />
     </NFormItem>
     <NSpace vertical :size="18" class="w-full">
-      <NButton type="primary" size="large" round block @click="handleSubmit">
+      <NButton type="primary" size="medium" block @click="handleSubmit">
         {{ $t('common.confirm') }}
       </NButton>
-      <NButton size="large" round block @click="toggleLoginModule('pwd-login')">
+      <NButton size="medium" block @click="toggleLoginModule('pwd-login')">
         {{ $t('page.login.common.back') }}
       </NButton>
     </NSpace>

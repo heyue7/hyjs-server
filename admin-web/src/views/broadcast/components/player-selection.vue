@@ -128,7 +128,7 @@ const columns: DataTableColumns<GamePlayer> = [
         <NButton text type="primary" :disabled="disabled || !value.playerIds.length" @click="clearSelection">清空已选</NButton>
       </div>
       <NAlert v-if="error" type="error" :title="error" class="mb-12px" />
-      <NDataTable :columns="columns" :data="rows" :loading="loading" :row-key="(row: GamePlayer) => row.id" :bordered="false" size="small" :max-height="320" />
+      <NDataTable :columns="columns" :data="rows" :loading="loading" :row-key="(row: GamePlayer) => row.id" :bordered="false" size="small" :max-height="320" :scroll-x="500" />
       <div class="audience-pagination">
         <NPagination v-model:page="page" v-model:page-size="pageSize" :page-sizes="[20, 50, 100]" :item-count="total" show-size-picker @update:page="load" @update:page-size="page = 1; load()" />
       </div>
@@ -141,7 +141,8 @@ const columns: DataTableColumns<GamePlayer> = [
 .audience-select { display: flex; flex-direction: column; gap: 10px; }
 .audience-hint { margin: 0; color: rgb(var(--base-text-color) / .65); font-size: 13px; line-height: 1.6; }
 .audience-toolbar { display: flex; gap: 8px; }
-.audience-summary { display: flex; justify-content: space-between; align-items: center; gap: 12px; color: rgb(var(--base-text-color) / .75); font-size: 13px; }
+.audience-summary { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; color: rgb(var(--base-text-color) / .75); font-size: 13px; }
 .audience-summary strong { color: rgb(var(--base-text-color)); }
-.audience-pagination { display: flex; justify-content: flex-end; }
+.audience-pagination { display: flex; justify-content: flex-end; max-width: 100%; overflow-x: auto; }
+@media (max-width: 600px) { .audience-summary > span { flex-basis: 100%; } .audience-select :deep(.n-radio-group) { display: flex; flex-wrap: wrap; } }
 </style>

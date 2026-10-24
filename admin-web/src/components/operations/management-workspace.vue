@@ -84,7 +84,7 @@ defineEmits<{ back: []; save: []; 'update:section': [value: string] }>();
 .management-layout {
   display: grid;
   grid-template-columns: 160px minmax(0, 1fr);
-  gap: 20px;
+  gap: 16px;
   align-items: start;
 }
 .management-layout-simple {
@@ -93,7 +93,7 @@ defineEmits<{ back: []; save: []; 'update:section': [value: string] }>();
 .management-nav {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 4px;
   position: sticky;
   top: 10px;
 }
@@ -103,7 +103,7 @@ defineEmits<{ back: []; save: []; 'update:section': [value: string] }>();
   background: transparent;
   border: 1px solid transparent;
   transition: background-color 120ms, color 120ms;
-  border-radius: 7px;
+  border-radius: 4px;
   color: rgb(var(--base-text-color) / 0.75);
   cursor: pointer;
 }
@@ -130,11 +130,10 @@ defineEmits<{ back: []; save: []; 'update:section': [value: string] }>();
   align-items: center;
   justify-content: space-between;
   gap: 18px;
-  padding: 12px 18px;
+  padding: 12px 16px;
   border: 1px solid rgb(var(--base-text-color) / 0.08);
   background: rgb(var(--container-bg-color));
-  border-radius: 9px;
-  box-shadow: 0 -2px 8px rgb(0 0 0/0.025);
+  border-radius: 6px;
 }
 @media (max-width: 800px) {
   .management-layout {

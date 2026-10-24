@@ -467,7 +467,7 @@ onMounted(async () => {
       </div>
     </NCard>
 
-    <NDrawer :show="drawer" :mask-closable="!busy" :close-on-esc="!busy" :width="1040" class="ops-editor-drawer" @update:show="value => !value && requestCloseDrawer()">
+    <NDrawer :show="drawer" :mask-closable="!busy" :close-on-esc="!busy" width="min(1040px, 100vw)" class="ops-editor-drawer" @update:show="value => !value && requestCloseDrawer()">
       <NDrawerContent :title="detail ? `${detail.name} · 公会管理` : '公会管理'" :closable="!busy">
         <NAlert v-if="detailError" type="error" :title="detailError" class="mb-16px" />
         <NAlert v-if="saveError" type="error" :title="saveError" class="mb-16px" />
@@ -528,7 +528,7 @@ onMounted(async () => {
       </NDrawerContent>
     </NDrawer>
 
-    <NModal :show="memberOpen" :closable="!busy" :mask-closable="!busy" @update:show="!$event && memberGuard.requestClose()" preset="card" title="编辑公会成员" style="width: 560px">
+    <NModal :show="memberOpen" :closable="!busy" :mask-closable="!busy" @update:show="!$event && memberGuard.requestClose()" preset="card" title="编辑公会成员" style="width: min(560px, calc(100vw - 32px))">
       <NAlert v-if="memberError" type="error" :title="memberError" class="mb-12px" />
       <NForm label-placement="left" label-width="130" :disabled="busy || !canWrite">
         <NFormItem label="角色"><span class="ops-mono">{{ memberTarget?.playerName }} · #{{ memberTarget?.playerId }}</span></NFormItem>
@@ -544,7 +544,7 @@ onMounted(async () => {
       </template>
     </NModal>
 
-    <NModal :show="addOpen" :closable="!busy" :mask-closable="!busy" @update:show="!$event && addGuard.requestClose()" preset="card" title="添加已有玩家" style="width: 560px">
+    <NModal :show="addOpen" :closable="!busy" :mask-closable="!busy" @update:show="!$event && addGuard.requestClose()" preset="card" title="添加已有玩家" style="width: min(560px, calc(100vw - 32px))">
       <NAlert v-if="addError" type="error" :title="addError" class="mb-12px" />
       <NForm label-placement="left" label-width="110" :disabled="busy || !canWrite">
         <NFormItem label="同区角色" required><NSelect v-model:value="addDraft.playerId" :options="playerOptions" :loading="playerLoading" filterable remote clearable placeholder="搜索角色名称或 ID" @search="searchPlayers" /></NFormItem>
@@ -556,7 +556,7 @@ onMounted(async () => {
       </template>
     </NModal>
 
-    <NModal :show="Boolean(removeTarget)" preset="card" title="移除公会成员" style="width: 540px" :closable="!busy" :mask-closable="!busy" @update:show="!$event && removeGuard.requestClose()">
+    <NModal :show="Boolean(removeTarget)" preset="card" title="移除公会成员" style="width: min(540px, calc(100vw - 32px))" :closable="!busy" :mask-closable="!busy" @update:show="!$event && removeGuard.requestClose()">
       <NAlert v-if="removeError" type="error" :title="removeError" class="mb-12px" />
       <p>将 <strong>{{ removeTarget?.playerName }}</strong> 按原离会流程移出，24小时退会冷却和房间/公会战撤权立即生效；历史记录与奖励保留。</p>
       <NForm label-placement="left" label-width="100" :disabled="busy || !canWrite">
@@ -567,7 +567,7 @@ onMounted(async () => {
       </template>
     </NModal>
 
-    <NModal :show="dissolveOpen" :closable="!busy" :mask-closable="!busy" @update:show="!$event && dissolveGuard.requestClose()" preset="card" title="二次确认：解散公会" style="width: 620px">
+    <NModal :show="dissolveOpen" :closable="!busy" :mask-closable="!busy" @update:show="!$event && dissolveGuard.requestClose()" preset="card" title="二次确认：解散公会" style="width: min(620px, calc(100vw - 32px))">
       <NAlert type="error" title="解散会移除全部成员并撤销公会频道/公会战资格，且不能撤销。历史回执、祈祷、战争结算和已发奖励保留。" class="mb-12px" />
       <NAlert v-if="dissolveError" type="error" :title="dissolveError" class="mb-12px" />
       <NForm label-placement="left" label-width="120" :disabled="busy || !canWrite">
@@ -583,7 +583,7 @@ onMounted(async () => {
 
 <style scoped>
 .guild-detail-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; margin-bottom: 16px; }
-.guild-detail-header h2 { margin: 0 0 4px; font-size: 22px; }
+.guild-detail-header h2 { margin: 0 0 4px; font-size: 18px; }
 .guild-form-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 0 16px; }
 @media (max-width: 720px) {
   .guild-detail-header { flex-direction: column; }

@@ -244,7 +244,7 @@ onBeforeUnmount(() => {
 }
 @media (max-width: 700px) {
   .inventory-toolbar {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   }
   .inventory-toolbar > :nth-child(2) {
     grid-column: 1/-1;

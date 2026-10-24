@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
+import { computed, h, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { onBeforeRouteLeave } from 'vue-router';
+import { NButton, NSpace, NTag } from 'naive-ui';
+import type { DataTableColumns } from 'naive-ui';
 import { ApiError, errorMessage, formatTime } from '@/service/operations';
 import { actClientUpdate, getClientUpdateHistory, getClientUpdates, saveClientUpdate } from '@/service/client-updates';
 import type { ClientRelease, ClientUpdateCommand, ClientUpdateDraft, ClientUpdateOverview, UpdateAction, UpdateMode } from '@/service/client-updates';
@@ -97,6 +99,19 @@ async function closeEditor() {
   if (dirty.value && !await discard('放弃未保存的修改？', '当前输入尚未保存，关闭后将丢失。')) return;
   editor.value = false;
 }
+const inspecting = ref<ClientRelease | null>(null);
+const historyColumns = computed<DataTableColumns<ClientRelease>>(() => [
+  { title: '版本 / 提醒标题', key: 'title', minWidth: 230, render: row => h('div', { class: 'release-identity' }, [h('strong', row.versionName), h('span', { class: 'ops-muted' }, row.title)]) },
+  { title: '构建号', key: 'buildCode', width: 135 },
+  { title: '更新方式', key: 'mode', width: 165, render: row => modeName(row.mode) },
+  { title: '状态', key: 'state', width: 110, render: row => h(NTag, { size: 'small', bordered: false, type: row.state === 'draft' ? 'default' : 'info' }, () => stateName(row.state)) },
+  { title: '更新时间', key: 'updatedAt', width: 185, render: row => formatTime(row.publishedAt || row.updatedAt) },
+  { title: '操作', key: 'actions', width: 240, render: row => h(NSpace, { size: 8, wrap: false }, () => [
+    h(NButton, { size: 'small', quaternary: true, onClick: () => inspecting.value = row }, () => '详情'),
+    row.state === 'draft' && canEdit.value ? h(NButton, { size: 'small', disabled: blocked.value, onClick: () => edit(row) }, () => '编辑') : null,
+    row.state === 'draft' && canPublish.value ? h(NButton, { size: 'small', type: 'primary', disabled: blocked.value, onClick: () => prepareAction('publish', row) }, () => '预览发布') : null
+  ]) }
+]);
 const actionOpen = ref(false); const actionReason = ref(''); const actionError = ref(''); const confirmed = ref(false);
 const selected = ref<ClientRelease | null>(null); const action = ref<UpdateAction>('publish');
 const pending = ref<ClientUpdateCommand | null>(null);
@@ -192,21 +207,29 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload));
         <section class="update-panel history-panel" aria-labelledby="history-title">
           <div class="section-heading"><h2 id="history-title">草稿与发布记录 <span v-if="total" class="record-count">{{ total }}</span></h2></div>
           <NAlert v-if="historyError" type="error" :title="historyError" class="mb-16px"><NButton size="small" @click="loadHistory">重试加载历史</NButton></NAlert>
-          <NEmpty v-if="!history.length && !historyError" description="暂无更新记录" class="history-empty"><template #extra><span class="ops-muted">新建草稿，预览后再发布。</span></template></NEmpty>
-          <article v-for="row in history" :key="row.id" class="release-row">
-            <div class="release-copy">
-              <div class="release-title"><h3>{{ row.versionName }}</h3><NTag size="small" :type="row.state === 'draft' ? 'default' : 'info'">{{ stateName(row.state) }}</NTag><span class="ops-muted">{{ modeName(row.mode) }}</span></div>
-              <p class="release-caption">{{ row.title }}</p>
-              <p class="release-meta">构建 {{ row.buildCode }} · 登录 {{ buildThreshold(row.minLoginBuild) }} · 运行 {{ buildThreshold(row.minRunBuild) }}</p>
-              <p class="ops-muted">{{ row.state === 'draft' ? '更新' : '发布' }}于 {{ formatTime(row.publishedAt || row.updatedAt) }} <span v-if="row.publishedBy">· {{ row.publishedBy }}</span></p>
-              <details class="release-details"><summary>查看更新说明{{ row.mode === 'maintenance' ? '与维护时间' : '' }}</summary><div class="release-preview"><h4>{{ row.title }}</h4><p class="player-content">{{ row.content }}</p><p class="ops-muted">请前往QQ群下载最新版</p><p v-if="row.mode === 'maintenance'">{{ formatTime(row.maintenanceStartAt) }} 至 {{ formatTime(row.maintenanceEndAt) }}（预计）</p></div></details>
-            </div>
-            <NSpace v-if="row.state === 'draft'" :wrap="false"><NButton v-if="canEdit" size="small" :disabled="blocked" @click="edit(row)">编辑</NButton><NButton v-if="canPublish" size="small" type="primary" :disabled="blocked" @click="prepareAction('publish', row)">预览发布</NButton></NSpace>
-          </article>
+          <NDataTable :columns="historyColumns" :data="history" :row-key="(row: ClientRelease) => row.id" :bordered="false" :scroll-x="1065">
+            <template #empty>暂无草稿或发布记录</template>
+          </NDataTable>
           <div v-if="total > 20" class="ops-pagination"><NPagination v-model:page="page" :page-size="20" :item-count="total" simple @update:page="loadHistory" /></div>
         </section>
       </div>
     </NSpin>
+    <NModal :show="!!inspecting" preset="card" title="更新记录详情" class="update-modal" @update:show="!$event && (inspecting = null)">
+      <template v-if="inspecting">
+        <NDescriptions :column="1" label-placement="left" class="mb-20px">
+          <NDescriptionsItem label="版本">{{ inspecting.versionName }} · 构建 {{ inspecting.buildCode }}</NDescriptionsItem>
+          <NDescriptionsItem label="状态">{{ stateName(inspecting.state) }}</NDescriptionsItem>
+          <NDescriptionsItem label="更新方式">{{ modeName(inspecting.mode) }}</NDescriptionsItem>
+          <NDescriptionsItem label="最低登录构建">{{ buildThreshold(inspecting.minLoginBuild) }}</NDescriptionsItem>
+          <NDescriptionsItem label="最低运行构建">{{ buildThreshold(inspecting.minRunBuild) }}</NDescriptionsItem>
+          <NDescriptionsItem label="更新时间">{{ formatTime(inspecting.publishedAt || inspecting.updatedAt) }}</NDescriptionsItem>
+          <NDescriptionsItem v-if="inspecting.publishedBy" label="发布人">{{ inspecting.publishedBy }}</NDescriptionsItem>
+          <NDescriptionsItem v-if="inspecting.mode === 'maintenance'" label="维护时间">{{ formatTime(inspecting.maintenanceStartAt) }} 至 {{ formatTime(inspecting.maintenanceEndAt) }}（预计）</NDescriptionsItem>
+        </NDescriptions>
+        <div class="player-preview"><h3>{{ inspecting.title }}</h3><p class="player-content">{{ inspecting.content }}</p><p>请前往QQ群下载最新版</p></div>
+      </template>
+      <template #footer><div class="modal-actions"><NButton @click="inspecting = null">关闭</NButton></div></template>
+    </NModal>
     <NModal :show="editor" preset="card" :title="preview ? '草稿预览' : draft.id ? '编辑更新草稿' : '新建更新草稿'" class="update-modal" :mask-closable="false" :closable="!busy" @update:show="!$event && closeEditor()">
       <NAlert v-if="formError" type="error" :title="formError" class="mb-16px" />
       <NForm v-if="!preview" label-placement="top" :show-feedback="false" :disabled="busy" class="update-form">
@@ -231,6 +254,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload));
 </template>
 
 <style scoped>
+:deep(.release-identity) { display: flex; flex-direction: column; gap: 4px; overflow-wrap: anywhere; }
 .update-page { padding-bottom: 24px; color: rgb(var(--base-text-color)); }
 .update-page :deep(.n-button--default-type) { color: rgb(var(--base-text-color)); }
 .update-toolbar, .section-heading, .policy-heading, .delivery-footer, .release-row, .release-title { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
@@ -239,11 +263,11 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload));
 .update-content { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(360px, 1fr); gap: 16px; align-items: stretch; }
 .history-panel { grid-column: 1 / -1; }
 .delivery-panel { display: flex; flex-direction: column; }
-.update-panel { padding: 22px 24px; border-radius: 10px; background: rgb(var(--container-bg-color)); }
+.update-panel { padding: 20px; border-radius: 6px; background: rgb(var(--container-bg-color)); }
 .section-heading { margin-bottom: 18px; gap: 12px; }
 .section-heading h2 { margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600; }
 .policy-heading { align-items: flex-start; }
-.version-name { font-size: 23px; font-weight: 600; line-height: 1.4; }
+.version-name { font-size: 20px; font-weight: 600; line-height: 1.4; }
 .policy-version p { margin: 6px 0 0; }
 .policy-actions { flex-shrink: 0; }
 .policy-summary, .delivery-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 24px; margin: 20px 0 0; }
@@ -276,9 +300,9 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload));
 .release-preview { padding: 12px 16px; margin-top: 8px; border-left: 2px solid rgb(var(--primary-color) / .3); background: rgb(var(--base-text-color) / .025); }
 .release-preview h4 { margin: 0 0 8px; font-weight: 500; }
 :global(.n-card.update-modal) { width: 720px; max-width: calc(100vw - 28px); }
-.update-form { display: flex; flex-direction: column; gap: 18px; }
+.update-form { display: flex; flex-direction: column; gap: 16px; }
 .update-form p { margin: -6px 0 0; line-height: 1.65; }
-.form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+.form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
 .form-grid :deep(.n-input-number), .form-grid :deep(.n-date-picker) { width: 100%; }
 .fixed-message, .player-preview { background: rgb(var(--base-text-color) / .04); padding: 16px; border-radius: 8px; }
 .fixed-message { font-size: 13px; line-height: 1.6; color: rgb(var(--base-text-color) / .65); }
@@ -304,7 +328,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload));
   .policy-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
   .delivery-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 0; }
   .delivery-grid > div:nth-child(3) { border-left: 0; padding-left: 0; }
-  .version-name { font-size: 21px; }
+  .version-name { font-size: 18px; }
   .release-row { flex-direction: column; gap: 12px; }
   .release-row > :deep(.n-space) { align-self: flex-end; }
   .form-grid { grid-template-columns: minmax(0, 1fr); }

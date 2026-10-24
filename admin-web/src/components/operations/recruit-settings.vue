@@ -300,9 +300,8 @@ defineExpose({ dirty, loading, invalid, request, accept });
   margin-bottom: 10px;
 }
 .recruit-rule-label {
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
+  font-size: 13px;
+  font-weight: 500;
   color: rgb(var(--base-text-color) / 0.55);
 }
 .recruit-rule-refresh {

@@ -79,7 +79,7 @@ const turntableNumbers = [
   <div>
     <NDescriptions
       v-if="fixedValues && Object.keys(fixedValues).length"
-      :column="3"
+      :column="1"
       label-placement="top"
       class="mb-24px"
     >
@@ -181,7 +181,7 @@ const turntableNumbers = [
       <NDescriptions :column="1" label-placement="left" class="mb-20px">
         <NDescriptionsItem label="每日探索次数">{{ options.dayLimit }}</NDescriptionsItem>
       </NDescriptions>
-      <NGrid :cols="2" :x-gap="16">
+      <NGrid cols="1 s:2" responsive="screen" :x-gap="16">
         <NGi>
           <NFormItem label="累计探索次数上限">
             <NInputNumber
@@ -230,7 +230,7 @@ const turntableNumbers = [
     <template v-else-if="mode === 'turntable'">
       <div class="ops-muted mb-16px">各开启奖位的最高概率，加上未开启递增的钻石大奖固定概率，合计须不超过100%。最迟抽数须不少于开启奖位数。钻石池为空暂停计数，返池后待保底奖位依次兑现。</div>
       <TurntableProbability v-model="options" :prize-id="9" :disabled="disabled" />
-      <NGrid :cols="2" :x-gap="16">
+      <NGrid cols="1 s:2" responsive="screen" :x-gap="16">
         <NGi v-for="field in turntableNumbers" :key="field.key">
           <NFormItem :label="field.label">
             <NInputNumber

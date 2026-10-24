@@ -6,6 +6,7 @@ import { useThemeStore } from '@/store/modules/theme';
 import { useRouteStore } from '@/store/modules/route';
 import { useTabStore } from '@/store/modules/tab';
 import { useRoute } from 'vue-router';
+import { $t } from '@/locales';
 import { serverScopedRoutes, useServerScopeStore } from '@/store/modules/server-scope';
 
 defineOptions({
@@ -27,6 +28,7 @@ const routeStore = useRouteStore();
 const tabStore = useTabStore();
 const route = useRoute();
 const scope = useServerScopeStore();
+const pageTitle = computed(() => route.meta.i18nKey ? $t(route.meta.i18nKey) : route.meta.title);
 const scoped = computed(() => serverScopedRoutes.has(String(route.name)));
 
 const transitionName = computed(() => (themeStore.page.animate ? themeStore.page.animateMode : ''));
@@ -39,6 +41,7 @@ function resetScroll() {
 </script>
 
 <template>
+  <h1 v-if="appStore.isMobile && !route.meta.constant && route.name !== 'game-accounts'" class="ops-mobile-title">{{ pageTitle }}</h1>
   <div v-if="scoped && !scope.currentServer" class="p-24px">
     <NCard :bordered="false">
       <NEmpty :description="scope.loading ? '正在加载区服' : '请在顶栏选择运营区服'">
@@ -68,4 +71,6 @@ function resetScroll() {
   </RouterView>
 </template>
 
-<style></style>
+<style scoped>
+.ops-mobile-title { margin: 0; padding: 16px 16px 0; font-size: 18px; font-weight: 600; line-height: 1.5; overflow-wrap: anywhere; }
+</style>

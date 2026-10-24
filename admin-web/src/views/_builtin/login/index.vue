@@ -59,7 +59,6 @@ async function submit(event?: Event) {
       </NForm>
       <div class="login-note">仅限已授权的运营账号</div>
     </NCard>
-    <div class="login-credit">灵魂之花 · 运营管理</div>
   </div>
 </template>
 
@@ -77,34 +76,32 @@ async function submit(event?: Event) {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 30px;
+  margin-bottom: 24px;
   font-size: 20px;
   font-weight: 600;
 }
 .login-card {
   width: 420px;
   max-width: 100%;
-  border-radius: 8px;
+  border-radius: 6px;
   border: 1px solid rgb(var(--base-text-color) / .08);
-  box-shadow: 0 8px 28px rgb(26 34 50 / .06);
 }
 .login-card :deep(.n-card__content) {
-  padding: 32px;
+  padding: 24px;
 }
 h1 {
-  font-size: 21px;
+  font-size: 18px;
   font-weight: 600;
   margin: 0 0 24px;
 }
 .login-note {
-  margin-top: 20px;
+  margin-top: 16px;
   font-size: 13px;
   color: rgb(var(--base-text-color) / .6);
   text-align: center;
 }
-.login-credit {
-  margin-top: 28px;
-  font-size: 12px;
-  color: rgb(var(--base-text-color) / .55);
+@media (max-width: 480px) {
+  .hyjs-login { padding: 16px; }
+  .login-card :deep(.n-card__content) { padding: 20px 16px; }
 }
 </style>

@@ -438,7 +438,7 @@ async function save() {
 .attribute-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0 20px;
+  gap: 0 16px;
 }
 @media (max-width: 600px) {
   .attribute-grid {
@@ -454,7 +454,7 @@ async function save() {
 }
 .inventory-picker-filters {
   display: grid;
-  grid-template-columns: 1fr 1.5fr 1fr auto;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr) minmax(0, 1fr) auto;
   gap: 8px;
   margin-bottom: 12px;
 }
@@ -465,7 +465,7 @@ async function save() {
 }
 @media (max-width: 600px) {
   .inventory-picker-filters {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   }
 }
 </style>

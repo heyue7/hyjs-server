@@ -97,7 +97,8 @@ registerShortcut();
     preset="card"
     auto-focus
     footer-style="padding: 0; margin: 0"
-    class="fixed left-0 right-0"
+    class="ops-search-modal fixed left-0 right-0"
+    aria-label="页面搜索"
     :class="[isMobile ? 'size-full top-0px rounded-0' : 'w-630px top-50px']"
     @after-leave="handleClose"
   >
@@ -120,4 +121,10 @@ registerShortcut();
   </NModal>
 </template>
 
-<style lang="scss" scoped></style>
+<style scoped>
+:global(.n-card.n-modal.ops-search-modal > .n-card__content) { padding: 20px; }
+@media (max-width: 767px) {
+  :global(.n-card.n-modal.ops-search-modal) { width: 100vw; max-width: 100vw; height: 100dvh; border-radius: 0; }
+  :global(.n-card.n-modal.ops-search-modal > .n-card__content) { padding: 16px; }
+}
+</style>

@@ -273,14 +273,43 @@ export function getNaiveTheme(
     },
     DataTable: {
       thFontWeight: '500',
-      tdPaddingMedium: '12px 16px',
-      thPaddingMedium: '11px 16px'
+      tdPaddingMedium: '11px 14px',
+      thPaddingMedium: '10px 14px',
+      tdPaddingSmall: '9px 12px',
+      thPaddingSmall: '9px 12px'
+    },
+    Card: {
+      borderRadius: '6px',
+      paddingMedium: '20px',
+      paddingLarge: '24px',
+      titleFontSizeMedium: '16px',
+      titleFontSizeLarge: '17px',
+      titleFontWeight: '600'
+    },
+    Drawer: {
+      bodyPadding: '20px 24px',
+      headerPadding: '18px 24px',
+      footerPadding: '14px 24px',
+      titleFontSize: '17px',
+      titleFontWeight: '600'
+    },
+    Dialog: {
+      borderRadius: '8px',
+      titleFontSize: '17px',
+      titleFontWeight: '600',
+      padding: '24px',
+      contentMargin: '16px 0 20px 0',
+      actionSpace: '8px'
+    },
+    Form: {
+      labelFontSizeLeftMedium: '13px',
+      labelFontSizeTopMedium: '13px'
     },
     LoadingBar: {
       colorLoading
     },
     Tag: {
-      borderRadius: `${settings.themeRadius}px`
+      borderRadius: '4px'
     }
   };
 

@@ -289,7 +289,7 @@ async function save() {
 .profile-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0 20px;
+  gap: 0 16px;
 }
 .profile-grid :deep(.n-input-number),
 .profile-grid :deep(.n-date-picker) {
@@ -300,4 +300,5 @@ async function save() {
     grid-template-columns: 1fr;
   }
 }
+.profile-modal h3 { margin: 20px 0 16px; font-size: 16px; font-weight: 600; }
 </style>

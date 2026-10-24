@@ -22,11 +22,11 @@ function remove(index: number) {
 
 <template>
   <div class="space-y-3">
-    <div v-for="(drop, i) in value" :key="i" class="border border-gray-200 rounded p-3 dark:border-gray-700">
-      <div class="mb-2 flex items-center gap-2">
+    <div v-for="(drop, i) in value" :key="i" class="field-drop">
+      <div class="field-drop-heading">
         <ResourceSelect
           v-model:value="drop.resourceId"
-          class="min-w-50 flex-1"
+          class="field-drop-resource"
           :disabled="disabled"
           :resources="resources"
         />
@@ -60,8 +60,15 @@ function remove(index: number) {
       </NButton>
     </div>
     <NButton dashed :disabled="disabled || value.length >= 32" @click="add">添加掉落道具</NButton>
-    <p v-if="!fixed" class="text-xs text-gray-500">
+    <p v-if="!fixed" class="ops-muted">
       每种道具独立抽取一个数量档位，权重按实际总和计算。数量 0 表示未掉落。
     </p>
   </div>
 </template>
+
+<style scoped>
+.field-drop { padding: 12px 0; border-bottom: 1px solid rgb(var(--base-text-color) / .09); }
+.field-drop-heading { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 12px; }
+.field-drop-resource { flex: 1 1 180px; min-width: 0; }
+.field-drop :deep(.n-input-number) { max-width: 100%; }
+</style>

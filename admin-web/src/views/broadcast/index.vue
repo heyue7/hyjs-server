@@ -119,26 +119,26 @@ const columns: DataTableColumns<BroadcastBatch> = [
     <div class="ops-filters">
       <ContextHelp
         title="群发范围"
-        text="仅向当前所选真实区服、预览时冻结的角色发放。可选全部玩家（跨分页）或勾选部分玩家；冻结账号和保护账号自动排除，预览后新建角色不追加。确认后只写入原领奖中心，不生成系统邮件；附件需在游戏内领奖中心领取。预览15分钟有效，失败重试沿用原批次。"
+        text="仅向当前所选区服、预览时冻结的角色发放。可选全部玩家（跨分页）或勾选部分玩家；冻结账号和保护账号自动排除，预览后新建角色不追加。确认后只写入领奖中心，不生成系统邮件；附件需在游戏内领奖中心领取。预览15分钟有效，失败重试沿用原批次。"
       />
       <NSpace :size="8">
         <NButton :loading="loading" @click="load">刷新</NButton>
         <NButton v-if="canWrite" type="primary" :disabled="!writable" @click="start">新建群发</NButton>
       </NSpace>
     </div>
-    <NAlert v-if="!scope.currentServer?.runtimeBound" type="warning" title="请选择已部署的真实区服后发放。" />
+    <NAlert v-if="!scope.currentServer?.runtimeBound" type="warning" title="请选择已部署的区服后发放。" />
     <NAlert v-if="error" type="error" :title="error" />
-    <NCard :bordered="false">
+    <NCard :bordered="false" class="ops-panel">
       <NDataTable :columns="columns" :data="rows" :loading="loading" :row-key="(row: BroadcastBatch) => row.id" :bordered="false" size="small" :scroll-x="1140" />
       <div class="ops-pagination"><NPagination v-model:page="page" v-model:page-size="pageSize" :page-sizes="[25,50,100]" :item-count="total" show-size-picker @update:page="load" @update:page-size="page = 1; load()" /></div>
     </NCard>
-    <NModal :show="editorOpen" preset="card" :title="inspecting ? '群发记录' : stage === 'form' ? '新建群发补偿' : stage === 'preview' ? '确认群发范围' : '发放完成'" class="broadcast-editor" :closable="!busy" :mask-closable="!busy" @update:show="!$event && closeEditor()">
+    <NModal :show="editorOpen" preset="card" :title="inspecting ? '群发记录' : stage === 'form' ? '新建群发补偿' : stage === 'preview' ? '确认群发范围' : '发放完成'" class="ops-modal broadcast-editor" :closable="!busy" :mask-closable="!busy" @update:show="!$event && closeEditor()">
       <NAlert v-if="saveError" type="error" :title="saveError" class="mb-16px" />
       <NForm v-if="stage === 'form'" label-placement="top" :disabled="busy" :show-feedback="false" class="broadcast-form">
         <div class="broadcast-realm">收件区服 <strong>{{ scope.currentServer?.name }}</strong></div>
         <NFormItem label="收件玩家" required><PlayerSelection v-model:value="draft.audience" :server-id="scope.serverId" :disabled="busy" /></NFormItem>
         <NFormItem label="补偿标题" required><NInput v-model:value="draft.title" :maxlength="60" placeholder="例如：停服维护补偿" /></NFormItem>
-        <NFormItem label="补偿说明" required><NInput v-model:value="draft.body" type="textarea" :maxlength="4000" :autosize="{ minRows: 3, maxRows: 6 }" placeholder="填写给玩家的补偿说明，将显示在原领奖中心" /></NFormItem>
+        <NFormItem label="补偿说明" required><NInput v-model:value="draft.body" type="textarea" :maxlength="4000" :autosize="{ minRows: 3, maxRows: 6 }" placeholder="填写给玩家的补偿说明，将显示在领奖中心" /></NFormItem>
         <NFormItem label="每个角色的补偿附件" required><RewardList v-model:value="draft.rewards" :disabled="busy" label="附件" /></NFormItem>
         <NFormItem label="操作原因" required><NInput v-model:value="draft.reason" :maxlength="300" placeholder="仅供后台操作记录使用" /></NFormItem>
       </NForm>
@@ -154,7 +154,7 @@ const columns: DataTableColumns<BroadcastBatch> = [
         <section class="broadcast-mail"><h3>{{ batch.title }}</h3><p>{{ batch.body }}</p><RewardSummary :rewards="batch.rewards" /></section>
         <div class="broadcast-reason"><span>操作原因</span><p>{{ batch.reason }}</p></div>
         <NAlert v-if="stage === 'preview' && batch.recipientCount < 1" type="warning" title="当前没有可发放的角色，本批次不能发送。" />
-        <NAlert v-else-if="stage === 'preview'" type="info" title="确认后只写入原领奖中心，不会生成系统邮件。" />
+        <NAlert v-else-if="stage === 'preview'" type="info" title="确认后只写入领奖中心，不会生成系统邮件。" />
         <NCheckbox v-if="stage === 'preview'" v-model:checked="confirmed" :disabled="busy || batch.recipientCount < 1">确认向以上 {{ batch.recipientCount }} 个角色发放，每个角色在领奖中心收到相同附件。</NCheckbox>
       </template>
       <template #footer><div class="ops-drawer-actions">
@@ -168,12 +168,12 @@ const columns: DataTableColumns<BroadcastBatch> = [
 
 <style scoped>
 :global(.n-card.broadcast-editor) { width: 780px; max-width: calc(100vw - 32px); }
-.broadcast-form { display: flex; flex-direction: column; gap: 18px; }
+.broadcast-form { display: flex; flex-direction: column; gap: 16px; }
 .broadcast-form :deep(.reward-list) { width: 100%; }
 .broadcast-realm { display: flex; gap: 16px; color: rgb(var(--base-text-color) / .7); }
 .broadcast-realm strong { color: rgb(var(--base-text-color)); }
 .broadcast-review { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 24px; }
-.broadcast-review > div { display: flex; flex-direction: column; gap: 5px; }
+.broadcast-review > div { min-width: 0; overflow-wrap: anywhere; display: flex; flex-direction: column; gap: 5px; }
 .broadcast-review > div > span:first-child, .broadcast-reason > span { color: rgb(var(--base-text-color) / .65); font-size: 13px; }
 .broadcast-mail { border-block: 1px solid rgb(var(--base-text-color) / .1); padding: 18px 0; margin: 18px 0; }
 .broadcast-mail h3 { margin: 0 0 10px; font-size: 16px; }

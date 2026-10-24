@@ -2,7 +2,7 @@
 import { computed, nextTick, ref, watch } from 'vue';
 import { useWindowSize } from '@vueuse/core';
 
-withDefaults(defineProps<{ title: string; text?: string; iconOnly?: boolean }>(), { iconOnly: false });
+withDefaults(defineProps<{ title: string; text?: string; iconOnly?: boolean }>(), { iconOnly: true });
 const open = ref(false);
 const trigger = ref<{ $el: HTMLButtonElement } | null>(null);
 const content = ref<HTMLElement | null>(null);
@@ -91,8 +91,8 @@ watch(open, async value => {
   color: rgb(var(--base-text-color) / .6);
 }
 .context-help-icon-only {
-  width: 22px;
-  height: 22px;
+  width: 26px;
+  height: 26px;
   padding: 0;
 }
 .context-help-content {
@@ -126,5 +126,8 @@ watch(open, async value => {
   max-height: min(440px, 65vh);
   overflow-y: auto;
   outline: none;
+}
+@media (pointer: coarse) {
+  .context-help-icon-only { width: 34px; height: 34px; }
 }
 </style>

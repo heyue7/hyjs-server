@@ -59,11 +59,11 @@ function share(row: ActivityPrize) {
 
 <style scoped>
 .prize-navigation { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; }
-.prize-navigation button { display: flex; flex-direction: column; gap: 7px; text-align: left; padding: 14px; background: rgb(var(--base-text-color) / .025); border: 1px solid transparent; border-radius: 7px; cursor: pointer; color: rgb(var(--base-text-color)); }
+.prize-navigation button { display: flex; flex-direction: column; gap: 7px; text-align: left; padding: 10px 12px; background: rgb(var(--base-text-color) / .025); border: 1px solid transparent; border-radius: 6px; cursor: pointer; color: rgb(var(--base-text-color)); }
 .prize-navigation button.selected { border-color: rgb(var(--primary-color) / .4); background: rgb(var(--primary-color) / .06); }
 .prize-navigation button:hover { background: rgb(var(--primary-color) / .06); }
 .prize-navigation button:focus-visible { outline: 2px solid rgb(var(--primary-color) / .6); outline-offset: 2px; }
 .prize-navigation strong { overflow-wrap: anywhere; font-size: 13px; font-weight: 500; }
-.prize-navigation span { font-size: 12px; color: rgb(var(--base-text-color) / .5); }
+.prize-navigation span { font-size: 13px; color: rgb(var(--base-text-color) / .65); }
 @media (max-width: 640px) { .prize-navigation { grid-template-columns: 1fr; } }
 </style>
