@@ -1,0 +1,11 @@
+{
+  "name": "Brain Burst 2039",
+  "reference": "https://getdrawings.com/accel-world-icon",
+  "referenceImage": "https://getdrawings.com/icon-images/accel-world-icon-21.jpg",
+  "method": "built-in image_gen restoration of supplied low-resolution patch reference; generated pixels, not original anime pixels",
+  "generatedSHA256": "cbc1155e7bbc5d6bee56e8580249462c1f6a9472dba7e06b50a0181104b3520b",
+  "size": [
+    1254,
+    1254
+  ]
+}

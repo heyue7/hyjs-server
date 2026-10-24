@@ -209,7 +209,15 @@ func walletLedger(tx *gorm.DB, id, start, end int64, kind string, page, size int
 	if err != nil {
 		return nil, err
 	}
-	return walletLedgerFromQuery(query, balance, start, end, kind, page, size)
+	owner, err := walletStorageOwner(tx, id)
+	if err != nil {
+		return nil, err
+	}
+	view, err := walletLedgerFromQuery(query, balance, start, end, kind, page, size)
+	if err == nil {
+		view.ServerID, view.PlayerID = AdminProfileServerID(*owner), id
+	}
+	return view, err
 }
 func accountWalletLedger(tx *gorm.DB, id, start, end int64, kind string, page, size int64) (*model.LocalWalletView, error) {
 	balance, err := accountWalletBalance(tx, id, false)

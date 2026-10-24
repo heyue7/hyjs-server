@@ -22,7 +22,11 @@ func TestGlobalAccountsLegacyMigrationAndWalletOrders(t *testing.T) {
 	f, id, ctx := localWalletFixture(t)
 	localWalletEnable(t)
 	f.id = id
-	if _, err := f.s.LocalWalletAdd(ctx, id, "legacy-account-funds", 2500); err != nil {
+	// Seed the frozen pre-migration local format directly; current wallet APIs already use role storage.
+	if err := db.GetIns().Create(&db.LocalWalletBalance{PlayerID: id, BalanceCents: 2500, Revision: 1}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.GetIns().Create(&db.LocalWalletEntry{PlayerID: id, Key: "add:legacy-account-funds", Kind: "add", DeltaCents: 2500, BalanceAfter: 2500, Revision: 1, At: time.Now().UnixMilli(), Source: constUtil.LocalWalletVersion, Label: "历史入账"}).Error; err != nil {
 		t.Fatal(err)
 	}
 	var old db.Profile
@@ -153,6 +157,10 @@ func TestGlobalAccountsThreeSchemaRealms(t *testing.T) {
 	if err := f.s.InitializeGlobalGameAccounts(ctx); err != nil {
 		t.Fatal(err)
 	}
+	// Shared account configuration is selected after the fixture opens: initialize its terminal sources in that schema.
+	if err := f.s.InitializeLocalWallet(ctx); err != nil {
+		t.Fatal(err)
+	}
 	if err := f.s.InitializeAccountWallets(ctx); err != nil {
 		t.Fatal(err)
 	}
@@ -221,10 +229,10 @@ func TestGlobalAccountsThreeSchemaRealms(t *testing.T) {
 	}
 	secondContext = context.WithValue(secondContext, constUtil.LocalWalletSessionContextKey, role.Session)
 	view, err := second.LocalWalletSnapshot(secondContext, role.Id)
-	if err != nil || view.BalanceCents != 4000 {
-		t.Fatal("wallet not shared across role databases", view, err)
+	if err != nil || view.BalanceCents != 0 {
+		t.Fatal("second role inherited first role funds", view, err)
 	}
-	if view, err = second.LocalWalletAdd(secondContext, role.Id, "realm-two-credit", 500); err != nil || view.BalanceCents != 4500 {
+	if view, err = second.LocalWalletAdd(secondContext, role.Id, "realm-two-credit", 2500); err != nil || view.BalanceCents != 2500 {
 		t.Fatal("second realm credit", view, err)
 	}
 	request := p3DemoProviderRequest(t, "djsy.wuyou.andp0006")
@@ -237,7 +245,7 @@ func TestGlobalAccountsThreeSchemaRealms(t *testing.T) {
 	if e = db.GetIns().First(&paidOrder, "id=?", orderID).Error; e != nil {
 		t.Fatal(e)
 	}
-	expectedBalance := int64(4500) - paidOrder.Cents
+	expectedBalance := int64(2500) - paidOrder.Cents
 	second.P3AutoConfirmDemoPayments = true
 	if view, e = second.LocalWalletPay(secondContext, role.Id, orderID); e != nil || view.BalanceCents != expectedBalance {
 		t.Fatal("cross-schema native payment", view, e)
@@ -257,8 +265,8 @@ func TestGlobalAccountsThreeSchemaRealms(t *testing.T) {
 	secondSQL.Close()
 	firstSQL.Close()
 	f.open(t)
-	if view, err = f.s.LocalWalletSnapshot(ctx, id); err != nil || view.BalanceCents != expectedBalance {
-		t.Fatal("first realm did not read shared credit", view, err)
+	if view, err = f.s.LocalWalletSnapshot(ctx, id); err != nil || view.BalanceCents != 4000 {
+		t.Fatal("second realm changed first realm balance", view, err)
 	}
 	if _, err = UpdateCurrentGlobalGameAccount(ctx, id, first.Session, "", "isolated-local-demo", "cross-realm-updated"); err != nil {
 		t.Fatal(err)
@@ -312,8 +320,12 @@ func TestGlobalAccountsAdminCreateRoleFromRegisteredShell(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	shell, loginErr := LoginAccount(f.ctx, registered.Username, "isolated-shell-password")
+	if loginErr != nil {
+		t.Fatal(loginErr)
+	}
 	var original db.Profile
-	if err = db.GetIns().First(&original, registered.PlayerID).Error; err != nil {
+	if err = db.GetIns().First(&original, shell.Id).Error; err != nil {
 		t.Fatal(err)
 	}
 	request := model.AdminGamePlayerCreateRequest{AccountID: original.AccountID, ServerID: 1, Name: "新角色", HeroID: "hero_043", Reason: "隔离注册壳创角代表"}

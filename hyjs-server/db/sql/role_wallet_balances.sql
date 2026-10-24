@@ -1,0 +1,1 @@
+CREATE TABLE IF NOT EXISTS role_wallet_balances (server_id BIGINT NOT NULL,player_id BIGINT NOT NULL,account_id BIGINT NOT NULL,balance_cents BIGINT NOT NULL,revision BIGINT NOT NULL,PRIMARY KEY(server_id,player_id),KEY idx_role_wallet_balances_account_id(account_id)) ENGINE=InnoDB;

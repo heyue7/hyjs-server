@@ -239,7 +239,7 @@ const local: App.I18n.Schema = {
     audit: 'Audit',
     users: 'Admin accounts',
     cdk: 'Redeem codes',
-    'game-accounts': 'Game users',
+    'game-accounts': 'Brain Burst 2039 accounts',
     players: 'Players',
     wallets: '蓝绿终端',
     'activities-unavailable': 'Unavailable activities',

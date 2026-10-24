@@ -47,7 +47,7 @@ func initializeTerminal(ctx context.Context) error {
 			return err
 		}
 	}
-	return nil
+	return initializeRoleWalletSchema(ctx)
 }
 
 func terminalDay(now time.Time) string {
@@ -119,14 +119,21 @@ func AdminSaveTerminalSettings(ctx context.Context, actor *model.AdminPrincipal,
 	return &out, err
 }
 
-// terminalCredit locks the global balance before touching receipts, keeping original payment lock ordering.
+// terminalCredit locks the recipient role balance before its scoped receipt and income card.
 func terminalCredit(tx *gorm.DB, accountID, serverID, playerID int64, key, source, label, reasonID string, cents int64, now time.Time) error {
-	balance, err := accountWalletBalance(tx, accountID, true)
+	owner, err := walletStorageOwner(tx, playerID)
 	if err != nil {
 		return err
 	}
-	var prior db.AccountWalletEntry
-	err = db.AccountsTable(tx, "account_wallet_entries").First(&prior, "account_id=? AND `key`=?", accountID, key).Error
+	if owner.AccountID != accountID || AdminProfileServerID(*owner) != serverID {
+		return ErrLocalWalletInvalid
+	}
+	balance, err := walletReadBalance(tx, playerID, true)
+	if err != nil {
+		return err
+	}
+	var prior db.LocalWalletEntry
+	err = walletFindEntry(tx, playerID, key, "", &prior)
 	if err == nil {
 		if prior.DeltaCents != cents || prior.Source != source {
 			return ErrLocalWalletConflict
@@ -141,61 +148,85 @@ func terminalCredit(tx *gorm.DB, accountID, serverID, playerID int64, key, sourc
 	}
 	balance.BalanceCents += cents
 	balance.Revision++
-	entry := db.AccountWalletEntry{AccountID: accountID, Key: key, ServerID: serverID, PlayerID: playerID, Kind: "add", DeltaCents: cents, BalanceAfter: balance.BalanceCents, Revision: balance.Revision, At: now.UnixMilli(), Source: source, Label: label, ReasonID: reasonID}
-	if err = db.AccountsTable(tx, "account_wallet_entries").Create(&entry).Error; err != nil {
+	entry := db.LocalWalletEntry{PlayerID: playerID, Key: key, Kind: "add", DeltaCents: cents, BalanceAfter: balance.BalanceCents, Revision: balance.Revision, At: now.UnixMilli(), Source: source, Label: label, ReasonID: reasonID}
+	if err = walletCreateEntry(tx, &entry); err != nil {
 		return err
 	}
-	if err = db.AccountsTable(tx, "account_wallet_balances").Save(balance).Error; err != nil {
+	if err = walletSaveBalance(tx, balance); err != nil {
 		return err
 	}
-	return db.AccountsTable(tx, "terminal_incomes").Create(&db.TerminalIncome{AccountID: accountID, ID: key, Label: label, AmountCents: cents, CreatedAt: now.UnixMilli(), Revision: balance.Revision, Source: source}).Error
+	return db.AccountsTable(tx, "terminal_role_incomes").Create(&db.TerminalRoleIncome{ServerID: serverID, PlayerID: playerID, AccountID: accountID, ID: key, Label: label, AmountCents: cents, CreatedAt: now.UnixMilli(), Revision: balance.Revision, Source: source}).Error
 }
 func terminalSignup(tx *gorm.DB, account *db.GameAccount, serverID, playerID int64) error {
 	// Legacy isolated consumers that have not enabled the terminal retain their original registration path.
-	if !gameSchemaHasTable(tx, &db.TerminalSetting{}) {
+	if !tx.Migrator().HasTable(&db.TerminalSetting{}) {
 		return nil
+	}
+	var locked db.GameAccount
+	if err := db.AccountsTable(tx, "game_accounts").Clauses(clause.Locking{Strength: "UPDATE"}).First(&locked, account.ID).Error; err != nil {
+		return err
+	}
+	// Locking reads see the latest committed claim even in an outer repeatable-read transaction.
+	for _, table := range []string{"account_wallet_entries", "role_wallet_entries"} {
+		var prior db.AccountWalletEntry
+		err := db.AccountsTable(tx, table).Clauses(clause.Locking{Strength: "UPDATE"}).Select("`key`").Where("account_id=? AND (`key`=? OR legacy_key=?)", account.ID, "terminal:signup", "terminal:signup").Take(&prior).Error
+		if err == nil {
+			return nil
+		}
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+	}
+	var priorRole db.GameAccountRole
+	err := db.AccountsTable(tx, "game_account_roles").Clauses(clause.Locking{Strength: "UPDATE"}).Where("account_id=? AND name<>? AND level>=? AND NOT (server_id=? AND player_id=?)", account.ID, "", 1, serverID, playerID).Take(&priorRole).Error
+	if err == nil {
+		return nil
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return err
 	}
 	cfg, err := terminalSettings(tx, serverID, false)
 	if err != nil {
 		return err
 	}
-	if cfg.SignupPoints == 0 || account.Protected {
+	if cfg.SignupPoints == 0 || locked.Protected {
 		return nil
 	}
 	return terminalCredit(tx, account.ID, serverID, playerID, "terminal:signup", "signup", "首次注册赠送", "", cfg.SignupPoints*100, time.Now())
 }
-func terminalAccountState(tx *gorm.DB, id int64) (*db.TerminalAccountState, error) {
-	row := db.TerminalAccountState{AccountID: id}
-	if err := db.AccountsTable(tx, "terminal_account_states").Clauses(clause.OnConflict{DoNothing: true}).Create(&row).Error; err != nil {
+func terminalRoleState(tx *gorm.DB, owner *db.Profile) (*db.TerminalRoleState, error) {
+	row := db.TerminalRoleState{AccountID: owner.AccountID, ServerID: AdminProfileServerID(*owner), PlayerID: owner.Id}
+	q := db.AccountsTable(tx, "terminal_role_states")
+	if err := q.Clauses(clause.OnConflict{DoNothing: true}).Create(&row).Error; err != nil {
 		return nil, err
 	}
-	err := db.AccountsTable(tx, "terminal_account_states").Clauses(clause.Locking{Strength: "UPDATE"}).First(&row, "account_id=?", id).Error
+	err := q.Clauses(clause.Locking{Strength: "UPDATE"}).Where("server_id=? AND player_id=?", row.ServerID, row.PlayerID).First(&row).Error
 	return &row, err
 }
 func terminalProjection(tx *gorm.DB, owner *db.Profile, balance *db.LocalWalletBalance, now time.Time) (*model.TerminalState, error) {
-	// The wallet lock serializes projection/acknowledgement with every account credit and daily action.
+	// The role wallet lock serializes projection and acknowledgement with its credits and daily action.
 	if owner.AccountID < 1 {
 		return nil, nil
 	}
-	if _, err := accountWalletBalance(tx, owner.AccountID, true); err != nil {
+	if _, err := walletReadBalance(tx, owner.Id, true); err != nil {
 		return nil, err
 	}
 	cfg, err := terminalSettings(tx, AdminProfileServerID(*owner), false)
 	if err != nil {
 		return nil, err
 	}
-	state, err := terminalAccountState(tx, owner.AccountID)
+	state, err := terminalRoleState(tx, owner)
 	if err != nil {
 		return nil, err
 	}
 	out := &model.TerminalState{BurstEnabled: cfg.BurstEnabled, BurstCostPoints: cfg.BurstCostPoints, BurstMinPoints: cfg.BurstMinPoints, BurstMaxPoints: cfg.BurstMaxPoints, BurstDay: terminalDay(now), IncomeEntries: []model.TerminalIncomeEntry{}}
 	var used int64
-	if err = db.AccountsTable(tx, "terminal_bursts").Where("account_id=? AND day=?", owner.AccountID, out.BurstDay).Count(&used).Error; err != nil {
+	if err = db.AccountsTable(tx, "terminal_role_bursts").Where("server_id=? AND player_id=? AND day=?", AdminProfileServerID(*owner), owner.Id, out.BurstDay).Count(&used).Error; err != nil {
 		return nil, err
 	}
 	out.CanBurst = cfg.BurstEnabled && used == 0 && balance.BalanceCents >= cfg.BurstCostPoints*100
-	var rows []db.TerminalIncome
-	if err = db.AccountsTable(tx, "terminal_incomes").Where("account_id=?", owner.AccountID).Order("revision DESC").Limit(20).Find(&rows).Error; err != nil {
+	var rows []db.TerminalRoleIncome
+	if err = db.AccountsTable(tx, "terminal_role_incomes").Where("server_id=? AND player_id=?", AdminProfileServerID(*owner), owner.Id).Order("revision DESC").Limit(20).Find(&rows).Error; err != nil {
 		return nil, err
 	}
 	for _, r := range rows {
@@ -204,12 +235,12 @@ func terminalProjection(tx *gorm.DB, owner *db.Profile, balance *db.LocalWalletB
 	if len(rows) > 0 {
 		out.LatestIncomeRevision = rows[0].Revision
 	}
-	if err = db.AccountsTable(tx, "terminal_incomes").Where("account_id=? AND revision>?", owner.AccountID, state.SeenRevision).Count(&out.UnreadCount).Error; err != nil {
+	if err = db.AccountsTable(tx, "terminal_role_incomes").Where("server_id=? AND player_id=? AND revision>?", AdminProfileServerID(*owner), owner.Id, state.SeenRevision).Count(&out.UnreadCount).Error; err != nil {
 		return nil, err
 	}
 	if out.LatestIncomeRevision > state.DeliveredRevision {
 		state.DeliveredRevision = out.LatestIncomeRevision
-		if err = db.AccountsTable(tx, "terminal_account_states").Save(state).Error; err != nil {
+		if err = db.AccountsTable(tx, "terminal_role_states").Save(state).Error; err != nil {
 			return nil, err
 		}
 	}
@@ -228,12 +259,12 @@ func (s *GameService) localWalletBurstAt(ctx context.Context, id int64, requestI
 		if owner.AccountID < 1 || !walletAccountOwner(tx, owner) || !localWalletSessionAllowed(ctx, owner) {
 			return ErrLocalWalletInvalid
 		}
-		balance, err := accountWalletBalance(tx, owner.AccountID, true)
+		balance, err := walletReadBalance(tx, owner.Id, true)
 		if err != nil {
 			return err
 		}
-		var receipt db.TerminalBurst
-		err = db.AccountsTable(tx, "terminal_bursts").First(&receipt, "account_id=? AND request_id=?", owner.AccountID, requestID).Error
+		var receipt db.TerminalRoleBurst
+		err = db.AccountsTable(tx, "terminal_role_bursts").First(&receipt, "server_id=? AND player_id=? AND request_id=?", AdminProfileServerID(*owner), owner.Id, requestID).Error
 		replay := err == nil
 		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 			return err
@@ -254,7 +285,7 @@ func (s *GameService) localWalletBurstAt(ctx context.Context, id int64, requestI
 				return ErrLocalWalletDisabled
 			}
 			var used int64
-			if err = db.AccountsTable(tx, "terminal_bursts").Where("account_id=? AND day=?", owner.AccountID, terminalDay(now)).Count(&used).Error; err != nil {
+			if err = db.AccountsTable(tx, "terminal_role_bursts").Where("server_id=? AND player_id=? AND day=?", AdminProfileServerID(*owner), owner.Id, terminalDay(now)).Count(&used).Error; err != nil {
 				return err
 			}
 			if used > 0 {
@@ -271,22 +302,22 @@ func (s *GameService) localWalletBurstAt(ctx context.Context, id int64, requestI
 			if err != nil {
 				return err
 			}
-			receipt = db.TerminalBurst{AccountID: owner.AccountID, RequestID: requestID, Day: terminalDay(now), AwardPoints: cfg.BurstMinPoints + n.Int64()}
+			receipt = db.TerminalRoleBurst{ServerID: AdminProfileServerID(*owner), PlayerID: owner.Id, AccountID: owner.AccountID, RequestID: requestID, Day: terminalDay(now), AwardPoints: cfg.BurstMinPoints + n.Int64()}
 			if cost > 0 {
 				balance.BalanceCents -= cost
 				balance.Revision++
-				debit := db.AccountWalletEntry{AccountID: owner.AccountID, Key: "terminal:burst:cost:" + requestID, ServerID: AdminProfileServerID(*owner), PlayerID: id, Kind: "debit", DeltaCents: -cost, BalanceAfter: balance.BalanceCents, Revision: balance.Revision, At: now.UnixMilli(), Source: "burst", Label: "Burst Link！启动消耗"}
-				if err = db.AccountsTable(tx, "account_wallet_entries").Create(&debit).Error; err != nil {
+				debit := db.LocalWalletEntry{Key: "terminal:burst:cost:" + requestID, PlayerID: id, Kind: "debit", DeltaCents: -cost, BalanceAfter: balance.BalanceCents, Revision: balance.Revision, At: now.UnixMilli(), Source: "burst", Label: "Burst Link！启动消耗"}
+				if err = walletCreateEntry(tx, &debit); err != nil {
 					return err
 				}
-				if err = db.AccountsTable(tx, "account_wallet_balances").Save(balance).Error; err != nil {
+				if err = walletSaveBalance(tx, balance); err != nil {
 					return err
 				}
 			}
 			if err = terminalCredit(tx, owner.AccountID, AdminProfileServerID(*owner), id, "terminal:burst:"+requestID, "burst", "Burst Link！每日超频奖励", "", receipt.AwardPoints*100, now); err != nil {
 				return err
 			}
-			if err = db.AccountsTable(tx, "terminal_bursts").Create(&receipt).Error; err != nil {
+			if err = db.AccountsTable(tx, "terminal_role_bursts").Create(&receipt).Error; err != nil {
 				return err
 			}
 		}
@@ -320,7 +351,7 @@ func (s *GameService) LocalWalletSeen(ctx context.Context, id, revision int64) (
 		if err != nil {
 			return err
 		}
-		state, err := terminalAccountState(tx, owner.AccountID)
+		state, err := terminalRoleState(tx, owner)
 		if err != nil {
 			return err
 		}
@@ -329,7 +360,7 @@ func (s *GameService) LocalWalletSeen(ctx context.Context, id, revision int64) (
 		}
 		if revision > state.SeenRevision {
 			state.SeenRevision = revision
-			if err = db.AccountsTable(tx, "terminal_account_states").Save(state).Error; err != nil {
+			if err = db.AccountsTable(tx, "terminal_role_states").Save(state).Error; err != nil {
 				return err
 			}
 		}
@@ -445,7 +476,7 @@ func terminalFreeze(tx *gorm.DB, serverID int64, requestID string, points int64,
 	return row, false, err
 }
 
-// terminalResume commits each recipient independently; receipts and account credits are atomic and restart-safe.
+// terminalResume commits each recipient independently; receipts and role credits are atomic and restart-safe.
 func terminalResume(ctx context.Context, id string) error {
 	d := db.GetIns().WithContext(ctx)
 	var batch db.TerminalBatch

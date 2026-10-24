@@ -21,6 +21,34 @@ func init() {
 	routes.RegisterPostRouter("/game-account/profile", wrapper.Wrapper(GameAccountProfileHandler))
 	routes.RegisterPostRouter("/game-account/nickname", wrapper.Wrapper(GameAccountNicknameHandler))
 	routes.RegisterPostRouter("/game-account/password", wrapper.Wrapper(GameAccountPasswordHandler))
+	routes.RegisterPostRouter("/game-account/logout", wrapper.Wrapper(GameAccountLogoutHandler))
+}
+
+// GameAccountLogoutHandler releases the supplied session without affecting a newer login.
+// @Summary 退出 Brain Burst 2039 登录
+// @Description 撤销当前区服会话；重复退出成功，不影响后续新登录或角色财产。
+// @Tags Game
+// @Accept json
+// @Produce json
+// @Param body body model.GameAccountLogoutRequest true "当前角色会话"
+// @Success 200 {object} model.GameAccountLogoutResponse
+// @Router /game-account/logout [post]
+func GameAccountLogoutHandler(c *gin.Context) error {
+	var req model.GameAccountLogoutRequest
+	if c.ShouldBindJSON(&req) != nil || req.PlayerID < 1 || len(req.SessionHex) != 32 {
+		return model.NewErrParamsError()
+	}
+	session, err := hex.DecodeString(req.SessionHex)
+	if err != nil || len(session) != 16 {
+		return model.NewErrParamsError()
+	}
+	out, err := service.LogoutCurrentGlobalGameAccount(c.Request.Context(), req.PlayerID, session)
+	if err != nil {
+		return err
+	}
+	c.Header("Cache-Control", "no-store")
+	c.JSON(http.StatusOK, model.NewBizCodeData(out))
+	return nil
 }
 
 // RegisterGlobalGameAccountRoutes uses the authenticated admin group for global user operations.

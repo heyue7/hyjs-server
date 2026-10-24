@@ -11,7 +11,7 @@ type GameAccountRegisterRequest struct {
 // GameAccountRegisterResponse leaves original login and starter-character creation unchanged.
 type GameAccountRegisterResponse struct {
 	Registered bool   `json:"registered"` // Registered is true only for a newly inserted original account.
-	PlayerID   int64  `json:"playerId"`   // PlayerID is the existing profile identity; the starter character is not yet created.
+	PlayerID   int64  `json:"playerId"`   // 全局账号注册为0；进入区服后由原登录流程分配角色身份。
 	Username   string `json:"username"`   // Username is the new login identity.
 }
 

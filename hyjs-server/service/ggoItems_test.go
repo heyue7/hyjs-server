@@ -46,7 +46,7 @@ func TestGGOConversionNoHitInvalidAndAtomicRollback(t *testing.T) {
 	if err := db.GetIns().First(&owner, id).Error; err != nil {
 		t.Fatal(err)
 	}
-	before, err := accountWalletBalance(db.GetIns(), owner.AccountID, false)
+	before, err := walletReadBalance(db.GetIns(), owner.Id, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -92,12 +92,12 @@ func TestGGOConversionNoHitInvalidAndAtomicRollback(t *testing.T) {
 	if !errors.Is(err, rollback) {
 		t.Fatal(err)
 	}
-	balance, err := accountWalletBalance(db.GetIns(), owner.AccountID, false)
+	balance, err := walletReadBalance(db.GetIns(), owner.Id, false)
 	if err != nil || balance.BalanceCents != before.BalanceCents {
 		t.Fatal("rollback balance", balance, err)
 	}
 	var count int64
-	db.AccountsTable(db.GetIns(), "terminal_incomes").Where("account_id=? AND source=?", owner.AccountID, constUtil.GGOIncomeSource).Count(&count)
+	db.AccountsTable(db.GetIns(), "terminal_role_incomes").Where("account_id=? AND source=?", owner.AccountID, constUtil.GGOIncomeSource).Count(&count)
 	if count != 0 {
 		t.Fatal("rollback income", count)
 	}
@@ -141,20 +141,20 @@ func TestGGOConversionNoHitInvalidAndAtomicRollback(t *testing.T) {
 	if err = ConvertGGOOverclockItem(nil, &owner, player, game); err != nil {
 		t.Fatal(err)
 	}
-	balance, err = accountWalletBalance(db.GetIns(), owner.AccountID, false)
+	balance, err = walletReadBalance(db.GetIns(), owner.Id, false)
 	if err != nil || balance.BalanceCents != before.BalanceCents+200 {
 		t.Fatal("credit/cold", balance, err)
 	}
-	db.AccountsTable(db.GetIns(), "terminal_incomes").Where("account_id=? AND source=?", owner.AccountID, constUtil.GGOIncomeSource).Count(&count)
+	db.AccountsTable(db.GetIns(), "terminal_role_incomes").Where("account_id=? AND source=?", owner.AccountID, constUtil.GGOIncomeSource).Count(&count)
 	if count != 1 {
 		t.Fatal("income count", count)
 	}
-	var income db.TerminalIncome
-	var entry db.AccountWalletEntry
-	if err = db.AccountsTable(db.GetIns(), "terminal_incomes").Where("account_id=? AND source=?", owner.AccountID, constUtil.GGOIncomeSource).First(&income).Error; err != nil {
+	var income db.TerminalRoleIncome
+	var entry db.RoleWalletEntry
+	if err = db.AccountsTable(db.GetIns(), "terminal_role_incomes").Where("account_id=? AND source=?", owner.AccountID, constUtil.GGOIncomeSource).First(&income).Error; err != nil {
 		t.Fatal(err)
 	}
-	if err = db.AccountsTable(db.GetIns(), "account_wallet_entries").Where("account_id=? AND source=?", owner.AccountID, constUtil.GGOIncomeSource).First(&entry).Error; err != nil {
+	if err = db.AccountsTable(db.GetIns(), "role_wallet_entries").Where("account_id=? AND source=?", owner.AccountID, constUtil.GGOIncomeSource).First(&entry).Error; err != nil {
 		t.Fatal(err)
 	}
 	wallEnd := time.Now().UnixMilli()
@@ -345,7 +345,7 @@ func TestGGOMySQLConcurrentTransactions(t *testing.T) {
 		t.Fatal(err)
 	}
 	req := model.GGOShopBuyRequest{PlayerID: id, ProductID: catalogue.Items[0].ID, Version: catalogue.Version, RequestID: uuid.NewString()}
-	before, err := accountWalletBalance(db.GetIns(), owner.AccountID, false)
+	before, err := walletReadBalance(db.GetIns(), owner.Id, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -414,13 +414,13 @@ func TestGGOMySQLConcurrentTransactions(t *testing.T) {
 		}
 	}
 
-	balance, err := accountWalletBalance(db.GetIns(), owner.AccountID, false)
+	balance, err := walletReadBalance(db.GetIns(), owner.Id, false)
 	if err != nil || balance.BalanceCents != before.BalanceCents+200 {
 		t.Fatal("exact minimal-unit credit", balance, err)
 	}
 	var incomes, entries int64
-	db.AccountsTable(db.GetIns(), "terminal_incomes").Where("account_id=? AND source=?", owner.AccountID, constUtil.GGOIncomeSource).Count(&incomes)
-	db.AccountsTable(db.GetIns(), "account_wallet_entries").Where("account_id=? AND source=?", owner.AccountID, constUtil.GGOIncomeSource).Count(&entries)
+	db.AccountsTable(db.GetIns(), "terminal_role_incomes").Where("account_id=? AND source=?", owner.AccountID, constUtil.GGOIncomeSource).Count(&incomes)
+	db.AccountsTable(db.GetIns(), "role_wallet_entries").Where("account_id=? AND source=?", owner.AccountID, constUtil.GGOIncomeSource).Count(&entries)
 	if incomes != 2 || entries != 2 {
 		t.Fatal("ledger/income exactly once", entries, incomes)
 	}
@@ -533,7 +533,7 @@ func TestGGOAdminInventoryImmediateCreditAtomicReplay(t *testing.T) {
 	if err := db.GetIns().First(&owner, id).Error; err != nil {
 		t.Fatal(err)
 	}
-	initial, err := accountWalletBalance(db.GetIns(), owner.AccountID, false)
+	initial, err := walletReadBalance(db.GetIns(), owner.Id, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -545,7 +545,7 @@ func TestGGOAdminInventoryImmediateCreditAtomicReplay(t *testing.T) {
 				t.Fatal("admin result kept overclock inventory")
 			}
 		}
-		wallet, e := accountWalletBalance(db.GetIns(), owner.AccountID, false)
+		wallet, e := walletReadBalance(db.GetIns(), owner.Id, false)
 		if e != nil || wallet.BalanceCents != initial.BalanceCents+delta {
 			t.Fatal("admin terminal delta", wallet, e)
 		}
@@ -646,11 +646,11 @@ func TestGGOAdminInventoryImmediateCreditAtomicReplay(t *testing.T) {
 	if coldReceipt.Detail != frozenReceipt {
 		t.Fatal("immutable admin receipt changed")
 	}
-	db.AccountsTable(db.GetIns(), "account_wallet_entries").Where("account_id=? AND source=?", owner.AccountID, constUtil.GGOIncomeSource).Count(&count)
+	db.AccountsTable(db.GetIns(), "role_wallet_entries").Where("account_id=? AND source=?", owner.AccountID, constUtil.GGOIncomeSource).Count(&count)
 	if count != 3 {
 		t.Fatal("admin ledger count", count)
 	}
-	db.AccountsTable(db.GetIns(), "terminal_incomes").Where("account_id=? AND source=?", owner.AccountID, constUtil.GGOIncomeSource).Count(&count)
+	db.AccountsTable(db.GetIns(), "terminal_role_incomes").Where("account_id=? AND source=?", owner.AccountID, constUtil.GGOIncomeSource).Count(&count)
 	if count != 3 {
 		t.Fatal("admin income count", count)
 	}

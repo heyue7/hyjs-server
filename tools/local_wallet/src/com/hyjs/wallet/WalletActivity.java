@@ -1,6 +1,7 @@
 package com.hyjs.wallet;
 
 import android.app.Dialog;
+import android.app.AlertDialog;
 import android.animation.ValueAnimator;
 import android.content.DialogInterface;
 import android.content.SharedPreferences;
@@ -64,7 +65,7 @@ import java.util.concurrent.Executors;
 /** A native wallet layered on the original Unity activity; the engine remains original. */
 public class WalletActivity extends UnityPlayerActivity {
     private static final int BLUE=Color.rgb(22,119,255), INK=Color.rgb(17,17,17), GRAY=Color.rgb(128,128,128), LINE=Color.rgb(240,240,240);
-    private static final int HOME=0, BILLS=4, ORDERS=5, CASHIER=6, ACCOUNT=7, NICKNAME=8, PASSWORD=9;
+    private static final int HOME=0, BILLS=4, ORDERS=5, CASHIER=6, ACCOUNT=7, NICKNAME=8, PASSWORD=9, ACCOUNT_HOME=10;
     private static volatile WalletActivity current;
     private static volatile Credentials credentials=new Credentials(0,"",0);
 
@@ -145,7 +146,7 @@ public class WalletActivity extends UnityPlayerActivity {
     private String origin, burstRequestId, selectedOrderId;
     private String message="";
     private boolean messageError, busy, destroyed, dockRight, dragging, keyboardBack, refreshQueued;
-    private int page=HOME;
+    private int page=ACCOUNT_HOME;
     private int ledgerRange=2, ledgerKind=0, ledgerPage=1, ledgerScrollY=0;
     private ScrollView ledgerScroll, homeScroll;
     private int homeScrollY;
@@ -164,19 +165,9 @@ public class WalletActivity extends UnityPlayerActivity {
         }
     }};
 
-    // Clip the drawable itself; Unity's window can disable outline clipping.
+    // Preserve the complete branded asset inside the existing 48dp touch window.
     private static final class CircularWalletIcon extends ImageView {
-        private final Path circle=new Path();
-        private final Paint surface=new Paint(Paint.ANTI_ALIAS_FLAG);
-        CircularWalletIcon(android.content.Context context){super(context);surface.setColor(Color.WHITE);}
-        @Override protected void onSizeChanged(int w,int h,int oldw,int oldh){
-            super.onSizeChanged(w,h,oldw,oldh);circle.reset();
-            circle.addCircle(w/2f,h/2f,Math.min(w,h)/2f,Path.Direction.CW);
-        }
-        @Override protected void onDraw(Canvas canvas){
-            canvas.drawCircle(getWidth()/2f,getHeight()/2f,Math.min(getWidth(),getHeight())/2f,surface);
-            int saved=canvas.save();canvas.clipPath(circle);super.onDraw(canvas);canvas.restoreToCount(saved);
-        }
+        CircularWalletIcon(android.content.Context context){super(context);}
     }
 
     // Clip the hidden half at the usable game edge, including immersive bars
@@ -253,12 +244,13 @@ public class WalletActivity extends UnityPlayerActivity {
 
     @Override protected void onCreate(Bundle state){
         try { LocalAssetOverlay.synchronize(this); } catch(java.io.IOException failure) { throw new IllegalStateException("本地游戏资源刷新失败", failure); }
-        super.onCreate(state);current=this;loadPendingRequests();
+        super.onCreate(state);current=this;
         try{
             JSONObject config=new JSONObject(readAsset("local-wallet.json"));URI uri=new URI(config.getString("origin"));
             if(!("http".equals(uri.getScheme()) || "https".equals(uri.getScheme())) || uri.getHost()==null || uri.getUserInfo()!=null || uri.getQuery()!=null || uri.getFragment()!=null || !(uri.getPath().isEmpty() || "/".equals(uri.getPath())))throw new Exception();
             origin=config.getString("origin").replaceAll("/+$","");
         }catch(Exception error){origin=null;}
+        loadPendingRequests();
         getWindow().getDecorView().post(new Runnable(){public void run(){attachBubble();}});
     }
     @Override protected void onResume(){super.onResume();current=this;foreground=true;pollHandler.removeCallbacks(statePoll);pollHandler.post(statePoll);if(panel!=null && panel.isShowing())refreshPage();}
@@ -295,7 +287,7 @@ public class WalletActivity extends UnityPlayerActivity {
         ViewGroup decor=(ViewGroup)getWindow().getDecorView();decor.setClipChildren(false);decor.setClipToPadding(false);
         overlay=new WalletOverlay();overlay.setClipChildren(false);overlay.setClipToPadding(false);overlay.setClickable(false);
         decor.addView(overlay,new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.MATCH_PARENT,Gravity.FILL));
-        ImageView icon=new CircularWalletIcon(this);icon.setContentDescription("蓝绿终端，点击展开，拖动位置");icon.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        ImageView icon=new CircularWalletIcon(this);icon.setContentDescription("Brain Burst 2039，点击展开，拖动位置");icon.setScaleType(ImageView.ScaleType.FIT_CENTER);
         try{InputStream in=getAssets().open("local-wallet/icon.png");BitmapFactory.Options options=new BitmapFactory.Options();options.inSampleSize=4;Bitmap bitmap=BitmapFactory.decodeStream(in,null,options);in.close();if(bitmap!=null)icon.setImageBitmap(bitmap);}catch(Exception unavailable){icon.setImageResource(android.R.drawable.ic_menu_save);icon.setColorFilter(BLUE);}
         bubble=icon;bubble.setAlpha(.40f);
         bubbleX=0;bubbleY=dp(70);
@@ -441,7 +433,7 @@ public class WalletActivity extends UnityPlayerActivity {
 
     private void openPanel(){
         if(destroyed || (panel!=null && panel.isShowing()))return;
-        revealBubble();homeScroll=null;homeScrollY=0;page=HOME;message="";messageError=false;
+        revealBubble();homeScroll=null;homeScrollY=0;page=ACCOUNT_HOME;message="";messageError=false;
         panel=new Dialog(this);panel.requestWindowFeature(Window.FEATURE_NO_TITLE);
         shell=column();shell.setBackgroundColor(Color.WHITE);shell.setFocusableInTouchMode(true);panel.setContentView(shell);
         Window window=panel.getWindow();window.setBackgroundDrawableResource(android.R.color.white);window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);window.setDimAmount(.24f);
@@ -469,8 +461,9 @@ public class WalletActivity extends UnityPlayerActivity {
     }
     private void back(){
         hideKeyboard();
-        if(page==HOME){panel.dismiss();return;}
-        if(page==NICKNAME || page==PASSWORD){navigate(ACCOUNT);return;}
+        if(page==ACCOUNT_HOME){panel.dismiss();return;}
+        if(page==HOME || page==ACCOUNT){navigate(ACCOUNT_HOME);return;}
+        if(page==NICKNAME || page==PASSWORD){navigate(ACCOUNT_HOME);return;}
         if(page==CASHIER && array(wallet,"pendingOrders").length()>1){navigate(ORDERS);return;}
         navigate(HOME);
     }
@@ -481,26 +474,27 @@ public class WalletActivity extends UnityPlayerActivity {
         if(panel==null)return;View focus=panel.getCurrentFocus();if(focus!=null){InputMethodManager ime=(InputMethodManager)getSystemService(INPUT_METHOD_SERVICE);if(ime!=null)ime.hideSoftInputFromWindow(focus.getWindowToken(),0);focus.clearFocus();}if(shell!=null)shell.requestFocus();
     }
     private void setMessage(String value,boolean error){message=value;messageError=error;if(feedback!=null){feedback.setText(value);feedback.setVisibility(value.isEmpty()?View.GONE:View.VISIBLE);feedback.setTextColor(error?Color.rgb(200,65,50):GRAY);}}
-    private String title(){switch(page){case BILLS:return "账单";case CASHIER:return "付款";case ORDERS:return "待支付订单";case ACCOUNT:return "账号设置";case NICKNAME:return "修改昵称";case PASSWORD:return "修改密码";default:return "蓝绿终端";}}
+    private String title(){switch(page){case BILLS:return "账单";case CASHIER:return "付款";case ORDERS:return "待支付订单";case ACCOUNT_HOME:case ACCOUNT:return "Brain Burst 2039";case NICKNAME:return "修改名称";case PASSWORD:return "修改密码";default:return "蓝绿终端";}}
     private void render(){
         if(panel==null || !panel.isShowing())return;
         fitPanel();
         rememberLedgerScroll();ledgerScroll=null;
         if(homeScroll!=null && page==HOME)homeScrollY=homeScroll.getScrollY();homeScroll=null;shell.removeAllViews();
         FrameLayout nav=new FrameLayout(this);
-        TextView title=center(title(),18,INK);nav.addView(title,new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(52)));
-        TextView back=center("‹",34,INK);back.setContentDescription(page==HOME?"收起蓝绿终端":"返回");FrameLayout.LayoutParams left=new FrameLayout.LayoutParams(dp(56),dp(52),Gravity.LEFT);nav.addView(back,left);back.setOnClickListener(new View.OnClickListener(){public void onClick(View v){back();}});
-        if(page==HOME){TextView menu=center("⋯",28,INK);menu.setContentDescription("终端菜单");FrameLayout.LayoutParams right=new FrameLayout.LayoutParams(dp(56),dp(52),Gravity.RIGHT);nav.addView(menu,right);menu.setOnClickListener(v->{PopupMenu popup=new PopupMenu(this,menu);popup.getMenu().add(0,1,0,"账单");popup.getMenu().add(0,2,1,"账号设置").setEnabled(ready());popup.getMenu().add(0,3,2,"Burst Link！规则").setEnabled(terminal()!=null);popup.setOnMenuItemClickListener(item->{if(item.getItemId()==3)showBurstRules();else navigate(item.getItemId()==1?BILLS:ACCOUNT);return true;});popup.show();});}
+        TextView title=center(title(),page==ACCOUNT_HOME?17:18,INK);title.setPadding(dp(58),0,dp(58),0);title.setMaxLines(2);if(Build.VERSION.SDK_INT>=26)title.setAutoSizeTextTypeUniformWithConfiguration(12,18,1,android.util.TypedValue.COMPLEX_UNIT_SP);nav.addView(title,new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(52)));
+        TextView back=center("‹",34,INK);back.setContentDescription(page==ACCOUNT_HOME?"收起 Brain Burst 2039":"返回");FrameLayout.LayoutParams left=new FrameLayout.LayoutParams(dp(56),dp(52),Gravity.LEFT);nav.addView(back,left);back.setOnClickListener(new View.OnClickListener(){public void onClick(View v){back();}});
+        if(page==HOME){TextView menu=center("⋯",28,INK);menu.setContentDescription("终端菜单");FrameLayout.LayoutParams right=new FrameLayout.LayoutParams(dp(56),dp(52),Gravity.RIGHT);nav.addView(menu,right);menu.setOnClickListener(v->{PopupMenu popup=new PopupMenu(this,menu);popup.getMenu().add(0,1,0,"账单");popup.getMenu().add(0,2,1,"待支付订单").setEnabled(ready());popup.getMenu().add(0,3,2,"Burst Link！规则").setEnabled(terminal()!=null);popup.setOnMenuItemClickListener(item->{if(item.getItemId()==3)showBurstRules();else navigate(item.getItemId()==1?BILLS:ORDERS);return true;});popup.show();});}
         else if(page==BILLS){TextView reload=center("刷新",14,BLUE);reload.setEnabled(!busy);nav.addView(reload,new FrameLayout.LayoutParams(dp(64),dp(52),Gravity.RIGHT));reload.setOnClickListener(new View.OnClickListener(){public void onClick(View v){refreshPage();}});}
         addFull(shell,nav,52);divider(shell);
         LinearLayout body=column();shell.addView(body,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,0,1));
-        switch(page){case BILLS:renderBills(body);break;case ORDERS:renderOrders(body);break;case CASHIER:renderCashier(body);break;case ACCOUNT:renderAccount(body);break;case NICKNAME:case PASSWORD:renderAccountForm(body);break;default:renderHome(body);}
+        switch(page){case BILLS:renderBills(body);break;case ORDERS:renderOrders(body);break;case CASHIER:renderCashier(body);break;case ACCOUNT_HOME:case ACCOUNT:renderAccount(body);break;case NICKNAME:case PASSWORD:renderAccountForm(body);break;default:renderHome(body);}
         feedback=center("",12,GRAY);feedback.setPadding(dp(20),dp(6),dp(20),dp(6));feedback.setMaxLines(2);shell.addView(feedback);
-        if(!credentials.valid())setMessage("登录游戏后可用",false);else if(origin==null)setMessage("蓝绿终端连接未配置",true);else setMessage(message,messageError);
+        if(!credentials.valid())setMessage("请先登录 Brain Burst 2039",false);else if(origin==null)setMessage("蓝绿终端连接未配置",true);else setMessage(message,messageError);
     }
     private void renderHome(LinearLayout body){
         LinearLayout content=column();
         LinearLayout summary=column();summary.setPadding(dp(20),dp(16),dp(20),dp(16));
+        JSONObject role=currentRole();TextView owner=text(role==null?"当前角色 · ID "+credentials.player:roleLabel(role),12,GRAY);owner.setPadding(0,0,0,dp(12));summary.addView(owner);
         JSONObject terminal=terminal();boolean enabled=terminal!=null && terminal.optBoolean("burstEnabled");boolean can=enabled && terminal.optBoolean("canBurst");
         boolean insufficient=terminal!=null && wallet.optLong("balanceCents")<terminal.optDouble("burstCostPoints")*100;
         LinearLayout row=new LinearLayout(this);row.setGravity(Gravity.CENTER_VERTICAL);
@@ -560,16 +554,51 @@ public class WalletActivity extends UnityPlayerActivity {
         Window window=detail.getWindow();if(window!=null){window.setBackgroundDrawableResource(android.R.color.white);window.setDimAmount(.30f);}detail.show();window=detail.getWindow();if(window!=null){attachWalletWindow(window.getDecorView());window.setLayout(Math.min(dp(430),getResources().getDisplayMetrics().widthPixels-dp(36)),Math.min(dp(560),getResources().getDisplayMetrics().heightPixels-dp(48)));window.setGravity(Gravity.CENTER);}
     }
     private static String pointNumber(double points){return BigDecimal.valueOf(points).stripTrailingZeros().toPlainString();}
+    private boolean isCurrentRole(JSONObject role){
+        return account!=null && role!=null && account.optLong("currentServerId")>0
+            && role.optLong("serverId")==account.optLong("currentServerId")
+            && role.optLong("playerId")==credentials.player;
+    }
+    private JSONObject currentRole(){
+        if(!credentials.valid())return null;
+        JSONArray roles=array(account,"players");
+        for(int i=0;i<roles.length();i++){JSONObject role=roles.optJSONObject(i);if(role!=null && isCurrentRole(role) && !role.optString("name").trim().isEmpty())return role;}
+        return null;
+    }
+    private String roleLabel(JSONObject role){return "区服 "+role.optLong("serverId")+" · "+role.optString("name")+" · Lv."+role.optLong("level");}
     private void renderAccount(LinearLayout body){
         LinearLayout content=column();content.setPadding(dp(24),dp(18),dp(24),dp(20));scrolling(body,content);
-        addFull(content,text("登录账号",13,GRAY),24);
-        TextView username=text(account==null?"读取中…":account.optString("username"),18,INK);username.setTextIsSelectable(true);addFull(content,username,38);
-        addFull(content,text("昵称",13,GRAY),28);addFull(content,text(account==null?"—":account.optString("nickname"),18,INK),38);divider(content);
-        LinearLayout.LayoutParams gap=new LinearLayout.LayoutParams(-1,dp(46));gap.topMargin=dp(18);
-        content.addView(action("修改昵称  ›",false,active() && account!=null,()->navigate(NICKNAME)),gap);
-        LinearLayout.LayoutParams next=new LinearLayout.LayoutParams(-1,dp(46));next.topMargin=dp(10);
-        content.addView(action("修改密码  ›",false,active() && account!=null,()->navigate(PASSWORD)),next);
-        TextView note=text("账号与超频点数在各区服通用，游戏角色按区服分别保存。",12,GRAY);note.setPadding(0,dp(22),0,0);content.addView(note);
+        if(!credentials.valid()){addFull(content,text("请先登录 Brain Burst 2039",16,INK),60);return;}
+        if(account==null){addFull(content,text(busy?"正在读取账号…":"账号信息尚未读取",16,INK),48);addFull(content,action("重试",false,active(),()->refreshPage()),46);return;}
+        addFull(content,text("账号名称",13,GRAY),24);
+        TextView name=text(account.optString("nickname"),21,INK);name.setPadding(0,dp(6),0,dp(12));content.addView(name);
+        TextView username=text("登录账号  "+account.optString("username"),14,GRAY);username.setTextIsSelectable(true);username.setPadding(0,0,0,dp(18));content.addView(username);divider(content);
+        TextView caption=text("区服角色",15,INK);caption.setPadding(0,dp(18),0,dp(8));content.addView(caption);
+        JSONArray roles=array(account,"players");
+        if(roles.length()==0){TextView empty=text("尚未创建角色，进入游戏区服后创建。",14,GRAY);empty.setPadding(0,dp(12),0,dp(12));content.addView(empty);}
+        for(int i=0;i<roles.length();i++){
+            final JSONObject role=roles.optJSONObject(i);if(role==null)continue;
+            final boolean created=!role.optString("name").trim().isEmpty();final boolean selected=created && isCurrentRole(role);
+            LinearLayout item=column();item.setPadding(0,dp(12),0,dp(12));
+            TextView label=text(created?roleLabel(role):"区服 "+role.optLong("serverId")+" · 未创建角色",15,INK);label.setLineSpacing(dp(3),1);item.addView(label);
+            TextView hint=text(selected?"当前角色 · 打开蓝绿终端  ›":created?"进入该区服后可打开终端":"进入该区服后创建角色",12,selected?BLUE:GRAY);hint.setPadding(0,dp(8),0,0);item.addView(hint);
+            if(selected){item.setMinimumHeight(dp(64));item.setBackground(new RippleDrawable(android.content.res.ColorStateList.valueOf(Color.argb(25,22,119,255)),null,null));item.setOnClickListener(v->{if(active())navigate(HOME);});}
+            content.addView(item);divider(content);
+        }
+        TextView note=text("每个区服可创建1个角色。超频点数与账单归属对应区服角色。",12,GRAY);note.setPadding(0,dp(14),0,dp(14));content.addView(note);
+        addFull(content,action("修改名称  ›",false,active(),()->navigate(NICKNAME)),46);
+        addFull(content,action("修改密码  ›",false,active(),()->navigate(PASSWORD)),46);
+        addFull(content,action(busy?"处理中…":"退出登录",false,active(),()->confirmLogout()),46);
+    }
+    private void confirmLogout(){
+        if(!active())return;final Credentials auth=credentials;
+        AlertDialog dialog=new AlertDialog.Builder(this).setTitle("退出 Brain Burst 2039？").setMessage("退出后需重新输入账号和密码登录。").setNegativeButton("取消",null).setPositiveButton("退出登录",(d,which)->{if(credentials.generation==auth.generation && active())request("/game-account/logout",new JSONObject(),true);}).create();
+        dialog.show();attachToNativeWindow(dialog.getWindow());
+    }
+    private void completeLogout(){
+        LoginCache.logout();bindSession(0,"");
+        if(panel!=null)panel.dismiss();
+        UnityPlayer.UnitySendMessage("LocalWalletSession","LogoutAccount","");
     }
     private EditText accountField(LinearLayout parent,String label,String hint,boolean secret){
         TextView caption=text(label,13,GRAY);caption.setPadding(0,dp(10),0,0);addFull(parent,caption,30);
@@ -580,14 +609,14 @@ public class WalletActivity extends UnityPlayerActivity {
     private void renderAccountForm(LinearLayout body){
         LinearLayout content=column();content.setPadding(dp(24),dp(10),dp(24),dp(20));scrolling(body,content);
         if(page==NICKNAME){
-            nicknameInput=accountField(content,"昵称","1–24个字",false);nicknameInput.setFilters(new InputFilter[]{new InputFilter.LengthFilter(24)});nicknameInput.setText(nicknameDraft);
+            nicknameInput=accountField(content,"账号名称","1–24个字",false);nicknameInput.setFilters(new InputFilter[]{new InputFilter.LengthFilter(24)});nicknameInput.setText(nicknameDraft);
             nicknameInput.addTextChangedListener(new TextWatcher(){public void beforeTextChanged(CharSequence t,int start,int count,int after){}public void onTextChanged(CharSequence t,int start,int before,int count){nicknameDraft=t.toString();}public void afterTextChanged(Editable t){}});
             nicknameInput.setImeOptions(EditorInfo.IME_FLAG_NO_EXTRACT_UI|EditorInfo.IME_FLAG_NO_FULLSCREEN|EditorInfo.IME_ACTION_DONE);
         }else{
             oldPasswordInput=accountField(content,"原密码","输入当前密码",true);newPasswordInput=accountField(content,"新密码","至少6个字符",true);confirmationInput=accountField(content,"确认新密码","再次输入新密码",true);
             confirmationInput.setImeOptions(EditorInfo.IME_FLAG_NO_EXTRACT_UI|EditorInfo.IME_FLAG_NO_FULLSCREEN|EditorInfo.IME_ACTION_DONE);
         }
-        TextView note=text(page==PASSWORD?"修改后，其他设备需要使用新密码重新登录。":"昵称显示在账号与钱包中，不会修改各区服的角色名。",12,GRAY);note.setPadding(0,dp(16),0,dp(14));content.addView(note);
+        TextView note=text(page==PASSWORD?"修改后，其他设备需要使用新密码重新登录。":"仅修改账号名称，登录账号与各区服角色名保持不变。",12,GRAY);note.setPadding(0,dp(16),0,dp(14));content.addView(note);
         addFull(content,action(busy?"保存中…":"保存",true,active(),()->saveAccount()),46);
     }
     private void saveAccount(){
@@ -596,7 +625,7 @@ public class WalletActivity extends UnityPlayerActivity {
             JSONObject payload=new JSONObject();
             if(page==NICKNAME){
                 String name=nicknameDraft;
-                if(name.trim().isEmpty() || !name.equals(name.trim()) || name.codePointCount(0,name.length())>24 || name.matches("(?s).*[\\p{Cc}\\p{Cf}].*")){setMessage("请填写1–24个字的昵称",true);return;}
+                if(name.trim().isEmpty() || !name.equals(name.trim()) || name.codePointCount(0,name.length())>24 || name.matches("(?s).*[\\p{Cc}\\p{Cf}].*")){setMessage("请填写1–24个字的账号名称",true);return;}
                 payload.put("nickname",name);hideKeyboard();request("/game-account/nickname",payload,true);
             }else if(page==PASSWORD){
                 String old=oldPasswordInput.getText().toString(),value=newPasswordInput.getText().toString(),confirmation=confirmationInput.getText().toString();
@@ -669,18 +698,37 @@ public class WalletActivity extends UnityPlayerActivity {
     private void renderRequestState(){render();}
     private void rememberLedgerScroll(){if(page==BILLS && ledgerScroll!=null)ledgerScrollY=ledgerScroll.getScrollY();}
 
-    private void sessionChanged(){wallet=null;incomeEntries=new JSONArray();seenConfirmedRevision=0;homeScrollY=0;updateUnreadBadge();ledger=null;account=null;nicknameDraft="";ledgerEntries=new JSONArray();ledgerPage=1;ledgerScrollY=0;busy=false;refreshQueued=false;page=HOME;message="";loadPendingRequests();if(panel!=null && panel.isShowing()){render();refreshPage();}pollHandler.removeCallbacks(statePoll);if(foreground)pollHandler.post(statePoll);}
+    private void sessionChanged(){HttpURLConnection preflight=rechargeConnection;if(preflight!=null)preflight.disconnect();rechargeGeneration++;HttpURLConnection connection=activeConnection;if(connection!=null)connection.disconnect();selectedOrderId=null;nicknameInput=null;oldPasswordInput=null;newPasswordInput=null;confirmationInput=null;wallet=null;incomeEntries=new JSONArray();seenConfirmedRevision=0;homeScrollY=0;updateUnreadBadge();ledger=null;account=null;nicknameDraft="";ledgerEntries=new JSONArray();ledgerPage=1;ledgerScrollY=0;busy=false;refreshQueued=false;page=ACCOUNT_HOME;message="";loadPendingRequests();if(panel!=null && panel.isShowing()){render();refreshPage();}pollHandler.removeCallbacks(statePoll);if(foreground)pollHandler.post(statePoll);}
     private SharedPreferences prefs(){return getSharedPreferences("local-wallet-pending",MODE_PRIVATE);}
+    private String storageOrigin(){
+        if(origin==null)return "";
+        try{URI uri=new URI(origin);String scheme=uri.getScheme().toLowerCase(Locale.US),host=uri.getHost().toLowerCase(Locale.US);int port=uri.getPort();
+            if(("http".equals(scheme) && port==80) || ("https".equals(scheme) && port==443))port=-1;
+            return new URI(scheme,null,host,port,null,null,null).toASCIIString();
+        }catch(Exception invalid){return "";}
+    }
+    private String burstStorageKey(long player){return "burst.v2."+storageOrigin()+"."+player;}
     private void loadPendingRequests(){
-        burstRequestId=null;SharedPreferences.Editor retired=prefs().edit();
-        for(String key:prefs().getAll().keySet())if(key.startsWith("tool.") || key.startsWith("add."))retired.remove(key);retired.commit();
-        if(!credentials.valid())return;String id=prefs().getString("burst."+credentials.player,null);
+        burstRequestId=null;SharedPreferences preferences=prefs();SharedPreferences.Editor retired=preferences.edit();
+        for(String key:preferences.getAll().keySet())if(key.startsWith("tool.") || key.startsWith("add."))retired.remove(key);retired.commit();
+        if(!credentials.valid() || storageOrigin().isEmpty())return;
+        // Bind all legacy single-server keys to one origin exactly once. Other
+        // origins may never consume a legacy player-only pending request.
+        String legacyOrigin=preferences.getString("burstLegacyOrigin",null);
+        if(legacyOrigin==null){if(!preferences.edit().putString("burstLegacyOrigin",storageOrigin()).commit())return;legacyOrigin=storageOrigin();}
+        String key=burstStorageKey(credentials.player),id=preferences.getString(key,null);
+        String legacyKey="burst."+credentials.player;
+        if(storageOrigin().equals(legacyOrigin) && preferences.contains(legacyKey)){
+            String legacy=preferences.getString(legacyKey,null);SharedPreferences.Editor migration=preferences.edit().remove(legacyKey);
+            if(id==null && legacy!=null && legacy.matches("[a-fA-F0-9-]{36}")){id=legacy;migration.putString(key,id);}
+            if(!migration.commit())return;
+        }
         if(id!=null && id.matches("[a-fA-F0-9-]{36}"))burstRequestId=id;
     }
     private void burst(){
         if(!active())return;
         try{if(burstRequestId==null)burstRequestId=UUID.randomUUID().toString();
-            if(!prefs().edit().putString("burst."+credentials.player,burstRequestId).commit())throw new Exception("保存请求失败，请重试");
+            if(!prefs().edit().putString(burstStorageKey(credentials.player),burstRequestId).commit())throw new Exception("保存请求失败，请重试");
             JSONObject payload=new JSONObject();payload.put("requestId",burstRequestId);request("/local-wallet/burst",payload,true);
         }catch(Exception failure){setMessage("保存请求失败，请重试",true);}
     }
@@ -702,7 +750,7 @@ public class WalletActivity extends UnityPlayerActivity {
     private void refreshPage(){
         if(busy){refreshQueued=true;return;}
         if(!active())return;
-        if(page==ACCOUNT || (page==NICKNAME || page==PASSWORD) && account==null)request("/game-account/profile",new JSONObject(),false);else if(page==NICKNAME || page==PASSWORD)return;else if(page==BILLS)requestLedger(1);else request("/local-wallet/state",new JSONObject(),false);
+        if(page==ACCOUNT_HOME || page==ACCOUNT || (page==NICKNAME || page==PASSWORD) && account==null)request("/game-account/profile",new JSONObject(),false);else if(page==NICKNAME || page==PASSWORD)return;else if(page==BILLS)requestLedger(1);else request("/local-wallet/state",new JSONObject(),false);
     }
     private void requestLedger(int number){
         if(!active())return;
@@ -727,14 +775,16 @@ public class WalletActivity extends UnityPlayerActivity {
     private void request(final String route,final JSONObject payload,final boolean mutation){request(route,payload,mutation,false);}
     private void request(final String route,final JSONObject payload,final boolean mutation,final boolean quiet){
         if(busy || destroyed || !ready())return;final Credentials auth=credentials;final String address=origin+route;final boolean accountRoute=route.startsWith("/game-account/");final String accountUsername=account==null?"":account.optString("username");busy=true;if(mutation)setMessage("处理中…",false);if(!quiet)renderRequestState();
-        network.execute(new Runnable(){public void run(){JSONObject data=null;String error=null;HttpURLConnection connection=null;
+        network.execute(new Runnable(){public void run(){if(destroyed || credentials.generation!=auth.generation){payload.remove("oldPassword");payload.remove("password");payload.remove("confirmPassword");return;}JSONObject data=null;String error=null;HttpURLConnection connection=null;
             try{
                 payload.put("playerId",auth.player);payload.put("sessionHex",auth.session);
                 connection=(HttpURLConnection)new URL(address).openConnection();activeConnection=connection;connection.setRequestMethod("POST");connection.setConnectTimeout(8000);connection.setReadTimeout(15000);connection.setInstanceFollowRedirects(false);connection.setDoOutput(true);connection.setRequestProperty("Content-Type","application/json; charset=utf-8");connection.setRequestProperty("Cache-Control","no-store");
                 byte[] body=payload.toString().getBytes("UTF-8");connection.setFixedLengthStreamingMode(body.length);OutputStream out=connection.getOutputStream();out.write(body);out.close();
                 int status=connection.getResponseCode();InputStream in=status>=400?connection.getErrorStream():connection.getInputStream();if(in==null)throw new Exception("连接失败，请重试");byte[] raw=readBounded(in,1048576);in.close();JSONObject reply=new JSONObject(new String(raw,"UTF-8"));
                 if(status!=200 || reply.optInt("code",-1)!=0)throw new Exception(reply.optString("msg","操作未完成，请重试"));data=reply.getJSONObject("data");
-                if(accountRoute){
+                if("/game-account/logout".equals(route)){
+                    if(!data.optBoolean("loggedOut",false))throw new Exception("退出登录未确认，请重试");
+                }else if(accountRoute){
                     if(data.optLong("id",0)<1 || data.optString("username").isEmpty() || data.optString("nickname").isEmpty())throw new Exception("账号信息无效，请重试");
                     if("/game-account/password".equals(route) && !data.optBoolean("passwordChanged",false))throw new Exception("密码修改未确认，请重试");
                 }else{
@@ -748,12 +798,13 @@ public class WalletActivity extends UnityPlayerActivity {
             finally{if(connection!=null)connection.disconnect();if(activeConnection==connection)activeConnection=null;}
             final JSONObject result=data;final String failure=error;
             runOnUiThread(new Runnable(){public void run(){
-                if(destroyed || credentials.generation!=auth.generation)return;busy=false;
+                if(destroyed || credentials.generation!=auth.generation){payload.remove("oldPassword");payload.remove("password");payload.remove("confirmPassword");return;}busy=false;
                 if(failure==null){
+                    if("/game-account/logout".equals(route)){completeLogout();return;}
                     if(accountRoute){
                         account=result;
-                        if("/game-account/password".equals(route)){LoginCache.passwordChanged(accountUsername,payload.optString("password"));page=ACCOUNT;setMessage("密码已修改",false);}
-                        else if("/game-account/nickname".equals(route)){nicknameDraft=result.optString("nickname");page=ACCOUNT;setMessage("昵称已更新",false);}
+                        if("/game-account/password".equals(route)){LoginCache.passwordChanged(accountUsername,payload.optString("password"));page=ACCOUNT_HOME;setMessage("密码已修改",false);}
+                        else if("/game-account/nickname".equals(route)){nicknameDraft=result.optString("nickname");page=ACCOUNT_HOME;setMessage("账号名称已更新",false);}
                     }else{
                     if(result.optJSONObject("terminal")==null && terminal()!=null)try{result.put("terminal",terminal());}catch(Exception ignored){}
                     wallet=result;acceptTerminal(result);updateUnreadBadge();
@@ -764,7 +815,7 @@ public class WalletActivity extends UnityPlayerActivity {
                     }
                     if("/local-wallet/seen".equals(route)){seenConfirmedRevision=Math.max(seenConfirmedRevision,payload.optLong("seenRevision"));}
                     else if("/local-wallet/burst".equals(route)){
-                        prefs().edit().remove("burst."+auth.player).commit();burstRequestId=null;ledger=null;ledgerEntries=new JSONArray();setMessage("已到账 "+pointNumber(result.optDouble("burstAwardPoints"))+" 点",false);
+                        prefs().edit().remove(burstStorageKey(auth.player)).commit();burstRequestId=null;ledger=null;ledgerEntries=new JSONArray();setMessage("已到账 "+pointNumber(result.optDouble("burstAwardPoints"))+" 点",false);
                     }else if("/local-wallet/pay".equals(route)){ledger=null;ledgerEntries=new JSONArray();UnityPlayer.UnitySendMessage("LocalWalletSession","RefreshAfterPayment","");page=HOME;setMessage("支付成功，去享受这一刻",false);}
                     }
                 }else if(!quiet)setMessage(failure+(mutation?"；可重试原操作":""),true);

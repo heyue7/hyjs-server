@@ -2,11 +2,13 @@ package model
 
 // LocalWalletView is the authenticated local wallet state used by the 蓝绿终端 overlay.
 type LocalWalletView struct {
-	Terminal         *TerminalState            `json:"terminal,omitempty"`         // Terminal contains account daily and income state.
+	ServerID         int64                     `json:"serverId"`                   // 当前钱包所属区服。
+	PlayerID         int64                     `json:"playerId"`                   // 当前钱包所属角色。
+	Terminal         *TerminalState            `json:"terminal,omitempty"`         // Terminal contains role daily and income state.
 	BurstAwardPoints int64                     `json:"burstAwardPoints,omitempty"` // BurstAwardPoints is the frozen daily award.
 	Name             string                    `json:"name"`                       // 固定显示名：蓝绿终端。
 	BalanceCents     int64                     `json:"balanceCents"`               // 当前余额，100最小单位=1超频点数，非负整数。
-	Revision         int64                     `json:"revision"`                   // 同账号成功入账/支付的单调递增序号。
+	Revision         int64                     `json:"revision"`                   // 同角色成功入账/支付的单调递增序号。
 	Currency         string                    `json:"currency"`                   // 枚举：CNY。
 	Enabled          bool                      `json:"enabled"`                    // 当前持久政策是否开放。
 	TestOnly         bool                      `json:"testOnly"`                   // 固定true，本地试玩余额。
@@ -23,7 +25,7 @@ type LocalWalletView struct {
 
 // LocalWalletEntryView projects one immutable wallet ledger entry.
 type LocalWalletEntryView struct {
-	ID           string `json:"id"`                // 同账号唯一流水标识。
+	ID           string `json:"id"`                // 同区服角色唯一流水标识。
 	Kind         string `json:"kind"`              // 枚举：credit增加余额；payment原充值消费。
 	AmountCents  int64  `json:"amountCents"`       // 本次变动最小单位，credit正数、payment负数。
 	BalanceCents int64  `json:"balanceCents"`      // 此次成功变动后的余额最小单位。

@@ -2,6 +2,8 @@ package model
 
 // GameAccountDTO exposes the global identity without credential or session bytes.
 type GameAccountDTO struct {
+	CurrentServerID int64                `json:"currentServerId,omitempty"` // 自助账号页当前会话所属区服；后台列表为0省略。
+	CurrentPlayerID int64                `json:"currentPlayerId,omitempty"` // 自助账号页当前区服角色编号，与区服共同标识终端。
 	PasswordChanged bool                 `json:"passwordChanged,omitempty"` // PasswordChanged confirms a successful self-service credential update.
 	ID              int64                `json:"id"`                        // ID is the global account ID.
 	Username        string               `json:"username"`                  // Username is the case-sensitive login name.
@@ -72,4 +74,15 @@ type GameAccountPasswordRequest struct {
 	OldPassword     string `json:"oldPassword" binding:"required"`     // 用户当前原密码，只用于验证，不保存明文。
 	Password        string `json:"password" binding:"required"`        // 新密码，至少6字符且最多72字节，绝不返回。
 	ConfirmPassword string `json:"confirmPassword" binding:"required"` // 与新密码完全相同的确认值。
+}
+
+// GameAccountLogoutRequest releases the current role session of a Brain Burst 2039 account.
+type GameAccountLogoutRequest struct {
+	PlayerID   int64  `json:"playerId" binding:"required"`   // 当前区服的角色编号。
+	SessionHex string `json:"sessionHex" binding:"required"` // 当前会话的32位十六进制值。
+}
+
+// GameAccountLogoutResponse also acknowledges a session already released by a retry.
+type GameAccountLogoutResponse struct {
+	LoggedOut bool `json:"loggedOut"` // true表示客户端可以清除当前登录状态。
 }

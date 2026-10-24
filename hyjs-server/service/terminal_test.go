@@ -56,18 +56,47 @@ func TestTerminalSignupSettingsAndLegacyIsolation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	shell, err := LoginAccount(ctx, account.Username, "isolated-terminal-pass")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = CreatePlayer(ctx, shell.Id, "新用户角色", "hero_043"); err != nil {
+		t.Fatal(err)
+	}
+	account.PlayerID = shell.Id
 	var owner db.Profile
 	if err = db.GetIns().First(&owner, account.PlayerID).Error; err != nil {
 		t.Fatal(err)
 	}
-	balance, err := accountWalletBalance(db.GetIns(), owner.AccountID, false)
+	balance, err := walletReadBalance(db.GetIns(), owner.Id, false)
 	if err != nil || balance.BalanceCents != 432100 {
 		t.Fatal("actual registration grant without a player", balance, err)
 	}
 	var n int64
-	db.AccountsTable(db.GetIns(), "terminal_incomes").Where("account_id=? AND source=?", owner.AccountID, "signup").Count(&n)
+	db.AccountsTable(db.GetIns(), "terminal_role_incomes").Where("account_id=? AND source=?", owner.AccountID, "signup").Count(&n)
 	if n != 1 {
 		t.Fatal("signup card missing", n)
+	}
+	// Creating a second realm role must not repeat the account's first-character signup grant.
+	second := owner
+	second.Id = 0
+	second.ServerID = 2
+	second.Uid = "terminal-second-" + uuid.NewString()
+	if err = db.GetIns().Create(&second).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err = db.GetIns().Transaction(func(tx *gorm.DB) error {
+		var global db.GameAccount
+		if err := db.AccountsTable(tx, "game_accounts").First(&global, owner.AccountID).Error; err != nil {
+			return err
+		}
+		return terminalSignup(tx, &global, 2, second.Id)
+	}); err != nil {
+		t.Fatal(err)
+	}
+	secondBalance, err := walletReadBalance(db.GetIns(), second.Id, false)
+	if err != nil || secondBalance.BalanceCents != 0 || secondBalance.Revision != 0 {
+		t.Fatal("signup repeated across realm", secondBalance, err)
 	}
 	f.restart(t)
 	if err = f.s.InitializeLocalWallet(ctx); err != nil {
@@ -77,7 +106,7 @@ func TestTerminalSignupSettingsAndLegacyIsolation(t *testing.T) {
 	if err != nil || cfg.SignupPoints != 4321 || cfg.Version != saved.Version {
 		t.Fatal("cold settings", cfg, err)
 	}
-	balance, err = accountWalletBalance(db.GetIns(), owner.AccountID, false)
+	balance, err = walletReadBalance(db.GetIns(), owner.Id, false)
 	if err != nil || balance.BalanceCents != 432100 {
 		t.Fatal("cold registration ledger", balance, err)
 	}
@@ -117,7 +146,7 @@ func TestTerminalBurstDailyReplayUnreadAndRealDate(t *testing.T) {
 	if _, err = f.s.localWalletBurstAt(ctx, id, uuid.NewString(), now); !errors.Is(err, ErrLocalWalletConflict) {
 		t.Fatal("second same day", err)
 	}
-	// A separate role in another realm shares the once-per-account receipt.
+	// A separate realm role starts with its own balance and daily allowance.
 	var crossRole db.Profile
 	db.GetIns().First(&crossRole, id)
 	crossRole.Id = 0
@@ -126,8 +155,15 @@ func TestTerminalBurstDailyReplayUnreadAndRealDate(t *testing.T) {
 	if err = db.GetIns().Create(&crossRole).Error; err != nil {
 		t.Fatal(err)
 	}
-	if _, err = f.s.localWalletBurstAt(ctx, crossRole.Id, uuid.NewString(), now); !errors.Is(err, ErrLocalWalletConflict) {
-		t.Fatal("realm switch repeated account daily award", err)
+	crossService := GameService{ServerID: 2, P3LocalWalletEnabled: true}
+	crossCtx := context.WithValue(ctx, constUtil.GameServiceContextKey, &crossService)
+	if err = db.GetIns().Transaction(func(tx *gorm.DB) error {
+		return terminalCredit(tx, owner.AccountID, 2, crossRole.Id, "fixture-credit", "admin_manual", "独立余额", "", 1000, now)
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if cross, err := crossService.localWalletBurstAt(crossCtx, crossRole.Id, key, now); err != nil || cross.AlreadyApplied {
+		t.Fatal("realm role daily allowance", cross, err)
 	}
 	revision := view.Terminal.LatestIncomeRevision
 	if _, err = f.s.LocalWalletSeen(ctx, id, revision+1); !errors.Is(err, ErrLocalWalletInvalid) {
@@ -157,8 +193,8 @@ func TestTerminalBurstDailyReplayUnreadAndRealDate(t *testing.T) {
 	if err != nil || !retry.AlreadyApplied || retry.BurstAwardPoints != 7 {
 		t.Fatal("cold UUID replay", retry, err)
 	}
-	var entries []db.AccountWalletEntry
-	db.AccountsTable(db.GetIns(), "account_wallet_entries").Where("account_id=? AND source=?", owner.AccountID, "burst").Find(&entries)
+	var entries []db.RoleWalletEntry
+	db.AccountsTable(db.GetIns(), "role_wallet_entries").Where("server_id=? AND player_id=? AND source=?", int64(1), owner.Id, "burst").Find(&entries)
 	if len(entries) != 4 {
 		t.Fatal("cost and income must be separate, twice", len(entries))
 	}
@@ -190,6 +226,14 @@ func TestTerminalDistributionResumeScopeAndWeekly(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	shellremote, loginErr := LoginAccount(secondCtx, remote.Username, "isolated-terminal-pass")
+	if loginErr != nil {
+		t.Fatal(loginErr)
+	}
+	if _, err = CreatePlayer(secondCtx, shellremote.Id, "测试新角色", "hero_043"); err != nil {
+		t.Fatal(err)
+	}
+	remote.PlayerID = shellremote.Id
 	var remoteOwner db.Profile
 	db.GetIns().First(&remoteOwner, remote.PlayerID)
 	remoteOwner.Player = owner.Player
@@ -245,11 +289,11 @@ func TestTerminalDistributionResumeScopeAndWeekly(t *testing.T) {
 	if count != 1 {
 		t.Fatal("weekly duplicate/historical catchup", count)
 	}
-	balance, err := accountWalletBalance(db.GetIns(), owner.AccountID, false)
+	balance, err := walletReadBalance(db.GetIns(), owner.Id, false)
 	if err != nil || balance.BalanceCents != 4600 {
 		t.Fatal("frozen distributions total", balance, err)
 	}
-	remoteBalance, err := accountWalletBalance(db.GetIns(), remoteOwner.AccountID, false)
+	remoteBalance, err := walletReadBalance(db.GetIns(), remoteOwner.Id, false)
 	if err != nil || remoteBalance.BalanceCents != 500000 {
 		t.Fatal("distribution crossed realm", remoteBalance, err)
 	}
@@ -271,6 +315,14 @@ func TestTerminalBlockedBatchDoesNotStopOtherAccountsAndPolicyClosure(t *testing
 	if err != nil {
 		t.Fatal(err)
 	}
+	shellfresh, loginErr := LoginAccount(ctx, fresh.Username, "isolated-terminal-pass")
+	if loginErr != nil {
+		t.Fatal(loginErr)
+	}
+	if _, err = CreatePlayer(ctx, shellfresh.Id, "测试新角色", "hero_043"); err != nil {
+		t.Fatal(err)
+	}
+	fresh.PlayerID = shellfresh.Id
 	var other db.Profile
 	db.GetIns().First(&other, fresh.PlayerID)
 	other.Player = owner.Player
@@ -310,7 +362,7 @@ func TestTerminalBlockedBatchDoesNotStopOtherAccountsAndPolicyClosure(t *testing
 	if batch.Status != "complete" || batch.Credited != 2 {
 		t.Fatal("blocked receipt recovery", batch)
 	}
-	balance, err := accountWalletBalance(db.GetIns(), other.AccountID, false)
+	balance, err := walletReadBalance(db.GetIns(), other.Id, false)
 	if err != nil || balance.BalanceCents != 500300 {
 		t.Fatal("recovery duplicated healthy recipient", balance, err)
 	}

@@ -77,6 +77,7 @@ func localWalletSessionAllowed(ctx context.Context, row *db.Profile) bool {
 
 func localWalletProjection(tx *gorm.DB, owner *db.Profile, p *pb.Player, balance *db.LocalWalletBalance, enabled bool, now time.Time) (*LocalWalletView, error) {
 	view := localWalletView(balance, enabled)
+	view.ServerID, view.PlayerID = AdminProfileServerID(*owner), owner.Id
 	loc := time.FixedZone("Asia/Shanghai", 8*3600)
 	current := now.In(loc)
 	start := time.Date(current.Year(), current.Month(), 1, 0, 0, 0, 0, loc).UnixMilli()

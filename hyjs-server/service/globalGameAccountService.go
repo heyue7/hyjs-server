@@ -271,6 +271,11 @@ func gameAccountProjection(tx *gorm.DB, account db.GameAccount) (model.GameAccou
 		return out, err
 	}
 	for _, role := range roles {
+		// Original login may reserve a realm identity before character creation.
+		// Only completed characters belong in the account's visible role list.
+		if role.Name == "" || role.Level < 1 {
+			continue
+		}
 		out.Players = append(out.Players, model.GameAccountRoleDTO{ServerID: role.ServerID, PlayerID: role.PlayerID, Name: role.Name, Level: role.Level})
 	}
 	return out, nil
@@ -287,7 +292,6 @@ func registerGlobalGameAccount(ctx context.Context, username, password, nickname
 	if err != nil {
 		return nil, err
 	}
-	var profile db.Profile
 	err = db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := db.AccountsTable(tx, "game_accounts").Create(account).Error; err != nil {
 			if gameAccountDuplicate(err) {
@@ -295,26 +299,31 @@ func registerGlobalGameAccount(ctx context.Context, username, password, nickname
 			}
 			return err
 		}
-		serverID := constUtil.GameDefaultServerID
-		if game, ok := ctx.Value(constUtil.GameServiceContextKey).(*GameService); ok {
-			serverID = game.OriginalServerID()
-		}
-		profile = db.Profile{ServerID: serverID, AccountID: account.ID, Uid: username, PasswordSalt: account.PasswordSalt, PasswordHash: account.PasswordHash, Session: make([]byte, 16)}
-		if _, err := rand.Read(profile.Session); err != nil {
-			return err
-		}
-		if err := tx.Create(&profile).Error; err != nil {
-			return err
-		}
-		if err := syncGlobalAccountRole(tx, &profile); err != nil {
-			return err
-		}
-		return terminalSignup(tx, account, serverID, profile.Id)
+		return nil
 	})
 	if err != nil {
 		return nil, err
 	}
-	return &model.GameAccountRegisterResponse{Registered: true, PlayerID: profile.Id, Username: username}, nil
+	return &model.GameAccountRegisterResponse{Registered: true, Username: username}, nil
+}
+
+// LogoutCurrentGlobalGameAccount invalidates only the supplied role session.
+// A missing or replaced session is already logged out: acknowledging it makes a lost-response retry safe,
+// and never revokes a newer login or exposes whether an account exists.
+func LogoutCurrentGlobalGameAccount(ctx context.Context, id int64, session []byte) (*model.GameAccountLogoutResponse, error) {
+	if id < 1 || len(session) != 16 {
+		return nil, ErrLocalWalletInvalid
+	}
+	replacement := make([]byte, 16)
+	if _, err := rand.Read(replacement); err != nil {
+		return nil, err
+	}
+	err := db.GetIns().WithContext(ctx).Model(&db.Profile{}).
+		Where("id=? AND session=?", id, session).UpdateColumn("session", replacement).Error
+	if err != nil {
+		return nil, err
+	}
+	return &model.GameAccountLogoutResponse{LoggedOut: true}, nil
 }
 
 // AdminGlobalGameAccounts lists global identities independently from the selected game realm.
@@ -465,6 +474,7 @@ func CurrentGlobalGameAccount(ctx context.Context, id int64, session []byte) (*m
 		return nil, err
 	}
 	out, err := gameAccountProjection(tx, *account)
+	out.CurrentServerID, out.CurrentPlayerID = AdminProfileServerID(*owner), owner.Id
 	return &out, err
 }
 
@@ -532,6 +542,7 @@ func UpdateCurrentGlobalGameAccount(ctx context.Context, id int64, session []byt
 		}
 		var err error
 		out, err = gameAccountProjection(tx, account)
+		out.CurrentServerID, out.CurrentPlayerID = AdminProfileServerID(current), current.Id
 		out.PasswordChanged = prepared != nil && err == nil
 		return err
 	})

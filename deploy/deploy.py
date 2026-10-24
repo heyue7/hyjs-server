@@ -19,6 +19,8 @@ parser.add_argument('--update-ingress', action='store_true', help='Apply the rev
 parser.add_argument('--initial-dump', type=Path, help='One-time private SQL gzip; sibling initial-verification.json required')
 parser.add_argument('--env-file', type=Path, default=ROOT / 'deploy/.env', help='Ignored private deployment settings')
 parser.add_argument('--check-config', action='store_true', help='Validate and render templates without build, SSH or Docker')
+parser.add_argument('--migrate-role-wallets', action='store_true', help='Quiesce legacy writers, back up and reconcile the one-time role-wallet cutover')
+parser.add_argument('--expected-live-revision', help='Refuse activation if a different live release appeared')
 args = parser.parse_args()
 settings = load(args.env_file)
 HOST = settings['HYJS_DEPLOY_SSH']
@@ -74,6 +76,9 @@ run('go', 'vet', './...', cwd=ROOT / 'hyjs-server')
 run('go', 'build', '-trimpath', '-buildvcs=false', '-o', str(app / 'hyjs-server'), '.', cwd=ROOT / 'hyjs-server', env=environment)
 run('go', 'build', '-trimpath', '-buildvcs=false', '-o', str(app / 'hyjs-backupseal'), './cmd/backupseal', cwd=ROOT / 'hyjs-server', env=environment)
 # 覆盖发布只包含当前业务程序；历史版本需要时从Git重新构建。
+if args.migrate_role_wallets:
+    assert args.expected_live_revision and not args.provision and not args.initial_dump, 'Wallet cutover requires an existing pinned release'
+    assert (ROOT / 'hyjs-server/db/roleWalletMigration.go').is_file()
 run('pnpm', 'typecheck', cwd=ROOT / 'admin-web')
 run('pnpm', 'build', cwd=ROOT / 'admin-web')
 assert not run('git', 'status', '--porcelain'), 'Build unexpectedly modified tracked source'
@@ -82,7 +87,7 @@ shutil.copytree(ROOT / 'analysis/tables', app / 'tables', ignore=shutil.ignore_p
 (app / 'config.test.yaml').write_text(render((ROOT / 'deploy/config.test.yaml').read_text(), settings))
 (stage / 'nginx.conf').write_text(render((ROOT / 'deploy/nginx.conf').read_text(), settings))
 (stage / 'deployment.env').write_text(''.join(key + '=' + settings[key] + '\n' for key in RUNTIME_KEYS))
-for name in ('Dockerfile', 'compose.yaml', 'activate.py'):
+for name in ('Dockerfile', 'compose.yaml', 'activate.py', 'role_wallet_migration.py'):
     shutil.copy2(ROOT / 'deploy' / name, stage / name)
 files = {str(p.relative_to(stage)): sha(p) for p in sorted(stage.rglob('*')) if p.is_file() and p.name != '.hyjs-stage'}
 manifest = {'revision': revision, 'architecture': 'linux/amd64', 'database': 'MySQL8.4', 'files': files,
@@ -117,6 +122,10 @@ if args.initial_dump:
     run('scp', '-q', str(verification), HOST + ':' + REMOTE + '/.incoming/initial-verification.json')
     remote('chmod 600 ' + shlex.quote(REMOTE + '/.incoming/initial.sql.gz') + ' ' + shlex.quote(REMOTE + '/.incoming/initial-verification.json'))
 command = 'sudo -n python3 ' + shlex.quote(remote_stage + '/activate.py') + ' ' + shlex.quote(remote_stage)
+if args.expected_live_revision:
+    command += ' --expected-live-revision ' + shlex.quote(args.expected_live_revision)
+if args.migrate_role_wallets:
+    command += ' --migrate-role-wallets'
 if args.provision or args.update_ingress:
     command += ' --provision-ingress'
 if args.initial_dump:

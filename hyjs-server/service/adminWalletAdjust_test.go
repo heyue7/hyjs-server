@@ -36,7 +36,7 @@ func adminWalletAdjustCounts(t *testing.T, accountID int64, entries, incomes, au
 		table string
 		want  int64
 	}{
-		{"account_wallet_entries", entries}, {"terminal_incomes", incomes},
+		{"role_wallet_entries", entries}, {"terminal_role_incomes", incomes},
 	} {
 		var count int64
 		if err := db.AccountsTable(db.GetIns(), check.table).Where("account_id=? AND source=?", accountID, constUtil.AdminWalletAdjustSource).Count(&count).Error; err != nil || count != check.want {
@@ -72,11 +72,11 @@ func TestAdminWalletAdjustCreditDebitReplayAndColdSharedBalance(t *testing.T) {
 		t.Fatal("replay after later transaction", retry, err)
 	}
 	adminWalletAdjustCounts(t, owner.AccountID, 2, 1, 2)
-	var income db.TerminalIncome
-	if err = db.AccountsTable(db.GetIns(), "terminal_incomes").First(&income, "account_id=? AND id=?", owner.AccountID, constUtil.AdminWalletAdjustKeyPrefix+credit.RequestID).Error; err != nil || income.Label != constUtil.AdminWalletAdjustCreditLabel+credit.Reason || income.AmountCents != 2500 || income.Revision != 1 {
+	var income db.TerminalRoleIncome
+	if err = db.AccountsTable(db.GetIns(), "terminal_role_incomes").First(&income, "account_id=? AND id=?", owner.AccountID, constUtil.AdminWalletAdjustKeyPrefix+credit.RequestID).Error; err != nil || income.Label != constUtil.AdminWalletAdjustCreditLabel+credit.Reason || income.AmountCents != 2500 || income.Revision != 1 {
 		t.Fatal("credit income frozen fields", income, err)
 	}
-	// 同账号另一个区服角色读取同一余额和支出兼容投影。
+	// 同账号另一区服的角色拥有独立空钱包。
 	other := owner
 	other.Id, other.ServerID, other.Uid = 0, 2, "adjust-other-"+uuid.NewString()
 	if err = db.GetIns().Create(&other).Error; err != nil {
@@ -84,8 +84,8 @@ func TestAdminWalletAdjustCreditDebitReplayAndColdSharedBalance(t *testing.T) {
 	}
 	otherCtx := context.WithValue(ctx, constUtil.AdminServerScopeContextKey, int64(2))
 	view, err := AdminWalletLedger(otherCtx, actor, other.Id, 0, 0, "payment", 1, 20)
-	if err != nil || view.BalanceCents != 1600 || view.Revision != 2 || view.Total != 1 || len(view.Entries) != 1 || view.Entries[0].Kind != "payment" || view.Entries[0].AmountCents != -900 || view.Entries[0].Label != constUtil.AdminWalletAdjustDebitLabel+debit.Reason {
-		t.Fatal("shared account or debit projection", view, err)
+	if err != nil || view.BalanceCents != 0 || view.Revision != 0 || view.Total != 0 || len(view.Entries) != 0 {
+		t.Fatal("other role inherited wallet", view, err)
 	}
 	f.restart(t)
 	retry, err = AdminWalletAdjust(ctx, actor, id, debit)
@@ -145,14 +145,15 @@ func TestAdminWalletAdjustConcurrentReplayAndPayloadConflict(t *testing.T) {
 		}
 	}
 	other := owner
-	other.Id, other.Uid = 0, "adjust-same-account-"+uuid.NewString()
+	other.Id, other.ServerID, other.Uid = 0, 2, "adjust-same-account-"+uuid.NewString()
 	if err := db.GetIns().Create(&other).Error; err != nil {
 		t.Fatal(err)
 	}
-	if _, err := AdminWalletAdjust(ctx, actor, other.Id, req); !errors.Is(err, constUtil.ErrAdminWalletAdjustReplay) {
-		t.Fatal("request replay changed owning role", err)
+	otherCtx := context.WithValue(ctx, constUtil.AdminServerScopeContextKey, int64(2))
+	if out, err := AdminWalletAdjust(otherCtx, actor, other.Id, req); err != nil || out.AlreadyApplied {
+		t.Fatal("cross realm request collision", out, err)
 	}
-	adminWalletAdjustCounts(t, owner.AccountID, 1, 1, 1)
+	adminWalletAdjustCounts(t, owner.AccountID, 2, 2, 2)
 }
 
 func TestAdminWalletAdjustIndependentAccountsConcurrentFirstCredit(t *testing.T) {
@@ -161,6 +162,14 @@ func TestAdminWalletAdjustIndependentAccountsConcurrentFirstCredit(t *testing.T)
 	if err != nil {
 		t.Fatal(err)
 	}
+	shell, err := LoginAccount(ctx, registered.Username, "isolated-terminal-pass")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = CreatePlayer(ctx, shell.Id, "独立测试角色", "hero_043"); err != nil {
+		t.Fatal(err)
+	}
+	registered.PlayerID = shell.Id
 	var other db.Profile
 	if err = db.GetIns().First(&other, registered.PlayerID).Error; err != nil {
 		t.Fatal(err)
@@ -171,14 +180,14 @@ func TestAdminWalletAdjustIndependentAccountsConcurrentFirstCredit(t *testing.T)
 	var (
 		owners = []db.Profile{owner, other}
 		ids    = []int64{id, other.Id}
-		before [2]db.AccountWalletBalance
+		before [2]db.LocalWalletBalance
 		wg     sync.WaitGroup
 		start  = make(chan struct{})
 		out    [2]*model.AdminWalletAdjustResponse
 		errs   [2]error
 	)
 	for index, account := range owners {
-		balance, readErr := accountWalletBalance(db.GetIns(), account.AccountID, false)
+		balance, readErr := walletReadBalance(db.GetIns(), account.Id, false)
 		if readErr != nil {
 			t.Fatal(readErr)
 		}
@@ -242,18 +251,18 @@ func TestAdminWalletAdjustPermissionProtectionAndScope(t *testing.T) {
 
 func TestAdminWalletAdjustOverflowAndAuditAtomicity(t *testing.T) {
 	_, id, ctx, actor, owner := adminWalletAdjustFixture(t)
-	for _, balance := range []db.AccountWalletBalance{
-		{AccountID: owner.AccountID, BalanceCents: math.MaxInt64 - 99, Revision: 0},
-		{AccountID: owner.AccountID, BalanceCents: 100, Revision: math.MaxInt64},
+	for _, balance := range []db.RoleWalletBalance{
+		{ServerID: 1, PlayerID: id, AccountID: owner.AccountID, BalanceCents: math.MaxInt64 - 99, Revision: 0},
+		{ServerID: 1, PlayerID: id, AccountID: owner.AccountID, BalanceCents: 100, Revision: math.MaxInt64},
 	} {
-		if err := db.AccountsTable(db.GetIns(), "account_wallet_balances").Save(&balance).Error; err != nil {
+		if err := db.AccountsTable(db.GetIns(), "role_wallet_balances").Save(&balance).Error; err != nil {
 			t.Fatal(err)
 		}
 		if _, err := AdminWalletAdjust(ctx, actor, id, adminWalletAdjustRequest(constUtil.AdminWalletAdjustCredit, 1, balance.Revision)); !errors.Is(err, constUtil.ErrAdminWalletAdjustOverflow) {
 			t.Fatal("overflow", err)
 		}
 	}
-	if err := db.AccountsTable(db.GetIns(), "account_wallet_balances").Where("account_id=?", owner.AccountID).Updates(map[string]any{"balance_cents": 0, "revision": 0}).Error; err != nil {
+	if err := db.AccountsTable(db.GetIns(), "role_wallet_balances").Where("account_id=?", owner.AccountID).Updates(map[string]any{"balance_cents": 0, "revision": 0}).Error; err != nil {
 		t.Fatal(err)
 	}
 	failure := errors.New("isolated audit failure")
@@ -271,7 +280,7 @@ func TestAdminWalletAdjustOverflowAndAuditAtomicity(t *testing.T) {
 		t.Fatal("audit failure not returned", err)
 	}
 	adminWalletAdjustCounts(t, owner.AccountID, 0, 0, 0)
-	balance, err := accountWalletBalance(db.GetIns(), owner.AccountID, false)
+	balance, err := walletReadBalance(db.GetIns(), owner.Id, false)
 	if err != nil || balance.BalanceCents != 0 || balance.Revision != 0 {
 		t.Fatal("audit failure committed balance", balance, err)
 	}

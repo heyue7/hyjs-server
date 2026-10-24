@@ -206,6 +206,7 @@ namespace HYJS.NativeAccount
             password.defaultText = "密码：请输入密码";
             confirmation.defaultText = "确认密码：请再次输入";
             name.UpdateLabel(); password.UpdateLabel(); confirmation.UpdateLabel();
+            ApplyTitle();
         }
         void ChangeRemember()
         {
@@ -234,8 +235,7 @@ namespace HYJS.NativeAccount
                 confirmation.gameObject.SetActive(registering);
                 confirmation.UpdateLabel();
             }
-            foreach (UILabel title in owner.GetComponentsInChildren<UILabel>(true))
-                if (title.text == "游戏登录" || title.text == "游戏注册") title.text = registering ? "游戏注册" : "游戏登录";
+            ApplyTitle();
             if (loginLabel != null) loginLabel.text = busy ? "注册中…" : registering ? "注册" : "登录";
             if (registerLabel != null) registerLabel.text = registering ? "返回登录" : "注册账号";
             if (login != null) login.isEnabled = !busy;
@@ -247,6 +247,26 @@ namespace HYJS.NativeAccount
                 using (AndroidJavaClass cache = Cache()) selected = cache.CallStatic<bool>("rememberEnabled");
                 if (rememberFace != null) rememberFace.color = selected ? new Color(0.16f, 0.71f, 0.81f, 1f) : new Color(0.96f, 0.98f, 0.99f, 1f);
                 if (rememberTick != null) rememberTick.SetActive(selected);
+            }
+        }
+        void ApplyTitle()
+        {
+            // The shipped header is a sibling of UserInput. Stop at the nearest
+            // ancestor containing its caption, preserving unrelated scene labels.
+            for (Transform node = owner.transform; node != null; node = node.parent)
+            {
+                bool found = false;
+                foreach (UILabel title in node.GetComponentsInChildren<UILabel>(true))
+                if (title.text == "游戏登录" || title.text == "游戏注册" || title.text == "Brain Burst 2039" || title.text == "注册 Brain Burst 2039")
+                {
+                    foreach (UILocalize localized in title.GetComponents<UILocalize>()) localized.enabled = false;
+                    title.text = registering ? "注册 Brain Burst 2039" : "Brain Burst 2039";
+                    title.fontSize = 20;
+                    title.width = Math.Max(title.width, 310);
+                    title.overflowMethod = UILabel.Overflow.ShrinkContent;
+                    found = true;
+                }
+                if (found) return;
             }
         }
         void Error(string message) { BoxManager.CreatePopupTextBox(message, 0f); }

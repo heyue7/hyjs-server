@@ -49,7 +49,7 @@ export function organizeOperationsMenus(menus: App.Global.Menu[]) {
     };
   }
   const global = group('global-settings', '全局设置', [
-    take('game-accounts', '用户管理'),
+    take('game-accounts', 'Brain Burst 2039 账号'),
     take('items', '道具与资源'),
     take('fields', '野外地图与部署'),
     take('trials', '试炼之地'),

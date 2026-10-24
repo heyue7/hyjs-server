@@ -7,8 +7,8 @@ import { api, ApiError, errorMessage, formatTime, json } from '@/service/operati
 import type { TerminalSettings, TerminalDistribution, TerminalDistributionResult } from '@/service/wallet-operations';
 import { useOperations } from '@/composables/useOperations';
 import { useDraftGuard } from '@/composables/useDraftGuard';
-import { createRequestId } from '@/utils/request-id';
 import { useServerScopeStore } from '@/store/modules/server-scope';
+import { createRequestId } from '@/utils/request-id';
 const scope = useServerScopeStore();
 const { canWrite } = useOperations();
 const route = useRoute();
@@ -80,7 +80,7 @@ async function loadRecords() {
 function confirmDistribution() {
   if (locked.value || conflict.value || !draft.value || !saved.value || settingsDirty.value || !points.value || !Number.isSafeInteger(points.value) || points.value <= 0 || !reason.value.trim() || !scope.currentServer || !window.$dialog) return;
   const request = { requestId: createRequestId(), points: points.value, reason: reason.value.trim(), version: saved.value.version, serverId: scope.currentServer.id, serverName: scope.currentServer.name };
-  window.$dialog.warning({ title: '确认向当前区服投放', content: `区服：${request.serverName}（${request.serverId}）。每个符合条件的账号到账 ${request.points} 超频点数。原因：${request.reason}。包含离线角色，同账号去重，保护账号不参与。`, positiveText: '确认投放', negativeText: '取消', onPositiveClick: () => { if (scope.serverId !== request.serverId || busy.value || !canWrite.value) return; pending.value = request; void distribute(); } });
+  window.$dialog.warning({ title: '确认向当前区服投放', content: `区服：${request.serverName}（${request.serverId}）。每个符合条件的角色到账 ${request.points} 超频点数。原因：${request.reason}。包含离线角色，每服每账号 1 个角色，保护账号不参与。`, positiveText: '确认投放', negativeText: '取消', onPositiveClick: () => { if (scope.serverId !== request.serverId || busy.value || !canWrite.value) return; pending.value = request; void distribute(); } });
 }
 async function distribute() {
   const request = pending.value;
@@ -102,8 +102,8 @@ const statusNames: Record<string, string> = { completed: '已完成', complete: 
 const columns: DataTableColumns<TerminalDistribution> = [
   { title: '时间（北京）', key: 'createdAt', width: 185, render: row => formatTime(row.createdAt) },
   { title: '投放类型', key: 'kind', width: 120, render: row => ({ admin_manual: '单次投放', manual: '单次投放', admin_weekly: '每周投放', weekly: '每周投放' }[row.kind] || row.kind) },
-  { title: '超频点数 / 账号', key: 'points', width: 160 },
-  { title: '已到账 / 接收账号', key: 'credited', width: 155, render: row => `${row.credited} / ${row.recipients}` },
+  { title: '超频点数 / 角色', key: 'points', width: 160 },
+  { title: '已到账 / 接收角色', key: 'credited', width: 155, render: row => `${row.credited} / ${row.recipients}` },
   { title: '状态', key: 'status', width: 110, render: row => h(NTag, { size: 'small', bordered: false }, () => statusNames[row.status] || row.status) },
   { title: '批次编号', key: 'batchId', minWidth: 240 }
 ];
@@ -140,16 +140,16 @@ onBeforeUnmount(() => { generation++; recordGeneration++; });
         </NSpin>
       </NTabPane>
       <NTabPane name="distribute" tab="单次全服投放">
-        <NAlert type="info" class="mb-20px">当前区服：{{ scope.currentServer?.name }}（{{ scope.serverId }}）。仅向本区服已创建角色的非保护账号投放，同账号去重，包含离线角色。</NAlert>
+        <NAlert type="info" class="mb-20px">当前区服：{{ scope.currentServer?.name }}（{{ scope.serverId }}）。仅向本区服非保护账号的角色投放，包含离线角色；每服每账号 1 个角色，余额按区服独立。</NAlert>
         <NAlert v-if="settingsDirty && !pending" type="warning" class="mb-16px">请先保存或取消终端设置草稿，再提交投放。</NAlert>
         <NForm label-placement="top" :disabled="locked" class="terminal-distribute" @submit.prevent="confirmDistribution">
-          <NFormItem label="每账号投放超频点数" required><NInputNumber v-model:value="points" :min="1" :precision="0" class="w-full" /></NFormItem>
+          <NFormItem label="每角色投放超频点数" required><NInputNumber v-model:value="points" :min="1" :precision="0" class="w-full" /></NFormItem>
           <NFormItem label="投放原因" required><NInput v-model:value="reason" type="textarea" :maxlength="200" show-count /></NFormItem>
           <NButton v-if="canWrite" attr-type="submit" type="primary" :disabled="locked || conflict || settingsDirty || !points || !reason.trim() || !saved">确认投放</NButton>
         </NForm>
-        <NAlert v-if="pending" type="warning" class="mt-20px">本次请求结果待确认：{{ pending.points }} 超频点数 / 账号，{{ pending.reason }}。请求编号 {{ pending.requestId }}。切区或离页前请先重试确认结果。<div class="mt-12px"><NButton :loading="distributing" :disabled="!canWrite" @click="distribute">重试同一请求</NButton></div></NAlert>
+        <NAlert v-if="pending" type="warning" class="mt-20px">本次请求结果待确认：{{ pending.points }} 超频点数 / 角色，{{ pending.reason }}。请求编号 {{ pending.requestId }}。切区或离页前请先重试确认结果。<div class="mt-12px"><NButton :loading="distributing" :disabled="!canWrite" @click="distribute">重试同一请求</NButton></div></NAlert>
         <NAlert v-if="distributeError" type="error" class="mt-16px">{{ distributeError }}</NAlert>
-        <NAlert v-if="result" type="success" class="mt-16px">批次 {{ result.batchId }}：已到账 {{ result.credited }} / {{ result.recipients }} 个账号{{ result.alreadyApplied ? '（已核对原请求）' : '' }}。</NAlert>
+        <NAlert v-if="result" type="success" class="mt-16px">批次 {{ result.batchId }}：已到账 {{ result.credited }} / {{ result.recipients }} 个角色{{ result.alreadyApplied ? '（已核对原请求）' : '' }}。</NAlert>
       </NTabPane>
       <NTabPane name="records" tab="投放记录">
         <div class="ops-toolbar mb-16px"><span class="ops-muted">{{ scope.currentServer?.name }} · 单次与每周投放</span><NButton :loading="recordsLoading" @click="loadRecords">刷新记录</NButton></div>

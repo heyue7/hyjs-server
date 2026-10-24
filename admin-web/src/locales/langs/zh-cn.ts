@@ -235,7 +235,7 @@ const local: App.I18n.Schema = {
     audit: '操作审计',
     users: '后台账号',
     cdk: '兑换码管理',
-    'game-accounts': '用户管理',
+    'game-accounts': 'Brain Burst 2039 账号',
     players: '玩家管理',
     wallets: '蓝绿终端',
     'activities-unavailable': '不可用活动',

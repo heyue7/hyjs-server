@@ -43,6 +43,14 @@ public sealed class LocalWalletSessionBridge : MonoBehaviour
         return value.ToString();
     }
 
+    // The native account page calls this only after the logout endpoint acknowledges release.
+    public void LogoutAccount(string ignored)
+    {
+        Pause();
+        ManagerController manager = ManagerController.Instance;
+        if (manager != null) manager.BackToLogin();
+    }
+
     private static void Bind(long player, string session)
     {
         try

@@ -10,7 +10,7 @@ import { createRequestId } from '@/utils/request-id';
 import { money } from '@/service/wallet-operations';
 import type { WalletLedger, WalletLedgerItem, WalletAdjustmentRequest, WalletAdjustmentResult } from '@/service/wallet-operations';
 const scope = useServerScopeStore();
-const props = defineProps<{ playerId?: number; accountId?: number; playerName?: string }>();
+const props = defineProps<{ playerId: number; playerName?: string }>();
 const { canWrite } = useOperations();
 const loading = ref(false);
 const error = ref('');
@@ -66,7 +66,7 @@ function confirmAdjustment() {
   confirming.value = true;
   window.$dialog.warning({
     title: `确认${label} ${body.points.toLocaleString('zh-CN')} 超频点数？`,
-    content: `${scope.currentServer!.name} · ${props.playerName || `角色 #${props.playerId}`}。账号余额 ${money(data.value.balanceCents)} → ${money(afterBalance.value!)}。原因：${body.reason}`,
+    content: `${scope.currentServer!.name} · ${props.playerName || `角色 #${props.playerId}`}。角色余额 ${money(data.value.balanceCents)} → ${money(afterBalance.value!)}。原因：${body.reason}`,
     positiveText: `确认${label}`, negativeText: '取消',
     onPositiveClick: () => {
       if (accepted || !canWrite.value || request.serverId !== scope.serverId || request.playerId !== props.playerId) return false;
@@ -121,17 +121,8 @@ async function load() {
     params.set('endAt', String(range.value[1]));
   }
   try {
-    let result: WalletLedger;
-    if (props.accountId) {
-      const ledger = await api<Omit<WalletLedger, 'items'> & { entries: WalletLedgerItem[] | null }>(
-        `/game-accounts/${props.accountId}/wallet?${params}`
-      );
-      if (!('entries' in ledger)) throw new Error('钱包账单数据不完整，请刷新重试');
-      result = { ...ledger, items: ledger.entries || [] };
-    } else {
-      if (!props.playerId) throw new Error('请先选择钱包所属用户');
-      result = await api<WalletLedger>(scope.serverQuery(`/wallets/${props.playerId}/ledger?${params}`));
-    }
+    if (!props.playerId) throw new Error('请先选择钱包所属角色');
+    const result = await api<WalletLedger>(scope.serverQuery(`/wallets/${props.playerId}/ledger?${params}`));
     if (seq === generation) {
       data.value = result;
       if (conflict.value) adjustmentError.value = '';
@@ -182,7 +173,7 @@ const columns: DataTableColumns<WalletLedgerItem> = [
   { title: '时间（北京）', key: 'createdAt', width: 185, render: row => formatTime(row.createdAt) }
 ];
 watch(
-  () => [props.accountId, props.playerId, scope.serverId],
+  () => [props.playerId, scope.serverId],
   () => {
     resetAdjustment(); pending.value = null;
     data.value = null;
@@ -200,12 +191,12 @@ onBeforeUnmount(() => { generation += 1; });
   <div class="wallet-ledger">
     <div class="ops-toolbar mb-20px">
       <div>
-        <div class="ops-muted mb-6px">账号余额</div>
+        <div class="ops-muted mb-6px">角色余额</div>
         <div class="wallet-balance">
           {{ data ? money(data.balanceCents) : '—' }}
           <span class="wallet-currency">超频点数</span>
         </div>
-        <div v-if="playerId" class="ops-muted mt-6px">同账号下的角色共用此余额</div>
+        <div v-if="playerId" class="ops-muted mt-6px">{{ scope.currentServer?.name }} · {{ playerName || `角色 #${playerId}` }}，余额仅属于本区服角色</div>
       </div>
       <div class="wallet-actions">
         <template v-if="adjustable">

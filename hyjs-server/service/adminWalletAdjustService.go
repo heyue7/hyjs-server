@@ -47,7 +47,7 @@ func AdminWalletAdjust(ctx context.Context, actor *model.AdminPrincipal, playerI
 		if account.Protected {
 			return constUtil.ErrAdminPermission
 		}
-		balance, err := accountWalletBalance(tx, owner.AccountID, true)
+		balance, err := walletReadBalance(tx, playerID, true)
 		if err != nil {
 			return err
 		}
@@ -55,7 +55,7 @@ func AdminWalletAdjust(ctx context.Context, actor *model.AdminPrincipal, playerI
 			amount = req.Points * 100
 			label  = constUtil.AdminWalletAdjustCreditLabel + req.Reason
 			key    = constUtil.AdminWalletAdjustKeyPrefix + req.RequestID
-			prior  db.AccountWalletEntry
+			prior  db.RoleWalletEntry
 		)
 		if req.Action == constUtil.AdminWalletAdjustDebit {
 			amount = -amount
@@ -63,7 +63,7 @@ func AdminWalletAdjust(ctx context.Context, actor *model.AdminPrincipal, playerI
 		}
 		// 当前读看到等待账号锁期间提交的回执，并保持余额到回执的锁序。
 		// 已成功请求先比对冻结业务字段，后续交易不会阻止原请求重放。
-		err = db.AccountsTable(tx, "account_wallet_entries").Clauses(clause.Locking{Strength: "UPDATE"}).First(&prior, "account_id=? AND `key`=?", owner.AccountID, key).Error
+		err = db.AccountsTable(tx, "role_wallet_entries").Clauses(clause.Locking{Strength: "UPDATE"}).First(&prior, "server_id=? AND player_id=? AND `key`=?", AdminProfileServerID(owner), playerID, key).Error
 		if err == nil {
 			if *req.Revision == math.MaxInt64 || prior.DeltaCents != amount || prior.Source != constUtil.AdminWalletAdjustSource || prior.Label != label || prior.ServerID != AdminProfileServerID(owner) || prior.PlayerID != playerID || prior.Revision != *req.Revision+1 {
 				return constUtil.ErrAdminWalletAdjustReplay
@@ -90,12 +90,12 @@ func AdminWalletAdjust(ctx context.Context, actor *model.AdminPrincipal, playerI
 				return err
 			}
 		} else {
-			entry := db.AccountWalletEntry{AccountID: owner.AccountID, Key: key, ServerID: AdminProfileServerID(owner), PlayerID: playerID, Kind: constUtil.AdminWalletAdjustDebit, DeltaCents: amount, BalanceAfter: before + amount, Revision: balance.Revision + 1, At: now.UnixMilli(), Source: constUtil.AdminWalletAdjustSource, Label: label}
-			if err = db.AccountsTable(tx, "account_wallet_entries").Create(&entry).Error; err != nil {
+			entry := db.LocalWalletEntry{Key: key, PlayerID: playerID, Kind: constUtil.AdminWalletAdjustDebit, DeltaCents: amount, BalanceAfter: before + amount, Revision: balance.Revision + 1, At: now.UnixMilli(), Source: constUtil.AdminWalletAdjustSource, Label: label}
+			if err = walletCreateEntry(tx, &entry); err != nil {
 				return err
 			}
 			balance.BalanceCents, balance.Revision = entry.BalanceAfter, entry.Revision
-			if err = db.AccountsTable(tx, "account_wallet_balances").Save(balance).Error; err != nil {
+			if err = walletSaveBalance(tx, balance); err != nil {
 				return err
 			}
 		}

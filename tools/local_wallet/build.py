@@ -51,7 +51,7 @@ def build(output, icon=None):
         # Existing APK supplies LoginCache; compile its unchanged public call as
         # a classpath-only stub. Root rebuilds all native account classes together.
         cache_stub = temp / 'LoginCache.java'
-        cache_stub.write_text('package com.hyjs.wallet; public final class LoginCache { public static void passwordChanged(String username,String password) {} }')
+        cache_stub.write_text('package com.hyjs.wallet; public final class LoginCache { public static void passwordChanged(String username,String password) {} public static void logout() {} }')
         run([*common, '-d', stubs, *sorted((HERE / 'stubs').rglob('*.java')), cache_stub], env)
         run([*common, '-classpath', str(android) + os.pathsep + str(stubs), '-d', classes, *sorted((HERE / 'src').rglob('*.java')), ROOT / 'tools/green_hero_compat/java/com/hyjs/wallet/LocalAssetOverlay.java'], env)
         wallet_classes = sorted(classes.rglob('*.class'))

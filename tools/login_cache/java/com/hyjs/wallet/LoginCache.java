@@ -122,5 +122,11 @@ public final class LoginCache {
         if(remember && savedUser.equals(username)){savedPassword=password;save();}
         pendingPassword="";transientPassword="";returnPass="";
     }
+    /** Explicit confirmed logout invalidates pending attempts and every credential source. */
+    public static synchronized void logout(){
+        loaded=true;remember=false;automatic=false;suppressed=true;autoConsumed=true;autoAttempt=false;bootQueued=false;
+        active=0;++serial;pendingUser="";pendingPassword="";transientUser="";transientPassword="";returnUser="";returnPass="";formUser="";formPass="";formVisible=false;
+        clear();hide();
+    }
     public static synchronized void pause(){suppressed=true;autoAttempt=false;active=0;++serial;pendingUser="";pendingPassword="";hide();}
 }

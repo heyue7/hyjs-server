@@ -370,6 +370,14 @@ func createPlayerLocked(tx *gorm.DB, id int64, name, heroId string) (*db.Profile
 		if row.Player != nil {
 			return nil
 		}
+		// Serialize first-character eligibility before any role-index or save writes.
+		// This keeps all realm creation paths in account -> role-index -> wallet lock order.
+		if row.AccountID > 0 {
+			var account db.GameAccount
+			if err := db.AccountsTable(tx, "game_accounts").Clauses(clause.Locking{Strength: "UPDATE"}).First(&account, row.AccountID).Error; err != nil {
+				return err
+			}
+		}
 		if err := lockProfilePeriods(tx); err != nil {
 			return err
 		}
@@ -413,7 +421,17 @@ func createPlayerLocked(tx *gorm.DB, id int64, name, heroId string) (*db.Profile
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&row, id).Error; err != nil {
 			return err
 		}
-		return syncGlobalAccountRole(tx, &row)
+		if err := syncGlobalAccountRole(tx, &row); err != nil {
+			return err
+		}
+		if row.AccountID > 0 {
+			account, err := AccountForProfile(tx, &row)
+			if err != nil {
+				return err
+			}
+			return terminalSignup(tx, account, AdminProfileServerID(row), row.Id)
+		}
+		return nil
 	}()
 	return &row, err
 }

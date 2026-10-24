@@ -1,0 +1,1 @@
+CREATE TABLE IF NOT EXISTS terminal_role_states (server_id BIGINT NOT NULL,player_id BIGINT NOT NULL,account_id BIGINT NOT NULL,seen_revision BIGINT NOT NULL,delivered_revision BIGINT NOT NULL,PRIMARY KEY(server_id,player_id),KEY idx_terminal_role_states_account_id(account_id)) ENGINE=InnoDB;

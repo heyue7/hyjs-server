@@ -1,6 +1,7 @@
 """Install one verified artifact set in place, preserving all persistent data."""
 from pathlib import Path
 import argparse
+import fcntl
 import gzip
 import hashlib
 import ipaddress
@@ -15,12 +16,18 @@ parser = argparse.ArgumentParser()
 parser.add_argument('stage')
 parser.add_argument('--initial-db', action='store_true')
 parser.add_argument('--provision-ingress', action='store_true')
+parser.add_argument('--migrate-role-wallets', action='store_true')
+parser.add_argument('--expected-live-revision')
 args = parser.parse_args()
 os.umask(0o077)
 stage = Path(args.stage).resolve()
 ROOT = stage.parent.parent
 assert stage.parent == ROOT / '.incoming' and (ROOT / '.hyjs-owned').is_file()
 manifest = json.loads((stage / 'artifact.json').read_text())
+deployment_lock = (ROOT / '.deploy.lock').open('a')
+fcntl.flock(deployment_lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+if args.expected_live_revision:
+    assert json.loads((ROOT / 'deployed.json').read_text())['revision'] == args.expected_live_revision, 'Live revision changed; rebase and verify first'
 
 def sha(path):
     digest = hashlib.sha256()
@@ -73,6 +80,16 @@ def backup_existing_database():
 for name, digest in manifest['files'].items():
     path = stage / name
     assert path.resolve().is_relative_to(stage) and sha(path) == digest, name
+if not args.provision_ingress:
+    assert Path('/etc/nginx/sites-enabled/hyjs-test.conf').read_bytes() == (stage / 'nginx.conf').read_bytes(), 'Ingress differs; explicit provision-ingress required'
+if args.migrate_role_wallets:
+    previous_backup = json.loads((ROOT / 'backup-latest.json').read_text())
+    expected_backup_size = (ROOT / 'backups' / previous_backup['file']).stat().st_size
+    assert shutil.disk_usage(ROOT).free > expected_backup_size * 3 + 400 * 1024 * 1024, 'Insufficient peak space for verified encrypted cutover backup'
+# Build before the maintenance window; MySQL and the old application stay live.
+shutil.copy2('/etc/ssl/certs/ca-certificates.crt', stage / 'ca-certificates.crt')
+old_image = subprocess.run(['docker', 'inspect', '--format={{.Image}}', 'hyjs-game'], capture_output=True, text=True).stdout.strip()
+run('docker', 'build', '--build-arg', 'REVISION=' + manifest['revision'], '-t', 'hyjs-game:current', str(stage))
 # Deployment topology may change; preserve all existing database credentials.
 runtime = {}
 for line in (stage / 'deployment.env').read_text().splitlines():
@@ -89,6 +106,14 @@ with os.fdopen(fd, 'w') as output:
 os.chmod(temporary_env, 0o600)
 os.replace(temporary_env, private_env)
 # Verify the encrypted snapshot before Compose can restart MySQL for new limits.
+wallet_baseline = None
+if args.migrate_role_wallets:
+    assert args.expected_live_revision and not args.initial_db and (ROOT / 'migration.json').exists()
+    import role_wallet_migration
+    role_wallet_migration.before(mysql)
+    compose('stop', '-t', '30', 'app')
+    wallet_baseline = role_wallet_migration.before(mysql)
+    (ROOT / 'role-wallet-cutover-before.json').write_text(json.dumps(wallet_baseline, indent=2))
 if (ROOT / 'migration.json').exists():
     backup_existing_database()
 shutil.copy2(stage / 'compose.yaml', ROOT / 'compose.yaml')
@@ -149,9 +174,6 @@ if args.initial_db and not already_imported:
 elif not (ROOT / 'migration.json').exists():
     raise SystemExit('Initial data must be explicitly imported before application start')
 
-shutil.copy2('/etc/ssl/certs/ca-certificates.crt', stage / 'ca-certificates.crt')
-old_image = subprocess.run(['docker', 'inspect', '--format={{.Image}}', 'hyjs-game'], capture_output=True, text=True).stdout.strip()
-run('docker', 'build', '--build-arg', 'REVISION=' + manifest['revision'], '-t', 'hyjs-game:current', str(stage))
 compose('up', '-d', '--no-deps', '--force-recreate', 'app')
 for _ in range(90):
     try:
@@ -161,7 +183,18 @@ for _ in range(90):
     except Exception:
         time.sleep(2)
 else:
+    if args.migrate_role_wallets:
+        compose('stop', '-t', '30', 'app')
     raise SystemExit('Application health failed; data and prior deployed.json preserved. Fix/retry this script, or deploy its recorded Git commit from a clean checkout; do not restore the database automatically.')
+
+if wallet_baseline is not None:
+    try:
+        reconciled = role_wallet_migration.after(mysql, wallet_baseline)
+        (ROOT / 'role-wallet-cutover-after.json').write_text(json.dumps(reconciled, indent=2))
+        manifest['roleWalletCutover'] = reconciled
+    except Exception:
+        compose('stop', '-t', '30', 'app')
+        raise SystemExit('Role wallet reconciliation failed. App stopped; preserve database, backup and evidence. Never start a legacy wallet binary against new role transactions.')
 
 if args.provision_ingress:
     destination = Path('/etc/nginx/sites-available/hyjs-test.conf')

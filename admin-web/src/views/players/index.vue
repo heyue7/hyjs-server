@@ -34,7 +34,7 @@ async function closeWallet() {
 function requestedWallet() {
   const id = Number(route.query.wallet);
   if (Number.isSafeInteger(id) && id > 0)
-    openWallet(rows.value.find(row => row.id === id) || { id, name: `用户 #${id}` });
+    openWallet(rows.value.find(row => row.id === id) || { id, name: `角色 #${id}` });
 }
 import PlayerProfileEditor from '@/components/operations/player-profile-editor.vue';
 import PlayerInventory from '@/components/operations/player-inventory.vue';
@@ -257,7 +257,7 @@ const columns = computed<DataTableColumns<GamePlayer>>(() => [
     render: row => h('div', [h('strong', row.name), h('div', { class: 'ops-mono ops-muted' }, `ID ${row.id}`)])
   },
   {
-    title: '所属用户',
+    title: 'Brain Burst 2039 账号',
     key: 'username',
     minWidth: 180,
     render: row =>
@@ -273,7 +273,7 @@ const columns = computed<DataTableColumns<GamePlayer>>(() => [
                   query: { accountId: row.accountId, q: row.username || '' }
                 })
             },
-            () => `${row.nickname || '—'} · ${row.username || '用户 #' + row.accountId}`
+            () => `${row.nickname || '—'} · ${row.username || '账号 #' + row.accountId}`
           )
         : `${row.nickname || '—'} · ${row.username || '—'}`
   },
@@ -328,7 +328,7 @@ onMounted(async () => {
   await load();
   requestedWallet();
   const id = Number(route.query.playerId);
-  if (Number.isSafeInteger(id) && id > 0) {
+  if (!route.query.wallet && Number.isSafeInteger(id) && id > 0) {
     open.value = true;
     await loadDetail(id);
   }
@@ -403,7 +403,7 @@ watch(
     </NCard>
     <NDrawer
       :show="Boolean(walletTarget)"
-      :width="1020"
+      :width="Math.min(1020, viewportWidth)"
       class="ops-editor-drawer"
       @update:show="!$event && closeWallet()"
     >
@@ -412,7 +412,6 @@ watch(
           v-if="walletTarget"
           ref="walletRef"
           :key="`${scope.serverId}:${walletTarget.id}`"
-          :account-id="walletTarget.accountId || undefined"
           :player-id="walletTarget.id"
           :player-name="walletTarget.name"
         />
@@ -440,18 +439,19 @@ watch(
             </div>
             <NTabs v-model:value="activeTab" type="line">
               <NTabPane name="overview" tab="角色概况">
-                <NDescriptions :column="3" label-placement="top" class="mb-28px mt-20px">
+                <NDescriptions :column="viewportWidth < 600 ? 2 : 3" label-placement="top" class="mb-28px mt-20px">
                   <NDescriptionsItem label="角色等级">{{ detail.level }}</NDescriptionsItem>
                   <NDescriptionsItem label="本级经验">{{ detail.exp }}</NDescriptionsItem>
                   <NDescriptionsItem label="所属区服">{{ scope.currentServer?.name }}</NDescriptionsItem>
-                  <NDescriptionsItem label="账号归属">{{ detail.username }} · {{ detail.accountId }}</NDescriptionsItem>
+                  <NDescriptionsItem label="Brain Burst 2039 账号" :span="viewportWidth < 600 ? 2 : 1"><NButton v-if="detail.accountId" text type="primary" @click="router.push({ path: '/game-accounts', query: { accountId: detail.accountId, q: detail.username || '' } })">{{ detail.nickname || detail.username }} · {{ detail.accountId }}</NButton><span v-else>—</span></NDescriptionsItem>
+                  <NDescriptionsItem label="蓝绿终端">本区服角色独立余额</NDescriptionsItem>
                   <NDescriptionsItem label="会员等级">VIP{{ detail.vip }}</NDescriptionsItem>
                   <NDescriptionsItem label="主线进度">{{ detail.chapter }} - {{ detail.mission }}</NDescriptionsItem>
                   <NDescriptionsItem label="所在场景">{{ sceneLabel(detail.scene) }}</NDescriptionsItem>
                   <NDescriptionsItem label="创建时间">{{ formatTime(detail.createdAt) }}</NDescriptionsItem>
                 </NDescriptions>
                 <h3 class="player-section-title">当前资源</h3>
-                <NDescriptions :column="3" label-placement="top" class="mb-28px">
+                <NDescriptions :column="viewportWidth < 600 ? 2 : 3" label-placement="top" class="mb-28px">
                   <NDescriptionsItem
                     v-for="(value, key) in detail.balances"
                     :key="key"
@@ -461,7 +461,7 @@ watch(
                   </NDescriptionsItem>
                 </NDescriptions>
                 <h3 class="player-section-title">持有概况</h3>
-                <NDescriptions :column="3" label-placement="top">
+                <NDescriptions :column="viewportWidth < 600 ? 2 : 3" label-placement="top">
                   <NDescriptionsItem
                     v-for="(value, key) in detail.counts"
                     :key="key"
