@@ -7,8 +7,11 @@ from device_demo import Device,ADB
 d=Device('10AF7Q0KSJ003GK');lease=json.loads((OUT/'phone-lease.json').read_text());mode=sys.argv[1]
 assert mode in ('install','restore')
 def into(path,data):
- r=subprocess.run(['rtk','proxy',str(ADB),'-s',d.serial,'exec-in','run-as',d.package,'tee',path],input=data,stdout=subprocess.DEVNULL,stderr=subprocess.PIPE,timeout=30)
- assert r.returncode==0,'Private owned file write failed'
+ # Verify file hashes after a private device-local pipe; exec-in truncated the caller.
+ local=PRIVATE/'owned-write.bin';local.write_bytes(data);local.chmod(0o600);temporary='/data/local/tmp/hyjs65-private-transfer'
+ d.run('push',local,temporary);d.run('shell','chmod','600',temporary)
+ try:d.run('shell','cat '+temporary+' | run-as '+d.package+' tee '+path+' > /dev/null')
+ finally:d.run('shell','rm','-f',temporary);local.unlink()
 def clear_prefs():
  for name in d.text('shell','run-as',d.package,'ls','shared_prefs').splitlines():
   assert re.fullmatch(r'[A-Za-z0-9_.-]+',name)
@@ -28,7 +31,9 @@ else:
  with tarfile.open(fileobj=io.BytesIO(raw))as t:
   assert all(not Path(x.name).is_absolute() and '..'not in Path(x.name).parts for x in t.getmembers())
  clear_prefs()
- r=subprocess.run(['rtk','proxy',str(ADB),'-s',d.serial,'exec-in','run-as',d.package,'tar','-xf','-','-C','shared_prefs'],input=raw,capture_output=True,timeout=30);assert r.returncode==0,'Original private preference restore failed'
+ temporary='/data/local/tmp/hyjs65-original-prefs';d.run('push',PRIVATE/'shared-prefs.tar',temporary);d.run('shell','chmod','600',temporary)
+ try:d.run('shell','cat '+temporary+' | run-as '+d.package+' tar -xf - -C shared_prefs')
+ finally:d.run('shell','rm','-f',temporary)
  names=d.text('shell','run-as',d.package,'ls','shared_prefs').splitlines();actual={n:d.text('shell','run-as',d.package,'sha256sum','shared_prefs/'+n).split()[0]for n in names};assert actual==lease['preferenceHashes']
  into('files/native-runner-current.dll',(PRIVATE/'original-caller.dll').read_bytes());assert d.text('shell','run-as',d.package,'sha256sum','files/native-runner-current.dll').split()[0]==lease['originalCallerSHA256']
  observed=d.run('exec-out','run-as',d.package,'cat','files/hyjs65-qa/observations.jsonl');gzip.compress(observed)
@@ -39,7 +44,8 @@ else:
   endpoint='tcp:'+str(port)
   if endpoint in current:
    assert current[endpoint]==endpoint;d.run('reverse','--remove',endpoint)
- for line in lease['originalReverse'].splitlines():
+ reverseRows=lease['originalReverse'];reverseRows=reverseRows if isinstance(reverseRows,list) else reverseRows.splitlines()
+ for line in reverseRows:
   a=line.split()
   if len(a)!=3:continue
   source,target=a[1:];current=reverses()

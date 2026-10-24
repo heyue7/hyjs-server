@@ -1,0 +1,42 @@
+{
+  "revision": "8219a2f774cb7fe2d9ec02c37a662cdf22633f2b",
+  "expectedExecutableSHA256": "2f6a2a15a9cdf9496cdac27d04c1ee9588d4f2c42d7138e9ddac36e75eda7dbb",
+  "runningExecutableSHA256": "2f6a2a15a9cdf9496cdac27d04c1ee9588d4f2c42d7138e9ddac36e75eda7dbb",
+  "runningBinaryMatches": true,
+  "appState": {
+    "Status": "running",
+    "OOMKilled": false
+  },
+  "appRestartCount": 0,
+  "mysqlState": {
+    "Status": "running",
+    "OOMKilled": false,
+    "Health": {
+      "Status": "healthy"
+    }
+  },
+  "mysqlRestartCount": 0,
+  "sqlMetadataAndProfileDigests": [
+    "0\t1\t35",
+    "1\t0\t18",
+    "1\tee8bfa75dc5089ec814112833f4974ab81b5ad6d3a824fce052435c536806628\t70ec6adc6a5128f5a476a9cac009f25e6b1b6208d443b106744dd86caf8a39cb",
+    "24\t496b3d07dc070fafa7c7e68e685b7b5516089863a7d97d218dbc1f2d1b252289\t9ac4a2dcabc1197007d742ed80f2b0e5ebb34d1413ecc3f0470de8fdbf3d7bc4",
+    "1\tcomputed\t1",
+    "0\t2"
+  ],
+  "backup": {
+    "file": "pre-deploy-8219a2f774cb-1792853191775145558.sql.gz.aesgcm",
+    "sha256": "611741b4066457291e8c989a66b4121ab6456c17b33e85c04c79a213e9e95249",
+    "bytes": 477959588
+  },
+  "freeBytes": 2867838976,
+  "publicHTTP": {
+    "health": 200,
+    "admin": 200,
+    "/admin/assets/index-BLd4oIC3.js": 200,
+    "/admin/assets/index-6eebTWhh.css": 200,
+    "corsStatus": 204,
+    "exactCorsOrigin": true
+  },
+  "productionGameLoginsOrRewardsIssued": false
+}

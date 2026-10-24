@@ -1,0 +1,82 @@
+{
+  "schema": "hyjs-feedback65-managed-v1",
+  "baseAPKSHA256": "f3ce73cc1f2e41bb45873c64f01e9a6ec81d84d1e41f18482c27d62c42ace3f9",
+  "inputManagedSHA256": "57f12e1c1aaa0ee46bc00d12be6b06bba5fda16533b47cc50a02c19c5e5e4f22",
+  "outputManagedSHA256": "5842a437f402d73dd209b85960bde78ce750150bf79719bc766d2b6d6bc6593d",
+  "inputDexSHA256": "b592412b77a0a0146e8f03d5598b187c95c0d6374d5f616f3191ed672f6f6bbb",
+  "payloadFiles": {
+    "assets/bin/Data/Managed/Assembly-CSharp.dll": "build/feedback65-overlay-r4/Assembly-CSharp.dll",
+    "assets/bin/Data/Managed/HYJS.Feedback65.dll": "build/feedback65-overlay-r4/HYJS.Feedback65.dll",
+    "assets/bin/Data/Managed/HYJS.BulkPurchase.dll": "build/feedback65-overlay-r4/HYJS.BulkPurchase.dll"
+  },
+  "replacementEntries": {
+    "assets/bin/Data/Managed/Assembly-CSharp.dll": "5842a437f402d73dd209b85960bde78ce750150bf79719bc766d2b6d6bc6593d",
+    "assets/bin/Data/Managed/HYJS.Feedback65.dll": "9a5bdef854697868c49e1cfb28cd81038b8c8b6ce3d48ba988b079385e6a9036",
+    "assets/bin/Data/Managed/HYJS.BulkPurchase.dll": "758ebcc36cfed9eb57e3f7e32e7ee7a2a738633f5a1b9a0ed9b957d191fd07d9"
+  },
+  "sourcePins": {
+    "tools/client_feedback65/Runtime.cs": "6b3fea1b27818f2d5b02cbfa1d3828dbe4c77914a56f88779d62ae9a308c5796",
+    "tools/client_feedback65/Injector.cs": "5e93acf5fc1d8f5b49ba4e817bd3465d822fba99f918ae66e5ad912587092d65",
+    "tools/client_feedback65/build.py": "a0bc92e94121fe6486128bc34f555e72d67188c06cd446123e2687b24c32bcf5",
+    "tools/client_feedback65/README.md": "32581552728608ccaabf54948dfe77342662a041165938262553806850493acf",
+    "tools/client_bulk_purchase/Runtime.cs": "dabf2fb44f41fa47f51442dcedc8b822eba18a669acf37d0a9286fc70db9726c"
+  },
+  "managedOnly": true,
+  "inheritedJavaByteExact": true,
+  "inheritedJavaPublicProtectedABIExact": true,
+  "allowedChangedMethods": [
+    "PlaybackKit::Start",
+    "UI.SelectReward::DoOpen",
+    "UI.RushPage::OnFightBtnClick",
+    "UI.RushFightReadyItem::OnFightBtnClick",
+    "UI.RushEliteBossPage::OnFightBtnClick",
+    "UI.WantedMission::SendEnterBattle",
+    "UI.WantedMission::EnterBattleCallback",
+    "Battle.WantedBattleOver::AskWantedFightResult",
+    "Battle.WantedBattleOver::<AskWantedFightResult>m__E",
+    "UI.WantedMission::OnNormalHit",
+    "UI.WantedMission::OnDeadlyHit"
+  ],
+  "targetPins": {
+    "0x6003bb8": "fe4bb19351224fbb51c07e65b3e33e4807e7ba68ff79a4ac3394b68502d7440a",
+    "0x6005284": "cf6c8828a3c3122cb3e84e461a3c1fa9f381e9b758c9fccc21f70756fee38513",
+    "0x6005e8b": "d2555df298ed543ab76e0081003639974527f9af9f0903b1d09610b23557ee3f",
+    "0x6005e71": "fcfd042bc4de062c21ad73ee20b71e7ed1af6ea4ec0e510e642d470aaf61929c",
+    "0x6005e66": "319b4d87de7de727321ced642713ce794b9162ae97ac540b51a8d57c2a191b05",
+    "0x600504e": "237b3a4f08687cfc90f8b12acc2b4a80e6c5ecdb39b00a85c20f914c2ff29e4b",
+    "0x600504f": "980404d4a1b6210e9b7a12565fb689e6a4fc63577404d4e8934a6a81439a2beb",
+    "0x6002b6b": "164a7fbacf02410dfafb6d8716f6d5d927662f852385ae6dee9da61d72c4ebec",
+    "0x6002b6d": "92bc6e6af08a32a0cc52f7f3b508bc74bb3175a7ecdf640fcc09af1f29c4763c",
+    "0x600504d": "5c9b10678e5873bae5216983c1d45d68dd0fe63cc09e180e77721ded371ce742",
+    "0x6005050": "d220ac43ad55de0d0c5da6cbe8782e190d519db98fb3dcbb826d92d644143763"
+  },
+  "apkBuilt": false,
+  "deviceTested": false,
+  "nonTargetRawCILExact": 26935,
+  "nonTargetHeadersLocalsAndEHBytesExact": true,
+  "changedMethodTokens": [
+    "0x6002b6b",
+    "0x6002b6d",
+    "0x6003bb8",
+    "0x600504d",
+    "0x600504e",
+    "0x600504f",
+    "0x6005050",
+    "0x6005284",
+    "0x6005e66",
+    "0x6005e71",
+    "0x6005e8b"
+  ],
+  "originalEngineMethods": 547,
+  "originalEngineCILAndEHExact": true,
+  "originalDefinitionSignaturesAndFieldRIDsExact": true,
+  "helperScopedMainTypeModuleRefs": [],
+  "addedFieldCount": 0,
+  "fieldPtrAbsent": true,
+  "methodPtrAbsent": true,
+  "originalEngineMethodsExact": 547,
+  "removedGuardOriginalSuffixBranchAndLocalsExact": true,
+  "originalSelectionBodyExactAfterPrefix": true,
+  "originalMetadataReferencesAppendOnly": true,
+  "wantedOriginalBodiesBranchesAndLocalsExactAfterPrefixes": true
+}

@@ -1,0 +1,15 @@
+{
+  "replacedByInstalledQA": "d995f7bc774381cd24ca85f3ab2b8a6adea5c07a7b8d9610f6fb3598dee8b3ca",
+  "removedFailedCandidates": [
+    {
+      "file": "build/hyjs-feedback65-formal.apk",
+      "sha256": "144466bc1d580bc45bc28b1fc6ccbe3e6a0501019a2a0960a46c5581f612a7e0",
+      "bytes": 683697401
+    },
+    {
+      "file": "build/hyjs-feedback65-qa-r3.apk",
+      "sha256": "0b8c4015ef7a1090df3ed108a7bc95abfa845ea53370896c9babf31f20f3b7f0",
+      "bytes": 683697401
+    }
+  ]
+}

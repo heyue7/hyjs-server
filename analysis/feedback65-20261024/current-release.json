@@ -1,0 +1,9 @@
+{
+  "versionName": "1.0.65",
+  "buildCode": 2026102405,
+  "APKSHA256": "f26942c80a6b39d2b83eeed63a0775dff7e84147db815f553256e09c06026ba7",
+  "serverRevision": "8219a2f774cb7fe2d9ec02c37a662cdf22633f2b",
+  "serverRunningExpectedSHA256": "2f6a2a15a9cdf9496cdac27d04c1ee9588d4f2c42d7138e9ddac36e75eda7dbb",
+  "aliasesHardlinked": true,
+  "formal64RebuildInputPreserved": true
+}

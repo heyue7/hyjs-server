@@ -1,0 +1,9 @@
+{
+  "removedOwnedOldBackup": "pre-deploy-f7c2be940bfc-1792833338400665742.sql.gz.aesgcm",
+  "bytesRemoved": 432216493,
+  "keptVerifiedBackup": "pre-deploy-8219a2f774cb-1792853191775145558.sql.gz.aesgcm",
+  "remainingEncryptedBackups": [
+    "pre-deploy-8219a2f774cb-1792853191775145558.sql.gz.aesgcm"
+  ],
+  "freeBytes": 3296677888
+}

@@ -22,5 +22,11 @@
     "mail": false,
     "rewardOrCompensation": false
   },
-  "finalAffectedRegression": "go-final-r7.json: all17top level tests PASS97.275s with committed-history prewarm"
+  "finalAffectedRegression": "go-final-r7.json: all17top level tests PASS97.275s with committed-history prewarm",
+  "release": "current-release.json",
+  "liveVerification": "live-after.json",
+  "formalPhone": "formal-phone-installed.json",
+  "phoneRestored": "phone-restored.json",
+  "qaReleased": "qa-cleanup.json",
+  "status": "RELEASED_VERIFIED_WITH_DECLARED_BOUNDARIES"
 }

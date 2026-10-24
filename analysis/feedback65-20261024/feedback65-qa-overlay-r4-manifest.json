@@ -1,0 +1,119 @@
+{
+  "schema": "hyjs-feedback65-qa-managed-v1",
+  "baseAPKSHA256": "f3ce73cc1f2e41bb45873c64f01e9a6ec81d84d1e41f18482c27d62c42ace3f9",
+  "inputManagedSHA256": "57f12e1c1aaa0ee46bc00d12be6b06bba5fda16533b47cc50a02c19c5e5e4f22",
+  "outputManagedSHA256": "537709d2a4520558c4451274e52a306fce5a17809587b4220560e32b0f138e5f",
+  "inputDexSHA256": "b592412b77a0a0146e8f03d5598b187c95c0d6374d5f616f3191ed672f6f6bbb",
+  "managedOnly": true,
+  "inheritedJavaByteExact": true,
+  "inheritedJavaPublicProtectedABIExact": true,
+  "payloadFiles": {
+    "assets/bin/Data/Managed/Assembly-CSharp.dll": "build/feedback65-qa-overlay-r4/Assembly-CSharp.dll",
+    "assets/bin/Data/Managed/HYJS.Feedback65.dll": "build/feedback65-overlay-r4/HYJS.Feedback65.dll",
+    "assets/bin/Data/Managed/HYJS.BulkPurchase.dll": "build/feedback65-overlay-r4/HYJS.BulkPurchase.dll"
+  },
+  "replacementEntries": {
+    "assets/bin/Data/Managed/Assembly-CSharp.dll": "537709d2a4520558c4451274e52a306fce5a17809587b4220560e32b0f138e5f",
+    "assets/bin/Data/Managed/HYJS.Feedback65.dll": "9a5bdef854697868c49e1cfb28cd81038b8c8b6ce3d48ba988b079385e6a9036",
+    "assets/bin/Data/Managed/HYJS.BulkPurchase.dll": "758ebcc36cfed9eb57e3f7e32e7ee7a2a738633f5a1b9a0ed9b957d191fd07d9"
+  },
+  "sourcePins": {
+    "tools/client_feedback65/Runtime.cs": "6b3fea1b27818f2d5b02cbfa1d3828dbe4c77914a56f88779d62ae9a308c5796",
+    "tools/client_feedback65/Injector.cs": "5e93acf5fc1d8f5b49ba4e817bd3465d822fba99f918ae66e5ad912587092d65",
+    "tools/client_feedback65/build.py": "a0bc92e94121fe6486128bc34f555e72d67188c06cd446123e2687b24c32bcf5",
+    "tools/client_feedback65/README.md": "32581552728608ccaabf54948dfe77342662a041165938262553806850493acf",
+    "tools/client_bulk_purchase/Runtime.cs": "dabf2fb44f41fa47f51442dcedc8b822eba18a669acf37d0a9286fc70db9726c",
+    "tools/client_feedback58/compose.py": "006e1f31cc8b49a4972772f08cbc0a98a9bbab4b3c24b083037d44db95609f2d",
+    "tools/client_remote/build.py": "9ddbb374ea1e0fc6372885194593675d7bb8ffb6ccc71d6ef687f2f6db83797d",
+    "tools/client_remote/Injector.cs": "e3a75eb70821aa5b19f95a5ce1fd8a6413b5e8cbe36c0be5ae7d938a5c9427ad",
+    "analysis/feedback65-20261024/compose_qa.py": "fb1db897f7f32acb298f055237cfc3576618b799b60812d0aca37501392df649"
+  },
+  "allowedChangedMethods": [
+    "Battle.FieldPVEWorldBossBattleOver::End",
+    "Battle.WantedBattleOver::<AskWantedFightResult>m__E",
+    "Battle.WantedBattleOver::AskWantedFightResult",
+    "PlaybackKit::Start",
+    "Room.RoomNetField::SCCurrentPosition",
+    "ServerConfig::GetServerUrl",
+    "UI.RushEliteBossPage::OnFightBtnClick",
+    "UI.RushFightReadyItem::OnFightBtnClick",
+    "UI.RushPage::OnFightBtnClick",
+    "UI.SelectReward::DoOpen",
+    "UI.WantedMission::EnterBattleCallback",
+    "UI.WantedMission::OnDeadlyHit",
+    "UI.WantedMission::OnNormalHit",
+    "UI.WantedMission::SendEnterBattle",
+    "VoicePlugin::InitGVoice"
+  ],
+  "qaOnly": true,
+  "neverPromote": true,
+  "qaOrigin": "http://127.0.0.1:28979",
+  "qaOriginProof": {
+    "originalEngineMethodsUnchanged": 547,
+    "unchangedInheritedRawMethodBodies": 26942,
+    "allInheritedNonTargetMethodsExact": true,
+    "changes": [
+      {
+        "method": "Battle.FieldPVEWorldBossBattleOver::End",
+        "beforeRawSHA256": "f1a2c6583bfd41700f4baeace5abe06d5da876778c6f3b7d7d39e7341fc38d18",
+        "afterRawSHA256": "e56f3010f3fa96846e1be8c7f0e34aa7e44032a0f487724609a1d1fb9b02bcc7",
+        "oldOrigin": "http://134.175.127.249:28861",
+        "remoteOrigin": "http://127.0.0.1:28979",
+        "onlyOneStringOperandChanged": true
+      },
+      {
+        "method": "Room.RoomNetField::SCCurrentPosition",
+        "beforeRawSHA256": "8c69de40bf7e290d404b64c65013a03ba78def667a398fd6ab9c08f7fe4c65b4",
+        "afterRawSHA256": "c4dd02daad11854e656f8e3f10118f9e45fd0bbb33e16f0aa590df454d983ead",
+        "oldOrigin": "http://134.175.127.249:28861",
+        "remoteOrigin": "http://127.0.0.1:28979",
+        "onlyOneStringOperandChanged": true
+      },
+      {
+        "method": "ServerConfig::GetServerUrl",
+        "beforeRawSHA256": "77a2d1ddae708c984c280c2feb692ab12ea26780deff27667f827c9e43ae3661",
+        "afterRawSHA256": "34db435fa11c4aaf603feb012a575dac74cfaa25da6ad439dab16cc8159e369c",
+        "oldOrigin": "http://134.175.127.249:28861/sao/",
+        "remoteOrigin": "http://127.0.0.1:28979/sao/",
+        "onlyOneStringOperandChanged": true
+      },
+      {
+        "method": "VoicePlugin::InitGVoice",
+        "beforeRawSHA256": "e577eaf10486bda784571670cd5be475b04413c9ea1ea852da70b9be73300a59",
+        "afterRawSHA256": "708354b1285bed7fea9a31d2370e67966152cdb0b2ccd617bb2b3c97022641e1",
+        "oldOrigin": "http://134.175.127.249:28861",
+        "remoteOrigin": "http://127.0.0.1:28979",
+        "onlyOneStringOperandChanged": true
+      }
+    ],
+    "onlyFourHTTPOriginLiteralsChanged": true,
+    "noManagedTypesMethodsFieldsAdded": true,
+    "noExecutableStaleAPIOriginRemaining": true
+  },
+  "nonTargetRawCILExact": 26931,
+  "nonTargetHeadersLocalsAndEHBytesExact": true,
+  "changedMethodTokens": [
+    "0x6002b18",
+    "0x6002b6b",
+    "0x6002b6d",
+    "0x6003bb8",
+    "0x60041fd",
+    "0x60045fa",
+    "0x600504d",
+    "0x600504e",
+    "0x600504f",
+    "0x6005050",
+    "0x6005284",
+    "0x6005e66",
+    "0x6005e71",
+    "0x6005e8b",
+    "0x600602f"
+  ],
+  "originalEngineMethods": 547,
+  "originalEngineCILAndEHExact": true,
+  "originalDefinitionSignaturesAndFieldRIDsExact": true,
+  "helperScopedMainTypeModuleRefs": [],
+  "addedFieldCount": 0,
+  "fieldPtrAbsent": true,
+  "methodPtrAbsent": true
+}

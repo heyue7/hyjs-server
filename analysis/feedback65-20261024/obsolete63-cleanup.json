@@ -1,0 +1,6 @@
+{
+  "file": "build/hyjs-feedback63-formal.apk",
+  "sha256": "4a85ed009e86c649b5954e8d1f02165e9d1951ec89256196f3dccd9076e6183d",
+  "bytesUnlinked": 683693216,
+  "reason": "Obsolete owned63 build; fixed64 input and formal65 preserved; no running install process uses local file"
+}

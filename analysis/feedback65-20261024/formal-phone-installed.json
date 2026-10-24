@@ -1,0 +1,15 @@
+{
+  "install": "Success",
+  "apk_sha256": "f26942c80a6b39d2b83eeed63a0775dff7e84147db815f553256e09c06026ba7",
+  "render": {
+    "game_foreground": true,
+    "mean_luminance": 11.41,
+    "bright_fraction": 0.246
+  },
+  "capture": {
+    "evidence": "/Users/lirui/.codex/worktrees/feedback63-field-trial-copy/hyjs/analysis/feedback65-20261024/phone-formal65-startup.png",
+    "preview": "/Users/lirui/.codex/worktrees/feedback63-field-trial-copy/hyjs/analysis/feedback65-20261024/phone-formal65-startup-preview.jpg",
+    "preview_bytes": 35670
+  },
+  "productionGameLoginSubmitted": false
+}

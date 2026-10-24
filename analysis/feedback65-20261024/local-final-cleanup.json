@@ -1,0 +1,24 @@
+{
+  "removed": [
+    {
+      "file": "build/hyjs-feedback65-qa-r4.apk",
+      "bytes": 683701497
+    },
+    {
+      "directory": "build/feedback65-overlay-r4",
+      "bytes": 4643922
+    },
+    {
+      "directory": "build/feedback65-qa-overlay-r4",
+      "bytes": 4603456
+    },
+    {
+      "file": "build/hyjs-feedback65-current",
+      "bytes": 61405602
+    }
+  ],
+  "ownedPortsClosed": true,
+  "leasesReleased": true,
+  "base64AndCurrent65Preserved": true,
+  "bytesRemoved": 754354477
+}

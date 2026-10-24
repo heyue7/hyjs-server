@@ -1,0 +1,15 @@
+{
+  "originalPreferenceHashesRestored": 8,
+  "originalCallerSHA256": "b24922784ec684324acdbbf48414a7d19b31993e40aac91d7d3de01d13941dce",
+  "QAProbeRemoved": true,
+  "QAPortsRemoved": true,
+  "originalReverseRestored": {
+    "tcp:5679": "tcp:5679",
+    "tcp:8904": "tcp:8904"
+  },
+  "displayRestored": true,
+  "gameForceStopped": true,
+  "productionGameLoginSubmitted": false,
+  "observationSHA256": "4a7a732b52568436bdcd246b155da661433b5cbfe92748161e2ad6b4e98745b2",
+  "restoreRunnerCorrections": "Device stream copy and original reverse list schema were corrected; all restored file hashes independently verified"
+}
