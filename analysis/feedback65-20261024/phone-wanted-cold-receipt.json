@@ -1,0 +1,11 @@
+{
+  "actualPhoneReceiptColdRepeat": true,
+  "exactProtoFieldPresencePreserved": true,
+  "result": 0,
+  "scoreAdd": 1042,
+  "damage": 52111.41058990784,
+  "ms": 703.733,
+  "profileGameAndHPUnchanged": true,
+  "requestSHA256": "180cac139fc47e046f7a04c91385d026deccd0246efb08be11e259fc338a7982",
+  "initialRunnerFailure": "Reconstructing absent optional result with explicit0 changed protobuf identity and was correctly rejected; exact stored field-preserving request passed"
+}

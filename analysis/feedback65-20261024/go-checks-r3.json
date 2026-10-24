@@ -1,0 +1,8 @@
+{
+  "selection": "TestP7Feedback65|TestP7EliteManual|TestP7RushHistorical|TestP7RushSettledReadMemo|TestP7RushContinuation|TestP7ReRushMySQLFirstSectionOriginalEndRewardAdditionResetSweepCold|TestP12WantedRecordedSourceBindingAndTerminalTamper|TestP12Wanted65",
+  "status": "FAIL",
+  "exitCode": 1,
+  "wallSeconds": 126.852,
+  "managedSchemas": 0,
+  "managedAccounts": 0
+}

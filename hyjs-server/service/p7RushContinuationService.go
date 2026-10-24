@@ -138,7 +138,7 @@ func p7RushContinuationTaskProjection(stage db.P7RushStageRule) (*pb.RushTaskInf
 	return &pb.RushTaskInfo{TaskId: proto.String(stage.TaskID), Star: proto.Int32(stage.Star), FightScore: proto.Float64(power), IsPassed: proto.Bool(false), Point: proto.Int32(10), Coin: proto.Int32(0)}, nil
 }
 
-// p7PendingRushContinuation 恢复本地首组和后继的当前轮合法快照，不升级旧来源或别人的战斗权限。
+// p7PendingRushContinuation 恢复当前轮合法试炼或精英快照；精英不占用普通楼层投影。
 func (s *GameService) p7PendingRushContinuation(tx *gorm.DB, state *db.P7RushState) (*pb.SCRushFightStart, *db.P7RushStageRule, bool, error) {
 	if state.ActiveFight == "" {
 		return nil, nil, false, nil
@@ -151,10 +151,10 @@ func (s *GameService) p7PendingRushContinuation(tx *gorm.DB, state *db.P7RushSta
 	if p6Digest(fight.Rule) != fight.RuleHash || json.Unmarshal(fight.Rule, &stage) != nil {
 		return nil, nil, false, errors.New("试炼活动战斗规则快照损坏")
 	}
-	if stage.Source != constUtil.P7RushContinuationSource && stage.Source != constUtil.P7SectionStageSource && stage.Source != constUtil.P7ReRushSource {
+	if fight.Kind != constUtil.P7RushElite && stage.Source != constUtil.P7RushContinuationSource && stage.Source != constUtil.P7SectionStageSource && stage.Source != constUtil.P7ReRushSource {
 		return nil, nil, false, nil
 	}
-	if fight.Diagnostic || fight.Kind != constUtil.P7RushTrial || fight.Status != constUtil.P7RushComputed || stage.Floor != state.Floor || stage.TaskID != fight.TaskID || p6Digest(fight.Start) != fight.StartHash {
+	if fight.Diagnostic || (fight.Kind != constUtil.P7RushTrial && fight.Kind != constUtil.P7RushElite) || stage.Kind != fight.Kind || fight.Status != constUtil.P7RushComputed || (fight.Kind == constUtil.P7RushTrial && stage.Floor != state.Floor) || (fight.Kind == constUtil.P7RushElite && stage.Star != 0) || stage.TaskID != fight.TaskID || p6Digest(fight.Start) != fight.StartHash {
 		return nil, nil, true, errors.New("本地后继活动战斗归属冲突")
 	}
 	start := &pb.SCRushFightStart{}

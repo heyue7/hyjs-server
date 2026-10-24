@@ -1,0 +1,11 @@
+{
+  "selection": "TestP7Feedback65|TestP7EliteManual|TestP7RushHistorical|TestP7RushSettledReadMemo|TestP7RushContinuation|TestP7ReRushMySQLFirstSectionOriginalEndRewardAdditionResetSweepCold$|TestP12WantedRecordedSourceBindingAndTerminalTamper$|TestP12Wanted65(ManualAutoEndColdConflict|AutomaticEmptyRecordedColumnsColdReceipt)$",
+  "status": "PASS",
+  "leaseOwner": "Root feedback65 existing QA wrapper",
+  "qaAppPaused": true,
+  "exitCode": 0,
+  "seconds": 97.275,
+  "qaAppResumed": true,
+  "managedSchemas": 0,
+  "managedAccounts": 0
+}

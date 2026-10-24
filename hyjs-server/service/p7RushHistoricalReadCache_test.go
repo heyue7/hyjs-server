@@ -6,6 +6,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"google.golang.org/protobuf/proto"
 	"gorm.io/gorm"
@@ -13,7 +14,9 @@ import (
 	"hyjs-server/db"
 	"hyjs-server/model"
 	pb "hyjs-server/model/protocol"
+	"os"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 )
@@ -27,7 +30,7 @@ func TestP7RushHistoricalCacheBoundsAndDatabaseIsolation(t *testing.T) {
 	if c.get(p7RushHistoricalKey{b, "same"}, now) != nil {
 		t.Fatal("cross database hit")
 	}
-	if c.get(key, now) == nil || c.get(key, now.Add(120*time.Second)) != nil {
+	if c.get(key, now) == nil || c.get(key, now.Add(time.Duration(constUtil.P7RushHistoricalReadCacheTTLSeconds)*time.Second)) != nil {
 		t.Fatal("TTL boundary")
 	}
 	for i := 0; i < 40; i++ {
@@ -260,6 +263,144 @@ func TestP7RushHistoricalAcceptedQueryCloneAndTamper(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestP7Feedback65RePrerequisiteReusesAcceptedHistory(t *testing.T) {
+	if !strings.HasPrefix(os.Getenv("HYJS_P7_MYSQL_DATABASE"), "hyjs_test_p7_") {
+		t.Skip("owned isolated MySQL P7 database required")
+	}
+	f := p7PartyBusinessFixture(t)
+	if err := f.s.PublishP7ReRush(f.ctx); err != nil {
+		t.Fatal(err)
+	}
+	old := p7RushHistoryCache
+	p7RushHistoryCache = &p7RushHistoricalCache{rows: make(map[p7RushHistoricalKey]p7RushHistoricalEntry)}
+	t.Cleanup(func() { p7RushHistoryCache = old })
+	start, err := f.s.p7Start(f.ctx, f.id, &pb.CSRushFightStart{RushType: proto.Int32(1), TaskId: proto.String("local_rush_1"), Star: proto.Int32(1)}, 65101, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	series, err := f.s.FreezeP6RushSeriesInput(start, true, false, nil, constUtil.P6OriginalClientHash)
+	if err != nil {
+		t.Fatal(err)
+	}
+	input, err := p7GenericMechanismRushInputAt(series, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client, err := f.s.ComputeOriginalP6ProtocolFinalHP(f.ctx, input, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if client.Outcome.Winner != 0 || client.Outcome.Authoritative {
+		t.Fatal("finite original roster lost; retain actual outcome")
+	}
+	end := &pb.CSRushFightEnd{FightId: start.FightId, Result: proto.Int32(1), OptRecord: client.OriginalOperates}
+	before, beforeGame := f.profile(t)
+	lateFailure := errors.New("feedback65 profile save after accepted fight")
+	callback := "p7feedback65:reject-final-profile-save"
+	lateReached := false
+	if err = db.GetIns().Callback().Update().After("gorm:update").Register(callback, func(tx *gorm.DB) {
+		if tx.Statement.Table != "profiles" {
+			return
+		}
+		var fight db.P7RushFight
+		if e := tx.Session(&gorm.Session{NewDB: true}).First(&fight, "id=?", start.GetFightId()).Error; e != nil {
+			tx.AddError(e)
+			return
+		}
+		if fight.Status == constUtil.P7RushSettled {
+			lateReached = true
+			if len(p7RushHistoryCache.rows) != 0 {
+				tx.AddError(errors.New("uncommitted accepted history published"))
+				return
+			}
+			tx.AddError(lateFailure)
+		}
+	}); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.GetIns().Callback().Update().Remove(callback) })
+	_, failed := f.s.p7End(f.ctx, f.id, end)
+	if err = db.GetIns().Callback().Update().Remove(callback); err != nil {
+		t.Fatal(err)
+	}
+	if !lateReached || !errors.Is(failed, lateFailure) || len(p7RushHistoryCache.rows) != 0 {
+		t.Fatal("late rollback did not keep history unpublished", lateReached, failed)
+	}
+	var rolledFight db.P7RushFight
+	var rolledManual db.P7RushManualCalculation
+	var rolledRecord db.P6BattleRecord
+	if err = db.GetIns().First(&rolledFight, "id=?", start.GetFightId()).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err = db.GetIns().First(&rolledManual, "fight_id=?", start.GetFightId()).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err = db.GetIns().First(&rolledRecord, "id=?", rolledFight.ReplayID).Error; err != nil {
+		t.Fatal(err)
+	}
+	afterRollback, afterRollbackGame := f.profile(t)
+	if rolledFight.Status != constUtil.P7RushComputed || len(rolledFight.Result) != 0 || len(rolledFight.EndRequest) != 0 || rolledManual.Status != constUtil.P7RushManualPending || len(rolledManual.Terminal) != 0 || rolledRecord.Status != constUtil.P6BattleCaptured || rolledRecord.Authoritative || !proto.Equal(before, afterRollback) || !p6CopySeriesJSONEqual(t, beforeGame, afterRollbackGame) {
+		t.Fatal("late profile failure left accepted source, reward or profile state")
+	}
+	if _, err = f.s.p7End(f.ctx, f.id, end); err != nil {
+		t.Fatal(err)
+	}
+	if len(p7RushHistoryCache.rows) != 1 {
+		t.Fatal("successful commit did not immediately warm accepted history")
+	}
+	var expiry time.Time
+	for _, entry := range p7RushHistoryCache.rows {
+		expiry = entry.expires
+	}
+	if _, err = f.s.p7End(f.ctx, f.id, end); err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range p7RushHistoryCache.rows {
+		if !entry.expires.Equal(expiry) {
+			t.Fatal("settled End replay renewed history")
+		}
+	}
+	read := func() error {
+		return db.GetIns().WithContext(p7WithRushReadRequestCache(f.ctx)).Transaction(func(tx *gorm.DB) error {
+			wins, e := p7ReRushAcceptedWins(tx, f.id, 1, 1, 1)
+			if e == nil && (len(wins) != 1 || wins[1].Fight != start.GetFightId() || wins[1].Star != 1) {
+				return fmt.Errorf("accepted prerequisite source changed")
+			}
+			return e
+		})
+	}
+	if err = read(); err != nil {
+		t.Fatal(err)
+	}
+	if len(p7RushHistoryCache.rows) != 1 {
+		t.Fatal("accepted prerequisite was not cached")
+	}
+	sequence := p7RushHistoryCache.sequence
+	if err = read(); err != nil {
+		t.Fatal(err)
+	}
+	if p7RushHistoryCache.sequence != sequence+1 {
+		t.Fatal("new prerequisite transaction did not reuse history")
+	}
+	for _, entry := range p7RushHistoryCache.rows {
+		if !entry.expires.Equal(expiry) {
+			t.Fatal("history recomputed on repeated prerequisite")
+		}
+	}
+	var manual db.P7RushManualCalculation
+	if err = db.GetIns().First(&manual, "fight_id=?", start.GetFightId()).Error; err != nil {
+		t.Fatal(err)
+	}
+	changed := append([]byte(nil), manual.Terminal...)
+	changed[0] ^= 1
+	if err = db.GetIns().Model(&manual).Update("terminal", changed).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err = read(); err == nil {
+		t.Fatal("changed actual history blob bypassed prerequisite verification")
 	}
 }
 

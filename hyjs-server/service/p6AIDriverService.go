@@ -25,8 +25,17 @@ func ValidateP6AIDriverPolicy(input *model.FrozenBattleInput) error {
 		return errors.New(constUtil.CombatInvalid)
 	}
 	if input.DiagnosticAIDriverPolicy == constUtil.P6DiagnosticManualAutoStart || input.DiagnosticManualAutoStartRoundTime != nil {
-		if input.DiagnosticAIDriverPolicy != constUtil.P6DiagnosticManualAutoStart || input.DiagnosticManualAutoStartRoundTime == nil || !combatFinite(*input.DiagnosticManualAutoStartRoundTime) || *input.DiagnosticManualAutoStartRoundTime < 0 || *input.DiagnosticManualAutoStartRoundTime > 110 || (input.BattleType != 9 && input.BattleType != 10 && input.BattleType != 16) || input.Monster == nil || input.Defender != nil || input.KFReplay != nil || input.PVECompatibilityRule != "" || input.IsAttToDef || input.DefenderFirst {
+		if input.DiagnosticAIDriverPolicy != constUtil.P6DiagnosticManualAutoStart || input.DiagnosticManualAutoStartRoundTime == nil || !combatFinite(*input.DiagnosticManualAutoStartRoundTime) || *input.DiagnosticManualAutoStartRoundTime < 0 || *input.DiagnosticManualAutoStartRoundTime > 110 || (input.BattleType != 8 && input.BattleType != 9 && input.BattleType != 10 && input.BattleType != 16) || input.Monster == nil || input.Defender != nil || input.KFReplay != nil || input.PVECompatibilityRule != "" || input.IsAttToDef || input.DefenderFirst {
 			return errors.New(constUtil.CombatUnsupported)
+		}
+		if input.BattleType == 8 {
+			// Type8 diagnostic driving remains inside the existing typed Wanted scope.
+			view := *input
+			view.DiagnosticAIDriverPolicy = ""
+			view.DiagnosticManualAutoStartRoundTime = nil
+			if _, err := P12WantedProofForInput(&view); err != nil {
+				return err
+			}
 		}
 		return nil
 	}

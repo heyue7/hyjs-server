@@ -1,0 +1,23 @@
+{
+  "diamondBefore": 100000,
+  "diamondAfter": 98200,
+  "fragments": {
+    "frag_hero_001": 20,
+    "frag_hero_003": 10
+  },
+  "actualPhonePurchases": [
+    {
+      "resource": "frag_hero_001",
+      "packs": 2,
+      "perPack": 10,
+      "cost": 1200
+    },
+    {
+      "resource": "frag_hero_003",
+      "packs": 1,
+      "perPack": 10,
+      "cost": 600
+    }
+  ],
+  "reopenedWithoutSelectionDidNotBuy": true
+}

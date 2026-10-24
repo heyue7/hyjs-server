@@ -366,6 +366,9 @@ func (s *GameService) P7RushQuery(ctx context.Context, id int64, request proto.M
 				if err = tx.Model(&db.P7RushProgress{}).Where("player_id=? AND kind=? AND task_id=?", id, constUtil.P7RushElite, stage.TaskID).Count(&wins).Error; err != nil {
 					return err
 				}
+				if wins > 0 {
+					first = nil
+				}
 				response.BossInfoList = append(response.BossInfoList, &pb.RushEliteBossInfo{EliteTaskId: proto.String(stage.TaskID), IsOpen: proto.Int32(open), FirstRewardList: first, GeneralRewardList: general, IsSuccess: proto.Int32(int32(min(wins, 1)))})
 			}
 			result = response
@@ -374,7 +377,7 @@ func (s *GameService) P7RushQuery(ctx context.Context, id int64, request proto.M
 			if e != nil {
 				return e
 			}
-			if pending {
+			if pending && pendingStage.Kind == constUtil.P7RushTrial {
 				switch request.(type) {
 				case *pb.CSGetRushInfo:
 					result, e = s.p7PendingRushContinuationInfo(tx, p, state, cfg, now, pendingStage.Source)
@@ -660,7 +663,7 @@ func (s *GameService) p7Start(ctx context.Context, id int64, request *pb.CSRushF
 				if pe != nil {
 					return pe
 				}
-				if owned && request.GetRushType() == constUtil.P7RushTrial && request.GetTaskId() == pendingStage.TaskID && request.GetStar() == pendingStage.Star {
+				if owned && request.GetRushType() == pendingStage.Kind && request.GetTaskId() == pendingStage.TaskID && request.GetStar() == pendingStage.Star {
 					result = pendingStart
 					return p7SaveReceipt(tx, id, domain, stamp, request, result)
 				}
@@ -907,6 +910,8 @@ func (s *GameService) ComputeP7Diagnostic(ctx context.Context, id int64, fightID
 func (s *GameService) p7End(ctx context.Context, id int64, request *pb.CSRushFightEnd) ([]proto.Message, error) {
 	var result *pb.SCRushFightEnd
 	var synchronizedPlayer *pb.Player
+	var warmKey p7RushHistoricalKey
+	var warmBody []byte
 	err := updateProfileWithTx(ctx, id, func(tx *gorm.DB, p *pb.Player, g *model.GameState) error {
 		var fight db.P7RushFight
 		if err := tx.Where("id=? AND player_id=?", request.GetFightId(), id).First(&fight).Error; err != nil {
@@ -1046,10 +1051,28 @@ func (s *GameService) p7End(ctx context.Context, id int64, request *pb.CSRushFig
 		if err = tx.Save(&fight).Error; err != nil {
 			return err
 		}
-		return s.p7FreezeMazeTrader(tx, &fight, time.Now())
+		if err = s.p7FreezeMazeTrader(tx, &fight, time.Now()); err != nil {
+			return err
+		}
+		if scoped && outcome != nil && outcome.Authoritative {
+			// Only stage the just-verified accepted manual source. The outer profile
+			// save and SQL commit must succeed before this evidence becomes shared.
+			historyCtx := p7WithRushHistoricalQuery(p7WithRushReadRequestCache(tx.Statement.Context))
+			var key p7RushHistoricalKey
+			p7RushReadFingerprint(tx.WithContext(historyCtx), &fight, request, &key)
+			if key.database != nil {
+				if body, e := p7EncodeHistoricalOutcome(outcome); e == nil {
+					warmKey, warmBody = key, body
+				}
+			}
+		}
+		return nil
 	})
 	if err != nil {
 		return nil, err
+	}
+	if warmKey.database != nil && len(warmBody) > 0 {
+		p7RushHistoryCache.put(warmKey, warmBody, time.Now())
 	}
 	if synchronizedPlayer != nil {
 		return []proto.Message{result, &pb.SCPlayer{Player: synchronizedPlayer}}, nil

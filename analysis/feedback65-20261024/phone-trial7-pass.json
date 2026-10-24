@@ -1,0 +1,21 @@
+{
+  "floorAfter": 8,
+  "starAfter": 7,
+  "taskId": "local_rush_7",
+  "kind": "1",
+  "result": 1,
+  "star": 1,
+  "rewards": [
+    [
+      "coin",
+      5500
+    ],
+    [
+      "point",
+      120
+    ]
+  ],
+  "coin": 1028000,
+  "point": 1230,
+  "actualPhoneEnd": true
+}

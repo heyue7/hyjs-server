@@ -1,0 +1,46 @@
+=== RUN   TestP12Wanted65ManualAutoEndColdConflict
+    p12WantedRecordedTransaction_test.go:187: real Start/live-auto End/cold/conflict: clock=1.2 operations=78 round=16
+--- PASS: TestP12Wanted65ManualAutoEndColdConflict (10.49s)
+=== RUN   TestP12Wanted65AutomaticEmptyRecordedColumnsColdReceipt
+--- PASS: TestP12Wanted65AutomaticEmptyRecordedColumnsColdReceipt (4.36s)
+=== RUN   TestP12WantedRecordedSourceBindingAndTerminalTamper
+=== RUN   TestP12WantedRecordedSourceBindingAndTerminalTamper/source
+=== RUN   TestP12WantedRecordedSourceBindingAndTerminalTamper/source-hash
+=== RUN   TestP12WantedRecordedSourceBindingAndTerminalTamper/hp
+=== RUN   TestP12WantedRecordedSourceBindingAndTerminalTamper/configuration
+--- PASS: TestP12WantedRecordedSourceBindingAndTerminalTamper (1.20s)
+    --- PASS: TestP12WantedRecordedSourceBindingAndTerminalTamper/source (0.10s)
+    --- PASS: TestP12WantedRecordedSourceBindingAndTerminalTamper/source-hash (0.11s)
+    --- PASS: TestP12WantedRecordedSourceBindingAndTerminalTamper/hp (0.09s)
+    --- PASS: TestP12WantedRecordedSourceBindingAndTerminalTamper/configuration (0.05s)
+=== RUN   TestP7EliteManualNewPermissionWholeEndColdOnce
+--- PASS: TestP7EliteManualNewPermissionWholeEndColdOnce (8.25s)
+=== RUN   TestP7EliteManualPolicyIsolationAndInitialization
+--- PASS: TestP7EliteManualPolicyIsolationAndInitialization (0.73s)
+=== RUN   TestP7Feedback65ElitePendingNewStampColdAndClosedPolicy
+--- PASS: TestP7Feedback65ElitePendingNewStampColdAndClosedPolicy (4.18s)
+=== RUN   TestP7Feedback65EliteFirstRewardQueryAndRepeatedEnd
+--- PASS: TestP7Feedback65EliteFirstRewardQueryAndRepeatedEnd (6.27s)
+=== RUN   TestP7ReRushMySQLFirstSectionOriginalEndRewardAdditionResetSweepCold
+    p7ReRush_test.go:293: Re first elite type10 actual original Start/End: winner=1, reward=simps:{id:"coin" num:40000} simps:{id:"point" num:2000}
+    p7ReRush_test.go:294: Re original wire: three actual first-section fights, exact rewards, claim/addition ordering, cold receipts, real-history-only bounded sweep and no new combat records
+--- PASS: TestP7ReRushMySQLFirstSectionOriginalEndRewardAdditionResetSweepCold (20.80s)
+=== RUN   TestP7RushContinuationRealAdditionFourthBattleEndColdReplayAndReplayable
+--- PASS: TestP7RushContinuationRealAdditionFourthBattleEndColdReplayAndReplayable (17.12s)
+=== RUN   TestP7RushContinuationCatalogueFullOriginalNPCAndActualRunGate
+--- PASS: TestP7RushContinuationCatalogueFullOriginalNPCAndActualRunGate (0.99s)
+=== RUN   TestP7RushHistoricalCacheBoundsAndDatabaseIsolation
+--- PASS: TestP7RushHistoricalCacheBoundsAndDatabaseIsolation (0.00s)
+=== RUN   TestP7RushHistoricalAcceptedQueryCloneAndTamper
+    p7RushHistoricalReadCache_test.go:153: verified fixture compressed bytes=20722
+--- PASS: TestP7RushHistoricalAcceptedQueryCloneAndTamper (6.42s)
+=== RUN   TestP7Feedback65RePrerequisiteReusesAcceptedHistory
+--- PASS: TestP7Feedback65RePrerequisiteReusesAcceptedHistory (5.44s)
+=== RUN   TestP7RushHistoricalFingerprintBindsEveryStoredField
+--- PASS: TestP7RushHistoricalFingerprintBindsEveryStoredField (0.00s)
+=== RUN   TestP7RushHistoricalBoundedDecoder
+--- PASS: TestP7RushHistoricalBoundedDecoder (0.03s)
+=== RUN   TestP7RushSettledReadMemoPreservesSourceAndTransaction
+--- PASS: TestP7RushSettledReadMemoPreservesSourceAndTransaction (3.31s)
+PASS
+ok  	hyjs-server/service	90.267s

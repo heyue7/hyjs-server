@@ -46,6 +46,9 @@ func p7ReRushAcceptedWins(tx *gorm.DB, id, runID int64, from, to int32, sourceFi
 		return nil, err
 	}
 	wins := map[int32]p7ReRushWin{}
+	// 分段资格只读取已结算历史。逐次核对实际持久化来源后复用权威结果，
+	// 避免领奖、购买加成和开始下一层时重算整段；当前战斗的End仍完整验证。
+	historyTx := tx.WithContext(p7WithRushHistoricalQuery(tx.Statement.Context))
 	for _, fight := range fights {
 		var stage db.P7RushStageRule
 		if json.Unmarshal(fight.Rule, &stage) != nil || p6Digest(fight.Rule) != fight.RuleHash || p6Digest(fight.Start) != fight.StartHash || stage.Source != constUtil.P7ReRushSource {
@@ -59,7 +62,7 @@ func p7ReRushAcceptedWins(tx *gorm.DB, id, runID int64, from, to int32, sourceFi
 		if result.GetResult() != 1 {
 			continue
 		}
-		outcome, scoped, err := p7ReadScopedRush(tx, &fight, end)
+		outcome, scoped, err := p7ReadScopedRush(historyTx, &fight, end)
 		if err != nil {
 			return nil, err
 		}

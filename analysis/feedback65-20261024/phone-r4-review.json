@@ -1,0 +1,9 @@
+{
+  "candidate": "r4",
+  "readOnlyReview": "trial65",
+  "result": "No evidenced blocker from owner/fight/session guards; original success result grant/cost runs once; failed settlements do not create a fake result; matching resume uses fresh deserialized original Start without issuing Start",
+  "originalReturnChain": "BattleToRoom\u2192_BattleToRoom\u2192ChangeUIBack(type8)\u2192MercenaryTaskPage.DoReopen\u2192DoOpen\u2192Int32.Parse(options[tab])\u2192HideLoading",
+  "confirmedFix": "Before return set numeric tab1, remove erroneous extra OpenPage; restore original presentation exit flag",
+  "mainPatchMethodsUnchanged": true,
+  "deviceRecheck": "pending secure keyguard owner unlock"
+}

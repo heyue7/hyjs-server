@@ -1,0 +1,21 @@
+{
+  "sourceSHA256": "eb1b2cb9dc9a9ae9455ca448844ac7124d85be2caf7eeb0e6f3cd16a1b6000ce",
+  "mainSHA256": "537709d2a4520558c4451274e52a306fce5a17809587b4220560e32b0f138e5f",
+  "referenceSHA256": {
+    "Assembly-CSharp.dll": "537709d2a4520558c4451274e52a306fce5a17809587b4220560e32b0f138e5f",
+    "mscorlib.dll": "7f16171cf5f87ca1e4c229727526d2fbc786079fc0c960f36197013ea0d986e1",
+    "UnityEngine.dll": "8d4bd6321a453263f8f97047be50dd04a6f2b8f247456ad23fddfbc75f2c2fa4",
+    "Assembly-CSharp-firstpass.dll": "e732d075c1f52133f665e835ac623e32be89ec9aa2e22ca11925014dfdff95b8",
+    "System.dll": "7e72b92ddcd6b7b791ab24dd5756544f2da81f65e7ba7d1ebe8223123720d0ac",
+    "System.Core.dll": "104278a0bf67b4de8fd1e910e3292a3ef51808ebee7a5f2a229125f18463c98c"
+  },
+  "caller": "HYJS65QA_eb1b2cb9dc9a9ae9.dll",
+  "callerSHA256": "03e3d2563bac1e4b5c431ea9b281fb4e0bb8b8922dcc29dd4bba37c7bee665e9",
+  "csharp3Compiled": true,
+  "referenceMainExpectedSHA256": "537709d2a4520558c4451274e52a306fce5a17809587b4220560e32b0f138e5f",
+  "referenceAPKSHA256": "f3ce73cc1f2e41bb45873c64f01e9a6ec81d84d1e41f18482c27d62c42ace3f9",
+  "mainChanged": false,
+  "phoneOperated": false,
+  "runtimeTested": false,
+  "commandMode": "explicit-whitelist-legal-ui-and-movement-only"
+}

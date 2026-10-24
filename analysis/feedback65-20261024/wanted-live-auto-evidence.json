@@ -1,0 +1,40 @@
+{
+  "schema": "wanted8-round1-live-auto-exact-record-evidence-v1",
+  "mode": 8,
+  "attackerCount": 1,
+  "defenderCount": 4,
+  "maximumRounds": 20,
+  "driver": "original-wanted8-round1-manual-then-live-auto-exact-record-v1",
+  "source": "original-live-manual-start-auto-enabled-at-round1-time1.2-local-diagnostic",
+  "sourceIsPhoneCapture": false,
+  "frozenStartSHA256": "3239171208fa8f387af7ddba56d419a89fa44cba05226088b0c1e8dc609bde7b",
+  "originalMainSHA256": "ee14d5df4077573abf94be309d6ebdbe7f4ba84c31b09743ed9a9008b65d200f",
+  "nativeCallerSourceSHA256": "bd626ebaafdee864a645dcf82ecf09d14b70ca188f360061c16ac1aa9d5c46f5",
+  "nativeHostSHA256": "ad1bbbffd26eba33ad6cb2e41b5637b81c2b7f396c1352ab5bbe22e567cafa03",
+  "nativeTwoStageTraceSHA256": "f007ffee9b7acc43218fd9f9801c41a39ecd8668494bedf0bd790bc8ea481cac",
+  "actualLiveSourceRecordSHA256": "d93da30c6e781e9a948c1ba15636749e775b42b48116538b060f9ea77773fde7",
+  "liveDriverComparison": {
+    "verification": "Root TestP12Wanted65PrivateNativeLiveAutoDiagnostic PASS",
+    "wholeRecordComparison": "proto.Equal",
+    "operationCount": 59,
+    "finalRound": 16,
+    "terminalHPComparison": "exact",
+    "toleranceAdded": false
+  },
+  "rejectedPlaybackComparison": {
+    "sourceFinalRound": 16,
+    "playbackFinalRound": 21,
+    "sourceOperations": 59,
+    "playbackOperations": 68,
+    "firstDifference": "second player action source time1.2 rerecorded time1.3",
+    "terminalHPDifferent": true,
+    "acceptedForAuthority": false
+  },
+  "boundaries": [
+    "Only round1 manual start followed by live auto at the first successful player command is inferred.",
+    "The complete resulting operation record must match exactly; arbitrary manual schedules remain rejected.",
+    "Original Wanted input eligibility and frozen automatic receipt remain required.",
+    "This evidence does not replace a real device Wanted manual or auto-toggle anchor.",
+    "No original engine methods or caller DLL were changed."
+  ]
+}

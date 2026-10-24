@@ -424,9 +424,23 @@ namespace HYJS.BulkPurchase
                 prefab = NativeQuantityPrefab;
             }
             if (prefab == null) { Tip("原数量组件暂不可用"); return false; }
+            Page quantityPage = PageManager.Instance.currentPage;
+            if (owner is ActivityAwardItem && quantityPage is SelectReward)
+            {
+                // The native picker closes immediately after invoking Receive; keep its quantity shell on the owning activity page.
+                Page activityPage = null;
+                for (Transform parent = owner.transform; parent != null; parent = parent.parent)
+                {
+                    activityPage = parent.GetComponent<Page>();
+                    if (activityPage != null) break;
+                }
+                if (!owner.gameObject.activeInHierarchy || activityPage == null || activityPage is SelectReward || !activityPage.gameObject.activeInHierarchy)
+                { Tip("当前活动页面已关闭，请重新打开后选择"); return true; }
+                quantityPage = activityPage;
+            }
             var root = (GameObject)UnityEngine.Object.Instantiate(prefab);
             root.name = "HYJSBulkQuantity";
-            root.transform.parent = PageManager.Instance.currentPage.transform;
+            root.transform.parent = quantityPage.transform;
             root.transform.localPosition = new Vector3(0, 0, -500); root.transform.localScale = Vector3.one;
             var view = root.GetComponent<BuyShopItem>();
             var s = root.AddComponent<QuantitySession>();

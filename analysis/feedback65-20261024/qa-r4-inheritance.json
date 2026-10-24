@@ -1,0 +1,14 @@
+{
+  "qaR3SHA256": "0b8c4015ef7a1090df3ed108a7bc95abfa845ea53370896c9babf31f20f3b7f0",
+  "qaR4SHA256": "d995f7bc774381cd24ca85f3ab2b8a6adea5c07a7b8d9610f6fb3598dee8b3ca",
+  "mainUnchangedSHA256": "537709d2a4520558c4451274e52a306fce5a17809587b4220560e32b0f138e5f",
+  "bulkHelperUnchangedSHA256": "758ebcc36cfed9eb57e3f7e32e7ee7a2a738633f5a1b9a0ed9b957d191fd07d9",
+  "onlyDelta": "Feedback65.WantedResult uses original numeric tab1 before synchronous return, removes erroneous extra reopen, clears original presentation flag. No other helper behavior changed.",
+  "sameSourceChecksReused": [
+    "profile-debug-hidden.json",
+    "choice-purchase-pass.json",
+    "phone-trial7-pass.json",
+    "phone-elite01-pass.json"
+  ],
+  "oldFailedCandidateNotDeliverable": true
+}

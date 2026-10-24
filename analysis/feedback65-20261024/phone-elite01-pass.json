@@ -1,0 +1,11 @@
+{
+  "actualPhoneEnd": true,
+  "coinBefore": 1028000,
+  "coinAfter": 1068000,
+  "pointBefore": 1230,
+  "pointAfter": 3230,
+  "expectedCoin": 40000,
+  "expectedPoint": 2000,
+  "taskId": "01",
+  "kind": "2"
+}

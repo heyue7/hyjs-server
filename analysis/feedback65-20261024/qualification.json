@@ -1,0 +1,26 @@
+{
+  "candidate": "feedback65-r4",
+  "formalAPKSHA256": "f26942c80a6b39d2b83eeed63a0775dff7e84147db815f553256e09c06026ba7",
+  "formalMainSHA256": "5842a437f402d73dd209b85960bde78ce750150bf79719bc766d2b6d6bc6593d",
+  "feedbackHelperSHA256": "9a5bdef854697868c49e1cfb28cd81038b8c8b6ce3d48ba988b079385e6a9036",
+  "serverBinarySHA256": "c5b4495d9e7b9ca39ca8c4398e13b3e03f56df9d578a83b63404e90237599295",
+  "goCompileVetBuild": "go-final-checks.json",
+  "incrementalAcceptedHistoryCommitRollback": "go-commit-cache-r6.json",
+  "wantedTransactionsColdAndCrossDomainPolicyIsolation": "go-checks-r5.json",
+  "historicalTestBaseline": "go-checks-r3.json broad entries passed; final continuation isolation failure corrected and rerun R5",
+  "originalEngineWholeMethods": 547,
+  "nonTargetWholeMethods": 26935,
+  "phoneR4": "PASS phone-r4-wanted-pass.json; failed settlement return and matching same-fight resume; actual manual start then one auto accepted 78ops, pending0",
+  "unverified": [
+    "arbitrary Wanted manual schedules",
+    "all emulator and tablet devices",
+    "all requests below1s"
+  ],
+  "operatorActions": {
+    "productionGameLogin": false,
+    "announcements": false,
+    "mail": false,
+    "rewardOrCompensation": false
+  },
+  "finalAffectedRegression": "go-final-r7.json: all17top level tests PASS97.275s with committed-history prewarm"
+}

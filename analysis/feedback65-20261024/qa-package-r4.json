@@ -1,0 +1,40 @@
+{
+  "status": "PASS_SIGN_ALIGN_SCOPED_OVERLAY_NOT_INSTALLED",
+  "binarySHA256": "d995f7bc774381cd24ca85f3ab2b8a6adea5c07a7b8d9610f6fb3598dee8b3ca",
+  "baseAPKSHA256": "f3ce73cc1f2e41bb45873c64f01e9a6ec81d84d1e41f18482c27d62c42ace3f9",
+  "replacementEntries": {
+    "assets/bin/Data/Managed/Assembly-CSharp.dll": "537709d2a4520558c4451274e52a306fce5a17809587b4220560e32b0f138e5f",
+    "assets/bin/Data/Managed/HYJS.Feedback65.dll": "9a5bdef854697868c49e1cfb28cd81038b8c8b6ce3d48ba988b079385e6a9036",
+    "assets/bin/Data/Managed/HYJS.BulkPurchase.dll": "758ebcc36cfed9eb57e3f7e32e7ee7a2a738633f5a1b9a0ed9b957d191fd07d9",
+    "AndroidManifest.xml": "d269000736f92e30890387a6a73339b3474583f44a062a6804fc648f5fa0534e",
+    "assets/local-wallet.json": "f38454ddab050619cf2aaccf08dd9e1e08c341b296dd383fc88e3799b27f30d0"
+  },
+  "openingFontChanges": [],
+  "fontFallbackProof": null,
+  "dungeonResourceProof": null,
+  "compatibilityProof": null,
+  "javaClassInventory": {
+    "DEXEntries": [
+      "classes.dex",
+      "classes2.dex",
+      "classes3.dex",
+      "classes4.dex",
+      "classes5.dex"
+    ],
+    "classCount": 4604,
+    "noDuplicateClass": true,
+    "noFinalSuperclass": true
+  },
+  "inheritedJavaByteExact": true,
+  "javaByteExact": true,
+  "allOtherEntriesAndCompressedPayloadsExact": true,
+  "managedAssemblyByteExact": false,
+  "qaOnly": true,
+  "neverPromote": true,
+  "signatureVerified": true,
+  "zipalignVerified": true,
+  "originalEngineMethodsExact": 547,
+  "outputAPK": "build/hyjs-feedback65-qa-r4.apk",
+  "buildCode": 2026102405,
+  "versionName": "1.0.65"
+}

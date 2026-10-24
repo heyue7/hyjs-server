@@ -34,7 +34,11 @@ func TestP7EliteManualNewPermissionWholeEndColdOnce(t *testing.T) {
 	if err = db.GetIns().First(&original, "id=?", row.P6RecordID).Error; err != nil {
 		t.Fatal(err)
 	}
-	if row.DriverPolicy != constUtil.P7RushEliteManualDriverSource || row.ScopeProof != constUtil.P6RushEliteManualNativeProof || row.Status != constUtil.P7RushManualPending || len(row.Terminal) != 0 || original.Authoritative || original.Status != constUtil.P6BattleCaptured {
+	family, err := p7ManualRushFamilyForReceipt(constUtil.P7RushElite, row.DriverPolicy, row.ScopeProof)
+	if err != nil {
+		t.Fatal("pending elite has no recognized frozen family", err)
+	}
+	if row.Status != constUtil.P7RushManualPending || len(row.Terminal) != 0 || original.Authoritative || original.Status != constUtil.P6BattleCaptured {
 		t.Fatal("preview became a real result")
 	}
 	raw, err := decodeP6StoredInput(row.Series)
@@ -44,6 +48,9 @@ func TestP7EliteManualNewPermissionWholeEndColdOnce(t *testing.T) {
 	var series model.FrozenP6RushSeries
 	if err = json.Unmarshal(raw, &series); err != nil {
 		t.Fatal(err)
+	}
+	if err = family.ValidateScope(&series); err != nil {
+		t.Fatal("pending elite family does not admit its frozen source", err)
 	}
 	input, err := cloneP6CalculationInput(series.Template)
 	if err != nil {

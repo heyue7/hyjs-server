@@ -251,6 +251,13 @@ func TestP7ReRushMySQLFirstSectionOriginalEndRewardAdditionResetSweepCold(t *tes
 		t.Fatal("sweep manufactured battle records")
 	}
 	// 首个精英使用已合格的原type10手控消费者，只打开匹配来源的隔离策略。
+	var previousElitePolicy db.P7RushManualPolicy
+	if err = db.GetIns().First(&previousElitePolicy, constUtil.P7RushEliteManualDriverPolicyID).Error; err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		db.GetIns().Model(&db.P7RushManualPolicy{}).Where("id=?", previousElitePolicy.ID).Update("enabled", previousElitePolicy.Enabled)
+	})
 	if err = db.GetIns().Model(&db.P7RushManualPolicy{}).Where("id=?", constUtil.P7RushEliteManualDriverPolicyID).Update("enabled", true).Error; err != nil {
 		t.Fatal(err)
 	}

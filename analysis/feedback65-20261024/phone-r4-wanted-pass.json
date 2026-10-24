@@ -1,0 +1,18 @@
+{
+  "actualPhonePlayerId": 1,
+  "candidateSHA256": "d995f7bc774381cd24ca85f3ab2b8a6adea5c07a7b8d9610f6fb3598dee8b3ca",
+  "formalBusinessHelperSHA256": "9a5bdef854697868c49e1cfb28cd81038b8c8b6ce3d48ba988b079385e6a9036",
+  "actualResult": 0,
+  "operationCount": 78,
+  "requestSHA256": "180cac139fc47e046f7a04c91385d026deccd0246efb08be11e259fc338a7982",
+  "recordedRecordSHA256": "97e7a535c9e112483c874ea7c86568ab376d6a7645ea9c372b12456910222775",
+  "appliedDamage": 52111.41058990784,
+  "scoreAdd": 1042,
+  "attemptsAfter": 9,
+  "fightRows": 1,
+  "pendingRows": 0,
+  "r4RejectedEndSafelyReturned": true,
+  "sameFightResumedWithoutStart": true,
+  "fullArbitraryManualScheduleAdmitted": false,
+  "nativeAnchor": "Original real mobile UI manual start then one auto, no later auto/skill clicks; original547 methods unchanged"
+}

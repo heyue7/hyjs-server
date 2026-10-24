@@ -40,7 +40,8 @@ func p7Setup(t *testing.T) *p1Fixture {
 			t.Fatal(err)
 		}
 	}
-	for _, table := range []any{&db.P7RushPolicy{}, &db.P7RushStageRule{}, &db.P7RushState{}, &db.P7RushProgress{}, &db.P7RushFight{}, &db.P7RushReceipt{}} {
+	// 同一专属MySQL库顺序跑多个夹具时，不继承前个夹具显式发布的Re策略。
+	for _, table := range []any{&db.P7RushPolicy{}, &db.P7ReRushPolicy{}, &db.P7RushManualPolicy{}, &db.P7RushStageRule{}, &db.P7RushState{}, &db.P7RushProgress{}, &db.P7RushFight{}, &db.P7RushReceipt{}} {
 		if err := db.GetIns().Where("1=1").Delete(table).Error; err != nil {
 			t.Fatal(err)
 		}

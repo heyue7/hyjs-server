@@ -1,0 +1,22 @@
+{
+  "sameOwnedProfile": 1,
+  "coldAfterRestartThenWarm": [
+    {
+      "call": 1,
+      "ms": 2913.919,
+      "floor": 8
+    },
+    {
+      "call": 2,
+      "ms": 595.992,
+      "floor": 8
+    },
+    {
+      "call": 3,
+      "ms": 571.509,
+      "floor": 8
+    }
+  ],
+  "freshEndPrewarmTransactionTest": "go-commit-cache-r6.json",
+  "network": "local HTTP includes protobuf/handler/MySQL; phone resource load excluded"
+}

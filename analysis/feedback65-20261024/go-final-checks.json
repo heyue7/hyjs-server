@@ -1,0 +1,17 @@
+[
+  {
+    "command": "go test ./... -run ^$",
+    "exitCode": 0,
+    "seconds": 22.883
+  },
+  {
+    "command": "go vet ./...",
+    "exitCode": 0,
+    "seconds": 5.898
+  },
+  {
+    "command": "go build -o /Users/lirui/.codex/worktrees/feedback63-field-trial-copy/hyjs/build/hyjs-feedback65-current .",
+    "exitCode": 0,
+    "seconds": 5.088
+  }
+]

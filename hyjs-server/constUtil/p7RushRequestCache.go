@@ -10,7 +10,7 @@ type P7RushHistoricalQueryKey struct{}
 
 const (
 	P7RushHistoricalReadCacheLimit        = 32
-	P7RushHistoricalReadCacheTTLSeconds   = 120
+	P7RushHistoricalReadCacheTTLSeconds   = 900
 	P7RushHistoricalReadCacheDecodedBytes = 2 * 1024 * 1024
 	P7RushHistoricalReadCacheEntryBytes   = 256 * 1024
 	P7RushHistoricalReadCacheTotalBytes   = 2 * 1024 * 1024

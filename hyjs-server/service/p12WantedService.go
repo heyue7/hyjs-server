@@ -694,6 +694,9 @@ func (s *GameService) p12WantedEnd(ctx context.Context, id int64, request *pb.CS
 			if fight.EndHash != p6Digest(fight.EndProto) || proto.Unmarshal(fight.EndProto, &out) != nil {
 				return errors.New(constUtil.P12WantedInvalid)
 			}
+			if err := p12WantedRecordedReceipt(&fight, request); err != nil {
+				return err
+			}
 			return nil
 		}
 		if fight.AbandonedAt > 0 || fight.InputHash != p6Digest([]byte(fight.InputJSON)) || fight.TerminalHash != p6Digest([]byte(fight.TerminalJSON)) || fight.StartHash != p6Digest(fight.StartProto) {
@@ -701,8 +704,18 @@ func (s *GameService) p12WantedEnd(ctx context.Context, id int64, request *pb.CS
 		}
 		var input model.FrozenBattleInput
 		var terminal model.CombatFinalHPOutcome
-		if json.Unmarshal([]byte(fight.InputJSON), &input) != nil || json.Unmarshal([]byte(fight.TerminalJSON), &terminal) != nil || ValidateP12WantedCertifiedReceipt(&input, &terminal) != nil || !proto.Equal(request.OptRecord, terminal.OriginalOperates) {
+		if json.Unmarshal([]byte(fight.InputJSON), &input) != nil || json.Unmarshal([]byte(fight.TerminalJSON), &terminal) != nil || ValidateP12WantedCertifiedReceipt(&input, &terminal) != nil {
 			return errors.New(constUtil.P12WantedInvalid)
+		}
+		if !proto.Equal(request.OptRecord, terminal.OriginalOperates) {
+			recorded, err := s.computeP12WantedRecorded(ctx, &input, request.OptRecord)
+			if err != nil {
+				return err
+			}
+			if err := p12WantedStoreRecorded(&fight, request, recorded); err != nil {
+				return err
+			}
+			terminal = *recorded
 		}
 		winner := int32(0)
 		if terminal.Outcome.Winner == 0 {
