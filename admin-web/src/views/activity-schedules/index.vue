@@ -808,7 +808,7 @@ onUnmounted(() => {
               <NButton v-if="canWrite" size="tiny" quaternary @click="archivePattern(pattern)">归档</NButton>
             </NSpace>
           </article>
-          <NEmpty v-if="!filteredPatterns.length" description="保存一份方案后，可拖入日期反复使用" />
+          <NEmpty v-if="!filteredPatterns.length" :description="patterns.length ? '没有符合筛选条件的排期方案' : '暂无排期方案'" />
         </template>
         <template v-else>
           <article
@@ -825,14 +825,14 @@ onUnmounted(() => {
               填入草稿
             </NButton>
           </article>
-          <NEmpty v-if="!filteredDefinitions.length" description="先在全局活动设置补齐并允许排期" />
+          <NEmpty v-if="!filteredDefinitions.length" :description="usableDefinitions.length ? '没有符合筛选条件的活动' : '暂无可排期活动，请到活动配置中允许排期'" />
         </template>
       </NCard>
       <div class="schedule-main">
         <NCard v-if="planningTab === 'character-day'" :bordered="false">
           <section class="character-schedules" aria-label="新玩家排期">
             <h2>新玩家活动</h2>
-            <NEmpty v-if="!shownCharacterItems.length" description="从左侧添加活动，再设置角色的起始日与持续天数。" />
+            <NEmpty v-if="!shownCharacterItems.length" description="暂无新玩家排期" />
             <article v-for="item in shownCharacterItems" :key="keyOf(item)">
               <div class="schedule-row-main">
                 <div class="schedule-row-title">

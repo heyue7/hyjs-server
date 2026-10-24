@@ -68,12 +68,9 @@ def backup_existing_database():
         shutil.copyfileobj(process.stdout, target)
     assert process.wait() == 0, 'Backup failed; pending snapshot retained privately'
     run(str(stage / 'app/hyjs-backupseal'), '--input', str(plain), '--output', str(encrypted), '--key-file', str(key_file))
-    # Authenticate the encrypted snapshot before deleting this task's temporary plaintext.
-    verified = backup_dir / (name + '.verified')
-    run(str(stage / 'app/hyjs-backupseal'), '--decrypt', '--input', str(encrypted), '--output', str(verified), '--key-file', str(key_file))
-    assert sha(verified) == sha(plain), 'Encrypted backup verification failed'
+    # Authenticate the complete encrypted stream and original digest without a third disk copy.
+    run(str(stage / 'app/hyjs-backupseal'), '--input', str(encrypted), '--key-file', str(key_file), '--verify-sha256', sha(plain))
     plain.unlink()
-    verified.unlink()
     (ROOT / 'backup-latest.json').write_text(json.dumps({'file': encrypted.name, 'sha256': sha(encrypted), 'format': 'HYJSBK02-AES256GCM-CHUNKED', 'revisionBefore': 'preserved running image'}, indent=2))
 
 
@@ -82,10 +79,12 @@ for name, digest in manifest['files'].items():
     assert path.resolve().is_relative_to(stage) and sha(path) == digest, name
 if not args.provision_ingress:
     assert Path('/etc/nginx/sites-enabled/hyjs-test.conf').read_bytes() == (stage / 'nginx.conf').read_bytes(), 'Ingress differs; explicit provision-ingress required'
-if args.migrate_role_wallets:
-    previous_backup = json.loads((ROOT / 'backup-latest.json').read_text())
-    expected_backup_size = (ROOT / 'backups' / previous_backup['file']).stat().st_size
-    assert shutil.disk_usage(ROOT).free > expected_backup_size * 3 + 400 * 1024 * 1024, 'Insufficient peak space for verified encrypted cutover backup'
+if (ROOT / 'migration.json').exists():
+    latest_backup = ROOT / 'backup-latest.json'
+    previous_backup = (ROOT / 'backups' / json.loads(latest_backup.read_text())['file']
+                       if latest_backup.exists() else ROOT / 'backups/initial-migration.sql.gz')
+    expected_backup_size = previous_backup.stat().st_size
+    assert shutil.disk_usage(ROOT).free > expected_backup_size * 2 + 400 * 1024 * 1024, 'Insufficient peak space for verified encrypted cutover backup'
 # Build before the maintenance window; MySQL and the old application stay live.
 shutil.copy2('/etc/ssl/certs/ca-certificates.crt', stage / 'ca-certificates.crt')
 old_image = subprocess.run(['docker', 'inspect', '--format={{.Image}}', 'hyjs-game'], capture_output=True, text=True).stdout.strip()

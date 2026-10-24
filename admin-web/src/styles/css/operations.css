@@ -114,3 +114,6 @@
 @media (prefers-reduced-motion: reduce) {
   .n-modal *, .n-drawer *, .n-dialog * { animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }
+
+/* Shared by render callbacks as well as templates; scoped page rules cannot style h() siblings. */
+.ops-table-actions{display:flex;align-items:center;gap:8px;flex-wrap:nowrap}.ops-table-actions>.n-button{flex-shrink:0}

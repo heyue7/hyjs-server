@@ -35,13 +35,11 @@ const helpText = computed(() =>
     ? [
         '橙卡招募常驻开放，每日次数与王者招募分开计算。',
         '每日次数填 0 表示不限；保底间隔 N 表示连续未出高品质时最多 N 次保底；最后20%的抽数逐步提高概率。',
-        '保存后对之后的所有抽取生效，已累计次数与保底进度保留。',
         '保底获得橙卡。保底间隔可设10或20抽，每日次数须为10的倍数。'
       ].join('\n')
     : [
-        '所有王者招募活动通用，三个世界共用每日次数与保底进度，幸运值由原版及三个世界共用，活动结束后保留，下次开启继续累计。达到兑换门槛后继续累计，兑换扣除所需值并保留余额。',
+        '所有王者招募活动通用，三个世界共用每日次数与保底进度，幸运值由常驻池及三个世界共用，活动结束后保留，下次开启继续累计。达到兑换门槛后继续累计，兑换扣除所需值并保留余额。',
         '免费招募也占 1 次；保底间隔 N 表示连续未出高品质时最多 N 次保底；最后20%的抽数逐步提高概率。',
-        '保存后对之后的所有抽取生效，已累计次数与保底进度保留。',
         '保底可能获得橙卡或红卡，不保证红卡。保底间隔可设10或20抽，每日次数须为10的倍数。'
       ].join('\n')
 );
@@ -226,6 +224,7 @@ defineExpose({ dirty, loading, invalid, request, accept });
       <span class="ops-muted">正在载入招募规则…</span>
     </div>
     <template v-else>
+      <p class="recruit-save-note">保存后用于后续抽取，已累计次数与保底进度保留。</p>
       <div v-if="error" class="recruit-rule-status recruit-rule-status-error">
         <NAlert type="error" :show-icon="false" class="recruit-rule-alert">{{ error }}</NAlert>
         <NButton size="tiny" :loading="loading" :disabled="loading" @click="refresh">重新载入</NButton>
@@ -290,6 +289,7 @@ defineExpose({ dirty, loading, invalid, request, accept });
 </template>
 
 <style scoped>
+.recruit-save-note { margin: 0 0 12px; font-size: 13px; line-height: 1.6; color: rgb(var(--base-text-color) / .65); }
 .recruit-rule-fields {
   min-width: 0;
 }

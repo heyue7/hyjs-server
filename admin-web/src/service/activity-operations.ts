@@ -102,6 +102,26 @@ export interface ActivityInstance {
 }
 export const productModes = ['exchange', 'discount-shop', 'half-price', 'limited-shop', 'mystic-shop'];
 export const cumulativeModes = ['recharge-total', 'diamond-spent', 'recruit-count', 'copy-win', 'login-total', 'arena-wins', 'plunder-count', 'hero-collection'];
+/** Format only the two known backend defaults; custom and unknown notes stay intact. */
+export function formatActivityModeNotes(mode?: Pick<ActivityMode, 'mode' | 'notes'>): string {
+  const notes = mode?.notes || '';
+  const base = '只修改今后未冻结的新一期；空奖品草稿保持关闭。';
+  const periodDefault = `${base} 每实例支持最多31档独立目标；累计充值目标单位为分。`;
+  const periodModes = [
+    'recharge-total', 'single-spend', 'work', 'diamond-spent', 'recruit-count',
+    'copy-win', 'arena-wins', 'plunder-count', 'wanted-attempts', 'wanted-kills',
+    'hero-collection', 'trial-stars', 'power-race', 'login-total'
+  ];
+  if (notes === periodDefault && periodModes.includes(mode?.mode || '')) {
+    return `每期最多配置 31 档独立目标。${mode?.mode === 'recharge-total' ? '充值目标以人民币分填写。' : ''}未配置奖励的草稿保持关闭。`;
+  }
+  const baseModes = [
+    ...productModes, 'login-rewards', 'limited-sign', 'stamina-meal',
+    'diamond-rebate', 'treasure-box'
+  ];
+  if (notes === base && baseModes.includes(mode?.mode || '')) return '未配置奖励的草稿保持关闭。';
+  return notes;
+}
 const milestoneTargets: Record<string, { label: string; unit: string; note?: string }> = {
   'recharge-total': { label: '累计充值', unit: '分' },
   'diamond-spent': { label: '累计消耗钻石', unit: '钻' },

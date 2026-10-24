@@ -209,7 +209,7 @@ watch(
           :class="{ 'is-zoomed': zoom > 1 }"
           :style="{ width: `${zoom * 100}%`, aspectRatio: `${mapWidth} / ${mapHeight}` }"
         >
-          <img class="map-image" :src="mapIcon" :alt="`${entry?.name || '野外地图'} 原小地图`" />
+          <img class="map-image" :src="mapIcon" :alt="`${entry?.name || '野外地图'} 小地图`" />
           <button
             v-for="point in visiblePoints"
             :key="point.key"
@@ -228,7 +228,7 @@ watch(
         </div>
       </div>
       <p class="mt-2 text-xs text-gray-500">
-        候选点按原小地图参数投影，标记位置不代表实时刷新状态；世界首领候选点属于同一全服周期，不会同时出现多只。
+        标记为候选位置，不显示实时刷新状态；同一周期仅出现一只世界首领。
       </p>
       <div class="map-detail" aria-live="polite">
         <template v-if="activePoint">
@@ -242,7 +242,7 @@ watch(
           </div>
           <div class="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-sm">
             <span>坐标 X {{ numberText(activePoint.x) }} · Z {{ numberText(activePoint.z) }}</span>
-            <span class="text-gray-500">原点位 {{ activePoint.id }}</span>
+            <span class="text-gray-500">点位编号 {{ activePoint.id }}</span>
             <span>{{ kindMap[activePoint.kind].candidateLabel }}：{{ activePoint.candidates }}</span>
           </div>
           <p v-if="activePoint.kind === 'worldBoss'" class="mt-2 text-sm text-gray-500">

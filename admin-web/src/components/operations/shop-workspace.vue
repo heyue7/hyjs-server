@@ -65,7 +65,7 @@ const settingSupports = (key: string) => Boolean(definition.value?.settingsField
 const sections = [
   { key: 'product', label: '商品与消耗' },
   { key: 'limits', label: '资格与限购' },
-  { key: 'publish', label: '状态与备注' }
+  { key: 'publish', label: '状态' }
 ];
 const title = computed(() =>
   isPopularityShop.value ? shopLabels[props.shopId] : definition.value?.label || shopLabels[props.shopId] || '商店管理'
@@ -291,6 +291,9 @@ function remove(row: ShopProduct) {
     }
   });
 }
+const shopNotes = computed(() => props.shopId === 'vip'
+  ? '每个礼包需配置奖励、价格和会员条件后启用。保存后用于后续购买，已领取次数保留。'
+  : definition.value?.notes || '');
 function resourceName(id: string) {
   return catalogue.value[id]?.name || (id ? '资源名称暂未载入' : '未配置');
 }
@@ -370,7 +373,7 @@ const columns = computed<DataTableColumns<ShopProduct>>(() => [
   },
   {
     title: '操作', key: 'action', width: props.shopId === 'memory' ? 120 : 135, fixed: 'right',
-    render: row => h(NSpace, { size: 4, wrap: false }, () => [
+    render: row => h('div', { class: 'ops-table-actions' }, [
       h(NButton, { size: 'small', secondary: true, onClick: () => edit(row) }, () => productReadonly(row) ? '查看' : '编辑'),
       ...(!productReadonly(row) ? [h(NButton, { size: 'small', quaternary: true, type: 'error', onClick: () => remove(row) }, () => '移除')] : [])
     ])
@@ -430,8 +433,9 @@ watch(
       @back="discard"
       @save="save"
     >
-      <template #title-extra><ContextHelp v-if="editing && definition?.notes" title="商店规则" :text="definition.notes" /></template>
+      <template #title-extra><ContextHelp v-if="editing && shopNotes" title="商店规则" :text="shopNotes" /></template>
 
+      <template #status>用于后续购买；历史订单、已用库存与限购记录保留。</template>
       <template #alert>
         <NAlert v-if="error || saveError" type="error" :title="saveError || error" />
       </template>
@@ -473,7 +477,7 @@ watch(
               placeholder="全部状态"
               class="ops-filter-select"
             />
-            <ContextHelp v-if="definition?.notes" title="商店规则" :text="definition.notes" />
+            <ContextHelp v-if="shopNotes" title="商店规则" :text="shopNotes" />
             <NButton :loading="loading" @click="load">刷新</NButton>
             <NButton v-if="canWrite && snapshot && definition?.settingsFields?.length" @click="configure()">商店设置</NButton>
             <NButton v-if="canWrite && definition && definition.canCreate !== false" type="primary" @click="beginCreate">
@@ -654,7 +658,7 @@ watch(
             />
           </section>
           <section v-show="section === 'publish'">
-            <h3 class="mb-20px">状态与备注</h3>
+            <h3 class="mb-20px">状态</h3>
             <NFormItem v-if="supports('enabled')" label="启用商品">
               <NSwitch v-model:value="draft.enabled" aria-label="启用商品" />
             </NFormItem>
@@ -677,10 +681,6 @@ watch(
                 <template #suffix>分钟</template>
               </NInputNumber>
             </NFormItem>
-            <NFormItem v-if="supports('source')" label="配置备注">
-              <NInput v-model:value="draft.source" type="textarea" :maxlength="1000" placeholder="选填：记录本次调整用途" />
-            </NFormItem>
-            <p class="ops-inline-note">修改仅影响后续购买，已购买的订单不变。</p>
           </section>
         </NForm>
       </template>
@@ -760,14 +760,6 @@ watch(
             type="datetime"
             clearable
             @update:value="settingsDraft.claimEndAt = $event || 0"
-          />
-        </NFormItem>
-        <NFormItem v-if="settingSupports('source')" label="配置备注">
-          <NInput
-            v-model:value="settingsDraft.source"
-            :disabled="shopId === 'popularity-rank'"
-            type="textarea"
-            :maxlength="1000"
           />
         </NFormItem>
       </NForm>

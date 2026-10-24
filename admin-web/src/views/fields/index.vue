@@ -471,7 +471,6 @@ onMounted(load);
                 <NSwitch v-model:value="cfg.ordinaryBossEnabled" :disabled="readonly" />
                 <span class="text-sm text-gray-500">{{ cfg.ordinaryBossEnabled ? '按下方刷新间隔出现' : '停止新的刷新与开战，已接受的战斗继续结算' }}</span>
               </div>
-              <p class="mb-4 text-sm text-gray-500">普通首领使用本地图的出生点和候选组，成员等级与数值随方案保存。</p>
               <NCollapse>
                 <NCollapseItem
                   v-for="group in ordinaryBossGroups"
@@ -514,7 +513,7 @@ onMounted(load);
               <div class="mb-2 mt-4 flex flex-wrap items-center gap-3">
                 <span>开放世界首领</span>
                 <NSwitch v-model:value="cfg.bossEnabled" :disabled="readonly" />
-                <span class="text-sm text-gray-500">{{ cfg.bossEnabled ? '按原全服时段开启' : '关闭后隐藏首领并停止新挑战，已接受战斗继续结算' }}</span>
+                <span class="text-sm text-gray-500">{{ cfg.bossEnabled ? '按全服时段开启' : '关闭后隐藏首领并停止新挑战，已接受战斗继续结算' }}</span>
               </div>
               <label class="mb-4 block">
                 新建周期等级
@@ -537,7 +536,7 @@ onMounted(load);
                 :level-editable="false"
                 level-hint="等级随周期等级与系数生效"
               />
-              <p class="mt-2 text-sm text-gray-500">基础数值会乘以原等级系数。数值和奖励调整在新建周期生效，已生成周期保留原配置。</p>
+              <p class="mt-2 text-sm text-gray-500">基础数值随周期等级与系数计算。数值和奖励调整在新建周期生效，已生成周期保留原配置。</p>
               <h4 class="mb-2 mt-5 font-medium">奖励档</h4>
               <label class="mb-3 block">
                 奖励档位等级
@@ -579,7 +578,6 @@ onMounted(load);
           <NTag v-if="dirty" type="warning">当前方案有未保存修改</NTag>
           <NTag>只读预览</NTag>
         </div>
-        <p class="mb-3 text-sm text-gray-500">查看当前方案的地图候选点与首领出生点，预览不会修改配置。</p>
         <FieldMap :template="selected" :presentation="presentation" />
       </NCard>
     </template>

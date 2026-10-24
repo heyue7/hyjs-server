@@ -143,7 +143,6 @@ onBeforeUnmount(() => { removeGuard(); listGeneration += 1; claimsGeneration += 
 <template>
   <div class="ops-page cdk-page">
 
-    <p class="ops-inline-note cdk-note">同一码每个角色限兑一次。</p>
     <p v-if="!scope.currentServer?.runtimeBound" class="ops-inline-note cdk-note">本区服尚未部署，部署后可生成和使用兑换码。</p>
     <NAlert v-if="error" type="error" :title="error" />
     <NCard :bordered="false" class="ops-panel cdk-list">

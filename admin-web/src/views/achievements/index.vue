@@ -10,7 +10,6 @@ import { useOperations } from '@/composables/useOperations';
 import ManagementWorkspace from '@/components/operations/management-workspace.vue';
 import RewardList from '@/components/operations/reward-list.vue';
 import RewardSummary from '@/components/operations/reward-summary.vue';
-const notes = ref('');
 const { canWrite, loading, error, run } = useOperations();
 const rows = ref<Achievement[]>([]);
 const kinds = ref<AchievementKind[]>([]);
@@ -38,7 +37,7 @@ const section = ref('goal');
 const sections = [
   { key: 'goal', label: '成就目标' },
   { key: 'rewards', label: '完成奖励' },
-  { key: 'publish', label: '状态与备注' }
+  { key: 'publish', label: '状态' }
 ];
 const dirty = computed(() => editing.value && original.value !== JSON.stringify(draft.value));
 const kindLabel = (value: string) =>
@@ -78,6 +77,48 @@ const condition = computed(
     (selected.value?.kind === draft.value.kind ? selected.value : undefined)
 );
 const fixedTarget = computed(() => isOSGrowth.value ? 3 : kinds.value.find(row => row.id === draft.value.kind)?.fixedTarget);
+// Display rules reviewed against AdminAchievementKinds; API notes remain available for unknown conditions.
+const conditionRules: Record<string, string> = {
+  vip: '会员等级达到目标。',
+  level: '主角等级达到目标。',
+  'level-advanced': '主角等级达到目标，分段目标可单独配置。',
+  'copy-stars': '按各主线关卡的历史最高星数合计，同一关卡不重复计数。',
+  'copy-stars-advanced': '与副本总星数（一）使用相同统计范围，分段目标可单独配置。',
+  fight: '阵容战斗力达到目标。',
+  'equipped-heroes': '统计穿齐四件装备的上阵角色人数。',
+  'treasure-heroes': '统计穿齐两件宝物的上阵角色人数。',
+  trial: '按试炼历史最高总星数计算，层数不计入。',
+  'formation-level': '至少四名角色上阵，四人等级都须达到目标。',
+  'expedition-hours': '累计已接受远征任务的已完成整小时，每个任务最多计入开始时的计划时长，不乘伙伴人数。',
+  'wanted-kills': '仅统计本人完成的首领击杀，参与伤害不计为击杀。',
+  'formation-breach': '至少四名角色上阵，四人的突破等级都须达到目标。',
+  'friend-disaster-help': '统计本人成功帮助其他玩家解决厄运的次数，重复请求不重复计数。',
+  'pet-count': '累计获得的精灵逐只去重，含已回收及成长消耗记录；缺失的历史记录不补计。',
+  'pet-elements': '按相同模型的精灵分组，每组元素去重，取元素最多的一组。',
+  'pet-level': '取当前精灵及保留的历史记录中的最高等级。',
+  'pet-breach': '取精灵最高突破等级。',
+  'pet-talents': '按单只精灵已解锁的不同天赋技能计数，取最多的一只；解锁条件为突破等级达到技能要求。',
+  'pet-intimacy': '取精灵最高亲密度星级，亲密经验不计为星级。',
+  'pet-recruit': '累计普通精灵招募次数，引导首抽不计入。',
+  'awake-1-1': '完整探索碧绿草原难度1；四个宝箱各5分、怪物80分，全部完成为100分。',
+  'login-days': '按北京时间累计登录日期，同日重连不重复计数。',
+  collection: '按已获得的不同角色种类计数，回收后保留图鉴记录。',
+  'copy-stages': '按已通关的不同主线关卡计数，同一关卡不重复。',
+  'formation-count': '统计上阵且仍在背包中的不同角色，不计空位和重复角色。',
+  're-os-growth': '累计登录、角色等级和主线通关数三项须同时达成。',
+  warrior_training: '历史培养条件，仅保留已有配置，不支持新建。'
+};
+const unavailableExplorationKinds = new Set([
+  'awake-1-2', 'awake-1-3', 'awake-2-1', 'awake-2-2', 'awake-2-3',
+  'awake-3-1', 'awake-3-2', 'awake-3-3', 'awake-4-1', 'awake-4-2',
+  'awake-4-3', 'awake-5-1', 'awake-5-2', 'awake-5-3'
+]);
+function conditionNote(row?: { id?: string; kind?: string; notes?: string }) {
+  if (!row) return '';
+  const id = row.kind || row.id || '';
+  if (unavailableExplorationKinds.has(id)) return '此地图难度的探索尚未开放，暂不能启用；完整探索目标为100%。';
+  return conditionRules[id] || row.notes || '';
+}
 const conditionColumns: DataTableColumns<AchievementKind> = [
   { title: '触发条件', key: 'label', minWidth: 230 },
   {
@@ -89,7 +130,7 @@ const conditionColumns: DataTableColumns<AchievementKind> = [
         row.supported === false ? '暂不可用' : '可配置'
       )
   },
-  { title: '说明', key: 'notes', minWidth: 360, render: (row) => row.notes || '按原进度条件配置' }
+  { title: '说明', key: 'notes', minWidth: 360, render: (row) => conditionNote(row) || '按所选进度条件配置' }
 ];
 const visible = computed(() =>
   rows.value.filter(
@@ -109,7 +150,6 @@ async function load() {
       rewards: row.rewards || []
     }));
     kinds.value = data.kinds || [];
-    notes.value = data.notes || '';
   }
 }
 function edit(row: Achievement | null) {
@@ -148,7 +188,7 @@ async function save() {
   saveError.value = !draft.value.name.trim()
     ? '请填写成就名称'
     : draft.value.enabled && condition.value?.supported === false
-      ? `此条件暂不能启用：${condition.value.notes || '对应玩法尚未恢复'}`
+      ? `此条件暂不能启用：${conditionNote(condition.value) || '对应玩法尚未恢复'}`
       : !draft.value.kind
         ? '请选择成就条件'
         : !Number.isInteger(draft.value.target) || draft.value.target < 1
@@ -199,7 +239,7 @@ const columns: DataTableColumns<Achievement> = [
       h('div', [
         h('strong', row.name || row.id),
         ...(row.supported === false
-          ? [h('div', { class: 'ops-muted mt-5px' }, `暂不可用：${row.notes || '对应玩法尚未恢复'}`)]
+          ? [h('div', { class: 'ops-muted mt-5px' }, `暂不可用：${conditionNote(row) || '对应玩法尚未恢复'}`)]
           : [])
       ])
   },
@@ -294,11 +334,12 @@ onMounted(load);
     @back="back"
     @save="save"
   >
-    <template #title-extra><ContextHelp v-if="notes" title="成就配置说明" :text="notes" /></template>
+    <template #title-extra><ContextHelp title="进度记录" text="仅记录已观察到的进度，缺失的历史进度不补计。" /></template>
     <template v-if="!editing" #actions>
       <NButton :loading="loading" @click="load">刷新</NButton>
       <NButton v-if="canWrite" type="primary" @click="edit(null)">新建成就</NButton>
     </template>
+    <template #status>修改用于之后首次接收此成就的玩家；已有目标、奖励和领取记录保留。</template>
     <template #alert>
       <NAlert v-if="error || saveError" type="error" :title="saveError || error" />
     </template>
@@ -354,13 +395,13 @@ onMounted(load);
           <NFormItem label="后台名称" required><NInput v-model:value="draft.name" placeholder="成就名称" /></NFormItem>
         </div>
         <NFormItem label="进度条件" required>
-          <template #label><span class="achievement-condition-label">进度条件<ContextHelp v-if="condition?.notes && condition.supported !== false" title="成就条件说明" :text="condition.notes" /></span></template>
+          <template #label><span class="achievement-condition-label">进度条件<ContextHelp v-if="conditionNote(condition) && condition?.supported !== false" title="成就条件说明" :text="conditionNote(condition)" /></span></template>
           <NSelect :value="draft.kind" :options="kindOptions" filterable placeholder="搜索或选择触发条件" @update:value="setKind" />
         </NFormItem>
         <NAlert
-          v-if="condition?.notes && condition.supported === false"
+          v-if="conditionNote(condition) && condition?.supported === false"
           type="warning"
-          :title="condition.notes"
+          :title="conditionNote(condition)"
           class="mb-20px"
         />
         <div v-if="isOSGrowth && draft.requirements" class="achievement-requirements">
@@ -378,7 +419,7 @@ onMounted(load);
         <RewardList v-model:value="draft.rewards" :disabled="saving || !canWrite" />
       </section>
       <section v-show="section === 'publish'">
-        <h3 class="mb-20px">状态与备注</h3>
+        <h3 class="mb-20px">状态</h3>
         <NFormItem label="启用成就">
           <NSwitch
             v-model:value="draft.enabled"
@@ -386,10 +427,6 @@ onMounted(load);
             aria-label="启用成就"
           />
         </NFormItem>
-        <NFormItem label="配置备注">
-          <NInput v-model:value="draft.source" type="textarea" :maxlength="1000" />
-        </NFormItem>
-        <p class="ops-inline-note">玩家已查看的成就保留当时的目标与奖励；保存后的配置用于之后首次接收此成就的玩家。已领取记录保留。</p>
       </section>
     </NForm>
   </ManagementWorkspace>

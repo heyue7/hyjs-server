@@ -120,15 +120,14 @@ function durationText(ms: number) {
         <NTag size="small">草案模板</NTag>
         <NTag size="small">未接入客户端</NTag>
       </div>
-      <p class="ggo-lede">保存后可继续调整，玩法生效时间待客户端接入。</p>
     </div>
 
     <NAlert v-if="!rules" type="warning" :bordered="false">
-      这份方案还没有 v2 规则对象。后台迁移完成后可编辑规则区；现有名称、NPC、怪物与芯片字段仍按草案保存。
+      此方案规则尚未初始化，规则区暂不可编辑；名称、NPC、怪物与芯片仍可保存为草案。
     </NAlert>
 
     <NAlert type="info" :bordered="false">
-      当前准备搜打撤规则；未确定的参数可留空。地图点位和客户端玩法待后续接入。
+      参数可留空保存为草案；地图点位与客户端玩法尚未接入。
     </NAlert>
 
     <section class="ggo-section">
@@ -273,7 +272,7 @@ function durationText(ms: number) {
         <p class="ggo-footnote">安全区结算由结算员对话单独说明，撤离接应人不接收芯片。</p>
         <NCollapse class="mt-3">
           <NCollapseItem title="撤离提示文案" name="extraction">
-            <p class="ggo-footnote mb-3">这些文案只描述返回初始安全区的过程，不承诺结算结果。</p>
+            <p class="ggo-footnote mb-3">此处填写返回初始安全区时的提示，芯片结算提示在结算员台词中设置。</p>
             <NForm label-placement="top" :disabled="disabled">
               <div class="ggo-field-grid">
                 <NFormItem label="抵达接应点">
@@ -392,7 +391,7 @@ function durationText(ms: number) {
                     :precision="3"
                     @update:value="enemy.respawnMs = Math.round(($event ?? 0) * 1000)"
                   />
-                  <template #feedback>30 秒为测试初值，可调；旧默认 60 秒会由后台迁移为 30 秒，自定义值保留。</template>
+                  <template #feedback>按秒填写，可保留当前间隔或自行调整。</template>
                 </NFormItem>
               </div>
             </NForm>
@@ -402,7 +401,7 @@ function durationText(ms: number) {
 
         <div class="ggo-subhead">
           <h4>Boss 候选</h4>
-          <span>沿用原 3 个候选，默认 60 分钟</span>
+          <span>3 个候选，默认 60 分钟</span>
         </div>
         <NCollapse>
           <NCollapseItem v-for="enemy in value.bosses" :key="enemy.id" :name="`boss:${enemy.id}`">
@@ -433,7 +432,6 @@ function durationText(ms: number) {
             <p class="ggo-raw">模型 {{ enemy.heroId }}</p>
           </NCollapseItem>
         </NCollapse>
-        <p class="ggo-footnote mt-3">六品质统一小怪掉落池在下方配置。</p>
       </section>
 
       <section class="ggo-section">
@@ -526,8 +524,7 @@ function durationText(ms: number) {
           </div>
         </header>
         <NAlert type="warning" :bordered="false" class="mb-3">
-          周限购尚未接入玩法或商店周额度执行。信用商店现有超频点数测试商品保持 1 信用点 / 每日 1
-          次，仅用于样式测试，不代表正式周限购。
+          周限购尚未生效。信用商店当前超频点数商品为 1 信用点、每日限购 1 次。
         </NAlert>
         <div class="ggo-fixed-grid">
           <div class="ggo-fixed">
@@ -596,14 +593,13 @@ function durationText(ms: number) {
         <header class="ggo-section-head">
           <div>
             <h3>NPC 与职责</h3>
-            <p>候选 NPC 的职责固定；本轮不提供坐标编辑，旧坐标原样保留。</p>
+            <p>候选 NPC 的职责固定，坐标暂不可编辑。</p>
           </div>
           <NTag size="small">{{ value.npcs.length }} 名候选</NTag>
         </header>
         <NAlert v-if="legacyRole" type="warning" :bordered="false" class="mb-3">
-          仍有旧版职责未迁移。后台会修正已知默认职责，保留人工改名、话术与坐标。
+          存在待更新的 NPC 职责；已修改的名称、台词与坐标保留。
         </NAlert>
-        <p class="ggo-footnote mb-3">模型 ID 只作配置候选，未部署到场景，也不代表客户端已可用。</p>
         <NCollapse>
           <NCollapseItem v-for="npc in value.npcs" :key="npc.id" :name="npc.id">
             <template #header>
@@ -617,7 +613,6 @@ function durationText(ms: number) {
                 </NTag>
               </div>
             </template>
-            <p class="ggo-role-note">{{ roleInfo(npc.role).note }}</p>
             <NForm label-placement="top" :disabled="disabled">
               <div class="ggo-field-grid">
                 <NFormItem label="显示名称">
@@ -656,12 +651,6 @@ function durationText(ms: number) {
 .ggo-head {
   display: grid;
   gap: 6px;
-}
-.ggo-lede {
-  margin: 0;
-  color: #6b7280;
-  font-size: 13px;
-  line-height: 1.6;
 }
 .ggo-section {
   min-width: 0;
@@ -749,12 +738,6 @@ function durationText(ms: number) {
 }
 .ggo-muted {
   color: #9ca3af;
-}
-.ggo-role-note {
-  margin: 0 0 12px;
-  color: #4b5563;
-  font-size: 13px;
-  line-height: 1.6;
 }
 .ggo-raw {
   margin: 8px 0 0;
@@ -845,7 +828,6 @@ function durationText(ms: number) {
 :global(.dark) .ggo-section {
   border-top-color: #374151;
 }
-:global(.dark) .ggo-lede,
 :global(.dark) .ggo-section-head p,
 :global(.dark) .ggo-footnote,
 :global(.dark) .ggo-subhead span,
@@ -855,8 +837,7 @@ function durationText(ms: number) {
 :global(.dark) .ggo-fixed span {
   color: #9ca3af;
 }
-:global(.dark) .ggo-fixed strong,
-:global(.dark) .ggo-role-note {
+:global(.dark) .ggo-fixed strong {
   color: #d1d5db;
 }
 :global(.dark) .ggo-chip-missing {

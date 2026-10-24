@@ -16,7 +16,11 @@ import { createRequestId } from '@/utils/request-id';
 const { canWrite, loading, error, run } = useOperations();
 const detailLabels: Record<string, string> = {
   '原表未提供可明确解释的独立数值，不补造属性或效果': '暂无独立属性或效果数据',
-  '原目录未提供可读简介': '暂无简介'
+  '原目录未提供可读简介': '暂无简介',
+  '未恢复该道具的独立原数值表；不推算属性或效果': '暂无独立属性或效果数据',
+  '原精灵表的基础生命、攻击、防御字段已标记废弃，不作为当前实际属性展示': '基础生命、攻击、防御字段已停用，不计入当前属性',
+  '原料理表仅列影响属性，单份增幅及累计上限见当前生效配置': '单份增幅及累计上限见当前生效数值',
+  '当前生效配置；与游戏食用时使用同一料理规则': '当前游戏内食用规则'
 };
 function detailValue(value: string) { return detailLabels[value] || value || '未提供'; }
 
@@ -174,6 +178,23 @@ const detailLoading = ref(false);
 const detailError = ref('');
 const detail = ref<ItemDetail | null>(null);
 const detailItem = ref<Item | null>(null);
+// Match the detail service's section/field pairs; unrelated dynamic values stay intact.
+const detailSections = computed(() => (detail.value?.sections || []).map(section => {
+  if (section.title === '数据依据') return {
+    title: '数值范围',
+    fields: section.fields.map(field => field.label === '来源'
+      ? { label: '基础数值', value: '不含角色养成加成' }
+      : field)
+  };
+  if (section.title === '道具说明') return {
+    ...section,
+    fields: section.fields.filter(field => !(field.label === '来源' && field.value === '本服新增 GGO 道具'))
+  };
+  return {
+    ...section,
+    fields: section.fields.filter(field => !(section.title === '当前生效数值' && field.label === '配置来源'))
+  };
+}).filter(section => section.fields.length));
 let detailGeneration = 0;
 async function showDetail(item: Item) {
   const current = ++detailGeneration;
@@ -228,7 +249,7 @@ const columns: DataTableColumns<Item> = [
     title: '操作',
     key: 'action',
     width: 160,
-    render: item => h('div', { class: 'item-actions' }, [h(NButton, { size: 'small', secondary: true, onClick: () => showDetail(item) }, () => '详情'),
+    render: item => h('div', { class: 'ops-table-actions' }, [h(NButton, { size: 'small', secondary: true, onClick: () => showDetail(item) }, () => '详情'),
       h(
         NButton,
         { size: 'small', secondary: true, disabled: !canWrite.value, onClick: () => openGrant(item) },
@@ -318,7 +339,7 @@ onMounted(load);
         <NSpin :show="detailLoading">
           <div class="item-detail-heading"><ResourceImage :item="detail?.item || detailItem" :size="64" /><div><h2>{{ detail?.item.name || detailItem?.name }}</h2><ItemQuality :item="detail?.item || detailItem || undefined" /><div class="ops-mono ops-muted mt-8px">{{ detailItem?.id }}</div></div></div>
           <NAlert v-if="detailError" type="error" :title="detailError" /><NButton v-if="detailError && detailItem" class="mt-12px" @click="showDetail(detailItem)">重新加载</NButton>
-          <section v-for="section in detail?.sections || []" :key="section.title" class="item-detail-section"><h3>{{ section.title }}</h3><dl><template v-for="field in section.fields" :key="field.label"><dt>{{ field.label }}</dt><dd><details v-if="field.label === '配置来源'"><summary>查看配置说明</summary>{{ field.value }}</details><template v-else>{{ detailValue(field.value) }}</template></dd></template></dl></section>
+          <section v-for="section in detailSections" :key="section.title" class="item-detail-section"><h3>{{ section.title }}</h3><dl><template v-for="field in section.fields" :key="field.label"><dt>{{ field.label }}</dt><dd>{{ detailValue(field.value) }}</dd></template></dl></section>
         </NSpin>
         <template #footer><div class="ops-drawer-actions"><NButton @click="closeDetail">关闭</NButton><NButton v-if="canWrite && detailItem" type="primary" @click="openGrant(detailItem)">发放此道具</NButton></div></template>
       </NDrawerContent>
@@ -380,6 +401,6 @@ onMounted(load);
 <style scoped>
 .grant-modal{display:flex;flex-direction:column}.grant-modal :deep(.n-card__content){min-height:0;overflow-y:auto}.grant-modal :deep(.n-card__footer){flex-shrink:0}
 @media(max-width:600px){.ops-drawer-actions{flex-wrap:wrap}.ops-drawer-actions :deep(.n-button){flex:1}}
-.item-actions{display:flex;gap:6px}.item-detail-heading{display:flex;gap:16px;align-items:center;margin-bottom:20px}.item-detail-heading h2{font-size:18px;margin:0 0 8px;overflow-wrap:anywhere}.item-detail-section{padding:20px 0;border-top:1px solid rgb(var(--base-text-color)/.08)}.item-detail-section h3{font-size:15px;margin:0 0 16px}.item-detail-section dl{display:grid;grid-template-columns:160px minmax(0,1fr);gap:10px 16px;margin:0}.item-detail-section dt{color:rgb(var(--base-text-color)/.6)}.item-detail-section dd{margin:0;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.7}
+:deep(.item-name){display:flex;gap:10px;align-items:center}:deep(.item-name>div){min-width:0}:deep(.item-name .n-button__content){white-space:normal;text-align:left;overflow-wrap:anywhere}.item-detail-heading{display:flex;gap:16px;align-items:center;margin-bottom:20px}.item-detail-heading h2{font-size:18px;margin:0 0 8px;overflow-wrap:anywhere}.item-detail-section{padding:20px 0;border-top:1px solid rgb(var(--base-text-color)/.08)}.item-detail-section h3{font-size:15px;margin:0 0 16px}.item-detail-section dl{display:grid;grid-template-columns:160px minmax(0,1fr);gap:10px 16px;margin:0}.item-detail-section dt{color:rgb(var(--base-text-color)/.6)}.item-detail-section dd{margin:0;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.7}
 @media(max-width:600px){.item-detail-heading{align-items:flex-start;gap:12px}.item-detail-heading>div{min-width:0}.item-detail-section dl{grid-template-columns:1fr;gap:6px}.item-detail-section dd{margin-bottom:10px}}
 </style>
