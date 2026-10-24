@@ -244,7 +244,7 @@ onMounted(load);
         <NAlert
           v-if="seasonal"
           type="info"
-          title="赛季称号的属性与期限由真实赛季结果决定，此处只读。"
+          title="赛季称号的属性与期限由赛季结果决定，此处只读。"
           class="mb-20px"
         />
         <div class="ops-section-heading">
@@ -304,11 +304,11 @@ onMounted(load);
 
 <style scoped>
 .title-list-art { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; padding-block: 6px; }
-.title-art-preview { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; margin-bottom: 28px; }
+.title-art-preview { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; margin-bottom: 20px; }
 .title-art-preview :deep(img) { max-width: min(100%, 360px); }
 .title-target-field :deep(.n-input-number) { width: min(100%, 320px); }
 .title-requirement { margin: 16px 0 24px; }
-.title-requirement p { margin: 7px 0 0; font-size: 15px; }
+.title-requirement p { margin: 7px 0 0; font-size: 14px; }
 
 .title-effect-row {
   display: grid;

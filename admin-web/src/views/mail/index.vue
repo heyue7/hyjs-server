@@ -113,26 +113,26 @@ const columns: DataTableColumns<MailBatch> = [
     <div class="ops-filters">
       <ContextHelp
         title="发送范围"
-        text="仅向当前所选真实区服、预览时冻结的角色发送原系统邮件。可选全部玩家（跨分页）或勾选部分玩家；冻结账号和保护账号自动排除，预览后新建角色不追加。邮件只写入游戏内邮箱，不创建领奖中心附件。预览15分钟有效，失败重试沿用原批次。"
+        text="仅向当前所选区服、预览时冻结的角色发送游戏内邮件。可选全部玩家（跨分页）或勾选部分玩家；冻结账号和保护账号自动排除，预览后新建角色不追加。邮件只写入游戏内邮箱，不创建领奖中心附件。预览15分钟有效，失败重试沿用原批次。"
       />
       <NSpace :size="8">
         <NButton :loading="loading" @click="load">刷新</NButton>
         <NButton v-if="canWrite" type="primary" :disabled="!writable" @click="start">新建邮件</NButton>
       </NSpace>
     </div>
-    <NAlert v-if="!scope.currentServer?.runtimeBound" type="warning" title="请选择已部署的真实区服后发送。" />
+    <NAlert v-if="!scope.currentServer?.runtimeBound" type="warning" title="请选择已部署的区服后发送。" />
     <NAlert v-if="error" type="error" :title="error" />
-    <NCard :bordered="false">
+    <NCard :bordered="false" class="ops-panel">
       <NDataTable :columns="columns" :data="rows" :loading="loading" :row-key="(row: MailBatch) => row.id" :bordered="false" size="small" :scroll-x="1060" />
       <div class="ops-pagination"><NPagination v-model:page="page" v-model:page-size="pageSize" :page-sizes="[25,50,100]" :item-count="total" show-size-picker @update:page="load" @update:page-size="page = 1; load()" /></div>
     </NCard>
-    <NModal :show="editorOpen" preset="card" :title="inspecting ? '邮件记录' : stage === 'form' ? '新建邮件' : stage === 'preview' ? '确认发送范围' : '发送完成'" class="mail-editor" :closable="!busy" :mask-closable="!busy" @update:show="!$event && closeEditor()">
+    <NModal :show="editorOpen" preset="card" :title="inspecting ? '邮件记录' : stage === 'form' ? '新建邮件' : stage === 'preview' ? '确认发送范围' : '发送完成'" class="ops-modal mail-editor" :closable="!busy" :mask-closable="!busy" @update:show="!$event && closeEditor()">
       <NAlert v-if="saveError" type="error" :title="saveError" class="mb-16px" />
       <NForm v-if="stage === 'form'" label-placement="top" :disabled="busy" :show-feedback="false" class="mail-form">
         <div class="mail-realm">收件区服 <strong>{{ scope.currentServer?.name }}</strong></div>
         <NFormItem label="收件玩家" required><PlayerSelection v-model:value="draft.audience" :server-id="scope.serverId" :disabled="busy" /></NFormItem>
         <NFormItem label="邮件标题" required><NInput v-model:value="draft.title" :maxlength="60" placeholder="例如：版本更新说明" /></NFormItem>
-        <NFormItem label="邮件正文" required><NInput v-model:value="draft.body" type="textarea" :maxlength="4000" :autosize="{ minRows: 3, maxRows: 6 }" placeholder="填写给玩家的邮件正文，将显示在原系统邮箱" /></NFormItem>
+        <NFormItem label="邮件正文" required><NInput v-model:value="draft.body" type="textarea" :maxlength="4000" :autosize="{ minRows: 3, maxRows: 6 }" placeholder="填写给玩家的邮件正文，将显示在游戏内邮箱" /></NFormItem>
         <NFormItem label="操作原因" required><NInput v-model:value="draft.reason" :maxlength="300" placeholder="仅供后台操作记录使用" /></NFormItem>
       </NForm>
       <template v-else-if="batch">
@@ -147,7 +147,7 @@ const columns: DataTableColumns<MailBatch> = [
         <section class="mail-preview"><h3>{{ batch.title }}</h3><p>{{ batch.body }}</p></section>
         <div class="mail-reason"><span>操作原因</span><p>{{ batch.reason }}</p></div>
         <NAlert v-if="stage === 'preview' && batch.recipientCount < 1" type="warning" title="当前没有可发送的角色，本批次不能发送。" />
-        <NAlert v-else-if="stage === 'preview'" type="info" title="确认后只写入原系统邮箱，不会创建领奖中心附件。" />
+        <NAlert v-else-if="stage === 'preview'" type="info" title="确认后只写入游戏内邮箱，不会创建领奖中心附件。" />
         <NCheckbox v-if="stage === 'preview'" v-model:checked="confirmed" :disabled="busy || batch.recipientCount < 1">确认向以上 {{ batch.recipientCount }} 个角色发送同一封邮件。</NCheckbox>
       </template>
       <template #footer><div class="ops-drawer-actions">
@@ -161,11 +161,11 @@ const columns: DataTableColumns<MailBatch> = [
 
 <style scoped>
 :global(.n-card.mail-editor) { width: 780px; max-width: calc(100vw - 32px); }
-.mail-form { display: flex; flex-direction: column; gap: 18px; }
+.mail-form { display: flex; flex-direction: column; gap: 16px; }
 .mail-realm { display: flex; gap: 16px; color: rgb(var(--base-text-color) / .7); }
 .mail-realm strong { color: rgb(var(--base-text-color)); }
 .mail-review { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 24px; }
-.mail-review > div { display: flex; flex-direction: column; gap: 5px; }
+.mail-review > div { min-width: 0; overflow-wrap: anywhere; display: flex; flex-direction: column; gap: 5px; }
 .mail-review > div > span:first-child, .mail-reason > span { color: rgb(var(--base-text-color) / .65); font-size: 13px; }
 .mail-preview { border-block: 1px solid rgb(var(--base-text-color) / .1); padding: 18px 0; margin: 18px 0; }
 .mail-preview h3 { margin: 0 0 10px; font-size: 16px; }

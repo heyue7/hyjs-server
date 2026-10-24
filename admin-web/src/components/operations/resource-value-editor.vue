@@ -122,5 +122,6 @@ function reset() {
 @media (max-width: 640px) {
   .resource-value-row { grid-template-columns: minmax(0, 1fr) auto; }
   .resource-value-resource { grid-column: 1 / -1; }
+  .resource-value-single .resource-value-row { grid-template-columns: minmax(0, 1fr); }
 }
 </style>

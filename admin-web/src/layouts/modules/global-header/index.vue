@@ -31,7 +31,7 @@ const { isFullscreen, toggle } = useFullscreen();
 </script>
 
 <template>
-  <DarkModeContainer class="h-full flex-y-center px-12px shadow-header">
+  <DarkModeContainer class="ops-global-header h-full flex-y-center px-12px shadow-header">
     <GlobalLogo v-if="showLogo" class="h-full" :style="{ width: themeStore.sider.width + 'px' }" />
     <MenuToggler v-if="showMenuToggler" :collapsed="appStore.siderCollapse" @click="appStore.toggleSiderCollapse" />
     <div v-if="showMenu" :id="GLOBAL_HEADER_MENU_ID" class="h-full flex-y-center flex-1-hidden"></div>
@@ -59,4 +59,10 @@ const { isFullscreen, toggle } = useFullscreen();
   </DarkModeContainer>
 </template>
 
-<style scoped></style>
+<style scoped>
+@media (max-width: 380px) {
+  .ops-global-header { padding-inline: 8px; }
+  .ops-global-header :deep(.n-button) { width: 34px; min-width: 34px; padding-inline: 5px; }
+  .ops-global-header :deep(.server-scope-select) { width: 137px; }
+}
+</style>

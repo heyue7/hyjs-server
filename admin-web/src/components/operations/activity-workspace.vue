@@ -103,7 +103,6 @@ const sectionOptions = computed(() => [
   ...(showSettings.value ? [{ key: 'settings', title: '规则设置', detail: '排名、折扣、招募次数与保底等规则' }] : []),
   { key: 'review', title: '检查配置', detail: '按玩家看到的内容核对' }
 ]);
-const currentSection = computed(() => sectionOptions.value.find(section => section.key === activeTab.value));
 const chosenTemplate = computed(() => selectedMode.value?.templates.find(template => template.id === form.value?.templateId));
 function leave() { open.value = false; nextTick(() => listHeading.value?.scrollIntoView({ block: 'start' })); }
 function requestClose() {
@@ -388,7 +387,6 @@ onBeforeUnmount(() => {
         </nav>
         <NCard :bordered="false" class="ops-panel activity-editor-body">
           <div v-show="editable && activeTab !== 'review'">
-            <div v-if="currentSection?.detail" class="activity-section-title"><ContextHelp :title="currentSection.title" :text="currentSection.detail" /></div>
             <NForm label-placement="top" :disabled="busy">
               <template v-if="activeTab === 'basics'">
                 <NFormItem required>
@@ -448,13 +446,12 @@ onBeforeUnmount(() => {
 .activity-editor-layout { display: grid; grid-template-columns: 160px minmax(0, 1fr); gap: 16px; align-items: start; }
 .activity-view-layout { grid-template-columns: minmax(0, 1fr); }
 .activity-sections { display: flex; flex-direction: column; gap: 5px; position: sticky; top: 20px; }
-.activity-sections button { display: flex; flex-direction: column; gap: 6px; padding: 13px 14px; border: 0; border-radius: 7px; color: rgb(var(--base-text-color) / .65); background: transparent; appearance: none; text-align: left; cursor: pointer; }
+.activity-sections button { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border: 0; border-radius: 6px; color: rgb(var(--base-text-color) / .65); background: transparent; appearance: none; text-align: left; cursor: pointer; }
 .activity-sections button:hover { background: rgb(var(--base-text-color) / .035); }
 .activity-sections button.selected { background: rgb(var(--primary-color) / .08); color: rgb(var(--primary-color)); }
 .activity-sections button:focus-visible { outline: 2px solid rgb(var(--primary-color) / .55); outline-offset: 2px; }
 .activity-sections strong { font-size: 14px; font-weight: 500; }
 .activity-sections span { font-size: 12px; line-height: 1.5; color: rgb(var(--base-text-color) / .46); }
-.activity-section-title { margin-bottom: 12px; }
 .activity-view-recruit-rules { margin-top: 20px; }
 .activity-editor-body { min-width: 0; }
 .activity-context { padding: 10px 0 10px 10px; }
@@ -463,8 +460,8 @@ onBeforeUnmount(() => {
 .activity-context dt { margin: 20px 0 6px; color: rgb(var(--base-text-color) / .5); }
 .activity-context dd { margin: 0; line-height: 1.7; overflow-wrap: anywhere; }
 .activity-context p { margin: 28px 0 0; padding-top: 20px; border-top: 1px solid rgb(var(--base-text-color) / .09); font-size: 12px; line-height: 1.8; color: rgb(var(--base-text-color) / .5); }
-.activity-editor-footer { position: sticky; bottom: 0; display: flex; justify-content: space-between; align-items: center; gap: 18px; padding: 17px 22px; background: rgb(var(--container-bg-color)); border-radius: 9px; border-top: 1px solid rgb(var(--base-text-color) / .08); z-index: 4; }
-.activity-template-preview { display: flex; align-items: center; gap: 20px; padding: 18px; border-radius: 8px; background: rgb(var(--base-text-color) / .025); }
+.activity-editor-footer { position: sticky; bottom: 0; display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 16px; background: rgb(var(--container-bg-color)); border-radius: 6px; border-top: 1px solid rgb(var(--base-text-color) / .08); z-index: 4; }
+.activity-template-preview { display: flex; align-items: center; gap: 16px; padding: 12px; border-radius: 6px; background: rgb(var(--base-text-color) / .025); }
 .activity-missing { margin: 8px 0 0; padding-left: 18px; }
 @media (max-width: 1300px) { .activity-editor-layout { grid-template-columns: 165px minmax(0, 1fr); } .activity-view-layout { grid-template-columns: minmax(0, 1fr); } .activity-context { display: none; } }
 @media (max-width: 760px) { .activity-editor-title { align-items: flex-start; flex-direction: column; gap: 10px; } .activity-editor-layout { display: block; } .activity-sections { flex-direction: row; position: static; overflow-x: auto; margin-bottom: 18px; } .activity-sections button { white-space: nowrap; padding: 10px 13px; } .activity-sections span { display: none; } .activity-editor-footer { padding: 14px; flex-wrap: wrap; } .activity-editor-footer > .ops-muted { width: 100%; } .activity-template-preview { flex-direction: column; align-items: flex-start; } }

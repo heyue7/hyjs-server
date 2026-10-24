@@ -307,7 +307,7 @@ onMounted(load);
                 </div>
                 <p>{{ message.content }}</p>
               </article>
-              <NEmpty v-if="!detailLoading && !detail.messages?.length" description="暂无可读消息" />
+              <NEmpty v-if="!detailLoading && !detail.messages?.length" description="暂无消息" />
             </div>
           </NSpin>
           <div v-if="canWrite" class="feedback-actions">
@@ -375,7 +375,7 @@ onMounted(load);
 .feedback-layout {
   display: grid;
   grid-template-columns: minmax(480px, 1.15fr) minmax(360px, 1fr);
-  gap: 22px;
+  gap: 16px;
   align-items: start;
 }
 .feedback-list,
@@ -413,30 +413,30 @@ onMounted(load);
   align-items: center;
   flex-wrap: wrap;
   gap: 12px;
-  margin: 20px 0 24px;
+  margin: 16px 0;
 }
 .feedback-conversation {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 0;
   max-height: 560px;
   overflow: auto;
 }
 .feedback-message {
-  padding: 17px;
-  background: rgb(var(--base-text-color) / 0.035);
-  border-radius: 9px;
+  padding: 16px 0;
+  border-bottom: 1px solid rgb(var(--base-text-color) / 0.08);
 }
 .feedback-message.support {
-  background: rgb(var(--primary-color) / 0.065);
+  padding-left: 12px;
   border-left: 2px solid rgb(var(--primary-color) / 0.45);
 }
 .feedback-message-label {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  font-size: 12px;
+  font-size: 13px;
   color: rgb(var(--base-text-color) / 0.55);
 }
 .feedback-message-label strong {
@@ -450,13 +450,13 @@ onMounted(load);
 }
 .feedback-actions {
   border-top: 1px solid rgb(var(--base-text-color) / 0.08);
-  padding-top: 22px;
-  margin-top: 28px;
+  padding-top: 20px;
+  margin-top: 20px;
 }
 .feedback-state {
   display: flex;
   gap: 12px;
-  margin-bottom: 24px;
+  margin-bottom: 16px;
 }
 .feedback-state > .n-select {
   flex: 1;
@@ -469,6 +469,7 @@ onMounted(load);
 }
 .feedback-send {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
   gap: 10px;
   margin-top: 14px;
@@ -483,5 +484,10 @@ onMounted(load);
   .feedback-conversation {
     max-height: none;
   }
+}
+@media (max-width: 600px) {
+  .feedback-detail-heading { flex-wrap: wrap; }
+  .feedback-state { flex-wrap: wrap; }
+  .feedback-state > .n-select { min-width: 140px; }
 }
 </style>

@@ -241,7 +241,7 @@ function reset() {
             <template v-else>
               <NAlert v-if="q && !groupFields(group.key).length" type="info" :title="`${group.label}没有匹配参数`" />
               <div v-else class="guild-field-grid">
-                <NCard v-for="field in groupFields(group.key)" :key="field.key" :bordered="false" class="guild-field-card" :class="{ 'guild-field-wide': field.valueType === 'string' && field.key !== 'UnionCreateCost' }">
+                <div v-for="field in groupFields(group.key)" :key="field.key" class="guild-field-row" :class="{ 'guild-field-wide': field.valueType === 'string' && field.key !== 'UnionCreateCost' }">
                   <div class="guild-field-label">{{ field.label }}</div>
                   <ResourceValueEditor v-if="field.key === 'UnionCreateCost'" v-model:value="form.fields[field.key]" single label="创建费用" :disabled="!canWrite || saving || !field.editable" @valid="setValidity(field.key, $event)" />
                   <NumberSequenceEditor v-else-if="field.key === 'UnionFightReviveTime'" v-model:value="form.fields[field.key]" label="死亡复活时间" :min="1" :max="86400" integer :max-rows="64" :disabled="!canWrite || saving || !field.editable" @valid="setValidity(field.key, $event)" />
@@ -255,7 +255,7 @@ function reset() {
                     :status="form.fields[field.key] === '' ? 'error' : undefined"
                     placeholder="必填"
                   />
-                </NCard>
+                </div>
               </div>
             </template>
           </NTabPane>
@@ -402,15 +402,19 @@ function reset() {
 <style scoped>
 .guild-actions { margin-bottom: 12px; }
 .guild-search { width: min(260px, 100%); }
-.guild-field-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
-.guild-field-card { border: 1px solid var(--n-border-color, #e5e7eb); border-radius: 8px; }
-.guild-field-label { min-height: 42px; font-weight: 600; line-height: 1.45; }
-.guild-field-wide { grid-column: 1 / -1; }
-.guild-field-card :deep(.n-input-number) { width: 100%; }
+.guild-field-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 24px; }
+.guild-field-row { display: grid; grid-template-columns: minmax(110px, 1fr) minmax(120px, 1.2fr); align-items: start; gap: 12px; padding: 12px 0; border-bottom: 1px solid rgb(var(--base-text-color) / .09); min-width: 0; }
+.guild-field-label { font-size: 13px; font-weight: 500; line-height: 1.5; padding-top: 7px; overflow-wrap: anywhere; }
+.guild-field-wide { grid-column: 1 / -1; grid-template-columns: minmax(0, 1fr); gap: 8px; }
+.guild-field-wide .guild-field-label { padding-top: 0; }
+.guild-field-row :deep(.n-input-number) { width: 100%; }
 .guild-reward-tier { border-top: 1px solid rgb(var(--base-text-color) / .09); padding-top: 12px; margin-top: 12px; }
 .guild-reward-tier h4 { margin: 0 0 16px; font-weight: 600; }
+@media (max-width: 1000px) { .guild-field-grid { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 600px) {
   .guild-field-grid { grid-template-columns: minmax(0, 1fr); }
   .guild-search { width: 100%; }
+  .guild-field-row { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .guild-field-label { padding-top: 0; }
 }
 </style>

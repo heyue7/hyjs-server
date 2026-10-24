@@ -86,4 +86,5 @@ function remove(index: number) {
 .prayer-row :deep(.n-input-number) { width: 100%; }
 .prayer-probability { display: flex; flex-direction: column; gap: 8px; min-height: 58px; justify-content: end; font-variant-numeric: tabular-nums; }
 @media (max-width: 760px) { .prayer-row { grid-template-columns: repeat(2, minmax(0, 1fr)); } .prayer-row > :first-child { grid-column: 1 / -1; } }
+@media (max-width: 380px) { .prayer-row { grid-template-columns: minmax(0, 1fr); } .prayer-probability { min-height: 0; flex-direction: row; justify-content: flex-start; } }
 </style>

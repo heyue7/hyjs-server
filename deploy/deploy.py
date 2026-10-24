@@ -65,7 +65,7 @@ stage = ROOT / 'build/deploy-stage'
 if stage.exists():
     assert (stage / '.hyjs-stage').is_file()
     shutil.rmtree(stage)
-stage.mkdir()
+stage.mkdir(parents=True)
 (stage / '.hyjs-stage').touch()
 app = stage / 'app'
 app.mkdir()

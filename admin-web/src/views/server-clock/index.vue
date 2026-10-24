@@ -70,7 +70,7 @@ onMounted(load);
             </div>
             <NTag :type="clock.enabled ? 'success' : 'default'" :bordered="false">{{ clock.enabled ? '全服生效' : '调整未启用' }}</NTag>
           </div>
-          <NDescriptions :column="2" label-placement="top" class="mt-28px mb-28px">
+          <NDescriptions :column="2" label-placement="top" class="mt-20px mb-20px">
             <NDescriptionsItem label="运行区服">{{ clock.serverId }} 区</NDescriptionsItem>
             <NDescriptionsItem label="偏移天数">{{ clock.offsetDays > 0 ? '+' : '' }}{{ clock.offsetDays }} 天</NDescriptionsItem>
             <NDescriptionsItem label="实际时间">{{ serverTime(clock.realTimeMs) }}</NDescriptionsItem>
@@ -109,9 +109,10 @@ onMounted(load);
 <style scoped>
 .server-clock-card { max-width: 900px; }
 .server-clock-heading { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
-.server-clock-date { font-size: 26px; line-height: 1.4; font-weight: 600; font-variant-numeric: tabular-nums; }
+.server-clock-date { font-size: 20px; line-height: 1.4; font-weight: 600; font-variant-numeric: tabular-nums; }
 @media (max-width: 640px) {
   .server-clock-heading { align-items: flex-start; flex-direction: column; }
-  .server-clock-date { font-size: 22px; }
+  .server-clock-date { font-size: 18px; }
 }
+.server-clock-date { overflow-wrap: anywhere; }
 </style>

@@ -13,7 +13,7 @@ const pointLabel = (id: string, index: number) => `${id.startsWith('mine') ? '�
 <template>
   <NCollapse>
     <NCollapseItem v-for="(point, index) in value" :key="point.id" :name="point.id" :title="`${pointLabel(point.id, index)} · 坐标 ${point.point}`">
-      <div v-for="(choice, i) in point.choices" :key="i" class="mb-2 flex items-center gap-2">
+      <div v-for="(choice, i) in point.choices" :key="i" class="field-point-choice">
         <NSelect v-model:value="choice.id" :options="groups" :render-label="renderLabel" :disabled="disabled" filterable class="flex-1" />
         <span>权重</span>
         <NInputNumber v-model:value="choice.weight" :min="1" :max="1000000" :disabled="disabled" class="w-28" />
@@ -37,3 +37,10 @@ const pointLabel = (id: string, index: number) => `${id.startsWith('mine') ? '�
     </NCollapseItem>
   </NCollapse>
 </template>
+
+<style scoped>
+.field-point-choice { display: grid; grid-template-columns: minmax(0, 1fr) auto 112px auto; gap: 8px; align-items: center; margin-bottom: 12px; }
+.field-point-choice :deep(.n-select) { min-width: 0; }
+.field-point-choice :deep(.n-input-number) { width: 100%; }
+@media (max-width: 600px) { .field-point-choice { grid-template-columns: auto minmax(0, 1fr) auto; } .field-point-choice > :first-child { grid-column: 1 / -1; } }
+</style>

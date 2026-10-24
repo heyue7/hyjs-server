@@ -369,9 +369,9 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload));
 .prize-footer {
   position: sticky;
   bottom: 0;
-  padding: 16px 20px;
+  padding: 12px 16px;
   margin-top: 20px;
-  border-radius: 8px;
+  border-radius: 6px;
   background: rgb(var(--container-bg-color));
   border: 1px solid rgb(var(--base-text-color) / 0.08);
 }

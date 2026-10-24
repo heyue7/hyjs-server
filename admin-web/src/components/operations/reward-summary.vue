@@ -59,7 +59,7 @@ onBeforeUnmount(() => {
 <style scoped>
 .reward-summary {
   display: flex;
-  gap: 12px 20px;
+  gap: 10px 16px;
   flex-wrap: wrap;
 }
 .reward-summary-item {
@@ -68,6 +68,7 @@ onBeforeUnmount(() => {
   align-items: center;
   min-width: 0;
 }
+.reward-summary-item > span { overflow-wrap: anywhere; }
 .reward-summary-item strong {
   font-variant-numeric: tabular-nums;
   font-weight: 500;

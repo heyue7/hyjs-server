@@ -331,8 +331,8 @@ onBeforeUnmount(() => { pendingDiscard?.dispose(); alive = false; loadGeneration
 .daily-sign-settings { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px; margin-bottom: 20px; }
 .daily-sign-caption { color: rgb(var(--base-text-color) / .6); font-size: 13px; }
 .daily-sign-resource-error { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; color: rgb(var(--base-text-color) / .65); }
-.daily-sign-footer { position: sticky; z-index: 20; bottom: 0; display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-top: 16px; padding: 16px 20px; border: 1px solid rgb(var(--base-text-color) / .08); border-radius: 8px; background: rgb(var(--container-bg-color)); }
-.daily-sign-loading { display: block; margin: 48px auto; }
+.daily-sign-footer { position: sticky; z-index: 20; bottom: 0; display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-top: 16px; padding: 12px 16px; border: 1px solid rgb(var(--base-text-color) / .08); border-radius: 6px; background: rgb(var(--container-bg-color)); }
+.daily-sign-loading { display: block; margin: 24px auto; }
 :global(.n-card.daily-sign-editor) { width: 720px; max-width: calc(100vw - 32px); }
 .daily-sign-editor :deep(.reward-list) { width: 100%; }
 .daily-sign-vip { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }

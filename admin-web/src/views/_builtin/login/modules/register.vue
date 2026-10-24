@@ -46,14 +46,14 @@ async function handleSubmit() {
 </script>
 
 <template>
-  <NForm ref="formRef" :model="model" :rules="rules" size="large" :show-label="false" @keyup.enter="handleSubmit">
+  <NForm ref="formRef" :model="model" :rules="rules" size="medium" :show-label="false" @keyup.enter="handleSubmit">
     <NFormItem path="phone">
       <NInput v-model:value="model.phone" :placeholder="$t('page.login.common.phonePlaceholder')" />
     </NFormItem>
     <NFormItem path="code">
       <div class="w-full flex-y-center gap-16px">
         <NInput v-model:value="model.code" :placeholder="$t('page.login.common.codePlaceholder')" />
-        <NButton size="large" :disabled="isCounting" :loading="loading" @click="getCaptcha(model.phone)">
+        <NButton size="medium" :disabled="isCounting" :loading="loading" @click="getCaptcha(model.phone)">
           {{ label }}
         </NButton>
       </div>
@@ -75,10 +75,10 @@ async function handleSubmit() {
       />
     </NFormItem>
     <NSpace vertical :size="18" class="w-full">
-      <NButton type="primary" size="large" round block @click="handleSubmit">
+      <NButton type="primary" size="medium" block @click="handleSubmit">
         {{ $t('common.confirm') }}
       </NButton>
-      <NButton size="large" round block @click="toggleLoginModule('pwd-login')">
+      <NButton size="medium" block @click="toggleLoginModule('pwd-login')">
         {{ $t('page.login.common.back') }}
       </NButton>
     </NSpace>

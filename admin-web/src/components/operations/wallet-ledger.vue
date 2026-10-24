@@ -288,14 +288,14 @@ onBeforeUnmount(() => { generation += 1; });
 
 <style scoped>
 .wallet-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-.wallet-adjustment { padding: 18px 20px; background: var(--ops-surface-soft, rgba(128, 128, 128, .04)); border-radius: 8px; }
+.wallet-adjustment { padding: 20px 0; border-block: 1px solid rgb(var(--base-text-color) / .1); }
 .wallet-adjustment-title { margin: 0 0 16px; font-size: 16px; font-weight: 600; }
-.wallet-adjustment-fields { display: grid; grid-template-columns: minmax(180px, 1fr) minmax(0, 2fr); gap: 20px; }
+.wallet-adjustment-fields { display: grid; grid-template-columns: minmax(180px, 1fr) minmax(0, 2fr); gap: 16px; }
 .wallet-adjustment-preview { margin-bottom: 16px; font-size: 14px; }
 .wallet-adjustment-preview strong { margin: 0 4px; font-variant-numeric: tabular-nums; }
 .wallet-adjustment-pending { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
 @media (max-width: 600px) {
-  .wallet-adjustment { padding: 16px 12px; }
+  .wallet-adjustment { padding: 16px 0; }
   .wallet-adjustment-fields { grid-template-columns: 1fr; gap: 0; }
   .wallet-actions { width: 100%; }
   .wallet-adjustment .ops-drawer-actions > * { flex: 1; }

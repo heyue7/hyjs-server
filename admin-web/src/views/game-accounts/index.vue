@@ -146,7 +146,7 @@ onBeforeUnmount(() => { generation += 1; draft.password = ''; draft.confirmPassw
 <template>
   <div class="ops-page">
 
-    <div class="account-heading"><img src="/media/brain-burst-2039.png" alt="" /><div><strong>Brain Burst 2039 账号</strong><p class="ops-muted">账号 → 区服角色 → 蓝绿终端</p></div></div>
+    <div class="account-heading"><img src="/media/brain-burst-2039.png" alt="" /><div><h1>Brain Burst 2039 账号</h1></div></div>
     <NAlert v-if="error" type="error" :title="error" />
     <NCard :bordered="false" class="ops-panel">
       <p v-if="locatedId" class="ops-inline-note">账号 #{{ locatedId }} <NButton text type="primary" @click="q = ''; search()">查看全部账号</NButton></p>
@@ -185,7 +185,7 @@ onBeforeUnmount(() => { generation += 1; draft.password = ''; draft.confirmPassw
 
 <style scoped>
 :deep(.account-located-row td){background:rgb(var(--primary-color) / .07)!important}:deep(.account-located-row td:first-child){box-shadow:inset 3px 0 rgb(var(--primary-color))}
-.account-heading{display:flex;align-items:center;gap:12px}.account-heading img{width:40px;height:40px;object-fit:contain;border-radius:8px}.account-heading strong{font-size:16px}.account-heading p{margin:4px 0 0}
-.account-editor{width:540px}.account-context{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:20px}
+.account-heading{display:flex;align-items:center;gap:12px}.account-heading img{width:40px;height:40px;object-fit:contain;border-radius:6px}.account-heading h1{font-size:16px;font-weight:600;margin:0;overflow-wrap:anywhere}
+.account-editor{width:540px;max-width:calc(100vw - 32px)}.account-context{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px}
 @media(max-width:600px){.account-context{align-items:flex-start;flex-direction:column;gap:4px}}
 </style>

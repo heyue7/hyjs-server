@@ -274,7 +274,7 @@ onMounted(load);
 </script>
 
 <template>
-  <div class="p-4 space-y-4">
+  <div class="ops-page field-page">
     <div class="flex flex-wrap items-center gap-3">
       <NButton :loading="loading" :disabled="saving || dirty || channelsDirty" @click="load">刷新</NButton>
     </div>
@@ -299,18 +299,14 @@ onMounted(load);
     </NTabs>
     <template v-if="mode === 'templates'">
       <div class="field-workspace">
-        <NCard size="small" title="资源方案" class="self-start">
+        <NCard size="small" title="资源方案" :bordered="false" class="ops-panel field-library">
           <NInput v-model:value="search" placeholder="搜索地图或方案" clearable class="mb-3" />
-          <div class="space-y-2">
+          <div class="field-options">
             <button
               v-for="row in filtered"
               :key="row.id"
-              class="w-full border rounded p-3 text-left transition hover:border-blue-400"
-              :class="
-                selected?.id === row.id
-                  ? 'border-blue-500 bg-blue-50 dark:bg-blue-950'
-                  : 'border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900'
-              "
+              class="field-option"
+              :class="{ selected: selected?.id === row.id }"
               :disabled="saving || loading"
               :aria-pressed="selected?.id === row.id"
               @click="choose(row)"
@@ -319,18 +315,18 @@ onMounted(load);
                 <NImage v-if="icon(row.configuration.scene)" :src="icon(row.configuration.scene)" width="36" height="36" object-fit="contain" @click.stop />
                 <span class="block font-medium">{{ row.name }}</span>
               </div>
-              <span class="text-xs text-gray-500">
+              <span class="ops-muted">
                 {{ row.available ? '可用' : '暂未开放' }}
               </span>
             </button>
           </div>
         </NCard>
-        <NCard v-if="selected && cfg" :key="selected.id" size="small">
+        <NCard v-if="selected && cfg" :key="selected.id" size="small" :bordered="false" class="ops-panel field-editor">
           <div class="mb-4 flex flex-wrap items-center gap-2">
             <NInput
               v-model:value="selected.name"
               :disabled="readonly"
-              class="min-w-50 flex-1"
+              class="field-name"
               maxlength="80"
               placeholder="方案名称"
             />
@@ -354,13 +350,13 @@ onMounted(load);
                 <NDescriptionsItem label="场景资源">{{ selected.available ? '客户端已内置' : '缺失，暂未开放' }}</NDescriptionsItem>
                 <NDescriptionsItem label="战斗场景">{{ label(cfg.scene, '野外地图') }}战斗场景</NDescriptionsItem>
               </NDescriptions>
-              <NForm label-placement="left" label-width="140" class="mt-5">
+              <NForm label-placement="top" class="field-rule-form">
                 <NFormItem label="开放等级">
                   <NInputNumber v-model:value="cfg.minLevel" :min="1" :max="1000" :disabled="readonly" />
                 </NFormItem>
                 <NFormItem label="允许野外 PK">
                   <NSwitch v-model:value="cfg.allowPk" :disabled="readonly" />
-                  <span class="ml-3 text-xs text-gray-500">角色达到 25 级后可在同线非安全区 PK</span>
+                  <span class="ml-3 ops-muted">角色达到 25 级后可在同线非安全区 PK</span>
                 </NFormItem>
                 <NFormItem label="同时存在矿点">
                   <NInputNumber
@@ -379,7 +375,7 @@ onMounted(load);
                   />
                 </NFormItem>
               </NForm>
-              <p class="text-sm text-gray-500">矿物和鱼群从候选位置随机刷新，同一轮不会占用重复位置。</p>
+              <p class="ops-muted">矿物和鱼群从候选位置随机刷新，同一轮不会占用重复位置。</p>
             </NTabPane>
             <NTabPane v-if="cfg.scene === 'field_003'" name="ggo" tab="搜打撤配置">
               <GgoConfigEditor v-if="cfg.ggo" v-model:value="cfg.ggo" :disabled="readonly" />
@@ -401,10 +397,10 @@ onMounted(load);
                   <template #header>
                     <div class="flex items-center gap-3">
                       <NImage v-if="icon(group.id)" :src="icon(group.id)" width="32" height="32" object-fit="contain" @click.stop />
-                      <div><span class="font-medium">{{ label(group.id, '采集资源') }}</span><p class="text-xs text-gray-500">{{ detail(group.id) }}</p></div>
+                      <div><span class="font-medium">{{ label(group.id, '采集资源') }}</span><p class="ops-muted">{{ detail(group.id) }}</p></div>
                     </div>
                   </template>
-                  <div class="grid grid-cols-2 mb-4 gap-3 lg:grid-cols-3">
+                  <div class="field-parameters">
                     <label>
                       生活等级
                       <NInputNumber v-model:value="group.level" :min="1" :max="6" :disabled="readonly" />
@@ -590,12 +586,12 @@ onMounted(load);
     <template v-else>
       <NAlert v-if="!scope.serverId" type="info">请先在顶部选择区服。</NAlert>
       <NCard v-else size="small" :title="`${scope.currentServer?.name || scope.serverId} · 野外部署`">
-        <p class="mb-4 text-sm text-gray-500">方案修改后需重新发布到区服。</p>
+        <p class="mb-4 ops-muted">方案修改后需重新发布到区服。</p>
         <div class="space-y-4">
           <div
             v-for="row in deployments"
             :key="row.scene"
-            class="border border-gray-200 rounded p-4 dark:border-gray-700"
+            class="field-deployment"
           >
             <div class="mb-3 flex flex-wrap items-center gap-3">
               <NImage v-if="icon(row.scene)" :src="icon(row.scene)" width="40" height="40" object-fit="contain" />
@@ -614,7 +610,7 @@ onMounted(load);
                   templates.filter(t => t.configuration.scene === row.scene).map(t => ({ label: t.name, value: t.id }))
                 "
                 filterable
-                class="min-w-60 flex-1"
+                class="field-template"
               />
               <NSwitch v-model:value="row.enabled" :disabled="readonly || !row.available" />
               <span>{{ row.enabled ? '开放' : '关闭' }}</span>
@@ -629,7 +625,7 @@ onMounted(load);
                 <NButton :disabled="readonly || !row.available" @click="saveChannels(channel)">保存分线</NButton>
               </div>
               <div class="flex flex-wrap gap-2"><NTag v-for="line in channel.lines" :key="line.line" :type="line.online >= channel.maxPlayers ? 'warning' : 'default'">{{ line.line }} 线 · {{ line.online }} 人</NTag></div>
-              <p class="text-xs text-gray-500">采集与小怪为个人进度；世界首领按全服周期。</p>
+              <p class="ops-muted">采集与小怪为个人进度；世界首领按全服周期。</p>
             </div>
           </div>
         </div>
@@ -639,6 +635,31 @@ onMounted(load);
 </template>
 
 <style scoped>
+.field-page { display: flex; flex-direction: column; gap: 16px; }
+.field-library, .field-editor { min-width: 0; }
+.field-options { display: flex; flex-direction: column; }
+.field-option { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 12px; text-align: left; color: inherit; background: transparent; border: 0; border-bottom: 1px solid rgb(var(--base-text-color) / .09); padding: 10px 8px; cursor: pointer; }
+.field-option > div { min-width: 0; }
+.field-option span { overflow-wrap: anywhere; }
+.field-option > .ops-muted { font-size: 13px; flex-shrink: 0; }
+.field-option.selected { color: rgb(var(--primary-color)); background: rgb(var(--primary-color) / .08); }
+.field-option:not(.selected):hover { background: rgb(var(--base-text-color) / .04); }
+.field-option:focus-visible { outline: 2px solid rgb(var(--primary-color)); outline-offset: -2px; }
+.field-option:disabled { cursor: default; opacity: .6; }
+.field-name { flex: 1 1 180px; min-width: 0; }
+.field-template { flex: 1 1 220px; min-width: 0; }
+.field-deployment { padding: 16px 0; border-bottom: 1px solid rgb(var(--base-text-color) / .09); }
+.field-parameters { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 16px; margin-bottom: 16px; }
+.field-parameters label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; min-width: 0; }
+.field-rule-form { margin-top: 20px; }
+.field-page :deep(.n-input-number) { max-width: 100%; }
+.field-page :deep(.n-descriptions-table-content__content) { min-width: 0; overflow-wrap: anywhere; }
+@media (max-width: 640px) {
+  .field-parameters { grid-template-columns: minmax(0, 1fr); }
+  .field-option { flex-wrap: wrap; }
+  .field-page :deep(.n-descriptions-table-content__content > .flex) { flex-wrap: wrap; }
+}
+
 .field-workspace {
   display: grid;
   grid-template-columns: 260px minmax(0, 1fr);
