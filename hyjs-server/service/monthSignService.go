@@ -16,7 +16,7 @@ import (
 // InitializeMonthSign 补齐独立表与缺失日档，已有运营SQL配置保持原值。
 func (s *GameService) InitializeMonthSign(ctx context.Context) error {
 	d := db.GetIns().WithContext(ctx)
-	if err := d.AutoMigrate(&db.MonthSignRule{}, &db.MonthSignState{}); err != nil {
+	if err := d.AutoMigrate(&db.MonthSignRule{}, &db.MonthSignState{}, &db.MonthSignCalendar{}); err != nil {
 		return err
 	}
 	return d.Transaction(func(tx *gorm.DB) error {
@@ -89,17 +89,25 @@ func (s *GameService) monthSignAt(ctx context.Context, id int64, request proto.M
 		local := now.In(time.FixedZone("UTC+8", 8*3600))
 		month, day := local.Format("2006-01"), local.Format("2006-01-02")
 		calendarDays := time.Date(local.Year(), local.Month()+1, 0, 0, 0, 0, 0, local.Location()).Day()
-		rules, err := localPlayMonthSignRules(tx)
+		rules, configured, err := monthSignCalendarRules(tx, month)
 		if err != nil {
 			return err
 		}
-		if rules == nil {
-			if err := tx.Where("day <= ?", calendarDays).Order("day").Find(&rules).Error; err != nil {
+		if !configured {
+			rules, err = localPlayMonthSignRules(tx)
+			if err != nil {
 				return err
 			}
-		} else {
-			rules = rules[:calendarDays]
+			if rules == nil {
+				if err := tx.Order("day").Find(&rules).Error; err != nil {
+					return err
+				}
+			}
 		}
+		if !validMonthSignRows(rules) {
+			return errors.New("月签到SQL日历缺失")
+		}
+		rules = rules[:calendarDays]
 		if len(rules) != calendarDays {
 			return errors.New("月签到SQL日历缺失")
 		}

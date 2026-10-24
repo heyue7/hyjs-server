@@ -1,0 +1,4 @@
+CREATE TABLE IF NOT EXISTS month_sign_calendars (
+ month_key VARCHAR(7) NOT NULL PRIMARY KEY,
+ rules BLOB NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

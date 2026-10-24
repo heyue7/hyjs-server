@@ -178,6 +178,9 @@ func run() error {
 	if err = s.InitializeMonthSign(ctx); err != nil {
 		return err
 	}
+	if err = s.SeedUserMonthSignCalendars(ctx); err != nil {
+		return err
+	}
 	if err = s.InitializeWarriorAwake(ctx); err != nil {
 		return err
 	}
