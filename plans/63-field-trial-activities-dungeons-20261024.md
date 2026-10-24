@@ -66,3 +66,7 @@ OpenCode模型固定`opencode/deepseek-v4.1-flash-free#high`。三个只读调�
 - 最终受影响合批35个根测试、57个含子项通过，0失败/跳过；全包编译/新最终vet及前端build/typecheck通过。已有广泛基线失败保留对照，不称全套通过。
 - 真实藏宝箱AdminAPI→原CSFortuneCatInfo：QA模板105→106，live consumer同步，旧quote与paid receipt摘要不变，新info未知tag100=106，cost100/TodayLeft5不变。新QA7无额外发奖/支付，结束完整恢复模板与关联consumer，原info恢复105。
 - 最终正式包已生成但未发布：build/hyjs-feedback63-formal.apk SHA4a85ed009e86c649b5954e8d1f02165e9d1951ec89256196f3dccd9076e6183d，Main6ee23581、原547引擎方法及26940其他方法字节精确。QA r17 Main仅额外4个本机origin方法，严禁发布QA。
+
+- 原机r17第一章mission3实际进入/任务9→10→12三场原战斗胜利、5星持久化、Complete=true，回剧情后退出列表仍5星，体力10000→9990只扣一次。普通怪未清时Boss未实例化，清完2组才出现。box_3落在导航地面(3,-0.0033,21)，原角色合法路径走到旁边并实际点击打开，serverOpen=1；奖励钻石50/金币80000到账，最终总coin1091650/diamond100050。强阵容及前关2/59一星、quest_4均有限QA前提，未伪造被测任务/结果。
+- 原机r17第十一章mission60：box_60从原(37,.2,26)映射至地面(7.1333,-1.4193,37.075)，实际原导航走近并点击，碎片hero_028×5、金币80000到账。初次弱阵容任务237实际战败保留；通过既有Admin库存接口与原FormationOn准备四人100级、原捕获合法训练及四槽100级装备，未改玩家钱包/敌方/战斗结果。实际237→238→239→最后Boss240全部获胜，Complete=true、5星，原退出后run=nil、列表5星、下一关61开放。证据phone-copy60-complete-r17.json及同名前后截图。当前原战术只支持四人，原第五阵位拒绝已保留，未改战术规则。
+- 部署环境排期只读核对：唯一登记区服1共18条，全部enabled=true，当前无停用排期可归档；后台新增停用项归档/恢复流程已在隔离环境实际验证。未停用或删除任何运行中的活动。
