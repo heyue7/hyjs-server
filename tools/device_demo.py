@@ -284,7 +284,8 @@ class Device:
         self.run('shell', 'uiautomator', 'dump', '/sdcard/hyjs-installer.xml')
         tree = ET.fromstring(self.run('shell', 'cat', '/sdcard/hyjs-installer.xml'))
         nodes = list(tree.iter('node'))
-        if not any('黑衣剑士·自建服' in node.get('text', '') for node in nodes):
+        owned_names = ('黑衣剑士·自建服', '刀剑神域黑衣剑士·灵魂之花')
+        if not any(any(name in node.get('text', '') for name in owned_names) for node in nodes):
             return False
         for expected in ['已了解应用的风险检测结果', '继续安装', '重新安装', '安装', '允许']:
             for node in nodes:

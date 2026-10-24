@@ -295,7 +295,7 @@ public class WalletActivity extends UnityPlayerActivity {
     }
     private GradientDrawable panelSurface(){GradientDrawable frame=shape(0xfff2f4f4,2);frame.setStroke(dp(1),0xffaab9bf);return frame;}
     private TextView helpButton(String title,String explanation){
-        TextView help=center("ⓘ",22,BLUE);help.setMinHeight(dp(44));help.setFocusable(true);help.setContentDescription(title+"，点击查看帮助");
+        TextView help=center("ⓘ",22,BLUE);help.setTextSize(android.util.TypedValue.COMPLEX_UNIT_DIP,22);help.setMinHeight(dp(44));help.setFocusable(true);help.setContentDescription(title+"，点击查看帮助");
         help.setBackground(new RippleDrawable(android.content.res.ColorStateList.valueOf(0x2230b5cd),null,null));
         help.setOnClickListener(v->{help.requestFocusFromTouch();LinearLayout content=column();TextView words=text(explanation,14,INK);words.setLineSpacing(dp(5),1);content.addView(words);showTerminalDetail(title,content);});return help;
     }
@@ -550,9 +550,9 @@ public class WalletActivity extends UnityPlayerActivity {
         TextView heading=center(title(),17,INK);heading.setPadding(dp(48),0,dp(48),0);heading.setMaxLines(2);
         if(Build.VERSION.SDK_INT>=26)heading.setAutoSizeTextTypeUniformWithConfiguration(12,17,1,android.util.TypedValue.COMPLEX_UNIT_SP);
         nav.addView(heading,new FrameLayout.LayoutParams(-1,dp(44)));
-        if(!accountLanding()){TextView back=center("‹",30,GRAY);back.setContentDescription("返回");back.setFocusable(true);nav.addView(back,new FrameLayout.LayoutParams(dp(44),dp(44),Gravity.LEFT));back.setOnClickListener(v->back());}
-        TextView right=center(page==HOME?"⋯":page==BILLS?"刷新":"×",page==BILLS?14:27,GRAY);right.setFocusable(true);right.setContentDescription(page==HOME?"终端菜单":page==BILLS?"刷新账单":"关闭 Brain Burst 2039");
-        nav.addView(right,new FrameLayout.LayoutParams(dp(44),dp(44),Gravity.RIGHT));
+        if(!accountLanding()){TextView back=center("‹",30,GRAY);back.setTextSize(android.util.TypedValue.COMPLEX_UNIT_DIP,30);back.setContentDescription("返回");back.setFocusable(true);nav.addView(back,new FrameLayout.LayoutParams(dp(44),dp(44),Gravity.LEFT));back.setOnClickListener(v->back());}
+        TextView right=center(page==HOME?"⋯":page==BILLS?"刷新":"×",page==BILLS?14:27,GRAY);if(page!=BILLS)right.setTextSize(android.util.TypedValue.COMPLEX_UNIT_DIP,27);right.setFocusable(true);right.setContentDescription(page==HOME?"终端菜单":page==BILLS?"刷新账单":"关闭 Brain Burst 2039");
+        nav.addView(right,new FrameLayout.LayoutParams(dp(page==BILLS?64:44),dp(44),Gravity.RIGHT));
         if(page==HOME)right.setOnClickListener(v->{right.requestFocusFromTouch();showTerminalMenu();});
         else if(page==BILLS){right.setEnabled(!busy);right.setOnClickListener(v->refreshPage());}
         else right.setOnClickListener(v->{hideKeyboard();panel.dismiss();});
@@ -633,7 +633,7 @@ public class WalletActivity extends UnityPlayerActivity {
         LinearLayout outer=column();outer.setPadding(dp(1),dp(1),dp(1),dp(1));outer.setBackground(panelSurface());
         FrameLayout bar=new FrameLayout(this);bar.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,new int[]{0xfffafafa,0xffe1e5e6}));
         TextView heading=center(title,16,INK);heading.setPadding(dp(44),0,dp(44),0);bar.addView(heading,new FrameLayout.LayoutParams(-1,dp(44)));
-        TextView close=center("×",27,GRAY);close.setContentDescription("关闭"+title);close.setFocusable(true);bar.addView(close,new FrameLayout.LayoutParams(dp(44),dp(44),Gravity.RIGHT));close.setOnClickListener(v->detail.dismiss());addFull(outer,bar,44);accountLine(outer);
+        TextView close=center("×",27,GRAY);close.setTextSize(android.util.TypedValue.COMPLEX_UNIT_DIP,27);close.setContentDescription("关闭"+title);close.setFocusable(true);bar.addView(close,new FrameLayout.LayoutParams(dp(44),dp(44),Gravity.RIGHT));close.setOnClickListener(v->detail.dismiss());addFull(outer,bar,44);accountLine(outer);
         ScrollView scroll=new ScrollView(this);content.setPadding(dp(20),dp(12),dp(20),dp(16));scroll.addView(content);outer.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));accountLine(outer);
         LinearLayout footer=new LinearLayout(this);footer.setGravity(Gravity.RIGHT);footer.setPadding(dp(12),dp(8),dp(12),dp(8));
         if(secondary!=null){TextView button=action(secondary,false,true,()->{detail.dismiss();if(cancel!=null)cancel.run();});LinearLayout.LayoutParams cell=new LinearLayout.LayoutParams(0,dp(44),1);cell.rightMargin=dp(8);footer.addView(button,cell);}
@@ -693,7 +693,7 @@ public class WalletActivity extends UnityPlayerActivity {
         UnityPlayer.UnitySendMessage("LocalWalletSession","LogoutAccount","");
     }
     private EditText accountField(LinearLayout parent,String label,String hint,boolean secret){
-        TextView caption=text(label,13,GRAY);caption.setPadding(0,dp(6),0,0);addFull(parent,caption,25);
+        TextView caption=text(label,13,GRAY);caption.setPadding(0,dp(6),0,0);caption.setMinHeight(dp(25));parent.addView(caption,new LinearLayout.LayoutParams(-1,-2));
         EditText field=new EditText(this);field.setSingleLine(true);field.setTextSize(14);field.setTextColor(INK);field.setHint(hint);field.setHintTextColor(GRAY);field.setPadding(dp(12),0,dp(12),0);GradientDrawable input=shape(0xfffbfcfc,1);input.setStroke(dp(1),0xffa8bac2);field.setBackground(input);field.setHighlightColor(0xffabe2ed);field.setId(View.generateViewId());caption.setLabelFor(field.getId());
         field.setInputType(InputType.TYPE_CLASS_TEXT|(secret?InputType.TYPE_TEXT_VARIATION_PASSWORD:InputType.TYPE_TEXT_FLAG_CAP_SENTENCES));
         field.setImeOptions(EditorInfo.IME_FLAG_NO_EXTRACT_UI|EditorInfo.IME_FLAG_NO_FULLSCREEN|EditorInfo.IME_ACTION_NEXT);field.setEnabled(!busy);addFull(parent,field,44);return field;
