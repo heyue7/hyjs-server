@@ -15,6 +15,9 @@ import android.graphics.Rect;
 import android.graphics.PixelFormat;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.Drawable;
+import android.graphics.drawable.BitmapDrawable;
+import android.graphics.drawable.StateListDrawable;
 import android.graphics.drawable.RippleDrawable;
 import android.os.Bundle;
 import android.os.Build;
@@ -139,6 +142,9 @@ public class WalletActivity extends UnityPlayerActivity {
     private LinearLayout shell;
     private TextView unreadBadge;
     private TextView feedback;
+    private final Bitmap[] accountButtonTiles=new Bitmap[4];
+    private boolean accountArtLoaded;
+    private Bitmap accountBrandIcon;
     private JSONObject wallet, ledger, account;
     private EditText nicknameInput, oldPasswordInput, newPasswordInput, confirmationInput;
     private String nicknameDraft="";
@@ -272,6 +278,38 @@ public class WalletActivity extends UnityPlayerActivity {
         t.setBackground(new RippleDrawable(android.content.res.ColorStateList.valueOf(Color.argb(35,22,119,255)),shape(primary?BLUE:Color.WHITE,6),null));
         t.setEnabled(enabled);t.setAlpha(enabled?1f:.4f);t.setFocusable(true);t.setOnClickListener(new View.OnClickListener(){public void onClick(View v){click.run();}});return t;
     }
+    private boolean accountPage(){return page==ACCOUNT_HOME || page==ACCOUNT || page==NICKNAME || page==PASSWORD;}
+    private boolean accountLanding(){return page==ACCOUNT_HOME || page==ACCOUNT;}
+    private void loadAccountArt(){
+        if(accountArtLoaded)return;accountArtLoaded=true;
+        try(InputStream in=getAssets().open("brain-burst/button-atlas.png")){
+            Bitmap atlas=BitmapFactory.decodeStream(in);
+            if(atlas!=null){
+                if(atlas.getWidth()>=1428 && atlas.getHeight()>=738){
+                    accountButtonTiles[0]=Bitmap.createBitmap(atlas,110,280,636,170);
+                    accountButtonTiles[1]=Bitmap.createBitmap(atlas,110,568,636,170);
+                    accountButtonTiles[2]=Bitmap.createBitmap(atlas,792,280,636,170);
+                    accountButtonTiles[3]=Bitmap.createBitmap(atlas,792,568,636,170);
+                }
+                atlas.recycle();
+            }
+        }catch(Exception unavailable){/* Same-theme native fallback keeps every action available. */}
+        try(InputStream in=getAssets().open("local-wallet/icon.png")){accountBrandIcon=BitmapFactory.decodeStream(in);}catch(Exception unavailable){}
+    }
+    private Drawable accountButtonSurface(boolean primary,boolean pressed){
+        loadAccountArt();Bitmap tile=accountButtonTiles[(primary?0:2)+(pressed?1:0)];
+        if(tile!=null){BitmapDrawable surface=new BitmapDrawable(getResources(),tile);surface.setGravity(Gravity.FILL);return surface;}
+        GradientDrawable surface=new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+            primary?(pressed?new int[]{0xff079bb9,0xff08728e}:new int[]{0xff46d8e6,0xff0796b6})
+                :(pressed?new int[]{0xffd1dadd,0xffe2e7e8}:new int[]{0xfffafcfc,0xffdde4e6}));
+        surface.setCornerRadius(dp(2));surface.setStroke(dp(1),primary?0xff4dcddd:0xffaab9bf);return surface;
+    }
+    private TextView accountAction(String label,boolean primary,boolean enabled,Runnable click){
+        TextView button=center(label,15,primary?Color.WHITE:0xff34464d);button.setMinHeight(dp(44));button.setPadding(dp(8),0,dp(8),0);
+        StateListDrawable states=new StateListDrawable();states.addState(new int[]{android.R.attr.state_pressed},accountButtonSurface(primary,true));states.addState(new int[]{android.R.attr.state_focused},accountButtonSurface(primary,true));states.addState(new int[]{},accountButtonSurface(primary,false));button.setBackground(states);
+        button.setEnabled(enabled);button.setAlpha(enabled?1f:.45f);button.setFocusable(true);button.setOnClickListener(v->click.run());return button;
+    }
+    private void accountLine(LinearLayout parent){View line=new View(this);line.setBackgroundColor(0xffbcc9ce);parent.addView(line,new LinearLayout.LayoutParams(-1,dp(1)));}
     private void addFull(LinearLayout parent,View child,int height){parent.addView(child,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(height)));}
     private void space(LinearLayout parent,float weight){parent.addView(new View(this),new LinearLayout.LayoutParams(1,0,weight));}
     private void divider(LinearLayout parent){View line=new View(this);line.setBackgroundColor(LINE);parent.addView(line,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(1)));}
@@ -454,6 +492,11 @@ public class WalletActivity extends UnityPlayerActivity {
         boolean home=page==HOME;
         int width=Math.min(dp(home?392:440),metrics.widthPixels-dp(32));
         int height=Math.min(dp(home?440:600),Math.round(metrics.heightPixels*(home?.78f:.90f)));
+        if(accountPage()){
+            Rect usable=bubbleBounds();int availableWidth=usable.width()>0?usable.width():metrics.widthPixels,availableHeight=usable.height()>0?usable.height():metrics.heightPixels;
+            width=Math.min(dp(availableWidth>availableHeight?640:440),Math.max(dp(1),availableWidth-dp(32)));
+            height=Math.min(dp(accountLanding()?310:page==PASSWORD?360:270),Math.round(availableHeight*.90f));
+        }
         panel.getWindow().setLayout(width,height);
     }
     private void navigate(int destination){
@@ -480,12 +523,26 @@ public class WalletActivity extends UnityPlayerActivity {
         fitPanel();
         rememberLedgerScroll();ledgerScroll=null;
         if(homeScroll!=null && page==HOME)homeScrollY=homeScroll.getScrollY();homeScroll=null;shell.removeAllViews();
+        boolean accountStyle=accountPage();
+        shell.setPadding(accountStyle?dp(1):0,accountStyle?dp(1):0,accountStyle?dp(1):0,accountStyle?dp(1):0);
+        if(accountStyle){GradientDrawable frame=shape(0xfff2f4f4,2);frame.setStroke(dp(1),0xffaab9bf);shell.setBackground(frame);}else shell.setBackgroundColor(Color.WHITE);
+        if(page!=PASSWORD){oldPasswordInput=null;newPasswordInput=null;confirmationInput=null;}
         FrameLayout nav=new FrameLayout(this);
+        if(accountStyle){
+            nav.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,new int[]{0xfffafafa,0xffe1e5e6}));
+            TextView heading=center(title(),17,0xff26383f);heading.setPadding(dp(48),0,dp(48),0);heading.setMaxLines(2);
+            if(Build.VERSION.SDK_INT>=26)heading.setAutoSizeTextTypeUniformWithConfiguration(12,17,1,android.util.TypedValue.COMPLEX_UNIT_SP);
+            nav.addView(heading,new FrameLayout.LayoutParams(-1,dp(44)));
+            if(!accountLanding()){TextView back=center("‹",30,0xff52636a);back.setContentDescription("返回账号首页");nav.addView(back,new FrameLayout.LayoutParams(dp(44),dp(44),Gravity.LEFT));back.setOnClickListener(v->back());}
+            TextView close=center("×",27,0xff52636a);close.setContentDescription("关闭 Brain Burst 2039");nav.addView(close,new FrameLayout.LayoutParams(dp(44),dp(44),Gravity.RIGHT));close.setOnClickListener(v->{hideKeyboard();panel.dismiss();});
+            addFull(shell,nav,44);accountLine(shell);
+        }else{
         TextView title=center(title(),page==ACCOUNT_HOME?17:18,INK);title.setPadding(dp(58),0,dp(58),0);title.setMaxLines(2);if(Build.VERSION.SDK_INT>=26)title.setAutoSizeTextTypeUniformWithConfiguration(12,18,1,android.util.TypedValue.COMPLEX_UNIT_SP);nav.addView(title,new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(52)));
         TextView back=center("‹",34,INK);back.setContentDescription(page==ACCOUNT_HOME?"收起 Brain Burst 2039":"返回");FrameLayout.LayoutParams left=new FrameLayout.LayoutParams(dp(56),dp(52),Gravity.LEFT);nav.addView(back,left);back.setOnClickListener(new View.OnClickListener(){public void onClick(View v){back();}});
         if(page==HOME){TextView menu=center("⋯",28,INK);menu.setContentDescription("终端菜单");FrameLayout.LayoutParams right=new FrameLayout.LayoutParams(dp(56),dp(52),Gravity.RIGHT);nav.addView(menu,right);menu.setOnClickListener(v->{PopupMenu popup=new PopupMenu(this,menu);popup.getMenu().add(0,1,0,"账单");popup.getMenu().add(0,2,1,"待支付订单").setEnabled(ready());popup.getMenu().add(0,3,2,"Burst Link！规则").setEnabled(terminal()!=null);popup.setOnMenuItemClickListener(item->{if(item.getItemId()==3)showBurstRules();else navigate(item.getItemId()==1?BILLS:ORDERS);return true;});popup.show();});}
         else if(page==BILLS){TextView reload=center("刷新",14,BLUE);reload.setEnabled(!busy);nav.addView(reload,new FrameLayout.LayoutParams(dp(64),dp(52),Gravity.RIGHT));reload.setOnClickListener(new View.OnClickListener(){public void onClick(View v){refreshPage();}});}
         addFull(shell,nav,52);divider(shell);
+        }
         LinearLayout body=column();shell.addView(body,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,0,1));
         switch(page){case BILLS:renderBills(body);break;case ORDERS:renderOrders(body);break;case CASHIER:renderCashier(body);break;case ACCOUNT_HOME:case ACCOUNT:renderAccount(body);break;case NICKNAME:case PASSWORD:renderAccountForm(body);break;default:renderHome(body);}
         feedback=center("",12,GRAY);feedback.setPadding(dp(20),dp(6),dp(20),dp(6));feedback.setMaxLines(2);shell.addView(feedback);
@@ -567,28 +624,31 @@ public class WalletActivity extends UnityPlayerActivity {
     }
     private String roleLabel(JSONObject role){return "区服 "+role.optLong("serverId")+" · "+role.optString("name")+" · Lv."+role.optLong("level");}
     private void renderAccount(LinearLayout body){
-        LinearLayout content=column();content.setPadding(dp(24),dp(18),dp(24),dp(20));scrolling(body,content);
+        LinearLayout content=column();content.setPadding(dp(18),dp(10),dp(18),dp(8));
+        ScrollView viewport=scrolling(body,content);viewport.setLayoutParams(new LinearLayout.LayoutParams(-1,0,1));
         if(!credentials.valid()){addFull(content,text("请先登录 Brain Burst 2039",16,INK),60);return;}
-        if(account==null){addFull(content,text(busy?"正在读取账号…":"账号信息尚未读取",16,INK),48);addFull(content,action("重试",false,active(),()->refreshPage()),46);return;}
-        addFull(content,text("账号名称",13,GRAY),24);
-        TextView name=text(account.optString("nickname"),21,INK);name.setPadding(0,dp(6),0,dp(12));content.addView(name);
-        TextView username=text("登录账号  "+account.optString("username"),14,GRAY);username.setTextIsSelectable(true);username.setPadding(0,0,0,dp(18));content.addView(username);divider(content);
-        TextView caption=text("区服角色",15,INK);caption.setPadding(0,dp(18),0,dp(8));content.addView(caption);
+        if(account==null){addFull(content,text(busy?"正在读取账号…":"账号信息尚未读取",16,INK),48);addFull(content,accountAction("重试",false,active(),()->refreshPage()),44);return;}
+        loadAccountArt();LinearLayout identity=new LinearLayout(this);identity.setGravity(Gravity.CENTER_VERTICAL);identity.setPadding(0,0,0,dp(8));identity.setMinimumHeight(dp(60));
+        ImageView icon=new ImageView(this);icon.setScaleType(ImageView.ScaleType.FIT_CENTER);if(accountBrandIcon!=null)icon.setImageBitmap(accountBrandIcon);else icon.setImageResource(android.R.drawable.ic_menu_myplaces);icon.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);identity.addView(icon,new LinearLayout.LayoutParams(dp(40),dp(40)));
+        LinearLayout names=column();names.setPadding(dp(12),0,0,0);TextView name=text(account.optString("nickname"),20,0xff26383f);name.setTextIsSelectable(true);name.setLineSpacing(dp(2),1);names.addView(name);
+        TextView username=text(account.optString("username"),12,0xff596b73);username.setContentDescription("登录账号 "+account.optString("username"));username.setTextIsSelectable(true);username.setPadding(0,dp(4),0,0);names.addView(username);identity.addView(names,new LinearLayout.LayoutParams(0,-2,1));content.addView(identity);accountLine(content);
+        TextView caption=text("区服角色",12,0xff596b73);caption.setPadding(0,dp(9),0,0);content.addView(caption);
         JSONArray roles=array(account,"players");
         if(roles.length()==0){TextView empty=text("尚未创建角色，进入游戏区服后创建。",14,GRAY);empty.setPadding(0,dp(12),0,dp(12));content.addView(empty);}
         for(int i=0;i<roles.length();i++){
             final JSONObject role=roles.optJSONObject(i);if(role==null)continue;
-            final boolean created=!role.optString("name").trim().isEmpty();final boolean selected=created && isCurrentRole(role);
-            LinearLayout item=column();item.setPadding(0,dp(12),0,dp(12));
-            TextView label=text(created?roleLabel(role):"区服 "+role.optLong("serverId")+" · 未创建角色",15,INK);label.setLineSpacing(dp(3),1);item.addView(label);
-            TextView hint=text(selected?"当前角色 · 打开蓝绿终端  ›":created?"进入该区服后可打开终端":"进入该区服后创建角色",12,selected?BLUE:GRAY);hint.setPadding(0,dp(8),0,0);item.addView(hint);
-            if(selected){item.setMinimumHeight(dp(64));item.setBackground(new RippleDrawable(android.content.res.ColorStateList.valueOf(Color.argb(25,22,119,255)),null,null));item.setOnClickListener(v->{if(active())navigate(HOME);});}
-            content.addView(item);divider(content);
+            final boolean created=!role.optString("name").trim().isEmpty(),selected=created && isCurrentRole(role);
+            LinearLayout item=new LinearLayout(this);item.setGravity(Gravity.CENTER_VERTICAL);item.setMinimumHeight(dp(64));item.setPadding(0,dp(8),0,dp(8));
+            LinearLayout words=column();TextView label=text(created?role.optString("name"):"未创建角色",16,0xff26383f);label.setLineSpacing(dp(2),1);words.addView(label);
+            TextView detail=text("区服 "+role.optLong("serverId")+(created?" · Lv."+role.optLong("level"):"")+(selected?" · 当前角色":""),12,0xff596b73);detail.setPadding(0,dp(4),0,0);words.addView(detail);
+            if(!selected){TextView hint=text(created?"进入该区服后可打开终端":"进入该区服后创建角色",12,0xff596b73);hint.setPadding(0,dp(4),0,0);words.addView(hint);}
+            item.addView(words,new LinearLayout.LayoutParams(0,-2,1));
+            if(selected){TextView open=accountAction("蓝绿终端",true,active(),()->{if(active())navigate(HOME);});LinearLayout.LayoutParams entry=new LinearLayout.LayoutParams(dp(112),dp(44));entry.leftMargin=dp(12);item.addView(open,entry);}
+            content.addView(item);accountLine(content);
         }
-        TextView note=text("每个区服可创建1个角色。超频点数与账单归属对应区服角色。",12,GRAY);note.setPadding(0,dp(14),0,dp(14));content.addView(note);
-        addFull(content,action("修改名称  ›",false,active(),()->navigate(NICKNAME)),46);
-        addFull(content,action("修改密码  ›",false,active(),()->navigate(PASSWORD)),46);
-        addFull(content,action(busy?"处理中…":"退出登录",false,active(),()->confirmLogout()),46);
+        accountLine(body);LinearLayout footer=new LinearLayout(this);footer.setPadding(dp(12),dp(8),dp(12),dp(8));
+        TextView[] actions={accountAction("修改名称",false,active(),()->navigate(NICKNAME)),accountAction("修改密码",false,active(),()->navigate(PASSWORD)),accountAction(busy?"处理中…":"退出登录",false,active(),()->confirmLogout())};actions[2].setTextColor(0xffa23d36);
+        for(int i=0;i<actions.length;i++){LinearLayout.LayoutParams cell=new LinearLayout.LayoutParams(0,dp(44),1);if(i>0)cell.leftMargin=dp(8);footer.addView(actions[i],cell);}body.addView(footer,new LinearLayout.LayoutParams(-1,-2));
     }
     private void confirmLogout(){
         if(!active())return;final Credentials auth=credentials;
@@ -601,23 +661,28 @@ public class WalletActivity extends UnityPlayerActivity {
         UnityPlayer.UnitySendMessage("LocalWalletSession","LogoutAccount","");
     }
     private EditText accountField(LinearLayout parent,String label,String hint,boolean secret){
-        TextView caption=text(label,13,GRAY);caption.setPadding(0,dp(10),0,0);addFull(parent,caption,30);
-        EditText field=new EditText(this);field.setSingleLine(true);field.setTextSize(16);field.setTextColor(INK);field.setHint(hint);field.setHintTextColor(GRAY);field.setPadding(dp(12),0,dp(12),0);field.setBackground(shape(Color.rgb(247,248,250),7));
+        TextView caption=text(label,13,GRAY);caption.setPadding(0,dp(6),0,0);addFull(parent,caption,25);
+        EditText field=new EditText(this);field.setSingleLine(true);field.setTextSize(16);field.setTextColor(INK);field.setHint(hint);field.setHintTextColor(GRAY);field.setPadding(dp(12),0,dp(12),0);GradientDrawable input=shape(0xfffbfcfc,1);input.setStroke(dp(1),0xffa8bac2);field.setBackground(input);field.setHighlightColor(0xffabe2ed);
         field.setInputType(InputType.TYPE_CLASS_TEXT|(secret?InputType.TYPE_TEXT_VARIATION_PASSWORD:InputType.TYPE_TEXT_FLAG_CAP_SENTENCES));
-        field.setImeOptions(EditorInfo.IME_FLAG_NO_EXTRACT_UI|EditorInfo.IME_FLAG_NO_FULLSCREEN|EditorInfo.IME_ACTION_NEXT);field.setEnabled(!busy);addFull(parent,field,46);return field;
+        field.setImeOptions(EditorInfo.IME_FLAG_NO_EXTRACT_UI|EditorInfo.IME_FLAG_NO_FULLSCREEN|EditorInfo.IME_ACTION_NEXT);field.setEnabled(!busy);addFull(parent,field,44);return field;
     }
     private void renderAccountForm(LinearLayout body){
-        LinearLayout content=column();content.setPadding(dp(24),dp(10),dp(24),dp(20));scrolling(body,content);
+        LinearLayout content=column();content.setPadding(dp(20),dp(8),dp(20),dp(12));scrolling(body,content);
         if(page==NICKNAME){
             nicknameInput=accountField(content,"账号名称","1–24个字",false);nicknameInput.setFilters(new InputFilter[]{new InputFilter.LengthFilter(24)});nicknameInput.setText(nicknameDraft);
             nicknameInput.addTextChangedListener(new TextWatcher(){public void beforeTextChanged(CharSequence t,int start,int count,int after){}public void onTextChanged(CharSequence t,int start,int before,int count){nicknameDraft=t.toString();}public void afterTextChanged(Editable t){}});
             nicknameInput.setImeOptions(EditorInfo.IME_FLAG_NO_EXTRACT_UI|EditorInfo.IME_FLAG_NO_FULLSCREEN|EditorInfo.IME_ACTION_DONE);
         }else{
-            oldPasswordInput=accountField(content,"原密码","输入当前密码",true);newPasswordInput=accountField(content,"新密码","至少6个字符",true);confirmationInput=accountField(content,"确认新密码","再次输入新密码",true);
+            String oldDraft=oldPasswordInput==null?"":oldPasswordInput.getText().toString(),newDraft=newPasswordInput==null?"":newPasswordInput.getText().toString(),confirmationDraft=confirmationInput==null?"":confirmationInput.getText().toString();
+            oldPasswordInput=accountField(content,"原密码","输入当前密码",true);
+            boolean wide=panel.getWindow().getDecorView().getWidth()>=dp(520);
+            if(wide){LinearLayout pair=new LinearLayout(this);LinearLayout first=column(),second=column();LinearLayout.LayoutParams half=new LinearLayout.LayoutParams(0,-2,1);half.rightMargin=dp(12);pair.addView(first,half);pair.addView(second,new LinearLayout.LayoutParams(0,-2,1));content.addView(pair);newPasswordInput=accountField(first,"新密码","至少6个字符",true);confirmationInput=accountField(second,"确认新密码","再次输入新密码",true);}
+            else{newPasswordInput=accountField(content,"新密码","至少6个字符",true);confirmationInput=accountField(content,"确认新密码","再次输入新密码",true);}
+            oldPasswordInput.setText(oldDraft);newPasswordInput.setText(newDraft);confirmationInput.setText(confirmationDraft);
             confirmationInput.setImeOptions(EditorInfo.IME_FLAG_NO_EXTRACT_UI|EditorInfo.IME_FLAG_NO_FULLSCREEN|EditorInfo.IME_ACTION_DONE);
         }
-        TextView note=text(page==PASSWORD?"修改后，其他设备需要使用新密码重新登录。":"仅修改账号名称，登录账号与各区服角色名保持不变。",12,GRAY);note.setPadding(0,dp(16),0,dp(14));content.addView(note);
-        addFull(content,action(busy?"保存中…":"保存",true,active(),()->saveAccount()),46);
+        TextView note=text(page==PASSWORD?"其他设备需用新密码重新登录":"不会更改角色名",12,GRAY);note.setPadding(0,dp(12),0,dp(10));content.addView(note);
+        addFull(content,accountAction(busy?"保存中…":"保存",true,active(),()->saveAccount()),44);
     }
     private void saveAccount(){
         if(!active())return;

@@ -116,7 +116,7 @@ def main():
  else:
   require(proof.get("inheritedJavaByteExact") is True,"Managed-only overlay must retain all Java entries")
  for name,file in proof.get("payloadFiles",{}).items():
-  require((name.startswith("assets/bin/Data/Managed/") and name.endswith(".dll")) or (proof.get("schema")=="brain-burst-account-overlay-v1" and name=="assets/local-wallet/icon.png"),"Unexpected overlay entry")
+  require((name.startswith("assets/bin/Data/Managed/") and name.endswith(".dll")) or (proof.get("schema")=="brain-burst-account-overlay-v1" and name in {"assets/local-wallet/icon.png","assets/brain-burst/button-atlas.png"}),"Unexpected overlay entry")
   f=ROOT/file;require(f.resolve().is_relative_to(ROOT),"Overlay file outside project");payload[name]=f.read_bytes()
  if a.build_code is not None:
   from tools.client_update.package import patch_manifest

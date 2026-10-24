@@ -59,6 +59,7 @@ def main():
     payload = {managed + name: str((out / name).relative_to(ROOT)) for name in
                ['SoulFlowerNativeAccount.dll', 'LocalWalletSession.dll']}
     payload['assets/local-wallet/icon.png'] = 'tools/local_wallet/assets/icon.png'
+    payload['assets/brain-burst/button-atlas.png'] = str(inputs[3].relative_to(ROOT))
     with zipfile.ZipFile(base) as source, tempfile.TemporaryDirectory(prefix='hyjs-brain-burst-') as tmp:
         work = Path(tmp)
         refs = []
