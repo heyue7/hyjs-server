@@ -117,6 +117,11 @@ func TestAdminShopProductEnabledP4ReceiptSlotsAndCold(t *testing.T) {
 				}
 			}
 			stable := target.GetId()
+			sourceID := stable
+			if key == "memory" {
+				parts := strings.Split(stable, ":")
+				sourceID = parts[len(parts)-1]
+			}
 			var buy proto.Message = &pb.CSShopBuy{ShopType: proto.Int32(shopType), ShopItemId: proto.String(stable), BuyCount: proto.Int32(1)}
 			if key == "memory" {
 				buy = &pb.CSRefreshShopBuy{ShopType: proto.Int32(3), ShopItemId: proto.String(stable)}
@@ -129,7 +134,7 @@ func TestAdminShopProductEnabledP4ReceiptSlotsAndCold(t *testing.T) {
 			if err = db.GetIns().First(&before, "player_id=? AND rule_id=?", f.id, page.Settings.PeriodID).Error; err != nil {
 				t.Fatal(err)
 			}
-			enabledShopToggle(t, f, actor, key, "period:"+stable, false)
+			enabledShopToggle(t, f, actor, key, "period:"+sourceID, false)
 			for _, item := range list() {
 				_, id, quoted := adminLiveShopParseSKU(item.GetId())
 				if !quoted {
@@ -146,7 +151,7 @@ func TestAdminShopProductEnabledP4ReceiptSlotsAndCold(t *testing.T) {
 			if err != nil || !proto.Equal(first[0], replay[0]) {
 				t.Fatal("successful receipt lost after stop", err)
 			}
-			enabledShopToggle(t, f, actor, key, "period:"+stable, true)
+			enabledShopToggle(t, f, actor, key, "period:"+sourceID, true)
 			var after db.P4CommerceState
 			if err = db.GetIns().First(&after, "player_id=? AND rule_id=?", f.id, page.Settings.PeriodID).Error; err != nil || !bytes.Equal(before.Payload, after.Payload) {
 				t.Fatal("toggle reset slot/version/quota", err)
@@ -228,6 +233,12 @@ func TestAdminShopProductEnabledPetReceiptInventoryAndCold(t *testing.T) {
 			t.Fatal(err)
 		}
 		return out[0].(*pb.SCPetShopProductList)
+	}
+	// Retained original single-slot inventory exercises old-save compatibility.
+	selectedRaw := adminJSON(cfg.Offers)
+	oldState := db.P9PetMarketState{PlayerID: f.id, WeekKey: p9MarketWeek(LocalPlayNow(f.ctx)), Generation: 1, Input: adminJSON(cfg), InputHash: p6Digest(adminJSON(cfg)), Selected: selectedRaw, SelectedHash: p6Digest(selectedRaw), Bought: []byte(`{}`)}
+	if err := db.GetIns().Create(&oldState).Error; err != nil {
+		t.Fatal(err)
 	}
 	first := listing()
 	buy := &pb.CSPetShopBuy{ShopItemId: first.ShopItemList[0].Id, BuyCount: proto.Int32(1)}

@@ -94,6 +94,44 @@ namespace HYJS.DungeonContent
         private static RoomCopy activeRoom;
         private static Vector3 spawn;
         private static bool prepared;
+        private static RoomCopy encounterRoom;
+        private static string encounterMission;
+
+        // The native boss story can leave the room. Keep that encounter behind all minions.
+        public static bool AllowTask(string taskId)
+        {
+            if ((int)RoomManager.curSceneType != 3 || encounterRoom == null ||
+                encounterMission != StaticData.currFightLevelId || !KnownMission(encounterMission)) return true;
+            var tasks = DictCopyTaskBlo.GetTasksByLevelId(encounterMission);
+            TableCopyTask target = null;
+            foreach (var task in tasks) if (task.TaskId == taskId) { target = task; break; }
+            if (target == null || target.IsBoss != 1) return true;
+            // On reconnect jobs contains only the server's remaining encounters.
+            if (StaticData.jobs != null && StaticData.jobs.Count > 0)
+            {
+                foreach (var job in StaticData.jobs)
+                    if (job.taskId != taskId && !encounterRoom.deadMonsters.Contains(job.taskId)) return false;
+            }
+            else foreach (var task in tasks)
+                if (task.TaskId != taskId && !encounterRoom.deadMonsters.Contains(task.TaskId)) return false;
+            return true;
+        }
+
+        // Called after each native load, including battle return with missionLoaded=true.
+        public static void AdvanceBoss(RoomCopy room)
+        {
+            if (room == null || room != encounterRoom || !room.missionLoaded || room.charactorManager == null ||
+                (int)RoomManager.curSceneType != 3 || !KnownMission(encounterMission) || encounterMission != StaticData.currFightLevelId) return;
+            if (StaticData.jobs != null && StaticData.jobs.Count > 0)
+            {
+                foreach (var job in StaticData.jobs)
+                    if (job.isBoss == 1 && !room.deadMonsters.Contains(job.taskId) && AllowTask(job.taskId) &&
+                        room.charactorManager.GetCharactor(job.taskId) == null) room.charactorManager.CreateMonster(job);
+            }
+            else foreach (var task in DictCopyTaskBlo.GetTasksByLevelId(encounterMission))
+                if (task.IsBoss == 1 && !room.deadMonsters.Contains(task.TaskId) && AllowTask(task.TaskId) &&
+                    room.charactorManager.GetCharactor(task.TaskId) == null) room.charactorManager.CreateMonster(task);
+        }
 
         public static string Scene(string original)
         {
@@ -292,6 +330,8 @@ namespace HYJS.DungeonContent
         public static void AdaptMission(RoomCopy room)
         {
             string id = StaticData.currFightLevelId;
+            encounterRoom = room;
+            encounterMission = KnownMission(id) ? id : null;
             bool resume = room != null && room == activeRoom && room.missionLoaded && activeMission == id && prepared;
             if (!resume)
             {
@@ -422,28 +462,41 @@ namespace HYJS.DungeonContent
 
         public static void Prepare(RoomCopy room)
         {
-            if (!Current() || room == null || room.missionLoaded) return;
+            if (room == null || room.missionLoaded || room != encounterRoom || !KnownMission(encounterMission)) return;
+            if (!Current()) { PrepareOriginalBoxes(); return; }
             var mission = DictCopyMissionBlo.GetTableCopyMission(activeMission);
             var tasks = DictCopyTaskBlo.GetTasksByLevelId(activeMission);
-            var points = Layout(mission.SceneName, tasks.Count + 1);
+            int boxCount = StaticData.boxs == null ? 0 : StaticData.boxs.Count;
+            var points = Layout(mission.SceneName, tasks.Count + boxCount + 1);
             Vector3 origin = points[0];
+            var ordered = new List<Vector3>(points.GetRange(1, points.Count - 1));
+            var distances = new Dictionary<Vector3, float>();
+            foreach (Vector3 point in ordered) distances[point] = PathDistance(origin, point);
+            ordered.Sort(delegate(Vector3 a, Vector3 b) { return distances[a].CompareTo(distances[b]); });
+            // Boxes are reachable before the final story. The boss occupies the farthest encounter.
+            var orderedTasks = new List<TableCopyTask>(tasks);
+            orderedTasks.Sort(delegate(TableCopyTask a, TableCopyTask b) {
+                int boss = a.IsBoss.CompareTo(b.IsBoss);
+                return boss != 0 ? boss : Int32.Parse(a.TaskId).CompareTo(Int32.Parse(b.TaskId));
+            });
             // Validate all encounters before applying spatial fields; IDs, AI radii and combat values stay native.
             for (int i = 0; i < tasks.Count; i++)
             {
                 var path = new NavMeshPath();
-                if (!NavMesh.CalculatePath(origin, points[i + 1], -1, path) || path.status != NavMeshPathStatus.PathComplete)
-                    throw new InvalidOperationException("Dungeon substitute encounter unreachable: " + tasks[i].TaskId);
+                if (!NavMesh.CalculatePath(origin, ordered[i + boxCount], -1, path) || path.status != NavMeshPathStatus.PathComplete)
+                    throw new InvalidOperationException("Dungeon substitute encounter unreachable: " + orderedTasks[i].TaskId);
             }
             spawn = origin;
             mission.BornX = spawn.x;
             mission.BornZ = spawn.z;
             for (int i = 0; i < tasks.Count; i++)
             {
-                Vector3 point = points[i + 1];
-                tasks[i].BornX = point.x;
-                tasks[i].BornZ = point.z;
-                Positions[tasks[i].TaskId] = point;
+                Vector3 point = ordered[i + boxCount];
+                orderedTasks[i].BornX = point.x;
+                orderedTasks[i].BornZ = point.z;
+                Positions[orderedTasks[i].TaskId] = point;
             }
+            for (int i = 0; i < boxCount; i++) SetBoxPoint(StaticData.boxs[i], ordered[i]);
             if (StaticData.jobs != null)
                 foreach (var job in StaticData.jobs)
                 {
@@ -451,6 +504,52 @@ namespace HYJS.DungeonContent
                     if (job != null && Positions.TryGetValue(job.taskId, out point)) { job.bornX = point.x; job.bornZ = point.z; }
                 }
             prepared = true;
+        }
+
+        private static float PathDistance(Vector3 origin, Vector3 point)
+        {
+            var path = new NavMeshPath();
+            if (!NavMesh.CalculatePath(origin, point, -1, path) || path.status != NavMeshPathStatus.PathComplete)
+                throw new InvalidOperationException("Dungeon point unreachable");
+            float length = 0;
+            for (int i = 1; i < path.corners.Length; i++) length += Vector3.Distance(path.corners[i - 1], path.corners[i]);
+            return length;
+        }
+        private static void SetBoxPoint(CopyBoxInfo box, Vector3 point)
+        {
+            box.x = point.x; box.y = point.y; box.z = point.z;
+        }
+        private static void PrepareOriginalBoxes()
+        {
+            if (StaticData.boxs == null || StaticData.boxs.Count == 0) return;
+            var mission = DictCopyMissionBlo.GetTableCopyMission(encounterMission);
+            if (mission == null) return;
+            NavMeshHit spawnHit;
+            if (!NavMesh.SamplePosition(new Vector3((float)mission.BornX, 0, (float)mission.BornZ), out spawnHit, 10f, -1))
+                throw new InvalidOperationException("Dungeon box lacks reachable spawn");
+            var mesh = NavMesh.CalculateTriangulation();
+            var proposed = new List<Vector3>();
+            foreach (var box in StaticData.boxs)
+            {
+                Vector3 original = new Vector3((float)box.x, (float)box.y, (float)box.z);
+                NavMeshHit hit;
+                var path = new NavMeshPath();
+                bool found = NavMesh.SamplePosition(original, out hit, 2f, -1) &&
+                    NavMesh.CalculatePath(spawnHit.position, hit.position, -1, path) && path.status == NavMeshPathStatus.PathComplete;
+                Vector3 best = found ? hit.position : Vector3.zero;
+                float nearest = found ? (best - original).sqrMagnitude : Single.MaxValue;
+                // Repair an off-mesh/unreachable original chest using the nearest reachable triangle interior.
+                for (int i = 0; !found && i + 2 < mesh.indices.Length; i += 3)
+                {
+                    Vector3 center = (mesh.vertices[mesh.indices[i]] + mesh.vertices[mesh.indices[i + 1]] + mesh.vertices[mesh.indices[i + 2]]) / 3f;
+                    if ((center - original).sqrMagnitude >= nearest || !NavMesh.SamplePosition(center, out hit, 0.5f, -1) ||
+                        !NavMesh.CalculatePath(spawnHit.position, hit.position, -1, path) || path.status != NavMeshPathStatus.PathComplete) continue;
+                    best = hit.position; nearest = (best - original).sqrMagnitude;
+                }
+                if (nearest == Single.MaxValue) throw new InvalidOperationException("Dungeon chest unreachable: " + box.boxId);
+                proposed.Add(best);
+            }
+            for (int i = 0; i < proposed.Count; i++) SetBoxPoint(StaticData.boxs[i], proposed[i]);
         }
 
         public static void AlignPlayer(RoomCopy room)

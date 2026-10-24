@@ -60,9 +60,9 @@ func TestP9MarketAndDecomposeLifecycle(t *testing.T) {
 		}
 	}
 	cfg.Offers = selected
-	cfg.Slots = 2
+	cfg.Slots = 6
 	input, _ := json.Marshal(cfg)
-	// 此隔离用例显式发布两项有限原商品窗口，生产默认关闭保持不变。
+	// 此隔离用例显式发布两种原商品的六槽有放回窗口，生产默认关闭保持不变。
 	if err := db.GetIns().Model(&live).Updates(map[string]interface{}{"input": input, "enabled": true}).Error; err != nil {
 		t.Fatal(err)
 	}
@@ -148,7 +148,7 @@ func TestP9MarketAndDecomposeLifecycle(t *testing.T) {
 		t.Fatal("currency audit confused with coin", err)
 	}
 	listing := call(&pb.CSPetShopProductList{}, 3).(*pb.SCPetShopProductList)
-	if listing.GetRefreshTimes() != 10 || len(listing.GetShopItemList()) != 2 {
+	if listing.GetRefreshTimes() != 10 || len(listing.GetShopItemList()) != 6 {
 		t.Fatal("native list refresh remaining")
 	}
 	var item *pb.ShopItem

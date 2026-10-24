@@ -156,9 +156,12 @@ type FieldState struct {
 	RespawnAt   map[string]int64              `json:"respawn_at"`
 	RewardDay   string                        `json:"reward_day"`
 	RewardKills int32                         `json:"reward_kills"`
-	Side        *pb.PlayerSide                `json:"side"`
-	Fight       *FieldFight                   `json:"fight,omitempty"`
-	Areas       map[string]*FieldAreaState    `json:"areas,omitempty"`
+	// 普通野外首领奖励跨地图共用，世界首领计数由独立域保存。
+	BossRewardDay    string                     `json:"boss_reward_day,omitempty"`
+	BossRewardClaims int64                      `json:"boss_reward_claims,omitempty"`
+	Side             *pb.PlayerSide             `json:"side"`
+	Fight            *FieldFight                `json:"fight,omitempty"`
+	Areas            map[string]*FieldAreaState `json:"areas,omitempty"`
 }
 
 // FieldAreaState preserves local monsters and their respawn deadlines when
@@ -188,4 +191,6 @@ type FieldFight struct {
 	BossReward      string `json:"boss_reward,omitempty"`
 	BossKill        string `json:"boss_kill,omitempty"`
 	BossCooldownMS  int64  `json:"boss_cooldown_ms,omitempty"`
+	// BossRewardDailyLimit 按开战冻结，nil兼容既有战斗的不限次数行为。
+	BossRewardDailyLimit *int64 `json:"boss_reward_daily_limit,omitempty"`
 }

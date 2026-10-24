@@ -32,6 +32,7 @@ declare module "@elegant-router/types" {
     "client-updates": "/client-updates";
     "daily-sign": "/daily-sign";
     "feedback": "/feedback";
+    "field-resources": "/field-resources";
     "fields": "/fields";
     "game-accounts": "/game-accounts";
     "guild-settings": "/guild-settings";
@@ -58,6 +59,7 @@ declare module "@elegant-router/types" {
     "shops_vip": "/shops/vip";
     "sprout-settings": "/sprout-settings";
     "titles": "/titles";
+    "trials": "/trials";
     "users": "/users";
     "wallet-reasons": "/wallet-reasons";
     "wallets": "/wallets";
@@ -107,6 +109,7 @@ declare module "@elegant-router/types" {
     | "client-updates"
     | "daily-sign"
     | "feedback"
+    | "field-resources"
     | "fields"
     | "game-accounts"
     | "guild-settings"
@@ -122,6 +125,7 @@ declare module "@elegant-router/types" {
     | "shops"
     | "sprout-settings"
     | "titles"
+    | "trials"
     | "users"
     | "wallet-reasons"
     | "wallets"
@@ -158,6 +162,7 @@ declare module "@elegant-router/types" {
     | "client-updates"
     | "daily-sign"
     | "feedback"
+    | "field-resources"
     | "fields"
     | "game-accounts"
     | "guild-settings"
@@ -181,6 +186,7 @@ declare module "@elegant-router/types" {
     | "shops_vip"
     | "sprout-settings"
     | "titles"
+    | "trials"
     | "users"
     | "wallet-reasons"
     | "wallets"

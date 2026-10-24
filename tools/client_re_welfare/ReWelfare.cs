@@ -1,8 +1,10 @@
 using System;
 using System.Globalization;
+using System.Collections.Generic;
 using UnityEngine;
 using UI;
 using ProtoBuf.Message;
+using ProtoBuf;
 using NetWork.Packets;
 
 namespace HYJS.ReWelfare
@@ -75,13 +77,13 @@ namespace HYJS.ReWelfare
 
         static long ReturnQuote(UIActivityTreasureCast page, ActivityFortuneCatData data)
         {
-            string[] parts = page.activityId.Split(new char[] { '~' });
-            int used = 5 - data.todayLeft;
-            if (parts.Length != 6 || used < 0 || used >= 5) return 0;
-            string[] values = parts[used + 1].Split(new char[] { ',' });
-            long cost, payout;
-            if (values.Length != 2 || !Int64.TryParse(values[0], NumberStyles.None, CultureInfo.InvariantCulture, out cost) ||
-                !Int64.TryParse(values[1], NumberStyles.None, CultureInfo.InvariantCulture, out payout) || cost != data.coinPool || payout < 1) return 0;
+            long payout = 0;
+            foreach (List<long> group in Extensible.GetValues<List<long>>(data, 100))
+            foreach (long quote in group)
+            {
+                if (payout != 0 || quote < 1) return 0;
+                payout = quote;
+            }
             return payout;
         }
 
@@ -103,12 +105,12 @@ namespace HYJS.ReWelfare
             {
                 cost.transform.localPosition = new Vector3(-130f, -116f, 0f);
                 cost.width = 350; cost.height = 40; cost.fontSize = 20;
-                cost.text = left > 0 ? "消耗 " + data.coinPool.ToString(CultureInfo.InvariantCulture) + " 钻石" : "今日探索次数已用完";
+                cost.text = left > 0 && payout < 1 ? "请重新打开藏宝箱刷新奖励" : left > 0 ? "消耗 " + data.coinPool.ToString(CultureInfo.InvariantCulture) + " 钻石" : "今日探索次数已用完";
             }
             if (page.btn != null)
             {
                 UIImageButton button = page.btn.GetComponent<UIImageButton>();
-                if (button != null) button.isEnabled = left > 0;
+                if (button != null) button.isEnabled = left > 0 && payout > 0;
                 UISprite[] words = page.btn.GetComponentsInChildren<UISprite>(true);
                 for (int i = 0; i < words.Length; i++)
                     if (words[i].spriteName.StartsWith("UI_huodong_cangbaoxiang_word_", StringComparison.Ordinal))

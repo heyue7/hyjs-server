@@ -134,7 +134,7 @@ namespace HYJS.ActivitySafety
             {
                 ActivityTab item = response.activityList[index];
                 string id = item == null ? null : item.activityId;
-                if (String.IsNullOrEmpty(id)) { response.activityList.RemoveAt(index); continue; }
+                if (String.IsNullOrEmpty(id) || id == "warriorWeightImprove") { response.activityList.RemoveAt(index); continue; }
                 int split = id.IndexOf('_');
                 string prefix = split < 0 ? id : id.Substring(0, split);
                 if (String.IsNullOrEmpty(prefix) || seen.ContainsKey(prefix)) { response.activityList.RemoveAt(index); continue; }
@@ -197,6 +197,8 @@ namespace HYJS.ActivitySafety
                 if (!String.IsNullOrEmpty(id)) Set(current, "activityId", id);
                 Trace("template-show begin type=" + type + " component=" + current.GetType().Name);
                 current.Show();
+                UIActivityEveryDaySign sign = current as UIActivityEveryDaySign;
+                if (sign != null && sign.GetComponent<DailySignPresentation>() == null) sign.gameObject.AddComponent<DailySignPresentation>();
                 InstanceSelector selector = owner.GetComponent<InstanceSelector>();
                 if (selector != null) selector.Render(type, id, current, root);
                 Call(owner, "PlayTweener", new object[0]);
@@ -211,4 +213,117 @@ namespace HYJS.ActivitySafety
             }
         }
     }
+    // Keep native requests/rewards; repair only the daily-sign presentation anchors.
+    public sealed class DailySignPresentation : MonoBehaviour
+    {
+        UILabel caption, unavailableTitle, unavailableReward;
+        readonly Dictionary<GameObject, bool> advertisement = new Dictionary<GameObject, bool>();
+        static readonly MethodInfo RefreshRedPoints = typeof(UIActivityEveryDaySign).GetMethod("ShowOrHideRedPoint", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+        static readonly object[] RedPointArguments = new object[] { null };
+        void Anchor(GameObject tip, GameObject tabs, string normal, string selected)
+        {
+            if (tip == null) return;
+            if (tabs == null || !tabs.activeInHierarchy || tip.transform.parent == null) { tip.SetActive(false); return; }
+            foreach (Transform button in tabs.GetComponentsInChildren<Transform>(true))
+            {
+                string name = button.name.Trim();
+                if (!button.gameObject.activeInHierarchy || (name != normal && name != selected)) continue;
+                UIWidget widget = button.GetComponent<UIWidget>();
+                if (widget == null) continue;
+                // The three selected-tab strips contain their own button artwork.
+                // Keep the red point on the permanent bar, outside those switched groups.
+                Vector3 point = tip.transform.parent.InverseTransformPoint(widget.worldCorners[2]);
+                tip.transform.localPosition = new Vector3(point.x - 8f, point.y - 8f, 0f);
+                tip.transform.localScale = Vector3.one;
+                return;
+            }
+            // Eligibility stays in RedPointTip; an unpublished tab has no visible anchor.
+            tip.SetActive(false);
+        }
+        UILabel StatusLabel(Transform parent, string name, UILabel style, string text, int width)
+        {
+            if (parent == null || style == null) return null;
+            GameObject go = new GameObject(name); go.layer = parent.gameObject.layer;
+            go.transform.parent = parent; go.transform.localScale = Vector3.one; go.transform.localRotation = Quaternion.identity;
+            UILabel label = go.AddComponent<UILabel>();
+            if (style.bitmapFont != null) label.bitmapFont = style.bitmapFont; else label.trueTypeFont = style.trueTypeFont;
+            label.material = style.material; label.fontSize = style.fontSize; label.fontStyle = style.fontStyle;
+            label.effectStyle = style.effectStyle; label.effectColor = style.effectColor; label.effectDistance = style.effectDistance;
+            label.color = style.color; label.width = width; label.height = Math.Max(40, style.fontSize * 2);
+            label.maxLineCount = 1; label.overflowMethod = UILabel.Overflow.ShrinkContent;
+            label.pivot = UIWidget.Pivot.Center; label.alignment = NGUIText.Alignment.Center;
+            int depth = style.depth;
+            foreach (UIWidget widget in parent.GetComponentsInChildren<UIWidget>(true)) depth = Math.Max(depth, widget.depth);
+            label.depth = depth + 5; label.text = text;
+            return label;
+        }
+        void LuxuryAvailability(UIActivityEveryDaySign page, bool available)
+        {
+            Transform body = page.superSign == null ? null : page.superSign.transform;
+            Transform banner = body == null ? null : body.Find("tipbk");
+            if (banner == null) return;
+            if (advertisement.Count == 0)
+            {
+                // Text is baked into these original sprite words; the Sprite child is the backdrop.
+                foreach (string name in new string[] { "0", "1", "2", "num" })
+                {
+                    Transform word = banner.Find(name);
+                    if (word != null) advertisement[word.gameObject] = word.gameObject.activeSelf;
+                }
+            }
+            foreach (KeyValuePair<GameObject, bool> word in advertisement)
+                if (word.Key != null) word.Key.SetActive(available && word.Value);
+            if (!available && unavailableTitle == null)
+            {
+                Transform footer = body.Find("Label");
+                UILabel rewardStyle = footer == null ? page.needRecharge : footer.GetComponent<UILabel>();
+                // The native recharge label may be transparent while no reward is configured.
+                // Use the visible native footer font and an explicit banner foreground color.
+                unavailableTitle = StatusLabel(banner, "LuxuryUnavailableTitle", rewardStyle, "暂未开放", 700);
+                if (unavailableTitle != null)
+                {
+                    unavailableTitle.color = Color.white;
+                    if (page.needRecharge != null && page.needRecharge.fontSize > 0) unavailableTitle.fontSize = page.needRecharge.fontSize;
+                    UIWidget background = banner.GetComponent<UIWidget>();
+                    Vector3[] corners = background == null ? null : background.localCorners;
+                    unavailableTitle.transform.localPosition = corners == null ? new Vector3(386f, 0f, 0f) : (corners[0] + corners[2]) * .5f;
+                }
+                unavailableReward = StatusLabel(body, "LuxuryUnavailableReward", rewardStyle, "奖励暂未配置", 310);
+                if (unavailableReward != null) unavailableReward.transform.localPosition = new Vector3(-100f, -65f, 0f);
+            }
+            if (unavailableTitle != null) unavailableTitle.gameObject.SetActive(!available);
+            if (unavailableReward != null) unavailableReward.gameObject.SetActive(!available);
+        }
+        void LateUpdate()
+        {
+            UIActivityEveryDaySign page = GetComponent<UIActivityEveryDaySign>();
+            if (page == null) return;
+            // Original IL only reads three RedPointTip flags and projects SetActive; no requests/events.
+            if (StaticData.redTips != null && RefreshRedPoints != null) RefreshRedPoints.Invoke(page, RedPointArguments);
+            GameObject tabs = page.normalSignTab != null && page.normalSignTab.activeInHierarchy ? page.normalSignTab :
+                page.superSignTab != null && page.superSignTab.activeInHierarchy ? page.superSignTab : page.limitSignTab;
+            Anchor(page.normalTip, tabs, "everyday", "everyday_actived");
+            Anchor(page.superTip, tabs, "super", "super_actived");
+            Anchor(page.limitSignTip, tabs, "LimitSign", "LimitSign_actived");
+            bool available = !String.IsNullOrEmpty(page.superItems);
+            if (page.currentTab != 1) return;
+            LuxuryAvailability(page, available);
+            if (page.btn != null) page.btn.gameObject.SetActive(available);
+            if (!available || page.btn == null || page.needRecharge == null) return;
+            if (caption == null)
+            {
+                GameObject go = new GameObject("DailySignButtonCaption"); go.layer = page.btn.gameObject.layer;
+                go.transform.parent = page.btn.transform; go.transform.localPosition = Vector3.zero; go.transform.localScale = Vector3.one;
+                caption = go.AddComponent<UILabel>();
+                if (page.needRecharge.bitmapFont != null) caption.bitmapFont = page.needRecharge.bitmapFont;
+                else caption.trueTypeFont = page.needRecharge.trueTypeFont;
+                caption.fontSize = page.needRecharge.fontSize; caption.color = Color.white;
+                caption.pivot = UIWidget.Pivot.Center; caption.alignment = NGUIText.Alignment.Center;
+                caption.width = 180; caption.height = 40; caption.maxLineCount = 1;
+                caption.depth = page.needRecharge.depth + 5;
+            }
+            caption.text = page.superState == 1 ? "领取" : page.superState == 2 ? "已领取" : "充值";
+        }
+    }
+
 }

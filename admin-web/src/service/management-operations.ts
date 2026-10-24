@@ -8,11 +8,14 @@ export interface ShopDefinition {
   settingsFields?: string[];
   canCreate?: boolean;
 }
+export interface ShopQuantityTier { amount: number; weight: number; cost: ResourceAmount }
+export interface ShopRefreshSettings { enabled: boolean; freeCap: number; freeRecoverySeconds: number; paidCap: number; cost: ResourceAmount; item?: ResourceAmount; period: 'day' | 'week' }
 export interface ShopProduct {
   id: string;
   name: string;
   rewards: ResourceAmount[];
   cost: ResourceAmount;
+  quantityTiers?: ShopQuantityTier[];
   dailyLimit: number;
   totalLimit: number;
   stock: number;
@@ -46,6 +49,7 @@ export interface ShopSnapshot {
     periodId?: string;
     frozen?: boolean;
     newPeriod?: boolean;
+    refresh?: ShopRefreshSettings;
   };
 }
 export interface AchievementKind {

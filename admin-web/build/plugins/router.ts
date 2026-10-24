@@ -81,6 +81,8 @@ export function setupElegantRouter() {
         servers: { title: '区服管理', icon: 'ph:flag', order: 2 },
         'activity-schedules': { title: '活动排期', icon: 'ph:calendar-blank', order: 3 },
         fields: { title: '野外地图与部署', icon: 'ph:mountains', order: 4 },
+        trials: { title: '试炼之地', icon: 'ph:stairs', order: 5 },
+        'field-resources': { title: '野外资源', icon: 'ph:leaf', order: 8 },
         'wallet-reasons': { title: '钱包入账规则', icon: 'ph:wallet', order: 7 },
         'arena-prizes': { title: '竞技胜利翻牌', icon: 'ph:cards-three', order: 6 },
         shops: { title: '商店管理', icon: 'ph:treasure-chest', order: 6 },

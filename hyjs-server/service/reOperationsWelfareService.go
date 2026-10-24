@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"google.golang.org/protobuf/encoding/protowire"
 	"google.golang.org/protobuf/proto"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -163,6 +164,11 @@ func reOperationsWelfareRuleKey(tx *gorm.DB, kind string, now time.Time) (string
 }
 
 func (s *GameService) loadReOperationsWelfare(tx *gorm.DB, owner int64, key, kind string, now time.Time) (*db.P4WelfareState, db.P4WelfareRule, reOperationsWelfareRules, *reOperationsWelfareProgress, error) {
+	return s.loadReOperationsWelfareQuote(tx, owner, key, kind, now, false)
+}
+
+// Refresh only the next cat quote; existing progress and immutable receipts remain untouched.
+func (s *GameService) loadReOperationsWelfareQuote(tx *gorm.DB, owner int64, key, kind string, now time.Time, refresh bool) (*db.P4WelfareState, db.P4WelfareRule, reOperationsWelfareRules, *reOperationsWelfareProgress, error) {
 	var cfg db.P4WelfareRule
 	var rules reOperationsWelfareRules
 	state := &reOperationsWelfareProgress{CatUses: map[string]int32{}, Claimed: map[int]bool{}, ClaimDays: map[string]bool{}}
@@ -177,11 +183,12 @@ func (s *GameService) loadReOperationsWelfare(tx *gorm.DB, owner int64, key, kin
 	if err = tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&cfg, "id=? AND kind=? AND enabled=?", key, kind, true).Error; err != nil {
 		return nil, cfg, rules, nil, err
 	}
-	if len(cfg.Frozen) > 0 {
+	refresh = refresh && kind == constUtil.ReWelfareCatKind
+	if len(cfg.Frozen) > 0 && !refresh {
 		if json.Unmarshal(cfg.Frozen, &cfg) != nil {
 			return nil, cfg, rules, nil, constUtil.ErrAdminConfiguration
 		}
-	} else {
+	} else if !refresh {
 		if err = s.validateReOperationsWelfare(cfg); err != nil {
 			return nil, cfg, rules, nil, err
 		}
@@ -191,7 +198,7 @@ func (s *GameService) loadReOperationsWelfare(tx *gorm.DB, owner int64, key, kin
 	}
 	err = tx.First(row, "player_id=? AND rule_id=?", owner, key).Error
 	if err == nil {
-		if json.Unmarshal(row.Snapshot, &cfg) != nil || json.Unmarshal(row.Payload, state) != nil {
+		if (!refresh && json.Unmarshal(row.Snapshot, &cfg) != nil) || json.Unmarshal(row.Payload, state) != nil {
 			return nil, cfg, rules, nil, constUtil.ErrAdminConfiguration
 		}
 	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
@@ -262,7 +269,15 @@ func reFortuneCatInfo(rules reOperationsWelfareRules, state *reOperationsWelfare
 		cost = int32(rules.Tiers[used].Cost)
 		status = 0
 	}
-	return &pb.ActivityFortuneCatData{TodayLeft: proto.Int32(5 - used), TotalLeft: proto.Int32(5 - used), ThisTimeStatus: proto.Int32(status), TotalStatus: proto.Int32(0), CoinPool: proto.Int32(cost), LastGetTime: proto.Int64(state.LastGet), NextGetTime: proto.Int64(0), CurrentTime: proto.Int64(now.UnixMilli())}
+	info := &pb.ActivityFortuneCatData{TodayLeft: proto.Int32(5 - used), TotalLeft: proto.Int32(5 - used), ThisTimeStatus: proto.Int32(status), TotalStatus: proto.Int32(0), CoinPool: proto.Int32(cost), LastGetTime: proto.Int64(state.LastGet), NextGetTime: proto.Int64(0), CurrentTime: proto.Int64(now.UnixMilli())}
+	// Original fields 1..8 retain their schema. Tag 100 is a scalar quote extension.
+	if used < 5 {
+		resources, err := p1RewardResources(rules.Tiers[used].Reward)
+		if err == nil && len(resources) == 1 && resources[0].GetId() == "coin" && resources[0].GetNum() > 0 {
+			info.ProtoReflect().SetUnknown(protowire.AppendVarint(protowire.AppendTag(nil, 100, protowire.VarintType), uint64(resources[0].GetNum())))
+		}
+	}
+	return info
 }
 
 // reFortuneCatWelfare keeps native cat requests and same-stamp receipts, with daily counts keyed by calendar date.
@@ -301,7 +316,7 @@ func (s *GameService) reFortuneCatWelfare(ctx context.Context, owner int64, requ
 				return nil
 			}
 		}
-		row, cfg, rules, state, e := s.loadReOperationsWelfare(tx, owner, key, constUtil.ReWelfareCatKind, now)
+		row, cfg, rules, state, e := s.loadReOperationsWelfareQuote(tx, owner, key, constUtil.ReWelfareCatKind, now, !claim)
 		if e != nil {
 			return e
 		}
@@ -493,7 +508,7 @@ func (s *GameService) reOperationsWelfareTabs(tx *gorm.DB, now time.Time) ([]*pb
 		if err = tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&cfg, "id=? AND kind=? AND enabled=?", key, spec.kind, true).Error; err != nil {
 			return nil, err
 		}
-		if len(cfg.Frozen) > 0 {
+		if len(cfg.Frozen) > 0 && spec.kind != constUtil.ReWelfareCatKind {
 			if json.Unmarshal(cfg.Frozen, &cfg) != nil {
 				return nil, constUtil.ErrAdminConfiguration
 			}
@@ -513,11 +528,7 @@ func (s *GameService) reOperationsWelfareTabs(tx *gorm.DB, now time.Time) ([]*pb
 			if json.Unmarshal(cfg.Rules, &rules) != nil {
 				return nil, constUtil.ErrAdminConfiguration
 			}
-			if len(cfg.Frozen) == 0 {
-				if err = tx.Model(&db.P4WelfareRule{}).Where("id=?", key).Update("frozen", adminJSON(cfg)).Error; err != nil {
-					return nil, err
-				}
-			}
+
 			for _, tier := range rules.Tiers {
 				resources, err := p1RewardResources(tier.Reward)
 				if err != nil {

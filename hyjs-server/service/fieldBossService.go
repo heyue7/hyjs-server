@@ -365,7 +365,11 @@ func (s *GameService) fieldBossFightStart(ctx context.Context, id int64, b *pb.C
 		result = &pb.SCSidePveBossFightStart{FightId: proto.String(token), RandSeed: proto.Int64(frozen.Seed), BattlePlayer: frozen.Attacker, BattleMonsterList: []*pb.BattleMonster{frozen.Monster}, FightScene: proto.String(""), Code: proto.Int32(1), Maxround: proto.Int32(frozen.MaxRound)}
 		// 兼容现有小怪判定的 Start 字段保持同一fightId，BossStart另行标识首领结算入口。
 		compatStart := &pb.SCSidePveFightStart{FightId: proto.String(token), RandSeed: proto.Int64(frozen.Seed), BattlePlayer: frozen.Attacker, BattleMonsterList: []*pb.BattleMonster{frozen.Monster}, FightScene: proto.String(""), Code: proto.Int32(1), Maxround: proto.Int32(frozen.MaxRound)}
-		f.Fight = &model.FieldFight{StartedAt: time.Now().UnixMilli(), BossUUID: boss.GetUuid(), BossLeaderGUID: leaderGUID, Start: compatStart, BossStart: result, BossInput: frozen, BossReward: reward, BossKill: kill, BossCooldownMS: hours * 3600 * 1000}
+		rewardLimit, err := s.fieldBossRewardLimit(tx)
+		if err != nil {
+			return err
+		}
+		f.Fight = &model.FieldFight{StartedAt: time.Now().UnixMilli(), BossUUID: boss.GetUuid(), BossLeaderGUID: leaderGUID, Start: compatStart, BossStart: result, BossInput: frozen, BossReward: reward, BossKill: kill, BossCooldownMS: hours * 3600 * 1000, BossRewardDailyLimit: &rewardLimit}
 		boss.State = proto.Int32(2)
 		f.Side.State = proto.Int32(6)
 		return nil
@@ -555,6 +559,10 @@ func (s *GameService) fieldBossFightEnd(ctx context.Context, id int64, b *pb.CSS
 				content += ";"
 			}
 			content += fight.BossKill
+		}
+		content, err = fieldBossResourceContent(ctx, f, fight, content)
+		if err != nil {
+			return err
 		}
 		if content != "" {
 			if gain, err = s.openServerGain(player, g, content); err != nil {

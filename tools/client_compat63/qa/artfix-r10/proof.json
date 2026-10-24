@@ -1,0 +1,293 @@
+{
+  "insertionOffset": 73256,
+  "singleInsertionDelta": 304,
+  "oldClinitCodeOff": 36648,
+  "newClinitCodeOff": 73256,
+  "nonClinitMethodsInstructionsEHAndDebugExact": 473,
+  "allOriginalIndexesAndReferencesExact": true,
+  "allClassAPIFlagsAndOtherOriginalBytesExactOutsideRelocatedOffsetFields": true,
+  "ulebWidthsVerifiedUnchanged": true,
+  "beforeSections": [
+    {
+      "kind": "0x0",
+      "count": 1,
+      "start": 0,
+      "parsedEnd": 112,
+      "spanEnd": 112
+    },
+    {
+      "kind": "0x1",
+      "count": 1540,
+      "start": 112,
+      "parsedEnd": 6272,
+      "spanEnd": 6272
+    },
+    {
+      "kind": "0x2",
+      "count": 262,
+      "start": 6272,
+      "parsedEnd": 7320,
+      "spanEnd": 7320
+    },
+    {
+      "kind": "0x3",
+      "count": 362,
+      "start": 7320,
+      "parsedEnd": 11664,
+      "spanEnd": 11664
+    },
+    {
+      "kind": "0x4",
+      "count": 348,
+      "start": 11664,
+      "parsedEnd": 14448,
+      "spanEnd": 14448
+    },
+    {
+      "kind": "0x5",
+      "count": 986,
+      "start": 14448,
+      "parsedEnd": 22336,
+      "spanEnd": 22336
+    },
+    {
+      "kind": "0x6",
+      "count": 93,
+      "start": 22336,
+      "parsedEnd": 25312,
+      "spanEnd": 25312
+    },
+    {
+      "kind": "0x2001",
+      "count": 474,
+      "start": 25312,
+      "parsedEnd": 73256,
+      "spanEnd": 73256
+    },
+    {
+      "kind": "0x2003",
+      "count": 302,
+      "start": 73256,
+      "parsedEnd": 76484,
+      "spanEnd": 76484
+    },
+    {
+      "kind": "0x1001",
+      "count": 209,
+      "start": 76484,
+      "parsedEnd": 78576,
+      "spanEnd": 78576
+    },
+    {
+      "kind": "0x2002",
+      "count": 1540,
+      "start": 78576,
+      "parsedEnd": 106140,
+      "spanEnd": 106140
+    },
+    {
+      "kind": "0x2004",
+      "count": 49,
+      "start": 106140,
+      "parsedEnd": 106732,
+      "spanEnd": 106732
+    },
+    {
+      "kind": "0x2000",
+      "count": 93,
+      "start": 106732,
+      "parsedEnd": 110911,
+      "spanEnd": 110911
+    },
+    {
+      "kind": "0x2005",
+      "count": 4,
+      "start": 110911,
+      "parsedEnd": 110949,
+      "spanEnd": 110952
+    },
+    {
+      "kind": "0x1003",
+      "count": 45,
+      "start": 110952,
+      "parsedEnd": 111444,
+      "spanEnd": 111444
+    },
+    {
+      "kind": "0x2006",
+      "count": 49,
+      "start": 111444,
+      "parsedEnd": 112692,
+      "spanEnd": 112692
+    },
+    {
+      "kind": "0x1000",
+      "count": 1,
+      "start": 112692,
+      "parsedEnd": 112900,
+      "spanEnd": 112900
+    }
+  ],
+  "afterSections": [
+    {
+      "kind": "0x0",
+      "count": 1,
+      "start": 0,
+      "parsedEnd": 112,
+      "spanEnd": 112
+    },
+    {
+      "kind": "0x1",
+      "count": 1540,
+      "start": 112,
+      "parsedEnd": 6272,
+      "spanEnd": 6272
+    },
+    {
+      "kind": "0x2",
+      "count": 262,
+      "start": 6272,
+      "parsedEnd": 7320,
+      "spanEnd": 7320
+    },
+    {
+      "kind": "0x3",
+      "count": 362,
+      "start": 7320,
+      "parsedEnd": 11664,
+      "spanEnd": 11664
+    },
+    {
+      "kind": "0x4",
+      "count": 348,
+      "start": 11664,
+      "parsedEnd": 14448,
+      "spanEnd": 14448
+    },
+    {
+      "kind": "0x5",
+      "count": 986,
+      "start": 14448,
+      "parsedEnd": 22336,
+      "spanEnd": 22336
+    },
+    {
+      "kind": "0x6",
+      "count": 93,
+      "start": 22336,
+      "parsedEnd": 25312,
+      "spanEnd": 25312
+    },
+    {
+      "kind": "0x2001",
+      "count": 475,
+      "start": 25312,
+      "parsedEnd": 73560,
+      "spanEnd": 73560
+    },
+    {
+      "kind": "0x2003",
+      "count": 302,
+      "start": 73560,
+      "parsedEnd": 76788,
+      "spanEnd": 76788
+    },
+    {
+      "kind": "0x1001",
+      "count": 209,
+      "start": 76788,
+      "parsedEnd": 78880,
+      "spanEnd": 78880
+    },
+    {
+      "kind": "0x2002",
+      "count": 1540,
+      "start": 78880,
+      "parsedEnd": 106444,
+      "spanEnd": 106444
+    },
+    {
+      "kind": "0x2004",
+      "count": 49,
+      "start": 106444,
+      "parsedEnd": 107036,
+      "spanEnd": 107036
+    },
+    {
+      "kind": "0x2000",
+      "count": 93,
+      "start": 107036,
+      "parsedEnd": 111215,
+      "spanEnd": 111215
+    },
+    {
+      "kind": "0x2005",
+      "count": 4,
+      "start": 111215,
+      "parsedEnd": 111253,
+      "spanEnd": 111256
+    },
+    {
+      "kind": "0x1003",
+      "count": 45,
+      "start": 111256,
+      "parsedEnd": 111748,
+      "spanEnd": 111748
+    },
+    {
+      "kind": "0x2006",
+      "count": 49,
+      "start": 111748,
+      "parsedEnd": 112996,
+      "spanEnd": 112996
+    },
+    {
+      "kind": "0x1000",
+      "count": 1,
+      "start": 112996,
+      "parsedEnd": 113204,
+      "spanEnd": 113204
+    }
+  ],
+  "actualPatchedDEXInitializedPins": [
+    {
+      "path": "tabledata/tablehero",
+      "sha256": "f45ffdffbd92df69ebae0b549002a3adeb4440c716bcc9145af68b121e757076",
+      "bytes": 10169
+    },
+    {
+      "path": "tabledata/tablefrag",
+      "sha256": "f489c4f769aac38633111f7a1c4bb0ed4164f16d65df01adc03524ea07210512",
+      "bytes": 3253
+    },
+    {
+      "path": "model/lingnai01_body",
+      "sha256": "0bb4db13e9c6667b6b52d88a1a469990895a154b6c38509dbdfe64a424322d4e",
+      "bytes": 526777
+    },
+    {
+      "path": "model/sicary01_body",
+      "sha256": "1dc1308c407872e7ad009ac97abae56710026e1a3572b043389597d135483d77",
+      "bytes": 596264
+    },
+    {
+      "path": "model/nio01_body",
+      "sha256": "5aa707be0d98bf19082fb05fcac5a10029cafca95a90aa9905ddfa38eb6e647a",
+      "bytes": 503359
+    },
+    {
+      "path": "smallassetmanifest",
+      "sha256": "fac59a57d1a146ad36cd87dcbc05a0f43fc516f6d81393c858d0cc94b087130f",
+      "bytes": 564315
+    }
+  ],
+  "oldClinitUnreferencedCodeRetained": true,
+  "stringIdsSortedAndByteExact": true,
+  "actualClinitRegisterTypesChecked": true,
+  "generatedClinitMoves": [
+    {
+      "opcode": "move-object",
+      "operands": "v2, v6"
+    }
+  ]
+}

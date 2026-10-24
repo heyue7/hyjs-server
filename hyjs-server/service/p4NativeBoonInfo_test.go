@@ -42,8 +42,8 @@ func TestP4NativeBoonInfoOriginal57053AndActualRotation(t *testing.T) {
 			count++
 		}
 	}
-	if count != 1 {
-		t.Fatal("original type31 must have one usable native tab", count)
+	if count != 0 {
+		t.Fatal("strong recruit must stay in the shop role-recruit entry and out of activity tabs", count)
 	}
 	after, afterGame := f.profile(t)
 	if !proto.Equal(before, after) || len(beforeGame.Warriors) != len(afterGame.Warriors) || len(beforeGame.Equipment) != len(afterGame.Equipment) {

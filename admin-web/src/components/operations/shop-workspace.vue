@@ -104,7 +104,7 @@ async function load() {
     snapshot.value = { ...result.data, items: result.data.items || [] };
     catalogueError.value = '';
     const resources = Object.fromEntries((result.data.resources || []).map(item => [item.id, item]));
-    const ids = [...new Set(result.data.items.flatMap(row => [...row.rewards.map(reward => reward.resourceId), row.cost?.resourceId]).filter(Boolean))].filter(id => !resources[id]);
+    const ids = [...new Set(result.data.items.flatMap(row => [...row.rewards.map(reward => reward.resourceId), row.cost?.resourceId, ...(row.quantityTiers || []).map(tier => tier.cost.resourceId)]).filter(Boolean))].filter(id => !resources[id]);
     try {
       const batches = [];
       for (let index = 0; index < ids.length; index += 100)
@@ -173,6 +173,12 @@ function validate() {
       !Number.isInteger(draft.value.cost.amount))
   )
     return '请填写完整的消耗资源和有效金额';
+  if (['memory', 'pet-market', 'ggo'].includes(props.shopId)) {
+    const tiers = draft.value.quantityTiers || [];
+    if (tiers.length && draft.value.rewards.length !== 1) return '数量档仅支持单项获得资源';
+    if (new Set(tiers.map(t => t.amount)).size !== tiers.length || tiers.some(t => !Number.isSafeInteger(t.amount) || t.amount < 1 || t.amount > 2147483647 || !Number.isSafeInteger(t.weight) || t.weight < 1 || !t.cost.resourceId || !Number.isSafeInteger(t.cost.amount) || t.cost.amount < 1 || t.cost.amount > 2147483647)) return '每档数量需唯一，权重和消耗需填写正整数';
+    if (draft.value.rewards[0]?.resourceId === 'hero_exp_004' && (draft.value.rewards[0].amount > 5 || tiers.some(t => t.amount > 5))) return '金色经验材料每档最多5个';
+  }
   if (supports('maxRank') && (!Number.isInteger(draft.value.maxRank) || draft.value.maxRank < 1))
     return '请填写可兑换的最末排名（正整数），排名数字越小越靠前';
   return '';
@@ -218,7 +224,7 @@ const settingsGuard = useDraftGuard({ active: () => settingsOpen.value, value: (
 function configure() {
   if (!snapshot.value) return;
   settingsDraft.value = {
-    ...snapshot.value.settings,
+    ...JSON.parse(JSON.stringify(snapshot.value.settings)),
     source: snapshot.value.settings.source || '用户运营配置',
     newPeriod: false
   };
@@ -243,12 +249,19 @@ async function saveSettings() {
           ? '领奖结束时间不能早于活动结束时间'
           : '';
   if (!settingsError.value && settingSupports('source') && !settingsDraft.value.source.trim()) settingsError.value = '请填写配置备注';
+  const refresh = settingsDraft.value.refresh;
+  if (!settingsError.value && refresh) {
+    const numbers = [refresh.freeCap, refresh.freeRecoverySeconds, refresh.paidCap];
+    if (numbers.some(n => !Number.isSafeInteger(n) || n < 0) || refresh.freeCap > 2147483647 || refresh.paidCap > 2147483647 || refresh.freeCap > 0 && refresh.freeRecoverySeconds < 1) settingsError.value = '请填写有效的刷新次数和恢复秒数';
+    else if (refresh.paidCap > 0 && (!refresh.cost.resourceId || !Number.isSafeInteger(refresh.cost.amount) || refresh.cost.amount < 1 || refresh.cost.amount > 2147483647)) settingsError.value = '请填写付费刷新消耗';
+    else if (refresh.item && (!refresh.item.resourceId || !Number.isSafeInteger(refresh.item.amount) || refresh.item.amount < 1)) settingsError.value = '请填写刷新道具消耗';
+  }
   if (settingsError.value) return;
   settingsSaving.value = true;
   try {
     await api(
       `/shops/${encodeURIComponent(props.shopId)}/settings`,
-      json('PUT', { ...settingsDraft.value, ...(props.shopId === 'memory' ? { slots: 6 } : {}), version: snapshot.value.version })
+      json('PUT', { ...settingsDraft.value, ...(['memory', 'pet-market'].includes(props.shopId) ? { slots: 6 } : {}), version: snapshot.value.version })
     );
     settingsOpen.value = false;
     editing.value = false;
@@ -324,11 +337,11 @@ const columns = computed<DataTableColumns<ShopProduct>>(() => [
   },
   {
     title: '获得数量', key: 'rewardAmounts', width: props.shopId === 'memory' ? 88 : 110,
-    render: row => h('div', { class: 'shop-cell-stack shop-number-cell' }, row.rewards.map(reward => h('span', Number(reward.amount).toLocaleString())))
+    render: row => h('div', { class: 'shop-cell-stack shop-number-cell' }, row.rewards.map(reward => h('span', row.quantityTiers?.length ? `${Math.min(...row.quantityTiers.map(t => t.amount))}～${Math.max(...row.quantityTiers.map(t => t.amount))}` : Number(reward.amount).toLocaleString())))
   },
   {
     title: '消耗资源', key: 'costResource', minWidth: props.shopId === 'memory' ? 130 : 180,
-    render: row => h('div', { class: 'shop-cell-stack' }, [
+    render: row => row.quantityTiers?.length ? h('div', { class: 'shop-cell-stack' }, [...new Set(row.quantityTiers.map(t => t.cost.resourceId))].map(id => h('span', resourceName(id)))) : h('div', { class: 'shop-cell-stack' }, [
       ...(row.cost?.resourceId ? [h('div', { class: 'shop-cost-resource', title: row.cost.resourceId }, [h(ResourceImage, { item: catalogue.value[row.cost.resourceId], size: 28 }), h('span', resourceName(row.cost.resourceId))])] : []),
       ...(row.contributionCost > 0 ? [h('span', '公会贡献')] : []),
       ...(!row.cost?.resourceId && !row.contributionCost ? [h('span', { class: 'ops-muted' }, '未配置')] : [])
@@ -336,12 +349,12 @@ const columns = computed<DataTableColumns<ShopProduct>>(() => [
   },
   {
     title: '消耗数量', key: 'costAmount', width: props.shopId === 'memory' ? 88 : 110,
-    render: row => h('div', { class: 'shop-cell-stack shop-number-cell' }, [
+    render: row => row.quantityTiers?.length ? h('span', '按数量档') : h('div', { class: 'shop-cell-stack shop-number-cell' }, [
       ...(row.cost?.resourceId ? [h('span', Number(row.cost.amount).toLocaleString())] : []),
       ...(row.contributionCost > 0 ? [h('span', row.contributionCost.toLocaleString())] : [])
     ])
   },
-  ...(props.shopId === 'memory' ? [{ title: '刷新权重', key: 'weight', width: 88, render: (row: ShopProduct) => h('span', { class: 'shop-number-cell' }, row.weight.toLocaleString()) }] : []),
+  ...(['memory', 'pet-market', 'ggo'].includes(props.shopId) ? [{ title: '刷新权重', key: 'weight', width: 88, render: (row: ShopProduct) => h('span', { class: 'shop-number-cell' }, row.weight.toLocaleString()) }] : []),
   { title: '限购与库存', key: 'limits', minWidth: props.shopId === 'memory' ? 108 : 125, render: row => renderLines(limitLines(row)) },
   { title: '购买资格', key: 'qualifications', minWidth: props.shopId === 'memory' ? 108 : 140, render: row => renderLines(qualificationLines(row)) },
   {
@@ -494,7 +507,7 @@ watch(
                 v-model:value="draft.rewards"
                 :disabled="saving || readonly"
                 :resources="shopId === 'union-fight' ? snapshot?.resources || [] : undefined"
-                :max="['union-fight', 'vip', 'pet-market'].includes(shopId) || isLegacyProduct ? 1 : 50"
+                :max="['union-fight', 'vip', 'pet-market', 'memory', 'ggo'].includes(shopId) || isLegacyProduct ? 1 : 50"
               />
             </NFormItem>
             <template v-if="supports('cost')">
@@ -516,6 +529,19 @@ watch(
                 </div>
               </NFormItem>
             </template>
+            <section v-if="supports('quantityTiers')" class="mb-20px">
+              <h4>随机数量档</h4>
+              <p class="ops-muted mb-3">留空使用上方固定数量和消耗。刷新时按各档权重抽取，已展示报价保持到下次刷新。权重为相对比例。</p>
+              <div v-for="(tier, index) in draft.quantityTiers || []" :key="index" class="mb-3">
+                <div class="ops-date-grid">
+                  <NFormItem :label="`第${index + 1}档数量`"><NInputNumber v-model:value="tier.amount" :min="1" :max="draft.rewards[0]?.resourceId === 'hero_exp_004' ? 5 : 2147483647" :precision="0" /></NFormItem>
+                  <NFormItem label="权重"><NInputNumber v-model:value="tier.weight" :min="1" :precision="0" /></NFormItem>
+                </div>
+                <NFormItem label="此档消耗" required><div class="resource-cost-line"><ResourceSelect v-model:value="tier.cost.resourceId" commerce-cost :recommended-ids="recommendedCosts" /><NInputNumber v-model:value="tier.cost.amount" :min="1" :max="2147483647" :precision="0" /></div></NFormItem>
+                <NButton :disabled="readonly || saving" size="small" @click="draft.quantityTiers?.splice(index, 1)">移除此档</NButton>
+              </div>
+              <NButton :disabled="readonly || saving || (draft.quantityTiers?.length || 0) >= 64" @click="(draft.quantityTiers ||= []).push({ amount: 1, weight: 0, cost: { ...draft.cost } })">添加数量档</NButton>
+            </section>
             <NFormItem v-if="supports('contributionCost')" label="公会贡献消耗">
               <NInputNumber v-model:value="draft.contributionCost" :min="0" :precision="0" />
             </NFormItem>
@@ -604,7 +630,7 @@ watch(
                 <NFormItem label="展示优先级"><NInputNumber v-model:value="draft.priority" :precision="0" /></NFormItem>
               </NGi>
               <NGi v-if="supports('weight')">
-                <NFormItem label="刷新权重" :feedback="props.shopId === 'memory' ? '在所属的碎片池或材料池内计算；数值越大，出现机会越高。' : undefined">
+                <NFormItem label="刷新权重" :feedback="['memory', 'pet-market'].includes(props.shopId) ? '在所属的碎片池或材料池内计算；数值越大，出现机会越高。' : undefined">
                   <NInputNumber v-model:value="draft.weight" :min="1" :precision="0" :input-props="{ 'aria-label': '刷新权重' }" />
                 </NFormItem>
               </NGi>
@@ -675,12 +701,12 @@ watch(
         title="保存商店设置后即可添加商品。"
         class="mb-20px"
       />
-      <p v-if="props.shopId === 'memory'" class="ops-inline-note mb-20px">固定 6 个位置，碎片占 1～4 个；其余为材料，允许重复，每格独立购买。</p>
+      <p v-if="['memory', 'pet-market'].includes(props.shopId)" class="ops-inline-note mb-20px">固定 6 个位置，碎片占 1～4 个；其余为材料，允许重复，每格独立购买。</p>
       <NForm label-placement="top" :disabled="settingsSaving || !canWrite">
         <NFormItem v-if="settingSupports('enabled') && !needsPeriod" label="营业状态">
           <NSwitch v-model:value="settingsDraft.enabled" aria-label="营业状态" />
         </NFormItem>
-        <NFormItem v-if="props.shopId !== 'memory' && settingSupports('slots')" label="展示槽位">
+        <NFormItem v-if="!['memory', 'pet-market'].includes(props.shopId) && settingSupports('slots')" label="展示槽位">
           <NInputNumber
             v-model:value="settingsDraft.slots"
             :min="1"
@@ -688,6 +714,21 @@ watch(
             :precision="0"
           />
         </NFormItem>
+        <section v-if="settingSupports('refresh') && settingsDraft.refresh" class="mb-20px">
+          <h3>刷新设置</h3>
+          <p class="ops-muted">{{ settingsDraft.refresh.period === 'week' ? '每周' : '每日' }}重置付费刷新次数；修改不重置已用次数。</p>
+          <NFormItem label="允许刷新"><NSwitch v-model:value="settingsDraft.refresh.enabled" /></NFormItem>
+          <div v-if="shopId !== 'pet-market'" class="ops-date-grid">
+            <NFormItem label="免费次数上限"><NInputNumber v-model:value="settingsDraft.refresh.freeCap" :min="0" :max="2147483647" :precision="0" /></NFormItem>
+            <NFormItem label="每次恢复秒数"><NInputNumber v-model:value="settingsDraft.refresh.freeRecoverySeconds" :min="0" :precision="0" /></NFormItem>
+          </div>
+          <NFormItem label="付费刷新次数上限"><NInputNumber v-model:value="settingsDraft.refresh.paidCap" :min="0" :max="2147483647" :precision="0" /></NFormItem>
+          <NFormItem label="每次付费刷新消耗"><div class="resource-cost-line"><ResourceSelect v-model:value="settingsDraft.refresh.cost.resourceId" commerce-cost :recommended-ids="shopId === 'ggo' ? ['item_9710'] : ['diamond']" /><NInputNumber v-model:value="settingsDraft.refresh.cost.amount" :min="1" :max="2147483647" :precision="0" /></div></NFormItem>
+          <template v-if="shopId === 'memory'">
+            <NFormItem label="优先消耗刷新道具"><NSwitch :value="Boolean(settingsDraft.refresh.item)" @update:value="settingsDraft.refresh.item = $event ? { resourceId: 'item_013', amount: 1 } : undefined" /></NFormItem>
+            <NFormItem v-if="settingsDraft.refresh.item" label="每次道具消耗"><div class="resource-cost-line"><ResourceSelect v-model:value="settingsDraft.refresh.item.resourceId" commerce-cost /><NInputNumber v-model:value="settingsDraft.refresh.item.amount" :min="1" :precision="0" /></div></NFormItem>
+          </template>
+        </section>
         <NFormItem v-if="settingSupports('unlimited')" label="不限时">
           <NSwitch v-model:value="settingsDraft.unlimited" aria-label="不限时" />
         </NFormItem>

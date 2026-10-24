@@ -160,8 +160,13 @@ func p7AuthorityAvailable(tx *gorm.DB) (bool, error) {
 }
 
 func (s *GameService) p7Policy(tx *gorm.DB) (db.P7RushPolicy, error) {
+	return s.p7ReadPolicy(tx.Clauses(clause.Locking{Strength: "UPDATE"}))
+}
+
+// p7ReadPolicy 供只读展示使用，避免全局运营行锁串行化所有玩家的查询。
+func (s *GameService) p7ReadPolicy(tx *gorm.DB) (db.P7RushPolicy, error) {
 	var cfg db.P7RushPolicy
-	err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&cfg, constUtil.P7RushPolicyID).Error
+	err := tx.First(&cfg, constUtil.P7RushPolicyID).Error
 	if err == nil && (cfg.EliteBuyCost < 1 || cfg.TrialResetCost < 1 || cfg.EliteBuyCost > math.MaxInt32/100 || cfg.TrialResetCost > math.MaxInt32/100) {
 		err = errors.New("试炼运营价格无效")
 	}
@@ -300,8 +305,8 @@ func (s *GameService) p7StagePrerequisite(tx *gorm.DB, id int64, stage db.P7Rush
 // P7RushQuery 返回原精英目录与真实VIP预算；普通楼层缺失时保持显式门禁。
 func (s *GameService) P7RushQuery(ctx context.Context, id int64, request proto.Message, now time.Time) ([]proto.Message, error) {
 	var result proto.Message
-	err := updateProfileWithTx(ctx, id, func(tx *gorm.DB, p *pb.Player, g *model.GameState) error {
-		cfg, err := s.p7Policy(tx)
+	err := updateProfileForP7QueryWithTx(ctx, id, func(tx *gorm.DB, p *pb.Player, g *model.GameState) error {
+		cfg, err := s.p7ReadPolicy(tx)
 		if err != nil {
 			return err
 		}
@@ -384,18 +389,36 @@ func (s *GameService) P7RushQuery(ctx context.Context, id int64, request proto.M
 				}
 				return e
 			}
-			stages, err := s.p7Stages(tx, constUtil.P7RushTrial)
-			if err != nil {
-				return err
-			}
 			var current []db.P7RushStageRule
-			legacyFirst, legacyErr := s.p7ReRushLegacyFirstSection(tx, state)
+			reEnabled, reErr := p7ReRushEnabled(tx)
+			if reErr != nil {
+				return reErr
+			}
+			legacyFirst, legacyErr := s.p7ReRushLegacyFirstSectionEnabled(tx, state, reEnabled)
 			if legacyErr != nil {
 				return legacyErr
 			}
+			// 当前页只消费当前楼层的可用来源，旧冻结首组仍读原关闭目录。
+			var stages []db.P7RushStageRule
+			stageQuery := tx.Where("kind=? AND floor=?", constUtil.P7RushTrial, state.Floor)
+			if legacyFirst {
+				stageQuery = stageQuery.Where("source=?", constUtil.P7SectionStageSource)
+			} else {
+				stageQuery = stageQuery.Where("enabled=?", true)
+			}
+			if err = stageQuery.Order("task_id,id").Find(&stages).Error; err != nil {
+				return err
+			}
+			var legacyRows []db.P7RushStageRule
+			if legacyFirst {
+				legacyRows, err = p7SectionCatalogue(true)
+				if err != nil {
+					return err
+				}
+			}
 			for _, stage := range stages {
 				if legacyFirst {
-					allowed, err := s.p7ReRushLegacyStage(tx, state, stage)
+					allowed, err := p7ReRushLegacyStageMatches(stage, legacyRows)
 					if err != nil {
 						return err
 					}
@@ -405,9 +428,13 @@ func (s *GameService) P7RushQuery(ctx context.Context, id int64, request proto.M
 					if _, err := s.validateP7Stage(stage); err != nil {
 						return err
 					}
-					allowed, e := s.p7RushContinuationStageAvailable(tx, state, stage)
-					if e != nil {
-						return e
+					allowed := reEnabled
+					if stage.Source != constUtil.P7ReRushSource {
+						var e error
+						allowed, e = s.p7RushContinuationStageAvailable(tx, state, stage)
+						if e != nil {
+							return e
+						}
 					}
 					if !allowed {
 						continue
@@ -416,10 +443,6 @@ func (s *GameService) P7RushQuery(ctx context.Context, id int64, request proto.M
 				}
 			}
 			if len(current) == 0 {
-				reEnabled, reErr := p7ReRushEnabled(tx)
-				if reErr != nil {
-					return reErr
-				}
 				if reEnabled && state.Floor > constUtil.P7ReRushLastFloor {
 					switch request.(type) {
 					case *pb.CSGetRushInfo:
@@ -538,6 +561,15 @@ func (s *GameService) P7RushQuery(ctx context.Context, id int64, request proto.M
 						continue
 					}
 					response.TaskInfoList = append(response.TaskInfoList, &pb.RushTaskInfo{TaskId: proto.String(stage.TaskID), Star: proto.Int32(stage.Star), FightScore: proto.Float64(stage.RecommendedPower), IsPassed: proto.Bool(false)})
+				}
+				for i, task := range response.TaskInfoList {
+					if task.GetFightScore() <= 0 {
+						power, err := p7RushProjectedPower(current[i])
+						if err != nil {
+							return err
+						}
+						task.FightScore = proto.Float64(power)
+					}
 				}
 				result = response
 			}
@@ -1180,7 +1212,7 @@ func (s *GameService) seedP7StarActivity(tx *gorm.DB, now time.Time, enabled boo
 func (s *GameService) DispatchP7(ctx context.Context, id int64, request proto.Message, stamp int64) ([]proto.Message, bool, error) {
 	switch request.(type) {
 	case *pb.CSGetRushEliteBossInfo, *pb.CSGetRushInfo, *pb.CSRushCurrentInfo, *pb.CSRushGetTopSweepInfo:
-		r, e := s.P7RushQuery(p7WithRushReadRequestCache(ctx), id, request, time.Now())
+		r, e := s.P7RushQuery(p7WithRushHistoricalQuery(p7WithRushReadRequestCache(ctx)), id, request, time.Now())
 		return r, true, e
 	case *pb.CSRushFightStart, *pb.CSRushFightEnd, *pb.CSRushEliteBossBuyTime, *pb.CSRushResetChallengeCount, *pb.CSRushAddition, *pb.CSRushAdditionView, *pb.CSRush3Hit, *pb.CSRushToTop, *pb.CSRushMazeTrader, *pb.CSRushMazeTraderBuy, *pb.CSRushRewardPreview, *pb.CSRushGetSectionReward, *pb.CSRushGetSectionAddition:
 		r, e := s.P7RushMutation(p7WithRushReadRequestCache(ctx), id, request, stamp)

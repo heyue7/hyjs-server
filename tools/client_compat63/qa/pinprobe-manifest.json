@@ -1,0 +1,9 @@
+{
+  "dexSHA256": "a02e368335a3f05d96e7a26758408082755749437dacd03a3a782cd0b00d255e",
+  "sourceSHA256": "26b5cec247a207579386aac2dc3dce4e5768022a5efe0171e5afc8c37e2dd67a",
+  "mainClass": "com.hyjs.compat.qa.PinProbe",
+  "readOnly": true,
+  "runsLocalAssetOverlayClinitOnly": true,
+  "synchronizationOrUnity": false,
+  "verifierMessageOnlyException": "java.lang.VerifyError"
+}

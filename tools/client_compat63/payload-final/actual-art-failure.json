@@ -1,0 +1,8 @@
+{
+  "status": "FAILED_ACTUAL_ART_VERIFYERROR_DO_NOT_PACKAGE",
+  "originalManifestSHA256": "f56f2ce23e20a790a6e443603a782b65a578386cf3c85ee43cf2cc1970e05809",
+  "reason": "clinit PC0x5c primitive move copied String Reference; corrected in r10 move-object",
+  "evidence": "analysis/feedback63-20261024/phone-art64-pinprobe-r8.txt",
+  "supersededBy": "tools/client_compat63/payload-artfix-r10",
+  "payloadFilesRemovedAsReproducible": true
+}

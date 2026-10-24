@@ -5,7 +5,7 @@
 /apks/
 /.analysis-venv/
 /.local-env/
-/.local-signing/
+/.local-signing
 /.tools/
 /build/
 /server/data/

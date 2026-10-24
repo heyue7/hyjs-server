@@ -1,0 +1,29 @@
+[
+  {
+    "token": "0x6003f3b",
+    "type": "Room.RCAIServerMonster",
+    "method": "Tick",
+    "helper": "PatrolTick",
+    "mode": "postfix",
+    "arguments": 1,
+    "inputCILSHA256": "7e7efaf1ade96aa207c26907bc906091c8523c8a56dbecfd1cdddbe3d5b9dabc"
+  },
+  {
+    "token": "0x600420f",
+    "type": "Room.RoomNetField",
+    "method": "SCSideMonster",
+    "helper": "Monsters",
+    "mode": "replace",
+    "arguments": 2,
+    "inputCILSHA256": "f469543b886ae3c3a4646c21ff4661ffec3766ac68f56a1d264d0de38976f6d3"
+  },
+  {
+    "token": "0x60045a2",
+    "type": "Room.RCUIServerMonster",
+    "method": "Tick",
+    "helper": "CollisionTick",
+    "mode": "replace",
+    "arguments": 1,
+    "inputCILSHA256": "d293c740a02814f11e511705b4fb30b2c4b61d29abe3d1704c9788c782907f98"
+  }
+]

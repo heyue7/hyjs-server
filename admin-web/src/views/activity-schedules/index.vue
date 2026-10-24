@@ -45,6 +45,12 @@ const planningTab = ref<'character-day' | 'calendar'>('calendar');
 const libraryTab = ref('patterns');
 const librarySearch = ref('');
 const selectedKey = ref<string | null>(null);
+const showDisabled = ref(false);
+const archiveOpen = ref(false);
+const archivedItems = ref<ActivityOccurrence[]>([]);
+const archiveBusy = ref(false);
+const disabledCount = computed(() => items.value.filter(item => !item.enabled).length);
+const visibleItems = computed(() => items.value.filter(item => showDisabled.value || item.enabled));
 const repeats = ref(1);
 const fillDate = ref(calendarMidnight(Date.now()));
 const patternDialog = ref(false);
@@ -61,7 +67,7 @@ const patternDraft = computed(() =>
 const patternDirty = computed(
   () => patternDialog.value && canWrite.value && patternDraft.value !== patternBaseline.value
 );
-const busy = computed(() => saving.value || checking.value || confirmingPublish.value || patternSaving.value || Boolean(definitionEditor.value?.saving));
+const busy = computed(() => archiveBusy.value || saving.value || checking.value || confirmingPublish.value || patternSaving.value || Boolean(definitionEditor.value?.saving));
 let requestGeneration = 0;
 let removeScopeGuard: (() => void) | undefined;
 const draftBody = computed(() => ({
@@ -73,7 +79,9 @@ const ready = computed(() => Boolean(scope.serverId && version.value && !busy.va
 const canPublish = computed(() => ready.value && canWrite.value && (dirty.value || !managed.value));
 function isCharacterItem(item: ActivityOccurrence) { return item.mode === 'opening-14' || item.timing === 'character-day'; }
 const characterItems = computed(() => items.value.filter(isCharacterItem));
+const shownCharacterItems = computed(() => visibleItems.value.filter(isCharacterItem));
 const calendarItems = computed(() => items.value.filter(item => !isCharacterItem(item)));
+const shownCalendarItems = computed(() => visibleItems.value.filter(item => !isCharacterItem(item)));
 const selected = computed(() => items.value.find(item => keyOf(item) === selectedKey.value));
 const usableDefinitions = computed(() => definitions.value.filter(item => item.enabled && item.availability.usable));
 function definitionAlias(definition: ActivityDefinition): string {
@@ -152,7 +160,7 @@ function selectBarAction(action: string | number, item: ActivityOccurrence) {
 const rows = computed(() => {
   const max = Math.min(31, Math.max(3, ...items.value.map(item => item.lane)) + 1);
   return Array.from({ length: max + 1 }, (_, lane) => {
-    const bars = items.value
+    const bars = visibleItems.value
       .filter(
         item =>
           !isCharacterItem(item) && item.lane === lane &&
@@ -221,6 +229,33 @@ async function loadCalendar(checkDraft = false) {
   }
   version.value = out.version;
   baseline.value = JSON.stringify(draftBody.value.items);
+}
+async function openArchive() {
+  const serverId = scope.serverId;
+  if (!serverId || busy.value) return;
+  archiveBusy.value = true;
+  try {
+    const out = await api<{ items: ActivityOccurrence[] }>(`/activity-schedules/archived?serverId=${serverId}`);
+    if (scope.serverId !== serverId) return;
+    archivedItems.value = out.items;
+    archiveOpen.value = true;
+  } catch (e) { window.$message?.error(errorMessage(e)); }
+  finally { archiveBusy.value = false; }
+}
+async function restoreArchived(item: ActivityOccurrence) {
+  if (!ready.value || !canWrite.value || archiveBusy.value) return;
+  if (dirty.value) { window.$message?.warning('请先发布或撤销当前草稿，再恢复归档排期'); return; }
+  const serverId = scope.serverId;
+  archiveBusy.value = true;
+  try {
+    await api(`/activity-schedules/${encodeURIComponent(item.id)}/restore?serverId=${serverId}`, json('POST', { version: version.value }));
+    if (scope.serverId !== serverId) return;
+    showDisabled.value = true;
+    archiveOpen.value = false;
+    await loadCalendar();
+    window.$message?.success('已恢复为停用，启用后发布即可开放');
+  } catch (e) { window.$message?.error(errorMessage(e)); }
+  finally { archiveBusy.value = false; }
 }
 async function loadLibrary() {
   const result = await run(() =>
@@ -434,6 +469,7 @@ function barPeriodSummary(item: ActivityOccurrence, lane: number) {
 }
 function removeSelected() {
   if (!selected.value || !canWrite.value || !ready.value || selected.value.frozen && selected.value.enabled) return;
+  // Publishing archives saved rows; filtering never removes hidden occurrences from the request.
   items.value = items.value.filter(item => keyOf(item) !== selectedKey.value);
   selectedKey.value = null;
   changed();
@@ -620,6 +656,8 @@ async function savePattern() {
         version: editingPattern.value?.version || ''
       })
     );
+    archiveOpen.value = false;
+    archivedItems.value = [];
     patternDialog.value = false;
     await loadLibrary();
     window.$message?.success('方案已保存，可按选定次数填入日期');
@@ -648,6 +686,8 @@ function archivePattern(pattern: ActivityPattern) {
 watch(
   () => scope.serverId,
   () => {
+    archiveOpen.value = false;
+    archivedItems.value = [];
     patternDialog.value = false;
     definitionEditorOpen.value = false;
     activityPreview.value = null;
@@ -688,7 +728,9 @@ onUnmounted(() => {
         <NTag size="small" :bordered="false" :type="managed ? 'success' : 'warning'">{{ managed ? '已发布' : '未启用' }}</NTag>
         <p class="ops-muted schedule-status">{{ managed ? '本服活动开放由当前排期控制' : '尚未发布本服排期' }}</p>
       </div>
-      <NSpace>
+      <NSpace align="center">
+        <NCheckbox v-model:checked="showDisabled">显示停用（{{ disabledCount }}）</NCheckbox>
+        <NButton :disabled="!scope.serverId || busy" :loading="archiveBusy" @click="openArchive">已归档</NButton>
         <NButton :disabled="busy" :loading="loading" @click="loadCalendar(true)">刷新本服</NButton>
         <NButton v-if="canWrite && planningTab === 'calendar'" :disabled="!ready" @click="openPattern(undefined, true)">可见活动存为方案</NButton>
         <NButton v-if="canWrite" type="primary" :disabled="!canPublish" :loading="saving" @click="publish">
@@ -696,6 +738,18 @@ onUnmounted(() => {
         </NButton>
       </NSpace>
     </div>
+    <NModal v-model:show="archiveOpen" preset="card" title="已归档排期" class="w-720px max-w-95vw">
+      <p class="ops-muted mb-12px">恢复后保持停用，原奖励与领取记录保留。</p>
+      <p v-if="dirty" class="ops-muted mb-12px">请先发布或撤销当前草稿，再恢复排期。</p>
+      <NEmpty v-if="!archivedItems.length" description="暂无归档排期" />
+      <NList v-else>
+        <NListItem v-for="item in archivedItems" :key="item.id">
+          <div>{{ item.name }}</div>
+          <div class="ops-muted">{{ isCharacterItem(item) ? `角色第${item.startDay || 1}天起` : `${calendarDate(item.startAt)} — ${calendarDate(item.endAt)}` }}</div>
+          <template #suffix><NButton v-if="canWrite" size="small" :disabled="archiveBusy || dirty" @click="restoreArchived(item)">恢复为停用</NButton></template>
+        </NListItem>
+      </NList>
+    </NModal>
     <NTabs v-model:value="planningTab" type="line" @update:value="selectedKey = null">
       <NTab name="character-day">新玩家排期</NTab>
       <NTab name="calendar">定期排期</NTab>
@@ -778,8 +832,8 @@ onUnmounted(() => {
         <NCard v-if="planningTab === 'character-day'" :bordered="false">
           <section class="character-schedules" aria-label="新玩家排期">
             <h2>新玩家活动</h2>
-            <NEmpty v-if="!characterItems.length" description="从左侧添加活动，再设置角色的起始日与持续天数。" />
-            <article v-for="item in characterItems" :key="keyOf(item)">
+            <NEmpty v-if="!shownCharacterItems.length" description="从左侧添加活动，再设置角色的起始日与持续天数。" />
+            <article v-for="item in shownCharacterItems" :key="keyOf(item)">
               <div class="schedule-row-main">
                 <div class="schedule-row-title">
                   <strong>{{ item.name }}</strong>
@@ -907,8 +961,8 @@ onUnmounted(() => {
               </div>
             </div>
           </div>
-          <div v-if="calendarItems.length" class="scheduled-activities" aria-label="本服活动清单">
-            <article v-for="item in calendarItems" :key="keyOf(item)">
+          <div v-if="shownCalendarItems.length" class="scheduled-activities" aria-label="本服活动清单">
+            <article v-for="item in shownCalendarItems" :key="keyOf(item)">
               <div class="schedule-row-main">
                 <div class="schedule-row-title">
                   <strong>{{ item.name }}</strong>
@@ -1027,7 +1081,7 @@ onUnmounted(() => {
           <NSpace>
             <NButton v-if="canWrite" @click="copySelected">{{ isCharacterItem(selected) ? '复制为新排期' : '复制到下一期' }}</NButton>
             <NButton v-if="canWrite && (!selected.frozen || !selected.enabled)" type="error" secondary @click="removeSelected">
-              从草稿移除
+              {{ selected.id ? '归档排期' : '移除草稿' }}
             </NButton>
             <NButton @click="selectedKey = null">完成</NButton>
           </NSpace>

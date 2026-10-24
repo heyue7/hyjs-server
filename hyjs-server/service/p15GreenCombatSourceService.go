@@ -93,20 +93,30 @@ func p15GreenCombatActorID(id string) bool {
 // Unused catalog compatibility cannot change the original actor calculations.
 // Active green actors retain their approved original donor attack source rows.
 func p15NormalizeUnusedGreenCombatRows(input *model.FrozenBattleInput, priorHash string) {
+	p15NormalizeUnusedGreenCombatRowsWithHash(input, priorHash, "")
+}
+
+// currentHash只能属于当前Tables；赋值后返回true要求调用者立即重算。
+func p15NormalizeUnusedGreenCombatRowsWithHash(input *model.FrozenBattleInput, priorHash, currentHash string) bool {
 	if p15GreenCombatHasActor(input) {
-		return
+		return false
 	}
-	// An already frozen compatible source must retain its exact table identity
-	// when canonical validation re-freezes it; new inputs have no prior hash.
 	if priorHash != "" {
-		raw, err := json.Marshal(input.Tables)
-		if err == nil && p6Digest(raw) == priorHash {
-			return
+		if currentHash == "" {
+			raw, err := json.Marshal(input.Tables)
+			if err == nil {
+				currentHash = p6Digest(raw)
+			}
+		}
+		if currentHash == priorHash {
+			return false
 		}
 	}
 	if rows, ok := p15GreenCombatOriginalView(input.Tables); ok {
 		input.Tables["Hero"] = rows
+		return true
 	}
+	return false
 }
 
 // Six-green actors already have independent original-engine comparison

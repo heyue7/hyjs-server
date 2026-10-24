@@ -260,6 +260,8 @@ const local: App.I18n.Schema = {
     servers: '区服管理',
     'activity-schedules': '活动排期',
     fields: '野外地图与部署',
+    trials: '试炼之地',
+    'field-resources': '野外资源',
     'wallet-reasons': '钱包入账规则',
     'arena-prizes': '竞技胜利翻牌',
     'server-clock': '服务器时间'

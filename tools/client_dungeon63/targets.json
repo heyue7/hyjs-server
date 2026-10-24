@@ -1,0 +1,5 @@
+[
+  {"token":"0x06004192","type":"Room.RoomCharactorManager","method":"CreateMonster","cilSHA256":"20b65d46c8d1b4eeba1e389d2cfe55850c985c372779eda94430c71ec54a4c79"},
+  {"token":"0x06004193","type":"Room.RoomCharactorManager","method":"CreateMonster","cilSHA256":"4e6e46677ad5ed2749f5b37c2022e1392b7b8e2bd79307f73d84503badb13da4"},
+  {"token":"0x06004497","type":"Room.RoomCopy","method":"OnLoadComplete","cilSHA256":"d2c8935dff8395faa22990d137eac9c45346c64a7fd132af3cd4c83d331de9e2"}
+]

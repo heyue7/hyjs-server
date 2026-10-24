@@ -320,13 +320,6 @@ func (s *GameService) P4ActivityTabs(ctx context.Context, now time.Time) ([]*pb.
 		if doubleOpen {
 			returnTabs = append(returnTabs, &pb.ActivityTab{ActivityId: proto.String("RechangeDouble"), Name: proto.String("首笔充值双倍"), Order: proto.Int32(38), Status: proto.Int32(0)})
 		}
-		// 橙卡入口与实际常驻招募共用同一奖池和开关，目录读取不冻结任何历史轮换。
-		if _, err := s.loadPermanentStrongRecruit(tx); err == nil {
-			returnTabs = append(returnTabs, &pb.ActivityTab{ActivityId: proto.String("warriorWeightImprove"), Name: proto.String("橙卡招募"), Order: proto.Int32(39), Status: proto.Int32(0)})
-		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
-			return err
-		}
-
 		return nil
 	})
 	return returnTabs, err

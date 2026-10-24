@@ -17,6 +17,8 @@ func RegisterAdminActivityScheduleRoutes(a *gin.RouterGroup) {
 	a.POST("/activity-templates", AdminActivityDefinitionCreateHandler)
 	a.PUT("/activity-templates/:id", AdminActivityDefinitionSaveHandler)
 	a.GET("/activity-schedules", AdminActivityScheduleHandler)
+	a.GET("/activity-schedules/archived", AdminArchivedActivitySchedulesHandler)
+	a.POST("/activity-schedules/:id/restore", AdminActivityScheduleRestoreHandler)
 	a.POST("/activity-schedules/preview", AdminActivitySchedulePreviewHandler)
 	a.PUT("/activity-schedules", AdminActivityScheduleSaveHandler)
 	a.GET("/activity-patterns", AdminActivityPatternsHandler)
@@ -363,6 +365,55 @@ func AdminActivityCostResourcesHandler(c *gin.Context) {
 	}
 
 	out, err := gameService.AdminActivityCostResources(c.Request.Context(), adminPrincipal(c), req.Q, req)
+	if err != nil {
+		adminError(c, err)
+		return
+	}
+	adminSuccess(c, out)
+}
+
+// AdminArchivedActivitySchedulesHandler returns retained archived occurrences.
+// @Summary 已归档排期
+// @Description 返回所选区服已软归档排期，保留原内容与领取历史
+// @Tags Admin
+// @Produce json
+// @Param serverId query int true "区服ID"
+// @Success 200 {array} model.AdminActivityOccurrenceDTO
+// @Router /admin/api/activity-schedules/archived [get]
+func AdminArchivedActivitySchedulesHandler(c *gin.Context) {
+	serverID, err := strconv.ParseInt(c.Query("serverId"), 10, 64)
+	if err != nil || serverID < 1 {
+		adminError(c, constUtil.ErrAdminInput)
+		return
+	}
+	out, err := gameService.AdminArchivedActivitySchedules(c.Request.Context(), adminPrincipal(c), serverID)
+	if err != nil {
+		adminError(c, err)
+		return
+	}
+	adminSuccess(c, gin.H{"items": out})
+}
+
+// AdminActivityScheduleRestoreHandler restores one archived row as disabled.
+// @Summary 恢复归档排期
+// @Description 校验区服与整份排期版本，恢复后保持停用；原领取与冻结记录保留
+// @Tags Admin
+// @Accept json
+// @Produce json
+// @Param serverId query int true "区服ID"
+// @Param id path string true "排期ID"
+// @Param body body model.AdminActivityScheduleRestoreRequest true "日历版本"
+// @Success 200 {object} model.AdminActivityScheduleResponse
+// @Router /admin/api/activity-schedules/{id}/restore [post]
+func AdminActivityScheduleRestoreHandler(c *gin.Context) {
+	serverID, err := strconv.ParseInt(c.Query("serverId"), 10, 64)
+	var req model.AdminActivityScheduleRestoreRequest
+	id := strings.TrimSpace(c.Param("id"))
+	if err != nil || serverID < 1 || id == "" || len(id) > 64 || c.ShouldBindJSON(&req) != nil || len(req.Version) != 64 {
+		adminError(c, constUtil.ErrAdminInput)
+		return
+	}
+	out, err := gameService.AdminRestoreActivitySchedule(c.Request.Context(), adminPrincipal(c), serverID, id, req)
 	if err != nil {
 		adminError(c, err)
 		return

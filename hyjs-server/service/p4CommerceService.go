@@ -23,23 +23,24 @@ import (
 )
 
 type p4Product struct {
-	SourceProductID string `json:"-"`
-	Enabled         *bool  `json:"enabled,omitempty"` // nil preserves enabled legacy catalogues; false suspends new purchases.
-	ID              string `json:"id"`
-	MaxRank         int64  `json:"maxRank,omitempty"`
-	Name            string `json:"name,omitempty"`
-	Index           int32  `json:"index"`
-	Rewards         string `json:"rewards"`
-	Cost            string `json:"cost"`
-	TierID          bool   `json:"tierId,omitempty"`
-	Priority        int32  `json:"priority"`
-	DailyLimit      int32  `json:"dailyLimit"`
-	TotalLimit      int32  `json:"totalLimit"`
-	Stock           int32  `json:"stock"`
-	MinLevel        int32  `json:"minLevel"`
-	MinVIP          int32  `json:"minVip"`
-	DiscountBps     int32  `json:"discountBps"`
-	Weight          int64  `json:"weight"`
+	QuantityTiers   []model.AdminShopQuantityTier `json:"quantityTiers,omitempty"`
+	SourceProductID string                        `json:"-"`
+	Enabled         *bool                         `json:"enabled,omitempty"` // nil preserves enabled legacy catalogues; false suspends new purchases.
+	ID              string                        `json:"id"`
+	MaxRank         int64                         `json:"maxRank,omitempty"`
+	Name            string                        `json:"name,omitempty"`
+	Index           int32                         `json:"index"`
+	Rewards         string                        `json:"rewards"`
+	Cost            string                        `json:"cost"`
+	TierID          bool                          `json:"tierId,omitempty"`
+	Priority        int32                         `json:"priority"`
+	DailyLimit      int32                         `json:"dailyLimit"`
+	TotalLimit      int32                         `json:"totalLimit"`
+	Stock           int32                         `json:"stock"`
+	MinLevel        int32                         `json:"minLevel"`
+	MinVIP          int32                         `json:"minVip"`
+	DiscountBps     int32                         `json:"discountBps"`
+	Weight          int64                         `json:"weight"`
 }
 
 func (p p4Product) isEnabled() bool {
@@ -47,6 +48,7 @@ func (p p4Product) isEnabled() bool {
 }
 
 type p4CommerceRules struct {
+	RefreshEnabled      *bool       `json:"refreshEnabled,omitempty"`
 	MemoryPolicyVersion int         `json:"memoryPolicyVersion,omitempty"`
 	LiveEditable        bool        `json:"liveEditable,omitempty"`
 	Products            []p4Product `json:"products"`
@@ -231,6 +233,21 @@ func (s *GameService) validateP4Commerce(cfg db.P4CommerceRule) (p4CommerceRules
 		if _, err = s.p4ParseCost(p.Cost); err != nil {
 			return rules, err
 		}
+		parts := strings.Split(p.Rewards, ",")
+		if len(p.QuantityTiers) > 0 && len(parts) != 2 {
+			return rules, errors.New("数量档仅支持单项奖励")
+		}
+		if len(parts) == 2 && (cfg.Kind == "memory" || cfg.Kind == "ggo") {
+			if parts[0] == "hero_exp_004" {
+				n, e := strconv.ParseInt(parts[1], 10, 64)
+				if e != nil || n > 5 {
+					return rules, errors.New("金色经验材料每档最多5个")
+				}
+			}
+			if err := s.validateShopQuantityTiers(cfg.Kind, parts[0], p.QuantityTiers); err != nil {
+				return rules, err
+			}
+		}
 		if p.TierID {
 			if _, err = s.p4TierCost(p.ID, 1, p.DailyLimit); err != nil {
 				return rules, err
@@ -241,9 +258,10 @@ func (s *GameService) validateP4Commerce(cfg db.P4CommerceRule) (p4CommerceRules
 		if err := s.validateMemoryShrine55(rules); err != nil {
 			return rules, err
 		}
-		if rules.FreeCap != 10 || rules.FreeSeconds != 7200 || rules.ResourceRefreshCap < 1 || rules.Slots < 1 || rules.Slots > len(rules.Products) || rules.RefreshItem != "item_013,1" || rules.RefreshCost != "diamond,20" {
-			return rules, errors.New("圣坛刷新不匹配原客户端规则")
+		if err := s.validateShopRefreshSettings("memory", shopP4RefreshSettings("memory", rules)); err != nil {
+			return rules, err
 		}
+
 	}
 	for _, bps := range rules.Discounts {
 		if bps < 1 || bps > 10000 {
@@ -448,11 +466,15 @@ func (s *GameService) loadP4Commerce(tx *gorm.DB, id int64, key string, shopType
 			return cfg, rules, nil, nil, err
 		}
 		if cfg.Kind == "memory" {
-			if state.FreeLeft < 0 || state.FreeLeft > rules.FreeCap || state.ResourceUsed < 0 || state.ResourceUsed > rules.ResourceRefreshCap || state.FreeAt <= 0 || state.FreeAt > now.UnixMilli() {
+			if state.FreeLeft < 0 || state.ResourceUsed < 0 || state.FreeAt <= 0 || state.FreeAt > now.UnixMilli() {
 				return cfg, rules, nil, nil, errors.New("圣坛刷新计时存档无效")
 			}
 			seconds := rules.FreeSeconds * 1000
-			elapsed := (now.UnixMilli() - state.FreeAt) / seconds
+			elapsed := int64(0)
+			if seconds > 0 && rules.FreeCap > 0 {
+				elapsed = (now.UnixMilli() - state.FreeAt) / seconds
+			}
+			state.FreeLeft = min(state.FreeLeft, rules.FreeCap)
 			if elapsed > 0 {
 				state.FreeLeft = int32(min(int64(rules.FreeCap), int64(state.FreeLeft)+elapsed))
 				state.FreeAt += elapsed * seconds
@@ -463,6 +485,7 @@ func (s *GameService) loadP4Commerce(tx *gorm.DB, id int64, key string, shopType
 				}
 			}
 		}
+		_ = memoryProducts55(cfg, rules, state) // Capture legacy fixed quotes before the query saves state.
 		return cfg, rules, row, state, nil
 	}
 	return cfg, rules, nil, nil, constUtil.ErrP4CommerceNotOpen
@@ -990,7 +1013,7 @@ func (s *GameService) p4Commerce(ctx context.Context, id int64, request proto.Me
 			}
 			response = &pb.SCMysticDiscount{Discount: proto.Float64(float64(state.DiscountBps) / 10000)}
 		} else if refresh {
-			if cfg.Kind != "memory" || p.GetLevel() < 16 {
+			if cfg.Kind != "memory" || p.GetLevel() < 16 || !shopRefreshEnabled(rules.RefreshEnabled, true) {
 				return errors.New("回忆圣坛刷新未解锁")
 			}
 			if state.FreeLeft > 0 {
@@ -999,11 +1022,14 @@ func (s *GameService) p4Commerce(ctx context.Context, id int64, request proto.Me
 				if state.ResourceUsed >= rules.ResourceRefreshCap {
 					return errors.New("今日资源刷新次数已耗尽")
 				}
-				cost, err = s.p4ParseCost(rules.RefreshItem)
+				cost = nil
+				if rules.RefreshItem != "" {
+					cost, err = s.p4ParseCost(rules.RefreshItem)
+				}
 				if err != nil {
 					return err
 				}
-				if p4ResourceBalance(p, g, cost.GetId()) < int64(cost.GetNum()) {
+				if cost == nil || p4ResourceBalance(p, g, cost.GetId()) < int64(cost.GetNum()) {
 					cost, err = s.p4ParseCost(rules.RefreshCost)
 					if err != nil {
 						return err
@@ -1135,9 +1161,9 @@ func (s *GameService) p4Commerce(ctx context.Context, id int64, request proto.Me
 			}
 			response = &pb.SCShopBuy{ShopType: proto.Int32(shopType), ShopItemList: items, Get: gain, Cost: costs}
 		case *pb.CSRefreshShopQuery:
-			response = &pb.SCRefreshShopQuery{ShopType: proto.Int32(3), ShopItemList: items, FreeLeftTimes: proto.Int32(state.FreeLeft), FreeMaxTimes: proto.Int32(rules.FreeCap), ResLeftTimes: proto.Int32(rules.ResourceRefreshCap - state.ResourceUsed), ResMaxTimes: proto.Int32(rules.ResourceRefreshCap), NextUpdateTime: proto.Int64(next)}
+			response = &pb.SCRefreshShopQuery{ShopType: proto.Int32(3), ShopItemList: items, FreeLeftTimes: proto.Int32(state.FreeLeft), FreeMaxTimes: proto.Int32(rules.FreeCap), ResLeftTimes: proto.Int32(max(int32(0), rules.ResourceRefreshCap-state.ResourceUsed)), ResMaxTimes: proto.Int32(rules.ResourceRefreshCap), NextUpdateTime: proto.Int64(next)}
 		case *pb.CSRefreshShopRefresh:
-			response = &pb.SCRefreshShopRefresh{ShopType: proto.Int32(3), ShopItemList: items, FreeLeftTimes: proto.Int32(state.FreeLeft), FreeMaxTimes: proto.Int32(rules.FreeCap), ResLeftTimes: proto.Int32(rules.ResourceRefreshCap - state.ResourceUsed), ResMaxTimes: proto.Int32(rules.ResourceRefreshCap), Cost: costs, NextUpdateTime: proto.Int64(next)}
+			response = &pb.SCRefreshShopRefresh{ShopType: proto.Int32(3), ShopItemList: items, FreeLeftTimes: proto.Int32(state.FreeLeft), FreeMaxTimes: proto.Int32(rules.FreeCap), ResLeftTimes: proto.Int32(max(int32(0), rules.ResourceRefreshCap-state.ResourceUsed)), ResMaxTimes: proto.Int32(rules.ResourceRefreshCap), Cost: costs, NextUpdateTime: proto.Int64(next)}
 		case *pb.CSRefreshShopBuy:
 			response = &pb.SCRefreshShopBuy{ShopType: proto.Int32(3), ShopItemList: items, Get: gain, Cost: costs, NextUpdateTime: proto.Int64(next)}
 		case *pb.CSActivityShopInfo:

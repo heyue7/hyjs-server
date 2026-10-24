@@ -545,9 +545,7 @@ func (s *GameService) fieldMonsterCheck(ctx context.Context, id int64, b *pb.CSS
 		if err := s.refreshField(id, g); err != nil {
 			return err
 		}
-		if err := s.refreshSharedFieldBosses55(tx, g); err != nil {
-			return err
-		}
+		// 小怪仅使用角色本地怪物；共享首领在专属入口和心跳刷新，避免无关行锁。
 		monster := fieldFind(g, b.GetUuid())
 		result = &pb.SCSideMonsterCheck{Monster: monster, Code: proto.Int32(1)}
 		if monster == nil || monster.GetState() == 3 {
@@ -580,7 +578,7 @@ func (s *GameService) fieldHeartbeat(ctx context.Context, id int64) ([]proto.Mes
 			return err
 		}
 		if s.P8GatherReady {
-			resources, err := s.RefreshP8Resources(tx, player, g, time.Now(), false)
+			resources, err := s.refreshP8Resources(tx, player, g, time.Now(), false, true)
 			if err != nil {
 				return err
 			}
@@ -640,9 +638,7 @@ func (s *GameService) fieldFightStart(ctx context.Context, id int64, b *pb.CSSid
 		if err := s.refreshField(id, g); err != nil {
 			return err
 		}
-		if err := s.refreshSharedFieldBosses55(tx, g); err != nil {
-			return err
-		}
+		// 小怪仅使用角色本地怪物；共享首领在专属入口和心跳刷新，避免无关行锁。
 		f := g.Field
 		if f.Fight != nil && !f.Fight.Settled {
 			if f.Fight.BossStart != nil {

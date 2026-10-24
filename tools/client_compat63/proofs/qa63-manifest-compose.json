@@ -1,0 +1,18 @@
+{
+  "qaInputManifestSHA256": "dd0006df91d25476b5a3d7b075be5e05403456b56a1cee2a117560935b9304a4",
+  "qaOutputManifestSHA256": "7f6c442aa224b3ee41705925e83c90475996d296f57dac970e444d59930bf3b8",
+  "versionCodePreserved": 2026102403,
+  "versionNamePreserved": "1.0.63",
+  "proof": {
+    "originalElementsAndAttributesExact": true,
+    "originalActivityAttributesAndUnityMetadataExact": true,
+    "onlyOriginalNodeMovement": "MAIN/LAUNCHER intent-filter to new plain Activity",
+    "newActivity": "com.hyjs.compat.StartupActivity",
+    "destinationActivity": "com.hyjs.wallet.ClientUpdateActivity",
+    "microphoneRequired": false,
+    "originalStringIndicesPreserved": true,
+    "resourcesArscChanged": false,
+    "beforeSHA256": "dd0006df91d25476b5a3d7b075be5e05403456b56a1cee2a117560935b9304a4",
+    "afterSHA256": "7f6c442aa224b3ee41705925e83c90475996d296f57dac970e444d59930bf3b8"
+  }
+}

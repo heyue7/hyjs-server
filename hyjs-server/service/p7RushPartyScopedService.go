@@ -214,12 +214,23 @@ func (family p7ManualRushFamily) ComputeEnd(ctx context.Context, s *GameService,
 	return out, nil
 }
 
+func (family p7ManualRushFamily) admitGenericScope(series *model.FrozenP6RushSeries) (*p7GenericMechanismRushAdmission, error) {
+	if !family.Generic || family.DriverSource != constUtil.P7GenericMechanismDriverSource || family.ScopeProof != constUtil.P7GenericMechanismCompatibilityProof {
+		return nil, errors.New(constUtil.CombatUnsupported)
+	}
+	return newP7GenericMechanismRushAdmission(series)
+}
+
 func (family p7ManualRushFamily) ValidateEnd(series *model.FrozenP6RushSeries, terminal *model.CombatFinalHPOutcome, supplied *pb.BattleOperate, reported int32) error {
+	if family.Generic {
+		admission, err := family.admitGenericScope(series)
+		if err != nil {
+			return err
+		}
+		return admission.validateEnd(series, terminal, supplied, reported)
+	}
 	if err := family.ValidateScope(series); err != nil {
 		return err
-	}
-	if family.Generic {
-		return p7GenericMechanismRushValidateEnd(series, terminal, supplied, reported)
 	}
 	if family.Natural {
 		return p7NaturalRushValidateEnd(series, terminal, supplied, reported)

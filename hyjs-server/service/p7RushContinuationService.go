@@ -131,7 +131,11 @@ func p7RushContinuationTaskProjection(stage db.P7RushStageRule) (*pb.RushTaskInf
 	if stage.Source != constUtil.P7RushContinuationSource && stage.Source != constUtil.P7SectionStageSource || stage.Reward != "point,10" || stage.FirstReward != "" {
 		return nil, errors.New("本地试炼后继奖励展示冲突")
 	}
-	return &pb.RushTaskInfo{TaskId: proto.String(stage.TaskID), Star: proto.Int32(stage.Star), FightScore: proto.Float64(stage.RecommendedPower), IsPassed: proto.Bool(false), Point: proto.Int32(10), Coin: proto.Int32(0)}, nil
+	power, err := p7RushProjectedPower(stage)
+	if err != nil {
+		return nil, err
+	}
+	return &pb.RushTaskInfo{TaskId: proto.String(stage.TaskID), Star: proto.Int32(stage.Star), FightScore: proto.Float64(power), IsPassed: proto.Bool(false), Point: proto.Int32(10), Coin: proto.Int32(0)}, nil
 }
 
 // p7PendingRushContinuation 恢复本地首组和后继的当前轮合法快照，不升级旧来源或别人的战斗权限。
@@ -163,6 +167,14 @@ func (s *GameService) p7PendingRushContinuation(tx *gorm.DB, state *db.P7RushSta
 	}
 	if !scoped || outcome == nil || !outcome.Authoritative || start.GetFightId() != fight.ID || start.GetRushType() != fight.Kind || start.BattlePlayer.GetPlayerId() != state.PlayerID {
 		return nil, nil, true, errors.New("本地后继活动战斗缺少完整冻结来源")
+	}
+	// Enemies不进入历史Rule JSON。仅在全部冻结来源校验通过后，为当前展示
+	// 补回同一Start的真实敌人；不重写Rule/Start或其摘要，不借用现行目录。
+	if len(stage.Enemies) == 0 && len(start.BattleMonsterList) == 1 {
+		stage.Enemies, err = proto.Marshal(start.BattleMonsterList[0])
+		if err != nil {
+			return nil, nil, true, err
+		}
 	}
 	return start, &stage, true, nil
 }

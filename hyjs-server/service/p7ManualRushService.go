@@ -12,6 +12,7 @@ import (
 	"hyjs-server/db"
 	"hyjs-server/model"
 	pb "hyjs-server/model/protocol"
+	"reflect"
 	"time"
 )
 
@@ -118,12 +119,19 @@ func p7ReadManualRush(tx *gorm.DB, fight *db.P7RushFight, request *pb.CSRushFigh
 	var series model.FrozenP6RushSeries
 	var cfg db.P7RushStageRule
 	start := &pb.SCRushFightStart{}
-	if err != nil || p6Digest(raw) != row.SeriesHash || json.Unmarshal(raw, &series) != nil || json.Unmarshal(fight.Rule, &cfg) != nil || proto.Unmarshal(fight.Start, start) != nil || family.ValidateScope(&series) != nil {
+	if err != nil || p6Digest(raw) != row.SeriesHash || json.Unmarshal(raw, &series) != nil || json.Unmarshal(fight.Rule, &cfg) != nil || proto.Unmarshal(fight.Start, start) != nil {
 		return reject()
 	}
-	a, _ := json.Marshal(input)
-	b, _ := json.Marshal(series.Template)
-	if !bytes.Equal(a, b) || !proto.Equal(start, series.Start) || start.GetFightId() != fight.ID || cfg.Kind != fight.Kind || cfg.TaskID != fight.TaskID || cfg.Scene != start.GetFightScene() || cfg.MaxRound != start.GetMaxRound() || cfg.WinKey != start.GetWinKey() || cfg.WinValue != start.GetWinValue() || input.Attacker.GetPlayerId() != fight.PlayerID || record.PlayerID != fight.PlayerID || record.Source != constUtil.P7RushReplaySource || record.SourceFight != fight.ID {
+	var genericAdmission *p7GenericMechanismRushAdmission
+	if family.Generic {
+		genericAdmission, err = family.admitGenericScope(&series)
+		if err != nil {
+			return reject()
+		}
+	} else if family.ValidateScope(&series) != nil {
+		return reject()
+	}
+	if !p7ManualRushInputsEqual(input, series.Template) || !proto.Equal(start, series.Start) || start.GetFightId() != fight.ID || cfg.Kind != fight.Kind || cfg.TaskID != fight.TaskID || cfg.Scene != start.GetFightScene() || cfg.MaxRound != start.GetMaxRound() || cfg.WinKey != start.GetWinKey() || cfg.WinValue != start.GetWinValue() || input.Attacker.GetPlayerId() != fight.PlayerID || record.PlayerID != fight.PlayerID || record.Source != constUtil.P7RushReplaySource || record.SourceFight != fight.ID {
 		return reject()
 	}
 	if row.Status == constUtil.P7RushManualPending {
@@ -135,7 +143,12 @@ func p7ReadManualRush(tx *gorm.DB, fight *db.P7RushFight, request *pb.CSRushFigh
 			if p6Digest(row.Preview) != row.PreviewHash || json.Unmarshal(row.Preview, &preview) != nil || preview.Outcome == nil {
 				return reject()
 			}
-			if family.ValidatePreview(&series, &preview) != nil {
+			if genericAdmission != nil {
+				err = genericAdmission.validatePreview(&series, &preview)
+			} else {
+				err = family.ValidatePreview(&series, &preview)
+			}
+			if err != nil {
 				return reject()
 			}
 			return preview.Outcome, true, nil
@@ -198,7 +211,12 @@ func p7ReadManualRush(tx *gorm.DB, fight *db.P7RushFight, request *pb.CSRushFigh
 		supplied = request.GetOptRecord()
 		reported = request.GetResult()
 	}
-	if err = family.ValidateEnd(&series, &terminal, supplied, reported); err != nil {
+	if genericAdmission != nil {
+		err = genericAdmission.validateEnd(&series, &terminal, supplied, reported)
+	} else {
+		err = family.ValidateEnd(&series, &terminal, supplied, reported)
+	}
+	if err != nil {
 		return nil, true, err
 	}
 	outcome, err := json.Marshal(terminal.Outcome)
@@ -255,4 +273,19 @@ func p7RushManualIdentity(kind int32) (int64, string, string, bool) {
 	default:
 		return 0, "", "", false
 	}
+}
+
+// p7ManualRushInputsEqual保留原完整JSON比较合同。结构相同的表不再重复编码；
+// 表结构不同时仍走原JSON，保留nil/empty、顺序及无效UTF8规范化的旧语义。
+func p7ManualRushInputsEqual(input, expected *model.FrozenBattleInput) bool {
+	if input != nil && expected != nil && reflect.DeepEqual(input.Tables, expected.Tables) {
+		left, right := *input, *expected
+		left.Tables, right.Tables = nil, nil
+		a, _ := json.Marshal(&left)
+		b, _ := json.Marshal(&right)
+		return bytes.Equal(a, b)
+	}
+	a, _ := json.Marshal(input)
+	b, _ := json.Marshal(expected)
+	return bytes.Equal(a, b)
 }

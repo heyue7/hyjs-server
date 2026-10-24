@@ -36,6 +36,8 @@ type GameService struct {
 	AdminCatalogueData *model.AdminCatalogueData
 	// ServerClockReady 表示全服时钟表及缓存已初始化。
 	ServerClockReady bool
+	// FieldResourcePolicyReady 表示普通野外首领奖励全局规则已持久化。
+	FieldResourcePolicyReady bool
 	// ServerClockState 为本服务后台任务提供并发安全的持久时钟快照。
 	ServerClockState atomic.Pointer[model.ServerGameClockView]
 	// adminFieldRuntimeReady 在野外管理表初始化成功后置位，正式高频路径跳过表存在检查。

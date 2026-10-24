@@ -25,7 +25,7 @@ public final class LocalAssetOverlay {
         new Pin("model/lingnai01_body", "0bb4db13e9c6667b6b52d88a1a469990895a154b6c38509dbdfe64a424322d4e", 526777L),
         new Pin("model/sicary01_body", "1dc1308c407872e7ad009ac97abae56710026e1a3572b043389597d135483d77", 596264L),
         new Pin("model/nio01_body", "5aa707be0d98bf19082fb05fcac5a10029cafca95a90aa9905ddfa38eb6e647a", 503359L),
-        new Pin("smallassetmanifest", "cfddb4d1b6ee15bfc8d51da311bfa7e6e1408c809c4ccd8b1e47049a85b45254", 563672L),
+        new Pin("smallassetmanifest", "fac59a57d1a146ad36cd87dcbc05a0f43fc516f6d81393c858d0cc94b087130f", 564315L),
     };
     private static final class Pin {
         final String path, sha256;

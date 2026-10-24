@@ -5,6 +5,7 @@ import (
 	"hyjs-server/constUtil"
 	"hyjs-server/model"
 	"hyjs-server/service"
+	"math"
 	"strings"
 	"time"
 )
@@ -70,6 +71,20 @@ func AdminShopProductSaveHandler(c *gin.Context) {
 	if c.ShouldBindJSON(&req) != nil || !service.AdminShopValid(key) || len(req.Version) != 64 || len(req.Name) > 128 || len(req.Source) > 1000 || len(req.Rewards) < 1 || len(req.Rewards) > 50 || len(c.Param("productId")) > 180 {
 		adminError(c, constUtil.ErrAdminInput)
 		return
+	}
+	if len(req.QuantityTiers) > 64 || len(req.QuantityTiers) > 0 && ((key != "memory" && key != "pet-market" && key != "ggo") || len(req.Rewards) != 1) {
+		adminError(c, constUtil.ErrAdminInput)
+		return
+	}
+	seen := map[int64]bool{}
+	var sum int64
+	for _, tier := range req.QuantityTiers {
+		if tier.Amount < 1 || tier.Amount > math.MaxInt32 || seen[tier.Amount] || tier.Weight < 1 || tier.Weight > math.MaxInt64-sum || tier.Cost.Amount < 1 || tier.Cost.Amount > math.MaxInt32 || tier.Cost.ResourceID == "" || len(tier.Cost.ResourceID) > 64 || strings.ContainsAny(tier.Cost.ResourceID, ",; \r\n") {
+			adminError(c, constUtil.ErrAdminInput)
+			return
+		}
+		seen[tier.Amount] = true
+		sum += tier.Weight
 	}
 	for _, r := range req.Rewards {
 		if r.ResourceID == "stamina" {

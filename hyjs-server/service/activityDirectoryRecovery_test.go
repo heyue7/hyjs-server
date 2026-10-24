@@ -97,9 +97,10 @@ func TestActivityDirectoryAbsentWheelAndIncompleteEntriesKeepHealthyTabs(t *test
 		t.Fatal(err)
 	}
 	got := list()
-	if has(got, badPeriod.ID) || has(got, badCommerce.ID) || has(got, badSeasonal.ID) || !has(got, "openServerFund_local_20261011") || !has(got, "warriorWeightImprove") {
+	if has(got, badPeriod.ID) || has(got, badCommerce.ID) || has(got, badSeasonal.ID) || !has(got, "openServerFund_local_20261011") || has(got, "warriorWeightImprove") {
 		t.Fatal("invalid draft or disabled rotation leaked", got)
 	}
+	activityDirectoryStrongRecruitEntry63(t, f)
 	if _, err := f.s.P1Activity(f.ctx, f.id, &pb.CSActivityReward{ActivityId: proto.String(badPeriod.ID)}); err == nil {
 		t.Fatal("invalid hidden period awarded")
 	}
@@ -115,15 +116,23 @@ func TestActivityDirectoryAbsentWheelAndIncompleteEntriesKeepHealthyTabs(t *test
 func TestActivityDirectoryNoSeasonalContentAndBadRotationDoesNotBlock(t *testing.T) {
 	f := p4Setup(t)
 	now := time.Now()
+	healthy := db.P4CommerceRule{ID: "halfDiscountSale_p4_directory_healthy", Kind: "half", Enabled: true, StartAt: now.Add(-time.Hour).UnixMilli(), EndAt: now.Add(time.Hour).UnixMilli(), ClaimEndAt: now.Add(time.Hour).UnixMilli(), Rules: adminJSON(p4CommerceRules{Products: []p4Product{p4BaseProduct("directory-healthy", "item_005,1", "coin,1", 1, 1)}})}
+	if err := db.GetIns().Create(&healthy).Error; err != nil {
+		t.Fatal(err)
+	}
 	bad := db.P4RecruitRotation{ID: "p4:recruit:invalid", Kind: 2, Enabled: true, StartAt: now.Add(-time.Hour).UnixMilli(), EndAt: now.Add(time.Hour).UnixMilli(), Frozen: []byte("{"), Rewards: []byte("[]")}
 	if err := db.GetIns().Create(&bad).Error; err != nil {
 		t.Fatal(err)
 	}
 	tabs, err := f.s.P4ActivityTabs(f.ctx, now)
-	if err != nil || !slices.ContainsFunc(tabs, func(tab *pb.ActivityTab) bool { return tab.GetActivityId() == "warriorWeightImprove" }) {
+	if err != nil || slices.ContainsFunc(tabs, func(tab *pb.ActivityTab) bool { return tab.GetActivityId() == "warriorWeightImprove" }) {
 		t.Fatal("bad rotation caused root list failure or exposure", err)
 	}
-	// 开放完整的原强者轮换后，仅该入口恢复；无额外活动奖励写入。
+	if !slices.ContainsFunc(tabs, func(tab *pb.ActivityTab) bool { return tab.GetActivityId() == healthy.ID }) {
+		t.Fatal("bad rotation hid healthy activity")
+	}
+	activityDirectoryStrongRecruitEntry63(t, f)
+	// 旧强者轮换有效与损坏都不再占活动列表；真实角色招募入口沿常驻池可用。
 	var base []db.GameplayPoolReward
 	if err := db.GetIns().Where("pool_id=?", "recruit_2").Find(&base).Error; err != nil {
 		t.Fatal(err)
@@ -136,9 +145,14 @@ func TestActivityDirectoryNoSeasonalContentAndBadRotationDoesNotBlock(t *testing
 		t.Fatal(err)
 	}
 	tabs, err = f.s.P4ActivityTabs(f.ctx, now)
-	if err != nil || !slices.ContainsFunc(tabs, func(tab *pb.ActivityTab) bool { return tab.GetActivityId() == "warriorWeightImprove" }) {
-		t.Fatal("valid operator rotation not visible", err)
+	if err != nil || slices.ContainsFunc(tabs, func(tab *pb.ActivityTab) bool { return tab.GetActivityId() == "warriorWeightImprove" }) {
+		t.Fatal("valid old rotation leaked into activity tabs", err)
 	}
+	if !slices.ContainsFunc(tabs, func(tab *pb.ActivityTab) bool { return tab.GetActivityId() == healthy.ID }) {
+		t.Fatal("valid old rotation hid healthy activity")
+	}
+	activityDirectoryStrongRecruitEntry63(t, f)
+
 }
 
 func TestActivityDirectorySeasonalMissingChildKeepsHealthySibling(t *testing.T) {
@@ -175,5 +189,23 @@ func TestActivityDirectorySeasonalMissingChildKeepsHealthySibling(t *testing.T) 
 	out, err = f.s.p15SeasonalList(f.ctx, f.id, &pb.CSActivityList{ActivityId: proto.String(parent.ID)}, now)
 	if err != nil || len(out[0].(*pb.SCActivityList).GetActivityList()) != 0 {
 		t.Fatal("empty seasonal directory not a valid response", err)
+	}
+}
+
+// Exercise the original shop role-recruit information protocol, without draws or rewards.
+func activityDirectoryStrongRecruitEntry63(t *testing.T, f *p1Fixture) {
+	t.Helper()
+	before, _ := f.profile(t)
+	messages, err := f.s.recruitInfo(f.ctx, f.id, &pb.CSWarriorRecruitGet{CostType: []int32{2}})
+	if err != nil || len(messages) != 1 {
+		t.Fatal("strong recruit shop entry unavailable", err)
+	}
+	entries := messages[0].(*pb.SCWarriorRecruitGet).GetRecruit()
+	if len(entries) != 1 || entries[0].GetCostType() != 2 || len(entries[0].GetRewardList()) == 0 || entries[0].GetChangeTime() != 0 {
+		t.Fatal("permanent strong recruit not served through shop", entries)
+	}
+	after, _ := f.profile(t)
+	if !proto.Equal(before, after) {
+		t.Fatal("recruit info changed player resources")
 	}
 }

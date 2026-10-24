@@ -233,12 +233,18 @@ func (s *GameService) adminValidateDefinition(tx *gorm.DB, f model.AdminActivity
 	return result
 }
 
-// AdminSaveActivityDefinition changes future scheduling input and leaves occurrence snapshots intact.
+// AdminSaveActivityDefinition 保存模板；藏宝箱数值同时更新尚未结束的对应排期。
 func (s *GameService) AdminSaveActivityDefinition(ctx context.Context, p *model.AdminPrincipal, id string, req model.AdminActivityDefinitionSaveRequest) (*model.AdminActivityDefinitionDTO, error) {
 	var out model.AdminActivityDefinitionDTO
 	err := db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := adminOperationUser(tx, p, true); err != nil {
 			return err
+		}
+		// 排期保存先锁日历再锁模板，模板同步沿用同一锁序。
+		if req.Form.Mode == "fortune-cat" && id != "" {
+			if err := adminLockTreasureCalendars(tx); err != nil {
+				return err
+			}
 		}
 		var row db.AdminActivityDefinition
 		if id != "" {
@@ -306,6 +312,11 @@ func (s *GameService) AdminSaveActivityDefinition(ctx context.Context, p *model.
 		row.UpdatedAtMillis = time.Now().UnixMilli()
 		if err := tx.Save(&row).Error; err != nil {
 			return err
+		}
+		if row.Mode == "fortune-cat" && row.Usable {
+			if err := s.adminSyncTreasureTemplate(tx, row, form, time.Now()); err != nil {
+				return err
+			}
 		}
 		var err error
 		out, err = adminActivityDefinitionDTO(row)

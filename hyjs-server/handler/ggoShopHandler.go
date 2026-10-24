@@ -17,6 +17,7 @@ import (
 func init() {
 	routes.RegisterPostRouter("/ggo-shop/catalogue", wrapper.Wrapper(GGOShopCatalogueHandler))
 	routes.RegisterPostRouter("/ggo-shop/buy", wrapper.Wrapper(GGOShopBuyHandler))
+	routes.RegisterPostRouter("/ggo-shop/refresh", wrapper.Wrapper(GGOShopRefreshHandler))
 }
 
 // GGOShopCatalogueHandler 查询信用商店。
@@ -79,6 +80,38 @@ func GGOShopBuyHandler(c *gin.Context) error {
 	}
 	ctx := context.WithValue(c.Request.Context(), constUtil.GameServiceContextKey, gameService)
 	out, err := gameService.GGOShopBuy(ctx, req, session)
+	if err != nil {
+		return err
+	}
+	c.JSON(http.StatusOK, model.NewBizCodeData(out))
+	return nil
+}
+
+// GGOShopRefreshHandler refreshes a frozen slot catalogue with a UUID receipt.
+// @Summary 刷新信用商店
+// @Description 优先免费次数，其次按当前展示的付费价格刷新；UUID重试沿用成功回执。
+// @Tags GGOShop
+// @Accept json
+// @Produce json
+// @Param body body model.GGOShopRefreshRequest true "角色、会话、版本和UUID"
+// @Success 200 {object} model.GGOShopRefreshResponse
+// @Router /ggo-shop/refresh [post]
+func GGOShopRefreshHandler(c *gin.Context) error {
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 2048)
+	var req model.GGOShopRefreshRequest
+	if c.ShouldBindJSON(&req) != nil || req.PlayerID < 1 || len(req.SessionHex) != 32 || gameService == nil || len(req.Version) != 64 || len(req.RequestID) != 36 {
+		return model.NewErrParamsError()
+	}
+	id, err := uuid.Parse(req.RequestID)
+	if err != nil || id == uuid.Nil || id.String() != req.RequestID {
+		return model.NewErrParamsError()
+	}
+	session, err := hex.DecodeString(req.SessionHex)
+	if err != nil || len(session) != 16 {
+		return model.NewErrParamsError()
+	}
+	ctx := context.WithValue(c.Request.Context(), constUtil.GameServiceContextKey, gameService)
+	out, err := gameService.GGOShopRefresh(ctx, req, session)
 	if err != nil {
 		return err
 	}

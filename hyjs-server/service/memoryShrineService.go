@@ -17,8 +17,9 @@ import (
 )
 
 type memoryOffer55 struct {
-	ID        string `json:"id"`
-	ProductID string `json:"productId"`
+	ID        string     `json:"id"`
+	ProductID string     `json:"productId"`
+	Quote     *p4Product `json:"quote,omitempty"`
 }
 
 func memorySource55(p p4Product) string {
@@ -28,13 +29,30 @@ func memorySource55(p p4Product) string {
 	return p.ID
 }
 func memoryProducts55(cfg db.P4CommerceRule, rules p4CommerceRules, state *p4CommerceProgress) []p4Product {
+	if cfg.Kind == "memory" && len(state.Offers) == 0 && len(state.Slots) > 0 {
+		for _, id := range state.Slots {
+			state.Offers = append(state.Offers, memoryOffer55{ID: id, ProductID: id})
+		}
+		state.Slots = nil
+	}
 	if cfg.Kind != "memory" || len(state.Offers) == 0 {
 		return rules.Products
 	}
 	var out []p4Product
-	for _, slot := range state.Offers {
+	for i := range state.Offers {
+		slot := &state.Offers[i]
 		for _, p := range rules.Products {
 			if p.ID == slot.ProductID {
+				if slot.Quote == nil {
+					q := p
+					q.QuantityTiers = nil
+					slot.Quote = &q
+				}
+				p.Rewards = slot.Quote.Rewards
+				p.Cost = slot.Quote.Cost
+				p.DiscountBps = slot.Quote.DiscountBps
+				p.TierID = slot.Quote.TierID
+				p.QuantityTiers = nil
 				p.SourceProductID = p.ID
 				p.ID = slot.ID
 				p.Index = int32(len(out) + 1)
@@ -48,11 +66,26 @@ func memoryProducts55(cfg db.P4CommerceRule, rules p4CommerceRules, state *p4Com
 func memoryRefresh55(rules p4CommerceRules, state *p4CommerceProgress) error {
 	if rules.MemoryPolicyVersion < 1 {
 		slots, err := p4SampleSlots(rules)
-		if err == nil {
-			state.Slots = slots
-			state.Offers = nil
+		if err != nil {
+			return err
 		}
-		return err
+		offers := make([]memoryOffer55, 0, len(slots))
+		for _, id := range slots {
+			for _, p := range rules.Products {
+				if p.ID != id {
+					continue
+				}
+				q, err := memoryDrawQuote63(p)
+				if err != nil {
+					return err
+				}
+				offers = append(offers, memoryOffer55{ID: id, ProductID: id, Quote: &q})
+				break
+			}
+		}
+		state.Slots = nil
+		state.Offers = offers
+		return nil
 	}
 	var fragments, materials []p4Product
 	for _, p := range rules.Products {
@@ -87,7 +120,18 @@ func memoryRefresh55(rules p4CommerceRules, state *p4CommerceProgress) error {
 			return errors.New("圣坛商品池不足")
 		}
 		id := sample[0]
-		offers = append(offers, memoryOffer55{ID: fmt.Sprintf("memory55:%d:%d:%s", state.Version, pos+1, id), ProductID: id})
+		var quote p4Product
+		for _, p := range pool {
+			if p.ID == id {
+				quote = p
+				break
+			}
+		}
+		quote, err = memoryDrawQuote63(quote)
+		if err != nil {
+			return err
+		}
+		offers = append(offers, memoryOffer55{ID: fmt.Sprintf("memory55:%d:%d:%s", state.Version, pos+1, id), ProductID: id, Quote: &quote})
 		if pos < count {
 			for i, p := range fragments {
 				if p.ID == id {
@@ -255,7 +299,7 @@ func (s *GameService) validateMemoryShrine55(rules p4CommerceRules) error {
 			}
 			continue
 		}
-		if id != "item_005" && id != "hero_exp_002" && id != "item_006" && id != "item_013" {
+		if id != "item_005" && id != "hero_exp_002" && id != "hero_exp_004" && id != "item_006" && id != "item_013" {
 			return errors.New("圣坛商品不在允许目录")
 		}
 		if p.isEnabled() && p.Weight > 0 {
@@ -266,4 +310,18 @@ func (s *GameService) validateMemoryShrine55(rules p4CommerceRules) error {
 		return errors.New("圣坛需要至少四种启用碎片和一种材料")
 	}
 	return nil
+}
+
+func memoryDrawQuote63(p p4Product) (p4Product, error) {
+	tier, err := shopDrawQuantityTier(p.QuantityTiers)
+	if err != nil {
+		return p, err
+	}
+	if tier != nil {
+		p.Rewards = strings.Split(p.Rewards, ",")[0] + fmt.Sprintf(",%d", tier.Amount)
+		p.Cost = shopResourceSpec(tier.Cost)
+		p.TierID = false
+	}
+	p.QuantityTiers = nil
+	return p, nil
 }

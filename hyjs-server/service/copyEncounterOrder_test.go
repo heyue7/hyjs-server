@@ -155,10 +155,7 @@ func TestCopyOriginalMapOrdinaryOutOfOrderActiveOwnershipAndAllEncounterCompleti
 		t.Fatal("one encounter completed mission")
 	}
 	reject(chapter, "8", "31")
-	boss := start("32")
-	if finish(boss, 1).GetIsCopyComplete() != 0 {
-		t.Fatal("early boss bypassed remaining encounters")
-	}
+	reject(chapter, "8", "32")
 	cold()
 	enter, err := service.copyEnter(ctx, id, &pb.CSCopyEnter{ChapterId: proto.String(chapter), MissionId: proto.String("8")})
 	if err != nil {
@@ -169,7 +166,7 @@ func TestCopyOriginalMapOrdinaryOutOfOrderActiveOwnershipAndAllEncounterCompleti
 	for _, job := range jobs {
 		tasks = append(tasks, job.GetTaskId())
 	}
-	if !slices.Equal(tasks, []string{"29", "30"}) {
+	if !slices.Equal(tasks, []string{"29", "30", "32"}) {
 		t.Fatal("cold map did not preserve dead/live encounter set", tasks)
 	}
 	afterEnter, _ := read()
@@ -179,13 +176,17 @@ func TestCopyOriginalMapOrdinaryOutOfOrderActiveOwnershipAndAllEncounterCompleti
 	if finish(start("30"), 1).GetIsCopyComplete() != 0 {
 		t.Fatal("missing task29 bypassed")
 	}
-	finalStart := start("29")
+	reject(chapter, "8", "32")
+	if finish(start("29"), 1).GetIsCopyComplete() != 0 {
+		t.Fatal("minions completed mission before boss")
+	}
+	finalStart := start("32")
 	end := finish(finalStart, 1)
 	if end.GetIsCopyComplete() != 1 {
 		t.Fatal("all actual encounters did not complete")
 	}
 	p, g := read()
-	if !g.Run.Complete || !slices.Equal(g.Run.Passed, []string{"31", "32", "30", "29"}) {
+	if !g.Run.Complete || !slices.Equal(g.Run.Passed, []string{"31", "30", "29", "32"}) {
 		t.Fatal("actual collision order not retained")
 	}
 	count := int32(0)

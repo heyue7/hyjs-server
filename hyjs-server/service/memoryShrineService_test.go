@@ -3,6 +3,7 @@ package service
 import (
 	"encoding/json"
 	"hyjs-server/db"
+	"reflect"
 	"testing"
 )
 
@@ -51,7 +52,7 @@ func TestMemoryShrine55Offers(t *testing.T) {
 		if err := json.Unmarshal(raw, &restored); err != nil {
 			t.Fatal(err)
 		}
-		if restored.Offers[5] != state.Offers[5] {
+		if !reflect.DeepEqual(restored.Offers[5], state.Offers[5]) {
 			t.Fatal("lost slot")
 		}
 		old := offers[0]

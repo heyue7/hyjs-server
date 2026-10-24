@@ -274,17 +274,31 @@ func (s *GameService) FreezeBattleInput(input model.FrozenBattleInput) (*model.F
 		}
 	}
 	// Preserve reviewed combat sources when unrelated startup catalog rows differ.
-	normalizeUnusedThreeOrangeCombatRows(&out, input.ConfigurationHash)
-	p15NormalizeUnusedGreenCombatRows(&out, input.ConfigurationHash)
-	out.AppliedProperties = map[string][]string{}
-	for key, ids := range input.AppliedProperties {
-		out.AppliedProperties[key] = append([]string(nil), ids...)
-	}
+	// 摘要只在本次Freeze内复用；任一normalizer实际赋值后立即失效重算。
 	encoded, err := json.Marshal(out.Tables)
 	if err != nil {
 		return nil, err
 	}
-	out.ConfigurationHash = p6Digest(encoded)
+	tableHash := p6Digest(encoded)
+	if normalizeUnusedThreeOrangeCombatRowsWithHash(&out, input.ConfigurationHash, tableHash) {
+		encoded, err = json.Marshal(out.Tables)
+		if err != nil {
+			return nil, err
+		}
+		tableHash = p6Digest(encoded)
+	}
+	if p15NormalizeUnusedGreenCombatRowsWithHash(&out, input.ConfigurationHash, tableHash) {
+		encoded, err = json.Marshal(out.Tables)
+		if err != nil {
+			return nil, err
+		}
+		tableHash = p6Digest(encoded)
+	}
+	out.AppliedProperties = map[string][]string{}
+	for key, ids := range input.AppliedProperties {
+		out.AppliedProperties[key] = append([]string(nil), ids...)
+	}
+	out.ConfigurationHash = tableHash
 	out.EngineVersion = constUtil.P6EngineVersion
 	if out.ClientVersion == "" {
 		out.ClientVersion = constUtil.P6OriginalClientHash

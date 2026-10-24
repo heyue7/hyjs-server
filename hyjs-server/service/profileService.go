@@ -267,6 +267,17 @@ func updateProfile(ctx context.Context, id int64, fn func(*pb.Player, *model.Gam
 
 // updateProfileWithTx 让相关奖励与限时效果沿用同一角色行锁和提交边界。
 func updateProfileWithTx(ctx context.Context, id int64, fn func(*gorm.DB, *pb.Player, *model.GameState) error) error {
+	return updateProfileTransaction(ctx, id, true, fn)
+}
+
+// updateProfileForP7QueryWithTx 仅供不产生P1事实的试炼查询使用。
+// 保留时钟、角色行锁、恢复、存档钩子及原子提交；查询期间不预锁公共活动窗口。
+// 开战、领奖、购买、重置及其他mutation必须继续使用updateProfileWithTx。
+func updateProfileForP7QueryWithTx(ctx context.Context, id int64, fn func(*gorm.DB, *pb.Player, *model.GameState) error) error {
+	return updateProfileTransaction(ctx, id, false, fn)
+}
+
+func updateProfileTransaction(ctx context.Context, id int64, prelockPeriods bool, fn func(*gorm.DB, *pb.Player, *model.GameState) error) error {
 	return db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := ServerGameClockGuardTransaction(tx); err != nil {
 			return err
@@ -283,8 +294,10 @@ func updateProfileWithTx(ctx context.Context, id int64, fn func(*gorm.DB, *pb.Pl
 		if _, err = ServerGameClockPrepareProfile(tx, &row, player); err != nil {
 			return err
 		}
-		if err := lockProfilePeriods(tx); err != nil {
-			return err
+		if prelockPeriods {
+			if err := lockProfilePeriods(tx); err != nil {
+				return err
+			}
 		}
 		if svc, ok := ctx.Value(constUtil.GameServiceContextKey).(*GameService); ok {
 			// Penalty recovery changes this same locked object, without blocking rewards.

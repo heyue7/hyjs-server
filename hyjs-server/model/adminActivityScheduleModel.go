@@ -117,3 +117,8 @@ type AdminActivityCostResourcesResponse struct {
 	Facets AdminCatalogueFacets `json:"facets"` // Facets contains labels present in the legal-cost catalogue.
 	Items  []AdminItemDTO       `json:"items"`  // Items carries readable names and original thumbnails for valid positive-cost resources.
 }
+
+// AdminActivityScheduleRestoreRequest protects restoration with the whole-calendar version.
+type AdminActivityScheduleRestoreRequest struct {
+	Version string `json:"version" binding:"required"` // Version is the latest calendar version.
+}

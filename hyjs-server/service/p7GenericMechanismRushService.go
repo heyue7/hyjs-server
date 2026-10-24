@@ -38,6 +38,35 @@ func p7GenericMechanismRushProof(series *model.FrozenP6RushSeries) (string, erro
 	return constUtil.P7GenericMechanismCompatibilityProof, nil
 }
 
+// p7GenericMechanismRushAdmission 仅绑定当前调用栈内已完整证明的冻结series。
+// seal覆盖全部表/演员/Start；使用前重验，禁止复用到修改后的series或其他指针。
+type p7GenericMechanismRushAdmission struct {
+	series *model.FrozenP6RushSeries
+	seal   string
+}
+
+func newP7GenericMechanismRushAdmission(series *model.FrozenP6RushSeries) (*p7GenericMechanismRushAdmission, error) {
+	if _, err := p7GenericMechanismRushProof(series); err != nil {
+		return nil, err
+	}
+	raw, err := json.Marshal(series)
+	if err != nil {
+		return nil, err
+	}
+	return &p7GenericMechanismRushAdmission{series: series, seal: p6Digest(raw)}, nil
+}
+
+func (admission *p7GenericMechanismRushAdmission) validate(series *model.FrozenP6RushSeries) error {
+	if admission == nil || series == nil || admission.series != series || admission.seal == "" {
+		return errors.New(constUtil.P6ReplayConflict)
+	}
+	raw, err := json.Marshal(series)
+	if err != nil || p6Digest(raw) != admission.seal {
+		return errors.New(constUtil.P6ReplayConflict)
+	}
+	return nil
+}
+
 func p7GenericMechanismRushSourceAvailable(series *model.FrozenP6RushSeries) bool {
 	if series == nil {
 		return false
@@ -52,6 +81,10 @@ func p7GenericMechanismRushInputAt(series *model.FrozenP6RushSeries, at float64)
 	if _, err := p7GenericMechanismRushProof(series); err != nil {
 		return nil, err
 	}
+	return p7GenericMechanismRushInputAtAdmitted(series, at)
+}
+
+func p7GenericMechanismRushInputAtAdmitted(series *model.FrozenP6RushSeries, at float64) (*model.FrozenBattleInput, error) {
 	if !combatFinite(at) || at < 0 || at > constUtil.P7NaturalRushAutoRoundTimeLimit {
 		return nil, errors.New(constUtil.P6ReplayConflict)
 	}
@@ -73,16 +106,34 @@ func p7GenericMechanismRushCalculationInput(series *model.FrozenP6RushSeries, su
 	if _, err := p7GenericMechanismRushProof(series); err != nil {
 		return nil, err
 	}
-	input, err := cloneP6CalculationInput(series.Template)
-	if err != nil {
+	return p7GenericMechanismRushCalculationInputAdmitted(series, supplied)
+}
+
+func p7GenericMechanismRushCalculationInputAdmitted(series *model.FrozenP6RushSeries, supplied *pb.BattleOperate) (*model.FrozenBattleInput, error) {
+	if err := p7GenericMechanismRushValidateControls(series, supplied); err != nil {
 		return nil, err
 	}
+	return cloneP6CalculationInput(series.Template)
+}
+
+// p7GenericMechanismRushValidateControls 仅读取已admitted的实例和原完整控制记录。
+// 保留旧clone在控制检查前的metadata有限数值门禁；只有实际选中的driver才深拷贝输入。
+func p7GenericMechanismRushValidateControls(series *model.FrozenP6RushSeries, supplied *pb.BattleOperate) error {
+	if series == nil || series.Template == nil {
+		return errors.New(constUtil.CombatInvalid)
+	}
+	input := series.Template
+	metadata := *input
+	metadata.Tables = nil
+	if _, err := json.Marshal(metadata); err != nil {
+		return err
+	}
 	if supplied == nil || supplied.DefenderTransOpt != nil || len(supplied.SkillOpts) == 0 || len(supplied.SkillOpts) > 16000 || p6ScopedUnknown(supplied) {
-		return nil, errors.New(constUtil.P6ReplayConflict)
+		return errors.New(constUtil.P6ReplayConflict)
 	}
 	if change := supplied.AttackerTransOpt; change != nil {
 		if p6ScopedUnknown(change) || change.GetRoundNum() != 1 || len(change.ActorUids) != len(input.Attacker.Formation) || len(change.Fpids) != len(change.ActorUids) {
-			return nil, errors.New(constUtil.P6ReplayConflict)
+			return errors.New(constUtil.P6ReplayConflict)
 		}
 		seenActors, seenPositions := map[string]bool{}, map[int32]bool{}
 		for index, uid := range change.ActorUids {
@@ -91,14 +142,14 @@ func p7GenericMechanismRushCalculationInput(series *model.FrozenP6RushSeries, su
 				found = found || actor.GetGuid() == uid
 			}
 			if !found || seenActors[uid] || change.Fpids[index] < 1 || change.Fpids[index] > 15 || seenPositions[change.Fpids[index]] {
-				return nil, errors.New(constUtil.P6ReplayConflict)
+				return errors.New(constUtil.P6ReplayConflict)
 			}
 			seenActors[uid], seenPositions[change.Fpids[index]] = true, true
 		}
 	}
 	for _, op := range supplied.SkillOpts {
 		if op == nil || p6ScopedUnknown(op) || op.GetCamp() < 0 || op.GetCamp() > 1 || op.GetRoundNum() < 1 || op.GetRoundNum() > input.MaxRound || !combatFinite(op.GetRoundTime()) || op.GetRoundTime() < 0 || op.GetRoundTime() > 120 || op.GetSkillIndex() < 0 || op.GetSkillIndex() > 3 {
-			return nil, errors.New(constUtil.P6ReplayConflict)
+			return errors.New(constUtil.P6ReplayConflict)
 		}
 		formation := input.Attacker.Formation
 		if op.GetCamp() == 1 {
@@ -109,10 +160,10 @@ func p7GenericMechanismRushCalculationInput(series *model.FrozenP6RushSeries, su
 			found = found || actor.GetGuid() == op.GetActorUid()
 		}
 		if !found {
-			return nil, errors.New(constUtil.P6ReplayConflict)
+			return errors.New(constUtil.P6ReplayConflict)
 		}
 	}
-	return input, nil
+	return nil
 }
 
 func p7GenericMechanismRushPreview(ctx context.Context, s *GameService, series *model.FrozenP6RushSeries) (*model.CombatFinalHPOutcome, error) {
@@ -211,7 +262,14 @@ func p7GenericMechanismRushComputeEnd(ctx context.Context, _ *GameService, serie
 }
 
 func p7GenericMechanismRushAutoCalculationInput(series *model.FrozenP6RushSeries, supplied *pb.BattleOperate) (*model.FrozenBattleInput, error) {
-	if _, err := p7GenericMechanismRushCalculationInput(series, supplied); err != nil {
+	if _, err := p7GenericMechanismRushProof(series); err != nil {
+		return nil, err
+	}
+	return p7GenericMechanismRushAutoCalculationInputAdmitted(series, supplied)
+}
+
+func p7GenericMechanismRushAutoCalculationInputAdmitted(series *model.FrozenP6RushSeries, supplied *pb.BattleOperate) (*model.FrozenBattleInput, error) {
+	if err := p7GenericMechanismRushValidateControls(series, supplied); err != nil {
 		return nil, err
 	}
 	if supplied.AttackerTransOpt != nil {
@@ -221,7 +279,7 @@ func p7GenericMechanismRushAutoCalculationInput(series *model.FrozenP6RushSeries
 	if first.GetCamp() != 0 || first.GetRoundNum() != 1 {
 		return nil, errors.New(constUtil.P6ReplayConflict)
 	}
-	return p7GenericMechanismRushInputAt(series, first.GetRoundTime())
+	return p7GenericMechanismRushInputAtAdmitted(series, first.GetRoundTime())
 }
 
 func p7GenericMechanismRushManualSourceDigest(input *model.FrozenBattleInput, record *pb.BattleOperate) (string, string, error) {
@@ -247,17 +305,30 @@ func p7GenericMechanismRushManualSourceDigest(input *model.FrozenBattleInput, re
 }
 
 func p7GenericMechanismRushValidateEnd(series *model.FrozenP6RushSeries, out *model.CombatFinalHPOutcome, supplied *pb.BattleOperate, reported int32) error {
-	input, err := p7GenericMechanismRushCalculationInput(series, supplied)
+	admission, err := newP7GenericMechanismRushAdmission(series)
 	if err != nil {
+		return err
+	}
+	return admission.validateEnd(series, out, supplied, reported)
+}
+
+func (admission *p7GenericMechanismRushAdmission) validateEnd(series *model.FrozenP6RushSeries, out *model.CombatFinalHPOutcome, supplied *pb.BattleOperate, reported int32) error {
+	if err := admission.validate(series); err != nil {
+		return err
+	}
+	if err := p7GenericMechanismRushValidateControls(series, supplied); err != nil {
 		return err
 	}
 	if out == nil || out.Outcome == nil {
 		return errors.New(constUtil.P6ReplayConflict)
 	}
+	var input *model.FrozenBattleInput
+	var err error
 	switch out.Outcome.DiagnosticAIDriverPolicy {
 	case "":
+		input, err = cloneP6CalculationInput(series.Template)
 	case constUtil.P6DiagnosticManualAutoStart:
-		input, err = p7GenericMechanismRushAutoCalculationInput(series, supplied)
+		input, err = p7GenericMechanismRushAutoCalculationInputAdmitted(series, supplied)
 		if err != nil {
 			return err
 		}
@@ -265,8 +336,12 @@ func p7GenericMechanismRushValidateEnd(series *model.FrozenP6RushSeries, out *mo
 		if supplied.AttackerTransOpt == nil {
 			return errors.New(constUtil.P6ReplayConflict)
 		}
+		input, err = cloneP6CalculationInput(series.Template)
 	default:
 		return errors.New(constUtil.P6ReplayConflict)
+	}
+	if err != nil {
+		return err
 	}
 	if out == nil || out.Outcome == nil || !out.Outcome.Authoritative || out.Outcome.CapabilityHash != constUtil.P7GenericMechanismCompatibilityProof || out.Schema != constUtil.P6FinalActorHPSchema || out.EngineVersion != input.EngineVersion || out.ClientVersion != input.ClientVersion || out.ConfigurationHash != input.ConfigurationHash || !proto.Equal(supplied, out.OriginalOperates) {
 		return errors.New(constUtil.P6ReplayConflict)
@@ -313,4 +388,15 @@ func p7GenericMechanismRushValidateEnd(series *model.FrozenP6RushSeries, out *mo
 		return errors.New(constUtil.P6ReplayConflict)
 	}
 	return nil
+}
+
+func (admission *p7GenericMechanismRushAdmission) validatePreview(series *model.FrozenP6RushSeries, out *model.CombatFinalHPOutcome) error {
+	if err := admission.validate(series); err != nil {
+		return err
+	}
+	input, err := p7GenericMechanismRushInputAtAdmitted(series, 0)
+	if err != nil {
+		return err
+	}
+	return p7GenericMechanismRushValidateTerminal(input, out)
 }

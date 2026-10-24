@@ -195,6 +195,18 @@ func (s *GameService) p8Nodes(tx *gorm.DB, id int64, scene string, now int64) ([
 	if err := tx.Where("player_id=? AND scene=?", id, scene).Order("pos_id").Find(&nodes).Error; err != nil {
 		return nil, false, err
 	}
+	// 只在本次节点读取内复用已校验快照；不跨请求缓存管理配置或冻结采集。
+	configs := make(map[string]*p8GatherConfig, len(nodes))
+	configFor := func(raw string) (*p8GatherConfig, error) {
+		if cfg := configs[raw]; cfg != nil {
+			return cfg, nil
+		}
+		cfg, err := p8DecodeConfig(raw)
+		if err == nil {
+			configs[raw] = cfg
+		}
+		return cfg, err
+	}
 	changed := false
 	// Preserve a live attempt's frozen node. Once it finishes, replace stale map
 	// projections in the same player transaction so count/point edits take effect.
@@ -202,7 +214,7 @@ func (s *GameService) p8Nodes(tx *gorm.DB, id int64, scene string, now int64) ([
 		expected := constUtil.P8GatherPolicySource + row["adminRevision"]
 		stale := false
 		for _, node := range nodes {
-			cfg, e := p8DecodeConfig(node.Snapshot)
+			cfg, e := configFor(node.Snapshot)
 			if e != nil {
 				return nil, false, e
 			}
@@ -261,7 +273,7 @@ func (s *GameService) p8Nodes(tx *gorm.DB, id int64, scene string, now int64) ([
 	}
 	for i := range nodes {
 		node := &nodes[i]
-		cfg, err := p8DecodeConfig(node.Snapshot)
+		cfg, err := configFor(node.Snapshot)
 		if err != nil || node.Remaining < 0 || node.Remaining > cfg.Times || node.Generation < 1 {
 			return nil, false, p8GatherError()
 		}
@@ -347,11 +359,18 @@ func (s *GameService) P8ObserveGatherMove(tx *gorm.DB, id int64, g *model.GameSt
 
 // RefreshP8Resources 用于场景恢复和心跳，原刷新帧refreshTime>0移除模型、0重新出现。
 func (s *GameService) RefreshP8Resources(tx *gorm.DB, p *pb.Player, g *model.GameState, now time.Time, force bool) ([]proto.Message, error) {
+	return s.refreshP8Resources(tx, p, g, now, force, false)
+}
+
+// fieldRefreshed 仅由同一事务中已完成野外刷新的调用者传入。
+func (s *GameService) refreshP8Resources(tx *gorm.DB, p *pb.Player, g *model.GameState, now time.Time, force, fieldRefreshed bool) ([]proto.Message, error) {
 	if s.p8GatherMap(g.Position.GetScene()) == nil || !s.P8FieldSceneAvailable(g.Position.GetScene()) {
 		return nil, nil
 	}
-	if err := s.refreshField(p.GetPlayerId(), g); err != nil {
-		return nil, err
+	if !fieldRefreshed {
+		if err := s.refreshField(p.GetPlayerId(), g); err != nil {
+			return nil, err
+		}
 	}
 	nodes, changed, err := s.p8Nodes(tx, p.GetPlayerId(), g.Position.GetScene(), now.UnixMilli())
 	if err != nil {
@@ -478,7 +497,19 @@ func (s *GameService) p8GrantGather(p *pb.Player, g *model.GameState, rewards st
 	return out, nil
 }
 
+// p8GatherProjection 只复用同一事务中未再修改的节点读取。领取仍重新读取更新后的节点。
+type p8GatherProjection struct {
+	nodes []db.P8ResourceNode
+	ready bool
+}
+
 func (s *GameService) p8GatherMutation(ctx context.Context, id int64, op string, stamp int64, request, response proto.Message, apply func(*gorm.DB, *pb.Player, *model.GameState, int64) error) ([]proto.Message, error) {
+	return s.p8GatherMutationProjected(ctx, id, op, stamp, request, response, func(tx *gorm.DB, p *pb.Player, g *model.GameState, now int64, _ *p8GatherProjection) error {
+		return apply(tx, p, g, now)
+	})
+}
+
+func (s *GameService) p8GatherMutationProjected(ctx context.Context, id int64, op string, stamp int64, request, response proto.Message, apply func(*gorm.DB, *pb.Player, *model.GameState, int64, *p8GatherProjection) error) ([]proto.Message, error) {
 	if stamp < 0 || stamp == 0 && op != constUtil.P8GatherStartOperation && op != constUtil.P8GatherClaimOperation {
 		return nil, p8GatherError()
 	}
@@ -533,15 +564,19 @@ func (s *GameService) p8GatherMutation(ctx context.Context, id int64, op string,
 		if err = s.p8GatherOpen(id, p, g, acceptedClaim); err != nil {
 			return err
 		}
-		if err = apply(tx, p, g, now); err != nil {
+		projection := &p8GatherProjection{}
+		if err = apply(tx, p, g, now, projection); err != nil {
 			return err
 		}
 		if err = saveProfile(tx, row, p, g); err != nil {
 			return err
 		}
-		nodes, _, err := s.p8Nodes(tx, id, g.Position.GetScene(), now)
-		if err != nil {
-			return err
+		nodes := projection.nodes
+		if !projection.ready {
+			nodes, _, err = s.p8Nodes(tx, id, g.Position.GetScene(), now)
+			if err != nil {
+				return err
+			}
 		}
 		info = p8ResourceInfo(nodes, now)
 		side = proto.Clone(g.Field.Side).(*pb.PlayerSide)
@@ -569,11 +604,12 @@ func (s *GameService) p8GatherMutation(ctx context.Context, id int64, op string,
 
 func (s *GameService) p8StartGather(ctx context.Context, id int64, b *pb.CSFieldResourceStartGather, stamp int64) ([]proto.Message, error) {
 	out := &pb.SCFieldResourceStartGather{}
-	return s.p8GatherMutation(ctx, id, constUtil.P8GatherStartOperation, stamp, b, out, func(tx *gorm.DB, p *pb.Player, g *model.GameState, now int64) error {
+	return s.p8GatherMutationProjected(ctx, id, constUtil.P8GatherStartOperation, stamp, b, out, func(tx *gorm.DB, p *pb.Player, g *model.GameState, now int64, projection *p8GatherProjection) error {
 		nodes, _, err := s.p8Nodes(tx, id, g.Position.GetScene(), now)
 		if err != nil {
 			return err
 		}
+		projection.nodes, projection.ready = nodes, true
 		var node *db.P8ResourceNode
 		for i := range nodes {
 			if nodes[i].PosID == b.GetPosId() {

@@ -158,14 +158,30 @@ func (s *GameService) ggoCatalogue(tx *gorm.DB, player *pb.Player, game *model.G
 			return nil, err
 		}
 	}
-	sort.SliceStable(rules.Products, func(i, j int) bool {
-		if rules.Products[i].Priority == rules.Products[j].Priority {
-			return rules.Products[i].Index < rules.Products[j].Index
+	if err := s.validateShopRefreshSettings("ggo", shopP4RefreshSettings("ggo", rules)); err != nil {
+		return nil, err
+	}
+	_, quote, err := s.ggoLoadQuote(tx, player.GetPlayerId(), *raw.Period, rules, out.Enabled)
+	if err != nil {
+		return nil, err
+	}
+	products := ggoQuoteProducts(rules, quote)
+	if quote != nil {
+		out.Version = ggoQuoteVersion(*raw.Period, rules, quote, out.Enabled)
+		out.Refresh = ggoQuoteRefreshInfo(rules, quote, out.Enabled)
+	}
+	sort.SliceStable(products, func(i, j int) bool {
+		if quote != nil {
+			return products[i].Index < products[j].Index
 		}
-		return rules.Products[i].Priority < rules.Products[j].Priority
+		if products[i].Priority == products[j].Priority {
+			return products[i].Index < products[j].Index
+		}
+		return products[i].Priority < products[j].Priority
 	})
-	for _, p := range rules.Products {
-		if len(p.ID)+len(constUtil.GGOShopStatePrefix) > 64 {
+	for _, p := range products {
+		sourceID := ggoSourceProductID(p)
+		if len(sourceID)+len(constUtil.GGOShopStatePrefix) > 64 {
 			return nil, constUtil.ErrAdminConfiguration
 		}
 		if !p.isEnabled() {
@@ -180,7 +196,7 @@ func (s *GameService) ggoCatalogue(tx *gorm.DB, player *pb.Player, game *model.G
 		if err != nil {
 			return nil, err
 		}
-		item := s.table("Item", "itemId", reward[0])
+		item := s.ggoRewardMetadata(reward[0])
 		if item == nil {
 			return nil, constUtil.ErrAdminConfiguration
 		}
@@ -190,14 +206,14 @@ func (s *GameService) ggoCatalogue(tx *gorm.DB, player *pb.Player, game *model.G
 		}
 		total := int64(0)
 		for _, c := range counts {
-			if c.ProductID == constUtil.GGOShopStatePrefix+p.ID {
+			if c.ProductID == constUtil.GGOShopStatePrefix+sourceID {
 				total += c.Bought
 				remaining -= c.Today
 			}
 		}
 		if p.Stock >= 0 {
 			for _, stock := range stocks {
-				if stock.ProductID == p.ID {
+				if stock.ProductID == sourceID {
 					remaining = min(remaining, int64(p.Stock)-int64(stock.Used))
 				}
 			}
@@ -207,6 +223,9 @@ func (s *GameService) ggoCatalogue(tx *gorm.DB, player *pb.Player, game *model.G
 		}
 		if player.GetLevel() < p.MinLevel || player.GetVip() < p.MinVIP {
 			remaining = 0
+		}
+		if quote != nil {
+			remaining = min(remaining, max(int64(0), 1-quote.SlotBought[p.ID]))
 		}
 		quality, _ := strconv.ParseInt(item["star"], 10, 64)
 		name := p.Name
@@ -238,7 +257,7 @@ func (s *GameService) GGOShopCatalogue(ctx context.Context, playerID int64, sess
 			return err
 		}
 		var row db.Profile
-		if err := tx.Clauses(clause.Locking{Strength: "SHARE"}).First(&row, playerID).Error; err != nil {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&row, playerID).Error; err != nil {
 			return err
 		}
 		if AdminProfileServerID(row) != s.OriginalServerID() || !bytes.Equal(row.Session, session) {
@@ -295,7 +314,7 @@ func (s *GameService) GGOShopBuy(ctx context.Context, req model.GGOShopBuyReques
 			if priorCount == 0 {
 				priorCount = 1
 			}
-			if prior.ProductID != req.ProductID || prior.Version != req.Version || priorCount != count {
+			if prior.ProductID == constUtil.GGOShopRefreshReceiptProduct || prior.ProductID != req.ProductID || prior.Version != req.Version || priorCount != count {
 				return errors.New("购买请求编号已用于其他商品、版本或数量")
 			}
 			return json.Unmarshal(prior.Response, &out)
@@ -327,8 +346,66 @@ func (s *GameService) GGOShopBuy(ctx context.Context, req model.GGOShopBuyReques
 		if offer == nil || offer.Remaining < count {
 			return errors.New("商品已下架或达到限购")
 		}
+		sourceID := req.ProductID
+		_, raw, err := s.adminReadShop(tx, constUtil.GGOShopKey)
+		if err != nil {
+			return err
+		}
+		if raw.Period == nil {
+			return constUtil.ErrAdminConfiguration
+		}
+		var liveRules p4CommerceRules
+		if json.Unmarshal(raw.Period.Rules, &liveRules) != nil {
+			return constUtil.ErrAdminConfiguration
+		}
+		quoteRow, quote, err := s.ggoLoadQuote(tx, row.Id, *raw.Period, liveRules, true)
+		if err != nil {
+			return err
+		}
+		if quote != nil {
+			found := false
+			for _, slot := range quote.Slots {
+				if slot.ID == req.ProductID {
+					sourceID = slot.SourceProductID
+					found = true
+					break
+				}
+			}
+			if !found || quote.SlotBought[req.ProductID] > 1-count {
+				return errors.New("该槽已购买或数量无效")
+			}
+		}
 		if offer.Price < 1 || offer.Amount < 1 || offer.Price > math.MaxInt32/count || offer.Amount > math.MaxInt32/count {
 			return errors.New("批量信用商店价格或奖励溢出")
+		}
+		// Keep source stock locking ahead of wallet/reward writes. Catalogue reads
+		// can be stale across different profile locks; this current read is authoritative.
+		var source *p4Product
+		for i := range liveRules.Products {
+			if liveRules.Products[i].ID == sourceID {
+				source = &liveRules.Products[i]
+				break
+			}
+		}
+		if source == nil || !source.isEnabled() {
+			return errors.New("商品已下架")
+		}
+		stock := db.P4CommerceStock{RuleID: raw.Period.ID, ProductID: sourceID}
+		if err = tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&stock).Error; err != nil {
+			return err
+		}
+		if err = tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&stock, "rule_id=? AND product_id=?", raw.Period.ID, sourceID).Error; err != nil {
+			return err
+		}
+		if stock.Used < 0 || int64(stock.Used)+count > math.MaxInt32 {
+			return errors.New("商品库存计数溢出")
+		}
+		if source.Stock >= 0 && int64(stock.Used) > int64(source.Stock)-count {
+			return errors.New("商品共享库存不足")
+		}
+		stock.Used += int32(count)
+		if err = tx.Model(&stock).Update("used", stock.Used).Error; err != nil {
+			return err
 		}
 		totalPrice, totalReward := offer.Price*count, offer.Amount*count
 		cost, err := s.p4ParseCost(fmt.Sprintf("%s,%d", constUtil.GGOCurrencyID, totalPrice))
@@ -346,7 +423,7 @@ func (s *GameService) GGOShopBuy(ctx context.Context, req model.GGOShopBuyReques
 		if err = saveProfile(tx, &row, player, game); err != nil {
 			return err
 		}
-		state := db.ShopState{PlayerID: row.Id, ProductID: constUtil.GGOShopStatePrefix + req.ProductID, Day: now.Format("2006-01-02")}
+		state := db.ShopState{PlayerID: row.Id, ProductID: constUtil.GGOShopStatePrefix + sourceID, Day: now.Format("2006-01-02")}
 		if err = tx.FirstOrCreate(&state).Error; err != nil {
 			return err
 		}
@@ -357,20 +434,12 @@ func (s *GameService) GGOShopBuy(ctx context.Context, req model.GGOShopBuyReques
 		if err = tx.Save(&state).Error; err != nil {
 			return err
 		}
-		var cfg db.P4CommerceRule
-		if err = tx.Select("id").Where("kind=? AND id NOT LIKE ?", constUtil.GGOShopKey, "shop_schedule_%").Order("start_at DESC,id DESC").First(&cfg).Error; err != nil {
-			return err
-		}
-		stock := db.P4CommerceStock{RuleID: cfg.ID, ProductID: req.ProductID}
-		if err = tx.FirstOrCreate(&stock).Error; err != nil {
-			return err
-		}
-		if stock.Used < 0 || int64(stock.Used)+count > math.MaxInt32 {
-			return errors.New("商品库存计数溢出")
-		}
-		stock.Used += int32(count)
-		if err = tx.Save(&stock).Error; err != nil {
-			return err
+
+		if quote != nil {
+			quote.SlotBought[req.ProductID] += count
+			if err = ggoSaveQuote(tx, quoteRow, quote); err != nil {
+				return err
+			}
 		}
 		after, err := s.ggoCatalogue(tx, player, game)
 		if err != nil {
@@ -387,4 +456,53 @@ func (s *GameService) GGOShopBuy(ctx context.Context, req model.GGOShopBuyReques
 		return tx.Create(&db.GGOShopReceipt{PlayerID: row.Id, RequestID: req.RequestID, ProductID: req.ProductID, Version: req.Version, Count: count, Response: payload, CreatedAt: now.UnixMilli()}).Error
 	})
 	return &out, err
+}
+
+// ggoRewardMetadata uses the real resource table and the original translated names.
+func (s *GameService) ggoRewardMetadata(id string) map[string]string {
+	if row := s.table("Item", "itemId", id); row != nil {
+		return row
+	}
+	var row map[string]string
+	fragment := false
+	if f := s.table("Frag", "id", id); f != nil {
+		fragment = true
+		for _, table := range []string{"Hero", "Equip", "Accessory", "Pet", "PetEquip"} {
+			if target := s.table(table, "id", f["target"]); target != nil {
+				row = target
+				break
+			}
+		}
+	} else if strings.HasPrefix(id, "hero_exp_") {
+		row = s.table("Hero", "id", id)
+	}
+	if row == nil {
+		return nil
+	}
+	resolve := func(value string) string {
+		if text := s.table("Text", "id", value); text != nil && text["text"] != "" {
+			return text["text"]
+		}
+		return value
+	}
+	name := resolve(row["name"])
+	if name == "" {
+		name = resolve("name_" + row["id"])
+	}
+	if fragment {
+		name += "碎片"
+	}
+	quality, _, _ := adminCatalogueQuality(adminCatalogueNumber(row["quality"]))
+	out := map[string]string{"name": name, "desc": resolve(adminCatalogueFirst(row, "desc", "intro")), "icon": adminCatalogueFirst(row, "icon", "iconName"), "star": strconv.FormatInt(quality, 10)}
+	if s.AdminCatalogueData != nil {
+		for _, v := range s.AdminCatalogueData.Items {
+			if v.ID == id {
+				out["name"] = v.Name
+				out["desc"] = v.Description
+				out["icon"] = v.Icon
+				break
+			}
+		}
+	}
+	return out
 }

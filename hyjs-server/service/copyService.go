@@ -629,6 +629,15 @@ func (s *GameService) copyFightStart(ctx context.Context, id int64, b *pb.CSCopy
 		if slices.Contains(run.Passed, next) {
 			return errors.New("This encounter has already been completed")
 		}
+		// Boss胜利会触发原客户端的结束剧情，须在其余遭遇全部完成后开放。
+		// 普通怪仍按玩家实际碰撞顺序处理，重连沿用本次付费Run的Passed。
+		if task["IsBoss"] == "1" {
+			for _, candidate := range s.tasks(run.Mission) {
+				if candidate["TaskId"] != next && !slices.Contains(run.Passed, candidate["TaskId"]) {
+					return errors.New("请先击败本关的小怪")
+				}
+			}
+		}
 		if task["BornType"] != "0" || task["IsDemoFight"] != "0" && task["IsDemoFight"] != "1" {
 			return errors.New("Unsupported scripted encounter")
 		}

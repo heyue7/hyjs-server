@@ -1,6 +1,7 @@
 package service
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -111,8 +112,9 @@ func TestLiveSpecialShopsVIPAndPetCostsQuotesLimitsAndCold(t *testing.T) {
 	if listVIP().GetCanBuy() != 0 {
 		t.Fatal("VIP edit reset daily claim")
 	}
-	// Make an explicit finite one-slot pet catalogue; keep original refresh and
-	// decomposition settings. A bought unit survives amount/cost/stock edits.
+
+	// Six independent positions use a declared pool of four fragments and two materials.
+	// Existing offers retain their accepted amount/cost until an explicit refresh.
 	var rule db.P9PetMarketRule
 	if err := db.GetIns().First(&rule, "id=?", constUtil.P9MarketRuleID).Error; err != nil {
 		t.Fatal(err)
@@ -121,67 +123,191 @@ func TestLiveSpecialShopsVIPAndPetCostsQuotesLimitsAndCold(t *testing.T) {
 	if err := json.Unmarshal(rule.Input, &cfg); err != nil {
 		t.Fatal(err)
 	}
-	cfg.Slots = 1
-	cfg.Offers = []p9MarketOffer{{ID: "live-pet", Resource: "item_124", Amount: 1, Currency: "item_001", Price: 2, Stock: 3, Weight: 1}}
+	cfg.Slots = 6
+	cfg.Offers = []p9MarketOffer{
+		{ID: "live-frag1", Resource: "frag_pet_001", Amount: 1, Currency: "item_001", Price: 2, Stock: 3, Weight: 1},
+		{ID: "live-frag2", Resource: "frag_pet_002", Amount: 1, Currency: "item_001", Price: 2, Stock: 3, Weight: 1},
+		{ID: "live-frag3", Resource: "frag_pet_003", Amount: 1, Currency: "item_001", Price: 2, Stock: 3, Weight: 1},
+		{ID: "live-frag4", Resource: "frag_pet_004", Amount: 1, Currency: "item_001", Price: 2, Stock: 3, Weight: 1},
+		{ID: "live-pet", Resource: "item_124", Amount: 1, Currency: "item_001", Price: 2, Stock: 3, Weight: 1},
+		{ID: "live-pet2", Resource: "item_005", Amount: 1, Currency: "item_001", Price: 2, Stock: 3, Weight: 1},
+	}
 	if err := db.GetIns().Model(&rule).Updates(map[string]any{"enabled": true, "input": adminJSON(cfg)}).Error; err != nil {
 		t.Fatal(err)
 	}
-	listPet := func() *pb.ShopItem {
+	listPet := func() *pb.SCPetShopProductList {
 		t.Helper()
 		messages, e := f.s.p9PetShopList(f.ctx, f.id)
 		if e != nil {
 			t.Fatal(e)
 		}
-		items := messages[0].(*pb.SCPetShopProductList).GetShopItemList()
-		if len(items) != 1 {
-			t.Fatal("pet selected slots", len(items))
+		list := messages[0].(*pb.SCPetShopProductList)
+		if len(list.GetShopItemList()) != 6 {
+			t.Fatal("pet selected positions", len(list.GetShopItemList()))
 		}
-		return items[0]
+		fragments := 0
+		seen := map[string]bool{}
+		for _, item := range list.ShopItemList {
+			if seen[item.GetId()] {
+				t.Fatal("duplicate slot identity")
+			}
+			seen[item.GetId()] = true
+			if strings.HasPrefix(item.Item[0].GetId(), "frag_pet_") {
+				fragments++
+			}
+		}
+		if fragments < 1 || fragments > 4 {
+			t.Fatal("fragment/material split", fragments)
+		}
+		return list
 	}
-	petOld := listPet()
+	findSlot := func(list *pb.SCPetShopProductList, sku string) *pb.ShopItem {
+		t.Helper()
+		for _, item := range list.ShopItemList {
+			if item.GetId() == sku {
+				return item
+			}
+		}
+		t.Fatal("accepted slot disappeared", sku)
+		return nil
+	}
+	initial := listPet()
+	var petOld *pb.ShopItem
+	for _, item := range initial.ShopItemList {
+		if !strings.HasPrefix(item.Item[0].GetId(), "frag_pet_") {
+			petOld = item
+			break
+		}
+	}
+	if petOld == nil {
+		t.Fatal("material positions missing")
+	}
+	targetResource := petOld.Item[0].GetId()
+	p, g = f.profile(t)
+	targetBefore := simpleOwned(p, g, targetResource)
 	shop, e := f.s.AdminShop(f.ctx, "pet-market")
 	if e != nil {
 		t.Fatal(e)
 	}
-	pet := shop.Items[0]
+	var pet model.AdminShopProduct
+	for _, item := range shop.Items {
+		if item.Rewards[0].ResourceID == targetResource {
+			pet = item
+			break
+		}
+	}
+	if pet.ID == "" {
+		t.Fatal("selected product absent from admin catalogue")
+	}
 	pet.Cost = model.AdminResourceAmount{ResourceID: "frag_hero_001", Amount: 3}
 	pet.Rewards[0].Amount = 2
 	save("pet-market", pet, false)
-	if _, e = f.s.p9PetShopBuy(f.ctx, f.id, &pb.CSPetShopBuy{ShopItemId: proto.String(petOld.GetId()), BuyCount: proto.Int32(1)}, 98001); e == nil {
-		t.Fatal("stale pet quote charged")
+	unchanged := findSlot(listPet(), petOld.GetId())
+	if !proto.Equal(unchanged, petOld) {
+		t.Fatal("config edit replaced accepted pet quote", unchanged)
 	}
-	petFresh := listPet()
-	if petFresh.GetPrice()[0].GetId() != "frag_hero_001" || petFresh.GetPrice()[0].GetNum() != 3 {
-		t.Fatal("pet live generic cost", petFresh)
-	}
-	bought, e := f.s.p9PetShopBuy(f.ctx, f.id, &pb.CSPetShopBuy{ShopItemId: proto.String(petFresh.GetId()), BuyCount: proto.Int32(1)}, 98002)
+	buyOld := &pb.CSPetShopBuy{ShopItemId: proto.String(petOld.GetId()), BuyCount: proto.Int32(1)}
+	bought, e := f.s.p9PetShopBuy(f.ctx, f.id, buyOld, 98001)
 	if e != nil {
-		t.Fatal(e)
+		t.Fatal("accepted old quote", e)
 	}
-	if bought[0].(*pb.SCPetShopBuy).GetShopItemList()[0].GetCanBuy() != 2 {
+	originalBuy := bought[0].(*pb.SCPetShopBuy)
+	if findSlot(listPet(), petOld.GetId()).GetCanBuy() != 2 {
 		t.Fatal("pet stock accounting")
 	}
+	var receipt db.P9PetReceipt
+	if e := db.GetIns().First(&receipt, "player_id=? AND operation=? AND timestamp=?", f.id, constUtil.P9MarketBuyOperation, 98001).Error; e != nil {
+		t.Fatal(e)
+	}
 	var oldState db.P9PetMarketState
-	db.GetIns().First(&oldState, f.id)
+	if e := db.GetIns().First(&oldState, "player_id=?", f.id).Error; e != nil {
+		t.Fatal(e)
+	}
 	pet.Stock = 2
 	pet.Cost.Amount = 5
 	save("pet-market", pet, false)
-	if got := listPet(); got.GetCanBuy() != 1 {
-		t.Fatal("stock edit reset consumed units", got)
+	got := findSlot(listPet(), petOld.GetId())
+	if got.GetCanBuy() != 1 || got.Price[0].GetId() != "item_001" || got.Price[0].GetNum() != 2 || got.Item[0].GetNum() != 1 {
+		t.Fatal("live stock or frozen quote", got)
 	}
 	var state db.P9PetMarketState
-	db.GetIns().First(&state, f.id)
-	if state.Generation != oldState.Generation || state.RefreshUsed != oldState.RefreshUsed {
-		t.Fatal("config edit refreshed inventory")
+	if e := db.GetIns().First(&state, "player_id=?", f.id).Error; e != nil {
+		t.Fatal(e)
+	}
+	if state.Generation != oldState.Generation || state.RefreshUsed != oldState.RefreshUsed || !bytes.Equal(state.Selected, oldState.Selected) || !bytes.Equal(state.Bought, oldState.Bought) {
+		t.Fatal("edit refreshed or reset purchased slots")
 	}
 	f.restart(t)
-	if listVIP().GetCanBuy() != 0 || listPet().GetCanBuy() != 1 {
-		t.Fatal("cold live shop lost quotas")
+	if listVIP().GetCanBuy() != 0 || findSlot(listPet(), petOld.GetId()).GetCanBuy() != 1 {
+		t.Fatal("cold shop lost quotas")
+	}
+	retry, e := f.s.p9PetShopBuy(f.ctx, f.id, buyOld, 98001)
+	if e != nil || !proto.Equal(retry[0].(*pb.SCPetShopBuy).Get, originalBuy.Get) || !p1SameResources(retry[0].(*pb.SCPetShopBuy).Cost, originalBuy.Cost) {
+		t.Fatal("old quote UUID lost successful terms", e)
 	}
 	p, g = f.profile(t)
-	if simpleOwned(p, g, "frag_hero_001") != 93 || simpleOwned(p, g, "item_124") != 2 {
-		t.Fatal("generic materials/rewards not persisted")
+	if simpleOwned(p, g, "frag_hero_001") != 96 || simpleOwned(p, g, "item_001") != 98 || simpleOwned(p, g, targetResource) != targetBefore+1 {
+		t.Fatal("old fixed quote/retry did not persist exact cost and reward")
 	}
+	// Disable only the unselected material so the explicit refresh deterministically
+	// includes the edited material; four healthy fragment products remain enabled.
+	shop, e = f.s.AdminShop(f.ctx, "pet-market")
+	if e != nil {
+		t.Fatal(e)
+	}
+	for _, other := range shop.Items {
+		if !strings.HasPrefix(other.Rewards[0].ResourceID, "frag_pet_") && other.ID != pet.ID {
+			other.Enabled = false
+			save("pet-market", other, false)
+		}
+	}
+	freshMessages, e := f.s.p9PetShopRefresh(f.ctx, f.id, &pb.CSRefreshPetShop{}, 98003)
+	if e != nil {
+		t.Fatal("explicit pet refresh", e)
+	}
+	refreshed := freshMessages[0].(*pb.SCPetShopProductList)
+	if refreshed.GetRefreshTimes() != initial.GetRefreshTimes()-1 {
+		t.Fatal("refresh counter not consumed once")
+	}
+	var petFresh *pb.ShopItem
+	for _, item := range refreshed.ShopItemList {
+		if item.Item[0].GetId() == targetResource {
+			petFresh = item
+			break
+		}
+	}
+	if petFresh == nil || petFresh.GetId() == petOld.GetId() || petFresh.Price[0].GetId() != "frag_hero_001" || petFresh.Price[0].GetNum() != 5 || petFresh.Item[0].GetNum() != 2 || petFresh.GetCanBuy() != 2 {
+		t.Fatal("new refresh ignored current configured quote", petFresh)
+	}
+	if _, e = f.s.p9PetShopBuy(f.ctx, f.id, buyOld, 98002); e == nil {
+		t.Fatal("old generation accepted new purchase")
+	}
+	if _, e = f.s.p9PetShopBuy(f.ctx, f.id, buyOld, 98001); e == nil {
+		t.Fatal("old-generation receipt projected stale inventory")
+	}
+	buyNew := &pb.CSPetShopBuy{ShopItemId: proto.String(petFresh.GetId()), BuyCount: proto.Int32(1)}
+	freshBuy, e := f.s.p9PetShopBuy(f.ctx, f.id, buyNew, 98004)
+	if e != nil {
+		t.Fatal("new current generic material quote", e)
+	}
+	freshResult := freshBuy[0].(*pb.SCPetShopBuy)
+	f.restart(t)
+	if listVIP().GetCanBuy() != 0 || findSlot(listPet(), petFresh.GetId()).GetCanBuy() != 1 {
+		t.Fatal("cold refreshed inventory reset purchases")
+	}
+	freshRetry, e := f.s.p9PetShopBuy(f.ctx, f.id, buyNew, 98004)
+	if e != nil || !proto.Equal(freshRetry[0].(*pb.SCPetShopBuy).Get, freshResult.Get) || !p1SameResources(freshRetry[0].(*pb.SCPetShopBuy).Cost, freshResult.Cost) {
+		t.Fatal("new UUID cold receipt changed", e)
+	}
+	p, g = f.profile(t)
+	if simpleOwned(p, g, "frag_hero_001") != 91 || simpleOwned(p, g, "item_001") != 98 || simpleOwned(p, g, targetResource) != targetBefore+3 || p.GetDiamond() != 850 {
+		t.Fatal("generic material/reward/refresh debit not persisted")
+	}
+	var saved db.P9PetReceipt
+	if e := db.GetIns().First(&saved, "player_id=? AND operation=? AND timestamp=?", f.id, constUtil.P9MarketBuyOperation, 98001).Error; e != nil || !bytes.Equal(saved.Response, receipt.Response) {
+		t.Fatal("refresh overwrote historical successful receipt", e)
+	}
+
 }
 
 // A single original war-shop actor is exercised after the existing bounded

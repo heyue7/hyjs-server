@@ -354,6 +354,9 @@ func run() error {
 		return err
 	}
 	s.P8LifeReady = true
+	if err = s.InitializeFieldResources(ctx); err != nil {
+		return err
+	}
 	// Install the independent default-off PK domain only after P6/P8 dependencies.
 	if err = s.LoadP12FieldPVPTables(cfg.Tables); err != nil {
 		return err

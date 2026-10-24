@@ -25,7 +25,7 @@ func AdminShopDefinitions() []model.AdminShopDefinition {
 		d := model.AdminShopDefinition{ID: v.id, Label: v.label, Fields: append([]string{}, base...), SettingsFields: []string{"unlimited", "enabled", "startAt", "endAt", "claimEndAt", "source"}, CanCreate: true, Notes: "保存后立即用于后续购买；历史交易、库存使用和限购保留。"}
 		switch v.id {
 		case "ggo":
-			d.Notes = "使用信用点兑换超频点数，获得后自动存入账号蓝绿终端。当前商品仅供样式测试：1信用点兑换1个，每日1次。正式账号周限购参数在沙漠搜打撤配置中准备，尚未接入购买规则。"
+			d.Notes = "使用信用点兑换道具、碎片及经验材料。数量档在刷新时选定，每格独立购买；已接受报价、限购与历史回执保留。"
 		case "ordinary":
 			d.Notes = "商品、价格与材料保存后生效；原阶梯价格保留到该商品被显式修改。"
 		case "memory":
@@ -38,7 +38,7 @@ func AdminShopDefinitions() []model.AdminShopDefinition {
 		case "pet-market":
 			d.Fields = []string{"rewards", "cost", "stock", "weight", "enabled"}
 			d.SettingsFields = []string{"unlimited", "startAt", "endAt", "claimEndAt", "enabled", "slots"}
-			d.Notes = "变更立即更新当前可见商品，已用库存及刷新次数保留。原150钻刷新/每周10次和分解规则保留。"
+			d.Notes = "固定6个位置，碎片占1～4格，其余为材料；允许同商品多格，每格独立购买。商品数量和价格在刷新时冻结，已用库存及刷新次数保留。"
 		case "union-fight":
 			d.Fields = []string{"rewards", "cost", "stock", "priority", "day", "buyCondition", "refreshMillis", "enabled", "source"}
 			d.SettingsFields = []string{"unlimited", "startAt", "endAt", "claimEndAt"}
@@ -47,6 +47,11 @@ func AdminShopDefinitions() []model.AdminShopDefinition {
 			d.Fields = []string{"rewards", "cost", "minVip", "enabled", "source"}
 			d.SettingsFields = []string{"unlimited", "startAt", "endAt", "claimEndAt"}
 			d.Notes = "对应游戏商城的“会员礼包”（原VIP商店，shopType=2）。空列表表示尚无已启用商品；请自行配置奖励、价格及会员条件后启用。保存后立即更新后续购买，已领次数保持。"
+		}
+		if v.id == "memory" || v.id == "pet-market" || v.id == "ggo" {
+			d.Fields = append(d.Fields, "quantityTiers")
+			d.SettingsFields = append(d.SettingsFields, "refresh")
+			d.Notes += " 数量档在刷新时抽取并冻结，重开沿用已显示数量与消耗；商品停用和限购继续生效。"
 		}
 		out = append(out, d)
 	}
@@ -75,6 +80,7 @@ func adminShopBaseProduct(id, reward, cost string) model.AdminShopProduct {
 }
 func adminShopP4Product(p p4Product) model.AdminShopProduct {
 	v := adminShopBaseProduct("period:"+p.ID, p.Rewards, p.Cost)
+	v.QuantityTiers = p.QuantityTiers
 	v.Name = p.Name
 	v.Enabled = p.isEnabled()
 	v.DailyLimit = int64(p.DailyLimit)
@@ -151,9 +157,10 @@ func (s *GameService) adminReadShop(tx *gorm.DB, key string) (*model.AdminShopRe
 		if json.Unmarshal(row.Input, &cfg) != nil {
 			return nil, nil, constUtil.ErrAdminConfiguration
 		}
-		out.Settings = model.AdminShopSettings{Enabled: row.Enabled, Slots: int64(cfg.Slots), Source: row.Source}
+		out.Settings = model.AdminShopSettings{Enabled: row.Enabled, Slots: 6, Source: row.Source, Refresh: &model.AdminShopRefreshSettings{Enabled: shopRefreshEnabled(cfg.RefreshEnabled, true), PaidCap: int64(cfg.RefreshCap), Cost: adminTypedResourceOne(cfg.RefreshCost), Period: "week"}}
 		for _, p := range cfg.Offers {
 			v := adminShopBaseProduct(p.ID, fmt.Sprintf("%s,%d", p.Resource, p.Amount), fmt.Sprintf("%s,%d", p.Currency, p.Price))
+			v.QuantityTiers = p.QuantityTiers
 			v.Stock = int64(p.Stock)
 			v.Weight = p.Weight
 			v.Enabled = p.isEnabled()
@@ -191,6 +198,9 @@ func (s *GameService) adminReadShop(tx *gorm.DB, key string) (*model.AdminShopRe
 				return nil, nil, constUtil.ErrAdminConfiguration
 			}
 			out.Settings.Slots = int64(rules.Slots)
+			if key == "memory" || key == "ggo" {
+				out.Settings.Refresh = shopP4RefreshSettings(key, rules)
+			}
 			for _, p := range rules.Products {
 				// Direct stamina was retired in favor of the original potion. Keep
 				// its stored terms and receipts, without offering an unusable switch.
@@ -202,6 +212,7 @@ func (s *GameService) adminReadShop(tx *gorm.DB, key string) (*model.AdminShopRe
 			if key == "guild" {
 				var gr p4GuildRules
 				_ = json.Unmarshal(row.Rules, &gr)
+
 				for i := range out.Items {
 					for _, p := range gr.Products {
 						if out.Items[i].ID == "period:"+p.ID {
@@ -212,6 +223,17 @@ func (s *GameService) adminReadShop(tx *gorm.DB, key string) (*model.AdminShopRe
 				}
 			}
 		}
+	}
+	if (key == "memory" || key == "ggo") && out.Settings.Refresh == nil {
+		rules := p4CommerceRules{}
+		if key == "memory" {
+			rules.FreeCap = 10
+			rules.FreeSeconds = 7200
+			rules.ResourceRefreshCap = 15
+			rules.RefreshCost = "diamond,20"
+			rules.RefreshItem = "item_013,1"
+		}
+		out.Settings.Refresh = shopP4RefreshSettings(key, rules)
 	}
 	for i := range out.Items {
 		s.adminShopName(&out.Items[i])
@@ -304,7 +326,20 @@ func (s *GameService) AdminSaveShopProduct(ctx context.Context, actor *model.Adm
 		if !ggoShopCostAllowed(key, p.Cost.ResourceID) {
 			return constUtil.ErrAdminInput
 		}
-		if key == constUtil.GGOShopKey && (len(p.Rewards) != 1 || s.table("Item", "itemId", p.Rewards[0].ResourceID) == nil) {
+		if key == constUtil.GGOShopKey && (len(p.Rewards) != 1 || !s.shopQuantityRewardResource(p.Rewards[0].ResourceID)) {
+			return constUtil.ErrAdminInput
+		}
+		if len(p.QuantityTiers) > 0 && len(p.Rewards) != 1 {
+			return constUtil.ErrAdminInput
+		}
+		if len(p.Rewards) == 1 && (key == "memory" || key == "pet-market" || key == "ggo") {
+			if p.Rewards[0].ResourceID == "hero_exp_004" && p.Rewards[0].Amount > 5 {
+				return constUtil.ErrAdminInput
+			}
+			if err := s.validateShopQuantityTiers(key, p.Rewards[0].ResourceID, p.QuantityTiers); err != nil {
+				return fmt.Errorf("%w: %v", constUtil.ErrAdminInput, err)
+			}
+		} else if len(p.QuantityTiers) > 0 {
 			return constUtil.ErrAdminInput
 		}
 		cost := fmt.Sprintf("%s,%d", p.Cost.ResourceID, p.Cost.Amount)
@@ -335,7 +370,7 @@ func (s *GameService) AdminSaveShopProduct(ctx context.Context, actor *model.Adm
 			}
 			var cfg p9MarketConfig
 			_ = json.Unmarshal(raw.Pet.Input, &cfg)
-			offer := p9MarketOffer{Enabled: &p.Enabled, ID: id, Resource: p.Rewards[0].ResourceID, Amount: int32(p.Rewards[0].Amount), Currency: p.Cost.ResourceID, Price: int32(p.Cost.Amount), Stock: int32(p.Stock), Weight: p.Weight}
+			offer := p9MarketOffer{QuantityTiers: p.QuantityTiers, Enabled: &p.Enabled, ID: id, Resource: p.Rewards[0].ResourceID, Amount: int32(p.Rewards[0].Amount), Currency: p.Cost.ResourceID, Price: int32(p.Cost.Amount), Stock: int32(p.Stock), Weight: p.Weight}
 			found := false
 			for i := range cfg.Offers {
 				if cfg.Offers[i].ID == id {
@@ -447,7 +482,7 @@ func (s *GameService) AdminSaveShopProduct(ctx context.Context, actor *model.Adm
 			if !create && found < 0 {
 				return fmt.Errorf("%w: 商品已不存在，请刷新", constUtil.ErrAdminInput)
 			}
-			value := p4Product{Enabled: &p.Enabled, ID: originalID, Name: p.Name, Index: nextIndex, Rewards: reward, Cost: cost, Priority: int32(p.Priority), DailyLimit: int32(p.DailyLimit), TotalLimit: int32(p.TotalLimit), Stock: int32(p.Stock), MinLevel: int32(p.MinLevel), MinVIP: int32(p.MinVip), Weight: p.Weight, DiscountBps: int32(p.DiscountBps), MaxRank: p.MaxRank}
+			value := p4Product{QuantityTiers: p.QuantityTiers, Enabled: &p.Enabled, ID: originalID, Name: p.Name, Index: nextIndex, Rewards: reward, Cost: cost, Priority: int32(p.Priority), DailyLimit: int32(p.DailyLimit), TotalLimit: int32(p.TotalLimit), Stock: int32(p.Stock), MinLevel: int32(p.MinLevel), MinVIP: int32(p.MinVip), Weight: p.Weight, DiscountBps: int32(p.DiscountBps), MaxRank: p.MaxRank}
 			if found >= 0 {
 				value.Index = rules.Products[found].Index
 				old := rules.Products[found]
@@ -555,6 +590,7 @@ func (s *GameService) AdminDeleteShopProduct(ctx context.Context, actor *model.A
 			}
 			document["products"] = adminJSON(kept)
 			document["liveEditable"] = adminJSON(true)
+
 			row.Rules = adminJSON(document)
 			if len(kept) == 0 {
 				row.Enabled = false
@@ -584,7 +620,15 @@ func (s *GameService) AdminSaveShopSettings(ctx context.Context, actor *model.Ad
 		if key == "pet-market" {
 			var cfg p9MarketConfig
 			_ = json.Unmarshal(raw.Pet.Input, &cfg)
-			cfg.Slots = int(req.Slots)
+			cfg.Slots = 6
+			if req.Refresh != nil {
+				if err := s.validateShopRefreshSettings(key, req.Refresh); err != nil {
+					return fmt.Errorf("%w: %v", constUtil.ErrAdminInput, err)
+				}
+				cfg.RefreshEnabled = &req.Refresh.Enabled
+				cfg.RefreshCap = int32(req.Refresh.PaidCap)
+				cfg.RefreshCost = shopResourceSpec(req.Refresh.Cost)
+			}
 			if err := s.validateP9MarketConfig(&cfg); err != nil {
 				return fmt.Errorf("%w: %v", constUtil.ErrAdminInput, err)
 			}
@@ -634,6 +678,22 @@ func (s *GameService) AdminSaveShopSettings(ctx context.Context, actor *model.Ad
 		var document map[string]json.RawMessage
 		_ = json.Unmarshal(row.Rules, &document)
 		document["liveEditable"] = adminJSON(true)
+		if (key == "memory" || key == "ggo") && req.Refresh != nil {
+			if err := s.validateShopRefreshSettings(key, req.Refresh); err != nil {
+				return fmt.Errorf("%w: %v", constUtil.ErrAdminInput, err)
+			}
+			r := req.Refresh
+			document["refreshEnabled"] = adminJSON(r.Enabled)
+			document["freeCap"] = adminJSON(r.FreeCap)
+			document["freeSeconds"] = adminJSON(r.FreeRecoverySeconds)
+			document["resourceRefreshCap"] = adminJSON(r.PaidCap)
+			document["refreshCost"] = adminJSON(shopResourceSpec(r.Cost))
+			item := ""
+			if r.Item != nil {
+				item = shopResourceSpec(*r.Item)
+			}
+			document["refreshItem"] = adminJSON(item)
+		}
 		if key == "memory" {
 			document["slots"] = adminJSON(6)
 		}

@@ -19,8 +19,15 @@ func (s *GameService) p7ReRushLegacyFirstSection(tx *gorm.DB, state *db.P7RushSt
 		return false, nil
 	}
 	enabled, err := p7ReRushEnabled(tx)
-	if err != nil || !enabled {
+	if err != nil {
 		return false, err
+	}
+	return s.p7ReRushLegacyFirstSectionEnabled(tx, state, enabled)
+}
+
+func (s *GameService) p7ReRushLegacyFirstSectionEnabled(tx *gorm.DB, state *db.P7RushState, enabled bool) (bool, error) {
+	if state.Floor > 3 || !enabled {
+		return false, nil
 	}
 	offer, _, err := s.p7ReadSectionOffer(tx, state)
 	if err != nil || offer != nil {
@@ -41,6 +48,14 @@ func (s *GameService) p7ReRushLegacyStage(tx *gorm.DB, state *db.P7RushState, st
 	rows, err := p7SectionCatalogue(true)
 	if err != nil {
 		return false, err
+	}
+	return p7ReRushLegacyStageMatches(stage, rows)
+}
+
+// p7ReRushLegacyStageMatches 验证旧目录原文；调用方在同请求已确认冻结资格时复用。
+func p7ReRushLegacyStageMatches(stage db.P7RushStageRule, rows []db.P7RushStageRule) (bool, error) {
+	if stage.Source != constUtil.P7SectionStageSource {
+		return false, nil
 	}
 	stage.Enabled = true
 	for _, row := range rows {

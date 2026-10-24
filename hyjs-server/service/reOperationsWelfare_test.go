@@ -95,12 +95,23 @@ func TestReFortuneCatNativeCostsDailyReplayAndCold(t *testing.T) {
 	if _, err = f.s.p4Welfare(f.ctx, f.id, &pb.CSFortuneCatReward{Type: proto.Int32(1)}, 500, at); err == nil {
 		t.Fatal("same stamp changed cat type")
 	}
+	var validLive db.P4WelfareRule
+	if err = db.GetIns().First(&validLive, "id=?", key).Error; err != nil {
+		t.Fatal(err)
+	}
 	if err = db.GetIns().Model(&db.P4WelfareRule{}).Where("id=?", key).Update("rules", []byte(`{"tiers":[]}`)).Error; err != nil {
+		t.Fatal(err)
+	}
+	// New Info must validate the latest quote, while old receipts stay immutable.
+	if _, err = f.s.p4Welfare(f.ctx, f.id, &pb.CSFortuneCatInfo{}, 0, at.AddDate(0, 0, 1)); err == nil {
+		t.Fatal("invalid live quote accepted")
+	}
+	if err = db.GetIns().Model(&db.P4WelfareRule{}).Where("id=?", key).Update("rules", validLive.Rules).Error; err != nil {
 		t.Fatal(err)
 	}
 	next, err := f.s.p4Welfare(f.ctx, f.id, &pb.CSFortuneCatInfo{}, 0, at.AddDate(0, 0, 1))
 	if err != nil || next[0].(*pb.SCFortuneCatInfo).GetInfo().GetTodayLeft() != 5 {
-		t.Fatal("frozen rules or new day reset", err)
+		t.Fatal("validated live quote or new day reset", err)
 	}
 	if _, err = f.s.p4Welfare(f.ctx, f.id, &pb.CSFortuneCatReward{Type: proto.Int32(0)}, 506, at.AddDate(0, 0, 1)); err != nil {
 		t.Fatal(err)

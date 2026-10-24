@@ -187,6 +187,18 @@ export const generatedRoutes: GeneratedRoute[] = [
     }
   },
   {
+    name: 'field-resources',
+    path: '/field-resources',
+    component: 'layout.base$view.field-resources',
+    meta: {
+      title: '野外资源',
+      i18nKey: 'route.field-resources',
+      icon: 'ph:leaf',
+      order: 8,
+      roles: ['viewer', 'operator', 'admin']
+    }
+  },
+  {
     name: 'fields',
     path: '/fields',
     component: 'layout.base$view.fields',
@@ -498,6 +510,18 @@ export const generatedRoutes: GeneratedRoute[] = [
       i18nKey: 'route.titles',
       icon: 'ph:treasure-chest',
       order: 8,
+      roles: ['viewer', 'operator', 'admin']
+    }
+  },
+  {
+    name: 'trials',
+    path: '/trials',
+    component: 'layout.base$view.trials',
+    meta: {
+      title: '试炼之地',
+      i18nKey: 'route.trials',
+      icon: 'ph:stairs',
+      order: 5,
       roles: ['viewer', 'operator', 'admin']
     }
   },

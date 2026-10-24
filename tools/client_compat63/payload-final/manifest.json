@@ -1,0 +1,448 @@
+{
+  "schema": "hyjs-client-compat63-overlay-v1",
+  "status": "STATIC_DEX_AND_HOST_PROBE_PASS_NOT_PACKAGED_NOT_DEVICE_TESTED",
+  "baseAPKSHA256": "fe427f13e8683b434bf7d2756b2dbd4a6f42746d0d6c66c86264182252704580",
+  "baseAPK": "/Users/lirui/.codex/worktrees/ggo-items-shop/hyjs/build/hyjs-local.apk",
+  "manifestProof": {
+    "originalElementsAndAttributesExact": true,
+    "originalActivityAttributesAndUnityMetadataExact": true,
+    "onlyOriginalNodeMovement": "MAIN/LAUNCHER intent-filter to new plain Activity",
+    "newActivity": "com.hyjs.compat.StartupActivity",
+    "destinationActivity": "com.hyjs.wallet.ClientUpdateActivity",
+    "microphoneRequired": false,
+    "originalStringIndicesPreserved": true,
+    "resourcesArscChanged": false,
+    "beforeSHA256": "e9fd2311f5f6d3444d64b58ef057993e388bf6fbb256727d845871147c0371ea",
+    "afterSHA256": "c04acc6892e38a349c05a3ee22f07b53649770be7eb71f0994436303a46b4311"
+  },
+  "replacements": {
+    "AndroidManifest.xml": {
+      "file": "AndroidManifest.xml",
+      "sha256": "c04acc6892e38a349c05a3ee22f07b53649770be7eb71f0994436303a46b4311"
+    },
+    "assets/local-resource-overrides.json": {
+      "file": "assets/local-resource-overrides.json",
+      "sha256": "16413e4e8411bbc08565eb806d5817a36addcfac1713696923d3fab0b16881aa"
+    },
+    "classes2.dex": {
+      "file": "classes2.dex",
+      "sha256": "2abc709a39750e028b3b2c883a42faf588d009447b0766c1a5c024980f7933fe"
+    }
+  },
+  "additions": {
+    "classes5.dex": {
+      "file": "classes5.dex",
+      "sha256": "05bc163e37a6054fda834335d0f6d1b60d515584433e84ee3c3d03333ae04036"
+    }
+  },
+  "newDexClasses": {
+    "Lcom/hyjs/compat/StartupActivity$1;": "Ljava/lang/Object;",
+    "Lcom/hyjs/compat/StartupActivity$2;": "Ljava/lang/Object;",
+    "Lcom/hyjs/compat/StartupGate$Action;": "Ljava/lang/Object;",
+    "Lcom/hyjs/compat/StartupActivity$3$1;": "Ljava/lang/Object;",
+    "Lcom/hyjs/compat/StartupActivity$3$2;": "Ljava/lang/Object;",
+    "Lcom/hyjs/compat/StartupActivity$3;": "Ljava/lang/Object;",
+    "Lcom/hyjs/compat/StartupActivity$4;": "Ljava/lang/Object;",
+    "Lcom/hyjs/compat/StartupActivity$5;": "Ljava/lang/Object;",
+    "Lcom/hyjs/compat/StartupActivity;": "Landroid/app/Activity;",
+    "Lcom/hyjs/compat/StartupGate;": "Ljava/lang/Object;"
+  },
+  "originalDexSHA256": {
+    "classes.dex": "d1df74a5498d81d68d191d43cf1b56f84eca38f06aa19a2166e74e859f58724b",
+    "classes2.dex": "04789033ca49866899eee137828ee5c15a18c0cde310bec6bd7ad5ccafe33bbf",
+    "classes3.dex": "7101405a1b9aa6c12fac342ca3dffc2873b8b31acdc5b76249f4ed79f44b6f3a",
+    "classes4.dex": "f03913cd721b550021ca0747facc2b7874bb0a438cf17d9ffeeac7c4fb7af16d"
+  },
+  "originalDexPolicy": "classes.dex/classes3.dex/classes4.dex byte-exact; classes2 only clinit manifest Pin semantics + necessary absolute offset relocation; all other method instructions/EH/debug and all APIs/flags exact",
+  "unchangedNativeAndManagedEntrySHA256": {
+    "lib/armeabi-v7a/libBugly.so": "c4cd310b4b36671e43ecaf3739ce00f60f8ebd6448e59941b0ffd2a79f304ac5",
+    "lib/armeabi-v7a/libentryexpro.so": "c517b409d169531273c3b33d3a45fdb61e74364014c2cb4dd3f17d7a102d9629",
+    "lib/armeabi-v7a/libGCloudVoice.so": "2174aba68a08ca3601cce4402ac41d76a87b0726464e438e0ef3c2fa092c92ce",
+    "lib/armeabi-v7a/libjcore119.so": "a7cda51be2664626343df18246ca77f4f9f7e20b60cab057ce6a5c2827908ca8",
+    "lib/armeabi-v7a/libmain.so": "2a9aa702a3bac31cddb56979302e409dba5cd1899ac875ec7ea0622e1cf3887d",
+    "lib/armeabi-v7a/libmono.so": "3ac02e3aee5c4ad2044732c6aec2f8f22bd02db251a3775f51da1d38e2cfa3c1",
+    "lib/armeabi-v7a/libsupersdkjni.so": "387ea37e5300cbfbcf7e51110b98a0a1dc0d96d48cc601aa68c432f2378d9bc4",
+    "lib/armeabi-v7a/libunity.so": "bd45fb9376c93ee9665e472f05b362f21ec2d6e6fdff0f59aafa2bdee2dcdaef",
+    "lib/armeabi-v7a/libuptsmaddon.so": "4ecb342aa337b3adf3a4a83a30d16cc529afc983a2a7f092587827cf0af1d831",
+    "lib/armeabi-v7a/libuptsmaddonmi.so": "1825184674dc3ebee5285ef7186cc1593d71f37d58b7e2d560f64595309d62f5",
+    "lib/x86/libBugly.so": "9b95a1bcd3fe30d847b71abae17b9625867c7a028cd85f1e16ca21bb9b9c0151",
+    "lib/x86/libentryexpro.so": "90f8b6e5ba97c82a4c3432df0d222417d3233f3946d6cab059f865950f24244d",
+    "lib/x86/libGCloudVoice.so": "c958d3e2d2336ec4363c7c497e834efb06db3e78c388f70b49967ab9159a09ec",
+    "lib/x86/libjcore119.so": "c93ce7d45a0856fe6af79d23e9bbc027f8b937a7a27f2a49e6d91adb7fb31041",
+    "lib/x86/libmain.so": "de18905429a734b611ecc593e0b8942b0e5b0c4626144fd13f846b2f4ff532c7",
+    "lib/x86/libmono.so": "ab27eaa4cb508bfde5cf906cb318f9e9e6d4a6d5cc4c677f74cc86af2314ccf2",
+    "lib/x86/libsupersdkjni.so": "c8c4ccad3fb1ec812a2d01b1c9e2722900451801adb28aa3eb6361c448a07ab3",
+    "lib/x86/libunity.so": "887761f1b7787cc1575f1627b138f883f47c510fa1ffb2b59ce01359cd7eeba7",
+    "lib/x86/libuptsmaddon.so": "0030610770395d7811ed3676349cc9a39f333290b178e647f714851f0dcbcfe9",
+    "lib/x86/libuptsmaddonmi.so": "84cc43b07d739773e601687c687ed1760990f96a97df98917d9de1741eca2976",
+    "assets/bin/Data/Managed/Assembly-CSharp-firstpass.dll": "e732d075c1f52133f665e835ac623e32be89ec9aa2e22ca11925014dfdff95b8",
+    "assets/bin/Data/Managed/Assembly-UnityScript.dll": "023fe6171dd462b2509c0f9ab3e4ecb9635cbc9e8c96bbeb1b766de26b51b2a9",
+    "assets/bin/Data/Managed/Boo.Lang.dll": "60a779808766fa12f0ce76b91e0bb91967735b2214630c984185535edda574ea",
+    "assets/bin/Data/Managed/LitJson.dll": "151e0a2a6d174558ffa9cb681746d092fde6ba36e937b5825c2f06bb6a8d3230",
+    "assets/bin/Data/Managed/Mono.Security.dll": "0d2ea1e08375cdf17b4586add8206b9f79d25adf09e68abedb57fb2c3a70ff23",
+    "assets/bin/Data/Managed/System.Core.dll": "104278a0bf67b4de8fd1e910e3292a3ef51808ebee7a5f2a229125f18463c98c",
+    "assets/bin/Data/Managed/System.dll": "7e72b92ddcd6b7b791ab24dd5756544f2da81f65e7ba7d1ebe8223123720d0ac",
+    "assets/bin/Data/Managed/UnityEngine.Networking.dll": "9f33f5f74b94d1b5d5c5b3dbc788f7a6a53ce453f846af5567060cacd1b1fde9",
+    "assets/bin/Data/Managed/UnityEngine.UI.dll": "e547d74e89f3d7f500443904fbbc6ce4e19f816a6e2a2d29d85edba14e25e372",
+    "assets/bin/Data/Managed/UnityEngine.dll": "8d4bd6321a453263f8f97047be50dd04a6f2b8f247456ad23fddfbc75f2c2fa4",
+    "assets/bin/Data/Managed/UnityEngine.dll.mdb": "47976903d60eff45c5c16fe77e48773b5fcf073104288f7bd45341c4b6f0bea9",
+    "assets/bin/Data/Managed/mscorlib.dll": "7f16171cf5f87ca1e4c229727526d2fbc786079fc0c960f36197013ea0d986e1",
+    "assets/bin/Data/Managed/Assembly-CSharp.dll": "29bbef55a2458304b7b86b8a0fc1388b8bf3c6c1185ea47dfb58ce0c6e8abb2e",
+    "assets/bin/Data/Managed/NativeBatch.dll": "e8e79ff499823e011277ff6170b4c5956dde3de9fc1cbc9ed21fe0bdd54231a1",
+    "assets/bin/Data/Managed/LocalVoicePCM.dll": "535272c2206d5347ed9a6cabe3d7d438e53accd1d4960b33181c2d1bf67d12c5",
+    "assets/bin/Data/Managed/LocalWorldBossSettlement.dll": "7a299f5c2b568fc7dbea0cab122b5d3a4e67133072c6fd7ecebe5ca514a1bac4",
+    "assets/bin/Data/Managed/LocalWalletSession.dll": "4fcb3f23251d58ca1b960177166a2f2b0606949c809143a4261e98d07691b100",
+    "assets/bin/Data/Managed/LocalAssetReady.dll": "2e6e08516a804723bf2ba7552d9996075a24bc04eaa11925978cc1947b0012cf",
+    "assets/bin/Data/Managed/LocalFormationUI.dll": "a6975c6b9ef497855fe42761ae8fe5d7a5eaee4cad21952725a1d5eea3ebae56",
+    "assets/bin/Data/Managed/SoulFlowerDisplay.dll": "958bd003897f1e616b42115d43914fe55f48b5d6aaa600adb7bf1f07b31d45de",
+    "assets/bin/Data/Managed/SoulFlowerActivity.dll": "1397efaa3bb71ed652cd4ec711a9f1339c98335430eca117620b8b1f7e8a2bee",
+    "assets/bin/Data/Managed/LocalPlayability.dll": "e8e21dd37df3167c249fa553433e69323e2e2ab1976c76f69b8a96402f7aa1fd",
+    "assets/bin/Data/Managed/SoulFlowerHeroArt.dll": "a7a4f7ff945fa4cf2bf6acd402dd672bb94c3eaf335bc3f3527ca04e25abe17c",
+    "assets/bin/Data/Managed/SoulFlowerWeaponRefresh.dll": "63fffceaa28aa4a21c694b3437ec5a38c012be46cbdd4d52f6763f95c4a8a8b6",
+    "assets/bin/Data/Managed/SoulFlowerNotices.dll": "cf804cecebd74935a5ef83635404895117f09499e93c85685e7298a16dce6f52",
+    "assets/bin/Data/Managed/SoulFlowerAchievements.dll": "2c5cc34f1cd1df44ff2c5032da18a76844e154353dc294d7575077f7081a5b56",
+    "assets/bin/Data/Managed/SoulFlowerReWelfare.dll": "8d81a8dccc79334c3ab3bd79dacff94d2d612bb41a769679595c817a61025358",
+    "assets/bin/Data/Managed/SoulFlowerKingRecruit.dll": "ec8b62601a4b0b0a6bba4867b510be2e05b88757ed64f116dcd20bc57b849856",
+    "assets/bin/Data/Managed/SoulFlowerVipEmpty.dll": "b74b42162f6020dc0a7d2b2e12ece018ffa8f452b6b94da4ca79e862f62834cd",
+    "assets/bin/Data/Managed/SoulFlowerWelfareFeedback.dll": "75e0224b6ca5ffdac0d8f8720076010965dadacac36bc2c5f9385a2692117aa6",
+    "assets/bin/Data/Managed/SoulFlowerNativeAccount.dll": "c7d2a60e86197c7a8e172432653f5493190916b9ac373baaa15d2681ae78fd90",
+    "assets/bin/Data/Managed/SoulFlowerMembership.dll": "51d85281cf9d1e5b2ba1b3d971ee6b68e2427e72170989ad86c1f7e4bde6eaa9",
+    "assets/bin/Data/Managed/SoulFlowerStaminaSweep.dll": "799575040c000da825d885c0f43d829d2725dcdcc6113f33eb560e19e97c3358",
+    "assets/bin/Data/Managed/SoulFlowerChatProfile.dll": "3ff2569d91a34aab5f66c9092eb311bc8ad1b6d2801b6dc73b8dcd994879df91",
+    "assets/bin/Data/Managed/SoulFlowerRecycle.dll": "2778f6867cc141a01375dc99954e4caf11a411c3c57f5a5d49f8fc5988b394b6",
+    "assets/bin/Data/Managed/HYJSClientUpdate.dll": "b2cd04d2f329949bf8a39a2636429d433d662087dde4ad8997ad8d3e83915fa9",
+    "assets/bin/Data/Managed/HYJS.ArenaState.dll": "8efc42e38e0b8fbeb67b15dd64fc3ec90e9f21394b26437e5e2aa115e3f87b71",
+    "assets/bin/Data/Managed/LocalFieldSettlement.dll": "8a62b7c55bc7bec47e4ebfefa2d597ef4b85d34152097f4de55cfff4dfb72eb7",
+    "assets/bin/Data/Managed/HYJS.Gameplay.dll": "ceda1fb4008b33a0ed496151878db844e2eb03968fca16b282ecdf492e40dbf9",
+    "assets/bin/Data/Managed/SoulFlowerPetEquip48.dll": "12dd13f00abd533f29f65cce11d73517aa2654cd210bab66bd10e9fabd2ace5b",
+    "assets/bin/Data/Managed/InstanceProtection.dll": "e343cf2dd32ee248457b99c6b31d73865c23763e91a7fbe21869afe767bd9c9b",
+    "assets/bin/Data/Managed/SoulFlowerGGOShop.dll": "97fd75197f863301c88dd24c29bf27923887db72f950b0f75730004d2a84d097",
+    "assets/bin/Data/Managed/HYJS.NewbieSign.dll": "52ae7629e9b79a03f789e6a76171cf79439ba196c083fb98d49ff110efa828e4",
+    "assets/bin/Data/Managed/HYJS.BulkPurchase.dll": "64edf441791848ecf3183f2a2cc12a371fac80bc135c777bacebb329b5a6167d",
+    "assets/bin/Data/Managed/HYJS.OneKey59.dll": "ac0a4482f71512f8800c3aeb9aec8738af72ccbb6015824409fd99e1ba3f0475",
+    "assets/bin/Data/Managed/HYJS.DungeonContent.dll": "2ff7940b28542b443190edd1e50697efa6443c42a5d968f2fa0f7ce8dcaf2e8f",
+    "assets/bin/Data/Managed/SoulFlowerPaymentFeedback.dll": "2321065242b55452c3e50b625b0fc050a0ab33c10a9a9243e2799831aeccc165",
+    "assets/bin/Data/Managed/HYJS.DungeonManifest.dll": "7b2ea730bff1f3ddf882b35ad9c2a299fbc5e863532899d5dcac06cb5f5fa5a3",
+    "assets/bin/Data/Managed/HYJS.Latency62.dll": "253126febc7e30b2a7aef3a77e831f967a3a723c12f0c1a7914a80794cc0abbe"
+  },
+  "sourcePins": {
+    "tools/client_compat63/README.md": "96c06ce72313a1d3f645f8830c411ca08e40e6bc39af6975b22434fc485c4eb6",
+    "tools/client_compat63/axml.py": "8322f8d484260ec4c761e46615087f3e8d2cbce5244379001fa6b12158dc9f92",
+    "tools/client_compat63/build.py": "19c3d160b7745c8c3e223e6ff21044cb4d5957f55811ae0a22b0d9734a95bec6",
+    "tools/client_compat63/dex_patch.py": "6fedf2b2b9c0fbb4ced18b3881bd6c3c6ed1cef03ff065a82cd8ebc4968208ac",
+    "tools/client_compat63/src/com/hyjs/compat/StartupActivity.java": "829e866757b8997c5c48b57b23f04b4eedcc32fd01e06a4811f210f7b40a4e87",
+    "tools/client_compat63/src/com/hyjs/compat/StartupGate.java": "3ed50652b844be75dea83d201833d978e60b936a71a9042f60cae48a1fefea32",
+    "tools/client_compat63/tests/android/content/Context.java": "994ae8ec0644caf44a797d378d4ec74ea65dc06184bec210aaf98f68031e76a3",
+    "tools/client_compat63/tests/android/content/res/AssetManager.java": "53346fcd350f4648ceff141eca6d1ea38fbfb83f4e2b1020e675f3bdf7b14cf4",
+    "tools/client_compat63/tests/com/hyjs/compat/StartupProbe.java": "3197f54285a92593d01002182a94b2c4803a5a0677497ff94a05374e7a1b266b",
+    "tools/green_hero_compat/java/com/hyjs/wallet/LocalAssetOverlay.java": "500a0f3e1db6d682343897d8ec9591e716b1c89b5ab20394679b866538a97cf9"
+  },
+  "dexProof": {
+    "insertionOffset": 73256,
+    "singleInsertionDelta": 304,
+    "oldClinitCodeOff": 36648,
+    "newClinitCodeOff": 73256,
+    "nonClinitMethodsInstructionsEHAndDebugExact": 473,
+    "allOriginalIndexesAndReferencesExact": true,
+    "allClassAPIFlagsAndOtherOriginalBytesExactOutsideRelocatedOffsetFields": true,
+    "ulebWidthsVerifiedUnchanged": true,
+    "beforeSections": [
+      {
+        "kind": "0x0",
+        "count": 1,
+        "start": 0,
+        "parsedEnd": 112,
+        "spanEnd": 112
+      },
+      {
+        "kind": "0x1",
+        "count": 1540,
+        "start": 112,
+        "parsedEnd": 6272,
+        "spanEnd": 6272
+      },
+      {
+        "kind": "0x2",
+        "count": 262,
+        "start": 6272,
+        "parsedEnd": 7320,
+        "spanEnd": 7320
+      },
+      {
+        "kind": "0x3",
+        "count": 362,
+        "start": 7320,
+        "parsedEnd": 11664,
+        "spanEnd": 11664
+      },
+      {
+        "kind": "0x4",
+        "count": 348,
+        "start": 11664,
+        "parsedEnd": 14448,
+        "spanEnd": 14448
+      },
+      {
+        "kind": "0x5",
+        "count": 986,
+        "start": 14448,
+        "parsedEnd": 22336,
+        "spanEnd": 22336
+      },
+      {
+        "kind": "0x6",
+        "count": 93,
+        "start": 22336,
+        "parsedEnd": 25312,
+        "spanEnd": 25312
+      },
+      {
+        "kind": "0x2001",
+        "count": 474,
+        "start": 25312,
+        "parsedEnd": 73256,
+        "spanEnd": 73256
+      },
+      {
+        "kind": "0x2003",
+        "count": 302,
+        "start": 73256,
+        "parsedEnd": 76484,
+        "spanEnd": 76484
+      },
+      {
+        "kind": "0x1001",
+        "count": 209,
+        "start": 76484,
+        "parsedEnd": 78576,
+        "spanEnd": 78576
+      },
+      {
+        "kind": "0x2002",
+        "count": 1540,
+        "start": 78576,
+        "parsedEnd": 106140,
+        "spanEnd": 106140
+      },
+      {
+        "kind": "0x2004",
+        "count": 49,
+        "start": 106140,
+        "parsedEnd": 106732,
+        "spanEnd": 106732
+      },
+      {
+        "kind": "0x2000",
+        "count": 93,
+        "start": 106732,
+        "parsedEnd": 110911,
+        "spanEnd": 110911
+      },
+      {
+        "kind": "0x2005",
+        "count": 4,
+        "start": 110911,
+        "parsedEnd": 110949,
+        "spanEnd": 110952
+      },
+      {
+        "kind": "0x1003",
+        "count": 45,
+        "start": 110952,
+        "parsedEnd": 111444,
+        "spanEnd": 111444
+      },
+      {
+        "kind": "0x2006",
+        "count": 49,
+        "start": 111444,
+        "parsedEnd": 112692,
+        "spanEnd": 112692
+      },
+      {
+        "kind": "0x1000",
+        "count": 1,
+        "start": 112692,
+        "parsedEnd": 112900,
+        "spanEnd": 112900
+      }
+    ],
+    "afterSections": [
+      {
+        "kind": "0x0",
+        "count": 1,
+        "start": 0,
+        "parsedEnd": 112,
+        "spanEnd": 112
+      },
+      {
+        "kind": "0x1",
+        "count": 1540,
+        "start": 112,
+        "parsedEnd": 6272,
+        "spanEnd": 6272
+      },
+      {
+        "kind": "0x2",
+        "count": 262,
+        "start": 6272,
+        "parsedEnd": 7320,
+        "spanEnd": 7320
+      },
+      {
+        "kind": "0x3",
+        "count": 362,
+        "start": 7320,
+        "parsedEnd": 11664,
+        "spanEnd": 11664
+      },
+      {
+        "kind": "0x4",
+        "count": 348,
+        "start": 11664,
+        "parsedEnd": 14448,
+        "spanEnd": 14448
+      },
+      {
+        "kind": "0x5",
+        "count": 986,
+        "start": 14448,
+        "parsedEnd": 22336,
+        "spanEnd": 22336
+      },
+      {
+        "kind": "0x6",
+        "count": 93,
+        "start": 22336,
+        "parsedEnd": 25312,
+        "spanEnd": 25312
+      },
+      {
+        "kind": "0x2001",
+        "count": 475,
+        "start": 25312,
+        "parsedEnd": 73560,
+        "spanEnd": 73560
+      },
+      {
+        "kind": "0x2003",
+        "count": 302,
+        "start": 73560,
+        "parsedEnd": 76788,
+        "spanEnd": 76788
+      },
+      {
+        "kind": "0x1001",
+        "count": 209,
+        "start": 76788,
+        "parsedEnd": 78880,
+        "spanEnd": 78880
+      },
+      {
+        "kind": "0x2002",
+        "count": 1540,
+        "start": 78880,
+        "parsedEnd": 106444,
+        "spanEnd": 106444
+      },
+      {
+        "kind": "0x2004",
+        "count": 49,
+        "start": 106444,
+        "parsedEnd": 107036,
+        "spanEnd": 107036
+      },
+      {
+        "kind": "0x2000",
+        "count": 93,
+        "start": 107036,
+        "parsedEnd": 111215,
+        "spanEnd": 111215
+      },
+      {
+        "kind": "0x2005",
+        "count": 4,
+        "start": 111215,
+        "parsedEnd": 111253,
+        "spanEnd": 111256
+      },
+      {
+        "kind": "0x1003",
+        "count": 45,
+        "start": 111256,
+        "parsedEnd": 111748,
+        "spanEnd": 111748
+      },
+      {
+        "kind": "0x2006",
+        "count": 49,
+        "start": 111748,
+        "parsedEnd": 112996,
+        "spanEnd": 112996
+      },
+      {
+        "kind": "0x1000",
+        "count": 1,
+        "start": 112996,
+        "parsedEnd": 113204,
+        "spanEnd": 113204
+      }
+    ],
+    "actualPatchedDEXInitializedPins": [
+      {
+        "path": "tabledata/tablehero",
+        "sha256": "f45ffdffbd92df69ebae0b549002a3adeb4440c716bcc9145af68b121e757076",
+        "bytes": 10169
+      },
+      {
+        "path": "tabledata/tablefrag",
+        "sha256": "f489c4f769aac38633111f7a1c4bb0ed4164f16d65df01adc03524ea07210512",
+        "bytes": 3253
+      },
+      {
+        "path": "model/lingnai01_body",
+        "sha256": "0bb4db13e9c6667b6b52d88a1a469990895a154b6c38509dbdfe64a424322d4e",
+        "bytes": 526777
+      },
+      {
+        "path": "model/sicary01_body",
+        "sha256": "1dc1308c407872e7ad009ac97abae56710026e1a3572b043389597d135483d77",
+        "bytes": 596264
+      },
+      {
+        "path": "model/nio01_body",
+        "sha256": "5aa707be0d98bf19082fb05fcac5a10029cafca95a90aa9905ddfa38eb6e647a",
+        "bytes": 503359
+      },
+      {
+        "path": "smallassetmanifest",
+        "sha256": "fac59a57d1a146ad36cd87dcbc05a0f43fc516f6d81393c858d0cc94b087130f",
+        "bytes": 564315
+      }
+    ],
+    "oldClinitUnreferencedCodeRetained": true,
+    "stringIdsSortedAndByteExact": true
+  },
+  "probe": "PASS 5 cases: actual overlay hash/IO/security fail closed; retry exactly once; in-flight/cancel/handoff guards; unrelated file preserved",
+  "formal62FailureReproduced": "EXPECTED_BLOCKER formal62 fresh cache: smallassetmanifest pin/asset mismatch; zero Unity launches",
+  "existingFormal62Blocker": {
+    "path": "smallassetmanifest",
+    "expectedBytes": 563672,
+    "expectedSHA256": "cfddb4d1b6ee15bfc8d51da311bfa7e6e1408c809c4ccd8b1e47049a85b45254",
+    "actualBytes": 564315,
+    "actualSHA256": "fac59a57d1a146ad36cd87dcbc05a0f43fc516f6d81393c858d0cc94b087130f",
+    "formal62FreshInstallLaunchBlocked": true
+  },
+  "probeOriginalOverlaySourceSHA256": "500a0f3e1db6d682343897d8ec9591e716b1c89b5ab20394679b866538a97cf9",
+  "probeScope": "Actual original Java overlay source + production StartupGate; host Context fixtures. New source pin/config uses true formal62 APK assets; unchanged formal62 fresh-cache failure is independently asserted. Android Activity lifecycle/UI/native crash recovery not exercised.",
+  "androidJavaRelease": 8,
+  "minAPI": 23,
+  "noOriginalDexRebuild": true,
+  "originalDEXReassembly": false,
+  "noUnityClassReferenceInNewDex": true,
+  "unverified": [
+    "Device cold start/error page/retry/duplicate launcher/process restore/background lifecycle",
+    "No-microphone device installation/voice behavior",
+    "64-bit-only OS and 16KiB engine compatibility remain unsupported/unproven"
+  ]
+}

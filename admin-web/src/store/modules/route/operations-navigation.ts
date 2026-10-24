@@ -9,7 +9,7 @@ export function organizeOperationsMenus(menus: App.Global.Menu[]) {
     'sprout-settings': 'ph:plant', 'guild-settings': 'ph:flag', guilds: 'ph:users-three', activities: 'ph:calendar-blank', achievements: 'ph:medal', titles: 'ph:crown',
     'arena-prizes': 'ph:cards-three', 'wallet-reasons': 'ph:wallet', 'server-clock': 'ph:clock-counter-clockwise',
     shops: 'ph:storefront', announcements: 'ph:megaphone', 'client-updates': 'ph:device-mobile', servers: 'ph:hard-drives',
-    'activity-schedules': 'ph:calendar-dots', fields: 'ph:map-trifold', players: 'ph:users-three',
+    'activity-schedules': 'ph:calendar-dots', fields: 'ph:map-trifold', trials: 'ph:stairs', players: 'ph:users-three',
     feedback: 'ph:chat-circle-text', users: 'ph:shield-check', audit: 'ph:clipboard-text',
     cdk: 'ph:gift', 'redeem-codes': 'ph:ticket', broadcast: 'ph:envelope-open', mail: 'ph:paper-plane-tilt',
     shops_ordinary: 'ph:shopping-bag', shops_memory: 'ph:sparkle', shops_popularity: 'ph:star',
@@ -52,11 +52,13 @@ export function organizeOperationsMenus(menus: App.Global.Menu[]) {
     take('game-accounts', '用户管理'),
     take('items', '道具与资源'),
     take('fields', '野外地图与部署'),
+    take('trials', '试炼之地'),
     take('sprout-settings', '小芽设置'),
     take('activities', '活动设置'),
     take('guild-settings', '公会设置'),
     group('growth-settings', '成长配置', [take('achievements'), take('titles')]),
     group('mechanism-settings', '游戏机制设置', [
+      take('field-resources', '野外资源'),
       take('arena-prizes'),
       take('wallet-reasons'),
       take('server-clock', '统一游戏时间')
