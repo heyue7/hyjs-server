@@ -26,3 +26,7 @@ game:
   tables: /app/tables
   enableTestPayments: true
   enableLocalWallet: true
+
+# Private deployment secret; empty retains complete historical validation.
+security:
+  rushHistoryCertificateKey: ""

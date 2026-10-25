@@ -129,6 +129,9 @@ func AdminRenameGamePlayer(ctx context.Context, p *model.AdminPrincipal, id int6
 	if !playerRenameNameValid(req.Name) || strings.TrimSpace(req.Reason) == "" {
 		return nil, constUtil.ErrAdminInput
 	}
+	if err := validateNameContent(req.Name); err != nil {
+		return nil, err
+	}
 	err := db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := ServerGameClockGuardTransaction(tx); err != nil {
 			return err

@@ -36,17 +36,18 @@ func main() {
 
 func run() error {
 	var (
-		env           = flag.String("env", "dev", "config env: dev|test|prd")
-		bind          = flag.String("bind", "", "override listen address")
-		advertiseHost = flag.String("advertise-host", "", "address reachable by the client")
-		tables        = flag.String("tables", "", "override APK tables directory")
-		serverID      = flag.Int64("server-id", 0, "trusted deployment server ID; 0 uses game.serverId")
-		database      = flag.String("db", "", "override SQLite database")
-		httpPort      = flag.Int("http-port", -1, "override HTTP port, 0 selects a free port")
-		tcpPort       = flag.Int("tcp-port", -1, "override TCP port, 0 selects a free port")
-		logFile       = flag.String("log-file", "", "isolated process log path; empty keeps configured path")
-		testPayments  = flag.Bool("enable-test-payments", false, "enable loopback-only demo payment confirmation")
-		localWallet   = flag.Bool("enable-local-wallet", false, "enable local demo wallet payments in dev/test; no real charge")
+		env            = flag.String("env", "dev", "config env: dev|test|prd")
+		bind           = flag.String("bind", "", "override listen address")
+		advertiseHost  = flag.String("advertise-host", "", "address reachable by the client")
+		tables         = flag.String("tables", "", "override APK tables directory")
+		serverID       = flag.Int64("server-id", 0, "trusted deployment server ID; 0 uses game.serverId")
+		database       = flag.String("db", "", "override SQLite database")
+		httpPort       = flag.Int("http-port", -1, "override HTTP port, 0 selects a free port")
+		tcpPort        = flag.Int("tcp-port", -1, "override TCP port, 0 selects a free port")
+		logFile        = flag.String("log-file", "", "isolated process log path; empty keeps configured path")
+		warmRushPlayer = flag.Int64("warm-rush-history-player", 0, "validate existing trial history and persist signed certificates, then exit")
+		testPayments   = flag.Bool("enable-test-payments", false, "enable loopback-only demo payment confirmation")
+		localWallet    = flag.Bool("enable-local-wallet", false, "enable local demo wallet payments in dev/test; no real charge")
 	)
 	flag.Parse()
 	if err := config.Init(*env); err != nil {
@@ -117,6 +118,22 @@ func run() error {
 	s.LocalPlayToolsEnabled = autoDemo
 	if err = s.LoadTables(cfg.Tables); err != nil {
 		return err
+	}
+	if *warmRushPlayer != 0 {
+		if *warmRushPlayer < 1 {
+			return errors.New("trial history owner must be positive")
+		}
+		if err = s.LoadP7Tables(cfg.Tables); err != nil {
+			return err
+		}
+		if err = service.InitializeP7RushHistoryCertificates(ctx); err != nil {
+			return err
+		}
+		if err = service.WarmP7RushHistory(context.WithValue(ctx, constUtil.GameServiceContextKey, s), *warmRushPlayer); err != nil {
+			return err
+		}
+		fmt.Println("Trial history certificates verified")
+		return nil
 	}
 	if err = s.InstallGGOItems(); err != nil {
 		return err
@@ -278,6 +295,9 @@ func run() error {
 		return err
 	}
 	if err = s.LoadP7ExpeditionTables(cfg.Tables); err != nil {
+		return err
+	}
+	if err = service.InitializeP7RushHistoryCertificates(ctx); err != nil {
 		return err
 	}
 	if err = s.InitializeP7Expedition(ctx); err != nil {

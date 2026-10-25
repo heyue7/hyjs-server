@@ -87,9 +87,6 @@ func (s *GameService) p7PrepareManualRush(ctx context.Context, tx *gorm.DB, id i
 // Preserve the original stored input. A new explicit permission row alone may
 // authorize the pending-to-computed transition after whole End comparison.
 func p7ReadManualRush(tx *gorm.DB, fight *db.P7RushFight, request *pb.CSRushFightEnd) (*model.CombatOutcome, bool, error) {
-	reject := func() (*model.CombatOutcome, bool, error) {
-		return nil, true, errors.New(constUtil.P7ScopedRushConflict)
-	}
 	var row db.P7RushManualCalculation
 	err := tx.First(&row, "fight_id=?", fight.ID).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -98,6 +95,19 @@ func p7ReadManualRush(tx *gorm.DB, fight *db.P7RushFight, request *pb.CSRushFigh
 	if err != nil {
 		return nil, true, err
 	}
+	return p7ReadManualRushRows(tx, fight, request, row, func(id string) (*db.P6BattleRecord, error) {
+		var record db.P6BattleRecord
+		err := tx.First(&record, "id=?", id).Error
+		return &record, err
+	})
+}
+
+// p7ReadManualRushRows shares the original verifier with the query-owned source snapshot.
+func p7ReadManualRushRows(tx *gorm.DB, fight *db.P7RushFight, request *pb.CSRushFightEnd, row db.P7RushManualCalculation, readRecord func(string) (*db.P6BattleRecord, error)) (*model.CombatOutcome, bool, error) {
+	reject := func() (*model.CombatOutcome, bool, error) {
+		return nil, true, errors.New(constUtil.P7ScopedRushConflict)
+	}
+	var err error
 	family, familyErr := p7ManualRushFamilyForReceipt(fight.Kind, row.DriverPolicy, row.ScopeProof)
 	if familyErr != nil {
 		return reject()
@@ -107,11 +117,11 @@ func p7ReadManualRush(tx *gorm.DB, fight *db.P7RushFight, request *pb.CSRushFigh
 	if fight.Diagnostic || row.PlayerID != fight.PlayerID || row.P6RecordID != fight.ReplayID || row.StartHash != fight.StartHash || p6Digest(fight.Start) != fight.StartHash || p6Digest(fight.Rule) != fight.RuleHash || row.DriverPolicy != driverSource || row.ScopeProof == "" || row.ScopeProof != scopeProof {
 		return reject()
 	}
-	var record db.P6BattleRecord
-	if err = tx.First(&record, "id=?", row.P6RecordID).Error; err != nil {
+	record, err := readRecord(row.P6RecordID)
+	if err != nil {
 		return nil, true, err
 	}
-	input, err := decodeP6Record(&record)
+	input, err := decodeP6Record(record)
 	if err != nil {
 		return nil, true, err
 	}

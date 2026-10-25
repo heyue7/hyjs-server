@@ -529,6 +529,10 @@ func p10VoiceMessageFrame(row *db.P10VoiceMessage, asset *db.P10VoiceAsset) (*pb
 
 // 同一实际上传对象只能发送一次，原TCP没有时间戳也能幂等读取原帧；重试仍先检查当前撤权。
 func (s *GameService) p10VoicePublish(ctx context.Context, id int64, session []byte, body *pb.CSChatTcp) ([]proto.Message, error) {
+	// 原音频载荷仍按原上传权限校验；随包的文字不能绕过公共过滤。
+	if err := validateChatContent(body.GetContent()); err != nil {
+		return nil, err
+	}
 	p10SceneMutation.Lock()
 	defer p10SceneMutation.Unlock()
 	var frame *pb.SCChatTcp

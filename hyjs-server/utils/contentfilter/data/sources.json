@@ -1,0 +1,32 @@
+[
+  {
+    "file": "政治类型.txt",
+    "url": "https://raw.githubusercontent.com/konsheng/Sensitive-lexicon/d967c30b053fa40b06c5a0dddf0be493f2dfae46/Vocabulary/%E6%94%BF%E6%B2%BB%E7%B1%BB%E5%9E%8B.txt",
+    "sha256": "0aa2ea38cb8164705068cab8f0ef060bc65b2bb8053bc07ff2b5bd96f928743e"
+  },
+  {
+    "file": "反动词库.txt",
+    "url": "https://raw.githubusercontent.com/konsheng/Sensitive-lexicon/d967c30b053fa40b06c5a0dddf0be493f2dfae46/Vocabulary/%E5%8F%8D%E5%8A%A8%E8%AF%8D%E5%BA%93.txt",
+    "sha256": "b1f24a2b856445f0d4f106a487f9fd1c114c17dac64853108539874ffc3c6714"
+  },
+  {
+    "file": "色情类型.txt",
+    "url": "https://raw.githubusercontent.com/konsheng/Sensitive-lexicon/d967c30b053fa40b06c5a0dddf0be493f2dfae46/Vocabulary/%E8%89%B2%E6%83%85%E7%B1%BB%E5%9E%8B.txt",
+    "sha256": "3e844e67b1f3dd50c21273beffa0c2f4c9f3b8fe3f7999353a0b5e6ff0cf94bc"
+  },
+  {
+    "file": "色情词库.txt",
+    "url": "https://raw.githubusercontent.com/konsheng/Sensitive-lexicon/d967c30b053fa40b06c5a0dddf0be493f2dfae46/Vocabulary/%E8%89%B2%E6%83%85%E8%AF%8D%E5%BA%93.txt",
+    "sha256": "9e3a27bf849acb3a907278218cd883c33347edd9f55d7bb26cc4b84bf956bc99"
+  },
+  {
+    "file": "TSCharacters.txt",
+    "url": "https://raw.githubusercontent.com/BYVoid/OpenCC/9b16591a0d065f5e1121620733721436e83c206f/data/dictionary/TSCharacters.txt",
+    "sha256": "9ff46a7d30e5765375eb13d33f2b03a34d298913caf2b120380679f33ae1642d"
+  },
+  {
+    "file": "OpenCC.LICENSE",
+    "url": "https://raw.githubusercontent.com/BYVoid/OpenCC/9b16591a0d065f5e1121620733721436e83c206f/LICENSE",
+    "sha256": "b534e465949558eec2597b04f5092b5e161236a68dfbfd04d547592ac3964308"
+  }
+]

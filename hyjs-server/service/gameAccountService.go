@@ -72,6 +72,9 @@ func passwordCredentialRetryable(err error) bool {
 
 // gameAccountNewProfile prepares the current Argon2id credential and session for a newly created identity.
 func gameAccountNewProfile(ctx context.Context, username, password string) (*db.Profile, error) {
+	if err := validateNameContent(username); err != nil {
+		return nil, err
+	}
 	serverID := constUtil.GameDefaultServerID
 	if game, ok := ctx.Value(constUtil.GameServiceContextKey).(*GameService); ok {
 		serverID = game.OriginalServerID()
@@ -92,6 +95,14 @@ func gameAccountNewProfile(ctx context.Context, username, password string) (*db.
 
 // RegisterGameAccount inserts a global identity and its current-runtime role shell after migration; duplicates never log in.
 func RegisterGameAccount(ctx context.Context, username, password string, nicknames ...string) (*model.GameAccountRegisterResponse, error) {
+	if err := validateNameContent(username); err != nil {
+		return nil, err
+	}
+	if len(nicknames) > 0 {
+		if err := validateNameContent(nicknames[0]); err != nil {
+			return nil, err
+		}
+	}
 	if globalGameAccountsAvailable(db.GetIns().WithContext(ctx)) {
 		nickname := username
 		if len(nicknames) > 0 && nicknames[0] != "" {
@@ -121,6 +132,14 @@ func RegisterGameAccount(ctx context.Context, username, password string, nicknam
 
 // AdminCreateGamePlayer selects an existing global account or a compatibility account, then creates the current runtime starter with audit.
 func (s *GameService) AdminCreateGamePlayer(ctx context.Context, p *model.AdminPrincipal, req model.AdminGamePlayerCreateRequest) (*model.AdminGamePlayerDTO, error) {
+	if err := validateNameContent(req.Name); err != nil {
+		return nil, err
+	}
+	if req.AccountID == 0 {
+		if err := validateNameContent(req.Username); err != nil {
+			return nil, err
+		}
+	}
 	selected := req.ServerID
 	if selected == 0 {
 		selected = AdminSelectedServerID(ctx)

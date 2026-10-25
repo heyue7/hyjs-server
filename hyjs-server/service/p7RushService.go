@@ -338,6 +338,11 @@ func (s *GameService) P7RushQuery(ctx context.Context, id int64, request proto.M
 			if err != nil {
 				return err
 			}
+			projection, err := p7NewEliteQueryProjection(tx, state)
+			if err != nil {
+				return err
+			}
+			projection.serverID = s.OriginalServerID()
 			for _, stage := range stages {
 				first, err := p1RewardResources(stage.FirstReward)
 				if err != nil {
@@ -347,14 +352,14 @@ func (s *GameService) P7RushQuery(ctx context.Context, id int64, request proto.M
 				if err != nil {
 					return err
 				}
-				passed, err := s.p7StagePrerequisite(tx, id, stage)
+				passed, err := projection.prerequisite(s, stage)
 				if err != nil {
 					return err
 				}
 				open := int32(0)
 				scoped := false
 				if cfg.Enabled && !authority && stage.Enabled && passed && p.GetLevel() >= stage.MinLevel {
-					scoped, err = s.p7ScopedStageAvailable(ctx, tx, p, g, stage, now)
+					scoped, err = projection.scopeAvailable(s, ctx, p, g, stage, now)
 					if err != nil {
 						return err
 					}
@@ -364,9 +369,9 @@ func (s *GameService) P7RushQuery(ctx context.Context, id int64, request proto.M
 						open = 1
 					}
 				}
-				var wins int64
-				if err = tx.Model(&db.P7RushProgress{}).Where("player_id=? AND kind=? AND task_id=?", id, constUtil.P7RushElite, stage.TaskID).Count(&wins).Error; err != nil {
-					return err
+				wins := int64(0)
+				if projection.progress[constUtil.P7RushElite][stage.TaskID] {
+					wins = 1
 				}
 				if wins > 0 {
 					first = nil

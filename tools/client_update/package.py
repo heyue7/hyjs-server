@@ -141,6 +141,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ('base-apk', 'overlay', 'output', 'record'):
         parser.add_argument('--' + name, type=Path, required=True)
+    parser.add_argument('--head-name-overlay', type=Path, help='Pinned original 3D name font resource overlay')
     parser.add_argument('--qa-origin', help='Loopback-only update UI QA; original Unity endpoints remain inherited')
     parser.add_argument('--gameplay-overlay', type=Path, help='Qualified gameplay45 input to the update layer')
     parser.add_argument('--pet-equip-overlay', type=Path, help='Qualified pet equipment input to the update layer')
@@ -275,6 +276,16 @@ def main():
                 helper_entry = 'assets/bin/Data/Managed/InstanceProtection.dll'
                 payload[helper_entry] = (protection_dir / 'InstanceProtection.dll').read_bytes()
                 require(hashlib.sha256(payload[helper_entry]).hexdigest() == protection['helperSHA256'], 'Instance protection helper changed')
+        head_name_report = None
+        if args.head_name_overlay:
+            from tools.client_head_names import build as head_names
+            expected, head_name_report = head_names.build_overlay(base)
+            folder = args.head_name_overlay.resolve()
+            require(folder.is_relative_to(ROOT), 'Head name overlay outside project')
+            pins[Path(head_names.__file__).resolve()] = common.digest(Path(head_names.__file__))
+            for name, raw in expected.items():
+                require(name not in payload and (folder / name).read_bytes() == raw, 'Head name resource differs')
+                payload[name] = raw
         with tempfile.TemporaryDirectory(prefix='hyjs-client-update-', dir=ROOT / 'build') as directory:
             temp = Path(directory)
             unsigned, aligned, signed = [temp / name for name in ('unsigned.apk', 'aligned.apk', 'signed.apk')]
@@ -307,7 +318,7 @@ def main():
             for path, digest in pins.items():
                 require(common.digest(path) == digest, 'Build input changed while packaging')
             require(common.digest(base) == proof['baseAPKSHA256'], 'Protected base changed')
-            result = dict(status='SIGNED_ALIGNED_UPDATE_CANDIDATE_NOT_INSTALLED', baseAPKSHA256=proof['baseAPKSHA256'], binarySHA256=common.digest(signed), outputAPK=str(output.relative_to(ROOT)), replacementEntries=hashes, originalEngineMethodsExact=547, inheritedEntryCount=len(inherited), allOtherEntriesAndCompressedPayloadsExact=True, inheritedWalletDexOnlyFinalFlagAndChecksumChanged=True, walletClassAccessFlagOffset=flag_offset, buildCode=proof['buildCode'], versionName=proof['versionName'], signerCertificateSHA256=certificate, signatureVerified=True, zipalignVerified=True, updateUIQAOnly=bool(args.qa_origin), originalGameEndpointsInherited=True, installed=False, promoted=False)
+            result = dict(headNameFontProof=head_name_report, status='SIGNED_ALIGNED_UPDATE_CANDIDATE_NOT_INSTALLED', baseAPKSHA256=proof['baseAPKSHA256'], binarySHA256=common.digest(signed), outputAPK=str(output.relative_to(ROOT)), replacementEntries=hashes, originalEngineMethodsExact=547, inheritedEntryCount=len(inherited), allOtherEntriesAndCompressedPayloadsExact=True, inheritedWalletDexOnlyFinalFlagAndChecksumChanged=True, walletClassAccessFlagOffset=flag_offset, buildCode=proof['buildCode'], versionName=proof['versionName'], signerCertificateSHA256=certificate, signatureVerified=True, zipalignVerified=True, updateUIQAOnly=bool(args.qa_origin), originalGameEndpointsInherited=True, installed=False, promoted=False)
             signed.replace(output)
             if signed.with_suffix('.apk.idsig').exists():
                 signed.with_suffix('.apk.idsig').unlink()

@@ -4,6 +4,7 @@
 port: 8080
 
 security:
+  rushHistoryCertificateKey: "" # Private signing secret; empty retains complete historical validation.
   trustedProxies: "" # Only explicit proxy IP/CIDR; never trust arbitrary forwarded headers.
   adminSecureCookies: false # Enable only when the public admin origin uses HTTPS.
 
