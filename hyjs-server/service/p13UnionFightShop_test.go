@@ -5,12 +5,13 @@ import (
 	"google.golang.org/protobuf/proto"
 	"hyjs-server/db"
 	pb "hyjs-server/model/protocol"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 )
 
-// TestP13UnionFightShop 使用真实采矿/上交来源消费OwnToken，并验证原5格/角色/逐次恢复/Cold/报价不可漂移。
+// TestP13UnionFightShop 使用真实采矿/上交来源消费OwnToken，并验证原5格/角色/逐次恢复/Cold/旧报价拒绝与新报价生效。
 func TestP13UnionFightShopActualMiningTokenSourceOfferStockRoleFiveSlotsAndCold(t *testing.T) {
 	f, ids, first, clock, match := p13UFFieldSetup(t)
 	now := func() time.Time { return time.UnixMilli(clock.Load()) }
@@ -97,17 +98,20 @@ func TestP13UnionFightShopActualMiningTokenSourceOfferStockRoleFiveSlotsAndCold(
 			t.Fatal("real50 mine to150 war currency")
 		}
 	}
+	quotes := map[int64]map[string]string{}
 	list := func(id int64, npc string) *pb.SCUFShopList {
 		t.Helper()
 		replies, err := f.s.p13UFShopList(f.ctx, id, &pb.CSUFShopList{NpcId: proto.String(npc)}, now())
 		if err != nil {
 			t.Fatal(err)
 		}
-		return replies[0].(*pb.SCUFShopList)
+		response := replies[0].(*pb.SCUFShopList)
+		quotes[id] = p13UFTestShopQuoteMap(t, response)
+		return response
 	}
 	buy := func(id int64, index int, stamp int64) *pb.SCUFPlayerBuyItemDetail {
 		t.Helper()
-		replies, err := f.s.p13UFShopBuy(f.ctx, id, &pb.CSUFPlayerBuyItem{ShopItemId: proto.String(fmt.Sprintf("catalog-%d", index)), NpcId: proto.String(shop)}, stamp, now())
+		replies, err := f.s.p13UFShopBuy(f.ctx, id, &pb.CSUFPlayerBuyItem{ShopItemId: proto.String(p13UFTestShopQuote(t, quotes[id], fmt.Sprintf("ufitem_%03d", 16+index))), NpcId: proto.String(shop)}, stamp, now())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -127,6 +131,7 @@ func TestP13UnionFightShopActualMiningTokenSourceOfferStockRoleFiveSlotsAndCold(
 	if catalog.Items[0].GetLeftBuyCount() != 2 || catalog.Items[0].GetRefreshIntervalTime() != 60000 {
 		t.Fatal("original stock/time projection")
 	}
+	firstQuote := p13UFTestShopQuote(t, quotes[ids[0]], "ufitem_016")
 	firstBuy := buy(ids[0], 0, 800)
 	if firstBuy.Player.GetOwnToken() != 140 || len(firstBuy.Player.Items) != 1 || firstBuy.Player.Items[0].GetLeftUseNum() != 1 {
 		t.Fatal("war token not consumed into actual original item")
@@ -138,7 +143,7 @@ func TestP13UnionFightShopActualMiningTokenSourceOfferStockRoleFiveSlotsAndCold(
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				_, err := f.s.p13UFShopBuy(f.ctx, ids[0], &pb.CSUFPlayerBuyItem{ShopItemId: proto.String("catalog-0"), NpcId: proto.String(shop)}, 800, now())
+				_, err := f.s.p13UFShopBuy(f.ctx, ids[0], &pb.CSUFPlayerBuyItem{ShopItemId: proto.String(firstQuote), NpcId: proto.String(shop)}, 800, now())
 				errs <- err
 			}()
 		}
@@ -157,8 +162,8 @@ func TestP13UnionFightShopActualMiningTokenSourceOfferStockRoleFiveSlotsAndCold(
 	if list(ids[0], "").Items[0].GetLeftBuyCount() != 0 {
 		t.Fatal("empty NPC refresh not bound to actual last shop")
 	}
-	if _, err = f.s.p13UFShopBuy(f.ctx, ids[0], &pb.CSUFPlayerBuyItem{ShopItemId: proto.String("catalog-0"), NpcId: proto.String(shop)}, 802, now()); err == nil {
-		t.Fatal("empty purchase stock")
+	if _, err = f.s.p13UFShopBuy(f.ctx, ids[0], &pb.CSUFPlayerBuyItem{ShopItemId: proto.String(p13UFTestShopQuote(t, quotes[ids[0]], "ufitem_016")), NpcId: proto.String(shop)}, 802, now()); err == nil || !strings.Contains(err.Error(), "购买次数") {
+		t.Fatal("empty purchase stock", err)
 	}
 	for i := 0; i < 3; i++ {
 		clock.Add(60000)
@@ -168,8 +173,8 @@ func TestP13UnionFightShopActualMiningTokenSourceOfferStockRoleFiveSlotsAndCold(
 		buy(ids[0], 0, 802+int64(i))
 	}
 	clock.Add(60000)
-	if _, err = f.s.p13UFShopBuy(f.ctx, ids[0], &pb.CSUFPlayerBuyItem{ShopItemId: proto.String("catalog-0"), NpcId: proto.String(shop)}, 805, now()); err == nil {
-		t.Fatal("original carried cap5 overflow")
+	if _, err = f.s.p13UFShopBuy(f.ctx, ids[0], &pb.CSUFPlayerBuyItem{ShopItemId: proto.String(p13UFTestShopQuote(t, quotes[ids[0]], "ufitem_016")), NpcId: proto.String(shop)}, 805, now()); err == nil || !strings.Contains(err.Error(), "携带上限") {
+		t.Fatal("original carried cap5 overflow", err)
 	}
 	if read(ids[0]).GetOwnToken() != 100 || read(ids[0]).Items[0].GetLeftUseNum() != 5 {
 		t.Fatal("rejected item overflow consumed war currency")
@@ -187,7 +192,7 @@ func TestP13UnionFightShopActualMiningTokenSourceOfferStockRoleFiveSlotsAndCold(
 			wg.Add(1)
 			go func(stamp int64) {
 				defer wg.Done()
-				_, err := f.s.p13UFShopBuy(f.ctx, ids[10], &pb.CSUFPlayerBuyItem{ShopItemId: proto.String("catalog-0"), NpcId: proto.String(shop)}, stamp, now())
+				_, err := f.s.p13UFShopBuy(f.ctx, ids[10], &pb.CSUFPlayerBuyItem{ShopItemId: proto.String(p13UFTestShopQuote(t, quotes[ids[10]], "ufitem_016")), NpcId: proto.String(shop)}, stamp, now())
 				accepted <- err == nil
 			}(1000 + int64(i))
 		}
@@ -204,20 +209,20 @@ func TestP13UnionFightShopActualMiningTokenSourceOfferStockRoleFiveSlotsAndCold(
 			t.Fatal("different requests overspent original personal stock/token", count, member)
 		}
 	}
-	if _, err = f.s.p13UFShopBuy(f.ctx, ids[10], &pb.CSUFPlayerBuyItem{ShopItemId: proto.String("catalog-2"), NpcId: proto.String(shop)}, 900, now()); err == nil {
-		t.Fatal("ordinary bought officer item")
+	if _, err = f.s.p13UFShopBuy(f.ctx, ids[10], &pb.CSUFPlayerBuyItem{ShopItemId: proto.String(p13UFTestShopQuote(t, quotes[ids[10]], "ufitem_018")), NpcId: proto.String(shop)}, 900, now()); err == nil || !strings.Contains(err.Error(), "购买资格") {
+		t.Fatal("ordinary bought officer item", err)
 	}
 	mine(ids[11], 502)
 	clock.Add(10000)
 	move(ids[11], shopPoint)
 	list(ids[11], shop)
 	buy(ids[11], 2, 901)
-	if _, err = f.s.p13UFShopBuy(f.ctx, ids[11], &pb.CSUFPlayerBuyItem{ShopItemId: proto.String("catalog-4"), NpcId: proto.String(shop)}, 902, now()); err == nil {
-		t.Fatal("vice bought chairman item")
+	if _, err = f.s.p13UFShopBuy(f.ctx, ids[11], &pb.CSUFPlayerBuyItem{ShopItemId: proto.String(p13UFTestShopQuote(t, quotes[ids[11]], "ufitem_020")), NpcId: proto.String(shop)}, 902, now()); err == nil || !strings.Contains(err.Error(), "购买资格") {
+		t.Fatal("vice bought chairman item", err)
 	}
 	p13GuildCall(t, f, ids[0], &pb.CSTransferChairman{PlayerId: proto.Int64(ids[10])}, 710, now())
-	if _, err = f.s.p13UFShopBuy(f.ctx, ids[0], &pb.CSUFPlayerBuyItem{ShopItemId: proto.String("catalog-4"), NpcId: proto.String(shop)}, 903, now()); err == nil {
-		t.Fatal("old chairman retained item permission")
+	if _, err = f.s.p13UFShopBuy(f.ctx, ids[0], &pb.CSUFPlayerBuyItem{ShopItemId: proto.String(p13UFTestShopQuote(t, quotes[ids[0]], "ufitem_020")), NpcId: proto.String(shop)}, 903, now()); err == nil || !strings.Contains(err.Error(), "购买资格") {
+		t.Fatal("old chairman retained item permission", err)
 	}
 	p13GuildCall(t, f, ids[10], &pb.CSTransferChairman{PlayerId: proto.Int64(ids[0])}, 711, now())
 	for i := 1; i < 5; i++ {
@@ -232,8 +237,22 @@ func TestP13UnionFightShopActualMiningTokenSourceOfferStockRoleFiveSlotsAndCold(
 			t.Fatal("original index out of bounds")
 		}
 	}
-	// 改发布价不改冻结报价；冷库和空NPC刷新继续原余量/物品/WarToken。
-	db.GetIns().Model(&db.P13UnionFightShopSource{}).Where("day=?", match.Day).Update("price", 999)
+	// 已展示报价绑定发布价格；热改价拒绝旧报价，刷新保留已消费库存。
+	beforeRefresh := list(ids[0], "")
+	oldQuote := p13UFTestShopQuote(t, quotes[ids[0]], "ufitem_016")
+	oldStocks := map[string]int32{}
+	for _, item := range beforeRefresh.Items {
+		oldStocks[item.GetItemId()] = item.GetLeftBuyCount()
+	}
+	if err = db.GetIns().Model(&db.P13UnionFightShopSource{}).Where("day=?", match.Day).Update("price", 999).Error; err != nil {
+		t.Fatal(err)
+	}
+	if _, err = f.s.p13UFShopBuy(f.ctx, ids[0], &pb.CSUFPlayerBuyItem{ShopItemId: proto.String(oldQuote), NpcId: proto.String(shop)}, 980, now()); err == nil || !strings.Contains(err.Error(), "商品报价已变化") {
+		t.Fatal("stale quote did not fail before balance/stock", err)
+	}
+	if read(ids[0]).GetOwnToken() != 20 || len(read(ids[0]).Items) != 5 {
+		t.Fatal("stale quote consumed existing currency/items")
+	}
 	sql, _ := db.GetIns().DB()
 	sql.Close()
 	f.open(t)
@@ -241,8 +260,13 @@ func TestP13UnionFightShopActualMiningTokenSourceOfferStockRoleFiveSlotsAndCold(
 		t.Fatal(err)
 	}
 	restored := list(ids[0], "")
-	if restored.Items[0].GetPrice() != 10 || read(ids[0]).GetOwnToken() != 20 || len(read(ids[0]).Items) != 5 {
-		t.Fatal("cold source/price/currency drift")
+	if restored.Items[0].GetPrice() != 999 || restored.Items[0].GetShopItemId() == oldQuote || read(ids[0]).GetOwnToken() != 20 || len(read(ids[0]).Items) != 5 {
+		t.Fatal("cold live price/currency/item drift")
+	}
+	for _, item := range restored.Items {
+		if item.GetPrice() != 999 || item.GetLeftBuyCount() != oldStocks[item.GetItemId()] {
+			t.Fatal("new quote reset consumed personal stock", item)
+		}
 	}
 	// 实际退出立即失去访问；原个人道具仅此比赛存档，不注入普通背包。
 	if _, err = f.s.p13UFFieldLeave(f.ctx, ids[0], &pb.CSTransferScene{Target: proto.String("town_main")}, now()); err != nil {

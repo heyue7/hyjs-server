@@ -1,0 +1,354 @@
+{
+  "schema": "guild-r7-playback-kit-diagnostic-overlay-v1",
+  "status": "STATIC_DEALIASED_VISIBILITY_DIAGNOSTIC_ONLY_NOT_PACKAGED",
+  "diagnosticOnly": true,
+  "qaOnly": true,
+  "neverPromote": true,
+  "baseAPK": "/Users/lirui/.codex/worktrees/guild-full-qa/hyjs/build/guild-r7-qa/hyjs-terminal-recycle-qa.apk",
+  "baseAPKSHA256": "552c21874227abb525b43a9f89688290d8547735fb8d51e5f686a5be6f08aecf",
+  "inputManagedSHA256": "e33d90e2e03c30c4f959151f58fc7b62ba8411600e18f9ba270b5141bfc567fa",
+  "outputManagedSHA256": "18903ec5404f75fb896b6b0646a704de3714d26b9942fdc6428017a36cd8ea1a",
+  "inputDexSHA256": "0444d3d6570ee789334ccad15badb51466d7110a558101f7a305d74e8b48d530",
+  "outputDexSHA256": "0444d3d6570ee789334ccad15badb51466d7110a558101f7a305d74e8b48d530",
+  "managedOnly": true,
+  "inheritedJavaByteExact": true,
+  "inheritedJavaPublicProtectedABIExact": true,
+  "sourcePins": {
+    "tools/client_guild_battle/diagnostics_kit.py": "4be8252d196852713688daf84c0e64d71dbd32a7fd2ae3aac8f7fb6b4f745c20",
+    "tools/awake_diff_rows/build.py": "3c27f83600d4d757adf7f4fb8cad2cb07f5558967a288bf200b5aa8226b3bde7",
+    "tools/local_asset_ready/remove_gate.py": "4e56beb6e7b4cc4cb330f1e024768a3ce6a3a21d5396437ba88e59b08e350fab"
+  },
+  "payloadFiles": {
+    "assets/bin/Data/Managed/Assembly-CSharp.dll": "/Users/lirui/.codex/worktrees/guild-full-qa/hyjs/tools/client_guild_battle/diagnostic-kit/Assembly-CSharp.dll"
+  },
+  "replacementEntries": {
+    "assets/bin/Data/Managed/Assembly-CSharp.dll": "18903ec5404f75fb896b6b0646a704de3714d26b9942fdc6428017a36cd8ea1a"
+  },
+  "allowedChangedMethods": [
+    "PlaybackKit::Start"
+  ],
+  "changedMethodRID": 15288,
+  "bodyDealias": {
+    "originalRVA": 120164,
+    "independentRVA": 4605380,
+    "bodyLength": 14,
+    "originalSharedAliases": [
+      {
+        "method": "CT01_DeadTime::HideMe",
+        "rid": 10432
+      },
+      {
+        "method": "BloodBarNumControl::Hide",
+        "rid": 11829
+      },
+      {
+        "method": "Battle.FirstCGPanel::Hide",
+        "rid": 11862
+      },
+      {
+        "method": "Battle.View.GuideOptionTarget::Hide",
+        "rid": 12149
+      },
+      {
+        "method": "Battle.View.BuffTransform0::Hide",
+        "rid": 12530
+      },
+      {
+        "method": "AssetUpdateShow::Hide",
+        "rid": 12890
+      },
+      {
+        "method": "DelayDisable::DisActive",
+        "rid": 12902
+      },
+      {
+        "method": "PlaybackKit::Start",
+        "rid": 15288
+      },
+      {
+        "method": "Story.StoryDialogHero::Hide",
+        "rid": 17942
+      },
+      {
+        "method": "Battle.BalanceBase::Hide",
+        "rid": 18516
+      },
+      {
+        "method": "BindTip::OnCloseButton",
+        "rid": 19039
+      },
+      {
+        "method": "UI.LoginNormalUI::Hide",
+        "rid": 19043
+      },
+      {
+        "method": "LoginTip::OnCloseButton",
+        "rid": 19048
+      },
+      {
+        "method": "UI.LoginUpdateUI::Hide",
+        "rid": 19070
+      },
+      {
+        "method": "UI.SelectedServerInfo::Hide",
+        "rid": 19099
+      },
+      {
+        "method": "InputNickName::Close",
+        "rid": 19133
+      },
+      {
+        "method": "AgreementUI::OnCloseButton",
+        "rid": 19147
+      },
+      {
+        "method": "MessageBoxController::OnMaskClick",
+        "rid": 19198
+      },
+      {
+        "method": "MessageBoxCountdown::OnMaskClick",
+        "rid": 19204
+      },
+      {
+        "method": "UI.DescriptionBigTurnPage::Hide",
+        "rid": 19317
+      },
+      {
+        "method": "UI.DescriptionPage::Hide",
+        "rid": 19321
+      },
+      {
+        "method": "UI.ChaCopyExitPanel::OCanclekBtn",
+        "rid": 19637
+      },
+      {
+        "method": "ChaCopyReviveFreePanel::Exit",
+        "rid": 19657
+      },
+      {
+        "method": "UI.GrabBuyTimes::Close",
+        "rid": 20622
+      },
+      {
+        "method": "DescPanel::ClosePanel",
+        "rid": 20671
+      },
+      {
+        "method": "UI.PlunderAutoTipWindow::Close",
+        "rid": 20790
+      },
+      {
+        "method": "ActivityDes::SureBtn",
+        "rid": 21080
+      },
+      {
+        "method": "UI.SelectRewardBySever::Hide",
+        "rid": 21131
+      },
+      {
+        "method": "UI.TopBar::Hide",
+        "rid": 21652
+      },
+      {
+        "method": "UI.ChoseUnion::Hide",
+        "rid": 21756
+      },
+      {
+        "method": "UI.UnionInfo::Hide",
+        "rid": 21853
+      },
+      {
+        "method": "UnionTipWindow::CancelBtnClick",
+        "rid": 21935
+      },
+      {
+        "method": "UI.PageManager::HideUI",
+        "rid": 22133
+      },
+      {
+        "method": "UI.PetTab::Hide",
+        "rid": 22309
+      },
+      {
+        "method": "UI.RecycleBreakupPanel::CloseTab",
+        "rid": 22327
+      },
+      {
+        "method": "UI.RecycleResetPanel::CloseTab",
+        "rid": 22467
+      },
+      {
+        "method": "UI.UIServerBattleStateTemplete::Hide",
+        "rid": 22837
+      },
+      {
+        "method": "BigTurnIconShow::Close",
+        "rid": 22998
+      },
+      {
+        "method": "Showluckily::Ok",
+        "rid": 23025
+      },
+      {
+        "method": "UI.UIActivityTemplate::Hide",
+        "rid": 23292
+      },
+      {
+        "method": "Battle.CopyStoneBalance::Hide",
+        "rid": 23427
+      },
+      {
+        "method": "UI.UICopyRunMapBox::OnClick",
+        "rid": 23570
+      },
+      {
+        "method": "UI.UIFieldAskEaster::Hide",
+        "rid": 23600
+      },
+      {
+        "method": "UI.UIFieldSetHpPage::onClose",
+        "rid": 23790
+      },
+      {
+        "method": "UI.RushEliteBossBuyTimePanel::Exit",
+        "rid": 24141
+      },
+      {
+        "method": "UI.RushFightReadyItem::Hide",
+        "rid": 24176
+      },
+      {
+        "method": "UI.RushResetConfirmPanel::Exit",
+        "rid": 24225
+      },
+      {
+        "method": "UI.RushSweepToTopConfirmPanel::Hide",
+        "rid": 24288
+      },
+      {
+        "method": "UI.UIUnionFightBattleResult::OnClickBlank",
+        "rid": 24314
+      },
+      {
+        "method": "UI.UIUnionFightFightHead::Hide",
+        "rid": 24349
+      },
+      {
+        "method": "UI.UIUnionFightMapPage::Close",
+        "rid": 24383
+      },
+      {
+        "method": "UI.UIUnionFightReviveTips::Close",
+        "rid": 24429
+      },
+      {
+        "method": "UI.UIUnionFightTaskPage::Close",
+        "rid": 24483
+      }
+    ],
+    "other52AliasBodiesExact": true
+  },
+  "bytePatch": {
+    "fileOffset": 4597707,
+    "before": 22,
+    "after": 23,
+    "independentBodyInstructionByteChanges": 1,
+    "physicalFileChangedBytes": 16,
+    "physicalFileOffsets": [
+      384,
+      2704430,
+      2704431,
+      2704432,
+      4597700,
+      4597701,
+      4597702,
+      4597703,
+      4597704,
+      4597706,
+      4597707,
+      4597708,
+      4597709,
+      4597710,
+      4597712,
+      4597713
+    ],
+    "peTextVirtualSizeExtended": true
+  },
+  "allMetadataExceptTargetRVAByteExact": true,
+  "allABITokensSignaturesFlagsExact": true,
+  "allOtherOriginalBodiesByteExact": true,
+  "originalEngineMethodsExact": 547,
+  "inheritedManagedEntrySHA256": {
+    "assets/bin/Data/Managed/Assembly-CSharp-firstpass.dll": "e732d075c1f52133f665e835ac623e32be89ec9aa2e22ca11925014dfdff95b8",
+    "assets/bin/Data/Managed/Assembly-UnityScript.dll": "023fe6171dd462b2509c0f9ab3e4ecb9635cbc9e8c96bbeb1b766de26b51b2a9",
+    "assets/bin/Data/Managed/Boo.Lang.dll": "60a779808766fa12f0ce76b91e0bb91967735b2214630c984185535edda574ea",
+    "assets/bin/Data/Managed/LitJson.dll": "151e0a2a6d174558ffa9cb681746d092fde6ba36e937b5825c2f06bb6a8d3230",
+    "assets/bin/Data/Managed/Mono.Security.dll": "0d2ea1e08375cdf17b4586add8206b9f79d25adf09e68abedb57fb2c3a70ff23",
+    "assets/bin/Data/Managed/System.Core.dll": "104278a0bf67b4de8fd1e910e3292a3ef51808ebee7a5f2a229125f18463c98c",
+    "assets/bin/Data/Managed/System.dll": "7e72b92ddcd6b7b791ab24dd5756544f2da81f65e7ba7d1ebe8223123720d0ac",
+    "assets/bin/Data/Managed/UnityEngine.Networking.dll": "9f33f5f74b94d1b5d5c5b3dbc788f7a6a53ce453f846af5567060cacd1b1fde9",
+    "assets/bin/Data/Managed/UnityEngine.UI.dll": "e547d74e89f3d7f500443904fbbc6ce4e19f816a6e2a2d29d85edba14e25e372",
+    "assets/bin/Data/Managed/UnityEngine.dll": "8d4bd6321a453263f8f97047be50dd04a6f2b8f247456ad23fddfbc75f2c2fa4",
+    "assets/bin/Data/Managed/UnityEngine.dll.mdb": "47976903d60eff45c5c16fe77e48773b5fcf073104288f7bd45341c4b6f0bea9",
+    "assets/bin/Data/Managed/mscorlib.dll": "7f16171cf5f87ca1e4c229727526d2fbc786079fc0c960f36197013ea0d986e1",
+    "assets/bin/Data/Managed/NativeBatch.dll": "e8e79ff499823e011277ff6170b4c5956dde3de9fc1cbc9ed21fe0bdd54231a1",
+    "assets/bin/Data/Managed/LocalVoicePCM.dll": "535272c2206d5347ed9a6cabe3d7d438e53accd1d4960b33181c2d1bf67d12c5",
+    "assets/bin/Data/Managed/LocalWorldBossSettlement.dll": "7a299f5c2b568fc7dbea0cab122b5d3a4e67133072c6fd7ecebe5ca514a1bac4",
+    "assets/bin/Data/Managed/LocalWalletSession.dll": "21f113d407d3edf2167c324c97f2dda0242d320a6047996bcaf2b53d3dc4adf2",
+    "assets/bin/Data/Managed/LocalAssetReady.dll": "2e6e08516a804723bf2ba7552d9996075a24bc04eaa11925978cc1947b0012cf",
+    "assets/bin/Data/Managed/LocalFormationUI.dll": "a6975c6b9ef497855fe42761ae8fe5d7a5eaee4cad21952725a1d5eea3ebae56",
+    "assets/bin/Data/Managed/SoulFlowerDisplay.dll": "958bd003897f1e616b42115d43914fe55f48b5d6aaa600adb7bf1f07b31d45de",
+    "assets/bin/Data/Managed/SoulFlowerActivity.dll": "19245c2f244366fa894b58070d0f83370cd68bb95b38081917c9c47c13311296",
+    "assets/bin/Data/Managed/LocalPlayability.dll": "e8e21dd37df3167c249fa553433e69323e2e2ab1976c76f69b8a96402f7aa1fd",
+    "assets/bin/Data/Managed/SoulFlowerHeroArt.dll": "a7a4f7ff945fa4cf2bf6acd402dd672bb94c3eaf335bc3f3527ca04e25abe17c",
+    "assets/bin/Data/Managed/SoulFlowerWeaponRefresh.dll": "63fffceaa28aa4a21c694b3437ec5a38c012be46cbdd4d52f6763f95c4a8a8b6",
+    "assets/bin/Data/Managed/SoulFlowerNotices.dll": "cf804cecebd74935a5ef83635404895117f09499e93c85685e7298a16dce6f52",
+    "assets/bin/Data/Managed/SoulFlowerAchievements.dll": "2c5cc34f1cd1df44ff2c5032da18a76844e154353dc294d7575077f7081a5b56",
+    "assets/bin/Data/Managed/SoulFlowerReWelfare.dll": "98457d198435c799addc9d9378f4149302fdbbcde4bb43f80022e07d89688c65",
+    "assets/bin/Data/Managed/SoulFlowerKingRecruit.dll": "ec8b62601a4b0b0a6bba4867b510be2e05b88757ed64f116dcd20bc57b849856",
+    "assets/bin/Data/Managed/SoulFlowerVipEmpty.dll": "b74b42162f6020dc0a7d2b2e12ece018ffa8f452b6b94da4ca79e862f62834cd",
+    "assets/bin/Data/Managed/SoulFlowerWelfareFeedback.dll": "75e0224b6ca5ffdac0d8f8720076010965dadacac36bc2c5f9385a2692117aa6",
+    "assets/bin/Data/Managed/SoulFlowerNativeAccount.dll": "fe9f2ec5ce5b1248ba353a41df2396efe9366abcc65c308eb329360fa6028d2c",
+    "assets/bin/Data/Managed/SoulFlowerMembership.dll": "51d85281cf9d1e5b2ba1b3d971ee6b68e2427e72170989ad86c1f7e4bde6eaa9",
+    "assets/bin/Data/Managed/SoulFlowerStaminaSweep.dll": "799575040c000da825d885c0f43d829d2725dcdcc6113f33eb560e19e97c3358",
+    "assets/bin/Data/Managed/SoulFlowerChatProfile.dll": "3ff2569d91a34aab5f66c9092eb311bc8ad1b6d2801b6dc73b8dcd994879df91",
+    "assets/bin/Data/Managed/SoulFlowerRecycle.dll": "2778f6867cc141a01375dc99954e4caf11a411c3c57f5a5d49f8fc5988b394b6",
+    "assets/bin/Data/Managed/HYJSClientUpdate.dll": "b2cd04d2f329949bf8a39a2636429d433d662087dde4ad8997ad8d3e83915fa9",
+    "assets/bin/Data/Managed/HYJS.ArenaState.dll": "8efc42e38e0b8fbeb67b15dd64fc3ec90e9f21394b26437e5e2aa115e3f87b71",
+    "assets/bin/Data/Managed/LocalFieldSettlement.dll": "8a62b7c55bc7bec47e4ebfefa2d597ef4b85d34152097f4de55cfff4dfb72eb7",
+    "assets/bin/Data/Managed/HYJS.Gameplay.dll": "ceda1fb4008b33a0ed496151878db844e2eb03968fca16b282ecdf492e40dbf9",
+    "assets/bin/Data/Managed/SoulFlowerPetEquip48.dll": "12dd13f00abd533f29f65cce11d73517aa2654cd210bab66bd10e9fabd2ace5b",
+    "assets/bin/Data/Managed/InstanceProtection.dll": "e343cf2dd32ee248457b99c6b31d73865c23763e91a7fbe21869afe767bd9c9b",
+    "assets/bin/Data/Managed/SoulFlowerGGOShop.dll": "d05a8e0ff1e022b6a2856f4d1ce495e7e1aea2456971a2b0c8e82a1a3c171928",
+    "assets/bin/Data/Managed/HYJS.NewbieSign.dll": "52ae7629e9b79a03f789e6a76171cf79439ba196c083fb98d49ff110efa828e4",
+    "assets/bin/Data/Managed/HYJS.BulkPurchase.dll": "758ebcc36cfed9eb57e3f7e32e7ee7a2a738633f5a1b9a0ed9b957d191fd07d9",
+    "assets/bin/Data/Managed/HYJS.OneKey59.dll": "ac0a4482f71512f8800c3aeb9aec8738af72ccbb6015824409fd99e1ba3f0475",
+    "assets/bin/Data/Managed/HYJS.DungeonContent.dll": "71d6ee0966e0d656224027a402dc6c21a70cf2bb580a352278020580b59b327b",
+    "assets/bin/Data/Managed/SoulFlowerPaymentFeedback.dll": "2321065242b55452c3e50b625b0fc050a0ab33c10a9a9243e2799831aeccc165",
+    "assets/bin/Data/Managed/HYJS.DungeonManifest.dll": "7b2ea730bff1f3ddf882b35ad9c2a299fbc5e863532899d5dcac06cb5f5fa5a3",
+    "assets/bin/Data/Managed/HYJS.Latency62.dll": "253126febc7e30b2a7aef3a77e831f967a3a723c12f0c1a7914a80794cc0abbe",
+    "assets/bin/Data/Managed/HYJS.Field63.dll": "2f27e72fca3642b3ea94fa58745539e9235a1f256f8c99d1cafcb61fba5056f0",
+    "assets/bin/Data/Managed/HYJS.Feedback65.dll": "9a5bdef854697868c49e1cfb28cd81038b8c8b6ce3d48ba988b079385e6a9036",
+    "assets/bin/Data/Managed/HYJS.Commerce66.dll": "897b6c1d0ad8e5b9231fd3988819f5227b9aed0dca20dcee71914edceac8d96e",
+    "assets/bin/Data/Managed/HYJS.Trial66.dll": "5c5b845af00552ceea9a4a94331b1ea4c80ff499cdc6955b226e0d48f8aa04d3",
+    "assets/bin/Data/Managed/SoulFlowerTrialReset69.dll": "a5e23e85d9ffe1f01d80542d7a3942cd4f100d053264b20becac128d342d130f",
+    "assets/bin/Data/Managed/HYJSMaterialEligibility.dll": "a70c69aa8e44ac2e0f93cd86a904a8fd628e304816a0cb3f5b5fd08a1cbe6eb0",
+    "assets/bin/Data/Managed/SoulFlowerGuildBattle.dll": "a4e3a12089427ba6b3598d24e3cd67eb903be887c3f61f8aba28f9de0bb736ab"
+  },
+  "guild16HooksAndFourOriginsUntouched": true,
+  "javaClassInventory": {
+    "DEXEntries": [
+      "classes.dex",
+      "classes2.dex",
+      "classes3.dex",
+      "classes4.dex",
+      "classes5.dex"
+    ],
+    "classCount": 4618,
+    "noDuplicateClass": true,
+    "noFinalSuperclass": true
+  },
+  "phoneVerified": false,
+  "sourceReference": "tools/patch_client.py demo_replay_controls opcode; approved independent-body de-aliasing because the QA writer shared this body with52 other methods",
+  "rollback": "Replace diagnostic QA with the normal r7 QA APK after native10 capture"
+}

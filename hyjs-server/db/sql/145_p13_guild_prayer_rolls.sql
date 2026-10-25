@@ -20,5 +20,6 @@ CREATE TABLE IF NOT EXISTS `p13_guild_prayer_rolls` (
  `source` varchar(1024) NOT NULL,
  `source_hash` char(64) NOT NULL,
  PRIMARY KEY (`player_id`,`stamp`),
- UNIQUE KEY `idx_p13_prayer_day_order` (`player_id`,`day`,`ordinal`)
+ UNIQUE KEY `idx_p13_prayer_day_order` (`player_id`,`day`,`ordinal`),
+ KEY `idx_p13_prayer_latest` (`player_id`,`applied_at` DESC,`ordinal` DESC,`stamp` DESC)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

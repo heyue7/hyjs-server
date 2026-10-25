@@ -1,4 +1,5 @@
 CREATE TABLE IF NOT EXISTS p13_union_fight_field_players (
+ map_projection VARCHAR(32) NOT NULL DEFAULT '',
  match_id CHAR(64) NOT NULL,player_id BIGINT NOT NULL,guild_id VARCHAR(64) NOT NULL,camp BIGINT NOT NULL,
  frame LONGBLOB NOT NULL,frame_hash CHAR(64) NOT NULL,battle LONGBLOB NOT NULL,battle_hash CHAR(64) NOT NULL,
  x FLOAT NOT NULL,y FLOAT NOT NULL,z FLOAT NOT NULL,session_hash CHAR(64) NOT NULL DEFAULT '',

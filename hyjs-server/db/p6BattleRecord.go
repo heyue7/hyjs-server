@@ -2,9 +2,10 @@ package db
 
 // P6BattleRecord 冻结归属、双方原实例、配置、随机种子、操作和结果；来源内唯一。
 type P6BattleRecord struct {
+	P13MatchID        string `gorm:"type:varchar(64);not null;default:'';index:p6_p13_match,priority:1;index:p6_p13_unscoped,priority:3" json:"p13MatchId,omitempty"`
 	ID                string `gorm:"primaryKey;size:64" json:"id"`
-	PlayerID          int64  `gorm:"not null;uniqueIndex:p6_source,priority:1;index;index:p6_playback_alias,priority:1" json:"playerId"`
-	Source            string `gorm:"size:32;not null;uniqueIndex:p6_source,priority:2" json:"source"`
+	PlayerID          int64  `gorm:"not null;uniqueIndex:p6_source,priority:1;index;index:p6_playback_alias,priority:1;index:p6_p13_unscoped,priority:1" json:"playerId"`
+	Source            string `gorm:"size:32;not null;uniqueIndex:p6_source,priority:2;index:p6_p13_match,priority:2;index:p6_p13_unscoped,priority:2" json:"source"`
 	SourceFight       string `gorm:"size:128;not null;uniqueIndex:p6_source,priority:3;index:p6_playback_alias,priority:2" json:"sourceFight"`
 	Status            string `gorm:"size:16;not null" json:"status"`
 	Seed              int64  `json:"seed"`

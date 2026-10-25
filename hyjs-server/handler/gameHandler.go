@@ -149,7 +149,8 @@ func ValidateGameRequest(p *model.GamePacket) error {
 				budget += 2
 			}
 		}
-		if b.GetPage() < 1 || b.GetPage() > 100000 || !utf8.ValidString(b.GetName()) || budget > 12 {
+		_, byID := service.P13GuildSearchID(b.GetName())
+		if b.GetPage() < 1 || b.GetPage() > 100000 || !utf8.ValidString(b.GetName()) || budget > 12 && !byID {
 			return errors.New("公会搜索参数无效")
 		}
 	case *pb.CSUnionApply:

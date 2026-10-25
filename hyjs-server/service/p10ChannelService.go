@@ -81,13 +81,6 @@ func (s *GameService) p10ChannelHistory(tx *gorm.DB, id int64, kind int32) ([]*p
 	}
 	list := []*pb.ChatInfo{}
 	for _, row := range rows {
-		blocked, err := p10Blocked(tx, id, row.SenderID)
-		if err != nil {
-			return nil, err
-		}
-		if blocked {
-			continue
-		}
 		frame, err := p10ChannelFrame(row)
 		if err != nil {
 			return nil, err

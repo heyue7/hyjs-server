@@ -100,12 +100,10 @@ func TestP13UnionFightItemActualMiningShopThreeLifeCooldownColdRaceAndEnd(t *tes
 	if _, err = f.s.p13UFFieldMove(f.ctx, id, &pb.CSMove{PointNew: shopPoint}, now()); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = f.s.p13UFShopList(f.ctx, id, &pb.CSUFShopList{NpcId: proto.String(shop)}, now()); err != nil {
-		t.Fatal(err)
-	}
+	shopQuotes := p13UFTestShopQuotes(t, f, id, shop, now())
 	for i, item := range []string{"ufitem_011", "ufitem_012", "ufitem_016"} {
 		for n := 0; n < 2; n++ {
-			if _, err = f.s.p13UFShopBuy(f.ctx, id, &pb.CSUFPlayerBuyItem{ShopItemId: proto.String(item), NpcId: proto.String(shop)}, 200+int64(i*2+n), now()); err != nil {
+			if _, err = f.s.p13UFShopBuy(f.ctx, id, &pb.CSUFPlayerBuyItem{ShopItemId: proto.String(p13UFTestShopQuote(t, shopQuotes, item)), NpcId: proto.String(shop)}, 200+int64(i*2+n), now()); err != nil {
 				t.Fatal(err)
 			}
 		}

@@ -45,6 +45,19 @@ func p13UFTransferSame(a, b *pb.PointNew) bool {
 	return a != nil && b != nil && a.GetX() == b.GetX() && a.GetY() == b.GetY() && a.GetZ() == b.GetZ()
 }
 
+// Only the trusted frozen endpoint is projected. Client coordinates still
+// have to equal this exact result and historical task bytes remain unchanged.
+func p13UFTransferProjectedTarget(actor *db.P13UnionFightFieldPlayer, target *pb.PointNew) (*pb.PointNew, error) {
+	if actor == nil || target == nil || !p13UFMapProjectionKnown(actor.MapProjection) {
+		return nil, errors.New("公会战传送投影无效")
+	}
+	point := proto.Clone(target).(*pb.PointNew)
+	if actor.MapProjection == constUtil.P13UnionFightMapProjectionReFlat {
+		point.Y = proto.Float32(0)
+	}
+	return point, nil
+}
+
 // p13UFTransferBegin 保存本场原目标和真实到期时刻；客户端target不能生成新落点。
 func (s *GameService) p13UFTransferBegin(ctx context.Context, id int64, request *pb.CSUFBeginTransfer, now time.Time) ([]proto.Message, error) {
 	var reply *pb.SCUFBeginTransfer
@@ -104,6 +117,10 @@ func (s *GameService) p13UFTransferBegin(ctx context.Context, id int64, request 
 			return errors.New("原传送点身份限制尚未恢复")
 		}
 		target, err := fieldPoint(transfer["TransferEnd"])
+		if err != nil {
+			return err
+		}
+		target, err = p13UFTransferProjectedTarget(actor, target)
 		if err != nil {
 			return err
 		}
@@ -190,6 +207,13 @@ func (s *GameService) p13UFTransferCancel(tx *gorm.DB, scope string, id int64, n
 	if err = tx.First(&actor, "match_id=? AND player_id=?", scope, id).Error; err != nil {
 		return err
 	}
+	snapshot, projectionErr := p13UFFieldStoredProjection(tx, actor.MatchID)
+	if projectionErr != nil {
+		return projectionErr
+	}
+	if err = p13UFFieldActorProjection(&actor, snapshot); err != nil {
+		return err
+	}
 	frame, err := p13UFFieldReadActor(&actor)
 	if err != nil {
 		return err
@@ -221,6 +245,16 @@ func (s *GameService) p13UFTransferFinishTx(tx *gorm.DB, task *db.P13UnionFightT
 	var actor db.P13UnionFightFieldPlayer
 	if err = tx.First(&actor, "match_id=? AND player_id=?", task.MatchID, task.PlayerID).Error; err != nil {
 		return nil, false, err
+	}
+	snapshot, projectionErr := p13UFFieldStoredProjection(tx, actor.MatchID)
+	if projectionErr != nil {
+		return nil, false, projectionErr
+	}
+	if err = p13UFFieldActorProjection(&actor, snapshot); err != nil {
+		return nil, false, err
+	}
+	if actor.MapProjection == constUtil.P13UnionFightMapProjectionReFlat && target.GetY() != 0 {
+		return nil, false, errors.New("公会战平面传送冻结终点高度无效")
 	}
 	var match db.P13UnionFightMatch
 	if err = tx.First(&match, "id=?", task.MatchID).Error; err != nil {
@@ -369,6 +403,13 @@ func (s *GameService) p13UFTransferEnd(ctx context.Context, id int64, request *p
 }
 
 func (s *GameService) p13UFTransferRecovery(tx *gorm.DB, actor *db.P13UnionFightFieldPlayer, now time.Time) ([]proto.Message, error) {
+	snapshot, projectionErr := p13UFFieldStoredProjection(tx, actor.MatchID)
+	if projectionErr != nil {
+		return nil, projectionErr
+	}
+	if err := p13UFFieldActorProjection(actor, snapshot); err != nil {
+		return nil, err
+	}
 	var task db.P13UnionFightTransferTask
 	err := tx.First(&task, "match_id=? AND player_id=? AND status=?", actor.MatchID, actor.PlayerID, constUtil.P13UnionFightTransferPending).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {

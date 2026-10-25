@@ -230,6 +230,10 @@ def main():
    for f,h in pins.items():require(common.digest(f)==h,"Source changed while packaging")
    require(common.digest(base)==proof["baseAPKSHA256"],"Base changed while packaging")
    result={"status":"PASS_SIGN_ALIGN_SCOPED_OVERLAY_NOT_INSTALLED","binarySHA256":common.digest(signed),"baseAPKSHA256":proof["baseAPKSHA256"],"replacementEntries":hashes,"openingFontChanges":font_changes,"fontFallbackProof":fallback_report,"dungeonResourceProof":dungeon_report,"compatibilityProof":compatibility_report,"javaClassInventory":java_inventory,"inheritedJavaByteExact":original_java_exact,"javaByteExact":java_byte_exact,"allOtherEntriesAndCompressedPayloadsExact":True,"managedAssemblyByteExact":common.DLL not in payload,"qaOnly":bool(a.qa_wallet_origin),"neverPromote":bool(a.qa_wallet_origin),"signatureVerified":True,"zipalignVerified":True,"originalEngineMethodsExact":547,"outputAPK":str(output.relative_to(ROOT))}
+   # QA and diagnostic restrictions survive another scoped packaging layer.
+   result["qaOnly"] = bool(proof.get("qaOnly") or a.qa_wallet_origin)
+   result["neverPromote"] = bool(proof.get("neverPromote") or proof.get("diagnosticOnly") or a.qa_wallet_origin)
+   if proof.get("diagnosticOnly"):result["diagnosticOnly"] = True
    if a.build_code is not None:result.update({"buildCode":a.build_code,"versionName":a.version_name})
    signed.replace(output)
    if signed.with_suffix(".apk.idsig").exists():signed.with_suffix(".apk.idsig").replace(output.with_suffix(".apk.idsig"))

@@ -1,0 +1,21 @@
+CREATE TABLE IF NOT EXISTS `p13_union_fight_guard_states` (
+ `match_id` CHAR(64) NOT NULL,
+ `guard_guid` BIGINT NOT NULL,
+ `guard_id` VARCHAR(64) NOT NULL,
+ `hero_id` VARCHAR(64) NOT NULL,
+ `camp` BIGINT NOT NULL,
+ `bind_guid` BIGINT NOT NULL,
+ `building_kind` VARCHAR(16) NOT NULL,
+ `generation` BIGINT NOT NULL DEFAULT 1,
+ `offer_hash` CHAR(64) NOT NULL,
+ `initial_frame` LONGBLOB NOT NULL,
+ `initial_hash` CHAR(64) NOT NULL,
+ `frame` LONGBLOB NOT NULL,
+ `frame_hash` CHAR(64) NOT NULL,
+ `pending_attempt_id` CHAR(64) NOT NULL DEFAULT '',
+ `defeated_at` BIGINT NOT NULL DEFAULT 0,
+ `recover_at` BIGINT NOT NULL DEFAULT 0,
+ `building_event` VARCHAR(32) NOT NULL DEFAULT '',
+ `source_hash` CHAR(64) NOT NULL,
+ PRIMARY KEY (`match_id`,`guard_guid`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;

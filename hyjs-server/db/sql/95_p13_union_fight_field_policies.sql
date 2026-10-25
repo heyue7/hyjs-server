@@ -1,4 +1,5 @@
 CREATE TABLE IF NOT EXISTS p13_union_fight_field_policies (
+ map_projection VARCHAR(32) NOT NULL DEFAULT '',
  id BIGINT NOT NULL,enabled BOOLEAN NOT NULL DEFAULT FALSE,preparation_millis BIGINT NOT NULL DEFAULT 0,
  left_revive_point_id BIGINT NOT NULL DEFAULT 0,right_revive_point_id BIGINT NOT NULL DEFAULT 0,
  initial_guard_hp DOUBLE NOT NULL DEFAULT 0,initial_gate_hp DOUBLE NOT NULL DEFAULT 0,move_tolerance DOUBLE NOT NULL DEFAULT 0,

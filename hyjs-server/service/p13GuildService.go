@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"crypto/subtle"
 	"encoding/csv"
 	"errors"
 	"fmt"
@@ -513,80 +514,136 @@ func p13GuildFirstFormationHeroID(p *pb.Player, g *model.GameState) string {
 }
 
 func (s *GameService) p13GuildPlayer(tx *gorm.DB, viewer, id int64, member *db.P13GuildMember, now time.Time) (*pb.UnionPlayerInfo, error) {
-	// 同一行存档同时生成战力与首发头像，避免再按成员逐条读取第二份 profile。
-	var row db.Profile
-	if err := tx.First(&row, id).Error; err != nil {
-		return nil, err
-	}
-	player, game, err := decodeProfile(&row)
-	if err != nil {
-		return nil, err
-	}
-	if err = s.PrepareP5GuildPrayerProperties(tx.Statement.Context, tx, player, game, p13UFNow(tx.Statement.Context)); err != nil {
-		return nil, err
-	}
-	power, err := s.formationFightPower(player, game)
-	if err != nil {
-		return nil, err
-	}
-	friend, err := p10Friends(tx, viewer, id)
-	if err != nil {
-		return nil, err
-	}
-	role := int32(0)
-	var contribution, coin, badge int32
+	members := map[int64]db.P13GuildMember{}
 	if member != nil {
-		role = member.Role
-		contribution = member.Contribution
-		if member.DonateDay == p13GuildDay(now) {
-			coin = int32(member.TodayCoin)
-			badge = member.TodayBadge
-		}
+		members[id] = *member
 	}
-	online := int64(0)
-	// 原客户端0显示在线；缺离线时间日志时不伪造最后登录时间。
-	if !s.p10ChannelOnline(tx, id) {
-		if member != nil {
-			online = member.LastLoginAt
-		}
+	list, err := s.p13GuildPlayers(tx, viewer, []int64{id}, members, now)
+	if err != nil {
+		return nil, err
 	}
-	isFriend := int32(0)
-	if friend {
-		isFriend = 1
-	}
-	return &pb.UnionPlayerInfo{PlayerId: proto.Int64(id), PlayerName: proto.String(player.GetName()), FightPower: proto.Int64(int64(power)), Role: proto.Int32(role), HeroWarId: proto.String(p13GuildFirstFormationHeroID(player, game)), IsFriend: proto.Int32(isFriend), LastLoginTime: proto.Int64(online), Level: proto.Int32(player.GetLevel()), Contribution: proto.Int32(contribution), TodayCoin: proto.Int32(coin), TodayBadge: proto.Int32(badge)}, nil
+	return list[0], nil
 }
-func (s *GameService) p13GuildSimple(tx *gorm.DB, viewer int64, g db.P13Guild) (*pb.SimpleUnionInfo, error) {
+
+// p13GuildPlayers reads current attribute sources and social relations once for
+// the whole list. Online state uses the same profile session snapshot.
+func (s *GameService) p13GuildPlayers(tx *gorm.DB, viewer int64, ids []int64, members map[int64]db.P13GuildMember, now time.Time) ([]*pb.UnionPlayerInfo, error) {
+	players, err := s.p13GuildReadPlayers(tx, ids, now)
+	if err != nil {
+		return nil, err
+	}
+	list := make([]*pb.UnionPlayerInfo, 0, len(ids))
+	if len(ids) == 0 {
+		return list, nil
+	}
+	var relations []db.P10SocialRelation
+	if err := tx.Select("low_id", "high_id").Where("(low_id=? AND high_id IN ?) OR (high_id=? AND low_id IN ?)", viewer, ids, viewer, ids).Find(&relations).Error; err != nil {
+		return nil, err
+	}
+	friends := map[int64]bool{}
+	for _, relation := range relations {
+		if relation.LowID == viewer {
+			friends[relation.HighID] = true
+		} else {
+			friends[relation.LowID] = true
+		}
+	}
+	for _, id := range ids {
+		read := players[id]
+		member := members[id]
+		var coin, badge int32
+		if member.DonateDay == p13GuildDay(now) {
+			coin, badge = int32(member.TodayCoin), member.TodayBadge
+		}
+		lastLogin := member.LastLoginAt
+		if value, ok := p10ClientSinks.Load(p10ClientKey{s.p10ClientOwner(), id}); ok && subtle.ConstantTimeCompare(read.Profile.Session, value.(*p10ClientSink).session) == 1 {
+			lastLogin = 0
+		}
+		friend := int32(0)
+		if friends[id] {
+			friend = 1
+		}
+		list = append(list, &pb.UnionPlayerInfo{PlayerId: proto.Int64(id), PlayerName: proto.String(read.Player.GetName()), FightPower: proto.Int64(int64(read.Power)), Role: proto.Int32(member.Role), HeroWarId: proto.String(p13GuildFirstFormationHeroID(read.Player, read.Game)), IsFriend: proto.Int32(friend), LastLoginTime: proto.Int64(lastLogin), Level: proto.Int32(read.Player.GetLevel()), Contribution: proto.Int32(member.Contribution), TodayCoin: proto.Int32(coin), TodayBadge: proto.Int32(badge)})
+	}
+	return list, nil
+}
+
+func (s *GameService) p13GuildSimples(tx *gorm.DB, viewer int64, guilds []db.P13Guild, now time.Time) ([]*pb.SimpleUnionInfo, error) {
+	list := make([]*pb.SimpleUnionInfo, 0, len(guilds))
+	if len(guilds) == 0 {
+		return list, nil
+	}
+	guildIDs := make([]string, 0, len(guilds))
+	for _, guild := range guilds {
+		guildIDs = append(guildIDs, guild.ID)
+	}
 	var members []db.P13GuildMember
-	if err := tx.Where("guild_id=?", g.ID).Order("player_id").Find(&members).Error; err != nil {
+	if err := tx.Where("guild_id IN ?", guildIDs).Order("guild_id,player_id").Find(&members).Error; err != nil {
 		return nil, err
 	}
-	reply := &pb.SimpleUnionInfo{Level: proto.Int32(g.Level), UnionId: proto.String(g.ID), UnionName: proto.String(g.Name), Declaration: proto.String(g.Declaration), CurrentMemberNum: proto.Int32(int32(len(members))), UnionFlag: proto.Int32(g.Flag)}
-	var total int64
-	for _, m := range members {
-		info, err := s.p10Player(tx, m.PlayerID)
-		if err != nil {
-			return nil, err
-		}
-		if int64(info.GetFightPower()) > math.MaxInt64-total {
-			return nil, errors.New("公会战力溢出")
-		}
-		total += int64(info.GetFightPower())
-		if m.Role == constUtil.P13GuildChairman {
-			reply.ChairmanLevel = info.Level
-			reply.ChairmanName = info.PlayerName
-		}
+	memberIDs := make([]int64, 0, len(members))
+	byGuild := map[string][]db.P13GuildMember{}
+	for _, member := range members {
+		memberIDs = append(memberIDs, member.PlayerID)
+		byGuild[member.GuildID] = append(byGuild[member.GuildID], member)
 	}
-	reply.TotalFightPower = proto.Int64(total)
-	var count int64
-	if err := tx.Model(&db.P13GuildApply{}).Where("guild_id=? AND player_id=?", g.ID, viewer).Count(&count).Error; err != nil {
+	players, err := s.p13GuildReadPlayers(tx, memberIDs, now)
+	if err != nil {
 		return nil, err
 	}
-	reply.IsApplied = proto.Int32(int32(count))
-	return reply, nil
+	var applies []db.P13GuildApply
+	if err := tx.Select("guild_id").Where("guild_id IN ? AND player_id=?", guildIDs, viewer).Find(&applies).Error; err != nil {
+		return nil, err
+	}
+	applied := map[string]bool{}
+	for _, apply := range applies {
+		applied[apply.GuildID] = true
+	}
+	for _, g := range guilds {
+		members := byGuild[g.ID]
+		reply := &pb.SimpleUnionInfo{Level: proto.Int32(g.Level), UnionId: proto.String(g.ID), UnionName: proto.String(g.Name), Declaration: proto.String(g.Declaration), CurrentMemberNum: proto.Int32(int32(len(members))), UnionFlag: proto.Int32(g.Flag), IsApplied: proto.Int32(0)}
+		var total int64
+		for _, member := range members {
+			read := players[member.PlayerID]
+			if int64(read.Power) > math.MaxInt64-total {
+				return nil, errors.New("公会战力溢出")
+			}
+			total += int64(read.Power)
+			if member.Role == constUtil.P13GuildChairman {
+				reply.ChairmanLevel, reply.ChairmanName = read.Player.Level, read.Player.Name
+			}
+		}
+		reply.TotalFightPower = proto.Int64(total)
+		if applied[g.ID] {
+			reply.IsApplied = proto.Int32(1)
+		}
+		list = append(list, reply)
+	}
+	return list, nil
+}
+
+func (s *GameService) p13GuildSimple(tx *gorm.DB, viewer int64, g db.P13Guild) (*pb.SimpleUnionInfo, error) {
+	list, err := s.p13GuildSimples(tx, viewer, []db.P13Guild{g}, p13UFNow(tx.Statement.Context))
+	if err != nil {
+		return nil, err
+	}
+	return list[0], nil
 }
 
 // p13GuildQuery 返回真实成员与申请数据，空会入口仍可供原登录初始化使用。
+// P13GuildSearchID recognizes the canonical ID created by the original guild
+// creation path without applying the separate weighted guild-name budget.
+func P13GuildSearchID(name string) (string, bool) {
+	if len(name) != 36 {
+		return "", false
+	}
+	id, err := uuid.Parse(name)
+	if err != nil || id.String() != strings.ToLower(name) {
+		return "", false
+	}
+	return id.String(), true
+}
+
 func (s *GameService) p13GuildQuery(ctx context.Context, id int64, request proto.Message, now time.Time) ([]proto.Message, error) {
 	var response proto.Message
 	err := db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
@@ -599,26 +656,27 @@ func (s *GameService) p13GuildQuery(ctx context.Context, id int64, request proto
 			if b.GetPage() < 1 || b.GetPage() > 100000 {
 				return errors.New("公会页码无效")
 			}
-			if b.GetName() != "" {
+			searchID, byID := P13GuildSearchID(b.GetName())
+			if b.GetName() != "" && !byID {
 				if err := s.p13GuildText(b.GetName(), "UnionNameLengthLimit", false); err != nil {
 					return err
 				}
 			}
 			var guilds []db.P13Guild
 			query := tx.Order("created_at,id").Limit(20).Offset(int(b.GetPage()-1) * 20)
-			if b.GetName() != "" {
+			if byID {
+				query = query.Where("id=?", searchID)
+			} else if b.GetName() != "" {
 				query = query.Where("name=? OR id=?", b.GetName(), b.GetName())
 			}
 			if err := query.Find(&guilds).Error; err != nil {
 				return err
 			}
 			reply := &pb.SCUnionSearch{}
-			for _, g := range guilds {
-				info, err := s.p13GuildSimple(tx, id, g)
-				if err != nil {
-					return err
-				}
-				reply.Unions = append(reply.Unions, info)
+			var err error
+			reply.Unions, err = s.p13GuildSimples(tx, id, guilds, now)
+			if err != nil {
+				return err
 			}
 			response = reply
 			return nil
@@ -701,12 +759,13 @@ func (s *GameService) p13GuildQuery(ctx context.Context, id int64, request proto
 					return err
 				}
 				reply := &pb.SCUnionApplyList{}
+				ids := make([]int64, 0, len(applies))
 				for _, a := range applies {
-					info, err := s.p13GuildPlayer(tx, id, a.PlayerID, nil, now)
-					if err != nil {
-						return err
-					}
-					reply.List = append(reply.List, info)
+					ids = append(ids, a.PlayerID)
+				}
+				reply.List, err = s.p13GuildPlayers(tx, id, ids, nil, now)
+				if err != nil {
+					return err
 				}
 				response = reply
 			} else {
@@ -715,12 +774,15 @@ func (s *GameService) p13GuildQuery(ctx context.Context, id int64, request proto
 					return err
 				}
 				reply := &pb.SCUnionMembers{}
+				ids := make([]int64, 0, len(members))
+				byID := make(map[int64]db.P13GuildMember, len(members))
 				for _, m := range members {
-					info, err := s.p13GuildPlayer(tx, id, m.PlayerID, &m, now)
-					if err != nil {
-						return err
-					}
-					reply.List = append(reply.List, info)
+					ids = append(ids, m.PlayerID)
+					byID[m.PlayerID] = m
+				}
+				reply.List, err = s.p13GuildPlayers(tx, id, ids, byID, now)
+				if err != nil {
+					return err
 				}
 				response = reply
 			}
@@ -1090,7 +1152,8 @@ func (s *GameService) p13GuildEconomy(ctx context.Context, id int64, request pro
 			response.(*pb.SCGetUnionStamina).Get = gain
 			m.StaminaDay = day
 		case *pb.CSUnionUpgrade:
-			if err = p13GuildRole(m, constUtil.P13GuildChairman); err != nil {
+			// Original union_des and UnionInfoTab permit both elected officers.
+			if err = p13GuildRole(m, constUtil.P13GuildVice); err != nil {
 				return err
 			}
 			if _, err = s.p13GuildCapacity(guild.Level + 1); err != nil {

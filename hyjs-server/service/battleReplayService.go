@@ -391,6 +391,10 @@ func (s *GameService) CaptureBattleReplay(ctx context.Context, tx *gorm.DB, play
 	if tx == nil || ctx == nil || playerID <= 0 || input.Attacker.GetPlayerId() != playerID || source == "" || len(source) > 32 || fightID == "" || len(fightID) > 128 {
 		return "", errors.New(constUtil.CombatInvalid)
 	}
+	matchID, scopeErr := p13P6MatchFromInput(source, &input)
+	if scopeErr != nil {
+		return "", scopeErr
+	}
 	key := fmt.Sprintf("%d/%s/%s", playerID, source, fightID)
 	id := p6Digest([]byte(key))
 	var previous db.P6BattleRecord
@@ -398,6 +402,9 @@ func (s *GameService) CaptureBattleReplay(ctx context.Context, tx *gorm.DB, play
 	if err == nil {
 		saved, decodeErr := decodeP6Record(&previous)
 		if decodeErr != nil || saved.Seed != input.Seed || saved.MaxRound != input.MaxRound || saved.BattleType != input.BattleType || saved.PVECompatibilityRule != input.PVECompatibilityRule || !proto.Equal(saved.Attacker, input.Attacker) || !proto.Equal(saved.Defender, input.Defender) || !proto.Equal(saved.Monster, input.Monster) || !proto.Equal(saved.KFReplay, input.KFReplay) || saved.DefenderFirst != input.DefenderFirst || saved.IsAttToDef != input.IsAttToDef || !reflect.DeepEqual(saved.AttackerDamageFactor, input.AttackerDamageFactor) || !reflect.DeepEqual(saved.DefenderDamageFactor, input.DefenderDamageFactor) || !reflect.DeepEqual(saved.AppliedProperties, input.AppliedProperties) && !(len(saved.AppliedProperties) == 0 && len(input.AppliedProperties) == 0) || !p6ConditionsEqual(saved.WinConditions, input.WinConditions) {
+			return "", errors.New(constUtil.P6ReplayConflict)
+		}
+		if previous.P13MatchID != "" && previous.P13MatchID != matchID {
 			return "", errors.New(constUtil.P6ReplayConflict)
 		}
 		// 重试仅核对原双方/seed，不用最新技能表替换该场冻结版本。
@@ -427,7 +434,7 @@ func (s *GameService) CaptureBattleReplay(ctx context.Context, tx *gorm.DB, play
 		return "", errors.New(constUtil.CombatInvalid)
 	}
 	now := time.Now().UnixMilli()
-	record := db.P6BattleRecord{ID: id, PlayerID: playerID, Source: source, SourceFight: fightID, Status: constUtil.P6BattleCaptured, Seed: frozen.Seed, ConfigurationHash: frozen.ConfigurationHash, EngineVersion: frozen.EngineVersion, ClientVersion: frozen.ClientVersion, Input: stored, InputHash: digest, CreatedAt: now, ExpiresAt: now + rule.TimeoutMillis}
+	record := db.P6BattleRecord{P13MatchID: matchID, ID: id, PlayerID: playerID, Source: source, SourceFight: fightID, Status: constUtil.P6BattleCaptured, Seed: frozen.Seed, ConfigurationHash: frozen.ConfigurationHash, EngineVersion: frozen.EngineVersion, ClientVersion: frozen.ClientVersion, Input: stored, InputHash: digest, CreatedAt: now, ExpiresAt: now + rule.TimeoutMillis}
 	return id, tx.WithContext(ctx).Create(&record).Error
 }
 

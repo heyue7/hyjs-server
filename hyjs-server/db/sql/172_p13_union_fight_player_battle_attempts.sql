@@ -1,6 +1,9 @@
 CREATE TABLE IF NOT EXISTS `p13_union_fight_player_battle_attempts` (
  `id` CHAR(64) NOT NULL, `match_id` CHAR(64) NOT NULL,
  `player_id` BIGINT NOT NULL, `target_id` BIGINT NOT NULL, `stamp` BIGINT NOT NULL, `client_stamp` BIGINT NOT NULL,
+ `calculation_stage` VARCHAR(16) NOT NULL DEFAULT '',
+ `next_calculation_at` BIGINT NOT NULL DEFAULT 0, `calculation_failures` BIGINT NOT NULL DEFAULT 0,
+ `calculation_quarantined` BOOLEAN NOT NULL DEFAULT FALSE,
  `status` VARCHAR(16) NOT NULL, `fight_id` VARCHAR(128) NOT NULL,
  `request_hash` CHAR(64) NOT NULL, `offer_hash` CHAR(64) NOT NULL,
  `p6_record_id` CHAR(64) NOT NULL, `input_hash` CHAR(64) NOT NULL,
@@ -16,5 +19,6 @@ CREATE TABLE IF NOT EXISTS `p13_union_fight_player_battle_attempts` (
  KEY `idx_p13_union_fight_player_battle_attempts_player_id` (`player_id`),
  KEY `p13_uf_player_battle_client` (`player_id`,`client_stamp`),
  KEY `p13_uf_player_battle_match` (`match_id`), KEY `p13_uf_player_battle_target` (`target_id`),
+ KEY `p13_uf_player_battle_compute` (`calculation_stage`,`status`,`calculation_quarantined`,`next_calculation_at`,`created_at`,`id`),
  KEY `p13_uf_player_battle_due` (`status`,`due_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;

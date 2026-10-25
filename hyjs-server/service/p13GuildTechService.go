@@ -156,12 +156,16 @@ func p13GuildTechRowHash(row p13GuildTechOriginalRow) string {
 // p13GuildTechLevels validates contiguous actual upgrades. A current mutable
 // operator policy never changes the original costs/props already frozen here.
 func p13GuildTechLevels(tx *gorm.DB, offer *db.P13GuildTechOffer) (map[string]int64, []db.P13GuildTechUpgrade, error) {
-	directory, original, err := p13GuildTechOfferRead(offer)
-	if err != nil {
+	var rows []db.P13GuildTechUpgrade
+	if err := tx.Where("guild_id=?", offer.GuildID).Order("tech_type,level").Find(&rows).Error; err != nil {
 		return nil, nil, err
 	}
-	var rows []db.P13GuildTechUpgrade
-	if err = tx.Where("guild_id=?", offer.GuildID).Order("tech_type,level").Find(&rows).Error; err != nil {
+	return p13GuildTechLevelsRead(offer, rows)
+}
+
+func p13GuildTechLevelsRead(offer *db.P13GuildTechOffer, rows []db.P13GuildTechUpgrade) (map[string]int64, []db.P13GuildTechUpgrade, error) {
+	directory, original, err := p13GuildTechOfferRead(offer)
+	if err != nil {
 		return nil, nil, err
 	}
 	levels := map[string]int64{}
@@ -250,7 +254,15 @@ func (s *GameService) P13GuildTechProperties(ctx context.Context, tx *gorm.DB, i
 	if err != nil {
 		return nil, "", err
 	}
-	levels, steps, err := p13GuildTechLevels(tx, &offer)
+	var steps []db.P13GuildTechUpgrade
+	if err := tx.Where("guild_id=?", offer.GuildID).Order("tech_type,level").Find(&steps).Error; err != nil {
+		return nil, "", err
+	}
+	return p13GuildTechPropertiesRead(&guild, &offer, steps, now)
+}
+
+func p13GuildTechPropertiesRead(guild *db.P13Guild, offer *db.P13GuildTechOffer, rows []db.P13GuildTechUpgrade, now time.Time) (*pb.BaseProp, string, error) {
+	levels, steps, err := p13GuildTechLevelsRead(offer, rows)
 	if err != nil {
 		return nil, "", err
 	}
@@ -260,7 +272,7 @@ func (s *GameService) P13GuildTechProperties(ctx context.Context, tx *gorm.DB, i
 	if offer.CapturedAt > now.UnixMilli() {
 		return nil, "", errors.New("公会科技升级时刻晚于当前快照")
 	}
-	directory, original, err := p13GuildTechOfferRead(&offer)
+	directory, original, err := p13GuildTechOfferRead(offer)
 	if err != nil {
 		return nil, "", err
 	}
@@ -295,7 +307,7 @@ func (s *GameService) P13GuildTechProperties(ctx context.Context, tx *gorm.DB, i
 		GuildID string   `json:"guildId"`
 		Offer   string   `json:"offer"`
 		Steps   []string `json:"steps"`
-	}{member.GuildID, offer.SourceHash, digests})
+	}{guild.ID, offer.SourceHash, digests})
 	return prop, p6Digest(raw), nil
 }
 

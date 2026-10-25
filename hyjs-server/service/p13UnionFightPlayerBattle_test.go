@@ -10,6 +10,7 @@ import (
 	"hyjs-server/db"
 	"hyjs-server/model"
 	pb "hyjs-server/model/protocol"
+	"math"
 	"os"
 	"strconv"
 	"strings"
@@ -105,8 +106,12 @@ func TestP13UFPlayerBattle172WholePlayerDeathAndTimeout(t *testing.T) {
 			}
 			bad = p13UFPlayerBattle172Rules()
 			bad.KillScore = 50
+			if _, _, _, _, e = p13UFPlayerBattleApply(before, input, terminal, bad); e != nil {
+				t.Fatal("valid published score50 rejected", e)
+			}
+			bad.KillScore = math.NaN()
 			if _, _, _, _, e = p13UFPlayerBattleApply(before, input, terminal, bad); e == nil {
-				t.Fatal("original five score changed")
+				t.Fatal("nonfinite published score accepted")
 			}
 			damaged := proto.Clone(before[0]).(*pb.InstUFPlayer)
 			damaged.FightInfo.HpPos[0]--
@@ -304,6 +309,13 @@ func TestP13UFPlayerBattle172ActualStartPendingDeathAndCold(t *testing.T) {
 	var row db.P13UnionFightPlayerBattleAttempt
 	if e = db.GetIns().First(&row, "player_id=?", id).Error; e != nil {
 		t.Fatal(e)
+	}
+	if row.CalculationStage != constUtil.P13UFPlayerBattleCaptured || len(row.Terminal) != 0 || row.ScopeProof != "" || row.TerminalHash != "" {
+		t.Fatal("Begin must precede terminal computation")
+	}
+	var captured db.P6BattleRecord
+	if e = db.GetIns().First(&captured, "id=?", row.P6RecordID).Error; e != nil || captured.Status != constUtil.P6BattleCaptured || captured.Authoritative {
+		t.Fatal("durable uncomputed source missing", e)
 	}
 	if row.ClientStamp != 0 || row.Stamp <= 0 || row.Status != constUtil.P13UFPlayerBattlePending {
 		t.Fatal("socket0 identity or pending journal")

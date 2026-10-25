@@ -312,6 +312,9 @@ func (s *GameService) p13UFWeeklySettle(tx *gorm.DB, offer *db.P13UnionFightWeek
 		if result.OfferHash != roundOffer.RulesHash || result.EndAt != match.EndAt || result.WinnerGuildID == result.LoserGuildID || (result.WinnerGuildID != match.LeftGuildID && result.WinnerGuildID != match.RightGuildID) || (result.LoserGuildID != match.LeftGuildID && result.LoserGuildID != match.RightGuildID) {
 			return nil, errors.New("周奖缺真实完整场次终局")
 		}
+		if err = s.p13UFCombatSettlementVerify(tx, &match, &result); err != nil {
+			return nil, err
+		}
 		scores[result.WinnerGuildID] += int64(rule.WinPrestige)
 		scores[result.LoserGuildID] += int64(rule.LosePrestige)
 		for _, guild := range []string{match.LeftGuildID, match.RightGuildID} {

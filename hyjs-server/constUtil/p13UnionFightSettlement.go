@@ -13,3 +13,8 @@ const (
 	P13UnionFightMissionTransport = int32(2)
 	P13UnionFightMissionSource    = "local-published-natural-missions-v1: original task lists/score push/award slot3; original text keys, local kind/threshold/points; actual completed ore tasks and cumulative deposits only; frozen before match; no combat authority"
 )
+
+// DueAt orders committed five-second combat effects regardless of worker delay.
+const P13UnionFightCombatSettlementSource = "local-certified-player-combat-settlement-v1: original kills/first-reaching/lower-frozen-power; local persisted DueAt effect order; complete certified ordinary14 ledger only; frozen published awards; unresolved exact tie/audit/pending/unknown changes"
+
+const P13UFCombatProofSchema = "p13-certified-combat-terminal-proof-v1"

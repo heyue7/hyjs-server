@@ -164,6 +164,10 @@ func p13UFPlayerBattleReadRules(tx *gorm.DB, row *db.P13UnionFightPlayerBattleAt
 	if err := tx.First(&offer, "match_id=?", row.MatchID).Error; err != nil {
 		return nil, err
 	}
+	return p13UFPlayerBattleRulesFromOffer(&offer, row)
+}
+
+func p13UFPlayerBattleRulesFromOffer(offer *db.P13UnionFightPlayerBattleOffer, row *db.P13UnionFightPlayerBattleAttempt) (*p13UFPlayerBattleRules, error) {
 	var rules p13UFPlayerBattleRules
 	if offer.SourceHash != row.OfferHash || p6Digest([]byte(offer.Snapshot)) != offer.SourceHash || json.Unmarshal([]byte(offer.Snapshot), &rules) != nil || !p13UFPlayerBattleRulesValid(&rules) || rules.MatchID != row.MatchID || row.CreatedAt <= 0 || row.CreatedAt > math.MaxInt64-rules.DurationMillis || row.DueAt <= row.CreatedAt || offer.CapturedAt > row.CreatedAt || row.CreatedAt < rules.Policy.StartsAt || row.DueAt >= rules.Policy.EndsAt || row.DueAt != row.CreatedAt+rules.DurationMillis {
 		return nil, errors.New(constUtil.P13UFPlayerBattleConflict)
@@ -424,25 +428,14 @@ func (s *GameService) p13UFTryPlayerBattle(ctx context.Context, id int64, reques
 		if e != nil {
 			return e
 		}
-		var terminal *model.CombatFinalHPOutcome
-		if !rules.FullHPOnly && validateP6UFPartialPlayerScope(frozen) == nil {
-			terminal, e = original.ComputeP6UFPartialPlayerSettlement(ctx, frozen)
-		} else {
-			terminal, e = original.ComputeP6UFPlayerSettlement(ctx, frozen)
-		}
-		if e != nil {
-			return e
-		}
-		if e = p13UFPlayerBattleAcceptP6(tx, &record, frozen, terminal, rules, now); e != nil {
+		// Admission validates the exact frozen scope; terminal calculation belongs
+		// to the durable worker after this transaction releases every guild/profile lock.
+		if e = p13UFPlayerBattleScope(frozen, rules); e != nil {
 			return e
 		}
 		row.InputHash = record.InputHash
-		row.ScopeProof = terminal.Outcome.CapabilityHash
-		row.Terminal, e = json.Marshal(terminal)
-		if e != nil {
-			return e
-		}
-		row.TerminalHash = p6Digest(row.Terminal)
+		row.CalculationStage = constUtil.P13UFPlayerBattleCaptured
+		row.Terminal = []byte{}
 		frame.State, targetFrame.State = proto.Int32(1), proto.Int32(1)
 		frame.LeftTime, targetFrame.LeftTime = proto.Float32(float32(rules.DurationMillis)/1000), proto.Float32(float32(rules.DurationMillis)/1000)
 		frame.TotalTime, targetFrame.TotalTime = proto.Float32(float32(rules.DurationMillis)/1000), proto.Float32(float32(rules.DurationMillis)/1000)
@@ -485,7 +478,7 @@ func p13UFPlayerBattleAcceptP6(tx *gorm.DB, record *db.P6BattleRecord, input *mo
 		return e
 	}
 	result := p6PlaybackResult(out.Outcome.Winner)
-	saved := tx.Model(&db.P6BattleRecord{}).Where("id=? AND status=?", record.ID, constUtil.P6BattleCaptured).Updates(map[string]any{"status": constUtil.P6BattleComputed, "operates": operations, "outcome": body, "outcome_hash": p6Digest(body), "client_result": result, "server_result": result, "replay_hash": p6Digest(append(append([]byte(nil), operations...), byte(result))), "authoritative": true, "finished_at": now.UnixMilli()})
+	saved := tx.Model(&db.P6BattleRecord{}).Where("id=? AND status=? AND input_hash=? AND source=? AND source_fight=?", record.ID, constUtil.P6BattleCaptured, record.InputHash, constUtil.P13UFPlayerBattleSource, record.SourceFight).Updates(map[string]any{"status": constUtil.P6BattleComputed, "operates": operations, "outcome": body, "outcome_hash": p6Digest(body), "client_result": result, "server_result": result, "replay_hash": p6Digest(append(append([]byte(nil), operations...), byte(result))), "authoritative": true, "finished_at": now.UnixMilli()})
 	if saved.Error != nil {
 		return saved.Error
 	}
@@ -588,18 +581,46 @@ func p13UFPlayerBattleApply(before []*pb.InstUFPlayer, input *model.FrozenBattle
 	return after, deadID, rewardID, revive, nil
 }
 
+// p13UFPlayerBattleScope uses the same capability gate as calculation without
+// running the combat engine or inventing a terminal during admission/retry.
+func p13UFPlayerBattleScope(input *model.FrozenBattleInput, rules *p13UFPlayerBattleRules) error {
+	if input == nil || !p13UFPlayerBattleRulesValid(rules) {
+		return errors.New(constUtil.P13UFPlayerBattleConflict)
+	}
+	if !rules.FullHPOnly && validateP6UFPartialPlayerScope(input) == nil {
+		return nil
+	}
+	return validateP6UFPlayerScope(input)
+}
+
 func (s *GameService) p13UFPlayerBattleVerify(tx *gorm.DB, row *db.P13UnionFightPlayerBattleAttempt) (*model.FrozenBattleInput, *model.CombatFinalHPOutcome, []p13UFPlayerBattleSide, *p13UFPlayerBattleRules, error) {
+	if row == nil {
+		return nil, nil, nil, nil, errors.New(constUtil.P13UFPlayerBattleConflict)
+	}
+	var offer db.P13UnionFightPlayerBattleOffer
+	if e := tx.First(&offer, "match_id=?", row.MatchID).Error; e != nil {
+		return nil, nil, nil, nil, e
+	}
+	var record db.P6BattleRecord
+	if e := tx.First(&record, "id=?", row.P6RecordID).Error; e != nil {
+		return nil, nil, nil, nil, e
+	}
+	return s.p13UFPlayerBattleVerifyLoaded(row, &record, &offer)
+}
+
+// VerifyLoaded consumes one batch-loaded immutable record/offer, without SQL.
+func (s *GameService) p13UFPlayerBattleVerifyLoaded(row *db.P13UnionFightPlayerBattleAttempt, record *db.P6BattleRecord, offer *db.P13UnionFightPlayerBattleOffer) (*model.FrozenBattleInput, *model.CombatFinalHPOutcome, []p13UFPlayerBattleSide, *p13UFPlayerBattleRules, error) {
 	reject := func() (*model.FrozenBattleInput, *model.CombatFinalHPOutcome, []p13UFPlayerBattleSide, *p13UFPlayerBattleRules, error) {
 		return nil, nil, nil, nil, errors.New(constUtil.P13UFPlayerBattleConflict)
 	}
-	if row == nil || row.ID != p6Digest([]byte(fmt.Sprintf("%s/%d/%d", row.MatchID, row.PlayerID, row.Stamp))) || row.FightID != strconv.FormatInt(p13UFFieldGUID(row.MatchID, "ordinary-player14", row.ID), 10) || row.SourceHash != p13UFPlayerBattleHash(row) || row.PlayerID <= 0 || row.TargetID <= 0 || row.PlayerID == row.TargetID || row.Stamp <= 0 || row.ClientStamp < 0 || (row.ClientStamp > 0 && row.ClientStamp != row.Stamp) || row.CreatedAt <= 0 || (row.Status != constUtil.P13UFPlayerBattlePending && row.Status != constUtil.P13UFPlayerBattleSettled) || row.StartHash != p6Digest(row.StartPB) || row.TerminalHash != p6Digest(row.Terminal) {
+	if row == nil || record == nil || offer == nil || record.ID != row.P6RecordID || offer.MatchID != row.MatchID || row.NextCalculationAt < 0 || row.CalculationFailures < 0 || row.ID != p6Digest([]byte(fmt.Sprintf("%s/%d/%d", row.MatchID, row.PlayerID, row.Stamp))) || row.FightID != strconv.FormatInt(p13UFFieldGUID(row.MatchID, "ordinary-player14", row.ID), 10) || row.SourceHash != p13UFPlayerBattleHash(row) || row.PlayerID <= 0 || row.TargetID <= 0 || row.PlayerID == row.TargetID || row.Stamp <= 0 || row.ClientStamp < 0 || (row.ClientStamp > 0 && row.ClientStamp != row.Stamp) || row.CreatedAt <= 0 || (row.Status != constUtil.P13UFPlayerBattlePending && row.Status != constUtil.P13UFPlayerBattleSettled) || row.StartHash != p6Digest(row.StartPB) || (row.CalculationStage != constUtil.P13UFPlayerBattleCaptured && row.TerminalHash != p6Digest(row.Terminal)) {
 		return reject()
 	}
 	request, _ := proto.MarshalOptions{Deterministic: true}.Marshal(&pb.CSUFPlayerAskFight{TargetGuid: proto.Int64(row.TargetID)})
 	if row.RequestHash != p6Digest(request) {
 		return reject()
 	}
-	rules, e := p13UFPlayerBattleReadRules(tx, row)
+	rules, e := p13UFPlayerBattleRulesFromOffer(offer, row)
 	if e != nil {
 		return nil, nil, nil, nil, e
 	}
@@ -611,15 +632,11 @@ func (s *GameService) p13UFPlayerBattleVerify(tx *gorm.DB, row *db.P13UnionFight
 	if proto.Unmarshal(row.StartPB, typed) != nil || typed.WinPlayerId != nil || len(typed.ProtoReflect().GetUnknown()) != 0 || typed.GetFightId() != row.FightID || len(typed.PlayerList) != 2 || typed.GetRoomId() != "map_forest_002" || typed.GetMaxRound() != 40 || typed.AttackerDamageFactor == nil || typed.DefenderDamageFactor == nil || typed.GetAttackerDamageFactor() != 1 || typed.GetDefenderDamageFactor() != 1 {
 		return reject()
 	}
-	var record db.P6BattleRecord
-	if e = tx.First(&record, "id=?", row.P6RecordID).Error; e != nil {
-		return nil, nil, nil, nil, e
-	}
-	input, e := decodeP6Record(&record)
+	input, e := decodeP6Record(record)
 	if e != nil {
 		return nil, nil, nil, nil, e
 	}
-	if record.PlayerID != row.PlayerID || record.Source != constUtil.P13UFPlayerBattleSource || record.SourceFight != row.FightID || record.Status != constUtil.P6BattleComputed || !record.Authoritative || record.InputHash != row.InputHash || record.FinishedAt != row.CreatedAt || record.EngineVersion != rules.Engine || record.ClientVersion != rules.Client || input.Seed != typed.GetRandomSeed() || input.Attacker.GetPlayerId() != row.PlayerID || input.Defender.GetPlayerId() != row.TargetID || !proto.Equal(input.Attacker, typed.PlayerList[0]) || !proto.Equal(input.Defender, typed.PlayerList[1]) {
+	if record.PlayerID != row.PlayerID || record.Source != constUtil.P13UFPlayerBattleSource || record.SourceFight != row.FightID || record.InputHash != row.InputHash || record.EngineVersion != rules.Engine || record.ClientVersion != rules.Client || input.Seed != typed.GetRandomSeed() || input.Attacker.GetPlayerId() != row.PlayerID || input.Defender.GetPlayerId() != row.TargetID || !proto.Equal(input.Attacker, typed.PlayerList[0]) || !proto.Equal(input.Defender, typed.PlayerList[1]) {
 		return reject()
 	}
 	var actualApplied map[string][]string
@@ -630,6 +647,18 @@ func (s *GameService) p13UFPlayerBattleVerify(tx *gorm.DB, row *db.P13UnionFight
 	left, _ := json.Marshal(input.AppliedProperties)
 	right, _ := json.Marshal(expected)
 	if !bytes.Equal(left, right) {
+		return reject()
+	}
+	if e = p13UFPlayerBattleScope(input, rules); e != nil {
+		return nil, nil, nil, nil, e
+	}
+	if row.CalculationStage == constUtil.P13UFPlayerBattleCaptured {
+		if row.Status != constUtil.P13UFPlayerBattlePending || record.Status != constUtil.P6BattleCaptured || record.Authoritative || record.FinishedAt != 0 || record.OutcomeHash != "" || record.ReplayHash != "" || record.ClientResult != 0 || record.ServerResult != 0 || len(record.Outcome) != 0 || len(record.Operates) != 0 || len(row.Terminal) != 0 || row.TerminalHash != "" || row.ScopeProof != "" || row.SettledAt != 0 || len(row.After) != 0 || row.DeadPlayerID != 0 || row.RewardPlayerID != 0 || row.ReviveSeconds != 0 {
+			return reject()
+		}
+		return input, nil, before, rules, nil
+	}
+	if row.CalculationStage != "" && row.CalculationStage != constUtil.P13UFPlayerBattleComputed || record.Status != constUtil.P6BattleComputed || !record.Authoritative || record.FinishedAt != row.CreatedAt {
 		return reject()
 	}
 	var out model.CombatFinalHPOutcome
@@ -664,14 +693,190 @@ func p13UFPlayerBattleFrames(before []p13UFPlayerBattleSide) ([]*pb.InstUFPlayer
 	return frames, nil
 }
 
-// Advance processes only persisted already-certified pending terminals. Turning
-// the new-start policy off cannot strand an existing five-second calculation.
-func (s *GameService) AdvanceP13UnionFightPlayerBattles(ctx context.Context, now time.Time) error {
-	var ids []string
-	if e := db.GetIns().WithContext(ctx).Model(&db.P13UnionFightPlayerBattleAttempt{}).Where("status=? AND due_at<=?", constUtil.P13UFPlayerBattlePending, now.UnixMilli()).Order("due_at,id").Limit(64).Pluck("id", &ids).Error; e != nil {
-		return e
+// Only engine failures after full immutable-input verification may re-sign
+// authenticated retry metadata. Storage and source failures retain their bytes.
+type p13UFPlayerBattleCalculationError struct{ err error }
+
+func (e *p13UFPlayerBattleCalculationError) Error() string { return e.err.Error() }
+func (e *p13UFPlayerBattleCalculationError) Unwrap() error { return e.err }
+
+func p13UFPlayerBattleCaptureDamaged(err error) bool {
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return true
+	}
+	switch err.Error() {
+	case constUtil.P13UFPlayerBattleConflict, constUtil.P6ReplayConflict, constUtil.CombatInvalid, constUtil.CombatUnsupported:
+		return true
+	}
+	return false
+}
+
+func (s *GameService) p13UFPlayerBattleQuarantine(ctx context.Context, captured *db.P13UnionFightPlayerBattleAttempt) error {
+	return db.GetIns().WithContext(ctx).Model(&db.P13UnionFightPlayerBattleAttempt{}).Where("id=? AND source_hash=? AND status=? AND calculation_stage=?", captured.ID, captured.SourceHash, constUtil.P13UFPlayerBattlePending, constUtil.P13UFPlayerBattleCaptured).Update("calculation_quarantined", true).Error
+}
+
+func (s *GameService) p13UFPlayerBattleRetryCalculation(ctx context.Context, captured *db.P13UnionFightPlayerBattleAttempt, now time.Time) error {
+	return db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var current db.P13UnionFightPlayerBattleAttempt
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&current, "id=?", captured.ID).Error; err != nil {
+			return err
+		}
+		if current.SourceHash != captured.SourceHash || current.CalculationStage != constUtil.P13UFPlayerBattleCaptured || current.CalculationQuarantined {
+			return nil
+		}
+		if _, _, _, _, err := s.p13UFPlayerBattleVerify(tx, &current); err != nil {
+			return err
+		}
+		delay := min(int64(1)<<min(current.CalculationFailures, int64(5)), int64(constUtil.P13UFPlayerBattleRetryMaxSeconds)) * 1000
+		if now.UnixMilli() < 0 || now.UnixMilli() > math.MaxInt64-delay {
+			return errors.New(constUtil.P13UFPlayerBattleConflict)
+		}
+		current.NextCalculationAt = now.UnixMilli() + delay
+		if current.CalculationFailures < math.MaxInt64 {
+			current.CalculationFailures++
+		}
+		current.SourceHash = p13UFPlayerBattleHash(&current)
+		updated := tx.Model(&db.P13UnionFightPlayerBattleAttempt{}).Where("id=? AND source_hash=? AND calculation_stage=? AND status=? AND calculation_quarantined=?", current.ID, captured.SourceHash, constUtil.P13UFPlayerBattleCaptured, constUtil.P13UFPlayerBattlePending, false).Updates(map[string]any{"next_calculation_at": current.NextCalculationAt, "calculation_failures": current.CalculationFailures, "source_hash": current.SourceHash})
+		if updated.Error != nil {
+			return updated.Error
+		}
+		if updated.RowsAffected != 1 {
+			return errors.New(constUtil.P13UFPlayerBattleConflict)
+		}
+		return nil
+	})
+}
+
+// computeP13UnionFightPlayerBattles reads durable captures without guild or
+// profile locks. Calculation may be cancelled; only the short CAS transaction
+// commits a certified terminal, so crashes retain a retryable captured input.
+func (s *GameService) computeP13UnionFightPlayerBattles(ctx context.Context, now time.Time) error {
+	return s.computeP13UnionFightPlayerBattlesWith(ctx, now, s.computeP13UnionFightPlayerBattle)
+}
+
+func (s *GameService) computeP13UnionFightPlayerBattlesWith(ctx context.Context, now time.Time, compute func(context.Context, *db.P13UnionFightPlayerBattleAttempt) error) error {
+	var rows []db.P13UnionFightPlayerBattleAttempt
+	tx := db.GetIns().WithContext(ctx)
+	if err := tx.Where("status=? AND calculation_stage=? AND calculation_quarantined=? AND next_calculation_at<=?", constUtil.P13UFPlayerBattlePending, constUtil.P13UFPlayerBattleCaptured, false, now.UnixMilli()).Order("next_calculation_at,created_at,id").Limit(constUtil.P13UFPlayerBattleComputeBatch).Find(&rows).Error; err != nil {
+		return err
 	}
 	var failures []error
+	for i := range rows {
+		if err := ctx.Err(); err != nil {
+			return errors.Join(append(failures, err)...)
+		}
+		if err := compute(ctx, &rows[i]); err != nil {
+			failures = append(failures, fmt.Errorf("ordinary14 calculate %s: %w", rows[i].ID, err))
+			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) || ctx.Err() != nil {
+				continue
+			}
+			var calculation *p13UFPlayerBattleCalculationError
+			if errors.As(err, &calculation) {
+				if retryErr := s.p13UFPlayerBattleRetryCalculation(ctx, &rows[i], now); retryErr != nil {
+					failures = append(failures, retryErr)
+				}
+			} else if p13UFPlayerBattleCaptureDamaged(err) {
+				// Keep the damaged bytes/hash intact. This independent scheduler
+				// flag prevents poison rows starving later accepted captures.
+				if quarantineErr := s.p13UFPlayerBattleQuarantine(ctx, &rows[i]); quarantineErr != nil {
+					failures = append(failures, quarantineErr)
+				}
+			}
+		}
+	}
+	return errors.Join(failures...)
+}
+
+func (s *GameService) computeP13UnionFightPlayerBattle(ctx context.Context, captured *db.P13UnionFightPlayerBattleAttempt) error {
+	return s.computeP13UnionFightPlayerBattleWith(ctx, captured, func(ctx context.Context, input *model.FrozenBattleInput, rules *p13UFPlayerBattleRules) (*model.CombatFinalHPOutcome, error) {
+		if !rules.FullHPOnly && validateP6UFPartialPlayerScope(input) == nil {
+			return s.ComputeP6UFPartialPlayerSettlement(ctx, input)
+		}
+		return s.ComputeP6UFPlayerSettlement(ctx, input)
+	})
+}
+
+// The calculator boundary makes lock ownership and cancellation explicit. The
+// production caller supplies the same certified engine used by legacy receipts.
+func (s *GameService) computeP13UnionFightPlayerBattleWith(ctx context.Context, captured *db.P13UnionFightPlayerBattleAttempt, calculate func(context.Context, *model.FrozenBattleInput, *p13UFPlayerBattleRules) (*model.CombatFinalHPOutcome, error)) error {
+	input, _, _, rules, err := s.p13UFPlayerBattleVerify(db.GetIns().WithContext(ctx), captured)
+	if err != nil {
+		return err
+	}
+	if captured.CalculationStage != constUtil.P13UFPlayerBattleCaptured {
+		return errors.New(constUtil.P13UFPlayerBattleConflict)
+	}
+	terminal, err := calculate(ctx, input, rules)
+	if err != nil {
+		return &p13UFPlayerBattleCalculationError{err: err}
+	}
+	if !p13UFPlayerBattleTerminalForRules(rules, input, terminal) {
+		return &p13UFPlayerBattleCalculationError{err: errors.New(constUtil.CombatUnsupported)}
+	}
+	if err = ctx.Err(); err != nil {
+		return err
+	}
+	return db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// Only the attempt row is locked here. No current policy/profile lookup
+		// can change the immutable accepted scope or charge a second request.
+		var current db.P13UnionFightPlayerBattleAttempt
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&current, "id=?", captured.ID).Error; err != nil {
+			return err
+		}
+		if current.CalculationStage != constUtil.P13UFPlayerBattleCaptured {
+			_, _, _, _, err := s.p13UFPlayerBattleVerify(tx, &current)
+			return err
+		}
+		if current.SourceHash != captured.SourceHash {
+			return errors.New(constUtil.P13UFPlayerBattleConflict)
+		}
+		verified, _, _, frozenRules, err := s.p13UFPlayerBattleVerify(tx, &current)
+		if err != nil {
+			return err
+		}
+		var record db.P6BattleRecord
+		if err = tx.First(&record, "id=?", current.P6RecordID).Error; err != nil {
+			return err
+		}
+		if record.InputHash != current.InputHash || record.Source != constUtil.P13UFPlayerBattleSource || record.SourceFight != current.FightID || record.PlayerID != current.PlayerID {
+			return errors.New(constUtil.P13UFPlayerBattleConflict)
+		}
+		// Preserve legacy FinishedAt semantics: it binds the accepted source
+		// clock, while the new stage carries the durable computation boundary.
+		if err = p13UFPlayerBattleAcceptP6(tx, &record, verified, terminal, frozenRules, time.UnixMilli(current.CreatedAt)); err != nil {
+			return err
+		}
+		current.Terminal, err = json.Marshal(terminal)
+		if err != nil {
+			return err
+		}
+		current.TerminalHash = p6Digest(current.Terminal)
+		current.ScopeProof = terminal.Outcome.CapabilityHash
+		current.CalculationStage = constUtil.P13UFPlayerBattleComputed
+		current.NextCalculationAt = 0
+		current.SourceHash = p13UFPlayerBattleHash(&current)
+		updated := tx.Model(&db.P13UnionFightPlayerBattleAttempt{}).Where("id=? AND source_hash=? AND calculation_stage=? AND status=?", current.ID, captured.SourceHash, constUtil.P13UFPlayerBattleCaptured, constUtil.P13UFPlayerBattlePending).Updates(map[string]any{"terminal": current.Terminal, "terminal_hash": current.TerminalHash, "scope_proof": current.ScopeProof, "calculation_stage": current.CalculationStage, "next_calculation_at": current.NextCalculationAt, "source_hash": current.SourceHash})
+		if updated.Error != nil {
+			return updated.Error
+		}
+		if updated.RowsAffected != 1 {
+			return errors.New(constUtil.P13UFPlayerBattleConflict)
+		}
+		return nil
+	})
+}
+
+// Advance calculates durable captures, then applies certified terminals only
+// after their original due time. Disabled new-start policy preserves accepted work.
+func (s *GameService) AdvanceP13UnionFightPlayerBattles(ctx context.Context, now time.Time) error {
+	var failures []error
+	if err := s.computeP13UnionFightPlayerBattles(ctx, now); err != nil {
+		failures = append(failures, err)
+	}
+	var ids []string
+	if e := db.GetIns().WithContext(ctx).Model(&db.P13UnionFightPlayerBattleAttempt{}).Where("status=? AND calculation_stage<>? AND due_at<=?", constUtil.P13UFPlayerBattlePending, constUtil.P13UFPlayerBattleCaptured, now.UnixMilli()).Order("due_at,id").Limit(64).Pluck("id", &ids).Error; e != nil {
+		return e
+	}
 	for _, id := range ids {
 		var changed *db.P13UnionFightPlayerBattleAttempt
 		e := db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {

@@ -653,9 +653,8 @@ func (s *GameService) DispatchP13UnionFight(ctx context.Context, id int64, reque
 		if replies, handled, retryErr := s.p13UFPlayerBattleRetry(ctx, id, request.(*pb.CSUFPlayerAskFight), stamp); handled || retryErr != nil {
 			return replies, true, retryErr
 		}
-		if err = s.p13UFObserveFight(ctx, id, request.(*pb.CSUFPlayerAskFight), stamp, now); err != nil {
-			return nil, true, err
-		}
+		// Accepted battles and audit attempts persist their evidence in the same
+		// transaction. Rejected requests must leave no independent match intent.
 		if replies, handled, battleErr := s.p13UFTryPlayerBattle(ctx, id, request.(*pb.CSUFPlayerAskFight), stamp, now); handled || battleErr != nil {
 			return replies, true, battleErr
 		}

@@ -331,6 +331,11 @@ func p13UFMonthlyRanks(tx *gorm.DB, offer *db.P13UnionFightMonthlyOffer) ([]p13U
 		if terminal && (result.OfferHash != roundOffer.RulesHash || result.EndAt != match.EndAt || result.WinnerGuildID == result.LoserGuildID || result.WinnerGuildID != match.LeftGuildID && result.WinnerGuildID != match.RightGuildID || result.LoserGuildID != match.LeftGuildID && result.LoserGuildID != match.RightGuildID) {
 			return nil, false, errors.New("月赛缺真实完整终局来源")
 		}
+		if terminal {
+			if e = p13UFCombatSettlementVerify(tx, &match, &result); e != nil {
+				return nil, false, e
+			}
+		}
 		week := p13UFWeek(day)
 		if weekScores[week] == nil {
 			weekScores[week] = map[string]int64{}

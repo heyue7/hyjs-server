@@ -123,11 +123,9 @@ func TestP13UnionFightBuffScopeActualMineShopCasterExitReenterColdAndEarnedMovem
 			t.Fatal(err)
 		}
 	}
-	if _, err = f.s.p13UFShopList(f.ctx, id, &pb.CSUFShopList{NpcId: proto.String(shop)}, now()); err != nil {
-		t.Fatal(err)
-	}
+	shopQuotes := p13UFTestShopQuotes(t, f, id, shop, now())
 	for i, item := range []string{"ufitem_015", "ufitem_015", "ufitem_011"} {
-		if _, err = f.s.p13UFShopBuy(f.ctx, id, &pb.CSUFPlayerBuyItem{ShopItemId: proto.String(item), NpcId: proto.String(shop)}, 600+int64(i), now()); err != nil {
+		if _, err = f.s.p13UFShopBuy(f.ctx, id, &pb.CSUFPlayerBuyItem{ShopItemId: proto.String(p13UFTestShopQuote(t, shopQuotes, item)), NpcId: proto.String(shop)}, 600+int64(i), now()); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -326,11 +324,9 @@ func TestP13UnionFightBuffScopeActualAuraFastExitReenterNoFurtherHealing(t *test
 			t.Fatal(err)
 		}
 	}
-	if _, err = f.s.p13UFShopList(f.ctx, id, &pb.CSUFShopList{NpcId: proto.String(shop)}, now()); err != nil {
-		t.Fatal(err)
-	}
+	shopQuotes := p13UFTestShopQuotes(t, f, id, shop, now())
 	for i, item := range []string{"ufitem_013", "ufitem_013", "ufitem_011"} {
-		if _, err = f.s.p13UFShopBuy(f.ctx, id, &pb.CSUFPlayerBuyItem{ShopItemId: proto.String(item), NpcId: proto.String(shop)}, 600+int64(i), now()); err != nil {
+		if _, err = f.s.p13UFShopBuy(f.ctx, id, &pb.CSUFPlayerBuyItem{ShopItemId: proto.String(p13UFTestShopQuote(t, shopQuotes, item)), NpcId: proto.String(shop)}, 600+int64(i), now()); err != nil {
 			t.Fatal(err)
 		}
 	}

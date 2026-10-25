@@ -2,6 +2,7 @@ package db
 
 // P13UnionFightFieldPolicy 保存具名本地场景策略，运营显式填入后才开放，不授予权威胜负。
 type P13UnionFightFieldPolicy struct {
+	MapProjection      string  `gorm:"type:varchar(32);not null;default:''" json:"mapProjection,omitempty"`
 	ID                 int64   `gorm:"primaryKey;autoIncrement:false" json:"id"`
 	Enabled            bool    `gorm:"not null;default:false" json:"enabled"`
 	PreparationMillis  int64   `gorm:"not null;default:0" json:"preparationMillis"`

@@ -115,9 +115,7 @@ func TestP13UnionFightGateItemActualTwoCampMiningShopNearestRepairAttackCrashCol
 		clock.Add(10000)
 		point, _ = fieldPoint(original.table("UnionFightNpc", "UFNId", shop)["Position"])
 		move(id, point)
-		if _, err = f.s.p13UFShopList(f.ctx, id, &pb.CSUFShopList{NpcId: proto.String(shop)}, now()); err != nil {
-			t.Fatal(err)
-		}
+		shopQuotes := p13UFTestShopQuotes(t, f, id, shop, now())
 		items := []string{"ufitem_019", "ufitem_020", "ufitem_016"}
 		if id == b {
 			items = []string{"ufitem_019"}
@@ -128,7 +126,7 @@ func TestP13UnionFightGateItemActualTwoCampMiningShopNearestRepairAttackCrashCol
 				count = 1
 			}
 			for n := 0; n < count; n++ {
-				if _, err = f.s.p13UFShopBuy(f.ctx, id, &pb.CSUFPlayerBuyItem{ShopItemId: proto.String(item), NpcId: proto.String(shop)}, 200+int64(i*3+n), now()); err != nil {
+				if _, err = f.s.p13UFShopBuy(f.ctx, id, &pb.CSUFPlayerBuyItem{ShopItemId: proto.String(p13UFTestShopQuote(t, shopQuotes, item)), NpcId: proto.String(shop)}, 200+int64(i*3+n), now()); err != nil {
 					t.Fatal(err)
 				}
 			}

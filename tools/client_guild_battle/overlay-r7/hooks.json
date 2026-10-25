@@ -1,0 +1,82 @@
+[
+  {
+    "method": "Room.RoomUnionFight::_WaitForLoadComplete",
+    "rid": 17696,
+    "prefixCount": 5
+  },
+  {
+    "method": "Room.RoomUnionFight::RegistAssets",
+    "rid": 17707,
+    "prefixCount": 6
+  },
+  {
+    "method": "Room.RCMoveNavigation::Tick",
+    "rid": 17421,
+    "prefixCount": 4
+  },
+  {
+    "method": "Room.RCMoveNavigation::MoveTo",
+    "rid": 17422,
+    "prefixCount": 5
+  },
+  {
+    "method": "Room.RCMoveNavigation::StopTo",
+    "rid": 17423,
+    "prefixCount": 5
+  },
+  {
+    "method": "Room.RCMoveNavigation::LerpPosition",
+    "rid": 17424,
+    "prefixCount": 5
+  },
+  {
+    "method": "Room.RCMoveNavigation::SetSpeed",
+    "rid": 17426,
+    "prefixCount": 5
+  },
+  {
+    "method": "Room.RCMoveNavigation::SamplePosition",
+    "rid": 17429,
+    "prefixCount": 5
+  },
+  {
+    "method": "Room.RCMoveNavigation::ResetPosition",
+    "rid": 17432,
+    "prefixCount": 4
+  },
+  {
+    "method": "Room.RCMoveNavigation::SamplePosition",
+    "rid": 17431,
+    "prefixCount": 6
+  },
+  {
+    "method": "Room.RCLODBase::LoadModel",
+    "rid": 16620,
+    "prefixCount": 5
+  },
+  {
+    "method": "UI.MiniMapComponent::SetData",
+    "rid": 24096,
+    "prefixCount": 4
+  },
+  {
+    "method": "UI.MiniMapComponent::SetData",
+    "rid": 24097,
+    "prefixCount": 4
+  },
+  {
+    "method": "Room.RCUIUnionGuard::OnClick",
+    "rid": 17859,
+    "prefixCount": 4
+  },
+  {
+    "method": "Room.RoomNetUnionFight::SCUFPlayerFightBegin",
+    "rid": 17070,
+    "prefixCount": 3
+  },
+  {
+    "method": "Room.RoomNetUnionFight::SCUFPlayerFightEnd",
+    "rid": 17071,
+    "prefixCount": 3
+  }
+]

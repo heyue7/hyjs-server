@@ -171,7 +171,12 @@ func (s *GameService) P13GuildPrayerProperties(ctx context.Context, tx *gorm.DB,
 	if err != nil {
 		return nil, "", 0, err
 	}
-	prop, err := p13GuildPrayerRollRead(&row)
+	return p13GuildPrayerPropertiesRead(&row, member, now)
+}
+
+// p13GuildPrayerPropertiesRead validates the latest frozen roll against its live membership term.
+func p13GuildPrayerPropertiesRead(row *db.P13GuildPrayerRoll, member *db.P13GuildMember, now time.Time) (*pb.BaseProp, string, int64, error) {
+	prop, err := p13GuildPrayerRollRead(row)
 	if err != nil {
 		return nil, "", 0, err
 	}

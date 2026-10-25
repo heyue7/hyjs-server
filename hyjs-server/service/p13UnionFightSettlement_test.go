@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"google.golang.org/protobuf/proto"
+	"hyjs-server/constUtil"
 	"hyjs-server/db"
 	pb "hyjs-server/model/protocol"
 )
@@ -268,12 +269,20 @@ func p13ZeroFightActualTimedRoundAndLocalInbox(t *testing.T, transportMVP bool, 
 			t.Fatal("original result winner")
 		}
 	}
-	// A real refused original TCP attack belongs to round two and must never become a peaceful result.
+	// A side-effect-free rejected request leaves no combat identity. A separately
+	// committed audit still blocks peaceful terminal and pending-week rewards.
 	var second db.P13UnionFightMatch
 	if err = db.GetIns().First(&second, "round=2 AND (left_guild_id=? OR right_guild_id=?)", match.LeftGuildID, match.LeftGuildID).Error; err != nil {
 		t.Fatal(err)
 	}
 	clock.Store(second.StartAt - 60000)
+	if !weekly || pendingWeek {
+		zero, one := float64(0), float64(1)
+		if err = db.GetIns().Save(&db.P13UnionFightBattleAuditSource{Day: second.Day, Enabled: true, SeedSalt: 42, AttackerDamageFactor: &zero, DefenderDamageFactor: &one, PublishedAt: clock.Load() - 1, Source: "isolated audit-only source; actual frozen PVE14/0-1; never war authority"}).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+
 	if err = f.s.TickP13UnionFightField(f.ctx, time.UnixMilli(clock.Load())); err != nil {
 		t.Fatal(err)
 	}
@@ -297,8 +306,46 @@ func p13ZeroFightActualTimedRoundAndLocalInbox(t *testing.T, transportMVP bool, 
 		if _, handled, err := f.s.DispatchP13UnionFight(f.ctx, pair[0], &pb.CSUFPlayerAskFight{TargetGuid: proto.Int64(pair[1])}, 0); !handled || err == nil {
 			t.Fatal("real nonauthority attack unexpectedly succeeded", err)
 		}
-		if count := p1Count(t, &db.P13UnionFightSettlementIntent{}, "match_id=?", second.ID); count != 1 {
-			t.Fatal("refused combat intent lost", count)
+		if count := p1Count(t, &db.P13UnionFightSettlementIntent{}, "match_id=?", second.ID); count != 0 {
+			t.Fatal("side-effect-free refusal polluted match", count)
+		}
+		// Check eligibility at EndAt inside a rolled-back transaction, then keep
+		// the live field before EndAt for a genuine committed audit request.
+		func() {
+			tx := db.GetIns().Begin()
+			if tx.Error != nil {
+				t.Fatal(tx.Error)
+			}
+			defer tx.Rollback()
+			var offer db.P13UnionFightSettlementOffer
+			if e := tx.First(&offer, "match_id=?", second.ID).Error; e != nil {
+				t.Fatal(e)
+			}
+			terminal, e := f.s.p13UFSettleZeroFight(tx, &second, &offer, time.UnixMilli(second.EndAt))
+			if e != nil || terminal == nil {
+				t.Fatal("harmless refused request prevented peaceful terminal", e)
+			}
+		}()
+		clock.Store(second.StartAt + 60000)
+		var target db.P13UnionFightFieldPlayer
+		if err = db.GetIns().First(&target, "match_id=? AND player_id=?", second.ID, pair[1]).Error; err != nil {
+			t.Fatal(err)
+		}
+		if _, err = f.s.p13UFFieldMove(f.ctx, pair[0], &pb.CSMove{PointNew: &pb.PointNew{X: proto.Float32(target.X), Y: proto.Float32(target.Y), Z: proto.Float32(target.Z)}}, time.UnixMilli(clock.Load())); err != nil {
+			t.Fatal("real audit approach", err)
+		}
+		if _, handled, e := f.s.DispatchP13UnionFight(f.ctx, pair[0], &pb.CSUFPlayerAskFight{TargetGuid: proto.Int64(pair[1])}, 987); !handled || e == nil || e.Error() != constUtil.P13UnionFightBattleAuditRefusal {
+			t.Fatal("actual audit committed refusal", handled, e)
+		}
+		var audit db.P13UnionFightBattleAuditAttempt
+		if err = db.GetIns().First(&audit, "match_id=? AND player_id=? AND stamp=?", second.ID, pair[0], 987).Error; err != nil {
+			t.Fatal("missing committed audit", err)
+		}
+		if audit.SourceHash != p13UFBattleAuditAttemptHash(&audit) {
+			t.Fatal("committed audit identity changed")
+		}
+		if err = p13UFBattleAuditVerifyRecord(db.GetIns(), &audit); err != nil {
+			t.Fatal("actual audit source invalid", err)
 		}
 		clock.Store(second.EndAt)
 		if err = f.s.TickP13UnionFightSettlement(f.ctx, time.UnixMilli(clock.Load())); err != nil {

@@ -11,6 +11,8 @@ import (
 // TestP13GuildIngress 原HTTP/TCP共用字段校验；非BMP字符按原UTF16长度计数。
 func TestP13GuildIngressOriginalEnumsLengthsAndTargets(t *testing.T) {
 	valid := []proto.Message{
+		&pb.CSUnionSearch{Page: proto.Int32(1), Name: proto.String("32ae04c1-abcd-4123-b341-000000000001")},
+		&pb.CSUnionSearch{Page: proto.Int32(1), Name: proto.String("32AE04C1-ABCD-4123-B341-000000000001")},
 		&pb.CSUnionCreate{Name: proto.String("真实公会")}, &pb.CSUnionCreate{Name: proto.String(strings.Repeat("剑", 6))},
 		&pb.CSUnionSearch{Page: proto.Int32(1)}, &pb.CSUnionApply{UnionId: proto.String("actual-guild")}, &pb.CSUnionUnApply{UnionId: proto.String("actual-guild")},
 		&pb.CSUnionAgreeApply{PlayerId: proto.Int64(2)}, &pb.CSUnionRefuseApply{PlayerId: proto.Int64(2)}, &pb.CSPromotionViceChairman{PlayerId: proto.Int64(2)}, &pb.CSDismissViceChairman{PlayerId: proto.Int64(2)}, &pb.CSRemoveUnionPlayer{PlayerId: proto.Int64(2)}, &pb.CSTransferChairman{PlayerId: proto.Int64(2)},
@@ -32,6 +34,7 @@ func TestP13GuildIngressOriginalEnumsLengthsAndTargets(t *testing.T) {
 		}
 	}
 	invalid := []proto.Message{
+		&pb.CSUnionSearch{Page: proto.Int32(1), Name: proto.String("32ae04c1-abcd-4123-b341-00000000000z")},
 		&pb.CSUnionCreate{}, &pb.CSUnionCreate{Name: proto.String("   ")}, &pb.CSUnionCreate{Name: proto.String(strings.Repeat("剑", 13))}, &pb.CSUnionCreate{Name: proto.String(strings.Repeat("😀", 7))},
 		&pb.CSUnionSearch{Page: proto.Int32(0)}, &pb.CSUnionSearch{Page: proto.Int32(-1)}, &pb.CSUnionSearch{Page: proto.Int32(100001)}, &pb.CSUnionSearch{Page: proto.Int32(1), Name: proto.String(strings.Repeat("😀", 7))},
 		&pb.CSUnionApply{}, &pb.CSUnionApply{UnionId: proto.String(" guild ")}, &pb.CSUnionUnApply{UnionId: proto.String(strings.Repeat("a", 65))},

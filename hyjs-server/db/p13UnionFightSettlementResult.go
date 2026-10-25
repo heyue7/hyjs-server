@@ -1,7 +1,15 @@
 package db
 
-// P13UnionFightSettlementResult 保存具名运营零战斗终局及其真实发奖来源。
+// P13UnionFightSettlementResult 保存零战或完整认证玩家战终局及冻结发奖来源。
 type P13UnionFightSettlementResult struct {
+	CombatProof      []byte `gorm:"type:longblob" json:"-"`
+	CombatProofHash  string `gorm:"type:varchar(64);not null;default:''" json:"combat_proof_hash,omitempty"`
+	LeftKills        int32  `gorm:"not null;default:0" json:"left_kills,omitempty"`
+	RightKills       int32  `gorm:"not null;default:0" json:"right_kills,omitempty"`
+	LeftReachedAt    int64  `gorm:"not null;default:0" json:"left_reached_at,omitempty"`
+	RightReachedAt   int64  `gorm:"not null;default:0" json:"right_reached_at,omitempty"`
+	Reason           string `gorm:"type:varchar(32);not null;default:''" json:"reason,omitempty"`
+	LedgerHash       string `gorm:"type:varchar(64);not null;default:''" json:"ledger_hash,omitempty"`
 	WinTaskPrestige  int32  `gorm:"not null;default:0" json:"win_task_prestige,omitempty"`
 	LoseTaskPrestige int32  `gorm:"not null;default:0" json:"lose_task_prestige,omitempty"`
 	MatchID          string `gorm:"primaryKey;type:char(64)" json:"match_id"`

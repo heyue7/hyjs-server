@@ -311,6 +311,11 @@ func (s *GameService) p13UFSettleZeroFight(tx *gorm.DB, match *db.P13UnionFightM
 	if joined[match.LeftGuildID] == 0 || joined[match.RightGuildID] == 0 {
 		return nil, nil
 	}
+	return s.p13UFFinishSettlement(tx, match, offer, rule, actors, awards, winner, loser, powers, now, db.P13UnionFightSettlementResult{})
+}
+
+// Both terminal branches share the frozen award, prestige and inbox transaction.
+func (s *GameService) p13UFFinishSettlement(tx *gorm.DB, match *db.P13UnionFightMatch, offer *db.P13UnionFightSettlementOffer, rule *db.P13UnionFightSettlementPolicy, actors []db.P13UnionFightFieldPlayer, awards []p13UFSettlementAward, winner, loser string, powers []int64, now time.Time, saved db.P13UnionFightSettlementResult) (*db.P13UnionFightSettlementResult, error) {
 	mvp, err := p13UFTransportMVP(tx, match, actors, awards, rule)
 	if err != nil {
 		return nil, err
@@ -335,7 +340,15 @@ func (s *GameService) p13UFSettleZeroFight(tx *gorm.DB, match *db.P13UnionFightM
 	if err != nil {
 		return nil, err
 	}
-	saved = db.P13UnionFightSettlementResult{WinTaskPrestige: winTasks, LoseTaskPrestige: loseTasks, MatchID: match.ID, WinnerGuildID: winner, LoserGuildID: loser, LeftPower: powers[0], RightPower: powers[1], EndAt: match.EndAt, SettledAt: now.UnixMilli(), AwardAt: awardAt, OfferHash: offer.RulesHash, Awards: raw, MVP: mvp, Source: constUtil.P13UnionFightSettlementSource + "; publication=" + rule.Version + "; " + rule.Source}
+	base := db.P13UnionFightSettlementResult{WinTaskPrestige: winTasks, LoseTaskPrestige: loseTasks, MatchID: match.ID, WinnerGuildID: winner, LoserGuildID: loser, LeftPower: powers[0], RightPower: powers[1], EndAt: match.EndAt, SettledAt: now.UnixMilli(), AwardAt: awardAt, OfferHash: offer.RulesHash, Awards: raw, MVP: mvp, Source: constUtil.P13UnionFightSettlementSource + "; publication=" + rule.Version + "; " + rule.Source}
+	base.LeftKills, base.RightKills = saved.LeftKills, saved.RightKills
+	base.LeftReachedAt, base.RightReachedAt = saved.LeftReachedAt, saved.RightReachedAt
+	base.Reason, base.LedgerHash = saved.Reason, saved.LedgerHash
+	base.CombatProof = saved.CombatProof
+	if saved.Reason != "" {
+		base.Source = constUtil.P13UnionFightCombatSettlementSource + "; publication=" + rule.Version + "; " + rule.Source
+	}
+	saved = base
 	if winTasks > 0 || loseTasks > 0 {
 		saved.Source += "; " + constUtil.P13UnionFightGuildMissionSource
 	}
@@ -344,6 +357,9 @@ func (s *GameService) p13UFSettleZeroFight(tx *gorm.DB, match *db.P13UnionFightM
 	}
 	if rule.TransportMVPRewards != "" {
 		saved.Source += "; " + constUtil.P13UnionFightTransportSource
+	}
+	if saved.Reason != "" {
+		saved.CombatProofHash = p13UFCombatProofDigest(&saved)
 	}
 	if err = tx.Create(&saved).Error; err != nil {
 		return nil, err
@@ -431,6 +447,15 @@ func (s *GameService) p13UFSettlementDeliver(tx *gorm.DB, result *db.P13UnionFig
 	if result.DeliveredAt > 0 || now.UnixMilli() < result.AwardAt {
 		return nil
 	}
+	if result.Reason != "" || result.LedgerHash != "" || len(result.CombatProof) > 0 || result.CombatProofHash != "" || strings.HasPrefix(result.Source, constUtil.P13UnionFightCombatSettlementSource) {
+		var match db.P13UnionFightMatch
+		if err := tx.First(&match, "id=?", result.MatchID).Error; err != nil {
+			return err
+		}
+		if err := s.p13UFCombatSettlementVerify(tx, &match, result); err != nil {
+			return err
+		}
+	}
 	var awards []p13UFSettlementAward
 	if err := json.Unmarshal(result.Awards, &awards); err != nil {
 		return err
@@ -474,6 +499,9 @@ func (s *GameService) TickP13UnionFightSettlement(ctx context.Context, now time.
 				return err
 			}
 			result, err := s.p13UFSettleZeroFight(tx, &match, &offer, now)
+			if err == nil && result == nil {
+				result, err = s.p13UFSettlePlayerCombat(tx, &match, &offer, now)
+			}
 			if err != nil || result == nil {
 				return err
 			}
@@ -607,6 +635,9 @@ func (s *GameService) p13UFSettlementQuery(ctx context.Context, id int64, reques
 				if err != nil {
 					return err
 				}
+				if err := s.p13UFCombatSettlementVerify(tx, &match, &result); err != nil {
+					return err
+				}
 				frame, err := p13UFSettlementFrame(&result, rule, id)
 				response = frame
 				return err
@@ -645,13 +676,20 @@ func (s *GameService) p13UFSettlementQuery(ctx context.Context, id int64, reques
 			if err != nil {
 				return err
 			}
+			if err := s.p13UFCombatSettlementVerify(tx, &match, &result); err != nil {
+				return err
+			}
 			won := int32(0)
 			a, b := rule.LosePrestige+result.LoseTaskPrestige, rule.WinPrestige+result.WinTaskPrestige
 			if member.GuildID == result.WinnerGuildID {
 				won = 1
 				a, b = b, a
 			}
-			reply.Reports = append(reply.Reports, &pb.UFFightReport{FightId: proto.String(match.ID), WeekId: proto.String(match.Day), RoundId: proto.Int32(match.Round), FightEndTime: proto.Int64(match.EndAt), Result: proto.Int32(won), UnionId1: own.UnionId, UnionId2: enemy.UnionId, UnionName1: own.UnionName, UnionName2: enemy.UnionName, ServerId1: own.ServerId, ServerId2: enemy.ServerId, KillNum1: proto.Int32(0), KillNum2: proto.Int32(0), AddPrestige1: proto.Int32(a), AddPrestige2: proto.Int32(b)})
+			ownKills, enemyKills := result.LeftKills, result.RightKills
+			if member.GuildID == match.RightGuildID {
+				ownKills, enemyKills = enemyKills, ownKills
+			}
+			reply.Reports = append(reply.Reports, &pb.UFFightReport{FightId: proto.String(match.ID), WeekId: proto.String(match.Day), RoundId: proto.Int32(match.Round), FightEndTime: proto.Int64(match.EndAt), Result: proto.Int32(won), UnionId1: own.UnionId, UnionId2: enemy.UnionId, UnionName1: own.UnionName, UnionName2: enemy.UnionName, ServerId1: own.ServerId, ServerId2: enemy.ServerId, KillNum1: proto.Int32(ownKills), KillNum2: proto.Int32(enemyKills), AddPrestige1: proto.Int32(a), AddPrestige2: proto.Int32(b)})
 		}
 		response = reply
 		return nil

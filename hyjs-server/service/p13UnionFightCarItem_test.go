@@ -99,16 +99,14 @@ func TestP13UnionFightCarItemActualNaturalFirstCarsMineShopBombsColdRaceDeadAndS
 	if _, err = f.s.p13UFFieldMove(f.ctx, id, &pb.CSMove{PointNew: point}, now()); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = f.s.p13UFShopList(f.ctx, id, &pb.CSUFShopList{NpcId: proto.String(shop)}, now()); err != nil {
-		t.Fatal(err)
-	}
+	shopQuotes := p13UFTestShopQuotes(t, f, id, shop, now())
 	for i, item := range []string{"ufitem_017", "ufitem_018", "ufitem_016"} {
 		count := 2
 		if item == "ufitem_016" {
 			count = 1
 		}
 		for n := 0; n < count; n++ {
-			if _, err = f.s.p13UFShopBuy(f.ctx, id, &pb.CSUFPlayerBuyItem{ShopItemId: proto.String(item), NpcId: proto.String(shop)}, 200+int64(i*2+n), now()); err != nil {
+			if _, err = f.s.p13UFShopBuy(f.ctx, id, &pb.CSUFPlayerBuyItem{ShopItemId: proto.String(p13UFTestShopQuote(t, shopQuotes, item)), NpcId: proto.String(shop)}, 200+int64(i*2+n), now()); err != nil {
 				t.Fatal(err)
 			}
 		}

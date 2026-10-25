@@ -22,6 +22,7 @@ import (
 )
 
 type p13UFFieldSnapshot struct {
+	MapProjection     string               `json:",omitempty"`
 	ShopDistance      *float64             `json:",omitempty"`
 	ResourceConfig    *p13UFResourceConfig `json:",omitempty"`
 	Buildings         []byte
@@ -205,19 +206,22 @@ func (s *GameService) p13UFFieldBuild(tx *gorm.DB, match *db.P13UnionFightMatch,
 		if err = json.Unmarshal(saved.Snapshot, &snapshot); err != nil {
 			return nil, err
 		}
+		if err := p13UFFieldProjection(&snapshot); err != nil {
+			return nil, err
+		}
 		return &snapshot, nil
 	}
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, err
 	}
-	if policy.PreparationMillis <= 0 || policy.PreparationMillis > 86400000 || policy.InitialGuardHP <= 0 || policy.InitialGateHP <= 0 || math.IsNaN(policy.InitialGuardHP) || math.IsInf(policy.InitialGuardHP, 0) || math.IsNaN(policy.InitialGateHP) || math.IsInf(policy.InitialGateHP, 0) || policy.MoveTolerance < 0 || policy.MoveTolerance > 50 || math.IsNaN(policy.MoveTolerance) || math.IsInf(policy.MoveTolerance, 0) || policy.Source == "" {
+	if !p13UFMapProjectionKnown(policy.MapProjection) || policy.PreparationMillis <= 0 || policy.PreparationMillis > 86400000 || policy.InitialGuardHP <= 0 || policy.InitialGateHP <= 0 || math.IsNaN(policy.InitialGuardHP) || math.IsInf(policy.InitialGuardHP, 0) || math.IsNaN(policy.InitialGateHP) || math.IsInf(policy.InitialGateHP, 0) || policy.MoveTolerance < 0 || policy.MoveTolerance > 50 || math.IsNaN(policy.MoveTolerance) || math.IsInf(policy.MoveTolerance, 0) || policy.Source == "" {
 		return nil, errors.New("公会战具名本地场景策略尚未完整发布")
 	}
 	original, err := s.p13UFFieldOriginal(match, tx)
 	if err != nil {
 		return nil, err
 	}
-	snapshot := &p13UFFieldSnapshot{PreparationMillis: policy.PreparationMillis, MoveTolerance: policy.MoveTolerance, Source: constUtil.P13UnionFightFieldSource + "；发布：" + policy.Source}
+	snapshot := &p13UFFieldSnapshot{MapProjection: policy.MapProjection, PreparationMillis: policy.PreparationMillis, MoveTolerance: policy.MoveTolerance, Source: constUtil.P13UnionFightFieldSource + "；发布：" + policy.Source}
 	rate, err := strconv.ParseFloat(original.table("GameConfigure", "StaticName", "UnionFightPlayerMoveSpeed")["NameValue"], 32)
 	if err != nil || rate <= 0 || math.IsNaN(rate) || math.IsInf(rate, 0) {
 		return nil, errors.New("公会战原移动速度配置缺失")
@@ -257,6 +261,9 @@ func (s *GameService) p13UFFieldBuild(tx *gorm.DB, match *db.P13UnionFightMatch,
 		point, err := fieldPoint(row["Position"])
 		if err != nil {
 			return nil, err
+		}
+		if snapshot.MapProjection == constUtil.P13UnionFightMapProjectionReFlat {
+			point.Y = proto.Float32(0)
 		}
 		if side == 0 {
 			snapshot.LeftSpawn = point
@@ -499,7 +506,48 @@ func p13UFFieldPlayerFrame(fighter *db.P13UnionFightFighter, camp int64, server 
 	return &pb.InstUFPlayer{Guid: proto.Int64(fighter.PlayerID), ServerId: proto.Int32(int32(server)), HeroId: main.Id, WeaponId: main.WeaponId, NickName: proto.String(fighter.Name), State: proto.Int32(0), Camp: proto.Int32(int32(camp)), UnionAuthority: proto.Int32(fighter.Role), FightInfo: fight, OwnRes: &pb.InstUFResource{ResourceNum: proto.Float64(0)}, OwnToken: proto.Float64(0), OwnScore: proto.Float64(0), IsAuto: proto.Int32(0)}, nil
 }
 
+func p13UFMapProjectionKnown(projection string) bool {
+	return projection == "" || projection == constUtil.P13UnionFightMapProjectionReFlat
+}
+
+func p13UFFieldProjection(snapshot *p13UFFieldSnapshot) error {
+	if snapshot == nil || !p13UFMapProjectionKnown(snapshot.MapProjection) || snapshot.MapProjection == constUtil.P13UnionFightMapProjectionReFlat && (snapshot.LeftSpawn == nil || snapshot.RightSpawn == nil || snapshot.LeftSpawn.GetY() != 0 || snapshot.RightSpawn.GetY() != 0) {
+		return errors.New("公会战冻结地图投影损坏")
+	}
+	return nil
+}
+
+func p13UFFieldActorProjection(actor *db.P13UnionFightFieldPlayer, snapshot *p13UFFieldSnapshot) error {
+	if err := p13UFFieldProjection(snapshot); err != nil {
+		return err
+	}
+	if actor == nil || actor.MapProjection != snapshot.MapProjection || actor.MapProjection == constUtil.P13UnionFightMapProjectionReFlat && actor.Y != 0 {
+		return errors.New("公会战角色与冻结地图投影不一致")
+	}
+	return nil
+}
+
+// Readers outside Current validate the existing immutable field without
+// rebuilding it from a changed live policy or rewriting historical actors.
+func p13UFFieldStoredProjection(tx *gorm.DB, scope string) (*p13UFFieldSnapshot, error) {
+	var saved db.P13UnionFightField
+	if err := tx.First(&saved, "match_id=?", scope).Error; err != nil {
+		return nil, err
+	}
+	var snapshot p13UFFieldSnapshot
+	if saved.SnapshotHash != p6Digest(saved.Snapshot) || json.Unmarshal(saved.Snapshot, &snapshot) != nil {
+		return nil, errors.New("公会战原地图快照损坏")
+	}
+	if err := p13UFFieldProjection(&snapshot); err != nil {
+		return nil, err
+	}
+	return &snapshot, nil
+}
+
 func p13UFFieldReadActor(actor *db.P13UnionFightFieldPlayer) (*pb.InstUFPlayer, error) {
+	if actor == nil || !p13UFMapProjectionKnown(actor.MapProjection) || actor.MapProjection == constUtil.P13UnionFightMapProjectionReFlat && actor.Y != 0 {
+		return nil, errors.New("公会战角色投影或平面高度损坏")
+	}
 	if p6Digest(actor.Frame) != actor.FrameHash || p6Digest(actor.Battle) != actor.BattleHash {
 		return nil, errors.New("公会战持久角色状态损坏")
 	}
@@ -616,7 +664,7 @@ func (s *GameService) p13UFFieldEnter(ctx context.Context, id int64, now time.Ti
 			if camp == 1 {
 				point = snapshot.RightSpawn
 			}
-			actor = db.P13UnionFightFieldPlayer{MatchID: selected.ID, PlayerID: id, GuildID: guild.ID, Camp: camp, Battle: append([]byte(nil), fighter.Battle...), BattleHash: fighter.SnapshotHash, X: point.GetX(), Y: point.GetY(), Z: point.GetZ(), JoinedAt: now.UnixMilli(), UpdatedAt: now.UnixMilli(), Source: snapshot.Source}
+			actor = db.P13UnionFightFieldPlayer{MapProjection: snapshot.MapProjection, MatchID: selected.ID, PlayerID: id, GuildID: guild.ID, Camp: camp, Battle: append([]byte(nil), fighter.Battle...), BattleHash: fighter.SnapshotHash, X: point.GetX(), Y: point.GetY(), Z: point.GetZ(), JoinedAt: now.UnixMilli(), UpdatedAt: now.UnixMilli(), Source: snapshot.Source}
 			if err = p13UFFieldSaveActor(tx, &actor, frame); err != nil {
 				return err
 			}
@@ -626,6 +674,9 @@ func (s *GameService) p13UFFieldEnter(ctx context.Context, id int64, now time.Ti
 			if _, err = p13UFFieldReadActor(&actor); err != nil {
 				return err
 			}
+		}
+		if err = p13UFFieldActorProjection(&actor, snapshot); err != nil {
+			return err
 		}
 		// 每个角色只有一场在线状态；原帧重复转场继续使用已持久位置，不重造HP/AP或物品权益。
 		closed := tx.Model(&db.P13UnionFightFieldPlayer{}).Where("player_id=? AND match_id<>? AND left_at=0", id, selected.ID).Updates(map[string]any{"left_at": now.UnixMilli(), "session_hash": ""})
@@ -659,7 +710,7 @@ func (s *GameService) p13UFFieldEnter(ctx context.Context, id int64, now time.Ti
 }
 
 func (s *GameService) p13UFFieldCurrent(tx *gorm.DB, id int64, now time.Time) (*db.P13UnionFightFieldPlayer, *db.P13UnionFightMatch, *p13UFFieldSnapshot, *pb.InstUFPlayer, error) {
-	policy, err := s.p13UFFieldNeedPolicy(tx)
+	_, err := s.p13UFFieldNeedPolicy(tx)
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
@@ -679,7 +730,9 @@ func (s *GameService) p13UFFieldCurrent(tx *gorm.DB, id int64, now time.Time) (*
 	if err != nil || camp != actor.Camp {
 		return nil, nil, nil, nil, errors.New("本场首发资格已失效")
 	}
-	snapshot, err := s.p13UFFieldBuild(tx, &match, policy, now)
+	// Entry creates the immutable map before its actor. Current readers must
+	// reject a missing map instead of rebuilding it from a changed live policy.
+	snapshot, err := p13UFFieldStoredProjection(tx, match.ID)
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
@@ -688,6 +741,9 @@ func (s *GameService) p13UFFieldCurrent(tx *gorm.DB, id int64, now time.Time) (*
 	}
 	if now.UnixMilli() >= match.EndAt+snapshot.KickMillis {
 		return nil, nil, nil, nil, errors.New("原本场公会战退场时限已到")
+	}
+	if err = p13UFFieldActorProjection(&actor, snapshot); err != nil {
+		return nil, nil, nil, nil, err
 	}
 	frame, err := p13UFFieldReadActor(&actor)
 	if err != nil {
@@ -864,6 +920,7 @@ func (s *GameService) P13UnionFightFieldNormalize(tx *gorm.DB, id int64, p *pb.P
 }
 
 func (s *GameService) p13UFFieldMove(ctx context.Context, id int64, request *pb.CSMove, now time.Time) ([]proto.Message, error) {
+	var moved *pb.PointNew
 	var scope string
 	var speed float32
 	var canceledGUID int64
@@ -910,6 +967,13 @@ func (s *GameService) p13UFFieldMove(ctx context.Context, id int64, request *pb.
 		if point == nil {
 			return errors.New("公会战移动目标缺失")
 		}
+		point = proto.Clone(point).(*pb.PointNew)
+		if actor.MapProjection == constUtil.P13UnionFightMapProjectionReFlat {
+			if math.IsNaN(float64(point.GetY())) || math.IsInf(float64(point.GetY()), 0) || math.Abs(float64(point.GetY())) > constUtil.P13UnionFightFlatYTolerance {
+				return errors.New("公会战平面移动高度无效")
+			}
+			point.Y = proto.Float32(0)
+		}
 		for i, value := range []float32{point.GetX(), point.GetY(), point.GetZ()} {
 			if math.IsNaN(float64(value)) || math.IsInf(float64(value), 0) || float64(value) < float64(snapshot.Minimum[i])-snapshot.MoveTolerance || float64(value) > float64(snapshot.Maximum[i])+snapshot.MoveTolerance {
 				return errors.New("公会战移动超出原静态地图与发布余量")
@@ -954,6 +1018,7 @@ func (s *GameService) p13UFFieldMove(ctx context.Context, id int64, request *pb.
 		if err = saveProfile(tx, &row, p, g); err != nil {
 			return err
 		}
+		moved = proto.Clone(point).(*pb.PointNew)
 		scope = actor.MatchID
 		speed = float32(currentRate)
 		return nil
@@ -964,7 +1029,7 @@ func (s *GameService) p13UFFieldMove(ctx context.Context, id int64, request *pb.
 	if ignored {
 		return nil, nil
 	}
-	message := &pb.SCUFElementMove{Guid: []int64{id}, Pos: []*pb.PointNew{proto.Clone(request.GetPointNew()).(*pb.PointNew)}, Speed: []float32{speed}}
+	message := &pb.SCUFElementMove{Guid: []int64{id}, Pos: []*pb.PointNew{moved}, Speed: []float32{speed}}
 	var response []proto.Message
 	if canceledGUID > 0 {
 		ended := &pb.SCUFPlayerCollectEnd{PlayerGuid: []int64{id}, ResGuid: []int64{canceledGUID}, IsResExhausted: []int32{0}}
@@ -1085,6 +1150,10 @@ func (s *GameService) p13UFFieldLive(tx *gorm.DB, actor db.P13UnionFightFieldPla
 	if err != nil || member.GuildID != actor.GuildID {
 		return nil, false
 	}
+	snapshot, projectionErr := p13UFFieldStoredProjection(tx, actor.MatchID)
+	if projectionErr != nil || p13UFFieldActorProjection(&actor, snapshot) != nil {
+		return nil, false
+	}
 	frame, err := p13UFFieldReadActor(&actor)
 	if err != nil {
 		return nil, false
@@ -1111,6 +1180,10 @@ func (s *GameService) p13UFFieldPeers(tx *gorm.DB, scope string, exclude int64) 
 	if err := tx.Table("p13_union_fight_field_players AS a").Select("a.*,m.guild_id AS current_guild_id,m.role AS current_role,p.session AS profile_session,"+sceneExpression+" AS actual_scene").Joins("JOIN profiles AS p ON p.id=a.player_id").Joins("JOIN p13_guild_members AS m ON m.player_id=a.player_id").Where("a.match_id=? AND a.player_id<>? AND a.left_at=0 AND a.session_hash<>?", scope, exclude, "").Order("a.player_id").Scan(&rows).Error; err != nil {
 		return nil, nil, err
 	}
+	snapshot, projectionErr := p13UFFieldStoredProjection(tx, scope)
+	if projectionErr != nil {
+		return nil, nil, projectionErr
+	}
 	var actors []db.P13UnionFightFieldPlayer
 	var frames []*pb.InstUFPlayer
 	now := p13UFNow(tx.Statement.Context)
@@ -1118,6 +1191,9 @@ func (s *GameService) p13UFFieldPeers(tx *gorm.DB, scope string, exclude int64) 
 		value, ok := p10ClientSinks.Load(p10ClientKey{s.p10ClientOwner(), row.PlayerID})
 		if !ok || row.CurrentGuildID != row.GuildID || row.ActualScene != constUtil.P13UnionFightFieldTarget || row.SessionHash != p6Digest(row.ProfileSession) || !bytes.Equal(row.ProfileSession, value.(*p10ClientSink).session) {
 			continue
+		}
+		if err := p13UFFieldActorProjection(&row.P13UnionFightFieldPlayer, snapshot); err != nil {
+			return nil, nil, err
 		}
 		frame, err := p13UFFieldReadActor(&row.P13UnionFightFieldPlayer)
 		if err != nil {
@@ -1398,39 +1474,35 @@ func (s *GameService) p13UFFieldElements(ctx context.Context, id int64, guids []
 
 // TickP13UnionFightField 真实时间只推进场景Ready/Fight/End并原4秒退场，不写默认胜负或奖励。
 func (s *GameService) TickP13UnionFightField(ctx context.Context, now time.Time) error {
-	if err := s.AdvanceP13UnionFightPlayerBattles(ctx, now); err != nil {
-		return err
+	var failures []error
+	for _, maintain := range []func(context.Context, time.Time) error{
+		s.AdvanceP13UnionFightPlayerBattles,
+		s.TickP13UnionFightTransfer,
+		s.TickP13UnionFightResource,
+		s.TickP13UnionFightFactory,
+		s.TickP13UnionFightCarMotion,
+		s.TickP13UnionFightCarAttack,
+		s.TickP13UnionFightSpeedItem,
+		s.TickP13UnionFightHealAura,
+		s.TickP13UnionFightWarDrum,
+		s.TickP13UnionFightRevivePoint,
+		s.TickP13UnionFightFocus,
+	} {
+		if err := maintain(ctx, now); err != nil {
+			failures = append(failures, err)
+		}
+		if err := ctx.Err(); err != nil {
+			return errors.Join(append(failures, err)...)
+		}
 	}
-	if err := s.TickP13UnionFightTransfer(ctx, now); err != nil {
-		return err
+	if err := s.p13UFFieldLifecycle(ctx, now); err != nil {
+		failures = append(failures, err)
 	}
-	if err := s.TickP13UnionFightResource(ctx, now); err != nil {
-		return err
-	}
-	if err := s.TickP13UnionFightFactory(ctx, now); err != nil {
-		return err
-	}
-	if err := s.TickP13UnionFightCarMotion(ctx, now); err != nil {
-		return err
-	}
-	if err := s.TickP13UnionFightCarAttack(ctx, now); err != nil {
-		return err
-	}
-	if err := s.TickP13UnionFightSpeedItem(ctx, now); err != nil {
-		return err
-	}
-	if err := s.TickP13UnionFightHealAura(ctx, now); err != nil {
-		return err
-	}
-	if err := s.TickP13UnionFightWarDrum(ctx, now); err != nil {
-		return err
-	}
-	if err := s.TickP13UnionFightRevivePoint(ctx, now); err != nil {
-		return err
-	}
-	if err := s.TickP13UnionFightFocus(ctx, now); err != nil {
-		return err
-	}
+	return errors.Join(failures...)
+}
+
+// p13UFFieldLifecycle runs even when an unrelated pending calculation is damaged.
+func (s *GameService) p13UFFieldLifecycle(ctx context.Context, now time.Time) error {
 	tx := db.GetIns().WithContext(ctx)
 	var policy db.P13UnionFightFieldPolicy
 	if err := tx.First(&policy, 1).Error; err != nil {
@@ -1457,6 +1529,9 @@ func (s *GameService) TickP13UnionFightField(ctx context.Context, now time.Time)
 		}
 		var snapshot p13UFFieldSnapshot
 		if err := json.Unmarshal(saved.Snapshot, &snapshot); err != nil {
+			return err
+		}
+		if err := p13UFFieldActorProjection(&row, &snapshot); err != nil {
 			return err
 		}
 		member, err := p13GuildMember(tx, row.PlayerID)

@@ -345,6 +345,12 @@ func (s *GameService) p13UFResourceFrames(tx *gorm.DB, scope string, guids map[i
 }
 
 func p13UFResourceDistance(actor *db.P13UnionFightFieldPlayer, x, y, z float32) float64 {
+	if actor == nil || !p13UFMapProjectionKnown(actor.MapProjection) {
+		return math.Inf(1)
+	}
+	if actor.MapProjection == constUtil.P13UnionFightMapProjectionReFlat {
+		return math.Hypot(float64(actor.X-x), float64(actor.Z-z))
+	}
 	dx, dy, dz := float64(actor.X-x), float64(actor.Y-y), float64(actor.Z-z)
 	return math.Sqrt(dx*dx + dy*dy + dz*dz)
 }
@@ -490,6 +496,13 @@ func (s *GameService) p13UFResourceCancel(tx *gorm.DB, scope string, id int64, n
 	if err = tx.First(&actor, "match_id=? AND player_id=?", scope, id).Error; err != nil {
 		return 0, false, err
 	}
+	snapshot, projectionErr := p13UFFieldStoredProjection(tx, actor.MatchID)
+	if projectionErr != nil {
+		return 0, false, projectionErr
+	}
+	if err = p13UFFieldActorProjection(&actor, snapshot); err != nil {
+		return 0, false, err
+	}
 	frame, err := p13UFFieldReadActor(&actor)
 	if err != nil {
 		return 0, false, err
@@ -529,6 +542,13 @@ func (s *GameService) TickP13UnionFightResource(ctx context.Context, now time.Ti
 			}
 			var actor db.P13UnionFightFieldPlayer
 			if err := tx.First(&actor, "match_id=? AND player_id=?", task.MatchID, task.PlayerID).Error; err != nil {
+				return err
+			}
+			snapshotProjection, projectionErr := p13UFFieldStoredProjection(tx, actor.MatchID)
+			if projectionErr != nil {
+				return projectionErr
+			}
+			if err := p13UFFieldActorProjection(&actor, snapshotProjection); err != nil {
 				return err
 			}
 			frame, err := p13UFFieldReadActor(&actor)
