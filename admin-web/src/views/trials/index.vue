@@ -66,7 +66,12 @@ onMounted(load);
 
 <template>
   <div class="ops-page trial-page">
-    <div class="ops-filters"><NButton :loading="loading" :disabled="saving" @click="load">刷新</NButton></div>
+    <div class="ops-filters">
+      <NButton :loading="loading" :disabled="saving" @click="load">刷新</NButton>
+      <RouterLink v-slot="{ href, navigate }" to="/shops/point" custom>
+        <NButton tag="a" :href="href" @click="navigate">试炼商店</NButton>
+      </RouterLink>
+    </div>
     <NAlert v-if="error" type="error" :title="error" />
     <NAlert v-if="conflict" type="warning" title="配置已被其他人更新。当前输入已保留，请记录后刷新。" />
     <NCard :bordered="false" class="ops-panel">

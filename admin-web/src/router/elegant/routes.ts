@@ -432,7 +432,7 @@ export const generatedRoutes: GeneratedRoute[] = [
         path: '/shops/point',
         component: 'view.shops_point',
         meta: {
-          title: '攻略点商店',
+          title: '试炼商店',
           i18nKey: 'route.shops_point',
           icon: 'ph:treasure-chest',
           order: 5,

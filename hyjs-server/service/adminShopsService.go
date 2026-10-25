@@ -21,7 +21,7 @@ import (
 func AdminShopDefinitions() []model.AdminShopDefinition {
 	base := []string{"rewards", "cost", "dailyLimit", "totalLimit", "stock", "minLevel", "minVip", "priority", "weight", "discountBps", "enabled"}
 	out := []model.AdminShopDefinition{}
-	for _, v := range []struct{ id, label string }{{"ggo", "信用商店"}, {"ordinary", "普通商店"}, {"memory", "回忆圣坛"}, {"popularity", "声望商店商品"}, {"popularity-rank", "声望商店奖励"}, {"point", "攻略点商店"}, {"score", "积分商店"}, {"guild", "公会商店"}, {"pet-market", "精灵商店"}, {"union-fight", "公会战商店"}, {"vip", "会员礼包"}} {
+	for _, v := range []struct{ id, label string }{{"ggo", "信用商店"}, {"ordinary", "普通商店"}, {"memory", "回忆圣坛"}, {"popularity", "声望商店商品"}, {"popularity-rank", "声望商店奖励"}, {"point", "试炼商店"}, {"score", "积分商店"}, {"guild", "公会商店"}, {"pet-market", "精灵商店"}, {"union-fight", "公会战商店"}, {"vip", "会员礼包"}} {
 		d := model.AdminShopDefinition{ID: v.id, Label: v.label, Fields: append([]string{}, base...), SettingsFields: []string{"unlimited", "enabled", "startAt", "endAt", "claimEndAt", "source"}, CanCreate: true, Notes: "保存后立即用于后续购买；历史交易、库存使用和限购保留。"}
 		switch v.id {
 		case "ggo":
@@ -33,6 +33,8 @@ func AdminShopDefinitions() []model.AdminShopDefinition {
 		case "popularity-rank":
 			d.Fields = append(d.Fields, "maxRank")
 			d.Notes = "对应游戏声望商店的“奖励”页签。配置奖励道具、声望价格与最高排名门槛；每日/整期各1次，保留原排名证明。保存后生效，历史购买和排名资格保留。"
+		case "point":
+			d.Notes = "使用攻略点兑换试炼道具。商品、数量、价格与限购保存后用于后续购买，已用次数和历史交易保留。"
 		case "guild":
 			d.Fields = append(d.Fields, "contributionCost", "guildLevel")
 		case "pet-market":

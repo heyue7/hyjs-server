@@ -485,7 +485,30 @@ watch(
             </NButton>
           </div>
           <p v-if="catalogueError" class="ops-inline-note">{{ catalogueError }}</p>
+          <NSpin v-if="shopId === 'point'" :show="loading" class="trial-shop-mobile">
+            <p v-if="!loading && !rows.length" class="ops-muted">暂无符合条件的商品</p>
+            <article v-for="row in rows" :key="row.id" class="trial-shop-item">
+              <h3 v-if="row.name && !row.rewards.some(reward => row.name === catalogue[reward.resourceId]?.name)">{{ row.name }}</h3>
+              <div v-for="reward in row.rewards" :key="reward.resourceId" class="trial-shop-reward">
+                <ResourceImage :item="catalogue[reward.resourceId]" :size="34" />
+                <div><span>{{ resourceName(reward.resourceId) }}</span><ItemQuality v-if="catalogue[reward.resourceId]?.qualityLabel" :item="catalogue[reward.resourceId]" /></div>
+                <span class="trial-shop-amount">×{{ Number(reward.amount).toLocaleString() }}</span>
+              </div>
+              <dl>
+                <div><dt>消耗</dt><dd>{{ resourceName(row.cost?.resourceId) }} {{ Number(row.cost?.amount || 0).toLocaleString() }}</dd></div>
+                <div><dt>限购</dt><dd>{{ limitLines(row).join(' · ') || '不限' }}</dd></div>
+                <div><dt>资格</dt><dd>{{ qualificationLines(row).join(' · ') || '不限' }}</dd></div>
+              </dl>
+              <div class="trial-shop-actions">
+                <NSwitch :value="row.enabled" size="small" :loading="toggling === row.id" :disabled="!canWrite || loading || saving || Boolean(toggling)" :aria-label="`启用商品：${row.name || '商品'}`" @update:value="toggleProduct(row, $event)" />
+                <span class="ops-muted">{{ row.enabled ? '已启用' : '已停用' }}</span>
+                <NButton size="small" secondary @click="edit(row)">{{ productReadonly(row) ? '查看' : '编辑' }}</NButton>
+                <NButton v-if="!productReadonly(row)" size="small" quaternary type="error" @click="remove(row)">移除</NButton>
+              </div>
+            </article>
+          </NSpin>
           <NDataTable
+            :class="{ 'trial-shop-desktop': shopId === 'point' }"
             :columns="columns"
             :data="rows"
             :loading="loading"
@@ -830,5 +853,22 @@ watch(
 .shop-settings-modal {
   width: 680px;
   max-width: calc(100vw - 32px);
+}
+.trial-shop-mobile { display: none; }
+@media (max-width: 680px) {
+  .trial-shop-desktop { display: none; }
+  .trial-shop-mobile { display: block; }
+  .trial-shop-item { padding: 16px 0; border-bottom: 1px solid var(--n-border-color, #e2e5ec); }
+  .trial-shop-item:first-child { padding-top: 0; }
+  .trial-shop-item h3 { margin: 0 0 8px; font-size: 14px; }
+  .trial-shop-reward { display: flex; align-items: center; gap: 8px; }
+  .trial-shop-reward > div { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; min-width: 0; }
+  .trial-shop-amount { margin-left: auto; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .trial-shop-item dl { display: grid; gap: 6px; margin: 12px 0; line-height: 1.5; }
+  .trial-shop-item dl > div { display: grid; grid-template-columns: 36px minmax(0, 1fr); gap: 8px; }
+  .trial-shop-item dt { color: rgb(var(--base-text-color) / .6); }
+  .trial-shop-item dd { margin: 0; overflow-wrap: anywhere; }
+  .trial-shop-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+  .trial-shop-actions .ops-muted { margin-right: auto; }
 }
 </style>

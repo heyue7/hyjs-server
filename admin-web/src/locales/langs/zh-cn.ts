@@ -247,7 +247,7 @@ const local: App.I18n.Schema = {
     'shops_memory': '回忆圣坛',
     'shops_popularity': '声望商店商品',
     'shops_popularity-rank': '声望商店奖励',
-    'shops_point': '攻略点商店',
+    'shops_point': '试炼商店',
     'shops_score': '积分商店',
     'shops_ggo': '信用商店',
     'sprout-settings': '小芽设置',

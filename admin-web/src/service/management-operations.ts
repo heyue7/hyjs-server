@@ -120,7 +120,7 @@ export const shopLabels: Record<string, string> = {
   memory: '回忆圣坛',
   popularity: '声望商店商品',
   'popularity-rank': '声望商店奖励',
-  point: '攻略点商店',
+  point: '试炼商店',
   score: '积分商店',
   ggo: '信用商店',
   guild: '公会商店',

@@ -57,7 +57,7 @@ export function setupElegantRouter() {
           order: 4
         },
         shops_point: {
-          title: '攻略点商店',
+          title: '试炼商店',
           icon: 'ph:treasure-chest',
           order: 5
         },

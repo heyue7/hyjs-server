@@ -279,7 +279,7 @@ func adminActivityReadableName(name, id, kind, mode string) string {
 		}
 		return d.label
 	}
-	if label := map[string]string{"guild": "公会商店", "memory": "回忆圣坛", "ordinary": "普通商店", "point": "攻略点商店", "popularity-rank": "声望排名商店", "popularity": "声望商店", "score": "积分商店"}[kind]; label != "" {
+	if label := map[string]string{"guild": "公会商店", "memory": "回忆圣坛", "ordinary": "普通商店", "point": "试炼商店", "popularity-rank": "声望排名商店", "popularity": "声望商店", "score": "积分商店"}[kind]; label != "" {
 		return label
 	}
 	return "待整理活动"
