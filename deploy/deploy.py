@@ -20,6 +20,7 @@ parser.add_argument('--initial-dump', type=Path, help='One-time private SQL gzip
 parser.add_argument('--env-file', type=Path, default=ROOT / 'deploy/.env', help='Ignored private deployment settings')
 parser.add_argument('--check-config', action='store_true', help='Validate and render templates without build, SSH or Docker')
 parser.add_argument('--migrate-role-wallets', action='store_true', help='Quiesce legacy writers, back up and reconcile the one-time role-wallet cutover')
+parser.add_argument('--warm-rush-history-player', action='append', type=int, default=[], help='Prevalidate this existing owner with the exact candidate before application cutover')
 parser.add_argument('--expected-live-revision', help='Refuse activation if a different live release appeared')
 args = parser.parse_args()
 settings = load(args.env_file)
@@ -122,6 +123,9 @@ if args.initial_dump:
     run('scp', '-q', str(verification), HOST + ':' + REMOTE + '/.incoming/initial-verification.json')
     remote('chmod 600 ' + shlex.quote(REMOTE + '/.incoming/initial.sql.gz') + ' ' + shlex.quote(REMOTE + '/.incoming/initial-verification.json'))
 command = 'sudo -n python3 ' + shlex.quote(remote_stage + '/activate.py') + ' ' + shlex.quote(remote_stage)
+for player_id in args.warm_rush_history_player:
+    assert player_id > 0
+    command += ' --warm-rush-history-player ' + str(player_id)
 if args.expected_live_revision:
     command += ' --expected-live-revision ' + shlex.quote(args.expected_live_revision)
 if args.migrate_role_wallets:

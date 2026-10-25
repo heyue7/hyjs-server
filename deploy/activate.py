@@ -18,6 +18,7 @@ parser.add_argument('--initial-db', action='store_true')
 parser.add_argument('--provision-ingress', action='store_true')
 parser.add_argument('--migrate-role-wallets', action='store_true')
 parser.add_argument('--expected-live-revision')
+parser.add_argument('--warm-rush-history-player', action='append', type=int, default=[])
 args = parser.parse_args()
 os.umask(0o077)
 stage = Path(args.stage).resolve()
@@ -98,6 +99,13 @@ for line in (stage / 'deployment.env').read_text().splitlines():
 private_env = ROOT / '.env'
 assert private_env.is_file() and not private_env.stat().st_mode & 0o077
 kept = [line for line in private_env.read_text().splitlines() if line.partition('=')[0] not in runtime]
+# Persist this application-only signing secret once; never emit or put it in the image.
+certificate_keys = [line.partition('=')[2] for line in kept if line.startswith('HYJS_RUSH_HISTORY_CERTIFICATE_KEY=')]
+assert len(certificate_keys) <= 1
+if not certificate_keys:
+    kept.append('HYJS_RUSH_HISTORY_CERTIFICATE_KEY=' + os.urandom(32).hex())
+else:
+    assert len(certificate_keys[0]) >= 32, 'Trial history certificate key is too short'
 temporary_env = ROOT / '.env.next'
 fd = os.open(temporary_env, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
 with os.fdopen(fd, 'w') as output:
@@ -172,6 +180,14 @@ if args.initial_db and not already_imported:
     (ROOT / '.incoming/initial-verification.json').unlink()
 elif not (ROOT / 'migration.json').exists():
     raise SystemExit('Initial data must be explicitly imported before application start')
+
+# Derived certificates are prepared with the exact candidate while the old app remains live.
+# This command opens no listener and cannot alter resources, progress or battle receipts.
+for player_id in args.warm_rush_history_player:
+    assert player_id > 0
+    compose('run', '--rm', '--no-deps', '-T', 'app', '--env', 'test', '--tables', '/app/tables',
+            '--warm-rush-history-player', str(player_id), '--log-file', '/app/logs/rush-history-warm.log')
+manifest['prewarmedRushPlayers'] = sorted(set(args.warm_rush_history_player))
 
 compose('up', '-d', '--no-deps', '--force-recreate', 'app')
 for _ in range(90):

@@ -44,11 +44,12 @@ func TestInitEnvironmentOverridesAndExplicitFile(t *testing.T) {
 	t.Setenv("HYJS_GAME_ENABLE_LOCAL_WALLET", "true")
 	t.Setenv("HYJS_MYSQL_PASSWORD", "")
 	t.Setenv("HYJS_JWT_KEY", "unit-test-placeholder")
+	t.Setenv("HYJS_RUSH_HISTORY_CERTIFICATE_KEY", "dedicated-certificate-placeholder")
 	if err := Init(" TEST "); err != nil {
 		t.Fatal(err)
 	}
 	cfg := AppConfigIns
-	if Env != "test" || cfg.Game.AdvertiseHost != "env.invalid" || cfg.Game.HTTPPort != 28080 || cfg.Game.TCPPort != 28081 || !cfg.Game.EnableLocalWallet || cfg.Game.Driver != "mysql" || cfg.MysqlConfig.Pass != "" || cfg.JwtKey != "unit-test-placeholder" {
+	if Env != "test" || cfg.Game.AdvertiseHost != "env.invalid" || cfg.Game.HTTPPort != 28080 || cfg.Game.TCPPort != 28081 || !cfg.Game.EnableLocalWallet || cfg.Game.Driver != "mysql" || cfg.MysqlConfig.Pass != "" || cfg.JwtKey != "unit-test-placeholder" || cfg.Security.RushHistoryCertificateKey != "dedicated-certificate-placeholder" {
 		t.Fatal("private config and environment precedence did not apply")
 	}
 }

@@ -174,9 +174,6 @@ func p7ReadScopedRushUncached(tx *gorm.DB, fight *db.P7RushFight, request *pb.CS
 	if out, handled, err := p7ReadManualRush(tx, fight, request); handled || err != nil {
 		return out, handled, err
 	}
-	reject := func() (*model.CombatOutcome, bool, error) {
-		return nil, true, errors.New(constUtil.P7ScopedRushConflict)
-	}
 	var row db.P7RushScopedCalculation
 	err := tx.First(&row, "fight_id=?", fight.ID).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -185,14 +182,26 @@ func p7ReadScopedRushUncached(tx *gorm.DB, fight *db.P7RushFight, request *pb.CS
 	if err != nil {
 		return nil, true, err
 	}
+	return p7ReadScopedRushRows(fight, request, row, func(id string) (*db.P6BattleRecord, error) {
+		var record db.P6BattleRecord
+		err := tx.First(&record, "id=?", id).Error
+		return &record, err
+	})
+}
+
+// p7ReadScopedRushRows validates the same frozen rows without issuing source queries.
+func p7ReadScopedRushRows(fight *db.P7RushFight, request *pb.CSRushFightEnd, row db.P7RushScopedCalculation, readRecord func(string) (*db.P6BattleRecord, error)) (*model.CombatOutcome, bool, error) {
+	reject := func() (*model.CombatOutcome, bool, error) {
+		return nil, true, errors.New(constUtil.P7ScopedRushConflict)
+	}
 	if fight.Diagnostic || row.PlayerID != fight.PlayerID || row.P6RecordID != fight.ReplayID || row.StartHash != fight.StartHash || p6Digest(fight.Start) != fight.StartHash || p6Digest(fight.Rule) != fight.RuleHash || p6Digest(row.Terminal) != row.TerminalHash {
 		return reject()
 	}
-	var record db.P6BattleRecord
-	if err = tx.First(&record, "id=?", row.P6RecordID).Error; err != nil {
+	record, err := readRecord(row.P6RecordID)
+	if err != nil {
 		return nil, true, err
 	}
-	input, err := decodeP6Record(&record)
+	input, err := decodeP6Record(record)
 	if err != nil {
 		return nil, true, err
 	}
