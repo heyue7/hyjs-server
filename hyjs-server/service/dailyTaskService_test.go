@@ -142,7 +142,7 @@ func TestDailyTaskCalendar(t *testing.T) {
 		t.Fatal(err)
 	}
 	p, _, err := decodeProfile(&profile)
-	if err != nil || p.GetCoin() != 1000 {
+	if err != nil || p.GetCoin() != 0 || p.GetDiamond() != 40 {
 		t.Fatal("reward snapshot", p, err)
 	}
 	// 覆盖其余所有受支持的事件和经验未升级的精炼、饰品强化。

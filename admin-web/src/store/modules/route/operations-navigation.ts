@@ -59,6 +59,7 @@ export function organizeOperationsMenus(menus: App.Global.Menu[]) {
     group('growth-settings', '成长配置', [take('achievements'), take('titles')]),
     group('mechanism-settings', '游戏机制设置', [
       take('field-resources', '野外资源'),
+      take('daily-tasks', '每日任务'),
       take('arena-prizes'),
       take('wallet-reasons'),
       take('server-clock', '统一游戏时间')

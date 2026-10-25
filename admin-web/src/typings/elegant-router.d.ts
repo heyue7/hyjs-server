@@ -31,6 +31,7 @@ declare module "@elegant-router/types" {
     "cdk": "/cdk";
     "client-updates": "/client-updates";
     "daily-sign": "/daily-sign";
+    "daily-tasks": "/daily-tasks";
     "feedback": "/feedback";
     "field-resources": "/field-resources";
     "fields": "/fields";
@@ -108,6 +109,7 @@ declare module "@elegant-router/types" {
     | "cdk"
     | "client-updates"
     | "daily-sign"
+    | "daily-tasks"
     | "feedback"
     | "field-resources"
     | "fields"
@@ -161,6 +163,7 @@ declare module "@elegant-router/types" {
     | "cdk"
     | "client-updates"
     | "daily-sign"
+    | "daily-tasks"
     | "feedback"
     | "field-resources"
     | "fields"

@@ -1144,7 +1144,7 @@ func (s *GameService) P7RushMutation(ctx context.Context, id int64, request prot
 		if err != nil {
 			return err
 		}
-		if state.ActiveFight != "" {
+		if state.ActiveFight != "" && domain != "trial-reset" {
 			return errors.New("当前试炼战斗结束前不能购买或重置")
 		}
 		failed, err := p7TrialMustReset(tx, state)
@@ -1177,7 +1177,7 @@ func (s *GameService) P7RushMutation(ctx context.Context, id int64, request prot
 			cost = []*pb.BaseResource{{Id: proto.String("diamond"), Num: proto.Int32(policy.EliteBuyCost)}}
 			state.EliteBought++
 		} else {
-			if state.Floor <= 1 && state.TotalStars == 0 && !failed {
+			if state.Floor <= 1 && state.TotalStars == 0 && !failed && state.ActiveFight == "" {
 				return errors.New("尚无可重置的试炼进度")
 			}
 			free, err := s.p7VIP(p, "numPerk2")
@@ -1198,6 +1198,9 @@ func (s *GameService) P7RushMutation(ctx context.Context, id int64, request prot
 			}
 			if state.RunID == math.MaxInt64 {
 				return errors.New("试炼轮次溢出")
+			}
+			if err := abandonP7TrialForReset69(tx, state); err != nil {
+				return err
 			}
 			state.RunID++
 			state.Floor = 1

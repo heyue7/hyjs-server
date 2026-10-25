@@ -83,6 +83,7 @@ export function setupElegantRouter() {
         fields: { title: '野外地图与部署', icon: 'ph:mountains', order: 4 },
         trials: { title: '试炼之地', icon: 'ph:stairs', order: 5 },
         'field-resources': { title: '野外资源', icon: 'ph:leaf', order: 8 },
+        'daily-tasks': { title: '每日任务', icon: 'ph:list-checks', order: 9 },
         'wallet-reasons': { title: '钱包入账规则', icon: 'ph:wallet', order: 7 },
         'arena-prizes': { title: '竞技胜利翻牌', icon: 'ph:cards-three', order: 6 },
         shops: { title: '商店管理', icon: 'ph:treasure-chest', order: 6 },

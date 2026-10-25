@@ -207,6 +207,25 @@ func (s *GameService) p8Nodes(tx *gorm.DB, id int64, scene string, now int64) ([
 		}
 		return cfg, err
 	}
+	boundary, err := s.fieldGatherRefreshBoundary(tx, now)
+	if err != nil {
+		return nil, false, err
+	}
+	// One batch protects frozen attempts at their exact scene, position and generation.
+	var attempts []db.P8GatherAttempt
+	if gameSchemaHasTable(tx, &db.P8GatherAttempt{}) {
+		if err := tx.Where("player_id=? AND active=?", id, true).Find(&attempts).Error; err != nil {
+			return nil, false, err
+		}
+	}
+	activeNode := func(node db.P8ResourceNode) bool {
+		for _, a := range attempts {
+			if a.Scene == node.Scene && a.PosID == node.PosID && a.Generation == node.Generation {
+				return true
+			}
+		}
+		return false
+	}
 	changed := false
 	// Preserve a live attempt's frozen node. Once it finishes, replace stale map
 	// projections in the same player transaction so count/point edits take effect.
@@ -221,13 +240,7 @@ func (s *GameService) p8Nodes(tx *gorm.DB, id int64, scene string, now int64) ([
 			stale = stale || cfg.Source != expected
 		}
 		if stale {
-			var active int64
-			if gameSchemaHasTable(tx, &db.P8GatherAttempt{}) {
-				if err := tx.Model(&db.P8GatherAttempt{}).Where("player_id=? AND active=?", id, true).Count(&active).Error; err != nil {
-					return nil, false, err
-				}
-			}
-			if active == 0 {
+			if len(attempts) == 0 {
 				if err := tx.Where("player_id=? AND scene=?", id, scene).Delete(&db.P8ResourceNode{}).Error; err != nil {
 					return nil, false, err
 				}
@@ -262,6 +275,7 @@ func (s *GameService) p8Nodes(tx *gorm.DB, id int64, scene string, now int64) ([
 				if err != nil {
 					return nil, false, err
 				}
+				node.ScheduledAt = boundary
 				if err = tx.Create(node).Error; err != nil {
 					return nil, false, err
 				}
@@ -277,7 +291,7 @@ func (s *GameService) p8Nodes(tx *gorm.DB, id int64, scene string, now int64) ([
 		if err != nil || node.Remaining < 0 || node.Remaining > cfg.Times || node.Generation < 1 {
 			return nil, false, p8GatherError()
 		}
-		if node.Remaining == 0 && node.RefreshAt > 0 && node.RefreshAt <= now {
+		if !activeNode(*node) && (node.ScheduledAt < boundary || node.Remaining == 0 && node.RefreshAt > 0 && node.RefreshAt <= now) {
 			if node.Generation == math.MaxInt64 {
 				return nil, false, p8GatherError()
 			}
@@ -285,6 +299,7 @@ func (s *GameService) p8Nodes(tx *gorm.DB, id int64, scene string, now int64) ([
 			if err != nil {
 				return nil, false, err
 			}
+			replacement.ScheduledAt = boundary
 			if err = tx.Save(replacement).Error; err != nil {
 				return nil, false, err
 			}

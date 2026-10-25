@@ -48,12 +48,18 @@ func (s *GameService) InitializeDailyTasks(ctx context.Context) error {
 		}
 		for i := range rules {
 			rules[i].Score = 20
-			rules[i].Reward = "coin,1000"
+			rules[i].Reward = dailyTask69DefaultReward(rules[i].Type)
 			rules[i].Enabled = true
-			rules[i].Source = "本地服日常：原服任务目标与积分未恢复；七类真实完成事件，每任务20分及1000金币；UTC+8日切，领取后加积分"
+			rules[i].Source = constUtil.DailyTask69RewardSource
 		}
 		if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&rules).Error; err != nil {
 			return err
+		}
+		// 仅升级旧版本原样seed，运营调整及已冻结日档保持原奖励。
+		for _, rule := range rules {
+			if err := tx.Model(&db.DailyTaskRule{}).Where("id=? AND type=? AND total=? AND score=? AND min_level=? AND enabled=? AND reward=? AND source=?", rule.ID, rule.Type, rule.Total, rule.Score, rule.MinLevel, rule.Enabled, "coin,1000", constUtil.DailyTask69LegacySource).Updates(map[string]any{"reward": rule.Reward, "source": rule.Source}).Error; err != nil {
+				return err
+			}
 		}
 		for _, row := range s.Tables["DailyTaskRewardBox"] {
 			parse := func(key string) (int32, error) { n, e := strconv.ParseInt(row[key], 10, 32); return int32(n), e }
@@ -285,7 +291,7 @@ func (s *GameService) recordDailyTaskSaveAt(tx *gorm.DB, row *db.Profile, player
 		kind = constUtil.DailyTaskCopy
 	case *pb.CSWarriorRecruit:
 		kind = constUtil.DailyTaskRecruit
-	case *pb.CSEquipStrengthen:
+	case *pb.CSEquipStrengthen, *pb.CSEquipStrengthenOneKey, *pb.CSEquipStrengthenMoreOneKey:
 		kind = constUtil.DailyTaskEquipStrengthen
 	case *pb.CSTreasureStrengthen:
 		kind = constUtil.DailyTaskTreasureStrengthen
@@ -329,6 +335,18 @@ func (s *GameService) recordDailyTaskSaveAt(tx *gorm.DB, row *db.Profile, player
 				}
 			}
 		}
+	case *pb.CSEquipStrengthenOneKey, *pb.CSEquipStrengthenMoreOneKey:
+		levels := make(map[string]int32, len(before.Equipment))
+		for _, equip := range before.Equipment {
+			levels[equip.GetGuid()] = equip.GetLevel()
+		}
+		var actual int64
+		for _, equip := range game.Equipment {
+			if level, found := levels[equip.GetGuid()]; found {
+				actual += int64(max(0, equip.GetLevel()-level))
+			}
+		}
+		count = int32(min(actual, int64(math.MaxInt32)))
 	case *pb.CSEquipRefine:
 		for _, a := range before.Equipment {
 			for _, v := range game.Equipment {

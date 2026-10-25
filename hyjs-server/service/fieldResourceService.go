@@ -2,9 +2,12 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"math"
+	"sort"
 	"strings"
+	"time"
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -19,8 +22,11 @@ func (s *GameService) InitializeFieldResources(ctx context.Context) error {
 	if err := tx.AutoMigrate(&db.FieldResourcePolicy{}); err != nil {
 		return err
 	}
-	row := db.FieldResourcePolicy{ID: constUtil.FieldResourcePolicyID, BossDailyRewards: constUtil.FieldBossRewardsUnlimited}
+	row := db.FieldResourcePolicy{ID: constUtil.FieldResourcePolicyID, BossDailyRewards: constUtil.FieldBossRewardsUnlimited, GatherRefreshHours: constUtil.FieldGatherRefreshDefault}
 	if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&row).Error; err != nil {
+		return err
+	}
+	if err := tx.Model(&db.FieldResourcePolicy{}).Where("id=? AND (gather_refresh_hours IS NULL OR gather_refresh_hours=?)", constUtil.FieldResourcePolicyID, "").Update("gather_refresh_hours", constUtil.FieldGatherRefreshDefault).Error; err != nil {
 		return err
 	}
 	s.FieldResourcePolicyReady = true
@@ -73,7 +79,9 @@ func fieldBossResourceContent(ctx context.Context, field *model.FieldState, figh
 }
 
 func fieldResourceResponse(row db.FieldResourcePolicy) *model.AdminFieldResourcesResponse {
-	return &model.AdminFieldResourcesResponse{BossDailyRewards: row.BossDailyRewards, Version: adminVersion(row)}
+	var hours []int64
+	_ = json.Unmarshal([]byte(row.GatherRefreshHours), &hours)
+	return &model.AdminFieldResourcesResponse{BossDailyRewards: row.BossDailyRewards, GatherRefreshHours: hours, Version: adminVersion(row)}
 }
 
 // AdminFieldResources 只读全局规则；不会创建周期或发放资源。
@@ -91,7 +99,7 @@ func (s *GameService) AdminFieldResources(ctx context.Context, actor *model.Admi
 
 // AdminSaveFieldResources 原子保存并审计，已接受战斗继续沿其冻结限额。
 func (s *GameService) AdminSaveFieldResources(ctx context.Context, actor *model.AdminPrincipal, req model.AdminFieldResourcesSaveRequest) (*model.AdminFieldResourcesResponse, error) {
-	if req.BossDailyRewards < constUtil.FieldBossRewardsUnlimited || req.BossDailyRewards > constUtil.FieldBossRewardsDailyMaximum || len(req.Version) != 64 || strings.TrimSpace(req.Reason) == "" || len([]rune(req.Reason)) > 500 {
+	if req.GatherRefreshHours != nil && !validFieldRefreshHours(req.GatherRefreshHours) || req.BossDailyRewards < constUtil.FieldBossRewardsUnlimited || req.BossDailyRewards > constUtil.FieldBossRewardsDailyMaximum || len(req.Version) != 64 || strings.TrimSpace(req.Reason) == "" || len([]rune(req.Reason)) > 500 {
 		return nil, constUtil.ErrAdminInput
 	}
 	var out *model.AdminFieldResourcesResponse
@@ -107,7 +115,16 @@ func (s *GameService) AdminSaveFieldResources(ctx context.Context, actor *model.
 			return constUtil.ErrAdminConfigConflict
 		}
 		before := row
-		if row.BossDailyRewards != req.BossDailyRewards {
+		hours := append([]int64(nil), req.GatherRefreshHours...)
+		if req.GatherRefreshHours == nil {
+			if json.Unmarshal([]byte(row.GatherRefreshHours), &hours) != nil || !validFieldRefreshHours(hours) {
+				return constUtil.ErrAdminConfiguration
+			}
+		}
+		sort.Slice(hours, func(i, j int) bool { return hours[i] < hours[j] })
+		encoded, _ := json.Marshal(hours)
+		if row.BossDailyRewards != req.BossDailyRewards || row.GatherRefreshHours != string(encoded) {
+			row.GatherRefreshHours = string(encoded)
 			row.BossDailyRewards, row.Revision = req.BossDailyRewards, row.Revision+1
 			if err := tx.Save(&row).Error; err != nil {
 				return err
@@ -120,4 +137,54 @@ func (s *GameService) AdminSaveFieldResources(ctx context.Context, actor *model.
 		return nil
 	})
 	return out, err
+}
+
+// validFieldRefreshHours bounds the persisted daily schedule and rejects duplicates.
+func validFieldRefreshHours(hours []int64) bool {
+	if len(hours) < 1 || len(hours) > 24 {
+		return false
+	}
+	seen := map[int64]bool{}
+	for _, h := range hours {
+		if h < 0 || h > 23 || seen[h] {
+			return false
+		}
+		seen[h] = true
+	}
+	return true
+}
+
+// fieldGatherBoundary uses fixed UTC+8 so server locale and DST cannot move refreshes.
+func fieldGatherBoundary(now int64, hours []int64) int64 {
+	local := time.UnixMilli(now).UTC().Add(8 * time.Hour)
+	midnight := time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, time.UTC).Add(-8 * time.Hour)
+	latest := int64(0)
+	for _, h := range hours {
+		candidate := midnight.Add(time.Duration(h) * time.Hour).UnixMilli()
+		if candidate > now {
+			candidate -= int64(24 * time.Hour / time.Millisecond)
+		}
+		if candidate > latest {
+			latest = candidate
+		}
+	}
+	return latest
+}
+
+func (s *GameService) fieldGatherRefreshBoundary(tx *gorm.DB, now int64) (int64, error) {
+	base := s
+	if s.RuntimeBase != nil {
+		base = s.RuntimeBase
+	}
+	hours := []int64{0, 12}
+	if base.FieldResourcePolicyReady {
+		var row db.FieldResourcePolicy
+		if err := tx.First(&row, constUtil.FieldResourcePolicyID).Error; err != nil {
+			return 0, err
+		}
+		if json.Unmarshal([]byte(row.GatherRefreshHours), &hours) != nil || !validFieldRefreshHours(hours) {
+			return 0, constUtil.ErrAdminConfiguration
+		}
+	}
+	return fieldGatherBoundary(now, hours), nil
 }

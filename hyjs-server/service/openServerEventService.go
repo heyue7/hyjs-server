@@ -21,7 +21,7 @@ func openServerTracksRequest(ctx context.Context) bool {
 		*pb.CSFormationOn, *pb.CSFormationOff, *pb.CSFormationExChange,
 		*pb.CSFormationChange, *pb.CSTaticalFormationLevelUp, *pb.CSUseTaticalFormation,
 		*pb.CSItemUse, *pb.CSCombine, *pb.CSTreasureStrengthen, *pb.CSTreasureRefine,
-		*pb.CSEquipStrengthen, *pb.CSEquipRefine, *pb.CSEquipStar, *pb.CSEquipForge,
+		*pb.CSEquipStrengthen, *pb.CSEquipStrengthenOneKey, *pb.CSEquipStrengthenMoreOneKey, *pb.CSEquipRefine, *pb.CSEquipStar, *pb.CSEquipForge,
 		*pb.CSEquipDecompose, *pb.CSCopyFightEnd, *pb.CSGetOpenServerReward,
 		*pb.CSRushFightEnd, *pb.CSShopBuy, *pb.CSQuestReward, *pb.CSOpenServerFundReward, *pb.CSActivityReward:
 		return true

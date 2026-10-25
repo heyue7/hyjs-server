@@ -251,10 +251,15 @@ func (s *GameService) refreshOpenServerProgressAt(tx *gorm.DB, player *pb.Player
 	for _, state := range states {
 		saved[state.TaskID] = state
 	}
+	var bestArenaRank int64
+	arenaRankRead := false
 	// 原第六天任务按历史最高星数达标，重置挑战不会清除已取得的星数纪录。
 	// 只在当前已开放且未达成的试炼任务存在时读一次；不创建轮次或逐档回放历史战斗。
 	for _, task := range tasks {
 		if task.Visible && task.TaskType == 24 && !saved[task.ID].Achieved {
+			if !gameSchemaHasTable(tx, &db.P7RushState{}) {
+				break
+			}
 			var rush db.P7RushState
 			err := tx.Select("total_stars", "record_stars").Where("player_id=?", player.GetPlayerId()).First(&rush).Error
 			if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
@@ -282,6 +287,16 @@ func (s *GameService) refreshOpenServerProgressAt(tx *gorm.DB, player *pb.Player
 			continue
 		}
 		current, e := s.openServerCurrent(player, g, cfg, t, values)
+		if t.TaskType == 8 {
+			if !arenaRankRead {
+				bestArenaRank, _, e = P11ArenaVerifiedBestWonRank(tx, player.GetPlayerId())
+				arenaRankRead = true
+			}
+			if bestArenaRank > math.MaxInt32 {
+				return errors.New("竞技场历史排名超出活动范围")
+			}
+			current = int32(bestArenaRank)
+		}
 		if e != nil {
 			return e
 		}
@@ -289,7 +304,10 @@ func (s *GameService) refreshOpenServerProgressAt(tx *gorm.DB, player *pb.Player
 			return errors.New("开服任务进度无效")
 		}
 		achieved := current >= t.Target
-		if current > 0 && (state.Progress != current || achieved) {
+		if t.TaskType == 8 {
+			achieved = current > 0 && current <= t.Target
+		}
+		if state.Progress != current || achieved {
 			state.PlayerID = player.GetPlayerId()
 			state.TaskID = t.ID
 			state.Progress = current

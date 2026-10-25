@@ -668,7 +668,7 @@ func (s *GameService) copyFightStart(ctx context.Context, id int64, b *pb.CSCopy
 		if err := s.ensureNoActiveDailyCopy(tx, id, time.Now()); err != nil {
 			return err
 		}
-		party, err := s.battlePlayer(player, g)
+		party, err := s.copyContinuityParty(player, g)
 		if err != nil {
 			return err
 		}
@@ -921,6 +921,10 @@ func (s *GameService) copyFightEnd(ctx context.Context, id int64, b *pb.CSCopyFi
 		if len(observed) != len(expected) || b.GetResult() == 1 && !surviving {
 			return errors.New("Invalid battle survivors")
 		}
+		acceptedParty, err := s.copyContinuityAccepted(run, b.GetBattlePlayer())
+		if err != nil {
+			return err
+		}
 		complete := false
 		result = &pb.SCCopyFightEnd{IsCopyComplete: proto.Int32(0), Star: proto.Int32(0), FightResult: proto.Int32(b.GetResult()), Gain: &pb.ResultObject{}}
 		if b.GetResult() == 1 {
@@ -1027,6 +1031,7 @@ func (s *GameService) copyFightEnd(ctx context.Context, id int64, b *pb.CSCopyFi
 		if err := s.FinishOriginalCopyReplay(ctx, tx, id, fight.Start, b); err != nil {
 			return err
 		}
+		run.Party = acceptedParty
 		fight.Settled = true
 		fight.Result = result
 		return nil

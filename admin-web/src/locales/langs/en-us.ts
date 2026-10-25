@@ -266,6 +266,7 @@ const local: App.I18n.Schema = {
     fields: '野外地图与部署',
     trials: 'Trial Grounds',
     'field-resources': 'Field resources',
+    'daily-tasks': 'Daily tasks',
     'wallet-reasons': '钱包入账规则',
     'arena-prizes': '竞技胜利翻牌',
     'server-clock': 'Server time'

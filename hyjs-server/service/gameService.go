@@ -779,7 +779,7 @@ func (s *GameService) dispatch(ctx context.Context, r *model.GamePacket, peer st
 		if game.Run == nil || game.Run.Chapter != b.GetChapterId() || game.Run.Mission != b.GetMissionId() {
 			return nil, errors.New("No active mission")
 		}
-		party, err := s.battlePlayer(player, game)
+		party, err := s.copyContinuityParty(player, game)
 		if err != nil {
 			return nil, err
 		}

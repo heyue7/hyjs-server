@@ -89,6 +89,8 @@ type FormationExchangeReceipt struct {
 
 // CopyRun 保存一次副本的完成节点和当前战斗，保证重试不会重复结算。
 type CopyRun struct {
+	// Party retains accepted HP and anger for this exploration only.
+	Party    *pb.BattlePlayer `json:"party,omitempty"`
 	Gain     *pb.ResultObject `json:"gain,omitempty"`
 	Chapter  string           `json:"chapter"`
 	Mission  string           `json:"mission"`

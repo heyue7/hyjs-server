@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"math"
 	"math/big"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -436,9 +437,6 @@ func (s *GameService) GuardP7ExpeditionSave(tx *gorm.DB, id int64, g *model.Game
 		return err
 	}
 	for _, hold := range holds {
-		if p7ExpeditionInFormation(g, hold.GUID) {
-			return errors.New("派遣中的伙伴不能加入出战阵容")
-		}
 		old := &pb.Warrior{}
 		if proto.Unmarshal(hold.Snapshot, old) != nil || old.GetGuid() != hold.GUID {
 			return errors.New("远征伙伴占用快照损坏")
@@ -622,7 +620,7 @@ func (s *GameService) p7Expedition(ctx context.Context, id int64, request proto.
 			seen := map[string]bool{}
 			var selected []*pb.Warrior
 			for _, guid := range b.GetHeroGuids() {
-				if seen[guid] || guid == p.GetHeroWarId() || p7ExpeditionInFormation(g, guid) {
+				if seen[guid] || guid == p.GetHeroWarId() {
 					return errors.New("远征伙伴重复或选中主角")
 				}
 				seen[guid] = true
@@ -633,7 +631,7 @@ func (s *GameService) p7Expedition(ctx context.Context, id int64, request proto.
 						break
 					}
 				}
-				if hero == nil || strings.HasPrefix(hero.GetId(), "hero_exp_") {
+				if hero == nil || strings.HasPrefix(hero.GetId(), "hero_exp_") || s.table("Hero", "id", hero.GetId()) == nil {
 					return errors.New("远征伙伴不存在或属于经验材料")
 				}
 				selected = append(selected, hero)
@@ -711,16 +709,21 @@ func (s *GameService) p7Expedition(ctx context.Context, id int64, request proto.
 			for _, hold := range holds {
 				busy[hold.GUID] = true
 			}
-			var idle []string
+			var idle, selected []string
+			// Match the original panel: every valid companion is either available
+			// or shown as executing. Formation membership does not block dispatch.
 			for _, hero := range g.Warriors {
-				if hero.GetGuid() != p.GetHeroWarId() && !p7ExpeditionInFormation(g, hero.GetGuid()) && !busy[hero.GetGuid()] && !strings.HasPrefix(hero.GetId(), "hero_exp_") {
+				if hero.GetGuid() == p.GetHeroWarId() || strings.HasPrefix(hero.GetId(), "hero_exp_") || s.table("Hero", "id", hero.GetId()) == nil {
+					continue
+				}
+				if busy[hero.GetGuid()] {
+					selected = append(selected, hero.GetGuid())
+				} else {
 					idle = append(idle, hero.GetGuid())
 				}
 			}
-			var selected []string
-			if len(mission.Heroes) > 0 && json.Unmarshal(mission.Heroes, &selected) != nil {
-				return errors.New("远征派遣存档损坏")
-			}
+			sort.Strings(idle)
+			sort.Strings(selected)
 			preview, err := p7ExpeditionPreviewIDs(q.Reward)
 			if err != nil {
 				return err

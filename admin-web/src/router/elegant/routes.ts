@@ -175,6 +175,18 @@ export const generatedRoutes: GeneratedRoute[] = [
     }
   },
   {
+    name: 'daily-tasks',
+    path: '/daily-tasks',
+    component: 'layout.base$view.daily-tasks',
+    meta: {
+      title: '每日任务',
+      i18nKey: 'route.daily-tasks',
+      icon: 'ph:list-checks',
+      order: 8,
+      roles: ['viewer', 'operator', 'admin']
+    }
+  },
+  {
     name: 'feedback',
     path: '/feedback',
     component: 'layout.base$view.feedback',
