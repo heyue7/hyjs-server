@@ -101,6 +101,16 @@ func (s *GameService) p13UFChatHistory(ctx context.Context, id int64, now time.T
 
 // p13UFChat 将原文字/固定指挥与当前比赛绑定，事务提交后只向仍在线的本会首发推送。
 func (s *GameService) p13UFChat(ctx context.Context, id int64, request proto.Message, stamp int64, now time.Time) ([]proto.Message, error) {
+	switch body := request.(type) {
+	case *pb.CSChatTcp:
+		if err := validateChatContent(body.GetContent()); err != nil {
+			return nil, err
+		}
+	case *pb.CSUFTalk:
+		if err := validateChatContent(body.GetContent()); err != nil {
+			return nil, err
+		}
+	}
 	var reply proto.Message
 	var scope, guild string
 	kind := int64(0)

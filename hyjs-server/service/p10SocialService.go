@@ -146,6 +146,20 @@ func p10SaveReceipt(tx *gorm.DB, id int64, domain string, stamp int64, request, 
 	return tx.Create(&row).Error
 }
 func (s *GameService) p10Social(ctx context.Context, id int64, request proto.Message, stamp int64, now time.Time) ([]proto.Message, bool, error) {
+	switch body := request.(type) {
+	case *pb.CSApplyFriend:
+		if err := validateChatContent(body.GetWord()); err != nil {
+			return nil, true, err
+		}
+	case *pb.CSChatTcp:
+		if err := validateChatContent(body.GetContent()); err != nil {
+			return nil, true, err
+		}
+	case *pb.CSSendMassageToFriend:
+		if err := validateChatContent(body.GetContent()); err != nil {
+			return nil, true, err
+		}
+	}
 	fresh := false
 	var response proto.Message
 	var push proto.Message

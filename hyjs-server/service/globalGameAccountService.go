@@ -281,6 +281,12 @@ func gameAccountProjection(tx *gorm.DB, account db.GameAccount) (model.GameAccou
 	return out, nil
 }
 func prepareGlobalGameAccount(ctx context.Context, username, password, nickname string) (*db.GameAccount, error) {
+	if err := validateNameContent(username); err != nil {
+		return nil, err
+	}
+	if err := validateNameContent(nickname); err != nil {
+		return nil, err
+	}
 	profile, err := gameAccountNewProfile(ctx, username, password)
 	if err != nil {
 		return nil, err
@@ -389,6 +395,9 @@ func AdminCreateGlobalGameAccount(ctx context.Context, actor *model.AdminPrincip
 
 // AdminUpdateGlobalGameAccount updates nickname/status with exact optimistic version and operator audit.
 func AdminUpdateGlobalGameAccount(ctx context.Context, actor *model.AdminPrincipal, id int64, req model.AdminGameAccountUpdateRequest) (*model.GameAccountDTO, error) {
+	if err := validateNameContent(req.Nickname); err != nil {
+		return nil, err
+	}
 	var out model.GameAccountDTO
 	err := db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := adminOperationUser(tx, actor, true); err != nil {
@@ -480,6 +489,11 @@ func CurrentGlobalGameAccount(ctx context.Context, id int64, session []byte) (*m
 
 // UpdateCurrentGlobalGameAccount verifies the role session again under lock before a self-service account change.
 func UpdateCurrentGlobalGameAccount(ctx context.Context, id int64, session []byte, nickname, oldPassword, newPassword string) (*model.GameAccountDTO, error) {
+	if newPassword == "" {
+		if err := validateNameContent(nickname); err != nil {
+			return nil, err
+		}
+	}
 	owner, err := AuthorizeAccount(ctx, id, session)
 	if err != nil {
 		return nil, err

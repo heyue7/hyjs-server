@@ -105,6 +105,9 @@ func (s *GameService) p10ChannelHistory(tx *gorm.DB, id int64, kind int32) ([]*p
 
 // p10ChannelAt 冻结真实发送资格、节流、原消息帧与回执，提交后向仍有权限的当前会话推送。
 func (s *GameService) p10ChannelAt(ctx context.Context, id int64, b *pb.CSChatTcp, stamp int64, now time.Time) ([]proto.Message, error) {
+	if err := validateChatContent(b.GetContent()); err != nil {
+		return nil, err
+	}
 	p10SceneMutation.Lock()
 	defer p10SceneMutation.Unlock()
 	var reply pb.SCChatTcp

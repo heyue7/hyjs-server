@@ -59,6 +59,10 @@ func GameAccountRegisterHandler(c *gin.Context) error {
 	}
 	out, err := service.RegisterGameAccount(ctx, req.Username, req.Password, req.Nickname)
 	if err != nil {
+		if errors.Is(err, constUtil.ErrNameSensitive) {
+			c.JSON(http.StatusBadRequest, gin.H{"code": 400, "msg": err.Error(), "data": nil})
+			return nil
+		}
 		if errors.Is(err, utils.ErrPasswordWorkBusy) {
 			c.Header("Retry-After", "2")
 			c.JSON(http.StatusServiceUnavailable, gin.H{"code": 503, "msg": "注册服务繁忙，请稍后重试", "data": nil})

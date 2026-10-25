@@ -42,6 +42,9 @@ func LoginAccount(ctx context.Context, uid, password string) (*db.Profile, error
 	}
 	if errors.Is(lookup, gorm.ErrRecordNotFound) {
 		// 旧存储首次登录保留自动注册兼容，新账号直接写入当前 Argon2id 凭据。
+		if err := validateNameContent(uid); err != nil {
+			return nil, err
+		}
 	} else {
 		exists = true
 		if game, ok := ctx.Value(constUtil.GameServiceContextKey).(*GameService); ok && AdminProfileServerID(snapshot) != game.OriginalServerID() {
@@ -369,6 +372,9 @@ func createPlayerLocked(tx *gorm.DB, id int64, name, heroId string) (*db.Profile
 		}
 		if row.Player != nil {
 			return nil
+		}
+		if err := validateNameContent(name); err != nil {
+			return err
 		}
 		// Serialize first-character eligibility before any role-index or save writes.
 		// This keeps all realm creation paths in account -> role-index -> wallet lock order.

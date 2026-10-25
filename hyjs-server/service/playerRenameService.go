@@ -129,6 +129,9 @@ func (s *GameService) changePlayerName(ctx context.Context, id int64, request *p
 	if stamp <= 0 || !playerRenameNameValid(request.GetPlayerName()) {
 		return nil, errors.New(constUtil.PlayerRenameInvalid)
 	}
+	if err := validateNameContent(request.GetPlayerName()); err != nil {
+		return nil, err
+	}
 	raw, err := proto.Marshal(request)
 	if err != nil {
 		return nil, err

@@ -130,7 +130,7 @@ func adminError(c *gin.Context, err error) {
 	case errors.Is(err, constUtil.ErrAdminConfigConflict):
 		status = http.StatusConflict
 		message = err.Error()
-	case errors.Is(err, constUtil.ErrAdminInput), errors.Is(err, constUtil.ErrAdminConfiguration):
+	case errors.Is(err, constUtil.ErrAdminInput), errors.Is(err, constUtil.ErrAdminConfiguration), errors.Is(err, constUtil.ErrNameSensitive), errors.Is(err, constUtil.ErrChatSensitive):
 		status = http.StatusBadRequest
 		message = err.Error()
 	}
