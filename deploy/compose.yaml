@@ -9,9 +9,11 @@ services:
       MYSQL_USER: hyjs
       MYSQL_PASSWORD: ${HYJS_MYSQL_PASSWORD:?required}
       MYSQL_ROOT_PASSWORD: ${HYJS_MYSQL_ROOT_PASSWORD:?required}
-    # Bound MySQL's independently allocated caches below the 768 MiB container.
+    # Leave headroom for MySQL caches, connections and health/diagnostic clients.
     # Keep the existing data directory and InnoDB durability settings intact.
     command:
+      # Bound retained binary logs on the shared 50 GiB production disk.
+      - --binlog-expire-logs-seconds=172800
       - --innodb-buffer-pool-size=128M
       - --innodb-log-buffer-size=16M
       - --key-buffer-size=1M
@@ -35,7 +37,8 @@ services:
       interval: 5s
       timeout: 5s
       retries: 40
-    mem_limit: 768m
+    mem_limit: 1g
+    memswap_limit: 1536m
     logging:
       driver: json-file
       options: {max-size: 10m, max-file: "3"}
