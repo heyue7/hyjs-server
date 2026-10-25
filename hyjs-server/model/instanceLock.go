@@ -17,6 +17,7 @@ type InstanceLockSetRequest struct {
 
 // InstanceLockResponse 返回已提交的保护集合和版本。
 type InstanceLockResponse struct {
-	LockedGUIDs []string `json:"lockedGuids"` // 当前角色锁定的实例GUID集合
-	Revision    int64    `json:"revision"`    // 锁定状态版本
+	MaterialUnavailable map[string]string `json:"materialUnavailable"` // 天赋材料不可用GUID及当前原因，包含远征/上阵/助阵/锁定/培养。
+	LockedGUIDs         []string          `json:"lockedGuids"`         // 当前角色锁定的实例GUID集合
+	Revision            int64             `json:"revision"`            // 锁定状态版本
 }

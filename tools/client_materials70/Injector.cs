@@ -1,0 +1,14 @@
+using System;using System.Linq;using dnlib.DotNet;using dnlib.DotNet.Emit;using dnlib.DotNet.Writer;
+using var module=ModuleDefMD.Load(args[0]);using var helper=ModuleDefMD.Load(args[1]);
+var guard=helper.GetTypes().Single(t=>t.FullName=="HYJS.MaterialEligibility.Guard");var importer=new Importer(module);
+var method=module.GetTypes().Single(t=>t.FullName=="UI.UIInstPlayerData").Methods.Single(m=>m.Name=="GetAdvenceAvailableHeroList");
+var calls=method.Body.Instructions.Where(i=>i.Operand is IMethod m&&m.DeclaringType.FullName=="HYJS.InstanceProtection.Protection"&&m.Name=="FilterGuids").ToList();
+if(calls.Count!=1)throw new InvalidOperationException("Original locked-material filter differs");
+calls[0].Operand=importer.Import(guard.Methods.Single(m=>m.Name=="FilterGuids"));
+var active=module.GetTypes().Single(t=>t.FullName=="UI.TalentDetail").Methods.Single(m=>m.Name=="OnActiveBtn");
+if(active.Body.ExceptionHandlers.Any(h=>h.HandlerType!=ExceptionHandlerType.Finally||h.TryStart==active.Body.Instructions[0]))throw new InvalidOperationException("Talent activate exception scope differs");
+var first=active.Body.Instructions[0];var prefix=new[]{Instruction.Create(OpCodes.Ldarg_0),Instruction.Create(OpCodes.Call,importer.Import(guard.Methods.Single(m=>m.Name=="BeforeTalentActive"))),Instruction.Create(OpCodes.Brtrue,first),Instruction.Create(OpCodes.Ret)};
+for(int i=0;i<prefix.Length;i++)active.Body.Instructions.Insert(i,prefix[i]);
+method.Body.KeepOldMaxStack=true;active.Body.KeepOldMaxStack=true;
+var options=new ModuleWriterOptions(module);options.MetadataOptions.Flags|=MetadataFlags.PreserveAll|MetadataFlags.KeepOldMaxStack;module.Write(args[2],options);
+Console.WriteLine("Shared talent candidate list and activation now await current material eligibility");

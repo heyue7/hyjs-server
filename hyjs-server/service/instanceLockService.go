@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 	"hyjs-server/constUtil"
 	"hyjs-server/db"
 	"hyjs-server/model"
@@ -73,17 +74,41 @@ func InstanceLockState(ctx context.Context, id int64, session []byte) (*model.In
 	if err != nil {
 		return nil, err
 	}
-	_, game, err := decodeProfile(row)
-	if err != nil {
-		return nil, err
-	}
-	return instanceLockSnapshot(game)
+	var out *model.InstanceLockResponse
+	err = db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var current db.Profile
+		if e := tx.Clauses(clause.Locking{Strength: "SHARE"}).First(&current, id).Error; e != nil {
+			return e
+		}
+		if subtle.ConstantTimeCompare(current.Session, session) != 1 || current.AccountID != row.AccountID || current.AccountAuthRevision != row.AccountAuthRevision {
+			return errors.New(constUtil.NoviceGuideSessionInvalid)
+		}
+		if current.AccountID > 0 {
+			account, e := AccountForProfile(tx, &current)
+			if e != nil {
+				return e
+			}
+			if !account.Enabled || account.AuthRevision != current.AccountAuthRevision {
+				return errors.New(constUtil.NoviceGuideSessionInvalid)
+			}
+		}
+		player, game, e := decodeProfile(&current)
+		if e != nil {
+			return e
+		}
+		out, e = instanceLockSnapshot(game)
+		if e != nil {
+			return e
+		}
+		return instanceTalentMaterialSnapshot(tx, player, game, out)
+	})
+	return out, err
 }
 
 // SetInstanceLock shares the consuming transaction's profile lock, and rechecks live ownership/auth.
 func SetInstanceLock(ctx context.Context, id int64, session []byte, guid string, locked bool, revision int64) (*model.InstanceLockResponse, error) {
 	var out *model.InstanceLockResponse
-	err := updateProfileWithTx(ctx, id, func(tx *gorm.DB, _ *pb.Player, game *model.GameState) error {
+	err := updateProfileWithTx(ctx, id, func(tx *gorm.DB, player *pb.Player, game *model.GameState) error {
 		var row db.Profile
 		if err := tx.First(&row, id).Error; err != nil {
 			return err
@@ -111,7 +136,7 @@ func SetInstanceLock(ctx context.Context, id int64, session []byte, guid string,
 		current := p5KV(game, constUtil.InstanceLockPrefix+guid) == "1"
 		// Explicit desired state makes retry idempotent without undoing another lock.
 		if current == locked {
-			return nil
+			return instanceTalentMaterialSnapshot(tx, player, game, out)
 		}
 		if out.Revision != revision || out.Revision == math.MaxInt64 {
 			return errors.New(constUtil.InstanceLockConflict)
@@ -123,7 +148,10 @@ func SetInstanceLock(ctx context.Context, id int64, session []byte, guid string,
 		p5SetKV(game, constUtil.InstanceLockPrefix+guid, value)
 		p5SetKV(game, constUtil.InstanceLockRevisionKey, strconv.FormatInt(out.Revision+1, 10))
 		out, err = instanceLockSnapshot(game)
-		return err
+		if err != nil {
+			return err
+		}
+		return instanceTalentMaterialSnapshot(tx, player, game, out)
 	})
 	return out, err
 }
