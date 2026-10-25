@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -46,6 +47,15 @@ type p7EliteQueryProjection struct {
 	records            map[string]db.P6BattleRecord
 	parsed             map[string]*p7EliteQueryParsed
 	reads              map[string]p7EliteQueryRead
+	scopePoliciesRead  bool
+	scopeEnabled       bool
+	scopePolicyErr     error
+	basePrepared       bool
+	baseAttacker       *pb.BattlePlayer
+	baseErr            error
+	rePrepared         bool
+	reAttacker         *pb.BattlePlayer
+	reErr              error
 	verified           int
 }
 
@@ -251,12 +261,16 @@ func (q *p7EliteQueryProjection) acceptedWins(runID int64, from, to int32, sourc
 }
 
 func (q *p7EliteQueryProjection) runWins(floor int32) (map[int32]p7ReRushWin, error) {
-	wins, err := q.acceptedWins(q.state.RunID, 1, floor, nil)
+	return q.runWinsBetween(1, floor)
+}
+
+func (q *p7EliteQueryProjection) runWinsBetween(from, floor int32) (map[int32]p7ReRushWin, error) {
+	wins, err := q.acceptedWins(q.state.RunID, from, floor, nil)
 	if err != nil {
 		return nil, err
 	}
 	for _, sweep := range q.sweeps {
-		if sweep.Floor < 1 || sweep.Floor > floor {
+		if sweep.Floor < from || sweep.Floor > floor {
 			continue
 		}
 		history, e := q.acceptedWins(0, sweep.Floor, sweep.Floor, &sweep.SourceFight)
@@ -335,4 +349,90 @@ func (q *p7EliteQueryProjection) prerequisite(s *GameService, stage db.P7RushSta
 		}
 	}
 	return false, nil
+}
+
+// The frozen current formation and selected trial bonus are identical for all
+// elite directory rows. Each enemy and admission remains checked separately.
+func (q *p7EliteQueryProjection) scopeAvailable(s *GameService, ctx context.Context, p *pb.Player, g *model.GameState, cfg db.P7RushStageRule, now time.Time) (bool, error) {
+	if !q.scopePoliciesRead {
+		q.scopePoliciesRead = true
+		allowed, err := p7ManualRushStageAllowed(q.tx, constUtil.P7RushElite)
+		q.scopePolicyErr = err
+		if err == nil && allowed {
+			q.scopeEnabled, q.scopePolicyErr = p7ScopedRushAvailable(q.tx)
+		}
+	}
+	if q.scopePolicyErr != nil || !q.scopeEnabled {
+		return false, q.scopePolicyErr
+	}
+	monster, err := s.validateP7Stage(cfg)
+	if err != nil {
+		return false, nil
+	}
+	if !q.basePrepared {
+		q.basePrepared = true
+		player := proto.Clone(p).(*pb.Player)
+		raw, e := json.Marshal(g)
+		if e != nil {
+			return false, e
+		}
+		var game model.GameState
+		if e = json.Unmarshal(raw, &game); e != nil {
+			return false, e
+		}
+		if e = s.PrepareP5GuildPrayerProperties(ctx, q.tx, player, &game, now); e != nil {
+			return false, e
+		}
+		q.baseAttacker, q.baseErr = s.battlePlayer(player, &game)
+	}
+	if q.baseErr != nil {
+		return false, nil
+	}
+	attacker := q.baseAttacker
+	if cfg.Source == constUtil.P7ReRushSource {
+		if !q.rePrepared {
+			q.rePrepared = true
+			readTx := q.tx.WithContext(context.WithValue(q.tx.Statement.Context, constUtil.P7EliteQueryProjectionKey{}, q))
+			q.reAttacker, q.reErr = s.p7ApplyReRushBonus(readTx, q.state, q.baseAttacker)
+		}
+		if q.reErr != nil {
+			return false, q.reErr
+		}
+		attacker = q.reAttacker
+	}
+	start := &pb.SCRushFightStart{FightId: proto.String("scope-query"), RandSeed: proto.Int64(0), BattlePlayer: proto.Clone(attacker).(*pb.BattlePlayer), BattleMonsterList: []*pb.BattleMonster{monster}, FightScene: proto.String(cfg.Scene), MaxRound: proto.Int32(cfg.MaxRound), WinKey: proto.Int32(cfg.WinKey), WinValue: proto.Int32(cfg.WinValue), RushType: proto.Int32(cfg.Kind)}
+	return s.p7FreshEliteDirectoryScope(start)
+}
+
+// The input series never escapes this fresh server-source qualification boundary.
+func (s *GameService) p7FreshEliteDirectoryScope(start *pb.SCRushFightStart) (bool, error) {
+	series, err := s.FreezeP6RushSeriesInput(start, false, true, nil, constUtil.P6OriginalClientHash)
+	if err != nil {
+		return false, nil
+	}
+	if validateP6RushStarterScope(series) == nil {
+		return true, nil
+	}
+	if p7PartyRushSourceAvailable(series) || p7NaturalRushSourceAvailable(series) {
+		return true, nil
+	}
+	// This series was just frozen from the current server tables in this function.
+	// Reuse the same sealed-source qualification path as freezeAndQualifyP6GenericMechanisms;
+	// persisted or supplied series still use the public full source verifier.
+	view := *series
+	view.PlayerAutomatic = false
+	if p7GenericMechanismRushShape(&view) != nil {
+		return false, nil
+	}
+	validator := &GameService{Tables: series.Template.Tables}
+	_, err = qualifyP6GenericMechanisms(validator, series.Template, series.Template)
+	return err == nil, nil
+}
+
+func p7EliteProjectionFor(tx *gorm.DB) *p7EliteQueryProjection {
+	q, _ := tx.Statement.Context.Value(constUtil.P7EliteQueryProjectionKey{}).(*p7EliteQueryProjection)
+	if q == nil || q.tx.Statement.ConnPool != tx.Statement.ConnPool {
+		return nil
+	}
+	return q
 }

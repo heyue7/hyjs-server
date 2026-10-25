@@ -154,6 +154,25 @@ func p7RushReadFingerprint(tx *gorm.DB, fight *db.P7RushFight, request *pb.CSRus
 }
 
 func p7ReadScopedRush(tx *gorm.DB, fight *db.P7RushFight, request *pb.CSRushFightEnd) (*model.CombatOutcome, bool, error) {
+	if q := p7EliteProjectionFor(tx); q != nil && fight.PlayerID == q.state.PlayerID && fight.Kind == constUtil.P7RushTrial && fight.Status == constUtil.P7RushSettled && request != nil {
+		if err := q.load(); err != nil {
+			return nil, true, err
+		}
+		for i := range q.fights {
+			stored := &q.fights[i]
+			if stored.ID != fight.ID {
+				continue
+			}
+			var end pb.CSRushFightEnd
+			a, ae := p7RushStoredRowFingerprint(stored)
+			b, be := p7RushStoredRowFingerprint(fight)
+			if ae == nil && be == nil && a == b && proto.Unmarshal(stored.EndRequest, &end) == nil && proto.Equal(request, &end) {
+				return q.read(stored, request)
+			}
+			break
+		}
+	}
+
 	var historical p7RushHistoricalKey
 	cache, key := p7RushReadFingerprint(tx, fight, request, &historical)
 	if cache != nil {

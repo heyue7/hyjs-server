@@ -17,3 +17,6 @@ Font191原有 `m_DefaultMaterial=(0,80)`、`m_Texture=(0,147)`，Material80的_M
 生成时重载检查37个对象库存、25个非目标对象原始字节、12个目标对象除字体/材质外全部字段、原有外部引用及新目标PPtr。TextMesh文字、颜色、字号、布局、Title和unionFlag对象保持。serialized文件因增加外部引用而重新生成元数据，对象偏移可变化。manifest记录全部对象输入SHA、字体依赖SHA、原DLL/dex SHA、源码SHA和精确PPtr变化。
 
 这是字体缺口的候选修复。`<1>`来自独立区服行，姓名实收、运行时TextMesh文字和最终画面仍由主代理验证；静态成功不代表野外姓名故障已完全解决。
+
+
+发布打包使用 `package.py`：只替换指定字体prefab和Android Manifest版本，保留正式69的所有DLL与DEX逐字相同。版本显示及更新上报沿用包内既有PackageManager读取，避免根目录旧版update构建工具造成回退。初始通用update候选已废弃且未安装。

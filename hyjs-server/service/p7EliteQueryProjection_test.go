@@ -186,3 +186,30 @@ func TestP7EliteQueryProjectionReSweepSourcesAndLazyHighFloor(t *testing.T) {
 		t.Fatal("irrelevant high floor changed lower proof", err)
 	}
 }
+
+// Compare the fresh server-owned directory path with the full public verifier.
+// Persisted/caller-supplied series continue to require that public verifier.
+func TestP7EliteFreshDirectoryScopeMatchesPublicAdmission(t *testing.T) {
+	s, source, _ := p6ActualManualSeries(t)
+	grown := p6GenericGrownActors(t)
+	for _, id := range []string{"hero_025", "hero_071", "hero_001"} {
+		t.Run(id, func(t *testing.T) {
+			start := proto.Clone(source.Start).(*pb.SCRushFightStart)
+			start.RushType = proto.Int32(constUtil.P7RushElite)
+			start.BattlePlayer.Formation = []*pb.BattleHero{proto.Clone(grown[id]).(*pb.BattleHero)}
+			series, err := s.FreezeP6RushSeriesInput(start, false, true, nil, constUtil.P6OriginalClientHash)
+			if err != nil {
+				t.Fatal(err)
+			}
+			expected := validateP6RushStarterScope(series) == nil || p7PartyRushSourceAvailable(series) || p7NaturalRushSourceAvailable(series) || p7GenericMechanismRushSourceAvailable(series)
+			got, err := s.p7FreshEliteDirectoryScope(start)
+			if err != nil || got != expected || !got {
+				t.Fatalf("fresh=%v public=%v err=%v", got, expected, err)
+			}
+			start.WinKey = proto.Int32(999)
+			if got, err = s.p7FreshEliteDirectoryScope(start); err != nil || got {
+				t.Fatal("unsupported win criterion accepted", got, err)
+			}
+		})
+	}
+}

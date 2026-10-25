@@ -359,7 +359,7 @@ func (s *GameService) P7RushQuery(ctx context.Context, id int64, request proto.M
 				open := int32(0)
 				scoped := false
 				if cfg.Enabled && !authority && stage.Enabled && passed && p.GetLevel() >= stage.MinLevel {
-					scoped, err = s.p7ScopedStageAvailable(ctx, tx, p, g, stage, now)
+					scoped, err = projection.scopeAvailable(s, ctx, p, g, stage, now)
 					if err != nil {
 						return err
 					}

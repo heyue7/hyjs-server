@@ -12,3 +12,6 @@ var (
 	ErrP7RushHistoryCertificateUnavailable = errors.New("试炼历史校验证书未启用或未初始化")
 	ErrP7RushHistoryWarmLimit              = errors.New("试炼历史预热超过单次128场上限，请使用有界分批维护")
 )
+
+// P7EliteQueryProjectionKey stays inside one locked read transaction.
+type P7EliteQueryProjectionKey struct{}

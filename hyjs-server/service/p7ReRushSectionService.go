@@ -88,6 +88,12 @@ func p7ReRushAcceptedWins(tx *gorm.DB, id, runID int64, from, to int32, sourceFi
 
 // p7ReRushRunWins 合并同轮实际挑战和逐条绑定历史权威胜利的合法扫荡。
 func p7ReRushRunWins(tx *gorm.DB, state *db.P7RushState, from, to int32) (map[int32]p7ReRushWin, error) {
+	if q := p7EliteProjectionFor(tx); q != nil && q.state.PlayerID == state.PlayerID && q.state.RunID == state.RunID {
+		if err := q.load(); err != nil {
+			return nil, err
+		}
+		return q.runWinsBetween(from, to)
+	}
 	wins, err := p7ReRushAcceptedWins(tx, state.PlayerID, state.RunID, from, to)
 	if err != nil {
 		return nil, err

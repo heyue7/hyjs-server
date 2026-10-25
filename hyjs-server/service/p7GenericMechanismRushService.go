@@ -16,8 +16,22 @@ import (
 // single-wave typed9/10 driver and strict independently recomputed End. Global
 // native coverage and the original math kernel stay unchanged.
 func p7GenericMechanismRushProof(series *model.FrozenP6RushSeries) (string, error) {
-	if err := validateP6RushSeries(series); err != nil {
+	if err := p7GenericMechanismRushShape(series); err != nil {
 		return "", err
+	}
+	input := series.Template
+	// Exact canonical table digest is checked again by generic admission; actor
+	// instances remain the original owner/NPC snapshots bound by the P7 caller.
+	validator := &GameService{Tables: input.Tables}
+	if _, err := validator.ValidateP6GenericMechanisms(context.Background(), input); err != nil {
+		return "", fmt.Errorf("Trial/Elite original mechanism: %w", err)
+	}
+	return constUtil.P7GenericMechanismCompatibilityProof, nil
+}
+
+func p7GenericMechanismRushShape(series *model.FrozenP6RushSeries) error {
+	if err := validateP6RushSeries(series); err != nil {
+		return err
 	}
 	input := series.Template
 	kind := series.Start.GetRushType()
@@ -27,15 +41,9 @@ func p7GenericMechanismRushProof(series *model.FrozenP6RushSeries) (string, erro
 		input.EngineVersion != constUtil.P6EngineVersion || input.ClientVersion != constUtil.P6OriginalClientHash || input.ConfigurationHash != constUtil.P6LinearPhysicalTables ||
 		input.Seed < 0 || input.Seed > (1<<48)-1 || input.DiagnosticAIDriverPolicy != "" || input.DiagnosticManualAutoStartRoundTime != nil || input.PVECompatibilityRule != "" || input.KFReplayViewer != nil ||
 		p6ScopedUnknown(series.Start) || p6ScopedUnknown(input.Attacker) || p6ScopedUnknown(input.Attacker.Inst) || len(input.Attacker.Inst.ExtBattleAdds) != 0 || len(constUtil.P7GenericMechanismCompatibilityProof) != 64 {
-		return "", errors.New(constUtil.CombatUnsupported)
+		return errors.New(constUtil.CombatUnsupported)
 	}
-	// Exact canonical table digest is checked again by generic admission; actor
-	// instances remain the original owner/NPC snapshots bound by the P7 caller.
-	validator := &GameService{Tables: input.Tables}
-	if _, err := validator.ValidateP6GenericMechanisms(context.Background(), input); err != nil {
-		return "", fmt.Errorf("Trial/Elite original mechanism: %w", err)
-	}
-	return constUtil.P7GenericMechanismCompatibilityProof, nil
+	return nil
 }
 
 // p7GenericMechanismRushAdmission 仅绑定当前调用栈内已完整证明的冻结series。
