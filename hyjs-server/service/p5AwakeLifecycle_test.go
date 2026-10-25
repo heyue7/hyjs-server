@@ -20,7 +20,8 @@ import (
 )
 
 // Talent investment must continue through both awakening stages and fusion.
-// A single ledger records each actual cost and permits a verified full reset.
+// Reset returns exact refundable costs and original fragments; a new combine
+// creates a fresh zero-growth GUID without reviving retired instances.
 func TestP5OriginalAwakeFullLifecycle(t *testing.T) {
 	ctx := context.Background()
 	path := filepath.Join(t.TempDir(), "awake-lifecycle.db")
@@ -72,6 +73,7 @@ func TestP5OriginalAwakeFullLifecycle(t *testing.T) {
 				t.Fatal(err)
 			}
 			guid := ""
+			retiredGUIDs := map[string]bool{}
 			resources := map[string]bool{"item_005": true, "item_312": true}
 			for stage := int32(1); stage <= 2; stage++ {
 				for _, part := range strings.Split(s.awakeTable("HeroAwakenCost", hero["id"], stage)["itemCost"], ";") {
@@ -97,6 +99,9 @@ func TestP5OriginalAwakeFullLifecycle(t *testing.T) {
 					return err
 				}
 				guid = gain.GetWars()[0].GetGuid()
+				for _, card := range gain.GetWars() {
+					retiredGUIDs[card.GetGuid()] = true
+				}
 				w, err := p5Warrior(g, guid)
 				if err != nil {
 					return err
@@ -122,14 +127,16 @@ func TestP5OriginalAwakeFullLifecycle(t *testing.T) {
 				}
 				return p, g, w
 			}
-			originalPlayer, originalGame, originalWarrior := read()
+			originalPlayer, originalGame, _ := read()
 			talent := &pb.CSWarriorTalent{Guid: proto.String(guid), Talent: proto.String("1"), Cost: []*pb.BaseResource{{Id: proto.String("coin"), Num: proto.Int32(10000)}, {Id: proto.String("item_005"), Num: proto.Int32(30)}}}
 			if _, err = s.warriorTalent(requestContext(talent), account.Id, talent); err != nil {
 				t.Fatal("initial talent", err)
 			}
 			awake := &pb.CSWarriorAwake{Guid: proto.String(guid)}
 			for stage := int32(1); stage <= 2; stage++ {
-				out, err := s.warriorAwake(requestContext(awake), account.Id, awake, int64(stage))
+				out, err := p5MeasureAwake(t, "awake", func() ([]proto.Message, error) {
+					return s.warriorAwake(requestContext(awake), account.Id, awake, int64(stage))
+				})
 				if err != nil || out[0].(*pb.SCWarriorAwake).GetNewWarrior().GetAwake().GetStage() != stage {
 					t.Fatal("tracked talent to awakening stage", stage, err)
 				}
@@ -156,7 +163,9 @@ func TestP5OriginalAwakeFullLifecycle(t *testing.T) {
 			// Each material has the exact original 500 experience. Consume the
 			// full original path total and retain the configured highest100.
 			fuse := &pb.CSAwakeFuse{Guid: proto.String(guid), Cost: []*pb.BaseResource{{Id: proto.String("item_312"), Num: proto.Int32(int32((totalFuseExp + 499) / 500))}}}
-			out, err := s.warriorAwakeFuse(requestContext(fuse), account.Id, fuse, 3)
+			out, err := p5MeasureAwake(t, "fuse100", func() ([]proto.Message, error) {
+				return s.warriorAwakeFuse(requestContext(fuse), account.Id, fuse, 3)
+			})
 			if err != nil || out[0].(*pb.SCAwakeFuse).GetNewWarrior().GetAwake().GetFuseLevel() != 100 {
 				t.Fatal("both awakening stages to original fusion100", err)
 			}
@@ -190,11 +199,36 @@ func TestP5OriginalAwakeFullLifecycle(t *testing.T) {
 			if _, err = s.p5WarriorReset(requestContext(reset), account.Id, reset, 5); err != nil {
 				t.Fatal("highest full lifecycle reset", err)
 			}
-			p, g, w = read()
-			expected := proto.Clone(originalWarrior).(*pb.Warrior)
-			expected.SkillOrder = proto.String(hero["SkillId2"] + "," + hero["SkillId1"])
-			if !proto.Equal(w, expected) || p.GetCoin() != originalPlayer.GetCoin() || len(g.Warriors) != len(originalGame.Warriors) {
-				t.Fatal("reset lost target baseline, actual coin or consumed same-card instances")
+			var resetProfile db.Profile
+			if err = db.GetIns().First(&resetProfile, account.Id).Error; err != nil {
+				t.Fatal(err)
+			}
+			p, g, err = decodeProfile(&resetProfile)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(retiredGUIDs) != 8 || len(g.Warriors) != len(originalGame.Warriors)-8 || p.GetCoin() != originalPlayer.GetCoin()-10000 || p.GetDiamond() != originalPlayer.GetDiamond()-50 {
+				t.Fatal("fragment reset changed retired count, nonrefundable talent coin or diamond fee")
+			}
+			for _, old := range originalGame.Warriors {
+				current, lookupErr := p5Warrior(g, old.GetGuid())
+				if retiredGUIDs[old.GetGuid()] {
+					if lookupErr == nil {
+						t.Fatal("reset revived original target or consumed donor", old.GetGuid())
+					}
+				} else if lookupErr != nil || !proto.Equal(current, old) {
+					t.Fatal("reset changed unrelated original warrior", old.GetGuid(), lookupErr)
+				}
+			}
+			fragment := s.table("Frag", "target", hero["id"])
+			fragmentCount, parseErr := strconv.ParseInt(fragment["num"], 10, 32)
+			if parseErr != nil || fragmentCount <= 0 || simpleOwned(p, g, fragment["id"])-simpleOwned(originalPlayer, originalGame, fragment["id"]) != 8*fragmentCount {
+				t.Fatal("target plus seven awakening donors did not return exact original fragments", parseErr)
+			}
+			for _, item := range resourceIDs {
+				if simpleOwned(p, g, item) != simpleOwned(originalPlayer, originalGame, item) {
+					t.Fatal("reset did not refund exact actual lifecycle resources", item)
+				}
 			}
 			if _, err := s.warriorAwake(requestContext(awake), account.Id, awake, 2); err == nil {
 				t.Fatal("old awake2 client projection accepted after reset")
@@ -202,14 +236,32 @@ func TestP5OriginalAwakeFullLifecycle(t *testing.T) {
 			if _, err := s.warriorAwakeFuse(requestContext(fuse), account.Id, fuse, 3); err == nil {
 				t.Fatal("old fuse100 client projection accepted after reset")
 			}
-			actor, err = s.battleWarrior(p, w, g, &pb.FormationItem{FormatPos: proto.Int32(2), BattlePos: proto.Int32(2), Things: []*pb.FormationThing{{Id: w.Id, Guid: w.Guid, Pos: proto.Int32(0)}}})
-			if err != nil || actor.GetAwakeStage() != 0 || actor.GetAwakenSkill() != "" || actor.GetSkillOrder() != expected.GetSkillOrder()+","+hero["UltSkillId"] {
-				t.Fatal("reset retained unavailable awakening in normal order", err)
+			combine := &pb.CSCombine{TargetId: proto.String(hero["id"])}
+			combined, combineErr := s.redCombine(requestContext(combine), account.Id, combine, 6)
+			if combineErr != nil {
+				t.Fatal("recombine original refunded fragments", combineErr)
 			}
-			for _, item := range resourceIDs {
-				if simpleOwned(p, g, item) != simpleOwned(originalPlayer, originalGame, item) {
-					t.Fatal("reset did not refund exact actual lifecycle resources", item)
-				}
+			newCards := combined[0].(*pb.SCCombine).GetGet().GetWars()
+			if len(newCards) != 1 || newCards[0].GetGuid() == "" || retiredGUIDs[newCards[0].GetGuid()] || newCards[0].GetId() != hero["id"] {
+				t.Fatal("fragment combine did not create one fresh GUID")
+			}
+			if err = db.GetIns().First(&resetProfile, account.Id).Error; err != nil {
+				t.Fatal(err)
+			}
+			p, g, err = decodeProfile(&resetProfile)
+			if err != nil {
+				t.Fatal(err)
+			}
+			w, err = p5Warrior(g, newCards[0].GetGuid())
+			if err != nil || !p5WarriorMaterialPristine(w) || w.GetAwake().GetStage() != 0 || w.GetAwake().GetFuseLevel() != 0 || w.GetAwake().GetFuseExp() != 0 || w.GetAwakenSkill() != "" {
+				t.Fatal("fresh combined warrior retained retired growth", err)
+			}
+			if simpleOwned(p, g, fragment["id"])-simpleOwned(originalPlayer, originalGame, fragment["id"]) != 7*fragmentCount {
+				t.Fatal("fresh combine did not consume one original card's fragments")
+			}
+			actor, err = s.battleWarrior(p, w, g, &pb.FormationItem{FormatPos: proto.Int32(2), BattlePos: proto.Int32(2), Things: []*pb.FormationThing{{Id: w.Id, Guid: w.Guid, Pos: proto.Int32(0)}}})
+			if err != nil || actor.GetAwakeStage() != 0 || actor.GetAwakenSkill() != "" || actor.GetSkillOrder() != hero["SkillId1"]+","+hero["SkillId2"]+","+hero["UltSkillId"] {
+				t.Fatal("fresh combined warrior normal battle projection", err)
 			}
 			resetReceipts[account.Id] = reset
 		})

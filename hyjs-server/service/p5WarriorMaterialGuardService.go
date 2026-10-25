@@ -65,7 +65,7 @@ func p5WarriorMaterialReason(p *pb.Player, g *model.GameState, w *pb.Warrior, he
 	if p5KV(g, "p5.dispatch:"+guid) != "" {
 		return constUtil.TalentMaterialDispatch
 	}
-	if !talentMaterialUnused(w) || p5WarriorProgressed(w) {
+	if !talentMaterialUnused(w) || !p5WarriorMaterialPristine(w) {
 		return constUtil.TalentMaterialProgressed
 	}
 	current, err := p5Warrior(g, guid)
