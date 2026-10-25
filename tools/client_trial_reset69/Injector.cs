@@ -18,8 +18,16 @@ if (!source.IsStatic || source.MethodSig.Params.Count != 2 || source.MethodSig.P
 var hook = new MemberRefUser(main, source.Name, MethodSig.CreateStatic(main.CorLibTypes.Void, main.CorLibTypes.Object, main.CorLibTypes.Object), new Importer(main).Import(hooks));
 var exits = target.Body.Instructions.Where(i => i.OpCode == OpCodes.Ret).ToArray();
 if (exits.Length != 1) throw new Exception("Unexpected Refresh exits");
+var hookStart = Instruction.Create(OpCodes.Ldarg_0);
+// Original conditional exits must pass the post-refresh hook as well.
+foreach (var instruction in target.Body.Instructions.ToArray())
+{
+    if (ReferenceEquals(instruction.Operand, exits[0])) instruction.Operand = hookStart;
+    else if (instruction.Operand is Instruction[] targets)
+        for (int i = 0; i < targets.Length; i++) if (ReferenceEquals(targets[i], exits[0])) targets[i] = hookStart;
+}
 int at = target.Body.Instructions.IndexOf(exits[0]);
-target.Body.Instructions.Insert(at++, Instruction.Create(OpCodes.Ldarg_0));
+target.Body.Instructions.Insert(at++, hookStart);
 target.Body.Instructions.Insert(at++, Instruction.Create(OpCodes.Ldarg_1));
 target.Body.Instructions.Insert(at, Instruction.Create(OpCodes.Call, hook));
 foreach (var m in main.GetTypes().SelectMany(t => t.Methods).Where(m => m.HasBody)) m.Body.KeepOldMaxStack = true;
