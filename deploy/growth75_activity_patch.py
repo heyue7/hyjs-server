@@ -194,7 +194,8 @@ def export_sql():
     for table, columns in TABLES.items():
         args = []
         for col in columns:
-            expr = f'CONVERT(`{col}` USING utf8mb4)' if col in JSON_COLUMNS or col in ('id', 'pool_id', 'instance_id', 'consumer_key') else f'`{col}`'
+            textual = col in JSON_COLUMNS or col in ('pool_id', 'instance_id', 'consumer_key') or (col == 'id' and table != 'gameplay_pool_rewards')
+            expr = f'CONVERT(`{col}` USING utf8mb4)' if textual else f'`{col}`'
             args.extend([repr(col), expr])
         print(f"SELECT '{table}',JSON_OBJECT({','.join(args)}) FROM `{table}` WHERE {filters[table]} LIMIT 20000;")
 
@@ -277,7 +278,11 @@ def make_plan(tables):
     for row in tables['gameplay_pool_rewards']:
         f = pool_forms.get(row['pool_id'])
         if f:
-            p = next(p for p in f['prizes'] if p['id'] == row['id'])
+            if not isinstance(row['id'], int) or isinstance(row['id'], bool):
+                raise ValueError('Wheel prize id must retain its integer SQL type; re-export the snapshot')
+            p = next((p for p in f['prizes'] if p['id'] == row['id']), None)
+            if p is None:
+                raise ValueError('Wheel prize absent from reviewed form: ' + row['pool_id'] + '/' + str(row['id']))
             change('gameplay_pool_rewards', row, {k: p[v] for k, v in [('resource_id', 'resourceId'), ('amount', 'amount'), ('stock', 'stock'), ('weight', 'weight')]}, '七彩石仅占一位，4颗×4次；其余普通养成资源')
     for row in tables['turntable_rules']:
         f = pool_forms.get(row['pool_id'])

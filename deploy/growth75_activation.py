@@ -47,7 +47,10 @@ def activate_growth75(mysql, compose, patch_script, backup_dir, revision, backup
         private_write(directory / 'manifest.json', json.dumps(record, ensure_ascii=False, indent=2) + '\n')
 
     def script(*args):
-        return subprocess.run(['python3', str(patch_script), *map(str, args)], check=True, capture_output=True, text=True, encoding='utf-8').stdout
+        result = subprocess.run(['python3', str(patch_script), *map(str, args)], capture_output=True, text=True, encoding='utf-8')
+        if result.returncode:
+            raise RuntimeError('Activity generator failed: ' + result.stderr[-5000:])
+        return result.stdout
 
     checkpoint()
     try:
