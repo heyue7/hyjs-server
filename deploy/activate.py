@@ -39,7 +39,17 @@ def sha(path):
     return digest.hexdigest()
 
 def run(*cmd, **kwargs):
-    return subprocess.run(cmd, check=True, capture_output=True, **kwargs)
+    try:
+        return subprocess.run(cmd, check=True, capture_output=True, **kwargs)
+    except subprocess.CalledProcessError as error:
+        detail = ((error.stdout or b'') + (error.stderr or b'')).decode('utf-8', errors='replace')
+        secret_file = ROOT / '.env'
+        if secret_file.is_file():
+            for line in secret_file.read_text().splitlines():
+                key, sep, value = line.partition('=')
+                if sep and value and any(word in key for word in ('PASSWORD', 'SECRET', 'KEY', 'TOKEN')):
+                    detail = detail.replace(value, '[REDACTED]')
+        raise RuntimeError('Deployment command failed: ' + detail[-5000:]) from None
 
 def compose(*cmd):
     return run('docker', 'compose', '--project-directory', str(ROOT), '--env-file', str(ROOT / '.env'), '-f', str(ROOT / 'compose.yaml'), *cmd)
