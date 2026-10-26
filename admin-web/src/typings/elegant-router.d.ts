@@ -30,6 +30,7 @@ declare module "@elegant-router/types" {
     "broadcast": "/broadcast";
     "cdk": "/cdk";
     "client-updates": "/client-updates";
+    "copy-drops": "/copy-drops";
     "daily-sign": "/daily-sign";
     "daily-tasks": "/daily-tasks";
     "feedback": "/feedback";
@@ -59,7 +60,6 @@ declare module "@elegant-router/types" {
     "shops_union-fight": "/shops/union-fight";
     "shops_vip": "/shops/vip";
     "sprout-settings": "/sprout-settings";
-    "copy-drops": "/copy-drops";
     "titles": "/titles";
     "trials": "/trials";
     "users": "/users";
@@ -109,6 +109,7 @@ declare module "@elegant-router/types" {
     | "broadcast"
     | "cdk"
     | "client-updates"
+    | "copy-drops"
     | "daily-sign"
     | "daily-tasks"
     | "feedback"
@@ -127,7 +128,6 @@ declare module "@elegant-router/types" {
     | "servers"
     | "shops"
     | "sprout-settings"
-    | "copy-drops"
     | "titles"
     | "trials"
     | "users"
@@ -164,6 +164,7 @@ declare module "@elegant-router/types" {
     | "broadcast"
     | "cdk"
     | "client-updates"
+    | "copy-drops"
     | "daily-sign"
     | "daily-tasks"
     | "feedback"
@@ -190,7 +191,6 @@ declare module "@elegant-router/types" {
     | "shops_union-fight"
     | "shops_vip"
     | "sprout-settings"
-    | "copy-drops"
     | "titles"
     | "trials"
     | "users"
