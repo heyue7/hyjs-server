@@ -201,3 +201,22 @@ func TestTerminalWeeklyEdit74(t *testing.T) {
 		t.Fatal("next week did not renew", n, e)
 	}
 }
+
+func TestServerGameClockSettledPKRewind74(t *testing.T) {
+	terminalFixture(t)
+	d := db.GetIns()
+	if e := d.AutoMigrate(&db.P12FieldPVPReceipt{}); e != nil {
+		t.Fatal(e)
+	}
+	now := time.Now()
+	row := db.P12FieldPVPReceipt{FightID: "rewind-lease", P6RecordID: "rewind-record", CreatedAt: now.UnixMilli(), BusyUntil: now.UnixMilli() + 6000, Response: []byte{}, Terminal: []byte{}, Replay: []byte{}, MV: []byte{}}
+	if e := d.Create(&row).Error; e != nil {
+		t.Fatal(e)
+	}
+	if e := serverGameClockPendingBattles(d, now, 0); e == nil {
+		t.Fatal("live replay lease accepted")
+	}
+	if e := serverGameClockPendingBattles(d, now, -4); e != nil {
+		t.Fatal("future settled receipt blocked rewind", e)
+	}
+}
