@@ -120,6 +120,7 @@ type combatRoundEngine struct {
 	roundLiveAutoControls          []p6RoundAutoControl
 	roundLiveAutoStarted           bool
 	originalRecordMode             bool
+	liveRecordedCommands           bool
 	tableIndexes                   map[combatRoundTableIndexKey]combatRoundTableIndex
 	service                        *GameService
 	input                          *model.FrozenBattleInput
@@ -301,6 +302,10 @@ func (s *GameService) computeFrozenBattleRecordControlled(ctx context.Context, i
 }
 
 func (s *GameService) computeFrozenBattleRecordRoundControlled(ctx context.Context, input *model.FrozenBattleInput, supplied *pb.BattleOperate, observer, terminalObserver func(*combatRoundEngine), originalRecordMode bool, formation *pb.BattleTransOperate, controls []p6RoundAutoControl) (*model.CombatOutcome, error) {
+	return s.computeFrozenBattleRecordLiveControlled(ctx, input, supplied, observer, terminalObserver, originalRecordMode, formation, controls, false)
+}
+
+func (s *GameService) computeFrozenBattleRecordLiveControlled(ctx context.Context, input *model.FrozenBattleInput, supplied *pb.BattleOperate, observer, terminalObserver func(*combatRoundEngine), originalRecordMode bool, formation *pb.BattleTransOperate, controls []p6RoundAutoControl, liveRecorded bool) (*model.CombatOutcome, error) {
 	if ctx == nil || input == nil {
 		return nil, errors.New(constUtil.CombatInvalid)
 	}
@@ -338,7 +343,15 @@ func (s *GameService) computeFrozenBattleRecordRoundControlled(ctx context.Conte
 	if err = ValidateP6PVECompatibility(frozen); err != nil {
 		return nil, err
 	}
-	e := &combatRoundEngine{service: &GameService{Tables: frozen.Tables}, input: &frozen, rng: NewCombatRandom(frozen.Seed), operate: &pb.BattleOperate{}, supplied: supplied, captureTicks: observer != nil, round: 1, originalRecordMode: originalRecordMode}
+	e := &combatRoundEngine{service: &GameService{Tables: frozen.Tables}, input: &frozen, rng: NewCombatRandom(frozen.Seed), operate: &pb.BattleOperate{}, supplied: supplied, captureTicks: observer != nil, round: 1, originalRecordMode: originalRecordMode, liveRecordedCommands: liveRecorded}
+	if liveRecorded {
+		if !originalRecordMode || supplied == nil || formation != nil || len(controls) != 0 {
+			return nil, errors.New(constUtil.P6ReplayConflict)
+		}
+		if err = validateP6LiveRecordedInput(&frozen, supplied); err != nil {
+			return nil, err
+		}
+	}
 	if len(controls) != 0 {
 		if supplied != nil || formation != nil || !originalRecordMode {
 			return nil, errors.New(constUtil.P6ReplayConflict)
@@ -1136,7 +1149,8 @@ func (e *combatRoundEngine) step() error {
 				e.aiDealingNormals = append(e.aiDealingNormals, skill)
 			}
 			e.suppliedIndex++
-			if e.originalRecordMode {
+			// Live player presses can share one clock; only PlaybackAI serializes them.
+			if e.originalRecordMode && !e.liveRecordedCommands {
 				// Original PlaybackAI.Update executes one queued message, clears
 				// curMsg and returns; same-time source messages wait one more Tick.
 				break
@@ -1362,7 +1376,9 @@ func (e *combatRoundEngine) canFinishRound() bool {
 		return false
 	}
 	if e.usesCopyEnemyAI(e.camp) {
-		if !e.copyEnemyFinishNotified && !(e.originalRecordMode && e.supplied != nil && e.originalPlaybackFinishHint) {
+		// Live NPC rounds wait for their AI, which may queue a ready ultimate
+		// after the last normal ends. Playback-only UI hints cannot end them.
+		if !e.copyEnemyFinishNotified && !(e.originalRecordMode && !e.liveRecordedCommands && e.supplied != nil && e.originalPlaybackFinishHint) {
 			// An original no-target normal never reaches the ultimate phase.
 			// Its separately checked stall/compatibility action stays explicit.
 			return !e.copyEnemyUltimatePhase && e.commandIndex >= len(e.commands) && !e.originalCopyNormalDone()

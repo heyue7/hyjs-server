@@ -62,6 +62,17 @@ func (s *GameService) p7ReRushMutation(ctx context.Context, id int64, request pr
 		if err != nil {
 			return err
 		}
+		switch request.(type) {
+		case *pb.CSRushRewardPreview, *pb.CSRushGetSectionReward, *pb.CSRushGetSectionAddition, *pb.CSRushAddition, *pb.CSRushAdditionView, *pb.CSRush3Hit, *pb.CSRushToTop:
+			tx, err = s.p7BindSettledQueryProjection(tx, state)
+			if err != nil {
+				return err
+			}
+			switch request.(type) {
+			case *pb.CSRush3Hit, *pb.CSRushToTop:
+				p7EliteProjectionFor(tx).refreshSweeps = true
+			}
+		}
 		legacyRequest, err = s.p7ReRushLegacyRequest(tx, state, request, stamp)
 		if err != nil || legacyRequest {
 			return err
@@ -109,6 +120,21 @@ func (s *GameService) p7ReRushSectionMutation(tx *gorm.DB, player *pb.Player, ga
 		return &pb.SCRushAdditionView{Prop: p7ReRushBonusProjection(bonus)}, nil
 	}
 	section := max(1, (state.Floor-1)/3)
+	switch request.(type) {
+	case *pb.CSRushGetSectionAddition, *pb.CSRushAddition:
+		if _, selecting := request.(*pb.CSRushAddition); selecting && state.AdditionOfferSection != 0 {
+			section = state.AdditionOfferSection
+		} else {
+			pending, err := p7ReRushPendingAddition(tx, state)
+			if err != nil {
+				return nil, err
+			}
+			if pending == nil {
+				return nil, errors.New("没有已领奖且待选择加成的试炼段")
+			}
+			section = pending.Section
+		}
+	}
 	stars, hash, complete, err := p7ReRushSectionProof(tx, state, section)
 	if err != nil {
 		return nil, err
@@ -143,8 +169,11 @@ func (s *GameService) p7ReRushSectionMutation(tx *gorm.DB, player *pb.Player, ga
 		}
 		return &pb.SCRushRewardPreview{SectionStar: proto.Int32(stars), SectionFrom: proto.Int32(section*3 - 2), SectionTo: proto.Int32(section * 3), ThreeStarReward: three, SixStarReward: six, NineStarReward: nine}, nil
 	case *pb.CSRushGetSectionAddition:
-		if !complete || row.Selected != "" {
+		if !complete || !row.Claimed || row.Selected != "" {
 			return nil, errors.New("本段试炼未完成或加成已选择")
+		}
+		if err = p7ReRushSaveAdditionOffer(tx, state, section); err != nil {
+			return nil, err
 		}
 		return &pb.SCRushGetSectionAddition{StarResult3: proto.String("perhp,0.03"), StarResult6: proto.String("peratt,0.06"), StarResult9: proto.String("perpdef,0.09"), CostStar: proto.Int32(stars), Prop: p7ReRushBonusProjection(bonus)}, nil
 	case *pb.CSRushGetSectionReward:
@@ -167,6 +196,9 @@ func (s *GameService) p7ReRushSectionMutation(tx *gorm.DB, player *pb.Player, ga
 		options := map[int32]string{3: "perhp,0.03", 6: "peratt,0.06", 9: "perpdef,0.09"}
 		if options[req.GetStar()] == "" || options[req.GetStar()] != req.GetSelect() {
 			return nil, errors.New("Re试炼加成选项与星数不匹配")
+		}
+		if err = p7ReRushSaveAdditionOffer(tx, state, section); err != nil {
+			return nil, err
 		}
 		row.Selected, row.SpentStars = req.GetSelect(), req.GetStar()
 		if err = tx.Save(row).Error; err != nil {
@@ -192,12 +224,12 @@ func (s *GameService) p7ReRushSweep(tx *gorm.DB, player *pb.Player, game *model.
 	if err != nil {
 		return nil, err
 	}
-	reward, addition, err := p7ReRushSectionFlags(tx, state)
+	reward, _, err := p7ReRushSectionFlags(tx, state)
 	if err != nil {
 		return nil, err
 	}
-	if failed || state.Floor > constUtil.P7ReRushLastFloor || reward != 0 || addition != 0 {
-		return nil, errors.New("请先重置已结束的试炼或处理本段奖励和加成")
+	if failed || state.Floor > constUtil.P7ReRushLastFloor || reward != 0 || state.ActiveFight != "" {
+		return nil, errors.New("请先重置已结束的试炼、完成当前战斗或领取本段奖励")
 	}
 	wins, err := p7ReRushAcceptedWins(tx, state.PlayerID, 0, state.Floor, min(state.Floor+2, constUtil.P7ReRushLastFloor))
 	if err != nil {
@@ -237,11 +269,7 @@ func (s *GameService) p7ReRushSweep(tx *gorm.DB, player *pb.Player, game *model.
 			if err != nil {
 				return nil, err
 			}
-			_, err = s.p7ReRushSectionMutation(tx, player, game, state, &pb.CSRushAddition{Star: proto.Int32(3), Select: proto.String("perhp,0.03")})
-			if err != nil {
-				return nil, err
-			}
-			info.IsSectionEnd, info.SectionGain, info.SectionProp = proto.Int32(1), sectionGain.(*pb.SCRushGetSectionReward).Gain, proto.String("perhp,0.03")
+			info.IsSectionEnd, info.SectionGain, info.SectionProp = proto.Int32(1), sectionGain.(*pb.SCRushGetSectionReward).Gain, proto.String("")
 			// 原三连回调只导入 gain；至最高回调另外导入 sectionGain。
 			// 三连将同次真实到账的分段资源并入末层展示，避免客户端库存漏刷新。
 			if three {

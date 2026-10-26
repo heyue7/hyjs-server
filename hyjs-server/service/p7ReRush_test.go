@@ -227,7 +227,7 @@ func TestP7ReRushMySQLFirstSectionOriginalEndRewardAdditionResetSweepCold(t *tes
 		t.Fatal("one-star historic source allowed three-star sweep")
 	}
 	sweep := call(&pb.CSRushToTop{}, 19425)[0].(*pb.SCRushToTop)
-	if len(sweep.SweepInfo) != 3 || sweep.SweepInfo[2].GetIsSectionEnd() != 1 || sweep.SweepInfo[2].GetSectionProp() != "perhp,0.03" {
+	if len(sweep.SweepInfo) != 3 || sweep.SweepInfo[2].GetIsSectionEnd() != 1 || sweep.SweepInfo[2].GetSectionProp() != "" {
 		t.Fatal("original bounded sweep and section result", sweep)
 	}
 	sweepPlayer, sweepGame := f.profile(t)

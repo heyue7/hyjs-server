@@ -41,6 +41,10 @@ func (s *GameService) computeFrozenBattleFinalHPControlled(ctx context.Context, 
 }
 
 func (s *GameService) computeFrozenBattleFinalHPRoundControlled(ctx context.Context, input *model.FrozenBattleInput, supplied *pb.BattleOperate, originalRecordMode bool, formation *pb.BattleTransOperate, controls []p6RoundAutoControl) (*model.CombatFinalHPOutcome, error) {
+	return s.computeFrozenBattleFinalHPLiveControlled(ctx, input, supplied, originalRecordMode, formation, controls, false)
+}
+
+func (s *GameService) computeFrozenBattleFinalHPLiveControlled(ctx context.Context, input *model.FrozenBattleInput, supplied *pb.BattleOperate, originalRecordMode bool, formation *pb.BattleTransOperate, controls []p6RoundAutoControl, liveRecorded bool) (*model.CombatFinalHPOutcome, error) {
 	if ctx == nil || input == nil {
 		return nil, errors.New(constUtil.CombatInvalid)
 	}
@@ -107,7 +111,7 @@ func (s *GameService) computeFrozenBattleFinalHPRoundControlled(ctx context.Cont
 		// Keep the full expected record bound above; live AI does not consume it.
 		driverRecord = nil
 	}
-	result.Outcome, err = s.computeFrozenBattleRecordRoundControlled(ctx, frozen, driverRecord, nil, terminal, originalRecordMode, formation, controls)
+	result.Outcome, err = s.computeFrozenBattleRecordLiveControlled(ctx, frozen, driverRecord, nil, terminal, originalRecordMode, formation, controls, liveRecorded)
 	if err != nil {
 		return nil, err
 	}
