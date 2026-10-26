@@ -159,8 +159,11 @@ func (s *GameService) warriorTalent(ctx context.Context, id int64, b *pb.CSWarri
 		result  = &pb.SCWarriorTalent{}
 		updated *pb.Player
 	)
-	err := updateProfile(ctx, id, func(player *pb.Player, g *model.GameState) error {
+	err := updateProfileWithTx(ctx, id, func(tx *gorm.DB, player *pb.Player, g *model.GameState) error {
 		if err := s.warriorTalentApply(player, g, b, result); err != nil {
+			return err
+		}
+		if err := s.refreshP5GrowthFightPower(ctx, tx, player, g); err != nil {
 			return err
 		}
 		updated = proto.Clone(player).(*pb.Player)
@@ -359,8 +362,11 @@ func talentMaterialUnused(w *pb.Warrior) bool {
 func (s *GameService) warriorStrengthen(ctx context.Context, id int64, b *pb.CSWarriorStrengthen) ([]proto.Message, error) {
 	result := &pb.SCWarriorStrengthen{}
 	var updated *pb.Player
-	err := updateProfile(ctx, id, func(player *pb.Player, g *model.GameState) error {
+	err := updateProfileWithTx(ctx, id, func(tx *gorm.DB, player *pb.Player, g *model.GameState) error {
 		if err := s.warriorStrengthenApply(player, g, b, result); err != nil {
+			return err
+		}
+		if err := s.refreshP5GrowthFightPower(ctx, tx, player, g); err != nil {
 			return err
 		}
 		updated = proto.Clone(player).(*pb.Player)

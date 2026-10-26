@@ -134,6 +134,9 @@ func (s *GameService) growthOperation(ctx context.Context, id int64, guid, kind 
 		if err != nil {
 			return err
 		}
+		if err = s.refreshP5GrowthFightPower(ctx, tx, player, g); err != nil {
+			return err
+		}
 		if err = saveProfile(tx, &row, player, g); err != nil {
 			return err
 		}

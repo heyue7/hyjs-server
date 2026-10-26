@@ -108,6 +108,26 @@ func p5Warrior(g *model.GameState, guid string) (*pb.Warrior, error) {
 	return result, nil
 }
 
+// refreshP5GrowthFightPower updates the derived cache after growth, using the
+// caller's profile lock and current guild projection. Movement and currency-only
+// requests do not enter this path.
+func (s *GameService) refreshP5GrowthFightPower(ctx context.Context, tx *gorm.DB, player *pb.Player, game *model.GameState) error {
+	if !s.P5Ready {
+		return nil
+	}
+	if game.GuildPrayerProjection == nil {
+		if err := s.PrepareP5GuildPrayerProperties(ctx, tx, player, game, p13UFNow(ctx)); err != nil {
+			return err
+		}
+	}
+	power, err := s.formationFightPower(player, game)
+	if err != nil {
+		return err
+	}
+	player.FightPower = proto.Int32(power)
+	return nil
+}
+
 // p5Mutation binds the successful response to the exact request inside the player lock.
 func (s *GameService) p5Mutation(ctx context.Context, id int64, op string, stamp int64, request, response proto.Message, action func(*gorm.DB, *pb.Player, *model.GameState) error) ([]proto.Message, error) {
 	if stamp <= 0 {

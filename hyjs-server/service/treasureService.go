@@ -173,6 +173,7 @@ func (s *GameService) treasureFormationOnApply(p *pb.Player, g *model.GameState,
 	if err != nil {
 		return err
 	}
+	p.FightPower = proto.Int32(power)
 	*result = pb.SCFormationOn{FormationItem: proto.Clone(target).(*pb.FormationItem), Fightpower: proto.Int32(power)}
 	return nil
 }
@@ -220,6 +221,7 @@ func (s *GameService) treasureFormationOffApply(p *pb.Player, g *model.GameState
 	if err != nil {
 		return err
 	}
+	p.FightPower = proto.Int32(power)
 	*result = pb.SCFormationOff{Fightpower: proto.Int32(power)}
 	return nil
 }
@@ -292,8 +294,11 @@ func (s *GameService) treasureLevelExp(t *pb.Treasure, level int32) (int64, erro
 // treasureStrengthen 保留被消耗实例已投入经验，金币系数沿用原配置。
 func (s *GameService) treasureStrengthen(ctx context.Context, id int64, b *pb.CSTreasureStrengthen) ([]proto.Message, error) {
 	result := &pb.SCTreasureStrengthen{}
-	err := updateProfile(ctx, id, func(p *pb.Player, g *model.GameState) error {
-		return s.treasureStrengthenApply(p, g, b, result)
+	err := updateProfileWithTx(ctx, id, func(tx *gorm.DB, p *pb.Player, g *model.GameState) error {
+		if err := s.treasureStrengthenApply(p, g, b, result); err != nil {
+			return err
+		}
+		return s.refreshP5GrowthFightPower(ctx, tx, p, g)
 	})
 	return []proto.Message{result}, err
 }
@@ -382,7 +387,7 @@ func (s *GameService) p5TreasureStrengthen(ctx context.Context, id int64, b *pb.
 // treasureRefine 从下一等级原表读取成本，完整校验后扣除材料及同名零进阶实例。
 func (s *GameService) treasureRefine(ctx context.Context, id int64, b *pb.CSTreasureRefine, stamp int64) ([]proto.Message, error) {
 	var result *pb.SCTreasureRefine
-	err := updateProfile(ctx, id, func(p *pb.Player, g *model.GameState) error {
+	err := updateProfileWithTx(ctx, id, func(tx *gorm.DB, p *pb.Player, g *model.GameState) error {
 		if receipt := g.TreasureRefineReceipts[b.GetTargetId()]; receipt != nil && stamp != 0 && stamp <= receipt.Timestamp {
 			if stamp < receipt.Timestamp {
 				return errors.New("精炼请求已过期")
@@ -469,7 +474,7 @@ func (s *GameService) treasureRefine(ctx context.Context, id int64, b *pb.CSTrea
 			g.TreasureRefineReceipts = map[string]*model.TreasureRefineReceipt{}
 		}
 		g.TreasureRefineReceipts[b.GetTargetId()] = &model.TreasureRefineReceipt{Timestamp: stamp, Response: proto.Clone(result).(*pb.SCTreasureRefine)}
-		return nil
+		return s.refreshP5GrowthFightPower(ctx, tx, p, g)
 	})
 	return []proto.Message{result}, err
 }

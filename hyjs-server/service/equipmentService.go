@@ -149,6 +149,7 @@ func (s *GameService) equipmentFormationOnApply(player *pb.Player, g *model.Game
 	if err != nil {
 		return err
 	}
+	player.FightPower = proto.Int32(power)
 	*result = pb.SCFormationOn{FormationItem: proto.Clone(target).(*pb.FormationItem), Fightpower: proto.Int32(power)}
 	return nil
 }
@@ -204,6 +205,7 @@ func (s *GameService) equipmentFormationOffApply(player *pb.Player, g *model.Gam
 	if err != nil {
 		return err
 	}
+	player.FightPower = proto.Int32(power)
 	*result = pb.SCFormationOff{Fightpower: proto.Int32(power)}
 	return nil
 }
@@ -262,8 +264,11 @@ func (s *GameService) validateP5EquipmentFormationOffReceipt(g *model.GameState,
 // equipmentStrengthen 校验原客户端逐级报价，再将最多五次确定性强化限制在角色上限内。
 func (s *GameService) equipmentStrengthen(ctx context.Context, id int64, request *pb.CSEquipStrengthen) ([]proto.Message, error) {
 	result := &pb.SCEquipStrengthen{}
-	err := updateProfile(ctx, id, func(p *pb.Player, g *model.GameState) error {
-		return s.equipmentStrengthenMutation(p, g, request, result)
+	err := updateProfileWithTx(ctx, id, func(tx *gorm.DB, p *pb.Player, g *model.GameState) error {
+		if err := s.equipmentStrengthenMutation(p, g, request, result); err != nil {
+			return err
+		}
+		return s.refreshP5GrowthFightPower(ctx, tx, p, g)
 	})
 	return []proto.Message{result}, err
 }

@@ -105,6 +105,13 @@ func (s *GameService) resourceProfile(ctx context.Context, id int64) (*pb.Player
 		player *pb.Player
 		game   *model.GameState
 	)
+	// Explicit player snapshots repair legacy growth caches. Other reads retain
+	// their existing cost; movement and currency requests do not recompute a party.
+	refreshPower := false
+	switch ctx.Value(constUtil.GameRequestContextKey).(type) {
+	case *pb.CSPlayer, *pb.CSPlayerLogin:
+		refreshPower = s.P5Ready
+	}
 	// 恢复结算属于查询前置步骤，不沿用外层业务消息触发活动进度回调。
 	readCtx := context.WithValue(ctx, constUtil.GameRequestContextKey, struct{}{})
 	err := db.GetIns().WithContext(readCtx).Transaction(func(tx *gorm.DB) error {
@@ -130,11 +137,19 @@ func (s *GameService) resourceProfile(ctx context.Context, id int64) (*pb.Player
 		if err != nil {
 			return err
 		}
+		storedPower := player.GetFightPower()
 		if err = s.RefreshP5GuildPrayerPower(readCtx, tx, player, game, p13UFNow(readCtx)); err != nil {
 			return err
 		}
+		powerChanged := false
+		if refreshPower {
+			if err = s.refreshP5GrowthFightPower(readCtx, tx, player, game); err != nil {
+				return err
+			}
+			powerChanged = storedPower != player.GetFightPower()
+		}
 		changed, err := settleResourceRecovery(player, time.Now().UnixMilli())
-		if err != nil || !changed && !penaltyChanged && !clockChanged {
+		if err != nil || !changed && !penaltyChanged && !clockChanged && !powerChanged {
 			return err
 		}
 		return saveProfileAgainst(tx, &row, player, game, &persisted)

@@ -81,6 +81,9 @@ func (s *GameService) equipmentMutation(ctx context.Context, id int64, opcode in
 		if err = mutate(tx, player, game); err != nil {
 			return err
 		}
+		if err = s.refreshP5GrowthFightPower(ctx, tx, player, game); err != nil {
+			return err
+		}
 		if err = saveProfile(tx, &profile, player, game); err != nil {
 			return err
 		}

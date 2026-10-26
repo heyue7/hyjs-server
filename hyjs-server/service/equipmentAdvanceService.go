@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"google.golang.org/protobuf/proto"
+	"gorm.io/gorm"
 	"hyjs-server/model"
 	pb "hyjs-server/model/protocol"
 )
@@ -15,7 +16,7 @@ import (
 // equipmentRefine 按原道具经验和资质分档精炼，时间戳回执保证重试只扣一次材料。
 func (s *GameService) equipmentRefine(ctx context.Context, id int64, request *pb.CSEquipRefine, stamp int64) ([]proto.Message, error) {
 	var result *pb.SCEquipRefine
-	err := updateProfile(ctx, id, func(_ *pb.Player, g *model.GameState) error {
+	err := updateProfileWithTx(ctx, id, func(tx *gorm.DB, player *pb.Player, g *model.GameState) error {
 		if stamp <= 0 {
 			return errors.New("精炼请求缺少有效时间戳")
 		}
@@ -93,7 +94,7 @@ func (s *GameService) equipmentRefine(ctx context.Context, id int64, request *pb
 			g.EquipmentRefineReceipts = map[string]*model.EquipmentRefineReceipt{}
 		}
 		g.EquipmentRefineReceipts[request.GetGuid()] = &model.EquipmentRefineReceipt{Timestamp: stamp, Request: proto.Clone(request).(*pb.CSEquipRefine), Response: proto.Clone(result).(*pb.SCEquipRefine)}
-		return nil
+		return s.refreshP5GrowthFightPower(ctx, tx, player, g)
 	})
 	if err != nil {
 		return nil, err
@@ -104,7 +105,7 @@ func (s *GameService) equipmentRefine(ctx context.Context, id int64, request *pb
 // equipmentStar 每次提升一星，费用取目标星级，低资质装备和未开放玩家不可升星。
 func (s *GameService) equipmentStar(ctx context.Context, id int64, request *pb.CSEquipStar, stamp int64) ([]proto.Message, error) {
 	var result *pb.SCEquipStar
-	err := updateProfile(ctx, id, func(player *pb.Player, g *model.GameState) error {
+	err := updateProfileWithTx(ctx, id, func(tx *gorm.DB, player *pb.Player, g *model.GameState) error {
 		if stamp <= 0 {
 			return errors.New("升星请求缺少有效时间戳")
 		}
@@ -167,7 +168,7 @@ func (s *GameService) equipmentStar(ctx context.Context, id int64, request *pb.C
 			g.EquipmentStarReceipts = map[string]*model.EquipmentStarReceipt{}
 		}
 		g.EquipmentStarReceipts[request.GetGuid()] = &model.EquipmentStarReceipt{Timestamp: stamp, Response: proto.Clone(result).(*pb.SCEquipStar)}
-		return nil
+		return s.refreshP5GrowthFightPower(ctx, tx, player, g)
 	})
 	if err != nil {
 		return nil, err

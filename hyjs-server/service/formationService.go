@@ -531,7 +531,7 @@ func (s *GameService) tacticalFormationUnlock(ctx context.Context, id int64, b *
 // tacticalFormationLevelUp 读取下一等级消耗，并保存有限回执防止重试重复升级。
 func (s *GameService) tacticalFormationLevelUp(ctx context.Context, id int64, b *pb.CSTaticalFormationLevelUp, stamp int64) ([]proto.Message, error) {
 	var result *pb.SCTaticalFormationLevelUp
-	err := updateProfile(ctx, id, func(player *pb.Player, g *model.GameState) error {
+	err := updateProfileWithTx(ctx, id, func(tx *gorm.DB, player *pb.Player, g *model.GameState) error {
 		if err := s.tacticalGate(player); err != nil {
 			return err
 		}
@@ -583,6 +583,9 @@ func (s *GameService) tacticalFormationLevelUp(ctx context.Context, id int64, b 
 			g.TacticalUpgradeReceipts = map[string]*model.TacticalUpgradeReceipt{}
 		}
 		g.TacticalUpgradeReceipts[target.GetId()] = &model.TacticalUpgradeReceipt{Timestamp: stamp, Response: proto.Clone(result).(*pb.SCTaticalFormationLevelUp)}
+		if current == target {
+			return s.refreshP5GrowthFightPower(ctx, tx, player, g)
+		}
 		return nil
 	})
 	return []proto.Message{result}, err
@@ -644,8 +647,11 @@ func (s *GameService) payFormationCost(player *pb.Player, g *model.GameState, sp
 // tacticalFormationUse 切换已经解锁的阵型，保留各阵型各自的站位记录。
 func (s *GameService) tacticalFormationUse(ctx context.Context, id int64, b *pb.CSUseTaticalFormation) ([]proto.Message, error) {
 	result := &pb.SCUseTaticalFormation{}
-	err := updateProfile(ctx, id, func(player *pb.Player, g *model.GameState) error {
-		return s.tacticalFormationUseApply(player, g, b, result)
+	err := updateProfileWithTx(ctx, id, func(tx *gorm.DB, player *pb.Player, g *model.GameState) error {
+		if err := s.tacticalFormationUseApply(player, g, b, result); err != nil {
+			return err
+		}
+		return s.refreshP5GrowthFightPower(ctx, tx, player, g)
 	})
 	return []proto.Message{result}, err
 }
