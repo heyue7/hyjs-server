@@ -30,6 +30,16 @@ func p7ReRushBonusProjection(bonus *pb.BaseProp) *pb.BaseProp {
 // p7ReRushAcceptedWins 只接受实际结束且与原引擎权威记录一致的胜利。
 // runID为0用于历史扫荡资格，当前轮分段严格匹配轮次；查询不生成通关状态。
 func p7ReRushAcceptedWins(tx *gorm.DB, id, runID int64, from, to int32, sourceFight ...string) (map[int32]p7ReRushWin, error) {
+	if q := p7EliteProjectionFor(tx); q != nil && q.state.PlayerID == id && (runID == 0 || q.state.RunID == runID) {
+		if err := q.load(); err != nil {
+			return nil, err
+		}
+		var source *string
+		if len(sourceFight) == 1 {
+			source = &sourceFight[0]
+		}
+		return q.acceptedWins(runID, from, to, source)
+	}
 	var tasks []string
 	for floor := from; floor <= to; floor++ {
 		tasks = append(tasks, fmt.Sprintf("local_rush_%d", floor))
@@ -225,18 +235,58 @@ func (s *GameService) p7ApplyReRushBonus(tx *gorm.DB, state *db.P7RushState, par
 	return result, nil
 }
 
+// p7ReRushPendingAddition 每次只取最早已领奖未选择段，来源证明由调用方按该段核验。
+func p7ReRushPendingAddition(tx *gorm.DB, state *db.P7RushState) (*db.P7ReRushSection, error) {
+	var row db.P7ReRushSection
+	err := tx.Where("player_id=? AND run_id=? AND claimed=? AND selected=?", state.PlayerID, state.RunID, true, "").Order("section ASC").First(&row).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	return &row, err
+}
+
+// p7ReRushSaveAdditionOffer 保留已确认段号，直到下一次明确打开选项，阻止重复确认消费后段。
+func p7ReRushSaveAdditionOffer(tx *gorm.DB, state *db.P7RushState, section int32) error {
+	if state.AdditionOfferSection == section {
+		return nil
+	}
+	if err := tx.Model(&db.P7RushState{}).Where("player_id=?", state.PlayerID).Update("addition_offer_section", section).Error; err != nil {
+		return err
+	}
+	state.AdditionOfferSection = section
+	return nil
+}
+
 // p7ReRushSectionFlags 保留每三层先领奖、再选择加成的原顺序。
 func p7ReRushSectionFlags(tx *gorm.DB, state *db.P7RushState) (int32, int32, error) {
 	section := (state.Floor - 1) / 3
 	if section < 1 {
 		return 0, 0, nil
 	}
-	_, hash, complete, err := p7ReRushSectionProof(tx, state, section)
-	if err != nil || !complete {
-		return 0, 0, err
-	}
 	row, err := p7ReRushSectionRow(tx, state, section)
 	if err != nil {
+		return 0, 0, err
+	}
+	pending, err := p7ReRushPendingAddition(tx, state)
+	if err != nil {
+		return 0, 0, err
+	}
+	if pending != nil {
+		_, hash, complete, err := p7ReRushSectionProof(tx, state, pending.Section)
+		if err != nil {
+			return 0, 0, err
+		}
+		if !complete || pending.AcceptanceHash != hash {
+			return 0, 0, errors.New("Re试炼待选加成分段来源冲突")
+		}
+		// 主页面仅验证当前待展示段；最新段未领奖仍优先拦截后续扫荡。
+		if !row.Claimed {
+			return 1, 1, nil
+		}
+		return 0, 1, nil
+	}
+	_, hash, complete, err := p7ReRushSectionProof(tx, state, section)
+	if err != nil || !complete {
 		return 0, 0, err
 	}
 	if row.AcceptanceHash != "" && row.AcceptanceHash != hash {

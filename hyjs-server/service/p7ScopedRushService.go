@@ -79,6 +79,9 @@ func (s *GameService) p7ScopedStageAvailable(ctx context.Context, tx *gorm.DB, p
 		}
 	}
 	start := &pb.SCRushFightStart{FightId: proto.String("scope-query"), RandSeed: proto.Int64(0), BattlePlayer: attacker, BattleMonsterList: []*pb.BattleMonster{monster}, FightScene: proto.String(cfg.Scene), MaxRound: proto.Int32(cfg.MaxRound), WinKey: proto.Int32(cfg.WinKey), WinValue: proto.Int32(cfg.WinValue), RushType: proto.Int32(cfg.Kind)}
+	if p7EliteProjectionFor(tx) != nil {
+		return s.p7FreshRushDirectoryScope(start, cfg.Kind == constUtil.P7RushTrial)
+	}
 	series, err := s.FreezeP6RushSeriesInput(start, cfg.Kind == constUtil.P7RushTrial, true, nil, constUtil.P6OriginalClientHash)
 	if err != nil {
 		return false, nil

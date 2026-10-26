@@ -316,6 +316,12 @@ func (s *GameService) P7RushQuery(ctx context.Context, id int64, request proto.M
 		if err != nil {
 			return err
 		}
+		if _, wholeElite := request.(*pb.CSGetRushEliteBossInfo); !wholeElite {
+			tx, err = s.p7BindSettledQueryProjection(tx, state)
+			if err != nil {
+				return err
+			}
+		}
 		authority, err := p7AuthorityAvailable(tx)
 		if err != nil {
 			return err
@@ -1208,6 +1214,7 @@ func (s *GameService) P7RushMutation(ctx context.Context, id int64, request prot
 				return err
 			}
 			state.RunID++
+			state.AdditionOfferSection = 0
 			state.Floor = 1
 			state.TotalStars = 0
 		}

@@ -106,10 +106,11 @@ namespace HYJS.Feedback66
             }
             value.EndPending = false;
             value.Recoverable = true;
-            value.Rejected = error != null && packet.nOpCode == 10001 && error.code == "90003" && error.msg == Conflict;
+            value.Rejected = error != null && packet.nOpCode == 10001 && error.code == "90003" &&
+                (error.msg == Conflict || error.msg != null && error.msg.StartsWith("录像操作不符合原技能时序:", StringComparison.Ordinal));
             LeaveBattle(value);
             Message(value.Rejected && value.PaidStart != null
-                ? "结算未完成，请点击原挑战按钮重新挑战本次战斗，次数不会重复扣除"
+                ? "战斗录像校验未通过，请点击挑战重新进行本次战斗，次数不会重复扣除"
                 : "结算未确认，请点击原挑战按钮重试本次结算");
         }
         public static bool Click(object entry, int mode)
@@ -145,9 +146,11 @@ namespace HYJS.Feedback66
         {
             State value = state;
             if (!Owned(value)) { state = null; return false; }
-            if (mode != 1 || value.Mode != mode || !value.Recoverable || value.Rejected) return false;
+            if (mode != 1 || value.Mode != mode || !value.Recoverable) return false;
             if (value.StartPending || value.InBattle || value.EndPending || NetAPI.IsSendingHttp()) return true;
-            RetryEnd(value);
+            if (value.Rejected && value.PaidStart != null && value.Entry != null) Resume(value, value.Entry);
+            else if (!value.Rejected) RetryEnd(value);
+            else return false;
             return true;
         }
         public static void Request(object entry, object request, int mode)
@@ -346,7 +349,7 @@ namespace HYJS.Feedback66
                 StaticData.curBattleData.SetData(start, true);
                 room.isReadyForBattle = true;
                 Page page = FieldValue(entry, "curPage") as Page;
-                if (page != null) page.Close();
+                if (page != null && PageManager.Instance.currentPage == page) page.Close();
             }
             else
             {

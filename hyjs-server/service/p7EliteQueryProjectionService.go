@@ -30,8 +30,8 @@ type p7EliteQueryParsed struct {
 	startHash, winHash      string
 }
 
-// p7EliteQueryProjection owns one locked query's source snapshot. No snapshot or
-// memo escapes this query; mutation and general settled-read invalidation stay unchanged.
+// p7EliteQueryProjection owns one profile transaction's accepted fight sources.
+// No source snapshot escapes it; sweep writes reread their current-run facts.
 type p7EliteQueryProjection struct {
 	serverID           int64
 	certificateRuntime *p7RushCertificateRuntime
@@ -42,6 +42,7 @@ type p7EliteQueryProjection struct {
 	fights             []db.P7RushFight
 	sweeps             []db.P7ReRushSweep
 	loaded             bool
+	refreshSweeps      bool
 	manuals            map[string]db.P7RushManualCalculation
 	scoped             map[string]db.P7RushScopedCalculation
 	records            map[string]db.P6BattleRecord
@@ -72,6 +73,18 @@ func p7NewEliteQueryProjection(tx *gorm.DB, state *db.P7RushState) (*p7EliteQuer
 		q.progress[row.Kind][row.TaskID] = true
 	}
 	return q, nil
+}
+
+// Bind settled-source proof reuse to one owning profile transaction. Section
+// choice/reward changes no fight source. Sweep requests also reread new sweep
+// facts before proving a section; paid Start and battle End never bind it.
+func (s *GameService) p7BindSettledQueryProjection(tx *gorm.DB, state *db.P7RushState) (*gorm.DB, error) {
+	q, err := p7NewEliteQueryProjection(tx, state)
+	if err != nil {
+		return nil, err
+	}
+	q.serverID = s.OriginalServerID()
+	return tx.WithContext(context.WithValue(tx.Statement.Context, constUtil.P7EliteQueryProjectionKey{}, q)), nil
 }
 
 // Load by owner and explicit source IDs, with bounded IN queries and no joins.
@@ -265,6 +278,13 @@ func (q *p7EliteQueryProjection) runWins(floor int32) (map[int32]p7ReRushWin, er
 }
 
 func (q *p7EliteQueryProjection) runWinsBetween(from, floor int32) (map[int32]p7ReRushWin, error) {
+	if q.refreshSweeps {
+		// The same sweep request may have just appended up to three facts.
+		// Keep accepted battle proofs while rereading every current-run sweep.
+		if err := q.tx.Where("player_id=? AND run_id=?", q.state.PlayerID, q.state.RunID).Find(&q.sweeps).Error; err != nil {
+			return nil, err
+		}
+	}
 	wins, err := q.acceptedWins(q.state.RunID, from, floor, nil)
 	if err != nil {
 		return nil, err
@@ -406,7 +426,11 @@ func (q *p7EliteQueryProjection) scopeAvailable(s *GameService, ctx context.Cont
 
 // The input series never escapes this fresh server-source qualification boundary.
 func (s *GameService) p7FreshEliteDirectoryScope(start *pb.SCRushFightStart) (bool, error) {
-	series, err := s.FreezeP6RushSeriesInput(start, false, true, nil, constUtil.P6OriginalClientHash)
+	return s.p7FreshRushDirectoryScope(start, false)
+}
+
+func (s *GameService) p7FreshRushDirectoryScope(start *pb.SCRushFightStart, trial bool) (bool, error) {
+	series, err := s.FreezeP6RushSeriesInput(start, trial, true, nil, constUtil.P6OriginalClientHash)
 	if err != nil {
 		return false, nil
 	}

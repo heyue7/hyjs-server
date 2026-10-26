@@ -253,11 +253,17 @@ func p7GenericMechanismRushComputeEnd(ctx context.Context, _ *GameService, serie
 		if result, fallbackErr := p7RoundLiveAutoRushComputeEnd(ctx, engine, series, supplied, reported); fallbackErr == nil {
 			return result, nil
 		}
+		if result, fallbackErr := p7LiveRecordedRushComputeEnd(ctx, engine, series, supplied, reported); fallbackErr == nil {
+			return result, nil
+		}
 		return nil, manualErr
 	}
 	out, _, err = engine.ComputeP6GenericMechanismBattle(ctx, autoInput, nil)
 	if err != nil || !proto.Equal(supplied, out.OriginalOperates) {
 		if result, fallbackErr := p7RoundLiveAutoRushComputeEnd(ctx, engine, series, supplied, reported); fallbackErr == nil {
+			return result, nil
+		}
+		if result, fallbackErr := p7LiveRecordedRushComputeEnd(ctx, engine, series, supplied, reported); fallbackErr == nil {
 			return result, nil
 		}
 		return nil, manualErr
@@ -335,6 +341,9 @@ func (admission *p7GenericMechanismRushAdmission) validateEnd(series *model.Froz
 	}
 	if out == nil || out.Outcome == nil {
 		return errors.New(constUtil.P6ReplayConflict)
+	}
+	if out.Outcome.DiagnosticAIDriverPolicy == constUtil.P6LiveRecordedDriver {
+		return p7LiveRecordedRushValidateEnd(series, out, supplied, reported)
 	}
 	if out.Outcome.DiagnosticAIDriverPolicy == constUtil.P6RoundLiveAutoDriver {
 		return p7RoundLiveAutoRushValidateEnd(series, out, supplied, reported)
