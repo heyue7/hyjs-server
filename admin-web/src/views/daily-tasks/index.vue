@@ -5,12 +5,13 @@ import type { DialogReactive } from 'naive-ui';
 import ResourceValueEditor from '@/components/operations/resource-value-editor.vue';
 import { useOperations } from '@/composables/useOperations';
 import { getDailyTasks, saveDailyTasks } from '@/service/daily-tasks';
-import type { DailyTaskRow, DailyTaskRules } from '@/service/daily-tasks';
+import type { DailyTaskRow, DailyTaskRules, DailyTaskBox } from '@/service/daily-tasks';
 import { ApiError, errorMessage } from '@/service/operations';
 
 const { canWrite } = useOperations();
 const snapshot = ref<DailyTaskRules>();
 const rows = ref<(DailyTaskRow & { value: string; valid: boolean })[]>([]);
+const boxes = ref<(DailyTaskBox & { value: string; valid: boolean })[]>([]);
 const reason = ref('');
 const original = ref('');
 const loading = ref(false);
@@ -18,13 +19,14 @@ const saving = ref(false);
 const error = ref('');
 const conflict = ref(false);
 let alive = true;
-const contents = () => JSON.stringify(rows.value.map(row => ({ id: row.id, value: row.value })));
+const contents = () => JSON.stringify({tasks:rows.value.map(row => ({ id: row.id, value: row.value })), boxes:boxes.value.map(row => ({id:row.id,value:row.value}))});
 const dirty = computed(() => Boolean(snapshot.value) && contents() !== original.value);
 const disabled = computed(() => !canWrite.value || saving.value || loading.value || conflict.value);
-const valid = computed(() => rows.value.length === 7 && rows.value.every(row => row.valid));
+const valid = computed(() => rows.value.length === 7 && rows.value.every(row => row.valid) && boxes.value.every(row => row.valid));
 function apply(data: DailyTaskRules) {
   snapshot.value = data;
   rows.value = data.items.map(row => ({ ...row, value: `${row.reward.resourceId},${row.reward.amount}`, valid: true }));
+  boxes.value = (data.boxes || []).map(row => ({...row, value:row.rewards.map(r => `${r.resourceId},${r.amount}`).join(';'),valid:true}));
   original.value = contents();
   reason.value = '';
   conflict.value = false;
@@ -68,7 +70,7 @@ async function submit() {
   saving.value = true;
   error.value = '';
   try {
-    const data = await saveDailyTasks({ version: snapshot.value.version, reason: reason.value.trim(), items: rows.value.map(row => {
+    const data = await saveDailyTasks({ version: snapshot.value.version, boxes: boxes.value.map(row => ({id:row.id,rewards:row.value.split(';').map(part => {const [resourceId,amount]=part.split(',');return {resourceId,amount:Number(amount)};})})), reason: reason.value.trim(), items: rows.value.map(row => {
       const [resourceId, amount] = row.value.split(',');
       return { id: row.id, reward: { resourceId, amount: Number(amount) } };
     }) });
@@ -116,6 +118,16 @@ onBeforeUnmount(() => { alive = false; pendingDialog?.dispose(); window.removeEv
           <ResourceValueEditor v-model:value="row.value" single :label="`${row.name}奖励`" :disabled="disabled" @valid="row.valid = $event" />
         </article>
       </section>
+      <NCollapse v-if="boxes.length" class="mt-20px">
+        <NCollapseItem title="积分宝箱 · 按角色等级配置四档奖励" name="score-boxes">
+          <section class="daily-list" aria-label="每日积分宝箱">
+            <article v-for="box in boxes" :key="box.id" class="daily-row">
+              <div class="daily-condition"><h2>{{ box.name }}</h2><p>达到 {{ box.score }} 积分后领取</p></div>
+              <ResourceValueEditor v-model:value="box.value" :label="box.name" :disabled="disabled" @valid="box.valid = $event" />
+            </article>
+          </section>
+        </NCollapseItem>
+      </NCollapse>
     </NSpin>
     <form v-if="snapshot" class="daily-save" @submit.prevent="save">
       <p>今天已生成的任务保持原奖励。新奖励从明天生效；今天尚未生成任务的角色首次进入时也会使用。</p>

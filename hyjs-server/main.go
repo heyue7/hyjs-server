@@ -47,6 +47,7 @@ func run() error {
 		logFile        = flag.String("log-file", "", "isolated process log path; empty keeps configured path")
 		warmRushPlayer = flag.Int64("warm-rush-history-player", 0, "validate existing trial history and persist signed certificates, then exit")
 		testPayments   = flag.Bool("enable-test-payments", false, "enable loopback-only demo payment confirmation")
+		applyGrowth    = flag.Bool("apply-growth74", false, "apply the authorized growth configuration during maintenance, then exit")
 		localWallet    = flag.Bool("enable-local-wallet", false, "enable local demo wallet payments in dev/test; no real charge")
 	)
 	flag.Parse()
@@ -135,6 +136,7 @@ func run() error {
 		fmt.Println("Trial history certificates verified")
 		return nil
 	}
+	s.InstallGrowth74Resources()
 	if err = s.InstallGGOItems(); err != nil {
 		return err
 	}
@@ -500,6 +502,9 @@ func run() error {
 	// 默认放行历史APK，更新策略仅由后台显式发布。
 	if err = s.InitializeClientUpdates(ctx); err != nil {
 		return err
+	}
+	if *applyGrowth {
+		return s.ApplyGrowth74(ctx)
 	}
 	httpListener, err := net.Listen("tcp", net.JoinHostPort(cfg.Bind, strconv.Itoa(cfg.HTTPPort)))
 	if err != nil {

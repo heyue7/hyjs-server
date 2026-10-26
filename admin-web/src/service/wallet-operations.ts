@@ -61,7 +61,7 @@ export interface TerminalSettings {
   burstCostPoints: number;
   burstMinPoints: number;
   burstMaxPoints: number;
-  weekly: { id: string; weekday: number; points: number; enabled: boolean }[];
+  weekly: { id: string; kind?: 'daily' | 'weekly' | 'monthly' | 'once'; time?: string; day?: number; date?: string; weekday: number; points: number; enabled: boolean }[];
 }
 export interface TerminalDistribution {
   batchId: string; points: number; recipients: number; credited: number; createdAt: number; kind: string; status: string;

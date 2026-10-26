@@ -5,6 +5,16 @@
 // arena/catalogue actions are declared in constUtil/adminArenaPrize.go and reActivityCatalogue.go.
 // Save/state actions stay distinct: a save does not imply publication or freezing.
 const actionLabels: Readonly<Record<string, string>> = {
+  'server.start': '启动游戏服务',
+  'server.stop': '关服维护',
+  'terminal.settings': '保存终端投放设置',
+  'terminal.distribute': '单次投放超频点数',
+  'copy.fragments.update': '调整副本碎片保底',
+  'growth74.applied': '应用成长投放方案',
+  'growth74.activities': '发布成长活动排期',
+  'growth74.test.anchor': '设置个人活动测试起点',
+  'growth74.test.leave': '维护期间退出副本',
+  'growth74.client.compatibility': '发布兼容客户端版本',
   'account.create': '新建游戏用户',
   'account.update': '编辑游戏用户',
   'account.password.reset': '重置游戏密码',

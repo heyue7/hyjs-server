@@ -21,6 +21,7 @@ parser.add_argument('--env-file', type=Path, default=ROOT / 'deploy/.env', help=
 parser.add_argument('--check-config', action='store_true', help='Validate and render templates without build, SSH or Docker')
 parser.add_argument('--migrate-role-wallets', action='store_true', help='Quiesce legacy writers, back up and reconcile the one-time role-wallet cutover')
 parser.add_argument('--warm-rush-history-player', action='append', type=int, default=[], help='Prevalidate this existing owner with the exact candidate before application cutover')
+parser.add_argument('--apply-growth74', action='store_true', help='Apply reviewed growth configuration while game is in maintenance')
 parser.add_argument('--expected-live-revision', help='Refuse activation if a different live release appeared')
 args = parser.parse_args()
 settings = load(args.env_file)
@@ -128,6 +129,8 @@ for player_id in args.warm_rush_history_player:
     command += ' --warm-rush-history-player ' + str(player_id)
 if args.expected_live_revision:
     command += ' --expected-live-revision ' + shlex.quote(args.expected_live_revision)
+if args.apply_growth74:
+    command += ' --apply-growth74'
 if args.migrate_role_wallets:
     command += ' --migrate-role-wallets'
 if args.provision or args.update_ingress:

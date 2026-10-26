@@ -484,6 +484,30 @@ func (s *GameService) AdminClientUpdateAction(ctx context.Context, actor *model.
 		if clientUpdateVersion(p) != req.Version {
 			return constUtil.ErrAdminConfigConflict
 		}
+		if req.Action == "server_stop" || req.Action == "server_start" {
+			stop := req.Action == "server_stop"
+			if stop != p.Maintenance || (!stop && p.MaintenanceStartAt != 0) {
+				p.Maintenance = stop
+				p.MaintenanceStartAt, p.MaintenanceEndAt = 0, 0
+				if stop {
+					p.MaintenanceStartAt = time.Now().UnixMilli()
+					p.MaintenanceEpoch++
+					notify = true
+				}
+				p.Revision++
+				if err = tx.Save(&p).Error; err != nil {
+					return err
+				}
+			}
+			if err = adminAudit(tx, actor, "server."+map[bool]string{true: "stop", false: "start"}[stop], "runtime", req.Reason); err != nil {
+				return err
+			}
+			out, err = s.clientUpdateOverview(ctx, tx, actor)
+			if err != nil {
+				return err
+			}
+			return tx.Create(&db.ClientUpdateAction{RequestID: req.RequestID, PayloadHash: hash, ActorID: actor.UserID, ResponseJSON: string(adminJSON(out)), CreatedAt: time.Now().UnixMilli()}).Error
+		}
 		var r db.ClientUpdateRelease
 		if err = tx.First(&r, req.ID).Error; err != nil {
 			return err

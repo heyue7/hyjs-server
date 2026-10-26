@@ -2,10 +2,14 @@ package model
 
 // TerminalWeeklyRule configures a real Beijing weekday delivery (Monday=1, Sunday=7).
 type TerminalWeeklyRule struct {
-	ID      string `json:"id"`      // ID remains stable across edits.
-	Weekday int64  `json:"weekday"` // Weekday is 1 through 7.
-	Points  int64  `json:"points"`  // Points is the whole overclock point award.
-	Enabled bool   `json:"enabled"` // Enabled permits future deliveries.
+	ID      string `json:"id"`             // ID remains stable across edits.
+	Kind    string `json:"kind,omitempty"` // Kind is daily, weekly, monthly or once; empty preserves legacy weekly.
+	Time    string `json:"time,omitempty"` // Time is Beijing HH:MM, default 00:00.
+	Day     int64  `json:"day,omitempty"`  // Day is a monthly calendar day 1..31; short months skip missing days.
+	Date    string `json:"date,omitempty"` // Date is YYYY-MM-DD for a one-off rule.
+	Weekday int64  `json:"weekday"`        // Weekday is 1 through 7.
+	Points  int64  `json:"points"`         // Points is the whole overclock point award.
+	Enabled bool   `json:"enabled"`        // Enabled permits future deliveries.
 }
 
 // TerminalSettings is the per-realm settings request and response.

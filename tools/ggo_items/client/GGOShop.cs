@@ -20,7 +20,8 @@ namespace HYJS.GGO
         TabScoreShop layout;
         UILabel balanceLabel;
         TopBarItem balanceItem;
-        CommonIcon balanceIcon;
+        UITexture balanceIcon;
+        static Texture2D balanceTexture;
         GameObject refreshButton; UILabel refreshInfo; UIButton refreshControl;
         bool refreshEnabled; long freeRefreshLeft, paidRefreshLeft, refreshCost; string refreshCurrency = "";
         const string RefreshProduct = "__refresh__";
@@ -211,18 +212,29 @@ namespace HYJS.GGO
             UISprite nativeIcon = balanceItem.logoSprite;
             if (nativeIcon == null) return;
             nativeIcon.gameObject.SetActive(true);
+            if (balanceTexture == null)
+            {
+                balanceTexture = new Texture2D(2, 2, TextureFormat.ARGB32, false);
+                using (System.IO.Stream stream = typeof(GGOShop).Assembly.GetManifestResourceStream("credit_hud.png"))
+                {
+                    byte[] bytes = new byte[stream.Length]; stream.Read(bytes, 0, bytes.Length); balanceTexture.LoadImage(bytes);
+                }
+                balanceTexture.filterMode = FilterMode.Bilinear;
+            }
             if (balanceIcon == null)
             {
-                balanceIcon = CommonMethod.CreateCommonIcon(nativeIcon.transform);
-                balanceIcon.gameObject.name = "GGOCreditTopBarIcon";
-                balanceIcon.transform.localPosition = Vector3.zero;
-                balanceIcon.transform.localScale = Vector3.one * (Math.Max(1, Math.Min(nativeIcon.width, nativeIcon.height)) / 128f);
+                GameObject child = new GameObject("GGOCreditTopBarIcon");
+                child.layer = nativeIcon.gameObject.layer;
+                child.transform.parent = nativeIcon.transform;
+                child.transform.localPosition = Vector3.zero;
+                child.transform.localScale = Vector3.one;
+                balanceIcon = child.AddComponent<UITexture>();
             }
-            // Reuse the same registered GGO resource and original icon renderer
-            // as the existing credit quantity selector, within the native slot.
-            balanceIcon.SetData(currency, false, -1, null);
-            if (balanceIcon.itemCount != null) balanceIcon.itemCount.gameObject.SetActive(false);
-            // Keep the parent widget enabled so NGUI does not hide the child icon.
+            balanceIcon.mainTexture = balanceTexture;
+            balanceIcon.width = Math.Max(1, nativeIcon.width);
+            balanceIcon.height = Math.Max(1, nativeIcon.height);
+            balanceIcon.depth = nativeIcon.depth + 1;
+            balanceIcon.color = Color.white;
             nativeIcon.spriteName = ""; nativeIcon.enabled = true;
         }
         void SetNotice(string text)

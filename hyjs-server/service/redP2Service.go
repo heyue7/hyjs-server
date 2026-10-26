@@ -70,6 +70,7 @@ func (s *GameService) InitializeP2(ctx context.Context) error {
 			box    string
 			heroes []string
 		}{
+			{"item_340", []string{"equip_041", "equip_042", "equip_043", "equip_044"}},
 			{"item_361", []string{"hero_001", "hero_002", "hero_065"}},
 			{"item_362", []string{"hero_003", "hero_004", "hero_066"}},
 			{"item_363", []string{"hero_005", "hero_006", "hero_067"}},

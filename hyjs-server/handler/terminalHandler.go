@@ -67,7 +67,7 @@ func AdminTerminalSettingsUpdateHandler(c *gin.Context) {
 	}
 	ids := map[string]bool{}
 	for _, rule := range req.Weekly {
-		if len(rule.ID) < 1 || len(rule.ID) > 48 || strings.TrimSpace(rule.ID) != rule.ID || strings.IndexFunc(rule.ID, unicode.IsControl) >= 0 || ids[rule.ID] || rule.Weekday < 1 || rule.Weekday > 7 || rule.Points < 1 || rule.Points > max {
+		if len(rule.ID) < 1 || len(rule.ID) > 48 || strings.TrimSpace(rule.ID) != rule.ID || strings.IndexFunc(rule.ID, unicode.IsControl) >= 0 || ids[rule.ID] || !service.TerminalScheduleValid(rule) || rule.Points < 1 || rule.Points > max {
 			adminError(c, constUtil.ErrAdminInput)
 			return
 		}

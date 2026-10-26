@@ -18,6 +18,7 @@ parser.add_argument('--initial-db', action='store_true')
 parser.add_argument('--provision-ingress', action='store_true')
 parser.add_argument('--migrate-role-wallets', action='store_true')
 parser.add_argument('--expected-live-revision')
+parser.add_argument('--apply-growth74', action='store_true')
 parser.add_argument('--warm-rush-history-player', action='append', type=int, default=[])
 args = parser.parse_args()
 os.umask(0o077)
@@ -114,6 +115,10 @@ os.chmod(temporary_env, 0o600)
 os.replace(temporary_env, private_env)
 # Verify the encrypted snapshot before Compose can restart MySQL for new limits.
 wallet_baseline = None
+if args.apply_growth74:
+    assert args.expected_live_revision and not args.initial_db
+    assert mysql('SELECT maintenance FROM client_update_policy WHERE id=1;').strip() == '1', 'Growth apply requires maintenance'
+    compose('stop', '-t', '30', 'app')
 if args.migrate_role_wallets:
     assert args.expected_live_revision and not args.initial_db and (ROOT / 'migration.json').exists()
     import role_wallet_migration
@@ -188,6 +193,12 @@ for player_id in args.warm_rush_history_player:
     compose('run', '--rm', '--no-deps', '-T', 'app', '--env', 'test', '--tables', '/app/tables',
             '--warm-rush-history-player', str(player_id), '--log-file', '/app/logs/rush-history-warm.log')
 manifest['prewarmedRushPlayers'] = sorted(set(args.warm_rush_history_player))
+
+if args.apply_growth74:
+    compose('run', '--rm', '--no-deps', '-T', 'app', '--env', 'test', '--tables', '/app/tables',
+            '--enable-test-payments', '--enable-local-wallet', '--apply-growth74', '--log-file', '/app/logs/growth74-apply.log')
+    assert mysql('SELECT maintenance FROM client_update_policy WHERE id=1;').strip() == '1'
+    manifest['growth74Applied'] = True
 
 compose('up', '-d', '--no-deps', '--force-recreate', 'app')
 for _ in range(90):

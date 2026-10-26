@@ -91,7 +91,15 @@ func AdminOverview(ctx context.Context, itemCount int64) (map[string]any, error)
 	if audit == nil {
 		audit = []db.AdminAudit{}
 	}
-	return map[string]any{"server": map[string]string{"version": "HYJS Go", "status": "running"}, "counts": counts, "recentAudit": audit}, nil
+	policy, err := clientUpdatePolicy(ctx)
+	if err != nil {
+		return nil, err
+	}
+	status := "running"
+	if policy.Maintenance {
+		status = "stopped"
+	}
+	return map[string]any{"server": map[string]string{"version": "HYJS Go", "status": status, "policyVersion": clientUpdateVersion(policy)}, "counts": counts, "recentAudit": audit}, nil
 }
 func adminActivityProjection(domain string, v any, rewards []db.GameplayPoolReward) model.AdminActivityDTO {
 	a := model.AdminActivityDTO{Type: domain, Configured: true}

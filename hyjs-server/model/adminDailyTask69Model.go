@@ -14,6 +14,7 @@ type AdminDailyTask69Item struct {
 
 // AdminDailyTask69Response 包含整批内容版本。
 type AdminDailyTask69Response struct {
+	Boxes   []AdminDailyTaskBox74  `json:"boxes"`   // 原积分宝箱，按等级和所需积分展示。
 	Version string                 `json:"version"` // 整批规则内容版本。
 	Items   []AdminDailyTask69Item `json:"items"`   // 七项任务或奖励。
 }
@@ -26,7 +27,20 @@ type AdminDailyTask69Reward struct {
 
 // AdminDailyTask69SaveRequest 原子更新全部七项奖励。
 type AdminDailyTask69SaveRequest struct {
-	Version string                   `json:"version" binding:"required"` // 整批规则内容版本。
-	Reason  string                   `json:"reason" binding:"required"`  // 修改原因。
-	Items   []AdminDailyTask69Reward `json:"items" binding:"required"`   // 七项任务或奖励。
+	Boxes   []AdminDailyTaskBoxReward74 `json:"boxes,omitempty"`            // 省略时保持旧调用方只修改任务奖励。
+	Version string                      `json:"version" binding:"required"` // 整批规则内容版本。
+	Reason  string                      `json:"reason" binding:"required"`  // 修改原因。
+	Items   []AdminDailyTask69Reward    `json:"items" binding:"required"`   // 七项任务或奖励。
+}
+
+// AdminDailyTaskBox74 exposes the existing score chest rules.
+type AdminDailyTaskBox74 struct {
+	ID      string                `json:"id"`
+	Name    string                `json:"name"`
+	Score   int32                 `json:"score"`
+	Rewards []AdminResourceAmount `json:"rewards"`
+}
+type AdminDailyTaskBoxReward74 struct {
+	ID      string                `json:"id"`
+	Rewards []AdminResourceAmount `json:"rewards"`
 }

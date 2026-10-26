@@ -92,6 +92,16 @@ func AdminTerminalSettings(ctx context.Context, actor *model.AdminPrincipal) (*m
 	return &out, err
 }
 func AdminSaveTerminalSettings(ctx context.Context, actor *model.AdminPrincipal, req model.TerminalSettings) (*model.TerminalSettings, error) {
+	if len(req.Weekly) > 100 {
+		return nil, constUtil.ErrAdminInput
+	}
+	ids := map[string]bool{}
+	for _, r := range req.Weekly {
+		if !TerminalScheduleValid(r) || r.ID == "" || ids[r.ID] || r.Points < 1 || r.Points > constUtil.LocalWalletMaxCreditCents/100 {
+			return nil, constUtil.ErrAdminInput
+		}
+		ids[r.ID] = true
+	}
 	var out model.TerminalSettings
 	err := db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := adminOperationUser(tx, actor, true); err != nil {
@@ -406,8 +416,10 @@ func terminalFreeze(tx *gorm.DB, serverID int64, requestID string, points int64,
 	row = db.TerminalBatch{ID: id, ServerID: serverID, RequestID: requestID, BodyHash: hash, Points: points, Reason: reason, Kind: kind, CreatedAt: now.UnixMilli(), Status: "pending"}
 	// Page profile saves and batch-read account eligibility; draw all labels from one loaded catalogue.
 	var catalogue []db.LocalWalletReason
-	if err = tx.Where("enabled=?", true).Order("id").Find(&catalogue).Error; err != nil {
-		return row, false, err
+	if kind != "admin_manual" {
+		if err = tx.Where("enabled=?", true).Order("id").Find(&catalogue).Error; err != nil {
+			return row, false, err
+		}
 	}
 	var cursor int64
 	for {
@@ -453,11 +465,15 @@ func terminalFreeze(tx *gorm.DB, serverID int64, requestID string, points int64,
 				continue
 			}
 			pageSeen[profile.AccountID] = true
-			reasonRow, drawErr := drawWalletReasonRows(catalogue, points*100)
-			if drawErr != nil {
-				return row, false, drawErr
+			label, reasonID := reason, ""
+			if kind != "admin_manual" {
+				reasonRow, drawErr := drawWalletReasonRows(catalogue, points*100)
+				if drawErr != nil {
+					return row, false, drawErr
+				}
+				label, reasonID = walletReasonLabel(reasonRow.Label, points*100), reasonRow.ID
 			}
-			recipients = append(recipients, db.TerminalRecipient{BatchID: id, AccountID: profile.AccountID, PlayerID: profile.Id, Label: walletReasonLabel(reasonRow.Label, points*100), ReasonID: reasonRow.ID})
+			recipients = append(recipients, db.TerminalRecipient{BatchID: id, AccountID: profile.AccountID, PlayerID: profile.Id, Label: label, ReasonID: reasonID})
 		}
 		if len(recipients) > 0 {
 			// The composite receipt key deduplicates accounts across pages without retaining every profile in memory.
@@ -615,21 +631,39 @@ func (s *GameService) processTerminalDistributionsAt(ctx context.Context, now ti
 	if err != nil {
 		return err
 	}
-	weekday := int64(now.In(time.FixedZone("Asia/Shanghai", 8*3600)).Weekday())
-	if weekday == 0 {
-		weekday = 7
-	}
 	for _, rule := range cfg.Weekly {
-		if !rule.Enabled || rule.Weekday != weekday {
+		key, due := terminalScheduleDue(rule, now)
+		if !due {
 			continue
 		}
 		var row db.TerminalBatch
 		err = d.Transaction(func(tx *gorm.DB) error {
 			var err error
-			// Rule identity and real date make same-day restarts/config edits replay the frozen batch.
-			row, _, err = terminalFreeze(tx, serverID, "weekly-"+terminalDay(now)+"-"+rule.ID, rule.Points, "每周超频点数投放", "admin_weekly", cfg.Version, now)
+			// Old weekly rows used the delivery date. Reuse any frozen batch from
+			// this week so migration or weekday edits cannot create a second award.
+			if rule.Kind == "" || rule.Kind == "weekly" {
+				local := now.In(time.FixedZone("Asia/Shanghai", 8*3600))
+				weekday := int(local.Weekday())
+				if weekday == 0 {
+					weekday = 7
+				}
+				monday := local.AddDate(0, 0, 1-weekday)
+				keys := []string{}
+				for i := 0; i < 7; i++ {
+					keys = append(keys, "weekly-"+terminalDay(monday.AddDate(0, 0, i))+"-"+rule.ID)
+				}
+				priorErr := tx.Where("server_id=? AND request_id IN ?", serverID, keys).Order("created_at").First(&row).Error
+				if priorErr == nil {
+					return nil
+				}
+				if !errors.Is(priorErr, gorm.ErrRecordNotFound) {
+					return priorErr
+				}
+			}
+			// Stable period identity makes restarts and edits replay the frozen batch.
+			row, _, err = terminalFreeze(tx, serverID, key, rule.Points, "定期超频点数投放", "admin_weekly", cfg.Version, now)
 			if errors.Is(err, constUtil.ErrAdminConfigConflict) {
-				id := fmt.Sprintf("terminal:%d:weekly-%s-%s", serverID, terminalDay(now), rule.ID)
+				id := fmt.Sprintf("terminal:%d:%s", serverID, key)
 				return tx.First(&row, "id=?", id).Error
 			}
 			return err

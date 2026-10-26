@@ -11,9 +11,11 @@ export interface DailyTaskRow {
   enabled: boolean;
   reward: ResourceAmount;
 }
-export interface DailyTaskRules { version: string; items: DailyTaskRow[] }
+export interface DailyTaskBox { id: string; name: string; score: number; rewards: ResourceAmount[] }
+export interface DailyTaskRules { version: string; items: DailyTaskRow[]; boxes?: DailyTaskBox[] }
 export interface DailyTaskSaveRequest {
   version: string;
+  boxes?: { id: string; rewards: ResourceAmount[] }[];
   reason: string;
   items: { id: string; reward: ResourceAmount }[];
 }

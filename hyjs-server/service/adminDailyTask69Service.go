@@ -35,6 +35,7 @@ func adminDailyTask69Name(kind int32) string {
 }
 
 func adminDailyTask69Read(tx *gorm.DB) (*model.AdminDailyTask69Response, []db.DailyTaskRule, error) {
+	tx = tx.Session(&gorm.Session{})
 	var rows []db.DailyTaskRule
 	if err := tx.Order("id").Find(&rows).Error; err != nil {
 		return nil, nil, err
@@ -42,9 +43,19 @@ func adminDailyTask69Read(tx *gorm.DB) (*model.AdminDailyTask69Response, []db.Da
 	if len(rows) != constUtil.AdminDailyTask69Count {
 		return nil, nil, constUtil.ErrAdminConfiguration
 	}
-	out := &model.AdminDailyTask69Response{Version: adminVersion(rows), Items: []model.AdminDailyTask69Item{}}
+	var boxes []db.DailyTaskBoxRule
+	if err := tx.Session(&gorm.Session{}).Order("id").Find(&boxes).Error; err != nil {
+		return nil, nil, err
+	}
+	out := &model.AdminDailyTask69Response{Version: adminVersion(struct {
+		Tasks []db.DailyTaskRule
+		Boxes []db.DailyTaskBoxRule
+	}{rows, boxes}), Items: []model.AdminDailyTask69Item{}}
 	for _, row := range rows {
 		out.Items = append(out.Items, model.AdminDailyTask69Item{ID: row.ID, Name: adminDailyTask69Name(row.Type), Type: row.Type, Total: row.Total, Score: row.Score, MinLevel: row.MinLevel, Enabled: row.Enabled, Reward: adminTypedResourceOne(row.Reward)})
+	}
+	for _, b := range boxes {
+		out.Boxes = append(out.Boxes, model.AdminDailyTaskBox74{ID: b.ID, Name: fmt.Sprintf("%d—%d级 · %d积分宝箱", b.StartLevel, b.EndLevel-1, b.Score), Score: b.Score, Rewards: adminTypedResources(b.Reward)})
 	}
 	return out, rows, nil
 }
@@ -109,6 +120,29 @@ func (s *GameService) AdminSaveDailyTasks69(ctx context.Context, actor *model.Ad
 			}
 			values[item.ID] = value
 		}
+		boxValues := map[string]string{}
+		if req.Boxes != nil {
+			if len(req.Boxes) != len(before.Boxes) {
+				return constUtil.ErrAdminInput
+			}
+			allowed := map[string]bool{}
+			for _, b := range before.Boxes {
+				allowed[b.ID] = true
+			}
+			for _, b := range req.Boxes {
+				if !allowed[b.ID] || boxValues[b.ID] != "" {
+					return constUtil.ErrAdminInput
+				}
+				value, e := s.adminTypedResourceSpec(b.Rewards, false)
+				if e != nil {
+					return e
+				}
+				if e = s.dailyTaskReward(value, false); e != nil {
+					return e
+				}
+				boxValues[b.ID] = value
+			}
+		}
 		changed := false
 		for _, row := range rows {
 			if row.Reward == values[row.ID] {
@@ -118,6 +152,12 @@ func (s *GameService) AdminSaveDailyTasks69(ctx context.Context, actor *model.Ad
 			if err := tx.Model(&db.DailyTaskRule{}).Where("id=?", row.ID).Update("reward", values[row.ID]).Error; err != nil {
 				return err
 			}
+		}
+		for id, value := range boxValues {
+			if err := tx.Model(&db.DailyTaskBoxRule{}).Where("id=?", id).Updates(map[string]any{"reward": value, "source": "后台积分宝箱配置"}).Error; err != nil {
+				return err
+			}
+			changed = true
 		}
 		if changed {
 			detail := fmt.Sprintf("reason=%s; before=%s; rewards=%s; frozen daily states retained", strings.TrimSpace(req.Reason), before.Version, string(adminJSON(req.Items)))

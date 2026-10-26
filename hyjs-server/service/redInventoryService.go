@@ -17,8 +17,11 @@ import (
 )
 
 func redChoiceBox(key string) bool {
+	if growth74BoxCategories[key] != "" {
+		return true
+	}
 	switch key {
-	case "item_023", "item_053", "item_054", "item_118", "item_119", "item_120", "item_121", "item_122", "item_156", "item_157", "item_347", "item_348", "item_361", "item_362", "item_363":
+	case "item_067", "item_339", "item_340", "item_023", "item_053", "item_054", "item_118", "item_119", "item_120", "item_121", "item_122", "item_156", "item_157", "item_347", "item_348", "item_361", "item_362", "item_363":
 		return true
 	}
 	return false
@@ -45,6 +48,25 @@ func (s *GameService) redBoxUse(ctx context.Context, id int64, b *pb.CSItemUse, 
 		if len(options) == 0 {
 			return errors.New("红箱选项配置缺失")
 		}
+		if growth74BoxCategories[cost.GetId()] != "" {
+			var maximum int64
+			for _, option := range options {
+				var instances int64
+				for _, part := range strings.Split(option["result"], ";") {
+					pair := strings.Split(part, ",")
+					if len(pair) == 2 && ((strings.HasPrefix(pair[0], "hero_") && !strings.HasPrefix(pair[0], "hero_exp_")) || strings.HasPrefix(pair[0], "equip_") || strings.HasPrefix(pair[0], "trea_") || strings.HasPrefix(pair[0], "pet_")) {
+						n, _ := strconv.ParseInt(pair[1], 10, 64)
+						instances += n
+					}
+				}
+				if instances > maximum {
+					maximum = instances
+				}
+			}
+			if maximum > 0 && int64(cost.GetNum()) > 100/maximum {
+				return fmt.Errorf("此礼包每次最多打开%d个，请减少数量", 100/maximum)
+			}
+		}
 		if err := deductPoolCost(p, g, &pb.BaseResource{Id: proto.String(cost.GetId()), Num: proto.Int32(cost.GetNum())}); err != nil {
 			return err
 		}
@@ -59,6 +81,11 @@ func (s *GameService) redBoxUse(ctx context.Context, id int64, b *pb.CSItemUse, 
 						break
 					}
 				}
+			} else if item["category"] == "2" && growth74BoxCategories[cost.GetId()] == "2" {
+				if len(options) != 1 || options[0]["odds"] != "100" {
+					return errors.New("养成礼包固定奖励配置无效")
+				}
+				chosen = options[0]
 			} else if item["category"] == "2" {
 				var configured []db.RedP2BoxReward
 				if e := tx.Where("box_id=?", cost.GetId()).Order("resource_id").Find(&configured).Error; e != nil {

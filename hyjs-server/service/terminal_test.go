@@ -60,7 +60,7 @@ func TestTerminalSignupSettingsAndLegacyIsolation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = CreatePlayer(ctx, shell.Id, "新用户角色", "hero_043"); err != nil {
+	if _, err = CreatePlayer(ctx, shell.Id, "露娜新人", "hero_043"); err != nil {
 		t.Fatal(err)
 	}
 	account.PlayerID = shell.Id

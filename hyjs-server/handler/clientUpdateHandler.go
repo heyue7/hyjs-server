@@ -88,7 +88,7 @@ func AdminClientUpdateActionHandler(c *gin.Context) {
 		return
 	}
 	req.Reason = strings.TrimSpace(req.Reason)
-	if req.ID < 1 || req.Version == "" || len(req.Version) > 40 || len(req.RequestID) < 16 || len(req.RequestID) > 80 || strings.ContainsAny(req.RequestID, " /\\\r\n\x00") || req.Reason == "" || len(req.Reason) > 1000 || (req.Action != "publish" && req.Action != "remind" && req.Action != "withdraw" && req.Action != "start_maintenance" && req.Action != "end_maintenance") {
+	if (req.ID < 1 && req.Action != "server_stop" && req.Action != "server_start") || req.Version == "" || len(req.Version) > 40 || len(req.RequestID) < 16 || len(req.RequestID) > 80 || strings.ContainsAny(req.RequestID, " /\\\r\n\x00") || req.Reason == "" || len(req.Reason) > 1000 || (req.Action != "publish" && req.Action != "remind" && req.Action != "withdraw" && req.Action != "start_maintenance" && req.Action != "end_maintenance" && req.Action != "server_stop" && req.Action != "server_start") {
 		adminError(c, constUtil.ErrAdminInput)
 		return
 	}

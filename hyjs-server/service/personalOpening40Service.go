@@ -218,7 +218,8 @@ func (s *GameService) AdminPersonalOpening40(ctx context.Context, p *model.Admin
 	}
 	out := []model.AdminPersonalOpening40DTO{}
 	for _, row := range rows {
-		if personalOpening40Rule(row) {
+		definition, supported := adminActivityDefinitionFor(row.Mode)
+		if personalOpening40Rule(row) || supported && definition.domain == "period" {
 			dto, err := personalOpening40DTO(row)
 			if err != nil {
 				return nil, err
@@ -250,7 +251,8 @@ func (s *GameService) AdminSavePersonalOpening40(ctx context.Context, p *model.A
 		if err = tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&row, "id=? AND server_id=?", id, server).Error; err != nil {
 			return err
 		}
-		if !personalOpening40Rule(row) || row.Archived || adminVersion(row) != req.Version {
+		definitionCheck, supported := adminActivityDefinitionFor(row.Mode)
+		if row.Timing != "character-day" || !supported || definitionCheck.domain != "period" || row.Archived || adminVersion(row) != req.Version {
 			return constUtil.ErrAdminConfigConflict
 		}
 		var form model.AdminActivityForm
