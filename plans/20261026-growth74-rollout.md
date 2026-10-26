@@ -28,3 +28,7 @@
 - 服务端定向回归包含单次理由、周／月／指定日期边界、每周改期防重复、开关服权限与重试、21种箱子实际使用与重试、个人开服、原信用周限、Boss、经验与碎片过滤。
 - 桌面后台实际验证了隔离环境启动→关服、定期时间保存→整页重载；画面 `analysis/growth74/terminal-before.png` 与 `terminal-after.png`。
 - 执行使用 `deploy/deploy.py --apply-growth74`，在加密备份后停原应用，用相同候选镜像执行有审计的既有运营服务，再启动应用。配置失败保持关服与旧历史，禁止自动恢复数据库。最终线上版本、配置回读和维护状态以 `analysis/growth74/live-verification.json` 为准。
+
+## 第7天测试存档修复
+
+74已于手机确认安装。回调日期后，既存公会宝箱发布时间、圣坛免费刷新计时与精灵市场周键仍在后来的真实日期，导致登录导航和商店读取拒绝。本次以 `deploy/test_calendar74_repair.sql` 对齐当前测试日历，并逐行审计原时间；保留原商品快照、购买和刷新用量、代次、历史领奖与战斗记录。该脚本仅供本次测试回调恢复；正式恢复时需同时依据审计复核时间锚点。线上现有角色原协议 `CSNavigationItem`、`CSRefreshShopQuery`、`CSPetShopProductList` 均200并返回各自正常响应，证据见 `analysis/growth74/calendar-login-stores-verification.json`。未要求重装APK，未停服。
