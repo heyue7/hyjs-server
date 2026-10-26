@@ -65,8 +65,16 @@ func validAdminSproutSettings(req model.AdminSproutSettingsSaveRequest) bool {
 	if _, err := hex.DecodeString(req.Version); err != nil {
 		return false
 	}
-	if req.Enabled && req.Days == nil {
+	if req.Enabled && (req.NewCharacterEnabled == nil || *req.NewCharacterEnabled) && req.Days == nil {
 		return false
 	}
-	return req.Days == nil || *req.Days >= 1 && *req.Days <= constUtil.AdminSproutMaxDays
+	for _, days := range []*int64{req.Days, req.ReturnOfflineDays, req.ReturnDays} {
+		if days != nil && (*days < 1 || *days > constUtil.AdminSproutMaxDays) {
+			return false
+		}
+	}
+	if req.ReturnEnabled != nil && *req.ReturnEnabled && (req.ReturnOfflineDays == nil || req.ReturnDays == nil) {
+		return false
+	}
+	return true
 }

@@ -157,6 +157,7 @@ func (s *GameService) sharedFieldBoss55Locked(tx *gorm.DB, scene, pos string, no
 		row.UUID = fresh.GetUuid()
 		row.RespawnAt = 0
 		row.KillerID = 0
+		row.DeathRules73 = nil
 		hp = map[string]float64{}
 		if err := saveSharedFieldBoss55(tx, &row, &boss, hp); err != nil {
 			return nil, nil, nil, err
@@ -261,6 +262,9 @@ func (s *GameService) applySharedFieldBoss55(tx *gorm.DB, id int64, f *model.Fie
 		return false, false, err
 	}
 	if row.UUID != boss.GetUuid() {
+		if f.Fight != nil && f.Fight.BossDeathRules73 != nil && f.Fight.BossDeathRules73.DeathSettlement {
+			return false, false, errors.New("共享首领实例已更新")
+		}
 		return false, false, nil
 	}
 	var shared pb.SideBoss
@@ -275,6 +279,7 @@ func (s *GameService) applySharedFieldBoss55(tx *gorm.DB, id int64, f *model.Fie
 		hp = map[string]float64{}
 	}
 	wasDead := row.RespawnAt > 0
+	actualDamage := float64(0)
 	allDead := true
 	for _, actor := range input.Monster.GetFormation() {
 		guid := actor.GetGuid()
@@ -291,6 +296,7 @@ func (s *GameService) applySharedFieldBoss55(tx *gorm.DB, id int64, f *model.Fie
 		if !combatFinite(damage) || !combatFinite(current) {
 			return false, false, errors.New("共享首领血量无效")
 		}
+		actualDamage += math.Min(current, damage)
 		current = math.Max(0, current-damage)
 		hp[guid] = current
 		if current > 0 {
@@ -310,6 +316,9 @@ func (s *GameService) applySharedFieldBoss55(tx *gorm.DB, id int64, f *model.Fie
 		shared.State = proto.Int32(3)
 	} else if !wasDead {
 		shared.State = proto.Int32(1)
+	}
+	if err := s.fieldBossContribute73(tx, id, f, actualDamage, killed); err != nil {
+		return false, false, err
 	}
 	if err := saveSharedFieldBoss55(tx, &row, &shared, hp); err != nil {
 		return false, false, err

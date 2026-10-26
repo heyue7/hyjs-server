@@ -54,6 +54,11 @@ export interface MonsterGroup {
 }
 /** 本地图普通首领组；刷新单位为小时，两类奖励沿用原消费者。 */
 export interface BossGroup {
+  deathSettlement: boolean;
+  rankDrops: { from: number; to: number; drops: FieldDrop[] }[];
+  sproutBonusBps: number;
+  sproutMax: number;
+
   id: string;
   groupIndex: number;
   heroId: string;

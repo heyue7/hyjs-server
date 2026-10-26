@@ -29,8 +29,11 @@ type copySpecialInput struct {
 }
 
 func (s *GameService) initializeCopySpecialDrops(tx *gorm.DB) error {
-	// 原特殊概率语义未恢复，不再默认启用每四胜固定赠送。
-	return tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&db.CopySpecialRule{ID: constUtil.CopySpecialRuleID, Enabled: false, Cycle: 4, Source: constUtil.CopySpecialSource}).Error
+	// 旧三元规则保持原状态；新独立规则仅开放原合法碎片本地保底。
+	if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&db.CopySpecialRule{ID: constUtil.CopySpecialRuleID, Enabled: false, Cycle: 4, Source: constUtil.CopySpecialSource}).Error; err != nil {
+		return err
+	}
+	return tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&db.CopySpecialRule{ID: constUtil.CopyFragmentRuleID, Enabled: true, Cycle: 4, Source: constUtil.CopyFragmentSource}).Error
 }
 func (s *GameService) copySpecialInput(tx *gorm.DB, task map[string]string) (*copySpecialInput, error) {
 	if strings.TrimSpace(task["SpecialOdds"]) == "" {
@@ -40,7 +43,7 @@ func (s *GameService) copySpecialInput(tx *gorm.DB, task map[string]string) (*co
 		return nil, nil
 	}
 	var cfg db.CopySpecialRule
-	if e := tx.Clauses(clause.Locking{Strength: "SHARE"}).First(&cfg, "id=?", constUtil.CopySpecialRuleID).Error; e != nil {
+	if e := tx.Clauses(clause.Locking{Strength: "SHARE"}).First(&cfg, "id=?", constUtil.CopyFragmentRuleID).Error; e != nil {
 		return nil, e
 	}
 	if cfg.Cycle < 1 || cfg.Cycle > 10000 || strings.TrimSpace(cfg.Source) == "" {
@@ -60,6 +63,7 @@ func (s *GameService) copySpecialInput(tx *gorm.DB, task map[string]string) (*co
 			return nil, errors.New(constUtil.CopySpecialConfigurationError)
 		}
 		seen[pair[0]] = true
+
 		supported, e := s.openServerRewardSupported(pair[0])
 		if e != nil || !supported {
 			return nil, errors.New(constUtil.CopySpecialConfigurationError)
@@ -76,7 +80,9 @@ func (s *GameService) copySpecialInput(tx *gorm.DB, task map[string]string) (*co
 			}
 			entry.OriginalTuple[i] = n
 		}
-		input.Entries = append(input.Entries, entry)
+		if s.copyFragmentAllowed(pair[0]) {
+			input.Entries = append(input.Entries, entry)
+		}
 	}
 	return input, nil
 }
@@ -141,4 +147,29 @@ func (s *GameService) rollCopySpecialDrops(tx *gorm.DB, id int64, p *pb.Player, 
 	}
 	gain, _, e := s.applyCopySpecialInput(tx, id, p, g, input)
 	return gain, e
+}
+
+// copyFragmentAllowed keeps new captures inside original fragment sources and excludes red equipment/accessories.
+func (s *GameService) copyFragmentAllowed(reward string) bool {
+	id := strings.Split(reward, ",")[0]
+	if !strings.HasPrefix(id, "frag_") {
+		return false
+	}
+	target := strings.TrimPrefix(id, "frag_")
+	table := ""
+	if strings.HasPrefix(target, "equip_") {
+		table = "Equip"
+	} else if strings.HasPrefix(target, "treasure_") {
+		table = "Treasure"
+	} else if strings.HasPrefix(target, "hero_") {
+		return true
+	} else {
+		return false
+	}
+	row := s.table(table, "id", target)
+	if row == nil {
+		return false
+	}
+	quality, _, _ := adminCatalogueQuality(adminCatalogueNumber(row["quality"]))
+	return quality > 0 && quality < 6
 }

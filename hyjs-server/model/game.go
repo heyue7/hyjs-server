@@ -176,6 +176,9 @@ type FieldAreaState struct {
 	Fight     *FieldFight                   `json:"fight,omitempty"`
 }
 type FieldFight struct {
+	BossDeathRules73 *AdminFieldBossGroup `json:"boss_death_rules73,omitempty"`
+	BossSprouts73    int64                `json:"boss_sprouts73,omitempty"`
+
 	StartedAt   int64                   `json:"started_at"`
 	MonsterUUID string                  `json:"monster_uuid"`
 	Start       *pb.SCSidePveFightStart `json:"start"`

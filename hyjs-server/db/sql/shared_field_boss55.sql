@@ -1,6 +1,7 @@
 CREATE TABLE IF NOT EXISTS shared_field_boss55 (
 server_id BIGINT NOT NULL, scene VARBINARY(64) NOT NULL, pos_id VARBINARY(64) NOT NULL,
 uuid VARBINARY(128) NOT NULL, payload LONGBLOB NOT NULL, hp LONGBLOB NOT NULL,
+death_rules73 LONGBLOB NULL,
 respawn_at BIGINT NOT NULL, killer_id BIGINT NOT NULL,
 PRIMARY KEY(server_id,scene,pos_id)
 );

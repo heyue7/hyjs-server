@@ -74,7 +74,10 @@ func (s *GameService) adminFieldBossGroups(bossIDs map[string]bool) []model.Admi
 		if leader == nil {
 			continue
 		}
+		var death model.AdminFieldBossGroup
+		_ = json.Unmarshal([]byte(leader["adminDeathRules73"]), &death)
 		groups = append(groups, model.AdminFieldBossGroup{
+			DeathSettlement: death.DeathSettlement, RankDrops: death.RankDrops, SproutBonusBps: death.SproutBonusBps, SproutMax: death.SproutMax,
 			ID:          row["BossId"],
 			GroupIndex:  groupIndex,
 			HeroID:      leader["HeroId"],

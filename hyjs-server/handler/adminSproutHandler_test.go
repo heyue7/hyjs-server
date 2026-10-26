@@ -25,3 +25,21 @@ func TestSproutSettingsValidation55(t *testing.T) {
 		})
 	}
 }
+
+func TestSproutReturnSettingsValidation73(t *testing.T) {
+	yes, no := true, false
+	days, invalid := int64(7), int64(0)
+	req := model.AdminSproutSettingsSaveRequest{Enabled: true, NewCharacterEnabled: &no, ReturnEnabled: &yes, ReturnOfflineDays: &days, ReturnDays: &days, Version: strings.Repeat("a", 64), Reason: "回归配置"}
+	if !validAdminSproutSettings(req) {
+		t.Fatal("return-only rule rejected")
+	}
+	req.ReturnDays = nil
+	if validAdminSproutSettings(req) {
+		t.Fatal("missing return duration accepted")
+	}
+	req.ReturnEnabled = &no
+	req.ReturnDays = &invalid
+	if validAdminSproutSettings(req) {
+		t.Fatal("invalid dormant duration accepted")
+	}
+}

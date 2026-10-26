@@ -481,6 +481,9 @@ func run() error {
 	if err = s.InitializeMemoryShrine55(ctx); err != nil {
 		return err
 	}
+	if err = s.InitializeFieldBossDeath73(ctx); err != nil {
+		return err
+	}
 	if err = s.InitializeSharedFieldBoss55(ctx); err != nil {
 		return err
 	}

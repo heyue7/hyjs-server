@@ -73,6 +73,7 @@ type GameService struct {
 	// P12FieldPVPReady marks initialized tables; its operational policy stays off.
 	P12FieldPVPReady       bool
 	SharedFieldBoss55Ready bool
+	FieldBossDeath73Ready  bool
 	// P12WantedReady 在原表与领域事务表初始化后启用入口；发布政策独立默认关闭。
 	P12WantedReady bool
 	// P3AutoConfirmDemoPayments is immutable startup configuration for the local
@@ -392,6 +393,13 @@ func (s *GameService) dispatch(ctx context.Context, r *model.GamePacket, peer st
 		} else if inside {
 			return reply, nil
 		}
+		newGain, err := s.CollectFieldBossPendingRewards(ctx, row.Id)
+		if err != nil {
+			return nil, err
+		}
+		if newGain != nil {
+			reply = append(reply, &pb.SCAddRewardsToPlayer{Result: newGain})
+		}
 		push, err := s.fieldHeartbeat(ctx, row.Id)
 		if err != nil {
 			return nil, err
@@ -609,6 +617,12 @@ func (s *GameService) dispatch(ctx context.Context, r *model.GamePacket, peer st
 	case *pb.CSUpRoleSkillRefineLevel, *pb.CSStrengthRoleSkillRefineLevel:
 		return s.skillSpecialtyUpgrade(ctx, row.Id, b, r.Timestamp)
 	case *pb.CSPlayerLogin:
+		if err := s.CollectFieldBossPending(ctx, row.Id); err != nil {
+			return nil, err
+		}
+		if err := s.RecordSproutLogin(ctx, row.Id); err != nil {
+			return nil, err
+		}
 		if err := s.SyncP12WorldBossRewards(ctx, row.Id); err != nil {
 			return nil, err
 		}
@@ -629,7 +643,15 @@ func (s *GameService) dispatch(ctx context.Context, r *model.GamePacket, peer st
 		// request during ResetPlayer and silently drop CSFriendList on the
 		// original single-flight HTTP transport. The durable flag is only
 		// acknowledged by successful CSGetUnionAddBaseProp below.
-		loginPlayer := proto.Clone(player).(*pb.Player)
+		var fresh db.Profile
+		if err := db.GetIns().WithContext(ctx).First(&fresh, row.Id).Error; err != nil {
+			return nil, err
+		}
+		freshPlayer, _, err := decodeProfile(&fresh)
+		if err != nil {
+			return nil, err
+		}
+		loginPlayer := proto.Clone(freshPlayer).(*pb.Player)
 		loginPlayer.NeedRefreshUnionProp = proto.Int32(0)
 		return gameReply("SCPlayerLogin", map[string]any{"player": loginPlayer, "playerCreateTime": row.CreatedAt})
 	case *pb.CSWarriorRecruitGuide:

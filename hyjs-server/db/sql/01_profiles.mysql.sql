@@ -7,6 +7,8 @@ CREATE TABLE IF NOT EXISTS profiles (
   session LONGBLOB NOT NULL,
   player LONGTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_bin NULL,
   game LONGTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_bin NULL,
+  last_sprout_login_at BIGINT NOT NULL DEFAULT 0,
+  return_sprout_started_at BIGINT NOT NULL DEFAULT 0,
   created_at BIGINT NULL,
   password_salt LONGBLOB NULL,
   password_hash LONGBLOB NULL,

@@ -312,6 +312,7 @@ function limitLines(row: ShopProduct) {
   if (props.shopId === 'vip') return ['每日 1 份'];
   return [
     ...(supports('dailyLimit') && row.dailyLimit > 0 ? [`每日 ${row.dailyLimit.toLocaleString()} 次`] : []),
+    ...(supports('accountWeeklyLimit') && row.accountWeeklyLimit > 0 ? [`账号每周 ${row.accountWeeklyLimit.toLocaleString()} 次`] : []),
     ...(supports('totalLimit') && row.totalLimit > 0 ? [`累计 ${row.totalLimit.toLocaleString()} 次`] : []),
     ...(supports('stock') && row.stock >= 0 ? [`${props.shopId === 'pet-market' ? '每周库存' : '库存'} ${row.stock.toLocaleString()}`] : [])
   ];
@@ -595,6 +596,11 @@ watch(
                     :min="1"
                     :precision="0"
                   />
+                </NFormItem>
+              </NGi>
+              <NGi v-if="supports('accountWeeklyLimit')">
+                <NFormItem label="账号每周限购（0 不限）" feedback="同账号跨角色、区服共用，每周一00:00恢复">
+                  <NInputNumber v-model:value="draft.accountWeeklyLimit" :min="0" :max="2147483647" :precision="0" :disabled="readonly || saving" :input-props="{ 'aria-label': '账号每周限购' }" />
                 </NFormItem>
               </NGi>
               <NGi v-if="supports('totalLimit')">

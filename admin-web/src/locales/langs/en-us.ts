@@ -255,6 +255,7 @@ const local: App.I18n.Schema = {
     'shops_score': '积分商店',
     'shops_ggo': '信用商店',
     'sprout-settings': '小芽设置',
+    'copy-drops': '副本碎片保底',
     'guild-settings': 'Guild settings',
     guilds: 'Guild management',
     'shops_guild': '公会商店',

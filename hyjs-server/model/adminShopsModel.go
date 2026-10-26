@@ -30,27 +30,28 @@ type AdminShopRefreshSettings struct {
 }
 
 type AdminShopProduct struct {
-	QuantityTiers    []AdminShopQuantityTier `json:"quantityTiers,omitempty"` // QuantityTiers is empty for the legacy fixed quote.
-	ID               string                  `json:"id"`                      // Stable product identity.
-	Name             string                  `json:"name"`                    // Readable original resource name.
-	Rewards          []AdminResourceAmount   `json:"rewards"`                 // Resources per purchase.
-	Cost             AdminResourceAmount     `json:"cost"`                    // Actual purchase currency and amount.
-	DailyLimit       int64                   `json:"dailyLimit"`              // Daily purchase count.
-	TotalLimit       int64                   `json:"totalLimit"`              // Period cap, zero unlimited.
-	Stock            int64                   `json:"stock"`                   // Shared stock, minus one unlimited.
-	MinLevel         int64                   `json:"minLevel"`                // Player level requirement.
-	MinVip           int64                   `json:"minVip"`                  // VIP requirement.
-	Priority         int64                   `json:"priority"`                // Original ordering.
-	Weight           int64                   `json:"weight"`                  // Refresh selection weight.
-	DiscountBps      int64                   `json:"discountBps"`             // Discount in basis points.
-	ContributionCost int64                   `json:"contributionCost"`        // Guild contribution cost.
-	GuildLevel       int64                   `json:"guildLevel"`              // Required guild level.
-	Day              string                  `json:"day"`                     // Guild battle offer date.
-	BuyCondition     int64                   `json:"buyCondition"`            // 0 all members, 1 deputy/master, 2 master.
-	RefreshMillis    int64                   `json:"refreshMillis"`           // Guild battle stock recovery interval.
-	Enabled          bool                    `json:"enabled"`                 // Whether the stored product is enabled.
-	Source           string                  `json:"source"`                  // Configuration provenance.
-	MaxRank          int64                   `json:"maxRank"`                 // Maximum eligible popularity rank.
+	QuantityTiers      []AdminShopQuantityTier `json:"quantityTiers,omitempty"` // QuantityTiers is empty for the legacy fixed quote.
+	ID                 string                  `json:"id"`                      // Stable product identity.
+	Name               string                  `json:"name"`                    // Readable original resource name.
+	Rewards            []AdminResourceAmount   `json:"rewards"`                 // Resources per purchase.
+	Cost               AdminResourceAmount     `json:"cost"`                    // Actual purchase currency and amount.
+	DailyLimit         int64                   `json:"dailyLimit"`              // Daily purchase count.
+	AccountWeeklyLimit int64                   `json:"accountWeeklyLimit"`      // 同账号跨角色区服每周份数，0不限。
+	TotalLimit         int64                   `json:"totalLimit"`              // Period cap, zero unlimited.
+	Stock              int64                   `json:"stock"`                   // Shared stock, minus one unlimited.
+	MinLevel           int64                   `json:"minLevel"`                // Player level requirement.
+	MinVip             int64                   `json:"minVip"`                  // VIP requirement.
+	Priority           int64                   `json:"priority"`                // Original ordering.
+	Weight             int64                   `json:"weight"`                  // Refresh selection weight.
+	DiscountBps        int64                   `json:"discountBps"`             // Discount in basis points.
+	ContributionCost   int64                   `json:"contributionCost"`        // Guild contribution cost.
+	GuildLevel         int64                   `json:"guildLevel"`              // Required guild level.
+	Day                string                  `json:"day"`                     // Guild battle offer date.
+	BuyCondition       int64                   `json:"buyCondition"`            // 0 all members, 1 deputy/master, 2 master.
+	RefreshMillis      int64                   `json:"refreshMillis"`           // Guild battle stock recovery interval.
+	Enabled            bool                    `json:"enabled"`                 // Whether the stored product is enabled.
+	Source             string                  `json:"source"`                  // Configuration provenance.
+	MaxRank            int64                   `json:"maxRank"`                 // Maximum eligible popularity rank.
 }
 
 // AdminShopSettings configures the original shop window and its source.

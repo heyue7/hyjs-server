@@ -7,6 +7,8 @@ CREATE TABLE IF NOT EXISTS profiles (
  session BLOB NOT NULL,
  player TEXT,
  game TEXT,
+ last_sprout_login_at INTEGER NOT NULL DEFAULT 0,
+ return_sprout_started_at INTEGER NOT NULL DEFAULT 0,
  created_at INTEGER,
  password_salt BLOB,
  password_hash BLOB

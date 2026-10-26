@@ -490,10 +490,30 @@ onMounted(load);
                   </label>
                   <h4 class="mb-2 font-medium">成员数值</h4>
                   <CombatEditor :members="group.members" :presentation="presentation" :readonly="readonly" />
-                  <h4 class="mb-2 mt-5 font-medium">每次胜利奖励</h4>
+                  <div class="mt-5 flex flex-wrap items-center gap-3">
+                    <span>死亡时统一结算</span>
+                    <NSwitch v-model:value="group.deathSettlement" :disabled="readonly" />
+                    <span class="text-sm text-gray-500">死亡后按有效伤害发放参与、排名和尾刀奖励，同场计一次每日资格（最多3次）</span>
+                  </div>
+                  <div v-if="group.deathSettlement" class="mt-4 flex flex-wrap gap-4">
+                    <label>每位小芽掉落概率加成（基点，0关闭）<NInputNumber v-model:value="group.sproutBonusBps" :min="0" :max="100000" :precision="0" :disabled="readonly" /></label>
+                    <label>同队同场小芽上限<NInputNumber v-model:value="group.sproutMax" :min="0" :max="2" :precision="0" :disabled="readonly" /></label>
+                  </div>
+                  <h4 class="mb-2 mt-5 font-medium">{{ group.deathSettlement ? '死亡参与奖励（有效伤害大于0）' : '每次胜利奖励' }}</h4>
                   <DropEditor v-model:value="group.drops" :disabled="readonly" :resources="bossResources" />
                   <h4 class="mb-2 mt-5 font-medium">击杀奖励</h4>
                   <DropEditor v-model:value="group.killDrops" :disabled="readonly" :resources="bossResources" />
+                  <div v-if="group.deathSettlement" class="mt-5">
+                    <h4 class="mb-2 font-medium">贡献排名奖励</h4>
+                    <div v-for="(rank, rankIndex) in group.rankDrops" :key="rankIndex" class="mb-4 rounded border border-gray-200 p-3">
+                      <div class="mb-3 flex flex-wrap items-center gap-2">
+                        <span>第</span><NInputNumber v-model:value="rank.from" :min="1" :max="100000" :precision="0" :disabled="readonly" class="w-28" /><span>至</span><NInputNumber v-model:value="rank.to" :min="rank.from" :max="100000" :precision="0" :disabled="readonly" class="w-28" /><span>名</span>
+                        <NButton v-if="!readonly" size="small" @click="group.rankDrops.splice(rankIndex, 1)">删除区间</NButton>
+                      </div>
+                      <DropEditor v-model:value="rank.drops" :disabled="readonly" :resources="bossResources" />
+                    </div>
+                    <NButton v-if="!readonly" size="small" @click="(group.rankDrops ||= []).push({ from: 1, to: 1, drops: [] })">添加排名区间</NButton>
+                  </div>
                 </NCollapseItem>
               </NCollapse>
             </NTabPane>

@@ -18,6 +18,7 @@ export interface ShopProduct {
   quantityTiers?: ShopQuantityTier[];
   dailyLimit: number;
   totalLimit: number;
+  accountWeeklyLimit: number;
   stock: number;
   minLevel: number;
   minVip: number;
@@ -136,6 +137,7 @@ export function newShopProduct(): ShopProduct {
     cost: { resourceId: '', amount: 1 },
     dailyLimit: 1,
     totalLimit: 0,
+    accountWeeklyLimit: 0,
     stock: -1,
     minLevel: 1,
     minVip: 0,

@@ -25,6 +25,7 @@ func AdminShopDefinitions() []model.AdminShopDefinition {
 		d := model.AdminShopDefinition{ID: v.id, Label: v.label, Fields: append([]string{}, base...), SettingsFields: []string{"unlimited", "enabled", "startAt", "endAt", "claimEndAt", "source"}, CanCreate: true, Notes: "保存后立即用于后续购买；历史交易、库存使用和限购保留。"}
 		switch v.id {
 		case "ggo":
+			d.Fields = append(d.Fields, "accountWeeklyLimit")
 			d.Notes = "使用信用点兑换道具、碎片及经验材料。数量档在刷新时选定，每格独立购买；已接受报价、限购与历史回执保留。"
 		case "ordinary":
 			d.Notes = "商品、价格与材料保存后生效；原阶梯价格保留到该商品被显式修改。"
@@ -87,6 +88,7 @@ func adminShopP4Product(p p4Product) model.AdminShopProduct {
 	v.Enabled = p.isEnabled()
 	v.DailyLimit = int64(p.DailyLimit)
 	v.TotalLimit = int64(p.TotalLimit)
+	v.AccountWeeklyLimit = p.AccountWeeklyLimit
 	v.Stock = int64(p.Stock)
 	v.MinLevel = int64(p.MinLevel)
 	v.MinVip = int64(p.MinVIP)
@@ -484,7 +486,7 @@ func (s *GameService) AdminSaveShopProduct(ctx context.Context, actor *model.Adm
 			if !create && found < 0 {
 				return fmt.Errorf("%w: 商品已不存在，请刷新", constUtil.ErrAdminInput)
 			}
-			value := p4Product{QuantityTiers: p.QuantityTiers, Enabled: &p.Enabled, ID: originalID, Name: p.Name, Index: nextIndex, Rewards: reward, Cost: cost, Priority: int32(p.Priority), DailyLimit: int32(p.DailyLimit), TotalLimit: int32(p.TotalLimit), Stock: int32(p.Stock), MinLevel: int32(p.MinLevel), MinVIP: int32(p.MinVip), Weight: p.Weight, DiscountBps: int32(p.DiscountBps), MaxRank: p.MaxRank}
+			value := p4Product{QuantityTiers: p.QuantityTiers, Enabled: &p.Enabled, ID: originalID, Name: p.Name, Index: nextIndex, Rewards: reward, Cost: cost, Priority: int32(p.Priority), DailyLimit: int32(p.DailyLimit), TotalLimit: int32(p.TotalLimit), AccountWeeklyLimit: p.AccountWeeklyLimit, Stock: int32(p.Stock), MinLevel: int32(p.MinLevel), MinVIP: int32(p.MinVip), Weight: p.Weight, DiscountBps: int32(p.DiscountBps), MaxRank: p.MaxRank}
 			if found >= 0 {
 				value.Index = rules.Products[found].Index
 				old := rules.Products[found]

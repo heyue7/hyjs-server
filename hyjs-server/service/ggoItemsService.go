@@ -89,6 +89,9 @@ func ConvertGGOOverclockItem(tx *gorm.DB, row *db.Profile, player *pb.Player, ga
 // InitializeGGO 只创建缺失目录和幂等回执，保留运营已编辑内容。
 func (s *GameService) InitializeGGO(ctx context.Context) error {
 	tx := db.GetIns().WithContext(ctx)
+	if err := initializeGGOAccountWeekly(tx); err != nil {
+		return err
+	}
 	if err := tx.AutoMigrate(&db.GGOShopReceipt{}); err != nil {
 		return err
 	}
@@ -166,6 +169,10 @@ func (s *GameService) ggoCatalogue(tx *gorm.DB, player *pb.Player, game *model.G
 		return nil, err
 	}
 	products := ggoQuoteProducts(rules, quote)
+	weekly, weeklyAccount, err := ggoWeeklyCatalogue(tx, player.GetPlayerId(), products, time.Now())
+	if err != nil {
+		return nil, err
+	}
 	if quote != nil {
 		out.Version = ggoQuoteVersion(*raw.Period, rules, quote, out.Enabled)
 		out.Refresh = ggoQuoteRefreshInfo(rules, quote, out.Enabled)
@@ -220,6 +227,13 @@ func (s *GameService) ggoCatalogue(tx *gorm.DB, player *pb.Player, game *model.G
 		}
 		if p.TotalLimit > 0 {
 			remaining = min(remaining, int64(p.TotalLimit)-total)
+		}
+		if p.AccountWeeklyLimit > 0 {
+			if weeklyAccount < 1 {
+				remaining = 0
+			} else {
+				remaining = min(remaining, p.AccountWeeklyLimit-weekly[sourceID])
+			}
 		}
 		if player.GetLevel() < p.MinLevel || player.GetVip() < p.MinVIP {
 			remaining = 0
@@ -390,6 +404,9 @@ func (s *GameService) GGOShopBuy(ctx context.Context, req model.GGOShopBuyReques
 		if source == nil || !source.isEnabled() {
 			return errors.New("商品已下架")
 		}
+		if err := useGGOAccountWeekly(tx, row.AccountID, sourceID, source.AccountWeeklyLimit, count, time.Now()); err != nil {
+			return err
+		}
 		stock := db.P4CommerceStock{RuleID: raw.Period.ID, ProductID: sourceID}
 		if err = tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&stock).Error; err != nil {
 			return err
@@ -467,7 +484,7 @@ func (s *GameService) ggoRewardMetadata(id string) map[string]string {
 	fragment := false
 	if f := s.table("Frag", "id", id); f != nil {
 		fragment = true
-		for _, table := range []string{"Hero", "Equip", "Accessory", "Pet", "PetEquip"} {
+		for _, table := range []string{"Hero", "Equip", "Treasure", "Accessory", "Pet", "PetEquip"} {
 			if target := s.table(table, "id", f["target"]); target != nil {
 				row = target
 				break

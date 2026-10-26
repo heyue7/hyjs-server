@@ -30,6 +30,7 @@ export const views: Record<LastLevelRouteKey, RouteComponent | (() => Promise<Ro
   broadcast: () => import("@/views/broadcast/index.vue"),
   cdk: () => import("@/views/cdk/index.vue"),
   "client-updates": () => import("@/views/client-updates/index.vue"),
+  "copy-drops": () => import("@/views/copy-drops/index.vue"),
   "daily-sign": () => import("@/views/daily-sign/index.vue"),
   "daily-tasks": () => import("@/views/daily-tasks/index.vue"),
   feedback: () => import("@/views/feedback/index.vue"),

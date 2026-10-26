@@ -367,6 +367,18 @@ func (s *GameService) fieldBossFightStart(ctx context.Context, id int64, b *pb.C
 			return err
 		}
 		f.Fight = &model.FieldFight{StartedAt: time.Now().UnixMilli(), BossUUID: boss.GetUuid(), BossLeaderGUID: leaderGUID, Start: compatStart, BossStart: result, BossInput: frozen, BossReward: reward, BossKill: kill, BossCooldownMS: hours * 3600 * 1000, BossRewardDailyLimit: &rewardLimit}
+		rules, err := s.freezeFieldBossDeath73(tx, f.Scene, boss, leader)
+		if err != nil {
+			return err
+		}
+		f.Fight.BossDeathRules73 = rules
+		if rules != nil && rules.DeathSettlement {
+			sprouts, e := s.fieldBossSprouts73(tx, id, f.Scene, rules.SproutMax)
+			if e != nil {
+				return e
+			}
+			f.Fight.BossSprouts73 = sprouts
+		}
 		boss.State = proto.Int32(2)
 		f.Side.State = proto.Int32(6)
 		return nil
@@ -551,7 +563,11 @@ func (s *GameService) fieldBossFightEnd(ctx context.Context, id int64, b *pb.CSS
 
 		gain := &pb.ResultObject{}
 		content := fight.BossReward
-		if killReward && fight.BossKill != "" {
+		deathMode := fight.BossDeathRules73 != nil && fight.BossDeathRules73.DeathSettlement
+		if deathMode {
+			content = ""
+		}
+		if !deathMode && killReward && fight.BossKill != "" {
 			if content != "" {
 				content += ";"
 			}
@@ -591,6 +607,16 @@ func (s *GameService) fieldBossFightEnd(ctx context.Context, id int64, b *pb.CSS
 	})
 	if err != nil {
 		return nil, err
+	}
+	pendingGain, collectErr := s.CollectFieldBossPendingRewards(ctx, id)
+	if collectErr != nil {
+		return nil, collectErr
+	}
+	if pendingGain != nil {
+		if result.Get == nil {
+			result.Get = &pb.ResultObject{}
+		}
+		p1AppendGain(result.Get, pendingGain)
 	}
 	// Only a newly committed kill publishes. Repeated/cold receipts return before
 	// constructing this message and preserve the single reward and deadline.

@@ -100,13 +100,17 @@ func AdminShopProductSaveHandler(c *gin.Context) {
 		adminError(c, constUtil.ErrAdminInput)
 		return
 	}
-	for _, n := range []int64{req.DailyLimit, req.TotalLimit, req.MinLevel, req.MinVip, req.ContributionCost, req.GuildLevel, req.Priority, req.MaxRank} {
+	for _, n := range []int64{req.DailyLimit, req.TotalLimit, req.AccountWeeklyLimit, req.MinLevel, req.MinVip, req.ContributionCost, req.GuildLevel, req.Priority, req.MaxRank} {
 		if n < 0 || n > 2147483647 {
 			adminError(c, constUtil.ErrAdminInput)
 			return
 		}
 	}
 	if req.Stock < -1 || req.Stock > 2147483647 || req.Weight < 0 || req.Weight > 1000000000000 || req.DiscountBps < 0 || req.DiscountBps > 10000 {
+		adminError(c, constUtil.ErrAdminInput)
+		return
+	}
+	if key != "ggo" && req.AccountWeeklyLimit != 0 {
 		adminError(c, constUtil.ErrAdminInput)
 		return
 	}

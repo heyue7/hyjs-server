@@ -17,8 +17,8 @@ func TestCopySpecialAllOriginalCadenceAndConservation(t *testing.T) {
 	if e := f.s.InitializeCopyDrops(f.ctx); e != nil {
 		t.Fatal(e)
 	}
-	// Enable only this finite cadence fixture; deployed special-drop policy remains closed.
-	if e := db.GetIns().Model(&db.CopySpecialRule{}).Where("id=?", constUtil.CopySpecialRuleID).Update("enabled", true).Error; e != nil {
+	// Exercise the new fragment-only cadence across every original special-drop task.
+	if e := db.GetIns().Model(&db.CopySpecialRule{}).Where("id=?", constUtil.CopyFragmentRuleID).Update("enabled", true).Error; e != nil {
 		t.Fatal(e)
 	}
 	tasks, entries, gear := 0, 0, 0
@@ -64,10 +64,10 @@ func TestCopySpecialAllOriginalCadenceAndConservation(t *testing.T) {
 			}
 		}
 	}
-	if tasks != 79 || entries != 102 || gear != 4 {
-		t.Fatal("full79 tasks/102 entries/4 original equips", tasks, entries, gear)
+	if tasks != 79 || entries != 98 || gear != 0 {
+		t.Fatal("full79 tasks/98 legal fragment entries/no original equips", tasks, entries, gear)
 	}
-	t.Log("full79/102 entries, local four-success cadence, 4equip/98frag, credit+spent=successes")
+	t.Log("full79 tasks/98 fragment entries, local four-success cadence, zero whole equipment, credit+spent=successes")
 }
 
 func TestCopySpecialFrozenCycleCapacityAndLegacy(t *testing.T) {
@@ -75,8 +75,8 @@ func TestCopySpecialFrozenCycleCapacityAndLegacy(t *testing.T) {
 	if e := f.s.InitializeCopyDrops(f.ctx); e != nil {
 		t.Fatal(e)
 	}
-	// 运营默认保持关闭；仅此隔离夹具启用四次特殊掉落以验证原容量回滚。
-	if e := db.GetIns().Model(&db.CopySpecialRule{}).Where("id=?", constUtil.CopySpecialRuleID).Update("enabled", true).Error; e != nil {
+	// 此隔离夹具同时验证旧冻结整装奖励的容量回滚。
+	if e := db.GetIns().Model(&db.CopySpecialRule{}).Where("id=?", constUtil.CopyFragmentRuleID).Update("enabled", true).Error; e != nil {
 		t.Fatal(e)
 	}
 	task := f.s.table("CopyTask", "TaskId", "20")
@@ -84,6 +84,8 @@ func TestCopySpecialFrozenCycleCapacityAndLegacy(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
+	// Old frozen inputs retain original capacity semantics; new captures omit all whole equipment.
+	input = &copySpecialInput{Enabled: true, Cycle: 4, TaskID: "20", Source: constUtil.CopySpecialSource, Entries: []copySpecialEntry{{Reward: "equip_001,1", OriginalTuple: [3]int64{0, 200, 400}}}}
 	p := &pb.Player{EquipBagSize: proto.Int32(0), Level: proto.Int32(100)}
 	g := &model.GameState{}
 	for n := 0; n < 3; n++ {
@@ -101,7 +103,7 @@ func TestCopySpecialFrozenCycleCapacityAndLegacy(t *testing.T) {
 	if state.Successes != 3 || state.Credit != 3 || state.Granted != 0 {
 		t.Fatal("failed grant committed credit")
 	}
-	if e = db.GetIns().Model(&db.CopySpecialRule{}).Where("id=?", constUtil.CopySpecialRuleID).Update("cycle", 9).Error; e != nil {
+	if e = db.GetIns().Model(&db.CopySpecialRule{}).Where("id=?", constUtil.CopyFragmentRuleID).Update("cycle", 9).Error; e != nil {
 		t.Fatal(e)
 	}
 	p.EquipBagSize = proto.Int32(60)
@@ -140,7 +142,7 @@ func TestCopySpecialFrozenCycleCapacityAndLegacy(t *testing.T) {
 	if _, e = f.s.copySpecialInput(db.GetIns(), invalid); e == nil {
 		t.Fatal("malformed original triple")
 	}
-	if e = db.GetIns().Model(&db.CopySpecialRule{}).Where("id=?", constUtil.CopySpecialRuleID).Update("enabled", false).Error; e != nil {
+	if e = db.GetIns().Model(&db.CopySpecialRule{}).Where("id=?", constUtil.CopyFragmentRuleID).Update("enabled", false).Error; e != nil {
 		t.Fatal(e)
 	}
 	off, e := f.s.copySpecialInput(db.GetIns(), task)

@@ -23,24 +23,25 @@ import (
 )
 
 type p4Product struct {
-	QuantityTiers   []model.AdminShopQuantityTier `json:"quantityTiers,omitempty"`
-	SourceProductID string                        `json:"-"`
-	Enabled         *bool                         `json:"enabled,omitempty"` // nil preserves enabled legacy catalogues; false suspends new purchases.
-	ID              string                        `json:"id"`
-	MaxRank         int64                         `json:"maxRank,omitempty"`
-	Name            string                        `json:"name,omitempty"`
-	Index           int32                         `json:"index"`
-	Rewards         string                        `json:"rewards"`
-	Cost            string                        `json:"cost"`
-	TierID          bool                          `json:"tierId,omitempty"`
-	Priority        int32                         `json:"priority"`
-	DailyLimit      int32                         `json:"dailyLimit"`
-	TotalLimit      int32                         `json:"totalLimit"`
-	Stock           int32                         `json:"stock"`
-	MinLevel        int32                         `json:"minLevel"`
-	MinVIP          int32                         `json:"minVip"`
-	DiscountBps     int32                         `json:"discountBps"`
-	Weight          int64                         `json:"weight"`
+	QuantityTiers      []model.AdminShopQuantityTier `json:"quantityTiers,omitempty"`
+	SourceProductID    string                        `json:"-"`
+	Enabled            *bool                         `json:"enabled,omitempty"` // nil preserves enabled legacy catalogues; false suspends new purchases.
+	ID                 string                        `json:"id"`
+	MaxRank            int64                         `json:"maxRank,omitempty"`
+	Name               string                        `json:"name,omitempty"`
+	Index              int32                         `json:"index"`
+	Rewards            string                        `json:"rewards"`
+	Cost               string                        `json:"cost"`
+	TierID             bool                          `json:"tierId,omitempty"`
+	Priority           int32                         `json:"priority"`
+	DailyLimit         int32                         `json:"dailyLimit"`
+	AccountWeeklyLimit int64                         `json:"accountWeeklyLimit,omitempty"`
+	TotalLimit         int32                         `json:"totalLimit"`
+	Stock              int32                         `json:"stock"`
+	MinLevel           int32                         `json:"minLevel"`
+	MinVIP             int32                         `json:"minVip"`
+	DiscountBps        int32                         `json:"discountBps"`
+	Weight             int64                         `json:"weight"`
 }
 
 func (p p4Product) isEnabled() bool {
@@ -221,7 +222,7 @@ func (s *GameService) validateP4Commerce(cfg db.P4CommerceRule) (p4CommerceRules
 	ids := map[string]bool{}
 	indices := map[int32]bool{}
 	for _, p := range rules.Products {
-		if p.ID == "" || len(p.ID) > 64 || len(p.Name) > 128 || ids[p.ID] || p.Index < 1 || indices[p.Index] || p.DailyLimit < 1 || p.DailyLimit > 10000 || p.TotalLimit < 0 || p.Stock < -1 || p.MinLevel < 1 || p.MinVIP < 0 || p.DiscountBps < 1 || p.DiscountBps > 10000 || p.Weight < 1 {
+		if p.ID == "" || len(p.ID) > 64 || len(p.Name) > 128 || ids[p.ID] || p.Index < 1 || indices[p.Index] || p.DailyLimit < 1 || p.DailyLimit > 10000 || p.AccountWeeklyLimit < 0 || p.AccountWeeklyLimit > math.MaxInt32 || p.TotalLimit < 0 || p.Stock < -1 || p.MinLevel < 1 || p.MinVIP < 0 || p.DiscountBps < 1 || p.DiscountBps > 10000 || p.Weight < 1 {
 			return rules, errors.New("商品库存/资格/折扣无效")
 		}
 		ids[p.ID] = true

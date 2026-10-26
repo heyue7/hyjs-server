@@ -223,6 +223,8 @@ func (s *GameService) buildAdminFieldRuntimeTables(deployments []db.AdminFieldDe
 				if row["TeamLeader"] == "1" {
 					row["RebornTime"] = fmt.Sprint(g.RebornHours)
 					row["rewardGroupId"], row["KillReward"] = adminFieldDropText(g.Drops), adminFieldDropText(g.KillDrops)
+					raw, _ := json.Marshal(g)
+					row["adminDeathRules73"] = string(raw)
 				}
 				if err := adminFieldApplyGroupMembers(row, g.Members, "Id"); err != nil {
 					return nil, err

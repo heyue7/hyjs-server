@@ -163,7 +163,7 @@ func AdminFieldSaveHandler(c *gin.Context) {
 		for _, g := range cfg.OrdinaryBossGroups {
 			key := fmt.Sprintf("%s:%d", g.ID, g.GroupIndex)
 			source, ok := sourceGroups[key]
-			if !ok || seen[key] || g.HeroID != source.HeroID || g.RebornHours < 1 || g.RebornHours > constUtil.AdminFieldBossMaxRebornHours || !adminFieldCombatMembersValid(g.Members, source.Members) || !adminFieldValidBossDrops(g.Drops) || !adminFieldValidBossDrops(g.KillDrops) {
+			if !ok || seen[key] || g.HeroID != source.HeroID || g.RebornHours < 1 || g.RebornHours > constUtil.AdminFieldBossMaxRebornHours || !adminFieldCombatMembersValid(g.Members, source.Members) || !adminFieldValidBossDrops(g.Drops) || !adminFieldValidBossDrops(g.KillDrops) || !adminFieldBossDeath73Valid(g) || g.DeathSettlement && cfg.Scene != "field_001" && cfg.Scene != "field_002" {
 				adminError(c, constUtil.ErrAdminInput)
 				return
 			}
@@ -419,4 +419,21 @@ func AdminFieldChannelSaveHandler(c *gin.Context) {
 		return
 	}
 	adminSuccess(c, result)
+}
+
+func adminFieldBossDeath73Valid(g model.AdminFieldBossGroup) bool {
+	if g.SproutMax < 0 || g.SproutMax > 2 || g.SproutBonusBps < 0 || g.SproutBonusBps > 100000 || len(g.RankDrops) > 50 {
+		return false
+	}
+	for i, r := range g.RankDrops {
+		if r.From < 1 || r.To < r.From || r.To > 100000 || !adminFieldValidBossDrops(r.Drops) {
+			return false
+		}
+		for _, x := range g.RankDrops[:i] {
+			if r.From <= x.To && x.From <= r.To {
+				return false
+			}
+		}
+	}
+	return true
 }

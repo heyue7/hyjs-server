@@ -19,7 +19,7 @@ func (s *GameService) InitializeAdminSproutSettings(ctx context.Context) error {
 	return tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&db.AdminSproutSetting{ID: 1, Revision: 1}).Error
 }
 func adminSproutDTO(row db.AdminSproutSetting) *model.AdminSproutSettingsResponse {
-	return &model.AdminSproutSettingsResponse{Enabled: row.Enabled, Days: row.Days, Icon: constUtil.AdminSproutIcon, Version: adminVersion(row)}
+	return &model.AdminSproutSettingsResponse{Enabled: row.Enabled, Days: row.Days, NewCharacterEnabled: row.NewCharacterEnabled, ReturnEnabled: row.ReturnEnabled, ReturnOfflineDays: row.ReturnOfflineDays, ReturnDays: row.ReturnDays, Icon: constUtil.AdminSproutIcon, Version: adminVersion(row)}
 }
 
 // AdminSproutSettings 读取与区服、地图无关的全局配置。
@@ -50,6 +50,8 @@ func (s *GameService) AdminSaveSproutSettings(ctx context.Context, actor *model.
 			return constUtil.ErrAdminConfigConflict
 		}
 		row.Enabled, row.Days = req.Enabled, req.Days
+		row.NewCharacterEnabled, row.ReturnEnabled = req.NewCharacterEnabled, req.ReturnEnabled
+		row.ReturnOfflineDays, row.ReturnDays = req.ReturnOfflineDays, req.ReturnDays
 		row.Revision++
 		row.UpdatedAt, row.UpdatedBy = time.Now().UnixMilli(), actor.Username
 		if err := tx.Save(&row).Error; err != nil {

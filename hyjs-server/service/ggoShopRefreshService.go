@@ -187,6 +187,7 @@ func ggoQuoteProducts(rules p4CommerceRules, state *ggoQuoteState) []p4Product {
 		p.MinVIP = source.MinVIP
 		p.DailyLimit = source.DailyLimit
 		p.TotalLimit = source.TotalLimit
+		p.AccountWeeklyLimit = source.AccountWeeklyLimit
 		p.Stock = source.Stock
 		products = append(products, p)
 	}
@@ -195,12 +196,13 @@ func ggoQuoteProducts(rules p4CommerceRules, state *ggoQuoteState) []p4Product {
 func ggoQuoteVersion(cfg db.P4CommerceRule, rules p4CommerceRules, state *ggoQuoteState, enabled bool) string {
 	type eligibility struct {
 		ID                                              string
+		AccountWeeklyLimit                              int64
 		Enabled                                         bool
 		DailyLimit, TotalLimit, Stock, MinLevel, MinVIP int32
 	}
 	live := make([]eligibility, 0, len(rules.Products))
 	for _, p := range rules.Products {
-		live = append(live, eligibility{p.ID, p.isEnabled(), p.DailyLimit, p.TotalLimit, p.Stock, p.MinLevel, p.MinVIP})
+		live = append(live, eligibility{p.ID, p.AccountWeeklyLimit, p.isEnabled(), p.DailyLimit, p.TotalLimit, p.Stock, p.MinLevel, p.MinVIP})
 	}
 	sort.Slice(live, func(i, j int) bool { return live[i].ID < live[j].ID })
 	return adminVersion(struct {

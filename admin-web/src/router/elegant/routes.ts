@@ -162,6 +162,18 @@ export const generatedRoutes: GeneratedRoute[] = [
     }
   },
   {
+    name: 'copy-drops',
+    path: '/copy-drops',
+    component: 'layout.base$view.copy-drops',
+    meta: {
+      title: '副本碎片保底',
+      i18nKey: 'route.copy-drops',
+      icon: 'ph:puzzle-piece',
+      order: 5,
+      roles: ['viewer', 'operator', 'admin']
+    }
+  },
+  {
     name: 'daily-sign',
     path: '/daily-sign',
     component: 'layout.base$view.daily-sign',

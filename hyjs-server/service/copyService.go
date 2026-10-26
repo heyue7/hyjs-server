@@ -60,7 +60,7 @@ func (s *GameService) LoadTables(root string) error {
 			s.Tables[name] = append(s.Tables[name], item)
 		}
 	}
-	return nil
+	return s.installCopyExperience73()
 }
 
 func (s *GameService) table(name, key, value string) map[string]string {

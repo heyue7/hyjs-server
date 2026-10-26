@@ -68,7 +68,18 @@ type AdminFieldMonsterGroup struct {
 }
 
 // AdminFieldBossGroup 配置本地图普通首领一组的刷新、成员数值和原奖励。
+// AdminFieldBossRank73 配置死亡贡献排名区间的独立掉落。
+type AdminFieldBossRank73 struct {
+	From  int64            `json:"from"`  // From 为排名起点，1起。
+	To    int64            `json:"to"`    // To 为排名终点，包含。
+	Drops []AdminFieldDrop `json:"drops"` // Drops 为固定或权重数量掉落。
+}
 type AdminFieldBossGroup struct {
+	DeathSettlement bool                   `json:"deathSettlement"` // DeathSettlement 为true时死亡统一结算参与、排行及尾刀。
+	RankDrops       []AdminFieldBossRank73 `json:"rankDrops"`       // RankDrops 为不重叠的贡献排名奖励。
+	SproutBonusBps  int64                  `json:"sproutBonusBps"`  // SproutBonusBps 为每名小芽提高出现概率的基点数，0关闭。
+	SproutMax       int64                  `json:"sproutMax"`       // SproutMax 为同队同场小芽上限，0至2。
+
 	ID          string                   `json:"id"`                // ID 为原 FieldBoss.BossId。
 	GroupIndex  int64                    `json:"groupIndex"`        // GroupIndex 为只读原组号。
 	HeroID      string                   `json:"heroId"`            // HeroID 为只读原队长模型。
