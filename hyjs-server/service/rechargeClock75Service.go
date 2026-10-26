@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 	"hyjs-server/constUtil"
 	"hyjs-server/db"
 	"hyjs-server/model"
@@ -38,14 +37,13 @@ func (s *GameService) BackfillGrowth75PublishedAt(ctx context.Context, a *model.
 		if proof.Time != 1793026861377 || proof.Action != "activity.schedule.save" || proof.Target != "1" || proof.Detail != "realm=1 revision=10 slots=820" {
 			return constUtil.ErrAdminConfiguration
 		}
-		var rows []db.AdminActivityOccurrence
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("server_id=? AND first_published_at=0", 1).Order("id").Find(&rows).Error; err != nil {
+		rows, err := growth75AuditedPublicationRows(tx, proof.Time)
+		if err != nil {
 			return err
 		}
 		ids := make([]string, 0, len(rows))
 		for _, row := range rows {
-			var form model.AdminActivityForm
-			if json.Unmarshal(row.FormJSON, &form) != nil || !strings.Contains(form.Source, "成长投放V12") {
+			if row.FirstPublishedAt != 0 {
 				continue
 			}
 			ids = append(ids, row.ID)
