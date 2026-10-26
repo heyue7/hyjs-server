@@ -132,6 +132,16 @@ func TestP4MemoryRefreshFreeTicketDiamondAndWindow(t *testing.T) {
 }
 func TestP4RealmCurrenciesAndRedEssenceExistingInstances(t *testing.T) {
 	f := p4Setup(t)
+	// Explicit finite trial-shop fragment offer using the original separate currencies.
+	var point db.P4CommerceRule
+	if err := db.GetIns().Where("kind=?", "point").First(&point).Error; err != nil {
+		t.Fatal(err)
+	}
+	rawPoint, _ := json.Marshal(p4CommerceRules{Products: []p4Product{p4BaseProduct("p4Point_1", "item_021,1", "point,100", 1, 1), p4BaseProduct("p4Point_2", "frag_equip_037,10", "item_021,10", 2, 1)}})
+	if err := db.GetIns().Model(&point).Updates(map[string]any{"rules": rawPoint, "frozen": nil}).Error; err != nil {
+		t.Fatal(err)
+	}
+
 	now := time.Now()
 	if _, e := f.s.p4Commerce(f.ctx, f.id, &pb.CSShopBuy{ShopType: proto.Int32(5), ShopItemId: proto.String("p4Point_2"), BuyCount: proto.Int32(1)}, 1, now); e == nil {
 		t.Fatal("unearned red exchange")
@@ -144,7 +154,7 @@ func TestP4RealmCurrenciesAndRedEssenceExistingInstances(t *testing.T) {
 		p4Trade(t, f, &pb.CSShopBuy{ShopType: proto.Int32(spec.typ), ShopItemId: proto.String(spec.sku), BuyCount: proto.Int32(1)}, int64(i+1), now)
 	}
 	p, g := f.profile(t)
-	if p.GetPopularity() != 980 || p.GetPoint() != 900 || p.GetScore() != 950 || simpleOwned(p, g, "item_021") != 1 || len(g.Equipment) != 1 || g.Equipment[0].GetEquipId() != "equip_037" {
+	if p.GetPopularity() != 980 || p.GetPoint() != 900 || p.GetScore() != 950 || simpleOwned(p, g, "item_021") != 1 || len(g.Equipment) != 0 || simpleOwned(p, g, "frag_equip_037") != 10 {
 		t.Fatal("actual alternate currencies or original red instance")
 	}
 	if p1Count(t, &db.EventFact{}, "player_id=? AND kind=?", f.id, "spend:score") != 1 {
@@ -210,7 +220,7 @@ func TestP4ActivitySharedStockFrozenQuotesAndMystic(t *testing.T) {
 	}
 }
 
-func TestP4RecruitRotationPreviewAndGuaranteeFrozen(t *testing.T) {
+func TestP4StrongRecruitPermanentPreviewAndGuaranteeFrozen(t *testing.T) {
 	f := p4Setup(t)
 	now := time.Now()
 	var one, two []db.GameplayPoolReward
@@ -218,9 +228,6 @@ func TestP4RecruitRotationPreviewAndGuaranteeFrozen(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var cfg db.P4RecruitRotation
-	db.GetIns().Where("kind=? AND start_at<=? AND end_at>?", 2, now.UnixMilli(), now.UnixMilli()).First(&cfg)
-	db.GetIns().Model(&cfg).Update("rewards", []byte(`[]`))
 	err = db.GetIns().Transaction(func(tx *gorm.DB) error { var e error; _, two, e = f.s.loadGameplayPool(tx, "recruit_2"); return e })
 	if err != nil {
 		t.Fatal(err)
@@ -234,17 +241,57 @@ func TestP4RecruitRotationPreviewAndGuaranteeFrozen(t *testing.T) {
 	if e != nil || !guaranteed.Guaranteed || f.s.table("Hero", "id", guaranteed.ResourceID)["quality"] != "20" {
 		t.Fatal("rotated guarantee")
 	}
-	next := time.UnixMilli(cfg.EndAt).Add(time.Minute)
+	next := now.AddDate(0, 0, 8)
 	var rotated []db.GameplayPoolReward
 	err = db.GetIns().Transaction(func(tx *gorm.DB) error { var e error; rotated, _, e = f.s.loadP4Rotation(tx, 2, next); return e })
 	if err != nil {
 		t.Fatal(err)
 	}
 	r, _ := json.Marshal(rotated)
-	if string(a) == string(r) {
-		t.Fatal("rotation never changed")
+	if string(a) != string(r) {
+		t.Fatal("permanent strong-recruit directory changed across weeks")
 	}
 }
+
+// Explicitly published normal-recruit windows still rotate; strong recruit stays permanent.
+func TestP4NormalRecruitExplicitFiniteRotationWindows(t *testing.T) {
+	f := p4Setup(t)
+	now := time.Now()
+	if err := f.s.seedP4Rotations(db.GetIns(), now); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.GetIns().Model(&db.P4RecruitRotation{}).Where("kind=?", 1).Update("enabled", true).Error; err != nil {
+		t.Fatal(err)
+	}
+	var periods []db.P4RecruitRotation
+	if err := db.GetIns().Where("kind=?", 1).Order("start_at").Find(&periods).Error; err != nil || len(periods) != 2 {
+		t.Fatal("finite normal windows", err, len(periods))
+	}
+	var first []db.GameplayPoolReward
+	for i, p := range periods {
+		var actual []db.GameplayPoolReward
+		if err := db.GetIns().Transaction(func(tx *gorm.DB) error {
+			var err error
+			actual, _, err = f.s.loadP4Rotation(tx, 1, time.UnixMilli(p.StartAt).Add(time.Second))
+			return err
+		}); err != nil {
+			t.Fatal(err)
+		}
+		if len(actual) == 0 {
+			t.Fatal("published normal window empty")
+		}
+		raw, _ := json.Marshal(actual)
+		if i == 0 {
+			first = actual
+		} else {
+			before, _ := json.Marshal(first)
+			if string(before) == string(raw) {
+				t.Fatal("normal windows did not rotate")
+			}
+		}
+	}
+}
+
 func TestP4ActualRebateDailyCapReplayAndFacts(t *testing.T) {
 	f := p4Setup(t)
 	now := time.Now()
@@ -381,6 +428,9 @@ func TestP4TabsUseFrozenCommerceAndWelfareEnable(t *testing.T) {
 	now := time.Now()
 	month := now.In(time.FixedZone("UTC+8", 8*3600)).Format("200601")
 	key := "halfDiscountSale_p4_" + month
+	if err := db.GetIns().Model(&db.P4CommerceRule{}).Where("id=?", key).Update("enabled", true).Error; err != nil {
+		t.Fatal(err)
+	}
 	p4Trade(t, f, &pb.CSActivityShopInfo{ActivityId: proto.String(key)}, 0, now)
 	if err := db.GetIns().Model(&db.P4CommerceRule{}).Where("id=?", key).Updates(map[string]any{"rules": []byte(`{}`), "end_at": now.Add(-time.Hour).UnixMilli()}).Error; err != nil {
 		t.Fatal(err)

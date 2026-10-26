@@ -17,10 +17,12 @@ type GameAccountDTO struct {
 
 // GameAccountRoleDTO indexes a real server role; details remain owned by that server.
 type GameAccountRoleDTO struct {
-	ServerID int64  `json:"serverId"` // 所属真实运行区服编号。
-	PlayerID int64  `json:"playerId"` // 当前区服的角色编号。
-	Name     string `json:"name"`     // 当前区服的角色名。
-	Level    int64  `json:"level"`    // 关联角色的当前等级。
+	ServerID             int64  `json:"serverId"`             // 所属真实运行区服编号。
+	PlayerID             int64  `json:"playerId"`             // 当前区服的角色编号。
+	Name                 string `json:"name"`                 // 当前区服的角色名。
+	Level                int64  `json:"level"`                // 关联角色的当前等级。
+	TerminalBalanceCents *int64 `json:"terminalBalanceCents"` // 本账号该区服角色的实际终端余额；null表示未读取或钱包尚未建立。
+	TerminalUnreadCount  *int64 `json:"terminalUnreadCount"`  // 本账号该区服角色未读投放条数；null表示未读取，0表示已读取且没有未读。
 }
 
 // AdminGameAccountsResponse is a global identity page.

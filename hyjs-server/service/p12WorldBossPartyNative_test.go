@@ -90,7 +90,7 @@ func p12WorldBossPartyNativePath(t *testing.T, relative string) string {
 
 func p12WorldBossPartyNativeRead(t *testing.T, name, expected string) []byte {
 	t.Helper()
-	raw, err := os.ReadFile(p12WorldBossPartyNativePath(t, name))
+	raw, err := readTestAnalysis75(p12WorldBossPartyNativePath(t, name))
 	if err != nil || len(expected) != 64 || p6Digest(raw) != expected {
 		t.Fatal("P12 diagnostic immutable source SHA", name, err)
 	}
@@ -233,7 +233,7 @@ func p12WorldBossPartyNativeLoadFamilyBundle(t *testing.T, family p12WorldBossPa
 	if name == "" {
 		return nil
 	}
-	raw, err := os.ReadFile(name)
+	raw, err := readTestAnalysis75(name)
 	expected := os.Getenv(family.Env + "_SHA256")
 	if err != nil || len(expected) != 64 || p6Digest(raw) != expected {
 		t.Fatal("explicit P12 native bundle SHA", err)
@@ -286,7 +286,7 @@ func p12WorldBossPartyNativeHitCaseCount(name string) int {
 	if !ok {
 		return 0
 	}
-	raw, err := os.ReadFile(os.Getenv(family.Env))
+	raw, err := readTestAnalysis75(os.Getenv(family.Env))
 	if err != nil || p6Digest(raw) != os.Getenv(family.Env+"_SHA256") {
 		return 0
 	}
@@ -302,7 +302,7 @@ func p12WorldBossPartyNativeHitCaseCount(name string) int {
 		if filepath.IsAbs(binding.Path) || !strings.HasPrefix(filepath.ToSlash(filepath.Clean(binding.Path)), "analysis/p6/") {
 			return 0
 		}
-		data, err := os.ReadFile(filepath.Join("../..", binding.Path))
+		data, err := readTestAnalysis75(filepath.Join("../..", binding.Path))
 		if err != nil || len(binding.SHA) != 64 || p6Digest(data) != binding.SHA {
 			return 0
 		}

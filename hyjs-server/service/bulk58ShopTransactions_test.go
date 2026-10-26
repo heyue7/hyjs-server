@@ -161,7 +161,7 @@ func TestBulk58GGOTotalCreditReceiptAndLegacy(t *testing.T) {
 	}
 	count := int64(3)
 	req := model.GGOShopBuyRequest{PlayerID: id, ProductID: catalogue.Items[0].ID, Version: catalogue.Version, RequestID: uuid.NewString(), Count: &count}
-	before, err := accountWalletBalance(db.GetIns(), owner.AccountID, false)
+	before, err := roleWalletBalance(db.GetIns(), AdminProfileServerID(owner), owner.Id, owner.AccountID, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -172,7 +172,7 @@ func TestBulk58GGOTotalCreditReceiptAndLegacy(t *testing.T) {
 	if result.RewardAmount != 9 || result.TerminalPointsAdded != 9 || result.Catalogue.Balance != 94 || result.Catalogue.Items[0].Remaining != 5 {
 		t.Fatal("batch totals", result)
 	}
-	after, err := accountWalletBalance(db.GetIns(), owner.AccountID, false)
+	after, err := roleWalletBalance(db.GetIns(), AdminProfileServerID(owner), owner.Id, owner.AccountID, false)
 	if err != nil || after.BalanceCents != before.BalanceCents+900 {
 		t.Fatal("terminal credit amount", err)
 	}
@@ -198,7 +198,7 @@ func TestBulk58GGOTotalCreditReceiptAndLegacy(t *testing.T) {
 	if err != nil || string(adminJSON(replay)) != string(adminJSON(result)) {
 		t.Fatal("cold batch receipt", err)
 	}
-	after, err = accountWalletBalance(db.GetIns(), owner.AccountID, false)
+	after, err = roleWalletBalance(db.GetIns(), AdminProfileServerID(owner), owner.Id, owner.AccountID, false)
 	if err != nil || after.BalanceCents != before.BalanceCents+900 {
 		t.Fatal("replay credited twice", err)
 	}

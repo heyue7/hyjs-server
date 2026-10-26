@@ -3,7 +3,6 @@ package service
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -16,7 +15,7 @@ import (
 
 func p6Starter047ScopeInput(t *testing.T, index int) *model.FrozenBattleInput {
 	t.Helper()
-	raw, err := os.ReadFile(fmt.Sprintf("../../analysis/p6/native-legal-starter-friend11-inputs-v115b/%03d.pb", index))
+	raw, err := readTestAnalysis75(fmt.Sprintf("../../analysis/p6/native-legal-starter-friend11-inputs-v115b/%03d.pb", index))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -117,7 +116,7 @@ func TestP6Starter047CertificatePinsActualProofAndPolicy(t *testing.T) {
 	if constUtil.P6StarterNativeProof == "" {
 		t.Skip("original starter comparison pending; computation remains rejected")
 	}
-	raw, err := os.ReadFile("../../analysis/p6/" + constUtil.P6StarterCertificateFile)
+	raw, err := readTestAnalysis75("../../analysis/p6/" + constUtil.P6StarterCertificateFile)
 	if err != nil || p6Digest(raw) != constUtil.P6StarterNativeProof {
 		t.Fatal("compiled starter proof changed", err)
 	}
@@ -142,23 +141,23 @@ func TestP6Starter047CertificatePinsActualProofAndPolicy(t *testing.T) {
 	if err = json.Unmarshal(raw, &proof); err != nil || proof.Scope != constUtil.P6StarterScope || proof.Engine != constUtil.P6LinearPhysicalEngine || !proof.NativeCompared || len(proof.RuntimeSources) == 0 || len(proof.Evidence) == 0 {
 		t.Fatal("starter certificate scope or evidence incomplete", err)
 	}
-	source, err := os.ReadFile(filepath.Base(proof.ScopePolicy.Source))
+	source, err := readTestAnalysis75(filepath.Base(proof.ScopePolicy.Source))
 	if err != nil || p6Digest(source) != proof.ScopePolicy.SHA {
 		t.Fatal("compiled starter mechanism policy changed", err)
 	}
-	constants, err := os.ReadFile("../constUtil/p6StarterSettlement.go")
+	constants, err := readTestAnalysis75("../constUtil/p6StarterSettlement.go")
 	if err != nil || p6Digest([]byte(strings.ReplaceAll(string(constants), constUtil.P6StarterNativeProof, ""))) != proof.ScopePolicy.ConstantSHA {
 		t.Fatal("starter constants changed beyond pinned proof", err)
 	}
 	for _, source := range proof.RuntimeSources {
 		path := filepath.Join("..", strings.TrimPrefix(source.Path, "hyjs-server/"))
-		raw, err := os.ReadFile(path)
+		raw, err := readTestAnalysis75(path)
 		if err != nil || p6Digest(raw) != source.SHA {
 			t.Fatal("certified starter runtime source changed", source.Path, err)
 		}
 	}
 	for _, evidence := range proof.Evidence {
-		raw, err := os.ReadFile("../../" + evidence.Path)
+		raw, err := readTestAnalysis75("../../" + evidence.Path)
 		if err != nil || p6Digest(raw) != evidence.SHA {
 			t.Fatal("original starter proof asset changed", evidence.Path, err)
 		}

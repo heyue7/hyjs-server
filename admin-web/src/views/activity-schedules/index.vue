@@ -72,7 +72,7 @@ let requestGeneration = 0;
 let removeScopeGuard: (() => void) | undefined;
 const draftBody = computed(() => ({
   version: version.value,
-  items: items.value.map(({ draftKey: _draftKey, ...item }) => item)
+  items: items.value.map(({ draftKey: _draftKey, form: _form, ...item }) => item)
 }));
 const dirty = computed(() => version.value !== '' && JSON.stringify(draftBody.value.items) !== baseline.value);
 const ready = computed(() => Boolean(scope.serverId && version.value && !busy.value && !loading.value));

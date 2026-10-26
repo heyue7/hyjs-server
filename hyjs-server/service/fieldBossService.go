@@ -573,7 +573,7 @@ func (s *GameService) fieldBossFightEnd(ctx context.Context, id int64, b *pb.CSS
 			}
 			content += fight.BossKill
 		}
-		content, err = fieldBossResourceContent(ctx, f, fight, content)
+		content, err = fieldBossResourceContent(ctx, f, fight, content, tx)
 		if err != nil {
 			return err
 		}

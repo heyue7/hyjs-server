@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import { useServerScopeStore } from '@/store/modules/server-scope';
+import type { ActivityOccurrence, ActivitySchedule } from '@/service/activity-schedules';
+import { shopCount75, trialShopMenu75, trialShopMenus75 } from './shop-presentation75';
 import { useDraftGuard } from '@/composables/useDraftGuard';
 import { computed, h, onBeforeUnmount, ref, watch } from 'vue';
 import { onBeforeRouteLeave, useRouter } from 'vue-router';
@@ -17,6 +20,55 @@ import ResourceImage from './resource-image.vue';
 import ItemQuality from './item-quality.vue';
 const props = defineProps<{ shopId: string }>();
 const router = useRouter();
+const scope = useServerScopeStore();
+const trialMenu = ref(1);
+const schedule = ref<ActivitySchedule>();
+const scheduleError = ref('');
+let scheduleGeneration = 0;
+const shopOccurrences = computed(() => (schedule.value?.items || []).filter(row => row.mode === 'shop-window' && row.form?.options.shopKey === props.shopId && row.enabled));
+const currentWindows = computed(() => (snapshot.value?.settings.unlimited ? [] : shopOccurrences.value).filter(row => row.timing !== 'character-day' && row.startAt <= (schedule.value?.gameTimeMs || 0) && row.endAt > (schedule.value?.gameTimeMs || 0)));
+const nextWindow = computed(() => (snapshot.value?.settings.unlimited ? [] : shopOccurrences.value).filter(row => row.timing !== 'character-day' && row.startAt > (schedule.value?.gameTimeMs || 0)).sort((a, b) => a.startAt - b.startAt)[0]);
+const currentWindow = computed(() => currentWindows.value.length === 1 ? currentWindows.value[0] : undefined);
+function windowDuration(row?: ActivityOccurrence) {
+  if (!row) return '';
+  const days = (row.endAt - row.startAt) / 86400000;
+  return Number.isInteger(days) ? `${days}天一期` : `${shopCount75((row.endAt - row.startAt) / 3600000)}小时一期`;
+}
+const shelfPeriod = computed(() => {
+  if (props.shopId === 'pet-market') return '每周一 00:00 换新周库存';
+  if (currentWindows.value.length > 1) return '营业排期重叠，需检查';
+  if (currentWindow.value) return `${windowDuration(currentWindow.value)} · ${formatTime(currentWindow.value.endAt)}结束`;
+  if (!snapshot.value?.settings.unlimited && shopOccurrences.value.some(row => row.timing === 'character-day')) return '个人开服排期 · 按角色创建日开启';
+  if (['point', 'guild'].includes(props.shopId)) return '当期库存周期未设置';
+  return snapshot.value?.settings.unlimited ? '常驻货架' : '营业时间见商店设置';
+});
+async function loadSchedule() {
+  const version = ++scheduleGeneration;
+  schedule.value = undefined;
+  scheduleError.value = '';
+  if (!scope.serverId) return;
+  try {
+    const data = await api<ActivitySchedule>(`/activity-schedules?serverId=${scope.serverId}`);
+    if (version === scheduleGeneration) schedule.value = data;
+  } catch { if (version === scheduleGeneration) scheduleError.value = '营业排期暂未载入'; }
+}
+function refreshText(row: ShopProduct) {
+  if (props.shopId === 'vip') return row.totalLimit > 0 ? ['每角色累计，跨日期保留'] : ['每日 00:00 恢复日限额'];
+  const parts: string[] = [];
+  if (supports('dailyLimit') && row.dailyLimit > 0 && !(row.totalLimit > 0 && row.totalLimit <= row.dailyLimit)) parts.push('每日 00:00 恢复日限额');
+  if (supports('accountWeeklyLimit') && row.accountWeeklyLimit > 0) parts.push('每周一 00:00 恢复账号周额');
+  if (supports('totalLimit') && row.totalLimit > 0) parts.push(currentWindow.value ? `${windowDuration(currentWindow.value)}，结束后按下一期排期` : '当期总限：刷新周期未设置');
+  if (props.shopId === 'pet-market') parts.push('每周一换新库存');
+  if (props.shopId === 'ggo') parts.push('每槽库存随手动刷新换新');
+  if (row.refreshMillis > 0) parts.push(`每 ${shopCount75(row.refreshMillis / 60000)} 分钟刷新`);
+  return parts.length ? parts : ['未设置周期'];
+}
+const allFilteredRows = computed(() => (snapshot.value?.items || []).filter(row =>
+  (state.value === null || row.enabled === (state.value === 'enabled')) &&
+  `${row.name} ${row.id} ${row.rewards.map(r => `${r.resourceId} ${catalogue.value[r.resourceId]?.name || ''}`).join(' ')} ${catalogue.value[row.cost?.resourceId]?.name || ''}`.toLowerCase().includes(q.value.trim().toLowerCase())
+));
+const trialGroups = computed(() => [...trialShopMenus75, ...(allFilteredRows.value.some(row => trialShopMenu75(row, catalogue.value) === 0) ? [{value: 0, label: '待分组'}] : [])].map(menu => ({...menu, count: allFilteredRows.value.filter(row => trialShopMenu75(row, catalogue.value) === menu.value).length})));
+
 const isPopularityShop = computed(() => ['popularity', 'popularity-rank'].includes(props.shopId));
 const { canWrite, loading, error, run } = useOperations();
 const definition = ref<ShopDefinition>();
@@ -76,22 +128,16 @@ const hasPublishFields = computed(() =>
   supports('enabled') ||
   ['day', 'refreshMillis', 'source'].some(supports)
 );
+const sourceAlwaysOpen = computed(() => Boolean(snapshot.value?.settings.unlimited || (snapshot.value?.settings.startAt && snapshot.value.settings.startAt <= 86400000 && snapshot.value.settings.endAt >= 253402214400000)));
 const showShopStatus = computed(() => Boolean(snapshot.value && (
   settingSupports('unlimited') || settingSupports('enabled') || snapshot.value.settings.startAt || snapshot.value.settings.endAt
 )));
 const dirty = computed(() => editing.value && JSON.stringify(draft.value) !== original.value);
-const rows = computed(() =>
-  (snapshot.value?.items || []).filter(
-    row =>
-      (state.value === null || row.enabled === (state.value === 'enabled')) &&
-      `${row.name} ${row.id} ${row.rewards.map(r => `${r.resourceId} ${catalogue.value[r.resourceId]?.name || ''}`).join(' ')} ${catalogue.value[row.cost?.resourceId]?.name || ''}`
-        .toLowerCase()
-        .includes(q.value.trim().toLowerCase())
-  )
-);
+const rows = computed(() => allFilteredRows.value.filter(row => props.shopId !== 'point' || trialShopMenu75(row, catalogue.value) === trialMenu.value));
 let generation = 0;
 async function load() {
   const current = ++generation;
+  void loadSchedule();
   const result = await run(async () => {
     const [directory, data] = await Promise.all([
       api<{ items: ShopDefinition[] }>('/shops'),
@@ -160,7 +206,7 @@ function discard() {
 }
 function validate() {
   if (draft.value.rewards.some(r => r.resourceId === 'stamina'))
-    return '体力通过体力药剂补充，请选择体力药剂（item_002）';
+    return '体力通过体力药剂补充，请选择体力药剂';
   if (
     !draft.value.rewards.length ||
     draft.value.rewards.some(r => !r.resourceId || !Number.isInteger(r.amount) || r.amount < 1 || r.amount > 10000)
@@ -299,7 +345,7 @@ function resourceName(id: string) {
 }
 function renderResourceNames(row: ShopProduct) {
   return h('div', { class: 'shop-cell-stack' }, row.rewards.map(reward =>
-    h('div', { class: 'shop-resource-name', title: reward.resourceId }, [
+    h('div', { class: 'shop-resource-name',  }, [
       h('span', resourceName(reward.resourceId)),
       ...(catalogue.value[reward.resourceId]?.qualityLabel ? [h(ItemQuality, { item: catalogue.value[reward.resourceId] })] : [])
     ])
@@ -309,12 +355,12 @@ function renderLines(lines: string[]) {
   return h('div', { class: 'shop-cell-stack shop-rule-lines' }, lines.length ? lines.map(line => h('span', line)) : [h('span', { class: 'ops-muted' }, '不限')]);
 }
 function limitLines(row: ShopProduct) {
-  if (props.shopId === 'vip') return ['每日 1 份'];
+  if (props.shopId === 'vip') return row.totalLimit > 0 ? [`每角色限购 ${shopCount75(row.totalLimit)} 次`, ...(row.totalLimit > 1 ? ['每日最多1次'] : [])] : ['每日 1 份'];
   return [
-    ...(supports('dailyLimit') && row.dailyLimit > 0 ? [`每日 ${row.dailyLimit.toLocaleString()} 次`] : []),
+    ...(supports('dailyLimit') && row.dailyLimit > 0 && !(row.totalLimit > 0 && row.totalLimit <= row.dailyLimit) ? [`每日 ${row.dailyLimit.toLocaleString()} 次`] : []),
     ...(supports('accountWeeklyLimit') && row.accountWeeklyLimit > 0 ? [`账号每周 ${row.accountWeeklyLimit.toLocaleString()} 次`] : []),
-    ...(supports('totalLimit') && row.totalLimit > 0 ? [`累计 ${row.totalLimit.toLocaleString()} 次`] : []),
-    ...(supports('stock') && row.stock >= 0 ? [`${props.shopId === 'pet-market' ? '每周库存' : '库存'} ${row.stock.toLocaleString()}`] : [])
+    ...(supports('totalLimit') && row.totalLimit > 0 ? [`每期限购 ${shopCount75(row.totalLimit)} 次`] : []),
+    ...(supports('stock') && row.stock >= 0 ? [`${props.shopId === 'pet-market' ? '每周库存' : props.shopId === 'ggo' ? '每槽库存' : '库存'} ${row.stock.toLocaleString()}`] : [])
   ];
 }
 function qualificationLines(row: ShopProduct) {
@@ -340,26 +386,23 @@ const columns = computed<DataTableColumns<ShopProduct>>(() => [
     ])
   },
   {
-    title: '获得数量', key: 'rewardAmounts', width: props.shopId === 'memory' ? 88 : 110,
-    render: row => h('div', { class: 'shop-cell-stack shop-number-cell' }, row.rewards.map(reward => h('span', row.quantityTiers?.length ? `${Math.min(...row.quantityTiers.map(t => t.amount))}～${Math.max(...row.quantityTiers.map(t => t.amount))}` : Number(reward.amount).toLocaleString())))
+    title: '每份数量', key: 'rewardAmounts', width: props.shopId === 'memory' ? 88 : 110,
+    render: row => h('div', { class: 'shop-cell-stack shop-number-cell' }, row.rewards.map(reward => h('span', row.quantityTiers?.length ? `${shopCount75(Math.min(...row.quantityTiers.map(t => t.amount)))}～${shopCount75(Math.max(...row.quantityTiers.map(t => t.amount)))}` : Number(reward.amount).toLocaleString())))
   },
   {
-    title: '消耗资源', key: 'costResource', minWidth: props.shopId === 'memory' ? 130 : 180,
-    render: row => row.quantityTiers?.length ? h('div', { class: 'shop-cell-stack' }, [...new Set(row.quantityTiers.map(t => t.cost.resourceId))].map(id => h('span', resourceName(id)))) : h('div', { class: 'shop-cell-stack' }, [
-      ...(row.cost?.resourceId ? [h('div', { class: 'shop-cost-resource', title: row.cost.resourceId }, [h(ResourceImage, { item: catalogue.value[row.cost.resourceId], size: 28 }), h('span', resourceName(row.cost.resourceId))])] : []),
-      ...(row.contributionCost > 0 ? [h('span', '公会贡献')] : []),
-      ...(!row.cost?.resourceId && !row.contributionCost ? [h('span', { class: 'ops-muted' }, '未配置')] : [])
-    ])
-  },
-  {
-    title: '消耗数量', key: 'costAmount', width: props.shopId === 'memory' ? 88 : 110,
-    render: row => row.quantityTiers?.length ? h('span', '按数量档') : h('div', { class: 'shop-cell-stack shop-number-cell' }, [
-      ...(row.cost?.resourceId ? [h('span', Number(row.cost.amount).toLocaleString())] : []),
-      ...(row.contributionCost > 0 ? [h('span', row.contributionCost.toLocaleString())] : [])
-    ])
+    title: '每份单价', key: 'unitPrice', minWidth: 200,
+    render: row => row.quantityTiers?.length
+      ? renderLines(row.quantityTiers.map(tier => `${shopCount75(tier.amount)}个：${shopCount75(tier.cost.amount)} ${resourceName(tier.cost.resourceId)} · 权重 ${shopCount75(tier.weight)}`))
+      : h('div', { class: 'shop-cell-stack shop-unit-price' }, [
+        ...(row.cost?.resourceId ? [h('div', { class: 'shop-cost-resource' }, [h(ResourceImage, {item: catalogue.value[row.cost.resourceId], size: 24}), h('strong', shopCount75(row.cost.amount)), h('span', resourceName(row.cost.resourceId))])] : []),
+        ...(row.contributionCost > 0 ? [h('span', `${shopCount75(row.contributionCost)} 公会贡献`)] : []),
+        ...(row.discountBps > 0 && row.discountBps !== 10000 ? [h('span', {class: 'ops-muted'}, `售价比例 ${row.discountBps / 100}%`)] : []),
+        ...(!row.cost?.resourceId && !row.contributionCost ? [h('span', {class: 'ops-muted'}, '未配置单价')] : [])
+      ])
   },
   ...(['memory', 'pet-market', 'ggo'].includes(props.shopId) ? [{ title: '刷新权重', key: 'weight', width: 88, render: (row: ShopProduct) => h('span', { class: 'shop-number-cell' }, row.weight.toLocaleString()) }] : []),
   { title: '限购与库存', key: 'limits', minWidth: props.shopId === 'memory' ? 108 : 125, render: row => renderLines(limitLines(row)) },
+  { title: '实际刷新周期', key: 'refreshPeriod', minWidth: 185, render: row => renderLines(refreshText(row)) },
   { title: '购买资格', key: 'qualifications', minWidth: props.shopId === 'memory' ? 108 : 140, render: row => renderLines(qualificationLines(row)) },
   {
     title: '状态', key: 'enabled', width: 85,
@@ -389,6 +432,7 @@ function beforeUnload(event: BeforeUnloadEvent) {
 window.addEventListener('beforeunload', beforeUnload);
 onBeforeUnmount(() => {
   generation += 1;
+  scheduleGeneration += 1;
   window.removeEventListener('beforeunload', beforeUnload);
 });
 onBeforeRouteLeave(async () => {
@@ -414,11 +458,13 @@ watch(
     definition.value = undefined;
     snapshot.value = undefined;
     q.value = '';
+    trialMenu.value = 1;
     state.value = null;
     load();
   },
   { immediate: true }
 );
+watch(() => scope.serverId, () => { void loadSchedule(); });
 </script>
 
 <template>
@@ -451,7 +497,7 @@ watch(
             >
               {{ snapshot.settings.enabled ? '营业中' : '已停用' }}
             </NTag>
-            <NTag v-if="snapshot.settings.unlimited" :bordered="false" size="small">不限时</NTag>
+            <NTag v-if="sourceAlwaysOpen" :bordered="false" size="small">常驻开放</NTag>
             <span v-else-if="snapshot.settings.startAt || snapshot.settings.endAt" class="ops-muted">
               {{ formatTime(snapshot.settings.startAt) }} →
               {{ snapshot.settings.endAt ? formatTime(snapshot.settings.endAt) : '不限' }}
@@ -461,13 +507,23 @@ watch(
         <NAlert v-if="shopId === 'vip' && snapshot && !snapshot.items.some(item => item.enabled)" type="info" title="暂无开放的会员礼包" class="mb-16px">
           {{ snapshot.items.length }} 件商品均已停用，启用后在游戏中显示。
         </NAlert>
+        <div v-if="snapshot" class="shop-cycle-band">
+          <div><span class="shop-cycle-label">货架周期<span v-if="scope.currentServer"> · {{ scope.currentServer.name }}</span></span><strong>{{ shelfPeriod }}</strong><span v-if="scheduleError" class="ops-muted">{{ scheduleError }}</span></div>
+          <div v-if="snapshot.settings.refresh"><span class="shop-cycle-label">手动刷新</span><span>{{ snapshot.settings.refresh.enabled ? `${snapshot.settings.refresh.period === 'week' ? '每周' : '每日'}最多 ${shopCount75(snapshot.settings.refresh.paidCap)} 次 · 每次 ${shopCount75(snapshot.settings.refresh.cost.amount)} ${resourceName(snapshot.settings.refresh.cost.resourceId)}` : '已关闭' }}</span></div>
+          <div v-if="nextWindow"><span class="shop-cycle-label">下期营业</span><span>{{ formatTime(nextWindow.startAt) }} · {{ windowDuration(nextWindow) }}</span></div>
+          <div v-if="!scope.serverId" class="ops-muted">选择区服后可核对实际营业排期。</div>
+          <NButton size="small" text type="primary" @click="router.push('/activity-schedules')">查看 / 调整活动排期</NButton>
+        </div>
         <NCard :bordered="false" class="ops-panel">
           <NTabs v-if="isPopularityShop" :value="shopId" type="line" class="mb-20px" @update:value="router.push(`/shops/${$event}`)">
             <NTab name="popularity">声望商店商品</NTab>
             <NTab name="popularity-rank">声望商店奖励</NTab>
           </NTabs>
+          <NTabs v-if="shopId === 'point'" v-model:value="trialMenu" type="line" class="shop-trial-tabs" aria-label="试炼商店原版页签">
+            <NTab v-for="menu in trialGroups" :key="menu.value" :name="menu.value">{{ menu.label }} <span class="shop-tab-count">{{ menu.count }}</span></NTab>
+          </NTabs>
           <div class="ops-filters">
-            <NInput v-model:value="q" class="ops-search" clearable placeholder="搜索商品名称或编号" />
+            <NInput v-model:value="q" class="ops-search" clearable placeholder="搜索商品或资源名称" />
             <NSelect
               v-model:value="state"
               clearable
@@ -498,6 +554,7 @@ watch(
               <dl>
                 <div><dt>消耗</dt><dd>{{ resourceName(row.cost?.resourceId) }} {{ Number(row.cost?.amount || 0).toLocaleString() }}</dd></div>
                 <div><dt>限购</dt><dd>{{ limitLines(row).join(' · ') || '不限' }}</dd></div>
+                <div><dt>刷新</dt><dd>{{ refreshText(row).join(' · ') }}</dd></div>
                 <div><dt>资格</dt><dd>{{ qualificationLines(row).join(' · ') || '不限' }}</dd></div>
               </dl>
               <div class="trial-shop-actions">
@@ -516,7 +573,7 @@ watch(
             :row-key="(row: ShopProduct) => row.id"
             :bordered="false"
             :pagination="{ pageSize: 20 }"
-            :scroll-x="shopId === 'memory' ? 1112 : 1285"
+            :scroll-x="1385"
           />
         </NCard>
       </template>
@@ -525,7 +582,7 @@ watch(
           <section v-show="section === 'product'">
             <h3 class="mb-20px">商品与消耗</h3>
             <div class="ops-date-grid">
-              <NFormItem v-if="selected" label="商品编号"><span class="ops-mono ops-muted">{{ draft.id }}</span></NFormItem>
+
               <NFormItem v-if="!['vip', 'pet-market', 'union-fight'].includes(shopId) && !isLegacyProduct" label="显示名称">
                 <NInput v-model:value="draft.name" placeholder="商品名称" />
               </NFormItem>
@@ -604,7 +661,7 @@ watch(
                 </NFormItem>
               </NGi>
               <NGi v-if="supports('totalLimit')">
-                <NFormItem label="累计限购（0 不限）">
+                <NFormItem :label="shopId === 'vip' ? '每角色总限购（0 为原每日一次）' : '当期累计限购（0 不限）'" :feedback="shopId === 'vip' ? '累计所有历史购买，改价格或切日期不重置；1 表示每角色只可购买一次。' : '换新排期后使用新一期额度；编辑商品保留当期已用次数。'">
                   <NInputNumber v-model:value="draft.totalLimit" :min="0" :precision="0" />
                 </NFormItem>
               </NGi>
@@ -660,7 +717,7 @@ watch(
                 </NFormItem>
               </NGi>
               <NGi v-if="supports('priority')">
-                <NFormItem label="展示优先级"><NInputNumber v-model:value="draft.priority" :precision="0" /></NFormItem>
+                <NFormItem label="原版展示顺序" :feedback="shopId === 'point' ? '游戏按奖励品质归入商品、紫装、橙装或红装，优先级末三位决定组内顺序。' : undefined"><NInputNumber v-model:value="draft.priority" :precision="0" /></NFormItem>
               </NGi>
               <NGi v-if="supports('weight')">
                 <NFormItem label="刷新权重" :feedback="['memory', 'pet-market'].includes(props.shopId) ? '在所属的碎片池或材料池内计算；数值越大，出现机会越高。' : undefined">
@@ -711,6 +768,14 @@ watch(
               </NInputNumber>
             </NFormItem>
           </section>
+          <details class="shop-technical-details">
+            <summary>配置标识与来源</summary>
+            <NFormItem v-if="snapshot?.settings.periodId" label="源目录标识"><span class="ops-mono">{{ snapshot.settings.periodId }}</span></NFormItem>
+            <NFormItem v-if="supports('dailyLimit')" label="原始每日上限"><span>{{ draft.dailyLimit }}</span></NFormItem>
+            <NFormItem v-if="selected" label="商品标识"><span class="ops-mono">{{ draft.id }}</span></NFormItem>
+            <NFormItem v-if="supports('source')" label="配置来源"><NInput v-model:value="draft.source" type="textarea" /></NFormItem>
+            <p v-if="!supports('source')" class="ops-muted">{{ draft.source || '未记录来源' }}</p>
+          </details>
         </NForm>
       </template>
     </ManagementWorkspace>
@@ -806,6 +871,16 @@ watch(
 .shop-workspace-root {
   width: 100%;
 }
+.shop-cycle-band { display: flex; align-items: flex-start; flex-wrap: wrap; gap: 12px 28px; padding: 14px 18px; border: 1px solid rgb(var(--base-text-color) / .12); border-radius: 6px; font-size: 13px; line-height: 1.6; }
+.shop-cycle-band > div { display: flex; flex-direction: column; gap: 3px; }
+.shop-cycle-label { color: rgb(var(--base-text-color) / .65); font-size: 12px; }
+.shop-cycle-band > .n-button { margin-left: auto; align-self: center; }
+.shop-trial-tabs { margin-bottom: 16px; }
+.shop-tab-count { margin-left: 6px; font-size: 12px; font-variant-numeric: tabular-nums; opacity: .65; }
+.shop-technical-details { margin-top: 20px; padding-top: 14px; border-top: 1px solid rgb(var(--base-text-color) / .12); }
+.shop-technical-details summary { cursor: pointer; margin-bottom: 14px; }
+.shop-technical-details summary:focus-visible { outline: 2px solid var(--n-color-target, #2563eb); outline-offset: 4px; }
+.shop-workspace-root :deep(.shop-unit-price strong) { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .shop-status-line {
   line-height: 24px;
 }

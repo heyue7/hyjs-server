@@ -7,7 +7,6 @@ import (
 	"hyjs-server/model"
 	pb "hyjs-server/model/protocol"
 	"math"
-	"os"
 	"path/filepath"
 	"sort"
 	"testing"
@@ -35,7 +34,7 @@ func TestP6NativeOriginalCastNumericalOrderGoldens(t *testing.T) {
 func p6OriginalOrderedCastFixture(t *testing.T, name, sha string) {
 	t.Helper()
 	root := filepath.Join("..", "..")
-	raw, err := os.ReadFile(filepath.Join(root, "analysis", "p6", name))
+	raw, err := readTestAnalysis75(filepath.Join(root, "analysis", "p6", name))
 	if err != nil || p6Digest(raw) != sha {
 		t.Fatal("ordered native fixture SHA", err)
 	}
@@ -66,7 +65,7 @@ func p6OriginalOrderedCastFixture(t *testing.T, name, sha string) {
 		t.Fatal("ordered original denominator", err)
 	}
 	for file, digest := range map[string]string{original.Source: original.SourceSHA, original.WireRoot: original.WireSHA} {
-		body, readErr := os.ReadFile(filepath.Join(root, file))
+		body, readErr := readTestAnalysis75(filepath.Join(root, file))
 		if readErr != nil || p6Digest(body) != digest {
 			t.Fatal("ordered original provenance", file, readErr)
 		}
@@ -77,7 +76,7 @@ func p6OriginalOrderedCastFixture(t *testing.T, name, sha string) {
 	s := p6OriginalTables(t)
 	for _, c := range original.Cases {
 		t.Run(c.Name, func(t *testing.T) {
-			wire, readErr := os.ReadFile(filepath.Join(root, c.Wire))
+			wire, readErr := readTestAnalysis75(filepath.Join(root, c.Wire))
 			if readErr != nil || p6Digest(wire) != c.WireSHA {
 				t.Fatal("ordered native PB SHA", readErr)
 			}

@@ -260,7 +260,7 @@ func TestP13UnionFightGuardAuditNativeExport(t *testing.T) {
 	if !strings.HasPrefix(filepath.Base(prebuilt), "hyjs-p13-prebuilt-") {
 		t.Fatal("fixed native source proof required")
 	}
-	proof, err := os.ReadFile(filepath.Join(prebuilt, "manifest.json"))
+	proof, err := readTestAnalysis75(filepath.Join(prebuilt, "manifest.json"))
 	if err != nil {
 		t.Fatal(err)
 	}

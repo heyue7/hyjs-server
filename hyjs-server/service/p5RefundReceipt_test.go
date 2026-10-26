@@ -25,7 +25,7 @@ func TestP5RefundMaterialReceiptHeldConsumedAndCold(t *testing.T) {
 		p.Level = proto.Int32(100)
 		p.Coin = proto.Int64(1000000)
 		p.WarriorBagSize = proto.Int32(1000)
-		_, e := f.s.GrantFixedReward(p, g, "item_067,4;hero_exp_001,2")
+		_, e := f.s.GrantFixedReward(p, g, "item_067,4;hero_exp_002,2")
 		return e
 	}); e != nil {
 		t.Fatal(e)
@@ -48,7 +48,7 @@ func TestP5RefundMaterialReceiptHeldConsumedAndCold(t *testing.T) {
 		_, g := f.profile(t)
 		var material *pb.Warrior
 		for _, w := range g.Warriors {
-			if w.GetId() == "hero_exp_001" {
+			if w.GetId() == "hero_exp_002" {
 				material = w
 				break
 			}
@@ -76,8 +76,8 @@ func TestP5RefundMaterialReceiptHeldConsumedAndCold(t *testing.T) {
 		} else {
 			refund = out[0].(*pb.SCWarriorSell).GetGet()
 		}
-		if len(refund.GetWars()) != 1 || refund.GetWars()[0].GetId() != "hero_exp_001" {
-			t.Fatal("actual original material refund", refund)
+		if len(refund.GetWars()) != 1 || refund.GetWars()[0].GetId() != "hero_exp_002" {
+			t.Fatal("actual 5000-EXP normalized material refund", refund)
 		}
 		if again, e := f.s.p5WarriorRecycle(requestCtx(recycle), f.id, []string{guids[0]}, decompose, stamp, recycle); e != nil || !proto.Equal(again[0], out[0]) {
 			t.Fatal("held refund old receipt", e)

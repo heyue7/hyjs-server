@@ -157,6 +157,12 @@ func TestP13UnionFightTowerPersistedReleaseCancelLateDeathAndIdempotence(t *test
 	if _, err := f.s.p13UFFieldEnter(f.ctx, ids[0], now()); err != nil {
 		t.Fatal(err)
 	}
+	if _, err := f.s.p13UFFieldFrames(f.ctx, ids[0], &pb.CSCurrentPosition{}, now()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.s.SyncP13UnionFightField(f.ctx, ids[0], false); err != nil {
+		t.Fatal(err)
+	}
 	// The integration owner wires Build into field creation. Permit isolated
 	// execution before that shared hook is merged, using the same real snapshot.
 	if err := db.GetIns().Model(&db.P13UnionFightTowerState{}).Where("match_id=?", match.ID).Count(&count).Error; err != nil {

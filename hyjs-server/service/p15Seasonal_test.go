@@ -17,6 +17,16 @@ func TestP15SeasonalNativeDirectoryActualSourcesAndFrozenRewards(t *testing.T) {
 	f := p4Setup(t)
 	now := time.Now()
 	suffix := now.In(time.FixedZone("UTC+8", 8*3600)).Format("200601")
+	// Explicit current-month QA catalogue and its material/login child periods.
+	if err := db.GetIns().Model(&db.P15SeasonalBundle{}).Where("id IN ?", []string{"festival_p4_" + suffix, "update_p4_" + suffix}).Update("enabled", true).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.GetIns().Model(&db.PeriodInstance{}).Where("id LIKE ? OR id LIKE ? OR id=?", "%_p4_festival_"+suffix, "%_p4_update_"+suffix, "celebrationActivity_p4_"+suffix).Update("enabled", true).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.GetIns().Model(&db.P4CommerceRule{}).Where("id=?", "limitExchangeFestival_p4_festival_"+suffix).Update("enabled", true).Error; err != nil {
+		t.Fatal(err)
+	}
 	list := func(kind string) *pb.SCActivityList {
 		t.Helper()
 		out, err := f.s.p15SeasonalList(f.ctx, f.id, &pb.CSActivityList{ActivityId: proto.String(kind + "_p4_" + suffix)}, now)

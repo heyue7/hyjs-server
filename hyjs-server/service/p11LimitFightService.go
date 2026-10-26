@@ -272,7 +272,7 @@ func (s *GameService) p11LimitFightAt(ctx context.Context, id int64, request *pb
 			return errors.New(constUtil.P11LimitFightRefresh)
 		}
 		var match db.P11LimitFightMatch
-		if e = tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("period_id=? AND player_id=? AND opponent_id=? AND expires_at>?", period.ID, id, other.Id, now.UnixMilli()).Order("created_at DESC,id DESC").First(&match).Error; e != nil {
+		if e = tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("period_id=? AND player_id=? AND opponent_id=? AND created_at<=? AND expires_at>?", period.ID, id, other.Id, now.UnixMilli(), now.UnixMilli()).Order("created_at DESC,id DESC").First(&match).Error; e != nil {
 			return errors.New(constUtil.P11LimitFightRefresh)
 		}
 		configuration, e := s.p11ArenaConfigurationHash()

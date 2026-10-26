@@ -191,8 +191,16 @@ func (s *GameService) KingRecruitWorlds(ctx context.Context, id int64, session [
 
 		present := false
 		for _, candidate := range candidates {
-			label := map[int64]string{0: "轮换世界", 1: "SAO", 2: "ALO", 3: "GGO"}[candidate.World]
-			out.Worlds = append(out.Worlds, model.KingRecruitWorld{PoolID: candidate.Key, World: candidate.World, Label: label, EndAt: candidate.EndAt})
+			world := candidate.World
+			if world == 0 {
+				_, active, _, e := s.kingConfiguration(tx, LocalPlayNow(ctx))
+				if e != nil {
+					return e
+				}
+				world = int64(active)
+			}
+			label := map[int64]string{1: "SAO", 2: "ALO", 3: "GGO"}[world]
+			out.Worlds = append(out.Worlds, model.KingRecruitWorld{PoolID: candidate.Key, World: world, Label: label, EndAt: candidate.EndAt})
 			if selected.PoolID == candidate.Key {
 				present = true
 			}

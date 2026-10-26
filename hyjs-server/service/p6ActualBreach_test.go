@@ -9,7 +9,7 @@ import (
 func p6ReadActualBreachPaths(t *testing.T) []p6ActualGrowthPath {
 	t.Helper()
 	file := "p5-breach-highest-actors-20261014.json"
-	raw, err := os.ReadFile("../../analysis/p6/" + file)
+	raw, err := readTestAnalysis75("../../analysis/p6/" + file)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -30,7 +30,7 @@ func p6ReadActualBreachPaths(t *testing.T) []p6ActualGrowthPath {
 		t.Fatal("actual breach25 fixture drift", err)
 	}
 	for table, digest := range fixture.TableSHA {
-		original, e := os.ReadFile("../../analysis/tables/Table" + table + ".tsv")
+		original, e := readTestAnalysis75("../../analysis/tables/Table" + table + ".tsv")
 		if e != nil || p6Digest(original) != digest {
 			t.Fatal("actual breach original table drift", table, e)
 		}

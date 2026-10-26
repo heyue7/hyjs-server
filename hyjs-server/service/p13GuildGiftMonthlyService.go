@@ -111,7 +111,25 @@ func p13GuildGiftPrestartGuard(tx *gorm.DB, guildID string) error {
 	if err != nil {
 		return err
 	}
+	if calendar75Adjusted(tx) {
+		// A trusted test rewind pauses this forward-only monthly ledger. Its
+		// head and earned entitlements remain intact; ordinary guild play works.
+		return nil
+	}
 	return p13GuildGiftError()
+}
+
+func p13GuildGiftTrackedBeforeStart75(tx *gorm.DB, guildID string) (bool, error) {
+	var head db.P13GuildGiftHead
+	err := tx.First(&head, "guild_id=?", guildID).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	_, _, err = p13GuildGiftVerifyHead(tx, &head)
+	return true, err
 }
 
 func p13GuildGiftReadRule(tx *gorm.DB, month string) (*db.P13GuildGiftRule, []p13GuildGiftLevel, error) {
@@ -342,6 +360,9 @@ func (s *GameService) P13GuildGiftBeforeMutation(tx *gorm.DB, guildID string, no
 		return false, err
 	}
 	if now.UnixMilli() < policy.StartsAt {
+		if calendar75Adjusted(tx) {
+			return p13GuildGiftTrackedBeforeStart75(tx, guildID)
+		}
 		return false, p13GuildGiftPrestartGuard(tx, guildID)
 	}
 	var guild db.P13Guild
@@ -357,12 +378,18 @@ func (s *GameService) P13GuildGiftBeforeMutation(tx *gorm.DB, guildID string, no
 			return true, err
 		}
 		if now.UnixMilli() < existingRule.FrozenAt || now.UnixMilli() < head.LastCreditAt {
+			if calendar75Adjusted(tx) && max(existingRule.FrozenAt, head.LastCreditAt) <= calendar75SourceHorizon(tx, now).UnixMilli() {
+				return true, nil
+			}
 			return true, p13GuildGiftError()
 		}
 		if head.RetiredAt != 0 {
 			return true, p13GuildGiftError()
 		}
 		if month < head.Month {
+			if calendar75Adjusted(tx) && existingRule.FrozenAt <= calendar75SourceHorizon(tx, now).UnixMilli() {
+				return true, nil
+			}
 			return true, p13GuildGiftError()
 		}
 		if month == head.Month {
@@ -415,6 +442,13 @@ func (s *GameService) P13GuildGiftRetire(tx *gorm.DB, guildID string, now time.T
 		return err
 	}
 	head.RetiredAt, head.DueAt = now.UnixMilli(), 0
+	if calendar75Adjusted(tx) {
+		rule, _, e := p13GuildGiftReadRule(tx, head.Month)
+		if e != nil {
+			return e
+		}
+		head.RetiredAt = max(head.RetiredAt, rule.StartAt, head.LastCreditAt)
+	}
 	head.SourceHash = p13GuildGiftHeadHash(head)
 	return tx.Save(&head).Error
 }
@@ -425,6 +459,9 @@ func (s *GameService) p13GuildGiftCredit(tx *gorm.DB, guild *db.P13Guild, member
 		return false, err
 	}
 	if now.UnixMilli() < policy.StartsAt {
+		if calendar75Adjusted(tx) {
+			return p13GuildGiftTrackedBeforeStart75(tx, guild.ID)
+		}
 		return false, p13GuildGiftPrestartGuard(tx, guild.ID)
 	}
 	var head db.P13GuildGiftHead
@@ -436,6 +473,11 @@ func (s *GameService) p13GuildGiftCredit(tx *gorm.DB, guild *db.P13Guild, member
 		return true, err
 	}
 	month, _, _ := p13GuildGiftMonth(now)
+	if calendar75Adjusted(tx) && (month < head.Month || now.UnixMilli() < head.LastCreditAt || now.UnixMilli() < rule.FrozenAt || member.JoinedAt > now.UnixMilli()) {
+		if max(head.LastCreditAt, rule.FrozenAt, member.JoinedAt) <= calendar75SourceHorizon(tx, now).UnixMilli() && int64(guild.ActiveScore) == head.Score && member.GuildID == guild.ID {
+			return true, nil
+		}
+	}
 	if head.Month != month || int64(guild.ActiveScore) != head.Score || member.GuildID != guild.ID || now.UnixMilli() < head.LastCreditAt || now.UnixMilli() < rule.FrozenAt {
 		return true, p13GuildGiftError()
 	}
@@ -567,6 +609,13 @@ func (s *GameService) p13GuildGiftDeliver(tx *gorm.DB, id string, now time.Time)
 // TickP13GuildGiftMonthly uses bounded discovery and per-guild/per-award TXs.
 // Use the same LocalPlayNow context as login/admin; no war-specific clock.
 func (s *GameService) TickP13GuildGiftMonthly(ctx context.Context, now time.Time) error {
+	ctx, bound, err := s.bindServerGameClockWorker75(ctx)
+	if err != nil {
+		return err
+	}
+	if bound {
+		now = LocalPlayNow(ctx)
+	}
 	d := db.GetIns().WithContext(ctx)
 	p, err := p13GuildGiftPolicy(d)
 	if err != nil || p == nil {

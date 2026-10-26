@@ -5,7 +5,6 @@ import (
 
 	"hyjs-server/model"
 	pb "hyjs-server/model/protocol"
-	"os"
 	"testing"
 )
 
@@ -61,7 +60,7 @@ func p6NativeKFRealmFixtureInput(t *testing.T, s *GameService, input *model.Froz
 	default:
 		t.Fatal("KF original wire source identity changed")
 	}
-	raw, err := os.ReadFile("../../analysis/p14/final-game-actual-native/actual-Game1-KFReplayData.pb")
+	raw, err := readTestAnalysis75("../../analysis/p14/final-game-actual-native/actual-Game1-KFReplayData.pb")
 	if err != nil || p6Digest(raw) != "18473d1c95d92d51850578f69a8fa6273039a6f77d55a0ebd6f64abf699c502c" {
 		t.Fatal("actual KF source SHA", err)
 	}

@@ -2,7 +2,6 @@ package service
 
 import (
 	"encoding/json"
-	"os"
 	"sort"
 	"strconv"
 	"testing"
@@ -16,7 +15,7 @@ import (
 
 func p12WorldBossPartyScopeInput(t *testing.T, s *GameService) *model.FrozenBattleInput {
 	t.Helper()
-	raw, err := os.ReadFile("../../analysis/p6/worldboss18-actual-party001003-pending-20261016/000.pb")
+	raw, err := readTestAnalysis75("../../analysis/p6/worldboss18-actual-party001003-pending-20261016/000.pb")
 	if err != nil || p6Digest(raw) != "b5da71b7c23d5b39f9031794f8af5846bc97226527dd9319eac942c66dab258c" {
 		t.Fatal("actual historical party typed18 source", err)
 	}

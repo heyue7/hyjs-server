@@ -29,6 +29,11 @@ func TestLocalPlayTrainingRewindActualCostsRebateAndCold(t *testing.T) {
 		}
 	}
 	f.s.P5Ready = true
+	localWelfareSourceFixture75(t, constUtil.P4WelfareRebate)
+	// One finite original material listing is explicitly published in this fixture.
+	if err := db.GetIns().Model(&db.ShopProduct{}).Where("id=?", "itemShopId_9").Update("enabled", true).Error; err != nil {
+		t.Fatal(err)
+	}
 	if err := updateProfile(f.ctx, id, func(p *pb.Player, _ *model.GameState) error { p.Level = proto.Int32(10); return nil }); err != nil {
 		t.Fatal(err)
 	}

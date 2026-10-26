@@ -22,7 +22,7 @@ namespace HYJS.GGO
         TopBarItem balanceItem;
         UITexture balanceIcon;
         static Texture2D balanceTexture;
-        GameObject refreshButton; UILabel refreshInfo; UIButton refreshControl;
+        GameObject refreshRoot, refreshButton; UILabel refreshInfo, refreshCostLabel; UIButton refreshControl;
         bool refreshEnabled; long freeRefreshLeft, paidRefreshLeft, refreshCost; string refreshCurrency = "";
         const string RefreshProduct = "__refresh__";
         long owner;
@@ -52,8 +52,8 @@ namespace HYJS.GGO
         string PreferenceKey() { return "hyjs.ggo.pending." + Uri.EscapeDataString(origin) + "." + owner; }
 
         static bool assetRegistrationErrorLogged;
-        // Old user manifests take precedence over APK manifests. Admit only our ten missing
-        // bundle keys in memory, through the native parser; never persist or replace entries.
+        // Old user manifests take precedence over APK manifests. Admit only our exact missing
+        // GGO and original-model pet portrait keys through the native parser; never replace existing entries.
         static void RegisterIcons()
         {
             try
@@ -66,8 +66,8 @@ namespace HYJS.GGO
                 AssetFileTool full = fullField == null ? null : fullField.GetValue(manager) as AssetFileTool;
                 AssetFileTool small = smallField == null ? null : smallField.GetValue(manager) as AssetFileTool;
                 if (full == null || small == null || full.assetCells == null || small.assetCells == null) return;
-                AssetFileTool additions = AssetFileTool.LoadFromString(GGOIconManifest.Text);
-                if (additions == null || additions.assetCells.Count != 10) return;
+                AssetFileTool additions = AssetFileTool.LoadFromString(GGOIconManifest.Text + PetIconManifest75.Text);
+                if (additions == null || additions.assetCells.Count != 13) return;
                 foreach (KeyValuePair<string, AssetCell> pair in additions.assetCells)
                 {
                     if (!full.assetCells.ContainsKey(pair.Key)) full.assetCells.Add(pair.Key, pair.Value);
@@ -82,6 +82,7 @@ namespace HYJS.GGO
 
         public static void Ensure(ShopPage page)
         {
+            TrialShopRefresh75.Ensure(page);
             RegisterIcons();
             if (page == null || page.simpleGrid == null) return;
             GGOShop control = page.GetComponent<GGOShop>();
@@ -154,10 +155,38 @@ namespace HYJS.GGO
             NGUITools.AddWidgetCollider(go);
             UIEventListener.Get(go).onClick = delegate(GameObject ignored) { Retry(); };
         }
+        // Preserve the memory shop footer's own coordinate space. Native labels
+        // stay beside their action instead of borrowing the recovery-room button.
+        GameObject CloneFooter(GameObject source, Transform sourceRoot, string name)
+        {
+            GameObject go = (GameObject)UnityEngine.Object.Instantiate(source);
+            go.name = name;
+            Vector3 position = sourceRoot.InverseTransformPoint(source.transform.position);
+            Vector3 scale = source.transform.lossyScale, rootScale = sourceRoot.lossyScale;
+            go.transform.parent = content.transform;
+            go.transform.localPosition = position;
+            go.transform.localRotation = Quaternion.Inverse(sourceRoot.rotation) * source.transform.rotation;
+            go.transform.localScale = new Vector3(scale.x / rootScale.x, scale.y / rootScale.y, scale.z / rootScale.z);
+            return go;
+        }
+        static string RelativePath(Transform root, Transform child)
+        {
+            string path = "";
+            while (child != root)
+            {
+                if (child == null) throw new Exception("refresh footer ownership changed");
+                path = child.name + (path.Length == 0 ? "" : "/" + path);
+                child = child.parent;
+            }
+            return path;
+        }
+        static void RemoveDynamicLocalization(UILabel label)
+        {
+            foreach (MonoBehaviour component in label.GetComponents<MonoBehaviour>())
+                if (component != null && component.GetType().Name == "TextKit") UnityEngine.Object.DestroyImmediate(component);
+        }
         void CreateRefresh()
         {
-            // Copy the original memory shop's refresh control and count font.
-            // The recovery-room button uses baked lettering and cannot be relabelled.
             GameObject template = null;
             try
             {
@@ -167,30 +196,33 @@ namespace HYJS.GGO
                 Transform native = null;
                 foreach (Transform child in template.GetComponentsInChildren<Transform>(true))
                     if (child.name == "BtnRefresh") { if (native != null) throw new Exception("ambiguous refresh control"); native = child; }
-                if (native == null || memory == null || memory.labLeftRefreshTimes == null) throw new Exception("native refresh control unavailable");
-                refreshButton = (GameObject)UnityEngine.Object.Instantiate(native.gameObject);
-                refreshButton.name = "GGOCreditRefresh";
-                refreshButton.transform.parent = shop.btnRecoverry.transform.parent;
-                refreshButton.transform.localPosition = shop.btnRecoverry.transform.localPosition;
-                refreshButton.transform.localScale = Vector3.one;
-                foreach (UIButtonMessage old in refreshButton.GetComponentsInChildren<UIButtonMessage>(true)) UnityEngine.Object.DestroyImmediate(old);
-                foreach (UIEventListener old in refreshButton.GetComponentsInChildren<UIEventListener>(true)) UnityEngine.Object.DestroyImmediate(old);
+                if (native == null || memory == null || memory.labLeftRefreshTimes == null || memory.labRefreshCost == null) throw new Exception("native refresh footer unavailable");
+                Transform nativeGroup = native.parent;
+                string buttonPath = RelativePath(nativeGroup, native);
+                string countPath = RelativePath(nativeGroup, memory.labLeftRefreshTimes.transform);
+                string costPath = RelativePath(nativeGroup, memory.labRefreshCost.transform);
+                refreshRoot = CloneFooter(nativeGroup.gameObject, template.transform, "GGOCreditRefreshBar");
+                refreshButton = refreshRoot.transform.Find(buttonPath).gameObject;
+                refreshInfo = refreshRoot.transform.Find(countPath).GetComponent<UILabel>();
+                refreshCostLabel = refreshRoot.transform.Find(costPath).GetComponent<UILabel>();
+                RemoveDynamicLocalization(refreshInfo); RemoveDynamicLocalization(refreshCostLabel);
+                if (memory.freeRefreshCDRoot != null)
+                {
+                    Transform countdown = refreshRoot.transform.Find(RelativePath(nativeGroup, memory.freeRefreshCDRoot.transform));
+                    if (countdown != null) countdown.gameObject.SetActive(false);
+                }
+                foreach (UIButtonMessage old in refreshRoot.GetComponentsInChildren<UIButtonMessage>(true)) UnityEngine.Object.DestroyImmediate(old);
+                foreach (UIEventListener old in refreshRoot.GetComponentsInChildren<UIEventListener>(true)) UnityEngine.Object.DestroyImmediate(old);
                 refreshControl = refreshButton.GetComponent<UIButton>();
                 if (refreshControl != null) { refreshControl.onClick.Clear(); EventDelegate.Set(refreshControl.onClick, RefreshStock); }
                 else UIEventListener.Get(refreshButton).onClick = delegate(GameObject ignored) { RefreshStock(); };
-                GameObject info = (GameObject)UnityEngine.Object.Instantiate(memory.labLeftRefreshTimes.gameObject);
-                info.name = "GGOCreditRefreshInfo"; info.transform.parent = refreshButton.transform;
-                info.transform.localScale = Vector3.one;
-                info.transform.localPosition = new Vector3(-240f, 0f, 0f);
-                refreshInfo = info.GetComponent<UILabel>(); refreshInfo.width = 300; refreshInfo.text = "";
-                refreshInfo.pivot = UIWidget.Pivot.Center; refreshInfo.alignment = NGUIText.Alignment.Center;
-                foreach (Collider collider in info.GetComponentsInChildren<Collider>(true)) UnityEngine.Object.DestroyImmediate(collider);
-                refreshButton.SetActive(false);
+                refreshInfo.text = refreshCostLabel.text = "";
+                refreshRoot.SetActive(false);
             }
             catch (Exception)
             {
-                if (refreshButton != null) UnityEngine.Object.Destroy(refreshButton);
-                refreshButton = null; refreshInfo = null; refreshControl = null;
+                if (refreshRoot != null) UnityEngine.Object.Destroy(refreshRoot);
+                refreshRoot = refreshButton = null; refreshInfo = refreshCostLabel = null; refreshControl = null;
                 SetNotice("刷新按钮暂不可用，请重新打开商店");
             }
             finally { if (template != null) UnityEngine.Object.Destroy(template); }
@@ -246,7 +278,8 @@ namespace HYJS.GGO
             inventorySnapshotGeneration++;
             StopRequests();
             if (selected && shop != null && shop.shopTopBar != null) shop.shopTopBar.gameObject.SetActive(restoreTop);
-            if (refreshButton != null) UnityEngine.Object.Destroy(refreshButton); refreshButton = null; refreshInfo = null; refreshControl = null; refreshEnabled = false;
+            if (refreshRoot != null) UnityEngine.Object.Destroy(refreshRoot);
+            refreshRoot = refreshButton = null; refreshInfo = refreshCostLabel = null; refreshControl = null; refreshEnabled = false;
             selected = false; if (content != null) content.SetActive(false);
         }
         void StopRequests() { StopAllCoroutines(); if (request != null) { request.Dispose(); request = null; } busy = false; }
@@ -565,8 +598,10 @@ namespace HYJS.GGO
                 freeRefreshLeft = Int64.Parse(refresh["freeLeft"].ToString()); paidRefreshLeft = Int64.Parse(refresh["paidLeft"].ToString());
                 refreshCost = Int64.Parse(refresh["costAmount"].ToString()); refreshCurrency = (string)refresh["costId"];
                 if (freeRefreshLeft < 0 || paidRefreshLeft < 0 || refreshCost < 0) throw new Exception("invalid refresh allowance");
-                if (refreshInfo != null) refreshInfo.text = freeRefreshLeft > 0 ? "免费刷新 " + freeRefreshLeft + "次" :
-                    (paidRefreshLeft > 0 ? refreshCost + " 信用点  剩余" + paidRefreshLeft + "次" : "刷新次数已用完");
+                long freeCap = Int64.Parse(refresh["freeCap"].ToString()), paidCap = Int64.Parse(refresh["paidCap"].ToString());
+                if (freeCap < 0 || paidCap < 0 || freeRefreshLeft > freeCap || paidRefreshLeft > paidCap) throw new Exception("invalid refresh caps");
+                if (refreshInfo != null) refreshInfo.text = (freeRefreshLeft + paidRefreshLeft) + "/" + (freeCap + paidCap);
+                if (refreshCostLabel != null) refreshCostLabel.text = freeRefreshLeft > 0 ? "免费" : "信用点×" + refreshCost;
             }
             foreach (GameObject child in new List<GameObject>(layout.simpleGrid.childs)) UnityEngine.Object.Destroy(child);
             layout.simpleGrid.childs.Clear(); rows.Clear();
@@ -587,7 +622,7 @@ namespace HYJS.GGO
         {
             bool blocked = busy || !enabledShop || pendingUnreadable || inventoryRefreshPending || !String.IsNullOrEmpty(pendingId);
             foreach (GGOProductRow row in rows) if (row != null) row.SetBusy(blocked);
-            if (refreshButton != null) refreshButton.SetActive(selected && refreshEnabled);
+            if (refreshRoot != null) refreshRoot.SetActive(selected && refreshEnabled);
             if (refreshControl != null) refreshControl.isEnabled = !blocked && (freeRefreshLeft > 0 || paidRefreshLeft > 0);
         }
 

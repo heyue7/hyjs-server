@@ -17,7 +17,7 @@ import (
 // The phone pin is a negative drift registry, not an authority certificate.
 func TestP6UFGuardPhoneInputScopeRejectsActorAndDriverDrift(t *testing.T) {
 	root := "../../analysis/p6/guild-guard-inputs-20261025-native"
-	raw, err := os.ReadFile(filepath.Join(root, "manifest.json"))
+	raw, err := readTestAnalysis75(filepath.Join(root, "manifest.json"))
 	if os.IsNotExist(err) {
 		t.Skip("retained independent phone inputs required")
 	}
@@ -35,7 +35,7 @@ func TestP6UFGuardPhoneInputScopeRejectsActorAndDriverDrift(t *testing.T) {
 	}
 	for _, row := range manifest.Cases {
 		t.Run(row.ID, func(t *testing.T) {
-			raw, err := os.ReadFile(filepath.Join(root, row.File))
+			raw, err := readTestAnalysis75(filepath.Join(root, row.File))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -53,8 +53,8 @@ func TestP6UFGuardPhoneInputScopeRejectsActorAndDriverDrift(t *testing.T) {
 			var player pb.InstUFPlayer
 			var guard pb.InstUFGuard
 			prefix := strings.TrimSuffix(row.File, ".frozen-input.json")
-			playerRaw, e1 := os.ReadFile(filepath.Join(rawRoot, prefix+".player-frame.pb"))
-			guardRaw, e2 := os.ReadFile(filepath.Join(rawRoot, prefix+".guard-frame.pb"))
+			playerRaw, e1 := readTestAnalysis75(filepath.Join(rawRoot, prefix+".player-frame.pb"))
+			guardRaw, e2 := readTestAnalysis75(filepath.Join(rawRoot, prefix+".guard-frame.pb"))
 			if e1 != nil || e2 != nil || proto.Unmarshal(playerRaw, &player) != nil || proto.Unmarshal(guardRaw, &guard) != nil {
 				t.Fatal("retained source frames", e1, e2)
 			}

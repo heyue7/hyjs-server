@@ -30,7 +30,7 @@ func p7RoundLiveAutoPhone66Fixture(t *testing.T, filename string) (*GameService,
 			EndHex string `json:"endHex"`
 		} `json:"ends"`
 	}
-	raw, err := os.ReadFile(filename)
+	raw, err := readTestAnalysis75(filename)
 	if err != nil {
 		t.Fatal(err)
 	}

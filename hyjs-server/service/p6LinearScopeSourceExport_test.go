@@ -43,7 +43,7 @@ func TestP6ExportLinearPhysicalCandidateSources(t *testing.T) {
 	provenance := []map[string]string{}
 	for _, stage := range []string{"breach", "training"} {
 		name := "p5-" + stage + "-highest-actors-20261014.json"
-		raw, e := os.ReadFile(filepath.Join(analysis, name))
+		raw, e := readTestAnalysis75(filepath.Join(analysis, name))
 		if e != nil {
 			t.Fatal(e)
 		}

@@ -95,7 +95,7 @@ func TestP2KingIdentityAndRotation(t *testing.T) {
 		t.Fatal(e)
 	}
 	for _, key := range preview[0].(*pb.SCWarriorRecruitGetPreview).GetRewards() {
-		if s.table("Hero", "id", key)["space"] != fmt.Sprint(king.GetSpace()) {
+		if s.table("Hero", "id", key)["quality"] == "23" && s.table("Hero", "id", key)["space"] != fmt.Sprint(king.GetSpace()) {
 			t.Fatal("preview crosses rotation", key)
 		}
 	}
@@ -371,6 +371,15 @@ func TestP2ExchangeCatalogQuotaAndPrice(t *testing.T) {
 	s, ctx := newP2Test(t)
 	id := dailyCopyTestPlayer(t, ctx, "p2-exchange", 20)
 	p2Funding(t, s, ctx, id, "item_020,800;item_021,200")
+	closed := &pb.CSGetActivityShopReward{ActivityId: proto.String(constUtil.P2RedExchangeActivity), Index: proto.Int32(3)}
+	if _, err := s.redExchangeBuy(ctx, id, closed, 99); err == nil {
+		t.Fatal("retired direct-red exchange unexpectedly open")
+	}
+	// Preserve the original transaction/quota path with one finite ordinary
+	// material fixture; no red-equipment catalogue is reopened.
+	if err := db.GetIns().Model(&db.RedP2Exchange{}).Where("id=?", 3).Updates(map[string]any{"enabled": true, "resource_id": "item_006", "amount": 10}).Error; err != nil {
+		t.Fatal(err)
+	}
 	request := &pb.CSGetActivityShopReward{ActivityId: proto.String(constUtil.P2RedExchangeActivity), Index: proto.Int32(3), CostResources: []*pb.BaseResource{p2Item("item_021", 99)}}
 	if _, e := s.redExchangeBuy(ctx, id, request, 1); e == nil {
 		t.Fatal("spoofed price")
@@ -380,12 +389,12 @@ func TestP2ExchangeCatalogQuotaAndPrice(t *testing.T) {
 	if _, e := s.redExchangeBuy(ctx, id, request, 1); e == nil {
 		t.Fatal("spoofed item")
 	}
-	request.GetResources = []*pb.BaseResource{p2Item("equip_037", 1)}
+	request.GetResources = []*pb.BaseResource{p2Item("item_006", 10)}
 	first, e := s.redExchangeBuy(ctx, id, request, 1)
 	if e != nil {
 		t.Fatal(e)
 	}
-	if first[0].(*pb.SCGetActivityShopReward).GetGet().GetEquips()[0].GetEquipId() != "equip_037" {
+	if first[0].(*pb.SCGetActivityShopReward).GetGet().GetSimps()[0].GetId() != "item_006" || first[0].(*pb.SCGetActivityShopReward).GetGet().GetSimps()[0].GetNum() != 10 {
 		t.Fatal(first)
 	}
 	retry, e := s.redExchangeBuy(ctx, id, request, 1)
@@ -396,7 +405,7 @@ func TestP2ExchangeCatalogQuotaAndPrice(t *testing.T) {
 		t.Fatal("daily quota")
 	}
 	p, g := p2Profile(t, id)
-	if simpleOwned(p, g, "item_021") != 100 || len(g.Equipment) != 1 {
+	if simpleOwned(p, g, "item_021") != 100 || len(g.Equipment) != 0 || simpleOwned(p, g, "item_006") != 10 {
 		t.Fatal("duplicate exchange")
 	}
 	catalog, e := s.redExchangeInfo(ctx, id)
@@ -558,6 +567,14 @@ func TestP2OldTurntableSettlementSurvivesSwitch(t *testing.T) {
 	if _, e := s.playBigTurn(ctx, id, &pb.CSPlayBigTurn{Count: proto.Int32(1)}, 1); e != nil {
 		t.Fatal(e)
 	}
+	legacy := dailyCopyTestPlayer(t, ctx, "p2-legacy-ranked", 20)
+	// Bounded pre-migration history: an accepted old shared-pool score, with
+	// no personal inventory. New native draws above already use personal ownership.
+	if err := db.GetIns().Create(&db.TurntableState{PoolID: "turntable_20261011", PlayerID: legacy, PlayerName: "legacy fixture", Score: 1}).Error; err != nil {
+		t.Fatal(err)
+	}
+	legacyP, legacyG := p2Profile(t, legacy)
+	legacyBefore := simpleOwned(legacyP, legacyG, "item_008")
 	db.GetIns().Model(&db.GameplayPool{}).Where("id=?", "turntable_20261011").Update("end_at", time.Now().UnixMilli()-1)
 	db.GetIns().Model(&db.KingRecruitRules{}).Where("id=1").Update("wheel_pool", constUtil.P2RedWheelPool)
 	p, g := p2Profile(t, id)
@@ -569,8 +586,12 @@ func TestP2OldTurntableSettlementSurvivesSwitch(t *testing.T) {
 		t.Fatal(e)
 	}
 	p, g = p2Profile(t, id)
-	if simpleOwned(p, g, "item_008") != before+100 {
-		t.Fatal("old-pool ranking lost or doubled")
+	if simpleOwned(p, g, "item_008") != before {
+		t.Fatal("personal wheel received legacy global ranking reward")
+	}
+	legacyP, legacyG = p2Profile(t, legacy)
+	if simpleOwned(legacyP, legacyG, "item_008") != legacyBefore+100 {
+		t.Fatal("legacy shared-pool ranking lost or doubled")
 	}
 }
 

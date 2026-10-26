@@ -6,7 +6,6 @@ import (
 	"hyjs-server/model"
 	pb "hyjs-server/model/protocol"
 	"math"
-	"os"
 	"strings"
 	"testing"
 
@@ -15,7 +14,7 @@ import (
 
 func p6NativeDailyInput(t *testing.T, fixturePath string) (*model.FrozenBattleInput, *pb.BattleOperate) {
 	t.Helper()
-	raw, err := os.ReadFile("../../analysis/p6/" + fixturePath)
+	raw, err := readTestAnalysis75("../../analysis/p6/" + fixturePath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -53,7 +52,7 @@ func p6NativeDailyInput(t *testing.T, fixturePath string) (*model.FrozenBattleIn
 // No server-computed values are used to author this golden or to claim full-content parity.
 func p6AssertNativePlaybackGolden(t *testing.T, caseName string, outcome *model.CombatOutcome) {
 	t.Helper()
-	raw, err := os.ReadFile("../../analysis/p6/native-playback-golden-" + caseName + "-20261014.json")
+	raw, err := readTestAnalysis75("../../analysis/p6/native-playback-golden-" + caseName + "-20261014.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -94,7 +93,7 @@ func p6AssertNativePlaybackGolden(t *testing.T, caseName string, outcome *model.
 	if err = json.Unmarshal(raw, &golden); err != nil {
 		t.Fatal(err)
 	}
-	log, err := os.ReadFile("../../analysis/p6/" + golden.SourceLog)
+	log, err := readTestAnalysis75("../../analysis/p6/" + golden.SourceLog)
 	if err != nil || p6Digest(log) != golden.SourceSHA256 {
 		t.Fatal("native golden source log drifted", err)
 	}

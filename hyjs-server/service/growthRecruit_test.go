@@ -234,9 +234,10 @@ func TestGrowthRecruitKingDailyCapSurvivesCalendarRevisit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// A naturally drawn red resets pity immediately; an orange advances one draw.
+	// Both orange and red entries belong to the original guaranteed group.
 	wantPity := int32(8)
-	if f.s.table("Hero", "id", awarded[0].(*pb.SCWarriorRecruit).GetGet().GetWars()[0].GetId())["quality"] == "23" {
+	quality := f.s.table("Hero", "id", awarded[0].(*pb.SCWarriorRecruit).GetGet().GetWars()[0].GetId())["quality"]
+	if quality == "20" || quality == "23" {
 		wantPity = 9
 	}
 	if baseInfo := growthRecruitInfo(t, f, base, 3); baseInfo.GetNum() != 0 || baseInfo.GetLeftTimes() != wantPity {

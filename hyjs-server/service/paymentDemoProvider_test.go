@@ -101,9 +101,15 @@ func TestP3DemoProviderDefaultClosedAndProtectedAccount(t *testing.T) {
 func TestP3DemoProviderActualConcurrentReceiptColdAndRedBoxUse(t *testing.T) {
 	f, id := p3DemoProviderFixture(t)
 	f.s.P3AutoConfirmDemoPayments = true
-	request := p3DemoProviderRequest(t, "local-p3-red-card")
+	request := p3DemoProviderRequest(t, "djsy.wuyou.andp0030")
 	var product db.PaymentProduct
 	if err := db.GetIns().First(&product, "id=?", request.GetPaymentId()).Error; err != nil {
+		t.Fatal(err)
+	}
+	// Red boxes are earned from a finite recharge activity, while the original
+	// directly sold red-box products remain disabled under current policy.
+	activity := db.PeriodInstance{ID: "rechargeTotal_p4_native_box75", Enabled: true, Title: "隔离充值奖励", Kind: "payment_amount", Mode: "cumulative", Goal: product.Cents, Rewards: "item_023,1", StartAt: time.Now().Add(-time.Hour).UnixMilli(), EndAt: time.Now().Add(time.Hour).UnixMilli(), RewardEndAt: time.Now().Add(2 * time.Hour).UnixMilli(), Source: "finite isolated actual-payment activity fixture"}
+	if err := db.GetIns().Create(&activity).Error; err != nil {
 		t.Fatal(err)
 	}
 	p3DemoProviderFund(t, f, id, "red-card-original-price", product.Cents)
@@ -147,15 +153,17 @@ func TestP3DemoProviderActualConcurrentReceiptColdAndRedBoxUse(t *testing.T) {
 		t.Fatal(err)
 	}
 	after, _ := f.profile(t)
-	if order.Status != constUtil.P3PaymentConfirmed || confirmations != 1 || order.Credited != 300 || after.GetDiamond()-before.GetDiamond() != order.Credited || after.GetChargeCount()-before.GetChargeCount() != 1 {
+	if order.Status != constUtil.P3PaymentConfirmed || confirmations != 1 || order.Credited < product.Charge || after.GetDiamond()-before.GetDiamond() != order.Credited || after.GetChargeCount()-before.GetChargeCount() != 1 {
 		t.Fatal("automatic demo confirmation did not use the once-only order ledger")
 	}
 	wallet, err := f.s.LocalWalletSnapshot(f.ctx, id)
 	if err != nil || wallet.BalanceCents != 0 || wallet.Revision != 2 || len(wallet.Entries) != 2 || wallet.Entries[0].AmountCents != -product.Cents {
 		t.Fatal("automatic provider bypassed the funded wallet", wallet, err)
 	}
-	// The paid native box is consumed by the original P2 item path. The provider
-	// creates no warrior directly and never imports an inventory or outcome.
+	if _, err := f.s.P1Activity(f.ctx, id, &pb.CSActivityReward{ActivityId: proto.String(activity.ID), Index: proto.Int32(1), GetResources: []*pb.BaseResource{{Id: proto.String("item_023"), Num: proto.Int32(1)}}}); err != nil {
+		t.Fatal("actual recharge activity box", err)
+	}
+	// The earned native box uses the original P2 path. Payment creates no warrior.
 	for index, item := range []struct {
 		id    string
 		index int32

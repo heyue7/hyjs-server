@@ -5,7 +5,6 @@ import (
 	"google.golang.org/protobuf/proto"
 	"hyjs-server/constUtil"
 	"hyjs-server/model"
-	"os"
 	"testing"
 )
 
@@ -62,7 +61,7 @@ func p6NativeEliteManualFixtureInput(t *testing.T, input *model.FrozenBattleInpu
 	default:
 		t.Fatal("elite manual wire identity changed")
 	}
-	raw, err := os.ReadFile("../../analysis/p6/original-elite-manual-inputs-v165/" + name + ".frozen-input.json")
+	raw, err := readTestAnalysis75("../../analysis/p6/original-elite-manual-inputs-v165/" + name + ".frozen-input.json")
 	if err != nil || p6Digest(raw) != expected {
 		t.Fatal("elite manual source SHA", err)
 	}

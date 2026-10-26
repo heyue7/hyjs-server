@@ -48,9 +48,13 @@ func run() error {
 		warmRushPlayer = flag.Int64("warm-rush-history-player", 0, "validate existing trial history and persist signed certificates, then exit")
 		testPayments   = flag.Bool("enable-test-payments", false, "enable loopback-only demo payment confirmation")
 		applyGrowth    = flag.Bool("apply-growth74", false, "apply the authorized growth configuration during maintenance, then exit")
+		applyGrowth75  = flag.Bool("apply-growth75", false, "apply audited publication, clock repair and growth75 economy during maintenance, then exit")
 		localWallet    = flag.Bool("enable-local-wallet", false, "enable local demo wallet payments in dev/test; no real charge")
 	)
 	flag.Parse()
+	if (*applyGrowth && *applyGrowth75) || ((*applyGrowth || *applyGrowth75) && *warmRushPlayer != 0) {
+		return errors.New("成长部署版本和试炼预热命令不能同时执行")
+	}
 	if err := config.Init(*env); err != nil {
 		return err
 	}
@@ -114,6 +118,11 @@ func run() error {
 	}
 	defer sqlDB.Close()
 	s := &service.GameService{Host: cfg.AdvertiseHost, ServerID: cfg.ServerID}
+	if *applyGrowth75 {
+		if err = s.CheckGrowth75Maintenance(ctx); err != nil {
+			return err
+		}
+	}
 	s.P3AutoConfirmDemoPayments = autoDemo
 	s.P3LocalWalletEnabled = autoDemo
 	s.LocalPlayToolsEnabled = autoDemo
@@ -505,6 +514,9 @@ func run() error {
 	}
 	if *applyGrowth {
 		return s.ApplyGrowth74(ctx)
+	}
+	if *applyGrowth75 {
+		return s.ApplyGrowth75(ctx)
 	}
 	httpListener, err := net.Listen("tcp", net.JoinHostPort(cfg.Bind, strconv.Itoa(cfg.HTTPPort)))
 	if err != nil {

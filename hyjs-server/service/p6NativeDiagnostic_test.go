@@ -28,7 +28,7 @@ func TestP6NativeFoodDarkID4Diagnostic(t *testing.T) {
 
 func p6CollectNativeDailyDiagnostic(t *testing.T, inputPath, fightID, outputPath string) {
 	t.Helper()
-	raw, err := os.ReadFile("../../analysis/p6/" + inputPath)
+	raw, err := readTestAnalysis75("../../analysis/p6/" + inputPath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -164,7 +164,7 @@ func p6NativeRedMainFixture(t *testing.T) (model.FrozenBattleInput, *pb.BattleOp
 
 func p6NativeMainFixture(t *testing.T, manifestPath, inputPath, recordID string) (model.FrozenBattleInput, *pb.BattleOperate) {
 	t.Helper()
-	raw, err := os.ReadFile("../../analysis/p6/" + manifestPath)
+	raw, err := readTestAnalysis75("../../analysis/p6/" + manifestPath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -180,7 +180,7 @@ func p6NativeMainFixture(t *testing.T, manifestPath, inputPath, recordID string)
 	if fixture.ID != recordID || fixture.InputPath != inputPath {
 		t.Fatal("unexpected main native record")
 	}
-	raw, err = os.ReadFile("../../analysis/p6/" + fixture.InputPath)
+	raw, err = readTestAnalysis75("../../analysis/p6/" + fixture.InputPath)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -7,14 +7,13 @@ import (
 	"hyjs-server/constUtil"
 	pb "hyjs-server/model/protocol"
 	"math"
-	"os"
 	"testing"
 )
 
 func TestP6UFPartialPlayerActualWarSourceScopeAndNoMutation(t *testing.T) {
 	s := p6OriginalTables(t)
 	for _, index := range []int{0, 1} {
-		raw, err := os.ReadFile(fmt.Sprintf("../../analysis/p6/native-actual-war-wounded14-inputs-v196/%03d.SCUFFightRecordReplay.pb", index))
+		raw, err := readTestAnalysis75(fmt.Sprintf("../../analysis/p6/native-actual-war-wounded14-inputs-v196/%03d.SCUFFightRecordReplay.pb", index))
 		if err != nil {
 			t.Fatal(err)
 		}

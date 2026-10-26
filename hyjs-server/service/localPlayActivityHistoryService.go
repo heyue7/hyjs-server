@@ -48,15 +48,25 @@ func localPlayActivityPaymentOrders(tx *gorm.DB, id int64, key string, start, en
 		return nil, err
 	}
 	orders, err := localPlayPaymentOrders(tx, id, start, end)
-	if err != nil || cycle == nil || len(orders) == 0 {
+	if err != nil || len(orders) == 0 {
 		return orders, err
+	}
+	realStart, err := rechargeActivityRealStart75(tx, id, key)
+	if err != nil {
+		return nil, err
+	}
+	if cycle != nil {
+		realStart = max(realStart, cycle.RealCreatedAt)
+	}
+	if realStart <= 0 {
+		return orders, nil
 	}
 	ids := make([]string, 0, len(orders))
 	for _, order := range orders {
 		ids = append(ids, order.ID)
 	}
 	var eligible []string
-	if err := tx.Model(&db.PaymentOrder{}).Where("player_id=? AND id IN ? AND confirmed_at>=?", id, ids, cycle.RealCreatedAt).Pluck("id", &eligible).Error; err != nil {
+	if err := tx.Model(&db.PaymentOrder{}).Where("player_id=? AND id IN ? AND confirmed_at>=?", id, ids, realStart).Pluck("id", &eligible).Error; err != nil {
 		return nil, err
 	}
 	keep := map[string]bool{}

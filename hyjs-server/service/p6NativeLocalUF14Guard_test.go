@@ -5,7 +5,6 @@ import (
 	"google.golang.org/protobuf/proto"
 	"hyjs-server/model"
 	pb "hyjs-server/model/protocol"
-	"os"
 	"path/filepath"
 	"testing"
 )
@@ -40,7 +39,7 @@ func TestP6NativeLocalUF14GuardActualOriginalExports(t *testing.T) {
 
 func TestP6NativeLocalUF14GuardActualFrozenSourceIdentity(t *testing.T) {
 	root := filepath.Join("..", "..")
-	raw, err := os.ReadFile(filepath.Join(root, "analysis/p13/actual-battle14-20261015/guard-actual-4165694016210520132.frozen-input.json"))
+	raw, err := readTestAnalysis75(filepath.Join(root, "analysis/p13/actual-battle14-20261015/guard-actual-4165694016210520132.frozen-input.json"))
 	if err != nil || p6Digest(raw) != "18d3d4834703036ac4f1ba0bcf6b04a7f39e1e8423a10f6ef006b02e594d0bd0" {
 		t.Fatal("actual local UF14 frozen source SHA", err)
 	}
@@ -48,7 +47,7 @@ func TestP6NativeLocalUF14GuardActualFrozenSourceIdentity(t *testing.T) {
 	if err = json.Unmarshal(raw, &stored); err != nil {
 		t.Fatal(err)
 	}
-	raw, err = os.ReadFile(filepath.Join(root, "analysis/p6/native-local-uf14-guard-input-v83/000.pb"))
+	raw, err = readTestAnalysis75(filepath.Join(root, "analysis/p6/native-local-uf14-guard-input-v83/000.pb"))
 	if err != nil || p6Digest(raw) != "3d69ec109c3d37c6817c871c8e83d14b5924ad96eb843163838b56fd75b5aea8" {
 		t.Fatal("actual local UF14 wire SHA", err)
 	}

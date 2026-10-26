@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
-	"os"
 	"path/filepath"
 	"testing"
 
@@ -97,7 +96,7 @@ func p6NativeOriginalProtocolRecordFixture(t *testing.T, name, expectedSHA strin
 // mismatch. Existing fixtures always retain their complete terminal HP checks.
 func p6NativeOriginalProtocolFixtureWithTerminalHP(t *testing.T, name, expectedSHA string, requireEnemy, compareTerminalHP bool, expectedCases ...int) {
 	t.Helper()
-	raw, err := os.ReadFile("../../analysis/p6/" + name)
+	raw, err := readTestAnalysis75("../../analysis/p6/" + name)
 	if err != nil || p6Digest(raw) != expectedSHA {
 		t.Fatal("actual original final record fixture SHA", err)
 	}
@@ -132,7 +131,7 @@ func p6NativeOriginalProtocolFixtureWithTerminalHP(t *testing.T, name, expectedS
 		t.Fatal("exact original final record source case count", err)
 	}
 	for _, binding := range [][2]string{{golden.Manifest, golden.ManifestSHA}, {golden.WireSource, golden.WireSHA}} {
-		raw, err = os.ReadFile(filepath.Join("../..", binding[0]))
+		raw, err = readTestAnalysis75(filepath.Join("../..", binding[0]))
 		if err != nil || p6Digest(raw) != binding[1] {
 			t.Fatal("actual native/input manifest binding", err)
 		}
@@ -140,7 +139,7 @@ func p6NativeOriginalProtocolFixtureWithTerminalHP(t *testing.T, name, expectedS
 	s := p6OriginalTables(t)
 	for _, c := range golden.Cases {
 		t.Run(c.Name, func(t *testing.T) {
-			raw, err := os.ReadFile(filepath.Join("../..", c.Wire))
+			raw, err := readTestAnalysis75(filepath.Join("../..", c.Wire))
 			if err != nil || p6Digest(raw) != c.SHA {
 				t.Fatal("original source wire SHA", err)
 			}

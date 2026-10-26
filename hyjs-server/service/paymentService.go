@@ -85,7 +85,7 @@ func (s *GameService) InitializePayments(ctx context.Context) error {
 	if len(s.Tables["Payment"]) == 0 || len(s.Tables["VipPerks"]) == 0 {
 		return errors.New(constUtil.P3PaymentConfigError)
 	}
-	if err := d.AutoMigrate(&db.PaymentProduct{}, &db.PaymentOrder{}, &db.PaymentConfirmation{}, &db.MembershipClaim{}, &db.PaymentActivityRule{}, &db.PaymentActivityState{}, &db.PaymentGiftCode{}, &db.PaymentLuxuryOffer{}, &db.VIPShopProduct{}); err != nil {
+	if err := d.AutoMigrate(&db.PaymentProduct{}, &db.PaymentOrder{}, &db.LocalPlayPaymentTime{}, &db.PaymentConfirmation{}, &db.MembershipClaim{}, &db.PaymentActivityRule{}, &db.PaymentActivityState{}, &db.PaymentGiftCode{}, &db.PaymentLuxuryOffer{}, &db.VIPShopProduct{}); err != nil {
 		return err
 	}
 	return d.Transaction(func(tx *gorm.DB) error {
@@ -418,6 +418,12 @@ func (s *GameService) confirmTestPaymentAt(ctx context.Context, orderID, eventID
 				if err := localPlayRecordPaymentTime(tx, &order, now); err != nil {
 					return err
 				}
+				// The same transaction's activity reads need the accepted order fact.
+				// Failure in an event or grant still rolls back this status and debit.
+				order.Status = outcome
+				if err := tx.Save(&order).Error; err != nil {
+					return err
+				}
 				if err := s.RecordP1Event(tx, row.Id, "payment:"+order.ID, "payment_amount", cents, LocalPlayAt(ctx, now)); err != nil {
 					return err
 				}
@@ -428,9 +434,11 @@ func (s *GameService) confirmTestPaymentAt(ctx context.Context, orderID, eventID
 					return err
 				}
 			}
-			order.Status = outcome
-			if err := tx.Save(&order).Error; err != nil {
-				return err
+			if order.Status != outcome {
+				order.Status = outcome
+				if err := tx.Save(&order).Error; err != nil {
+					return err
+				}
 			}
 			if outcome == constUtil.P3PaymentConfirmed {
 				if err := s.refreshP3OpenServer(tx, p, g, LocalPlayAt(ctx, now)); err != nil {
@@ -498,6 +506,11 @@ func (s *GameService) refreshP3OpenServerCounters(tx *gorm.DB, id int64, cfg *db
 	old := map[string]int32{}
 	for _, row := range previous {
 		old[row.CounterKey] = row.Value
+		if strings.HasPrefix(row.CounterKey, constUtil.P3OpenServerSinglePaid) {
+			if _, found := values[row.CounterKey]; !found {
+				values[row.CounterKey] = 0
+			}
+		}
 	}
 	for key, value := range values {
 		if old[key] == value {

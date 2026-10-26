@@ -24,6 +24,19 @@ func TestAdminShopUnlimitedFrozenCatalogueAndOriginalReceipt(t *testing.T) {
 	if err := db.GetIns().Where("kind=?", "point").Order("start_at DESC,id DESC").First(&source).Error; err != nil {
 		t.Fatal(err)
 	}
+	// Freeze one explicit original consumer. Other enabled fixture roots and
+	// the live-editable default are independent contracts, not this historical quote.
+	if err := db.GetIns().Model(&db.P4CommerceRule{}).Where("kind=? AND id<>?", "point", source.ID).Update("enabled", false).Error; err != nil {
+		t.Fatal(err)
+	}
+	var accepted p4CommerceRules
+	if err := json.Unmarshal(source.Rules, &accepted); err != nil {
+		t.Fatal(err)
+	}
+	accepted.LiveEditable = false
+	if err := db.GetIns().Model(&source).Update("rules", adminJSON(accepted)).Error; err != nil {
+		t.Fatal(err)
+	}
 	now := time.Now()
 	if err := db.GetIns().Model(&source).Updates(map[string]any{"enabled": true, "start_at": now.AddDate(0, 0, -3).UnixMilli(), "end_at": now.AddDate(0, 0, -2).UnixMilli(), "claim_end_at": now.AddDate(0, 0, -2).UnixMilli()}).Error; err != nil {
 		t.Fatal(err)

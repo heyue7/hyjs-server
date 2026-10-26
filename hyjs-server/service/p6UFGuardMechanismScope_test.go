@@ -25,7 +25,7 @@ type p6GuardMechanismFixture struct {
 func p6GuardMechanismFixtures(t *testing.T) []p6GuardMechanismFixture {
 	t.Helper()
 	root := "../../analysis/p6/guild-guard-inputs-20261025-raw"
-	raw, err := os.ReadFile(filepath.Join(root, "source-export.json"))
+	raw, err := readTestAnalysis75(filepath.Join(root, "source-export.json"))
 	if os.IsNotExist(err) {
 		t.Skip("retained original producer input/offer/frames required")
 	}
@@ -50,7 +50,7 @@ func p6GuardMechanismFixtures(t *testing.T) []p6GuardMechanismFixture {
 		read := func(suffix string) []byte {
 			t.Helper()
 			name := row.Prefix + "." + suffix
-			raw, err := os.ReadFile(filepath.Join(root, name))
+			raw, err := readTestAnalysis75(filepath.Join(root, name))
 			if err != nil || row.Files[name] == "" || p6Digest(raw) != row.Files[name] {
 				t.Fatal("source SHA drift", name, err)
 			}

@@ -27,7 +27,7 @@ func TestP5OriginalBreachCommittedRecovery(t *testing.T) {
 	if e != nil || !strings.Contains(absolute, "/build/candidates/p5-training-breach-highest-20261014/artifacts/") {
 		t.Fatal("dedicated breach backup guard")
 	}
-	raw, e := os.ReadFile(absolute)
+	raw, e := readTestAnalysis75(absolute)
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -174,7 +174,7 @@ func TestP5OriginalBreachCommittedRecovery(t *testing.T) {
 	if output := os.Getenv("HYJS_P5_BREACH_RECOVERY_ACTOR_OUTPUT"); output != "" {
 		hashes := map[string]string{}
 		for _, name := range []string{"Hero", "TalentAdvenced", "Talent", "HeroBreached", "Skill"} {
-			b, e := os.ReadFile("../../analysis/tables/Table" + name + ".tsv")
+			b, e := readTestAnalysis75("../../analysis/tables/Table" + name + ".tsv")
 			if e != nil {
 				t.Fatal(e)
 			}

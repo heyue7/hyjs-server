@@ -40,7 +40,7 @@ func p6ExportSingleAutomaticInputAudit(t *testing.T, wirePath, output string) {
 	if _, err = os.Stat(output); err == nil {
 		t.Fatal("preserve existing diagnostic evidence")
 	}
-	raw, err := os.ReadFile(wirePath)
+	raw, err := readTestAnalysis75(wirePath)
 	if err != nil {
 		t.Fatal(err)
 	}

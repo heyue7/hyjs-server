@@ -3,7 +3,6 @@ package service
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 	"testing"
 
 	"hyjs-server/constUtil"
@@ -13,7 +12,7 @@ import (
 func TestP6ActualPartyUltimateScopeRequiresIndependentOriginalProof(t *testing.T) {
 	s := &GameService{}
 	for index := 0; index < 4; index++ {
-		raw, err := os.ReadFile(fmt.Sprintf("../../analysis/p6/actual-demo-ultimate-mirror-inputs-v147/%03d.frozen-input.json", index))
+		raw, err := readTestAnalysis75(fmt.Sprintf("../../analysis/p6/actual-demo-ultimate-mirror-inputs-v147/%03d.frozen-input.json", index))
 		if err != nil {
 			t.Fatal(err)
 		}

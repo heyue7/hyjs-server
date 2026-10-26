@@ -5,13 +5,12 @@ import (
 	"hyjs-server/constUtil"
 	"hyjs-server/model"
 	pb "hyjs-server/model/protocol"
-	"os"
 	"testing"
 )
 
 func p6ActualSameIDKF(t *testing.T) *pb.KFReplayData {
 	t.Helper()
-	raw, err := os.ReadFile("../../analysis/p14/final-game-actual-native/actual-Game1-KFReplayData.pb")
+	raw, err := readTestAnalysis75("../../analysis/p14/final-game-actual-native/actual-Game1-KFReplayData.pb")
 	if err != nil || p6Digest(raw) != "18473d1c95d92d51850578f69a8fa6273039a6f77d55a0ebd6f64abf699c502c" {
 		t.Fatal("actual Game1 source SHA", err)
 	}

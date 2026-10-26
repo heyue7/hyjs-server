@@ -57,7 +57,7 @@ func p12WorldBossNativePath(t *testing.T, relative string) string {
 
 func p12WorldBossNativeRead(t *testing.T, name, expected string) []byte {
 	t.Helper()
-	raw, err := os.ReadFile(p12WorldBossNativePath(t, name))
+	raw, err := readTestAnalysis75(p12WorldBossNativePath(t, name))
 	if err != nil || len(expected) != 64 || p6Digest(raw) != expected {
 		t.Fatal("P12 diagnostic immutable source SHA", name, err)
 	}
@@ -125,7 +125,7 @@ func p12WorldBossNativeLoadBundle(t *testing.T) *p12WorldBossNativeBundle {
 	if name == "" {
 		return nil
 	}
-	raw, err := os.ReadFile(name)
+	raw, err := readTestAnalysis75(name)
 	expected := os.Getenv("HYJS_P12_WORLDBOSS_NATIVE_BUNDLE_SHA256")
 	if err != nil || len(expected) != 64 || p6Digest(raw) != expected {
 		t.Fatal("explicit P12 native bundle SHA", err)
@@ -174,7 +174,7 @@ func p12WorldBossNativeLoadBundle(t *testing.T) *p12WorldBossNativeBundle {
 // The count hook admits this exact independent bundle; earlier P7/other fixture
 // denominators remain unchanged. Missing or malformed opt-in evidence cannot pass.
 func p12WorldBossNativeHitCaseCount(name string) int {
-	raw, err := os.ReadFile(os.Getenv("HYJS_P12_WORLDBOSS_NATIVE_BUNDLE"))
+	raw, err := readTestAnalysis75(os.Getenv("HYJS_P12_WORLDBOSS_NATIVE_BUNDLE"))
 	if err != nil || p6Digest(raw) != os.Getenv("HYJS_P12_WORLDBOSS_NATIVE_BUNDLE_SHA256") {
 		return 0
 	}
@@ -190,7 +190,7 @@ func p12WorldBossNativeHitCaseCount(name string) int {
 		if filepath.IsAbs(binding.Path) || !strings.HasPrefix(filepath.ToSlash(filepath.Clean(binding.Path)), "analysis/p6/") {
 			return 0
 		}
-		data, err := os.ReadFile(filepath.Join("../..", binding.Path))
+		data, err := readTestAnalysis75(filepath.Join("../..", binding.Path))
 		if err != nil || len(binding.SHA) != 64 || p6Digest(data) != binding.SHA {
 			return 0
 		}

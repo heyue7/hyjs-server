@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
-	"os"
 	"testing"
 
 	"google.golang.org/protobuf/proto"
@@ -20,7 +19,7 @@ import (
 func p6UFPartyFixture(t *testing.T, a, b int) (*GameService, *model.FrozenBattleInput) {
 	t.Helper()
 	s := p6OriginalTables(t)
-	raw, err := os.ReadFile("../../analysis/p6/native-actual-war-wounded14-inputs-v196/000.SCUFFightRecordReplay.pb")
+	raw, err := readTestAnalysis75("../../analysis/p6/native-actual-war-wounded14-inputs-v196/000.SCUFFightRecordReplay.pb")
 	if err != nil {
 		t.Fatal(err)
 	}

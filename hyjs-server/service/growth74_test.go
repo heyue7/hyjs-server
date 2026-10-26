@@ -216,7 +216,10 @@ func TestServerGameClockSettledPKRewind74(t *testing.T) {
 	if e := serverGameClockPendingBattles(d, now, 0); e == nil {
 		t.Fatal("live replay lease accepted")
 	}
-	if e := serverGameClockPendingBattles(d, now, -4); e != nil {
-		t.Fatal("future settled receipt blocked rewind", e)
+	if e := serverGameClockPendingBattles(d, now, -4); e == nil {
+		t.Fatal("live real-time PK lease was bypassed by a virtual rewind")
+	}
+	if e := serverGameClockPendingBattles(d, now.Add(7*time.Second), -4); e != nil {
+		t.Fatal("expired real-time PK lease blocked virtual rewind", e)
 	}
 }

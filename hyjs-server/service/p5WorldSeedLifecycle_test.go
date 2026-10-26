@@ -162,8 +162,13 @@ func TestP5OriginalWorldSeedFullLifecycle(t *testing.T) {
 				}
 			}
 			reset := &pb.CSWarriorReset{Guid: w.Guid}
-			if _, err = s.p5WarriorReset(requestContext(reset), account.Id, reset, stamp+3); err == nil {
-				t.Fatal("main identity protection lost")
+			mainID, mainLevel, mainEXP := w.GetId(), w.GetLevel(), w.GetExp()
+			if _, err = s.p5WarriorReset(requestContext(reset), account.Id, reset, stamp+3); err != nil {
+				t.Fatal("original main reset", err)
+			}
+			p, g, w = read()
+			if w.GetGuid() != identityGUID || w.GetId() != mainID || w.GetLevel() != mainLevel || w.GetExp() != mainEXP || p.GetCurrentWorldSeedId() != 85 || g.Equipment[0].GetLastHeroId() != mainID || p5KV(g, "p5.invest:"+identityGUID) != "" {
+				t.Fatal("main reset lost identity, global progress, equipment or retained refunded ledger")
 			}
 		})
 	}
@@ -183,8 +188,8 @@ func TestP5OriginalWorldSeedFullLifecycle(t *testing.T) {
 		if err != nil || p.GetCurrentWorldSeedId() != 85 {
 			t.Fatal("highest original worldseed restart", err)
 		}
-		if _, err = p5InvestmentState(g, w.GetGuid(), w); err != nil {
-			t.Fatal("highest transformed main investment restart", err)
+		if p5KV(g, "p5.invest:"+w.GetGuid()) != "" || w.GetTalent() != 0 {
+			t.Fatal("cold main reset retained refunded investment")
 		}
 	}
 }

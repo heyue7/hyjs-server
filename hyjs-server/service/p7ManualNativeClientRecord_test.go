@@ -17,7 +17,7 @@ func TestP7ManualNativeClientRecord(t *testing.T) {
 	if source == "" || destination == "" {
 		t.Skip("explicit isolated native test control fixture")
 	}
-	raw, err := os.ReadFile(source)
+	raw, err := readTestAnalysis75(source)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -9,6 +9,7 @@ import (
 	"google.golang.org/protobuf/proto"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
+	"hyjs-server/constUtil"
 	"hyjs-server/db"
 	"hyjs-server/model"
 	pb "hyjs-server/model/protocol"
@@ -275,14 +276,17 @@ func (s *GameService) CollectFieldBossPendingRewards(ctx context.Context, id int
 		}
 		today := LocalPlayNow(ctx).Format("2006-01-02")
 		field := g.Field
+		if err := fieldBossQuota75(tx, id, field, today); err != nil {
+			return err
+		}
 		if field.BossRewardDay != today {
 			field.BossRewardDay = today
 			field.BossRewardClaims = 0
 		}
-		days := []string{}
-		seenDays := map[string]bool{}
+		days := []string{today}
+		seenDays := map[string]bool{today: true}
 		for _, r := range rows {
-			if r.RewardDay != today && !seenDays[r.RewardDay] {
+			if !seenDays[r.RewardDay] {
 				seenDays[r.RewardDay] = true
 				days = append(days, r.RewardDay)
 			}
@@ -300,11 +304,19 @@ func (s *GameService) CollectFieldBossPendingRewards(ctx context.Context, id int
 				usedByDay[c.RewardDay] = c.Used
 			}
 		}
+		cached, err := fieldBossQuota75Cached(tx, id, days)
+		if err != nil {
+			return err
+		}
+		for day, used := range cached {
+			usedByDay[day] = max(usedByDay[day], used)
+		}
+		// The profile includes legacy victories without contribution rows; durable
+		// claimed rows recover death-mode rewards after a forward/backward date.
+		usedByDay[today] = max(usedByDay[today], field.BossRewardClaims)
+		field.BossRewardClaims = usedByDay[today]
 		for _, r := range rows {
-			used := field.BossRewardClaims
-			if r.RewardDay != today {
-				used = usedByDay[r.RewardDay]
-			}
+			used := usedByDay[r.RewardDay]
 			eligible := used < r.DailyLimit
 			if eligible {
 				if r.Reward != "" {
@@ -322,9 +334,8 @@ func (s *GameService) CollectFieldBossPendingRewards(ctx context.Context, id int
 				}
 				if r.RewardDay == today {
 					field.BossRewardClaims++
-				} else {
-					usedByDay[r.RewardDay]++
 				}
+				usedByDay[r.RewardDay]++
 			}
 			updates := map[string]any{"claimed": true}
 			if !eligible {
@@ -332,6 +343,27 @@ func (s *GameService) CollectFieldBossPendingRewards(ctx context.Context, id int
 			}
 			if err := tx.Model(&r).Updates(updates).Error; err != nil {
 				return err
+			}
+		}
+		// Save changed day counts in one batch. Older pending rewards can share a
+		// day with legacy grants, so retaining only claimed death rows would lose
+		// the combined count on the next callback.
+		if ServerGameClockContextBound(ctx) {
+			archives := []db.LocalPlayActivityOperation{}
+			for day, used := range usedByDay {
+				if used == cached[day] {
+					continue
+				}
+				raw, err := json.Marshal(used)
+				if err != nil {
+					return err
+				}
+				archives = append(archives, db.LocalPlayActivityOperation{PlayerID: id, RequestID: "calendar75:" + constUtil.CalendarQuota75FieldBoss + ":" + day, Action: constUtil.CalendarQuota75Action, ActivityID: constUtil.CalendarQuota75FieldBoss, Response: raw, CreatedAt: time.Now().UnixMilli()})
+			}
+			if len(archives) > 0 {
+				if err := tx.Clauses(clause.OnConflict{Columns: []clause.Column{{Name: "player_id"}, {Name: "request_id"}}, DoUpdates: clause.AssignmentColumns([]string{"response"})}).Create(&archives).Error; err != nil {
+					return err
+				}
 			}
 		}
 		return nil

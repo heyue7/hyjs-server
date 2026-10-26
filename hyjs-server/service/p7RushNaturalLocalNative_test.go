@@ -46,7 +46,7 @@ func p7NaturalLocalRushNativeBundle(t *testing.T) *p7NaturalLocalNativeBundle {
 	if file == "" {
 		return nil
 	}
-	raw, err := os.ReadFile(file)
+	raw, err := readTestAnalysis75(file)
 	if err != nil || len(os.Getenv("HYJS_P7_NATURAL_LOCAL_BUNDLE_SHA256")) != 64 || p6Digest(raw) != os.Getenv("HYJS_P7_NATURAL_LOCAL_BUNDLE_SHA256") {
 		t.Fatal("explicit P7 native bundle SHA", err)
 	}
@@ -55,7 +55,7 @@ func p7NaturalLocalRushNativeBundle(t *testing.T) *p7NaturalLocalNativeBundle {
 		t.Fatal("bounded original party bundle identity/denominator/authority")
 	}
 	for _, binding := range [][2]string{{bundle.Source, bundle.SourceSHA}, {bundle.Capture, bundle.CaptureSHA}} {
-		data, err := os.ReadFile(p7NaturalLocalNativePath(t, binding[0]))
+		data, err := readTestAnalysis75(p7NaturalLocalNativePath(t, binding[0]))
 		if err != nil || len(binding[1]) != 64 || p6Digest(data) != binding[1] {
 			t.Fatal("native source/capture manifest SHA", binding[0], err)
 		}
@@ -88,7 +88,7 @@ func p7NaturalLocalRushNativeFixtureInput(t *testing.T, input *model.FrozenBattl
 	if !bound {
 		return input, false
 	}
-	raw, err := os.ReadFile(p7NaturalLocalNativePath(t, bundle.Source))
+	raw, err := readTestAnalysis75(p7NaturalLocalNativePath(t, bundle.Source))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -102,7 +102,7 @@ func p7NaturalLocalRushNativeFixtureInput(t *testing.T, input *model.FrozenBattl
 		if row.WireSHA != wireSHA {
 			continue
 		}
-		typed, err := os.ReadFile(filepath.Join(filepath.Dir(p7NaturalLocalNativePath(t, bundle.Source)), row.Typed))
+		typed, err := readTestAnalysis75(filepath.Join(filepath.Dir(p7NaturalLocalNativePath(t, bundle.Source)), row.Typed))
 		if err != nil || p6Digest(typed) != row.TypedSHA {
 			t.Fatal("native party typed input SHA", err)
 		}
@@ -128,7 +128,7 @@ func p7NaturalLocalRushNativeFixtureInput(t *testing.T, input *model.FrozenBattl
 // p7NaturalLocalRushNativeHitCaseCount 仅给显式bundle内已校验命中的新fixture声明四例分母。
 // 旧fixture继续使用原helper的既有固定分母。
 func p7NaturalLocalRushNativeHitCaseCount(name string) int {
-	raw, err := os.ReadFile(os.Getenv("HYJS_P7_NATURAL_LOCAL_BUNDLE"))
+	raw, err := readTestAnalysis75(os.Getenv("HYJS_P7_NATURAL_LOCAL_BUNDLE"))
 	if err != nil || p6Digest(raw) != os.Getenv("HYJS_P7_NATURAL_LOCAL_BUNDLE_SHA256") {
 		return 0
 	}
@@ -140,7 +140,7 @@ func p7NaturalLocalRushNativeHitCaseCount(name string) int {
 	if hits.Path != name || filepath.IsAbs(name) || strings.HasPrefix(filepath.ToSlash(filepath.Clean(name)), "../") {
 		return 0
 	}
-	data, err := os.ReadFile(filepath.Join("../../analysis/p6", name))
+	data, err := readTestAnalysis75(filepath.Join("../../analysis/p6", name))
 	if err != nil || len(hits.SHA) != 64 || p6Digest(data) != hits.SHA {
 		return 0
 	}
@@ -154,7 +154,7 @@ func TestP7NaturalLocalRushNativeAllLayers(t *testing.T) {
 	}
 	// Verify every derived fixture once before invoking the unchanged highest helpers.
 	for kind, fixture := range bundle.Fixtures {
-		raw, err := os.ReadFile(p7NaturalLocalNativePath(t, filepath.Join("analysis/p6", fixture.Path)))
+		raw, err := readTestAnalysis75(p7NaturalLocalNativePath(t, filepath.Join("analysis/p6", fixture.Path)))
 		if err != nil || p6Digest(raw) != fixture.SHA {
 			t.Fatal("native fixture SHA", kind, err)
 		}
@@ -187,7 +187,7 @@ func TestP7NaturalLocalRushNativeAllLayers(t *testing.T) {
 // Actual tutorial talent1/companion3 is retained. Only Player22/32 is a
 // finite prerequisite. This test uses the production projector and no DB.
 func TestP7NaturalLocalBattlePlayerProjection(t *testing.T) {
-	raw, err := os.ReadFile("../../analysis/growth-first-20261016/m1-natural-phone-20261017/94-real-equipment-source-profile.json")
+	raw, err := readTestAnalysis75("../../analysis/growth-first-20261016/m1-natural-phone-20261017/94-real-equipment-source-profile.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -202,7 +202,7 @@ func TestP7NaturalLocalBattlePlayerProjection(t *testing.T) {
 		Player *pb.Player       `json:"player"`
 		Game   *model.GameState `json:"game"`
 	}
-	raw, err = os.ReadFile("../../analysis/growth-first-20261016/m1-natural-phone-20261017/89-mission3-result-profile.json")
+	raw, err = readTestAnalysis75("../../analysis/growth-first-20261016/m1-natural-phone-20261017/89-mission3-result-profile.json")
 	if err != nil || json.Unmarshal(raw, &old) != nil || old.Game.Run == nil {
 		t.Fatal("original observed talent1 Start", err)
 	}
@@ -228,7 +228,7 @@ func TestP7NaturalLocalBattlePlayerProjection(t *testing.T) {
 			t.Fatal(err)
 		}
 		name := []string{"000", "002"}[i]
-		raw, err = os.ReadFile("../../analysis/p6/p7-natural047025-local-inputs-r1-20261017/" + name + ".SCRushFightStart.pb")
+		raw, err = readTestAnalysis75("../../analysis/p6/p7-natural047025-local-inputs-r1-20261017/" + name + ".SCRushFightStart.pb")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -243,8 +243,13 @@ func TestP7NaturalLocalBattlePlayerProjection(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err = p7ManualRushFamilyForSeries(series); err == nil {
-			t.Fatal("new unanchored natural roster gained production authority")
+		legacy, err := p7ManualRushLegacyFamilyForSeries(series)
+		if err != nil || !legacy.Natural || legacy.ScopeProof != constUtil.P7NaturalRushNativeProof {
+			t.Fatal("reviewed natural numeric legacy family lost its exact independent proof", err)
+		}
+		current, err := p7ManualRushFamilyForSeries(series)
+		if err != nil || !current.Generic || current.ScopeProof != constUtil.P7GenericMechanismCompatibilityProof || current.DriverSource != constUtil.P7GenericMechanismDriverSource {
+			t.Fatal("current mechanism source borrowed another family's proof", err)
 		}
 	}
 }

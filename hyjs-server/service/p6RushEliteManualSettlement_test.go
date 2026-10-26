@@ -6,13 +6,12 @@ import (
 	"google.golang.org/protobuf/proto"
 	"hyjs-server/constUtil"
 	pb "hyjs-server/model/protocol"
-	"os"
 	"testing"
 )
 
 func TestP6EliteManualOriginalWholeEndDistinctProof(t *testing.T) {
 	s := p6OriginalTables(t)
-	raw, err := os.ReadFile("../../analysis/p6/native-elite-manual-original-records-v168.json")
+	raw, err := readTestAnalysis75("../../analysis/p6/native-elite-manual-original-records-v168.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -27,7 +26,7 @@ func TestP6EliteManualOriginalWholeEndDistinctProof(t *testing.T) {
 		t.Fatal("original exact native records")
 	}
 	for i, name := range []string{"000", "001"} {
-		raw, err = os.ReadFile("../../analysis/p6/original-elite-manual-inputs-v165/" + name + ".SCRushFightStart.pb")
+		raw, err = readTestAnalysis75("../../analysis/p6/original-elite-manual-inputs-v165/" + name + ".SCRushFightStart.pb")
 		if err != nil {
 			t.Fatal(err)
 		}

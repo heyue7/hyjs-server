@@ -3,7 +3,6 @@ package service
 import (
 	"bytes"
 	"encoding/json"
-	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -19,7 +18,7 @@ func p14FinalGameActualPair(t *testing.T) *p14FinalGameProvenance {
 	t.Helper()
 	var root string
 	for _, candidate := range []string{"../../analysis/p14/finals-draw-actual-native", "../../../analysis/p14/finals-draw-actual-native"} {
-		if _, err := os.Stat(filepath.Join(candidate, "actual-ordered-pair-source.json")); err == nil {
+		if _, err := readTestAnalysis75(filepath.Join(candidate, "actual-ordered-pair-source.json")); err == nil {
 			root = candidate
 			break
 		}
@@ -30,18 +29,18 @@ func p14FinalGameActualPair(t *testing.T) *p14FinalGameProvenance {
 	var source struct {
 		Pair p14FinalDrawPair `json:"pair"`
 	}
-	raw, err := os.ReadFile(filepath.Join(root, "actual-ordered-pair-source.json"))
+	raw, err := readTestAnalysis75(filepath.Join(root, "actual-ordered-pair-source.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if err = json.Unmarshal(raw, &source); err != nil {
 		t.Fatal(err)
 	}
-	left, err := os.ReadFile(filepath.Join(root, "actual-pair-left-BattlePlayer.pb"))
+	left, err := readTestAnalysis75(filepath.Join(root, "actual-pair-left-BattlePlayer.pb"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	right, err := os.ReadFile(filepath.Join(root, "actual-pair-right-BattlePlayer.pb"))
+	right, err := readTestAnalysis75(filepath.Join(root, "actual-pair-right-BattlePlayer.pb"))
 	if err != nil {
 		t.Fatal(err)
 	}

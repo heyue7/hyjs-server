@@ -23,6 +23,8 @@ type P13GuildPrayerRoll struct {
 	EffectHash       string `gorm:"type:char(64);not null" json:"effect_hash"`
 	Source           string `gorm:"type:varchar(1024);not null" json:"source"`
 	SourceHash       string `gorm:"type:char(64);not null" json:"source_hash"`
+	// Zero is the legacy witness; omitempty retains its original source hash.
+	MemberJoinedAt int64 `gorm:"not null;default:0" json:"member_joined_at,omitempty"`
 }
 
 func (P13GuildPrayerRoll) TableName() string { return "p13_guild_prayer_rolls" }

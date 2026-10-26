@@ -70,7 +70,7 @@ func TestP12Wanted65PrivateNativeLiveAutoDiagnostic(t *testing.T) {
 	if sourcePath == "" || inputPath == "" {
 		t.Skip("private native evidence paths not supplied")
 	}
-	sourceBody, err := os.ReadFile(sourcePath)
+	sourceBody, err := readTestAnalysis75(sourcePath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -78,7 +78,7 @@ func TestP12Wanted65PrivateNativeLiveAutoDiagnostic(t *testing.T) {
 	if err = proto.Unmarshal(sourceBody, &record); err != nil {
 		t.Fatal(err)
 	}
-	body, err := os.ReadFile(inputPath)
+	body, err := readTestAnalysis75(inputPath)
 	if err != nil {
 		t.Fatal(err)
 	}

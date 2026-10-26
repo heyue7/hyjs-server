@@ -5,7 +5,6 @@ import (
 	"google.golang.org/protobuf/proto"
 	"hyjs-server/model"
 	pb "hyjs-server/model/protocol"
-	"os"
 	"testing"
 )
 
@@ -14,7 +13,7 @@ func p6ActualManualSeries(t *testing.T) (*GameService, *model.FrozenP6RushSeries
 	input := p6ActualManualAutoInput(t)
 	s := &GameService{Tables: input.Tables}
 	folder := "../../analysis/p6/actual-phone-rush-manual-auto-input-v161/"
-	raw, err := os.ReadFile(folder + "000.SCRushFightStart.pb")
+	raw, err := readTestAnalysis75(folder + "000.SCRushFightStart.pb")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -26,7 +25,7 @@ func p6ActualManualSeries(t *testing.T) (*GameService, *model.FrozenP6RushSeries
 	if err != nil {
 		t.Fatal(err)
 	}
-	raw, err = os.ReadFile(folder + "000.CSRushFightEnd.pb")
+	raw, err = readTestAnalysis75(folder + "000.CSRushFightEnd.pb")
 	if err != nil {
 		t.Fatal(err)
 	}

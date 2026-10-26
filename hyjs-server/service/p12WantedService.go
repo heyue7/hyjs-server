@@ -570,7 +570,7 @@ func (s *GameService) p12WantedStart(ctx context.Context, id int64, request *pb.
 			}
 		}
 		var pending db.P12WantedFight
-		found := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("player_id=? AND committed=? AND abandoned_at=0", id, false).Order("created_at,id").First(&pending).Error
+		found := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("player_id=? AND committed=? AND abandoned_at=0 AND created_at<=?", id, false, now.UnixMilli()).Order("created_at,id").First(&pending).Error
 		if found == nil {
 			var priorInstance db.P12WantedInstance
 			if err = tx.First(&priorInstance, "id=?", pending.InstanceID).Error; err != nil {
@@ -606,7 +606,7 @@ func (s *GameService) p12WantedStart(ctx context.Context, id int64, request *pb.
 		if err = tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&instance, "id=?", request.GetRebelId()).Error; err != nil {
 			return err
 		}
-		if instance.ServerID != s.OriginalServerID() || instance.FinderID != id && instance.SharedAt == 0 || instance.State != constUtil.P12WantedActive || instance.ExpiresAt <= now.UnixMilli() || instance.CurrentHP <= 0 {
+		if instance.ServerID != s.OriginalServerID() || instance.FinderID != id && instance.SharedAt == 0 || instance.State != constUtil.P12WantedActive || instance.CreatedAt > now.UnixMilli() || instance.ExpiresAt <= now.UnixMilli() || instance.CurrentHP <= 0 {
 			return errors.New(constUtil.P12WantedUnavailable)
 		}
 		if err = p12WantedRecover(player, now); err != nil {
@@ -699,7 +699,7 @@ func (s *GameService) p12WantedEnd(ctx context.Context, id int64, request *pb.CS
 			}
 			return nil
 		}
-		if fight.AbandonedAt > 0 || fight.InputHash != p6Digest([]byte(fight.InputJSON)) || fight.TerminalHash != p6Digest([]byte(fight.TerminalJSON)) || fight.StartHash != p6Digest(fight.StartProto) {
+		if fight.AbandonedAt > 0 || calendar75Adjusted(tx) && fight.CreatedAt > now.UnixMilli() || fight.InputHash != p6Digest([]byte(fight.InputJSON)) || fight.TerminalHash != p6Digest([]byte(fight.TerminalJSON)) || fight.StartHash != p6Digest(fight.StartProto) {
 			return errors.New(constUtil.P12WantedInvalid)
 		}
 		var input model.FrozenBattleInput

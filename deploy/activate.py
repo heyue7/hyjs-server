@@ -19,8 +19,12 @@ parser.add_argument('--provision-ingress', action='store_true')
 parser.add_argument('--migrate-role-wallets', action='store_true')
 parser.add_argument('--expected-live-revision')
 parser.add_argument('--apply-growth74', action='store_true')
+parser.add_argument('--apply-growth75', action='store_true')
 parser.add_argument('--warm-rush-history-player', action='append', type=int, default=[])
 args = parser.parse_args()
+assert not (args.apply_growth74 and args.apply_growth75), 'Choose one explicit growth deployment version'
+if args.apply_growth75:
+    assert args.expected_live_revision and not args.initial_db and not args.migrate_role_wallets, 'Growth75 requires a pinned maintenance cutover'
 os.umask(0o077)
 stage = Path(args.stage).resolve()
 ROOT = stage.parent.parent
@@ -56,7 +60,7 @@ def compose(*cmd):
 
 def mysql(query):
     return run('docker', 'exec', '-i', 'hyjs-mysql', 'sh', '-c',
-               'MYSQL_PWD="$MYSQL_PASSWORD" exec mysql -uhyjs --batch --raw --skip-column-names hyjs',
+               'MYSQL_PWD="$MYSQL_PASSWORD" exec mysql -uhyjs --default-character-set=utf8mb4 --binary-mode --batch --raw --skip-column-names hyjs',
                input=query.encode()).stdout.decode()
 
 
@@ -83,7 +87,9 @@ def backup_existing_database():
     # Authenticate the complete encrypted stream and original digest without a third disk copy.
     run(str(stage / 'app/hyjs-backupseal'), '--input', str(encrypted), '--key-file', str(key_file), '--verify-sha256', sha(plain))
     plain.unlink()
-    (ROOT / 'backup-latest.json').write_text(json.dumps({'file': encrypted.name, 'sha256': sha(encrypted), 'format': 'HYJSBK02-AES256GCM-CHUNKED', 'revisionBefore': 'preserved running image'}, indent=2))
+    backup_record = {'file': encrypted.name, 'sha256': sha(encrypted), 'format': 'HYJSBK02-AES256GCM-CHUNKED', 'revisionBefore': args.expected_live_revision or 'preserved running image'}
+    (ROOT / 'backup-latest.json').write_text(json.dumps(backup_record, indent=2))
+    return backup_record
 
 
 for name, digest in manifest['files'].items():
@@ -125,7 +131,8 @@ os.chmod(temporary_env, 0o600)
 os.replace(temporary_env, private_env)
 # Verify the encrypted snapshot before Compose can restart MySQL for new limits.
 wallet_baseline = None
-if args.apply_growth74:
+verified_backup = None
+if args.apply_growth74 or args.apply_growth75:
     assert args.expected_live_revision and not args.initial_db
     assert mysql('SELECT maintenance FROM client_update_policy WHERE id=1;').strip() == '1', 'Growth apply requires maintenance'
     compose('stop', '-t', '30', 'app')
@@ -137,7 +144,7 @@ if args.migrate_role_wallets:
     wallet_baseline = role_wallet_migration.before(mysql)
     (ROOT / 'role-wallet-cutover-before.json').write_text(json.dumps(wallet_baseline, indent=2))
 if (ROOT / 'migration.json').exists():
-    backup_existing_database()
+    verified_backup = backup_existing_database()
 shutil.copy2(stage / 'compose.yaml', ROOT / 'compose.yaml')
 compose('up', '-d', 'mysql')
 for _ in range(80):
@@ -209,6 +216,16 @@ if args.apply_growth74:
             '--enable-test-payments', '--enable-local-wallet', '--apply-growth74', '--log-file', '/app/logs/growth74-apply.log')
     assert mysql('SELECT maintenance FROM client_update_policy WHERE id=1;').strip() == '1'
     manifest['growth74Applied'] = True
+
+if args.apply_growth75:
+    import growth75_activation
+    try:
+        manifest['growth75Applied'] = growth75_activation.activate_growth75(
+            mysql, compose, stage / 'growth75_activity_patch.py', ROOT / 'backups', manifest['revision'],
+            verified_backup)
+    except Exception:
+        compose('stop', '-t', '30', 'app')
+        raise RuntimeError('Growth75 failed under maintenance. App remains stopped; inspect private backups/growth75-*/manifest.json. Any failed uncommitted CAS transaction was rolled back; prior candidate CLI steps remain audited. Do not reopen or auto-restore the full database.') from None
 
 compose('up', '-d', '--no-deps', '--force-recreate', 'app')
 for _ in range(90):

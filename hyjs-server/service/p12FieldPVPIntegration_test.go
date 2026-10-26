@@ -14,11 +14,21 @@ import (
 )
 
 func TestP12FieldPVPIntegrationSelectiveControlAndQueryRecovery(t *testing.T) {
-	f, _, _, sessions := p12FieldPVPSetup(t)
+	f, opponent, _, sessions := p12FieldPVPSetup(t)
 	f.s.P12FieldPVPReady = true
 	ctx := context.WithValue(f.ctx, constUtil.GameServiceContextKey, f.s)
 	now := time.Now()
-	state := db.P12FieldPVPState{PlayerID: f.id, BusyUntil: now.Add(time.Minute).UnixMilli(), Source: constUtil.P12FieldPVPSource}
+	// A login presentation requires the actual accepted receipt, not an orphan busy lease.
+	p12FieldPVPEnable(t)
+	request := &pb.CSSidePvpFightResult{PlayerId: proto.Int64(opponent), FightType: proto.Int32(0)}
+	if _, err := f.s.p12FieldPVPFightAt(ctx, f.id, sessions[f.id], request, 0, now); err != nil {
+		t.Fatal("real PK presentation prerequisite", err)
+	}
+	var state db.P12FieldPVPState
+	if err := db.GetIns().First(&state, "player_id=?", f.id).Error; err != nil {
+		t.Fatal(err)
+	}
+	state.BusyUntil = now.Add(time.Minute).UnixMilli()
 	if err := db.GetIns().Save(&state).Error; err != nil {
 		t.Fatal(err)
 	}
@@ -75,7 +85,8 @@ func TestP12FieldPVPIntegrationSelectiveControlAndQueryRecovery(t *testing.T) {
 	if err := db.GetIns().Save(&state).Error; err != nil {
 		t.Fatal(err)
 	}
-	if err := updateProfile(ctx, f.id, func(p *pb.Player, g *model.GameState) error {
+	// Build the boundary in the isolated fixture without invoking recovery before the read under test.
+	if err := updateProfile(f.ctx, f.id, func(p *pb.Player, g *model.GameState) error {
 		p.RedeemTime = proto.Int64(state.JailUntil)
 		g.Field.Side.Kills = proto.Int32(6)
 		g.Field.Side.State = proto.Int32(5)

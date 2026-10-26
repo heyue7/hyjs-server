@@ -19,6 +19,8 @@ type growth74Product struct {
 	Name, Reward, Currency, Period string
 	Quantity, Price, Limit, Weight int64
 	MinimumPlayerLevel             int64 `json:"minimum_player_level"`
+	Menu                           int64 `json:"menu"`
+	ContributionCost               int64 `json:"contribution_cost"`
 }
 type growth74Store struct {
 	Name     string
@@ -26,8 +28,11 @@ type growth74Store struct {
 	Products []growth74Product
 }
 type growth74Plan struct {
-	Stores     map[string]growth74Store
-	CreditShop struct{ Products []growth74Product } `json:"credit_shop"`
+	Stores        map[string]growth74Store
+	CreditShop    struct{ Products []growth74Product } `json:"credit_shop"`
+	MemoryChanges growth75Memory                       `json:"memory_changes"`
+	VIP7Once      growth75VIP7                         `json:"vip7_once75"`
+	PetMarket     growth75PetMarket                    `json:"pet_market_policy"`
 }
 
 // ApplyGrowth74 is an explicit deployment command. Normal startup never applies it.
@@ -159,12 +164,13 @@ func (s *GameService) growth74Shop(ctx context.Context, a *model.AdminPrincipal,
 	}
 	used := map[string]bool{}
 	for i, v := range products {
-		id := ""
+		id, matchErr := s.growth75StableShopID(shop.Items, used, v)
+		if matchErr != nil {
+			return matchErr
+		}
+		beforeIDs := map[string]bool{}
 		for _, old := range shop.Items {
-			if !used[old.ID] && len(old.Rewards) == 1 && old.Rewards[0].ResourceID == v.Reward {
-				id = old.ID
-				break
-			}
+			beforeIDs[old.ID] = true
 		}
 		currency := v.Currency
 		if currency == "credit" {
@@ -174,6 +180,9 @@ func (s *GameService) growth74Shop(ctx context.Context, a *model.AdminPrincipal,
 			currency = "point"
 		}
 		q := model.AdminShopProduct{ID: id, Name: v.Name, Rewards: growth74Packed(v.Reward, v.Quantity), Cost: model.AdminResourceAmount{ResourceID: currency, Amount: v.Price}, Stock: -1, MinLevel: level, Priority: int64(100 + i), Weight: 1, DiscountBps: 10000, Enabled: true, Source: "成长投放V12 / 2026-10-26"}
+		if key == "point" && v.Menu > 0 {
+			q.Priority = v.Menu*1000 + int64(100+i)
+		}
 		if v.MinimumPlayerLevel > q.MinLevel {
 			q.MinLevel = v.MinimumPlayerLevel
 		}
@@ -185,7 +194,7 @@ func (s *GameService) growth74Shop(ctx context.Context, a *model.AdminPrincipal,
 		}
 		if key == "guild" {
 			q.Cost.ResourceID = "item_311"
-			q.ContributionCost = 1
+			q.ContributionCost = max(int64(1), v.ContributionCost)
 			q.GuildLevel = 1
 			q.DailyLimit = 1
 		}
@@ -208,10 +217,22 @@ func (s *GameService) growth74Shop(ctx context.Context, a *model.AdminPrincipal,
 			return fmt.Errorf("%s: %w", v.Name, err)
 		}
 		shop = next
-		for _, row := range shop.Items {
-			if row.Name == q.Name && string(adminJSON(row.Rewards)) == string(adminJSON(q.Rewards)) && row.Cost == q.Cost {
-				used[row.ID] = true
+		if id != "" {
+			used[id] = true
+		} else {
+			created := ""
+			for _, row := range shop.Items {
+				if !beforeIDs[row.ID] {
+					if created != "" {
+						return fmt.Errorf("商店新增商品标识不唯一")
+					}
+					created = row.ID
+				}
 			}
+			if created == "" {
+				return fmt.Errorf("商店新增商品标识缺失")
+			}
+			used[created] = true
 		}
 	}
 	for _, old := range append([]model.AdminShopProduct(nil), shop.Items...) {
@@ -239,7 +260,10 @@ func (s *GameService) growth74Shop(ctx context.Context, a *model.AdminPrincipal,
 		settings.Refresh = &model.AdminShopRefreshSettings{Enabled: true, FreeCap: 0, PaidCap: 15, Cost: model.AdminResourceAmount{ResourceID: "item_9710", Amount: 10}, Period: "day"}
 	}
 	_, e = s.AdminSaveShopSettings(ctx, a, key, model.AdminShopSettingsSaveRequest{AdminShopSettings: settings, Version: shop.Version})
-	return e
+	if e != nil {
+		return fmt.Errorf("%s营业与刷新设置: %w", key, e)
+	}
+	return nil
 }
 
 func (s *GameService) growth74TestDay(ctx context.Context, a *model.AdminPrincipal) error {

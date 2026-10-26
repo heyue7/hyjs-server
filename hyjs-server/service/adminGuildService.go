@@ -707,7 +707,7 @@ func adminGuildUpdatePolicy(tx *gorm.DB, s *GameService, save *model.AdminGuildP
 				row.PublishedAt = now.UnixMilli()
 			}
 		}
-		if row.PublishedAt > now.UnixMilli() {
+		if row.PublishedAt > calendar75SourceHorizon(tx, now).UnixMilli() {
 			return constUtil.ErrAdminInput
 		}
 		if err := tx.Save(&row).Error; err != nil {
@@ -739,7 +739,7 @@ func adminGuildUpdatePolicy(tx *gorm.DB, s *GameService, save *model.AdminGuildP
 				row.PublishedAt = now.UnixMilli()
 			}
 		}
-		if row.PublishedAt > now.UnixMilli() {
+		if row.PublishedAt > calendar75SourceHorizon(tx, now).UnixMilli() {
 			return constUtil.ErrAdminInput
 		}
 		if err := tx.Save(&row).Error; err != nil {

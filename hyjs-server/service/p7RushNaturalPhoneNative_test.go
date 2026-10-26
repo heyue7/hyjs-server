@@ -46,7 +46,7 @@ func p7NaturalPhoneRushNativeBundle(t *testing.T) *p7NaturalPhoneNativeBundle {
 	if file == "" {
 		return nil
 	}
-	raw, err := os.ReadFile(file)
+	raw, err := readTestAnalysis75(file)
 	if err != nil || len(os.Getenv("HYJS_P7_NATURAL_PHONE_BUNDLE_SHA256")) != 64 || p6Digest(raw) != os.Getenv("HYJS_P7_NATURAL_PHONE_BUNDLE_SHA256") {
 		t.Fatal("explicit P7 native bundle SHA", err)
 	}
@@ -55,7 +55,7 @@ func p7NaturalPhoneRushNativeBundle(t *testing.T) *p7NaturalPhoneNativeBundle {
 		t.Fatal("bounded original party bundle identity/denominator/authority")
 	}
 	for _, binding := range [][2]string{{bundle.Source, bundle.SourceSHA}, {bundle.Capture, bundle.CaptureSHA}} {
-		data, err := os.ReadFile(p7NaturalPhoneNativePath(t, binding[0]))
+		data, err := readTestAnalysis75(p7NaturalPhoneNativePath(t, binding[0]))
 		if err != nil || len(binding[1]) != 64 || p6Digest(data) != binding[1] {
 			t.Fatal("native source/capture manifest SHA", binding[0], err)
 		}
@@ -87,7 +87,7 @@ func p7NaturalPhoneRushNativeFixtureInput(t *testing.T, input *model.FrozenBattl
 	if !bound {
 		return input, false
 	}
-	raw, err := os.ReadFile(p7NaturalPhoneNativePath(t, bundle.Source))
+	raw, err := readTestAnalysis75(p7NaturalPhoneNativePath(t, bundle.Source))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -101,7 +101,7 @@ func p7NaturalPhoneRushNativeFixtureInput(t *testing.T, input *model.FrozenBattl
 		if row.WireSHA != wireSHA {
 			continue
 		}
-		typed, err := os.ReadFile(filepath.Join(filepath.Dir(p7NaturalPhoneNativePath(t, bundle.Source)), row.Typed))
+		typed, err := readTestAnalysis75(filepath.Join(filepath.Dir(p7NaturalPhoneNativePath(t, bundle.Source)), row.Typed))
 		if err != nil || p6Digest(typed) != row.TypedSHA {
 			t.Fatal("native party typed input SHA", err)
 		}
@@ -127,7 +127,7 @@ func p7NaturalPhoneRushNativeFixtureInput(t *testing.T, input *model.FrozenBattl
 // p7NaturalPhoneRushNativeHitCaseCount 仅给显式bundle内已校验命中的新fixture声明四例分母。
 // 旧fixture继续使用原helper的既有固定分母。
 func p7NaturalPhoneRushNativeHitCaseCount(name string) int {
-	raw, err := os.ReadFile(os.Getenv("HYJS_P7_NATURAL_PHONE_BUNDLE"))
+	raw, err := readTestAnalysis75(os.Getenv("HYJS_P7_NATURAL_PHONE_BUNDLE"))
 	if err != nil || p6Digest(raw) != os.Getenv("HYJS_P7_NATURAL_PHONE_BUNDLE_SHA256") {
 		return 0
 	}
@@ -139,7 +139,7 @@ func p7NaturalPhoneRushNativeHitCaseCount(name string) int {
 	if hits.Path != name || filepath.IsAbs(name) || strings.HasPrefix(filepath.ToSlash(filepath.Clean(name)), "../") {
 		return 0
 	}
-	data, err := os.ReadFile(filepath.Join("../../analysis/p6", name))
+	data, err := readTestAnalysis75(filepath.Join("../../analysis/p6", name))
 	if err != nil || len(hits.SHA) != 64 || p6Digest(data) != hits.SHA {
 		return 0
 	}
@@ -155,7 +155,7 @@ func TestP7NaturalPhoneRushNativeAllLayers(t *testing.T) {
 	}
 	// Verify every derived fixture once before invoking the unchanged highest helpers.
 	for kind, fixture := range bundle.Fixtures {
-		raw, err := os.ReadFile(p7NaturalPhoneNativePath(t, filepath.Join("analysis/p6", fixture.Path)))
+		raw, err := readTestAnalysis75(p7NaturalPhoneNativePath(t, filepath.Join("analysis/p6", fixture.Path)))
 		if err != nil || p6Digest(raw) != fixture.SHA {
 			t.Fatal("native fixture SHA", kind, err)
 		}

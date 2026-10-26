@@ -99,7 +99,7 @@ func TestP5OriginalEquipmentHighestFullScope(t *testing.T) {
 				}
 				return p, g, e
 			}
-			initialP, initialG, initialE := read()
+			initialP, initialG, _ := read()
 			var totalCoin int64
 			for level := 1; level < 260; level++ {
 				for _, r := range s.Tables["EquipExp"] {
@@ -174,6 +174,7 @@ func TestP5OriginalEquipmentHighestFullScope(t *testing.T) {
 			p, g, e = read()
 			var lastForgeRequest *pb.CSEquipForge
 			var lastForgeStamp int64
+			var forgeCoins, failedForgeFragments int64
 			if tableNumber(config, "quality") >= 20 {
 				maximum := int32(8)
 				if config["quality"] == "23" {
@@ -191,6 +192,14 @@ func TestP5OriginalEquipmentHighestFullScope(t *testing.T) {
 						t.Fatal("original forge highest path", config["id"], before, err)
 					}
 					result := out[0].(*pb.SCEquipForge)
+					for _, cost := range costs {
+						if cost.GetId() == "coin" {
+							forgeCoins += int64(cost.GetNum())
+						}
+						if strings.HasPrefix(cost.GetId(), "frag_equip_") && result.GetResult() == 0 {
+							failedForgeFragments += int64(cost.GetNum())
+						}
+					}
 					lastForgeRequest, lastForgeStamp = request, 1000+attempt
 					if result.GetEquip().GetForgeLevel() != before+result.GetResult() {
 						t.Fatal("original forge success/failure level")
@@ -217,9 +226,16 @@ func TestP5OriginalEquipmentHighestFullScope(t *testing.T) {
 			if _, err = s.p5EquipmentReset(requestCtx(reset), account.Id, reset, 100); err != nil {
 				t.Fatal("highest full investment reset", err)
 			}
-			p, g, e = read()
-			if !proto.Equal(e, initialE) || p.GetCoin() != initialP.GetCoin() {
-				t.Fatal("highest original equipment baseline or fee refund")
+			var resetRow db.Profile
+			if err := db.GetIns().First(&resetRow, account.Id).Error; err != nil {
+				t.Fatal(err)
+			}
+			p, g, err = decodeProfile(&resetRow)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, lookupErr := s.equipmentRecord(g, guid); lookupErr == nil || p.GetCoin() != initialP.GetCoin()-forgeCoins {
+				t.Fatal("reset consumed GUID and exact refundable investment; forge fees remain spent")
 			}
 			if _, err := s.equipmentRefine(requestCtx(refine), account.Id, refine, 20); err == nil {
 				t.Fatal("old refine80 client projection accepted after reset")
@@ -242,7 +258,7 @@ func TestP5OriginalEquipmentHighestFullScope(t *testing.T) {
 					t.Fatal("highest exact original resource refund", resource)
 				}
 			}
-			if tableNumber(config, "quality") >= 20 && simpleOwned(p, g, "frag_"+config["id"]) != simpleOwned(initialP, initialG, "frag_"+config["id"]) {
+			if tableNumber(config, "quality") >= 20 && simpleOwned(p, g, "frag_"+config["id"]) != simpleOwned(initialP, initialG, "frag_"+config["id"])+int64(tableNumber(s.table("Frag", "id", "frag_"+config["id"]), "num"))-failedForgeFragments {
 				t.Fatal("highest original forge actual fragment costs not refunded")
 			}
 			receipts[account.Id] = reset

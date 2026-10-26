@@ -97,3 +97,13 @@ services:
 使用当前同一镜像、原compose.yaml、原.env及该覆盖文件，仅重建app服务；MySQL、账号、钱包、存档、回执及密码保持。本次回退保留原安全事件API及活动配置功能。下一次正常部署不使用此临时覆盖文件。
 
 2026-10-23：按用户要求覆盖更新，仅部署当前业务程序；发布包不再附带旧版兼容回退程序，也不保留历史版本目录或旧镜像。旧版本源码保留在Git，需要时重新构建。
+
+## 75版维护投放
+
+从审核通过的干净提交运行原 `deploy.py --revision <commit> --expected-live-revision <live-commit> --apply-growth75`，需要更新入口规则时另外明确传 `--update-ingress`。禁止与74投放、首次导库或角色钱包迁移混用。正常启动不执行75投放。
+
+部署保留维护并停应用，生成并认证本轮加密数据库备份；候选程序 `--apply-growth75 --server-id 1` 先核对维护、audit321及完整820条V12排期，再依次恢复真实发布时间、修复日历锚点、应用经济目录、发布1.0.75/build2026102702兼容门槛。完成后仍处于维护。
+
+候选CLI成功之后才新鲜导出活动原数据；用同一制品中的 `growth75_activity_patch.py` 生成带原值CAS的SQL，在一个utf8mb4 MySQL连接内执行。私有 `backups/growth75-*/manifest.json` 记录本轮加密备份、快照/SQL摘要、修改条数和结果。任一CAS失败时，未提交事务随连接关闭回滚，应用保持停止；此前CLI已提交的领域步骤保留审计，可核对证据后重试。脚本不会自动恢复整个数据库或自动开服。维护服务恢复运行仅用于健康检查，开服由后台人工执行。
+
+本地脚本编排检查：`python3 -m unittest discover -s deploy -p test_growth75_activation.py`，不连接SSH、Docker或数据库。实际区服核账和原协议验收另行执行。

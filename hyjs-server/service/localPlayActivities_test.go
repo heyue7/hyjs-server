@@ -41,6 +41,7 @@ func localPlayActivitiesFixture(t *testing.T) (*p1Fixture, int64) {
 	if err := f.s.seedP4Rotations(db.GetIns().WithContext(f.ctx), time.Now()); err != nil {
 		t.Fatal(err)
 	}
+	localPlaySourcesFixture75(t, f)
 	f.s.LocalPlayToolsEnabled = true
 	if err := db.GetIns().Model(&db.LocalPlayPolicy{}).Where("id=1").Update("enabled", true).Error; err != nil {
 		t.Fatal(err)
@@ -241,7 +242,7 @@ func TestLocalPlayActivitiesOriginalMonthSignNewPeriodAndOldStamp(t *testing.T) 
 		t.Fatal(err)
 	}
 	current, _ := f.profile(t)
-	if current.GetCoin()-after.GetCoin() != 1000 {
+	if current.GetCoin()-after.GetCoin() != 100000 {
 		t.Fatal("fresh original day1 reward", current.GetCoin()-after.GetCoin())
 	}
 	if p1Count(t, &db.MonthSignState{}, "player_id=?", id) != 0 {

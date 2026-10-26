@@ -1,7 +1,6 @@
 package service
 
 import (
-	"os"
 	"testing"
 
 	"google.golang.org/protobuf/proto"
@@ -11,7 +10,7 @@ import (
 
 func p6ActualTyped17Input(t *testing.T) *model.FrozenBattleInput {
 	t.Helper()
-	raw, err := os.ReadFile("../../analysis/p6/native-local-p14-type17-qualified-input-v119/000.pb")
+	raw, err := readTestAnalysis75("../../analysis/p6/native-local-p14-type17-qualified-input-v119/000.pb")
 	if err != nil {
 		t.Fatal(err)
 	}

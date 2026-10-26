@@ -3,7 +3,6 @@ package service
 import (
 	"bytes"
 	"encoding/json"
-	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -16,9 +15,9 @@ func p14SeriesActualGame(t *testing.T) (*db.P14FinalGame, *db.P14FinalFormationO
 	t.Helper()
 	var raw, frame []byte
 	for _, root := range []string{"../../analysis/p14/final-game-actual-native", "../../../analysis/p14/final-game-actual-native"} {
-		if data, err := os.ReadFile(filepath.Join(root, "actual-Game1-provenance.json")); err == nil {
+		if data, err := readTestAnalysis75(filepath.Join(root, "actual-Game1-provenance.json")); err == nil {
 			raw = data
-			frame, err = os.ReadFile(filepath.Join(root, "actual-Game1-KFReplayData.pb"))
+			frame, err = readTestAnalysis75(filepath.Join(root, "actual-Game1-KFReplayData.pb"))
 			if err != nil {
 				t.Fatal(err)
 			}

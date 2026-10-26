@@ -273,7 +273,7 @@ func TestP5OriginalAwakeFullLifecycle(t *testing.T) {
 	if output := os.Getenv("HYJS_P5_AWAKE_BATTLE_ACTOR_OUTPUT"); output != "" {
 		hashes := map[string]string{}
 		for _, name := range []string{"Hero", "TalentAdvenced", "HeroAwakenAdd", "HeroAwakenFuseProp", "HeroAwakenFuseLevel", "Skill"} {
-			data, err := os.ReadFile(filepath.Join("../../analysis/tables", "Table"+name+".tsv"))
+			data, err := readTestAnalysis75(filepath.Join("../../analysis/tables", "Table"+name+".tsv"))
 			if err != nil {
 				t.Fatal(err)
 			}

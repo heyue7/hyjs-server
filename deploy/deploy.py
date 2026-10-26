@@ -22,8 +22,12 @@ parser.add_argument('--check-config', action='store_true', help='Validate and re
 parser.add_argument('--migrate-role-wallets', action='store_true', help='Quiesce legacy writers, back up and reconcile the one-time role-wallet cutover')
 parser.add_argument('--warm-rush-history-player', action='append', type=int, default=[], help='Prevalidate this existing owner with the exact candidate before application cutover')
 parser.add_argument('--apply-growth74', action='store_true', help='Apply reviewed growth configuration while game is in maintenance')
+parser.add_argument('--apply-growth75', action='store_true', help='Apply audited 75 publication, calendar, economy and fresh activity CAS while keeping maintenance')
 parser.add_argument('--expected-live-revision', help='Refuse activation if a different live release appeared')
 args = parser.parse_args()
+assert not (args.apply_growth74 and args.apply_growth75), 'Choose one explicit growth deployment version'
+if args.apply_growth75:
+    assert args.expected_live_revision and not args.provision and not args.initial_dump and not args.migrate_role_wallets, 'Growth75 requires a pinned existing release and its own maintenance window'
 settings = load(args.env_file)
 HOST = settings['HYJS_DEPLOY_SSH']
 REMOTE = settings['HYJS_DEPLOY_ROOT']
@@ -89,7 +93,7 @@ shutil.copytree(ROOT / 'analysis/tables', app / 'tables', ignore=shutil.ignore_p
 (app / 'config.test.yaml').write_text(render((ROOT / 'deploy/config.test.yaml').read_text(), settings))
 (stage / 'nginx.conf').write_text(render((ROOT / 'deploy/nginx.conf').read_text(), settings))
 (stage / 'deployment.env').write_text(''.join(key + '=' + settings[key] + '\n' for key in RUNTIME_KEYS))
-for name in ('Dockerfile', 'compose.yaml', 'activate.py', 'role_wallet_migration.py'):
+for name in ('Dockerfile', 'compose.yaml', 'activate.py', 'role_wallet_migration.py', 'growth75_activation.py', 'growth75_activity_patch.py'):
     shutil.copy2(ROOT / 'deploy' / name, stage / name)
 files = {str(p.relative_to(stage)): sha(p) for p in sorted(stage.rglob('*')) if p.is_file() and p.name != '.hyjs-stage'}
 manifest = {'revision': revision, 'architecture': 'linux/amd64', 'database': 'MySQL8.4', 'files': files,
@@ -131,6 +135,8 @@ if args.expected_live_revision:
     command += ' --expected-live-revision ' + shlex.quote(args.expected_live_revision)
 if args.apply_growth74:
     command += ' --apply-growth74'
+if args.apply_growth75:
+    command += ' --apply-growth75'
 if args.migrate_role_wallets:
     command += ' --migrate-role-wallets'
 if args.provision or args.update_ingress:

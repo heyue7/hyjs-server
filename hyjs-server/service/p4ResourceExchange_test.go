@@ -17,6 +17,27 @@ func TestP4ResourceExchangeOriginalSingleType23(t *testing.T) {
 	f := p4Setup(t)
 	now := time.Now()
 	key := p4ExchangeKey(now)
+	// Publish a finite non-red material exchange source for this protocol regression.
+	// The production direct-red template remains disabled and is not re-enabled.
+	var source db.P4CommerceRule
+	if err := db.GetIns().Where("id=?", "limitExchange_p4_"+now.In(time.FixedZone("UTC+8", 8*3600)).Format("200601")).First(&source).Error; err != nil {
+		t.Fatal(err)
+	}
+	var rules p4CommerceRules
+	if err := json.Unmarshal(source.Rules, &rules); err != nil {
+		t.Fatal(err)
+	}
+	rules.Products[0].Rewards = "item_005,1"
+	source.ID += "_fixture75"
+	source.Enabled, source.Frozen, source.Source = true, nil, "explicit finite non-red resource-exchange protocol fixture"
+	source.Rules, _ = json.Marshal(rules)
+	if err := db.GetIns().Create(&source).Error; err != nil {
+		t.Fatal(err)
+	}
+	// Original gem/book helpers remain separately limited material-only fixtures.
+	if err := db.GetIns().Model(&db.P4CommerceRule{}).Where("id LIKE ?", constUtil.P5GemSupplyPrefix+"%").Update("enabled", true).Error; err != nil {
+		t.Fatal(err)
+	}
 	if err := updateProfile(f.ctx, f.id, func(p *pb.Player, g *model.GameState) error {
 		p.Level = proto.Int32(100)
 		p.Coin = proto.Int64(100000000)
@@ -42,11 +63,11 @@ func TestP4ResourceExchangeOriginalSingleType23(t *testing.T) {
 		t.Fatal("exactly one original Type23", n)
 	}
 	listing := p4Trade(t, f, &pb.CSActivityShopInfo{ActivityId: proto.String(key)}, 0, now).(*pb.SCActivityShopInfo)
-	if len(listing.GetShopItemList()) != 10 {
-		t.Fatal("all base/gem/book products", listing)
+	if len(listing.GetShopItemList()) != 6 {
+		t.Fatal("all explicitly published base/gem products", listing)
 	}
-	if listing.GetShopItemList()[0].GetName() != constUtil.P4EssenceDisplayName {
-		t.Fatal("original canonical equipment title", listing.GetShopItemList()[0])
+	if listing.GetShopItemList()[0].GetGetResource()[0].GetId() != "item_005" {
+		t.Fatal("explicit non-red material source", listing.GetShopItemList()[0])
 	}
 	var gem *pb.ActivityShopItem
 	seen := map[int32]bool{}
@@ -115,7 +136,7 @@ func TestP4ResourceExchangeOriginalSingleType23(t *testing.T) {
 		t.Fatal(err)
 	}
 	current = p4Trade(t, f, &pb.CSActivityShopInfo{ActivityId: proto.String(key)}, 0, now).(*pb.SCActivityShopInfo)
-	if len(current.GetShopItemList()) != 5 {
+	if len(current.GetShopItemList()) != 1 {
 		t.Fatal("closed child visible")
 	}
 	if _, err = f.s.p4Commerce(f.ctx, f.id, req, 4, now); err == nil {

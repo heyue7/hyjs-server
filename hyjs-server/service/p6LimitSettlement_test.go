@@ -6,13 +6,12 @@ import (
 	"google.golang.org/protobuf/proto"
 	"hyjs-server/constUtil"
 	"hyjs-server/model"
-	"os"
 	"testing"
 )
 
 func TestP6LimitPendingIndependentProof(t *testing.T) {
 	s := p6OriginalTables(t)
-	raw, err := os.ReadFile("../../analysis/p6/original-limit20-inputs-v172/000.frozen-input-no-tables.json")
+	raw, err := readTestAnalysis75("../../analysis/p6/original-limit20-inputs-v172/000.frozen-input-no-tables.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -50,7 +49,7 @@ func TestP6LimitPendingIndependentProof(t *testing.T) {
 func TestP6LimitCertifiedActualStrongWeakAndUnknown(t *testing.T) {
 	s := p6OriginalTables(t)
 	for index, winner := range []int32{0, 1} {
-		raw, err := os.ReadFile(fmt.Sprintf("../../analysis/p6/original-limit20-strong-inputs-v180/%03d.frozen-input-no-tables.json", index))
+		raw, err := readTestAnalysis75(fmt.Sprintf("../../analysis/p6/original-limit20-strong-inputs-v180/%03d.frozen-input-no-tables.json", index))
 		if err != nil {
 			t.Fatal(err)
 		}

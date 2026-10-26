@@ -52,6 +52,7 @@ func TestP4ArenaWinActualAcceptedLatePublicationOriginalClaimTitlesAndCold(t *te
 		}
 	}
 	now := time.Now()
+	arenaTitleLadderFixture75(t, f, challenger, now)
 	cfg := p4ArenaWinPeriod(now)
 	var initial db.PeriodInstance
 	if err := db.GetIns().First(&initial, "id=?", cfg.ID).Error; err != nil || initial.Enabled {

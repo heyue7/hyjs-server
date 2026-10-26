@@ -49,8 +49,8 @@ func localPetGrowthClockFixture(t *testing.T) (*p1Fixture, int64, *db.Profile, c
 		t.Fatal(err)
 	}
 
-	// Freeze one already seeded original offer to avoid a probabilistic market
-	// prerequisite. Its original item, amount, currency and price are unchanged.
+	// Publish a finite original fragment plus material catalogue. Six slots retain
+	// the production 1-4 fragment split, while every material slot is item124.
 	var rule db.P9PetMarketRule
 	if err := db.GetIns().First(&rule, "id=?", constUtil.P9MarketRuleID).Error; err != nil {
 		t.Fatal(err)
@@ -69,17 +69,26 @@ func localPetGrowthClockFixture(t *testing.T) (*p1Fixture, int64, *db.Profile, c
 	if len(selected) != 1 || selected[0].Currency != "coinpet" || selected[0].Price != 20 || selected[0].Amount != 10 || cfg.RefreshCost != "diamond,150" || cfg.RefreshCap != 10 {
 		t.Fatal("original market fixture prerequisites changed", selected, cfg.RefreshCost, cfg.RefreshCap)
 	}
+	for _, offer := range cfg.Offers {
+		if offer.Resource == "frag_pet_002" {
+			selected = append(selected, offer)
+			break
+		}
+	}
+	if len(selected) != 2 {
+		t.Fatal("original fragment offer missing")
+	}
 	cfg.Offers = selected
-	cfg.Slots = 1
+	cfg.Slots = 6
 	input, err := json.Marshal(cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err = db.GetIns().Model(&db.P9PetMarketRule{}).Where("id=?", rule.ID).Update("input", input).Error; err != nil {
+	if err = db.GetIns().Model(&db.P9PetMarketRule{}).Where("id=?", rule.ID).Updates(map[string]any{"input": input, "enabled": true}).Error; err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() {
-		if err := db.GetIns().Model(&db.P9PetMarketRule{}).Where("id=?", rule.ID).Update("input", priorInput).Error; err != nil {
+		if err := db.GetIns().Model(&db.P9PetMarketRule{}).Where("id=?", rule.ID).Updates(map[string]any{"input": priorInput, "enabled": rule.Enabled}).Error; err != nil {
 			t.Error("restore finite market catalogue", err)
 		}
 		if err := db.GetIns().Model(&db.LocalPlayPolicy{}).Where("id=1").Update("enabled", false).Error; err != nil {
@@ -256,10 +265,17 @@ func TestLocalPlayPetGrowthClockPreviousDayLifecycleAndMarket(t *testing.T) {
 		t.Fatal("previous-day market list", err)
 	}
 	items := listing[0].(*pb.SCPetShopProductList).GetShopItemList()
-	if len(items) != 1 || len(items[0].GetItem()) != 1 || items[0].GetItem()[0].GetId() != "item_124" {
+	var material *pb.ShopItem
+	for _, item := range items {
+		if len(item.GetItem()) == 1 && item.GetItem()[0].GetId() == "item_124" {
+			material = item
+			break
+		}
+	}
+	if len(items) != 6 || material == nil {
 		t.Fatal("finite original market item", items)
 	}
-	buy := &pb.CSPetShopBuy{ShopItemId: items[0].Id, BuyCount: proto.Int32(1)}
+	buy := &pb.CSPetShopBuy{ShopItemId: material.Id, BuyCount: proto.Int32(1)}
 	localPetGrowthClockEight(t, func() ([]proto.Message, error) {
 		return f.s.p9PetShopBuy(ctx, id, buy, 91004)
 	})
@@ -273,7 +289,7 @@ func TestLocalPlayPetGrowthClockPreviousDayLifecycleAndMarket(t *testing.T) {
 		return f.s.p9PetShopRefresh(ctx, id, refresh, 91005)
 	}).(*pb.SCPetShopProductList)
 	p, game = f.profile(t)
-	if p.GetDiamond() != before.GetDiamond()-150 || refreshed.GetRefreshTimes() != 9 || len(refreshed.GetShopItemList()) != 1 || refreshed.GetShopItemList()[0].GetId() == items[0].GetId() {
+	if p.GetDiamond() != before.GetDiamond()-150 || refreshed.GetRefreshTimes() != 9 || len(refreshed.GetShopItemList()) != 6 || refreshed.GetShopItemList()[0].GetId() == items[0].GetId() {
 		t.Fatal("original150 refresh fee/epoch/replay", refreshed, p.GetDiamond())
 	}
 	refreshFact := localPetGrowthClockFact(t, id, "p9:shop-refresh:91005", constUtil.P1EventDiamondSpent, 150, started, LocalPlayNow(ctx))

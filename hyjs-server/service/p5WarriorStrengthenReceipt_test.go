@@ -123,15 +123,15 @@ func TestP5WarriorStrengthenCommittedReceiptOrderGrowthResetSoldAndCold(t *testi
 	f.restart(t)
 	reject(second, 199004)
 	sale := &pb.CSWarriorSell{Guid: []string{target.GetGuid()}}
-	if _, err = f.s.p5WarriorRecycle(ctx(sale), f.id, sale.Guid, false, 199007, sale); err != nil {
-		t.Fatal(err)
+	if _, err = f.s.p5WarriorRecycle(ctx(sale), f.id, sale.Guid, false, 199007, sale); err == nil {
+		t.Fatal("reset retired target GUID was sold twice")
 	}
 	reject(first, 199001)
 	reject(second, 199004)
 	f.restart(t)
 	reject(second, 199004)
 	p, g := f.profile(t)
-	if p.GetCoin() != 1800 || p.GetDiamond() != 0 {
+	if p.GetCoin() != 800 || p.GetDiamond() != 0 || simpleOwned(p, g, "frag_hero_011") != 80 {
 		t.Fatal("real growth/refund/sale conservation", p.GetCoin(), p.GetDiamond())
 	}
 	count := 0
@@ -143,7 +143,7 @@ func TestP5WarriorStrengthenCommittedReceiptOrderGrowthResetSoldAndCold(t *testi
 			count++
 		}
 	}
-	if count != 2 {
-		t.Fatal("actual consumed warrior refund count", count)
+	if count != 0 {
+		t.Fatal("800 paidEXP is below5000 refund unit and must not recreate400-EXP donors", count)
 	}
 }

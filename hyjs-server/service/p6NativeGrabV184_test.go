@@ -5,7 +5,6 @@ import (
 	"google.golang.org/protobuf/proto"
 	"hyjs-server/model"
 	pb "hyjs-server/model/protocol"
-	"os"
 	"path/filepath"
 	"testing"
 )
@@ -54,7 +53,7 @@ func p6NativeGrabFixtureInput(t *testing.T, s *GameService, input *model.FrozenB
 		return input, false
 	}
 	const source = "../../analysis/p6/original-grab19-candidate-inputs-v183/manifest.json"
-	raw, err := os.ReadFile(source)
+	raw, err := readTestAnalysis75(source)
 	if err != nil || p6Digest(raw) != "c5cd717a47aaa6ed874a148bb710ca351d98b89ca72b7c1b70dbb4d22197757c" {
 		t.Fatal("original Grab19 source manifest SHA", err)
 	}
@@ -73,7 +72,7 @@ func p6NativeGrabFixtureInput(t *testing.T, s *GameService, input *model.FrozenB
 		if row.WireSHA != wireSHA {
 			continue
 		}
-		encoded, err := os.ReadFile(filepath.Join(filepath.Dir(source), row.Typed))
+		encoded, err := readTestAnalysis75(filepath.Join(filepath.Dir(source), row.Typed))
 		if err != nil || p6Digest(encoded) != row.TypedSHA {
 			t.Fatal("original Grab19 typed SHA", err)
 		}

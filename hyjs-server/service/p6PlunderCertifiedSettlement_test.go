@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"hyjs-server/constUtil"
 	"hyjs-server/model"
-	"os"
 	"testing"
 )
 
@@ -13,7 +12,7 @@ func TestP6PlunderOriginalCertifiedCompleteStructuralScope(t *testing.T) {
 	s := &GameService{}
 	for index := 0; index < 11; index++ {
 		t.Run(fmt.Sprint(index), func(t *testing.T) {
-			raw, err := os.ReadFile(fmt.Sprintf("../../analysis/p11/actual-original-plunder3-inputs-v156/%03d.frozen-input.json", index))
+			raw, err := readTestAnalysis75(fmt.Sprintf("../../analysis/p11/actual-original-plunder3-inputs-v156/%03d.frozen-input.json", index))
 			if err != nil {
 				t.Fatal(err)
 			}

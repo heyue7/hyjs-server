@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	mysqlDriver "github.com/go-sql-driver/mysql"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 	"hyjs-server/constUtil"
@@ -264,7 +265,7 @@ func loginGlobalGameAccount(ctx context.Context, uid, password string) (*db.Prof
 	return &result, err
 }
 
-func gameAccountProjection(tx *gorm.DB, account db.GameAccount) (model.GameAccountDTO, error) {
+func gameAccountProjection(tx *gorm.DB, account db.GameAccount, terminal ...bool) (model.GameAccountDTO, error) {
 	out := model.GameAccountDTO{ID: account.ID, Username: account.Username, Nickname: account.Nickname, Enabled: account.Enabled, Protected: account.Protected, CreatedAt: account.CreatedAt, Version: adminVersion(account), Players: []model.GameAccountRoleDTO{}}
 	var roles []db.GameAccountRole
 	if err := db.AccountsTable(tx, "game_account_roles").Where("account_id=?", account.ID).Order("server_id").Find(&roles).Error; err != nil {
@@ -278,7 +279,79 @@ func gameAccountProjection(tx *gorm.DB, account db.GameAccount) (model.GameAccou
 		}
 		out.Players = append(out.Players, model.GameAccountRoleDTO{ServerID: role.ServerID, PlayerID: role.PlayerID, Name: role.Name, Level: role.Level})
 	}
+	// Account-session callers are already authenticated. Admin projections opt
+	// out explicitly, avoiding a wallet query for each row in the admin list.
+	if len(out.Players) > 0 && (len(terminal) == 0 || terminal[0]) {
+		if err := gameAccountTerminalProjection(tx, account.ID, out.Players); err != nil {
+			return out, err
+		}
+	}
 	return out, nil
+}
+
+// gameAccountTerminalProjection reads existing shared role-wallet facts in two
+// batches. It never creates a wallet, acknowledges an income or credits signup.
+func gameAccountTerminalProjection(tx *gorm.DB, accountID int64, roles []model.GameAccountRoleDTO) error {
+	var balances []db.RoleWalletBalance
+	err := db.AccountsTable(tx.Session(&gorm.Session{}), "role_wallet_balances").Where("account_id=?", accountID).Find(&balances).Error
+	if gameAccountTerminalMissingSchema(err) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	type roleKey struct{ server, player int64 }
+	known := make(map[roleKey]int64, len(balances))
+	for _, row := range balances {
+		if row.BalanceCents < 0 {
+			return ErrLocalWalletInvalid
+		}
+		known[roleKey{row.ServerID, row.PlayerID}] = row.BalanceCents
+	}
+	for i := range roles {
+		if amount, ok := known[roleKey{roles[i].ServerID, roles[i].PlayerID}]; ok {
+			value := amount
+			roles[i].TerminalBalanceCents = &value
+		}
+	}
+	if len(known) == 0 {
+		return nil
+	}
+	var unread []struct {
+		ServerID    int64
+		PlayerID    int64
+		UnreadCount int64
+	}
+	err = db.AccountsTable(tx.Session(&gorm.Session{}), "terminal_role_incomes AS income").
+		Select("income.server_id, income.player_id, COUNT(*) AS unread_count").
+		Joins("LEFT JOIN "+db.AccountsTableName("terminal_role_states")+" AS seen ON seen.server_id=income.server_id AND seen.player_id=income.player_id AND seen.account_id=income.account_id").
+		Where("income.account_id=? AND income.revision>COALESCE(seen.seen_revision,0)", accountID).
+		Group("income.server_id,income.player_id").Scan(&unread).Error
+	if gameAccountTerminalMissingSchema(err) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	counts := make(map[roleKey]int64, len(unread))
+	for _, row := range unread {
+		counts[roleKey{row.ServerID, row.PlayerID}] = row.UnreadCount
+	}
+	for i := range roles {
+		key := roleKey{roles[i].ServerID, roles[i].PlayerID}
+		if _, ok := known[key]; ok {
+			count := counts[key]
+			roles[i].TerminalUnreadCount = &count
+		}
+	}
+	return nil
+}
+
+// Optional legacy test/partial-startup schemas project null instead of inventing
+// a zero balance. Every other database failure remains visible to the caller.
+func gameAccountTerminalMissingSchema(err error) bool {
+	var driver *mysqlDriver.MySQLError
+	return err != nil && (errors.As(err, &driver) && driver.Number == 1146 || strings.HasPrefix(err.Error(), "no such table:"))
 }
 func prepareGlobalGameAccount(ctx context.Context, username, password, nickname string) (*db.GameAccount, error) {
 	if err := validateNameContent(username); err != nil {
@@ -354,7 +427,7 @@ func AdminGlobalGameAccounts(ctx context.Context, actor *model.AdminPrincipal, q
 		return nil, err
 	}
 	for _, row := range rows {
-		v, err := gameAccountProjection(tx, row)
+		v, err := gameAccountProjection(tx, row, false)
 		if err != nil {
 			return nil, err
 		}
@@ -387,7 +460,7 @@ func AdminCreateGlobalGameAccount(ctx context.Context, actor *model.AdminPrincip
 			return err
 		}
 		var err error
-		out, err = gameAccountProjection(tx, *account)
+		out, err = gameAccountProjection(tx, *account, false)
 		return err
 	})
 	return &out, err
@@ -425,7 +498,7 @@ func AdminUpdateGlobalGameAccount(ctx context.Context, actor *model.AdminPrincip
 			return err
 		}
 		var err error
-		out, err = gameAccountProjection(tx, account)
+		out, err = gameAccountProjection(tx, account, false)
 		return err
 	})
 	return &out, err
@@ -465,7 +538,7 @@ func AdminResetGlobalGameAccountPassword(ctx context.Context, actor *model.Admin
 			return err
 		}
 		var err error
-		out, err = gameAccountProjection(tx, account)
+		out, err = gameAccountProjection(tx, account, false)
 		return err
 	})
 	return &out, err

@@ -120,8 +120,18 @@ func TestP7ScopedRushActualPaidStartCompleteRecordEndAndColdOnce(t *testing.T) {
 			if err != nil || !proto.Equal(retry, start) {
 				t.Fatal("paid start retry drift", err)
 			}
-			if _, err = f.s.p7Start(f.ctx, f.id, request, 1411, false); err == nil {
-				t.Fatal("active paid fight replaced")
+			beforePending, gamePending := f.profile(t)
+			continued, pendingErr := f.s.p7Start(f.ctx, f.id, request, 1411, false)
+			if kind == constUtil.P7RushElite {
+				if pendingErr != nil || !proto.Equal(continued, start) {
+					t.Fatal("owned elite pending did not resume the exact frozen Start", pendingErr)
+				}
+			} else if pendingErr == nil {
+				t.Fatal("arbitrary diagnostic-source trial admitted a new start")
+			}
+			afterPending, afterGamePending := f.profile(t)
+			if !proto.Equal(beforePending, afterPending) || !p6CopySeriesJSONEqual(t, gamePending, afterGamePending) {
+				t.Fatal("pending start charged or changed frozen run")
 			}
 			// Current policy/content changes stop new starts and preserve the accepted frozen run.
 			if err = db.GetIns().Model(&db.P7RushScopedPolicy{}).Where("id=?", 1).Update("enabled", false).Error; err != nil {

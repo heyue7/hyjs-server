@@ -213,7 +213,7 @@ func TestP5OriginalBreachHighestFullScope(t *testing.T) {
 	if output := os.Getenv("HYJS_P5_BREACH_ACTOR_OUTPUT"); output != "" {
 		hashes := map[string]string{}
 		for _, name := range []string{"Hero", "TalentAdvenced", "Talent", "HeroBreached", "Skill"} {
-			raw, e := os.ReadFile("../../analysis/tables/Table" + name + ".tsv")
+			raw, e := readTestAnalysis75("../../analysis/tables/Table" + name + ".tsv")
 			if e != nil {
 				t.Fatal(e)
 			}

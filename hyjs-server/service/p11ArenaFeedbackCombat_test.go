@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"hyjs-server/constUtil"
 	"hyjs-server/db"
-	"os"
 	"testing"
 
 	"google.golang.org/protobuf/proto"
@@ -17,7 +16,7 @@ import (
 // Read-only combat input from the three original match structures. IDs are
 // local stand-ins; original formation, panels, Inst, skill order and seed remain.
 func TestP11ArenaFeedbackOriginal062047023Mechanisms(t *testing.T) {
-	raw, err := os.ReadFile("testdata/p11-arena-feedback-20261018.json")
+	raw, err := readTestAnalysis75("testdata/p11-arena-feedback-20261018.json")
 	if err != nil {
 		t.Fatal(err)
 	}

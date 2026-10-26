@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
-	"os"
 	"path/filepath"
 	"reflect"
 	"sort"
@@ -23,7 +22,7 @@ func TestP6NativeOriginalBuffManagerIdentitiesGolden(t *testing.T) {
 func p6NativeOriginalManagerFixture(t *testing.T, file, expectedSHA string, groups int, expectedCases ...int) {
 	t.Helper()
 	root := filepath.Join("..", "..")
-	raw, err := os.ReadFile(filepath.Join(root, "analysis", "p6", file))
+	raw, err := readTestAnalysis75(filepath.Join(root, "analysis", "p6", file))
 	if err != nil || p6Digest(raw) != expectedSHA {
 		t.Fatal("original manager identities golden digest", err)
 	}
@@ -57,7 +56,7 @@ func p6NativeOriginalManagerFixture(t *testing.T, file, expectedSHA string, grou
 	s := p6OriginalTables(t)
 	for _, group := range fixture.Groups {
 		for name, sha := range map[string]string{group.Manifest: group.ManifestSHA, group.WireSource: group.WireSHA} {
-			body, readErr := os.ReadFile(filepath.Join(root, name))
+			body, readErr := readTestAnalysis75(filepath.Join(root, name))
 			if readErr != nil || p6Digest(body) != sha {
 				t.Fatal("original manager source digest", name, readErr)
 			}
@@ -67,7 +66,7 @@ func p6NativeOriginalManagerFixture(t *testing.T, file, expectedSHA string, grou
 		}
 		for _, c := range group.Cases {
 			t.Run(c.Name, func(t *testing.T) {
-				wire, readErr := os.ReadFile(filepath.Join(root, c.Wire))
+				wire, readErr := readTestAnalysis75(filepath.Join(root, c.Wire))
 				if readErr != nil || p6Digest(wire) != c.WireSHA {
 					t.Fatal("original manager wire digest", readErr)
 				}

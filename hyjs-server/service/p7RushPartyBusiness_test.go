@@ -42,7 +42,7 @@ func p7PartyBusinessFixture(t *testing.T) *p1Fixture {
 		t.Fatal(err)
 	}
 	f.id = account.Id
-	raw, err := os.ReadFile("../../analysis/p7/party-rush-isolated-roster-r2-20261016.json")
+	raw, err := readTestAnalysis75("../../analysis/p7/party-rush-isolated-roster-r2-20261016.json")
 	if err != nil || p6Digest(raw) != "e60e9774a43efe58f67b9eb84c1a30cf40a3a30f2e5f68c87d063d3aeb29a5c9" {
 		t.Fatal("finite historical equipped roster SHA", err)
 	}
@@ -115,11 +115,11 @@ func p7PartyActualEnd(t *testing.T, f *p1Fixture, start *pb.SCRushFightStart) *p
 	if err != nil {
 		t.Fatal(err)
 	}
-	input, err := p7PartyRushInputAt(series, 30.1)
+	input, err := p7GenericMechanismRushInputAt(series, 30.1)
 	if err != nil {
 		t.Fatal(err)
 	}
-	out, err := f.s.ComputeOriginalP6ProtocolFinalHP(f.ctx, input, nil)
+	out, _, err := f.s.ComputeP6GenericMechanismBattle(f.ctx, input, nil)
 	if err != nil || out.Outcome.Authoritative {
 		t.Fatal("independent test-client source computation", err)
 	}
@@ -132,6 +132,7 @@ func p7PartyActualEnd(t *testing.T, f *p1Fixture, start *pb.SCRushFightStart) *p
 
 func TestP7PartyRushBusinessRealStarsAdditionContinuationColdConcurrentOnce(t *testing.T) {
 	f := p7PartyBusinessFixture(t)
+	p7StarActivityOperations75(t, f)
 	p7SectionPublish(t)
 	p7PublishRushAddition(t)
 	p7PublishContinuation(t)
@@ -175,7 +176,7 @@ func TestP7PartyRushBusinessRealStarsAdditionContinuationColdConcurrentOnce(t *t
 			t.Fatal("earned addition did not affect actual next party battle")
 		}
 		var row db.P7RushManualCalculation
-		if err = db.GetIns().First(&row, "fight_id=?", start.GetFightId()).Error; err != nil || row.DriverPolicy != constUtil.P7RushPartyManualDriverSource || row.ScopeProof != constUtil.P7RushPartyManualNativeProof || row.Status != constUtil.P7RushManualPending || len(row.Terminal) != 0 {
+		if err = db.GetIns().First(&row, "fight_id=?", start.GetFightId()).Error; err != nil || row.DriverPolicy != constUtil.P7GenericMechanismDriverSource || row.ScopeProof != constUtil.P7GenericMechanismCompatibilityProof || row.Status != constUtil.P7RushManualPending || len(row.Terminal) != 0 {
 			t.Fatal("new party pending source/proof", err)
 		}
 		end := p7PartyActualEnd(t, f, start)
@@ -260,6 +261,7 @@ func TestP7PartyRushBusinessRealStarsAdditionContinuationColdConcurrentOnce(t *t
 			t.Fatal(err)
 		}
 	}
+	p7PointShopOperations75(t, f)
 	var activity db.PeriodInstance
 	if err = db.GetIns().Where("kind=? AND enabled=?", constUtil.P7RushStarEvent, true).First(&activity).Error; err != nil {
 		t.Fatal(err)
@@ -334,7 +336,7 @@ func TestP7PartyRushExportOriginalHTTPStart(t *testing.T) {
 			t.Fatal("owned P7 source/output required")
 		}
 	}
-	raw, err := os.ReadFile(file)
+	raw, err := readTestAnalysis75(file)
 	if err != nil || p6Digest(raw) != os.Getenv("HYJS_P7_PARTY_HTTP_START_SHA256") {
 		t.Fatal("original HTTP Start SHA", err)
 	}

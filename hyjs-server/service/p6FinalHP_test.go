@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"os"
 	"path/filepath"
 	"testing"
 
@@ -93,7 +92,7 @@ func TestP6FinalActorHPActualOriginalUF14TerminalSnapshot(t *testing.T) {
 		t.Fatal("actual local UF14 terminal native source", err)
 	}
 	c := original.Cases[0]
-	data, err := os.ReadFile(filepath.Join(wireRoot, c.Wire))
+	data, err := readTestAnalysis75(filepath.Join(wireRoot, c.Wire))
 	if err != nil || p6Digest(data) != c.SHA {
 		t.Fatal(err)
 	}

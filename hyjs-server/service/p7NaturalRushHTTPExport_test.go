@@ -33,7 +33,7 @@ func TestP7NaturalRushExportOriginalHTTPStart(t *testing.T) {
 		!strings.HasSuffix(inputPath, ".SCRushFightStart.pb") || !strings.HasSuffix(outputPath, ".calculated.json") {
 		t.Fatal("owned analysis/p7/function-natural-rush-* input/output required")
 	}
-	raw, err := os.ReadFile(inputPath)
+	raw, err := readTestAnalysis75(inputPath)
 	if err != nil || p6Digest(raw) != os.Getenv("HYJS_P7_NATURAL_HTTP_START_SHA256") {
 		t.Fatal("exact original HTTP Start SHA", err)
 	}

@@ -157,7 +157,7 @@ public class WalletActivity extends UnityPlayerActivity {
     private ValueAnimator bubbleDockAnimation;
     private Dialog panel;
     private LinearLayout shell;
-    private TextView unreadBadge;
+    private TextView unreadBadge, terminalEntryBadge, currentRoleBalance;
     private TextView feedback;
     private final Bitmap[] accountButtonTiles=new Bitmap[4];
     private boolean accountArtLoaded;
@@ -427,12 +427,20 @@ public class WalletActivity extends UnityPlayerActivity {
         updateBubbleGestureExclusion();
     }
     private JSONObject terminal(){return wallet==null?null:wallet.optJSONObject("terminal");}
+    private void setTerminalBadge(TextView badge,int count){
+        if(badge==null)return;badge.setText(count>99?"99+":String.valueOf(count));badge.setVisibility(count>0?View.VISIBLE:View.GONE);
+        badge.setContentDescription("未读到账 "+count+" 条");
+    }
     private void updateUnreadBadge(){
-        if(unreadBadge==null)return;JSONObject terminal=terminal();int count=terminal==null?0:terminal.optInt("unreadCount");
-        unreadBadge.setText(count>99?"99+":String.valueOf(count));unreadBadge.setVisibility(count>0?View.VISIBLE:View.GONE);
-        // Clamp the top-right marker to the visible icon half inside its real 48dp window.
-        Rect handle=bubbleTouchBounds();float x=bubbleX-handle.left+dp(30);unreadBadge.setTranslationX(Math.max(0,Math.min(dp(30),x)));unreadBadge.setTranslationY(dp(1));
-        unreadBadge.setContentDescription("未读到账 "+count+" 条");
+        JSONObject terminal=terminal();int count=terminal==null?0:Math.max(0,terminal.optInt("unreadCount"));
+        setTerminalBadge(unreadBadge,count);setTerminalBadge(terminalEntryBadge,count);
+        if(unreadBadge!=null){
+            // Clamp only the floating marker; the terminal entry owns its own right edge.
+            Rect handle=bubbleTouchBounds();float x=bubbleX-handle.left+dp(30);unreadBadge.setTranslationX(Math.max(0,Math.min(dp(30),x)));unreadBadge.setTranslationY(dp(1));
+        }
+        if(currentRoleBalance!=null && wallet!=null && wallet.has("balanceCents") && !wallet.isNull("balanceCents")){
+            long amount=wallet.optLong("balanceCents",-1);if(amount>=0){currentRoleBalance.setText(money(amount));currentRoleBalance.setContentDescription("剩余超频点数 "+money(amount));}
+        }
     }
     private Rect bubbleBounds(){
         if(overlay==null)return new Rect();
@@ -656,6 +664,7 @@ public class WalletActivity extends UnityPlayerActivity {
     }
     private String roleLabel(JSONObject role){return "区服 "+role.optLong("serverId")+" · "+role.optString("name")+" · Lv."+role.optLong("level");}
     private void renderAccount(LinearLayout body){
+        terminalEntryBadge=null;currentRoleBalance=null;
         LinearLayout content=column();content.setPadding(dp(18),dp(10),dp(18),dp(8));
         ScrollView viewport=scrolling(body,content);viewport.setLayoutParams(new LinearLayout.LayoutParams(-1,0,1));
         if(!accountReady()){addFull(content,text("请先登录 Brain Burst 2039",16,INK),60);return;}
@@ -675,9 +684,24 @@ public class WalletActivity extends UnityPlayerActivity {
             TextView detail=text("区服 "+role.optLong("serverId")+(created?" · Lv."+role.optLong("level"):"")+(selected?" · 当前角色":""),12,0xff596b73);detail.setPadding(0,dp(4),0,0);words.addView(detail);
 
             item.addView(words,new LinearLayout.LayoutParams(0,-2,1));
-            if(selected){TextView open=accountAction("蓝绿终端",true,active(),()->{if(active())navigate(HOME);});LinearLayout.LayoutParams entry=new LinearLayout.LayoutParams(dp(112),dp(44));entry.leftMargin=dp(12);item.addView(open,entry);}else item.addView(helpButton("角色终端",created?"进入该角色所在区服后，可打开蓝绿终端查看超频点数和账单。":"进入该区服后创建角色；同一区服只能创建一个角色。"),new LinearLayout.LayoutParams(dp(44),dp(44)));
+            if(created){
+                LinearLayout points=column();points.setGravity(Gravity.RIGHT|Gravity.CENTER_VERTICAL);points.setPadding(dp(8),0,0,0);
+                TextView pointTitle=text("超频点数",11,0xff596b73);pointTitle.setGravity(Gravity.RIGHT);points.addView(pointTitle,new LinearLayout.LayoutParams(-1,-2));
+                boolean hasBalance=role.has("terminalBalanceCents") && !role.isNull("terminalBalanceCents");long amount=hasBalance?role.optLong("terminalBalanceCents",-1):-1;
+                if(selected && wallet!=null && wallet.has("balanceCents") && !wallet.isNull("balanceCents"))amount=wallet.optLong("balanceCents",-1);
+                TextView pointAmount=text(amount>=0?money(amount):"—",18,0xff26383f);pointAmount.setGravity(Gravity.RIGHT);pointAmount.setSingleLine(true);pointAmount.setPadding(0,dp(3),0,0);
+                if(Build.VERSION.SDK_INT>=26)pointAmount.setAutoSizeTextTypeUniformWithConfiguration(11,18,1,android.util.TypedValue.COMPLEX_UNIT_SP);
+                pointAmount.setContentDescription(amount>=0?"剩余超频点数 "+money(amount):"剩余超频点数尚未读取");points.addView(pointAmount,new LinearLayout.LayoutParams(-1,dp(28)));if(selected)currentRoleBalance=pointAmount;
+                item.addView(points,new LinearLayout.LayoutParams(dp(88),-2));
+            }
+            if(selected){
+                FrameLayout terminalEntry=new FrameLayout(this);TextView open=accountAction("蓝绿终端",true,active(),()->{if(active())navigate(HOME);});terminalEntry.addView(open,new FrameLayout.LayoutParams(-1,-1));
+                terminalEntryBadge=center("",10,Color.WHITE);terminalEntryBadge.setBackground(shape(Color.rgb(239,67,67),9));FrameLayout.LayoutParams badge=new FrameLayout.LayoutParams(dp(18),dp(18),Gravity.TOP|Gravity.RIGHT);terminalEntry.addView(terminalEntryBadge,badge);
+                LinearLayout.LayoutParams entry=new LinearLayout.LayoutParams(dp(112),dp(44));entry.leftMargin=dp(12);item.addView(terminalEntry,entry);
+            }else item.addView(helpButton("角色终端",created?"进入该角色所在区服后，可打开蓝绿终端查看超频点数和账单。":"进入该区服后创建角色；同一区服只能创建一个角色。"),new LinearLayout.LayoutParams(dp(44),dp(44)));
             content.addView(item);accountLine(content);
         }
+        updateUnreadBadge();
         accountLine(body);LinearLayout footer=new LinearLayout(this);footer.setPadding(dp(12),dp(8),dp(12),dp(8));
         TextView[] actions={accountAction("修改名称",false,accountActive(),()->navigate(NICKNAME)),accountAction("修改密码",false,accountActive(),()->navigate(PASSWORD)),accountAction(busy?"处理中…":"退出登录",false,accountActive(),()->confirmLogout())};actions[2].setTextColor(0xffa23d36);
         for(int i=0;i<actions.length;i++){LinearLayout.LayoutParams cell=new LinearLayout.LayoutParams(0,dp(44),1);if(i>0)cell.leftMargin=dp(8);footer.addView(actions[i],cell);}body.addView(footer,new LinearLayout.LayoutParams(-1,-2));

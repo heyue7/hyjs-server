@@ -259,6 +259,9 @@ func TestP10SceneCurrentProfileSceneOverridesStalePresenceFrame(t *testing.T) {
 	if err != nil || len(peers) != 0 {
 		t.Fatal("stale scene frame advertised moved peer", err)
 	}
+	if _, err := f.s.fieldScene(f.ctx, b, false); err != nil {
+		t.Fatal("original loaded CurrentPosition handshake", err)
+	}
 	if err = f.s.SyncP10Scene(f.ctx, b, false); err != nil {
 		t.Fatal(err)
 	}

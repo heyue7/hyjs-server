@@ -30,11 +30,11 @@ func TestP4CopyBenefitsIntegratedSweep(t *testing.T) {
 		t.Fatal(err)
 	}
 	result := first[0].(*pb.SCCopySweep)
-	if len(result.GetGain().GetSimps()) != 2 || result.GetGain().GetSimps()[0].GetNum() != 4380 || result.GetGain().GetSimps()[1].GetNum() != 280 {
+	if len(result.GetGain().GetSimps()) != 2 || result.GetGain().GetSimps()[0].GetNum() != 4380 || result.GetGain().GetSimps()[1].GetNum() != 310 {
 		t.Fatal("actual sweep not doubled", result)
 	}
 	p, g := f.profile(t)
-	if p.GetCoin() != 4380 || p.GetStamina() != 110 || p.GetLevel() != 15 || p.GetExp() != 0 || g.Copy.GetPassedCopyInfo()[0].GetChallengeTimes() != 1 {
+	if p.GetCoin() != 4380 || p.GetStamina() != 110 || p.GetLevel() != 15 || p.GetExp() != 30 || g.Copy.GetPassedCopyInfo()[0].GetChallengeTimes() != 1 {
 		t.Fatal("sweep reward did not persist", p, g.Copy)
 	}
 	for _, at := range []int{0, 2} {
@@ -44,7 +44,7 @@ func TestP4CopyBenefitsIntegratedSweep(t *testing.T) {
 		}
 	}
 	after, _ := f.profile(t)
-	if after.GetCoin() != 4380 || after.GetExp() != 0 {
+	if after.GetCoin() != 4380 || after.GetExp() != 30 {
 		t.Fatal("sweep retry amplified rewards")
 	}
 }

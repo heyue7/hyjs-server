@@ -14,7 +14,7 @@ import (
 )
 
 func TestP6OriginalPaidDaily50NoTargetStrictAndNamedCompatibility(t *testing.T) {
-	raw, err := os.ReadFile("../../analysis/p6/daily50-local-pve-no-target-finish-v1-input-20261014/001.pb")
+	raw, err := readTestAnalysis75("../../analysis/p6/daily50-local-pve-no-target-finish-v1-input-20261014/001.pb")
 	if err != nil || p6Digest(raw) != "f2497a9f8031b3b2c103a3db1aa1b4d57d267849758f960c6990aa392b0668ed" {
 		t.Fatal("actual original paid native input changed", err)
 	}

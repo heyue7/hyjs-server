@@ -82,7 +82,7 @@ func TestP13GuildPrayerLoginThreeRealPrayersCachedPayloadAndSingleRefresh(t *tes
 	id := ids[0]
 	// The full original login records Activity/P1/P4 facts. Use the real
 	// initializer chain rather than bypassing any login consumer.
-	for _, initialize := range []func(context.Context) error{f.s.InitializeOpenServerActivity, f.s.InitializeActivities, f.s.InitializeGameplayPools, f.s.InitializeShop, f.s.InitializeP4} {
+	for _, initialize := range []func(context.Context) error{f.s.InitializeP10Scene, f.s.InitializeAdminSproutSettings, f.s.InitializeOpenServerActivity, f.s.InitializeActivities, f.s.InitializeGameplayPools, f.s.InitializeShop, f.s.InitializeP4} {
 		if err := initialize(f.ctx); err != nil {
 			t.Fatal(err)
 		}

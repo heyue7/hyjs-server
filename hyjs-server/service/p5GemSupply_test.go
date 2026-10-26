@@ -24,6 +24,10 @@ func TestP5GemSupply(t *testing.T) {
 	}
 	now := time.Now()
 	key := constUtil.P5GemSupplyPrefix + now.In(time.FixedZone("UTC+8", 8*3600)).Format("200601")
+	// Explicit finite non-red material exchange publication in this isolated fixture.
+	if err := db.GetIns().Model(&db.P4CommerceRule{}).Where("id=?", key).Update("enabled", true).Error; err != nil {
+		t.Fatal(err)
+	}
 	listing := p4Trade(t, f, &pb.CSActivityShopInfo{ActivityId: proto.String(key)}, 0, now).(*pb.SCActivityShopInfo)
 	if len(listing.GetShopItemList()) != 5 {
 		t.Fatal("five original gem packages")

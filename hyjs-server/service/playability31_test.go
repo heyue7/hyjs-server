@@ -16,7 +16,17 @@ import (
 
 func TestPlayability31NativeRemovalPreservesHistory(t *testing.T) {
 	f, operator := adminNativeFixture(t, false)
-	item := adminNativeFind(t, f, operator, "vip-benefits")
+	permanent := adminNativeFind(t, f, operator, "vip-benefits")
+	if !permanent.Permanent {
+		t.Fatal("VIP benefits lost permanent activity identity")
+	}
+	if err := f.s.AdminRemoveNativeActivity(f.ctx, operator, permanent.ID, permanent.Version); !errors.Is(err, constUtil.ErrAdminConfigConflict) {
+		t.Fatal("permanent VIP benefits removed", err)
+	}
+	item := adminNativeFind(t, f, operator, "copy-benefits")
+	if item.Permanent {
+		t.Fatal("copy benefit is not a removable timed activity")
+	}
 	// 启用配置必须先停用，旧版本和只读账号不能移除。
 	if item.Enabled {
 		if err := f.s.AdminRemoveNativeActivity(f.ctx, operator, item.ID, item.Version); !errors.Is(err, constUtil.ErrAdminConfigConflict) {

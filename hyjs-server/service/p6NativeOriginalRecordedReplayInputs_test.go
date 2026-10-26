@@ -17,7 +17,7 @@ import (
 // Both-camp entries exercise the original PVE camp0 driver and automatic enemy.
 func p6ActualOriginalRecordedZeroCases(t *testing.T) []*pb.SCFightPlayback {
 	t.Helper()
-	raw, err := os.ReadFile("../../analysis/p6/native-actual-paid-copy-auto-original-records-v86.json")
+	raw, err := readTestAnalysis75("../../analysis/p6/native-actual-paid-copy-auto-original-records-v86.json")
 	if err != nil || p6Digest(raw) != "012ed908ee4175d49644ce153d182af0806476637c4362287d8ff9b5f3d0137b" {
 		t.Fatal("original recorded source fixture SHA", err)
 	}
@@ -36,7 +36,7 @@ func p6ActualOriginalRecordedZeroCases(t *testing.T) []*pb.SCFightPlayback {
 	}
 	var cases []*pb.SCFightPlayback
 	for _, c := range source.Cases {
-		raw, err = os.ReadFile(filepath.Join("../..", c.Wire))
+		raw, err = readTestAnalysis75(filepath.Join("../..", c.Wire))
 		if err != nil || p6Digest(raw) != c.SHA {
 			t.Fatal("original zero-factor source PB SHA", err)
 		}

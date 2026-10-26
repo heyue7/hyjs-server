@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"os"
 	"testing"
 
 	"google.golang.org/protobuf/proto"
@@ -178,7 +177,7 @@ func TestP6OriginalRushRequiredInstMessagesAndLegacyInvalidSource(t *testing.T) 
 			t.Fatal("invalid source was silently repaired")
 		}
 	}
-	raw, err := os.ReadFile("../../analysis/p6/actual-local-p7-rush-inputs-v97/000.SCRushFightStart.pb")
+	raw, err := readTestAnalysis75("../../analysis/p6/actual-local-p7-rush-inputs-v97/000.SCRushFightStart.pb")
 	if err != nil {
 		t.Fatal(err)
 	}

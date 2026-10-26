@@ -102,11 +102,9 @@ func TestP5SpecialtyContinuityCross75GrowthResetAndCold(t *testing.T) {
 		return string(raw)
 	}
 	p, g := f.profile(t)
-	initial, err := p5Warrior(g, guid)
-	if err != nil {
+	if _, err := p5Warrior(g, guid); err != nil {
 		t.Fatal(err)
 	}
-	baseline := proto.Clone(initial).(*pb.Warrior)
 	var stamp int64 = 203000
 	train := func() {
 		t.Helper()
@@ -236,11 +234,11 @@ func TestP5SpecialtyContinuityCross75GrowthResetAndCold(t *testing.T) {
 	f.restart(t)
 	p, g = f.profile(t)
 	w, err = p5Warrior(g, guid)
-	if err != nil || !proto.Equal(w, baseline) {
-		t.Fatal("cold exact pre-investment baseline", err)
+	if err == nil || simpleOwned(p, g, "frag_hero_003") != 150 {
+		t.Fatal("cold reset must retire partnerGUID and return150 original fragments", err)
 	}
-	if p.GetCoin() != 1000000 || p.GetDiamond() != 950 || simpleOwned(p, g, "item_007") != 6 || simpleOwned(p, g, "item_439") != 20 || simpleOwned(p, g, "item_440") != 15 {
-		t.Fatal("actual costs were not refunded exactly; reset fee must remain")
+	if p.GetCoin() != 1000000 || p.GetDiamond() != 940 || simpleOwned(p, g, "item_007") != 6 || simpleOwned(p, g, "item_439") != 20 || simpleOwned(p, g, "item_440") != 15 {
+		t.Fatal("refundable materials must return; two training diamond fees and reset fee remain")
 	}
 	foods := 0
 	for _, card := range g.Warriors {
@@ -251,8 +249,8 @@ func TestP5SpecialtyContinuityCross75GrowthResetAndCold(t *testing.T) {
 			}
 		}
 	}
-	if foods != 1 {
-		t.Fatal("original consumed food refund count", foods)
+	if foods != 0 {
+		t.Fatal("400 paidEXP below5000 cannot recreate original donor", foods)
 	}
 	current := snapshot()
 	again, err := f.s.p5WarriorReset(ctx(reset), f.id, reset, stamp)
@@ -260,7 +258,7 @@ func TestP5SpecialtyContinuityCross75GrowthResetAndCold(t *testing.T) {
 		t.Fatal("reset cold replay granted or charged twice", err)
 	}
 	if err := f.s.skillSpecialtyPrepare(f.ctx, f.id); err != nil {
-		t.Fatal("restored74 not eligible", err)
+		t.Fatal("removed partner not eligible", err)
 	}
 	_, g = f.profile(t)
 	if p5KV(g, "p5.invest:"+guid) != "" {

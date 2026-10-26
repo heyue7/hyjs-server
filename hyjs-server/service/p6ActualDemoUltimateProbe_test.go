@@ -28,7 +28,7 @@ func TestP6ProbeActualDemoFullPartyUltimateExecutions(t *testing.T) {
 	if err != nil || filepath.Dir(output) != root {
 		t.Fatal("probe summary must be directly under analysis/p6")
 	}
-	source, err := os.ReadFile("../../analysis/p6/actual-demo4-vs-demo3-friend11-input-v128b/000.frozen-input.json")
+	source, err := readTestAnalysis75("../../analysis/p6/actual-demo4-vs-demo3-friend11-input-v128b/000.frozen-input.json")
 	if err != nil || p6Digest(source) != "d0e70186dc665f5e894eaae0a30915cb8032beb2ab86e0950ebd3e0ada41fa94" {
 		t.Fatal("immutable actual source", err)
 	}

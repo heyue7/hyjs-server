@@ -122,7 +122,7 @@ func (s *GameService) ggoLoadQuote(tx *gorm.DB, playerID int64, cfg db.P4Commerc
 		return nil, nil, nil
 	}
 	now := LocalPlayNow(tx.Statement.Context)
-	day := now.Format("2006-01-02")
+	day := p1Day(now)
 	state := &ggoQuoteState{}
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		state.Day = day
@@ -132,7 +132,13 @@ func (s *GameService) ggoLoadQuote(tx *gorm.DB, playerID int64, cfg db.P4Commerc
 			return nil, nil, err
 		}
 	} else {
-		if len(row.Payload) > 262144 || json.Unmarshal(row.Payload, state) != nil || state.Generation < 1 || len(state.Slots) != 6 || state.SlotBought == nil || state.FreeLeft < 0 || state.PaidUsed < 0 || state.Day > day || state.FreeAt <= 0 || state.FreeAt > now.UnixMilli() {
+		if len(row.Payload) > 262144 || json.Unmarshal(row.Payload, state) != nil {
+			return nil, nil, errors.New("信用商店报价存档无效")
+		}
+		if err = calendarGGODay75(tx, playerID, cfg.ID, state, now); err != nil {
+			return nil, nil, err
+		}
+		if state.Generation < 1 || len(state.Slots) != 6 || state.SlotBought == nil || state.FreeLeft < 0 || state.PaidUsed < 0 || state.Day > day || state.FreeAt <= 0 || state.FreeAt > now.UnixMilli() {
 			return nil, nil, errors.New("信用商店报价存档无效")
 		}
 		seen := map[string]bool{}

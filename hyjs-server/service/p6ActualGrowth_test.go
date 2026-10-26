@@ -41,7 +41,7 @@ func p6ReadActualGrowthPaths(t *testing.T) []p6ActualGrowthPath {
 		name             string
 		count, mutations int
 	}{{"p5-highest-actors-20261014.json", 76, 927}, {"p5-awake-highest-actors-20261014.json", 15, 0}} {
-		raw, err := os.ReadFile("../../analysis/p6/" + tc.name)
+		raw, err := readTestAnalysis75("../../analysis/p6/" + tc.name)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -55,7 +55,7 @@ func p6ReadActualGrowthPaths(t *testing.T) []p6ActualGrowthPath {
 			t.Fatal("real original growth fixture drift", tc.name, err)
 		}
 		for table, expected := range fixture.TableSHA {
-			original, readErr := os.ReadFile("../../analysis/tables/Table" + table + ".tsv")
+			original, readErr := readTestAnalysis75("../../analysis/tables/Table" + table + ".tsv")
 			if readErr != nil || p6Digest(original) != expected {
 				t.Fatal("actual growth source table drift", table, readErr)
 			}

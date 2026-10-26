@@ -218,7 +218,7 @@ func TestP5OriginalTrainingHighestFullScope(t *testing.T) {
 	if output := os.Getenv("HYJS_P5_TRAINING_ACTOR_OUTPUT"); output != "" {
 		hashes := map[string]string{}
 		for _, name := range []string{"Hero", "TalentAdvenced", "Talent", "HeroTrainingMaxMin", "HeroBreached", "Skill"} {
-			data, e := os.ReadFile("../../analysis/tables/Table" + name + ".tsv")
+			data, e := readTestAnalysis75("../../analysis/tables/Table" + name + ".tsv")
 			if e != nil {
 				t.Fatal(e)
 			}

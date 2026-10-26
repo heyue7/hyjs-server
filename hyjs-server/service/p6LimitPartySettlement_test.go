@@ -7,7 +7,6 @@ import (
 	"hyjs-server/constUtil"
 	"hyjs-server/model"
 	pb "hyjs-server/model/protocol"
-	"os"
 	"testing"
 )
 
@@ -15,7 +14,7 @@ import (
 // accepted single047 proof and frozen terminal readable under its old family.
 func TestP6LimitPartyIndependentProofPreservesHistorical047(t *testing.T) {
 	s := p6OriginalTables(t)
-	raw, err := os.ReadFile("../../analysis/p6/original-limit20-strong-inputs-v180/000.frozen-input-no-tables.json")
+	raw, err := readTestAnalysis75("../../analysis/p6/original-limit20-strong-inputs-v180/000.frozen-input-no-tables.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -28,7 +27,7 @@ func TestP6LimitPartyIndependentProofPreservesHistorical047(t *testing.T) {
 	if err != nil || validateP6LimitScope(frozen) != nil || !p6KnownLimitSettlementProof(frozen, constUtil.P6LimitNativeProof) {
 		t.Fatal("historical047 capability changed", err)
 	}
-	raw, err = os.ReadFile("../../analysis/p6/original-full-party-limit20-inputs-v187/000.SCLimitPvpFightResult.pb")
+	raw, err = readTestAnalysis75("../../analysis/p6/original-full-party-limit20-inputs-v187/000.SCLimitPvpFightResult.pb")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -97,7 +96,7 @@ func TestP6LimitPartyIndependentProofPreservesHistorical047(t *testing.T) {
 func TestP6LimitPartyCertifiedActualDirectionsAndTerminal(t *testing.T) {
 	s := p6OriginalTables(t)
 	for index := 0; index < 2; index++ {
-		raw, err := os.ReadFile(fmt.Sprintf("../../analysis/p6/original-full-party-limit20-inputs-v187/%03d.SCLimitPvpFightResult.pb", index))
+		raw, err := readTestAnalysis75(fmt.Sprintf("../../analysis/p6/original-full-party-limit20-inputs-v187/%03d.SCLimitPvpFightResult.pb", index))
 		if err != nil {
 			t.Fatal(err)
 		}

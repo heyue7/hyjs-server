@@ -229,15 +229,20 @@ func (s *GameService) localPlayTimeChange(ctx context.Context, id int64, action,
 // separate activity-calendar projection inside the same original payment tx.
 func localPlayRecordPaymentTime(tx *gorm.DB, order *db.PaymentOrder, real time.Time) error {
 	ctx := tx.Statement.Context
-	if !GameCalendarContextBound(ctx) {
-		return nil
-	}
-	owner := GameCalendarOwner(ctx)
-	if owner != order.PlayerID {
+	if order == nil || order.ID == "" || order.PlayerID <= 0 || real.UnixMilli() <= 0 || order.ConfirmedAt != real.UnixMilli() {
 		return errors.New(constUtil.LocalPlayInvalidMessage)
 	}
-	days := GameCalendarOffsetDays(ctx)
-	projection := db.LocalPlayPaymentTime{OrderID: order.ID, PlayerID: order.PlayerID, GameAt: LocalPlayAt(ctx, real).UnixMilli(), RealAt: real.UnixMilli(), OffsetDays: days}
+	if GameCalendarContextBound(ctx) && GameCalendarOwner(ctx) != order.PlayerID {
+		return errors.New(constUtil.LocalPlayInvalidMessage)
+	}
+	game := LocalPlayAt(ctx, real)
+	days := int64(game.Sub(real) / (24 * time.Hour))
+	if GameCalendarContextBound(ctx) {
+		days = GameCalendarOffsetDays(ctx)
+	}
+	// Freeze zero-offset confirmations too. A later clock binding or cold worker
+	// must never reinterpret the same paid order using a different calendar.
+	projection := db.LocalPlayPaymentTime{OrderID: order.ID, PlayerID: order.PlayerID, GameAt: game.UnixMilli(), RealAt: real.UnixMilli(), OffsetDays: days}
 	return tx.Create(&projection).Error
 }
 
@@ -245,8 +250,7 @@ func localPlayRecordPaymentTime(tx *gorm.DB, order *db.PaymentOrder, real time.T
 // projected ConfirmedAt values never rewrites the persisted payment orders.
 func localPlayPaymentOrders(tx *gorm.DB, id, start, end int64) ([]db.PaymentOrder, error) {
 	var orders []db.PaymentOrder
-	owner := GameCalendarOwner(tx.Statement.Context)
-	if !GameCalendarContextBound(tx.Statement.Context) || owner != id {
+	if !gameSchemaHasTable(tx, &db.LocalPlayPaymentTime{}) {
 		err := tx.Where("player_id=? AND status=? AND confirmed_at>=? AND confirmed_at<?", id, constUtil.P3PaymentConfirmed, start, end).Order("confirmed_at,id").Find(&orders).Error
 		return orders, err
 	}

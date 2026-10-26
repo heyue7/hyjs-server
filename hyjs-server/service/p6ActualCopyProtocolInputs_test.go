@@ -20,7 +20,7 @@ func p6ActualCopyPlaybackProjection(start *pb.SCCopyFightStart) *pb.SCFightPlayb
 
 func TestP6ActualCopyPlaybackProjectionPreservesOriginalDefaultFactors(t *testing.T) {
 	for _, task := range []string{"10", "12"} {
-		raw, err := os.ReadFile("../../analysis/p15/actual-copy-starts-20261015/mission3-task" + task + ".SCCopyFightStart.pb")
+		raw, err := readTestAnalysis75("../../analysis/p15/actual-copy-starts-20261015/mission3-task" + task + ".SCCopyFightStart.pb")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -75,7 +75,7 @@ func TestP6ExportActualPaidCopyOriginalAutomaticInputs(t *testing.T) {
 		{"12", "502cc6a0765aee667797bb8fd56c9ad4060afc39b406d3e24958de7b54e25d01", "28d8052507cd1f6d8fc56fc437b1c4cc601ca8710cfd03d6e3eb4e2bfc9ef04d"},
 	} {
 		prefix := filepath.Join(root, "analysis/p15/actual-copy-starts-20261015/mission3-task"+item.task+".SCCopyFightStart")
-		raw, readErr := os.ReadFile(prefix + ".pb")
+		raw, readErr := readTestAnalysis75(prefix + ".pb")
 		if readErr != nil || p6Digest(raw) != item.protoSHA {
 			t.Fatal("actual paid original proto representation", readErr)
 		}
@@ -83,7 +83,7 @@ func TestP6ExportActualPaidCopyOriginalAutomaticInputs(t *testing.T) {
 		if err = proto.Unmarshal(raw, start); err != nil {
 			t.Fatal(err)
 		}
-		raw, readErr = os.ReadFile(prefix + ".source.json")
+		raw, readErr = readTestAnalysis75(prefix + ".source.json")
 		if readErr != nil || p6Digest(raw) != item.jsonSHA {
 			t.Fatal("actual paid source object", readErr)
 		}
@@ -95,7 +95,7 @@ func TestP6ExportActualPaidCopyOriginalAutomaticInputs(t *testing.T) {
 
 		if playback {
 			recordPath := strings.TrimSuffix(prefix, ".SCCopyFightStart") + ".OriginalOperates.pb"
-			recordRaw, recordErr := os.ReadFile(recordPath)
+			recordRaw, recordErr := readTestAnalysis75(recordPath)
 			if recordErr != nil || p6Digest(recordRaw) != "876a8702571500c345fee44104993887c244ab979a776bc69e7c6245eb4cfa12" {
 				t.Fatal("actual accepted record SHA", recordErr)
 			}

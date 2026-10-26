@@ -48,7 +48,7 @@ func p7AwakeBusinessStartEnd(t *testing.T, f *p1Fixture, monGUID string, now tim
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = P7Awake16ProofForInput(input); err != nil {
+	if _, err = f.s.p7AwakeBattleProof(f.ctx, input); err != nil {
 		t.Fatal(err)
 	}
 	// 测试客户端从真实Start独立产出原操作；不把预设胜者或提交记录作为服务端driver。
@@ -309,7 +309,7 @@ func TestP7AwakeExportOriginalHTTPStart(t *testing.T) {
 			t.Fatal("owned P7 immutable source/output required")
 		}
 	}
-	raw, err := os.ReadFile(file)
+	raw, err := readTestAnalysis75(file)
 	if err != nil || p6Digest(raw) != os.Getenv("HYJS_P7_AWAKE_HTTP_START_SHA256") {
 		t.Fatal("actual HTTP typed16 SHA", err)
 	}
@@ -351,10 +351,17 @@ func TestP7AwakeBusinessUnsupportedRosterDoesNotSpend(t *testing.T) {
 	if err := db.GetIns().Model(&db.P7AwakePolicy{}).Where("id=?", constUtil.P7AwakeBattlePolicyID).Update("enabled", true).Error; err != nil {
 		t.Fatal(err)
 	}
+	// A real experience-material actor has no combat skills and cannot be a roster.
+	if err := updateProfile(f.ctx, f.id, func(_ *pb.Player, g *model.GameState) error {
+		g.Warriors[0].Id = proto.String("hero_exp_004")
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
 	before, bg := f.profile(t)
 	now := time.Date(2026, 10, 16, 12, 0, 0, 0, time.FixedZone("UTC+8", 8*3600))
 	if _, err := f.s.p7AwakeExplore(f.ctx, f.id, &pb.CSEnterAwakeCopy{CopyId: proto.String("501")}, now, 399001); err == nil {
-		t.Fatal("starter047 borrowed normal001003 type16 authority")
+		t.Fatal("experience-material roster gained battle authority")
 	}
 	after, ag := f.profile(t)
 	if !proto.Equal(before, after) || !p6CopySeriesJSONEqual(t, bg, ag) || p1Count(t, &db.P7AwakeRun{}, "player_id=?", f.id) != 0 || p1Count(t, &db.P7AwakeExploration{}, "player_id=?", f.id) != 0 || p1Count(t, &db.P6BattleRecord{}, "player_id=? AND source=?", f.id, constUtil.P7AwakeBattleReplaySource) != 0 {

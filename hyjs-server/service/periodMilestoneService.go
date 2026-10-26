@@ -110,6 +110,9 @@ func (s *GameService) p1PeriodItems(tx *gorm.DB, playerID int64, progress *db.Pe
 		status := int32(0)
 		if delivery.ID > 0 {
 			status = 1
+			if cfg.Kind == "payment_amount" && value < tier.Goal {
+				status = 0
+			}
 			if delivery.ClaimedAt > 0 {
 				status = 2
 			}

@@ -2,7 +2,6 @@ package service
 
 import (
 	"encoding/json"
-	"os"
 	"testing"
 
 	"google.golang.org/protobuf/proto"
@@ -19,7 +18,7 @@ func TestP6ActualPaidChapter3CopySeriesSourceAndStrictAutomatic(t *testing.T) {
 	} {
 		t.Run(item.task, func(t *testing.T) {
 			prefix := "../../analysis/p15/actual-copy-starts-20261015/mission3-task" + item.task + ".SCCopyFightStart"
-			raw, err := os.ReadFile(prefix + ".pb")
+			raw, err := readTestAnalysis75(prefix + ".pb")
 			if err != nil || p6Digest(raw) != item.protoSHA {
 				t.Fatal("actual paid start proto representation SHA", err)
 			}
@@ -27,7 +26,7 @@ func TestP6ActualPaidChapter3CopySeriesSourceAndStrictAutomatic(t *testing.T) {
 			if err = proto.Unmarshal(raw, start); err != nil {
 				t.Fatal(err)
 			}
-			raw, err = os.ReadFile(prefix + ".source.json")
+			raw, err = readTestAnalysis75(prefix + ".source.json")
 			if err != nil || p6Digest(raw) != item.jsonSHA {
 				t.Fatal("actual paid source object SHA", err)
 			}

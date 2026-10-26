@@ -45,7 +45,7 @@ type copyNativeSourceState struct {
 // frozen reply and the actual original automatic-AI result; no victory is made up.
 func readCopyOriginalNativeOutcome(t *testing.T, path string, start *pb.SCCopyFightStart) (*pb.CSCopyFightEnd, string) {
 	t.Helper()
-	raw, err := os.ReadFile(path)
+	raw, err := readTestAnalysis75(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -182,7 +182,7 @@ func TestCopyOriginalPaidStateRecovery(t *testing.T) {
 		return
 	}
 	folder := "../../analysis/p6/copy-book-native-chain-20261014"
-	raw, err := os.ReadFile(filepath.Join(folder, "000-paid-profile-state.json"))
+	raw, err := readTestAnalysis75(filepath.Join(folder, "000-paid-profile-state.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -203,7 +203,7 @@ func TestCopyOriginalPaidStateRecovery(t *testing.T) {
 	if start.GetFightId() != "5469211627dd34fbbfaf2518" || start.GetRandSeed() != 636902327 {
 		t.Fatal("genuine original identity changed")
 	}
-	original, err := os.ReadFile(filepath.Join(folder, "000.pb"))
+	original, err := readTestAnalysis75(filepath.Join(folder, "000.pb"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -386,7 +386,7 @@ func restoreCopySourceCheckpoint(t *testing.T, ctx context.Context, s *GameServi
 	if err != nil || !strings.HasPrefix(actual, root+string(os.PathSeparator)) || len(expectedSHA) != 64 {
 		t.Fatal("credential-free local source checkpoint and exact manifest SHA required")
 	}
-	raw, err := os.ReadFile(actual)
+	raw, err := readTestAnalysis75(actual)
 	if err != nil || p6Digest(raw) != expectedSHA {
 		t.Fatal("actual source checkpoint SHA mismatch", err)
 	}

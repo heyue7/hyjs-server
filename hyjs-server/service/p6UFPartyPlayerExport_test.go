@@ -30,7 +30,7 @@ func TestP6UFPartyPlayerExportProspectiveInput(t *testing.T) {
 	}
 	read := func(p string) []byte {
 		t.Helper()
-		r, e := os.ReadFile(p)
+		r, e := readTestAnalysis75(p)
 		if e != nil {
 			t.Fatal(e)
 		}

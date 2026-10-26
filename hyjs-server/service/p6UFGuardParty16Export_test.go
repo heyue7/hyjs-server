@@ -29,7 +29,7 @@ func TestP6UFGuardParty16ExportProspectiveInputs(t *testing.T) {
 	parent := filepath.Join(root, "analysis/p6/guild-guard-prospective-inputs-20261026-r1/manifest.json")
 	read := func(p string) []byte {
 		t.Helper()
-		r, e := os.ReadFile(p)
+		r, e := readTestAnalysis75(p)
 		if e != nil {
 			t.Fatal(e)
 		}

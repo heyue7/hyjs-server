@@ -2,7 +2,6 @@ package service
 
 import (
 	"encoding/json"
-	"os"
 	"testing"
 
 	"google.golang.org/protobuf/proto"
@@ -18,7 +17,7 @@ func TestP7RoundOneAutoFormationOriginalNativeConsumersAndCold(t *testing.T) {
 	root := "../../analysis/playable-plan-20261017/round1-trans-auto-r3/"
 	read := func(name, digest string) []byte {
 		t.Helper()
-		raw, err := os.ReadFile(name)
+		raw, err := readTestAnalysis75(name)
 		if err != nil || p6Digest(raw) != digest {
 			t.Fatal("fixed original source", name, err)
 		}

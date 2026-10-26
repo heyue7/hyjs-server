@@ -3,7 +3,6 @@ package service
 import (
 	"encoding/json"
 	"math"
-	"os"
 	"testing"
 
 	"google.golang.org/protobuf/proto"
@@ -12,7 +11,7 @@ import (
 )
 
 func TestP7PartyRushBusinessCertificateRequiresExactIndependentSource(t *testing.T) {
-	raw, err := os.ReadFile("../../analysis/p6/party-rush-manual-capability-certificate-20261016.json")
+	raw, err := readTestAnalysis75("../../analysis/p6/party-rush-manual-capability-certificate-20261016.json")
 	if err != nil || p6Digest(raw) != constUtil.P7RushPartyManualNativeProof {
 		t.Fatal("independent typed9 party certificate SHA", err)
 	}
@@ -21,7 +20,7 @@ func TestP7PartyRushBusinessCertificateRequiresExactIndependentSource(t *testing
 	if !p7PartyRushSourceAvailable(series) {
 		t.Fatal("certified original source is not available")
 	}
-	family, err := p7ManualRushFamilyForSeries(series)
+	family, err := p7ManualRushLegacyFamilyForSeries(series)
 	if err != nil || !family.Party || family.ScopeProof != constUtil.P7RushPartyManualNativeProof {
 		t.Fatal("certified source did not select its independent family", err)
 	}
@@ -41,11 +40,11 @@ func TestP7PartyRushBusinessCertificateRequiresExactIndependentSource(t *testing
 func TestP7PartyRushBusinessActualOriginalEndStrictWholeRecord(t *testing.T) {
 	s, cases := p7PartyRushSources(t)
 	series := p7PartyRushSeries(t, s, cases[0])
-	family, err := p7ManualRushFamilyForSeries(series)
+	family, err := p7ManualRushLegacyFamilyForSeries(series)
 	if err != nil {
 		t.Fatal(err)
 	}
-	raw, err := os.ReadFile("../../analysis/p6/p7-party-rush-fixtures-r2-20261016/000.original.BattleOperate.pb")
+	raw, err := readTestAnalysis75("../../analysis/p6/p7-party-rush-fixtures-r2-20261016/000.original.BattleOperate.pb")
 	if err != nil || p6Digest(raw) != "876a8702571500c345fee44104993887c244ab979a776bc69e7c6245eb4cfa12" {
 		t.Fatal("actual original record bytes", err)
 	}

@@ -50,7 +50,7 @@ func TestReRushShopNativeCataloguePurchaseAndCold(t *testing.T) {
 				break
 			}
 		}
-		if index < 0 || item.GetItem()[0].GetId() != goods[index] || item.GetItem()[0].GetNum() != 10 || item.GetExchangeList()[0].GetId() != "point" || item.GetExchangeList()[0].GetNum() != int32(500+index*100) || item.GetDayTotalTimes() != 1000 || item.GetPriority() != int32(1000+(index%4)*1000+index) {
+		if index < 0 || item.GetItem()[0].GetId() != goods[index] || item.GetItem()[0].GetNum() != 10 || item.GetExchangeList()[0].GetId() != "point" || item.GetExchangeList()[0].GetNum() != int32(500+index*100) || item.GetDayTotalTimes() != 1000 || item.GetPriority() != int32(1000+index) {
 			t.Fatal("source catalogue mismatch", item)
 		}
 		if index == 0 {

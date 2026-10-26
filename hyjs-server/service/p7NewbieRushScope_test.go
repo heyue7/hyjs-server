@@ -3,7 +3,6 @@ package service
 import (
 	"encoding/base64"
 	"encoding/json"
-	"os"
 	"path/filepath"
 	"testing"
 
@@ -15,7 +14,7 @@ import (
 
 func p7NewbieRushTestSource(t *testing.T) (*GameService, []*pb.SCRushFightStart, []*pb.BattleOperate) {
 	t.Helper()
-	raw, err := os.ReadFile("../../analysis/p6/p7-newbie047025-local-inputs-r2-20261017/manifest.json")
+	raw, err := readTestAnalysis75("../../analysis/p6/p7-newbie047025-local-inputs-r2-20261017/manifest.json")
 	if err != nil || p6Digest(raw) != "460d5b87b5310affdf95def39fec86c9408e649e38d040dd3f11f7cced7b21ab" {
 		t.Fatal("fixed local input", err)
 	}
@@ -25,7 +24,7 @@ func p7NewbieRushTestSource(t *testing.T) (*GameService, []*pb.SCRushFightStart,
 	if json.Unmarshal(raw, &manifest) != nil || len(manifest.Cases) != 4 {
 		t.Fatal("four bounded source cases")
 	}
-	raw, err = os.ReadFile("../../analysis/p6/p7-newbie047025-local-fixtures-r1-20261017/records.json")
+	raw, err = readTestAnalysis75("../../analysis/p6/p7-newbie047025-local-fixtures-r1-20261017/records.json")
 	if err != nil || p6Digest(raw) != "678bfb2e94a5c54055208a0b0fb8cc95630de315bc850f5b9b28a16c873b525a" {
 		t.Fatal("fixed LOCAL original Engine records", err)
 	}
@@ -43,7 +42,7 @@ func p7NewbieRushTestSource(t *testing.T) (*GameService, []*pb.SCRushFightStart,
 	var starts []*pb.SCRushFightStart
 	var operations []*pb.BattleOperate
 	for _, row := range manifest.Cases {
-		raw, err = os.ReadFile(filepath.Join("../../analysis/p6/p7-newbie047025-local-inputs-r2-20261017", row.Typed))
+		raw, err = readTestAnalysis75(filepath.Join("../../analysis/p6/p7-newbie047025-local-inputs-r2-20261017", row.Typed))
 		if err != nil || p6Digest(raw) != row.TypedSHA {
 			t.Fatal("typed source SHA", err)
 		}
@@ -113,12 +112,13 @@ func TestP7NewbieRushScopeBoundaries(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			candidate := proto.Clone(starts[0]).(*pb.SCRushFightStart)
 			change(candidate)
-			if err := validateP7NewbieRushScope(freeze(candidate)); err == nil {
+			series, err := s.FreezeP6RushSeriesInput(candidate, true, false, nil, constUtil.P6OriginalClientHash)
+			if err == nil && validateP7NewbieRushScope(series) == nil {
 				t.Fatal("outside bounded family admitted")
 			}
 		})
 	}
-	legacyRaw, err := os.ReadFile("../../analysis/p6/p7-party-rush-pending-20261016/000.SCRushFightStart.pb")
+	legacyRaw, err := readTestAnalysis75("../../analysis/p6/p7-party-rush-pending-20261016/000.SCRushFightStart.pb")
 	legacy := &pb.SCRushFightStart{}
 	if err != nil || proto.Unmarshal(legacyRaw, legacy) != nil {
 		t.Fatal(err)
@@ -152,7 +152,9 @@ func TestP7NewbieRushClosedProofAndExactEndControl(t *testing.T) {
 		if input.DiagnosticManualAutoStartRoundTime == nil || *input.DiagnosticManualAutoStartRoundTime != records[index].SkillOpts[0].GetRoundTime() {
 			t.Fatal("exact original End boundary changed")
 		}
-		out, err := s.computeP7NewbieRushDiagnostic(t.Context(), series, records[index].SkillOpts[0].GetRoundTime())
+		// The current mechanism engine recomputes the frozen historical input;
+		// the unanchored Newbie-specific production proof remains closed.
+		out, _, err := s.ComputeP6GenericMechanismBattle(t.Context(), input, nil)
 		if err != nil || out.Outcome.Authoritative || !proto.Equal(out.OriginalOperates, records[index]) {
 			t.Fatal("bounded local independent recomputation", err)
 		}

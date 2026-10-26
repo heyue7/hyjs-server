@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
-	"os"
 	"path/filepath"
 	"testing"
 
@@ -43,7 +42,7 @@ func TestP6NativeOriginalDamageFactorAndRoundExhaustionTickGolden(t *testing.T) 
 
 func p6NativeAutomaticPVPOriginalTickGolden(t *testing.T, file, expectedSHA string, count int) {
 	t.Helper()
-	raw, err := os.ReadFile("../../analysis/p6/" + file)
+	raw, err := readTestAnalysis75("../../analysis/p6/" + file)
 	if err != nil || p6Digest(raw) != expectedSHA {
 		t.Fatal("original derived numerical fixture hash", err)
 	}
@@ -67,7 +66,7 @@ func p6NativeAutomaticPVPOriginalTickGolden(t *testing.T, file, expectedSHA stri
 	if err = json.Unmarshal(raw, &golden); err != nil || len(golden.Cases) != count {
 		t.Fatal("original priority case denominator", err)
 	}
-	manifest, err := os.ReadFile(filepath.Join("../..", golden.Manifest))
+	manifest, err := readTestAnalysis75(filepath.Join("../..", golden.Manifest))
 	if err != nil || p6Digest(manifest) != golden.ManifestSHA {
 		t.Fatal("original phone manifest hash changed", err)
 	}
@@ -75,7 +74,7 @@ func p6NativeAutomaticPVPOriginalTickGolden(t *testing.T, file, expectedSHA stri
 	wireRoot := p6NativeOriginalWireMirrorRoot(filepath.Dir(golden.WireSource))
 	for _, tc := range golden.Cases {
 		t.Run(tc.Name, func(t *testing.T) {
-			wire, err := os.ReadFile(filepath.Join(wireRoot, tc.Wire))
+			wire, err := readTestAnalysis75(filepath.Join(wireRoot, tc.Wire))
 			if err != nil || p6Digest(wire) != tc.WireSHA {
 				t.Fatal("actual original paid-growth wire hash", err)
 			}

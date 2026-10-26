@@ -20,6 +20,7 @@ func TestP7PartyRushSixNineStarsActualPerksSixFloorsRewardShopColdReset(t *testi
 	for _, star := range []int32{2, 3} {
 		t.Run(fmt.Sprintf("star%d", star), func(t *testing.T) {
 			f := p7PartyBusinessFixture(t)
+			p7StarActivityOperations75(t, f)
 			p7SectionPublish(t)
 			p7PublishRushAddition(t)
 			p7PublishContinuation(t)
@@ -130,6 +131,7 @@ func TestP7PartyRushSixNineStarsActualPerksSixFloorsRewardShopColdReset(t *testi
 					t.Fatal(err)
 				}
 			}
+			p7PointShopOperations75(t, f)
 			var activity db.PeriodInstance
 			if err := db.GetIns().Where("kind=? AND enabled=?", constUtil.P7RushStarEvent, true).First(&activity).Error; err != nil {
 				t.Fatal(err)

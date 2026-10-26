@@ -2,7 +2,6 @@ package service
 
 import (
 	"encoding/json"
-	"os"
 	"testing"
 
 	"google.golang.org/protobuf/proto"
@@ -102,7 +101,7 @@ func TestP6OriginalPVERecordReplaysRecordedPlayerAndAutomaticEnemy(t *testing.T)
 }
 
 func TestP6OriginalUF14ProducesNoRecordedSkillsDespiteActualPresses(t *testing.T) {
-	raw, err := os.ReadFile("../../analysis/p6/native-local-uf14-guard-input-v83/000.pb")
+	raw, err := readTestAnalysis75("../../analysis/p6/native-local-uf14-guard-input-v83/000.pb")
 	if err != nil || p6Digest(raw) != "3d69ec109c3d37c6817c871c8e83d14b5924ad96eb843163838b56fd75b5aea8" {
 		t.Fatal(err)
 	}
@@ -130,7 +129,7 @@ func TestP6ActualPaidChapter3AcceptedOriginalRecordReplay(t *testing.T) {
 	for _, task := range []string{"10", "12"} {
 		t.Run(task, func(t *testing.T) {
 			prefix := "../../analysis/p15/actual-copy-starts-20261015/mission3-task" + task
-			raw, err := os.ReadFile(prefix + ".SCCopyFightStart.pb")
+			raw, err := readTestAnalysis75(prefix + ".SCCopyFightStart.pb")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -138,7 +137,7 @@ func TestP6ActualPaidChapter3AcceptedOriginalRecordReplay(t *testing.T) {
 			if err = proto.Unmarshal(raw, start); err != nil {
 				t.Fatal(err)
 			}
-			raw, err = os.ReadFile(prefix + ".OriginalOperates.pb")
+			raw, err = readTestAnalysis75(prefix + ".OriginalOperates.pb")
 			if err != nil || p6Digest(raw) != "876a8702571500c345fee44104993887c244ab979a776bc69e7c6245eb4cfa12" {
 				t.Fatal("actual sameTX observed original record SHA", err)
 			}

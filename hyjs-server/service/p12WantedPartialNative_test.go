@@ -55,7 +55,7 @@ func p12WantedPartialNativePath(t *testing.T, relative string) string {
 
 func p12WantedPartialNativeRead(t *testing.T, name, expected string) []byte {
 	t.Helper()
-	raw, err := os.ReadFile(p12WantedPartialNativePath(t, name))
+	raw, err := readTestAnalysis75(p12WantedPartialNativePath(t, name))
 	if err != nil || len(expected) != 64 || p6Digest(raw) != expected {
 		t.Fatal("P12 Wanted diagnostic immutable source SHA", name, err)
 	}
@@ -77,7 +77,7 @@ func p12WantedPartialNativeCases(t *testing.T) []p12WantedPartialNativeCase {
 		t.Fatal("independent full four-case typed8 source identity")
 	}
 	for name, expected := range source.Tables {
-		data, err := os.ReadFile(filepath.Join("../../analysis/tables", "Table"+name+".tsv"))
+		data, err := readTestAnalysis75(filepath.Join("../../analysis/tables", "Table"+name+".tsv"))
 		if err != nil || len(expected) != 64 || p6Digest(data) != expected {
 			t.Fatal("Wanted original table SHA", name, err)
 		}
@@ -132,7 +132,7 @@ func p12WantedPartialNativeLoadBundle(t *testing.T) *p12WantedPartialNativeBundl
 	if name == "" {
 		return nil
 	}
-	raw, err := os.ReadFile(name)
+	raw, err := readTestAnalysis75(name)
 	expected := os.Getenv("HYJS_P12_WANTED_PARTIAL_NATIVE_BUNDLE_SHA256")
 	if err != nil || len(expected) != 64 || p6Digest(raw) != expected {
 		t.Fatal("explicit P12 Wanted native bundle SHA", err)
@@ -181,7 +181,7 @@ func p12WantedPartialNativeLoadBundle(t *testing.T) *p12WantedPartialNativeBundl
 // The count hook admits this exact independent bundle; earlier P7/other fixture
 // denominators remain unchanged. Missing or malformed opt-in evidence cannot pass.
 func p12WantedPartialNativeHitCaseCount(name string) int {
-	raw, err := os.ReadFile(os.Getenv("HYJS_P12_WANTED_PARTIAL_NATIVE_BUNDLE"))
+	raw, err := readTestAnalysis75(os.Getenv("HYJS_P12_WANTED_PARTIAL_NATIVE_BUNDLE"))
 	if err != nil || p6Digest(raw) != os.Getenv("HYJS_P12_WANTED_PARTIAL_NATIVE_BUNDLE_SHA256") {
 		return 0
 	}
@@ -199,7 +199,7 @@ func p12WantedPartialNativeHitCaseCount(name string) int {
 		if filepath.IsAbs(binding.Path) || (!strings.HasPrefix(clean, "analysis/p6/") && clean != "analysis/p12/wanted-playable-20261016/partial-native-inputs/manifest.json") {
 			return 0
 		}
-		data, err := os.ReadFile(filepath.Join("../..", binding.Path))
+		data, err := readTestAnalysis75(filepath.Join("../..", binding.Path))
 		if err != nil || len(binding.SHA) != 64 || p6Digest(data) != binding.SHA {
 			return 0
 		}

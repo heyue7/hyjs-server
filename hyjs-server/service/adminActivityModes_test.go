@@ -117,6 +117,10 @@ func TestAdminTypedActivityOriginalCommerceVIPAndCold(t *testing.T) {
 // TestAdminTypedLoginOriginalConsumerAndTemplateWhitelist checks original login messages and no fabricated initial reward.
 func TestAdminTypedLoginOriginalConsumerAndTemplateWhitelist(t *testing.T) {
 	f, operator := adminModesFixture(t)
+	// The typed-source test starts with no competing enabled login publication.
+	if err := db.GetIns().Model(&db.P4WelfareRule{}).Where("kind=?", constUtil.P4WelfareLogin).Update("enabled", false).Error; err != nil {
+		t.Fatal(err)
+	}
 	form := adminModeForm("login-rewards")
 	form.Milestones = []model.AdminActivityMilestone{{Goal: 1, Rewards: []model.AdminResourceAmount{{ResourceID: "coin", Amount: 13}}}}
 	wrong := form

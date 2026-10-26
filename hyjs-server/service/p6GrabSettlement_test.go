@@ -7,13 +7,12 @@ import (
 	"hyjs-server/constUtil"
 	"hyjs-server/model"
 	pb "hyjs-server/model/protocol"
-	"os"
 	"testing"
 )
 
 func TestP6GrabPendingIndependentSourceAndNoAuthority(t *testing.T) {
 	s := p6OriginalTables(t)
-	raw, err := os.ReadFile("../../analysis/p6/original-limit20-strong-inputs-v180/000.frozen-input-no-tables.json")
+	raw, err := readTestAnalysis75("../../analysis/p6/original-limit20-strong-inputs-v180/000.frozen-input-no-tables.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -70,7 +69,7 @@ func TestP6GrabPendingIndependentSourceAndNoAuthority(t *testing.T) {
 func TestP6GrabCertifiedStructureAndTerminal(t *testing.T) {
 	s := p6OriginalTables(t)
 	for _, index := range []int{1, 3} {
-		raw, err := os.ReadFile(fmt.Sprintf("../../analysis/p6/original-grab19-candidate-inputs-v183/%03d.SCGrab.pb", index))
+		raw, err := readTestAnalysis75(fmt.Sprintf("../../analysis/p6/original-grab19-candidate-inputs-v183/%03d.SCGrab.pb", index))
 		if err != nil {
 			t.Fatal(err)
 		}

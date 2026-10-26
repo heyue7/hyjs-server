@@ -2,7 +2,6 @@ package service
 
 import (
 	"encoding/json"
-	"os"
 	"reflect"
 	"strings"
 	"testing"
@@ -14,7 +13,7 @@ import (
 )
 
 func TestP6OriginalAIDriverUsesBattleTypeAndPreservesDiagnosticSource(t *testing.T) {
-	raw, err := os.ReadFile("../../analysis/p6/ai-driver-selection-v93-original.il.txt")
+	raw, err := readTestAnalysis75("../../analysis/p6/ai-driver-selection-v93-original.il.txt")
 	if err != nil || p6Digest(raw) != "e5b72c71143248e1280c5539792a930a223e07574959ea9d152cba461885346d" {
 		t.Fatal("original mode driver source", err)
 	}

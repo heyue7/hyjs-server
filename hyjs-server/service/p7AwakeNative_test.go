@@ -53,7 +53,7 @@ func p7AwakeNativePath(t *testing.T, relative string) string {
 
 func p7AwakeNativeRead(t *testing.T, name, expected string) []byte {
 	t.Helper()
-	raw, err := os.ReadFile(p7AwakeNativePath(t, name))
+	raw, err := readTestAnalysis75(p7AwakeNativePath(t, name))
 	if err != nil || len(expected) != 64 || p6Digest(raw) != expected {
 		t.Fatal("P7 Awake diagnostic immutable source SHA", name, err)
 	}
@@ -73,7 +73,7 @@ func p7AwakeNativeCases(t *testing.T) []p7AwakeNativeCase {
 		t.Fatal("independent typed16 source identity")
 	}
 	for path, expected := range source.Pins {
-		data, err := os.ReadFile(filepath.Join("../..", path))
+		data, err := readTestAnalysis75(filepath.Join("../..", path))
 		if err != nil || len(expected) != 64 || p6Digest(data) != expected {
 			t.Fatal("Awake original DLL/actual actor/NPC source SHA", path, err)
 		}
@@ -100,12 +100,12 @@ func p7AwakeNativeTypedInput(t *testing.T, row p7AwakeNativeCase) *pb.SCFightPla
 		}
 	}
 	actorSource := &pb.SCRushFightStart{}
-	raw, err := os.ReadFile("../../analysis/p7/normal-party-phone-20261016/wire/start-CSRushFightStart-1792135594857-SCRushFightStart.pb")
+	raw, err := readTestAnalysis75("../../analysis/p7/normal-party-phone-20261016/wire/start-CSRushFightStart-1792135594857-SCRushFightStart.pb")
 	if err != nil || proto.Unmarshal(raw, actorSource) != nil || !proto.Equal(actorSource.BattlePlayer, wire.Attacker) {
 		t.Fatal("actual normal account4 actor differs")
 	}
 	npcSource := &pb.SCFightPlayback{}
-	raw, err = os.ReadFile("../../analysis/p6/native-actual-paid-copy-auto-input-v87/000.pb")
+	raw, err = readTestAnalysis75("../../analysis/p6/native-actual-paid-copy-auto-input-v87/000.pb")
 	if err != nil || proto.Unmarshal(raw, npcSource) != nil || !proto.Equal(npcSource.Defender2, wire.Defender2) {
 		t.Fatal("actual original NPC source differs")
 	}
@@ -118,7 +118,7 @@ func p7AwakeNativeLoadBundle(t *testing.T) *p7AwakeNativeBundle {
 	if name == "" {
 		return nil
 	}
-	raw, err := os.ReadFile(name)
+	raw, err := readTestAnalysis75(name)
 	expected := os.Getenv("HYJS_P7_AWAKE_NATIVE_BUNDLE_SHA256")
 	if err != nil || len(expected) != 64 || p6Digest(raw) != expected {
 		t.Fatal("explicit P7 Awake native bundle SHA", err)
@@ -167,7 +167,7 @@ func p7AwakeNativeLoadBundle(t *testing.T) *p7AwakeNativeBundle {
 // The count hook admits this exact independent bundle; earlier P7/other fixture
 // denominators remain unchanged. Missing or malformed opt-in evidence cannot pass.
 func p7AwakeNativeHitCaseCount(name string) int {
-	raw, err := os.ReadFile(os.Getenv("HYJS_P7_AWAKE_NATIVE_BUNDLE"))
+	raw, err := readTestAnalysis75(os.Getenv("HYJS_P7_AWAKE_NATIVE_BUNDLE"))
 	if err != nil || p6Digest(raw) != os.Getenv("HYJS_P7_AWAKE_NATIVE_BUNDLE_SHA256") {
 		return 0
 	}
@@ -185,7 +185,7 @@ func p7AwakeNativeHitCaseCount(name string) int {
 		if filepath.IsAbs(binding.Path) || (!strings.HasPrefix(clean, "analysis/p6/") && clean != "analysis/p7/awake-playable-20261016/native-inputs/manifest.json") {
 			return 0
 		}
-		data, err := os.ReadFile(filepath.Join("../..", binding.Path))
+		data, err := readTestAnalysis75(filepath.Join("../..", binding.Path))
 		if err != nil || len(binding.SHA) != 64 || p6Digest(data) != binding.SHA {
 			return 0
 		}

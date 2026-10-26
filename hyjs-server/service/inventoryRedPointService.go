@@ -54,11 +54,11 @@ func (s *GameService) inventoryMailRedPoints(ctx context.Context, tx *gorm.DB, i
 	}
 	values[constUtil.RedPointBackpack] = values[constUtil.RedPointWarriorFrag] || values[constUtil.RedPointEquipmentFrag] || values[constUtil.RedPointPetFrag]
 	if s.redPointHasTable(tx, &db.RewardDelivery{}) {
-		var count int64
-		if err = tx.Model(&db.RewardDelivery{}).Where("player_id=? AND claimed_at=0 AND (expires_at=0 OR expires_at>?)", id, LocalPlayNow(ctx).UnixMilli()).Limit(1).Count(&count).Error; err != nil {
-			return nil, err
+		pending, pendingErr := eligiblePendingRewards75(tx, id, LocalPlayNow(ctx).UnixMilli(), 1, true)
+		if pendingErr != nil {
+			return nil, pendingErr
 		}
-		values[constUtil.RedPointRewardCenter] = count > 0
+		values[constUtil.RedPointRewardCenter] = len(pending) > 0
 	}
 	if s.redPointHasTable(tx, &db.MailMessage{}) {
 		var count int64

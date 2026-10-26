@@ -53,7 +53,7 @@ func p12FieldPVPNativePath(t *testing.T, relative string) string {
 
 func p12FieldPVPNativeRead(t *testing.T, name, expected string) []byte {
 	t.Helper()
-	raw, err := os.ReadFile(p12FieldPVPNativePath(t, name))
+	raw, err := readTestAnalysis75(p12FieldPVPNativePath(t, name))
 	if err != nil || len(expected) != 64 || p6Digest(raw) != expected {
 		t.Fatal("P12 Field PK diagnostic immutable source SHA", name, err)
 	}
@@ -73,7 +73,7 @@ func p12FieldPVPNativeCases(t *testing.T) []p12FieldPVPNativeCase {
 		t.Fatal("independent typed5 source identity")
 	}
 	for path, expected := range source.Pins {
-		data, err := os.ReadFile(filepath.Join("../..", path))
+		data, err := readTestAnalysis75(filepath.Join("../..", path))
 		if err != nil || len(expected) != 64 || p6Digest(data) != expected {
 			t.Fatal("Field PK original DLL/actual actor/NPC source SHA", path, err)
 		}
@@ -111,7 +111,7 @@ func p12FieldPVPNativeLoadBundle(t *testing.T) *p12FieldPVPNativeBundle {
 	if name == "" {
 		return nil
 	}
-	raw, err := os.ReadFile(name)
+	raw, err := readTestAnalysis75(name)
 	expected := os.Getenv("HYJS_P12_FIELD_PVP_NATIVE_BUNDLE_SHA256")
 	if err != nil || len(expected) != 64 || p6Digest(raw) != expected {
 		t.Fatal("explicit P12 Field PK native bundle SHA", err)
@@ -160,7 +160,7 @@ func p12FieldPVPNativeLoadBundle(t *testing.T) *p12FieldPVPNativeBundle {
 // The count hook admits this exact independent bundle; earlier P7/other fixture
 // denominators remain unchanged. Missing or malformed opt-in evidence cannot pass.
 func p12FieldPVPNativeHitCaseCount(name string) int {
-	raw, err := os.ReadFile(os.Getenv("HYJS_P12_FIELD_PVP_NATIVE_BUNDLE"))
+	raw, err := readTestAnalysis75(os.Getenv("HYJS_P12_FIELD_PVP_NATIVE_BUNDLE"))
 	if err != nil || p6Digest(raw) != os.Getenv("HYJS_P12_FIELD_PVP_NATIVE_BUNDLE_SHA256") {
 		return 0
 	}
@@ -178,7 +178,7 @@ func p12FieldPVPNativeHitCaseCount(name string) int {
 		if filepath.IsAbs(binding.Path) || (!strings.HasPrefix(clean, "analysis/p6/") && clean != "analysis/p6/field-pvp5-actual-actors-pending-20261016/manifest.json") {
 			return 0
 		}
-		data, err := os.ReadFile(filepath.Join("../..", binding.Path))
+		data, err := readTestAnalysis75(filepath.Join("../..", binding.Path))
 		if err != nil || len(binding.SHA) != 64 || p6Digest(data) != binding.SHA {
 			return 0
 		}

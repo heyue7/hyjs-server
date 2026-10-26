@@ -109,6 +109,10 @@ func TestP13UFGuardBuildingBaseRequiresAuthenticatedEnemyGate(t *testing.T) {
 		t.Fatal(err)
 	}
 	scope := p6Digest([]byte(t.Name()))
+	// Explicit legacy match is needed by authenticated base admission.
+	if err := db.GetIns().Create(&db.P13UnionFightMatch{ID: scope, StartAt: time.Now().Add(-time.Hour).UnixMilli(), EndAt: time.Now().Add(time.Hour).UnixMilli(), LeftPreview: []byte{}, RightPreview: []byte{}, Roster: []byte{}}).Error; err != nil {
+		t.Fatal(err)
+	}
 	actor := &db.P13UnionFightFieldPlayer{MatchID: scope, PlayerID: 9, Camp: 0}
 	guard := &pb.InstUFGuard{Guid: proto.Int64(111), BindGuid: proto.Int64(222), Camp: proto.Int32(1)}
 	raw, _ := proto.Marshal(&pb.SCUFBuildingRefresh{BaseCampInfos: []*pb.InstUFBaseCamp{{Guid: proto.Int64(222), Guard: guard}}})
@@ -168,13 +172,16 @@ func TestP13UFGuardBuildingFactoryStopsAndColdResumesWithoutCatchup(t *testing.T
 	}
 	var frame *pb.InstUFCariotFactory
 	for _, candidate := range buildings.FactoryInfos {
-		if candidate.GetIsOpen() == 1 {
+		if candidate.GetGuard().GetFightInfo() != nil {
+			// Explicit already-open field-factory lifecycle prerequisite.
+			candidate.IsOpen = proto.Int32(1)
+			candidate.State = proto.Int32(0)
 			frame = candidate
 			break
 		}
 	}
 	if frame == nil {
-		t.Fatal("original open factory missing")
+		t.Fatal("original guarded field factory missing")
 	}
 	var factory db.P13UnionFightFactoryState
 	if err := db.GetIns().First(&factory, "match_id=? AND guid=?", match.ID, frame.GetGuid()).Error; err != nil {

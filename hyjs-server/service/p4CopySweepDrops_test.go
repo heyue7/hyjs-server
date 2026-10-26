@@ -82,10 +82,10 @@ func TestP4CopyBenefitsSweepActualDropsDoubleUniqueOnceAndCold(t *testing.T) {
 						t.Fatal("bonus GUID absent from original result")
 					}
 				}
-				if counts["coin"] != 4380 || counts["exp"] != 280 || counts["item_124"]%2 != 0 || counts["item_124"] > 2 || after.GetCoin()-before.GetCoin() != 4380 || after.GetLevel() != 15 {
+				if counts["coin"] != 4380 || counts["exp"] != 310 || counts["item_124"]%2 != 0 || counts["item_124"] > 2 || after.GetCoin()-before.GetCoin() != 4380 || after.GetLevel() != 15 {
 					t.Fatal("loot bonus multiplied already doubled currency or changed original draw", counts)
 				}
-			} else if len(gain.GetWars()) < 1 || len(gain.GetWars()) > 3 || counts["item_124"] > 1 || counts["coin"] != 2190 || counts["exp"] != 140 || p1Count(t, &db.P4CopyBenefitGrant{}, "player_id=?", f.id) != 0 {
+			} else if len(gain.GetWars()) < 1 || len(gain.GetWars()) > 3 || counts["item_124"] > 1 || counts["coin"] != 2190 || counts["exp"] != 155 || p1Count(t, &db.P4CopyBenefitGrant{}, "player_id=?", f.id) != 0 {
 				t.Fatal("closed welfare changed base random drops", gain)
 			}
 			f.restart(t)

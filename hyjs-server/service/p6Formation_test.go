@@ -2,7 +2,6 @@ package service
 
 import (
 	"encoding/json"
-	"os"
 	"strings"
 	"testing"
 
@@ -28,7 +27,7 @@ func TestP6OriginalFormationMainPositionAndPlaybackRunOrder(t *testing.T) {
 		{"formation-position-v94-original.il.txt", "c4a57834f5ca5706e03cb22f31e05d5064cd0e171574176d4b4d5efd551ba808", []string{"METHOD Battle.Engine.FPosition::SetFPID", "0009 stfld Battle.Engine.FPosition::row", "001b stfld Battle.Engine.FPosition::col"}},
 		{"formation-record-v94-original.il.txt", "7f3f9817e3e97e84c020f8fa332657aff5cecfb8ce50512ba822d2cd3e412c44", []string{"0027 ldfld Battle.Engine.LogicModel.FActor::MainPosition", "0033 callvirt Battle.Engine.FPosition::SetFPID", "00b5 callvirt Add", "003a callvirt Battle.Engine.ComputeCore::RoundBegin", "0050 callvirt Battle.Engine.AI.EngineAI::NextRound"}},
 	} {
-		raw, err := os.ReadFile("../../analysis/p6/" + item.file)
+		raw, err := readTestAnalysis75("../../analysis/p6/" + item.file)
 		if err != nil || p6Digest(raw) != item.sha {
 			t.Fatal("original formation rule evidence", err)
 		}

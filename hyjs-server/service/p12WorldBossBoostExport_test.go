@@ -20,7 +20,7 @@ import (
 func p12WorldBossBoostOriginalTable(t *testing.T, name string) ([]map[string]string, string) {
 	t.Helper()
 	path := "../../analysis/tables/Table" + name + ".tsv"
-	raw, err := os.ReadFile(path)
+	raw, err := readTestAnalysis75(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -164,7 +164,7 @@ func TestP12WorldBossExportBoostInputs(t *testing.T) {
 			cases = append(cases, map[string]any{"case": fightID, "fightId": fightID, "battleType": 18, "seed": seed, "nativeScope": "original-worldboss-automatic-ai", "wire": stem + ".pb", "wireSHA256": write(stem+".pb", encoded(wire)), "typedCallback": stem + ".SCWorldBossFight.pb", "typedCallbackSHA256": write(stem+".SCWorldBossFight.pb", encoded(typed)), "frozenInput": stem + ".frozen-input.json", "frozenInputSHA256": write(stem+".frozen-input.json", append(input, '\n')), "sourceActorSHA256": actorSHAs, "sourceBossMemberSHA256": baseRow.MemberSHAs, "fullBossMembers": 4, "bossLevel": 1, "boostMask": mask, "diagnosticBoostIDs": ids, "actualPaid": false, "actualBusinessStart": false, "status": "awaiting-original-automatic-ai"})
 		}
 	}
-	helper, err := os.ReadFile("p12WorldBossBattleService.go")
+	helper, err := readTestAnalysis75("p12WorldBossBattleService.go")
 	if err != nil {
 		t.Fatal(err)
 	}

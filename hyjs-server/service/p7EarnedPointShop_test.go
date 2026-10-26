@@ -19,6 +19,8 @@ func TestP7EarnedTrialStarsActivityPointShopMaterialColdOnce(t *testing.T) {
 	if err := f.s.InitializeP4(f.ctx); err != nil {
 		t.Fatal(err)
 	}
+	p7StarActivityOperations75(t, f)
+	p7PointShopOperations75(t, f)
 	initial, game := f.profile(t)
 	if initial.GetPoint() != 0 || simpleOwned(initial, game, "item_021") != 0 {
 		t.Fatal("source account must have no pre-funded point or essence")

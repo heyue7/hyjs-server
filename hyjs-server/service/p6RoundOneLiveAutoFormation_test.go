@@ -3,7 +3,6 @@ package service
 import (
 	"bytes"
 	"encoding/json"
-	"os"
 	"path/filepath"
 	"testing"
 
@@ -31,7 +30,7 @@ func TestP6RoundOneLiveAutoFormationOriginalNative(t *testing.T) {
 		{"awake16", "32ff5ed964ce84cb5a6c06406f3c7b51511ee4753f150c1cbbfd792203d77503"},
 	} {
 		t.Run(item.name, func(t *testing.T) {
-			raw, err := os.ReadFile(filepath.Join(root, item.name+"-frozen-input.json"))
+			raw, err := readTestAnalysis75(filepath.Join(root, item.name+"-frozen-input.json"))
 			if err != nil || p6Digest(raw) != item.inputSHA {
 				t.Fatal("original unchanged input", err)
 			}
@@ -45,11 +44,11 @@ func TestP6RoundOneLiveAutoFormationOriginalNative(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			expectedBytes, err := os.ReadFile(filepath.Join(root, item.name+"-original-operates.pb"))
+			expectedBytes, err := readTestAnalysis75(filepath.Join(root, item.name+"-original-operates.pb"))
 			if err != nil || p6Digest(expectedBytes) != "fc6b8af25388775e2c5c22c417fac4c3013ae2cccf1ccfb1f79fc5a4f7f39bb4" {
 				t.Fatal("independent native completePB", err)
 			}
-			controlBytes, err := os.ReadFile(filepath.Join(root, item.name+"-formation.pb"))
+			controlBytes, err := readTestAnalysis75(filepath.Join(root, item.name+"-formation.pb"))
 			if err != nil || p6Digest(controlBytes) != "ca7602185a7558cd52810499d35af6234261e43fdd3883b4c35b7da3a65574c4" {
 				t.Fatal("separate original formation", err)
 			}
@@ -83,7 +82,7 @@ func TestP6RoundOneLiveAutoFormationOriginalNative(t *testing.T) {
 					} `json:"defender"`
 				} `json:"state"`
 			}
-			native, err := os.ReadFile(filepath.Join(root, item.name+"-terminal.json"))
+			native, err := readTestAnalysis75(filepath.Join(root, item.name+"-terminal.json"))
 			if err != nil || json.Unmarshal(native, &terminal) != nil {
 				t.Fatal("native terminal", err)
 			}

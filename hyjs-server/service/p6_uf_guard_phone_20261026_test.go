@@ -2,7 +2,6 @@ package service
 
 import (
 	"encoding/json"
-	"os"
 	"path/filepath"
 	"testing"
 )
@@ -22,7 +21,7 @@ func p6UFGuardPhone20261026HitCaseCount(name string) int {
 	if name != p6UFGuardPhone20261026Root+"hits.json" {
 		return 0
 	}
-	raw, err := os.ReadFile(filepath.Join("../../analysis/p6", name))
+	raw, err := readTestAnalysis75(filepath.Join("../../analysis/p6", name))
 	if err != nil || p6Digest(raw) != p6UFGuardPhone20261026HitsSHA {
 		return 0
 	}
@@ -37,7 +36,7 @@ func p6UFGuardPhone20261026HitCaseCount(name string) int {
 
 func p6UFGuardPhone20261026Bind(t *testing.T) {
 	t.Helper()
-	raw, err := os.ReadFile(filepath.Join("../../analysis/p6", p6UFGuardPhone20261026Root+"bundle.json"))
+	raw, err := readTestAnalysis75(filepath.Join("../../analysis/p6", p6UFGuardPhone20261026Root+"bundle.json"))
 	if err != nil || p6Digest(raw) != p6UFGuardPhone20261026BundleSHA {
 		t.Fatal("exact guard10 phone bundle SHA", err)
 	}
@@ -61,7 +60,7 @@ func p6UFGuardPhone20261026Bind(t *testing.T) {
 		t.Fatal("exact guard10 phone source/denominator/origin boundary")
 	}
 	for _, binding := range [][2]string{{bundle.Source, bundle.SourceSHA}, {bundle.Capture, bundle.CaptureSHA}} {
-		raw, err := os.ReadFile(filepath.Join("../..", binding[0]))
+		raw, err := readTestAnalysis75(filepath.Join("../..", binding[0]))
 		if err != nil || p6Digest(raw) != binding[1] {
 			t.Fatal("guard10 input/capture manifest binding", binding[0], err)
 		}
@@ -71,7 +70,7 @@ func p6UFGuardPhone20261026Bind(t *testing.T) {
 		if item.Path != p6UFGuardPhone20261026Root+kind+".json" || item.SHA != wantSHA {
 			t.Fatal("guard10 fixture binding", kind)
 		}
-		raw, err := os.ReadFile(filepath.Join("../../analysis/p6", item.Path))
+		raw, err := readTestAnalysis75(filepath.Join("../../analysis/p6", item.Path))
 		if err != nil || p6Digest(raw) != wantSHA {
 			t.Fatal("guard10 fixture SHA", kind, err)
 		}

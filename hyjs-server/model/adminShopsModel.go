@@ -37,7 +37,7 @@ type AdminShopProduct struct {
 	Cost               AdminResourceAmount     `json:"cost"`                    // Actual purchase currency and amount.
 	DailyLimit         int64                   `json:"dailyLimit"`              // Daily purchase count.
 	AccountWeeklyLimit int64                   `json:"accountWeeklyLimit"`      // 同账号跨角色区服每周份数，0不限。
-	TotalLimit         int64                   `json:"totalLimit"`              // Period cap, zero unlimited.
+	TotalLimit         int64                   `json:"totalLimit"`              // Period cap; VIP uses lifetime per-role claims, 0 keeps its original daily rule.
 	Stock              int64                   `json:"stock"`                   // Shared stock, minus one unlimited.
 	MinLevel           int64                   `json:"minLevel"`                // Player level requirement.
 	MinVip             int64                   `json:"minVip"`                  // VIP requirement.

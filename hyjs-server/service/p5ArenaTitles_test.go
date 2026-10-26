@@ -25,6 +25,7 @@ func TestP5OriginalArenaWinnerTitlesWearAndCold(t *testing.T) {
 		t.Fatal(err)
 	}
 	now := time.Now()
+	arenaTitleLadderFixture75(t, f, challenger, now)
 	for _, table := range []any{&db.P11ArenaPolicy{}, &db.P11ArenaFightPolicy{}} {
 		if err := db.GetIns().Model(table).Where("id=1").Update("enabled", true).Error; err != nil {
 			t.Fatal(err)

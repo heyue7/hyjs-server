@@ -7,7 +7,6 @@ import (
 	"hyjs-server/model"
 	pb "hyjs-server/model/protocol"
 	"math"
-	"os"
 	"path/filepath"
 	"testing"
 )
@@ -25,7 +24,7 @@ func TestP6NativeOriginalImmediateBuffValueDeadGoldens(t *testing.T) {
 func p6OriginalValueBuffDeadFixture(t *testing.T, name, sha string) {
 	t.Helper()
 	root := filepath.Join("..", "..")
-	raw, err := os.ReadFile(filepath.Join(root, "analysis", "p6", name))
+	raw, err := readTestAnalysis75(filepath.Join(root, "analysis", "p6", name))
 	if err != nil || p6Digest(raw) != sha {
 		t.Fatal("standalone immediate Buff value death native SHA", err)
 	}
@@ -59,7 +58,7 @@ func p6OriginalValueBuffDeadFixture(t *testing.T, name, sha string) {
 		t.Fatal("standalone immediate Buff value death denominator", err)
 	}
 	for file, digest := range map[string]string{d.Source: d.SourceSHA, d.WireRoot: d.WireSHA} {
-		body, readErr := os.ReadFile(filepath.Join(root, file))
+		body, readErr := readTestAnalysis75(filepath.Join(root, file))
 		if readErr != nil || p6Digest(body) != digest {
 			t.Fatal("standalone immediate Buff value death provenance", file, readErr)
 		}
@@ -70,7 +69,7 @@ func p6OriginalValueBuffDeadFixture(t *testing.T, name, sha string) {
 	s := p6OriginalTables(t)
 	for _, c := range d.Cases {
 		t.Run(c.Name, func(t *testing.T) {
-			wire, readErr := os.ReadFile(filepath.Join(root, c.Wire))
+			wire, readErr := readTestAnalysis75(filepath.Join(root, c.Wire))
 			if readErr != nil || p6Digest(wire) != c.WireSHA {
 				t.Fatal("standalone immediate Buff value death PB", readErr)
 			}

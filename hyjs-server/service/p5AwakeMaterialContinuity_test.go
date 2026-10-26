@@ -57,8 +57,8 @@ func TestP5AwakeMaterialContinuityFrozenMonthStopAndPrivateDirectory(t *testing.
 		t.Fatal(err)
 	}
 	february := load(january.AddDate(0, 1, 0))
-	if !february.Enabled || string(february.Rules) != string(wanted) || len(february.Frozen) != 0 {
-		t.Fatal("next month lost frozen330 publication")
+	if february.Enabled || string(february.Rules) != string(wanted) || len(february.Frozen) != 0 {
+		t.Fatal("next month must retain frozen330 terms but stay closed")
 	}
 	if err = tx.Model(&february).Update("enabled", false).Error; err != nil {
 		t.Fatal(err)
@@ -70,8 +70,8 @@ func TestP5AwakeMaterialContinuityFrozenMonthStopAndPrivateDirectory(t *testing.
 	if err = tx.Model(&december).Update("enabled", true).Error; err != nil {
 		t.Fatal(err)
 	}
-	if next := load(january.AddDate(1, 0, 0)); !next.Enabled || next.ID != constUtil.P5AwakeMaterialSupplyPrefix+"203101" {
-		t.Fatal("year boundary lost explicit330 publication")
+	if next := load(january.AddDate(1, 0, 0)); next.Enabled || next.ID != constUtil.P5AwakeMaterialSupplyPrefix+"203101" {
+		t.Fatal("year boundary silently re-enabled330 publication")
 	}
 	// 当前真实个人目录在330发布后仍保持地址及快照，采用新源须显式刷新。
 	if _, err = f.s.LocalPlayActivitiesApply(f.ctx, id, "open", "TimeLimitExchange", "33000000-0000-4000-8000-000000000001"); err != nil {

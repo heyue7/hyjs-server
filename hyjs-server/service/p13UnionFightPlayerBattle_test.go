@@ -11,7 +11,6 @@ import (
 	"hyjs-server/model"
 	pb "hyjs-server/model/protocol"
 	"math"
-	"os"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -44,7 +43,7 @@ func TestP13UFPlayerBattle172WholePlayerDeathAndTimeout(t *testing.T) {
 	s := p6OriginalTables(t)
 	for _, index := range []int{0, 1, 2, 3} {
 		t.Run(fmt.Sprint(index), func(t *testing.T) {
-			raw, e := os.ReadFile(fmt.Sprintf("../../analysis/p6/original-uf14-player-factor1-inputs-v191/%03d.SCUFFightRecordReplay.pb", index))
+			raw, e := readTestAnalysis75(fmt.Sprintf("../../analysis/p6/original-uf14-player-factor1-inputs-v191/%03d.SCUFFightRecordReplay.pb", index))
 			if e != nil {
 				t.Fatal(e)
 			}
@@ -123,7 +122,7 @@ func TestP13UFPlayerBattle172WholePlayerDeathAndTimeout(t *testing.T) {
 }
 
 func TestP13UFPlayerBattle172FrozenFrameNoMissingHPOrAPProjection(t *testing.T) {
-	raw, e := os.ReadFile("../../analysis/p6/original-uf14-player-factor1-inputs-v191/001.SCUFFightRecordReplay.pb")
+	raw, e := readTestAnalysis75("../../analysis/p6/original-uf14-player-factor1-inputs-v191/001.SCUFFightRecordReplay.pb")
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -443,10 +442,22 @@ func TestP13UFPlayerBattle172ActualStartPendingDeathAndCold(t *testing.T) {
 // stranding a certified pending terminal or bypassing the death movement guard.
 func p13UFPlayerBattle172ResourceActionsDenied(t *testing.T, f *p1Fixture, id int64, now time.Time) {
 	t.Helper()
-	if _, err := f.s.p13UFResourceBegin(f.ctx, id, &pb.CSUFPlayerCollect{ResGuid: proto.Int64(1)}, now); err == nil || !strings.Contains(err.Error(), "原普通战斗") {
+	expected := "原普通战斗"
+	var actor db.P13UnionFightFieldPlayer
+	if err := db.GetIns().Where("player_id=? AND left_at=0", id).First(&actor).Error; err != nil {
+		t.Fatal(err)
+	}
+	frame, err := p13UFFieldReadActor(&actor)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if frame.GetState() == 3 {
+		expected = "死亡状态需要原复活流程"
+	}
+	if _, err := f.s.p13UFResourceBegin(f.ctx, id, &pb.CSUFPlayerCollect{ResGuid: proto.Int64(1)}, now); err == nil || !strings.Contains(err.Error(), expected) {
 		t.Fatal("collect bypassed real battle lifecycle", err)
 	}
-	if _, err := f.s.p13UFResourceDeposit(f.ctx, id, &pb.CSUFPlayerUpResource{NpcId: proto.String("1")}, 19501, now); err == nil || !strings.Contains(err.Error(), "原普通战斗") {
+	if _, err := f.s.p13UFResourceDeposit(f.ctx, id, &pb.CSUFPlayerUpResource{NpcId: proto.String("1")}, 19501, now); err == nil || !strings.Contains(err.Error(), expected) {
 		t.Fatal("deposit bypassed real battle lifecycle", err)
 	}
 }

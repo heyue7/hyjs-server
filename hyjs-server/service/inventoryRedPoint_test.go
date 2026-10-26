@@ -8,6 +8,7 @@ import (
 
 	"google.golang.org/protobuf/proto"
 	"hyjs-server/constUtil"
+	"hyjs-server/db"
 	"hyjs-server/model"
 	pb "hyjs-server/model/protocol"
 )
@@ -88,6 +89,9 @@ func TestInventoryRedPointMailPartialClaimExpiryAndCold(t *testing.T) {
 	first := f.reward(t, "red:first", "coin,1", 0)
 	second := f.reward(t, "red:second", "coin,1", 0)
 	f.reward(t, "red:expired", "coin,1", time.Now().Add(-time.Minute).UnixMilli())
+	if _, err := f.s.EnqueueMail(db.GetIns(), f.id, "red:explicit-business-mail", constUtil.P1MailboxSystem, "业务通知", "附件在领奖中心领取", "", constUtil.P1MailSystemType, 0); err != nil {
+		t.Fatal(err)
+	}
 	values := inventoryPoints(t, f)
 	if values[constUtil.RedPointRewardCenter] != 1 || values[constUtil.RedPointMessage] != 1 {
 		t.Fatal("new mail outside panels", values)

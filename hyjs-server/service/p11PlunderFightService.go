@@ -401,7 +401,7 @@ func (s *GameService) p11PlunderFightTx(ctx context.Context, tx *gorm.DB, id int
 			return errors.New(constUtil.P11PlunderFightRefresh)
 		}
 		var match db.P11PlunderFightMatch
-		matchQuery := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("player_id=? AND opponent_id=? AND fragment_id=? AND expires_at>?", id, peer.Id, request.GetTargetFlagId(), now.UnixMilli())
+		matchQuery := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("player_id=? AND opponent_id=? AND fragment_id=? AND created_at<=? AND expires_at>?", id, peer.Id, request.GetTargetFlagId(), now.UnixMilli(), now.UnixMilli())
 		if matchID != "" {
 			matchQuery = matchQuery.Where("id=?", matchID)
 		}

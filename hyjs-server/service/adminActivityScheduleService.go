@@ -919,6 +919,9 @@ func (s *GameService) AdminSaveActivitySchedule(ctx context.Context, p *model.Ad
 					}
 				}
 			}
+			if item.Enabled && row.FirstPublishedAt == 0 && (!exists || !existing[item.ID].Enabled) {
+				row.FirstPublishedAt = time.Now().UnixMilli()
+			}
 			if err := tx.Save(&row).Error; err != nil {
 				return err
 			}

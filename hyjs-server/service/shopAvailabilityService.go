@@ -92,7 +92,11 @@ func (s *GameService) AdminOrdinaryShopSource(tx *gorm.DB, key string) (db.P4Com
 	if !AdminShopValid(key) || key == "vip" || key == "pet-market" || key == "union-fight" {
 		return source, constUtil.ErrAdminInput
 	}
-	if err := tx.Clauses(clause.Locking{Strength: "SHARE"}).Where("kind=? AND id NOT LIKE ?", key, "shop_schedule_%").Order("start_at DESC,id DESC").First(&source).Error; err != nil {
+	query := tx.Clauses(clause.Locking{Strength: "SHARE"}).Where("kind=? AND id NOT LIKE ?", key, "shop_schedule_%")
+	if key == "memory" {
+		query = query.Order("enabled DESC")
+	}
+	if err := query.Order("start_at DESC,id DESC").First(&source).Error; err != nil {
 		return source, err
 	}
 	frozen, _, err := s.p4CommerceSnapshot(source)

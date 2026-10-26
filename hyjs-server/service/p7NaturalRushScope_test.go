@@ -4,7 +4,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"math"
-	"os"
 	"path/filepath"
 	"testing"
 
@@ -16,7 +15,7 @@ import (
 
 func p7NaturalRushTestSource(t *testing.T) (*GameService, []*pb.SCRushFightStart, []*pb.BattleOperate) {
 	t.Helper()
-	raw, err := os.ReadFile("../../analysis/p6/p7-numeric047025-local-inputs-r1-20261017/manifest.json")
+	raw, err := readTestAnalysis75("../../analysis/p6/p7-numeric047025-local-inputs-r1-20261017/manifest.json")
 	if err != nil || p6Digest(raw) != "7e74d64e647ee3bc0de9f48afd10cea8bae14ea14461652342d06b88ab8eceac" {
 		t.Fatal("fixed local input", err)
 	}
@@ -26,7 +25,7 @@ func p7NaturalRushTestSource(t *testing.T) (*GameService, []*pb.SCRushFightStart
 	if json.Unmarshal(raw, &manifest) != nil || len(manifest.Cases) != 4 {
 		t.Fatal("four bounded source cases")
 	}
-	raw, err = os.ReadFile("../../analysis/p6/p7-numeric047025-android-fixtures-r1-20261017/records.json")
+	raw, err = readTestAnalysis75("../../analysis/p6/p7-numeric047025-android-fixtures-r1-20261017/records.json")
 	if err != nil || p6Digest(raw) != "be6883a4d93de76ad167402ea02251d66bf1000bc714280deaa7404d05bf5bf6" {
 		t.Fatal("fixed actual Android original Engine records", err)
 	}
@@ -44,7 +43,7 @@ func p7NaturalRushTestSource(t *testing.T) (*GameService, []*pb.SCRushFightStart
 	var starts []*pb.SCRushFightStart
 	var operations []*pb.BattleOperate
 	for _, row := range manifest.Cases {
-		raw, err = os.ReadFile(filepath.Join("../../analysis/p6/p7-numeric047025-local-inputs-r1-20261017", row.Typed))
+		raw, err = readTestAnalysis75(filepath.Join("../../analysis/p6/p7-numeric047025-local-inputs-r1-20261017", row.Typed))
 		if err != nil || p6Digest(raw) != row.TypedSHA {
 			t.Fatal("typed source SHA", err)
 		}
@@ -143,7 +142,7 @@ func TestP7NaturalRushMechanismAndNumericBoundary(t *testing.T) {
 }
 
 func TestP7NaturalRushExactAndroidEndAndIndependentProof(t *testing.T) {
-	raw, err := os.ReadFile("../../analysis/p6/natural047025-numeric-android-capability-certificate-20261017.json")
+	raw, err := readTestAnalysis75("../../analysis/p6/natural047025-numeric-android-capability-certificate-20261017.json")
 	if err != nil || p6Digest(raw) != constUtil.P7NaturalRushNativeProof || constUtil.P7NaturalRushNativeProof == constUtil.P7RushPartyManualNativeProof || constUtil.P7NaturalRushNativeProof == constUtil.P6LinearPhysicalNativeProof {
 		t.Fatal("independent actual Android proof missing or borrowed", err)
 	}
@@ -166,7 +165,7 @@ func TestP7NaturalRushExactAndroidEndAndIndependentProof(t *testing.T) {
 		if err != nil || proof != constUtil.P7NaturalRushNativeProof || !p7NaturalRushSourceAvailable(series) {
 			t.Fatal("actual source unavailable after independent activation", err)
 		}
-		family, err := p7ManualRushFamilyForSeries(series)
+		family, err := p7ManualRushLegacyFamilyForSeries(series)
 		if err != nil || !family.Natural || family.ScopeProof != proof || family.DriverSource != constUtil.P7NaturalRushDriverSource {
 			t.Fatal("family fell through to another certificate", err)
 		}

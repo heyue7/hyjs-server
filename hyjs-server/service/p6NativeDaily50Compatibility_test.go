@@ -6,7 +6,6 @@ import (
 	"hyjs-server/constUtil"
 	"hyjs-server/model"
 	pb "hyjs-server/model/protocol"
-	"os"
 	"strings"
 	"testing"
 )
@@ -43,7 +42,7 @@ func TestP6NativeDaily50NamedCompatibilityLegacyExports(t *testing.T) {
 // under unbound or strict native evidence, or mutate the cached frozen source.
 func TestP6NativeDaily50NamedCompatibilityScopeDoesNotAuthorizeStrict(t *testing.T) {
 	s := p6OriginalTables(t)
-	raw, err := os.ReadFile("../../analysis/p6/daily50-local-pve-no-target-finish-v1-input-20261014/001.pb")
+	raw, err := readTestAnalysis75("../../analysis/p6/daily50-local-pve-no-target-finish-v1-input-20261014/001.pb")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -130,8 +130,8 @@ func (s *GameService) RewardCenter(ctx context.Context, id int64, request proto.
 					return err
 				}
 			}
-			var rows []db.RewardDelivery
-			if err := tx.Where("player_id = ? AND claimed_at = 0 AND (expires_at = 0 OR expires_at > ?)", id, now).Order("id ASC").Limit(constUtil.P1RewardMaximumBatch).Find(&rows).Error; err != nil {
+			rows, err := eligiblePendingRewards75(tx, id, now, constUtil.P1RewardMaximumBatch, false)
+			if err != nil {
 				return err
 			}
 			if err := projectPeriodRewardNotices(tx, id, rows); err != nil {
@@ -168,9 +168,16 @@ func (s *GameService) RewardCenter(ctx context.Context, id int64, request proto.
 				}
 				rows = append(rows, row)
 			}
+			eligible, err := rechargeRewardEligibility75(tx, rows, now)
+			if err != nil {
+				return err
+			}
 			for _, row := range rows {
 				if row.ClaimedAt != 0 {
 					continue
+				}
+				if !eligible[row.ID] {
+					return errors.New("本期充值条件未达成")
 				}
 				current, err := s.GrantFixedReward(player, game, row.Rewards)
 				if err != nil {

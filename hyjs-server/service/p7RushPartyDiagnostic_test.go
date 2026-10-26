@@ -24,7 +24,7 @@ type p7PartyRushCase struct {
 
 func p7PartyRushSources(t *testing.T) (*GameService, []p7PartyRushCase) {
 	t.Helper()
-	raw, err := os.ReadFile("../../analysis/p6/p7-party-rush-pending-20261016/manifest.json")
+	raw, err := readTestAnalysis75("../../analysis/p6/p7-party-rush-pending-20261016/manifest.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -40,7 +40,7 @@ func p7PartyRushSources(t *testing.T) (*GameService, []p7PartyRushCase) {
 
 func p7PartyRushSeries(t *testing.T, s *GameService, source p7PartyRushCase) *model.FrozenP6RushSeries {
 	t.Helper()
-	raw, err := os.ReadFile(filepath.Join("../../analysis/p6/p7-party-rush-pending-20261016", source.Typed))
+	raw, err := readTestAnalysis75(filepath.Join("../../analysis/p6/p7-party-rush-pending-20261016", source.Typed))
 	if err != nil || p6Digest(raw) != source.TypedSHA {
 		t.Fatal("typed party source changed", err)
 	}
@@ -96,7 +96,7 @@ func TestP7PartyRushOriginalFinalRecordPending(t *testing.T) {
 	if file == "" {
 		t.Skip("PENDING: four original typed9 party cases have not been captured; diagnostic is never business authority")
 	}
-	raw, err := os.ReadFile(file)
+	raw, err := readTestAnalysis75(file)
 	if err != nil || p6Digest(raw) != os.Getenv("HYJS_P7_PARTY_NATIVE_RECORDS_SHA256") {
 		t.Fatal("original record fixture SHA", err)
 	}

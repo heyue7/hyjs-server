@@ -283,7 +283,7 @@ func (s *GameService) refreshOpenServerProgressAt(tx *gorm.DB, player *pb.Player
 		if state.Claims < 0 || state.Progress < 0 {
 			return errors.New("开服任务存档无效")
 		}
-		if state.Achieved {
+		if state.Claims > 0 || state.Achieved && t.TaskType != 2 && t.TaskType != 101 {
 			continue
 		}
 		current, e := s.openServerCurrent(player, g, cfg, t, values)
@@ -307,7 +307,7 @@ func (s *GameService) refreshOpenServerProgressAt(tx *gorm.DB, player *pb.Player
 		if t.TaskType == 8 {
 			achieved = current > 0 && current <= t.Target
 		}
-		if state.Progress != current || achieved {
+		if state.Progress != current || state.Achieved != achieved {
 			state.PlayerID = player.GetPlayerId()
 			state.TaskID = t.ID
 			state.Progress = current

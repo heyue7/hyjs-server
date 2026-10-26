@@ -135,7 +135,7 @@ func p6NativeFrozenInputCacheReport(path string) {
 
 func TestP6NativeFrozenInputCacheFreshIdentityAndIsolation(t *testing.T) {
 	t.Setenv("HYJS_P6_NATIVE_FREEZE_UNCACHED", "")
-	wire, err := os.ReadFile("../../analysis/p6/native-next-real-inputs-v64/000.pb")
+	wire, err := readTestAnalysis75("../../analysis/p6/native-next-real-inputs-v64/000.pb")
 	if err != nil {
 		t.Fatal(err)
 	}

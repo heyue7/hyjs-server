@@ -14,7 +14,7 @@ import (
 // 代表来自真实原机HTTP81011。实际命令只驱动我方，伤害/敌方AI/终末由现有原引擎移植重算。
 func TestP7Awake16ActualPhoneManualRecordStrictReplay(t *testing.T) {
 	root := "../../analysis/playable-plan-20261017"
-	frozen, err := os.ReadFile(filepath.Join(root, "awake-phone-r2/frozen-combat-input.json"))
+	frozen, err := readTestAnalysis75(filepath.Join(root, "awake-phone-r2/frozen-combat-input.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -26,7 +26,7 @@ func TestP7Awake16ActualPhoneManualRecordStrictReplay(t *testing.T) {
 	if err = json.Unmarshal(raw, &input); err != nil {
 		t.Fatal(err)
 	}
-	body, err := os.ReadFile(filepath.Join(root, "awake-original-end-capture-r1/original-End.pb"))
+	body, err := readTestAnalysis75(filepath.Join(root, "awake-original-end-capture-r1/original-End.pb"))
 	if err != nil || p6Digest(body) != "4696d6ac79fcaf3fd906e38ef77b1482a7a81dd1b143068ae17093ed62580b21" {
 		t.Fatal("original phone End pin", err)
 	}

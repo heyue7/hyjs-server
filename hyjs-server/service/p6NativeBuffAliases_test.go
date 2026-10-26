@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
-	"os"
 	"path/filepath"
 	"testing"
 
@@ -15,7 +14,7 @@ import (
 
 func TestP6NativeOriginalBuffInstanceAliasingAcrossLifecycle(t *testing.T) {
 	const file = "native-next-real-skills-buff-aliases-v100.json"
-	raw, err := os.ReadFile("../../analysis/p6/" + file)
+	raw, err := readTestAnalysis75("../../analysis/p6/" + file)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -46,7 +45,7 @@ func TestP6NativeOriginalBuffInstanceAliasingAcrossLifecycle(t *testing.T) {
 		t.Fatal("exact source14", err)
 	}
 	for _, binding := range [][2]string{{d.Source, d.SourceSHA}, {d.WireSource, d.WireSHA}} {
-		body, e := os.ReadFile(filepath.Join("../..", binding[0]))
+		body, e := readTestAnalysis75(filepath.Join("../..", binding[0]))
 		if e != nil || p6Digest(body) != binding[1] {
 			t.Fatal("original alias provenance", e)
 		}
@@ -61,7 +60,7 @@ func TestP6NativeOriginalBuffInstanceAliasingAcrossLifecycle(t *testing.T) {
 	}
 	for _, c := range d.Cases {
 		t.Run(c.Name, func(t *testing.T) {
-			body, e := os.ReadFile(filepath.Join("../..", c.Wire))
+			body, e := readTestAnalysis75(filepath.Join("../..", c.Wire))
 			if e != nil || p6Digest(body) != c.WireSHA {
 				t.Fatal("original alias wire", e)
 			}

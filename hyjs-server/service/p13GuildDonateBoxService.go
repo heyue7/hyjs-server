@@ -90,6 +90,16 @@ func p13GuildDonateBoxSourceHash(source db.P13GuildDonateBoxSource) string {
 	return p6Digest(raw)
 }
 
+// Immutable membership/source identities remain valid when an administrator
+// revisits their business day; civil-time ordering is not a replay identity.
+func calendar75Adjusted(tx *gorm.DB) bool {
+	if !ServerGameClockContextBound(tx.Statement.Context) {
+		return false
+	}
+	revision, _ := tx.Statement.Context.Value(constUtil.ServerGameClockRevisionKey).(int64)
+	return revision > 0
+}
+
 func p13GuildDonateBoxPolicy(tx *gorm.DB, now time.Time) (*db.P13GuildDonateBoxPolicy, error) {
 	// Isolated legacy domains can omit this optional schema; the main initializer creates it.
 	if !gameSchemaHasTable(tx, &db.P13GuildDonateBoxPolicy{}) {
@@ -102,8 +112,14 @@ func p13GuildDonateBoxPolicy(tx *gorm.DB, now time.Time) (*db.P13GuildDonateBoxP
 	if !policy.Enabled {
 		return nil, nil
 	}
-	if policy.Version != constUtil.P13GuildDonateBoxVersion || policy.Source != constUtil.P13GuildDonateBoxSource || policy.PublishedAt <= 0 || policy.PublishedAt > now.UnixMilli() {
+	publicationNow := calendar75SourceHorizon(tx, now).UnixMilli()
+	if policy.Version != constUtil.P13GuildDonateBoxVersion || policy.Source != constUtil.P13GuildDonateBoxSource || policy.PublishedAt <= 0 || policy.PublishedAt > publicationNow {
 		return nil, errors.New("公会捐献宝箱缺提前发布的具名规则")
+	}
+	// Persisted publication is real time. Only the returned day-snapshot effective
+	// start follows the selected game day; the source policy is never rewritten.
+	if calendar75Adjusted(tx) {
+		policy.PublishedAt = min(policy.PublishedAt, now.UnixMilli())
 	}
 	return &policy, nil
 }
@@ -115,7 +131,7 @@ func (s *GameService) RecordP13GuildDonateBox(tx *gorm.DB, member *db.P13GuildMe
 	if err != nil || policy == nil {
 		return err
 	}
-	if member.GuildID == "" || member.JoinedAt <= 0 || member.JoinedAt > now.UnixMilli() || stamp <= 0 || amount <= 0 || score <= 0 || request.GetDonateType() != "coin" && request.GetDonateType() != "badge" {
+	if member.GuildID == "" || member.JoinedAt <= 0 || (member.JoinedAt > now.UnixMilli() && !calendar75Adjusted(tx)) || stamp <= 0 || amount <= 0 || score <= 0 || request.GetDonateType() != "coin" && request.GetDonateType() != "badge" {
 		return errors.New("公会捐献宝箱实际捐献来源无效")
 	}
 	day := p13GuildDay(now)
@@ -133,7 +149,7 @@ func (s *GameService) RecordP13GuildDonateBox(tx *gorm.DB, member *db.P13GuildMe
 	} else if err != nil {
 		return err
 	}
-	if frozen.Version != constUtil.P13GuildDonateBoxVersion || frozen.Source != constUtil.P13GuildDonateBoxSource || frozen.RulesHash != p6Digest([]byte(frozen.RulesJSON)) || frozen.PublishedAt <= 0 || frozen.PublishedAt > frozen.CreatedAt || frozen.CreatedAt > now.UnixMilli() || frozen.Score < 0 || int64(frozen.Score)+int64(score) > math.MaxInt32 {
+	if frozen.Version != constUtil.P13GuildDonateBoxVersion || frozen.Source != constUtil.P13GuildDonateBoxSource || frozen.RulesHash != p6Digest([]byte(frozen.RulesJSON)) || frozen.PublishedAt <= 0 || frozen.PublishedAt > frozen.CreatedAt || (frozen.CreatedAt > now.UnixMilli() && !calendar75Adjusted(tx)) || frozen.Score < 0 || int64(frozen.Score)+int64(score) > math.MaxInt32 {
 		return errors.New("公会捐献宝箱当日冻结规则无效")
 	}
 	if _, err := p13GuildDonateBoxReadRules(frozen.RulesJSON); err != nil {
@@ -169,7 +185,7 @@ func p13GuildDonateBoxDayRead(tx *gorm.DB, member *db.P13GuildMember, now time.T
 	if err != nil {
 		return nil, false, err
 	}
-	if day.Version != constUtil.P13GuildDonateBoxVersion || day.Source != constUtil.P13GuildDonateBoxSource || day.RulesHash != p6Digest([]byte(day.RulesJSON)) || day.CreatedAt <= 0 || day.PublishedAt <= 0 || day.PublishedAt > day.CreatedAt || day.CreatedAt > now.UnixMilli() || day.Score < 0 {
+	if day.Version != constUtil.P13GuildDonateBoxVersion || day.Source != constUtil.P13GuildDonateBoxSource || day.RulesHash != p6Digest([]byte(day.RulesJSON)) || day.CreatedAt <= 0 || day.PublishedAt <= 0 || day.PublishedAt > day.CreatedAt || (day.CreatedAt > now.UnixMilli() && !calendar75Adjusted(tx)) || day.Score < 0 {
 		return nil, false, errors.New("公会捐献宝箱冻结日来源损坏")
 	}
 	if _, err := p13GuildDonateBoxReadRules(day.RulesJSON); err != nil {
@@ -182,7 +198,7 @@ func p13GuildDonateBoxDayRead(tx *gorm.DB, member *db.P13GuildMember, now time.T
 	var total int64
 	eligible := false
 	for _, source := range sources {
-		if source.PlayerID <= 0 || source.Stamp <= 0 || source.JoinedAt <= 0 || source.JoinedAt > source.CreatedAt || source.CreatedAt < day.CreatedAt || source.CreatedAt > now.UnixMilli() || source.Day != p13GuildDay(time.UnixMilli(source.CreatedAt)) || source.Amount <= 0 || source.Score <= 0 || source.DonateType != "coin" && source.DonateType != "badge" || source.SourceHash != p13GuildDonateBoxSourceHash(source) {
+		if source.PlayerID <= 0 || source.Stamp <= 0 || source.JoinedAt <= 0 || ((source.JoinedAt > source.CreatedAt || source.CreatedAt < day.CreatedAt || source.CreatedAt > now.UnixMilli()) && !calendar75Adjusted(tx)) || source.Day != p13GuildDay(time.UnixMilli(source.CreatedAt)) || source.Amount <= 0 || source.Score <= 0 || source.DonateType != "coin" && source.DonateType != "badge" || source.SourceHash != p13GuildDonateBoxSourceHash(source) {
 			return nil, false, errors.New("公会捐献宝箱积分缺实际捐献来源")
 		}
 		total += int64(source.Score)

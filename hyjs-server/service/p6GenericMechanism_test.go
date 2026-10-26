@@ -15,7 +15,7 @@ import (
 
 func p6GenericGrownActors(t *testing.T) map[string]*pb.BattleHero {
 	t.Helper()
-	data, err := os.ReadFile("../../analysis/p6/p5-highest-actors-20261014.json")
+	data, err := readTestAnalysis75("../../analysis/p6/p5-highest-actors-20261014.json")
 	if err != nil {
 		t.Fatal(err)
 	}

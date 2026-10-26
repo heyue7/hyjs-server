@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"os"
@@ -55,6 +56,7 @@ func TestP3PaymentDomain(t *testing.T) {
 				t.Fatal(err)
 			}
 		}
+		p3DomainOperationsFixture75(t)
 	}
 	initialize()
 	protected, err := LoginAccount(ctx, "p3-protected-original", "test-password")
@@ -146,7 +148,7 @@ func TestP3PaymentDomain(t *testing.T) {
 		if len(catalog("AND0004").GetPaymentInfoList()) != 0 {
 			t.Fatal("unknown native channel accepted")
 		}
-		for _, productID := range []string{"djsy.wuyou.andp0006", "local-p3-red-card", "local-p3-red-equipment"} {
+		for _, productID := range []string{"djsy.wuyou.andp0006", "djsy.wuyou.andp0030", "djsy.wuyou.andp0128"} {
 			var product db.PaymentProduct
 			if e := db.GetIns().First(&product, "id = ?", productID).Error; e != nil {
 				t.Fatal(e)
@@ -344,7 +346,7 @@ func TestP3PaymentDomain(t *testing.T) {
 			o := generate(id, "djsy.wuyou.andp0030", now)
 			confirm(o, fmt.Sprintf("activity-%d", i), now)
 		}
-		for _, activity := range []string{"firstRecharge_local_p3", "rechargeSingle_local_p3", "rechargeTotal_local_p3"} {
+		for _, activity := range []string{"firstRecharge_local_p3", "rechargeSingle_fixture75_local_p3", "rechargeTotal_fixture75_local_p3"} {
 			r := call(id, &pb.CSActivityInfo{ActivityId: proto.String(activity)})[0].(*pb.SCActivityInfo)
 			if r.ItemList[0].GetStatus() != 1 {
 				t.Fatal("paid condition not met", activity)
@@ -373,7 +375,7 @@ func TestP3PaymentDomain(t *testing.T) {
 			order := generate(id, "djsy.wuyou.andp0006", at)
 			confirm(order, fmt.Sprintf("continued-%d", i), at)
 		}
-		r := call(id, &pb.CSContinuedRechargeInfo{ActivityId: proto.String("continuedRecharge_local_p3")})[0].(*pb.SCContinuedRechargeInfo)
+		r := call(id, &pb.CSContinuedRechargeInfo{ActivityId: proto.String("continuedRecharge_fixture75_local_p3")})[0].(*pb.SCContinuedRechargeInfo)
 		if r.GetStatus() != 1 || len(r.ItemList) != 3 {
 			t.Fatal("continued count")
 		}
@@ -392,8 +394,15 @@ func TestP3PaymentDomain(t *testing.T) {
 	})
 	t.Run("vip_week_consumption_luxury_sign_and_red_box_gift", func(t *testing.T) {
 		id := fresh("welfare")
-		order := generate(id, "local-p3-red-card", now)
+		activity := db.PeriodInstance{ID: "rechargeTotal_p4_welfare_box75", Enabled: true, Title: "隔离充值奖励", Kind: "payment_amount", Mode: "cumulative", Goal: 3000, Rewards: "item_023,1", StartAt: now.Add(-time.Hour).UnixMilli(), EndAt: now.Add(time.Hour).UnixMilli(), RewardEndAt: now.Add(2 * time.Hour).UnixMilli(), Source: "finite actual-payment activity fixture"}
+		if e := db.GetIns().Create(&activity).Error; e != nil {
+			t.Fatal(e)
+		}
+		order := generate(id, "djsy.wuyou.andp0030", now)
 		confirm(order, "red-paid", now)
+		if _, e := s.P1Activity(ctx, id, &pb.CSActivityReward{ActivityId: proto.String(activity.ID), Index: proto.Int32(1), GetResources: []*pb.BaseResource{{Id: proto.String("item_023"), Num: proto.Int32(1)}}}); e != nil {
+			t.Fatal(e)
+		}
 		r := call(id, &pb.CSGetVipBoonInfo{})[0].(*pb.SCGetVipBoonInfo)
 		if r.Daily[0].GetStatus() != 1 || r.Week[0].GetStatus() != 1 {
 			t.Fatal("VIP unavailable")
@@ -406,12 +415,12 @@ func TestP3PaymentDomain(t *testing.T) {
 		if _, e := s.monthSignAt(ctx, id, &pb.CSReceiveLuxurySign{}, now); e == nil {
 			t.Fatal("luxury duplicate")
 		}
-		call(id, &pb.CSConvertGiftCode{GiftCode: proto.String("HYJS-DEMO-P3")})
-		if _, _, e := s.HandlePayment(ctx, id, &pb.CSConvertGiftCode{GiftCode: proto.String("HYJS-DEMO-P3")}, 1); e == nil {
+		call(id, &pb.CSConvertGiftCode{GiftCode: proto.String("P3-FIXTURE75")})
+		if _, _, e := s.HandlePayment(ctx, id, &pb.CSConvertGiftCode{GiftCode: proto.String("P3-FIXTURE75")}, 1); e == nil {
 			t.Fatal("gift duplicate")
 		}
 		p, g := profile(id)
-		if p.GetDiamond() != 300 || p.GetCoin() != 3000 {
+		if p.GetDiamond() != 230 || p.GetCoin() != 3000 {
 			t.Fatal("welfare funds", p)
 		}
 		boxes := map[string]int32{}
@@ -474,31 +483,53 @@ func TestP3PaymentDomain(t *testing.T) {
 		if len(items) != 2 {
 			t.Fatal("VIP catalogue", items)
 		}
+		trainingSKU, growthSKU := "", ""
 		for _, item := range items {
 			// 按原 SetShopVipItem 的索引方式验证完整回包，避免残留未挂载的商品卡。
 			if len(item.GetItem()) == 0 || len(item.GetPrice()) != 1 || len(item.GetDiscount()) != 1 || !proto.Equal(item.Price[0], item.Discount[0]) || !proto.Equal(item.Price[0], item.ExchangeList[0]) {
 				t.Fatal("native VIP card requires original and discounted price", item.GetId())
 			}
+			if strings.HasSuffix(item.GetId(), ":fixture75_training") {
+				trainingSKU = item.GetId()
+			}
+			if strings.HasSuffix(item.GetId(), ":fixture75_growth_material") {
+				growthSKU = item.GetId()
+			}
 		}
-		if e := db.GetIns().Model(&db.VIPShopProduct{}).Where("id = ?", "p3vip_training").Update("cost", 9999).Error; e != nil {
+		if trainingSKU == "" || growthSKU == "" {
+			t.Fatal("quoted original VIP material identities missing")
+		}
+		if e := db.GetIns().Model(&db.VIPShopProduct{}).Where("id = ?", "fixture75_training").Update("cost", 9999).Error; e != nil {
 			t.Fatal(e)
 		}
-		call(id, &pb.CSShopBuy{ShopType: proto.Int32(2), ShopItemId: proto.String("p3vip_training"), BuyCount: proto.Int32(1)})
-		p, _ := profile(id)
-		if p.GetDiamond() != 1325 {
-			t.Fatal("day quote changed", p.GetDiamond())
+		if _, _, e := s.HandlePayment(ctx, id, &pb.CSShopBuy{ShopType: proto.Int32(2), ShopItemId: proto.String(trainingSKU), BuyCount: proto.Int32(1)}, 1); !errors.Is(e, constUtil.ErrShopQuoteChanged) {
+			t.Fatal("stale VIP price quote remained usable", e)
 		}
-		if _, _, e := s.HandlePayment(ctx, id, &pb.CSShopBuy{ShopType: proto.Int32(2), ShopItemId: proto.String("p3vip_training"), BuyCount: proto.Int32(1)}, 1); e == nil {
+		if e := db.GetIns().Model(&db.VIPShopProduct{}).Where("id=?", "fixture75_training").Update("cost", 125).Error; e != nil {
+			t.Fatal(e)
+		}
+		current := call(id, &pb.CSShopProductList{ShopType: proto.Int32(2)})[0].(*pb.SCShopProductList).GetShopItemList()
+		for _, item := range current {
+			if strings.HasSuffix(item.GetId(), ":fixture75_training") {
+				trainingSKU = item.GetId()
+			}
+		}
+		call(id, &pb.CSShopBuy{ShopType: proto.Int32(2), ShopItemId: proto.String(trainingSKU), BuyCount: proto.Int32(1)})
+		p, _ := profile(id)
+		if p.GetDiamond() != 1300 {
+			t.Fatal("current VIP quote charge mismatch", p.GetDiamond())
+		}
+		if _, _, e := s.HandlePayment(ctx, id, &pb.CSShopBuy{ShopType: proto.Int32(2), ShopItemId: proto.String(trainingSKU), BuyCount: proto.Int32(1)}, 1); e == nil {
 			t.Fatal("daily shop quota replay")
 		}
-		call(id, &pb.CSShopBuy{ShopType: proto.Int32(2), ShopItemId: proto.String("p3vip_red_card"), BuyCount: proto.Int32(1)})
-		info := call(id, &pb.CSActivityInfo{ActivityId: proto.String("costTotal_local_p3")})[0].(*pb.SCActivityInfo)
+		call(id, &pb.CSShopBuy{ShopType: proto.Int32(2), ShopItemId: proto.String(growthSKU), BuyCount: proto.Int32(1)})
+		info := call(id, &pb.CSActivityInfo{ActivityId: proto.String("costTotal_fixture75_local_p3")})[0].(*pb.SCActivityInfo)
 		if info.ItemList[0].GetStatus() != 1 {
 			t.Fatal("confirmed consumption not reached")
 		}
 		call(id, &pb.CSActivityReward{ActivityId: info.ActivityId, Index: proto.Int32(1), GetResources: info.ItemList[0].RewardList})
 		p, _ = profile(id)
-		if p.GetDiamond() != 1055 {
+		if p.GetDiamond() != 1030 {
 			t.Fatal("rebate altered paid metrics", p.GetDiamond())
 		}
 		var spent []db.EventFact
@@ -507,12 +538,16 @@ func TestP3PaymentDomain(t *testing.T) {
 		for _, fact := range spent {
 			total += fact.Amount
 		}
-		if total != 400 {
+		if total != 425 {
 			t.Fatal("consumption duplicated", total)
 		}
 	})
 	t.Run("paid_vip_unblocks_month_sign_difference_and_original_fund", func(t *testing.T) {
 		id := fresh("vip-month-difference")
+		// Explicit supplement fixture, separate from the current default Re calendar.
+		if e := db.GetIns().Model(&db.MonthSignRule{}).Where("day=?", 1).Updates(map[string]any{"reward": "coin,1000", "double_vip": 2, "source": "isolated P3 same-day VIP supplement fixture"}).Error; e != nil {
+			t.Fatal(e)
+		}
 		if _, e := s.monthSignAt(ctx, id, &pb.CSReceiveMonthSign{}, now); e != nil {
 			t.Fatal(e)
 		}

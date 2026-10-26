@@ -2,7 +2,6 @@ package service
 
 import (
 	"encoding/json"
-	"os"
 	"testing"
 	"time"
 
@@ -18,7 +17,7 @@ import (
 func p7MazeFixture(t *testing.T) (*p1Fixture, *pb.CSRushFightStart, time.Time) {
 	t.Helper()
 	f, cfg, request := p7ScopedFixture(t, constUtil.P7RushTrial)
-	raw, err := os.ReadFile("../../analysis/p6/actual-local-p7-rush-terminal-inputs-v127/000.SCRushFightStart.pb")
+	raw, err := readTestAnalysis75("../../analysis/p6/actual-local-p7-rush-terminal-inputs-v127/000.SCRushFightStart.pb")
 	if err != nil {
 		t.Fatal(err)
 	}

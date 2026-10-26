@@ -29,6 +29,7 @@ func TestP5ArenaTitleListOneWinnerReadPerRequest(t *testing.T) {
 		}
 	}
 	now := time.Now()
+	arenaTitleLadderFixture75(t, f, challenger, now)
 	if _, err := f.s.p11ArenaQuery(f.ctx, challenger, &pb.CSPvpFindMatch{}, 901, now); err != nil {
 		t.Fatal(err)
 	}

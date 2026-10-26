@@ -232,7 +232,8 @@ func TestCopySweepOriginalRules(t *testing.T) {
 		t.Fatal("retry after repair", err)
 	}
 	p, _ = load()
-	if p.GetLevel() != 15 || p.GetExp() != 139 || p.GetStamina() != 110 || p.GetEnergy() != 110 {
+	// Approved row14 is155 experience;279+155-280 leaves154.
+	if p.GetLevel() != 15 || p.GetExp() != 154 || p.GetStamina() != 110 || p.GetEnergy() != 110 {
 		t.Fatal("upgrade resource accounting", p)
 	}
 	// 原表100级以 -1 截止且资源列空白，跨入满级只发明示的金币和经验。
@@ -246,7 +247,8 @@ func TestCopySweepOriginalRules(t *testing.T) {
 		t.Fatal("terminal level", err)
 	}
 	p, _ = load()
-	if p.GetLevel() != 100 || p.GetExp() != 1979 || p.GetStamina() != 90 || p.GetEnergy() != 100 {
+	// Approved row99 is7556 experience, preserving the original terminal threshold.
+	if p.GetLevel() != 100 || p.GetExp() != 7555 || p.GetStamina() != 90 || p.GetEnergy() != 100 {
 		t.Fatal("terminal level accounting", p)
 	}
 }

@@ -45,7 +45,7 @@ func p12WantedOwnershipInstance(t *testing.T, f *p1Fixture, id string, now time.
 
 func TestP12WantedOwnershipAwakePKFieldBusyRejectWithoutCost(t *testing.T) {
 	f := p12WantedPersistenceFixture(t)
-	now := time.Now()
+	now := time.Date(2026, 10, 23, 12, 0, 0, 0, time.FixedZone("UTC+8", 8*3600))
 	for _, load := range []func(string) error{f.s.LoadP7AwakeTables, f.s.LoadP12FieldPVPTables} {
 		if err := load("../../analysis/tables"); err != nil {
 			t.Fatal(err)

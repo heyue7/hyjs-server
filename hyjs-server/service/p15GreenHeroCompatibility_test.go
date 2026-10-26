@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"encoding/base64"
 	"encoding/json"
-	"os"
 	"strings"
 	"testing"
 
@@ -31,7 +30,7 @@ func TestP15GreenCompatibleOriginalEngineAndResourceTableConsistency(t *testing.
 	}
 	root := "../../analysis/green-hero-compat-20261017"
 	for _, name := range []string{"Hero", "Frag"} {
-		raw, err := os.ReadFile(root + "/assets-r3/Table" + name + ".tsv")
+		raw, err := readTestAnalysis75(root + "/assets-r3/Table" + name + ".tsv")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -53,7 +52,7 @@ func TestP15GreenCompatibleOriginalEngineAndResourceTableConsistency(t *testing.
 			}
 		}
 	}
-	wireBytes, err := os.ReadFile(root + "/native-r1/original-input.pb")
+	wireBytes, err := readTestAnalysis75(root + "/native-r1/original-input.pb")
 	if err != nil || p6Digest(wireBytes) != "fdee30a30dfd659449430a7c52538d9fee66406e78748fc6d027f9806ee15f96" {
 		t.Fatal("independent native source", err)
 	}
@@ -72,7 +71,7 @@ func TestP15GreenCompatibleOriginalEngineAndResourceTableConsistency(t *testing.
 	if qualification.ActorCount != 12 || qualification.NativeCertified || out.Outcome.Authoritative {
 		t.Fatal("compatibility count/authority", qualification)
 	}
-	trace, err := os.ReadFile(root + "/native-r1/original.native.jsonl")
+	trace, err := readTestAnalysis75(root + "/native-r1/original.native.jsonl")
 	if err != nil || p6Digest(trace) != "f8b7bfca0537f7888046843b40d6cfc802088795811e2fee4c705adecd3c63d6" {
 		t.Fatal("original host independent output", err)
 	}

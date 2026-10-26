@@ -46,8 +46,17 @@ func p13UFWeeklyStart(week string) (time.Time, error) {
 	return at, nil
 }
 func p13UFWeeklyRules(offer *db.P13UnionFightWeeklyOffer) (*db.P13UnionFightWeeklyPolicy, []p13UFWeeklyReward, error) {
+	if offer == nil || (offer.FirstMatchID == "") == (offer.FirstByeID == "") {
+		return nil, nil, p13UFByeError()
+	}
+	return p13UFWeeklyPolicyPayload(offer)
+}
+
+// An operator may validate a future weekly policy before a real match exists.
+// Accepted offers still require their exclusive actual match/bye anchor above.
+func p13UFWeeklyPolicyPayload(offer *db.P13UnionFightWeeklyOffer) (*db.P13UnionFightWeeklyPolicy, []p13UFWeeklyReward, error) {
 	var policy db.P13UnionFightWeeklyPolicy
-	if (offer.FirstMatchID == "") == (offer.FirstByeID == "") {
+	if offer == nil {
 		return nil, nil, p13UFByeError()
 	}
 	if p6Digest(offer.Rules) != offer.RulesHash || json.Unmarshal(offer.Rules, &policy) != nil || policy.WeekStart != offer.WeekStart || policy.Group != offer.Group || !policy.Enabled || policy.Version == "" || policy.Source == "" || policy.PublishedAt <= 0 || policy.PublishedAt > offer.FrozenAt {

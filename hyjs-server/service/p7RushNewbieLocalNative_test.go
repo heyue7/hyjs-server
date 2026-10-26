@@ -46,7 +46,7 @@ func p7NewbieLocalRushNativeBundle(t *testing.T) *p7NewbieLocalNativeBundle {
 	if file == "" {
 		return nil
 	}
-	raw, err := os.ReadFile(file)
+	raw, err := readTestAnalysis75(file)
 	if err != nil || len(os.Getenv("HYJS_P7_NEWBIE_LOCAL_BUNDLE_SHA256")) != 64 || p6Digest(raw) != os.Getenv("HYJS_P7_NEWBIE_LOCAL_BUNDLE_SHA256") {
 		t.Fatal("explicit P7 native bundle SHA", err)
 	}
@@ -55,7 +55,7 @@ func p7NewbieLocalRushNativeBundle(t *testing.T) *p7NewbieLocalNativeBundle {
 		t.Fatal("bounded original party bundle identity/denominator/authority")
 	}
 	for _, binding := range [][2]string{{bundle.Source, bundle.SourceSHA}, {bundle.Capture, bundle.CaptureSHA}} {
-		data, err := os.ReadFile(p7NewbieLocalNativePath(t, binding[0]))
+		data, err := readTestAnalysis75(p7NewbieLocalNativePath(t, binding[0]))
 		if err != nil || len(binding[1]) != 64 || p6Digest(data) != binding[1] {
 			t.Fatal("native source/capture manifest SHA", binding[0], err)
 		}
@@ -88,7 +88,7 @@ func p7NewbieLocalRushNativeFixtureInput(t *testing.T, input *model.FrozenBattle
 	if !bound {
 		return input, false
 	}
-	raw, err := os.ReadFile(p7NewbieLocalNativePath(t, bundle.Source))
+	raw, err := readTestAnalysis75(p7NewbieLocalNativePath(t, bundle.Source))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -102,7 +102,7 @@ func p7NewbieLocalRushNativeFixtureInput(t *testing.T, input *model.FrozenBattle
 		if row.WireSHA != wireSHA {
 			continue
 		}
-		typed, err := os.ReadFile(filepath.Join(filepath.Dir(p7NewbieLocalNativePath(t, bundle.Source)), row.Typed))
+		typed, err := readTestAnalysis75(filepath.Join(filepath.Dir(p7NewbieLocalNativePath(t, bundle.Source)), row.Typed))
 		if err != nil || p6Digest(typed) != row.TypedSHA {
 			t.Fatal("native party typed input SHA", err)
 		}
@@ -128,7 +128,7 @@ func p7NewbieLocalRushNativeFixtureInput(t *testing.T, input *model.FrozenBattle
 // p7NewbieLocalRushNativeHitCaseCount 仅给显式bundle内已校验命中的新fixture声明四例分母。
 // 旧fixture继续使用原helper的既有固定分母。
 func p7NewbieLocalRushNativeHitCaseCount(name string) int {
-	raw, err := os.ReadFile(os.Getenv("HYJS_P7_NEWBIE_LOCAL_BUNDLE"))
+	raw, err := readTestAnalysis75(os.Getenv("HYJS_P7_NEWBIE_LOCAL_BUNDLE"))
 	if err != nil || p6Digest(raw) != os.Getenv("HYJS_P7_NEWBIE_LOCAL_BUNDLE_SHA256") {
 		return 0
 	}
@@ -140,7 +140,7 @@ func p7NewbieLocalRushNativeHitCaseCount(name string) int {
 	if hits.Path != name || filepath.IsAbs(name) || strings.HasPrefix(filepath.ToSlash(filepath.Clean(name)), "../") {
 		return 0
 	}
-	data, err := os.ReadFile(filepath.Join("../../analysis/p6", name))
+	data, err := readTestAnalysis75(filepath.Join("../../analysis/p6", name))
 	if err != nil || len(hits.SHA) != 64 || p6Digest(data) != hits.SHA {
 		return 0
 	}
@@ -154,7 +154,7 @@ func TestP7NewbieLocalRushNativeAllLayers(t *testing.T) {
 	}
 	// Verify every derived fixture once before invoking the unchanged highest helpers.
 	for kind, fixture := range bundle.Fixtures {
-		raw, err := os.ReadFile(p7NewbieLocalNativePath(t, filepath.Join("analysis/p6", fixture.Path)))
+		raw, err := readTestAnalysis75(p7NewbieLocalNativePath(t, filepath.Join("analysis/p6", fixture.Path)))
 		if err != nil || p6Digest(raw) != fixture.SHA {
 			t.Fatal("native fixture SHA", kind, err)
 		}
@@ -187,7 +187,7 @@ func TestP7NewbieLocalRushNativeAllLayers(t *testing.T) {
 // The finite Player32 probe must use the real projection, including the main
 // hero's effective level. No test DB, wallet or account is mutated here.
 func TestP7NewbieLocalBattlePlayerProjection(t *testing.T) {
-	raw, err := os.ReadFile("../../analysis/growth-first-20261016/m1-natural-phone-20261017/53-task7-end-profile.json")
+	raw, err := readTestAnalysis75("../../analysis/growth-first-20261016/m1-natural-phone-20261017/53-task7-end-profile.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -222,7 +222,7 @@ func TestP7NewbieLocalBattlePlayerProjection(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	raw, err = os.ReadFile("../../analysis/p6/p7-newbie047025-local-inputs-r2-20261017/000.SCRushFightStart.pb")
+	raw, err = readTestAnalysis75("../../analysis/p6/p7-newbie047025-local-inputs-r2-20261017/000.SCRushFightStart.pb")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -237,7 +237,7 @@ func TestP7NewbieLocalBattlePlayerProjection(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = p7ManualRushFamilyForSeries(series); err == nil {
+	if _, err = p7ManualRushLegacyFamilyForSeries(series); err == nil {
 		t.Fatal("unanchored local047025 probe gained production scope")
 	}
 }

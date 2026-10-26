@@ -70,6 +70,9 @@ func p13GuildPrayerRollHash(row *db.P13GuildPrayerRoll) string {
 }
 
 func p13GuildPrayerRollRead(row *db.P13GuildPrayerRoll) (*pb.BaseProp, error) {
+	if row.MemberJoinedAt < 0 {
+		return nil, errors.New("公会祈祷成员身份来源无效")
+	}
 	if row.DurationHours < 1 || row.DurationHours > 720 {
 		return nil, errors.New("公会祈祷有效时长无效")
 	}
@@ -164,7 +167,11 @@ func (s *GameService) P13GuildPrayerProperties(ctx context.Context, tx *gorm.DB,
 		return nil, "", 0, err
 	}
 	var row db.P13GuildPrayerRoll
-	err = tx.Where("player_id=?", id).Order("applied_at DESC,ordinal DESC,stamp DESC").First(&row).Error
+	query := tx.Where("player_id=?", id)
+	if calendar75Adjusted(tx) {
+		query = query.Where("applied_at<=?", now.UnixMilli())
+	}
+	err = query.Order("applied_at DESC,ordinal DESC,stamp DESC").First(&row).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return &pb.BaseProp{}, "", 0, nil
 	}
@@ -184,7 +191,7 @@ func p13GuildPrayerPropertiesRead(row *db.P13GuildPrayerRoll, member *db.P13Guil
 		return nil, "", 0, errors.New("公会祈祷实际发生时刻晚于当前属性快照")
 	}
 	// A later membership term cannot reactivate a prayer bought before leaving.
-	if row.GuildID != member.GuildID || member.JoinedAt > row.AppliedAt || now.UnixMilli() >= row.ExpiresAt {
+	if row.GuildID != member.GuildID || (row.MemberJoinedAt > 0 && row.MemberJoinedAt != member.JoinedAt) || (row.MemberJoinedAt == 0 && member.JoinedAt > row.AppliedAt) || now.UnixMilli() >= row.ExpiresAt {
 		return &pb.BaseProp{}, "", 0, nil
 	}
 	return proto.Clone(prop).(*pb.BaseProp), row.SourceHash, row.ExpiresAt, nil
@@ -250,7 +257,7 @@ func (s *GameService) p13GuildPrayer(ctx context.Context, id int64, request *pb.
 		if !policy.Enabled {
 			return errors.New(constUtil.P13GuildPrayerClosed)
 		}
-		if policy.Source != constUtil.P13GuildPrayerSource || policy.PublishedAt <= 0 || policy.PublishedAt > now.UnixMilli() || strings.TrimSpace(policy.Version) == "" || len(policy.Version) > 128 {
+		if policy.Source != constUtil.P13GuildPrayerSource || policy.PublishedAt <= 0 || policy.PublishedAt > calendar75SourceHorizon(tx, now).UnixMilli() || strings.TrimSpace(policy.Version) == "" || len(policy.Version) > 128 {
 			return errors.New("公会祈祷缺实际提前发布的具名池版本")
 		}
 		choices, total, err := p13GuildPrayerPool(policy.PoolJSON, policy.PoolHash)
@@ -278,7 +285,7 @@ func (s *GameService) p13GuildPrayer(ctx context.Context, id int64, request *pb.
 			if _, err = p13GuildPrayerRollRead(&latest); err != nil {
 				return err
 			}
-			if latest.AppliedAt > now.UnixMilli() {
+			if latest.AppliedAt > calendar75SourceHorizon(tx, now).UnixMilli() {
 				return errors.New("祈祷时钟早于实际最近发生记录")
 			}
 		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
@@ -307,7 +314,12 @@ func (s *GameService) p13GuildPrayer(ctx context.Context, id int64, request *pb.
 		if now.UnixMilli() > math.MaxInt64-int64(time.Duration(duration)*time.Hour/time.Millisecond) {
 			return errors.New("公会祈祷有效时刻溢出")
 		}
-		row := db.P13GuildPrayerRoll{PlayerID: id, Stamp: stamp, GuildID: member.GuildID, Day: day, Ordinal: count + 1, AppliedAt: now.UnixMilli(), ExpiresAt: now.Add(time.Duration(duration) * time.Hour).UnixMilli(), ContributionCost: cost, DailyLimit: limit, DurationHours: duration, PoolVersion: policy.Version, PoolJSON: policy.PoolJSON, PoolHash: policy.PoolHash, PublishedAt: policy.PublishedAt, Draw: draw.Int64(), ChosenIndex: chosen, Effect: effect, EffectHash: p6Digest(effect), Source: constUtil.P13GuildPrayerSource}
+		published := policy.PublishedAt
+		if calendar75Adjusted(tx) {
+			published = min(published, now.UnixMilli())
+		}
+		row := db.P13GuildPrayerRoll{PlayerID: id, Stamp: stamp, GuildID: member.GuildID, Day: day, Ordinal: count + 1, AppliedAt: now.UnixMilli(), ExpiresAt: now.Add(time.Duration(duration) * time.Hour).UnixMilli(), ContributionCost: cost, DailyLimit: limit, DurationHours: duration, PoolVersion: policy.Version, PoolJSON: policy.PoolJSON, PoolHash: policy.PoolHash, PublishedAt: published, Draw: draw.Int64(), ChosenIndex: chosen, Effect: effect, EffectHash: p6Digest(effect), Source: constUtil.P13GuildPrayerSource}
+		row.MemberJoinedAt = member.JoinedAt
 		row.SourceHash = p13GuildPrayerRollHash(&row)
 		if _, err = p13GuildPrayerRollRead(&row); err != nil {
 			return err

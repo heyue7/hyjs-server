@@ -7,7 +7,6 @@ import (
 	"hyjs-server/model"
 	pb "hyjs-server/model/protocol"
 	"math"
-	"os"
 	"path/filepath"
 	"reflect"
 	"testing"
@@ -26,7 +25,7 @@ func TestP6NativeOriginalCastPersistentLoadsAndDeadOrderGoldens(t *testing.T) {
 func p6OriginalCastLifecycleFixture(t *testing.T, name, sha string) {
 	t.Helper()
 	root := filepath.Join("..", "..")
-	raw, err := os.ReadFile(filepath.Join(root, "analysis", "p6", name))
+	raw, err := readTestAnalysis75(filepath.Join(root, "analysis", "p6", name))
 	if err != nil || p6Digest(raw) != sha {
 		t.Fatal("cast lifecycle native SHA", err)
 	}
@@ -59,7 +58,7 @@ func p6OriginalCastLifecycleFixture(t *testing.T, name, sha string) {
 		t.Fatal("cast lifecycle original denominator", err)
 	}
 	for file, digest := range map[string]string{d.Source: d.SourceSHA, d.WireRoot: d.WireSHA} {
-		b, readErr := os.ReadFile(filepath.Join(root, file))
+		b, readErr := readTestAnalysis75(filepath.Join(root, file))
 		if readErr != nil || p6Digest(b) != digest {
 			t.Fatal("cast lifecycle provenance", file, readErr)
 		}
@@ -74,7 +73,7 @@ func p6OriginalCastLifecycleFixture(t *testing.T, name, sha string) {
 	s := p6OriginalTables(t)
 	for _, c := range d.Cases {
 		t.Run(c.Name, func(t *testing.T) {
-			wire, readErr := os.ReadFile(filepath.Join(root, c.Wire))
+			wire, readErr := readTestAnalysis75(filepath.Join(root, c.Wire))
 			if readErr != nil || p6Digest(wire) != c.WireSHA {
 				t.Fatal("cast lifecycle original PB", readErr)
 			}

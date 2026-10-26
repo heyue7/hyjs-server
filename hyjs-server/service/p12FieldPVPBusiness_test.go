@@ -40,7 +40,7 @@ func p12FieldPVPSetup(t *testing.T) (*p1Fixture, int64, int64, map[int64][]byte)
 			t.Fatal(err)
 		}
 	}
-	for _, init := range []func(context.Context) error{f.s.InitializeP1, f.s.InitializeP5, f.s.InitializeP6, f.s.InitializeP8Life, f.s.InitializeP10Social, f.s.InitializeP10Scene, f.s.InitializeP12FieldPVP} {
+	for _, init := range []func(context.Context) error{f.s.InitializeP1, f.s.InitializeP5, f.s.InitializeP6, f.s.InitializeP8Life, f.s.InitializeP10Social, f.s.InitializeP10Scene, f.s.InitializeP12FieldPVP, f.s.InitializeSharedFieldBoss55} {
 		if err := init(f.ctx); err != nil {
 			t.Fatal(err)
 		}
@@ -293,6 +293,10 @@ func TestP12FieldPVPBusinessClosedSafeDistanceBusyAndScopeNoMutation(t *testing.
 					t.Fatal(err)
 				}
 			case "unsupported":
+				hero := f.s.table("Hero", "id", "hero_004")
+				originalSkill := hero["SkillId1"]
+				hero["SkillId1"] = "fixture75-unpublished-skill"
+				t.Cleanup(func() { hero["SkillId1"] = originalSkill })
 				for _, w := range g.Warriors {
 					w.Id = proto.String("hero_004")
 				}

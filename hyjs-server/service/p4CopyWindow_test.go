@@ -23,8 +23,12 @@ func TestP4CopyWindow(t *testing.T) {
 	if err := db.GetIns().First(&cfg, "id=?", key).Error; err != nil {
 		t.Fatal(err)
 	}
-	if !cfg.Enabled || cfg.WeekdayMask != 127 || cfg.StartMinute != 1140 || cfg.EndMinute != 1260 || cfg.CurrencyFactor != 2 || cfg.DropFactor != 2 || cfg.Source != constUtil.P4CopyWindowSource {
+	if cfg.Enabled || cfg.WeekdayMask != 127 || cfg.StartMinute != 1140 || cfg.EndMinute != 1260 || cfg.CurrencyFactor != 2 || cfg.DropFactor != 2 || cfg.Source != constUtil.P4CopyWindowSource {
 		t.Fatal("declared evening instance", cfg)
+	}
+	// Publish this finite evening bonus only inside the isolated regression.
+	if err := db.GetIns().Model(&cfg).Update("enabled", true).Error; err != nil {
+		t.Fatal(err)
 	}
 	for _, tc := range []struct {
 		at     time.Time
@@ -60,7 +64,7 @@ func TestP4CopyWindow(t *testing.T) {
 	if err != nil || len(tabs) != 0 {
 		t.Fatal("operatoroff silently reopened", tabs, err)
 	}
-	// Next monthly instance follows the same policy without reusing historical IDs.
+	// A new month stays disabled until explicitly published, with its own identity.
 	next := time.Date(local.Year(), local.Month()+1, 1, 20, 0, 0, 0, local.Location())
 	if err := f.s.seedP4CopyWindow(db.GetIns(), next); err != nil {
 		t.Fatal(err)
@@ -69,7 +73,7 @@ func TestP4CopyWindow(t *testing.T) {
 	if err := db.GetIns().First(&nextCfg, "id=?", constUtil.P4CopyWindowPrefix+next.Format("200601")).Error; err != nil {
 		t.Fatal(err)
 	}
-	if !nextCfg.Enabled || nextCfg.StartAt != time.Date(next.Year(), next.Month(), 1, 0, 0, 0, 0, next.Location()).UnixMilli() {
+	if nextCfg.Enabled || nextCfg.StartAt != time.Date(next.Year(), next.Month(), 1, 0, 0, 0, 0, next.Location()).UnixMilli() {
 		t.Fatal("next independent month")
 	}
 	if err := db.GetIns().Delete(&nextCfg).Error; err != nil {

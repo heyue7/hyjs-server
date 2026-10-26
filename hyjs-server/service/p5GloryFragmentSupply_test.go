@@ -195,24 +195,23 @@ func TestP5GloryFragmentSupplyFourActualCombineForgeWearRefundAndCold(t *testing
 			t.Fatal("actual paid forge investment refund", err)
 		}
 		p, g = f.profile(t)
-		if simpleOwned(p, g, frag) != 3 {
-			t.Fatal("original tracked3 fragments not refunded")
+		if simpleOwned(p, g, frag) != 63 {
+			t.Fatal("reset must return sixty synthesis plus three forge fragments")
+		}
+		if _, lookupErr := f.s.equipmentRecord(g, gear.GetGuid()); lookupErr == nil {
+			t.Fatal("reset retained consumed equipment GUID")
 		}
 		decompose := &pb.CSEquipDecompose{Guid: []string{gear.GetGuid()}}
-		out, err := f.s.p5EquipmentDecompose(requestCtx(decompose), f.id, decompose, int64(999300+i))
-		if err != nil {
-			t.Fatal(err)
-		}
-		if again, e := f.s.p5EquipmentDecompose(requestCtx(decompose), f.id, decompose, int64(999300+i)); e != nil || !proto.Equal(out[0], again[0]) {
-			t.Fatal("decompose once receipt", e)
+		if _, err := f.s.p5EquipmentDecompose(requestCtx(decompose), f.id, decompose, int64(999300+i)); err == nil {
+			t.Fatal("consumed reset GUID could be decomposed again")
 		}
 		if _, err = f.s.redCombine(requestCtx(combine), f.id, combine, int64(999000+i)); err == nil {
 			t.Fatal("removed GUID resurrected by old combine")
 		}
 		p, g = f.profile(t)
 	}
-	if p.GetPoint() != 120000 || p.GetCoin() != 1604000 || p.GetDiamond() != 800 {
-		t.Fatal("exact paid/refund/original decompose balances", p.GetPoint(), p.GetCoin(), p.GetDiamond())
+	if p.GetPoint() != 0 || p.GetCoin() != 1596000 || p.GetDiamond() != 800 {
+		t.Fatal("exact paid/refund balances without decomposing consumed GUID", p.GetPoint(), p.GetCoin(), p.GetDiamond())
 	}
 	beforeP, beforeGame := proto.Clone(p).(*pb.Player), p5GloryJSON(t, g)
 	f.restart(t)
@@ -319,8 +318,8 @@ func TestP5GloryFragmentSupplyMonthlyFrozenPriceAndShutdown(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, actual, err := f.s.p4CommerceSnapshot(inherited)
-	if err != nil || !inherited.Enabled || actual.Products[0].Cost != "coin,600000" {
-		t.Fatal("next month lost legitimate frozen publication", err)
+	if err != nil || inherited.Enabled || actual.Products[0].Cost != "coin,600000" {
+		t.Fatal("next month must retain frozen terms without auto-enabling publication", err)
 	}
 	if err = db.GetIns().Model(&inherited).Update("enabled", false).Error; err != nil {
 		t.Fatal(err)

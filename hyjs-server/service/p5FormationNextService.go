@@ -320,7 +320,7 @@ func (s *GameService) validateP5TacticalReceipt(g *model.GameState, request, res
 	case *pb.SCTaticalFormationChange:
 		original, ok := request.(*pb.CSTaticalFormationChange)
 		current, err := s.currentTacticalFormation(g)
-		if !ok || err != nil || current.GetId() != original.GetId() || !proto.Equal(current, result.GetFormation()) {
+		if !ok || err != nil || current.GetId() != original.GetId() || !proto.Equal(tacticalFormationView(g, current), result.GetFormation()) {
 			return errors.New(constUtil.P5GrowthReceiptChanged)
 		}
 	}

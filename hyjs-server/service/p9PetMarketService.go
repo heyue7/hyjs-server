@@ -238,7 +238,13 @@ func (s *GameService) p9MarketState(tx *gorm.DB, id int64, now time.Time) (*db.P
 		return nil, nil, err
 	}
 	week := p9MarketWeek(LocalPlayAt(tx.Statement.Context, now))
-	if state.WeekKey > week {
+	if state.PlayerID > 0 && state.WeekKey != week && ServerGameClockContextBound(tx.Statement.Context) {
+		_, e := calendarPetWeek75(tx, &state, week)
+		if e != nil {
+			return nil, nil, e
+		}
+	}
+	if state.WeekKey > week && !ServerGameClockContextBound(tx.Statement.Context) {
 		return nil, nil, errors.New(constUtil.P9MarketError)
 	}
 	cfg := &p9MarketConfig{}

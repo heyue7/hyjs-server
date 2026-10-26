@@ -38,6 +38,11 @@ func reWelfarePublish(t *testing.T, f *p1Fixture, actor *model.AdminPrincipal, m
 
 func TestReFortuneCatNativeCostsDailyReplayAndCold(t *testing.T) {
 	f, actor := adminModesFixture(t)
+	// One explicitly published cat owns this scenario; older enabled fixture
+	// sources must not become an independent fallback after its shutdown.
+	if err := db.GetIns().Model(&db.P4WelfareRule{}).Where("kind=?", constUtil.P4WelfareCat).Update("enabled", false).Error; err != nil {
+		t.Fatal(err)
+	}
 	at := time.Now()
 	created, key := reWelfarePublish(t, f, actor, "fortune-cat", at)
 	if len(created.Form.Milestones) != 5 || created.Form.Milestones[4].Goal != 3000 || created.Form.Milestones[4].Rewards[0].Amount != 3150 {

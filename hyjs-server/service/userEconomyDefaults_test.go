@@ -12,7 +12,7 @@ import (
 )
 
 func TestUserEconomyUnconfiguredLoginRewardInfoHiddenAndClaimClosed(t *testing.T) {
-	f := p4Setup(t)
+	f := p4UnconfiguredSetup75(t)
 	player, game := f.profile(t)
 	before, _ := json.Marshal([]any{player, game})
 	out, handled, err := f.s.DispatchP4(f.ctx, f.id, &pb.CSLoginRewardInfo{}, 0)
@@ -43,7 +43,12 @@ func TestUserEconomyUnconfiguredLoginRewardInfoHiddenAndClaimClosed(t *testing.T
 }
 
 func TestUserEconomyUnconfiguredShopLoginCatalogueAndPurchaseClosed(t *testing.T) {
-	f := p4Setup(t)
+	f := p4UnconfiguredSetup75(t)
+	// The original constant trial catalogue is independent of an operator's
+	// empty-catalogue scenario. Explicitly stop that source in this fixture.
+	if err := db.GetIns().Model(&db.P4CommerceRule{}).Where("kind=?", "point").Update("enabled", false).Error; err != nil {
+		t.Fatal(err)
+	}
 	beforePlayer, beforeGame := f.profile(t)
 	before, _ := json.Marshal([]any{beforePlayer, beforeGame})
 	queries := []proto.Message{&pb.CSShopProductList{ShopType: proto.Int32(1)}, &pb.CSShopProductList{ShopType: proto.Int32(4)}, &pb.CSShopProductList{ShopType: proto.Int32(5)}, &pb.CSShopProductList{ShopType: proto.Int32(7)}}
@@ -55,10 +60,24 @@ func TestUserEconomyUnconfiguredShopLoginCatalogueAndPurchaseClosed(t *testing.T
 		} else {
 			out, _, err = f.s.DispatchP4(f.ctx, f.id, query, 735001)
 		}
-		if err != nil || len(out) != 1 {
+		if err != nil || len(out) == 0 {
 			t.Fatal("empty catalogue blocked original query", query, err)
 		}
-		for _, item := range out[0].(*pb.SCShopProductList).GetShopItemList() {
+		// Original inventory synchronization accompanies the catalogue without
+		// changing saved assets. Require exactly one catalogue and its own type.
+		var catalogue *pb.SCShopProductList
+		for _, message := range out {
+			if candidate, ok := message.(*pb.SCShopProductList); ok {
+				if catalogue != nil {
+					t.Fatal("duplicate catalogue frame")
+				}
+				catalogue = candidate
+			}
+		}
+		if catalogue == nil || catalogue.GetShopType() != query.(*pb.CSShopProductList).GetShopType() {
+			t.Fatal("missing original catalogue frame")
+		}
+		for _, item := range catalogue.GetShopItemList() {
 			if item.GetId() != "itemShopId_12" {
 				t.Fatal("retired invented product returned", item.GetId())
 			}
@@ -86,7 +105,14 @@ func TestUserEconomyUnconfiguredShopLoginCatalogueAndPurchaseClosed(t *testing.T
 
 // TestUserEconomyUnconfiguredSourcesStayClosed 检查新期不会把用户撤掉的自设投放重新开启。
 func TestUserEconomyUnconfiguredSourcesStayClosed(t *testing.T) {
-	f := p4Setup(t)
+	f := p4UnconfiguredSetup75(t)
+	// This scenario models an operator withdrawing the sources, including the
+	// original constant trial catalogue; seeding must preserve that explicit stop.
+	for _, table := range []any{&db.P4WelfareRule{}, &db.P4CommerceRule{}, &db.P4RecruitRotation{}} {
+		if err := db.GetIns().Model(table).Where("enabled=?", true).Update("enabled", false).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
 	now := time.Now()
 	for _, at := range []time.Time{now, now.AddDate(0, 1, 0)} {
 		for _, seed := range []func(time.Time) error{

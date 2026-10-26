@@ -136,7 +136,7 @@ func TestAdminScheduledVIPUsesNativeGateAndEligibility(t *testing.T) {
 	}
 	found := false
 	for _, item := range output[0].(*pb.SCShopProductList).GetShopItemList() {
-		if item.GetId() == product.ID {
+		if item.GetId() == vipShopSKU(product) {
 			found = true
 			if item.GetCanBuy() != 0 {
 				t.Fatal("schedule bypassed original paid/VIP eligibility")
@@ -146,7 +146,7 @@ func TestAdminScheduledVIPUsesNativeGateAndEligibility(t *testing.T) {
 	if !found {
 		t.Fatal("native VIP product missing")
 	}
-	if _, err = f.s.vipShop(bound, f.id, &pb.CSShopBuy{ShopType: proto.Int32(2), ShopItemId: proto.String(product.ID), BuyCount: proto.Int32(1)}, LocalPlayNow(bound)); err == nil {
+	if _, err = f.s.vipShop(bound, f.id, &pb.CSShopBuy{ShopType: proto.Int32(2), ShopItemId: proto.String(vipShopSKU(product)), BuyCount: proto.Int32(1)}, LocalPlayNow(bound)); err == nil {
 		t.Fatal("schedule gave an unpaid role a VIP purchase")
 	}
 	reuseToggle(t, f, actor, slot.ID, false)
@@ -165,6 +165,10 @@ func TestAdminScheduledVIPUsesNativeGateAndEligibility(t *testing.T) {
 // Readiness is separate from the operator's explicit template switch.
 func TestAdminScheduledShopReadinessAndExplicitStop(t *testing.T) {
 	f, actor := reuseFixture(t, false)
+	// This readiness test explicitly starts with its source closed, independently of shared P4 operating prerequisites.
+	if err := db.GetIns().Model(&db.P4CommerceRule{}).Where("kind=?", "popularity").Update("enabled", false).Error; err != nil {
+		t.Fatal(err)
+	}
 	if err := f.s.InitializeAdminShopAvailability(f.ctx); err != nil {
 		t.Fatal(err)
 	}

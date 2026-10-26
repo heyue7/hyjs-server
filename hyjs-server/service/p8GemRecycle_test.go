@@ -128,14 +128,14 @@ func TestP8GemRecycle(t *testing.T) {
 			t.Fatal("tracked reset with mounted current gem", err)
 		}
 		p, g = state(id)
-		restored, _ := s.equipmentRecord(g, equip.GetGuid())
-		if p.GetCoin() != beforeResetCoin+int64(spent) || p.GetDiamond() != 50 || len(restored.GetGems()) != 0 || restored.GetLevel() != 1 {
+		_, restoredErr := s.equipmentRecord(g, equip.GetGuid())
+		if p.GetCoin() != beforeResetCoin+int64(spent) || p.GetDiamond() != 50 || restoredErr == nil {
 			t.Fatal("exact reset resources and emptied original slots")
 		}
 		if count(id, "MineItem_019") != 1 || count(id, "MineItem_020") != 1 {
 			t.Fatal("baseline gem duplicated or current gem lost")
 		}
-		if len(reset[0].(*pb.SCEquipReBuild).GetGet().GetEquips()[0].GetGems()) != 0 {
+		if len(reset[0].(*pb.SCEquipReBuild).GetGet().GetEquips()) != 0 {
 			t.Fatal("native reset exposes old gem slot")
 		}
 		// The original reset receipt returns the same movement, never another gem.

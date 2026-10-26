@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"sort"
@@ -53,11 +54,16 @@ func (s *GameService) fieldBossRewardLimit(tx *gorm.DB) (int64, error) {
 
 // fieldBossResourceContent 在原Profile锁内共享跨地图次数；成功回执在此之前返回。
 // 限额沿开战冻结，旧战斗缺省不限；每日计数按实际获奖时的游戏日期推进。
-func fieldBossResourceContent(ctx context.Context, field *model.FieldState, fight *model.FieldFight, content string) (string, error) {
+func fieldBossResourceContent(ctx context.Context, field *model.FieldState, fight *model.FieldFight, content string, transactions ...*gorm.DB) (string, error) {
 	if content == "" {
 		return "", nil
 	}
 	day := LocalPlayNow(ctx).Format("2006-01-02")
+	if len(transactions) > 0 {
+		if err := fieldBossQuota75(transactions[0], GameCalendarOwner(ctx), field, day); err != nil {
+			return "", err
+		}
+	}
 	if field.BossRewardDay != day {
 		field.BossRewardDay, field.BossRewardClaims = day, 0
 	}
@@ -76,6 +82,75 @@ func fieldBossResourceContent(ctx context.Context, field *model.FieldState, figh
 	}
 	field.BossRewardClaims++
 	return content, nil
+}
+
+// fieldBossQuota75 keeps the outgoing day's complete count, including legacy
+// non-death rewards. The original profile lock owns this reversible date cache.
+func fieldBossQuota75(tx *gorm.DB, id int64, field *model.FieldState, day string) error {
+	if !ServerGameClockContextBound(tx.Statement.Context) {
+		return nil
+	}
+	if id < 1 {
+		return errors.New(constUtil.CalendarQuota75Invalid)
+	}
+	oldDay := field.BossRewardDay
+	days := []string{day}
+	if oldDay != "" {
+		days = append(days, oldDay)
+	}
+	counts, err := fieldBossQuota75Cached(tx, id, days)
+	if err != nil {
+		return err
+	}
+	// Recover already-claimed death receipts even when the reversible cache was
+	// introduced after that date. max keeps legacy grants and death grants from
+	// being counted twice when the profile already contains both.
+	if s, ok := tx.Statement.Context.Value(constUtil.GameServiceContextKey).(*GameService); ok && s.FieldBossDeath73Ready {
+		var claimed int64
+		if err = tx.Model(&db.FieldBossContribution73{}).Where("server_id=? AND player_id=? AND reward_day=? AND claimed=? AND reward_rank>0", s.OriginalServerID(), id, day, true).Count(&claimed).Error; err != nil {
+			return err
+		}
+		counts[day] = max(counts[day], claimed)
+	}
+	if field.BossRewardClaims < 0 {
+		return errors.New(constUtil.CalendarQuota75Invalid)
+	}
+	if oldDay != "" && field.BossRewardClaims > counts[oldDay] {
+		if err = calendarQuota75Save(tx, id, constUtil.CalendarQuota75FieldBoss, oldDay, field.BossRewardClaims); err != nil {
+			return err
+		}
+		counts[oldDay] = field.BossRewardClaims
+	}
+	field.BossRewardDay = day
+	field.BossRewardClaims = counts[day]
+	return nil
+}
+
+func fieldBossQuota75Cached(tx *gorm.DB, id int64, days []string) (map[string]int64, error) {
+	counts := map[string]int64{}
+	if !ServerGameClockContextBound(tx.Statement.Context) {
+		return counts, nil
+	}
+	keys := []string{}
+	prefix := "calendar75:" + constUtil.CalendarQuota75FieldBoss + ":"
+	for _, day := range days {
+		if _, err := time.Parse("2006-01-02", day); err != nil {
+			return nil, errors.New(constUtil.CalendarQuota75Invalid)
+		}
+		keys = append(keys, prefix+day)
+	}
+	var rows []db.LocalPlayActivityOperation
+	if err := tx.Select("request_id,action,activity_id,response").Where("player_id=? AND request_id IN ?", id, keys).Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	for _, row := range rows {
+		var used int64
+		if row.Action != constUtil.CalendarQuota75Action || row.ActivityID != constUtil.CalendarQuota75FieldBoss || len(row.Response) > constUtil.CalendarQuota75MaxBytes || json.Unmarshal(row.Response, &used) != nil || used < 0 {
+			return nil, errors.New(constUtil.CalendarQuota75Invalid)
+		}
+		counts[strings.TrimPrefix(row.RequestID, prefix)] = used
+	}
+	return counts, nil
 }
 
 func fieldResourceResponse(row db.FieldResourcePolicy) *model.AdminFieldResourcesResponse {

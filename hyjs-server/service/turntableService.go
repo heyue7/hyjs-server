@@ -527,7 +527,12 @@ func (s *GameService) turntableRead(ctx context.Context, id int64, kind string) 
 			if player.GetLevel() >= cfg.MinLevel && now >= cfg.StartAt && now < cfg.EndAt && !global.Settled && turntableFree(cfg, &state, LocalPlayNow(ctx)) {
 				free = 1
 			}
-			result = &pb.SCBigTurnTableInfo{BoughtCoins: proto.Int64(state.BoughtCoins), DiamondPool: proto.Int64(global.DiamondPool), RewardItems: items, IsFree: proto.Int32(free), EndTime: proto.Int64(cfg.EndAt), NextFreeTime: proto.Int64(state.NextFree), Score: proto.Int32(state.Score), OtherPlayerRewards: records, RewardEndTime: proto.Int64(cfg.RewardEndAt), ServerTime: proto.Int64(now)}
+			// The original client immediately re-queries when a non-free countdown is zero.
+			nextFree := state.NextFree
+			if free == 0 && nextFree <= now {
+				nextFree = max(cfg.EndAt, now+86400000)
+			}
+			result = &pb.SCBigTurnTableInfo{BoughtCoins: proto.Int64(state.BoughtCoins), DiamondPool: proto.Int64(global.DiamondPool), RewardItems: items, IsFree: proto.Int32(free), EndTime: proto.Int64(cfg.EndAt), NextFreeTime: proto.Int64(nextFree), Score: proto.Int32(state.Score), OtherPlayerRewards: records, RewardEndTime: proto.Int64(cfg.RewardEndAt), ServerTime: proto.Int64(now)}
 		case "rank":
 			ranks, e := s.turntableRanks(tx, &global, rules)
 			if e != nil {

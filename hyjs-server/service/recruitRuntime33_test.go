@@ -161,8 +161,8 @@ func TestRecruitRuntimeGuaranteeOverrideUsesRealGuaranteedResult(t *testing.T) {
 		t.Fatal(err)
 	}
 	wars := messages[0].(*pb.SCWarriorRecruit).GetGet().GetWars()
-	if len(wars) != 1 || s.table("Hero", "id", wars[0].GetId())["quality"] != "23" {
-		t.Fatal("runtime guarantee did not award guaranteed red", messages)
+	if len(wars) != 1 || (s.table("Hero", "id", wars[0].GetId())["quality"] != "20" && s.table("Hero", "id", wars[0].GetId())["quality"] != "23") {
+		t.Fatal("runtime guarantee did not award original orange-or-red high quality", messages)
 	}
 	if info := recruitRuntimeInfo(t, s, ctx, id, 3); info.GetLeftTimes() != 2 {
 		t.Fatal("guarantee reset countdown", info)
@@ -181,8 +181,8 @@ func TestRecruitRuntimeGuaranteeOverrideUsesRealGuaranteedResult(t *testing.T) {
 		t.Fatal(err)
 	}
 	wars = messages[0].(*pb.SCWarriorRecruit).GetGet().GetWars()
-	if len(wars) != 1 || s.table("Hero", "id", wars[0].GetId())["quality"] != "23" {
-		t.Fatal("immediate runtime guarantee did not award red", messages)
+	if len(wars) != 1 || (s.table("Hero", "id", wars[0].GetId())["quality"] != "20" && s.table("Hero", "id", wars[0].GetId())["quality"] != "23") {
+		t.Fatal("immediate runtime guarantee did not award original orange-or-red high quality", messages)
 	}
 }
 

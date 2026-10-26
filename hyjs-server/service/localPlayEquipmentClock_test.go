@@ -67,8 +67,20 @@ func TestLocalPlayEquipmentRewindStrengthenRefundAndCold(t *testing.T) {
 		t.Fatal("reset must work in the previous personal day", err)
 	}
 	restored, restoredGame := f.profile(t)
-	if restored.GetCoin() != before.GetCoin() || before.GetDiamond()-restored.GetDiamond() != 50 || restoredGame.Equipment[0].GetLevel() != 1 {
+	if restored.GetCoin() != before.GetCoin() || before.GetDiamond()-restored.GetDiamond() != 50 {
 		t.Fatal("original fifty-diamond reset did not refund actual investment")
+	}
+	if _, err := f.s.equipmentRecord(restoredGame, guid); err == nil {
+		t.Fatal("reset retained retired equipment GUID")
+	}
+	fragments, err := f.s.p5WarriorFragmentReward("equip_005", 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, fragment := range fragments {
+		if simpleOwned(restored, restoredGame, fragment.GetId()) != int64(fragment.GetNum()) {
+			t.Fatal("reset lost original synthesis fragments", fragment)
+		}
 	}
 	replay, err := f.s.p5EquipmentReset(resetCtx, id, reset, 818002)
 	replayed, _ := f.profile(t)

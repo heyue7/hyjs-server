@@ -7,7 +7,6 @@ import (
 	"hyjs-server/constUtil"
 	"hyjs-server/model"
 	pb "hyjs-server/model/protocol"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -15,7 +14,7 @@ import (
 
 func p6LinearPhysicalScopeInput(t *testing.T) *model.FrozenBattleInput {
 	t.Helper()
-	raw, err := os.ReadFile(filepath.Join("../../analysis/p6/native-linear-physical-candidate-inputs-v110b", "000.pb"))
+	raw, err := readTestAnalysis75(filepath.Join("../../analysis/p6/native-linear-physical-candidate-inputs-v110b", "000.pb"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -112,7 +111,7 @@ func TestP6LinearPhysicalScopeRejectsReachableUnknowns(t *testing.T) {
 func TestP6LinearPhysicalTerminalAndProofGate(t *testing.T) {
 	s := p6OriginalTables(t)
 	for index := 0; index < 8; index++ {
-		raw, err := os.ReadFile(fmt.Sprintf("../../analysis/p6/native-linear-physical-candidate-inputs-v110b/%03d.pb", index))
+		raw, err := readTestAnalysis75(fmt.Sprintf("../../analysis/p6/native-linear-physical-candidate-inputs-v110b/%03d.pb", index))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -184,7 +183,7 @@ func TestP6LinearPhysicalScopedSettlementCertificateAndOwnership(t *testing.T) {
 }
 
 func TestP6LinearPhysicalCertificatePinsActualProofAndPolicy(t *testing.T) {
-	raw, err := os.ReadFile("../../analysis/p6/" + constUtil.P6LinearPhysicalCertificateFile)
+	raw, err := readTestAnalysis75("../../analysis/p6/" + constUtil.P6LinearPhysicalCertificateFile)
 	if err != nil || p6Digest(raw) != constUtil.P6LinearPhysicalNativeProof {
 		t.Fatal("compiled scope proof changed", err)
 	}
@@ -207,23 +206,23 @@ func TestP6LinearPhysicalCertificatePinsActualProofAndPolicy(t *testing.T) {
 	if err = json.Unmarshal(raw, &proof); err != nil {
 		t.Fatal(err)
 	}
-	source, err := os.ReadFile(filepath.Base(proof.ScopePolicy.Source))
+	source, err := readTestAnalysis75(filepath.Base(proof.ScopePolicy.Source))
 	if err != nil || p6Digest(source) != proof.ScopePolicy.SHA {
 		t.Fatal("compiled structural mechanism policy changed", err)
 	}
-	constants, err := os.ReadFile("../constUtil/p6ScopedSettlement.go")
+	constants, err := readTestAnalysis75("../constUtil/p6ScopedSettlement.go")
 	if err != nil || p6Digest([]byte(strings.ReplaceAll(string(constants), constUtil.P6LinearPhysicalNativeProof, ""))) != proof.ScopePolicy.ConstantSHA {
 		t.Fatal("scope constants changed beyond pinned proof", err)
 	}
 	for _, source := range proof.RuntimeSources {
 		path := filepath.Join("..", strings.TrimPrefix(source.Path, "hyjs-server/"))
-		raw, err := os.ReadFile(path)
+		raw, err := readTestAnalysis75(path)
 		if err != nil || p6Digest(raw) != source.SHA {
 			t.Fatal("certified runtime source changed", source.Path, err)
 		}
 	}
 	for _, evidence := range proof.Evidence {
-		body, readErr := os.ReadFile("../../" + evidence.Path)
+		body, readErr := readTestAnalysis75("../../" + evidence.Path)
 		if readErr != nil || p6Digest(body) != evidence.SHA {
 			t.Fatal("native proof asset changed", evidence.Path, readErr)
 		}
@@ -233,7 +232,7 @@ func TestP6LinearPhysicalCertificatePinsActualProofAndPolicy(t *testing.T) {
 func TestP6LinearPhysicalFriend11ScopedOriginalSource(t *testing.T) {
 	s := p6OriginalTables(t)
 	for index := 0; index < 2; index++ {
-		raw, err := os.ReadFile(fmt.Sprintf("../../analysis/p6/native-linear-physical-friend11-inputs-v112/%03d.pb", index))
+		raw, err := readTestAnalysis75(fmt.Sprintf("../../analysis/p6/native-linear-physical-friend11-inputs-v112/%03d.pb", index))
 		if err != nil {
 			t.Fatal(err)
 		}

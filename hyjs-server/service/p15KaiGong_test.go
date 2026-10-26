@@ -14,6 +14,10 @@ func TestP15KaiGongRealCopyFactsFrozenClaimAndCold(t *testing.T) {
 	f := p4Setup(t)
 	now := time.Now()
 	key := constUtil.P15KaiGongPrefix + now.In(time.FixedZone("UTC+8", 8*3600)).Format("200601")
+	// Only this finite copy-win material period is opened for the isolated test.
+	if err := db.GetIns().Model(&db.PeriodInstance{}).Where("id=?", key).Update("enabled", true).Error; err != nil {
+		t.Fatal(err)
+	}
 	query := func() *pb.SCActivityInfo {
 		t.Helper()
 		out, err := f.s.P1Activity(f.ctx, f.id, &pb.CSActivityInfo{ActivityId: proto.String(key)})

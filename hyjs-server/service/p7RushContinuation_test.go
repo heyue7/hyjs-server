@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"math"
-	"os"
 	"strings"
 	"testing"
 	"time"
@@ -169,7 +168,7 @@ func TestP7RushContinuationCatalogueFullOriginalNPCAndActualRunGate(t *testing.T
 	if err = proto.Unmarshal(baseRows[0].Enemies, base); err != nil {
 		t.Fatal(err)
 	}
-	seed, err := os.ReadFile("../db/sql/86_p7_rush_stage_rules.seed.sql")
+	seed, err := readTestAnalysis75("../db/sql/86_p7_rush_stage_rules.seed.sql")
 	if err != nil {
 		t.Fatal(err)
 	}

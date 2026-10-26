@@ -3,7 +3,6 @@ package service
 import (
 	"encoding/json"
 	"math"
-	"os"
 	"reflect"
 	"testing"
 
@@ -13,7 +12,7 @@ import (
 )
 
 func TestP6OriginalBasePercentageInputHasNoEngineConsumer(t *testing.T) {
-	raw, err := os.ReadFile("../../analysis/p6/base-property-percentage-readers-v90-original.json")
+	raw, err := readTestAnalysis75("../../analysis/p6/base-property-percentage-readers-v90-original.json")
 	if err != nil || p6Digest(raw) != "6bfae376fbec6a0d64f474644448439e30e2fdfdffbeef9fb150058a2342a583" {
 		t.Fatal("complete original percentage getter audit", err)
 	}

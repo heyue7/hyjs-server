@@ -77,6 +77,8 @@ func TestP13UnionFightHealAuraActualMineShopTeamTicksColdConcurrentClampDeadPose
 		if _, err = f.s.p13UFFieldFrames(f.ctx, player, &pb.CSCurrentPosition{}, now()); err != nil {
 			t.Fatal(err)
 		}
+		// Team aura eligibility uses the original authenticated TCP session binding.
+		p10SceneConnect(t, f, player, &p10SceneRecorder{})
 	}
 	read := func(player int64) (db.P13UnionFightFieldPlayer, *pb.InstUFPlayer) {
 		t.Helper()

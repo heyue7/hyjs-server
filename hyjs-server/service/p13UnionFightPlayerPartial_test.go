@@ -7,13 +7,12 @@ import (
 	"hyjs-server/constUtil"
 	"hyjs-server/db"
 	pb "hyjs-server/model/protocol"
-	"os"
 	"testing"
 )
 
 func TestP13UFPlayerPartialNewPolicyPreservesLegacyAndActualState(t *testing.T) {
 	s := p6OriginalTables(t)
-	raw, err := os.ReadFile("../../analysis/p6/native-actual-war-wounded14-inputs-v196/000.SCUFFightRecordReplay.pb")
+	raw, err := readTestAnalysis75("../../analysis/p6/native-actual-war-wounded14-inputs-v196/000.SCUFFightRecordReplay.pb")
 	if err != nil {
 		t.Fatal(err)
 	}

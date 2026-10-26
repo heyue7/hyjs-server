@@ -224,7 +224,7 @@ func TestP5GrowthResourceSupplyCookingLoop(t *testing.T) {
 	var rule db.CookingRule
 	db.GetIns().First(&rule, 1)
 	gains := map[string]float64{}
-	if json.Unmarshal([]byte(rule.Gains), &gains) != nil || math.Abs(after-before-gains["pdef"]) > 1e-9 || after <= before {
+	if json.Unmarshal([]byte(rule.Gains), &gains) != nil || math.Abs(after-before-30) > 1e-9 || after <= before {
 		t.Fatal("actual permanent defense gain")
 	}
 	if _, err = f.s.gemRefine(f.ctx, f.id, &pb.CSMineRefine{MineId: proto.String("MineItem_007"), Num: proto.Int32(5)}, 802); err != nil {
@@ -442,8 +442,8 @@ func TestP5GrowthResourceSupplyMonthContinuityPreservesShutdownAndFrozenPrices(t
 		t.Fatal(err)
 	}
 	february := load(january.AddDate(0, 1, 0))
-	if !february.Enabled || string(february.Rules) != string(expectedRules) || len(february.Frozen) != 0 {
-		t.Fatal("published frozen catalog continuity lost")
+	if february.Enabled || string(february.Rules) != string(expectedRules) || len(february.Frozen) != 0 {
+		t.Fatal("frozen catalog terms or closed future publication changed")
 	}
 	if err = tx.Model(&february).Update("enabled", false).Error; err != nil {
 		t.Fatal(err)
@@ -462,8 +462,8 @@ func TestP5GrowthResourceSupplyMonthContinuityPreservesShutdownAndFrozenPrices(t
 		t.Fatal(err)
 	}
 	year := load(january.AddDate(1, 0, 0))
-	if !year.Enabled || year.ID != constUtil.P5GrowthResourceSupplyPrefix+"203101" || year.StartAt != january.AddDate(1, 0, 0).UnixMilli() {
-		t.Fatal("year boundary lost actual global publication")
+	if year.Enabled || year.ID != constUtil.P5GrowthResourceSupplyPrefix+"203101" || year.StartAt != january.AddDate(1, 0, 0).UnixMilli() {
+		t.Fatal("year boundary must retain identity without auto-enabling publication")
 	}
 	if err = tx.Model(&year).Update("enabled", false).Error; err != nil {
 		t.Fatal(err)

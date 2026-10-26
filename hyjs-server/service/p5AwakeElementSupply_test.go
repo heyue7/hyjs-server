@@ -304,8 +304,8 @@ func TestP5AwakeElementSupplyMonthlyFrozenPriceAndShutdown(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, actual, err := f.s.p4CommerceSnapshot(inherited)
-	if err != nil || !inherited.Enabled || actual.Products[0].Cost != "coin,600000" {
-		t.Fatal("next month lost legitimate frozen publication", err)
+	if err != nil || inherited.Enabled || actual.Products[0].Cost != "coin,600000" {
+		t.Fatal("next month must retain frozen terms without auto-enabling publication", err)
 	}
 	if err = db.GetIns().Model(&inherited).Update("enabled", false).Error; err != nil {
 		t.Fatal(err)

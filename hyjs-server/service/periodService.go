@@ -237,6 +237,11 @@ func (s *GameService) p1ActivityApply(tx *gorm.DB, id int64, player *pb.Player, 
 	if err != nil {
 		return nil, err
 	}
+	if frozen.Kind == "payment_amount" {
+		if err := s.reconcileRechargeProgress75(tx, progress, frozen, now); err != nil {
+			return nil, err
+		}
+	}
 	if frozen.Kind == constUtil.P1EventCopyWin && frozen.Mode == "cumulative" && now < frozen.EndAt {
 		if err = s.p1ReconcileCopyProgress(tx, progress, frozen, now); err != nil {
 			return nil, err
@@ -272,7 +277,7 @@ func (s *GameService) p1ActivityApply(tx *gorm.DB, id int64, player *pb.Player, 
 		}
 		item := items[index]
 		delivery := deliveries[index]
-		if delivery.ID == 0 {
+		if delivery.ID == 0 || frozen.Kind == "payment_amount" && delivery.ClaimedAt == 0 && item.GetStatus() != 1 {
 			return nil, errors.New("活动条件未达成")
 		}
 		gain := &pb.ResultObject{}

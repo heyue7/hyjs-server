@@ -219,8 +219,8 @@ func TestP9PetFoodSupplyFrozenMonthlyPublicationAndShutdown(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, actual, err := f.s.p9PetFoodSnapshot(inherited)
-	if err != nil || !inherited.Enabled || actual.Products[0].Cost != "coin,70000" {
-		t.Fatal("frozen legal quote/publication not inherited", err)
+	if err != nil || inherited.Enabled || actual.Products[0].Cost != "coin,70000" {
+		t.Fatal("frozen legal quote must inherit while new month remains explicitly closed", err)
 	}
 	if err = db.GetIns().Model(&inherited).Update("enabled", false).Error; err != nil {
 		t.Fatal(err)

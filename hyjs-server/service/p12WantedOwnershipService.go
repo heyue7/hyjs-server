@@ -29,6 +29,9 @@ func P12WantedRequireIdle(tx *gorm.DB, id int64, now time.Time) error {
 		if instance.State != constUtil.P12WantedActive && instance.State != constUtil.P12WantedKilled && instance.State != constUtil.P12WantedExpired {
 			return errors.New(constUtil.P12WantedInvalid)
 		}
+		if calendar75Adjusted(tx) && (fight.CreatedAt > now.UnixMilli() || instance.CreatedAt > now.UnixMilli()) {
+			continue
+		}
 		if instance.State == constUtil.P12WantedActive && instance.ExpiresAt > now.UnixMilli() && instance.CurrentHP > 0 {
 			return errors.New(constUtil.P12WantedBusy)
 		}

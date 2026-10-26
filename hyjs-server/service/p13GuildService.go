@@ -242,6 +242,9 @@ func (s *GameService) p13GuildLoginAt(ctx context.Context, id int64, now time.Ti
 		if m.GuildID == "" {
 			return nil
 		}
+		if err = calendarGuildDay75(tx, m, now); err != nil {
+			return err
+		}
 		if _, err = s.P13GuildGiftBeforeMutation(tx, m.GuildID, now); err != nil {
 			return err
 		}
@@ -1194,6 +1197,9 @@ func (s *GameService) p13GuildEconomy(ctx context.Context, id int64, request pro
 	return s.p13GuildMutate(ctx, id, request, response, stamp, now, true, func(tx *gorm.DB, row *db.Profile, p *pb.Player, state *model.GameState) error {
 		m, guild, err := p13GuildNeedMember(tx, id)
 		if err != nil {
+			return err
+		}
+		if err = calendarGuildDay75(tx, m, now); err != nil {
 			return err
 		}
 		day := p13GuildDay(now)

@@ -3,6 +3,7 @@ CREATE TABLE IF NOT EXISTS `p3_vip_shop_products` (
  `id` VARCHAR(64) NOT NULL,
  `min_vip` BIGINT NOT NULL,
  `cost` BIGINT NOT NULL,
+ `total_limit` BIGINT NOT NULL DEFAULT 0,
  `cost_resource` VARCHAR(64) NOT NULL DEFAULT '',
  `reward` TEXT NOT NULL,
  `source` TEXT NOT NULL,

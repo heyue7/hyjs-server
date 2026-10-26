@@ -45,7 +45,7 @@ func dailyPlaybackSetup(t *testing.T) (*p1Fixture, int64) {
 }
 func dailyPlaybackNative(t *testing.T, f *p1Fixture, name string, stamp int64) (db.DailyCopyFight, db.DailyCopyStartReceipt, *pb.SCDailyCopyFightStart, *pb.CSDailyCopyFightEnd) {
 	t.Helper()
-	raw, err := os.ReadFile("../../analysis/p6/" + name)
+	raw, err := readTestAnalysis75("../../analysis/p6/" + name)
 	if err != nil {
 		t.Fatal(err)
 	}

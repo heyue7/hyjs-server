@@ -43,7 +43,7 @@ func TestP6ExportOriginalCopyEnemyMechanismProbes(t *testing.T) {
 	}
 	s := p6OriginalTables(t)
 	sourcePath := filepath.Join(root, "analysis/p6/native-next-real-skills-inputs-v95/000.pb")
-	raw, err := os.ReadFile(sourcePath)
+	raw, err := readTestAnalysis75(sourcePath)
 	if err != nil || p6Digest(raw) != "398c6819d7b8d5d1b4f06287610fdd2d34b8e81e791b3b35c0f61c48330f257f" {
 		t.Fatal("real cold actor source SHA", err)
 	}
@@ -51,7 +51,7 @@ func TestP6ExportOriginalCopyEnemyMechanismProbes(t *testing.T) {
 	if err = proto.Unmarshal(raw, playerSource); err != nil {
 		t.Fatal(err)
 	}
-	remainingRaw, err := os.ReadFile(filepath.Join(root, "analysis/p6/native-next-real-skills-inputs-v97/manifest.json"))
+	remainingRaw, err := readTestAnalysis75(filepath.Join(root, "analysis/p6/native-next-real-skills-inputs-v97/manifest.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -177,7 +177,7 @@ func TestP6ExportOriginalCopyEnemyMechanismProbes(t *testing.T) {
 	if len(cases) == 0 {
 		t.Fatal("no actually computed new NPC skill candidate", failures)
 	}
-	table, err := os.ReadFile(filepath.Join(root, "analysis/tables/TableCopyEnemy.tsv"))
+	table, err := readTestAnalysis75(filepath.Join(root, "analysis/tables/TableCopyEnemy.tsv"))
 	if err != nil {
 		t.Fatal(err)
 	}

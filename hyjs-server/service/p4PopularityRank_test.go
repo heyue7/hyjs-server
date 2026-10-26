@@ -120,7 +120,7 @@ func TestP4PopularityActualArenaDailyCurrencyRankExchangeColdAndGuide(t *testing
 		t.Fatal(err)
 	}
 	before, _ := p10LuckyProfile(t, owner)
-	if before.GetPopularity() != 5000 {
+	if before.GetPopularity() != 5050 {
 		t.Fatal("real original P1 daily source missing", before.GetPopularity())
 	}
 	query := &pb.CSShopProductList{ShopType: proto.Int32(4)}
@@ -154,7 +154,7 @@ func TestP4PopularityActualArenaDailyCurrencyRankExchangeColdAndGuide(t *testing
 	bought := replies[0].(*pb.SCShopBuy)
 	original, _ := proto.Marshal(bought)
 	current, game := p10LuckyProfile(t, owner)
-	if current.GetPopularity() != 4980 || current.GetNoviceGuideSchedule() != 14 || simpleOwned(current, game, "item_001") != 1 || bought.GetCost()[0].GetNum() != 20 || p4PopularityFind(t, bought.ShopItemList, sku.GetId()).GetCanBuy() != 2 {
+	if current.GetPopularity() != 5030 || current.GetNoviceGuideSchedule() != 14 || simpleOwned(current, game, "item_001") != 1 || bought.GetCost()[0].GetNum() != 20 || p4PopularityFind(t, bought.ShopItemList, sku.GetId()).GetCanBuy() != 2 {
 		t.Fatal("rank source/actual cost/quota/guide", current, bought)
 	}
 	var claim db.P4PopularityRankClaim
@@ -189,7 +189,7 @@ func TestP4PopularityActualArenaDailyCurrencyRankExchangeColdAndGuide(t *testing
 	}
 	replay, _ := proto.Marshal(again[0])
 	current, game = p10LuckyProfile(t, owner)
-	if !bytes.Equal(original, replay) || current.GetPopularity() != 4980 || simpleOwned(current, game, "item_001") != 1 || p1Count(t, &db.P4PopularityRankClaim{}, "player_id=?", owner) != 1 {
+	if !bytes.Equal(original, replay) || current.GetPopularity() != 5030 || simpleOwned(current, game, "item_001") != 1 || p1Count(t, &db.P4PopularityRankClaim{}, "player_id=?", owner) != 1 {
 		t.Fatal("cold replay changed actual wallet/item/claim")
 	}
 }

@@ -35,7 +35,7 @@ func loadP3VIPShop(tx *gorm.DB, id int64, product string, now time.Time) (db.VIP
 	if err := tx.Clauses(clause.Locking{Strength: "SHARE"}).First(&result, "id=?", product).Error; err != nil {
 		return result, err
 	}
-	if result.ID != product || !result.Enabled || shopHasDirectStamina(result.Reward) || result.MinVIP < 1 || result.MinVIP > 12 || result.Cost <= 0 || result.Cost > math.MaxInt32 || result.Source == "" {
+	if result.ID != product || !result.Enabled || shopHasDirectStamina(result.Reward) || result.MinVIP < 1 || result.MinVIP > 12 || result.TotalLimit < 0 || result.TotalLimit > math.MaxInt32 || result.Cost <= 0 || result.Cost > math.MaxInt32 || result.Source == "" {
 		return result, errors.New(constUtil.P3PaymentConfigError)
 	}
 	key := "vip-shop:" + product + ":" + p3Day(now)
@@ -76,6 +76,13 @@ func vipShopQuotedProduct(tx *gorm.DB, id int64, sku string, now time.Time) (db.
 	}
 	return cfg, nil
 }
+
+// Count accepted claims across every historical period for the stable product identity.
+func vipShopTotalClaimCount(tx *gorm.DB, id int64, product string) (int64, error) {
+	var count int64
+	err := tx.Model(&db.MembershipClaim{}).Where("player_id=? AND kind=?", id, "vip-shop:"+product).Count(&count).Error
+	return count, err
+}
 func (s *GameService) p3VIPShopList(tx *gorm.DB, p *pb.Player, now time.Time) ([]*pb.ShopItem, error) {
 	var products []db.VIPShopProduct
 	if err := tx.Where("enabled = ?", true).Order("id").Find(&products).Error; err != nil {
@@ -84,6 +91,25 @@ func (s *GameService) p3VIPShopList(tx *gorm.DB, p *pb.Player, now time.Time) ([
 	_, _, paid, err := PaymentTotals(tx, p.GetPlayerId(), 0, now.UnixMilli()+1)
 	if err != nil {
 		return nil, err
+	}
+	var lifetime []struct {
+		Kind  string
+		Count int64
+	}
+	kinds := []string{}
+	for _, p := range products {
+		if p.TotalLimit > 0 {
+			kinds = append(kinds, "vip-shop:"+p.ID)
+		}
+	}
+	totals := map[string]int64{}
+	if len(kinds) > 0 {
+		if err := tx.Model(&db.MembershipClaim{}).Select("kind,COUNT(*) AS count").Where("player_id=? AND kind IN ?", p.GetPlayerId(), kinds).Group("kind").Scan(&lifetime).Error; err != nil {
+			return nil, err
+		}
+		for _, r := range lifetime {
+			totals[r.Kind] = r.Count
+		}
 	}
 	var items []*pb.ShopItem
 	for _, live := range products {
@@ -106,6 +132,11 @@ func (s *GameService) p3VIPShopList(tx *gorm.DB, p *pb.Player, now time.Time) ([
 		if bought {
 			left = 0
 		}
+		totalLeft := int64(-1)
+		if cfg.TotalLimit > 0 {
+			totalLeft = max(int64(0), cfg.TotalLimit-totals["vip-shop:"+cfg.ID])
+			left = min(left, int32(totalLeft))
+		}
 		can := left
 		if paid == 0 || int64(p.GetVip()) < cfg.MinVIP {
 			can = 0
@@ -116,7 +147,7 @@ func (s *GameService) p3VIPShopList(tx *gorm.DB, p *pb.Player, now time.Time) ([
 		if e != nil {
 			return nil, e
 		}
-		items = append(items, &pb.ShopItem{Id: proto.String(vipShopSKU(cfg)), Item: reward, Price: []*pb.BaseResource{price}, Discount: []*pb.BaseResource{proto.Clone(price).(*pb.BaseResource)}, ExchangeList: []*pb.BaseResource{proto.Clone(price).(*pb.BaseResource)}, CanBuy: proto.Int32(can), DayLeftTimes: proto.Int32(left), DayTotalTimes: proto.Int32(1), Condition: &pb.ShopCondition{Type: proto.String("vip"), Value: proto.Int64(cfg.MinVIP)}})
+		items = append(items, &pb.ShopItem{Id: proto.String(vipShopSKU(cfg)), Item: reward, Price: []*pb.BaseResource{price}, Discount: []*pb.BaseResource{proto.Clone(price).(*pb.BaseResource)}, ExchangeList: []*pb.BaseResource{proto.Clone(price).(*pb.BaseResource)}, CanBuy: proto.Int32(can), DayLeftTimes: proto.Int32(left), DayTotalTimes: proto.Int32(1), TotalTimes: proto.Int32(int32(cfg.TotalLimit)), TotalLeftTimes: proto.Int32(int32(totalLeft)), Condition: &pb.ShopCondition{Type: proto.String("vip"), Value: proto.Int64(cfg.MinVIP)}})
 	}
 	return items, nil
 }
@@ -147,6 +178,15 @@ func (s *GameService) vipShop(ctx context.Context, id int64, request proto.Messa
 		}
 		if paid == 0 || int64(p.GetVip()) < cfg.MinVIP {
 			return errors.New(constUtil.P3PaymentUnavailable)
+		}
+		if cfg.TotalLimit > 0 {
+			used, err := vipShopTotalClaimCount(tx, id, cfg.ID)
+			if err != nil {
+				return err
+			}
+			if used >= cfg.TotalLimit {
+				return errors.New(constUtil.P3PaymentUnavailable)
+			}
 		}
 		cost, e := s.p4ParseCost(fmt.Sprintf("%s,%d", vipShopCostResource(cfg), cfg.Cost))
 		if e != nil {

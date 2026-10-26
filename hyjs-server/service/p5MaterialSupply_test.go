@@ -19,6 +19,10 @@ func TestP5MaterialSupplyFrozenLimits(t *testing.T) {
 	f := p4Setup(t)
 	now := time.Now().Add(-24 * time.Hour).In(time.FixedZone("UTC+8", 8*3600))
 	key := constUtil.P5SpecialtySupplyPrefix + now.Format("200601")
+	// Explicit finite specialty-material publication; original source remains default-off.
+	if err := db.GetIns().Model(&db.P4CommerceRule{}).Where("id=?", key).Update("enabled", true).Error; err != nil {
+		t.Fatal(err)
+	}
 	query := &pb.CSActivityShopInfo{ActivityId: proto.String(key)}
 	listing := p4Trade(t, f, query, 0, now).(*pb.SCActivityShopInfo)
 	if len(listing.GetShopItemList()) != 4 {

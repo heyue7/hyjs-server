@@ -258,7 +258,7 @@ func (s *GameService) P13GuildTechProperties(ctx context.Context, tx *gorm.DB, i
 	if err := tx.Where("guild_id=?", offer.GuildID).Order("tech_type,level").Find(&steps).Error; err != nil {
 		return nil, "", err
 	}
-	return p13GuildTechPropertiesRead(&guild, &offer, steps, now)
+	return p13GuildTechPropertiesRead(&guild, &offer, steps, calendar75SourceHorizon(tx, now))
 }
 
 func p13GuildTechPropertiesRead(guild *db.P13Guild, offer *db.P13GuildTechOffer, rows []db.P13GuildTechUpgrade, now time.Time) (*pb.BaseProp, string, error) {
@@ -348,7 +348,7 @@ func (s *GameService) p13GuildTechQuery(ctx context.Context, id int64, building 
 			if !source.Enabled {
 				return nil
 			}
-			if source.Source != constUtil.P13GuildTechSource || source.Version == "" || source.PublishedAt <= 0 || source.PublishedAt > now.UnixMilli() {
+			if source.Source != constUtil.P13GuildTechSource || source.Version == "" || source.PublishedAt <= 0 || source.PublishedAt > calendar75SourceHorizon(tx, now).UnixMilli() {
 				return errors.New("公会科技目录尚未发布")
 			}
 			directory, err = p13GuildTechDirectoryRead(source.DirectoryJSON, source.DirectoryHash)
@@ -368,7 +368,7 @@ func (s *GameService) p13GuildTechQuery(ctx context.Context, id int64, building 
 				return err
 			}
 			for _, step := range steps {
-				if step.AppliedAt > now.UnixMilli() {
+				if step.AppliedAt > calendar75SourceHorizon(tx, now).UnixMilli() {
 					return errors.New("公会科技升级时刻晚于当前查询")
 				}
 			}
@@ -428,7 +428,7 @@ func (s *GameService) p13GuildTechUpgrade(ctx context.Context, id int64, request
 		var offer db.P13GuildTechOffer
 		err = tx.First(&offer, "guild_id=?", guild.ID).Error
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			if policy.Source != constUtil.P13GuildTechSource || policy.PublishedAt <= 0 || policy.PublishedAt > now.UnixMilli() || strings.TrimSpace(policy.Version) == "" || len(policy.Version) > 128 {
+			if policy.Source != constUtil.P13GuildTechSource || policy.PublishedAt <= 0 || policy.PublishedAt > calendar75SourceHorizon(tx, now).UnixMilli() || strings.TrimSpace(policy.Version) == "" || len(policy.Version) > 128 {
 				return errors.New("公会科技目录尚未发布")
 			}
 			if _, err = p13GuildTechDirectoryRead(policy.DirectoryJSON, policy.DirectoryHash); err != nil {
@@ -439,6 +439,9 @@ func (s *GameService) p13GuildTechUpgrade(ctx context.Context, id int64, request
 				return err
 			}
 			offer = db.P13GuildTechOffer{GuildID: guild.ID, Version: policy.Version, DirectoryJSON: policy.DirectoryJSON, DirectoryHash: policy.DirectoryHash, OriginalRowsJSON: originalJSON, OriginalRowsHash: p6Digest([]byte(originalJSON)), OriginalClient: constUtil.P6OriginalClientHash, PublishedAt: policy.PublishedAt, CapturedAt: now.UnixMilli(), Source: constUtil.P13GuildTechSource}
+			if calendar75Adjusted(tx) {
+				offer.PublishedAt = min(offer.PublishedAt, offer.CapturedAt)
+			}
 			if offer.OriginalRowsHash != constUtil.P13GuildTechOriginalRowsHash {
 				offer.Source = constUtil.AdminGuildTechSource
 			}
@@ -460,10 +463,17 @@ func (s *GameService) p13GuildTechUpgrade(ctx context.Context, id int64, request
 		if err != nil {
 			return err
 		}
+		appliedAt := now.UnixMilli()
 		for _, step := range steps {
-			if step.AppliedAt > now.UnixMilli() {
+			if step.AppliedAt > calendar75SourceHorizon(tx, now).UnixMilli() {
 				return errors.New("科技升级早于既有实际记录")
 			}
+			if calendar75Adjusted(tx) {
+				appliedAt = max(appliedAt, step.AppliedAt)
+			}
+		}
+		if calendar75Adjusted(tx) {
+			appliedAt = max(appliedAt, offer.CapturedAt)
 		}
 		level := levels[kind]
 		if level >= constUtil.P13GuildTechMaxLevel {
@@ -481,7 +491,7 @@ func (s *GameService) p13GuildTechUpgrade(ctx context.Context, id int64, request
 		if err = tx.Save(guild).Error; err != nil {
 			return err
 		}
-		step := db.P13GuildTechUpgrade{GuildID: guild.ID, Type: kind, Level: level + 1, Building: building, PlayerID: id, Stamp: stamp, AppliedAt: now.UnixMilli(), Coin: row.Coin, Badge: row.Badge, Prop: row.Prop, OfferHash: offer.SourceHash, OriginalRowHash: p13GuildTechRowHash(row)}
+		step := db.P13GuildTechUpgrade{GuildID: guild.ID, Type: kind, Level: level + 1, Building: building, PlayerID: id, Stamp: stamp, AppliedAt: appliedAt, Coin: row.Coin, Badge: row.Badge, Prop: row.Prop, OfferHash: offer.SourceHash, OriginalRowHash: p13GuildTechRowHash(row)}
 		step.SourceHash = p13GuildTechUpgradeHash(&step)
 		if err = tx.Create(&step).Error; err != nil {
 			return err

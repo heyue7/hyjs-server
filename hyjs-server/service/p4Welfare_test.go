@@ -20,7 +20,12 @@ import (
 	pb "hyjs-server/model/protocol"
 )
 
-func p4Setup(t *testing.T) *p1Fixture {
+func p4Setup(t *testing.T) *p1Fixture { return p4SetupWithOperations75(t, true) }
+
+// Default-closed assertions use identical initialization without explicit test operations.
+func p4UnconfiguredSetup75(t *testing.T) *p1Fixture { return p4SetupWithOperations75(t, false) }
+
+func p4SetupWithOperations75(t *testing.T, operations bool) *p1Fixture {
 	t.Helper()
 	f := &p1Fixture{ctx: context.Background(), path: filepath.Join(t.TempDir(), "p4.db")}
 	if name := os.Getenv("HYJS_P4_MYSQL_DATABASE"); name != "" {
@@ -57,6 +62,20 @@ func p4Setup(t *testing.T) *p1Fixture {
 	}
 	if err := f.s.seedP4Registry(db.GetIns().WithContext(f.ctx)); err != nil {
 		t.Fatal(err)
+	}
+	if operations {
+		// Finite fixed material slots from the original item price table, test-only.
+		if err := db.GetIns().Model(&db.ShopProduct{}).Where("id IN ?", []string{"itemShopId_8", "itemShopId_9", "itemShopId_10", "itemShopId_11", "itemShopId_12", "itemShopId_13", "itemShopId_14", "itemShopId_16"}).Update("enabled", true).Error; err != nil {
+			t.Fatal(err)
+		}
+		// Explicit finite operation of ordinary materials in this isolated fixture.
+		// Production seeds stay disabled; no direct-red sale/exchange source opens here.
+		if err := db.GetIns().Model(&db.P4CommerceRule{}).Where("kind IN ?", []string{"ordinary", "memory", "popularity", "point", "score"}).Update("enabled", true).Error; err != nil {
+			t.Fatal(err)
+		}
+		if err := db.GetIns().Model(&db.P4WelfareRule{}).Where("kind IN ?", []string{constUtil.P4WelfareLogin, constUtil.P4WelfareLimit, constUtil.P4WelfareMeal, constUtil.P4WelfareRebate, constUtil.P4WelfareCat}).Update("enabled", true).Error; err != nil {
+			t.Fatal(err)
+		}
 	}
 	a, err := LoginAccount(f.ctx, "p4-"+t.Name()+fmt.Sprint(time.Now().UnixNano()), "isolated-password")
 	if err != nil {
@@ -251,6 +270,13 @@ func TestP4MonthGraceKeepsEarnedOldRewards(t *testing.T) {
 	p4Call(t, f, &pb.CSLoginRewardInfo{}, 0, at)
 	local := at.In(time.FixedZone("UTC+8", 8*3600))
 	next := time.Date(local.Year(), local.Month()+1, 1, 10, 0, 0, 0, local.Location())
+	// Independently publish the next finite login/cat window; seeds stay closed.
+	if err := f.s.seedP4Welfare(db.GetIns(), next); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.GetIns().Model(&db.P4WelfareRule{}).Where("start_at=? AND kind IN ?", time.Date(next.Year(), next.Month(), 1, 0, 0, 0, 0, next.Location()).UnixMilli(), []string{constUtil.P4WelfareLogin, constUtil.P4WelfareCat}).Update("enabled", true).Error; err != nil {
+		t.Fatal(err)
+	}
 	old := p4Call(t, f, &pb.CSLoginRewardInfo{}, 0, next).(*pb.SCLoginRewardInfo)
 	if old.GetHasReward() != 1 || old.GetItems()[0].GetState() != 1 {
 		t.Fatal("old earned calendar hidden by new month")

@@ -20,6 +20,9 @@ func TestTrustedDeploymentServerIdentity(t *testing.T) {
 	}
 	pool, _ := db.GetIns().DB()
 	defer pool.Close()
+	if err := InitializeLoginSecurity(ctx); err != nil {
+		t.Fatal(err)
+	}
 	s := &GameService{Host: "127.0.0.1", ServerID: 2}
 	wrong := &model.GamePacket{ZoneId: 1, Body: &pb.CSUserLogin{PlatformUid: proto.String("trusted-id-fixture"), AuthCode: proto.String("isolated-fixture-password")}}
 	if _, err := s.dispatch(ctx, wrong, "127.0.0.1"); err == nil {

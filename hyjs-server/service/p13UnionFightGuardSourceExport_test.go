@@ -123,7 +123,7 @@ func TestP13UnionFightGuardSourceExport(t *testing.T) {
 	}
 	pins := map[string]string{}
 	for _, relative := range []string{"hyjs-server/service/p13UnionFightGuardSourceExport_test.go", "hyjs-server/service/p13UnionFightGuardAudit_test.go", "hyjs-server/service/p13UnionFightGuardAuditService.go", "hyjs-server/service/p13UnionFightBattleAuditService.go", "hyjs-server/service/p13UnionFightBattleFrozenService.go", "hyjs-server/service/p13UnionFightFieldService.go", "hyjs-server/service/p6FinalHPService.go", "hyjs-server/service/combatRoundService.go", "analysis/tables/TableUnionFightGuard.tsv", "analysis/tables/TableHero.tsv", "analysis/tables/TableSkill.tsv", "analysis/tables/TableSkillCast.tsv", "analysis/tables/TableBuff.tsv"} {
-		raw, err := os.ReadFile(filepath.Join(repo, relative))
+		raw, err := readTestAnalysis75(filepath.Join(repo, relative))
 		if err != nil {
 			t.Fatal(err)
 		}

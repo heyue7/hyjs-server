@@ -5,7 +5,6 @@ import (
 	"google.golang.org/protobuf/proto"
 	"hyjs-server/constUtil"
 	"hyjs-server/model"
-	"os"
 	"testing"
 )
 
@@ -68,7 +67,7 @@ func p6NativeManualAutoFixtureInput(t *testing.T, input *model.FrozenBattleInput
 	if wireSHA != "1ffc83ab125a4b9f8b27ac53e4b66d157f8458cfcfa20cff1d9691fc45a64c21" {
 		t.Fatal("manual source wire changed")
 	}
-	raw, err := os.ReadFile("../../analysis/p6/actual-phone-rush-manual-auto-input-v161/000.frozen-input.json")
+	raw, err := readTestAnalysis75("../../analysis/p6/actual-phone-rush-manual-auto-input-v161/000.frozen-input.json")
 	if err != nil || p6Digest(raw) != "647f1129df6efd57f95dba3ed8fe31135d5750d76ebe592cc34e222e0e83f9d0" {
 		t.Fatal("actual manual source field hash changed", err)
 	}

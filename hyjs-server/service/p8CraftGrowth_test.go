@@ -42,7 +42,7 @@ func TestP8CraftGrowth(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	for _, init := range []func(context.Context) error{s.InitializeP1, s.InitializeP5, s.InitCooking, s.InitGems, s.InitializeP8Gather} {
+	for _, init := range []func(context.Context) error{s.InitializeP1, s.InitializeGameplayPools, s.InitializeP2, s.InitializeP5, s.InitCooking, s.InitGems, s.InitializeP8Gather} {
 		if err = init(base); err != nil {
 			t.Fatal(err)
 		}
@@ -203,7 +203,7 @@ func TestP8CraftGrowth(t *testing.T) {
 				afterAtt = h.GetProp().GetAtt()
 			}
 		}
-		if math.Abs(afterAtt-beforeAtt-3) > 1e-9 {
+		if math.Abs(afterAtt-beforeAtt-300) > 1e-9 {
 			t.Fatal("actual accumulated permanent att", beforeAtt, afterAtt)
 		}
 		power, err := s.formationFightPower(afterP, afterG)
@@ -229,18 +229,32 @@ func TestP8CraftGrowth(t *testing.T) {
 			t.Fatal("original half accumulated dishes floor3/2")
 		}
 		_, g := state(id)
-		w, _ := p5Warrior(g, guid)
-		if w.GetCooking() != nil || p5KV(g, "p5.invest:"+guid) != "" {
-			t.Fatal("baseline and investment not reset")
+		if _, missing := p5Warrior(g, guid); missing == nil || p5KV(g, "p5.invest:"+guid) != "" {
+			t.Fatal("partner GUID must retire and investment clear")
 		}
+		p, _ := state(id)
+		if simpleOwned(p, g, "frag_hero_003") != 150 {
+			t.Fatal("original partner fragments missing")
+		}
+		stamp++
+		combined, combineErr := s.redCombine(base, id, &pb.CSCombine{TargetId: proto.String("hero_003")}, stamp)
+		if combineErr != nil {
+			t.Fatal("actual fragment recombination", combineErr)
+		}
+		guid = combined[0].(*pb.SCCombine).GetGet().GetWars()[0].GetGuid()
 		stamp++
 		if _, err = eat(id, guid, stamp); err != nil {
 			t.Fatal("refunded actual dish not reusable", err)
 		}
 		stamp++
 		reset, err = s.p5WarriorReset(base, id, &pb.CSWarriorReset{Guid: proto.String(guid)}, stamp)
-		if err != nil || len(reset[0].(*pb.SCWarriorReset).GetGet().GetSimps()) != 0 {
-			t.Fatal("one dish half integer boundary should refund zero without blocking", err)
+		if err != nil {
+			t.Fatal("one dish reset", err)
+		}
+		for _, r := range reset[0].(*pb.SCWarriorReset).GetGet().GetSimps() {
+			if r.GetId() == "FishItem_029" {
+				t.Fatal("one dish half integer boundary invented dish", r)
+			}
 		}
 		if cookingCount(id, "FishItem_029") != 0 {
 			t.Fatal("half refund invented a fraction")

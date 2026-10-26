@@ -67,7 +67,10 @@ func TestP7AincradPersonalNewEarnedStarsOriginalGenericRewardResetAndCold(t *tes
 	} else if closed.Results[0].Status != "open" {
 		t.Fatal("unknown original source status", closed)
 	}
-	// An actual accepted old three-star floor enables the global source only.
+	// Publish a finite original activity; real wins no longer open operating rewards.
+	p7StarActivityOperations75(t, f)
+	p7PointShopOperations75(t, f)
+	// The accepted old three-star floor advances the independently published global source.
 	p7SectionPlayFloor(t, f, 1, 3, 94201)
 	var global db.PeriodInstance
 	if err = db.GetIns().Where("kind=? AND enabled=?", constUtil.P7RushStarEvent, true).First(&global).Error; err != nil {

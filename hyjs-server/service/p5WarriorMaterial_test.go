@@ -158,7 +158,7 @@ func TestP5WarriorMaterialOriginalEXPTrackedResetRetryAndCold(t *testing.T) {
 	}
 	count := 0
 	for _, unit := range resetG.Warriors {
-		if unit.GetGuid() == donorGUID || unit.GetGuid() == spentGUID {
+		if unit.GetGuid() == donorGUID || unit.GetGuid() == spentGUID || unit.GetGuid() == targetGUID {
 			t.Fatal("reset restored a consumed GUID")
 		}
 		if unit.GetId() == "hero_011" {
@@ -168,8 +168,8 @@ func TestP5WarriorMaterialOriginalEXPTrackedResetRetryAndCold(t *testing.T) {
 			}
 		}
 	}
-	if count != 4 {
-		t.Fatal("nested ordinary unit conservation", count)
+	if count != 1 || simpleOwned(p, resetG, "frag_hero_011") != 80 {
+		t.Fatal("upgrade donors become EXP; target becomes80 fragments; unused card survives", count, simpleOwned(p, resetG, "frag_hero_011"))
 	}
 	resetRaw, _ := json.Marshal(resetG)
 	if _, err = f.s.p5WarriorReset(ctx(reset), f.id, reset, 772003); err != nil {
@@ -425,7 +425,7 @@ func TestP5WarriorMaterialRealTrainingCookingOddMergeResetOnceAndCold(t *testing
 		t.Fatal("confirmed training/food donors rejected", err)
 	}
 	result := out[0].(*pb.SCWarriorStrengthen)
-	if result.GetGuid().GetLevel() != 12 || result.GetGuid().GetExp() != 4088 || result.GetGuid().GetCooking().GetProp().GetPdef() != 1 || growthValues(result.GetGuid().GetTraining()) != [4]int32{} {
+	if result.GetGuid().GetLevel() != 12 || result.GetGuid().GetExp() != 4088 || result.GetGuid().GetCooking().GetProp().GetPdef() != 30 || growthValues(result.GetGuid().GetTraining()) != [4]int32{} {
 		t.Fatal("consumer changed originalEXP-only inheritance", result.GetGuid())
 	}
 	p, grownG := f.profile(t)
@@ -467,8 +467,8 @@ func TestP5WarriorMaterialRealTrainingCookingOddMergeResetOnceAndCold(t *testing
 			drills += r.GetNum()
 		}
 	}
-	if dishes != 1 || drills != 3 || p.GetCoin() != 100000 || p.GetDiamond() != 50 {
-		t.Fatal("single final aggregate rounddown/refund", dishes, drills, p)
+	if dishes != 1 || drills != 3 || p.GetCoin() != 100000 || p.GetDiamond() != 45 {
+		t.Fatal("single final aggregate rounddown/refund; training diamonds remain spent", dishes, drills, p)
 	}
 	refundHero, refundEXP := 0, 0
 	for _, w := range resetG.Warriors {
@@ -478,12 +478,12 @@ func TestP5WarriorMaterialRealTrainingCookingOddMergeResetOnceAndCold(t *testing
 		if w.GetId() == "hero_011" && w.GetGuid() != target.GetGuid() {
 			refundHero++
 		}
-		if w.GetId() == "hero_exp_004" {
+		if w.GetId() == "hero_exp_002" {
 			refundEXP++
 		}
 	}
-	if refundHero != 2 || refundEXP != 1 {
-		t.Fatal("flattened original-unit refund count", refundHero, refundEXP)
+	if refundHero != 0 || refundEXP != 4 || simpleOwned(p, resetG, "frag_hero_011") != 80 {
+		t.Fatal("target80 fragments and20000 paidEXP normalized to four5000 crystals", refundHero, refundEXP, simpleOwned(p, resetG, "frag_hero_011"))
 	}
 	savedRaw, _ := json.Marshal(resetG)
 	if again, e := f.s.p5WarriorReset(ctx(reset), f.id, reset, 773009); e != nil || !proto.Equal(again[0], resetOut[0]) {

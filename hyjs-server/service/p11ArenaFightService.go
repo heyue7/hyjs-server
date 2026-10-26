@@ -167,7 +167,7 @@ func (s *GameService) p11ArenaScopedFightAt(ctx context.Context, id int64, reque
 			return err
 		}
 		var match db.P11ArenaMatch
-		if err = tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("viewer_id=? AND opponent_id=? AND expires_at>?", id, request.GetPlayerId(), now.UnixMilli()).Order("created_at DESC, id DESC").First(&match).Error; err != nil {
+		if err = tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("viewer_id=? AND opponent_id=? AND created_at<=? AND expires_at>?", id, request.GetPlayerId(), now.UnixMilli(), now.UnixMilli()).Order("created_at DESC, id DESC").First(&match).Error; err != nil {
 			return errors.New(constUtil.P11ArenaFightRefreshRequired)
 		}
 		configHash, err := s.p11ArenaConfigurationHash()

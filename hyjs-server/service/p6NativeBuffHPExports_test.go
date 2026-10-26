@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
-	"os"
 	"path/filepath"
 	"sort"
 	"testing"
@@ -34,7 +33,7 @@ func p6OriginalBuffHPFixture(t *testing.T, name, sha string, classes ...int32) {
 	t.Helper()
 	preciseRoundBegin := name == "native-hit-exports-golden-v81-v66abatch.json" || name == "native-hit-exports-golden-v76-v65abatch.json" || name == "native-hit-exports-golden-v73-v64batch.json" || name == "native-hit-exports-golden-v63-v63batch.json" || name == "native-hit-exports-golden-v62-v62batch.json" || name == "native-hit-exports-golden-v58-v58batch.json" || name == "native-hit-exports-golden-v59-v59batch.json" || name == "native-hit-exports-golden-v60-v60batch.json" || name == "native-hit-exports-golden-v61-v61batch.json"
 	root := filepath.Join("..", "..")
-	raw, err := os.ReadFile(filepath.Join(root, "analysis", "p6", name))
+	raw, err := readTestAnalysis75(filepath.Join(root, "analysis", "p6", name))
 	if err != nil || p6Digest(raw) != sha {
 		t.Fatal("original standalone Buff HP export digest", err)
 	}
@@ -76,7 +75,7 @@ func p6OriginalBuffHPFixture(t *testing.T, name, sha string, classes ...int32) {
 		t.Fatal("original standalone Buff HP denominator", err)
 	}
 	for file, digest := range map[string]string{original.Source: original.SourceSHA, original.WireRoot: original.WireSHA} {
-		body, readErr := os.ReadFile(filepath.Join(root, file))
+		body, readErr := readTestAnalysis75(filepath.Join(root, file))
 		if readErr != nil || p6Digest(body) != digest {
 			t.Fatal("original standalone Buff HP provenance", file, readErr)
 		}
@@ -94,7 +93,7 @@ func p6OriginalBuffHPFixture(t *testing.T, name, sha string, classes ...int32) {
 	s := p6OriginalTables(t)
 	for _, c := range original.Cases {
 		t.Run(c.Name, func(t *testing.T) {
-			wire, readErr := os.ReadFile(filepath.Join(root, c.Wire))
+			wire, readErr := readTestAnalysis75(filepath.Join(root, c.Wire))
 			if readErr != nil || p6Digest(wire) != c.WireSHA {
 				t.Fatal("original standalone Buff HP input SHA", readErr)
 			}

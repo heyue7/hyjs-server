@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"encoding/json"
-	"os"
 	"testing"
 
 	"google.golang.org/protobuf/proto"
@@ -14,7 +13,7 @@ import (
 func TestP6CrossStarterIndependentScopeAndPendingProof(t *testing.T) {
 	service := &GameService{}
 	for _, name := range []string{"000", "001", "002"} {
-		raw, err := os.ReadFile("../../analysis/p6/actual-qualified-prayer-type17-inputs-v129/" + name + ".frozen-input.json")
+		raw, err := readTestAnalysis75("../../analysis/p6/actual-qualified-prayer-type17-inputs-v129/" + name + ".frozen-input.json")
 		if err != nil {
 			t.Fatal(err)
 		}

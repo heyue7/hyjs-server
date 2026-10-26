@@ -94,6 +94,9 @@ func (s *GameService) p13GuildReadPlayers(tx *gorm.DB, ids []int64, now time.Tim
 		if prayerEnabled {
 			var rows []db.P13GuildPrayerRoll
 			ranked := tx.Model(&db.P13GuildPrayerRoll{}).Select("*, ROW_NUMBER() OVER (PARTITION BY player_id ORDER BY applied_at DESC, ordinal DESC, stamp DESC) AS prayer_rank").Where("player_id IN ?", unique)
+			if calendar75Adjusted(tx) {
+				ranked = ranked.Where("applied_at<=?", now.UnixMilli())
+			}
 			if err := tx.Table("(?) AS latest_prayers", ranked).Where("prayer_rank = 1").Find(&rows).Error; err != nil {
 				return nil, err
 			}
@@ -126,7 +129,7 @@ func (s *GameService) p13GuildReadPlayers(tx *gorm.DB, ids []int64, now time.Tim
 			if offer, ok := offers[member.GuildID]; techEnabled && ok {
 				source, computed := techs[member.GuildID]
 				if !computed {
-					source.prop, source.hash, err = p13GuildTechPropertiesRead(&guild, &offer, upgrades[member.GuildID], now)
+					source.prop, source.hash, err = p13GuildTechPropertiesRead(&guild, &offer, upgrades[member.GuildID], calendar75SourceHorizon(tx, now))
 					if err != nil {
 						return nil, err
 					}

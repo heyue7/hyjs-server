@@ -750,7 +750,7 @@ func (s *GameService) p13FunctionalPeriodPlan(tx *gorm.DB, schedule *db.P13Union
 		if e != nil {
 			return nil, e
 		}
-		_, rewards, e := p13UFWeeklyRules(&db.P13UnionFightWeeklyOffer{WeekStart: week, Group: q.Group, Rules: raw, RulesHash: p6Digest(raw), FrozenAt: q.PublishedAt})
+		_, rewards, e := p13UFWeeklyPolicyPayload(&db.P13UnionFightWeeklyOffer{WeekStart: week, Group: q.Group, Rules: raw, RulesHash: p6Digest(raw), FrozenAt: q.PublishedAt})
 		if e != nil {
 			return nil, e
 		}

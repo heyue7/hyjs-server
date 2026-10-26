@@ -8,7 +8,6 @@ import (
 	"hyjs-server/constUtil"
 	"hyjs-server/db"
 	pb "hyjs-server/model/protocol"
-	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -46,7 +45,7 @@ func p7AwakeActualPaidFixture(t *testing.T) (*p1Fixture, *pb.CSAwakeCopyFightEnd
 	}
 	f.id = 4
 	folder := "../../analysis/playable-plan-20261017/awake-original-end-capture-r1"
-	raw, err := os.ReadFile(filepath.Join(folder, "paid-pending-fixture.json"))
+	raw, err := readTestAnalysis75(filepath.Join(folder, "paid-pending-fixture.json"))
 	if err != nil || p6Digest(raw) != "3f44e322658eac3572f2b2204566f693b033a2c0206187efddc6d3f9a8a64ad7" {
 		t.Fatal("actual paid pending source pin", err)
 	}
@@ -105,7 +104,7 @@ func p7AwakeActualPaidFixture(t *testing.T) (*p1Fixture, *pb.CSAwakeCopyFightEnd
 			t.Fatal(err)
 		}
 	}
-	body, err := os.ReadFile(filepath.Join(folder, "original-End.pb"))
+	body, err := readTestAnalysis75(filepath.Join(folder, "original-End.pb"))
 	if err != nil || p6Digest(body) != "4696d6ac79fcaf3fd906e38ef77b1482a7a81dd1b143068ae17093ed62580b21" {
 		t.Fatal("actual original End pin", err)
 	}

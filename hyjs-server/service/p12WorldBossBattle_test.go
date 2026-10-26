@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"os"
 	"sync"
 	"testing"
 	"time"
@@ -57,7 +56,7 @@ func p12WorldBossBattleFullBuild(t *testing.T, f *p1Fixture, id int64) {
 	if err := f.s.InitializeP9Pets(f.ctx); err != nil {
 		t.Fatal(err)
 	}
-	raw, err := os.ReadFile("../../analysis/p7/party-rush-isolated-roster-r2-20261016.json")
+	raw, err := readTestAnalysis75("../../analysis/p7/party-rush-isolated-roster-r2-20261016.json")
 	if err != nil || p6Digest(raw) != "e60e9774a43efe58f67b9eb84c1a30cf40a3a30f2e5f68c87d063d3aeb29a5c9" {
 		t.Fatal("same proven actual roster", err)
 	}
@@ -516,6 +515,11 @@ func TestP12WorldBossBattlePurchaseUnsupportedRosterDoesNotCharge(t *testing.T) 
 	if err != nil || len(party.GetFormation()) != 2 || party.Formation[1].GetId() != "hero_004" {
 		t.Fatal("negative prerequisite must reach a valid different P5 battle actor", err)
 	}
+	// This finite fixture models a genuinely unpublished skill, since hero004 itself is supported.
+	hero := f.s.table("Hero", "id", "hero_004")
+	originalSkill := hero["SkillId1"]
+	hero["SkillId1"] = "fixture75-unpublished-skill"
+	t.Cleanup(func() { hero["SkillId1"] = originalSkill })
 	var before db.Profile
 	if err := db.GetIns().First(&before, f.id).Error; err != nil {
 		t.Fatal(err)

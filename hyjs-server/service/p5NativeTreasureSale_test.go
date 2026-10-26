@@ -84,7 +84,8 @@ func TestP5NativeTreasureSaleOriginalEligibilityAndInvestmentProtection(t *testi
 // All tested treasure GUIDs are produced by the unchanged paid original022
 // box, with its full random pool. No reward row, random draw or price is edited.
 func TestP5NativeTreasureSaleOriginal022MixedAtomicAndCold(t *testing.T) {
-	f := p1Setup(t)
+	f, id := p3DemoProviderFixture(t)
+	f.id = id
 	if err := f.s.LoadP5Tables("../../analysis/tables"); err != nil {
 		t.Fatal(err)
 	}
@@ -108,13 +109,11 @@ func TestP5NativeTreasureSaleOriginal022MixedAtomicAndCold(t *testing.T) {
 	requestContext := func(request proto.Message) context.Context {
 		return context.WithValue(context.WithValue(f.ctx, constUtil.GameServiceContextKey, f.s), constUtil.GameRequestContextKey, request)
 	}
-	buy := &pb.CSShopBuy{ShopType: proto.Int32(1), ShopItemId: proto.String("itemShopId_14"), BuyCount: proto.Int32(20)}
-	if _, err := f.s.shopBuy(requestContext(buy), f.id, buy, 93001); err != nil {
-		t.Fatal("original022 twenty paid5-diamond boxes", err)
-	}
+	fundedRechargeRewardFixture75(t, f, "native-treasure", "item_022,20")
 	bought, _ := f.profile(t)
-	if bought.GetDiamond() != 900 {
-		t.Fatal("original022 cost changed", bought.GetDiamond())
+	paidDiamond := bought.GetDiamond()
+	if paidDiamond != 1330 {
+		t.Fatal("original native30 recharge diamond budget changed", paidDiamond)
 	}
 	use := &pb.CSItemUse{CostItem: &pb.BaseResource{Id: proto.String("item_022"), Num: proto.Int32(20)}}
 	opened, err := f.s.treasureBoxUse(requestContext(use), f.id, use, 93002)
@@ -199,7 +198,7 @@ func TestP5NativeTreasureSaleOriginal022MixedAtomicAndCold(t *testing.T) {
 	}
 	expectedCoin := int64(tableNumber(f.s.table("Equip", "id", equipment.GetEquipId()), "sellPrice")) + 1000
 	final, finalGame := f.profile(t)
-	if final.GetCoin()-p.GetCoin() != expectedCoin || final.GetDiamond() != 900 {
+	if final.GetCoin()-p.GetCoin() != expectedCoin || final.GetDiamond() != paidDiamond {
 		t.Fatal("mixed sale paid more than original base prices")
 	}
 	if final.GetEquipBagSize() != p.GetEquipBagSize() || len(finalGame.Treasures) != len(g.Treasures)-1 || len(finalGame.Equipment) != len(g.Equipment)-1 {

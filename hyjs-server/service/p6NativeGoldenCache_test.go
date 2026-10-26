@@ -55,7 +55,7 @@ func p6NativeGoldenCacheSource(t *testing.T) string {
 	sort.Strings(files)
 	body := []byte{}
 	for _, p := range files {
-		raw, err := os.ReadFile(p)
+		raw, err := readTestAnalysis75(p)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -68,7 +68,7 @@ func p6NativeGoldenCacheClocks(t *testing.T) map[string]map[string]bool {
 	fixtures := p6NativeGoldenClockFixtures()
 	clocks := map[string]map[string]bool{}
 	for _, fixture := range fixtures {
-		raw, err := os.ReadFile("../../analysis/p6/" + fixture[0])
+		raw, err := readTestAnalysis75("../../analysis/p6/" + fixture[0])
 		if err != nil || p6Digest(raw) != fixture[1] {
 			t.Fatal("cache original clock SHA", fixture[0], err)
 		}
@@ -356,7 +356,7 @@ func p6CloneNativeGoldenTick(e *combatRoundEngine, storage ...bool) *combatRound
 // Compare a real SHA-bound native input directly and through the cache, then
 // mutate every returned container family and verify the next caller stays intact.
 func TestP6NativeGoldenCacheIsolationAndRealResult(t *testing.T) {
-	wire, err := os.ReadFile("../../analysis/p6/native-next-real-inputs-v59/000.pb")
+	wire, err := readTestAnalysis75("../../analysis/p6/native-next-real-inputs-v59/000.pb")
 	if err != nil {
 		t.Fatal(err)
 	}

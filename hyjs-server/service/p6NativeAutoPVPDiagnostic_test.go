@@ -54,7 +54,7 @@ func TestP6OriginalNextRealCoverageExpectedTimelines(t *testing.T) {
 
 func p6AutomaticPVPExpectedTimelines(t *testing.T, manifestPath, output string, count int, variedFactors bool) {
 	t.Helper()
-	raw, err := os.ReadFile(manifestPath)
+	raw, err := readTestAnalysis75(manifestPath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -82,7 +82,7 @@ func p6AutomaticPVPExpectedTimelines(t *testing.T, manifestPath, output string, 
 		if manifest.Source == "" {
 			wireRoot = filepath.Dir(manifestPath)
 		}
-		wire, err := os.ReadFile(filepath.Join(wireRoot, c.Wire))
+		wire, err := readTestAnalysis75(filepath.Join(wireRoot, c.Wire))
 		if err != nil || p6Digest(wire) != c.WireSHA {
 			t.Fatal("original raw priority wire hash", c.Name, err)
 		}
@@ -148,7 +148,7 @@ func p6AutomaticPVPExpectedTimelines(t *testing.T, manifestPath, output string, 
 		if err = os.WriteFile(filepath.Join(output, name), append(bytes, '\n'), 0644); err != nil {
 			t.Fatal(err)
 		}
-		tickBytes, readErr := os.ReadFile(tickPath)
+		tickBytes, readErr := readTestAnalysis75(tickPath)
 		if readErr != nil {
 			t.Fatal(readErr)
 		}

@@ -87,7 +87,7 @@ func TestLocalPlayCopyExperiencePrivateCalendarRealSweepLevelupAndCold(t *testin
 		}
 	}
 	after, game := f.profile(t)
-	if exp != 280 || after.GetLevel() != 15 || after.GetExp() != 0 || after.GetCoin()-before.GetCoin() != 4380 || after.GetStamina() != before.GetStamina()-10+20 || game.Copy.GetPassedCopyInfo()[0].GetChallengeTimes() != 1 {
+	if exp != 310 || after.GetLevel() != 15 || after.GetExp() != 30 || after.GetCoin()-before.GetCoin() != 4380 || after.GetStamina() != before.GetStamina()-10+20 || game.Copy.GetPassedCopyInfo()[0].GetChallengeTimes() != 1 {
 		t.Fatal("visible private2x window did not feed Player.exp and original level15 stamina20", result, after)
 	}
 	// 回拨后原已结收益仍按冻结回执，不以新的窗口时间重算或多发经验。
@@ -101,7 +101,7 @@ func TestLocalPlayCopyExperiencePrivateCalendarRealSweepLevelupAndCold(t *testin
 		t.Fatal("cold rewind repriced original earned gain", err)
 	}
 	current, _ := f.profile(t)
-	if current.GetLevel() != 15 || current.GetExp() != 0 || current.GetCoin() != after.GetCoin() || current.GetStamina() != after.GetStamina() {
+	if current.GetLevel() != 15 || current.GetExp() != 30 || current.GetCoin() != after.GetCoin() || current.GetStamina() != after.GetStamina() {
 		t.Fatal("old receipt granted Player experience twice", current)
 	}
 	var stored db.LocalPlayActivityCycle

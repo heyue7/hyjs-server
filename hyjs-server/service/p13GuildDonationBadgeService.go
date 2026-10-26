@@ -48,7 +48,7 @@ func (s *GameService) RecordP13GuildDonationBadge(tx *gorm.DB, member *db.P13Gui
 	if !policy.Enabled {
 		return nil
 	}
-	if !p13GuildDonationBadgePolicyValid(&policy, now) {
+	if !p13GuildDonationBadgePolicyValid(&policy, calendar75SourceHorizon(tx, now)) {
 		return errors.New("公会捐献徽章来源未提前发布或与具名规则不符")
 	}
 	minimum, err := s.p10Setting("UnionMinDailyDonateCoin")
@@ -59,7 +59,7 @@ func (s *GameService) RecordP13GuildDonationBadge(tx *gorm.DB, member *db.P13Gui
 	if err != nil {
 		return err
 	}
-	if minimum != policy.CoinCost || int64(maximum) < int64(policy.CoinCost)*policy.DailyLimit || amount != minimum || member.GuildID == "" || member.JoinedAt <= 0 || member.JoinedAt > now.UnixMilli() || member.DonateDay != p13GuildDay(now) || member.TodayCoin < int64(amount) || member.TodayCoin > int64(maximum) || stamp <= 0 {
+	if minimum != policy.CoinCost || int64(maximum) < int64(policy.CoinCost)*policy.DailyLimit || amount != minimum || member.GuildID == "" || member.JoinedAt <= 0 || member.JoinedAt > calendar75SourceHorizon(tx, now).UnixMilli() || member.DonateDay != p13GuildDay(now) || member.TodayCoin < int64(amount) || member.TodayCoin > int64(maximum) || stamp <= 0 {
 		return errors.New("公会捐献徽章实际金币来源与原限额不符")
 	}
 	day := p13GuildDay(now)
@@ -69,7 +69,7 @@ func (s *GameService) RecordP13GuildDonationBadge(tx *gorm.DB, member *db.P13Gui
 	}
 	var previousCoin int64
 	for index, saved := range previous {
-		if saved.Ordinal != int64(index+1) || saved.SourceHash != p13GuildDonationBadgeSourceHash(saved) || saved.Version != policy.Version || saved.Source != policy.Source || saved.CoinCost <= 0 || saved.BadgeAmount <= 0 || saved.DailyLimit < 1 || saved.DailyLimit > 1000 || saved.Stamp <= 0 || saved.GuildID == "" || saved.JoinedAt <= 0 || saved.JoinedAt > saved.CreatedAt || saved.PublishedAt <= 0 || saved.PublishedAt > saved.CreatedAt || saved.CreatedAt > now.UnixMilli() || saved.DeliveryID <= 0 || saved.DeliveryKey != fmt.Sprintf("p13:coin-badge:%d:%d", saved.PlayerID, saved.Stamp) {
+		if saved.Ordinal != int64(index+1) || saved.SourceHash != p13GuildDonationBadgeSourceHash(saved) || saved.Version != policy.Version || saved.Source != policy.Source || saved.CoinCost <= 0 || saved.BadgeAmount <= 0 || saved.DailyLimit < 1 || saved.DailyLimit > 1000 || saved.Stamp <= 0 || saved.GuildID == "" || saved.JoinedAt <= 0 || (saved.JoinedAt > saved.CreatedAt && !calendar75Adjusted(tx)) || saved.PublishedAt <= 0 || saved.PublishedAt > saved.CreatedAt || saved.CreatedAt > calendar75SourceHorizon(tx, now).UnixMilli() || saved.DeliveryID <= 0 || saved.DeliveryKey != fmt.Sprintf("p13:coin-badge:%d:%d", saved.PlayerID, saved.Stamp) {
 			return errors.New("公会捐献徽章已冻结来源损坏")
 		}
 		previousCoin += int64(saved.CoinCost)
@@ -90,7 +90,11 @@ func (s *GameService) RecordP13GuildDonationBadge(tx *gorm.DB, member *db.P13Gui
 	if delivery.PlayerID != member.PlayerID || delivery.SourceKey != key || delivery.Rewards != rewards || delivery.ClaimedAt != 0 || delivery.ExpiresAt != 0 {
 		return errors.New("公会捐献徽章P1投递来源冲突")
 	}
-	row := db.P13GuildDonationBadgeSource{PlayerID: member.PlayerID, Stamp: stamp, Day: day, Ordinal: int64(len(previous) + 1), GuildID: member.GuildID, JoinedAt: member.JoinedAt, CoinCost: amount, BadgeAmount: policy.BadgeAmount, DailyLimit: policy.DailyLimit, Version: policy.Version, Source: policy.Source, PublishedAt: policy.PublishedAt, CreatedAt: now.UnixMilli(), DeliveryID: delivery.ID, DeliveryKey: key}
+	published := policy.PublishedAt
+	if calendar75Adjusted(tx) {
+		published = min(published, now.UnixMilli())
+	}
+	row := db.P13GuildDonationBadgeSource{PlayerID: member.PlayerID, Stamp: stamp, Day: day, Ordinal: int64(len(previous) + 1), GuildID: member.GuildID, JoinedAt: member.JoinedAt, CoinCost: amount, BadgeAmount: policy.BadgeAmount, DailyLimit: policy.DailyLimit, Version: policy.Version, Source: policy.Source, PublishedAt: published, CreatedAt: now.UnixMilli(), DeliveryID: delivery.ID, DeliveryKey: key}
 	row.SourceHash = p13GuildDonationBadgeSourceHash(row)
 	return tx.Create(&row).Error
 }

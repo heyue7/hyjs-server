@@ -46,7 +46,7 @@ func p7NumericLocalRushNativeBundle(t *testing.T) *p7NumericLocalNativeBundle {
 	if file == "" {
 		return nil
 	}
-	raw, err := os.ReadFile(file)
+	raw, err := readTestAnalysis75(file)
 	if err != nil || len(os.Getenv("HYJS_P7_NUMERIC_LOCAL_BUNDLE_SHA256")) != 64 || p6Digest(raw) != os.Getenv("HYJS_P7_NUMERIC_LOCAL_BUNDLE_SHA256") {
 		t.Fatal("explicit P7 native bundle SHA", err)
 	}
@@ -55,7 +55,7 @@ func p7NumericLocalRushNativeBundle(t *testing.T) *p7NumericLocalNativeBundle {
 		t.Fatal("bounded original party bundle identity/denominator/authority")
 	}
 	for _, binding := range [][2]string{{bundle.Source, bundle.SourceSHA}, {bundle.Capture, bundle.CaptureSHA}} {
-		data, err := os.ReadFile(p7NumericLocalNativePath(t, binding[0]))
+		data, err := readTestAnalysis75(p7NumericLocalNativePath(t, binding[0]))
 		if err != nil || len(binding[1]) != 64 || p6Digest(data) != binding[1] {
 			t.Fatal("native source/capture manifest SHA", binding[0], err)
 		}
@@ -88,7 +88,7 @@ func p7NumericLocalRushNativeFixtureInput(t *testing.T, input *model.FrozenBattl
 	if !bound {
 		return input, false
 	}
-	raw, err := os.ReadFile(p7NumericLocalNativePath(t, bundle.Source))
+	raw, err := readTestAnalysis75(p7NumericLocalNativePath(t, bundle.Source))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -102,7 +102,7 @@ func p7NumericLocalRushNativeFixtureInput(t *testing.T, input *model.FrozenBattl
 		if row.WireSHA != wireSHA {
 			continue
 		}
-		typed, err := os.ReadFile(filepath.Join(filepath.Dir(p7NumericLocalNativePath(t, bundle.Source)), row.Typed))
+		typed, err := readTestAnalysis75(filepath.Join(filepath.Dir(p7NumericLocalNativePath(t, bundle.Source)), row.Typed))
 		if err != nil || p6Digest(typed) != row.TypedSHA {
 			t.Fatal("native party typed input SHA", err)
 		}
@@ -128,7 +128,7 @@ func p7NumericLocalRushNativeFixtureInput(t *testing.T, input *model.FrozenBattl
 // p7NumericLocalRushNativeHitCaseCount 仅给显式bundle内已校验命中的新fixture声明四例分母。
 // 旧fixture继续使用原helper的既有固定分母。
 func p7NumericLocalRushNativeHitCaseCount(name string) int {
-	raw, err := os.ReadFile(os.Getenv("HYJS_P7_NUMERIC_LOCAL_BUNDLE"))
+	raw, err := readTestAnalysis75(os.Getenv("HYJS_P7_NUMERIC_LOCAL_BUNDLE"))
 	if err != nil || p6Digest(raw) != os.Getenv("HYJS_P7_NUMERIC_LOCAL_BUNDLE_SHA256") {
 		return 0
 	}
@@ -140,7 +140,7 @@ func p7NumericLocalRushNativeHitCaseCount(name string) int {
 	if hits.Path != name || filepath.IsAbs(name) || strings.HasPrefix(filepath.ToSlash(filepath.Clean(name)), "../") {
 		return 0
 	}
-	data, err := os.ReadFile(filepath.Join("../../analysis/p6", name))
+	data, err := readTestAnalysis75(filepath.Join("../../analysis/p6", name))
 	if err != nil || len(hits.SHA) != 64 || p6Digest(data) != hits.SHA {
 		return 0
 	}
@@ -154,7 +154,7 @@ func TestP7NumericLocalRushNativeAllLayers(t *testing.T) {
 	}
 	// Verify every derived fixture once before invoking the unchanged highest helpers.
 	for kind, fixture := range bundle.Fixtures {
-		raw, err := os.ReadFile(p7NumericLocalNativePath(t, filepath.Join("analysis/p6", fixture.Path)))
+		raw, err := readTestAnalysis75(p7NumericLocalNativePath(t, filepath.Join("analysis/p6", fixture.Path)))
 		if err != nil || p6Digest(raw) != fixture.SHA {
 			t.Fatal("native fixture SHA", kind, err)
 		}
@@ -187,7 +187,7 @@ func TestP7NumericLocalRushNativeAllLayers(t *testing.T) {
 // Actual tutorial talent1/companion3 is retained. Only Player22/32 is a
 // finite prerequisite. This test uses the production projector and no DB.
 func TestP7NumericLocalBattlePlayerProjection(t *testing.T) {
-	raw, err := os.ReadFile("../../analysis/growth-first-20261016/m1-natural-phone-20261017/102-first-real-strengthen-profile.json")
+	raw, err := readTestAnalysis75("../../analysis/growth-first-20261016/m1-natural-phone-20261017/102-first-real-strengthen-profile.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -202,7 +202,7 @@ func TestP7NumericLocalBattlePlayerProjection(t *testing.T) {
 		Player *pb.Player       `json:"player"`
 		Game   *model.GameState `json:"game"`
 	}
-	raw, err = os.ReadFile("../../analysis/growth-first-20261016/m1-natural-phone-20261017/106-equipped-copy1-run-profile.json")
+	raw, err = readTestAnalysis75("../../analysis/growth-first-20261016/m1-natural-phone-20261017/106-equipped-copy1-run-profile.json")
 	if err != nil || json.Unmarshal(raw, &old) != nil || old.Game.Run == nil {
 		t.Fatal("original observed talent1 Start", err)
 	}
@@ -218,8 +218,18 @@ func TestP7NumericLocalBattlePlayerProjection(t *testing.T) {
 	observed := old.Game.Run.Fight.Start.GetBattlePlayer()
 	actual.Player.Level = proto.Int32(observed.GetLevel())
 	baseline, err := s.battlePlayer(actual.Player, actual.Game)
-	if err != nil || !proto.Equal(baseline, observed) {
-		t.Fatal("real strengthened worn equipment projection differs from observed original Start", err)
+	legacyAppearance := func(party *pb.BattlePlayer) *pb.BattlePlayer {
+		t.Helper()
+		view := proto.Clone(party).(*pb.BattlePlayer)
+		if len(view.Formation) != 2 || view.Formation[0].GetWeaponId() != "equip_001" {
+			t.Fatal("current original worn-weapon appearance not transported")
+		}
+		// Historical frozen Start predates weapon display metadata; all combat fields remain exact.
+		view.Formation[0].WeaponId = nil
+		return view
+	}
+	if err != nil || !proto.Equal(legacyAppearance(baseline), observed) {
+		t.Fatal("real strengthened worn equipment combat projection differs from observed original Start", err)
 	}
 	for i, level := range []int32{22, 32} {
 		actual.Player.Level = proto.Int32(level)
@@ -228,12 +238,12 @@ func TestP7NumericLocalBattlePlayerProjection(t *testing.T) {
 			t.Fatal(err)
 		}
 		name := []string{"000", "002"}[i]
-		raw, err = os.ReadFile("../../analysis/p6/p7-numeric047025-local-inputs-r1-20261017/" + name + ".SCRushFightStart.pb")
+		raw, err = readTestAnalysis75("../../analysis/p6/p7-numeric047025-local-inputs-r1-20261017/" + name + ".SCRushFightStart.pb")
 		if err != nil {
 			t.Fatal(err)
 		}
 		start := &pb.SCRushFightStart{}
-		if proto.Unmarshal(raw, start) != nil || !proto.Equal(expected, start.BattlePlayer) {
+		if proto.Unmarshal(raw, start) != nil || !proto.Equal(legacyAppearance(expected), start.BattlePlayer) {
 			t.Fatal("finite22/32 source differs from real production projection", level)
 		}
 		if !proto.Equal(baseline.Formation[1], expected.Formation[1]) || expected.Formation[1].GetLevel() != 3 || len(expected.Formation[0].GetTalentList()) != 1 || expected.Formation[0].TalentList[0] != "tal_1" {
@@ -243,8 +253,13 @@ func TestP7NumericLocalBattlePlayerProjection(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err = p7ManualRushFamilyForSeries(series); err == nil {
-			t.Fatal("new unanchored natural roster gained production authority")
+		legacy, err := p7ManualRushLegacyFamilyForSeries(series)
+		if err != nil || !legacy.Natural || legacy.ScopeProof != constUtil.P7NaturalRushNativeProof {
+			t.Fatal("reviewed natural numeric legacy family lost its exact independent proof", err)
+		}
+		current, err := p7ManualRushFamilyForSeries(series)
+		if err != nil || !current.Generic || current.ScopeProof != constUtil.P7GenericMechanismCompatibilityProof || current.DriverSource != constUtil.P7GenericMechanismDriverSource {
+			t.Fatal("current mechanism source borrowed another family's proof", err)
 		}
 	}
 }

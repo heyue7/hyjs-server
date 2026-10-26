@@ -76,6 +76,12 @@ func p11ArenaDailyNow(ctx context.Context, requested time.Time) time.Time {
 	if clock, ok := ctx.Value(constUtil.P11ArenaDailyClockContextKey{}).(func() time.Time); ok && clock != nil {
 		return clock()
 	}
+	if ServerGameClockContextBound(ctx) {
+		revision, _ := ctx.Value(constUtil.ServerGameClockRevisionKey).(int64)
+		if revision > 0 {
+			return LocalPlayNow(ctx)
+		}
+	}
 	actual := time.Now()
 	if requested.After(actual) {
 		return requested
@@ -184,6 +190,12 @@ func (s *GameService) PrepareP11ArenaDailyMutation(ctx context.Context, tx *gorm
 	if !p11ArenaDailyPolicyValid(&policy) {
 		return now, errors.New(constUtil.P11ArenaDailyConfigError)
 	}
+	// The permanent source remains published while an administrator revisits an
+	// earlier game day. Freeze only a bounded copy; its original row stays intact.
+	if policy.Permanent && calendar75Adjusted(tx) && policy.PublishedAt > now.UnixMilli() && policy.PublishedAt <= calendar75SourceHorizon(tx, now).UnixMilli() {
+		start, _ := p11ArenaDailyWindow(now, policy.CutoffSecond)
+		policy.PublishedAt, policy.StartAt = now.UnixMilli(), start.UnixMilli()
+	}
 	start, end := p11ArenaDailyWindow(now, policy.CutoffSecond)
 	if start.UnixMilli() < policy.StartAt || (!policy.Permanent && end.UnixMilli() > policy.EndAt) || now.UnixMilli() < policy.PublishedAt {
 		return now, nil
@@ -270,7 +282,11 @@ func (s *GameService) p11ArenaDailyClose(tx *gorm.DB, offer *db.P11ArenaDailyOff
 		counts[fact.PlayerID]++
 	}
 	var members []db.P11ArenaMember
-	if err = tx.Where("position>0 AND position<=1000 AND created_at<?", offer.EndAt).Order("position").Find(&members).Error; err != nil {
+	membership := tx.Where("position>0 AND position<=1000")
+	if !calendar75Adjusted(tx) {
+		membership = membership.Where("created_at<?", offer.EndAt)
+	}
+	if err = membership.Order("position").Find(&members).Error; err != nil {
 		return err
 	}
 	// Validate each immutable battle at most once in this cutoff transaction.
@@ -365,6 +381,13 @@ func (s *GameService) p11ArenaDailyClose(tx *gorm.DB, offer *db.P11ArenaDailyOff
 // TickP11ArenaDaily closes only already-frozen windows under the same arena
 // serialization lock. Offline rewards use the existing P1 once-only delivery.
 func (s *GameService) TickP11ArenaDaily(ctx context.Context, now time.Time) error {
+	ctx, bound, err := s.bindServerGameClockWorker75(ctx)
+	if err != nil {
+		return err
+	}
+	if bound {
+		now = LocalPlayNow(ctx)
+	}
 	return db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := ServerGameClockGuardTransaction(tx); err != nil {
 			return err

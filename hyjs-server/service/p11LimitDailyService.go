@@ -71,6 +71,12 @@ func p11LimitDailyNow(ctx context.Context, requested time.Time) time.Time {
 	if clock, ok := ctx.Value(constUtil.P11LimitDailyClockContextKey{}).(func() time.Time); ok && clock != nil {
 		return clock()
 	}
+	if ServerGameClockContextBound(ctx) {
+		revision, _ := ctx.Value(constUtil.ServerGameClockRevisionKey).(int64)
+		if revision > 0 {
+			return LocalPlayNow(ctx)
+		}
+	}
 	actual := time.Now()
 	if requested.After(actual) {
 		return requested
@@ -462,6 +468,13 @@ func (s *GameService) p11LimitDailyClose(tx *gorm.DB, offer *db.P11LimitDailyOff
 // TickP11LimitDaily follows the same period serialization lock as requests;
 // offline closure touches only period points and existing P1 source facts.
 func (s *GameService) TickP11LimitDaily(ctx context.Context, now time.Time) error {
+	ctx, bound, err := s.bindServerGameClockWorker75(ctx)
+	if err != nil {
+		return err
+	}
+	if bound {
+		now = LocalPlayNow(ctx)
+	}
 	return db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := ServerGameClockGuardTransaction(tx); err != nil {
 			return err

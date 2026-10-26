@@ -16,7 +16,7 @@ func p6ReadActualCombinedPaths(t *testing.T) []p6ActualGrowthPath {
 		file = "p5-combined-all76-highest-actors-20261014.json"
 		count, scope = 76, "all76 original configured identities, actual consecutive combined highest"
 	}
-	raw, err := os.ReadFile("../../analysis/p6/" + file)
+	raw, err := readTestAnalysis75("../../analysis/p6/" + file)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -44,7 +44,7 @@ func p6ReadActualCombinedPaths(t *testing.T) []p6ActualGrowthPath {
 		t.Fatal("real consecutive highest fixture drift", err)
 	}
 	for table, digest := range fixture.TableSHA {
-		original, e := os.ReadFile("../../analysis/tables/Table" + table + ".tsv")
+		original, e := readTestAnalysis75("../../analysis/tables/Table" + table + ".tsv")
 		if e != nil || p6Digest(original) != digest {
 			t.Fatal("combined original table drift", table, e)
 		}

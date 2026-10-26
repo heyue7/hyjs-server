@@ -150,7 +150,29 @@ func (s *GameService) BindServerGameClockContext(ctx context.Context, owner *db.
 	ctx = context.WithValue(ctx, constUtil.ServerGameClockServerKey, row.ServerID)
 	ctx = context.WithValue(ctx, constUtil.ServerGameClockOffsetKey, row.OffsetDays)
 	ctx = context.WithValue(ctx, constUtil.ServerGameClockRevisionKey, row.Revision)
+	ctx = context.WithValue(ctx, constUtil.ServerGameClockHighDaysKey, row.HighDays)
 	return ctx, nil
+}
+
+// Workers share the persisted calendar snapshot and transaction revision guard.
+// No role identity or permission is created by this binding.
+func (s *GameService) bindServerGameClockWorker75(ctx context.Context) (context.Context, bool, error) {
+	if !s.ServerClockReady || ServerGameClockContextBound(ctx) {
+		return ctx, false, nil
+	}
+	var row db.ServerGameClock
+	if err := db.GetIns().WithContext(ctx).First(&row, "server_id=?", s.serverGameClockID()).Error; err != nil {
+		return ctx, false, err
+	}
+	if !serverGameClockValid(&row) {
+		return ctx, false, constUtil.ErrAdminConfiguration
+	}
+	ctx = context.WithValue(ctx, constUtil.ServerGameClockBoundKey, true)
+	ctx = context.WithValue(ctx, constUtil.ServerGameClockServerKey, row.ServerID)
+	ctx = context.WithValue(ctx, constUtil.ServerGameClockOffsetKey, row.OffsetDays)
+	ctx = context.WithValue(ctx, constUtil.ServerGameClockRevisionKey, row.Revision)
+	ctx = context.WithValue(ctx, constUtil.ServerGameClockHighDaysKey, row.HighDays)
+	return ctx, true, nil
 }
 
 // AdminServerGameClock reads the same persistent calendar used by ordinary game requests.
@@ -216,7 +238,7 @@ func (s *GameService) AdminChangeServerGameClock(ctx context.Context, p *model.A
 		}
 		// Profile locks keep in-flight original battle creation ordered against this calendar change.
 		var profiles []db.Profile
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("player IS NOT NULL AND game IS NOT NULL").Order("id").Find(&profiles).Error; err != nil {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("player IS NOT NULL AND game IS NOT NULL AND (server_id=? OR server_id=0)", s.OriginalServerID()).Order("id").Find(&profiles).Error; err != nil {
 			return err
 		}
 		for _, profile := range profiles {
@@ -228,7 +250,14 @@ func (s *GameService) AdminChangeServerGameClock(ctx context.Context, p *model.A
 				return fmt.Errorf("%w: 有玩家尚未结束战斗，请结束后调整全服日期", constUtil.ErrAdminConfigConflict)
 			}
 		}
-		if err := serverGameClockPendingBattles(tx, time.Now(), row.OffsetDays); err != nil {
+		calendarReal := time.Now()
+		if err := expireCalendarWanted75(tx, s.OriginalServerID(), calendarReal.AddDate(0, 0, int(row.OffsetDays)).UnixMilli()); err != nil {
+			return err
+		}
+		if err := serverGameClockPendingBattles(tx, calendarReal, row.OffsetDays); err != nil {
+			return err
+		}
+		if err := s.shiftCalendarDurationTimers75(tx, profiles, req.DeltaDays); err != nil {
 			return err
 		}
 		row.OffsetDays += req.DeltaDays
@@ -347,26 +376,26 @@ func serverGameClockPendingBattles(tx *gorm.DB, real time.Time, offset int64) er
 		return nil
 	}
 	if gameSchemaHasTable(tx, &db.P12WantedFight{}) && gameSchemaHasTable(tx, &db.P12WantedInstance{}) {
-		q := tx.Table("p12_wanted_fights AS fight").Joins("JOIN p12_wanted_instances AS instance ON instance.id=fight.instance_id").Where("fight.committed=? AND fight.abandoned_at=0 AND instance.state=? AND instance.expires_at>? AND instance.current_hp>0", false, constUtil.P12WantedActive, gameMS)
+		q := tx.Table("p12_wanted_fights AS fight").Joins("JOIN p12_wanted_instances AS instance ON instance.id=fight.instance_id").Where("fight.committed=? AND fight.abandoned_at=0 AND instance.state=? AND instance.created_at<=? AND instance.expires_at>? AND instance.current_hp>0", false, constUtil.P12WantedActive, gameMS, gameMS)
 		if err := busy(q); err != nil {
 			return err
 		}
 	}
 	if gameSchemaHasTable(tx, &db.P12WorldBossBattleReceipt{}) && gameSchemaHasTable(tx, &db.P12WorldBossCycle{}) {
-		q := tx.Table("p12_world_boss_battle_receipts AS fight").Joins("JOIN p12_world_boss_cycles AS cycle ON cycle.id=fight.instance_id").Where("fight.committed=? AND fight.abandoned_at=0 AND cycle.ends_at>?", false, gameMS)
+		q := tx.Table("p12_world_boss_battle_receipts AS fight").Joins("JOIN p12_world_boss_cycles AS cycle ON cycle.id=fight.instance_id").Where("fight.committed=? AND fight.abandoned_at=0 AND cycle.starts_at<=? AND cycle.ends_at>?", false, gameMS, gameMS)
 		if err := busy(q); err != nil {
 			return err
 		}
 	}
-	// Settled immutable PK receipts from a later virtual date cannot be live leases after a rewind.
+	// PK is a real six-second lease, independent from the adjusted business calendar.
 	if gameSchemaHasTable(tx, &db.P12FieldPVPReceipt{}) {
-		if err := busy(tx.Model(&db.P12FieldPVPReceipt{}).Where("busy_until>? AND created_at<=?", gameMS, gameMS)); err != nil {
+		if err := busy(tx.Model(&db.P12FieldPVPReceipt{}).Where("busy_until>?", real.UnixMilli())); err != nil {
 			return err
 		}
 	}
 	// P11对手报价尚未接纳战斗，不阻挡调日；实际结算与日期变更共享事务锁序。
 	if gameSchemaHasTable(tx, &db.P13UnionFightPlayerBattleAttempt{}) && gameSchemaHasTable(tx, &db.P13UnionFightMatch{}) {
-		q := tx.Table("p13_union_fight_player_battle_attempts AS fight").Joins("JOIN p13_union_fight_matches AS battle ON battle.id=fight.match_id").Where("fight.status=? AND battle.end_at>?", constUtil.P13UFPlayerBattlePending, gameMS)
+		q := tx.Table("p13_union_fight_player_battle_attempts AS fight").Joins("JOIN p13_union_fight_matches AS battle ON battle.id=fight.match_id").Where("fight.status=? AND battle.start_at<=? AND battle.end_at>?", constUtil.P13UFPlayerBattlePending, gameMS, gameMS)
 		if err := busy(q); err != nil {
 			return err
 		}

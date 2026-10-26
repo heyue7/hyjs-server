@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -99,7 +100,7 @@ func TestP3VIP9GrowthActualTestOrdersAndOriginalBook(t *testing.T) {
 	if err = db.GetIns().Model(&cfg).Update("enabled", true).Error; err != nil {
 		t.Fatal(err)
 	}
-	buy := &pb.CSShopBuy{ShopType: proto.Int32(2), ShopItemId: proto.String(cfg.ID), BuyCount: proto.Int32(1)}
+	buy := &pb.CSShopBuy{ShopType: proto.Int32(2), ShopItemId: proto.String(vipShopSKU(cfg)), BuyCount: proto.Int32(1)}
 	if _, err = s.vipShop(ctx, id, buy, now); err == nil {
 		t.Fatal("unpaid fresh player accepted")
 	}
@@ -121,14 +122,21 @@ func TestP3VIP9GrowthActualTestOrdersAndOriginalBook(t *testing.T) {
 	}
 	before := p.GetDiamond()
 	for _, row := range list() {
-		if row.GetId() == cfg.ID && (row.GetCanBuy() != 1 || len(row.Price) != 1 || len(row.Discount) != 1 || !proto.Equal(row.Price[0], row.Discount[0]) || row.Price[0].GetNum() != 1000) {
+		if row.GetId() == vipShopSKU(cfg) && (row.GetCanBuy() != 1 || len(row.Price) != 1 || len(row.Discount) != 1 || !proto.Equal(row.Price[0], row.Discount[0]) || row.Price[0].GetNum() != 1000) {
 			t.Fatal("original member card price/discount/qualification")
 		}
 	}
-	// 冻结报价之后热改运营价格，八并发仅首次购买成功。
+	// A stale member quote must reject without a debit; refreshing publishes the current real SKU.
 	if err = db.GetIns().Model(&cfg).Update("cost", 9999).Error; err != nil {
 		t.Fatal(err)
 	}
+	if _, err = s.vipShop(ctx, id, buy, now); !errors.Is(err, constUtil.ErrShopQuoteChanged) {
+		t.Fatal("stale quote accepted", err)
+	}
+	if err = db.GetIns().Model(&cfg).Update("cost", 1000).Error; err != nil {
+		t.Fatal(err)
+	}
+	list()
 	var wg sync.WaitGroup
 	errs := make(chan error, 8)
 	for i := 0; i < 8; i++ {

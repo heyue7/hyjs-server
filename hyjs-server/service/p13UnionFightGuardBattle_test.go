@@ -40,7 +40,7 @@ func TestP13UFGuardBattlePolicyDefaultsOffAndCannotCapture(t *testing.T) {
 // certified result. Compute/terminal authority remains explicitly unavailable.
 func TestP13UFGuardBattleActualDiagnosticMappingAndProofRefusal(t *testing.T) {
 	root := "../../analysis/p6/guild-guard-inputs-20261025-raw"
-	metadata, err := os.ReadFile(filepath.Join(root, "source-export.json"))
+	metadata, err := readTestAnalysis75(filepath.Join(root, "source-export.json"))
 	if os.IsNotExist(err) {
 		t.Skip("explicit retained real producer inputs required")
 	}
@@ -66,7 +66,7 @@ func TestP13UFGuardBattleActualDiagnosticMappingAndProofRefusal(t *testing.T) {
 			read := func(suffix string) []byte {
 				t.Helper()
 				name := row.Prefix + "." + suffix
-				raw, err := os.ReadFile(filepath.Join(root, name))
+				raw, err := readTestAnalysis75(filepath.Join(root, name))
 				if err != nil || p6Digest(raw) != row.Files[name] {
 					t.Fatal("preserved producer file changed", name, err)
 				}

@@ -7,13 +7,12 @@ import (
 	"hyjs-server/constUtil"
 	"hyjs-server/model"
 	pb "hyjs-server/model/protocol"
-	"os"
 	"testing"
 )
 
 func TestP6UFPlayerPendingIndependentFactorAndSource(t *testing.T) {
 	s := p6OriginalTables(t)
-	raw, err := os.ReadFile("../../analysis/p6/original-uf14-player-factor1-inputs-v191/001.SCUFFightRecordReplay.pb")
+	raw, err := readTestAnalysis75("../../analysis/p6/original-uf14-player-factor1-inputs-v191/001.SCUFFightRecordReplay.pb")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -93,7 +92,7 @@ func TestP6UFPlayerPendingIndependentFactorAndSource(t *testing.T) {
 func TestP6UFPlayerCertifiedFamiliesAndTerminal(t *testing.T) {
 	s := p6OriginalTables(t)
 	for _, index := range []int{1, 2, 3, 4} {
-		raw, err := os.ReadFile(fmt.Sprintf("../../analysis/p6/original-uf14-player-factor1-inputs-v191/%03d.SCUFFightRecordReplay.pb", index))
+		raw, err := readTestAnalysis75(fmt.Sprintf("../../analysis/p6/original-uf14-player-factor1-inputs-v191/%03d.SCUFFightRecordReplay.pb", index))
 		if err != nil {
 			t.Fatal(err)
 		}

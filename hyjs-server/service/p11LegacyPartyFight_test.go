@@ -3,7 +3,6 @@ package service
 import (
 	"bytes"
 	"encoding/json"
-	"os"
 	"testing"
 	"time"
 
@@ -30,7 +29,7 @@ func TestP11LegacyPartyActualSourceClonePublicOnceAndProfilesUnchanged(t *testin
 	f.s.ServerID = 1
 	f.s.P5Ready = true
 	f.s.P9PetsReady = true
-	raw, err := os.ReadFile("../../analysis/p6/actual-demo4-vs-demo3-friend11-input-v128b/000.actual-profile-source.json")
+	raw, err := readTestAnalysis75("../../analysis/p6/actual-demo4-vs-demo3-friend11-input-v128b/000.actual-profile-source.json")
 	if err != nil || p6Digest(raw) != "89c060a63da435f39a4d15137a0435efb77b68ab786747440f1b081805c0a88b" {
 		t.Fatal("actual readonly source SHA", err)
 	}
@@ -116,7 +115,7 @@ func TestP11LegacyPartyActualSourceClonePublicOnceAndProfilesUnchanged(t *testin
 		t.Fatal("public duel changed profile/resources/rank")
 	}
 	var receipt db.P11FriendFightSettlement
-	if err = db.GetIns().First(&receipt, "player_id=?", f.id).Error; err != nil || receipt.ScopeProof != constUtil.P6LegacyPartyNativeProof {
+	if err = db.GetIns().First(&receipt, "player_id=?", f.id).Error; err != nil || receipt.ScopeProof != constUtil.P11GenericFriendCompatibilityProof {
 		t.Fatal("missing independent party receipt", err)
 	}
 	if err = db.GetIns().Model(&db.P11ArenaPolicy{}).Where("id=?", 1).Update("duel_enabled", false).Error; err != nil {

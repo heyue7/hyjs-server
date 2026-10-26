@@ -15,8 +15,8 @@ import (
 	pb "hyjs-server/model/protocol"
 )
 
-// An allowed original starter outside the certified047 mechanism family
-// remains rejected even when the public policy is explicitly enabled. No failed public request can leave a P6 audit,
+// An explicitly unpublished skill source remains rejected even when the public
+// policy is enabled. No failed public request can leave a P6 audit,
 // receipt, roster edit, resource edit or diagnostic result behind.
 func TestP11FriendScopedPublicDefaultsPermissionsAndUnsupportedRollback(t *testing.T) {
 	f, _, third := p11ArenaSetup(t)
@@ -28,6 +28,12 @@ func TestP11FriendScopedPublicDefaultsPermissionsAndUnsupportedRollback(t *testi
 		t.Fatal(err)
 	}
 	peer := login.Id
+	// hero044 is now supported by the published generic family. Corrupt only
+	// this finite fixture's source to exercise the actual unsupported boundary.
+	hero := f.s.table("Hero", "id", "hero_044")
+	originalSkill := hero["SkillId1"]
+	hero["SkillId1"] = "fixture75-unpublished-skill"
+	t.Cleanup(func() { hero["SkillId1"] = originalSkill })
 	now := time.Now()
 	request := &pb.CSFriendFight{PlayerId: proto.Int64(peer), ServerId: proto.Int32(1)}
 	profiles := func() []byte {

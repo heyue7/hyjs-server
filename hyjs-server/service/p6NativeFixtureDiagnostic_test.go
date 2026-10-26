@@ -18,7 +18,7 @@ func p6NativeDiagnosticFixture(t *testing.T, file, expectedSHA, nextEnv string, 
 	if next {
 		path = os.Getenv(nextEnv)
 	}
-	raw, err := os.ReadFile(path)
+	raw, err := readTestAnalysis75(path)
 	if err != nil || !next && p6Digest(raw) != expectedSHA {
 		t.Fatal("original diagnostic fixture hash", err)
 	}
@@ -34,7 +34,7 @@ func p6NativeDiagnosticFixture(t *testing.T, file, expectedSHA, nextEnv string, 
 	if !filepath.IsAbs(manifestPath) {
 		manifestPath = filepath.Join("../..", manifestPath)
 	}
-	manifest, err := os.ReadFile(manifestPath)
+	manifest, err := readTestAnalysis75(manifestPath)
 	if err != nil || p6Digest(manifest) != provenance.SHA {
 		t.Fatal("original native output manifest hash", err)
 	}

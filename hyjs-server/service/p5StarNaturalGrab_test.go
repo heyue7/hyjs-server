@@ -201,9 +201,11 @@ func TestP5StarNaturalGrab37DaysHighestRefundAndCold(t *testing.T) {
 			t.Fatal("natural star exact material refund", key)
 		}
 	}
-	resetGear, err := f.s.equipmentRecord(resetG, guid)
-	if err != nil || resetGear.GetStar() != 0 {
-		t.Fatal("same equipment baseline", err)
+	if _, err := f.s.equipmentRecord(resetG, guid); err == nil {
+		t.Fatal("reset retained consumed equipment GUID")
+	}
+	if simpleOwned(resetP, resetG, "frag_equip_037") != simpleOwned(sourceP, sourceG, "frag_equip_037")+60 {
+		t.Fatal("reset must return original sixty synthesis fragments")
 	}
 	if _, err = f.s.equipmentStar(requestCtx, f.id, request, lastStamp); err == nil {
 		t.Fatal("old star5 resurrected after reset")

@@ -3,7 +3,6 @@ package service
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 	"testing"
 
 	"google.golang.org/protobuf/proto"
@@ -15,7 +14,7 @@ func TestP6LegacyPartyActualP5StructurePendingProofAndUnknownBranches(t *testing
 	s := &GameService{}
 	for index := 0; index < 8; index++ {
 		t.Run(fmt.Sprint(index), func(t *testing.T) {
-			raw, err := os.ReadFile(fmt.Sprintf("../../analysis/p6/actual-demo-readonly-branches-inputs-v140/%03d.frozen-input.json", index))
+			raw, err := readTestAnalysis75(fmt.Sprintf("../../analysis/p6/actual-demo-readonly-branches-inputs-v140/%03d.frozen-input.json", index))
 			if err != nil {
 				t.Fatal(err)
 			}

@@ -64,7 +64,7 @@ func p6NativeActorPropertiesFromFixture(t *testing.T, output string, strict bool
 	s := p6OriginalTables(t)
 	var reports []map[string]any
 	for _, c := range original.Cases {
-		wire, readErr := os.ReadFile(filepath.Join(wireRoot, c.Wire))
+		wire, readErr := readTestAnalysis75(filepath.Join(wireRoot, c.Wire))
 		if readErr != nil || p6Digest(wire) != c.SHA {
 			t.Fatal("original property wire", readErr)
 		}

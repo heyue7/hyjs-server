@@ -77,6 +77,13 @@ func (s *GameService) RecordP1Event(tx *gorm.DB, playerID int64, sourceKey, kind
 	}
 	// 以拿到窗口锁的实际提交时间判断截止，晚于截止提交的动作保留事实但不回写截止快照。
 	acceptedAt := max(at.UnixMilli(), LocalPlayNow(tx.Statement.Context).UnixMilli())
+	var paymentRealAt int64
+	if kind == "payment_amount" {
+		paymentRealAt, err = rechargeEventRealAt75(tx, playerID, sourceKey)
+		if err != nil {
+			return err
+		}
+	}
 	periodScope, _ := tx.Statement.Context.Value(constUtil.PeriodEventScopeContextKey{}).(string)
 	for _, live := range configs {
 		if periodScope != "" && live.ID != periodScope {
@@ -108,6 +115,15 @@ func (s *GameService) RecordP1Event(tx *gorm.DB, playerID int64, sourceKey, kind
 		if !allowed {
 			continue
 		}
+		if kind == "payment_amount" {
+			realStart, err := rechargeActivityRealStart75(tx, playerID, cfg.ID)
+			if err != nil {
+				return err
+			}
+			if paymentRealAt < realStart {
+				continue
+			}
+		}
 		cfg, err = s.freezeP1Period(tx, live, true)
 		if err != nil {
 			return err
@@ -123,28 +139,36 @@ func (s *GameService) RecordP1Event(tx *gorm.DB, playerID int64, sourceKey, kind
 		if err != nil {
 			return err
 		}
-		switch frozen.Mode {
-		case "cumulative":
-			if progress.Value > math.MaxInt64-amount {
-				return errors.New("活动累计溢出")
+		if kind == "payment_amount" {
+			value, day, err := rechargePeriodValue75(tx, playerID, frozen, acceptedAt)
+			if err != nil {
+				return err
 			}
-			progress.Value += amount
-		case "daily":
-			// 延迟到达的前日事实只留审计，不能倒退当前日进度。
-			if progress.LastDay > fact.Day {
-				continue
+			progress.Value, progress.LastDay = value, day
+		} else {
+			switch frozen.Mode {
+			case "cumulative":
+				if progress.Value > math.MaxInt64-amount {
+					return errors.New("活动累计溢出")
+				}
+				progress.Value += amount
+			case "daily":
+				// 延迟到达的前日事实只留审计，不能倒退当前日进度。
+				if progress.LastDay > fact.Day {
+					continue
+				}
+				if progress.LastDay != fact.Day {
+					progress.Value = 0
+				}
+				if progress.Value > math.MaxInt64-amount {
+					return errors.New("活动当天累计溢出")
+				}
+				progress.Value += amount
+			case "single":
+				progress.Value = max(progress.Value, amount)
 			}
-			if progress.LastDay != fact.Day {
-				progress.Value = 0
-			}
-			if progress.Value > math.MaxInt64-amount {
-				return errors.New("活动当天累计溢出")
-			}
-			progress.Value += amount
-		case "single":
-			progress.Value = max(progress.Value, amount)
+			progress.LastDay = fact.Day
 		}
-		progress.LastDay = fact.Day
 		if progress.RewardID == 0 && progress.Value >= frozen.Goal {
 			reward, err := s.EnqueueRewardNotice(tx, playerID, p1PeriodSources(frozen)[0], frozen.Title, frozen.Source, frozen.Rewards, frozen.RewardEndAt)
 			if err != nil {

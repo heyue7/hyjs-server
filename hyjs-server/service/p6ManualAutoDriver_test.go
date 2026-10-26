@@ -7,13 +7,12 @@ import (
 	"hyjs-server/model"
 	pb "hyjs-server/model/protocol"
 	"math"
-	"os"
 	"testing"
 )
 
 func p6ActualManualAutoInput(t *testing.T) *model.FrozenBattleInput {
 	t.Helper()
-	raw, err := os.ReadFile("../../analysis/p6/actual-phone-rush-manual-auto-input-v161/000.frozen-input.json")
+	raw, err := readTestAnalysis75("../../analysis/p6/actual-phone-rush-manual-auto-input-v161/000.frozen-input.json")
 	if err != nil || p6Digest(raw) != "647f1129df6efd57f95dba3ed8fe31135d5750d76ebe592cc34e222e0e83f9d0" {
 		t.Fatal("manual source SHA", err)
 	}
@@ -28,7 +27,7 @@ func p6ActualManualAutoInput(t *testing.T) *model.FrozenBattleInput {
 // the supplied record as engine instructions or rewriting its first clock.
 func TestP6ManualAutoActualEndAndFrozenIsolation(t *testing.T) {
 	input := p6ActualManualAutoInput(t)
-	raw, err := os.ReadFile("../../analysis/p7/actual-scoped-phone-v149-20261015/p7-d187f5f2045cd967d55b3f9c4da55383-CSRushFightEnd-1792070372964.pb")
+	raw, err := readTestAnalysis75("../../analysis/p7/actual-scoped-phone-v149-20261015/p7-d187f5f2045cd967d55b3f9c4da55383-CSRushFightEnd-1792070372964.pb")
 	if err != nil {
 		t.Fatal(err)
 	}

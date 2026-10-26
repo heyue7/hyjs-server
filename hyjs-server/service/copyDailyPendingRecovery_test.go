@@ -54,7 +54,7 @@ func TestCopyActualDailyPendingTwoRecovery(t *testing.T) {
 	if simpleOwned(player, game, "item_379") != 10 || simpleOwned(player, game, "item_384") != 5 {
 		t.Fatal("actual first winner's source changed")
 	}
-	raw, err := os.ReadFile("../../analysis/p6/copy-pet-daily-native-20261014/001.pb")
+	raw, err := readTestAnalysis75("../../analysis/p6/copy-pet-daily-native-20261014/001.pb")
 	if err != nil || p6Digest(raw) != "f2497a9f8031b3b2c103a3db1aa1b4d57d267849758f960c6990aa392b0668ed" {
 		t.Fatal("actual original playback changed", err)
 	}

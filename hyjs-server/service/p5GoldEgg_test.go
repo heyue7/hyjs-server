@@ -10,39 +10,21 @@ import (
 	pb "hyjs-server/model/protocol"
 	"sync"
 	"testing"
-	"time"
 )
 
 func TestP5GoldEggOriginalAll54AndOneUse(t *testing.T) {
-	f := p4Setup(t)
-	now := time.Now()
-	key := p4ExchangeKey(now)
-	old := p4Trade(t, f, &pb.CSActivityShopInfo{ActivityId: proto.String(key)}, 0, now).(*pb.SCActivityShopInfo)
+	f, id := p3DemoProviderFixture(t)
+	f.id = id
+	if err := f.s.InitializeP4(f.ctx); err != nil {
+		t.Fatal(err)
+	}
 	if err := f.s.InitializeP5(f.ctx); err != nil {
 		t.Fatal(err)
 	}
-	if err := updateProfile(f.ctx, f.id, func(p *pb.Player, g *model.GameState) error {
-		p.Level = proto.Int32(100)
-		p.Coin = proto.Int64(20000000)
-		return nil
-	}); err != nil {
+	if err := updateProfile(f.ctx, f.id, func(p *pb.Player, _ *model.GameState) error { p.Level = proto.Int32(100); return nil }); err != nil {
 		t.Fatal(err)
 	}
-	listing := p4Trade(t, f, &pb.CSActivityShopInfo{ActivityId: proto.String(key)}, 0, now).(*pb.SCActivityShopInfo)
-	if len(listing.GetShopItemList()) != len(old.GetShopItemList())+1 {
-		t.Fatal("append new supply without losing old products")
-	}
-	for i, item := range old.GetShopItemList() {
-		if listing.GetShopItemList()[i].GetIndex() != item.GetIndex() {
-			t.Fatal("renumbered old receipt indices")
-		}
-	}
-	item := listing.GetShopItemList()[len(listing.GetShopItemList())-1]
-	if item.GetGetResource()[0].GetId() != "item_360" || item.GetCostResource()[0].GetNum() != 4000000 || item.GetIndex() != 11 {
-		t.Fatal("named source and append index", item)
-	}
-	buy := &pb.CSBuyActivityShop{ActivityId: proto.String(key), Index: item.Index, Num: proto.Int32(1), CostResources: item.CostResource, GetResources: item.GetResource}
-	p4Trade(t, f, buy, 1, now)
+	fundedRechargeRewardFixture75(t, f, "original-gold-egg", "item_360,1")
 	use := &pb.CSItemUse{CostItem: &pb.BaseResource{Id: proto.String("item_360"), Num: proto.Int32(1)}}
 	bad := proto.Clone(use).(*pb.CSItemUse)
 	bad.CostItem.Num = proto.Int32(2)
@@ -106,9 +88,9 @@ func TestP5GoldEggOriginalAll54AndOneUse(t *testing.T) {
 	if _, e = f.s.p5GoldEggUse(f.ctx, f.id, use, 4); e == nil {
 		t.Fatal("operator-off use")
 	}
-	listing = p4Trade(t, f, &pb.CSActivityShopInfo{ActivityId: proto.String(key)}, 0, now).(*pb.SCActivityShopInfo)
-	if len(listing.GetShopItemList()) != 10 {
-		t.Fatal("closed gold source visible")
+	var enabledDirect int64
+	if err := db.GetIns().Model(&db.P4CommerceRule{}).Where("id LIKE ? AND enabled=1", constUtil.P5GoldEggSupplyPrefix+"%").Count(&enabledDirect).Error; err != nil || enabledDirect != 0 {
+		t.Fatal("forbidden direct gold source enabled", enabledDirect, err)
 	}
 	pool, _ := db.GetIns().DB()
 	pool.Close()
@@ -120,5 +102,5 @@ func TestP5GoldEggOriginalAll54AndOneUse(t *testing.T) {
 	if e != nil || !proto.Equal(prior[0], again[0]) {
 		t.Fatal("cold original item receipt", e)
 	}
-	t.Log("54 original awards/110150 frozen relative weights/single action/8once/cold/off/late append indices/sourcecoin4m; original private param/rate/pity unknown")
+	t.Log("54 original awards/110150 frozen relative weights/single action/8once/cold/off/earned actual recharge source; original private param/rate/pity unknown")
 }

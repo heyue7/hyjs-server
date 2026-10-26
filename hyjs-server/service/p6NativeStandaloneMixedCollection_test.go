@@ -7,7 +7,6 @@ import (
 	"hyjs-server/model"
 	pb "hyjs-server/model/protocol"
 	"math"
-	"os"
 	"path/filepath"
 	"sort"
 	"testing"
@@ -31,7 +30,7 @@ func TestP6NativeOriginalStandaloneMixedCollectionGoldens(t *testing.T) {
 func p6OriginalStandaloneMixedCollectionFixture(t *testing.T, name, sha string) {
 	t.Helper()
 	root := filepath.Join("..", "..")
-	raw, err := os.ReadFile(filepath.Join(root, "analysis", "p6", name))
+	raw, err := readTestAnalysis75(filepath.Join(root, "analysis", "p6", name))
 	if err != nil || p6Digest(raw) != sha {
 		t.Fatal("standalone mixed exports native SHA", err)
 	}
@@ -66,7 +65,7 @@ func p6OriginalStandaloneMixedCollectionFixture(t *testing.T, name, sha string) 
 		t.Fatal("standalone mixed exports denominator", err)
 	}
 	for file, digest := range map[string]string{d.Source: d.SourceSHA, d.WireRoot: d.WireSHA} {
-		body, readErr := os.ReadFile(filepath.Join(root, file))
+		body, readErr := readTestAnalysis75(filepath.Join(root, file))
 		if readErr != nil || p6Digest(body) != digest {
 			t.Fatal("standalone mixed exports provenance", file, readErr)
 		}
@@ -77,7 +76,7 @@ func p6OriginalStandaloneMixedCollectionFixture(t *testing.T, name, sha string) 
 	s := p6OriginalTables(t)
 	for _, c := range d.Cases {
 		t.Run(c.Name, func(t *testing.T) {
-			wire, readErr := os.ReadFile(filepath.Join(root, c.Wire))
+			wire, readErr := readTestAnalysis75(filepath.Join(root, c.Wire))
 			if readErr != nil || p6Digest(wire) != c.WireSHA {
 				t.Fatal("standalone mixed exports PB", readErr)
 			}

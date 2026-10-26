@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"math"
-	"os"
 	"testing"
 
 	"google.golang.org/protobuf/proto"
@@ -16,7 +15,7 @@ import (
 func TestP6RushStarterOriginalTypedStructureAndPendingProof(t *testing.T) {
 	service := &GameService{}
 	for _, name := range []string{"000", "001", "002", "003"} {
-		raw, err := os.ReadFile("../../analysis/p6/actual-local-p7-rush-terminal-inputs-v127/" + name + ".rush-series.json")
+		raw, err := readTestAnalysis75("../../analysis/p6/actual-local-p7-rush-terminal-inputs-v127/" + name + ".rush-series.json")
 		if err != nil {
 			t.Fatal(err)
 		}

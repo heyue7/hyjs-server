@@ -3,7 +3,6 @@ package service
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 	"testing"
 
 	"hyjs-server/constUtil"
@@ -13,7 +12,7 @@ import (
 func TestP6ActualArenaWholePartyIndependentOriginalScope(t *testing.T) {
 	s := &GameService{}
 	for index := 0; index < 8; index++ {
-		raw, err := os.ReadFile(fmt.Sprintf("../../analysis/p6/actual-full-party-arena2-inputs-v151/%03d.frozen-input.json", index))
+		raw, err := readTestAnalysis75(fmt.Sprintf("../../analysis/p6/actual-full-party-arena2-inputs-v151/%03d.frozen-input.json", index))
 		if err != nil {
 			t.Fatal(err)
 		}

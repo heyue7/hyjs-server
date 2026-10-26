@@ -58,7 +58,7 @@ func (s *GameService) p7ReRushMutation(ctx context.Context, id int64, request pr
 				return err
 			}
 		}
-		state, err := p7State(tx, id, LocalPlayNow(ctx))
+		state, err := p7State(tx, id, time.Now())
 		if err != nil {
 			return err
 		}
@@ -97,7 +97,7 @@ func (s *GameService) p7ReRushMutation(ctx context.Context, id int64, request pr
 		if !mutation {
 			return nil
 		}
-		if err = saveP7RushCalendar(tx, state, LocalPlayNow(ctx)); err != nil {
+		if err = saveP7RushCalendar(tx, state, time.Now()); err != nil {
 			return err
 		}
 		return p7SaveReceipt(tx, id, domain, stamp, request, response)

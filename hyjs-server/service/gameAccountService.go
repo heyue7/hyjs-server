@@ -182,6 +182,7 @@ func (s *GameService) AdminCreateGamePlayer(ctx context.Context, p *model.AdminP
 			calendar = context.WithValue(calendar, constUtil.ServerGameClockServerKey, clock.ServerID)
 			calendar = context.WithValue(calendar, constUtil.ServerGameClockOffsetKey, clock.OffsetDays)
 			calendar = context.WithValue(calendar, constUtil.ServerGameClockRevisionKey, clock.Revision)
+			calendar = context.WithValue(calendar, constUtil.ServerGameClockHighDaysKey, clock.HighDays)
 			tx = tx.WithContext(calendar)
 		}
 		if err := ServerGameClockGuardTransaction(tx); err != nil {

@@ -25,7 +25,7 @@ func TestP6InitialActorAdmissionOriginalSource(t *testing.T) {
 		{"initial-actor-source-v92-original.il.txt", "f70792fd23df03e118f38939af61ed80c2772b2b31a9bb57ec3593553017b392", []string{"006d callvirt ProtoBuf.Message.BattleHeroInst::get_curHp", "0072 stfld .BattleActorData::hp", "0014 ldfld Battle.Engine.InputData.InActorData::hp", "0019 stfld Battle.Engine.LogicModel.FAttribute::hp"}},
 		{"initial-actor-admission-v92-original.il.txt", "6ef743ec70b8f322a1a4d96ecf3b28003f2d54ccfe950ceced0df6262d3637aa", []string{"METHOD Battle.Engine.LogicModel.FPlayer::init", "0116 ble.un 307", "0133 ldarg.0 None\n0134 ldfld Battle.Engine.LogicModel.FPlayer::actors\n0139 ldloc.2 None\n013a callvirt Add", "0162 stfld Battle.Engine.LogicModel.FPlayer::deadActors", "006d callvirt Battle.Engine.LogicModel.FBuffProc::LoadBuffByTimer"}},
 	} {
-		raw, err := os.ReadFile(filepath.Join("../../analysis/p6", item.file))
+		raw, err := readTestAnalysis75(filepath.Join("../../analysis/p6", item.file))
 		if err != nil || p6Digest(raw) != item.sha {
 			t.Fatal("immutable original actor source", err)
 		}

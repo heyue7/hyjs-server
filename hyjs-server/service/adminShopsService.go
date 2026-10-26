@@ -12,6 +12,7 @@ import (
 	"hyjs-server/db"
 	"hyjs-server/model"
 	pb "hyjs-server/model/protocol"
+	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -47,7 +48,7 @@ func AdminShopDefinitions() []model.AdminShopDefinition {
 			d.SettingsFields = []string{"unlimited", "startAt", "endAt", "claimEndAt"}
 			d.Notes = "按公会战日期设置商品，保存后更新当前场次后续购买；已用库存和携带上限保留。"
 		case "vip":
-			d.Fields = []string{"rewards", "cost", "minVip", "enabled", "source"}
+			d.Fields = []string{"rewards", "cost", "minVip", "totalLimit", "enabled", "source"}
 			d.SettingsFields = []string{"unlimited", "startAt", "endAt", "claimEndAt"}
 			d.Notes = "对应游戏商城的“会员礼包”（原VIP商店，shopType=2）。空列表表示尚无已启用商品；请自行配置奖励、价格及会员条件后启用。保存后立即更新后续购买，已领次数保持。"
 		}
@@ -147,6 +148,7 @@ func (s *GameService) adminReadShop(tx *gorm.DB, key string) (*model.AdminShopRe
 		for _, p := range raw.VIP {
 			v := adminShopBaseProduct(p.ID, p.Reward, fmt.Sprintf("%s,%d", vipShopCostResource(p), p.Cost))
 			v.MinVip = p.MinVIP
+			v.TotalLimit = p.TotalLimit
 			v.Source = p.Source
 			v.Enabled = p.Enabled
 			out.Items = append(out.Items, v)
@@ -190,7 +192,11 @@ func (s *GameService) adminReadShop(tx *gorm.DB, key string) (*model.AdminShopRe
 		}
 	default:
 		var row db.P4CommerceRule
-		err := tx.Where("kind=? AND id NOT LIKE ?", key, "shop_schedule_%").Order("start_at DESC,id DESC").First(&row).Error
+		query := tx.Where("kind=? AND id NOT LIKE ?", key, "shop_schedule_%")
+		if key == "memory" {
+			query = query.Order("enabled DESC")
+		}
+		err := query.Order("start_at DESC,id DESC").First(&row).Error
 		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil, err
 		}
@@ -349,13 +355,13 @@ func (s *GameService) AdminSaveShopProduct(ctx context.Context, actor *model.Adm
 		cost := fmt.Sprintf("%s,%d", p.Cost.ResourceID, p.Cost.Amount)
 		switch key {
 		case "vip":
-			if p.MinVip < 1 || p.MinVip > 12 {
+			if p.MinVip < 1 || p.MinVip > 12 || p.TotalLimit < 0 || p.TotalLimit > math.MaxInt32 {
 				return constUtil.ErrAdminInput
 			}
 			if _, err := s.p4ParseCost(cost); err != nil {
 				return err
 			}
-			row := db.VIPShopProduct{ID: id, MinVIP: p.MinVip, CostResource: p.Cost.ResourceID, Cost: p.Cost.Amount, Reward: reward, Enabled: p.Enabled, Source: p.Source}
+			row := db.VIPShopProduct{ID: id, MinVIP: p.MinVip, TotalLimit: p.TotalLimit, CostResource: p.Cost.ResourceID, Cost: p.Cost.Amount, Reward: reward, Enabled: p.Enabled, Source: p.Source}
 			if !create {
 				found := false
 				for _, old := range raw.VIP {

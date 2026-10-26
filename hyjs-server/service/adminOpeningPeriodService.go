@@ -20,6 +20,9 @@ func adminOpeningPeriod(tx *gorm.DB) *adminOpeningScope {
 	return scope
 }
 func adminBindOpeningPeriod(tx *gorm.DB, issued db.AdminCharacterActivityInstance) {
+	// Payment qualification needs the accepted source even when this first
+	// once-only programme deliberately retains its original legacy task ledger.
+	tx.Statement.Context = context.WithValue(tx.Statement.Context, rechargeOpeningScope75{}, &adminOpeningScope{OccurrenceID: issued.OccurrenceID, PlayerID: issued.PlayerID})
 	var scope *adminOpeningScope
 	if strings.HasPrefix(issued.ConsumerKey, "opening_period_") {
 		scope = &adminOpeningScope{OccurrenceID: issued.OccurrenceID, PlayerID: issued.PlayerID}
@@ -31,6 +34,7 @@ func adminBindOpeningPeriod(tx *gorm.DB, issued db.AdminCharacterActivityInstanc
 // once source retains all existing claims; subsequent periods never clear them.
 func adminResolveOpeningSchedule(tx *gorm.DB, cfg *db.OpenServerActivityRule, now, playerID int64, rows []db.AdminActivityOccurrence) error {
 	tx.Statement.Context = context.WithValue(tx.Statement.Context, adminOpeningScopeKey{}, (*adminOpeningScope)(nil))
+	tx.Statement.Context = context.WithValue(tx.Statement.Context, rechargeOpeningScope75{}, (*adminOpeningScope)(nil))
 	baseStart, baseEnabled := cfg.StartAt, cfg.Enabled
 	// Do not range-lock an empty issued set: different first-time roles may
 	// share its InnoDB gap. The profile lock and unique insert/current read

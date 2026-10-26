@@ -77,7 +77,7 @@ func p6NativeDetailsFromFixture(t *testing.T, output string, strict bool, file, 
 	s := p6OriginalTables(t)
 	var reports []map[string]any
 	for _, c := range original.Cases {
-		wire, err := os.ReadFile(filepath.Join(wireRoot, c.Wire))
+		wire, err := readTestAnalysis75(filepath.Join(wireRoot, c.Wire))
 		if err != nil || p6Digest(wire) != c.WireSHA {
 			t.Fatal("original detail wire", err)
 		}

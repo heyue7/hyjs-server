@@ -36,7 +36,7 @@ func p6GenericLocalNativeBundle(t *testing.T) *p6GenericLocalNativeBundleData {
 	if path == "" {
 		return nil
 	}
-	raw, err := os.ReadFile(path)
+	raw, err := readTestAnalysis75(path)
 	if err != nil || p6Digest(raw) != os.Getenv("HYJS_P6_GENERIC_LOCAL_BUNDLE_SHA256") || len(os.Getenv("HYJS_P6_GENERIC_LOCAL_BUNDLE_SHA256")) != 64 {
 		t.Fatal("fixed four local original bundle SHA", err)
 	}
@@ -45,14 +45,14 @@ func p6GenericLocalNativeBundle(t *testing.T) *p6GenericLocalNativeBundleData {
 		t.Fatal("fixed original four-case identity/denominator/origin")
 	}
 	for _, binding := range [][2]string{{bundle.Source, bundle.SourceSHA}, {bundle.Capture, bundle.CaptureSHA}} {
-		raw, err := os.ReadFile(p7NumericLocalNativePath(t, binding[0]))
+		raw, err := readTestAnalysis75(p7NumericLocalNativePath(t, binding[0]))
 		if err != nil || p6Digest(raw) != binding[1] || len(binding[1]) != 64 {
 			t.Fatal("original four-case source binding", binding[0], err)
 		}
 	}
 	for _, kind := range []string{"core", "hits", "manager", "records"} {
 		fixture := bundle.Fixtures[kind]
-		raw, err := os.ReadFile(p7NumericLocalNativePath(t, filepath.Join("analysis/p6", fixture.Path)))
+		raw, err := readTestAnalysis75(p7NumericLocalNativePath(t, filepath.Join("analysis/p6", fixture.Path)))
 		if err != nil || p6Digest(raw) != fixture.SHA || len(fixture.SHA) != 64 {
 			t.Fatal("original four-case fixture binding", kind, err)
 		}
@@ -62,7 +62,7 @@ func p6GenericLocalNativeBundle(t *testing.T) *p6GenericLocalNativeBundleData {
 
 // Only this exact explicit local bundle can declare four original hit cases.
 func p6GenericLocalNativeHitCaseCount(name string) int {
-	raw, err := os.ReadFile(os.Getenv("HYJS_P6_GENERIC_LOCAL_BUNDLE"))
+	raw, err := readTestAnalysis75(os.Getenv("HYJS_P6_GENERIC_LOCAL_BUNDLE"))
 	if err != nil || p6Digest(raw) != os.Getenv("HYJS_P6_GENERIC_LOCAL_BUNDLE_SHA256") {
 		return 0
 	}
@@ -74,7 +74,7 @@ func p6GenericLocalNativeHitCaseCount(name string) int {
 	if hits.Path != name || filepath.IsAbs(name) || strings.HasPrefix(filepath.ToSlash(filepath.Clean(name)), "../") {
 		return 0
 	}
-	data, err := os.ReadFile(filepath.Join("../../analysis/p6", name))
+	data, err := readTestAnalysis75(filepath.Join("../../analysis/p6", name))
 	if err != nil || p6Digest(data) != hits.SHA || len(hits.SHA) != 64 {
 		return 0
 	}
@@ -111,7 +111,7 @@ func TestP6GenericLocalOriginalAllLayers(t *testing.T) {
 
 func p6GenericLocalStrictTerminal(t *testing.T, file, digest string) {
 	t.Helper()
-	raw, err := os.ReadFile(filepath.Join("../../analysis/p6", file))
+	raw, err := readTestAnalysis75(filepath.Join("../../analysis/p6", file))
 	if err != nil || p6Digest(raw) != digest {
 		t.Fatal("original terminal record SHA", err)
 	}
@@ -134,7 +134,7 @@ func p6GenericLocalStrictTerminal(t *testing.T, file, digest string) {
 	s := p6OriginalTables(t)
 	for _, row := range source.Cases {
 		t.Run(row.Name, func(t *testing.T) {
-			raw, err := os.ReadFile(filepath.Join("../..", row.Wire))
+			raw, err := readTestAnalysis75(filepath.Join("../..", row.Wire))
 			if err != nil || p6Digest(raw) != row.SHA {
 				t.Fatal("original wire source SHA", err)
 			}

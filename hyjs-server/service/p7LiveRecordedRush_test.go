@@ -12,7 +12,6 @@ import (
 	pb "hyjs-server/model/protocol"
 	"io"
 	"math"
-	"os"
 	"strings"
 	"testing"
 )
@@ -29,7 +28,7 @@ func p7LiveRecordedOriginal34(t *testing.T) (*GameService, *model.FrozenP6RushSe
 			EndHex string `json:"endHex"`
 		} `json:"ends"`
 	}
-	raw, err := os.ReadFile("testdata/p7_live_recorded_original34.json")
+	raw, err := readTestAnalysis75("testdata/p7_live_recorded_original34.json")
 	if err != nil {
 		t.Fatal(err)
 	}

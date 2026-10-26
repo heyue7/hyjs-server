@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
-	"os"
 	"path/filepath"
 	"sort"
 	"testing"
@@ -63,7 +62,7 @@ func p6OriginalPrimaryHPFixture(t *testing.T, name, sha string, classes ...int32
 	}
 	t.Helper()
 	root := filepath.Join("..", "..")
-	raw, err := os.ReadFile(filepath.Join(root, "analysis", "p6", name))
+	raw, err := readTestAnalysis75(filepath.Join(root, "analysis", "p6", name))
 	if err != nil || p6Digest(raw) != sha {
 		t.Fatal("original primary HP export digest", err)
 	}
@@ -102,7 +101,7 @@ func p6OriginalPrimaryHPFixture(t *testing.T, name, sha string, classes ...int32
 		t.Fatal("original primary HP denominator", err)
 	}
 	for file, digest := range map[string]string{original.Source: original.SourceSHA, original.WireRoot: original.WireSHA} {
-		body, readErr := os.ReadFile(filepath.Join(root, file))
+		body, readErr := readTestAnalysis75(filepath.Join(root, file))
 		if readErr != nil || p6Digest(body) != digest {
 			t.Fatal("original primary HP provenance", file, readErr)
 		}
@@ -120,7 +119,7 @@ func p6OriginalPrimaryHPFixture(t *testing.T, name, sha string, classes ...int32
 	s := p6OriginalTables(t)
 	for _, c := range original.Cases {
 		t.Run(c.Name, func(t *testing.T) {
-			wire, readErr := os.ReadFile(filepath.Join(root, c.Wire))
+			wire, readErr := readTestAnalysis75(filepath.Join(root, c.Wire))
 			if readErr != nil || p6Digest(wire) != c.WireSHA {
 				t.Fatal("original primary HP input SHA", readErr)
 			}
