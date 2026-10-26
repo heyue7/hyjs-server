@@ -69,6 +69,9 @@ func periodRewardNoticeCopy(cfg db.PeriodInstance, index int) (string, string) {
 // projectPeriodRewardNotices 批量读取角色快照，同时修正历史和新投递的展示副本。
 // 来源、数量、领取状态及原始记录保持原值，配置编辑也不会改写旧奖励的达标门槛。
 func projectPeriodRewardNotices(tx *gorm.DB, playerID int64, rows []db.RewardDelivery) error {
+	if err := projectPeriodRankRewardNotices(tx, playerID, rows); err != nil {
+		return err
+	}
 	keys := map[string]bool{}
 	indices := map[string]int{}
 	instances := map[string]string{}
@@ -138,6 +141,73 @@ func projectPeriodRewardNotices(tx *gorm.DB, playerID int64, rows []db.RewardDel
 				rows[i].Content = "活动目标已达成，奖励已发放。"
 			}
 		}
+	}
+	return nil
+}
+
+// periodRankRewardNoticeCopy uses only the settled activity and this player's
+// frozen rank. Missing evidence never becomes a guessed current ranking.
+func periodRankRewardNoticeCopy(cfg db.PeriodInstance, rank int32) (string, string) {
+	name := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(cfg.Title), "Re"))
+	if cfg.Kind == constUtil.P7RushStarEvent {
+		name = "试炼之地"
+	}
+	if name == "" {
+		name = "活动"
+	}
+	subject := name
+	if cfg.Kind == constUtil.P7RushStarEvent {
+		subject = "试炼"
+	}
+	if rank < 1 {
+		return name + "排名奖励", "本期" + subject + "排名奖励已发放。"
+	}
+	return name + "排名奖励", fmt.Sprintf("本期%s排名第%d名，排名奖励已发放。", subject, rank)
+}
+
+func projectPeriodRankRewardNotices(tx *gorm.DB, playerID int64, rows []db.RewardDelivery) error {
+	keys := map[string]bool{}
+	for i := range rows {
+		if strings.HasPrefix(rows[i].SourceKey, "rank:") {
+			key := strings.TrimPrefix(rows[i].SourceKey, "rank:")
+			keys[key] = true
+			rows[i].Title = "排名奖励"
+			rows[i].Content = "本期排名奖励已发放。"
+		}
+	}
+	ids := make([]string, 0, len(keys))
+	for id := range keys {
+		ids = append(ids, id)
+	}
+	snapshots := map[string]p1Settlement{}
+	for from := 0; from < len(ids); from += 128 {
+		var settled []db.PeriodSettlement
+		if err := tx.Where("instance_id IN ?", ids[from:min(from+128, len(ids))]).Find(&settled).Error; err != nil {
+			return err
+		}
+		for _, row := range settled {
+			var snapshot p1Settlement
+			if json.Unmarshal(row.Snapshot, &snapshot) == nil && snapshot.Rules.ID == row.InstanceID {
+				snapshots[row.InstanceID] = snapshot
+			}
+		}
+	}
+	for i := range rows {
+		if !strings.HasPrefix(rows[i].SourceKey, "rank:") {
+			continue
+		}
+		snapshot, ok := snapshots[strings.TrimPrefix(rows[i].SourceKey, "rank:")]
+		if !ok {
+			continue
+		}
+		rank := int32(0)
+		for _, frozen := range snapshot.Ranks {
+			if frozen.PlayerID == playerID && frozen.Rank > 0 {
+				rank = frozen.Rank
+				break
+			}
+		}
+		rows[i].Title, rows[i].Content = periodRankRewardNoticeCopy(snapshot.Rules, rank)
 	}
 	return nil
 }

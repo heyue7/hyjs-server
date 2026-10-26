@@ -1,7 +1,7 @@
 package db
 
-// P7RushHistoryCertificate is derived verification evidence. Actual frozen rows
-// and their complete fingerprint remain authoritative on every query.
+// P7RushHistoryCertificate durably proves an accepted settled fact under the
+// explicit validation contract. Every query binds all actual frozen source bytes.
 type P7RushHistoryCertificate struct {
 	ServerID    int64  `gorm:"primaryKey;autoIncrement:false"`
 	PlayerID    int64  `gorm:"primaryKey;autoIncrement:false"`
@@ -9,6 +9,7 @@ type P7RushHistoryCertificate struct {
 	Format      int64  `gorm:"not null"`
 	Validator   string `gorm:"type:char(64);not null"`
 	Fingerprint string `gorm:"type:char(64);not null"`
+	Winner      int32  `gorm:"not null;default:0"`
 	OutcomeHash string `gorm:"type:char(64);not null"`
 	VerifiedAt  int64  `gorm:"not null"`
 	MAC         string `gorm:"column:mac;type:char(64);not null"`

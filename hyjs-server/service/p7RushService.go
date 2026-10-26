@@ -661,6 +661,16 @@ func (s *GameService) p7Start(ctx context.Context, id int64, request *pb.CSRushF
 			if err = tx.First(&accepted, "id=? AND player_id=?", result.GetFightId(), id).Error; err != nil {
 				return err
 			}
+			if accepted.Status == constUtil.P7RushSettled && accepted.Kind == constUtil.P7RushTrial {
+				var state db.P7RushState
+				if err = tx.First(&state, "player_id=?", id).Error; err != nil {
+					return err
+				}
+				tx, err = s.p7BindSettledQueryProjection(tx, &state)
+				if err != nil {
+					return err
+				}
+			}
 			_, _, err = p7ReadScopedRush(tx, &accepted, nil)
 			return err
 		}
@@ -705,6 +715,12 @@ func (s *GameService) p7Start(ctx context.Context, id int64, request *pb.CSRushF
 		state, err := p7State(tx, id, time.Now())
 		if err != nil {
 			return err
+		}
+		if !diagnostic {
+			tx, err = s.p7BindSettledQueryProjection(tx, state)
+			if err != nil {
+				return err
+			}
 		}
 		if !diagnostic && state.ActiveFight != "" {
 			return errors.New("请先完成当前试炼战斗")
@@ -923,8 +939,6 @@ func (s *GameService) ComputeP7Diagnostic(ctx context.Context, id int64, fightID
 func (s *GameService) p7End(ctx context.Context, id int64, request *pb.CSRushFightEnd) ([]proto.Message, error) {
 	var result *pb.SCRushFightEnd
 	var synchronizedPlayer *pb.Player
-	var warmKey p7RushHistoricalKey
-	var warmBody []byte
 	err := updateProfileWithTx(ctx, id, func(tx *gorm.DB, p *pb.Player, g *model.GameState) error {
 		var fight db.P7RushFight
 		if err := tx.Where("id=? AND player_id=?", request.GetFightId(), id).First(&fight).Error; err != nil {
@@ -941,6 +955,16 @@ func (s *GameService) p7End(ctx context.Context, id int64, request *pb.CSRushFig
 			result = &pb.SCRushFightEnd{}
 			if err = proto.Unmarshal(fight.Result, result); err != nil {
 				return err
+			}
+			if fight.Kind == constUtil.P7RushTrial {
+				var state db.P7RushState
+				if err = tx.First(&state, "player_id=?", id).Error; err != nil {
+					return err
+				}
+				tx, err = s.p7BindSettledQueryProjection(tx, &state)
+				if err != nil {
+					return err
+				}
 			}
 			_, scoped, err := p7ReadScopedRush(tx, &fight, request)
 			if err != nil {
@@ -1068,15 +1092,10 @@ func (s *GameService) p7End(ctx context.Context, id int64, request *pb.CSRushFig
 			return err
 		}
 		if scoped && outcome != nil && outcome.Authoritative {
-			// Only stage the just-verified accepted manual source. The outer profile
-			// save and SQL commit must succeed before this evidence becomes shared.
-			historyCtx := p7WithRushHistoricalQuery(p7WithRushReadRequestCache(tx.Statement.Context))
-			var key p7RushHistoricalKey
-			p7RushReadFingerprint(tx.WithContext(historyCtx), &fight, request, &key)
-			if key.database != nil {
-				if body, e := p7EncodeHistoricalOutcome(outcome); e == nil {
-					warmKey, warmBody = key, body
-				}
+			// Persist only the just-verified source in the same settlement transaction.
+			// Rollback removes both the reward and its verification proof.
+			if err = p7PersistRushSettlementProof(tx, &fight, request, outcome, s.OriginalServerID()); err != nil {
+				return err
 			}
 		}
 		return nil
@@ -1094,9 +1113,6 @@ func (s *GameService) p7End(ctx context.Context, id int64, request *pb.CSRushFig
 			}
 		}
 		return nil, err
-	}
-	if warmKey.database != nil && len(warmBody) > 0 {
-		p7RushHistoryCache.put(warmKey, warmBody, time.Now())
 	}
 	if synchronizedPlayer != nil {
 		return []proto.Message{result, &pb.SCPlayer{Player: synchronizedPlayer}}, nil

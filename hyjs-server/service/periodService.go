@@ -552,7 +552,8 @@ func (s *GameService) SettleP1Periods(ctx context.Context) error {
 			for i := range ranks {
 				ranks[i].Rank = int32(i + 1)
 				if cfg.Enabled && cfg.RankPlaces > 0 && ranks[i].Rank <= cfg.RankPlaces {
-					if _, err = s.EnqueueRewardNotice(tx, ranks[i].PlayerID, "rank:"+cfg.ID, cfg.Title+"排行奖励", cfg.Source, cfg.RankRewards, cfg.RewardEndAt); err != nil {
+					title, content := periodRankRewardNoticeCopy(cfg, ranks[i].Rank)
+					if _, err = s.EnqueueRewardNotice(tx, ranks[i].PlayerID, "rank:"+cfg.ID, title, content, cfg.RankRewards, cfg.RewardEndAt); err != nil {
 						return err
 					}
 				}

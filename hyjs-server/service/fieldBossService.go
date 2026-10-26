@@ -548,13 +548,17 @@ func (s *GameService) fieldBossFightEnd(ctx context.Context, id int64, b *pb.CSS
 				name := "野外首领"
 				if s.AdminCatalogueData != nil {
 					hero := s.table("Hero", "id", boss.GetHeroId())
-					if localized := s.AdminCatalogueData.DisplayNames[hero["name"]]; localized != "" {
+					if localized := strings.TrimSpace(s.AdminCatalogueData.DisplayNames[hero["name"]]); localized != "" && localized != hero["name"] && localized != boss.GetHeroId() && !strings.ContainsAny(localized, "%{}") {
 						name = localized
 					}
 				}
+				playerName := strings.TrimSpace(p12NoticeName(player.GetName()))
+				if playerName == "" {
+					playerName = "勇士"
+				}
 				notice = &pb.SCPublicMessage{Pubmsg: &pb.PublicMessage{
 					Type: proto.Int32(constUtil.P12WorldBossKillNoticeType), ScrollType: proto.Int32(constUtil.P12WorldBossKillNoticeScrollType),
-					Msg: proto.String(fmt.Sprintf(constUtil.FieldBossKillNoticeFormat, p12NoticeName(player.GetName()), p12NoticeName(name))),
+					Msg: proto.String(fmt.Sprintf(constUtil.FieldBossKillNoticeFormat, playerName, p12NoticeName(name))),
 				}}
 			}
 		} else {

@@ -32,3 +32,7 @@
 原phone QA进程、自有MySQL库/账号及临时夹具link已释放，手机锁已归还。源码36967c5与入口6f32dd4均已推送codex/trial-on-demand-20261026；公会同意本专项先独立上线，后继至少合这两提交，expected-live使用6f32，客户端以71为正式基线。根目录其他任务差量保持。无公告、邮件、奖励、补偿或强制更新策略。
 
 证据：根目录analysis/trial-demand-20261026/中的http-perf-current.json、phone-runtime-measurements.json、mysql-domain.log、settlement-validation.json、one-key-http.json、phone-observer.jsonl、phone-return.json及同状态截图；当前源码回归夹具service/testdata/p7_live_recorded_original34.json已去身份。
+
+## 后续故障修正
+
+2026-10-26用户实测仍分钟级等待后，已查到二进制版本绑定导致历史证明失效、Start重复历史验证及超时误报。后续代码和正式服等待边界见[持久验证修正](20261026-trial-durable-proof.md)；本记录既有发布/验收仅代表当时范围。

@@ -1,6 +1,9 @@
 package service
 
 import (
+	"encoding/json"
+	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -95,5 +98,102 @@ func TestPeriodRewardNoticeHistoryBothListsPreserveReceipt(t *testing.T) {
 	after, _ = f.profile(t)
 	if after.GetCoin() != before.GetCoin()+17 {
 		t.Fatal("claim repeated or lost")
+	}
+}
+
+func TestPeriodRankRewardNoticeFrozenOwnerAndFallback(t *testing.T) {
+	f := p1Setup(t)
+	cfg := db.PeriodInstance{ID: "p1:rank-copy", Title: "Re试炼星数", Kind: constUtil.P7RushStarEvent, Source: "internal-source-must-not-display"}
+	snapshot, err := json.Marshal(p1Settlement{Rules: cfg, Ranks: []p1Rank{{PlayerID: f.id + 1, Rank: 1}, {PlayerID: f.id, Rank: 7}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = db.GetIns().Create(&db.PeriodSettlement{InstanceID: cfg.ID, SettledAt: time.Now().UnixMilli(), Snapshot: snapshot}).Error; err != nil {
+		t.Fatal(err)
+	}
+	// A later mutable leaderboard cannot replace the already settled rank.
+	if err = db.GetIns().Create(&db.PeriodProgress{InstanceID: cfg.ID, PlayerID: f.id, Value: 999999, Snapshot: []byte(`{}`)}).Error; err != nil {
+		t.Fatal(err)
+	}
+	original := []db.RewardDelivery{{ID: 101, PlayerID: f.id, SourceKey: "rank:" + cfg.ID, Title: "Re试炼星数排行奖励", Content: cfg.Source, Rewards: "coin,13", ClaimedAt: 123, ExpiresAt: 456}, {ID: 102, PlayerID: f.id, SourceKey: "rank:archived", Title: "Reinternal", Content: "internal-other", Rewards: "coin,9"}}
+	rows := append([]db.RewardDelivery(nil), original...)
+	if err = projectPeriodRewardNotices(db.GetIns(), f.id, rows); err != nil {
+		t.Fatal(err)
+	}
+	if rows[0].Title != "试炼之地排名奖励" || rows[0].Content != "本期试炼排名第7名，排名奖励已发放。" {
+		t.Fatal(rows[0])
+	}
+	if rows[1].Title != "排名奖励" || rows[1].Content != "本期排名奖励已发放。" {
+		t.Fatal(rows[1])
+	}
+	for i := range rows {
+		rows[i].Title = original[i].Title
+		rows[i].Content = original[i].Content
+	}
+	if !reflect.DeepEqual(rows, original) {
+		t.Fatal("projection changed reward receipt")
+	}
+	if err = projectPeriodRewardNotices(db.GetIns(), f.id+9, rows); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(rows[0].Content, "第") || strings.Contains(rows[0].Title+rows[0].Content, "Re") || strings.Contains(rows[0].Content, cfg.Source) {
+		t.Fatal("missing owner rank guessed", rows[0])
+	}
+	var actual db.PeriodSettlement
+	if err = db.GetIns().First(&actual, "instance_id=?", cfg.ID).Error; err != nil || string(actual.Snapshot) != string(snapshot) {
+		t.Fatal("frozen snapshot changed", err)
+	}
+}
+
+func TestPeriodRankRewardNoticeCopyAndFieldBossLastHit(t *testing.T) {
+	title, body := periodRankRewardNoticeCopy(db.PeriodInstance{Title: " Re竞技场 "}, 3)
+	if title != "竞技场排名奖励" || body != "本期竞技场排名第3名，排名奖励已发放。" {
+		t.Fatal(title, body)
+	}
+	title, body = periodRankRewardNoticeCopy(db.PeriodInstance{}, 0)
+	if title != "活动排名奖励" || body != "本期活动排名奖励已发放。" {
+		t.Fatal(title, body)
+	}
+	notice := fmt.Sprintf(constUtil.FieldBossKillNoticeFormat, p12NoticeName("[FF0000]勇者[-]"), p12NoticeName("森林首领"))
+	if !strings.Contains(notice, "完成最后一击，击败了森林首领！") || strings.Contains(notice, "[") || strings.Contains(notice, "%!") {
+		t.Fatal(notice)
+	}
+}
+
+func TestPeriodRankRewardNoticeNewSettlement(t *testing.T) {
+	f := p1Setup(t)
+	cfg := p1Instance(t, f, "p1:rank-copy-settle", "rank-copy-kind", "cumulative", 99, time.Now().Add(-time.Second), 1)
+	cfg.Title = "Re竞技场"
+	cfg.Source = "private-rule-source"
+	if err := db.GetIns().Model(&db.PeriodInstance{}).Where("id=?", cfg.ID).Updates(map[string]any{"title": cfg.Title, "source": cfg.Source}).Error; err != nil {
+		t.Fatal(err)
+	}
+	raw, err := json.Marshal(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = db.GetIns().Create(&db.PeriodProgress{InstanceID: cfg.ID, PlayerID: f.id, Value: 5, Snapshot: raw}).Error; err != nil {
+		t.Fatal(err)
+	}
+	before, _ := f.profile(t)
+	if err = f.s.SettleP1Periods(f.ctx); err != nil {
+		t.Fatal(err)
+	}
+	var saved db.RewardDelivery
+	if err = db.GetIns().First(&saved, "player_id=? AND source_key=?", f.id, "rank:"+cfg.ID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if saved.Title != "竞技场排名奖励" || saved.Content != "本期竞技场排名第1名，排名奖励已发放。" || saved.Rewards != cfg.RankRewards || saved.ExpiresAt != cfg.RewardEndAt || saved.ClaimedAt != 0 {
+		t.Fatal(saved)
+	}
+	if err = f.s.SettleP1Periods(f.ctx); err != nil {
+		t.Fatal(err)
+	}
+	if p1Count(t, &db.RewardDelivery{}, "source_key=?", "rank:"+cfg.ID) != 1 {
+		t.Fatal("settlement duplicated")
+	}
+	after, _ := f.profile(t)
+	if !proto.Equal(before, after) {
+		t.Fatal("notice delivery changed player resources")
 	}
 }

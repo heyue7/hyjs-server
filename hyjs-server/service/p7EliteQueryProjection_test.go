@@ -30,7 +30,13 @@ func TestP7EliteQueryProjectionContinuousSourcesAndBoundedReads(t *testing.T) {
 	if err := db.GetIns().Callback().Query().After("gorm:query").Register(name, func(tx *gorm.DB) { counts[tx.Statement.Table]++ }); err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { db.GetIns().Callback().Query().Remove(name) })
+	if err := db.GetIns().Callback().Row().After("gorm:row").Register(name, func(tx *gorm.DB) { counts[tx.Statement.Table]++ }); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		db.GetIns().Callback().Query().Remove(name)
+		db.GetIns().Callback().Row().Remove(name)
+	})
 	for i := 0; i < 3; i++ {
 		if got, err := f.s.p7StagePrerequisite(db.GetIns(), f.id, elite); err != nil || !got {
 			t.Fatal("original qualification", got, err)
@@ -58,8 +64,14 @@ func TestP7EliteQueryProjectionContinuousSourcesAndBoundedReads(t *testing.T) {
 		}
 
 		for _, table := range []string{"p7_rush_progress", "p7_rush_fights", "p7_rush_manual_calculations", "p7_rush_scoped_calculations", "p6_battle_records", "p7_re_rush_sweeps"} {
-			if counts[table] != 1 {
-				t.Fatalf("%s read %d times, want one bulk read", table, counts[table])
+			maximum := 1
+			if tx.Dialector.Name() == "mysql" && (table == "p7_rush_manual_calculations" || table == "p7_rush_scoped_calculations" || table == "p6_battle_records") {
+				// A missing durable proof permits one metadata read plus one
+				// bounded raw batch; never one query per historical fight.
+				maximum = 2
+			}
+			if counts[table] < 1 || counts[table] > maximum {
+				t.Fatalf("%s read %d times, want 1..%d bounded bulk reads", table, counts[table], maximum)
 			}
 		}
 		return nil
