@@ -196,6 +196,10 @@ func (s *GameService) refreshField(id int64, g *model.GameState) error {
 	}
 	// 日期按本地服北京时间计算，日切仅重置奖励计数和生活技能疲劳记录。
 	day := time.Now().In(time.FixedZone("Asia/Shanghai", 8*60*60)).Format("2006-01-02")
+	if g.FieldCalendarDay != "" {
+		day = g.FieldCalendarDay
+		f.LifeCalendar75 = true
+	}
 	if f.Side == nil {
 		f.Side = &pb.PlayerSide{PlayerId: proto.Int64(id), State: proto.Int32(0), Anger: proto.Float64(0), MaxHp: proto.Float64(1), CurHp: proto.Float64(1)}
 	}

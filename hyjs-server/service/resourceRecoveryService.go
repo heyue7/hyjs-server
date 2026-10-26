@@ -133,6 +133,14 @@ func (s *GameService) resourceProfile(ctx context.Context, id int64) (*pb.Player
 		if err != nil {
 			return err
 		}
+		fieldChanged := false
+		if ServerGameClockContextBound(readCtx) && row.Id == GameCalendarOwner(readCtx) {
+			game.FieldCalendarDay = LocalPlayNow(readCtx).In(time.FixedZone("Asia/Shanghai", 8*60*60)).Format("2006-01-02")
+			fieldChanged, err = prepareFieldCalendar75(tx, row.Id, game, game.FieldCalendarDay)
+			if err != nil {
+				return err
+			}
+		}
 		penaltyChanged, err := s.syncP12FieldPVPPenaltyForRead(tx, player, game, time.Now())
 		if err != nil {
 			return err
@@ -149,7 +157,7 @@ func (s *GameService) resourceProfile(ctx context.Context, id int64) (*pb.Player
 			powerChanged = storedPower != player.GetFightPower()
 		}
 		changed, err := settleResourceRecovery(player, time.Now().UnixMilli())
-		if err != nil || !changed && !penaltyChanged && !clockChanged && !powerChanged {
+		if err != nil || !changed && !penaltyChanged && !clockChanged && !powerChanged && !fieldChanged {
 			return err
 		}
 		return saveProfileAgainst(tx, &row, player, game, &persisted)
@@ -171,6 +179,12 @@ func decodeProfileForCalendarUpdate(tx *gorm.DB, row *db.Profile) (*pb.Player, *
 	if err != nil {
 		return nil, nil, err
 	}
+	game.FieldCalendarDay = LocalPlayNow(tx.Statement.Context).In(time.FixedZone("Asia/Shanghai", 8*60*60)).Format("2006-01-02")
+	fieldChanged, err := prepareFieldCalendar75(tx, row.Id, game, game.FieldCalendarDay)
+	if err != nil {
+		return nil, nil, err
+	}
+	changed = changed || fieldChanged
 	if changed {
 		neutral := context.WithValue(tx.Statement.Context, constUtil.GameRequestContextKey, struct{}{})
 		if err = saveProfile(tx.WithContext(neutral), row, player, game); err != nil {

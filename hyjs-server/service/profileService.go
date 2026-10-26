@@ -290,11 +290,8 @@ func updateProfileTransaction(ctx context.Context, id int64, prelockPeriods bool
 			return err
 		}
 		persisted := row
-		player, game, err := decodeProfileForUpdate(&row)
+		player, game, err := decodeProfileForCalendarUpdate(tx, &row)
 		if err != nil {
-			return err
-		}
-		if _, err = ServerGameClockPrepareProfile(tx, &row, player); err != nil {
 			return err
 		}
 		if prelockPeriods {

@@ -27,7 +27,9 @@ type GameState struct {
 	// WarriorBagCapacityScale reads the unreleased hero-only fivefold candidate without multiplying it again.
 	WarriorBagCapacityScale int32 `json:"warrior_bag_capacity_scale,omitempty"`
 	// Guild prayer attributes are recaptured from the current transaction and never persisted.
-	GuildPrayerProjection  *P5GuildPrayerProjection          `json:"-"`
+	GuildPrayerProjection *P5GuildPrayerProjection `json:"-"`
+	// Authenticated request projection; absolute field cooldowns keep wall time.
+	FieldCalendarDay       string                            `json:"-"`
 	CopySweepReceipt       *CopySweepReceipt                 `json:"copy_sweep_receipt,omitempty"`
 	SkillSpecialtyReceipts map[string]*SkillSpecialtyReceipt `json:"skill_specialty_receipts,omitempty"`
 	TreasureBoxReceipt     *TreasureBoxReceipt               `json:"treasure_box_receipt,omitempty"`
@@ -151,13 +153,15 @@ type EquipmentStarReceipt struct {
 	Response  *pb.SCEquipStar `json:"response"`
 }
 type FieldState struct {
-	Scene       string                        `json:"scene"`
-	Monsters    []*pb.SideMonster             `json:"monsters"`
-	Bosses      []*pb.SideBoss                `json:"bosses,omitempty"`
-	BossHP      map[string]map[string]float64 `json:"boss_hp,omitempty"`
-	RespawnAt   map[string]int64              `json:"respawn_at"`
-	RewardDay   string                        `json:"reward_day"`
-	RewardKills int32                         `json:"reward_kills"`
+	// Marks the day namespace after one conservative legacy projection.
+	LifeCalendar75 bool                          `json:"life_calendar75,omitempty"`
+	Scene          string                        `json:"scene"`
+	Monsters       []*pb.SideMonster             `json:"monsters"`
+	Bosses         []*pb.SideBoss                `json:"bosses,omitempty"`
+	BossHP         map[string]map[string]float64 `json:"boss_hp,omitempty"`
+	RespawnAt      map[string]int64              `json:"respawn_at"`
+	RewardDay      string                        `json:"reward_day"`
+	RewardKills    int32                         `json:"reward_kills"`
 	// 普通野外首领奖励跨地图共用，世界首领计数由独立域保存。
 	BossRewardDay    string                     `json:"boss_reward_day,omitempty"`
 	BossRewardClaims int64                      `json:"boss_reward_claims,omitempty"`

@@ -251,6 +251,9 @@ func (s *GameService) AdminChangeServerGameClock(ctx context.Context, p *model.A
 			}
 		}
 		calendarReal := time.Now()
+		if err := captureFieldCalendar75BeforeShift(tx, profiles, calendarReal.AddDate(0, 0, int(row.OffsetDays))); err != nil {
+			return err
+		}
 		if err := expireCalendarWanted75(tx, s.OriginalServerID(), calendarReal.AddDate(0, 0, int(row.OffsetDays)).UnixMilli()); err != nil {
 			return err
 		}

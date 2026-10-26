@@ -186,19 +186,9 @@ func (s *GameService) p3Profile(ctx context.Context, id int64, fn func(*gorm.DB,
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&row, id).Error; err != nil {
 			return err
 		}
-		p, g, err := decodeProfileForUpdate(&row)
+		p, g, err := decodeProfileForCalendarUpdate(tx, &row)
 		if err != nil {
 			return err
-		}
-		clockChanged, err := ServerGameClockPrepareProfile(tx, &row, p)
-		if err != nil {
-			return err
-		}
-		if clockChanged {
-			neutral := context.WithValue(ctx, constUtil.GameRequestContextKey, struct{}{})
-			if err = saveProfile(tx.WithContext(neutral), &row, p, g); err != nil {
-				return err
-			}
 		}
 		if err := lockProfilePeriods(tx); err != nil {
 			return err
