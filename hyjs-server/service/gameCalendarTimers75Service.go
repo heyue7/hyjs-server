@@ -170,6 +170,30 @@ func calendar75MemoryTimers(tx *gorm.DB, serverID int64, shift int64, repair boo
 	return nil
 }
 
+// Protection is a mutable game-calendar duration. Translate its three anchors
+// together, including expired states, so neither direction revives or skips it.
+// Paid receipts and their original admission times retain their exact bytes.
+func calendar75PlunderTimers(tx *gorm.DB, serverID, shift int64) error {
+	if !gameSchemaHasTable(tx, &db.P11PlunderState{}) {
+		return nil
+	}
+	q := tx.Model(&db.P11PlunderState{}).Where("player_id IN (SELECT id FROM profiles WHERE server_id=? OR server_id=0)", serverID)
+	if shift < 0 {
+		var invalid int64
+		if err := q.Session(&gorm.Session{}).Where("(avoid_until>0 AND avoid_until<=?) OR (last_use_at>0 AND last_use_at<=?) OR (updated_at>0 AND updated_at<=?)", -shift, -shift, -shift).Count(&invalid).Error; err != nil {
+			return err
+		}
+		if invalid > 0 {
+			return constUtil.ErrAdminConfiguration
+		}
+	}
+	return q.Where("avoid_until>0 OR last_use_at>0 OR updated_at>0").Updates(map[string]any{
+		"avoid_until": gorm.Expr("CASE WHEN avoid_until>0 THEN avoid_until + ? ELSE avoid_until END", shift),
+		"last_use_at": gorm.Expr("CASE WHEN last_use_at>0 THEN last_use_at + ? ELSE last_use_at END", shift),
+		"updated_at":  gorm.Expr("CASE WHEN updated_at>0 THEN updated_at + ? ELSE updated_at END", shift),
+	}).Error
+}
+
 func (s *GameService) shiftCalendarDurationTimers75(tx *gorm.DB, rows []db.Profile, delta int64) error {
 	if delta == 0 {
 		return nil
@@ -179,6 +203,9 @@ func (s *GameService) shiftCalendarDurationTimers75(tx *gorm.DB, rows []db.Profi
 		return e
 	}
 	if e := calendar75MemoryTimers(tx, s.OriginalServerID(), shift, false, 0); e != nil {
+		return e
+	}
+	if e := calendar75PlunderTimers(tx, s.OriginalServerID(), shift); e != nil {
 		return e
 	}
 	if gameSchemaHasTable(tx, &db.TurntableState{}) {

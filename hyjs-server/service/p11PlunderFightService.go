@@ -80,6 +80,20 @@ func p11PlunderPolicyOpen(cfg *db.P11PlunderFightPolicy, stamp int64) bool {
 	return p11PlunderFightPolicyValid(cfg) && stamp >= cfg.StartAt && (cfg.Permanent || stamp < cfg.EndAt)
 }
 
+// p11PlunderCalendarOpen75 permits only already published permanent sources
+// within the trusted Admin calendar's visited horizon. The immutable snapshot
+// validator and finite activity windows retain their original time bounds.
+func p11PlunderCalendarOpen75(tx *gorm.DB, cfg *db.P11PlunderFightPolicy, now time.Time) bool {
+	if p11PlunderPolicyOpen(cfg, now.UnixMilli()) {
+		return true
+	}
+	if !p11PlunderFightPolicyValid(cfg) || !cfg.Permanent || !calendar75Adjusted(tx) {
+		return false
+	}
+	horizon := calendar75SourceHorizon(tx, now).UnixMilli()
+	return cfg.PublishedAt <= horizon && cfg.StartAt <= horizon
+}
+
 func p11PlunderMatchExpires(cfg *db.P11PlunderFightPolicy, stamp int64) int64 {
 	expires := stamp + cfg.MatchMillis
 	if !cfg.Permanent {
@@ -114,14 +128,17 @@ func p11PlunderFightOffer(tx *gorm.DB, now time.Time) (*db.P11PlunderFightOffer,
 	var offer db.P11PlunderFightOffer
 	err := tx.First(&offer, "version=?", live.Version).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		if !p11PlunderPolicyOpen(&live, now.UnixMilli()) {
+		if !p11PlunderCalendarOpen75(tx, &live, now) {
 			return nil, nil, errors.New(constUtil.P11PlunderFightUnavailable)
 		}
 		raw, err := json.Marshal(live)
 		if err != nil {
 			return nil, nil, err
 		}
-		offer = db.P11PlunderFightOffer{Version: live.Version, Snapshot: string(raw), SourceHash: p6Digest(raw), CapturedAt: now.UnixMilli()}
+		// A new offer still captures inside its exact original source window;
+		// only its availability on a rewound game date is relaxed above.
+		capturedAt := max(now.UnixMilli(), live.StartAt)
+		offer = db.P11PlunderFightOffer{Version: live.Version, Snapshot: string(raw), SourceHash: p6Digest(raw), CapturedAt: capturedAt}
 		if err = tx.Create(&offer).Error; err != nil {
 			return nil, nil, err
 		}
@@ -132,7 +149,7 @@ func p11PlunderFightOffer(tx *gorm.DB, now time.Time) (*db.P11PlunderFightOffer,
 	if err != nil {
 		return nil, nil, err
 	}
-	if !p11PlunderPolicyOpen(cfg, now.UnixMilli()) {
+	if !p11PlunderCalendarOpen75(tx, cfg, now) {
 		return nil, nil, errors.New(constUtil.P11PlunderFightUnavailable)
 	}
 	return &offer, cfg, nil
