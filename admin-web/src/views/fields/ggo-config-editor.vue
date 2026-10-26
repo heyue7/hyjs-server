@@ -519,12 +519,12 @@ function durationText(ms: number) {
       <section class="ggo-section">
         <header class="ggo-section-head">
           <div>
-            <h3>经济与周限购</h3>
-            <p>账号周限购参数只保存为配置，暂不计算每周购买次数。</p>
+            <h3>地图经济预留参数</h3>
+            <p>此处保存地图总额度方案；信用商店各商品的账号周限购在商店管理中设置。</p>
           </div>
         </header>
         <NAlert type="warning" :bordered="false" class="mb-3">
-          周限购尚未生效。信用商店当前超频点数商品为 1 信用点、每日限购 1 次。
+          下方地图总额度暂不参与结算。信用商店已按商品执行账号周限购，实际售价和数量以商店管理为准。
         </NAlert>
         <div class="ggo-fixed-grid">
           <div class="ggo-fixed">

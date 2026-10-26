@@ -55,7 +55,7 @@ async function loadSchedule() {
 function refreshText(row: ShopProduct) {
   if (props.shopId === 'vip') return row.totalLimit > 0 ? ['每角色累计，跨日期保留'] : ['每日 00:00 恢复日限额'];
   const parts: string[] = [];
-  if (supports('dailyLimit') && row.dailyLimit > 0 && !(row.totalLimit > 0 && row.totalLimit <= row.dailyLimit)) parts.push('每日 00:00 恢复日限额');
+  if (showDailyLimit(row)) parts.push('每日 00:00 恢复日限额');
   if (supports('accountWeeklyLimit') && row.accountWeeklyLimit > 0) parts.push('每周一 00:00 恢复账号周额');
   if (supports('totalLimit') && row.totalLimit > 0) parts.push(currentWindow.value ? `${windowDuration(currentWindow.value)}，结束后按下一期排期` : '当期总限：刷新周期未设置');
   if (props.shopId === 'pet-market') parts.push('每周一换新库存');
@@ -357,11 +357,16 @@ function renderLines(lines: string[]) {
 function limitLines(row: ShopProduct) {
   if (props.shopId === 'vip') return row.totalLimit > 0 ? [`每角色限购 ${shopCount75(row.totalLimit)} 次`, ...(row.totalLimit > 1 ? ['每日最多1次'] : [])] : ['每日 1 份'];
   return [
-    ...(supports('dailyLimit') && row.dailyLimit > 0 && !(row.totalLimit > 0 && row.totalLimit <= row.dailyLimit) ? [`每日 ${row.dailyLimit.toLocaleString()} 次`] : []),
+    ...(showDailyLimit(row) ? [`每日 ${row.dailyLimit.toLocaleString()} 次`] : []),
     ...(supports('accountWeeklyLimit') && row.accountWeeklyLimit > 0 ? [`账号每周 ${row.accountWeeklyLimit.toLocaleString()} 次`] : []),
     ...(supports('totalLimit') && row.totalLimit > 0 ? [`每期限购 ${shopCount75(row.totalLimit)} 次`] : []),
     ...(supports('stock') && row.stock >= 0 ? [`${props.shopId === 'pet-market' ? '每周库存' : props.shopId === 'ggo' ? '每槽库存' : '库存'} ${row.stock.toLocaleString()}`] : [])
   ];
+}
+function showDailyLimit(row: ShopProduct) {
+  return supports('dailyLimit') && row.dailyLimit > 0 &&
+    !(row.totalLimit > 0 && row.totalLimit <= row.dailyLimit) &&
+    !(supports('accountWeeklyLimit') && row.accountWeeklyLimit > 0 && row.accountWeeklyLimit <= row.dailyLimit);
 }
 function qualificationLines(row: ShopProduct) {
   return [
