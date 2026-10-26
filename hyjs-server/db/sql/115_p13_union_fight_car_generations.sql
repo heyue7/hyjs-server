@@ -10,6 +10,8 @@ CREATE TABLE IF NOT EXISTS p13_union_fight_car_generations (
  car_frame LONGBLOB NOT NULL,
  car_hash CHAR(64) NOT NULL,
  state_hash CHAR(64) NOT NULL,
+ produced_at BIGINT NOT NULL DEFAULT 0,
+
  PRIMARY KEY(match_id,car_guid),
  UNIQUE KEY p13_car_generation(match_id,factory_guid,generation)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

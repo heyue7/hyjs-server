@@ -52,6 +52,9 @@ func p13UFGuildMissionFactoryOpened(tx *gorm.DB, match *db.P13UnionFightMatch, a
 	if err = tx.Create(&fact).Error; err != nil {
 		return false, err
 	}
+	if p13UFAbortEnabled(rule) {
+		return true, nil
+	} // The real fact is immediate; economic prestige waits for a certified terminal.
 	day, err := time.ParseInLocation("2006-01-02", match.Day, time.FixedZone("Asia/Shanghai", 8*3600))
 	if err != nil {
 		return false, err

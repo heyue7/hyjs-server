@@ -10,5 +10,6 @@ CREATE TABLE IF NOT EXISTS p13_union_fight_heal_aura_effects (
  source_hash VARCHAR(64) NOT NULL,
  PRIMARY KEY(match_id,guid),
  INDEX p13_heal_caster(caster_id),
- INDEX p13_heal_pending(ended_at,next_tick_at)
+ INDEX p13_heal_pending(ended_at,next_tick_at),
+ INDEX p13_heal_scope_pending(match_id,ended_at,next_tick_at,guid)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

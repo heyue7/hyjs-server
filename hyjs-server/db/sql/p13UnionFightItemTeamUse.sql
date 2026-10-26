@@ -1,0 +1,1 @@
+CREATE TABLE IF NOT EXISTS p13_union_fight_item_team_uses (match_id CHAR(64) NOT NULL,camp BIGINT NOT NULL,item_id VARCHAR(64) NOT NULL,used BIGINT NOT NULL,use_limit BIGINT NOT NULL,rule VARCHAR(64) NOT NULL,offer_hash CHAR(64) NOT NULL,source_hash CHAR(64) NOT NULL,PRIMARY KEY(match_id,camp,item_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;

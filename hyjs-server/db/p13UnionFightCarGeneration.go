@@ -13,6 +13,7 @@ type P13UnionFightCarGeneration struct {
 	CarFrame        []byte `gorm:"not null;type:longblob" json:"car_frame"`
 	CarHash         string `gorm:"not null;type:char(64)" json:"car_hash"`
 	StateHash       string `gorm:"not null;type:char(64)" json:"state_hash"`
+	ProducedAt      int64  `gorm:"not null;default:0" json:"produced_at,omitempty"`
 }
 
 func (P13UnionFightCarGeneration) TableName() string { return "p13_union_fight_car_generations" }

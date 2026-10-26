@@ -791,7 +791,7 @@ func (s *GameService) openServerRewardSupported(content string) (bool, error) {
 			return false, errors.New("开服奖励实例数量超过本地服安全上限100")
 		}
 		switch key {
-		case "coin", "diamond", "light", "point", "score", "popularity", "energy", "stamina":
+		case "coin", "diamond", "light", "point", "score", "popularity", "energy", "stamina", "contribution":
 			continue
 		}
 		switch {
@@ -886,6 +886,8 @@ func (s *GameService) openServerGain(player *pb.Player, g *model.GameState, cont
 		default:
 			var balance *int32
 			switch key {
+			case "contribution":
+				balance = player.Contribution
 			case "light":
 				balance = player.Light
 			case "point":
@@ -908,6 +910,8 @@ func (s *GameService) openServerGain(player *pb.Player, g *model.GameState, cont
 			}
 			value += n
 			switch key {
+			case "contribution":
+				player.Contribution = proto.Int32(value)
 			case "light":
 				player.Light = proto.Int32(value)
 			case "point":

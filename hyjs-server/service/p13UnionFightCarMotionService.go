@@ -158,7 +158,22 @@ func (s *GameService) TickP13UnionFightCarMotion(ctx context.Context, now time.T
 	if err != nil {
 		return err
 	}
+	scopes := make([]string, 0, len(rows))
+	for _, row := range rows {
+		scopes = append(scopes, row.MatchID)
+	}
+	clocks, clockErr := p13UFWorldClockBatch(ctx, scopes, now)
+	if clockErr != nil {
+		return clockErr
+	}
+	var failures []error
 	for _, candidate := range rows {
+		if err := ctx.Err(); err != nil {
+			return errors.Join(append(failures, err)...)
+		}
+		if clocks.paused(candidate.MatchID) {
+			continue
+		}
 		var movement *pb.SCUFElementMove
 		err := db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 			if err := ServerGameClockGuardTransaction(tx); err != nil {
@@ -168,6 +183,11 @@ func (s *GameService) TickP13UnionFightCarMotion(ctx context.Context, now time.T
 			var gate db.P13GuildPolicy
 			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&gate, 1).Error; err != nil {
 				return err
+			}
+			if closed, err := p13UFWorldSealed(tx, candidate.MatchID); err != nil {
+				return err
+			} else if closed {
+				return nil
 			}
 			var policy db.P13UnionFightPolicy
 			if err := tx.First(&policy, 1).Error; err != nil {
@@ -184,7 +204,7 @@ func (s *GameService) TickP13UnionFightCarMotion(ctx context.Context, now time.T
 			if err := tx.First(&match, "id=?", candidate.MatchID).Error; err != nil {
 				return err
 			}
-			if now.UnixMilli() < match.StartAt || now.UnixMilli() >= match.EndAt {
+			if now.UnixMilli() < match.StartAt || now.UnixMilli() >= clocks.end(&match) {
 				return nil
 			}
 			var count int64
@@ -246,11 +266,17 @@ func (s *GameService) TickP13UnionFightCarMotion(ctx context.Context, now time.T
 			return nil
 		})
 		if err != nil {
-			return err
+			failures = append(failures, err)
+			continue
 		}
 		if movement != nil {
-			s.p13UFFieldBroadcast(ctx, candidate.MatchID, 0, movement)
+			if err := p13UFPublishBeforeAbort(ctx, candidate.MatchID, func() {
+				s.p13UFFieldBroadcast(ctx, candidate.MatchID, 0, movement)
+			}); err != nil {
+				failures = append(failures, err)
+				continue
+			}
 		}
 	}
-	return nil
+	return errors.Join(failures...)
 }

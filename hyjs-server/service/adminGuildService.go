@@ -188,6 +188,14 @@ func adminGuildCloneRows(rows []map[string]string) []map[string]string {
 	return out
 }
 
+// Mode is derived from the locked source; clients cannot select combat rules.
+func adminGuildGuardHPMode(row *db.P13UnionFightFieldPolicy) string {
+	if row != nil && row.GuardHPSource == constUtil.P13UnionFightGuardHPSourceMonster {
+		return "template"
+	}
+	return "uniform"
+}
+
 func adminGuildFieldValues(s *GameService, stored adminGuildStored) map[string]string {
 	values := make(map[string]string, len(adminGuildConfigDefs))
 	for _, def := range adminGuildConfigDefs {
@@ -557,6 +565,7 @@ func adminGuildPolicyState(tx *gorm.DB) (model.AdminGuildPolicyState, []model.Ad
 		var row db.P13UnionFightPolicy
 		err := tx.First(&row, 1).Error
 		if err == nil {
+			state.UnionFight.WarEnabled = row.WarEnabled
 			state.UnionFight.Enrollment = model.AdminGuildUnionFightEnrollmentPolicy{EnrollmentEnabled: row.EnrollmentEnabled, MatchEnabled: row.MatchEnabled, Source: row.Source}
 		}
 		return err
@@ -587,7 +596,7 @@ func adminGuildPolicyState(tx *gorm.DB) (model.AdminGuildPolicyState, []model.Ad
 		var row db.P13UnionFightFieldPolicy
 		err := tx.First(&row, 1).Error
 		if err == nil {
-			state.UnionFight.Field = model.AdminGuildUnionFightFieldPolicy{Enabled: row.Enabled, PreparationMillis: row.PreparationMillis, LeftRevivePointID: row.LeftRevivePointID, RightRevivePointID: row.RightRevivePointID, InitialGuardHP: row.InitialGuardHP, InitialGateHP: row.InitialGateHP, MoveTolerance: row.MoveTolerance, Source: row.Source}
+			state.UnionFight.Field = model.AdminGuildUnionFightFieldPolicy{Enabled: row.Enabled, PreparationMillis: row.PreparationMillis, LeftRevivePointID: row.LeftRevivePointID, RightRevivePointID: row.RightRevivePointID, InitialGuardHP: row.InitialGuardHP, GuardHPMode: adminGuildGuardHPMode(&row), InitialGateHP: row.InitialGateHP, MoveTolerance: row.MoveTolerance, Source: row.Source}
 		}
 		return err
 	}); err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
@@ -823,6 +832,23 @@ func adminGuildUpdatePolicy(tx *gorm.DB, s *GameService, save *model.AdminGuildP
 		}
 	}
 	if uf := save.UnionFight; uf != nil {
+		if uf.WarEnabled != nil {
+			// Admission holds this same lock before reading the master gate. A close
+			// response therefore cannot race a later commit of a newly accepted entry.
+			var gate db.P13GuildPolicy
+			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&gate, 1).Error; err != nil {
+				return err
+			}
+			var policy db.P13UnionFightPolicy
+			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&policy, 1).Error; err != nil {
+				return err
+			}
+			if policy.WarEnabled != *uf.WarEnabled {
+				if err := tx.Model(&policy).Update("war_enabled", *uf.WarEnabled).Error; err != nil {
+					return err
+				}
+			}
+		}
 		if uf.Enrollment != nil {
 			if !gameSchemaHasTable(tx, &db.P13UnionFightPolicy{}) {
 				return constUtil.ErrAdminConfiguration
@@ -875,9 +901,18 @@ func adminGuildUpdatePolicy(tx *gorm.DB, s *GameService, save *model.AdminGuildP
 			if !gameSchemaHasTable(tx, &db.P13UnionFightFieldPolicy{}) {
 				return constUtil.ErrAdminConfiguration
 			}
+			var row db.P13UnionFightFieldPolicy
+			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&row, 1).Error; err != nil {
+				return err
+			}
+			if uf.Field.GuardHPMode != "" && uf.Field.GuardHPMode != adminGuildGuardHPMode(&row) {
+				return constUtil.ErrAdminInput
+			}
+			candidate := row
+			candidate.InitialGuardHP = uf.Field.InitialGuardHP
 			if uf.Field.Enabled {
 				if uf.Field.PreparationMillis <= 0 || uf.Field.PreparationMillis > 86400000 ||
-					uf.Field.InitialGuardHP <= 0 || uf.Field.InitialGateHP <= 0 ||
+					!p13UFGuardTemplatePolicyValid(&candidate) || uf.Field.InitialGateHP <= 0 ||
 					math.IsNaN(uf.Field.InitialGuardHP) || math.IsInf(uf.Field.InitialGuardHP, 0) ||
 					math.IsNaN(uf.Field.InitialGateHP) || math.IsInf(uf.Field.InitialGateHP, 0) ||
 					uf.Field.MoveTolerance < 0 || uf.Field.MoveTolerance > 50 ||
@@ -893,10 +928,6 @@ func adminGuildUpdatePolicy(tx *gorm.DB, s *GameService, save *model.AdminGuildP
 			}
 			if strings.TrimSpace(uf.Field.Source) == "" || len(uf.Field.Source) > 1024 {
 				return constUtil.ErrAdminInput
-			}
-			var row db.P13UnionFightFieldPolicy
-			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&row, 1).Error; err != nil {
-				return err
 			}
 			row.Enabled = uf.Field.Enabled
 			row.PreparationMillis = uf.Field.PreparationMillis
@@ -916,7 +947,7 @@ func adminGuildUpdatePolicy(tx *gorm.DB, s *GameService, save *model.AdminGuildP
 			}
 			seen := map[int64]bool{}
 			for _, item := range uf.PlayerBattle {
-				if seen[item.ID] || item.ID != 1 && item.ID != constUtil.P13UFPlayerPartialPolicyID {
+				if seen[item.ID] || item.ID != 1 && item.ID != constUtil.P13UFPlayerPartialPolicyID && item.ID != constUtil.P13UFPlayerPartyPolicyID {
 					return constUtil.ErrAdminInput
 				}
 				seen[item.ID] = true
@@ -1047,7 +1078,15 @@ func AdminGuildRuntimeTables(ctx context.Context, baseTables map[string][]map[st
 	if baseTables == nil {
 		return nil, nil
 	}
-	tx := db.GetIns().WithContext(ctx)
+	return adminGuildRuntimeTablesTx(db.GetIns().WithContext(ctx), baseTables)
+}
+
+// Transactional publishers read their own settings on the caller's connection.
+// The overlay remains copy-on-write and never mutates the shared original tables.
+func adminGuildRuntimeTablesTx(tx *gorm.DB, baseTables map[string][]map[string]string) (map[string][]map[string]string, error) {
+	if baseTables == nil {
+		return nil, nil
+	}
 	// 正式初始化成功后不再逐请求检查表；隔离测试未初始化时才回退原表。
 	if !adminGuildSettingsReady.Load() && !gameSchemaHasTable(tx, &db.AdminGuildSetting{}) {
 		return baseTables, nil
@@ -1385,6 +1424,9 @@ func (s *GameService) AdminUpdateGuild(ctx context.Context, p *model.AdminPrinci
 		if err := s.P13MonthlyBeforeGuildMutation(tx, now); err != nil {
 			return err
 		}
+		if _, err := s.P13GuildGiftBeforeMutation(tx, id, now); err != nil {
+			return err
+		}
 		owned, err := adminGuildLoadOwned(tx, id, selected, false)
 		if err != nil {
 			return err
@@ -1426,6 +1468,15 @@ func (s *GameService) AdminUpdateGuild(ctx context.Context, p *model.AdminPrinci
 		var locked db.P13Guild
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&locked, "id=?", id).Error; err != nil {
 			return err
+		}
+		if req.ActiveScore != locked.ActiveScore {
+			tracked, err := s.P13GuildGiftBeforeMutation(tx, id, now)
+			if err != nil {
+				return err
+			}
+			if tracked {
+				return fmt.Errorf("%w：%s", constUtil.ErrAdminInput, constUtil.P13GuildGiftAdminActive)
+			}
 		}
 		before := locked
 		locked.Name = req.Name
@@ -1497,6 +1548,9 @@ func (s *GameService) AdminUpdateGuildMember(ctx context.Context, p *model.Admin
 			return err
 		}
 		if err := s.P13MonthlyBeforeGuildMutation(tx, now); err != nil {
+			return err
+		}
+		if _, err := s.P13GuildGiftBeforeMutation(tx, guildID, now); err != nil {
 			return err
 		}
 		owned, err := adminGuildLoadOwned(tx, guildID, selected, false)
@@ -1634,6 +1688,9 @@ func (s *GameService) AdminAddGuildMember(ctx context.Context, p *model.AdminPri
 		if err := s.P13MonthlyBeforeGuildMutation(tx, now); err != nil {
 			return err
 		}
+		if _, err := s.P13GuildGiftBeforeMutation(tx, guildID, now); err != nil {
+			return err
+		}
 		owned, err := adminGuildLoadOwned(tx, guildID, selected, false)
 		if err != nil {
 			return err
@@ -1717,6 +1774,9 @@ func (s *GameService) AdminRemoveGuildMember(ctx context.Context, p *model.Admin
 		if err := s.P13MonthlyBeforeGuildMutation(tx, now); err != nil {
 			return err
 		}
+		if _, err := s.P13GuildGiftBeforeMutation(tx, guildID, now); err != nil {
+			return err
+		}
 		owned, err := adminGuildLoadOwned(tx, guildID, selected, false)
 		if err != nil {
 			return err
@@ -1766,6 +1826,9 @@ func (s *GameService) AdminDissolveGuild(ctx context.Context, p *model.AdminPrin
 		if err := s.P13MonthlyBeforeGuildMutation(tx, now); err != nil {
 			return err
 		}
+		if _, err := s.P13GuildGiftBeforeMutation(tx, guildID, now); err != nil {
+			return err
+		}
 		owned, err := adminGuildLoadOwned(tx, guildID, selected, false)
 		if err != nil {
 			return err
@@ -1785,6 +1848,9 @@ func (s *GameService) AdminDissolveGuild(ctx context.Context, p *model.AdminPrin
 		}
 		var locked db.P13Guild
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&locked, "id=?", guildID).Error; err != nil {
+			return err
+		}
+		if err := s.P13GuildGiftRetire(tx, guildID, now); err != nil {
 			return err
 		}
 		for i := range owned.members {

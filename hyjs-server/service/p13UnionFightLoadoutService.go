@@ -21,7 +21,11 @@ func (s *GameService) p13UFSetRoundItems(tx *gorm.DB, id int64, guild string, st
 	if !policy.MatchEnabled {
 		return errors.New("公会战真实匹配尚未开放")
 	}
-	_, day, stage, _ := p13UFClock(now)
+	calendar, err := p13UFCalendar(tx, now)
+	if err != nil {
+		return err
+	}
+	day, stage := calendar.MatchDay, calendar.Stage
 	if stage == constUtil.P13UnionFightStageMatch {
 		return errors.New("原公会战匹配窗口尚未结束")
 	}

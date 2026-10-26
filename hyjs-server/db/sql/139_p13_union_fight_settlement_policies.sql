@@ -1,4 +1,9 @@
 CREATE TABLE IF NOT EXISTS `p13_union_fight_settlement_policies` (
+ abort_rule VARCHAR(192) NOT NULL DEFAULT '',
+ finalization_grace_millis BIGINT NOT NULL DEFAULT 0,
+ terminal_rule VARCHAR(160) NOT NULL DEFAULT '',
+ draw_prestige INT NOT NULL DEFAULT 0,
+
   `group` CHAR(1) NOT NULL,
   `enabled` BOOLEAN NOT NULL DEFAULT 0,
   `version` CHAR(64) NOT NULL,

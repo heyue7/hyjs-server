@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, h, onBeforeUnmount, onMounted, ref } from 'vue';
 import { onBeforeRouteLeave } from 'vue-router';
-import { NButton, NDatePicker, NInput, NInputNumber, NSelect, NSwitch, NTag } from 'naive-ui';
+import { NButton, NDatePicker, NInput, NInputNumber, NSelect, NSwitch, NTag, NText } from 'naive-ui';
 import type { DataTableColumns } from 'naive-ui';
 import {
   getGuildSettings,
@@ -13,12 +13,14 @@ import type {
   GuildTableColumn
 } from '@/service/guilds';
 import GuildRewardsWorkspace from '@/components/operations/guild-rewards-workspace.vue';
+import GuildScheduleWorkspace from '@/components/operations/guild-schedule-workspace.vue';
 import ContextHelp from '@/components/operations/context-help.vue';
 import ResourceValueEditor from '@/components/operations/resource-value-editor.vue';
 import NumberSequenceEditor from '@/components/operations/number-sequence-editor.vue';
 import GuildPrayerEditor from '@/components/operations/guild-prayer-editor.vue';
 import GuildTechDirectoryEditor from '@/components/operations/guild-tech-directory-editor.vue';
 import { useOperations } from '@/composables/useOperations';
+import { errorMessage } from '@/service/operations';
 
 interface EditorState {
   fields: Record<string, string>;
@@ -33,6 +35,10 @@ const form = ref<EditorState>();
 const baseline = ref('');
 const saving = ref(false);
 const saveError = ref('');
+const warSaving = ref(false);
+const warSaveError = ref('');
+const warRetryValue = ref<boolean>();
+const warEnabled = computed(() => settings.value?.policies.unionFight.warEnabled === true);
 const reason = ref('');
 const q = ref('');
 const editorValidity = ref<Record<string, boolean>>({});
@@ -47,9 +53,12 @@ const attributes = [
 ];
 const tab = ref('basic');
 const rewardsWorkspace = ref<{ hasUnsavedChanges: () => boolean; discardChanges: () => void }>();
+const scheduleWorkspace = ref<{ hasUnsavedChanges: () => boolean; discardChanges: () => void }>();
 function changeTab(value: string) {
   if (tab.value === 'rewards' && rewardsWorkspace.value?.hasUnsavedChanges() && !window.confirm('奖励配置有未保存修改，确定离开并放弃？')) return;
   if (tab.value === 'rewards' && value !== 'rewards') rewardsWorkspace.value?.discardChanges();
+  if (tab.value === 'schedule' && value !== 'schedule' && scheduleWorkspace.value?.hasUnsavedChanges() && !window.confirm('排期有未保存修改，确定离开并放弃？')) return;
+  if (tab.value === 'schedule' && value !== 'schedule') scheduleWorkspace.value?.discardChanges();
   tab.value = value;
 }
 const dirty = computed(() => Boolean(form.value) && JSON.stringify(form.value) !== baseline.value && canWrite.value);
@@ -69,18 +78,48 @@ function applySettings(value: GuildSettings) {
       ...value.policies,
       unionFight: {
         ...value.policies.unionFight,
+        warEnabled: value.policies.unionFight.warEnabled === true,
         playerBattle: value.policies.unionFight.playerBattle || []
       }
     })
   };
   baseline.value = JSON.stringify(form.value);
-  if (!value.groups.some(group => group.key === tab.value) && !['policies','rewards','levels','tech'].includes(tab.value)) tab.value = value.groups[0]?.key || 'policies';
+  if (!value.groups.some(group => group.key === tab.value) && !['policies','rewards','schedule','levels','tech'].includes(tab.value)) tab.value = value.groups[0]?.key || 'policies';
+}
+
+async function saveWarEnabled(value: boolean) {
+  if (!settings.value || !form.value || !canWrite.value || warSaving.value || saving.value) return;
+  warSaving.value = true;
+  warSaveError.value = '';
+  warRetryValue.value = value;
+  try {
+    const result = await saveGuildSettings({
+      version: settings.value.version,
+      reason: value ? '开放公会战报名和入场' : '关闭公会战新报名和入场',
+      policies: { unionFight: { warEnabled: value } }
+    });
+    // Refresh the CAS catalog while preserving every unrelated local draft.
+    settings.value = result;
+    const persisted = result.policies.unionFight.warEnabled === true;
+    form.value.policies.unionFight.warEnabled = persisted;
+    const savedBaseline = JSON.parse(baseline.value) as EditorState;
+    savedBaseline.policies.unionFight.warEnabled = persisted;
+    baseline.value = JSON.stringify(savedBaseline);
+    warRetryValue.value = undefined;
+    window.$message?.success(persisted ? '公会战已开放' : '公会战已关闭');
+  } catch (e) {
+    warSaveError.value = errorMessage(e);
+  } finally {
+    warSaving.value = false;
+  }
 }
 
 async function load() {
   if (dirty.value && !window.confirm('全局公会设置有未保存修改，确定刷新并放弃？')) return;
   if (rewardsWorkspace.value?.hasUnsavedChanges() && !window.confirm('奖励配置有未保存修改，确定刷新并放弃？')) return;
+  if (scheduleWorkspace.value?.hasUnsavedChanges() && !window.confirm('排期有未保存修改，确定刷新并放弃？')) return;
   rewardsWorkspace.value?.discardChanges();
+  scheduleWorkspace.value?.discardChanges();
   const result = await run(getGuildSettings);
   if (result) applySettings(result);
 }
@@ -213,9 +252,9 @@ function reset() {
       <NInput v-model:value="q" clearable placeholder="搜索参数名称" class="guild-search" />
       <ContextHelp title="设置何时生效" text="修改对后续操作与新场次生效。已开始的祈祷、科技报价和公会战继续使用开始时的设置。" />
       <NButton :loading="loading" :disabled="saving" @click="load">刷新</NButton>
-      <NButton v-if="canWrite && tab !== 'rewards'" :disabled="!dirty || saving" @click="reset">放弃修改</NButton>
-      <NButton v-if="canWrite && tab !== 'rewards'" type="primary" :loading="saving" :disabled="!form || !dirty || invalidInputs" @click="save">保存设置</NButton>
-      <NTag v-if="dirty && canWrite && tab !== 'rewards'" type="warning" :bordered="false">未保存</NTag>
+      <NButton v-if="canWrite && !['rewards', 'schedule'].includes(tab)" :disabled="!dirty || saving" @click="reset">放弃修改</NButton>
+      <NButton v-if="canWrite && !['rewards', 'schedule'].includes(tab)" type="primary" :loading="saving" :disabled="!form || !dirty || invalidInputs" @click="save">保存设置</NButton>
+      <NTag v-if="dirty && canWrite && !['rewards', 'schedule'].includes(tab)" type="warning" :bordered="false">未保存</NTag>
       <NTag v-if="!canWrite" :bordered="false">只读</NTag>
     </NSpace>
     <NAlert v-if="error" type="error" :title="error" class="mb-12px" />
@@ -261,6 +300,25 @@ function reset() {
           </NTabPane>
 
           <NTabPane name="rewards" tab="公会战奖励"><GuildRewardsWorkspace ref="rewardsWorkspace" /></NTabPane>
+          <NTabPane name="schedule" tab="公会战排期">
+            <NCard :bordered="false" class="ops-panel guild-war-open-panel">
+              <div class="guild-war-open-row">
+                <div class="guild-war-open-copy">
+                  <h3 id="guild-war-open-title">公会战开放</h3>
+                  <p id="guild-war-open-description">关闭后停止新的报名和入场，已有报名按排期处理，进行中的战斗继续结算。</p>
+                </div>
+                <div class="guild-war-open-control">
+                  <NTag :type="warEnabled ? 'success' : 'default'" :bordered="false">{{ warEnabled ? '已开放' : '未开放' }}</NTag>
+                  <NSwitch :value="warEnabled" :loading="warSaving" :disabled="!canWrite || warSaving || saving" aria-label="公会战开放" aria-describedby="guild-war-open-description" @update:value="saveWarEnabled" />
+                </div>
+              </div>
+              <div v-if="warSaveError" class="guild-war-open-error" role="alert">
+                <NText type="error">{{ warSaveError }}</NText>
+                <NButton v-if="canWrite && warRetryValue !== undefined" size="small" :loading="warSaving" :disabled="warSaving || saving" @click="saveWarEnabled(warRetryValue!)">重试</NButton>
+              </div>
+            </NCard>
+            <GuildScheduleWorkspace ref="scheduleWorkspace" />
+          </NTabPane>
           <NTabPane name="policies" tab="规则与门槛">
             <NCard :bordered="false" class="ops-panel mb-12px">
               <template #header>公会影响入口</template>
@@ -350,7 +408,10 @@ function reset() {
                 </NFormItem>
                 <NFormItem label="左侧固定复活点"><NInputNumber v-model:value="form.policies.unionFight.field.leftRevivePointId" :min="0" :precision="0" /></NFormItem>
                 <NFormItem label="右侧固定复活点"><NInputNumber v-model:value="form.policies.unionFight.field.rightRevivePointId" :min="0" :precision="0" /></NFormItem>
-                <NFormItem label="守卫初始生命"><NInputNumber v-model:value="form.policies.unionFight.field.initialGuardHp" :min="0.01" /></NFormItem>
+                <NFormItem label="守卫初始生命">
+                  <NText v-if="form.policies.unionFight.field.guardHpMode === 'template'">使用本场守卫模板</NText>
+                  <NInputNumber v-else v-model:value="form.policies.unionFight.field.initialGuardHp" :min="0.01" />
+                </NFormItem>
                 <NFormItem label="城门初始生命"><NInputNumber v-model:value="form.policies.unionFight.field.initialGateHp" :min="0.01" /></NFormItem>
                 <NFormItem label="位置容差">
                   <NInputNumber v-model:value="form.policies.unionFight.field.moveTolerance" :min="0" :max="50" />
@@ -384,7 +445,7 @@ function reset() {
           </NTabPane>
         </NTabs>
 
-        <NCard v-if="tab !== 'rewards'" :bordered="false" class="ops-panel mt-12px">
+        <NCard v-if="!['rewards', 'schedule'].includes(tab)" :bordered="false" class="ops-panel mt-12px">
           <NForm label-placement="left" label-width="100">
             <NFormItem label="变更原因" required>
               <NInput v-model:value="reason" :disabled="!canWrite || saving" maxlength="500" show-count placeholder="用于审计" />
@@ -398,6 +459,13 @@ function reset() {
 </template>
 
 <style scoped>
+.guild-war-open-panel { margin-bottom: 16px; }
+.guild-war-open-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; min-width: 0; }
+.guild-war-open-copy { flex: 1 1 320px; min-width: 0; }
+.guild-war-open-copy h3 { margin: 0 0 4px; font-size: 16px; font-weight: 600; line-height: 1.5; }
+.guild-war-open-copy p { margin: 0; font-size: 13px; line-height: 1.65; color: rgb(var(--base-text-color) / .65); overflow-wrap: anywhere; }
+.guild-war-open-control { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.guild-war-open-error { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-top: 12px; overflow-wrap: anywhere; }
 .guild-actions { margin-bottom: 12px; }
 .guild-search { width: min(260px, 100%); }
 .guild-field-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 24px; }

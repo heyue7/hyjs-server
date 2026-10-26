@@ -70,6 +70,9 @@ func (s *GameService) p13UFResourceDeposit(ctx context.Context, id int64, reques
 		if err = p13UFPlayerBattleAction(tx, actor, frame); err != nil {
 			return err
 		}
+		if (frame.GetState() != 0 && frame.GetState() != 5) || !p13UFResourceLiving(frame) {
+			return errors.New("交矿需要真实存活空闲或移动角色")
+		}
 		if now.UnixMilli() < match.StartAt || now.UnixMilli() >= match.EndAt || actor.Hooked || frame.GetState() == 2 || frame.GetState() == 4 || frame.GetState() == 12 {
 			return errors.New("原Fight阶段且非挂机/采集中才可回收资源")
 		}
@@ -394,6 +397,9 @@ func (s *GameService) p13UFResourceBegin(ctx context.Context, id int64, request 
 		var active db.P13UnionFightResourceTask
 		err = tx.First(&active, "match_id=? AND player_id=? AND status=?", match.ID, id, constUtil.P13UnionFightResourcePending).Error
 		if err == nil {
+			if frame.GetState() != 2 || !p13UFResourceLiving(frame) {
+				return errors.New("采集租约不属于当前存活采集状态")
+			}
 			if active.NodeGUID != request.GetResGuid() {
 				return errors.New("本角色已有采集尚未结束")
 			}
@@ -402,6 +408,9 @@ func (s *GameService) p13UFResourceBegin(ctx context.Context, id int64, request 
 		}
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return err
+		}
+		if (frame.GetState() != 0 && frame.GetState() != 5) || !p13UFResourceLiving(frame) {
+			return errors.New("采集需要真实存活空闲或移动角色")
 		}
 		var node db.P13UnionFightResourceNode
 		if err = tx.First(&node, "match_id=? AND guid=?", match.ID, request.GetResGuid()).Error; err != nil {
@@ -507,9 +516,13 @@ func (s *GameService) p13UFResourceCancel(tx *gorm.DB, scope string, id int64, n
 	if err != nil {
 		return 0, false, err
 	}
-	frame.State, frame.LeftTime, frame.TotalTime = proto.Int32(0), proto.Float32(0), proto.Float32(0)
-	if err = p13UFFieldSaveActor(tx, &actor, frame); err != nil {
-		return 0, false, err
+	// Retire only this collection's lease. A tower may now own the death
+	// state/clock; canceling mining must never overwrite that later lifecycle.
+	if frame.GetState() == 2 {
+		frame.State, frame.LeftTime, frame.TotalTime = proto.Int32(0), proto.Float32(0), proto.Float32(0)
+		if err = p13UFFieldSaveActor(tx, &actor, frame); err != nil {
+			return 0, false, err
+		}
 	}
 	return task.NodeGUID, true, nil
 }
@@ -520,7 +533,18 @@ func (s *GameService) TickP13UnionFightResource(ctx context.Context, now time.Ti
 	if err := db.GetIns().WithContext(ctx).Where("status=?", constUtil.P13UnionFightResourcePending).Order("due_at,id").Find(&tasks).Error; err != nil {
 		return err
 	}
+	scopes := make([]string, 0, len(tasks))
+	for _, row := range tasks {
+		scopes = append(scopes, row.MatchID)
+	}
+	clocks, clockErr := p13UFWorldClockBatch(ctx, scopes, now)
+	if clockErr != nil {
+		return clockErr
+	}
 	for _, candidate := range tasks {
+		if clocks.paused(candidate.MatchID) {
+			continue
+		}
 		var detail *pb.SCUFPlayerCollectEndDetail
 		var ended *pb.SCUFPlayerCollectEnd
 		var missionPush *pb.SCUFMissionPush
@@ -532,6 +556,11 @@ func (s *GameService) TickP13UnionFightResource(ctx context.Context, now time.Ti
 			var gate db.P13GuildPolicy
 			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&gate, 1).Error; err != nil {
 				return err
+			}
+			if closed, err := p13UFWorldSealed(tx, candidate.MatchID); err != nil {
+				return err
+			} else if closed {
+				return nil
 			}
 			var task db.P13UnionFightResourceTask
 			if err := tx.First(&task, "id=?", candidate.ID).Error; err != nil {
@@ -582,7 +611,11 @@ func (s *GameService) TickP13UnionFightResource(ctx context.Context, now time.Ti
 			if err != nil {
 				return err
 			}
-			valid := gate.ManagementEnabled && field.Enabled && enrollment.EnrollmentEnabled && enrollment.MatchEnabled && actor.LeftAt == 0 && member.GuildID == actor.GuildID && task.StartedAt >= match.StartAt && task.DueAt <= match.EndAt
+			alive := false
+			for _, hp := range frame.GetFightInfo().GetHpPos() {
+				alive = alive || hp > 0
+			}
+			valid := gate.ManagementEnabled && field.Enabled && enrollment.EnrollmentEnabled && enrollment.MatchEnabled && actor.LeftAt == 0 && member.GuildID == actor.GuildID && frame.GetState() == 2 && alive && task.StartedAt >= match.StartAt && task.DueAt <= clocks.end(&match)
 			if valid && now.UnixMilli() < task.DueAt {
 				return nil
 			}
@@ -612,9 +645,13 @@ func (s *GameService) TickP13UnionFightResource(ctx context.Context, now time.Ti
 			if err = p13UFResourceSaveNode(tx, &node, point); err != nil {
 				return err
 			}
-			frame.State = proto.Int32(0)
-			frame.LeftTime = proto.Float32(0)
-			frame.TotalTime = proto.Float32(0)
+			// A tower may have killed the collector while the task was pending.
+			// Retire the task without clearing the independently owned death clock.
+			if frame.GetState() == 2 {
+				frame.State = proto.Int32(0)
+				frame.LeftTime = proto.Float32(0)
+				frame.TotalTime = proto.Float32(0)
+			}
 			if err = p13UFFieldSaveActor(tx, &actor, frame); err != nil {
 				return err
 			}
@@ -646,10 +683,14 @@ func (s *GameService) TickP13UnionFightResource(ctx context.Context, now time.Ti
 			return err
 		}
 		if ended != nil {
-			s.p13UFFieldBroadcast(ctx, candidate.MatchID, candidate.PlayerID, ended)
-			s.publishP10Private(ctx, candidate.PlayerID, detail)
-			if missionPush != nil {
-				s.publishP10Private(ctx, candidate.PlayerID, missionPush)
+			if err := p13UFPublishBeforeAbort(ctx, candidate.MatchID, func() {
+				s.p13UFFieldBroadcast(ctx, candidate.MatchID, candidate.PlayerID, ended)
+				s.publishP10Private(ctx, candidate.PlayerID, detail)
+				if missionPush != nil {
+					s.publishP10Private(ctx, candidate.PlayerID, missionPush)
+				}
+			}); err != nil {
+				return err
 			}
 		}
 	}
@@ -666,4 +707,27 @@ func (s *GameService) p13UFResourceRecovery(tx *gorm.DB, actor *db.P13UnionFight
 		return nil, err
 	}
 	return []proto.Message{&pb.SCUFPlayerCollect{PlayerGuid: []int64{actor.PlayerID}, ResGuid: []int64{task.NodeGUID}, CollectTime: []float64{float64(max(int64(0), task.DueAt-now.UnixMilli())) / 1000}}}, nil
+}
+
+// Resource actions cannot infer life from the existence of a P6 death journal:
+// environmental tower deaths are equally real. Check the current full HP map.
+func p13UFResourceLiving(frame *pb.InstUFPlayer) bool {
+	if frame == nil || frame.FightInfo == nil || frame.FightInfo.GetGuid() != frame.GetGuid() {
+		return false
+	}
+	fight := frame.FightInfo
+	if len(fight.Index) == 0 || len(fight.Index) != len(fight.HpPos) || len(fight.Index) != len(fight.MaxHpPos) {
+		return false
+	}
+	alive := false
+	seen := map[int32]bool{}
+	for i, pose := range fight.Index {
+		hp, maxHP := fight.HpPos[i], fight.MaxHpPos[i]
+		if seen[pose] || !combatFinite(hp) || !combatFinite(maxHP) || maxHP <= 0 || hp < 0 || hp > maxHP {
+			return false
+		}
+		seen[pose] = true
+		alive = alive || hp > 0
+	}
+	return alive
 }

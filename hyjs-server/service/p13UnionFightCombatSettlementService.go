@@ -15,6 +15,10 @@ import (
 )
 
 type p13UFCombatLedger struct {
+	ActualKills  map[int64]int32
+	ActualDeaths map[int64]int32
+	ActualScores map[int64]float64
+	LastCars     map[int64]*pb.InstUFCariot
 	Kills        [2]int32
 	Reached      [2]int64
 	Hash         string
@@ -163,14 +167,14 @@ func (s *GameService) p13UFCombatLedgerRead(tx *gorm.DB, match *db.P13UnionFight
 		}
 		for i := range batch {
 			row := &batch[i]
-			if row.Status != constUtil.P13UFPlayerBattleSettled || row.CreatedAt < match.StartAt || row.DueAt >= match.EndAt || row.DueAt <= row.CreatedAt || row.SettledAt < row.DueAt {
+			if row.Status != constUtil.P13UFPlayerBattleSettled || row.CreatedAt < match.StartAt || row.DueAt > match.EndAt || row.DueAt <= row.CreatedAt || row.SettledAt < row.DueAt {
 				return nil, nil
 			}
 			record := byID[row.P6RecordID]
 			if record == nil || record.P13MatchID != match.ID {
 				return nil, errors.New("公会战 P6 归属未认证")
 			}
-			input, out, before, rules, e := s.p13UFPlayerBattleVerifyLoaded(row, record, &offer)
+			input, out, before, rules, e := s.p13UFPlayerBattleVerifyLoaded(tx.Statement.Context, row, record, &offer)
 			if e != nil {
 				return nil, e
 			}
@@ -261,6 +265,17 @@ func (s *GameService) p13UFCombatLedgerRead(tx *gorm.DB, match *db.P13UnionFight
 }
 
 func (s *GameService) p13UFSettlePlayerCombat(tx *gorm.DB, match *db.P13UnionFightMatch, offer *db.P13UnionFightSettlementOffer, now time.Time) (*db.P13UnionFightSettlementResult, error) {
+	mixed, mixedErr := p13UFMixedNeeded(tx, match)
+	if mixedErr != nil {
+		return nil, mixedErr
+	}
+	frozenRule, ruleErr := p13UFSettlementRules(offer, match)
+	if ruleErr != nil {
+		return nil, ruleErr
+	}
+	if mixed || frozenRule.TerminalRule == constUtil.P13UFMixedTerminalRule {
+		return s.p13UFSettleMixedCombat(tx, match, offer, now)
+	}
 	if now.UnixMilli() < match.EndAt {
 		return nil, nil
 	}
@@ -302,7 +317,7 @@ func (s *GameService) p13UFSettlePlayerCombat(tx *gorm.DB, match *db.P13UnionFig
 	}
 	for _, actor := range actors {
 		seenActors[actor.PlayerID] = true
-		if actor.GuildID != guilds[actor.PlayerID] || actor.JoinedAt <= 0 || actor.JoinedAt >= match.EndAt || actor.LeftAt > 0 && actor.LeftAt < match.EndAt {
+		if actor.GuildID != guilds[actor.PlayerID] || !p13UFSettlementParticipantTimeValid(&actor, match.EndAt) {
 			return nil, nil
 		}
 		frame, e := p13UFFieldReadActor(&actor)
@@ -337,6 +352,9 @@ func (s *GameService) p13UFSettlePlayerCombat(tx *gorm.DB, match *db.P13UnionFig
 					return nil, nil
 				}
 			}
+		}
+		if !p13UFSettlementParticipated(&actor, match.StartAt) {
+			continue
 		}
 		joined[actor.GuildID]++
 		rewards := rule.ParticipationRewards

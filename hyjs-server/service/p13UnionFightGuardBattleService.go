@@ -28,6 +28,8 @@ type p13UFGuardBattleRules struct {
 	Policy                                    db.P13UnionFightGuardBattlePolicy
 	Proof, LocalRule, BuildingKind, GateProof string
 	DurationMillis, RecoverySeconds           int64
+	MatchStartAt                              int64 `json:",omitempty"`
+	MatchEndAt                                int64 `json:",omitempty"`
 	ReviveSeconds                             []int64
 }
 
@@ -54,7 +56,7 @@ func p13UFGuardBattleHash(row *db.P13UnionFightGuardBattleAttempt) string {
 }
 func p13UFGuardStateFrame(row *db.P13UnionFightGuardState) (*pb.InstUFGuard, error) {
 	frame := &pb.InstUFGuard{}
-	if row == nil || row.Generation < 1 || row.SourceHash != p13UFGuardStateHash(row) || row.FrameHash != p6Digest(row.Frame) || row.InitialHash != p6Digest(row.InitialFrame) || proto.Unmarshal(row.Frame, frame) != nil || frame.GetGuid() != row.GuardGUID || frame.GetUFGuardId() != row.GuardID || frame.GetCamp() != int32(row.Camp) || frame.GetBindGuid() != row.BindGUID {
+	if row == nil || !p13UFGuardTemplateRuleKnown(row.GuardRule) || row.Generation < 1 || row.SourceHash != p13UFGuardStateHash(row) || row.FrameHash != p6Digest(row.Frame) || row.InitialHash != p6Digest(row.InitialFrame) || proto.Unmarshal(row.Frame, frame) != nil || frame.GetGuid() != row.GuardGUID || frame.GetUFGuardId() != row.GuardID || frame.GetCamp() != int32(row.Camp) || frame.GetBindGuid() != row.BindGUID {
 		return nil, errors.New(constUtil.P13UFGuardConflict)
 	}
 	return frame, nil
@@ -126,7 +128,13 @@ func p13UFGuardBattleOverlay(tx *gorm.DB, scope string, buildings *pb.SCUFBuildi
 	return nil
 }
 func p13UFGuardRulesValid(r *p13UFGuardBattleRules) bool {
-	if r == nil || !r.Policy.Enabled || r.Policy.ID != 1 || strings.TrimSpace(r.Policy.Version) == "" || strings.TrimSpace(r.Policy.Source) == "" || r.Policy.PublishedAt <= 0 || r.Policy.StartsAt < r.Policy.PublishedAt || r.Policy.EndsAt <= r.Policy.StartsAt || r.LocalRule != constUtil.P13UFGuardLocalRule || r.DurationMillis != 5000 || len(r.ReviveSeconds) < 1 || len(r.ReviveSeconds) > 64 {
+	if r == nil || !r.Policy.Enabled || r.Policy.ID != 1 || strings.TrimSpace(r.Policy.Version) == "" || strings.TrimSpace(r.Policy.Source) == "" || r.Policy.PublishedAt <= 0 || r.Policy.StartsAt < r.Policy.PublishedAt || r.Policy.EndsAt <= r.Policy.StartsAt || (r.LocalRule != constUtil.P13UFGuardLocalRule && r.LocalRule != constUtil.P13UFGuardMirrorRule) || r.DurationMillis != 5000 || len(r.ReviveSeconds) < 1 || len(r.ReviveSeconds) > 64 {
+		return false
+	}
+	if r.LocalRule == constUtil.P13UFGuardMirrorRule && (r.MatchStartAt <= 0 || r.MatchEndAt <= r.MatchStartAt) {
+		return false
+	}
+	if r.LocalRule == constUtil.P13UFGuardLocalRule && (r.MatchStartAt != 0 || r.MatchEndAt != 0) {
 		return false
 	}
 	if r.BuildingKind != "base" && r.BuildingKind != "tower" && r.BuildingKind != "factory" {
@@ -225,10 +233,11 @@ func (s *GameService) p13UFTryGuardBattle(ctx context.Context, id int64, request
 			return nil
 		}
 		handled = true
-		if constUtil.P6UFGuardNativeProof == "" {
-			return errors.New(constUtil.P13UFGuardProofMissing)
+		proof, err := p6UFGuardProofForRule(snapshot.GuardRule)
+		if err != nil {
+			return err
 		}
-		if game.PositionLoading || game.Position.GetScene() != constUtil.P13UnionFightFieldTarget || actor.Hooked || (frame.GetState() != 0 && frame.GetState() != 5) || now.UnixMilli() < match.StartAt || now.UnixMilli()+5000 >= match.EndAt {
+		if game.PositionLoading || game.Position.GetScene() != constUtil.P13UnionFightFieldTarget || actor.Hooked || (frame.GetState() != 0 && frame.GetState() != 5) || now.UnixMilli() < match.StartAt || now.UnixMilli()+5000 > match.EndAt {
 			return errors.New(constUtil.P13UFGuardConflict)
 		}
 		if frame.GetKillNum() < 0 || frame.GetDeadNum() < 0 || frame.GetDeadNum() == math.MaxInt32 || !combatFinite(frame.GetOwnScore()) || !combatFinite(frame.GetOwnToken()) || frame.GetOwnScore() < 0 || frame.GetOwnToken() < 0 {
@@ -240,6 +249,9 @@ func (s *GameService) p13UFTryGuardBattle(ctx context.Context, id int64, request
 		if err = p13UFGuardBattleAction(tx, actor, frame); err != nil {
 			return err
 		}
+		if err = p13UFTowerPendingLife(tx, match.ID, id, frame.GetDeadNum()); err != nil {
+			return err
+		}
 		var quote db.P13UnionFightGuardAuditOffer
 		var common db.P13UnionFightBattleAuditOffer
 		if err = tx.First(&quote, "match_id=? AND guard_guid=?", match.ID, initial.GetGuid()).Error; err != nil {
@@ -248,14 +260,14 @@ func (s *GameService) p13UFTryGuardBattle(ctx context.Context, id int64, request
 		if err = tx.First(&common, "match_id=?", match.ID).Error; err != nil {
 			return err
 		}
-		if quote.SourceHash != p13UFGuardOfferHash(&quote) || quote.BattleOfferHash != common.SourceHash || !p13UFBattleAuditQuoteValid(&common) {
+		if !p13UFGuardTemplateRuleKnown(quote.GuardRule) || quote.GuardRule != snapshot.GuardRule || quote.SourceHash != p13UFGuardOfferHash(&quote) || quote.BattleOfferHash != common.SourceHash || !p13UFBattleAuditQuoteValid(&common) {
 			return errors.New(constUtil.P13UFGuardConflict)
 		}
 		var state db.P13UnionFightGuardState
 		err = tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&state, "match_id=? AND guard_guid=?", match.ID, initial.GetGuid()).Error
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			raw, _ := proto.MarshalOptions{Deterministic: true}.Marshal(initial)
-			state = db.P13UnionFightGuardState{MatchID: match.ID, GuardGUID: initial.GetGuid(), GuardID: quote.GuardID, HeroID: quote.HeroID, Camp: quote.Camp, BindGUID: quote.BindGUID, BuildingKind: p13UFGuardBinding(buildings, initial.GetGuid()), Generation: 1, OfferHash: quote.SourceHash, InitialFrame: raw, InitialHash: p6Digest(raw), Frame: raw, FrameHash: p6Digest(raw)}
+			state = db.P13UnionFightGuardState{GuardRule: quote.GuardRule, MatchID: match.ID, GuardGUID: initial.GetGuid(), GuardID: quote.GuardID, HeroID: quote.HeroID, Camp: quote.Camp, BindGUID: quote.BindGUID, BuildingKind: p13UFGuardBinding(buildings, initial.GetGuid()), Generation: 1, OfferHash: quote.SourceHash, InitialFrame: raw, InitialHash: p6Digest(raw), Frame: raw, FrameHash: p6Digest(raw)}
 			state.SourceHash = p13UFGuardStateHash(&state)
 			if err = tx.Create(&state).Error; err != nil {
 				return err
@@ -267,10 +279,14 @@ func (s *GameService) p13UFTryGuardBattle(ctx context.Context, id int64, request
 		if err != nil {
 			return err
 		}
-		if state.OfferHash != quote.SourceHash || state.PendingAttemptID != "" || state.DefeatedAt != 0 || guard.GetState() != 0 || guard.GetCamp() == int32(actor.Camp) || p13UFResourceDistance(actor, guard.GetInitPosition().GetX(), guard.GetInitPosition().GetY(), guard.GetInitPosition().GetZ()) > quote.ArriveRange {
+		if state.GuardRule != quote.GuardRule || state.OfferHash != quote.SourceHash || state.PendingAttemptID != "" || state.DefeatedAt != 0 || guard.GetState() != 0 || guard.GetCamp() == int32(actor.Camp) || p13UFResourceDistance(actor, guard.GetInitPosition().GetX(), guard.GetInitPosition().GetY(), guard.GetInitPosition().GetZ()) > quote.ArriveRange {
 			return errors.New(constUtil.P13UFGuardConflict)
 		}
-		rules := p13UFGuardBattleRules{Policy: policy, Proof: constUtil.P6UFGuardNativeProof, LocalRule: constUtil.P13UFGuardLocalRule, BuildingKind: state.BuildingKind, DurationMillis: 5000}
+		rules := p13UFGuardBattleRules{Policy: policy, Proof: proof, LocalRule: constUtil.P13UFGuardLocalRule, BuildingKind: state.BuildingKind, DurationMillis: 5000}
+		if quote.GuardRule == constUtil.P13UFGuardMirrorRule {
+			rules.LocalRule = constUtil.P13UFGuardMirrorRule
+			rules.MatchStartAt, rules.MatchEndAt = match.StartAt, match.EndAt
+		}
 		if state.BuildingKind == "base" {
 			if len(baseCheck) != 1 || baseCheck[0] == nil {
 				return errors.New("基地守卫门通行认证尚未集成")
@@ -320,7 +336,7 @@ func (s *GameService) p13UFTryGuardBattle(ctx context.Context, id int64, request
 			}
 			internal = n.Int64() + 1
 		}
-		row := db.P13UnionFightGuardBattleAttempt{ID: p6Digest([]byte(fmt.Sprintf("%s/%d/%d/guard", match.ID, id, internal))), MatchID: match.ID, PlayerID: id, GuardGUID: guard.GetGuid(), GuardGeneration: state.Generation, Stamp: internal, ClientStamp: stamp, Status: constUtil.P13UFGuardPending, CalculationStage: constUtil.P13UFGuardCaptured, OfferHash: quote.SourceHash, CreatedAt: now.UnixMilli(), DueAt: now.UnixMilli() + 5000}
+		row := db.P13UnionFightGuardBattleAttempt{BuildingKind: rules.BuildingKind, ID: p6Digest([]byte(fmt.Sprintf("%s/%d/%d/guard", match.ID, id, internal))), MatchID: match.ID, PlayerID: id, GuardGUID: guard.GetGuid(), GuardGeneration: state.Generation, Stamp: internal, ClientStamp: stamp, Status: constUtil.P13UFGuardPending, CalculationStage: constUtil.P13UFGuardCaptured, OfferHash: quote.SourceHash, CreatedAt: now.UnixMilli(), DueAt: now.UnixMilli() + 5000}
 		row.FightID = strconv.FormatInt(p13UFFieldGUID(match.ID, "guard-battle", row.ID), 10)
 		requestRaw, _ := proto.MarshalOptions{Deterministic: true}.Marshal(request)
 		row.RequestHash = p6Digest(requestRaw)
@@ -345,7 +361,10 @@ func (s *GameService) p13UFTryGuardBattle(ctx context.Context, id int64, request
 		if err != nil {
 			return err
 		}
-		if err = validateP6UFGuardCandidate(input); err != nil {
+		if err = validateP6UFGuardMechanismScope(input); err != nil {
+			return err
+		}
+		if _, err = engine.ValidateP6UFGuardMechanisms(ctx, input, id, frame, guard, &quote); err != nil {
 			return err
 		}
 		row.P6RecordID, err = engine.CaptureBattleReplay(ctx, tx, id, constUtil.P13UFGuardBattleSource, row.FightID, *input)
@@ -401,15 +420,62 @@ func p13UFGuardBegin(row *db.P13UnionFightGuardBattleAttempt) []proto.Message {
 // Verification closes both independent journals and the exact pre-result
 // identity. It does not inspect current enabled policy or recompute a battle.
 func (s *GameService) p13UFGuardBattleVerify(tx *gorm.DB, row *db.P13UnionFightGuardBattleAttempt) (*model.FrozenBattleInput, *model.CombatFinalHPOutcome, *p13UFGuardBattleRules, error) {
+	if row == nil {
+		return nil, nil, nil, errors.New(constUtil.P13UFGuardConflict)
+	}
+	var offer db.P13UnionFightGuardAuditOffer
+	if err := tx.First(&offer, "match_id=? AND guard_guid=?", row.MatchID, row.GuardGUID).Error; err != nil {
+		return nil, nil, nil, err
+	}
+	var record db.P6BattleRecord
+	if err := tx.First(&record, "id=?", row.P6RecordID).Error; err != nil {
+		return nil, nil, nil, err
+	}
+	input, out, rules, err := s.p13UFGuardBattleVerifyLoaded(tx.Statement.Context, row, &record, &offer)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	if rules.LocalRule == constUtil.P13UFGuardMirrorRule {
+		var match db.P13UnionFightMatch
+		if err = tx.Select("id,start_at,end_at").First(&match, "id=?", row.MatchID).Error; err != nil {
+			return nil, nil, nil, err
+		}
+		if rules.MatchStartAt != match.StartAt || rules.MatchEndAt != match.EndAt {
+			return nil, nil, nil, errors.New(constUtil.P13UFGuardConflict)
+		}
+	}
+	if row.Status == constUtil.P13UFGuardPending {
+		var state db.P13UnionFightGuardState
+		if err = tx.First(&state, "match_id=? AND guard_guid=?", row.MatchID, row.GuardGUID).Error; err != nil {
+			return nil, nil, nil, err
+		}
+		current, readErr := p13UFGuardStateFrame(&state)
+		before := &pb.InstUFGuard{}
+		if readErr != nil || proto.Unmarshal(row.GuardBefore, before) != nil || state.PendingAttemptID != row.ID || state.Generation != row.GuardGeneration || state.SourceHash != row.ReservationHash || current.GetState() != 1 || !proto.Equal(current.FightInfo, before.FightInfo) {
+			return nil, nil, nil, errors.New(constUtil.P13UFGuardConflict)
+		}
+	}
+	return input, out, rules, nil
+}
+
+// VerifyLoaded authenticates immutable inputs without per-attempt SQL. The
+// transactional wrapper separately checks pending reservation ownership.
+func (s *GameService) p13UFGuardBattleVerifyLoaded(ctx context.Context, row *db.P13UnionFightGuardBattleAttempt, record *db.P6BattleRecord, offer *db.P13UnionFightGuardAuditOffer) (*model.FrozenBattleInput, *model.CombatFinalHPOutcome, *p13UFGuardBattleRules, error) {
 	reject := func() (*model.FrozenBattleInput, *model.CombatFinalHPOutcome, *p13UFGuardBattleRules, error) {
 		return nil, nil, nil, errors.New(constUtil.P13UFGuardConflict)
 	}
 	if row == nil || row.ID != p6Digest([]byte(fmt.Sprintf("%s/%d/%d/guard", row.MatchID, row.PlayerID, row.Stamp))) || row.SourceHash != p13UFGuardBattleHash(row) || row.PlayerID <= 0 || row.GuardGUID <= 0 || row.GuardGeneration < 1 || row.Stamp <= 0 || row.ClientStamp < 0 || (row.ClientStamp > 0 && row.ClientStamp != row.Stamp) || row.NextCalculationAt < 0 || row.CalculationFailures < 0 || row.CreatedAt <= 0 || row.DueAt != row.CreatedAt+5000 || (row.Status != constUtil.P13UFGuardPending && row.Status != constUtil.P13UFGuardSettled) {
 		return reject()
 	}
-	var rules p13UFGuardBattleRules
-	if json.Unmarshal(row.Rules, &rules) != nil || !p13UFGuardRulesValid(&rules) || rules.Policy.PublishedAt > row.CreatedAt || row.CreatedAt < rules.Policy.StartsAt || row.DueAt >= rules.Policy.EndsAt {
+	if row.Status == constUtil.P13UFGuardPending && (row.BuildingAppliedAt != 0 || len(row.BuildingProof) > 0) {
 		return reject()
+	}
+	var rules p13UFGuardBattleRules
+	if json.Unmarshal(row.Rules, &rules) != nil || row.BuildingKind != "" && row.BuildingKind != rules.BuildingKind || !p13UFGuardRulesValid(&rules) || rules.Policy.PublishedAt > row.CreatedAt || row.CreatedAt < rules.Policy.StartsAt || row.DueAt >= rules.Policy.EndsAt {
+		return reject()
+	}
+	if err := p13UFGuardRulesProof(&rules); err != nil {
+		return nil, nil, nil, err
 	}
 	var player pb.InstUFPlayer
 	var guard pb.InstUFGuard
@@ -420,28 +486,30 @@ func (s *GameService) p13UFGuardBattleVerify(tx *gorm.DB, row *db.P13UnionFightG
 	if row.RequestHash != p6Digest(request) || row.FightID != strconv.FormatInt(p13UFFieldGUID(row.MatchID, "guard-battle", row.ID), 10) {
 		return reject()
 	}
-	var offer db.P13UnionFightGuardAuditOffer
-	if e := tx.First(&offer, "match_id=? AND guard_guid=?", row.MatchID, row.GuardGUID).Error; e != nil {
-		return nil, nil, nil, e
-	}
-	if offer.SourceHash != p13UFGuardOfferHash(&offer) || offer.SourceHash != row.OfferHash {
+	if record == nil || offer == nil || offer.MatchID != row.MatchID || offer.GuardGUID != row.GuardGUID || record.ID != row.P6RecordID {
 		return reject()
 	}
-	var record db.P6BattleRecord
-	if e := tx.First(&record, "id=?", row.P6RecordID).Error; e != nil {
-		return nil, nil, nil, e
+	expectedRule := constUtil.P13UFGuardLocalRule
+	if offer.GuardRule == constUtil.P13UFGuardMirrorRule {
+		expectedRule = constUtil.P13UFGuardMirrorRule
 	}
-	input, e := decodeP6Record(&record)
+	if !p13UFGuardTemplateRuleKnown(offer.GuardRule) || rules.LocalRule != expectedRule || offer.SourceHash != p13UFGuardOfferHash(offer) || offer.SourceHash != row.OfferHash {
+		return reject()
+	}
+	if rules.LocalRule == constUtil.P13UFGuardMirrorRule && (row.CreatedAt < rules.MatchStartAt || row.DueAt > rules.MatchEndAt || rules.BuildingKind == "base" && row.CreatedAt < rules.MatchStartAt+(rules.MatchEndAt-rules.MatchStartAt)/2) {
+		return reject()
+	}
+	input, e := decodeP6Record(record)
 	if e != nil {
 		return nil, nil, nil, e
 	}
 	if record.Source != constUtil.P13UFGuardBattleSource || record.SourceFight != row.FightID || record.PlayerID != row.PlayerID || record.P13MatchID != row.MatchID || record.InputHash != row.InputHash || input.Attacker.GetPlayerId() != row.PlayerID || input.Monster.GetMonsterId() != row.GuardGUID {
 		return reject()
 	}
-	if e = validateP6UFGuardCandidate(input); e != nil {
+	if e = validateP6UFGuardMechanismScope(input); e != nil {
 		return nil, nil, nil, e
 	}
-	expected, err := p13UFGuardAuditMonster(&offer, &guard)
+	expected, err := p13UFGuardAuditMonster(offer, &guard)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -449,22 +517,13 @@ func (s *GameService) p13UFGuardBattleVerify(tx *gorm.DB, row *db.P13UnionFightG
 		return reject()
 	}
 	tag := constUtil.P13UFGuardBattleSource + ";match=" + row.MatchID + ";attempt=" + row.ID + ";offer=" + row.OfferHash + ";guard=" + strconv.FormatInt(row.GuardGUID, 10) + ";playerFrame=" + p6Digest(row.PlayerBefore) + ";guardFrame=" + p6Digest(row.GuardBefore)
-	if len(input.AppliedProperties["guard-battle"]) != 1 || input.AppliedProperties["guard-battle"][0] != tag || player.FightInfo == nil || len(player.FightInfo.Index) != 1 || len(player.FightInfo.HpPos) != 1 || len(player.FightInfo.MaxHpPos) != 1 || player.FightInfo.Index[0] != input.Attacker.Formation[0].GetPose() || player.FightInfo.HpPos[0] != input.Attacker.Formation[0].GetInst().GetCurHp() || player.FightInfo.MaxHpPos[0] != input.Attacker.Formation[0].GetProp().GetHp() || player.FightInfo.GetAnger() != input.Attacker.GetInst().GetAnger() {
+	if len(input.AppliedProperties["guard-battle"]) != 1 || input.AppliedProperties["guard-battle"][0] != tag || !p13UFGuardPlayerFrameMatches(input, &player, &rules) {
 		return reject()
 	}
-	if row.Status == constUtil.P13UFGuardPending {
-		var state db.P13UnionFightGuardState
-		if e := tx.First(&state, "match_id=? AND guard_guid=?", row.MatchID, row.GuardGUID).Error; e != nil {
-			return nil, nil, nil, e
-		}
-		current, e := p13UFGuardStateFrame(&state)
-		if e != nil {
-			return nil, nil, nil, e
-		}
-		if state.PendingAttemptID != row.ID || state.Generation != row.GuardGeneration || state.SourceHash != row.ReservationHash || current.GetState() != 1 || !proto.Equal(current.FightInfo, guard.FightInfo) {
-			return reject()
-		}
+	if _, e = s.ValidateP6UFGuardMechanisms(ctx, input, row.PlayerID, &player, &guard, offer); e != nil {
+		return nil, nil, nil, e
 	}
+
 	if row.CalculationStage == constUtil.P13UFGuardCaptured {
 		if record.Status != constUtil.P6BattleCaptured || record.Authoritative || record.FinishedAt != 0 || len(record.Outcome) != 0 || len(record.Operates) != 0 || record.OutcomeHash != "" || record.ReplayHash != "" || len(row.Terminal) != 0 || row.TerminalHash != "" || row.Status != constUtil.P13UFGuardPending || row.SettledAt != 0 || len(row.PlayerAfter) != 0 || len(row.GuardAfter) != 0 || row.PlayerDied || row.GuardDefeated || row.ReviveSeconds != 0 || row.BuildingEvent != "" {
 			return reject()
@@ -478,7 +537,7 @@ func (s *GameService) p13UFGuardBattleVerify(tx *gorm.DB, row *db.P13UnionFightG
 	if json.Unmarshal(row.Terminal, &out) != nil {
 		return reject()
 	}
-	if e = validateP6UFGuardTerminal(input, &out); e != nil {
+	if e = validateP6UFGuardTerminalForRule(input, &out, &rules); e != nil {
 		return nil, nil, nil, e
 	}
 	raw, _ := json.Marshal(out.Outcome)
@@ -566,7 +625,7 @@ func (s *GameService) RunP13UnionFightGuardBattleWorker(ctx context.Context, rep
 // The batch uses a bounded number of calculators and joins them on cancellation.
 func (s *GameService) ComputeP13UnionFightGuardBattles(ctx context.Context, now time.Time) error {
 	var rows []db.P13UnionFightGuardBattleAttempt
-	if err := db.GetIns().WithContext(ctx).Where("status=? AND calculation_stage=? AND quarantined=? AND next_calculation_at<=?", constUtil.P13UFGuardPending, constUtil.P13UFGuardCaptured, false, now.UnixMilli()).Order("next_calculation_at,created_at,id").Limit(constUtil.P13UFGuardWorkerBatch).Find(&rows).Error; err != nil {
+	if err := p13UFCombatOpenCandidates(db.GetIns().WithContext(ctx), "p13_union_fight_guard_battle_attempts", now).Where("status=? AND calculation_stage=? AND quarantined=? AND next_calculation_at<=?", constUtil.P13UFGuardPending, constUtil.P13UFGuardCaptured, false, now.UnixMilli()).Order("next_calculation_at,created_at,id").Limit(constUtil.P13UFGuardWorkerBatch).Find(&rows).Error; err != nil {
 		return err
 	}
 	jobs := make(chan db.P13UnionFightGuardBattleAttempt)
@@ -605,28 +664,38 @@ func (s *GameService) ComputeP13UnionFightGuardBattles(ctx context.Context, now 
 	return errors.Join(errs...)
 }
 func (s *GameService) p13UFGuardCalculate(ctx context.Context, row *db.P13UnionFightGuardBattleAttempt, now time.Time) error {
-	input, _, _, err := s.p13UFGuardBattleVerify(db.GetIns().WithContext(ctx), row)
+	input, _, rules, err := s.p13UFGuardBattleVerify(db.GetIns().WithContext(ctx), row)
 	if err != nil {
 		if ctx.Err() == nil && (errors.Is(err, gorm.ErrRecordNotFound) || err.Error() == constUtil.P13UFGuardConflict || err.Error() == constUtil.P6ReplayConflict || err.Error() == constUtil.CombatInvalid || err.Error() == constUtil.CombatUnsupported) {
-			qErr := db.GetIns().WithContext(ctx).Model(&db.P13UnionFightGuardBattleAttempt{}).Where("id=? AND source_hash=? AND status=? AND calculation_stage=?", row.ID, row.SourceHash, constUtil.P13UFGuardPending, constUtil.P13UFGuardCaptured).Update("quarantined", true).Error
+			qErr := db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+				stop, e := p13UFCombatCommitGate(tx, row.MatchID, p13UFNow(ctx))
+				if e != nil || stop {
+					return e
+				}
+				return tx.Model(&db.P13UnionFightGuardBattleAttempt{}).Where("id=? AND source_hash=? AND status=? AND calculation_stage=?", row.ID, row.SourceHash, constUtil.P13UFGuardPending, constUtil.P13UFGuardCaptured).Update("quarantined", true).Error
+			})
 			return errors.Join(err, qErr)
 		}
 		return err
 	}
-	terminal, err := s.ComputeP6UFGuardSettlement(ctx, input)
+	terminal, err := s.computeP6UFGuardForRule(ctx, input, rules)
 	if err != nil {
 		if ctx.Err() == nil && !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
 			return errors.Join(err, s.p13UFGuardRetry(ctx, row, now))
 		}
 		return err
 	}
-	if err = validateP6UFGuardTerminal(input, terminal); err != nil {
+	if err = validateP6UFGuardTerminalForRule(input, terminal, rules); err != nil {
 		return errors.Join(err, s.p13UFGuardRetry(ctx, row, now))
 	}
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
 	return db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		stop, gateErr := p13UFCombatCommitGate(tx, row.MatchID, p13UFNow(ctx))
+		if gateErr != nil || stop {
+			return gateErr
+		}
 		var current db.P13UnionFightGuardBattleAttempt
 		if e := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&current, "id=?", row.ID).Error; e != nil {
 			return e
@@ -670,6 +739,10 @@ func (s *GameService) p13UFGuardRetry(ctx context.Context, row *db.P13UnionFight
 		return ctx.Err()
 	}
 	return db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		stop, gateErr := p13UFCombatCommitGate(tx, row.MatchID, p13UFNow(ctx))
+		if gateErr != nil || stop {
+			return gateErr
+		}
 		var current db.P13UnionFightGuardBattleAttempt
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&current, "id=?", row.ID).Error; err != nil {
 			return err
@@ -700,47 +773,100 @@ func (s *GameService) p13UFGuardRetry(ctx context.Context, row *db.P13UnionFight
 	})
 }
 
+func p13UFGuardPlayerFrameMatches(input *model.FrozenBattleInput, before *pb.InstUFPlayer, rules *p13UFGuardBattleRules) bool {
+	if input == nil || input.Attacker == nil || input.Attacker.Inst == nil || before == nil || before.FightInfo == nil || rules == nil || before.GetGuid() != input.Attacker.GetPlayerId() {
+		return false
+	}
+	count := len(input.Attacker.Formation)
+	if count < 1 || count > 4 || rules.LocalRule == constUtil.P13UFGuardLocalRule && count != 1 || len(before.FightInfo.Index) != count || len(before.FightInfo.HpPos) != count || len(before.FightInfo.MaxHpPos) != count || before.FightInfo.GetAnger() != input.Attacker.Inst.GetAnger() {
+		return false
+	}
+	slots := map[int32]int{}
+	for i, pose := range before.FightInfo.Index {
+		if _, ok := slots[pose]; ok {
+			return false
+		}
+		slots[pose] = i
+	}
+	seen := map[string]bool{}
+	poses := map[int32]bool{}
+	for _, hero := range input.Attacker.Formation {
+		if hero == nil || hero.Prop == nil || hero.Inst == nil || hero.GetGuid() == "" || seen[hero.GetGuid()] || poses[hero.GetPose()] {
+			return false
+		}
+		index, ok := slots[hero.GetPose()]
+		if !ok || before.FightInfo.HpPos[index] != hero.Inst.GetCurHp() || before.FightInfo.MaxHpPos[index] != hero.Prop.GetHp() {
+			return false
+		}
+		seen[hero.GetGuid()], poses[hero.GetPose()] = true, true
+	}
+	return true
+}
+
 // Mapping is pure and can inspect diagnostic terminals. Production application
 // must first call validateP6UFGuardTerminal; this helper cannot certify a result.
 func p13UFGuardBattleMap(input *model.FrozenBattleInput, out *model.CombatFinalHPOutcome, before *pb.InstUFPlayer, guardBefore *pb.InstUFGuard, rules *p13UFGuardBattleRules, due, now int64) (*pb.InstUFPlayer, *pb.InstUFGuard, bool, bool, int64, error) {
 	reject := func() (*pb.InstUFPlayer, *pb.InstUFGuard, bool, bool, int64, error) {
 		return nil, nil, false, false, 0, errors.New(constUtil.P13UFGuardConflict)
 	}
-	if input == nil || out == nil || out.Outcome == nil || before == nil || guardBefore == nil || !p13UFGuardRulesValid(rules) || now < due || input.Attacker == nil || input.Monster == nil || len(input.Attacker.Formation) != 1 || len(input.Monster.Formation) != 1 || before.FightInfo == nil || guardBefore.FightInfo == nil || len(before.FightInfo.Index) != 1 || len(before.FightInfo.HpPos) != 1 || len(before.FightInfo.MaxHpPos) != 1 || len(guardBefore.FightInfo.Index) != 1 || guardBefore.FightInfo.Index[0] != 0 || len(guardBefore.FightInfo.HpPos) != 1 || len(guardBefore.FightInfo.MaxHpPos) != 1 || before.GetGuid() != input.Attacker.GetPlayerId() || guardBefore.GetGuid() != input.Monster.GetMonsterId() || out.Outcome.Attacker == nil || out.Outcome.Monster == nil || out.Outcome.Attacker.Inst == nil || out.Outcome.Monster.Inst == nil || out.Outcome.Attacker.GetPlayerId() != before.GetGuid() || out.Outcome.Monster.GetMonsterId() != guardBefore.GetGuid() || len(out.FinalActors) != 2 {
+	if input == nil || out == nil || out.Outcome == nil || before == nil || guardBefore == nil || !p13UFGuardRulesValid(rules) || now < due || input.Attacker == nil || input.Monster == nil || len(input.Monster.Formation) != 1 || !p13UFGuardPlayerFrameMatches(input, before, rules) || guardBefore.FightInfo == nil || len(guardBefore.FightInfo.Index) != 1 || guardBefore.FightInfo.Index[0] != 0 || len(guardBefore.FightInfo.HpPos) != 1 || len(guardBefore.FightInfo.MaxHpPos) != 1 || guardBefore.GetGuid() != input.Monster.GetMonsterId() || out.Outcome.Attacker == nil || out.Outcome.Monster == nil || out.Outcome.Attacker.Inst == nil || out.Outcome.Monster.Inst == nil || out.Outcome.Attacker.GetPlayerId() != before.GetGuid() || out.Outcome.Monster.GetMonsterId() != guardBefore.GetGuid() || len(out.FinalActors) != len(input.Attacker.Formation)+1 {
 		return reject()
 	}
 	player := proto.Clone(before).(*pb.InstUFPlayer)
 	guard := proto.Clone(guardBefore).(*pb.InstUFGuard)
-	seen := [2]bool{}
-	for _, actor := range out.FinalActors {
-		if actor.Camp < 0 || actor.Camp > 1 || seen[actor.Camp] {
-			return reject()
+	initial := map[string]*pb.BattleHero{}
+	slots := map[string]int{}
+	for _, hero := range input.Attacker.Formation {
+		key := "0/" + hero.GetGuid()
+		initial[key] = hero
+		for index, pose := range before.FightInfo.Index {
+			if pose == hero.GetPose() {
+				slots[key] = index
+			}
 		}
-		camp := actor.Camp
-		seen[camp] = true
-		initial := input.Attacker.Formation[0]
-		fight := player.FightInfo
-		if camp == 1 {
-			initial = input.Monster.Formation[0]
-			fight = guard.FightInfo
-		}
-		raw, _ := proto.MarshalOptions{Deterministic: true}.Marshal(initial)
-		if actor.GUID != initial.GetGuid() || actor.HeroID != initial.GetId() || actor.Pose != initial.GetPose() || actor.BloodNumber != 1 || actor.InitialActorSHA256 != p6Digest(raw) || !combatFinite(actor.CurrentHP) || !combatFinite(actor.MaxHP) || actor.CurrentHP < 0 || actor.MaxHP <= 0 || actor.CurrentHP > actor.MaxHP || fight.HpPos[0] != initial.GetInst().GetCurHp() || fight.MaxHpPos[0] != initial.GetProp().GetHp() || (camp == 0 && fight.Index[0] != initial.GetPose()) {
-			return reject()
-		}
-		fight.HpPos[0] = actor.CurrentHP
-		fight.MaxHpPos[0] = actor.MaxHP
 	}
-	if !seen[0] || !seen[1] {
+	monster := input.Monster.Formation[0]
+	if monster == nil || monster.Prop == nil || monster.Inst == nil {
 		return reject()
 	}
+	initial["1/"+monster.GetGuid()] = monster
+	slots["1/"+monster.GetGuid()] = 0
+	seen := map[string]bool{}
+	for _, actor := range out.FinalActors {
+		if actor.Camp < 0 || actor.Camp > 1 {
+			return reject()
+		}
+		key := strconv.FormatInt(int64(actor.Camp), 10) + "/" + actor.GUID
+		origin, ok := initial[key]
+		if !ok || seen[key] {
+			return reject()
+		}
+		fight := player.FightInfo
+		if actor.Camp == 1 {
+			fight = guard.FightInfo
+		}
+		index := slots[key]
+		raw, _ := proto.MarshalOptions{Deterministic: true}.Marshal(origin)
+		if actor.HeroID != origin.GetId() || actor.Pose != origin.GetPose() || actor.BloodNumber != 1 || actor.InitialActorSHA256 != p6Digest(raw) || !combatFinite(actor.CurrentHP) || !combatFinite(actor.MaxHP) || actor.CurrentHP < 0 || actor.MaxHP <= 0 || actor.CurrentHP > actor.MaxHP || fight.HpPos[index] != origin.Inst.GetCurHp() || fight.MaxHpPos[index] != origin.Prop.GetHp() {
+			return reject()
+		}
+		fight.HpPos[index], fight.MaxHpPos[index] = actor.CurrentHP, actor.MaxHP
+		seen[key] = true
+	}
+	if len(seen) != len(initial) {
+		return reject()
+	}
+
 	pAP, gAP := out.Outcome.Attacker.GetInst().GetAnger(), out.Outcome.Monster.GetInst().GetAnger()
 	if !combatFinite(pAP) || !combatFinite(gAP) || pAP < 0 || gAP < 0 || pAP > 300 || gAP > 300 {
 		return reject()
 	}
 	player.FightInfo.Anger = proto.Float64(pAP)
 	guard.FightInfo.Anger = proto.Float64(gAP)
-	dead, defeated := player.FightInfo.HpPos[0] == 0, guard.FightInfo.HpPos[0] == 0
+	dead, defeated := true, guard.FightInfo.HpPos[0] == 0
+	for _, hp := range player.FightInfo.HpPos {
+		dead = dead && hp == 0
+	}
 	if dead && defeated || dead && out.Outcome.Winner != 1 || defeated && out.Outcome.Winner != 0 || out.Outcome.Winner < 0 || out.Outcome.Winner > 1 {
 		return reject()
 	}
@@ -761,6 +887,14 @@ func p13UFGuardBattleMap(input *model.FrozenBattleInput, out *model.CombatFinalH
 	}
 	if defeated {
 		guard.State = proto.Int32(2)
+	} else if rules.LocalRule == constUtil.P13UFGuardMirrorRule {
+		// Business reset only. The original P6 Terminal and final actors retain
+		// their exact HP/AP; an uncompleted NPC challenge keeps no wound.
+		guard.FightInfo = proto.Clone(guardBefore.FightInfo).(*pb.InstFightable)
+		for i, maximum := range guard.FightInfo.MaxHpPos {
+			guard.FightInfo.HpPos[i] = maximum
+		}
+		guard.FightInfo.Anger = proto.Float64(0)
 	}
 	// Guard defeat grants zero score/token and never increments player kills.
 	return player, guard, dead, defeated, revive, nil
@@ -770,12 +904,13 @@ func p13UFGuardBattleMap(input *model.FrozenBattleInput, out *model.CombatFinalH
 // owns calculation; no computation or five-second wait occurs in field Tick.
 func (s *GameService) AdvanceP13UnionFightGuardBattles(ctx context.Context, now time.Time) error {
 	var ids []string
-	if err := db.GetIns().WithContext(ctx).Model(&db.P13UnionFightGuardBattleAttempt{}).Where("status=? AND calculation_stage=? AND due_at<=?", constUtil.P13UFGuardPending, constUtil.P13UFGuardComputed, now.UnixMilli()).Order("due_at,id").Limit(constUtil.P13UFGuardWorkerBatch).Pluck("id", &ids).Error; err != nil {
+	if err := p13UFCombatOpenCandidates(db.GetIns().WithContext(ctx), "p13_union_fight_guard_battle_attempts", now).Model(&db.P13UnionFightGuardBattleAttempt{}).Where("status=? AND calculation_stage=? AND due_at<=?", constUtil.P13UFGuardPending, constUtil.P13UFGuardComputed, now.UnixMilli()).Order("due_at,id").Limit(constUtil.P13UFGuardWorkerBatch).Pluck("id", &ids).Error; err != nil {
 		return err
 	}
 	var failures []error
 	for _, id := range ids {
 		var completed *db.P13UnionFightGuardBattleAttempt
+		var buildingFrames []proto.Message
 		err := db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 			if e := ServerGameClockGuardTransaction(tx); e != nil {
 				return e
@@ -791,11 +926,15 @@ func (s *GameService) AdvanceP13UnionFightGuardBattles(ctx context.Context, now 
 			if row.Status != constUtil.P13UFGuardPending || row.DueAt > now.UnixMilli() {
 				return nil
 			}
+			stop, gateErr := p13UFCombatCommitGate(tx, row.MatchID, p13UFNow(ctx))
+			if gateErr != nil || stop {
+				return gateErr
+			}
 			input, out, rules, e := s.p13UFGuardBattleVerify(tx, &row)
 			if e != nil {
 				return e
 			}
-			if e = validateP6UFGuardTerminal(input, out); e != nil {
+			if e = validateP6UFGuardTerminalForRule(input, out, rules); e != nil {
 				return e
 			}
 			var state db.P13UnionFightGuardState
@@ -832,9 +971,7 @@ func (s *GameService) AdvanceP13UnionFightGuardBattles(ctx context.Context, now 
 			current.State = after.State
 			current.LeftTime = after.LeftTime
 			current.TotalTime = after.TotalTime
-			if e = p13UFFieldSaveActor(tx, &actor, current); e != nil {
-				return e
-			}
+
 			state.Frame, _ = proto.MarshalOptions{Deterministic: true}.Marshal(guardAfter)
 			state.FrameHash = p6Digest(state.Frame)
 			state.PendingAttemptID = ""
@@ -862,9 +999,24 @@ func (s *GameService) AdvanceP13UnionFightGuardBattles(ctx context.Context, now 
 			row.Status = constUtil.P13UFGuardSettled
 			row.SettledAt = now.UnixMilli()
 			row.SourceHash = p13UFGuardBattleHash(&row)
+			if row.GuardDefeated {
+				buildingFrames, e = s.p13UFGuardBuildingApply(tx, &row, &state, now)
+				if e != nil {
+					return e
+				}
+				row.SourceHash = p13UFGuardBattleHash(&row)
+			}
 			if e = tx.Save(&row).Error; e != nil {
 				return e
 			}
+			scene, drainFrames, drainErr := p13UFTowerDrain(tx, &actor, current, "guard", row.ID, row.InputHash, row.DueAt, now)
+			if drainErr != nil {
+				return drainErr
+			}
+			if e = p13UFFieldSaveActor(tx, &actor, scene); e != nil {
+				return e
+			}
+			buildingFrames = append(buildingFrames, drainFrames...)
 			completed = &row
 			return nil
 		})
@@ -873,9 +1025,18 @@ func (s *GameService) AdvanceP13UnionFightGuardBattles(ctx context.Context, now 
 			continue
 		}
 		if completed != nil {
-			s.p13UFGuardBattlePublish(ctx, completed)
-			if completed.BuildingEvent != "" {
-				failures = append(failures, errors.New(constUtil.P13UFGuardBuildingPending+": "+completed.BuildingEvent))
+			publishErr := p13UFPublishBeforeAbort(ctx, completed.MatchID, func() {
+				s.p13UFGuardBattlePublish(ctx, completed)
+				for _, frame := range buildingFrames {
+					if _, private := frame.(*pb.SCUFPlayerDead); private {
+						s.publishP10Private(ctx, completed.PlayerID, frame)
+					} else {
+						s.p13UFFieldBroadcast(ctx, completed.MatchID, 0, frame)
+					}
+				}
+			})
+			if publishErr != nil {
+				failures = append(failures, publishErr)
 			}
 		}
 	}
@@ -912,6 +1073,9 @@ func p13UFGuardBattleAction(tx *gorm.DB, actor *db.P13UnionFightFieldPlayer, fra
 	if actor == nil || frame == nil {
 		return errors.New(constUtil.P13UFGuardConflict)
 	}
+	if frame.GetState() == 3 {
+		return errors.New("死亡状态需要原复活流程，不能开始其他场景操作")
+	}
 	var count int64
 	if err := tx.Model(&db.P13UnionFightGuardBattleAttempt{}).Where("match_id=? AND player_id=? AND status=?", actor.MatchID, actor.PlayerID, constUtil.P13UFGuardPending).Count(&count).Error; err != nil {
 		return err
@@ -919,14 +1083,7 @@ func p13UFGuardBattleAction(tx *gorm.DB, actor *db.P13UnionFightFieldPlayer, fra
 	if count > 0 {
 		return errors.New("守卫战斗5秒接纳尚未结束，不能开始其他场景操作")
 	}
-	if frame.GetState() == 3 {
-		if err := tx.Model(&db.P13UnionFightGuardBattleAttempt{}).Where("match_id=? AND player_id=? AND status=? AND player_died=?", actor.MatchID, actor.PlayerID, constUtil.P13UFGuardSettled, true).Count(&count).Error; err != nil {
-			return err
-		}
-		if count > 0 {
-			return errors.New("守卫战死亡状态需要原复活流程")
-		}
-	}
+
 	return nil
 }
 func p13UFGuardBattleProject(tx *gorm.DB, actor *db.P13UnionFightFieldPlayer, frame *pb.InstUFPlayer, now time.Time) error {

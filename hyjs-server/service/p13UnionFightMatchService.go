@@ -66,11 +66,39 @@ func (s *GameService) p13UFGuildPreview(tx *gorm.DB, guild db.P13Guild, power in
 	if err != nil {
 		return nil, err
 	}
-	icon := s.table("UnionLogo", "id", strconv.Itoa(int(guild.Flag)))["iconName"]
+	logoID := strconv.Itoa(int(guild.Flag))
+	icon := s.table("UnionLogo", "id", logoID)["iconName"]
 	if icon == "" {
 		return nil, errors.New("公会旗帜原资源缺失")
 	}
-	return proto.Marshal(&pb.UFInfoPreView{UnionId: proto.String(guild.ID), UnionName: proto.String(guild.Name), ServerId: proto.Int32(int32(s.OriginalServerID())), FightPower: proto.Int64(power), MasterName: player.Name, UnionLogo: proto.String(icon), UnionPrestige: proto.Int32(0)})
+	return proto.Marshal(&pb.UFInfoPreView{UnionId: proto.String(guild.ID), UnionName: proto.String(guild.Name), ServerId: proto.Int32(int32(s.OriginalServerID())), FightPower: proto.Int64(power), MasterName: player.Name, UnionLogo: proto.String(logoID), UnionPrestige: proto.Int32(0)})
+}
+
+// Original UnionTitleInfo.InitWithData resolves unionLogo through UnionLogo.id
+// before setting names. Earlier local snapshots stored iconName instead. Adapt
+// only the outgoing PB; immutable match previews and their hashes stay intact.
+func (s *GameService) p13UFClientPreview(preview *pb.UFInfoPreView) error {
+	if preview == nil {
+		return errors.New(constUtil.P13UFPreviewLogoConflict)
+	}
+	logo := preview.GetUnionLogo()
+	if row := s.table("UnionLogo", "id", logo); row != nil && row["iconName"] != "" {
+		return nil
+	}
+	var id string
+	for _, row := range s.Tables["UnionLogo"] {
+		if row["iconName"] == logo && row["id"] != "" {
+			if id != "" {
+				return errors.New(constUtil.P13UFPreviewLogoConflict)
+			}
+			id = row["id"]
+		}
+	}
+	if id == "" {
+		return errors.New(constUtil.P13UFPreviewLogoConflict)
+	}
+	preview.UnionLogo = proto.String(id)
+	return nil
 }
 
 type p13UFMatchCandidate struct {
@@ -118,14 +146,6 @@ func p13UFReadMatchFighter(tx *gorm.DB, item p13UFMatchFighter) (*db.P13UnionFig
 
 // MatchP13UnionFight 只把真实冻结名单与明确日历配成待开赛实例，不使用诊断胜负产生战果。
 func (s *GameService) MatchP13UnionFight(ctx context.Context, now time.Time) error {
-	start, matchDay, _, _ := p13UFClock(now)
-	switch start.Weekday() {
-	case time.Tuesday, time.Thursday, time.Saturday:
-	default:
-		return nil
-	}
-	registrationDay := start.AddDate(0, 0, -1).Format("2006-01-02")
-	week := p13UFWeek(start)
 	return db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := ServerGameClockGuardTransaction(tx); err != nil {
 			return err
@@ -142,16 +162,35 @@ func (s *GameService) MatchP13UnionFight(ctx context.Context, now time.Time) err
 		if !gate.ManagementEnabled || !policy.EnrollmentEnabled || !policy.MatchEnabled {
 			return nil
 		}
+		calendar, err := p13UFCalendar(tx, now)
+		if err != nil {
+			return err
+		}
+		start, matchDay := calendar.DayStart, calendar.MatchDay
+		registrationDay := start.AddDate(0, 0, -1).Format("2006-01-02")
+		if calendar.Custom {
+			if calendar.Schedule == nil || now.UnixMilli() < calendar.Schedule.EnrollmentEndAt || now.UnixMilli() >= calendar.Schedule.SecondStartAt+calendar.Schedule.DurationMillis {
+				return nil
+			}
+			registrationDay = calendar.RegistrationDay
+		} else {
+			switch start.Weekday() {
+			case time.Tuesday, time.Thursday, time.Saturday:
+			default:
+				return nil
+			}
+		}
+		week := p13UFWeek(start)
 		// 日历为运营发布事实；没有原时刻来源时保留冻结名单，绝不生成假开赛时刻。
 		var schedule db.P13UnionFightSchedule
-		err := tx.First(&schedule, "day=?", matchDay).Error
+		err = tx.First(&schedule, "day=?", matchDay).Error
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil
 		}
 		if err != nil {
 			return err
 		}
-		if schedule.FirstStartAt <= start.Add(30*time.Minute).UnixMilli() || schedule.SecondStartAt <= schedule.FirstStartAt || schedule.DurationMillis <= 0 || schedule.DurationMillis > 86400000 || schedule.FirstStartAt > math.MaxInt64-schedule.DurationMillis || schedule.FirstStartAt+schedule.DurationMillis > schedule.SecondStartAt || schedule.SecondStartAt > math.MaxInt64-schedule.DurationMillis || schedule.SecondStartAt+schedule.DurationMillis > start.AddDate(0, 0, 1).UnixMilli() || schedule.Source == "" {
+		if !calendar.Custom && (schedule.FirstStartAt <= start.Add(30*time.Minute).UnixMilli() || schedule.SecondStartAt <= schedule.FirstStartAt || schedule.DurationMillis <= 0 || schedule.DurationMillis > 86400000 || schedule.FirstStartAt > math.MaxInt64-schedule.DurationMillis || schedule.FirstStartAt+schedule.DurationMillis > schedule.SecondStartAt || schedule.SecondStartAt > math.MaxInt64-schedule.DurationMillis || schedule.SecondStartAt+schedule.DurationMillis > start.AddDate(0, 0, 1).UnixMilli() || schedule.Source == "") {
 			return errors.New("公会战已发布日历不完整")
 		}
 		var entries []db.P13UnionFightEntry
@@ -274,8 +313,12 @@ func (s *GameService) MatchP13UnionFight(ctx context.Context, now time.Time) err
 					}
 				}
 			}
+			if err = s.p13UFByeProduce(tx, &schedule, registrationDay, week, group, bucket, now); err != nil {
+				return err
+			}
 		}
-		// 单个余数公会仅记录已处理配对批次，继续待对手/轮空规则审计，不颁布轮空胜利。
+		// Legacy/missing publications remain unresolved; only newly authenticated
+		// odd tails with a frozen settlement source produce independent bye facts.
 		for _, candidate := range candidates {
 			if err = tx.Model(&candidate.entry).Update("match_processed", true).Error; err != nil {
 				return err
@@ -309,14 +352,23 @@ func (s *GameService) p13UFMatchPreviews(tx *gorm.DB, guild string, day string, 
 		if proto.Unmarshal(ownRaw, own) != nil || proto.Unmarshal(enemyRaw, enemy) != nil || own.GetUnionId() != guild || enemy.GetUnionId() != enemyID || enemyID == guild {
 			return nil, "", errors.New("公会战原预览联合身份损坏")
 		}
+		if err := s.p13UFClientPreview(own); err != nil {
+			return nil, "", err
+		}
+		if err := s.p13UFClientPreview(enemy); err != nil {
+			return nil, "", err
+		}
 		preview := &pb.UFUnionBattlePreView{OurUnion: own, EnemyUnion: enemy, StartFightTime: proto.Int64(row.StartAt), EndFightTime: proto.Int64(row.EndAt), IsRoundBye: proto.Int32(0)}
 		// 原SignUpItem只认识1胜/2负；仅有已保存的真实终局才给出结果。
 		var settled db.P13UnionFightSettlementResult
-		err := tx.First(&settled, "match_id=?", row.ID).Error
+		err := tx.Select("match_id,result_kind,winner_guild_id,loser_guild_id").First(&settled, "match_id=?", row.ID).Error
 		if err == nil {
-			value := int32(2)
-			if settled.WinnerGuildID == guild {
-				value = 1
+			value := int32(0)
+			if settled.WinnerGuildID != "" {
+				value = 2
+				if settled.WinnerGuildID == guild {
+					value = 1
+				}
 			}
 			preview.FightResult = proto.Int32(value)
 		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
@@ -333,6 +385,35 @@ func (s *GameService) p13UFMatchPreviews(tx *gorm.DB, guild string, day string, 
 		}
 		previews = append(previews, preview)
 		group = row.Group
+	}
+	byes, err := p13UFByes(tx, day, p13UFNextDay(day), "")
+	if err != nil {
+		return nil, "", err
+	}
+	for i := range byes {
+		row := &byes[i]
+		if row.GuildID != guild {
+			continue
+		}
+		if len(rows) != 0 {
+			return nil, "", p13UFByeError()
+		}
+		b, err := p13UFByeRead(row)
+		if err != nil {
+			return nil, "", err
+		}
+		own := &pb.UFInfoPreView{}
+		if proto.Unmarshal(b.Preview, own) != nil {
+			return nil, "", p13UFByeError()
+		}
+		if err := s.p13UFClientPreview(own); err != nil {
+			return nil, "", err
+		}
+		previews = append(previews, &pb.UFUnionBattlePreView{OurUnion: own, IsRoundBye: proto.Int32(1), FightResult: proto.Int32(1), StartFightTime: proto.Int64(row.StartAt), EndFightTime: proto.Int64(row.EndAt)})
+		group = row.Group
+	}
+	if len(rows) == 0 {
+		sort.Slice(previews, func(i, j int) bool { return previews[i].GetStartFightTime() < previews[j].GetStartFightTime() })
 	}
 	return previews, group, nil
 }

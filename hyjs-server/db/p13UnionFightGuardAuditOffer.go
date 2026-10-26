@@ -2,6 +2,7 @@ package db
 
 // P13UnionFightGuardAuditOffer 冻结本场原守卫模型/阵营/绑定及具名本地单实体Monster模板。
 type P13UnionFightGuardAuditOffer struct {
+	GuardRule       string  `gorm:"type:varchar(64);not null;default:''" json:"guard_rule,omitempty"`
 	MatchID         string  `gorm:"primaryKey;type:varchar(64)" json:"match_id"`
 	GuardGUID       int64   `gorm:"primaryKey;autoIncrement:false" json:"guard_guid"`
 	GuardID         string  `gorm:"type:varchar(64);not null" json:"guard_id"`

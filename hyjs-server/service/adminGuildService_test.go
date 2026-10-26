@@ -19,7 +19,8 @@ func adminGuildTestActor(t *testing.T, role string) *model.AdminPrincipal {
 	if err := AdminInitialize(context.Background(), ""); err != nil {
 		t.Fatal(err)
 	}
-	user := db.AdminUser{Username: "guild-" + role + "-" + t.Name(), PasswordHash: "fixture", Role: role, Enabled: true}
+	// Long descriptive test names still obey the real varchar(64) contract.
+	user := db.AdminUser{Username: "guild-" + p6Digest([]byte(role + "/" + t.Name()))[:32], PasswordHash: "fixture", Role: role, Enabled: true}
 	if err := db.GetIns().Create(&user).Error; err != nil {
 		t.Fatal(err)
 	}

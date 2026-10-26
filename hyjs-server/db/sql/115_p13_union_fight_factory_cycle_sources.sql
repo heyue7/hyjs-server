@@ -6,5 +6,8 @@ CREATE TABLE IF NOT EXISTS p13_union_fight_factory_cycle_sources (
  max_alive BIGINT NOT NULL,
  published_at BIGINT NOT NULL,
  source TEXT NOT NULL,
+ rule VARCHAR(64) NOT NULL DEFAULT '',
+ buffer_capacity BIGINT NOT NULL DEFAULT 0,
+
  PRIMARY KEY(day,factory_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

@@ -343,13 +343,54 @@ func (s *GameService) DispatchP13GuildPrayer(ctx context.Context, id int64, requ
 				return err
 			}
 
+			// Serialize acknowledgement with prayer/tech mutations using their
+			// guild-policy -> profile lock order. Default schema-free readers
+			// retain the original empty-property compatibility.
+			owner := s.p10ClientOwner()
+			if owner.guildCoreSchemaReady.Load() || gameSchemaHasTable(tx, &db.P13GuildPolicy{}) {
+				var policy db.P13GuildPolicy
+				err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&policy, 1).Error
+				if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+					return err
+				}
+			}
+			var profile db.Profile
+			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Select("id,player").First(&profile, id).Error; err != nil {
+				return err
+			}
+
 			var err error
 			prayer, _, _, err = s.P13GuildPrayerProperties(ctx, tx, id, now)
 			if err != nil {
 				return err
 			}
 			tech, _, err = s.P13GuildTechProperties(ctx, tx, id, now)
-			return err
+			if err != nil {
+				return err
+			}
+			// Acknowledge only after both current sources succeeded. Updating
+			// this one Player JSON leaf preserves Game/prayer history and does
+			// not run unrelated inventory/resource save hooks.
+			if profile.Player == nil {
+				return errors.New("角色存档不存在")
+			}
+			var player pb.Player
+			if err = json.Unmarshal([]byte(*profile.Player), &player); err != nil {
+				return err
+			}
+			if player.GetNeedRefreshUnionProp() == 0 {
+				return nil
+			}
+			var raw map[string]json.RawMessage
+			if err = json.Unmarshal([]byte(*profile.Player), &raw); err != nil {
+				return err
+			}
+			raw["needRefreshUnionProp"] = json.RawMessage("0")
+			encoded, err := json.Marshal(raw)
+			if err != nil {
+				return err
+			}
+			return tx.Model(&profile).Update("player", string(encoded)).Error
 		})
 		if err != nil {
 			return nil, true, err

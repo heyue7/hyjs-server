@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS p13_union_fight_gate_item_offers (
+CREATE TABLE IF NOT EXISTS p13_union_fight_gate_item_offers (budget_rule VARCHAR(64) NOT NULL DEFAULT '',team_use_limit BIGINT NOT NULL DEFAULT 0,target_cooldown_millis BIGINT NOT NULL DEFAULT 0,effect_family VARCHAR(32) NOT NULL DEFAULT '',
  match_id CHAR(64) NOT NULL, item_id VARCHAR(64) NOT NULL,
  hp_percent BIGINT NOT NULL, enemy BOOLEAN NOT NULL, radius DOUBLE NOT NULL,
  cooldown_millis BIGINT NOT NULL, source TEXT NOT NULL, source_hash CHAR(64) NOT NULL,

@@ -4,11 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 	"hyjs-server/constUtil"
 	"hyjs-server/db"
+	"hyjs-server/elog"
 	"hyjs-server/model"
 	pb "hyjs-server/model/protocol"
 	"math"
@@ -18,7 +20,7 @@ import (
 // InitializeP13UnionFight 迁移报名事实；自动宣战选择已并入公会资产，不再创建旧 Setting 表。
 func (s *GameService) InitializeP13UnionFight(ctx context.Context) error {
 	tx := db.GetIns().WithContext(ctx)
-	if err := tx.AutoMigrate(&db.P13UnionFightPolicy{}, &db.P13UnionFightEntry{}, &db.P13UnionFightFighter{}, &db.P13UnionFightSchedule{}, &db.P13UnionFightGroup{}, &db.P13UnionFightMatch{}, &db.P13UnionFightLoadout{}); err != nil {
+	if err := tx.AutoMigrate(&db.P13UnionFightPolicy{}, &db.P13UnionFightEntry{}, &db.P13UnionFightFighter{}, &db.P13UnionFightSchedule{}, &db.P13UnionFightGroup{}, &db.P13UnionFightMatch{}, &db.P13UnionFightLoadout{}, &db.P13UnionFightBye{}); err != nil {
 		return err
 	}
 	if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&db.P13UnionFightPolicy{ID: 1, Source: constUtil.P13UnionFightSource}).Error; err != nil {
@@ -65,32 +67,21 @@ func p13UFDay(now time.Time) string {
 
 // ServeP13UnionFight 在服务生命周期内检查自动窗口与冻结截止，取消时停止ticker。
 func (s *GameService) ServeP13UnionFight(ctx context.Context) error {
-	if err := s.TickP13UnionFight(ctx, p13UFNow(ctx)); err != nil {
-		if ctx.Err() != nil {
-			return nil
-		}
-		return err
-	}
-	ticker := time.NewTicker(constUtil.P13UnionFightTickInterval)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return nil
-		case <-ticker.C:
-			if err := s.TickP13UnionFight(ctx, p13UFNow(ctx)); err != nil {
-				if ctx.Err() != nil {
-					return nil
-				}
-				return err
-			}
-		}
-	}
+	// Match-specific proof failures keep their awards closed and are reported
+	// with the same bounded cadence as finalization. They cannot stop unrelated
+	// listeners. Driver failures still reach the common durable-worker backoff.
+	return serveP13UFFinalization(ctx, constUtil.P13UnionFightTickInterval, s.TickP13UnionFightMaintenance, func(err error, consecutive int64) {
+		elog.Warn("guild war maintenance source remains unresolved", zap.Error(err), zap.Int64("consecutiveFailures", consecutive))
+	})
 }
 
 // p13UFDeclare 在原宣战日记录当时全部真实成员与职位，不增加公会资产或比赛结果。
 func (s *GameService) p13UFDeclare(tx *gorm.DB, guild *db.P13Guild, now time.Time) error {
-	_, day, stage, deadline := p13UFClock(now)
+	calendar, err := p13UFCalendar(tx, now)
+	if err != nil {
+		return err
+	}
+	day, stage, deadline := calendar.RegistrationDay, calendar.Stage, calendar.Deadline
 	if stage != constUtil.P13UnionFightStageDeclare {
 		return errors.New("当前不在原公会宣战日")
 	}
@@ -109,7 +100,18 @@ func (s *GameService) p13UFDeclare(tx *gorm.DB, guild *db.P13Guild, now time.Tim
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return err
 	}
-	entry := db.P13UnionFightEntry{GuildID: guild.ID, Day: day, AppliedAt: now.UnixMilli(), Deadline: deadline, Source: constUtil.P13UnionFightSource}
+	if err := p13UFNeedWarEnabled(tx); err != nil {
+		return err
+	}
+	source := constUtil.P13UnionFightSource
+	if calendar.Custom {
+		raw, err := json.Marshal(calendar.Schedule)
+		if err != nil {
+			return err
+		}
+		source = "后台明确发布自定义日历；冻结报名时排期：" + string(raw)
+	}
+	entry := db.P13UnionFightEntry{GuildID: guild.ID, Day: day, AppliedAt: now.UnixMilli(), Deadline: deadline, Source: source}
 	if err = tx.Create(&entry).Error; err != nil {
 		return err
 	}
@@ -128,6 +130,22 @@ func (s *GameService) p13UFDeclare(tx *gorm.DB, guild *db.P13Guild, now time.Tim
 
 // TickP13UnionFight 使用明确传入的时钟处理原自动窗口与截止冻结；不会制造匹配、胜负或奖励。
 func (s *GameService) TickP13UnionFight(ctx context.Context, now time.Time) error {
+	if err := s.p13UFAdvanceEnrollmentAndMatch(ctx, now); err != nil {
+		return err
+	}
+	return s.TickP13UnionFightSettlement(ctx, now)
+}
+
+// TickP13UnionFightMaintenance serves the slower admission/award cadence only.
+func (s *GameService) TickP13UnionFightMaintenance(ctx context.Context, now time.Time) error {
+	if err := s.p13UFAdvanceEnrollmentAndMatch(ctx, now); err != nil {
+		return err
+	}
+	return s.TickP13UnionFightSettlementMaintenance(ctx, now)
+}
+
+// Queries may advance due admission facts, without evaluating or delivering wars.
+func (s *GameService) p13UFAdvanceEnrollmentAndMatch(ctx context.Context, now time.Time) error {
 	// 新报名/截止快照采用当前全局规则，已冻结场次继续使用原快照。
 	tables, configErr := AdminGuildRuntimeTables(ctx, s.Tables)
 	if configErr != nil {
@@ -144,7 +162,7 @@ func (s *GameService) TickP13UnionFight(ctx context.Context, now time.Time) erro
 			return err
 		}
 		var cfg db.P13UnionFightPolicy
-		if err := tx.First(&cfg, 1).Error; err != nil {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&cfg, 1).Error; err != nil {
 			return err
 		}
 		if !gate.ManagementEnabled || !cfg.EnrollmentEnabled {
@@ -199,24 +217,29 @@ func (s *GameService) TickP13UnionFight(ctx context.Context, now time.Time) erro
 				return err
 			}
 		}
-		start, _, stage, _ := p13UFClock(now)
-		if stage != constUtil.P13UnionFightStageDeclare || !now.Before(start.Add(5*time.Minute)) {
+		// Accepted entries still freeze and match on their original calendar.
+		// Only automatic creation of another declaration is disabled by the master.
+		if !cfg.WarEnabled {
 			return nil
 		}
-		// 一次取出开启自动宣战的公会资产，避免逐条回查 Setting 后形成 N+1。
+		calendar, err := p13UFCalendar(tx, now)
+		if err != nil {
+			return err
+		}
+		if calendar.Stage != constUtil.P13UnionFightStageDeclare || !calendar.Custom && !now.Before(calendar.DayStart.Add(5*time.Minute)) {
+			return nil
+		}
+		minimum, err := s.p10Setting("UnionFightApplyLevelLimit")
+		if err != nil {
+			return err
+		}
+		// Bound each automatic batch and eliminate already-declared guilds in SQL.
 		var guilds []db.P13Guild
-		if err := tx.Where("union_fight_auto_apply = ?", true).Order("id").Find(&guilds).Error; err != nil {
+		if err = tx.Where("union_fight_auto_apply=? AND level>=?", true, minimum).Where("NOT EXISTS (?)", tx.Model(&db.P13UnionFightEntry{}).Select("1").Where("guild_id=p13_guilds.id AND day=?", calendar.RegistrationDay)).Order("id").Limit(8).Find(&guilds).Error; err != nil {
 			return err
 		}
 		for i := range guilds {
 			guild := &guilds[i]
-			min, err := s.p10Setting("UnionFightApplyLevelLimit")
-			if err != nil {
-				return err
-			}
-			if guild.Level < min {
-				continue
-			}
 			if err = s.p13UFDeclare(tx, guild, now); err != nil {
 				return err
 			}
@@ -226,10 +249,7 @@ func (s *GameService) TickP13UnionFight(ctx context.Context, now time.Time) erro
 	if err != nil {
 		return err
 	}
-	if err := s.MatchP13UnionFight(ctx, now); err != nil {
-		return err
-	}
-	return s.TickP13UnionFightSettlement(ctx, now)
+	return s.MatchP13UnionFight(ctx, now)
 }
 
 // p13UFSnapshot 只从当前真实存档生成报名阵容，角色装备改变不会隐式改写已上传阵容。
@@ -290,6 +310,11 @@ func (s *GameService) p13UFMutate(ctx context.Context, id int64, request proto.M
 		}
 		switch b := request.(type) {
 		case *pb.CSUFAutoApplySet:
+			if b.GetIsAuto() == 1 {
+				if err := p13UFNeedWarEnabled(tx); err != nil {
+					return err
+				}
+			}
 			if err = p13GuildRole(member, constUtil.P13GuildVice); err != nil {
 				return err
 			}
@@ -301,7 +326,11 @@ func (s *GameService) p13UFMutate(ctx context.Context, id int64, request proto.M
 			}
 			return s.p13UFDeclare(tx, guild, now)
 		}
-		_, day, stage, _ := p13UFClock(now)
+		calendar, err := p13UFCalendar(tx, now)
+		if err != nil {
+			return err
+		}
+		day, stage := calendar.RegistrationDay, calendar.Stage
 		if stage != constUtil.P13UnionFightStageDeclare {
 			return errors.New("原公会战报名截止已到")
 		}
@@ -384,6 +413,9 @@ func (s *GameService) p13UFMutate(ctx context.Context, id int64, request proto.M
 				}
 				return nil
 			}
+			if err := p13UFNeedWarEnabled(tx); err != nil {
+				return err
+			}
 			var firsts int64
 			if err = tx.Model(&db.P13UnionFightFighter{}).Where("guild_id=? AND day=? AND applied_at>0 AND first_on=1", guild.ID, day).Count(&firsts).Error; err != nil {
 				return err
@@ -456,9 +488,76 @@ func (s *GameService) p13UFMutate(ctx context.Context, id int64, request proto.M
 	})
 }
 
+// p13UFQueryMaintenanceDue reads only current calendar/admission metadata.
+// Historical catch-up and settlement remain the background worker's responsibility.
+func (s *GameService) p13UFQueryMaintenanceDue(ctx context.Context, now time.Time) (bool, error) {
+	tx := db.GetIns().WithContext(ctx)
+	var gate db.P13GuildPolicy
+	if err := tx.Select("id,management_enabled").First(&gate, 1).Error; err != nil {
+		return false, err
+	}
+	var policy db.P13UnionFightPolicy
+	if err := tx.Select("id,enrollment_enabled,match_enabled").First(&policy, 1).Error; err != nil {
+		return false, err
+	}
+	if !gate.ManagementEnabled || !policy.EnrollmentEnabled {
+		return false, nil
+	}
+	calendar, err := p13UFCalendar(tx, now)
+	if err != nil {
+		return false, err
+	}
+	days := []string{}
+	if calendar.RegistrationDay != "" {
+		days = append(days, calendar.RegistrationDay)
+	}
+	if !calendar.Custom {
+		days = append(days, calendar.DayStart.AddDate(0, 0, -1).Format("2006-01-02"))
+	}
+	var due []db.P13UnionFightEntry
+	if len(days) > 0 {
+		q := tx.Select("guild_id,day").Where("day IN ? AND deadline<=?", days, now.UnixMilli())
+		matchDue := policy.MatchEnabled
+		if calendar.Custom {
+			matchDue = matchDue && calendar.Schedule != nil && now.UnixMilli() >= calendar.Schedule.EnrollmentEndAt && now.UnixMilli() < calendar.Schedule.SecondStartAt+calendar.Schedule.DurationMillis
+		} else {
+			switch calendar.DayStart.Weekday() {
+			case time.Tuesday, time.Thursday, time.Saturday:
+			default:
+				matchDue = false
+			}
+		}
+		if matchDue {
+			q = q.Where("frozen_at=0 OR match_processed=0")
+		} else {
+			q = q.Where("frozen_at=0")
+		}
+		if err = q.Limit(1).Find(&due).Error; err != nil {
+			return false, err
+		}
+		if len(due) > 0 {
+			return true, nil
+		}
+	}
+	if calendar.Stage != constUtil.P13UnionFightStageDeclare || !calendar.Custom && !now.Before(calendar.DayStart.Add(5*time.Minute)) {
+		return false, nil
+	}
+	minimum, err := s.p10Setting("UnionFightApplyLevelLimit")
+	if err != nil {
+		return false, err
+	}
+	var guilds []db.P13Guild
+	err = tx.Select("id").Where("union_fight_auto_apply=? AND level>=?", true, minimum).Where("NOT EXISTS (?)", tx.Model(&db.P13UnionFightEntry{}).Select("1").Where("guild_id=p13_guilds.id AND day=?", calendar.RegistrationDay)).Limit(1).Find(&guilds).Error
+	return len(guilds) > 0, err
+}
+
 func (s *GameService) p13UFQuery(ctx context.Context, id int64, request proto.Message, now time.Time) ([]proto.Message, error) {
-	if err := s.TickP13UnionFight(ctx, now); err != nil {
+	if due, err := s.p13UFQueryMaintenanceDue(ctx, now); err != nil {
 		return nil, err
+	} else if due {
+		if err = s.p13UFAdvanceEnrollmentAndMatch(ctx, now); err != nil {
+			return nil, err
+		}
 	}
 	var response proto.Message
 	err := db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
@@ -480,18 +579,26 @@ func (s *GameService) p13UFQuery(ctx context.Context, id int64, request proto.Me
 		if err != nil {
 			return err
 		}
-		day := p13UFDay(now)
+		calendar, err := p13UFCalendar(tx, now)
+		if err != nil {
+			return err
+		}
+		day := calendar.RegistrationDay
 		var fighters []db.P13UnionFightFighter
 		if err = tx.Where("guild_id=? AND day=? AND applied_at>0", guild.ID, day).Order("applied_at,player_id").Find(&fighters).Error; err != nil {
 			return err
 		}
 		switch request.(type) {
 		case *pb.CSUFInfoPreView:
-			matchDate, err := time.ParseInLocation("2006-01-02", day, time.FixedZone("Asia/Shanghai", 8*3600))
-			if err != nil {
-				return err
+			matchDay := calendar.MatchDay
+			if !calendar.Custom {
+				matchDate, e := time.ParseInLocation("2006-01-02", day, time.FixedZone("Asia/Shanghai", 8*3600))
+				if e != nil {
+					return e
+				}
+				matchDay = matchDate.AddDate(0, 0, 1).Format("2006-01-02")
 			}
-			previews, _, err := s.p13UFMatchPreviews(tx, guild.ID, matchDate.AddDate(0, 0, 1).Format("2006-01-02"), id)
+			previews, _, err := s.p13UFMatchPreviews(tx, guild.ID, matchDay, id)
 			if err != nil {
 				return err
 			}
@@ -533,7 +640,7 @@ func (s *GameService) p13UFQuery(ctx context.Context, id int64, request proto.Me
 
 			response = reply
 		case *pb.CSUFCurrentStageInfo:
-			_, _, stage, deadline := p13UFClock(now)
+			stage, deadline := calendar.Stage, calendar.Deadline
 			reply := &pb.SCUFCurrentStageInfo{Stage: proto.Int32(stage), NextStageTime: proto.Int64(deadline), ServerTimeNow: proto.Int64(now.UnixMilli()), AppliedNum: proto.Int32(int32(len(fighters))), IsUnionApplied: proto.Int32(0), IsAutoApply: proto.Int32(0), IsAutoFight: proto.Int32(0), IsPlayerApplied: proto.Int32(0), IsIn25: proto.Int32(0), FightPower: proto.Int64(0), AdjustTimes: proto.Int32(0), BattleArrayAdjustTime: proto.Int32(0)}
 			var entry db.P13UnionFightEntry
 			err = tx.First(&entry, "guild_id=? AND day=?", guild.ID, day).Error
@@ -570,11 +677,14 @@ func (s *GameService) p13UFQuery(ctx context.Context, id int64, request proto.Me
 				}
 			}
 			// 原UI读取两个显示起止值；仅使用运营已发布日历，不填零时刻伪造可开赛。
-			matchDate, err := time.ParseInLocation("2006-01-02", day, time.FixedZone("Asia/Shanghai", 8*3600))
-			if err != nil {
-				return err
+			matchDay := calendar.MatchDay
+			if !calendar.Custom {
+				matchDate, e := time.ParseInLocation("2006-01-02", day, time.FixedZone("Asia/Shanghai", 8*3600))
+				if e != nil {
+					return e
+				}
+				matchDay = matchDate.AddDate(0, 0, 1).Format("2006-01-02")
 			}
-			matchDay := matchDate.AddDate(0, 0, 1).Format("2006-01-02")
 			var schedule db.P13UnionFightSchedule
 			err = tx.First(&schedule, "day=?", matchDay).Error
 			if err == nil && schedule.FirstStartAt > 0 && schedule.SecondStartAt > schedule.FirstStartAt && schedule.DurationMillis > 0 && schedule.SecondStartAt <= math.MaxInt64-schedule.DurationMillis {
@@ -656,6 +766,9 @@ func (s *GameService) DispatchP13UnionFight(ctx context.Context, id int64, reque
 		// Accepted battles and audit attempts persist their evidence in the same
 		// transaction. Rejected requests must leave no independent match intent.
 		if replies, handled, battleErr := s.p13UFTryPlayerBattle(ctx, id, request.(*pb.CSUFPlayerAskFight), stamp, now); handled || battleErr != nil {
+			return replies, true, battleErr
+		}
+		if replies, handled, battleErr := s.p13UFTryGuardBattle(ctx, id, request.(*pb.CSUFPlayerAskFight), stamp, now); handled || battleErr != nil {
 			return replies, true, battleErr
 		}
 		messages, err = s.p13UFAskFightAnyAudit(ctx, id, request.(*pb.CSUFPlayerAskFight), stamp, now)

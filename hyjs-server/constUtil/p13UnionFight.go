@@ -2,6 +2,8 @@ package constUtil
 
 import "time"
 
+const P13UFPreviewLogoConflict = "公会战预览旗帜原表编号无效"
+
 const (
 	P13UnionFightClosed             = "公会战报名本批尚未开放"
 	P13UnionFightUnknown            = "公会战匹配、战场与每场道具实际投入仍待完整原规则核实"

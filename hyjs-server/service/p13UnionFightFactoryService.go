@@ -34,7 +34,9 @@ func p13UFFactoryStateDigest(row *db.P13UnionFightFactoryState) string {
 		MatchID                                                    string
 		GUID, OpenedAt, StartedAt, AnimationAt, DueAt, CompletedAt int64
 		FrameHash, CarHash                                         string
-	}{row.MatchID, row.GUID, row.OpenedAt, row.StartedAt, row.AnimationAt, row.DueAt, row.CompletedAt, row.FrameHash, row.CarHash})
+		PausedAt                                                   int64 `json:",omitempty"`
+		RemainingMillis                                            int64 `json:",omitempty"`
+	}{row.MatchID, row.GUID, row.OpenedAt, row.StartedAt, row.AnimationAt, row.DueAt, row.CompletedAt, row.FrameHash, row.CarHash, row.PausedAt, row.RemainingMillis})
 	return p6Digest(raw)
 }
 func p13UFFactoryFrame(row *db.P13UnionFightFactoryState) (*pb.InstUFCariotFactory, error) {
@@ -362,7 +364,18 @@ func (s *GameService) TickP13UnionFightFactory(ctx context.Context, now time.Tim
 	if err := db.GetIns().WithContext(ctx).Where("completed_at=0 AND due_at>0 AND animation_at<=?", now.UnixMilli()).Order("due_at,guid").Find(&pending).Error; err != nil {
 		return err
 	}
+	scopes := make([]string, 0, len(pending))
+	for _, row := range pending {
+		scopes = append(scopes, row.MatchID)
+	}
+	clocks, clockErr := p13UFWorldClockBatch(ctx, scopes, now)
+	if clockErr != nil {
+		return clockErr
+	}
 	for _, candidate := range pending {
+		if clocks.paused(candidate.MatchID) {
+			continue
+		}
 		if err := ctx.Err(); err != nil {
 			return err
 		}
@@ -375,6 +388,11 @@ func (s *GameService) TickP13UnionFightFactory(ctx context.Context, now time.Tim
 			var gate db.P13GuildPolicy
 			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&gate, 1).Error; err != nil {
 				return err
+			}
+			if closed, err := p13UFWorldSealed(tx, candidate.MatchID); err != nil {
+				return err
+			} else if closed {
+				return nil
 			}
 			var enroll db.P13UnionFightPolicy
 			if err := tx.First(&enroll, 1).Error; err != nil {
@@ -395,11 +413,11 @@ func (s *GameService) TickP13UnionFightFactory(ctx context.Context, now time.Tim
 			if err != nil {
 				return err
 			}
-			if row.CompletedAt != 0 || row.DueAt == 0 {
+			if row.CompletedAt != 0 || row.DueAt == 0 || row.PausedAt != 0 {
 				return nil
 			}
-			if row.StartedAt < match.StartAt || row.StartedAt >= match.EndAt || row.DueAt > match.EndAt {
-				if now.UnixMilli() >= match.EndAt {
+			if row.StartedAt < match.StartAt || row.StartedAt >= clocks.end(&match) || row.DueAt > clocks.end(&match) {
+				if now.UnixMilli() >= clocks.end(&match) {
 					row.CompletedAt = constUtil.P13UnionFightFactoryCanceled
 					return p13UFFactorySave(tx, row, factory)
 				}
@@ -452,8 +470,14 @@ func (s *GameService) TickP13UnionFightFactory(ctx context.Context, now time.Tim
 		if err != nil {
 			return err
 		}
-		for _, frame := range frames {
-			s.p13UFFieldBroadcast(ctx, candidate.MatchID, 0, frame)
+		if len(frames) > 0 {
+			if err := p13UFPublishBeforeAbort(ctx, candidate.MatchID, func() {
+				for _, frame := range frames {
+					s.p13UFFieldBroadcast(ctx, candidate.MatchID, 0, frame)
+				}
+			}); err != nil {
+				return err
+			}
 		}
 	}
 	return s.TickP13UnionFightFactoryCycle(ctx, now)

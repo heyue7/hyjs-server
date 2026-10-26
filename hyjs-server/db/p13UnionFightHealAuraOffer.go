@@ -2,6 +2,7 @@ package db
 
 // P13UnionFightHealAuraOffer 保存原013回复法阵的原buff009五秒及提前发布具名本地团队治疗策略。
 type P13UnionFightHealAuraOffer struct {
+	EffectRule     string  `gorm:"type:varchar(64);not null;default:''" json:"effect_rule,omitempty"`
 	MatchID        string  `gorm:"primaryKey;type:varchar(64)" json:"match_id"`
 	ItemID         string  `gorm:"primaryKey;type:varchar(64)" json:"item_id"`
 	HPPercent      int64   `gorm:"not null" json:"hp_percent"`

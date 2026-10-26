@@ -102,9 +102,16 @@ func p13UFMonthlyReadRules(offer *db.P13UnionFightMonthlyOffer) (*p13UFMonthlyRu
 	}
 	return &rules, rewards, nil
 }
-func (s *GameService) p13UFMonthlyArm(tx *gorm.DB, now time.Time) error {
+func (s *GameService) p13UFMonthlyArm(tx *gorm.DB, now time.Time, onlyMonths ...string) error {
 	var policies []db.P13UnionFightMonthlyPolicy
-	if err := tx.Where("enabled=?", true).Order("month").Find(&policies).Error; err != nil {
+	query := tx.Where("enabled=?", true).Order("month")
+	if len(onlyMonths) > 0 {
+		if len(onlyMonths) > constUtil.P13UFMonthlyArmMaximumMonths {
+			return errors.New(constUtil.P13UFMonthlyArmRange)
+		}
+		query = query.Where("month IN ?", onlyMonths)
+	}
+	if err := query.Find(&policies).Error; err != nil {
 		return err
 	}
 	for _, policy := range policies {
@@ -315,26 +322,35 @@ func p13UFMonthlyRanks(tx *gorm.DB, offer *db.P13UnionFightMonthlyOffer) ([]p13U
 		if e != nil {
 			return nil, false, e
 		}
-		rule, e := p13UFSettlementRules(&roundOffer, &match)
-		if e != nil {
-			return nil, false, e
-		}
 		var result db.P13UnionFightSettlementResult
 		e = tx.First(&result, "match_id=?", match.ID).Error
 		terminal := e == nil
 		if e != nil && !errors.Is(e, gorm.ErrRecordNotFound) {
 			return nil, false, e
 		}
+		if terminal && result.ResultKind == constUtil.P13UFTechnicalAbortKind {
+			if e = p13UFCombatSettlementVerify(tx, &match, &result); e != nil {
+				return nil, false, e
+			}
+			continue
+		}
+		rule, e := p13UFSettlementRules(&roundOffer, &match)
+		if e != nil {
+			return nil, false, e
+		}
 		if inMonth && !terminal {
 			complete = false
 		}
-		if terminal && (result.OfferHash != roundOffer.RulesHash || result.EndAt != match.EndAt || result.WinnerGuildID == result.LoserGuildID || result.WinnerGuildID != match.LeftGuildID && result.WinnerGuildID != match.RightGuildID || result.LoserGuildID != match.LeftGuildID && result.LoserGuildID != match.RightGuildID) {
+		if terminal && (result.OfferHash != roundOffer.RulesHash || !p13UFMixedRoundIdentity(&match, &result, rule)) {
 			return nil, false, errors.New("月赛缺真实完整终局来源")
 		}
 		if terminal {
 			if e = p13UFCombatSettlementVerify(tx, &match, &result); e != nil {
 				return nil, false, e
 			}
+		}
+		if terminal && result.ResultKind == constUtil.P13UFTechnicalAbortKind {
+			continue
 		}
 		week := p13UFWeek(day)
 		if weekScores[week] == nil {
@@ -347,17 +363,14 @@ func p13UFMonthlyRanks(tx *gorm.DB, offer *db.P13UnionFightMonthlyOffer) ([]p13U
 			}
 			delta := int64(extra)
 			if terminal {
-				if guild == result.WinnerGuildID {
-					if result.WinTaskPrestige != extra {
-						return nil, false, errors.New("月赛胜方工厂事实与终局不一致")
-					}
-					delta += int64(rule.WinPrestige)
-				} else {
-					if result.LoseTaskPrestige != extra {
-						return nil, false, errors.New("月赛负方工厂事实与终局不一致")
-					}
-					delta += int64(rule.LosePrestige)
+				base, snapshotExtra, prestigeErr := p13UFMixedRoundPrestige(&match, &result, rule, guild)
+				if prestigeErr != nil {
+					return nil, false, prestigeErr
 				}
+				if snapshotExtra != extra {
+					return nil, false, errors.New("月赛工厂威望与真实三态终局不一致")
+				}
+				delta += base
 			}
 			if delta < 0 || weekScores[week][guild] > math.MaxInt32-delta {
 				return nil, false, errors.New("月赛真实威望溢出")
@@ -380,12 +393,49 @@ func p13UFMonthlyRanks(tx *gorm.DB, offer *db.P13UnionFightMonthlyOffer) ([]p13U
 			}
 		}
 	}
-	var entries []db.P13UnionFightEntry
-	if err = tx.Where("day>=? AND day<?", start.AddDate(0, 0, -1).Format("2006-01-02"), end.AddDate(0, 0, -1).Format("2006-01-02")).Find(&entries).Error; err != nil {
+	byes, err := p13UFByes(tx, firstWeek.Format("2006-01-02"), lastWeek.AddDate(0, 0, 7).Format("2006-01-02"), "")
+	if err != nil {
+		return nil, false, err
+	}
+	for i := range byes {
+		row := &byes[i]
+		b, e := p13UFByeRead(row)
+		if e != nil {
+			return nil, false, e
+		}
+		day, e := time.ParseInLocation("2006-01-02", row.Day, start.Location())
+		if e != nil {
+			return nil, false, e
+		}
+		delta := int64(row.WinPrestige)
+		weekScores[b.Week][row.GuildID] += delta
+		if weekScores[b.Week][row.GuildID] > math.MaxInt32 {
+			return nil, false, p13UFByeError()
+		}
+		if !day.Before(start) && day.Before(end) {
+			monthMatches++
+			key := row.Day + "/" + row.GuildID
+			if coverage[key] == nil {
+				coverage[key] = map[int32]bool{}
+			}
+			if coverage[key][row.Round] {
+				return nil, false, p13UFByeError()
+			}
+			coverage[key][row.Round] = true
+			monthScores[row.GuildID] += delta
+			if monthScores[row.GuildID] > math.MaxInt32 {
+				return nil, false, p13UFByeError()
+			}
+			previews[row.GuildID] = b.Preview
+		}
+	}
+	declarations, err := p13UFCalendarCoverage(tx, start, end, matches)
+	if err != nil {
 		return nil, false, err
 	}
 	declaredCoverage := map[string]bool{}
-	for _, entry := range entries {
+	for _, row := range declarations {
+		entry := row.Entry
 		if entry.FrozenAt <= 0 {
 			complete = false
 			continue
@@ -393,11 +443,7 @@ func p13UFMonthlyRanks(tx *gorm.DB, offer *db.P13UnionFightMonthlyOffer) ([]p13U
 		if entry.EligibleCount == 0 {
 			continue
 		}
-		declared, e := time.ParseInLocation("2006-01-02", entry.Day, start.Location())
-		if e != nil {
-			return nil, false, e
-		}
-		coverageKey := declared.AddDate(0, 0, 1).Format("2006-01-02") + "/" + entry.GuildID
+		coverageKey := row.MatchDay + "/" + entry.GuildID
 		declaredCoverage[coverageKey] = true
 		rounds := coverage[coverageKey]
 		if !entry.MatchProcessed || !rounds[1] || !rounds[2] {
@@ -455,7 +501,8 @@ func p13UFMonthlyResultHash(row *db.P13UnionFightMonthlyResult) string {
 		Ranks, Awards        []byte
 		Settled              int64
 		Source               string
-	}{row.Month, row.OfferHash, row.CutoffHash, row.Rankings, row.Awards, row.SettledAt, row.Source})
+		ByeDirectory         []byte `json:",omitempty"`
+	}{row.Month, row.OfferHash, row.CutoffHash, row.Rankings, row.Awards, row.SettledAt, row.Source, row.ByeDirectory})
 	return p6Digest(raw)
 }
 func (s *GameService) p13UFMonthlySettle(tx *gorm.DB, offer *db.P13UnionFightMonthlyOffer, now time.Time) (*db.P13UnionFightMonthlyResult, error) {
@@ -467,6 +514,13 @@ func (s *GameService) p13UFMonthlySettle(tx *gorm.DB, offer *db.P13UnionFightMon
 	if err == nil {
 		if existing.ResultHash != p13UFMonthlyResultHash(&existing) || existing.OfferHash != offer.RulesHash {
 			return nil, errors.New("月赛终局归档无效")
+		}
+		start, end, e := p13UFMonth(offer.Month)
+		if e != nil {
+			return nil, e
+		}
+		if e = p13UFByeDirectoryVerify(tx, existing.ByeDirectory, start.Format("2006-01-02"), end.Format("2006-01-02"), ""); e != nil {
+			return nil, e
 		}
 		return &existing, nil
 	}
@@ -544,7 +598,15 @@ func (s *GameService) p13UFMonthlySettle(tx *gorm.DB, offer *db.P13UnionFightMon
 	if err != nil {
 		return nil, err
 	}
-	result := db.P13UnionFightMonthlyResult{Month: offer.Month, OfferHash: offer.RulesHash, CutoffHash: cutoff.SnapshotHash, Rankings: rawRanks, Awards: rawAwards, SettledAt: now.UnixMilli(), Source: constUtil.P13UnionFightMonthlySource + "; " + rules.Policy.Version + "; " + rules.Policy.Source}
+	monthStart, monthEnd, e := p13UFMonth(offer.Month)
+	if e != nil {
+		return nil, e
+	}
+	monthByes, e := p13UFByes(tx, monthStart.Format("2006-01-02"), monthEnd.Format("2006-01-02"), "")
+	if e != nil {
+		return nil, e
+	}
+	result := db.P13UnionFightMonthlyResult{ByeDirectory: p13UFByeDirectory(monthByes), Month: offer.Month, OfferHash: offer.RulesHash, CutoffHash: cutoff.SnapshotHash, Rankings: rawRanks, Awards: rawAwards, SettledAt: now.UnixMilli(), Source: constUtil.P13UnionFightMonthlySource + "; " + rules.Policy.Version + "; " + rules.Policy.Source}
 	result.ResultHash = p13UFMonthlyResultHash(&result)
 	if err = tx.Create(&result).Error; err != nil {
 		return nil, err

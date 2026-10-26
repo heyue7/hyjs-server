@@ -8,5 +8,6 @@ CREATE TABLE IF NOT EXISTS p13_union_fight_car_attack_states (
  hits BIGINT NOT NULL DEFAULT 0,
  offer_hash VARCHAR(64) NOT NULL,
  state_hash VARCHAR(64) NOT NULL,
+ KEY p13_car_attack_pending(completed,pending_release_at,match_id),
  PRIMARY KEY(match_id,factory_guid)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

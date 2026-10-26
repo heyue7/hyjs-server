@@ -1,0 +1,1 @@
+CREATE TABLE IF NOT EXISTS p13_union_fight_item_target_cooldowns (match_id CHAR(64) NOT NULL,target_guid BIGINT NOT NULL,effect_family VARCHAR(32) NOT NULL,`until` BIGINT NOT NULL,rule VARCHAR(64) NOT NULL,offer_hash CHAR(64) NOT NULL,source_hash CHAR(64) NOT NULL,PRIMARY KEY(match_id,target_guid,effect_family)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;

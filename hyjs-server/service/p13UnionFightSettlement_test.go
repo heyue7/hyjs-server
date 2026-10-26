@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"sync"
@@ -17,11 +18,16 @@ func TestP13ZeroFightActualTimedRoundAndLocalInbox(t *testing.T) {
 	p13ZeroFightActualTimedRoundAndLocalInbox(t, false, false)
 }
 
+func TestP13UFFinalizationWorkerRealTimedRoundWithoutQuery(t *testing.T) {
+	p13ZeroFightActualTimedRoundAndLocalInbox(t, false, false, false, false, false, false, true)
+}
+
 func p13ZeroFightActualTimedRoundAndLocalInbox(t *testing.T, transportMVP bool, tiedMVP bool, naturalMissions ...bool) {
 	missions := len(naturalMissions) > 0 && naturalMissions[0]
 	weekly := len(naturalMissions) > 1 && naturalMissions[1]
 	pendingWeek := len(naturalMissions) > 2 && naturalMissions[2]
 	unmatchedWeek := len(naturalMissions) > 3 && naturalMissions[3]
+	fastWorker := len(naturalMissions) > 4 && naturalMissions[4]
 	f, ids, first, clock, match := p13UFFieldSetup(t)
 	if err := f.s.InitializeP6(f.ctx); err != nil {
 		t.Fatal(err)
@@ -208,21 +214,43 @@ func p13ZeroFightActualTimedRoundAndLocalInbox(t *testing.T, transportMVP bool, 
 	if count != 0 {
 		t.Fatal("early result")
 	}
-	clock.Store(match.EndAt)
-	var workers sync.WaitGroup
-	failures := make(chan error, 8)
-	for i := 0; i < 8; i++ {
-		workers.Add(1)
-		go func() {
-			defer workers.Done()
-			failures <- f.s.TickP13UnionFightSettlement(f.ctx, time.UnixMilli(clock.Load()))
-		}()
-	}
-	workers.Wait()
-	close(failures)
-	for err := range failures {
-		if err != nil {
-			t.Fatal(err)
+	if fastWorker {
+		// The slow cadence last ran before End. Only the actual fast worker
+		// advances the real round at End; no query or direct full Tick does it.
+		clock.Store(match.EndAt - 1)
+		workerCtx, cancel := context.WithCancel(f.ctx)
+		calls := 0
+		err = serveP13UFFinalization(workerCtx, time.Millisecond, func(ctx context.Context, at time.Time) error {
+			calls++
+			e := f.s.TickP13UnionFightFinalization(ctx, at)
+			if calls == 1 {
+				clock.Store(match.EndAt)
+			} else {
+				cancel()
+			}
+			return e
+		}, func(e error, _ int64) { t.Error(e) })
+		cancel()
+		if err != nil || calls != 2 {
+			t.Fatal("fast worker cadence", calls, err)
+		}
+	} else {
+		clock.Store(match.EndAt)
+		var workers sync.WaitGroup
+		failures := make(chan error, 8)
+		for i := 0; i < 8; i++ {
+			workers.Add(1)
+			go func() {
+				defer workers.Done()
+				failures <- f.s.TickP13UnionFightSettlement(f.ctx, time.UnixMilli(clock.Load()))
+			}()
+		}
+		workers.Wait()
+		close(failures)
+		for err := range failures {
+			if err != nil {
+				t.Fatal(err)
+			}
 		}
 	}
 	var result db.P13UnionFightSettlementResult

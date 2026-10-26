@@ -1,4 +1,5 @@
 CREATE TABLE IF NOT EXISTS p13_union_fight_heal_aura_offers (
+ effect_rule VARCHAR(64) NOT NULL DEFAULT '',
  match_id VARCHAR(64) NOT NULL,
  item_id VARCHAR(64) NOT NULL,
  hp_percent BIGINT NOT NULL,

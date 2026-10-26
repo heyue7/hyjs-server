@@ -21,7 +21,7 @@ import (
 // InitializeP13UnionFightItem 单独迁移生命道具消费域，生产不默认发布原服未留的效果量。
 func (s *GameService) InitializeP13UnionFightItem(ctx context.Context) error {
 	tx := db.GetIns().WithContext(ctx)
-	if err := tx.AutoMigrate(&db.P13UnionFightItemPolicy{}, &db.P13UnionFightItemSource{}, &db.P13UnionFightItemOffer{}, &db.P13UnionFightItemState{}); err != nil {
+	if err := tx.AutoMigrate(&db.P13UnionFightItemPolicy{}, &db.P13UnionFightItemSource{}, &db.P13UnionFightItemOffer{}, &db.P13UnionFightItemState{}, &db.P13UnionFightPlayerRecovery{}); err != nil {
 		return err
 	}
 	return tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&db.P13UnionFightItemPolicy{ID: 1, Source: constUtil.P13UnionFightItemSource}).Error
@@ -243,7 +243,16 @@ func (s *GameService) p13UFItemUse(ctx context.Context, id int64, request *pb.CS
 		if item == nil || item.GetLeftUseNum() < 1 || int64(item.GetLeftUseNum()) > quote.Maximum {
 			return errors.New("本场原道具库存不足或携带上限损坏")
 		}
+		beforeLife := proto.Clone(frame).(*pb.InstUFPlayer)
 		if err = p13UFItemLife(frame, &quote); err != nil {
+			return err
+		}
+		if err = p13UFPlayerRecoveryRecord(tx, beforeLife, frame, db.P13UnionFightPlayerRecovery{
+			MatchID: scope, Kind: constUtil.P13UFRecoveryItem, ItemID: quote.ItemID,
+			Stamp: stamp, CasterID: id, OfferHash: quote.SourceHash, HPPercent: quote.HPPercent,
+			InventoryBefore: item.GetLeftUseNum(), InventoryAfter: item.GetLeftUseNum() - 1,
+			LogicalAt: now.UnixMilli(), AppliedAt: now.UnixMilli(),
+		}); err != nil {
 			return err
 		}
 		item.LeftUseNum = proto.Int32(item.GetLeftUseNum() - 1)

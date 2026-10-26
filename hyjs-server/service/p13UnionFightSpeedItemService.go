@@ -335,10 +335,21 @@ func (s *GameService) p13UFSpeedUse(ctx context.Context, id int64, request *pb.C
 // TickP13UnionFightSpeedItem 到期一次撤销原buff视觉，移动历史仍保留完整五秒积分来源。
 func (s *GameService) TickP13UnionFightSpeedItem(ctx context.Context, now time.Time) error {
 	var effects []db.P13UnionFightSpeedItemEffect
-	if err := db.GetIns().WithContext(ctx).Where("ended_at=0 AND expires_at<=?", now.UnixMilli()).Order("match_id,guid").Find(&effects).Error; err != nil {
+	if err := db.GetIns().WithContext(ctx).Where("ended_at=0").Order("match_id,guid").Find(&effects).Error; err != nil {
 		return err
 	}
+	scopes := make([]string, 0, len(effects))
+	for _, row := range effects {
+		scopes = append(scopes, row.MatchID)
+	}
+	clocks, clockErr := p13UFWorldClockBatch(ctx, scopes, now)
+	if clockErr != nil {
+		return clockErr
+	}
 	for _, candidate := range effects {
+		if clocks.paused(candidate.MatchID) {
+			continue
+		}
 		fresh := false
 		err := db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 			if err := ServerGameClockGuardTransaction(tx); err != nil {
@@ -349,6 +360,11 @@ func (s *GameService) TickP13UnionFightSpeedItem(ctx context.Context, now time.T
 			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&policy, 1).Error; err != nil {
 				return err
 			}
+			if closed, err := p13UFWorldSealed(tx, candidate.MatchID); err != nil {
+				return err
+			} else if closed {
+				return nil
+			}
 			var row db.P13UnionFightSpeedItemEffect
 			if err := tx.First(&row, "match_id=? AND guid=?", candidate.MatchID, candidate.GUID).Error; err != nil {
 				return err
@@ -356,10 +372,15 @@ func (s *GameService) TickP13UnionFightSpeedItem(ctx context.Context, now time.T
 			if _, err := p13UFSpeedRead(tx, &row); err != nil {
 				return err
 			}
-			if row.EndedAt != 0 || row.ExpiresAt > now.UnixMilli() {
+			var match db.P13UnionFightMatch
+			if err := tx.Select("id,end_at").First(&match, "id=?", row.MatchID).Error; err != nil {
+				return err
+			}
+			end := min(row.ExpiresAt, clocks.end(&match))
+			if row.EndedAt != 0 || end > now.UnixMilli() {
 				return nil
 			}
-			row.EndedAt = row.ExpiresAt
+			row.EndedAt = end
 			row.SourceHash = p13UFSpeedEffectHash(&row)
 			if err := tx.Save(&row).Error; err != nil {
 				return err
@@ -385,7 +406,11 @@ func (s *GameService) TickP13UnionFightSpeedItem(ctx context.Context, now time.T
 			return err
 		}
 		if fresh {
-			s.p13UFFieldBroadcast(ctx, candidate.MatchID, 0, &pb.SCUFElementBuffOff{BuffGuid: []int64{candidate.GUID}})
+			if err := p13UFPublishBeforeAbort(ctx, candidate.MatchID, func() {
+				s.p13UFFieldBroadcast(ctx, candidate.MatchID, 0, &pb.SCUFElementBuffOff{BuffGuid: []int64{candidate.GUID}})
+			}); err != nil {
+				return err
+			}
 		}
 	}
 	return nil

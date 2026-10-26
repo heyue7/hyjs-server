@@ -94,7 +94,7 @@ func AdminGuildSettingsSaveHandler(c *gin.Context) {
 			return
 		}
 		if p := req.Policies.UnionFight; p != nil {
-			if f := p.Field; f != nil && (f.PreparationMillis < 0 || f.PreparationMillis > 86400000 || len(f.Source) > 1024) {
+			if f := p.Field; f != nil && (f.PreparationMillis < 0 || f.PreparationMillis > 86400000 || len(f.Source) > 1024 || f.GuardHPMode != "" && f.GuardHPMode != "uniform" && f.GuardHPMode != "template") {
 				adminError(c, constUtil.ErrAdminInput)
 				return
 			}
@@ -102,9 +102,17 @@ func AdminGuildSettingsSaveHandler(c *gin.Context) {
 				adminError(c, constUtil.ErrAdminInput)
 				return
 			}
-			if len(p.PlayerBattle) > 2 {
+			if len(p.PlayerBattle) > 3 {
 				adminError(c, constUtil.ErrAdminInput)
 				return
+			}
+			seenPolicies := map[int64]bool{}
+			for _, policy := range p.PlayerBattle {
+				if seenPolicies[policy.ID] || policy.ID != 1 && policy.ID != constUtil.P13UFPlayerPartialPolicyID && policy.ID != constUtil.P13UFPlayerPartyPolicyID {
+					adminError(c, constUtil.ErrAdminInput)
+					return
+				}
+				seenPolicies[policy.ID] = true
 			}
 		}
 	}

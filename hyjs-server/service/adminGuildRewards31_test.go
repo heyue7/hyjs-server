@@ -72,7 +72,7 @@ func TestAdminGuildRewards31CASPermissionFutureAndFrozen(t *testing.T) {
 		t.Fatalf("past period accepted: %v", err)
 	}
 	// Updating the group's publication leaves the previous match's immutable rules intact.
-	settlement := db.P13UnionFightSettlementPolicy{Group: "A", Version: "old", Source: "old publication"}
+	settlement := db.P13UnionFightSettlementPolicy{Group: "A", Version: "old", Source: "old publication", TerminalRule: constUtil.P13UFMixedTerminalRule, AbortRule: constUtil.P13UFTechnicalAbortRule, FinalizationGraceMillis: 5000, DrawPrestige: 5}
 	if err = tx.Create(&settlement).Error; err != nil {
 		t.Fatal(err)
 	}
@@ -84,8 +84,16 @@ func TestAdminGuildRewards31CASPermissionFutureAndFrozen(t *testing.T) {
 		t.Fatal(err)
 	}
 	settleReq := model.AdminGuildRewardSaveRequest{AdminGuildRewardPolicy: model.AdminGuildRewardPolicy{Kind: "settlement", Group: "A", Version: "next", Source: "new matches only"}, RowVersion: adminVersion(settlement), Reason: "调整后续场次"}
-	if _, err = s.AdminSaveGuildReward(ctx, actor, settleReq, false); err != nil {
+	saved, err := s.AdminSaveGuildReward(ctx, actor, settleReq, false)
+	if err != nil {
 		t.Fatal(err)
+	}
+	var publication db.P13UnionFightSettlementPolicy
+	if err = tx.First(&publication, "`group`=?", "A").Error; err != nil {
+		t.Fatal(err)
+	}
+	if publication.TerminalRule != settlement.TerminalRule || publication.AbortRule != settlement.AbortRule || publication.FinalizationGraceMillis != settlement.FinalizationGraceMillis || publication.DrawPrestige != settlement.DrawPrestige || saved.RowVersion != adminVersion(publication) {
+		t.Fatal("reward edit changed combat rules or returned a stale CAS token")
 	}
 	var kept db.P13UnionFightSettlementOffer
 	if err = tx.First(&kept, "match_id=?", oldOffer.MatchID).Error; err != nil {

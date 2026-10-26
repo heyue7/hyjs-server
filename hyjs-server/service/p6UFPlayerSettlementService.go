@@ -13,6 +13,15 @@ import (
 // explicit published factor policy. Actual war/HP/owner facts belong to the
 // producer transaction; this API never projects a missing HP or winner.
 func (s *GameService) FreezeP6UFPlayerInput(source *pb.SCUFFightRecordReplay) (*model.FrozenBattleInput, error) {
+	input, err := p6UFPlayerTypedSource(source)
+	if err != nil {
+		return nil, err
+	}
+	return s.FreezeBattleInput(*input)
+}
+
+// No tables or caller-provided frozen snapshot can enter this typed constructor.
+func p6UFPlayerTypedSource(source *pb.SCUFFightRecordReplay) (*model.FrozenBattleInput, error) {
 	if source == nil || source.GetFightId() == "" || source.WinPlayerId != nil || len(source.PlayerList) != 2 || source.AttackerDamageFactor == nil || source.DefenderDamageFactor == nil || len(source.ProtoReflect().GetUnknown()) != 0 || source.GetRoomId() != "" && source.GetRoomId() != "map_forest_002" {
 		return nil, errors.New(constUtil.CombatInvalid)
 	}
@@ -31,7 +40,7 @@ func (s *GameService) FreezeP6UFPlayerInput(source *pb.SCUFFightRecordReplay) (*
 		maximum = 40
 	}
 	first, second := source.PlayerList[0].GetInst().GetFirstOrder(), source.PlayerList[1].GetInst().GetFirstOrder()
-	return s.FreezeBattleInput(model.FrozenBattleInput{Attacker: source.PlayerList[0], Defender: source.PlayerList[1], Seed: source.GetRandomSeed(), MaxRound: maximum, BattleType: 14, IsAttToDef: false, DefenderFirst: first == 0 && second == 1, AttackerDamageFactor: source.AttackerDamageFactor, DefenderDamageFactor: source.DefenderDamageFactor})
+	return &model.FrozenBattleInput{Attacker: source.PlayerList[0], Defender: source.PlayerList[1], Seed: source.GetRandomSeed(), MaxRound: maximum, BattleType: 14, IsAttToDef: false, DefenderFirst: first == 0 && second == 1, AttackerDamageFactor: source.AttackerDamageFactor, DefenderDamageFactor: source.DefenderDamageFactor}, nil
 }
 
 // The explicit diagnostic entry preserves original ordinary-player mode14 and returns no

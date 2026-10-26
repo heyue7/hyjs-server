@@ -10,6 +10,8 @@ type P13UnionFightFactoryCycleOffer struct {
 	MaxAlive        int64  `gorm:"not null" json:"max_alive"`
 	Source          string `gorm:"not null;type:text" json:"source"`
 	SourceHash      string `gorm:"not null;type:char(64)" json:"source_hash"`
+	Rule            string `gorm:"type:varchar(64);not null;default:''" json:"rule,omitempty"`
+	BufferCapacity  int64  `gorm:"not null;default:0" json:"buffer_capacity,omitempty"`
 }
 
 func (P13UnionFightFactoryCycleOffer) TableName() string {

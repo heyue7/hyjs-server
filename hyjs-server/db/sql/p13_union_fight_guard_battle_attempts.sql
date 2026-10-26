@@ -1,5 +1,8 @@
 CREATE TABLE IF NOT EXISTS `p13_union_fight_guard_battle_attempts` (
+ `building_kind` VARCHAR(16) NOT NULL DEFAULT '',
  `guard_generation` BIGINT NOT NULL,
+ `building_applied_at` BIGINT NOT NULL DEFAULT 0,
+ `building_proof` BLOB,
  `id` CHAR(64) NOT NULL,
  `match_id` CHAR(64) NOT NULL,
  `player_id` BIGINT NOT NULL,
@@ -35,8 +38,10 @@ CREATE TABLE IF NOT EXISTS `p13_union_fight_guard_battle_attempts` (
  PRIMARY KEY (`id`),
  UNIQUE KEY p13_guard_battle_stamp (`player_id`,`stamp`),
  UNIQUE KEY p13_guard_battle_p6 (`p6_record_id`),
+ KEY p13_guard_battle_base_barrier (`match_id`,`status`,`building_kind`,`due_at`),
  KEY p13_guard_battle_client (`player_id`,`client_stamp`),
  KEY p13_guard_battle_compute (`status`,`calculation_stage`,`quarantined`,`next_calculation_at`,`created_at`,`id`),
  KEY p13_guard_battle_due (`status`,`due_at`,`id`),
+ KEY p13_guard_battle_death (`match_id`,`player_id`,`status`,`player_died`,`created_at` DESC,`id` DESC),
  KEY p13_guard_battle_guard (`match_id`,`guard_guid`,`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;

@@ -16,6 +16,8 @@ CREATE TABLE IF NOT EXISTS p13_union_fight_factory_states (
  completed_at BIGINT NOT NULL DEFAULT 0,
  car_frame LONGBLOB NULL,
  car_hash CHAR(64) NOT NULL DEFAULT '',
+  paused_at BIGINT NOT NULL DEFAULT 0,
+  remaining_millis BIGINT NOT NULL DEFAULT 0,
  PRIMARY KEY(match_id,guid),
  KEY p13_factory_pending(completed_at,due_at,animation_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

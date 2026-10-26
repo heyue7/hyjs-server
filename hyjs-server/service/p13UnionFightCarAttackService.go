@@ -187,7 +187,22 @@ func (s *GameService) TickP13UnionFightCarAttack(ctx context.Context, now time.T
 	if err != nil {
 		return err
 	}
+	scopes := make([]string, 0, len(rows))
+	for _, row := range rows {
+		scopes = append(scopes, row.MatchID)
+	}
+	clocks, clockErr := p13UFWorldClockBatch(ctx, scopes, now)
+	if clockErr != nil {
+		return clockErr
+	}
+	var failures []error
 	for _, candidate := range rows {
+		if err := ctx.Err(); err != nil {
+			return errors.Join(append(failures, err)...)
+		}
+		if clocks.paused(candidate.MatchID) {
+			continue
+		}
 		var frames []proto.Message
 		err := db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 			if err := ServerGameClockGuardTransaction(tx); err != nil {
@@ -197,6 +212,11 @@ func (s *GameService) TickP13UnionFightCarAttack(ctx context.Context, now time.T
 			var gate db.P13GuildPolicy
 			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&gate, 1).Error; err != nil {
 				return err
+			}
+			if closed, err := p13UFWorldSealed(tx, candidate.MatchID); err != nil {
+				return err
+			} else if closed {
+				return nil
 			}
 			var policy db.P13UnionFightPolicy
 			if err := tx.First(&policy, 1).Error; err != nil {
@@ -213,7 +233,7 @@ func (s *GameService) TickP13UnionFightCarAttack(ctx context.Context, now time.T
 			if err := tx.First(&match, "id=?", candidate.MatchID).Error; err != nil {
 				return err
 			}
-			if now.UnixMilli() < match.StartAt || now.UnixMilli() >= match.EndAt {
+			if now.UnixMilli() < match.StartAt {
 				return nil
 			}
 			var count int64
@@ -289,6 +309,13 @@ func (s *GameService) TickP13UnionFightCarAttack(ctx context.Context, now time.T
 			if state.Completed {
 				return nil
 			}
+			end := clocks.end(&match)
+			if now.UnixMilli() >= end && (state.PendingReleaseAt == 0 || state.PendingReleaseAt > end) {
+				state.Completed = true
+				state.PendingReleaseAt = 0
+				state.StateHash = p13UFCarAttackStateHash(&state)
+				return tx.Save(&state).Error
+			}
 			if door.GetHp() == 0 {
 				state.Completed = true
 				state.PendingReleaseAt = 0
@@ -299,6 +326,9 @@ func (s *GameService) TickP13UnionFightCarAttack(ctx context.Context, now time.T
 				}
 				old := door.GetHp()
 				door.Hp = proto.Float64(math.Max(0, old-door.GetMaxHp()*float64(offer.HPPercent)/100))
+				if err = p13UFGateImpactRecord(tx, &target, door, db.P13UnionFightGateImpact{Kind: constUtil.P13UFGateImpactCar, OfferHash: offer.SourceHash, CarGUID: car.GetGuid(), HitOrdinal: state.Hits + 1, Percent: -offer.HPPercent, LogicalAt: state.PendingReleaseAt, AppliedAt: now.UnixMilli()}); err != nil {
+					return err
+				}
 				if err = p13UFGateSave(tx, &target, door); err != nil {
 					return err
 				}
@@ -310,6 +340,9 @@ func (s *GameService) TickP13UnionFightCarAttack(ctx context.Context, now time.T
 					frames = append(frames, &pb.SCUFGateCrash{GateId: proto.Int64(target.GateID)}, &pb.SCUFCariotComplete{Guid: car.Guid})
 				}
 			} else if now.UnixMilli() >= state.NextAttackAt {
+				if now.UnixMilli()+offer.ReleaseMillis > end {
+					return nil
+				}
 				state.PendingReleaseAt = now.UnixMilli() + offer.ReleaseMillis
 				state.NextAttackAt = now.UnixMilli() + offer.CooldownMillis
 				frames = append(frames, &pb.SCUFCariotAttackGate{Guid: car.Guid, GateGuid: proto.Int64(target.GUID)})
@@ -320,11 +353,19 @@ func (s *GameService) TickP13UnionFightCarAttack(ctx context.Context, now time.T
 			return tx.Save(&state).Error
 		})
 		if err != nil {
-			return err
+			failures = append(failures, err)
+			continue
 		}
-		for _, frame := range frames {
-			s.p13UFFieldBroadcast(ctx, candidate.MatchID, 0, frame)
+		if len(frames) > 0 {
+			if err := p13UFPublishBeforeAbort(ctx, candidate.MatchID, func() {
+				for _, frame := range frames {
+					s.p13UFFieldBroadcast(ctx, candidate.MatchID, 0, frame)
+				}
+			}); err != nil {
+				failures = append(failures, err)
+				continue
+			}
 		}
 	}
-	return nil
+	return errors.Join(failures...)
 }

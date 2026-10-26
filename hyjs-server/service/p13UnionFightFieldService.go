@@ -7,6 +7,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"google.golang.org/protobuf/proto"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -23,6 +24,7 @@ import (
 
 type p13UFFieldSnapshot struct {
 	MapProjection     string               `json:",omitempty"`
+	GuardRule         string               `json:",omitempty"`
 	ShopDistance      *float64             `json:",omitempty"`
 	ResourceConfig    *p13UFResourceConfig `json:",omitempty"`
 	Buildings         []byte
@@ -36,6 +38,23 @@ type p13UFFieldSnapshot struct {
 	KickMillis        int64
 	PlayerLimit       int32
 	Source            string
+}
+
+// p13UFProfileInField only routes an authenticated profile snapshot. Gameplay
+// consumers retain their own locked current-scene and frozen-source checks.
+func p13UFProfileInField(profile *db.Profile) (bool, error) {
+	if profile == nil || profile.Game == nil {
+		return false, nil
+	}
+	var location struct {
+		Position struct {
+			Scene string `json:"scene"`
+		} `json:"position"`
+	}
+	if err := json.Unmarshal([]byte(*profile.Game), &location); err != nil {
+		return false, err
+	}
+	return location.Position.Scene == constUtil.P13UnionFightFieldTarget, nil
 }
 
 type p13UFOriginalCacheKey struct {
@@ -149,7 +168,16 @@ func (s *GameService) InitializeP13UnionFightField(ctx context.Context) error {
 	if err := s.InitializeP13UnionFightPlayerBattle(ctx); err != nil {
 		return err
 	}
+	if err := s.InitializeP13UnionFightGuardBattle(ctx); err != nil {
+		return err
+	}
 	if err := s.InitializeP13UnionFightWarDrum(ctx); err != nil {
+		return err
+	}
+	if err := s.InitializeP13UnionFightTower(ctx); err != nil {
+		return err
+	}
+	if err := s.InitializeP13UnionFightNaturalRevive(ctx); err != nil {
 		return err
 	}
 	return s.p13UFFieldPrewarm(ctx)
@@ -161,16 +189,34 @@ func p13UFFieldGUID(match, kind, id string) int64 {
 }
 
 func (s *GameService) p13UFFieldOriginal(match *db.P13UnionFightMatch, tx *gorm.DB) (*GameService, error) {
-	date, err := time.ParseInLocation("2006-01-02", match.Day, time.FixedZone("Asia/Shanghai", 8*3600))
+	registrationDay, err := p13UFRegistrationDay(tx, match.Day)
 	if err != nil {
 		return nil, err
 	}
 	var entry db.P13UnionFightEntry
-	if err = tx.First(&entry, "guild_id=? AND day=?", match.LeftGuildID, date.AddDate(0, 0, -1).Format("2006-01-02")).Error; err != nil {
-		return nil, err
-	}
-	if p6Digest(entry.FrozenTables) != match.ConfigurationHash || entry.ClientVersion != match.ClientVersion || entry.EngineVersion != match.EngineVersion {
-		return nil, errors.New("公会战原实例配置版本损坏")
+	mysqlDigest := tx.Dialector.Name() == "mysql"
+	if mysqlDigest {
+		// Hash the actual stored bytes on every read. A warm cache needs only
+		// this small result, instead of transferring the frozen table blob each
+		// time while holding the shared guild admission lock.
+		var stored struct {
+			Digest        string
+			ClientVersion string
+			EngineVersion string
+		}
+		if err = tx.Model(&db.P13UnionFightEntry{}).Select("LOWER(SHA2(frozen_tables,256)) AS digest,client_version,engine_version").Where("guild_id=? AND day=?", match.LeftGuildID, registrationDay).Take(&stored).Error; err != nil {
+			return nil, err
+		}
+		if stored.Digest != match.ConfigurationHash || stored.ClientVersion != match.ClientVersion || stored.EngineVersion != match.EngineVersion {
+			return nil, errors.New("公会战原实例配置版本损坏")
+		}
+	} else {
+		if err = tx.First(&entry, "guild_id=? AND day=?", match.LeftGuildID, registrationDay).Error; err != nil {
+			return nil, err
+		}
+		if p6Digest(entry.FrozenTables) != match.ConfigurationHash || entry.ClientVersion != match.ClientVersion || entry.EngineVersion != match.EngineVersion {
+			return nil, errors.New("公会战原实例配置版本损坏")
+		}
 	}
 	// 先校验本次真实数据库字节，再按完整版本命中只读缓存；不因缓存跳过损坏检测。
 	key := p13UFOriginalCacheKey{match.ConfigurationHash, match.ClientVersion, match.EngineVersion, s.ServerID}
@@ -178,6 +224,14 @@ func (s *GameService) p13UFFieldOriginal(match *db.P13UnionFightMatch, tx *gorm.
 	defer p13UFOriginalCache.Unlock()
 	if original, ok := p13UFOriginalCache.Entries[key]; ok {
 		return original, nil
+	}
+	if mysqlDigest {
+		if err = tx.First(&entry, "guild_id=? AND day=?", match.LeftGuildID, registrationDay).Error; err != nil {
+			return nil, err
+		}
+		if p6Digest(entry.FrozenTables) != match.ConfigurationHash || entry.ClientVersion != match.ClientVersion || entry.EngineVersion != match.EngineVersion {
+			return nil, errors.New("公会战原实例配置版本损坏")
+		}
 	}
 	var tables map[string][]map[string]string
 	if err = json.Unmarshal(entry.FrozenTables, &tables); err != nil {
@@ -214,14 +268,25 @@ func (s *GameService) p13UFFieldBuild(tx *gorm.DB, match *db.P13UnionFightMatch,
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, err
 	}
-	if !p13UFMapProjectionKnown(policy.MapProjection) || policy.PreparationMillis <= 0 || policy.PreparationMillis > 86400000 || policy.InitialGuardHP <= 0 || policy.InitialGateHP <= 0 || math.IsNaN(policy.InitialGuardHP) || math.IsInf(policy.InitialGuardHP, 0) || math.IsNaN(policy.InitialGateHP) || math.IsInf(policy.InitialGateHP, 0) || policy.MoveTolerance < 0 || policy.MoveTolerance > 50 || math.IsNaN(policy.MoveTolerance) || math.IsInf(policy.MoveTolerance, 0) || policy.Source == "" {
+	var calendar db.P13UnionFightSchedule
+	calendarErr := tx.First(&calendar, "day=?", match.Day).Error
+	if calendarErr != nil && !errors.Is(calendarErr, gorm.ErrRecordNotFound) {
+		return nil, calendarErr
+	}
+	if calendarErr == nil && calendar.RegistrationDay != "" {
+		frozenPolicy := *policy
+		frozenPolicy.PreparationMillis = calendar.PreparationMillis
+		policy = &frozenPolicy
+	}
+	guardHPValid := p13UFGuardTemplatePolicyValid(policy)
+	if !guardHPValid || !p13UFMapProjectionKnown(policy.MapProjection) || policy.PreparationMillis <= 0 || policy.PreparationMillis > 86400000 || policy.InitialGateHP <= 0 || math.IsNaN(policy.InitialGuardHP) || math.IsInf(policy.InitialGuardHP, 0) || math.IsNaN(policy.InitialGateHP) || math.IsInf(policy.InitialGateHP, 0) || policy.MoveTolerance < 0 || policy.MoveTolerance > 50 || math.IsNaN(policy.MoveTolerance) || math.IsInf(policy.MoveTolerance, 0) || policy.Source == "" {
 		return nil, errors.New("公会战具名本地场景策略尚未完整发布")
 	}
 	original, err := s.p13UFFieldOriginal(match, tx)
 	if err != nil {
 		return nil, err
 	}
-	snapshot := &p13UFFieldSnapshot{MapProjection: policy.MapProjection, PreparationMillis: policy.PreparationMillis, MoveTolerance: policy.MoveTolerance, Source: constUtil.P13UnionFightFieldSource + "；发布：" + policy.Source}
+	snapshot := &p13UFFieldSnapshot{MapProjection: policy.MapProjection, GuardRule: policy.GuardRule, PreparationMillis: policy.PreparationMillis, MoveTolerance: policy.MoveTolerance, Source: constUtil.P13UnionFightFieldSource + "；发布：" + policy.Source}
 	rate, err := strconv.ParseFloat(original.table("GameConfigure", "StaticName", "UnionFightPlayerMoveSpeed")["NameValue"], 32)
 	if err != nil || rate <= 0 || math.IsNaN(rate) || math.IsInf(rate, 0) {
 		return nil, errors.New("公会战原移动速度配置缺失")
@@ -233,7 +298,7 @@ func (s *GameService) p13UFFieldBuild(tx *gorm.DB, match *db.P13UnionFightMatch,
 	}
 	snapshot.KickMillis = kick * 1000
 	firstLimit, err := strconv.ParseInt(original.table("GameConfigure", "StaticName", "UnionFighterNum")["NameValue"], 10, 32)
-	if err != nil || firstLimit <= 0 || firstLimit > 100 {
+	if err != nil || firstLimit <= 0 || firstLimit > constUtil.P13UnionFightFieldMaxPlayers/2 {
 		return nil, errors.New("公会战原首发容量缺失")
 	}
 	snapshot.PlayerLimit = int32(firstLimit * 2)
@@ -272,6 +337,10 @@ func (s *GameService) p13UFFieldBuild(tx *gorm.DB, match *db.P13UnionFightMatch,
 		}
 	}
 	buildings := &pb.SCUFBuildingRefresh{}
+	guardHP, err := p13UFGuardTemplateHP(tx, match, policy, original, now)
+	if err != nil {
+		return nil, err
+	}
 	guard := func(id string, camp int32, bind int64) (*pb.InstUFGuard, error) {
 		if id == "" {
 			return nil, nil
@@ -285,7 +354,15 @@ func (s *GameService) p13UFFieldBuild(tx *gorm.DB, match *db.P13UnionFightMatch,
 			return nil, err
 		}
 		guid := p13UFFieldGUID(match.ID, "guard", id)
-		return &pb.InstUFGuard{Guid: proto.Int64(guid), UFGuardId: proto.String(id), Camp: proto.Int32(camp), BindGuid: proto.Int64(bind), State: proto.Int32(0), InitPosition: point, FightInfo: &pb.InstFightable{Guid: proto.Int64(guid), Index: []int32{0}, HpPos: []float64{policy.InitialGuardHP}, MaxHpPos: []float64{policy.InitialGuardHP}, Anger: proto.Float64(0)}}, nil
+		hp := policy.InitialGuardHP
+		if policy.GuardHPSource != "" {
+			var found bool
+			hp, found = guardHP[id]
+			if !found {
+				return nil, errors.New("本场守卫缺提前发布的独立生命模板")
+			}
+		}
+		return &pb.InstUFGuard{Guid: proto.Int64(guid), UFGuardId: proto.String(id), Camp: proto.Int32(camp), BindGuid: proto.Int64(bind), State: proto.Int32(0), InitPosition: point, FightInfo: &pb.InstFightable{Guid: proto.Int64(guid), Index: []int32{0}, HpPos: []float64{hp}, MaxHpPos: []float64{hp}, Anger: proto.Float64(0)}}, nil
 	}
 	for _, row := range original.Tables["UnionFightBaseCamp"] {
 		id, err := strconv.ParseInt(row["UFBId"], 10, 32)
@@ -419,7 +496,10 @@ func (s *GameService) p13UFFieldBuild(tx *gorm.DB, match *db.P13UnionFightMatch,
 	if err = s.p13UFRevivePointBuild(tx, match, buildings, original, now); err != nil {
 		return nil, err
 	}
-	if err = s.p13UFGuardAuditBuild(tx, match, buildings, original, now); err != nil {
+	if err = s.p13UFGuardAuditBuild(tx, match, buildings, original, now, snapshot.GuardRule); err != nil {
+		return nil, err
+	}
+	if err = s.p13UFTowerBuild(tx, match, buildings, original, now); err != nil {
 		return nil, err
 	}
 	if err = s.p13UFDrumBuild(tx, match, original, now); err != nil {
@@ -559,13 +639,25 @@ func p13UFFieldReadActor(actor *db.P13UnionFightFieldPlayer) (*pb.InstUFPlayer, 
 }
 
 func p13UFFieldSaveActor(tx *gorm.DB, actor *db.P13UnionFightFieldPlayer, frame *pb.InstUFPlayer) error {
+	creating := len(actor.Frame) == 0
 	raw, err := proto.Marshal(frame)
 	if err != nil {
 		return err
 	}
 	actor.Frame = raw
 	actor.FrameHash = p6Digest(raw)
-	return tx.Save(actor).Error
+	actor.FrameState = int64(frame.GetState())
+	if creating {
+		return tx.Create(actor).Error
+	}
+	// Battle and its hash are frozen at admission. Frequent movement, healing
+	// and countdown updates must not rewrite that large immutable payload.
+	return tx.Model(&db.P13UnionFightFieldPlayer{}).Where("match_id=? AND player_id=?", actor.MatchID, actor.PlayerID).Updates(map[string]any{
+		"frame": raw, "frame_hash": actor.FrameHash, "frame_state": actor.FrameState,
+		"x": actor.X, "y": actor.Y, "z": actor.Z, "session_hash": actor.SessionHash,
+		"joined_at": actor.JoinedAt, "updated_at": actor.UpdatedAt, "left_at": actor.LeftAt,
+		"hooked": actor.Hooked, "movement_debt": actor.MovementDebt,
+	}).Error
 }
 
 func (s *GameService) p13UFFieldNeedPolicy(tx *gorm.DB) (*db.P13UnionFightFieldPolicy, error) {
@@ -588,10 +680,6 @@ func (s *GameService) p13UFFieldNeedPolicy(tx *gorm.DB) (*db.P13UnionFightFieldP
 }
 
 func (s *GameService) p13UFFieldEnter(ctx context.Context, id int64, now time.Time) ([]proto.Message, error) {
-	_, day, stage, _ := p13UFClock(now)
-	if stage == constUtil.P13UnionFightStageMatch {
-		return nil, errors.New("原公会战匹配窗口尚未结束")
-	}
 	err := db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := ServerGameClockGuardTransaction(tx); err != nil {
 			return err
@@ -600,6 +688,22 @@ func (s *GameService) p13UFFieldEnter(ctx context.Context, id int64, now time.Ti
 		policy, err := s.p13UFFieldNeedPolicy(tx)
 		if err != nil {
 			return err
+		}
+		if err := p13UFNeedWarEnabled(tx); err != nil {
+			return err
+		}
+		calendar, err := p13UFCalendar(tx, now)
+		if err != nil {
+			return err
+		}
+		day, stage := calendar.MatchDay, calendar.Stage
+		if stage == constUtil.P13UnionFightStageMatch {
+			return errors.New("原公会战匹配窗口尚未结束")
+		}
+		if calendar.Custom && calendar.Schedule != nil {
+			frozenPolicy := *policy
+			frozenPolicy.PreparationMillis = calendar.Schedule.PreparationMillis
+			policy = &frozenPolicy
 		}
 		var row db.Profile
 		if err = tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&row, id).Error; err != nil {
@@ -634,6 +738,11 @@ func (s *GameService) p13UFFieldEnter(ctx context.Context, id int64, now time.Ti
 		}
 		if selected == nil {
 			return errors.New("本会没有处于已发布准备或开赛窗口的真实对局")
+		}
+		if closed, err := p13UFWorldClosed(tx, selected.ID); err != nil {
+			return err
+		} else if closed {
+			return errors.New("本场已经封账，不能重新入场")
 		}
 		if selected.Day != day {
 			return errors.New("本场已发布对局不属于当前原比赛日")
@@ -679,7 +788,7 @@ func (s *GameService) p13UFFieldEnter(ctx context.Context, id int64, now time.Ti
 			return err
 		}
 		// 每个角色只有一场在线状态；原帧重复转场继续使用已持久位置，不重造HP/AP或物品权益。
-		closed := tx.Model(&db.P13UnionFightFieldPlayer{}).Where("player_id=? AND match_id<>? AND left_at=0", id, selected.ID).Updates(map[string]any{"left_at": now.UnixMilli(), "session_hash": ""})
+		closed := p13UFWorldUnclosedActors(tx.Model(&db.P13UnionFightFieldPlayer{})).Where("player_id=? AND match_id<>? AND left_at=0", id, selected.ID).Updates(map[string]any{"left_at": now.UnixMilli(), "session_hash": ""})
 		if closed.Error != nil {
 			return closed.Error
 		}
@@ -715,8 +824,13 @@ func (s *GameService) p13UFFieldCurrent(tx *gorm.DB, id int64, now time.Time) (*
 		return nil, nil, nil, nil, err
 	}
 	var actor db.P13UnionFightFieldPlayer
-	if err = tx.First(&actor, "player_id=? AND left_at=0", id).Error; err != nil {
+	if err = p13UFWorldUnclosedActors(tx).First(&actor, "player_id=? AND left_at=0", id).Error; err != nil {
 		return nil, nil, nil, nil, errors.New("角色尚未进入实际公会战实例")
+	}
+	if closed, err := p13UFWorldClosed(tx, actor.MatchID); err != nil {
+		return nil, nil, nil, nil, err
+	} else if closed {
+		return nil, nil, nil, nil, errors.New("本场已经封账，请返回主城")
 	}
 	member, _, err := p13GuildNeedMember(tx, id)
 	if err != nil || member.GuildID != actor.GuildID {
@@ -724,6 +838,9 @@ func (s *GameService) p13UFFieldCurrent(tx *gorm.DB, id int64, now time.Time) (*
 	}
 	var match db.P13UnionFightMatch
 	if err = tx.First(&match, "id=?", actor.MatchID).Error; err != nil {
+		return nil, nil, nil, nil, err
+	}
+	if err = p13UFFieldTerminalAction(tx, match.ID, now); err != nil {
 		return nil, nil, nil, nil, err
 	}
 	fighter, camp, err := p13UFFieldFighter(tx, &match, id, actor.GuildID)
@@ -768,6 +885,12 @@ func (s *GameService) p13UFFieldCurrent(tx *gorm.DB, id int64, now time.Time) (*
 		}
 	}
 	if err = p13UFPlayerBattleProject(tx, &actor, frame, now); err != nil {
+		return nil, nil, nil, nil, err
+	}
+	if err = p13UFGuardBattleProject(tx, &actor, frame, now); err != nil {
+		return nil, nil, nil, nil, err
+	}
+	if err = p13UFTowerProject(tx, &actor, frame, now); err != nil {
 		return nil, nil, nil, nil, err
 	}
 	return &actor, &match, snapshot, frame, nil
@@ -820,6 +943,9 @@ func (s *GameService) p13UFFieldFrames(ctx context.Context, id int64, request pr
 		if err = s.p13UFFactoryOverlay(tx, match.ID, buildings); err != nil {
 			return err
 		}
+		if err = p13UFGuardBattleOverlay(tx, match.ID, buildings); err != nil {
+			return err
+		}
 		if err = p13UFGateItemOverlay(tx, match.ID, buildings); err != nil {
 			return err
 		}
@@ -829,6 +955,11 @@ func (s *GameService) p13UFFieldFrames(ctx context.Context, id int64, request pr
 		}
 		transfer := &pb.SCUnionFightTransfer{UnionFightId: proto.String(match.ID), State: proto.Int32(state), LeftTime: proto.Int64(left), TotalTime: proto.Int64(total), Player: frame, PlayerPos: position.Current, BaseCampInfos: buildings.BaseCampInfos, FactoryInfos: buildings.FactoryInfos, GateInfos: buildings.GateInfos, TowerInfos: buildings.TowerInfos, RevivePointInfos: buildings.PointInfos, UnionInfos: buildings.UnionInfos}
 		messages = append(messages, transfer)
+		towerFrames, err := p13UFTowerFrames(tx, match.ID, now)
+		if err != nil {
+			return err
+		}
+		messages = append(messages, towerFrames...)
 		cars, err := s.p13UFFactoryCars(tx, match, nil)
 		if err != nil {
 			return err
@@ -1053,6 +1184,7 @@ func (s *GameService) p13UFFieldLeaveExpected(ctx context.Context, id int64, req
 	}
 	var scope string
 	left := false
+	var closedEnd *pb.SCUnionFightUpdateState
 	var canceledDrums []proto.Message
 	err := db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := ServerGameClockGuardTransaction(tx); err != nil {
@@ -1072,35 +1204,67 @@ func (s *GameService) p13UFFieldLeaveExpected(ctx context.Context, id int64, req
 			return err
 		}
 		var actor db.P13UnionFightFieldPlayer
-		err = tx.First(&actor, "player_id=? AND left_at=0", id).Error
+		actorQuery := tx.Where("player_id=? AND left_at=0", id)
+		if expectedMatch != "" {
+			err = actorQuery.First(&actor, "match_id=?", expectedMatch).Error
+		} else {
+			err = p13UFWorldUnclosedActors(actorQuery).First(&actor).Error
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				err = tx.Where("player_id=? AND left_at=0", id).First(&actor).Error
+			}
+		}
 		if expectedMatch != "" && (errors.Is(err, gorm.ErrRecordNotFound) || err == nil && actor.MatchID != expectedMatch) {
 			return nil
 		}
 		left = true
 		if err == nil {
 			scope = actor.MatchID
-			_, _, err = s.p13UFResourceCancel(tx, actor.MatchID, id, now)
-			if err != nil {
-				return err
+			closed, closedErr := p13UFWorldClosed(tx, scope)
+			if closedErr != nil {
+				return closedErr
 			}
-			if err = s.p13UFTransferCancel(tx, actor.MatchID, id, now); err != nil {
-				return err
+			if closed {
+				active, activeErr := p13UFWorldHasActiveActor(tx, id)
+				if activeErr != nil {
+					return activeErr
+				}
+				if active {
+					left = false
+					return nil
+				}
+				if g.Position.GetScene() != constUtil.P13UnionFightFieldTarget {
+					left = false
+					return nil
+				}
+				var match db.P13UnionFightMatch
+				if err = tx.Select("id,start_at,end_at").First(&match, "id=?", scope).Error; err != nil {
+					return err
+				}
+				closedEnd = &pb.SCUnionFightUpdateState{UnionFightId: proto.String(scope), State: proto.Int32(3), LeftTime: proto.Int64(0), TotalTime: proto.Int64(match.EndAt - match.StartAt)}
+			} else {
+				_, _, err = s.p13UFResourceCancel(tx, actor.MatchID, id, now)
+				if err != nil {
+					return err
+				}
+				if err = s.p13UFTransferCancel(tx, actor.MatchID, id, now); err != nil {
+					return err
+				}
+				if err != nil {
+					return err
+				}
+				if err = tx.Model(&actor).Updates(map[string]any{"left_at": now.UnixMilli(), "session_hash": ""}).Error; err != nil {
+					return err
+				}
+				canceledDrums, err = p13UFDrumCancel(tx, actor.MatchID, id, now)
+				if err != nil {
+					return err
+				}
+				buffOff, err := p13UFBuffScopeCancel(tx, actor.MatchID, id, now)
+				if err != nil {
+					return err
+				}
+				canceledDrums = append(canceledDrums, buffOff...)
 			}
-			if err != nil {
-				return err
-			}
-			if err = tx.Model(&actor).Updates(map[string]any{"left_at": now.UnixMilli(), "session_hash": ""}).Error; err != nil {
-				return err
-			}
-			canceledDrums, err = p13UFDrumCancel(tx, actor.MatchID, id, now)
-			if err != nil {
-				return err
-			}
-			buffOff, err := p13UFBuffScopeCancel(tx, actor.MatchID, id, now)
-			if err != nil {
-				return err
-			}
-			canceledDrums = append(canceledDrums, buffOff...)
 		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return err
 		}
@@ -1120,11 +1284,23 @@ func (s *GameService) p13UFFieldLeaveExpected(ctx context.Context, id int64, req
 	if !left {
 		return nil, false, nil
 	}
-	if scope != "" {
-		s.p13UFFieldBroadcast(ctx, scope, id, &pb.SCUFPlayerDisappear{Guid: []int64{id}})
+	if scope != "" && closedEnd == nil {
+		published := false
+		if err := p13UFPublishBeforeAbort(ctx, scope, func() {
+			published = true
+			s.p13UFFieldBroadcast(ctx, scope, id, &pb.SCUFPlayerDisappear{Guid: []int64{id}})
+			for _, canceled := range canceledDrums {
+				s.p13UFFieldBroadcast(ctx, scope, id, canceled)
+			}
+		}); err != nil {
+			return nil, false, err
+		}
+		if !published {
+			canceledDrums = nil
+		}
 	}
-	for _, canceled := range canceledDrums {
-		s.p13UFFieldBroadcast(ctx, scope, id, canceled)
+	if closedEnd != nil {
+		return []proto.Message{closedEnd, &pb.SCTransferScene{Result: proto.Int32(1)}}, true, nil
 	}
 	return append([]proto.Message{&pb.SCTransferScene{Result: proto.Int32(1)}}, canceledDrums...), true, nil
 }
@@ -1164,10 +1340,11 @@ func (s *GameService) p13UFFieldLive(tx *gorm.DB, actor db.P13UnionFightFieldPla
 
 type p13UFFieldLiveRow struct {
 	db.P13UnionFightFieldPlayer
-	CurrentGuildID string
-	ProfileSession []byte
-	ActualScene    string
-	CurrentRole    int32
+	CurrentGuildID  string
+	ProfileSession  []byte
+	ActualScene     string
+	CurrentRole     int32
+	PositionLoading bool
 }
 
 func (s *GameService) p13UFFieldPeers(tx *gorm.DB, scope string, exclude int64) ([]db.P13UnionFightFieldPlayer, []*pb.InstUFPlayer, error) {
@@ -1199,26 +1376,76 @@ func (s *GameService) p13UFFieldPeers(tx *gorm.DB, scope string, exclude int64) 
 		if err != nil {
 			return nil, nil, err
 		}
-		// Peer views derive the same remaining interval as the owner's Current.
-		// No persisted old5s frame is rewritten or its countdown restarted.
-		if err = p13UFPlayerBattleProject(tx, &row.P13UnionFightFieldPlayer, frame, now); err != nil {
-			return nil, nil, err
-		}
 		frame.UnionAuthority = proto.Int32(min(frame.GetUnionAuthority(), row.CurrentRole))
 		actors = append(actors, row.P13UnionFightFieldPlayer)
 		frames = append(frames, frame)
 	}
+	// Share bounded combat journal reads across all eligible peers.
+	if err := p13UFFieldCombatProjectBatch(tx, actors, frames, now); err != nil {
+		return nil, nil, err
+	}
 	return actors, frames, nil
 }
 
-func (s *GameService) p13UFFieldBroadcast(ctx context.Context, scope string, exclude int64, message proto.Message) {
-	rows, _, err := s.p13UFFieldPeers(db.GetIns().WithContext(ctx), scope, exclude)
+type p13UFFieldRecipient struct {
+	PlayerID int64
+	Sink     *p10ClientSink
+}
+
+// Broadcast membership needs no battle/display projection. The immutable map
+// supplies its admission bound and projection contract, not recipient PBs.
+func (s *GameService) p13UFFieldBroadcastRecipients(tx *gorm.DB, scope string, exclude int64) ([]p13UFFieldRecipient, error) {
+	snapshot, err := p13UFFieldStoredProjection(tx, scope)
+	if err != nil {
+		return nil, err
+	}
+	if snapshot.PlayerLimit <= 0 || snapshot.PlayerLimit > constUtil.P13UnionFightFieldMaxPlayers {
+		return nil, errors.New("公会战冻结广播容量无效")
+	}
+	var rows []p13UFFieldLiveRow
+	sceneExpression := "json_extract(p.game,'$.position.scene')"
+	if tx.Dialector.Name() == "mysql" {
+		sceneExpression = "JSON_UNQUOTE(" + sceneExpression + ")"
+	}
+	if err := tx.Table("p13_union_fight_field_players AS a").Select("a.match_id,a.player_id,a.guild_id,a.session_hash,a.map_projection,a.y,m.guild_id AS current_guild_id,p.session AS profile_session,"+sceneExpression+" AS actual_scene").Joins("JOIN profiles AS p ON p.id=a.player_id").Joins("JOIN p13_guild_members AS m ON m.player_id=a.player_id").Where("a.match_id=? AND a.player_id<>? AND a.left_at=0 AND a.session_hash<>?", scope, exclude, "").Order("a.player_id").Limit(int(snapshot.PlayerLimit) + 1).Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+	if len(rows) > int(snapshot.PlayerLimit) {
+		return nil, errors.New("公会战广播目录超过冻结容量")
+	}
+	recipients := []p13UFFieldRecipient{}
+	for _, row := range rows {
+		value, ok := p10ClientSinks.Load(p10ClientKey{s.p10ClientOwner(), row.PlayerID})
+		if !ok || row.CurrentGuildID != row.GuildID || row.ActualScene != constUtil.P13UnionFightFieldTarget || row.SessionHash != p6Digest(row.ProfileSession) {
+			continue
+		}
+		sink := value.(*p10ClientSink)
+		if !bytes.Equal(row.ProfileSession, sink.session) {
+			continue
+		}
+		if err := p13UFFieldActorProjection(&row.P13UnionFightFieldPlayer, snapshot); err != nil {
+			return nil, err
+		}
+		recipients = append(recipients, p13UFFieldRecipient{row.PlayerID, sink})
+	}
+	return recipients, nil
+}
+
+func (s *GameService) p13UFFieldBroadcastBatch(ctx context.Context, scope string, exclude int64, messages []proto.Message) {
+	if len(messages) == 0 {
+		return
+	}
+	recipients, err := s.p13UFFieldBroadcastRecipients(db.GetIns().WithContext(ctx), scope, exclude)
 	if err != nil {
 		return
 	}
-	for _, row := range rows {
-		s.publishP10Private(ctx, row.PlayerID, message)
+	for _, recipient := range recipients {
+		s.publishP10PrivateBatchPinned(ctx, recipient.PlayerID, recipient.Sink, messages)
 	}
+}
+
+func (s *GameService) p13UFFieldBroadcast(ctx context.Context, scope string, exclude int64, message proto.Message) {
+	s.p13UFFieldBroadcastBatch(ctx, scope, exclude, []proto.Message{message})
 }
 
 // SyncP13UnionFightField 只同步同MatchID的真实已认证TCP，公共世界开关不改变战场可见范围。
@@ -1243,6 +1470,13 @@ func (s *GameService) SyncP13UnionFightField(ctx context.Context, id int64, move
 	if _, err = AuthorizeAccount(ctx, id, sink.session); err != nil {
 		return true, err
 	}
+	if cleaned, err := s.p13UFFieldCleanupClosedProfile(ctx, id, sink.session); err != nil {
+		return true, err
+	} else if cleaned {
+		s.publishP10Private(ctx, id, &pb.SCTransferScene{Result: proto.Int32(1)})
+		s.publishP10Private(ctx, id, &pb.SCUFKickPlayer{})
+		return true, nil
+	}
 	var current *db.P13UnionFightFieldPlayer
 	var frame *pb.InstUFPlayer
 	changed := false
@@ -1257,13 +1491,11 @@ func (s *GameService) SyncP13UnionFightField(ctx context.Context, id int64, move
 		}
 		changed = actor.SessionHash != p6Digest(sink.session)
 		actor.SessionHash = p6Digest(sink.session)
-		updates := map[string]any{"session_hash": actor.SessionHash}
 		if changed {
 			actor.UpdatedAt = p13UFNow(ctx).UnixMilli()
-			updates["updated_at"] = actor.UpdatedAt
-		}
-		if err = tx.Model(actor).Updates(updates).Error; err != nil {
-			return err
+			if err = tx.Model(actor).Updates(map[string]any{"session_hash": actor.SessionHash, "updated_at": actor.UpdatedAt}).Error; err != nil {
+				return err
+			}
 		}
 		current = actor
 		frame = live
@@ -1272,34 +1504,143 @@ func (s *GameService) SyncP13UnionFightField(ctx context.Context, id int64, move
 	if err != nil {
 		return true, err
 	}
+	if _, heartbeat := ctx.Value(constUtil.GameRequestContextKey).(*pb.CSPingTcp); heartbeat && !changed {
+		// Registration and real scene handshakes keep their full peer snapshot,
+		// including reconnect with the same session. An unchanged heartbeat has
+		// already passed Current above and creates no new presence event.
+		return true, nil
+	}
 	rows, frames, err := s.p13UFFieldPeers(db.GetIns().WithContext(ctx), current.MatchID, id)
 	if err != nil {
 		return true, err
 	}
-	if changed || !movement {
-		s.p13UFFieldBroadcast(ctx, current.MatchID, id, &pb.SCUFPlayerAppear{Player: []*pb.InstUFPlayer{frame}, Local: []*pb.PointNew{{X: proto.Float32(current.X), Y: proto.Float32(current.Y), Z: proto.Float32(current.Z)}}})
-		if len(frames) > 0 {
-			positions := make([]*pb.PointNew, 0, len(rows))
-			for _, row := range rows {
-				positions = append(positions, &pb.PointNew{X: proto.Float32(row.X), Y: proto.Float32(row.Y), Z: proto.Float32(row.Z)})
+	if err := p13UFPublishBeforeAbort(ctx, current.MatchID, func() {
+		if changed || !movement {
+			s.p13UFFieldBroadcast(ctx, current.MatchID, id, &pb.SCUFPlayerAppear{Player: []*pb.InstUFPlayer{frame}, Local: []*pb.PointNew{{X: proto.Float32(current.X), Y: proto.Float32(current.Y), Z: proto.Float32(current.Z)}}})
+			if len(frames) > 0 {
+				positions := make([]*pb.PointNew, 0, len(rows))
+				for _, row := range rows {
+					positions = append(positions, &pb.PointNew{X: proto.Float32(row.X), Y: proto.Float32(row.Y), Z: proto.Float32(row.Z)})
+				}
+				s.publishP10Private(ctx, id, &pb.SCUFPlayer{Player: frames, Local: positions})
 			}
-			s.publishP10Private(ctx, id, &pb.SCUFPlayer{Player: frames, Local: positions})
 		}
+	}); err != nil {
+		return true, err
 	}
+
 	return true, nil
+}
+
+// No current match is guessed from several historical closed actors. If any
+// real unclosed participant exists, this profile belongs to that newer entry.
+func (s *GameService) p13UFFieldCleanupClosedProfile(ctx context.Context, id int64, session []byte) (bool, error) {
+	var candidate db.P13UnionFightFieldPlayer
+	preflight := db.GetIns().WithContext(ctx).Select("p13_union_fight_field_players.match_id,p13_union_fight_field_players.player_id").Joins("JOIN p13_union_fight_settlement_results AS closed_world ON closed_world.match_id=p13_union_fight_field_players.match_id").Where("player_id=? AND left_at=0 AND closed_world.result_kind=?", id, constUtil.P13UFTechnicalAbortKind).First(&candidate).Error
+	if errors.Is(preflight, gorm.ErrRecordNotFound) {
+		return false, nil
+	}
+	if preflight != nil {
+		return false, preflight
+	}
+	cleaned := false
+	err := db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var gate db.P13GuildPolicy
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&gate, 1).Error; err != nil {
+			return err
+		}
+		active, activeErr := p13UFWorldHasActiveActor(tx, id)
+		if activeErr != nil {
+			return activeErr
+		}
+		if active {
+			return nil
+		}
+		var closed int64
+		if err := tx.Model(&db.P13UnionFightFieldPlayer{}).Joins("JOIN p13_union_fight_settlement_results AS closed_world ON closed_world.match_id=p13_union_fight_field_players.match_id").Where("player_id=? AND left_at=0 AND closed_world.result_kind=?", id, constUtil.P13UFTechnicalAbortKind).Count(&closed).Error; err != nil {
+			return err
+		}
+		if closed == 0 {
+			return nil
+		}
+		var profile db.Profile
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&profile, id).Error; err != nil {
+			return err
+		}
+		if !bytes.Equal(profile.Session, session) {
+			return nil
+		}
+		player, game, err := decodeProfileForCalendarUpdate(tx, &profile)
+		if err != nil {
+			return err
+		}
+		if game.Position.GetScene() != constUtil.P13UnionFightFieldTarget {
+			return nil
+		}
+		game.PositionLoading = true
+		game.Position = &pb.Position{PlayerId: proto.Int64(id), Scene: proto.String("town_main"), Current: &pb.PointNew{X: proto.Float32(0), Y: proto.Float32(0), Z: proto.Float32(0)}}
+		if err = saveProfile(tx, &profile, player, game); err != nil {
+			return err
+		}
+		cleaned = true
+		return nil
+	})
+	return cleaned, err
 }
 
 // DisconnectP13UnionFightField 旧会话不能清除新连接的战场在线状态，持久HP/AP与位置继续保留。
 func (s *GameService) DisconnectP13UnionFightField(ctx context.Context, id int64, session []byte) bool {
 	var actor db.P13UnionFightFieldPlayer
-	err := db.GetIns().WithContext(ctx).First(&actor, "player_id=? AND left_at=0 AND session_hash=?", id, p6Digest(session)).Error
+	matched, closedExit := false, false
+	err := db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var gate db.P13GuildPolicy
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&gate, 1).Error; err != nil {
+			return err
+		}
+		if err := tx.First(&actor, "player_id=? AND left_at=0 AND session_hash=?", id, p6Digest(session)).Error; err != nil {
+			return err
+		}
+		matched = true
+		closed, err := p13UFWorldClosed(tx, actor.MatchID)
+		if err != nil {
+			return err
+		}
+		if !closed {
+			return tx.Model(&actor).Where("session_hash=?", p6Digest(session)).Update("session_hash", "").Error
+		}
+		closedExit = true
+		active, activeErr := p13UFWorldHasActiveActor(tx, id)
+		if activeErr != nil {
+			return activeErr
+		}
+		if active {
+			return nil
+		}
+		var profile db.Profile
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&profile, id).Error; err != nil {
+			return err
+		}
+		// A rotated account session cannot be retired by an old disconnect.
+		if !bytes.Equal(profile.Session, session) {
+			return nil
+		}
+		player, game, err := decodeProfileForCalendarUpdate(tx, &profile)
+		if err != nil {
+			return err
+		}
+		if game.Position.GetScene() != constUtil.P13UnionFightFieldTarget {
+			return nil
+		}
+		game.PositionLoading = true
+		game.Position = &pb.Position{PlayerId: proto.Int64(id), Scene: proto.String("town_main"), Current: &pb.PointNew{X: proto.Float32(0), Y: proto.Float32(0), Z: proto.Float32(0)}}
+		return saveProfile(tx, &profile, player, game)
+	})
 	if err != nil {
-		return false
+		return matched
 	}
-	if err = db.GetIns().WithContext(ctx).Model(&actor).Where("session_hash=?", p6Digest(session)).Update("session_hash", "").Error; err != nil {
-		return true
+	if !closedExit {
+		_ = p13UFPublishBeforeAbort(ctx, actor.MatchID, func() { s.p13UFFieldBroadcast(ctx, actor.MatchID, id, &pb.SCUFPlayerDisappear{Guid: []int64{id}}) })
 	}
-	s.p13UFFieldBroadcast(ctx, actor.MatchID, id, &pb.SCUFPlayerDisappear{Guid: []int64{id}})
 	return true
 }
 
@@ -1378,6 +1719,9 @@ func (s *GameService) p13UFFieldElements(ctx context.Context, id int64, guids []
 		if err = s.p13UFFactoryOverlay(tx, match.ID, buildings); err != nil {
 			return err
 		}
+		if err = p13UFGuardBattleOverlay(tx, match.ID, buildings); err != nil {
+			return err
+		}
 		if err = p13UFGateItemOverlay(tx, match.ID, buildings); err != nil {
 			return err
 		}
@@ -1435,6 +1779,28 @@ func (s *GameService) p13UFFieldElements(ctx context.Context, id int64, guids []
 		if len(towers.Tower) > 0 {
 			messages = append(messages, towers)
 		}
+		towerFrames, towerErr := p13UFTowerFrames(tx, match.ID, now)
+		if towerErr != nil {
+			return towerErr
+		}
+		selectedTowers := map[int64]bool{}
+		for _, tower := range towers.Tower {
+			selectedTowers[tower.GetGuid()] = true
+		}
+		for _, message := range towerFrames {
+			var guid int64
+			switch value := message.(type) {
+			case *pb.SCUFTowerCrash:
+				guid = value.GetTowerGuid()
+			case *pb.SCUFTowerAttackPlayer:
+				guid = value.GetTowerGuid()
+			case *pb.SCUFTowerAttackCariot:
+				guid = value.GetTowerGuid()
+			}
+			if len(wanted) == 0 || selectedTowers[guid] {
+				messages = append(messages, message)
+			}
+		}
 		for _, unit := range buildings.FactoryInfos {
 			if selected(unit.GetGuid()) || unit.GetGuard() != nil && selected(unit.GetGuard().GetGuid()) {
 				messages = append(messages, &pb.SCUFCariotFactory{Factory: unit})
@@ -1477,6 +1843,9 @@ func (s *GameService) TickP13UnionFightField(ctx context.Context, now time.Time)
 	var failures []error
 	for _, maintain := range []func(context.Context, time.Time) error{
 		s.AdvanceP13UnionFightPlayerBattles,
+		s.AdvanceP13UnionFightGuardBattles,
+		s.TickP13UnionFightNaturalRevive,
+		s.TickP13UnionFightGuardBuildings,
 		s.TickP13UnionFightTransfer,
 		s.TickP13UnionFightResource,
 		s.TickP13UnionFightFactory,
@@ -1487,6 +1856,7 @@ func (s *GameService) TickP13UnionFightField(ctx context.Context, now time.Time)
 		s.TickP13UnionFightWarDrum,
 		s.TickP13UnionFightRevivePoint,
 		s.TickP13UnionFightFocus,
+		s.TickP13UnionFightTower,
 	} {
 		if err := maintain(ctx, now); err != nil {
 			failures = append(failures, err)
@@ -1501,6 +1871,115 @@ func (s *GameService) TickP13UnionFightField(ctx context.Context, now time.Time)
 	return errors.Join(failures...)
 }
 
+// Lifecycle is a fair read-only metadata scan. Restart/cursor loss only repeats
+// projection; every actual exit retains its transaction-level scope checks.
+type p13UFFieldLifecycleActor struct {
+	MatchID       string
+	PlayerID      int64
+	GuildID       string
+	MapProjection string
+	Y             float32
+}
+
+var p13UFFieldLifecycleCursor struct {
+	sync.Mutex
+	DB       *gorm.DB
+	PlayerID int64
+	MatchID  string
+}
+
+func p13UFFieldLifecycleCandidates(ctx context.Context) ([]p13UFFieldLifecycleActor, error) {
+	p13UFFieldLifecycleCursor.Lock()
+	defer p13UFFieldLifecycleCursor.Unlock()
+	database := db.GetIns()
+	if p13UFFieldLifecycleCursor.DB != database {
+		p13UFFieldLifecycleCursor.DB = database
+		p13UFFieldLifecycleCursor.PlayerID = 0
+		p13UFFieldLifecycleCursor.MatchID = ""
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	tx := database.WithContext(ctx)
+	scene := "json_extract(lifecycle_profile.game,'$.position.scene')"
+	if tx.Dialector.Name() == "mysql" {
+		scene = "JSON_UNQUOTE(" + scene + ")"
+	}
+	query := tx.Table("p13_union_fight_field_players AS a").Select("a.match_id,a.player_id,a.guild_id,a.map_projection,a.y").Joins("JOIN profiles AS lifecycle_profile ON lifecycle_profile.id=a.player_id").Where("a.left_at=0 AND "+scene+"=?", constUtil.P13UnionFightFieldTarget)
+	if p13UFFieldLifecycleCursor.PlayerID > 0 {
+		query = query.Where("a.player_id>? OR (a.player_id=? AND a.match_id>?)", p13UFFieldLifecycleCursor.PlayerID, p13UFFieldLifecycleCursor.PlayerID, p13UFFieldLifecycleCursor.MatchID)
+	}
+	var rows []p13UFFieldLifecycleActor
+	err := query.Order("a.player_id,a.match_id").Limit(constUtil.P13UnionFightFieldLifecycleBatch).Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	if len(rows) > 0 {
+		last := rows[len(rows)-1]
+		p13UFFieldLifecycleCursor.PlayerID = last.PlayerID
+		p13UFFieldLifecycleCursor.MatchID = last.MatchID
+	}
+	// Like the settlement scan, a short/empty page resets only the next tick.
+	// There is never a second wrap query or a whole-history loop in this tick.
+	if len(rows) < constUtil.P13UnionFightFieldLifecycleBatch {
+		p13UFFieldLifecycleCursor.PlayerID = 0
+		p13UFFieldLifecycleCursor.MatchID = ""
+	}
+	return rows, nil
+}
+
+// A corrupt receipt must not poison valid scopes in the same page. Normal
+// operation remains one batch. Only the known domain/absent-source errors may
+// split; driver/connection/context failures return immediately, never fan out.
+// A binary tree over at most128 scopes has at most255 total batch calls.
+func p13UFFieldLifecycleTerminals(ctx context.Context, scopes []string, read func([]string) (map[string]int64, error)) (map[string]int64, map[string]error, error) {
+	values := map[string]int64{}
+	damaged := map[string]error{}
+	if len(scopes) > constUtil.P13UnionFightFieldLifecycleBatch {
+		return nil, nil, errors.New("生命周期终局批次超限")
+	}
+	calls := 0
+	var visit func([]string) error
+	visit = func(ids []string) error {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if len(ids) == 0 {
+			return nil
+		}
+		if calls >= 255 {
+			return errors.New("生命周期终局隔离批次超限")
+		}
+		calls++
+		batch, err := read(ids)
+		if err == nil {
+			for id, at := range batch {
+				values[id] = at
+			}
+			return nil
+		}
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		if !errors.Is(err, gorm.ErrRecordNotFound) && err.Error() != constUtil.P13UFMixedConflict {
+			return err
+		}
+		if len(ids) == 1 {
+			damaged[ids[0]] = err
+			return nil
+		}
+		mid := len(ids) / 2
+		if err = visit(ids[:mid]); err != nil {
+			return err
+		}
+		return visit(ids[mid:])
+	}
+	if err := visit(scopes); err != nil {
+		return nil, nil, err
+	}
+	return values, damaged, nil
+}
+
 // p13UFFieldLifecycle runs even when an unrelated pending calculation is damaged.
 func (s *GameService) p13UFFieldLifecycle(ctx context.Context, now time.Time) error {
 	tx := db.GetIns().WithContext(ctx)
@@ -1508,61 +1987,214 @@ func (s *GameService) p13UFFieldLifecycle(ctx context.Context, now time.Time) er
 	if err := tx.First(&policy, 1).Error; err != nil {
 		return err
 	}
-	var rows []db.P13UnionFightFieldPlayer
-	if err := tx.Where("left_at=0").Order("player_id").Find(&rows).Error; err != nil {
+	rows, err := p13UFFieldLifecycleCandidates(ctx)
+	if err != nil {
 		return err
 	}
+	if len(rows) == 0 {
+		return nil
+	}
+	failures := []error{}
+	validRows := make([]p13UFFieldLifecycleActor, 0, len(rows))
+	for _, row := range rows {
+		if row.MatchID == "" || row.PlayerID <= 0 {
+			failures = append(failures, errors.New("公会战生命周期候选身份损坏"))
+			continue
+		}
+		validRows = append(validRows, row)
+	}
+	rows = validRows
+	if len(rows) == 0 {
+		return errors.Join(failures...)
+	}
+
+	var gate db.P13GuildPolicy
+	if err = tx.First(&gate, 1).Error; err != nil {
+		return err
+	}
+	var enrollment db.P13UnionFightPolicy
+	if err = tx.First(&enrollment, 1).Error; err != nil {
+		return err
+	}
+	scopes, ids := []string{}, []int64{}
+	knownScopes, knownIDs := map[string]bool{}, map[int64]bool{}
+	for _, row := range rows {
+		if !knownScopes[row.MatchID] {
+			knownScopes[row.MatchID] = true
+			scopes = append(scopes, row.MatchID)
+		}
+		if !knownIDs[row.PlayerID] {
+			knownIDs[row.PlayerID] = true
+			ids = append(ids, row.PlayerID)
+		}
+	}
+	closed, err := p13UFWorldClosedBatch(tx, scopes)
+	if err != nil {
+		return err
+	}
+	// One aggregate existence row per player; MIN is only a compact witness of
+	// another unclosed actor, never a guess about which historical scope is current.
+	var activeRows []struct {
+		PlayerID int64
+		MatchID  string
+	}
+	if err = tx.Table("p13_union_fight_field_players AS a").Select("a.player_id,MIN(a.match_id) AS match_id").Joins("LEFT JOIN p13_union_fight_settlement_results AS r ON r.match_id=a.match_id").Where("a.player_id IN ? AND a.left_at=0 AND (r.match_id IS NULL OR r.result_kind<>?)", ids, constUtil.P13UFTechnicalAbortKind).Group("a.player_id").Limit(len(ids)).Scan(&activeRows).Error; err != nil {
+		return err
+	}
+	active := map[int64]bool{}
+	for _, row := range activeRows {
+		active[row.PlayerID] = true
+	}
+	matches := map[string]db.P13UnionFightMatch{}
+	snapshots := map[string]*p13UFFieldSnapshot{}
+	members := map[int64]db.P13GuildMember{}
+	scopeErrors := map[string]error{}
+
+	for offset := 0; offset < len(scopes); offset += 128 {
+		if err := ctx.Err(); err != nil {
+			return errors.Join(append(failures, err)...)
+		}
+		batch := scopes[offset:min(offset+128, len(scopes))]
+		var matchRows []db.P13UnionFightMatch
+		if err = tx.Select("id,start_at,end_at,created_at").Where("id IN ?", batch).Find(&matchRows).Error; err != nil {
+			return errors.Join(append(failures, err)...)
+		}
+		for _, row := range matchRows {
+			matches[row.ID] = row
+		}
+		open := []string{}
+		for _, scope := range batch {
+			if !closed[scope] {
+				open = append(open, scope)
+			}
+		}
+		if len(open) == 0 {
+			continue
+		}
+		var maps []db.P13UnionFightField
+		if err = tx.Where("match_id IN ?", open).Find(&maps).Error; err != nil {
+			return errors.Join(append(failures, err)...)
+		}
+		for _, saved := range maps {
+			if err := ctx.Err(); err != nil {
+				return errors.Join(append(failures, err)...)
+			}
+			if p6Digest(saved.Snapshot) != saved.SnapshotHash {
+				scopeErrors[saved.MatchID] = errors.New("公会战生命周期原地图快照损坏")
+				continue
+			}
+			snapshot := &p13UFFieldSnapshot{}
+			if err = json.Unmarshal(saved.Snapshot, snapshot); err != nil {
+				scopeErrors[saved.MatchID] = err
+				continue
+			}
+			if err = p13UFFieldProjection(snapshot); err != nil {
+				scopeErrors[saved.MatchID] = err
+				continue
+			}
+			snapshots[saved.MatchID] = snapshot
+		}
+	}
+	for offset := 0; offset < len(ids); offset += 128 {
+		if err := ctx.Err(); err != nil {
+			return errors.Join(append(failures, err)...)
+		}
+		var batch []db.P13GuildMember
+		if err = tx.Select("player_id,guild_id").Where("player_id IN ?", ids[offset:min(offset+128, len(ids))]).Find(&batch).Error; err != nil {
+			return errors.Join(append(failures, err)...)
+		}
+		for _, member := range batch {
+			members[member.PlayerID] = member
+		}
+	}
+	open := []string{}
+	for _, scope := range scopes {
+		if _, ok := matches[scope]; !ok {
+			scopeErrors[scope] = gorm.ErrRecordNotFound
+		}
+		if !closed[scope] {
+			if snapshots[scope] == nil && scopeErrors[scope] == nil {
+				scopeErrors[scope] = gorm.ErrRecordNotFound
+			}
+			if scopeErrors[scope] == nil {
+				open = append(open, scope)
+			}
+		}
+	}
+	terminal, broken, err := p13UFFieldLifecycleTerminals(ctx, open, func(ids []string) (map[string]int64, error) { return p13UFMixedTerminalBatch(tx, ids) })
+	if err != nil {
+		return errors.Join(append(failures, err)...)
+	}
+	for scope, err := range broken {
+		scopeErrors[scope] = err
+	}
+	for _, scope := range scopes {
+		if err := scopeErrors[scope]; err != nil {
+			failures = append(failures, fmt.Errorf("field lifecycle %s: %w", scope, err))
+		}
+	}
+	enabled := policy.Enabled && gate.ManagementEnabled && enrollment.EnrollmentEnabled && enrollment.MatchEnabled
 	for _, row := range rows {
 		if err := ctx.Err(); err != nil {
-			return err
+			return errors.Join(append(failures, err)...)
 		}
-		var match db.P13UnionFightMatch
-		if err := tx.First(&match, "id=?", row.MatchID).Error; err != nil {
-			return err
+		// A sealed historical row cannot retire the profile of a newly entered match.
+		if closed[row.MatchID] && active[row.PlayerID] {
+			continue
 		}
-		var saved db.P13UnionFightField
-		if err := tx.First(&saved, "match_id=?", row.MatchID).Error; err != nil {
-			return err
+		if scopeErrors[row.MatchID] != nil {
+			continue
 		}
-		if p6Digest(saved.Snapshot) != saved.SnapshotHash {
-			return errors.New("公会战生命周期原地图快照损坏")
+		match := matches[row.MatchID]
+		if err = s.p13UFFieldLifecycleRow(ctx, row, &match, snapshots[row.MatchID], members[row.PlayerID], closed[row.MatchID], terminal[row.MatchID], enabled, now); err != nil {
+			failures = append(failures, fmt.Errorf("field lifecycle %s/%d: %w", row.MatchID, row.PlayerID, err))
 		}
-		var snapshot p13UFFieldSnapshot
-		if err := json.Unmarshal(saved.Snapshot, &snapshot); err != nil {
-			return err
-		}
-		if err := p13UFFieldActorProjection(&row, &snapshot); err != nil {
-			return err
-		}
-		member, err := p13GuildMember(tx, row.PlayerID)
-		if err != nil {
-			return err
-		}
-		var gate db.P13GuildPolicy
-		if err = tx.First(&gate, 1).Error; err != nil {
-			return err
-		}
-		var enrollment db.P13UnionFightPolicy
-		if err = tx.First(&enrollment, 1).Error; err != nil {
-			return err
-		}
-		if !policy.Enabled || !gate.ManagementEnabled || !enrollment.EnrollmentEnabled || !enrollment.MatchEnabled || member.GuildID != row.GuildID || now.UnixMilli() >= match.EndAt+snapshot.KickMillis {
-			_, left, err := s.p13UFFieldLeaveExpected(ctx, row.PlayerID, &pb.CSTransferScene{Target: proto.String("town_main")}, now, row.MatchID)
+	}
+	return errors.Join(failures...)
+}
+
+func (s *GameService) p13UFFieldLifecycleRow(ctx context.Context, row p13UFFieldLifecycleActor, match *db.P13UnionFightMatch, snapshot *p13UFFieldSnapshot, member db.P13GuildMember, closed bool, terminal int64, enabled bool, now time.Time) error {
+	if closed {
+		if now.UnixMilli() >= match.EndAt+4000 {
+			packets, left, err := s.p13UFFieldLeaveExpected(ctx, row.PlayerID, &pb.CSTransferScene{Target: proto.String("town_main")}, now, row.MatchID)
 			if err != nil {
 				return err
 			}
 			if left {
+				for _, packet := range packets {
+					s.publishP10Private(ctx, row.PlayerID, packet)
+				}
 				s.publishP10Private(ctx, row.PlayerID, &pb.SCUFKickPlayer{})
 			}
-			continue
+		} else {
+			s.publishP10Private(ctx, row.PlayerID, &pb.SCUnionFightUpdateState{UnionFightId: proto.String(match.ID), State: proto.Int32(3), LeftTime: proto.Int64(0), TotalTime: proto.Int64(match.EndAt - match.StartAt)})
 		}
-		state, left, total := p13UFFieldState(&match, now)
-		if state == 1 {
-			total = snapshot.PreparationMillis
-		}
-		s.publishP10Private(ctx, row.PlayerID, &pb.SCUnionFightUpdateState{UnionFightId: proto.String(match.ID), State: proto.Int32(state), LeftTime: proto.Int64(left), TotalTime: proto.Int64(total)})
+		return nil
 	}
-	return nil
+	if terminal > 0 && terminal < match.EndAt {
+		match.EndAt = terminal
+	}
+	metadata := db.P13UnionFightFieldPlayer{MatchID: row.MatchID, PlayerID: row.PlayerID, GuildID: row.GuildID, MapProjection: row.MapProjection, Y: row.Y}
+	if err := p13UFFieldActorProjection(&metadata, snapshot); err != nil {
+		return err
+	}
+	if !enabled || member.GuildID != row.GuildID || now.UnixMilli() >= match.EndAt+snapshot.KickMillis {
+		_, left, err := s.p13UFFieldLeaveExpected(ctx, row.PlayerID, &pb.CSTransferScene{Target: proto.String("town_main")}, now, row.MatchID)
+		if err != nil {
+			return err
+		}
+		if left {
+			s.publishP10Private(ctx, row.PlayerID, &pb.SCUFKickPlayer{})
+		}
+		return nil
+	}
+	state, left, total := p13UFFieldState(match, now)
+	if state == 1 {
+		total = snapshot.PreparationMillis
+	}
+	return p13UFPublishBeforeAbort(ctx, row.MatchID, func() {
+		s.publishP10Private(ctx, row.PlayerID, &pb.SCUnionFightUpdateState{UnionFightId: proto.String(match.ID), State: proto.Int32(state), LeftTime: proto.Int64(left), TotalTime: proto.Int64(total)})
+	})
 }
 
 // ServeP13UnionFightField 绑定服务ctx每秒检查生命周期，关闭服务时保留同场持久状态供恢复。

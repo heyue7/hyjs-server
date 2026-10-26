@@ -388,12 +388,31 @@ func validateFrozenP6(input *model.FrozenBattleInput) error {
 
 // CaptureBattleReplay 由已锁Profile的原战斗开始事务调用，冻结输入并保留来源回执。
 func (s *GameService) CaptureBattleReplay(ctx context.Context, tx *gorm.DB, playerID int64, source, fightID string, input model.FrozenBattleInput) (string, error) {
+	id, matchID, previous, _, err := p6ReplayCaptureIdentity(ctx, tx, playerID, source, fightID, input)
+	if err != nil {
+		return "", err
+	}
+	if previous != nil {
+		return previous.ID, nil
+	}
+	frozen, err := s.FreezeBattleInput(input)
+	if err != nil {
+		return "", err
+	}
+	record, err := p6WriteCapturedReplay(ctx, tx, id, matchID, playerID, source, fightID, frozen)
+	if err != nil {
+		return "", err
+	}
+	return record.ID, nil
+}
+
+func p6ReplayCaptureIdentity(ctx context.Context, tx *gorm.DB, playerID int64, source, fightID string, input model.FrozenBattleInput) (string, string, *db.P6BattleRecord, *model.FrozenBattleInput, error) {
 	if tx == nil || ctx == nil || playerID <= 0 || input.Attacker.GetPlayerId() != playerID || source == "" || len(source) > 32 || fightID == "" || len(fightID) > 128 {
-		return "", errors.New(constUtil.CombatInvalid)
+		return "", "", nil, nil, errors.New(constUtil.CombatInvalid)
 	}
 	matchID, scopeErr := p13P6MatchFromInput(source, &input)
 	if scopeErr != nil {
-		return "", scopeErr
+		return "", "", nil, nil, scopeErr
 	}
 	key := fmt.Sprintf("%d/%s/%s", playerID, source, fightID)
 	id := p6Digest([]byte(key))
@@ -402,40 +421,45 @@ func (s *GameService) CaptureBattleReplay(ctx context.Context, tx *gorm.DB, play
 	if err == nil {
 		saved, decodeErr := decodeP6Record(&previous)
 		if decodeErr != nil || saved.Seed != input.Seed || saved.MaxRound != input.MaxRound || saved.BattleType != input.BattleType || saved.PVECompatibilityRule != input.PVECompatibilityRule || !proto.Equal(saved.Attacker, input.Attacker) || !proto.Equal(saved.Defender, input.Defender) || !proto.Equal(saved.Monster, input.Monster) || !proto.Equal(saved.KFReplay, input.KFReplay) || saved.DefenderFirst != input.DefenderFirst || saved.IsAttToDef != input.IsAttToDef || !reflect.DeepEqual(saved.AttackerDamageFactor, input.AttackerDamageFactor) || !reflect.DeepEqual(saved.DefenderDamageFactor, input.DefenderDamageFactor) || !reflect.DeepEqual(saved.AppliedProperties, input.AppliedProperties) && !(len(saved.AppliedProperties) == 0 && len(input.AppliedProperties) == 0) || !p6ConditionsEqual(saved.WinConditions, input.WinConditions) {
-			return "", errors.New(constUtil.P6ReplayConflict)
+			return "", "", nil, nil, errors.New(constUtil.P6ReplayConflict)
 		}
 		if previous.P13MatchID != "" && previous.P13MatchID != matchID {
-			return "", errors.New(constUtil.P6ReplayConflict)
+			return "", "", nil, nil, errors.New(constUtil.P6ReplayConflict)
 		}
 		// 重试仅核对原双方/seed，不用最新技能表替换该场冻结版本。
-		return previous.ID, nil
+		return previous.ID, matchID, &previous, saved, nil
 	}
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
-		return "", err
+		return "", "", nil, nil, err
 	}
-	frozen, err := s.FreezeBattleInput(input)
-	if err != nil {
-		return "", err
-	}
+	return id, matchID, nil, nil, nil
+}
+
+// Shared storage writer; all callers first authenticate source identity and freeze.
+func p6WriteCapturedReplay(ctx context.Context, tx *gorm.DB, id, matchID string, playerID int64, source, fightID string, frozen *model.FrozenBattleInput) (*db.P6BattleRecord, error) {
 	encoded, err := json.Marshal(frozen)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
+	return p6WriteCapturedReplayEncoded(ctx, tx, id, matchID, playerID, source, fightID, frozen, encoded)
+}
+
+func p6WriteCapturedReplayEncoded(ctx context.Context, tx *gorm.DB, id, matchID string, playerID int64, source, fightID string, frozen *model.FrozenBattleInput, encoded []byte) (*db.P6BattleRecord, error) {
 	digest := p6Digest(encoded)
 	stored, err := encodeP6StoredInput(encoded)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	var rule db.P6CombatRule
 	if err = tx.WithContext(ctx).First(&rule, 1).Error; err != nil {
-		return "", err
+		return nil, err
 	}
 	if rule.TimeoutMillis < 1000 || rule.TimeoutMillis > 86400000 || rule.MaxRounds < 1 || rule.MaxRounds > 40 {
-		return "", errors.New(constUtil.CombatInvalid)
+		return nil, errors.New(constUtil.CombatInvalid)
 	}
 	now := time.Now().UnixMilli()
 	record := db.P6BattleRecord{P13MatchID: matchID, ID: id, PlayerID: playerID, Source: source, SourceFight: fightID, Status: constUtil.P6BattleCaptured, Seed: frozen.Seed, ConfigurationHash: frozen.ConfigurationHash, EngineVersion: frozen.EngineVersion, ClientVersion: frozen.ClientVersion, Input: stored, InputHash: digest, CreatedAt: now, ExpiresAt: now + rule.TimeoutMillis}
-	return id, tx.WithContext(ctx).Create(&record).Error
+	return &record, tx.WithContext(ctx).Create(&record).Error
 }
 
 // FinishObservedBattleReplay 只记录原单人路径已接受的结果，不改变旧奖励或冒充权威计算。

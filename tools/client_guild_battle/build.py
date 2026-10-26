@@ -21,6 +21,7 @@ SOURCE = Path(__file__).resolve().parent
 BASE_SHAS = {
     'd60dd8b6a9de9b11d8a673d240f19f3cc16d33956cdede386794cc26e2f71f8d': 69,
     '97a9ebcc82e1127a8c877ea2385da1a715a1b17d1f9a0eeed352debc53c70061': 70,
+    '7a648808558035ad76b11929fa8f7ed6299372dc657fe092e03a2e743bd3b482': 71,
 }
 MAIN = 'assets/bin/Data/Managed/Assembly-CSharp.dll'
 HELPER = 'assets/bin/Data/Managed/SoulFlowerGuildBattle.dll'
@@ -35,12 +36,16 @@ def file_sha(path):
         return hashlib.file_digest(source, 'sha256').hexdigest()
 
 
-def semantic(pe, row, shift=0):
+def semantic(pe, row, shift=0, skip=(), replacements=None):
     body = read_method_body_from_bytes(exact_body(pe, row))
-    indices = {i.offset: n - shift for n, i in enumerate(body.instructions)}
-    indices[body.instructions[-1].offset + body.instructions[-1].size] = len(body.instructions) - shift
+    kept = [(n, i) for n, i in enumerate(body.instructions) if n not in skip]
+    indices = {i.offset: n - shift for n, (_, i) in enumerate(kept)}
+    indices[body.instructions[-1].offset + body.instructions[-1].size] = len(kept) - shift
     code = []
-    for instruction in body.instructions:
+    for original_index, instruction in kept:
+        if replacements and original_index in replacements:
+            code.append(replacements[original_index])
+            continue
         value = instruction.operand
         if instruction.opcode.name == 'switch':
             value = [indices[o] for o in value]
@@ -56,11 +61,52 @@ def semantic(pe, row, shift=0):
     return code, regions
 
 
+def verify_correct_time(a, old, b, new):
+    old_code, old_eh = semantic(a, old)
+    new_code, new_eh = semantic(b, new)
+    require(len(old_code) == 22 and not old_eh and len(new_code) == 25 and not new_eh, 'CorrectTime exact body shape changed')
+    def member(pe, token, name):
+        require(token >> 24 == 10, 'Expected DateTime MemberRef')
+        row = pe.net.mdtables.MemberRef.rows[(token & 0xffffff) - 1]
+        require(str(row.Class.row.TypeNamespace) == 'System' and str(row.Class.row.TypeName) == 'DateTime' and str(row.Name) == name, 'Clock API identity changed')
+    member(a, old_code[5][1], 'get_UtcNow')
+    member(a, old_code[11][1], 'get_Now')
+    member(a, old_code[15][1], 'get_UtcNow')
+    require(new_code[12:14] == [('stloc', 4), ('ldloc', 4)] and new_code[17] == ('ldloca', 4), 'Clock sample local differs')
+    require(new_code[18][0] == 'call', 'UTC conversion missing')
+    member(b, new_code[18][1], 'ToUniversalTime')
+    conversion = b.net.mdtables.MemberRef.rows[(new_code[18][1] & 0xffffff) - 1]
+    require(bytes(conversion.Signature.value) == bytes.fromhex('20001182ad'), 'UTC conversion ABI differs')
+    normalized, eh = semantic(b, new, skip={12, 13, 18}, replacements={17: old_code[15]})
+    require(normalized == old_code and eh == old_eh, 'Unrelated CorrectTime IL/EH changed')
+    def locals_blob(pe, row):
+        body = read_method_body_from_bytes(exact_body(pe, row))
+        return bytes(pe.net.mdtables.StandAloneSig.rows[(body.local_var_sig_tok.value & 0xffffff) - 1].Signature.value)
+    require(locals_blob(a, old) == bytes.fromhex('07041182ad1182ad1182ad1182ad') and locals_blob(b, new) == bytes.fromhex('07051182ad1182ad1182ad1182ad1182ad'), 'Clock locals must append exactly one DateTime')
+    return dict(singleLocalClockSample=True, originalFirstUtcSamplePreserved=True, inheritedCILAndExceptionRegionsExact=True)
+
+
+def verify_scanned_sender(a, old, b, new):
+    original, old_regions = semantic(a, old)
+    patched, new_regions = semantic(b, new)
+    calls = [i for i, (op, token) in enumerate(original) if op == 'callvirt' and token == 0x0600428c]
+    require(len(calls) == 1, 'Original scan sender token differs')
+    at = calls[0]
+    require(len(patched) == len(original) + 1 and patched[at][0] == 'ldarg.0' and patched[at + 1][0] == 'call', 'Scanned adapter stack differs')
+    token = patched[at + 1][1]
+    require(token >> 24 == 10, 'Scanned adapter must be a MemberRef')
+    member = b.net.mdtables.MemberRef.rows[(token & 0xffffff) - 1]
+    require(str(member.Name) == 'SendScannedPlayerAsk' and str(member.Class.row.TypeName) == 'GuildBattleScene' and str(member.Class.row.TypeNamespace) == 'HYJS.GuildBattle', 'Scanned adapter owner differs')
+    normalized, regions = semantic(b, new, skip={at}, replacements={at + 1: original[at]})
+    require(normalized == original and regions == old_regions and new_regions == old_regions, 'Original scan timer/cleanup/branches changed')
+    return dict(originalScanTimerAndCleanupExact=True, onlyOriginalPlayerScanSenderAdapted=True, guardSenderUnchanged=True)
+
+
 def verify(before, after, hooks):
     a, b = [dnfile.dnPE(data=x) for x in (before, after)]
     left, right = methods(a), methods(b)
     allowed = {row['rid']: row for row in hooks}
-    require(len(allowed) == 16, 'Expected sixteen exact overload-scoped hooks')
+    require(len(allowed) == 24 and allowed[0x3303]['method'] == 'ServerTimerTool::CorrectTime' and allowed[0x5597]['method'] == 'UI.UnionFightSignUpItem::GotoFightScene' and allowed[0x542a]['method'] == 'UI.TownPage::Update', 'Expected scoped guild hooks including master availability, preparation entry and exact CorrectTime fix')
     for table in ['TypeDef', 'Field', 'MethodDef']:
         require(len(getattr(a.net.mdtables, table).rows) == len(getattr(b.net.mdtables, table).rows), 'ABI inventory changed: ' + table)
     require(not getattr(b.net.mdtables, 'FieldPtr', None), 'Unity FieldPtr forbidden')
@@ -76,12 +122,33 @@ def verify(before, after, hooks):
         if rid in allowed:
             spec = allowed[rid]
             require(name == spec['method'], 'Hook identity mismatch')
+            if rid == 0x3303:
+                detail = verify_correct_time(a, old, b, new)
+                changed.append(dict(spec, signatureHex=bytes(old.Signature.value).hex(), beforeSHA256=sha(x), afterSHA256=sha(y), **detail))
+                continue
+            if rid in (0x42ae, 0x42af):
+                original, old_regions = semantic(a, old)
+                patched, _ = semantic(b, new)
+                at = len(original) - 1
+                require(original[-1][0] == 'ret' and len(patched) == len(original) + 3 and [op for op, _ in patched[at:at + 3]] == ['ldarg.0', 'ldarg.1', 'call'], 'Player reply observer must follow the original consumer')
+                normalized, regions = semantic(b, new, skip={at, at + 1, at + 2})
+                require(normalized == original and regions == old_regions, 'Original reply consumer changed')
+                changed.append(dict(spec, signatureHex=bytes(old.Signature.value).hex(), beforeSHA256=sha(x), afterSHA256=sha(y), originalReplyConsumerRunsFirst=True, inheritedCILAndExceptionRegionsExact=True))
+                continue
+            if rid == 0x6018:
+                detail = verify_scanned_sender(a, old, b, new)
+                changed.append(dict(spec, signatureHex=bytes(old.Signature.value).hex(), beforeSHA256=sha(x), afterSHA256=sha(y), **detail))
+                continue
             n = spec['prefixCount']
             old_code, old_regions = semantic(a, old)
             new_code, new_regions = semantic(b, new, n)
             require(old_code == new_code[n:] and old_regions == new_regions, 'Inherited CIL/EH changed: ' + name)
             observer = name in ['Room.RoomNetUnionFight::SCUFPlayerFightBegin', 'Room.RoomNetUnionFight::SCUFPlayerFightEnd']
-            if observer:
+            if name == 'Room.RCAIUnionSelf::AutoGoto':
+                require(n == 3 and [op for op, _ in new_code[:n]] == ['ldarg.3', 'call', 'starg'] and new_code[2][1] == 3, 'Approach range may only replace arg3 before exact original body')
+            elif name in ['Room.RCUIUnionActor::OnClick', 'UI.TownPage::Update']:
+                require(n == 2 and [op for op, _ in new_code[:n]] == ['ldarg.0', 'call'], 'Click observer must preserve original action')
+            elif observer:
                 require(n == 3 and [op for op, _ in new_code[:n]] == ['ldarg.0', 'ldarg.1', 'call'], 'Observer must fall through to original consumer')
             else:
                 require(new_code[n - 1][0] == 'ret', 'Hook must return or fall through')
@@ -92,7 +159,7 @@ def verify(before, after, hooks):
         if name.startswith('Battle.Engine'):
             engine += 1
             require(x == y, 'Battle engine changed')
-    require(engine == 547 and len(changed) == 16, 'Engine/hook denominator differs')
+    require(engine == 547 and len(changed) == 24, 'Engine/hook denominator differs')
     for old, new in zip(a.net.mdtables.AssemblyRef.rows, b.net.mdtables.AssemblyRef.rows):
         require((str(old.Name), old.struct.Flags, old.PublicKey.value) == (str(new.Name), new.struct.Flags, new.PublicKey.value), 'Inherited assembly reference changed')
     native_types = {str(t.TypeNamespace) + '.' + str(t.TypeName) for t in a.net.mdtables.TypeDef.rows}
@@ -123,13 +190,13 @@ def verify_guard_helper(raw):
                 token = getattr(instruction.operand, 'value', 0)
                 if token >> 24 == 10 and names.get(token & 0xffffff) == 'SendCSUFPlayerAskFight':
                     sender_sites.append(name)
-    require(sender_sites == ['GuardArrived'], 'Guard sender must have one controlled callsite')
+    require(sorted(sender_sites) == ['GuardArrived', 'SendScannedPlayerAsk'], 'Original sender must have only the controlled guard and player scan sites')
     for name in ['ObservePlayerBegin', 'ObservePlayerEnd']:
         body = bodies[name]
         require(bool(body.exception_handlers), 'Observer must catch exceptions')
         require(not any(i.opcode.name in ['throw', 'rethrow'] for i in body.instructions), 'Observer can interrupt original consumer')
     require(not any(str(r.Name) == 'SendSocket' for r in pe.net.mdtables.MemberRef.rows), 'Guard helper bypasses original sender')
-    return dict(guardSenderSingleOriginalCallsite=True, guardObserversExceptionContained=True, noDirectSocketSender=True)
+    return dict(guardSenderSingleOriginalCallsite=True, playerScanSenderSingleOriginalCallsite=True, guardObserversExceptionContained=True, noDirectSocketSender=True)
 
 
 
@@ -175,7 +242,7 @@ def preflight_packager(base, directory):
         require(changed == set(proof['allowedChangedMethods']) and engine == 547, 'Packager managed scope differs')
         require(not any(row.struct.Flags & 1 and not row.PublicKey.value for row in b.net.mdtables.AssemblyRef.rows), 'Invalid assembly public key')
         detail = verify(before, payload[MAIN], json.loads((directory / 'hooks.json').read_text()))
-        require(len(detail['allowedChangedMethodDetails']) == 16, 'Overload scope differs')
+        require(len(detail['allowedChangedMethodDetails']) == 24, 'Overload scope differs')
     sdk = Path.home() / 'Library/Android/sdk/build-tools/33.0.0'
     require(all((sdk / name).is_file() for name in ['zipalign', 'apksigner']), 'Packaging tools unavailable')
     require((ROOT / '.local-signing/debug.keystore').is_file(), 'Signing file unavailable')
@@ -183,7 +250,7 @@ def preflight_packager(base, directory):
     return dict(status='READ_ONLY_PACKAGER_CONTRACT_PASS_NOT_PACKAGED', manifestSHA256=file_sha(directory / 'manifest.json'),
                 payloadUnchangedSHA256={name: sha(raw) for name, raw in payload.items()}, inputDexSHA256=proof['inputDexSHA256'],
                 outputDexSHA256=proof['outputDexSHA256'], managedOnly=True, requiredManifestKeysPresent=required,
-                uniqueChangedMethodNames=len(changed), changedOverloads=16, originalEngineMethodsExact=engine,
+                uniqueChangedMethodNames=len(changed), changedOverloads=24, originalEngineMethodsExact=engine,
                 sourcePinsVerified=True, payloadPinsVerified=True, signingToolsAndDiskAvailable=True,
                 javaClassInventory=java, optionalOverlaysNotRequested=True, packaged=False, signerExecuted=False)
 
@@ -196,7 +263,7 @@ def main():
     parser.add_argument('--preflight-report', type=Path)
     args = parser.parse_args()
     input_apk_hash = file_sha(args.base_apk)
-    require(input_apk_hash in BASE_SHAS, 'Require one of the two explicitly pinned formal69/formal70 APKs')
+    require(input_apk_hash in BASE_SHAS, 'Require an explicitly pinned formal69/formal70/formal71 APK')
     out = args.output.resolve()
     if args.preflight:
         result = preflight_packager(args.base_apk, out)
@@ -234,7 +301,7 @@ def main():
             target.write_bytes(archive.read('assets/bin/Data/Managed/' + name))
             references.append(target)
         helper = out / 'SoulFlowerGuildBattle.dll'
-        run('compile-helper', [dotnet, compiler, '/nologo', '/target:library', '/nostdlib+', '/langversion:3', '/deterministic+', '/out:' + str(helper), *['/reference:' + str(x) for x in references], SOURCE / 'GuildBattleScene.cs'])
+        run('compile-helper', [dotnet, compiler, '/nologo', '/target:library', '/nostdlib+', '/langversion:3', '/deterministic+', '/out:' + str(helper), *['/reference:' + str(x) for x in references], SOURCE / 'GuildBattleScene.cs', SOURCE / 'PlayerRequestGate.cs', SOURCE / 'GuildWarAvailability.cs'])
         shutil.copyfile(SOURCE / 'Injector.cs', work / 'Program.cs')
         project = work / 'Patch.csproj'
         project.write_text('<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings></PropertyGroup><ItemGroup><Reference Include="dnlib"><HintPath>' + str(dnlib) + '</HintPath></Reference></ItemGroup></Project>')
@@ -245,7 +312,7 @@ def main():
         validation = verify(before, after, json.loads((out / 'hooks.json').read_text()))
         helper_pe = dnfile.dnPE(data=helper.read_bytes())
         require(not any(str(r.Name) == 'OfflineBootstrap' for r in helper_pe.net.mdtables.AssemblyRef.rows), 'Re cloud/bootstrap dependency imported')
-        pins = {str(p.relative_to(ROOT)): sha(p.read_bytes()) for p in [SOURCE / 'GuildBattleScene.cs', SOURCE / 'Injector.cs', SOURCE / 'README.md', Path(__file__).resolve()]}
+        pins = {str(p.relative_to(ROOT)): sha(p.read_bytes()) for p in [SOURCE / 'GuildBattleScene.cs', SOURCE / 'PlayerRequestGate.cs', SOURCE / 'GuildWarAvailability.cs', SOURCE / 'Injector.cs', SOURCE / 'README.md', Path(__file__).resolve()]}
         reference = ROOT / 'analysis/guild-full-qa-20261025/re-reference/csharp/OfflineGuildBattleAssets310.cs'
         reference_pin = dict(path=str(reference), sha256=file_sha(reference))
 

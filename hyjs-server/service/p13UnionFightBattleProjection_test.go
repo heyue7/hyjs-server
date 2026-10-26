@@ -185,6 +185,7 @@ func TestP13UnionFightBattleProjectionActualShopWardOriginalPoseCurrentHPAndFigh
 	t.Cleanup(func() { db.GetIns().Where("1=1").Delete(&db.P13UnionFightWarDrumSource{}) })
 	row, frame := read(id)
 	frame.State = proto.Int32(1)
+	frame.FightInfo.Anger = proto.Float64(88.125)
 	for i, hp := range frame.FightInfo.MaxHpPos {
 		frame.FightInfo.HpPos[i] = hp * .5
 		if i > 0 {
@@ -197,6 +198,9 @@ func TestP13UnionFightBattleProjectionActualShopWardOriginalPoseCurrentHPAndFigh
 	live, applied, err := f.s.ProjectP13UnionFightFieldBattle(f.ctx, id, now())
 	if err != nil {
 		t.Fatal("original actor fightstate1 accepted", err)
+	}
+	if live.GetInst().GetAnger() != 88.125 {
+		t.Fatal("current war AP was replaced by the entry snapshot", live.GetInst())
 	}
 	originalBattle := baseline(id)
 	for i, hero := range live.Formation {

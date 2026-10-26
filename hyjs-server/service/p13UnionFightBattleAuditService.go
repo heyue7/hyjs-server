@@ -180,10 +180,14 @@ func p13UFBattleAuditVerifyRecord(tx *gorm.DB, attempt *db.P13UnionFightBattleAu
 	if err := tx.First(&record, "id=?", attempt.P6RecordID).Error; err != nil {
 		return err
 	}
+	return p13UFBattleAuditVerifyLoaded(attempt, &record)
+}
+
+func p13UFBattleAuditVerifyLoaded(attempt *db.P13UnionFightBattleAuditAttempt, record *db.P6BattleRecord) error {
 	if record.PlayerID != attempt.PlayerID || record.Source != constUtil.P13UnionFightBattleAuditP6Source || record.SourceFight != strconv.FormatInt(attempt.GUID, 10) || record.Status != constUtil.P6BattleComputed || record.Authoritative || record.InputHash != attempt.InputHash || record.OutcomeHash != attempt.OutcomeHash || record.ReplayHash != attempt.ReplayHash || p6Digest(record.Outcome) != record.OutcomeHash {
 		return errors.New("公会战审计计算实例SHA/身份不符")
 	}
-	input, err := decodeP6Record(&record)
+	input, err := decodeP6Record(record)
 	if err != nil {
 		return err
 	}

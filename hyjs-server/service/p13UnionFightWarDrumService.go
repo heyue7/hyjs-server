@@ -15,6 +15,7 @@ import (
 	"gorm.io/gorm/clause"
 	"hyjs-server/constUtil"
 	"hyjs-server/db"
+	"hyjs-server/model"
 	pb "hyjs-server/model/protocol"
 )
 
@@ -68,6 +69,13 @@ func p13UFDrumRead(tx *gorm.DB, row *db.P13UnionFightWarDrumEffect) (*db.P13Unio
 	if err := tx.First(&quote, "match_id=? AND item_id=?", row.MatchID, "ufitem_014").Error; err != nil {
 		return nil, err
 	}
+	return p13UFDrumReadLoaded(row, &quote)
+}
+func p13UFDrumReadLoaded(row *db.P13UnionFightWarDrumEffect, frozen *db.P13UnionFightWarDrumOffer) (*db.P13UnionFightWarDrumOffer, error) {
+	if row == nil || frozen == nil || frozen.MatchID != row.MatchID || frozen.ItemID != "ufitem_014" {
+		return nil, errors.New("战鼓冻结报价缺失")
+	}
+	quote := *frozen
 	if !p13UFDrumQuoteValid(&quote) || row.SourceHash != p13UFDrumEffectHash(row) || row.OfferHash != quote.SourceHash || row.CasterID <= 0 || row.GuildID == "" || (row.Camp != 0 && row.Camp != 1) || row.StartedAt <= 0 || row.ExpiresAt <= row.StartedAt || row.ExpiresAt > row.StartedAt+quote.DurationMillis || (row.EndedAt != 0 && (row.EndedAt < row.StartedAt || row.EndedAt > row.ExpiresAt)) || row.GUID != p13UFFieldGUID(row.MatchID, "war-drum", strconv.FormatInt(row.CasterID, 10)+"/"+strconv.FormatInt(row.StartedAt, 10)) || math.IsNaN(float64(row.X)) || math.IsNaN(float64(row.Y)) || math.IsNaN(float64(row.Z)) || math.IsInf(float64(row.X), 0) || math.IsInf(float64(row.Y), 0) || math.IsInf(float64(row.Z), 0) {
 		return nil, errors.New("战鼓持久源SHA/原实例/时序损坏")
 	}
@@ -259,24 +267,38 @@ func (s *GameService) ProjectP13UnionFightWarDrumBattle(ctx context.Context, id 
 }
 
 func (s *GameService) p13UFDrumBattle(tx *gorm.DB, id int64, now time.Time) (*pb.BattlePlayer, map[string][]string, error) {
+	actor, match, _, frame, err := s.p13UFFieldCurrent(tx, id, now)
+	if err != nil {
+		return nil, nil, err
+	}
+	var profile db.Profile
+	if err = tx.First(&profile, id).Error; err != nil {
+		return nil, nil, err
+	}
+	_, game, err := decodeProfileForCalendarUpdate(tx, &profile)
+	if err != nil {
+		return nil, nil, err
+	}
+	return s.p13UFDrumBattleLoaded(tx, actor, match, frame, game, now)
+}
+
+// Loaded consumes the exact actor/frame and locked profile already authenticated
+// by the caller in this guild-gated transaction; effects/expiry remain live reads.
+func (s *GameService) p13UFDrumBattleLoaded(tx *gorm.DB, actor *db.P13UnionFightFieldPlayer, match *db.P13UnionFightMatch, frame *pb.InstUFPlayer, game *model.GameState, now time.Time) (*pb.BattlePlayer, map[string][]string, error) {
 	var battle *pb.BattlePlayer
 	applied := map[string][]string{}
 	err := func() error {
-		actor, match, _, frame, err := s.p13UFFieldCurrent(tx, id, now)
-		if err != nil {
-			return err
+		if actor == nil || match == nil || frame == nil || game == nil || actor.MatchID != match.ID || actor.PlayerID != frame.GetGuid() || actor.Camp != int64(frame.GetCamp()) || actor.LeftAt != 0 {
+			return errors.New("战鼓受益需要当前实际存活比赛角色")
+		}
+		id := actor.PlayerID
+		if p6Digest(actor.Battle) != actor.BattleHash {
+			return errors.New("战鼓受益原冻结角色身份损坏")
 		}
 		if actor.Hooked || (frame.GetState() != 0 && frame.GetState() != 1 && frame.GetState() != 6 && frame.GetState() != 5) || now.UnixMilli() < match.StartAt || now.UnixMilli() >= match.EndAt {
 			return errors.New("战鼓受益需要当前实际存活比赛角色")
 		}
-		var profile db.Profile
-		if err = tx.First(&profile, id).Error; err != nil {
-			return err
-		}
-		_, game, err := decodeProfileForCalendarUpdate(tx, &profile)
-		if err != nil {
-			return err
-		}
+		var err error
 		if game.PositionLoading || game.Position.GetScene() != constUtil.P13UnionFightFieldTarget {
 			return errors.New("战鼓受益原Current尚未加载")
 		}
@@ -291,23 +313,53 @@ func (s *GameService) p13UFDrumBattle(tx *gorm.DB, id int64, now time.Time) (*pb
 		if err = tx.Where("match_id=? AND camp=? AND guild_id=? AND ended_at=0 AND started_at<=? AND expires_at>?", match.ID, actor.Camp, actor.GuildID, now.UnixMilli(), now.UnixMilli()).Order("guid").Find(&rows).Error; err != nil {
 			return err
 		}
+		var quotes []db.P13UnionFightWarDrumOffer
+		if len(rows) > 0 {
+			if err = tx.Where("match_id=? AND item_id=?", match.ID, "ufitem_014").Find(&quotes).Error; err != nil {
+				return err
+			}
+		}
+		var quote *db.P13UnionFightWarDrumOffer
+		if len(quotes) == 1 {
+			quote = &quotes[0]
+		}
+		ids := make([]int64, 0, len(rows))
+		for _, row := range rows {
+			ids = append(ids, row.CasterID)
+		}
+		members := map[int64]db.P13GuildMember{}
+		casters := map[int64]db.P13UnionFightFieldPlayer{}
+		for offset := 0; offset < len(ids); offset += 128 {
+			batch := ids[offset:min(offset+128, len(ids))]
+			var ms []db.P13GuildMember
+			if err = tx.Where("player_id IN ?", batch).Find(&ms).Error; err != nil {
+				return err
+			}
+			for _, m := range ms {
+				members[m.PlayerID] = m
+			}
+			var actors []db.P13UnionFightFieldPlayer
+			if err = tx.Where("match_id=? AND player_id IN ?", match.ID, batch).Find(&actors).Error; err != nil {
+				return err
+			}
+			for _, a := range actors {
+				casters[a.PlayerID] = a
+			}
+		}
 		percent := int64(0)
 		var benefits []string
 		for _, row := range rows {
-			quote, err := p13UFDrumRead(tx, &row)
+			quote, err := p13UFDrumReadLoaded(&row, quote)
 			if err != nil {
 				return err
 			}
-			member, err := p13GuildMember(tx, row.CasterID)
-			if err != nil {
-				return err
-			}
+			member := members[row.CasterID]
 			if member.GuildID != row.GuildID || p13UFResourceDistance(actor, row.X, row.Y, row.Z) > quote.Radius {
 				continue
 			}
-			var caster db.P13UnionFightFieldPlayer
-			if err = tx.First(&caster, "match_id=? AND player_id=?", row.MatchID, row.CasterID).Error; err != nil {
-				return err
+			caster, exists := casters[row.CasterID]
+			if !exists {
+				return gorm.ErrRecordNotFound
 			}
 			if caster.LeftAt != 0 || caster.GuildID != row.GuildID || caster.Camp != row.Camp {
 				continue
@@ -353,7 +405,18 @@ func (s *GameService) TickP13UnionFightWarDrum(ctx context.Context, now time.Tim
 	if err := db.GetIns().WithContext(ctx).Where("ended_at=0").Order("match_id,guid").Find(&rows).Error; err != nil {
 		return err
 	}
+	scopes := make([]string, 0, len(rows))
 	for _, candidate := range rows {
+		scopes = append(scopes, candidate.MatchID)
+	}
+	clocks, clockErr := p13UFWorldClockBatch(ctx, scopes, now)
+	if clockErr != nil {
+		return clockErr
+	}
+	for _, candidate := range rows {
+		if clocks.paused(candidate.MatchID) {
+			continue
+		}
 		fresh := false
 		err := db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 			if err := ServerGameClockGuardTransaction(tx); err != nil {
@@ -363,6 +426,11 @@ func (s *GameService) TickP13UnionFightWarDrum(ctx context.Context, now time.Tim
 			var gate db.P13GuildPolicy
 			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&gate, 1).Error; err != nil {
 				return err
+			}
+			if closed, err := p13UFWorldSealed(tx, candidate.MatchID); err != nil {
+				return err
+			} else if closed {
+				return nil
 			}
 			var row db.P13UnionFightWarDrumEffect
 			if err := tx.First(&row, "match_id=? AND guid=?", candidate.MatchID, candidate.GUID).Error; err != nil {
@@ -386,10 +454,10 @@ func (s *GameService) TickP13UnionFightWarDrum(ctx context.Context, now time.Tim
 			if err = tx.First(&actor, "match_id=? AND player_id=?", row.MatchID, row.CasterID).Error; err != nil {
 				return err
 			}
-			if now.UnixMilli() < row.ExpiresAt && now.UnixMilli() < match.EndAt && member.GuildID == row.GuildID && actor.GuildID == row.GuildID && actor.LeftAt == 0 && gate.ManagementEnabled {
+			if now.UnixMilli() < row.ExpiresAt && now.UnixMilli() < clocks.end(&match) && member.GuildID == row.GuildID && actor.GuildID == row.GuildID && actor.LeftAt == 0 && gate.ManagementEnabled {
 				return nil
 			}
-			row.EndedAt = min(now.UnixMilli(), row.ExpiresAt)
+			row.EndedAt = min(now.UnixMilli(), row.ExpiresAt, clocks.end(&match))
 			if row.EndedAt < row.StartedAt {
 				return nil
 			}
@@ -404,7 +472,11 @@ func (s *GameService) TickP13UnionFightWarDrum(ctx context.Context, now time.Tim
 			return err
 		}
 		if fresh {
-			s.p13UFFieldBroadcast(ctx, candidate.MatchID, 0, &pb.SCUFTotemDestroy{Guid: proto.Int64(candidate.GUID)})
+			if err := p13UFPublishBeforeAbort(ctx, candidate.MatchID, func() {
+				s.p13UFFieldBroadcast(ctx, candidate.MatchID, 0, &pb.SCUFTotemDestroy{Guid: proto.Int64(candidate.GUID)})
+			}); err != nil {
+				return err
+			}
 		}
 	}
 	return nil

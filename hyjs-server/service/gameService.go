@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	mysqlDriver "github.com/go-sql-driver/mysql"
@@ -148,7 +149,12 @@ func (s *GameService) Dispatch(ctx context.Context, request *model.GamePacket, p
 		}
 	}
 	if !failed {
-		s.AfterP10SceneRequest(ctx, request.PlayerId, request.Body)
+		// A committed war move already publishes its authoritative position to
+		// the same field. Do not repeat the full presence transaction before
+		// replying to this socket; the next queued gameplay request must proceed.
+		if !p13UFMovePublished(request, result) {
+			s.AfterP10SceneRequest(ctx, request.PlayerId, request.Body)
+		}
 		if current, ok := request.Body.(*pb.CSCurrentPosition); ok && current.GetShowArround() != 0 {
 			peers, snapshotErr := s.p10CurrentScenePeers(ctx, request.PlayerId)
 			if snapshotErr != nil {
@@ -163,6 +169,19 @@ func (s *GameService) Dispatch(ctx context.Context, request *model.GamePacket, p
 	}
 	SanitizePlayerDisplay(result)
 	return result
+}
+
+func p13UFMovePublished(request *model.GamePacket, messages []proto.Message) bool {
+	if _, ok := request.Body.(*pb.CSMove); !ok {
+		return false
+	}
+	for _, message := range messages {
+		move, ok := message.(*pb.SCUFElementMove)
+		if ok && len(move.Guid) == 1 && move.Guid[0] == request.PlayerId && len(move.Pos) == 1 && move.Pos[0] != nil {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *GameService) dispatch(ctx context.Context, r *model.GamePacket, peer string) ([]proto.Message, error) {
@@ -290,12 +309,18 @@ func (s *GameService) dispatch(ctx context.Context, r *model.GamePacket, peer st
 	if err != nil {
 		return nil, err
 	}
-	// Transport packets keep authentication and clock binding; materialize personal
-	// activities before the next gameplay consumer instead of every movement tick.
+	// Transport and frozen war admission retain authentication/clock binding;
+	// personal activity sources are prepared by their next gameplay consumer.
 	prepareActivities := true
 	switch r.Body.(type) {
-	case *pb.CSMove, *pb.CSPingTcp, *pb.CSPingAckTcp, *pb.CSSpeedCheck, *pb.CSEnterBackgroud:
+	case *pb.CSMove, *pb.CSPingTcp, *pb.CSPingAckTcp, *pb.CSSpeedCheck, *pb.CSEnterBackgroud, *pb.CSUFPlayerAskFight:
 		prepareActivities = false
+	case *pb.CSSocketLogin, *pb.CSCurrentPosition, *pb.CSLoginScene, *pb.CSUFInit:
+		inside, locationErr := p13UFProfileInField(row)
+		if locationErr != nil {
+			return nil, locationErr
+		}
+		prepareActivities = !inside
 	}
 	if row.Player != nil && prepareActivities {
 		if err = s.PrepareAdminCharacterActivitySchedules(ctx, row.Id); err != nil {
@@ -313,6 +338,22 @@ func (s *GameService) dispatch(ctx context.Context, r *model.GamePacket, peer st
 	ctx = bindFieldRuntime(ctx, s)
 	switch b := r.Body.(type) {
 	case *pb.CSMove:
+		// Reuse the authenticated snapshot to route war movement before the
+		// generic field fast path. Its transaction rechecks the actual room and
+		// updates the frozen actor and profile together under guild/profile locks.
+		if row.Game != nil {
+			var location struct {
+				Position struct {
+					Scene string `json:"scene"`
+				} `json:"position"`
+			}
+			if err := json.Unmarshal([]byte(*row.Game), &location); err != nil {
+				return nil, err
+			}
+			if location.Position.Scene == constUtil.P13UnionFightFieldTarget {
+				return s.p13UFFieldMove(ctx, row.Id, b, p13UFNow(ctx))
+			}
+		}
 		// The movement transaction already recovers resources under its role lock.
 		return nil, s.fieldMove(ctx, row.Id, b)
 	case *pb.CSRefreshSideHp:
@@ -344,6 +385,13 @@ func (s *GameService) dispatch(ctx context.Context, r *model.GamePacket, peer st
 		if row.Player == nil || row.Game == nil {
 			return reply, nil
 		}
+		// A war heartbeat has no ordinary-field work. Its existing scene sync
+		// still verifies the frozen actor, live membership and closed-world exit.
+		if inside, locationErr := p13UFProfileInField(row); locationErr != nil {
+			return nil, locationErr
+		} else if inside {
+			return reply, nil
+		}
 		push, err := s.fieldHeartbeat(ctx, row.Id)
 		if err != nil {
 			return nil, err
@@ -368,6 +416,20 @@ func (s *GameService) dispatch(ctx context.Context, r *model.GamePacket, peer st
 	if s.P12FieldPVPReady {
 		if reply, handled, err := s.DispatchP12FieldPVP(ctx, row.Id, r.Session, r.Body, r.Timestamp); handled {
 			return reply, err
+		}
+	}
+	// Frozen war transport and admission own their locked profile checks. Avoid
+	// a separate personal-resource transaction before the same domain operation.
+	switch r.Body.(type) {
+	case *pb.CSCurrentPosition, *pb.CSLoginScene, *pb.CSUFInit, *pb.CSUFPlayerAskFight:
+		inside, locationErr := p13UFProfileInField(row)
+		if locationErr != nil {
+			return nil, locationErr
+		}
+		if inside {
+			if reply, handled, warErr := s.DispatchP13UnionFight(ctx, row.Id, r.Body, r.Timestamp); handled {
+				return reply, warErr
+			}
 		}
 	}
 	player, game, err := s.resourceProfile(ctx, row.Id)
@@ -562,7 +624,14 @@ func (s *GameService) dispatch(ctx context.Context, r *model.GamePacket, peer st
 		if err := s.RecordP4Login(ctx, row.Id); err != nil {
 			return nil, err
 		}
-		return gameReply("SCPlayerLogin", map[string]any{"player": player, "playerCreateTime": row.CreatedAt})
+		// Original LoginPlayerLogin always fetches guild properties before
+		// InitPlayerData. A dirty cached login Player would send a duplicate
+		// request during ResetPlayer and silently drop CSFriendList on the
+		// original single-flight HTTP transport. The durable flag is only
+		// acknowledged by successful CSGetUnionAddBaseProp below.
+		loginPlayer := proto.Clone(player).(*pb.Player)
+		loginPlayer.NeedRefreshUnionProp = proto.Int32(0)
+		return gameReply("SCPlayerLogin", map[string]any{"player": loginPlayer, "playerCreateTime": row.CreatedAt})
 	case *pb.CSWarriorRecruitGuide:
 		return s.recruitGuide(ctx, row.Id)
 	case *pb.CSWarriorAwake:

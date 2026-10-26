@@ -132,6 +132,65 @@ func TestP13UFGuardBattleActualDiagnosticMappingAndProofRefusal(t *testing.T) {
 			if _, _, _, _, _, err := p13UFGuardBattleMap(&input, &bad, &before, &guard, rules, 5000, 6000); err == nil {
 				t.Fatal("mismatched terminal actor accepted")
 			}
+			mirror := *rules
+			mirror.LocalRule = constUtil.P13UFGuardMirrorRule
+			mirror.MatchStartAt, mirror.MatchEndAt = 1, 100000
+			terminalBytes, _ := json.Marshal(&terminal)
+			mp, mg, md, mf, _, err := p13UFGuardBattleMap(&input, &terminal, &before, &guard, &mirror, 5000, 6000)
+			if err != nil || !proto.Equal(mp, after) || md != dead || mf != defeated {
+				t.Fatal("mirror changed actual player terminal", err)
+			}
+			if !defeated && (mg.FightInfo.HpPos[0] != guard.FightInfo.MaxHpPos[0] || mg.FightInfo.GetAnger() != 0) {
+				t.Fatal("unfinished mirror challenge retained NPC wounds/AP")
+			}
+			if defeated && !proto.Equal(mg, guardAfter) {
+				t.Fatal("defeated mirror did not preserve terminal")
+			}
+			afterTerminalBytes, _ := json.Marshal(&terminal)
+			if string(terminalBytes) != string(afterTerminalBytes) {
+				t.Fatal("business reset rewrote raw P6 terminal")
+			}
+			// Mapping-only cardinality/identity coverage; these derived copies are
+			// not original-engine evidence and do not acquire authority.
+			var multi model.FrozenBattleInput
+			inputBytes, _ := json.Marshal(&input)
+			_ = json.Unmarshal(inputBytes, &multi)
+			var multiOut model.CombatFinalHPOutcome
+			_ = json.Unmarshal(terminalBytes, &multiOut)
+			multiBefore := proto.Clone(&before).(*pb.InstUFPlayer)
+			var playerActor model.CombatFinalActorHP
+			for _, actor := range multiOut.FinalActors {
+				if actor.Camp == 0 {
+					playerActor = actor
+				}
+			}
+			used := map[int32]bool{multi.Attacker.Formation[0].GetPose(): true}
+			for n := 2; n <= 4; n++ {
+				hero := proto.Clone(multi.Attacker.Formation[0]).(*pb.BattleHero)
+				pose := int32(1)
+				for used[pose] {
+					pose++
+				}
+				used[pose] = true
+				hero.Pose = proto.Int32(pose)
+				hero.Guid = proto.String(hero.GetGuid() + "/map-copy/" + string(rune('0'+n)))
+				multi.Attacker.Formation = append(multi.Attacker.Formation, hero)
+				multiBefore.FightInfo.Index = append(multiBefore.FightInfo.Index, pose)
+				multiBefore.FightInfo.HpPos = append(multiBefore.FightInfo.HpPos, hero.Inst.GetCurHp())
+				multiBefore.FightInfo.MaxHpPos = append(multiBefore.FightInfo.MaxHpPos, hero.Prop.GetHp())
+				actor := playerActor
+				actor.GUID, actor.Pose = hero.GetGuid(), pose
+				raw, _ := proto.MarshalOptions{Deterministic: true}.Marshal(hero)
+				actor.InitialActorSHA256 = p6Digest(raw)
+				multiOut.FinalActors = append(multiOut.FinalActors, actor)
+				mapped, _, _, _, _, err := p13UFGuardBattleMap(&multi, &multiOut, multiBefore, &guard, &mirror, 5000, 6000)
+				if err != nil || len(mapped.FightInfo.HpPos) != n || mapped.FightInfo.HpPos[n-1] != playerActor.CurrentHP {
+					t.Fatal("multihero GUID/Pose mapping", n, err)
+				}
+				if _, _, _, _, _, err = p13UFGuardBattleMap(&multi, &multiOut, multiBefore, &guard, rules, 5000, 6000); err == nil {
+					t.Fatal("legacy single-hero contract expanded")
+				}
+			}
 			if terminal.Outcome.Authoritative {
 				t.Fatal("pure map promoted diagnostic result")
 			}

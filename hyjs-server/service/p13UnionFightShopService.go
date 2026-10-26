@@ -21,7 +21,7 @@ import (
 )
 
 func (s *GameService) InitializeP13UnionFightShop(ctx context.Context) error {
-	return db.GetIns().WithContext(ctx).AutoMigrate(&db.P13UnionFightShopSource{}, &db.P13UnionFightShopOffer{}, &db.P13UnionFightShopStock{}, &db.P13UnionFightShopVisit{})
+	return db.GetIns().WithContext(ctx).AutoMigrate(&db.P13UnionFightShopSource{}, &db.P13UnionFightShopOffer{}, &db.P13UnionFightShopStock{}, &db.P13UnionFightShopVisit{}, &db.P13UnionFightShopPurchase{})
 }
 
 func p13UFShopCostResource(source db.P13UnionFightShopSource) string {
@@ -88,6 +88,31 @@ func (s *GameService) p13UFShopBuild(tx *gorm.DB, match *db.P13UnionFightMatch, 
 	if len(sources) > 100 {
 		return 0, errors.New("具名本地场内目录超过100项")
 	}
+	if len(sources) == 0 {
+		return distance, nil
+	}
+	activeIDs := make([]string, 0, len(sources))
+	for _, source := range sources {
+		activeIDs = append(activeIDs, source.ShopItemID)
+	}
+	var previousRows []db.P13UnionFightShopOffer
+	if err = tx.Where("match_id=? AND shop_item_id IN ?", match.ID, activeIDs).Order("shop_item_id").Limit(101).Find(&previousRows).Error; err != nil {
+		return 0, err
+	}
+	if len(previousRows) > 100 {
+		return 0, errors.New("本场冻结商店目录超过100项")
+	}
+	previousByID := make(map[string]*db.P13UnionFightShopOffer, len(previousRows))
+	var legacyIDs []string
+	var legacyArgs []any
+	legacyCase := "CASE shop_item_id"
+	for i := range previousRows {
+		row := &previousRows[i]
+		if _, e := p13UFShopOffer(row); e != nil {
+			return 0, e
+		}
+		previousByID[row.ShopItemID] = row
+	}
 	for _, source := range sources {
 		item := original.table("UnionFightItem", "UFItemId", source.ItemID)
 		if item == nil || source.ShopItemID == "" || strings.TrimSpace(source.ShopItemID) != source.ShopItemID || len(source.ShopItemID) > 64 || strings.TrimSpace(source.Source) == "" || source.PublishedAt <= 0 || source.PublishedAt > now.UnixMilli() {
@@ -106,21 +131,19 @@ func (s *GameService) p13UFShopBuild(tx *gorm.DB, match *db.P13UnionFightMatch, 
 				return 0, err
 			}
 		}
-		var previous db.P13UnionFightShopOffer
-		priorErr := tx.First(&previous, "match_id=? AND shop_item_id=?", match.ID, source.ShopItemID).Error
-		if priorErr == nil {
-			priorFrame, e := p13UFShopOffer(&previous)
+		if previous := previousByID[source.ShopItemID]; previous != nil {
+			priorFrame, e := p13UFShopOffer(previous)
 			if e != nil {
-				return 0, e
-			}
-			if e = tx.Model(&db.P13UnionFightShopStock{}).Where("match_id=? AND shop_item_id=? AND capacity=?", match.ID, source.ShopItemID, 0).Update("capacity", priorFrame.GetTotalBuyCount()).Error; e != nil {
 				return 0, e
 			}
 			if priorFrame.GetShopItemId() == p13UFShopQuotedID(source) {
 				continue
 			}
-		} else if !errors.Is(priorErr, gorm.ErrRecordNotFound) {
-			return 0, priorErr
+			if int64(priorFrame.GetTotalBuyCount()) != source.BuyCount {
+				legacyIDs = append(legacyIDs, source.ShopItemID)
+				legacyCase += " WHEN ? THEN ?"
+				legacyArgs = append(legacyArgs, source.ShopItemID, priorFrame.GetTotalBuyCount())
+			}
 		}
 		frame := &pb.InstUFShopItem{ShopItemId: proto.String(p13UFShopQuotedID(source)), ItemId: proto.String(source.ItemID), Num: proto.Int32(int32(source.Quantity)), Price: proto.Int32(int32(source.Price)), TotalBuyCount: proto.Int32(int32(source.BuyCount)), LeftBuyCount: proto.Int32(int32(source.BuyCount)), Priority: proto.Int32(int32(source.Priority)), BuyCondition: proto.Int32(int32(source.BuyCondition)), LastRefreshTime: proto.Int64(now.UnixMilli()), RefreshIntervalTime: proto.Int64(source.RefreshMillis)}
 		raw, err := proto.Marshal(frame)
@@ -130,6 +153,14 @@ func (s *GameService) p13UFShopBuild(tx *gorm.DB, match *db.P13UnionFightMatch, 
 		offer := db.P13UnionFightShopOffer{MatchID: match.ID, ShopItemID: source.ShopItemID, Frame: raw, FrameHash: p6Digest(raw), Source: constUtil.P13UnionFightShopSource + "；发布：" + source.Source}
 		offer.SourceHash = p13UFShopDigest(&offer)
 		if err = tx.Clauses(clause.OnConflict{Columns: []clause.Column{{Name: "match_id"}, {Name: "shop_item_id"}}, DoUpdates: clause.AssignmentColumns([]string{"frame", "frame_hash", "source_hash", "source"})}).Create(&offer).Error; err != nil {
+			return 0, err
+		}
+	}
+	// Preserve the prior capacity before a quota change. Unchanged catalogues
+	// leave old zero-capacity rows to the existing per-member lazy migration.
+	if len(legacyIDs) > 0 {
+		legacyCase += " ELSE capacity END"
+		if err = tx.Model(&db.P13UnionFightShopStock{}).Where("match_id=? AND capacity=0 AND shop_item_id IN ?", match.ID, legacyIDs).Update("capacity", gorm.Expr(legacyCase, legacyArgs...)).Error; err != nil {
 			return 0, err
 		}
 	}
@@ -153,35 +184,82 @@ func p13UFShopStock(tx *gorm.DB, scope string, id int64, item *pb.InstUFShopItem
 	if err = tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&stock, "match_id=? AND player_id=? AND shop_item_id=?", scope, id, item.GetShopItemId()).Error; err != nil {
 		return nil, err
 	}
+	before := stock
+	if err = p13UFShopRefreshStock(&stock, item, now); err != nil {
+		return nil, err
+	}
+	if stock != before {
+		if err = tx.Save(&stock).Error; err != nil {
+			return nil, err
+		}
+	}
+	return &stock, nil
+}
+
+func p13UFShopRefreshStock(stock *db.P13UnionFightShopStock, item *pb.InstUFShopItem, now time.Time) error {
 	maximum := int64(item.GetTotalBuyCount())
 	if stock.LeftCount < 0 || stock.LastRefreshAt <= 0 {
-		return nil, errors.New("场内个人购买余量损坏")
+		return errors.New("场内个人购买余量损坏")
 	}
 	if stock.Capacity == 0 {
 		stock.Capacity = maximum
 	}
 	if stock.Capacity < 1 || stock.LeftCount > stock.Capacity {
-		return nil, errors.New("场内个人购买余量损坏")
+		return errors.New("场内个人购买余量损坏")
 	}
 	if stock.Capacity != maximum {
 		used := max(int64(0), stock.Capacity-stock.LeftCount)
 		stock.LeftCount = max(int64(0), maximum-used)
 		stock.Capacity = maximum
-		if err := tx.Save(&stock).Error; err != nil {
-			return nil, err
-		}
 	}
 	if stock.LeftCount < maximum {
 		steps := max(int64(0), now.UnixMilli()-stock.LastRefreshAt) / item.GetRefreshIntervalTime()
 		if steps > 0 {
 			stock.LeftCount = min(maximum, stock.LeftCount+steps)
 			stock.LastRefreshAt += steps * item.GetRefreshIntervalTime()
-			if err = tx.Save(&stock).Error; err != nil {
-				return nil, err
-			}
 		}
 	}
-	return &stock, nil
+	return nil
+}
+
+// List takes all of this member's displayed stock rows in one indexed query.
+// Guild policy serializes creation; existing rows additionally use row locks.
+func p13UFShopListStocks(tx *gorm.DB, scope string, id int64, items map[string]*pb.InstUFShopItem, now time.Time) (map[string]db.P13UnionFightShopStock, error) {
+	stocks := make(map[string]db.P13UnionFightShopStock, len(items))
+	if len(items) == 0 {
+		return stocks, nil
+	}
+	ids := make([]string, 0, len(items))
+	for key := range items {
+		ids = append(ids, key)
+	}
+	var rows []db.P13UnionFightShopStock
+	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("match_id=? AND player_id=? AND shop_item_id IN ?", scope, id, ids).Order("shop_item_id").Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	for _, row := range rows {
+		stocks[row.ShopItemID] = row
+	}
+	var changed []db.P13UnionFightShopStock
+	for key, item := range items {
+		stock, exists := stocks[key]
+		before := stock
+		if !exists {
+			stock = db.P13UnionFightShopStock{MatchID: scope, PlayerID: id, ShopItemID: key, LeftCount: int64(item.GetTotalBuyCount()), Capacity: int64(item.GetTotalBuyCount()), LastRefreshAt: now.UnixMilli()}
+		} else if err := p13UFShopRefreshStock(&stock, item, now); err != nil {
+			return nil, err
+		}
+		stocks[key] = stock
+		if stock != before {
+			changed = append(changed, stock)
+		}
+	}
+	if len(changed) > 0 {
+		if err := tx.Clauses(clause.OnConflict{Columns: []clause.Column{{Name: "match_id"}, {Name: "player_id"}, {Name: "shop_item_id"}}, DoUpdates: clause.AssignmentColumns([]string{"left_count", "capacity", "last_refresh_at"})}).Create(&changed).Error; err != nil {
+			return nil, err
+		}
+	}
+	return stocks, nil
 }
 
 // p13UFShopNPC 绑定真实本阵营NPC和当前位置；原购买后空npcId仅引用本场已授权的上次店。
@@ -223,11 +301,26 @@ func (s *GameService) p13UFShopCurrentOffers(tx *gorm.DB, match *db.P13UnionFigh
 	if err = tx.Where("day=? AND enabled=?", match.Day, true).Order("priority,shop_item_id").Find(&sources).Error; err != nil {
 		return nil, err
 	}
-	var offers []db.P13UnionFightShopOffer
+	var ids []string
 	for _, source := range sources {
-		var offer db.P13UnionFightShopOffer
-		if err = tx.First(&offer, "match_id=? AND shop_item_id=?", match.ID, source.ShopItemID).Error; err != nil {
-			return nil, err
+		ids = append(ids, source.ShopItemID)
+	}
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	var rows []db.P13UnionFightShopOffer
+	if err = tx.Where("match_id=? AND shop_item_id IN ?", match.ID, ids).Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	byID := make(map[string]db.P13UnionFightShopOffer, len(rows))
+	for _, row := range rows {
+		byID[row.ShopItemID] = row
+	}
+	offers := make([]db.P13UnionFightShopOffer, 0, len(sources))
+	for _, source := range sources {
+		offer, ok := byID[source.ShopItemID]
+		if !ok {
+			return nil, gorm.ErrRecordNotFound
 		}
 		offers = append(offers, offer)
 	}
@@ -272,16 +365,32 @@ func (s *GameService) p13UFShopList(ctx context.Context, id int64, request *pb.C
 		if err != nil {
 			return err
 		}
+		items := make(map[string]*pb.InstUFShopItem, len(offers))
 		for _, offer := range offers {
 			item, err := p13UFShopOffer(&offer)
 			if err != nil {
 				return err
 			}
-			stock, err := p13UFShopStock(tx, match.ID, id, p13UFShopStockItem(item, offer.ShopItemID), now)
-			if err != nil {
-				return err
-			}
+			items[offer.ShopItemID] = item
+		}
+		stocks, err := p13UFShopListStocks(tx, match.ID, id, items, now)
+		if err != nil {
+			return err
+		}
+		itemIDs := make([]string, 0, len(items))
+		for _, item := range items {
+			itemIDs = append(itemIDs, item.GetItemId())
+		}
+		budgets, err := p13UFShopBudgetBatch(tx, match, actor, itemIDs)
+		if err != nil {
+			return err
+		}
+		for _, offer := range offers {
+			item, stock := items[offer.ShopItemID], stocks[offer.ShopItemID]
 			item.LeftBuyCount = proto.Int32(int32(stock.LeftCount))
+			if budget := budgets[item.GetItemId()]; budget.Enabled {
+				item.LeftBuyCount = proto.Int32(int32(min(stock.LeftCount, budget.Remaining/int64(item.GetNum()))))
+			}
 			item.LastRefreshTime = proto.Int64(stock.LastRefreshAt)
 			reply.Items = append(reply.Items, item)
 		}
@@ -405,6 +514,7 @@ func (s *GameService) p13UFShopBuy(ctx context.Context, id int64, request *pb.CS
 			return err
 		}
 		var item *pb.InstUFShopItem
+		var frozenPurchaseOffer *db.P13UnionFightShopOffer
 		var stableID string
 		for _, offer := range offers {
 			candidate, e := p13UFShopOffer(&offer)
@@ -414,6 +524,8 @@ func (s *GameService) p13UFShopBuy(ctx context.Context, id int64, request *pb.CS
 			if candidate.GetShopItemId() == request.GetShopItemId() {
 				item = candidate
 				stableID = offer.ShopItemID
+				copy := offer
+				frozenPurchaseOffer = &copy
 				break
 			}
 		}
@@ -438,8 +550,17 @@ func (s *GameService) p13UFShopBuy(ctx context.Context, id int64, request *pb.CS
 		if item.GetPrice() < 0 || int64(item.GetPrice()) > math.MaxInt32/int64(count) || item.GetNum() < 1 || int64(item.GetNum()) > math.MaxInt32/int64(count) {
 			return errors.New("批量价格或数量超限")
 		}
+		purchaseBefore := proto.Clone(frame).(*pb.InstUFPlayer)
+		purchaseStockBefore := stock.LeftCount
 		totalPrice := int64(item.GetPrice()) * int64(count)
 		totalQuantity := item.GetNum() * count
+		budgets, err := p13UFShopBudgetBatch(tx, match, actor, []string{item.GetItemId()})
+		if err != nil {
+			return err
+		}
+		if err = p13UFShopBudgetCheck(budgets[item.GetItemId()], int64(totalQuantity)); err != nil {
+			return err
+		}
 		owned := frame.GetOwnToken()
 		if costResource == constUtil.UnionFightShopTokenResource && (owned < 0 || math.IsNaN(owned) || math.IsInf(owned, 0) || owned != math.Trunc(owned) || owned > 9007199254740991 || owned < float64(totalPrice)) {
 			return errors.New("原战争贡献余额不足或损坏")
@@ -476,6 +597,9 @@ func (s *GameService) p13UFShopBuy(ctx context.Context, id int64, request *pb.CS
 			if err = saveProfile(tx, &profile, player, game); err != nil {
 				return err
 			}
+		}
+		if err = p13UFShopPurchaseRecord(tx, scope, id, stamp, now.UnixMilli(), int64(count), frozenPurchaseOffer, purchaseStockBefore, stock.LeftCount, purchaseBefore, frame); err != nil {
+			return err
 		}
 		if err = p13UFFieldSaveActor(tx, actor, frame); err != nil {
 			return err

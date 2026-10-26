@@ -1,4 +1,7 @@
 CREATE TABLE IF NOT EXISTS `p13_union_fight_settlement_results` (
+ result_kind VARCHAR(32) NOT NULL DEFAULT '',
+ terminal_at BIGINT NOT NULL DEFAULT 0,
+
   `win_task_prestige` INT NOT NULL DEFAULT 0,
   `lose_task_prestige` INT NOT NULL DEFAULT 0,
   `combat_proof` LONGBLOB NULL,
@@ -22,5 +25,6 @@ CREATE TABLE IF NOT EXISTS `p13_union_fight_settlement_results` (
   `awards` LONGBLOB NOT NULL,
   `mvp` BLOB NULL,
   `source` TEXT NOT NULL,
+  KEY `p13_uf_settlement_delivery` (`delivered_at`,`award_at`,`match_id`),
   PRIMARY KEY (`match_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

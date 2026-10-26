@@ -13,7 +13,7 @@ import (
 
 func p13UFOpen(t *testing.T) {
 	t.Helper()
-	if err := db.GetIns().Model(&db.P13UnionFightPolicy{}).Where("id=1").Updates(map[string]any{"enrollment_enabled": true, "match_enabled": false}).Error; err != nil {
+	if err := db.GetIns().Model(&db.P13UnionFightPolicy{}).Where("id=1").Updates(map[string]any{"war_enabled": true, "enrollment_enabled": true, "match_enabled": false}).Error; err != nil {
 		t.Fatal(err)
 	}
 }

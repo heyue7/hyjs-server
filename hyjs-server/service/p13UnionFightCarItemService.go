@@ -21,7 +21,10 @@ import (
 
 // InitializeP13UnionFightCarItem 炸弹效果来源单独迁移，原伤害量没有默认本地值。
 func (s *GameService) InitializeP13UnionFightCarItem(ctx context.Context) error {
-	return db.GetIns().WithContext(ctx).AutoMigrate(&db.P13UnionFightCarItemSource{}, &db.P13UnionFightCarItemOffer{})
+	if err := db.GetIns().WithContext(ctx).AutoMigrate(&db.P13UnionFightCarItemSource{}, &db.P13UnionFightCarItemOffer{}, &db.P13UnionFightCarImpact{}); err != nil {
+		return err
+	}
+	return s.InitializeP13UnionFightItemBudget(ctx)
 }
 func p13UFCarItemOfferHash(row *db.P13UnionFightCarItemOffer) string {
 	copy := *row
@@ -37,6 +40,9 @@ func (s *GameService) p13UFCarItemBuild(tx *gorm.DB, match *db.P13UnionFightMatc
 		return err
 	}
 	for _, source := range sources {
+		if err := p13UFItemBudgetValidate(source.ItemID, p13UFItemBudgetConfig{source.BudgetRule, source.TeamUseLimit, source.TargetCooldownMillis, source.EffectFamily}); err != nil {
+			return err
+		}
 		effect := ""
 		switch source.ItemID {
 		case "ufitem_017":
@@ -54,7 +60,7 @@ func (s *GameService) p13UFCarItemBuild(tx *gorm.DB, match *db.P13UnionFightMatc
 		if err != nil || math.IsNaN(cd) || math.IsInf(cd, 0) || cd < 0.1 || cd > 3600 {
 			return errors.New("原炸弹普通5秒CD缺失")
 		}
-		quote := db.P13UnionFightCarItemOffer{MatchID: match.ID, ItemID: source.ItemID, HPPercent: source.HPPercent, Radius: 5, CooldownMillis: int64(cd * 1000), Source: constUtil.P13UnionFightCarItemSource + "；发布：" + source.Source}
+		quote := db.P13UnionFightCarItemOffer{BudgetRule: source.BudgetRule, TeamUseLimit: source.TeamUseLimit, TargetCooldownMillis: source.TargetCooldownMillis, EffectFamily: source.EffectFamily, MatchID: match.ID, ItemID: source.ItemID, HPPercent: source.HPPercent, Radius: 5, CooldownMillis: int64(cd * 1000), Source: constUtil.P13UnionFightCarItemSource + "；发布：" + source.Source}
 		quote.SourceHash = p13UFCarItemOfferHash(&quote)
 		if err = tx.Create(&quote).Error; err != nil {
 			return err
@@ -201,6 +207,9 @@ func (s *GameService) p13UFCarItemUse(ctx context.Context, id int64, request *pb
 		if quote.SourceHash != p13UFCarItemOfferHash(&quote) || quote.Radius != 5 || (quote.CooldownMillis < 100 || quote.CooldownMillis > 3600000) || quote.HPPercent < 1 || quote.HPPercent > 100 || (quote.ItemID != "ufitem_017" && quote.ItemID != "ufitem_018") {
 			return errors.New("原车炸弹目标/具名比例SHA损坏")
 		}
+		if err = p13UFItemBudgetValidate(quote.ItemID, p13UFItemBudgetConfig{quote.BudgetRule, quote.TeamUseLimit, quote.TargetCooldownMillis, quote.EffectFamily}); err != nil {
+			return err
+		}
 		state, err := p13UFItemProject(tx, scope, id, frame, now)
 		if err != nil {
 			return err
@@ -229,7 +238,17 @@ func (s *GameService) p13UFCarItemUse(ctx context.Context, id int64, request *pb
 			return err
 		}
 		oldHP := target.GetHp()
-		target.Hp = proto.Float64(max(float64(0), oldHP-target.GetMaxHp()*(float64(quote.HPPercent)/100)))
+		newHP := max(float64(0), oldHP-target.GetMaxHp()*(float64(quote.HPPercent)/100))
+		if newHP >= oldHP {
+			return errors.New("本次炸弹没有可生效的实际车HP")
+		}
+		if err = p13UFItemBudgetConsume(tx, scope, actor.Camp, quote.ItemID, target.GetGuid(), quote.SourceHash, p13UFItemBudgetConfig{quote.BudgetRule, quote.TeamUseLimit, quote.TargetCooldownMillis, quote.EffectFamily}, now); err != nil {
+			return err
+		}
+		target.Hp = proto.Float64(newHP)
+		if err = p13UFCarImpactRecord(tx, row, target, db.P13UnionFightCarImpact{PlayerID: id, Camp: actor.Camp, ItemID: quote.ItemID, Stamp: stamp, OfferHash: quote.SourceHash, HPPercent: quote.HPPercent, InventoryBefore: int64(item.GetLeftUseNum()), InventoryAfter: int64(item.GetLeftUseNum() - 1), LogicalAt: now.UnixMilli(), AppliedAt: now.UnixMilli()}); err != nil {
+			return err
+		}
 		rawCar, err := proto.Marshal(target)
 		if err != nil {
 			return err

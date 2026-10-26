@@ -53,6 +53,12 @@ func p13UFCombatProofDigest(result *db.P13UnionFightSettlementResult) string {
 }
 
 func p13UFCombatProofVerify(tx *gorm.DB, match *db.P13UnionFightMatch, result *db.P13UnionFightSettlementResult) error {
+	if result.ResultKind == constUtil.P13UFTechnicalAbortKind || result.Source == constUtil.P13UFTechnicalAbortSource {
+		return p13UFTechnicalAbortVerify(tx, match, result)
+	}
+	if strings.HasPrefix(result.Source, constUtil.P13UnionFightMixedSettlementSource) || p13UFMixedSchema(result.CombatProof) {
+		return p13UFMixedProofVerify(tx, match, result)
+	}
 	reject := func() error { return errors.New("公会战轻量终局证明或来源不一致") }
 	combat := strings.HasPrefix(result.Source, constUtil.P13UnionFightCombatSettlementSource)
 	if !combat && result.Reason == "" && result.LedgerHash == "" && result.LeftKills == 0 && result.RightKills == 0 && result.LeftReachedAt == 0 && result.RightReachedAt == 0 && len(result.CombatProof) == 0 && result.CombatProofHash == "" {

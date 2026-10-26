@@ -28,8 +28,25 @@ public sealed class OwnedSceneLifetime : MonoBehaviour {
  private void Update() { GuildBattleScene.GuardTick(); }
  private void OnDestroy() { GuildBattleScene.Release(gameObject); }
 }
+public sealed class GuildEntryProbe : MonoBehaviour {
+ internal UnionFightSignUpItem Item;
+ internal WWW Request;
+ private bool busy;
+ internal void Begin(UnionFightSignUpItem item) {
+  if (busy) return;
+  Item = item; busy = true;
+  StartCoroutine(GuildBattleScene.ProbeEntry(this, item));
+ }
+ internal void Complete() {
+  if (Request != null) Request.Dispose();
+  Request = null; Item = null; busy = false;
+ }
+ private void OnDisable() { StopAllCoroutines(); Complete(); }
+}
 public static class GuildBattleScene
 {
+ public static void ObserveTown(TownPage page) { GuildWarAvailability.EnsureTownAvailability(page); }
+ public static bool BlockTownEntry(TownPage page) { return !GuildWarAvailability.CanEnterFromTown(page); }
 	private static GameObject root;
     private static RoomUnionFight sceneRoom;
     private static long scenePlayerID;
@@ -57,6 +74,7 @@ public static class GuildBattleScene
  }
  private static readonly List<Projection> projections = new List<Projection>();
  private static readonly List<Texture2D> textures = new List<Texture2D>();
+ private static readonly List<Mesh> meshes = new List<Mesh>();
  private static readonly List<MiniMapRestore> miniMaps = new List<MiniMapRestore>();
  private sealed class MiniMapRestore {
   public MiniMapComponent Component; public UITexture Texture; public Texture OriginalTexture;
@@ -73,6 +91,7 @@ public static class GuildBattleScene
  public static void Release(GameObject owner) {
   if (!object.ReferenceEquals(root, owner)) return;
   CancelGuard(true);
+  ResetPlayerRequests();
   root = null; sceneRoom = null; scenePlayerID = 0; sceneSession = null;
   for (int i = projections.Count - 1; i >= 0; i--) projections[i].Restore();
   projections.Clear(); prepared = false;
@@ -88,6 +107,8 @@ public static class GuildBattleScene
   stone = blue = red = wood = road = null;
   foreach (Texture2D texture in textures) if (texture != null) UnityEngine.Object.Destroy(texture);
   textures.Clear(); if (map != null) UnityEngine.Object.Destroy(map); map = null;
+  foreach (Mesh mesh in meshes) if (mesh != null) UnityEngine.Object.Destroy(mesh);
+  meshes.Clear();
  }
 	private static readonly BindingFlags Flags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
 
@@ -206,6 +227,7 @@ public static class GuildBattleScene
 	private static Transform Node (string path, Vector3 at)
 	{
 		string[] array = path.Split ('/');
+        if (array.Length < 2 || array[0] != root.name) throw new InvalidOperationException("Guild scene node must name a child of the battlefield");
 		Transform transform = root.transform;
 		for (int i = 1; i < array.Length; i++) {
 			Transform transform2 = transform.Find (array [i]);
@@ -235,7 +257,8 @@ public static class GuildBattleScene
 		root = new GameObject ("map_battle_001");
 		root.layer = 8;
         root.AddComponent<OwnedSceneLifetime>();
-		Shape (root.transform, "BattlefieldGround", PrimitiveType.Cube, new Vector3 (40f, -0.25f, 0f), new Vector3 (155f, 0.5f, 108f), stone, true);
+		GameObject ground = Shape (root.transform, "BattlefieldGround", PrimitiveType.Cube, new Vector3 (40f, -0.25f, 0f), new Vector3 (155f, 0.5f, 108f), stone, true);
+        ground.layer = 11; // Static Scene terrain must stay outside the original Actor selection mask.
 		Shape (root.transform, "MainRoad", PrimitiveType.Cube, new Vector3 (38f, 0.01f, 0f), new Vector3 (130f, 0.04f, 13f), road);
 		Shape (root.transform, "UpperRoad", PrimitiveType.Cube, new Vector3 (38f, 0.01f, 25f), new Vector3 (100f, 0.04f, 8f), road);
 		Shape (root.transform, "LowerRoad", PrimitiveType.Cube, new Vector3 (38f, 0.01f, -25f), new Vector3 (100f, 0.04f, 8f), road);
@@ -271,6 +294,9 @@ public static class GuildBattleScene
 			transform.rotation = Quaternion.Euler (0f, (float)cache4.GateRotation, 0f);
 		}
 		foreach (TableUnionFightRevivePoint cache5 in instance.tableUnionFightRevivePointDao.CacheList) {
+            // Original points 6/7 are hidden safety locations with no scene model.
+            // Passing their empty path to Node would move the entire battlefield.
+            if (string.IsNullOrEmpty(cache5.ModelUrl)) continue;
 			Shape (Node (cache5.ModelUrl, Vec (cache5.Position)), "CapturePoint", PrimitiveType.Cylinder, new Vector3 (0f, 0.12f, 0f), new Vector3 (4f, 0.12f, 4f), (cache5.InitCamp == 0) ? blue : ((cache5.InitCamp == 1) ? red : road));
 		}
 		GameObject gameObject2 = new GameObject ("BattlefieldLight");
@@ -345,6 +371,7 @@ public static class GuildBattleScene
   catch { CancelGuard(false); throw; } // Original sender feedback/exception propagation remains.
  }
  public static void GuardTick() {
+  TickPlayerRequests();
   try {
    GuardAction action = guardAction;
    if (action == null) return;
@@ -354,6 +381,7 @@ public static class GuildBattleScene
   } catch (Exception) { guardAction = null; ++guardGeneration; }
  }
  public static void ObservePlayerBegin(RoomNetUnionFight net, object value) {
+  ObservePlayerAdmission(net,value,true);
   try {
    GuardAction action = guardAction; SCUFPlayerFightBegin frame = value as SCUFPlayerFightBegin;
    if (!GuardOwner(action) || frame == null || !object.ReferenceEquals(action.Room.netManager,net) || frame.guid != action.PlayerID) return;
@@ -362,10 +390,94 @@ public static class GuildBattleScene
   } catch (Exception) { guardAction = null; ++guardGeneration; }
  }
  public static void ObservePlayerEnd(RoomNetUnionFight net, object value) {
+  ObservePlayerAdmission(net,value,false);
   try {
    GuardAction action = guardAction; SCUFPlayerFightEnd frame = value as SCUFPlayerFightEnd;
    if (GuardOwner(action) && action.Phase == 2 && frame != null && object.ReferenceEquals(action.Room.netManager,net) && frame.guid == action.PlayerID) CancelGuard(false);
   } catch (Exception) { guardAction = null; ++guardGeneration; }
+ }
+ private static readonly PlayerRequestGate playerRequests = new PlayerRequestGate();
+ private static float nextPlayerRequestCheck;
+ private static void ResetPlayerRequests() { playerRequests.Reset(); }
+ private static void TickPlayerRequests() {
+  if (!playerRequests.HasIntent || Time.realtimeSinceStartup < nextPlayerRequestCheck) return;
+  nextPlayerRequestCheck = Time.realtimeSinceStartup + .25f;
+  if (!Active || !NetAPI.SocketIsConnected()) { ResetPlayerRequests(); return; }
+  RCAIUnionActor self = SelfPlayerActor();
+  if (self == null || self.instPlayer == null || (int)self.CurrState == 3 || (int)self.CurrState == 8) { ResetPlayerRequests(); return; }
+  playerRequests.ObserveFightState(sceneGeneration,self.instPlayer.deadNum,(int)self.CurrState == 1 || (int)self.CurrState == 6);
+  long targetID = playerRequests.Target;
+  if (targetID <= 0) return;
+  RoomCharactor target = sceneRoom.charactorManager.GetCharactor(targetID.ToString(CultureInfo.InvariantCulture));
+  float range = (float)DictDataManager.Instance.tableGameConfigureDao.currentData.UnionFightArriveOther;
+  Vector3 delta = target == null ? Vector3.zero : target.transform.position - self.owner.transform.position;
+  if (target == null || delta.x * delta.x + delta.z * delta.z > range * range)
+   playerRequests.OutsideRange(sceneGeneration,self.instPlayer.deadNum,targetID,Time.realtimeSinceStartup);
+ }
+ private static RCAIUnionActor SelfPlayerActor() {
+  RoomCharactor self = sceneRoom == null ? null : sceneRoom.charactorManager.GetSelfCharactor();
+  return self == null ? null : self.ai as RCAIUnionActor;
+ }
+ private static bool PlayerStateAvailable(RCAIUnionActor actor) {
+  if (actor == null || actor.instPlayer == null) return false;
+  int state = (int)actor.CurrState;
+  return state != 1 && state != 3 && state != 6 && state != 8;
+ }
+ // Only the original ordinary-player scanner calls this adapter. Its original
+ // timer and candidate cleanup still run, and guard sends keep their own path.
+ public static void SendScannedPlayerAsk(RoomNetUnionFight net, long targetID, RoomUnionFightCheckPvp scan) {
+  if (AllowScannedPlayerAsk(net,targetID,scan)) {
+   SyncArrivalPosition(sceneRoom.charactorManager.GetSelfCharactor());
+   net.SendCSUFPlayerAskFight(targetID);
+  }
+ }
+ private static bool AllowScannedPlayerAsk(RoomNetUnionFight net, long targetID, RoomUnionFightCheckPvp scan) {
+  if (!Active) { ResetPlayerRequests(); return root == null; }
+  if (scan == null || !object.ReferenceEquals(scan.roomBase,sceneRoom) || !object.ReferenceEquals(scan.net,net) || !object.ReferenceEquals(sceneRoom.netManager,net)) return false;
+  if (!NetAPI.SocketIsConnected() || (int)NetUnionFightBattle.state != 2 || RoomUnionFight.IsOnHook) { ResetPlayerRequests(); return false; }
+  RoomCharactor target;
+  RCAIUnionActor self = SelfPlayerActor();
+  if (self == null || self.instPlayer == null || self.instPlayer.guid != scenePlayerID) { ResetPlayerRequests(); return false; }
+  if ((int)self.CurrState == 3 || (int)self.CurrState == 8) { ResetPlayerRequests(); return false; }
+  if (!PlayerStateAvailable(self) || !scan.rivalCharactors.TryGetValue(targetID,out target) || target == null || (int)target.type != 20) return false;
+  RCAIUnionActor rival = target.ai as RCAIUnionActor;
+  if (!PlayerStateAvailable(rival) || rival.instPlayer.guid != targetID || rival.Camp == self.Camp) return false;
+  float range = (float)DictDataManager.Instance.tableGameConfigureDao.currentData.UnionFightArriveOther;
+  if (range <= .01f || float.IsNaN(range) || float.IsInfinity(range)) return false;
+  Vector3 delta = target.transform.position - self.owner.transform.position;
+  double now = Time.realtimeSinceStartup;
+  // A small inward margin keeps float coordinates inside the unchanged server gate.
+  float inside = range - .001f;
+  if (delta.x * delta.x + delta.z * delta.z > inside * inside) {
+   playerRequests.OutsideRange(sceneGeneration,self.instPlayer.deadNum,targetID,now); return false;
+  }
+  if (!playerRequests.TrySend(sceneGeneration,self.instPlayer.deadNum,targetID,rival.instPlayer.deadNum,now)) return false;
+  return true;
+ }
+ public static void ObservePlayerClick(RCUIUnionActor click) {
+  try {
+   if (!Active || click == null || click.owner == null || (int)click.owner.type != 20) return;
+   long target; RCAIUnionActor self = SelfPlayerActor();
+   if (self != null && self.instPlayer != null && long.TryParse(click.owner.name,out target))
+    playerRequests.ExplicitClick(sceneGeneration,self.instPlayer.deadNum,target,Time.realtimeSinceStartup);
+  } catch (Exception) { } // Never interrupt the original selection/navigation action.
+ }
+ private static void ObservePlayerAdmission(RoomNetUnionFight net, object value, bool begin) {
+  try {
+   if (!Active || !object.ReferenceEquals(sceneRoom.netManager,net)) return;
+   RCAIUnionActor self = SelfPlayerActor();
+   if (self == null || self.instPlayer == null) return;
+   if (begin) {
+    SCUFPlayerFightBegin frame = value as SCUFPlayerFightBegin;
+    if (frame != null && frame.guid == scenePlayerID) {
+     playerRequests.ObserveBegin(sceneGeneration,self.instPlayer.deadNum);
+     playerRequests.ObserveFightState(sceneGeneration,self.instPlayer.deadNum,(int)self.CurrState == 1 || (int)self.CurrState == 6);
+    }
+   } else {
+    SCUFPlayerFightEnd frame = value as SCUFPlayerFightEnd;
+    if (frame != null && frame.guid == scenePlayerID) playerRequests.ObserveEnd(sceneGeneration,self.instPlayer.deadNum);
+   }
+  } catch (Exception) { ResetPlayerRequests(); }
  }
  public static bool CanLoad() { return RoomManager.curSceneType == SceneType.UNIONFIGHT; }
  private static int loadGeneration;
@@ -378,12 +490,43 @@ public static class GuildBattleScene
  private static bool Current(RoomUnionFight room, long id, string session, int generation) {
   return generation == loadGeneration && room != null && object.ReferenceEquals(RoomManager.currentRoom,room) && CanLoad() && StaticData.playerData != null && StaticData.playerData.playerId == id && SessionHex() == session;
  }
- private static WWW RequestMap(long id, string session) {
+ public static bool TryPrepareEntry(UnionFightSignUpItem item) {
+  if (GameConfig.Instance.IsAssetFull || item == null || item.gotoFightSceneBtn == null || !item.gotoFightSceneBtn.activeInHierarchy || StaticData.playerData == null || SessionHex() == null) return false;
+  GuildEntryProbe probe = item.gotoFightSceneBtn.GetComponent<GuildEntryProbe>();
+  if (probe == null) probe = item.gotoFightSceneBtn.AddComponent<GuildEntryProbe>();
+  probe.Begin(item);
+  return true;
+ }
+ internal static IEnumerator ProbeEntry(GuildEntryProbe probe, UnionFightSignUpItem item) {
+  long id = StaticData.playerData.playerId;
+  string session = SessionHex();
+  object room = RoomManager.currentRoom;
+  WWW request = RequestMap(id, session, "/guild-war/map-entry");
+  probe.Request = request;
+  if (request == null) {
+   probe.Complete(); BoxManager.CreateNetError("公会战场景读取失败，请稍后重试"); yield break;
+  }
+  float deadline = Time.realtimeSinceStartup + 3f;
+  while (!request.isDone && Time.realtimeSinceStartup < deadline) yield return null;
+  bool current = probe != null && probe.gameObject.activeInHierarchy && object.ReferenceEquals(probe.Item,item) && object.ReferenceEquals(RoomManager.currentRoom,room) && StaticData.playerData != null && StaticData.playerData.playerId == id && SessionHex() == session;
+  string projection = null;
+  bool accepted = current && ReadProjection(request, out projection);
+  // The probe grants no entry or reward. The original transfer still validates
+  // enrollment and the following loader checks the actual frozen map again.
+  bool compatible = accepted && projection == "re-flat-v1";
+  probe.Complete();
+  if (!current) yield break;
+  if (!accepted) { BoxManager.CreateNetError("公会战场景读取失败，请稍后重试"); yield break; }
+  if (!compatible) { BoxManager.CreatePopupTextBox(LanguageTool.GetTextNoUpdate(1046), 0f); yield break; }
+  ManagerController.Instance.TrySceneTransfer("fight_union", Vector3.zero, "UIUnionFightRunMap", null, string.Empty);
+ }
+ private static WWW RequestMap(long id, string session) { return RequestMap(id, session, "/guild-war/map"); }
+ private static WWW RequestMap(long id, string session, string path) {
   try {
    string origin = new Uri(ServerConfig.GetServerUrl()).GetLeftPart(UriPartial.Authority);
    Dictionary<string,string> headers = new Dictionary<string,string>(); headers.Add("Content-Type","application/json");
    string body = "{\"playerId\":" + id.ToString(CultureInfo.InvariantCulture) + ",\"sessionHex\":\"" + session + "\"}";
-   return new WWW(origin + "/guild-war/map",Encoding.UTF8.GetBytes(body),headers);
+   return new WWW(origin + path,Encoding.UTF8.GetBytes(body),headers);
   } catch (Exception) { return null; }
  }
  private static bool ReadProjection(WWW request, out string projection) {
@@ -415,12 +558,37 @@ public static class GuildBattleScene
    BoxManager.CreateNetError("公会战地图加载失败，请重试"); return false;
   }
  }
+ // Original pooled DrawCalls can still belong to the scene that created them.
+ // Keep only those standalone UI objects alive across this owned map transition.
+ private static bool PreserveDrawCalls(UnityEngine.SceneManagement.Scene previous) {
+  BetterList<UIDrawCall> active = UIDrawCall.activeList, inactive = UIDrawCall.inactiveList;
+  if (!CheckDrawCalls(active,previous,false) || !CheckDrawCalls(inactive,previous,false)) return false;
+  return CheckDrawCalls(active,previous,true) && CheckDrawCalls(inactive,previous,true);
+ }
+ private static bool CheckDrawCalls(BetterList<UIDrawCall> list, UnityEngine.SceneManagement.Scene previous, bool move) {
+  if (list == null) return true;
+  if (list.size < 0 || list.size > 512 || (list.size > 0 && (list.buffer == null || list.buffer.Length < list.size))) return false;
+  for (int i = 0; i < list.size; i++) {
+   UIDrawCall call = list.buffer[i]; if (call == null) continue;
+   GameObject item = call.gameObject;
+   if (!item.scene.Equals(previous)) continue;
+   if (item.transform.parent != null) return false;
+   if (move) UnityEngine.Object.DontDestroyOnLoad(item);
+  }
+  return true;
+ }
  public static IEnumerator LoadRoom(RoomUnionFight room) {
   int generation = ++loadGeneration;
   if (pending != null) { pending.Dispose(); pending = null; }
   if (!CanLoad() || room == null || StaticData.playerData == null) yield break;
   long id = StaticData.playerData.playerId; string session = SessionHex();
-  if (id <= 0 || session == null || !Current(room,id,session,generation)) yield break;
+  if (id <= 0 || session == null) yield break;
+  // RoomManager.Switch sets currentRoom only after GetRoom returns. The
+  // original Init starts this coroutine inside GetRoom, so its first move
+  // must yield once before checking the actual owner. Never assign the owner
+  // here or accept a stale room/player/session after that binding point.
+  yield return null;
+  if (!Current(room,id,session,generation)) yield break;
   WWW request = RequestMap(id,session);
   if (request == null) { BoxManager.CreateNetError("公会战地图加载失败，请重试"); yield break; }
   pending = request;
@@ -452,6 +620,7 @@ public static class GuildBattleScene
   if (!PrepareProjection()) yield break;
   UnityEngine.SceneManagement.Scene previous = SceneManager.GetActiveScene();
   if (previous.name != "map_battle_001") {
+   if (!PreserveDrawCalls(previous)) { BoxManager.CreateNetError("公会战界面加载失败，请重试"); yield break; }
    SceneManager.SetActiveScene(SceneManager.CreateScene("map_battle_001"));
    if (!BuildScene()) yield break;
    if (previous.name != "DontDestroyOnLoad") SceneManager.UnloadScene(previous.name);
@@ -478,6 +647,25 @@ public static class GuildBattleScene
   if (Active && AssetBundleManager.Instance.IsLoadedAssetBundle(path)) GameObjectPoolManager.Instance.Regist(path, CommonMethod.GetAssetNameFromAssetBundleName(path));
  }
 
+ public static float ApproachDistance(float range) {
+  // Move one centimetre inside the server's unchanged range to avoid float
+  // endpoints landing just outside it after the original MoveTowards call.
+  return Active && range > 0f && !float.IsNaN(range) && !float.IsInfinity(range) ? Mathf.Max(0f,range - .01f) : range;
+ }
+ private static readonly FieldInfo MoveCommitTime = typeof(RoomNetBase).GetField("lastCommitTime",Flags);
+ private static readonly FieldInfo MoveLastPosition = typeof(RoomNetBase).GetField("lastPosition",Flags);
+ private static readonly MethodInfo MoveSync = typeof(RoomNetUnionFight).GetMethod("SolveSyncSelfToServer",Flags);
+ private static void SyncArrivalPosition(RoomCharactor actor) {
+  if (!Active || RoomUnionFight.IsOnHook || !NetAPI.SocketIsConnected() || actor == null ||
+      !object.ReferenceEquals(sceneRoom.charactorManager.GetSelfCharactor(),actor)) return;
+  RoomNetUnionFight net = sceneRoom.netManager as RoomNetUnionFight;
+  if (net == null || MoveCommitTime == null || MoveLastPosition == null || MoveSync == null) return;
+  // Flush a changed endpoint through the original CSMove sender before the
+  // original arrival callback can ask for a fight on the same ordered socket.
+  if ((Vector3)MoveLastPosition.GetValue(net) == actor.transform.position) return;
+  MoveCommitTime.SetValue(net,Time.time - Mathf.Max(0f,net.sendTime) - .001f);
+  MoveSync.Invoke(net,null);
+ }
 	public static bool TickMove (RCMoveNavigation move)
 	{
 		if (!Active) {
@@ -497,7 +685,11 @@ public static class GuildBattleScene
 			move.owner.transform.rotation = Quaternion.RotateTowards (move.owner.transform.rotation, Quaternion.LookRotation (forward), 720f * Time.deltaTime);
 		}
 		if ((vector2 - vector).sqrMagnitude < 0.01f) {
+			// AutoGoto's endpoint already includes the original interaction range.
+			// Complete that final segment before its arrival callback can ask PK.
+			move.owner.transform.position = vector;
 			queue.Dequeue ();
+			if (queue.Count == 0) SyncArrivalPosition(move.owner);
 		}
 		return true;
 	}
@@ -558,9 +750,33 @@ public static class GuildBattleScene
 		if (lod.Model != null) {
 			return true;
 		}
+		// The original chariot HP presentation reads a skinned body and its
+		// first textured material. Keep that contract with the recovered camp
+		// materials even when the missing model bundle uses procedural geometry.
+		Material bodyMaterial = Resources.Load<Material>("shaders/" + name);
+		if (bodyMaterial == null || bodyMaterial.mainTexture == null) {
+			throw new InvalidOperationException("公会战冲车原阵营材质加载失败");
+		}
 		GameObject gameObject = new GameObject (name);
 		gameObject.transform.SetParent (lod.owner.transform, false);
-		Shape (gameObject.transform, "Cart", PrimitiveType.Cube, new Vector3 (0f, 1f, 0f), new Vector3 (2.3f, 1f, 3.7f), wood);
+		GameObject body = Shape (gameObject.transform, "Cart", PrimitiveType.Cube, new Vector3 (0f, 1f, 0f), new Vector3 (2.3f, 1f, 3.7f), bodyMaterial);
+		MeshFilter bodyFilter = body.GetComponent<MeshFilter>();
+		Mesh bodyMesh = UnityEngine.Object.Instantiate(bodyFilter.sharedMesh) as Mesh;
+		meshes.Add(bodyMesh);
+		BoneWeight[] weights = new BoneWeight[bodyMesh.vertexCount];
+		for (int i = 0; i < weights.Length; i++) { weights[i].boneIndex0 = 0; weights[i].weight0 = 1f; }
+		bodyMesh.boneWeights = weights;
+		bodyMesh.bindposes = new Matrix4x4[] { Matrix4x4.identity };
+		MeshRenderer rigid = body.GetComponent<MeshRenderer>();
+		rigid.enabled = false;
+		UnityEngine.Object.Destroy(rigid);
+		UnityEngine.Object.Destroy(bodyFilter);
+		SkinnedMeshRenderer skin = body.AddComponent<SkinnedMeshRenderer>();
+		skin.sharedMesh = bodyMesh;
+		skin.bones = new Transform[] { body.transform };
+		skin.rootBone = body.transform;
+		skin.localBounds = bodyMesh.bounds;
+		skin.sharedMaterial = bodyMaterial;
 		Shape (gameObject.transform, "Ram", PrimitiveType.Cylinder, new Vector3 (0f, 1.3f, 1f), new Vector3 (0.55f, 2.2f, 0.55f), stone).transform.localRotation = Quaternion.Euler (90f, 0f, 0f);
 		for (int i = -1; i <= 1; i += 2) {
 			for (int j = -1; j <= 1; j += 2) {

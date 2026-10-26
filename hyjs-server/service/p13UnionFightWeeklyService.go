@@ -47,6 +47,9 @@ func p13UFWeeklyStart(week string) (time.Time, error) {
 }
 func p13UFWeeklyRules(offer *db.P13UnionFightWeeklyOffer) (*db.P13UnionFightWeeklyPolicy, []p13UFWeeklyReward, error) {
 	var policy db.P13UnionFightWeeklyPolicy
+	if (offer.FirstMatchID == "") == (offer.FirstByeID == "") {
+		return nil, nil, p13UFByeError()
+	}
 	if p6Digest(offer.Rules) != offer.RulesHash || json.Unmarshal(offer.Rules, &policy) != nil || policy.WeekStart != offer.WeekStart || policy.Group != offer.Group || !policy.Enabled || policy.Version == "" || policy.Source == "" || policy.PublishedAt <= 0 || policy.PublishedAt > offer.FrozenAt {
 		return nil, nil, errors.New("公会战周奖冻结来源无效")
 	}
@@ -156,10 +159,29 @@ func p13UFWeeklyRanks(tx *gorm.DB, week, group string) ([]p13UFWeeklyRank, error
 			continue
 		}
 		var match db.P13UnionFightMatch
-		if err = tx.Where("day>=? AND day<? AND `group`=? AND (left_guild_id=? OR right_guild_id=?)", week, start.AddDate(0, 0, 7).Format("2006-01-02"), group, g.GuildID, g.GuildID).Order("start_at desc,id").First(&match).Error; err != nil {
+		err = tx.Where("day>=? AND day<? AND `group`=? AND (left_guild_id=? OR right_guild_id=?)", week, start.AddDate(0, 0, 7).Format("2006-01-02"), group, g.GuildID, g.GuildID).Order("start_at desc,id").First(&match).Error
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, err
 		}
 		raw := match.LeftPreview
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			byes, e := p13UFByes(tx, week, start.AddDate(0, 0, 7).Format("2006-01-02"), group)
+			if e != nil {
+				return nil, e
+			}
+			for i := range byes {
+				if byes[i].GuildID == g.GuildID {
+					b, e := p13UFByeRead(&byes[i])
+					if e != nil {
+						return nil, e
+					}
+					raw = b.Preview
+				}
+			}
+			if len(raw) == 0 {
+				return nil, p13UFByeError()
+			}
+		}
 		if match.RightGuildID == g.GuildID {
 			raw = match.RightPreview
 		}
@@ -223,7 +245,8 @@ func p13UFWeeklyResultHash(result *db.P13UnionFightWeeklyResult) string {
 	raw, _ := json.Marshal(struct {
 		Week, Group, Offer string
 		Rankings, Awards   []byte
-	}{result.WeekStart, result.Group, result.OfferHash, result.Rankings, result.Awards})
+		ByeDirectory       []byte `json:",omitempty"`
+	}{result.WeekStart, result.Group, result.OfferHash, result.Rankings, result.Awards, result.ByeDirectory})
 	return p6Digest(raw)
 }
 func (s *GameService) p13UFWeeklySettle(tx *gorm.DB, offer *db.P13UnionFightWeeklyOffer, now time.Time) (*db.P13UnionFightWeeklyResult, error) {
@@ -240,9 +263,15 @@ func (s *GameService) p13UFWeeklySettle(tx *gorm.DB, offer *db.P13UnionFightWeek
 		if saved.ResultHash != p13UFWeeklyResultHash(&saved) {
 			return nil, errors.New("公会战周奖结算归档无效")
 		}
+		if err = p13UFByeDirectoryVerify(tx, saved.ByeDirectory, offer.WeekStart, start.AddDate(0, 0, 7).Format("2006-01-02"), offer.Group); err != nil {
+			return nil, err
+		}
 		return &saved, nil
 	}
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, err
+	}
+	if err = p13UFByeWeeklyAnchor(tx, offer); err != nil {
 		return nil, err
 	}
 	policy, defs, err := p13UFWeeklyRules(offer)
@@ -253,34 +282,71 @@ func (s *GameService) p13UFWeeklySettle(tx *gorm.DB, offer *db.P13UnionFightWeek
 	if err = tx.Where("day>=? AND day<? AND `group`=?", offer.WeekStart, start.AddDate(0, 0, 7).Format("2006-01-02"), offer.Group).Order("start_at,id").Find(&matches).Error; err != nil {
 		return nil, err
 	}
-	if len(matches) == 0 {
+	byes, err := p13UFByes(tx, offer.WeekStart, start.AddDate(0, 0, 7).Format("2006-01-02"), offer.Group)
+	if err != nil {
+		return nil, err
+	}
+	if len(matches) == 0 && len(byes) == 0 {
 		return nil, nil
 	}
 	// Every actually accepted eligible registration needs both original rounds.
 	// Odd unmatched guilds, missing calendars and unfinished freezing remain unresolved.
-	var entries []db.P13UnionFightEntry
-	if err = tx.Table("p13_union_fight_entries AS e").Select("e.*").Joins("JOIN p13_union_fight_groups AS g ON g.guild_id=e.guild_id AND g.week_start=?", offer.WeekStart).Where("e.day>=? AND e.day<? AND g.`group`=?", offer.WeekStart, start.AddDate(0, 0, 6).Format("2006-01-02"), offer.Group).Scan(&entries).Error; err != nil {
+	coverage, err := p13UFCalendarCoverage(tx, start, start.AddDate(0, 0, 7), matches)
+	if err != nil {
 		return nil, err
 	}
-	for _, entry := range entries {
+	groupByGuild := map[string]string{}
+	lastGuild := ""
+	for {
+		if tx.Statement.Context.Err() != nil {
+			return nil, tx.Statement.Context.Err()
+		}
+		var groups []db.P13UnionFightGroup
+		query := tx.Select("guild_id,`group`").Where("week_start=?", offer.WeekStart)
+		if lastGuild != "" {
+			query = query.Where("guild_id>?", lastGuild)
+		}
+		if err = query.Order("guild_id").Limit(128).Find(&groups).Error; err != nil {
+			return nil, err
+		}
+		for _, row := range groups {
+			groupByGuild[row.GuildID] = row.Group
+		}
+		if len(groups) < 128 {
+			break
+		}
+		lastGuild = groups[len(groups)-1].GuildID
+	}
+	for _, row := range coverage {
+		entry := row.Entry
+		group, assigned := groupByGuild[entry.GuildID]
+		if assigned && group != offer.Group {
+			continue
+		}
 		if entry.FrozenAt <= 0 {
 			return nil, nil
 		}
 		if entry.EligibleCount == 0 {
 			continue
 		}
-		if !entry.MatchProcessed {
+		if !assigned || !entry.MatchProcessed {
 			return nil, nil
 		}
-		declared, err := time.ParseInLocation("2006-01-02", entry.Day, start.Location())
-		if err != nil {
-			return nil, err
-		}
-		expectedDay := declared.AddDate(0, 0, 1).Format("2006-01-02")
 		rounds := map[int32]bool{}
 		for _, match := range matches {
-			if match.Day == expectedDay && (match.LeftGuildID == entry.GuildID || match.RightGuildID == entry.GuildID) {
+			if match.Day == row.MatchDay && (match.LeftGuildID == entry.GuildID || match.RightGuildID == entry.GuildID) {
+				if rounds[match.Round] || match.Round < 1 || match.Round > 2 {
+					return nil, p13UFByeError()
+				}
 				rounds[match.Round] = true
+			}
+		}
+		for _, bye := range byes {
+			if bye.Day == row.MatchDay && bye.GuildID == entry.GuildID {
+				if rounds[bye.Round] {
+					return nil, p13UFByeError()
+				}
+				rounds[bye.Round] = true
 			}
 		}
 		if !rounds[1] || !rounds[2] {
@@ -305,24 +371,38 @@ func (s *GameService) p13UFWeeklySettle(tx *gorm.DB, offer *db.P13UnionFightWeek
 		if err = tx.First(&roundOffer, "match_id=?", match.ID).Error; err != nil {
 			return nil, err
 		}
+		if result.ResultKind == constUtil.P13UFTechnicalAbortKind {
+			if err = s.p13UFCombatSettlementVerify(tx, &match, &result); err != nil {
+				return nil, err
+			}
+			continue
+		}
 		rule, err := p13UFSettlementRules(&roundOffer, &match)
 		if err != nil {
 			return nil, err
 		}
-		if result.OfferHash != roundOffer.RulesHash || result.EndAt != match.EndAt || result.WinnerGuildID == result.LoserGuildID || (result.WinnerGuildID != match.LeftGuildID && result.WinnerGuildID != match.RightGuildID) || (result.LoserGuildID != match.LeftGuildID && result.LoserGuildID != match.RightGuildID) {
+		if result.OfferHash != roundOffer.RulesHash || !p13UFMixedRoundIdentity(&match, &result, rule) {
 			return nil, errors.New("周奖缺真实完整场次终局")
 		}
 		if err = s.p13UFCombatSettlementVerify(tx, &match, &result); err != nil {
 			return nil, err
 		}
-		scores[result.WinnerGuildID] += int64(rule.WinPrestige)
-		scores[result.LoserGuildID] += int64(rule.LosePrestige)
+		if result.ResultKind == constUtil.P13UFTechnicalAbortKind {
+			continue
+		}
 		for _, guild := range []string{match.LeftGuildID, match.RightGuildID} {
 			extra, err := p13UFGuildMissionPrestige(tx, &match, guild)
 			if err != nil {
 				return nil, err
 			}
-			scores[guild] += int64(extra)
+			base, snapshotExtra, prestigeErr := p13UFMixedRoundPrestige(&match, &result, rule, guild)
+			if prestigeErr != nil {
+				return nil, prestigeErr
+			}
+			if snapshotExtra != extra {
+				return nil, errors.New("周奖工厂威望与真实三态终局不一致")
+			}
+			scores[guild] += base + int64(extra)
 		}
 		var actual []p13UFSettlementAward
 		if err = json.Unmarshal(result.Awards, &actual); err != nil {
@@ -338,6 +418,29 @@ func (s *GameService) p13UFWeeklySettle(tx *gorm.DB, offer *db.P13UnionFightWeek
 			participants[actor.GuildID][actor.PlayerID] = true
 		}
 	}
+	currentByeMembers, err := p13UFByeCurrentMembers(tx, byes)
+	if err != nil {
+		return nil, err
+	}
+	for i := range byes {
+		bye := &byes[i]
+		if now.UnixMilli() < bye.EndAt {
+			return nil, nil
+		}
+		b, e := p13UFByeRead(bye)
+		if e != nil {
+			return nil, e
+		}
+		scores[bye.GuildID] += int64(bye.WinPrestige)
+		if participants[bye.GuildID] == nil {
+			participants[bye.GuildID] = map[int64]bool{}
+		}
+		for _, f := range b.Roster {
+			if currentByeMembers[f.PlayerID] == bye.GuildID {
+				participants[bye.GuildID][f.PlayerID] = true
+			}
+		}
+	}
 	ranks, err := p13UFWeeklyRanks(tx, offer.WeekStart, offer.Group)
 	if err != nil {
 		return nil, err
@@ -351,6 +454,17 @@ func (s *GameService) p13UFWeeklySettle(tx *gorm.DB, offer *db.P13UnionFightWeek
 	for _, actor := range entered {
 		if firstGuild[actor.PlayerID] == "" {
 			firstGuild[actor.PlayerID] = actor.GuildID
+		}
+	}
+	for i := range byes {
+		b, e := p13UFByeRead(&byes[i])
+		if e != nil {
+			return nil, e
+		}
+		for _, f := range b.Roster {
+			if firstGuild[f.PlayerID] == "" && currentByeMembers[f.PlayerID] == byes[i].GuildID {
+				firstGuild[f.PlayerID] = byes[i].GuildID
+			}
 		}
 	}
 	byRank := map[int32]string{}
@@ -379,7 +493,7 @@ func (s *GameService) p13UFWeeklySettle(tx *gorm.DB, offer *db.P13UnionFightWeek
 	if err != nil {
 		return nil, err
 	}
-	saved = db.P13UnionFightWeeklyResult{WeekStart: offer.WeekStart, Group: offer.Group, OfferHash: offer.RulesHash, Rankings: rawRanks, Awards: rawAwards, SettledAt: now.UnixMilli(), Source: constUtil.P13UnionFightWeeklySource + "; " + policy.Version + "; " + policy.Source}
+	saved = db.P13UnionFightWeeklyResult{ByeDirectory: p13UFByeDirectory(byes), WeekStart: offer.WeekStart, Group: offer.Group, OfferHash: offer.RulesHash, Rankings: rawRanks, Awards: rawAwards, SettledAt: now.UnixMilli(), Source: constUtil.P13UnionFightWeeklySource + "; " + policy.Version + "; " + policy.Source}
 	saved.ResultHash = p13UFWeeklyResultHash(&saved)
 	if err = tx.Create(&saved).Error; err != nil {
 		return nil, err

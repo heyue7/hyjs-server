@@ -62,6 +62,20 @@ func (s *GameService) publishP10PrivateBatch(ctx context.Context, id int64, mess
 		return
 	}
 	sink := value.(*p10ClientSink)
+	s.publishP10PrivateBatchPinned(ctx, id, sink, messages)
+}
+
+// A directory caller pins its authenticated socket so a replacement connection
+// cannot inherit frames selected for an earlier scene/session.
+func (s *GameService) publishP10PrivateBatchPinned(ctx context.Context, id int64, sink *p10ClientSink, messages []proto.Message) {
+	if sink == nil || len(messages) == 0 {
+		return
+	}
+	key := p10ClientKey{s.p10ClientOwner(), id}
+	current, ok := p10ClientSinks.Load(key)
+	if !ok || current != sink {
+		return
+	}
 	// 每次推送重新授权，重登后的旧socket没有收取后续私聊的权限。
 	if _, err := AuthorizeAccount(ctx, id, sink.session); err != nil {
 		if p10ClientSinks.CompareAndDelete(key, sink) {
@@ -71,6 +85,10 @@ func (s *GameService) publishP10PrivateBatch(ctx context.Context, id int64, mess
 				s.DisconnectP10Scene(cleanupCtx, id, sink.session)
 			}()
 		}
+		return
+	}
+	current, ok = p10ClientSinks.Load(key)
+	if !ok || current != sink {
 		return
 	}
 	for _, message := range messages {

@@ -1,4 +1,5 @@
 CREATE TABLE IF NOT EXISTS `p13_union_fight_guard_states` (
+ guard_rule VARCHAR(64) NOT NULL DEFAULT '',
  `match_id` CHAR(64) NOT NULL,
  `guard_guid` BIGINT NOT NULL,
  `guard_id` VARCHAR(64) NOT NULL,

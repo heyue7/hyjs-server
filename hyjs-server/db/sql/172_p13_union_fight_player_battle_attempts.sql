@@ -20,5 +20,8 @@ CREATE TABLE IF NOT EXISTS `p13_union_fight_player_battle_attempts` (
  KEY `p13_uf_player_battle_client` (`player_id`,`client_stamp`),
  KEY `p13_uf_player_battle_match` (`match_id`), KEY `p13_uf_player_battle_target` (`target_id`),
  KEY `p13_uf_player_battle_compute` (`calculation_stage`,`status`,`calculation_quarantined`,`next_calculation_at`,`created_at`,`id`),
- KEY `p13_uf_player_battle_due` (`status`,`due_at`)
+ KEY `p13_uf_player_battle_due` (`status`,`due_at`),
+ KEY `p13_uf_player_death_latest` (`match_id`,`dead_player_id`,`status`,`due_at` DESC,`id` DESC),
+ KEY `p13_uf_player_active_att` (`match_id`,`player_id`,`status`),
+ KEY `p13_uf_player_active_def` (`match_id`,`target_id`,`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;

@@ -7,6 +7,7 @@ type P13UnionFightWeeklyOffer struct {
 	Rules        []byte `gorm:"type:longblob;not null" json:"-"`
 	RulesHash    string `gorm:"type:char(64);not null" json:"rules_hash"`
 	FrozenAt     int64  `gorm:"not null" json:"frozen_at"`
+	FirstByeID   string `gorm:"type:char(64);not null;default:''" json:"first_bye_id,omitempty"`
 	FirstMatchID string `gorm:"type:char(64);not null" json:"first_match_id"`
 }
 

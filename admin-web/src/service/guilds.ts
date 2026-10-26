@@ -78,6 +78,7 @@ export interface GuildUnionFightItemPolicy {
   source: string;
 }
 export interface GuildUnionFightFieldPolicy {
+  guardHpMode?: 'uniform' | 'template';
   enabled: boolean;
   preparationMillis: number;
   leftRevivePointId: number;
@@ -98,6 +99,7 @@ export interface GuildUnionFightPlayerBattlePolicy {
   reviveRule: string;
 }
 export interface GuildUnionFightPolicyState {
+  warEnabled: boolean;
   enrollment: GuildUnionFightEnrollmentPolicy;
   chat: GuildUnionFightChatPolicy;
   item: GuildUnionFightItemPolicy;
@@ -139,6 +141,12 @@ export interface GuildSettingsSave {
   policies?: Partial<GuildPolicyState> & {
     unionFight?: Partial<GuildUnionFightPolicyState>;
   };
+}
+// Independent master switch write; excludes unrelated unsaved settings.
+export interface GuildWarOpenSave {
+  version: string;
+  reason: string;
+  policies: { unionFight: { warEnabled: boolean } };
 }
 export interface GuildSummary {
   id: string;
@@ -225,7 +233,7 @@ export interface GuildMemberUpdate {
 const withServer = (path: string, serverId: number) => `${path}${path.includes('?') ? '&' : '?'}serverId=${serverId}`;
 
 export const getGuildSettings = () => api<GuildSettings>('/guild-settings');
-export const saveGuildSettings = (body: GuildSettingsSave) => api<GuildSettings>('/guild-settings', json('PUT', body));
+export const saveGuildSettings = (body: GuildSettingsSave | GuildWarOpenSave) => api<GuildSettings>('/guild-settings', json('PUT', body));
 export const getGuilds = (serverId: number, q: string, page: number, pageSize: number) =>
   api<GuildList>(withServer(`/guilds?${new URLSearchParams({ q, page: String(page), pageSize: String(pageSize) })}`, serverId));
 export const getGuild = (serverId: number, id: string) =>

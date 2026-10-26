@@ -325,7 +325,18 @@ func (s *GameService) TickP13UnionFightTransfer(ctx context.Context, now time.Ti
 	if err := db.GetIns().WithContext(ctx).Where("status=?", constUtil.P13UnionFightTransferPending).Order("due_at,id").Find(&tasks).Error; err != nil {
 		return err
 	}
+	scopes := make([]string, 0, len(tasks))
+	for _, task := range tasks {
+		scopes = append(scopes, task.MatchID)
+	}
+	clocks, clockErr := p13UFWorldClockBatch(ctx, scopes, now)
+	if clockErr != nil {
+		return clockErr
+	}
 	for _, candidate := range tasks {
+		if clocks.paused(candidate.MatchID) {
+			continue
+		}
 		var ended *pb.SCUFEndTransfer
 		fresh := false
 		err := db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
@@ -337,12 +348,20 @@ func (s *GameService) TickP13UnionFightTransfer(ctx context.Context, now time.Ti
 			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&gate, 1).Error; err != nil {
 				return err
 			}
+			if closed, err := p13UFWorldSealed(tx, candidate.MatchID); err != nil {
+				return err
+			} else if closed {
+				return nil
+			}
 			var task db.P13UnionFightTransferTask
 			if err := tx.First(&task, "id=?", candidate.ID).Error; err != nil {
 				return err
 			}
 			if task.Status != constUtil.P13UnionFightTransferPending {
 				return nil
+			}
+			if end := clocks.terminal[task.MatchID]; end > 0 && task.DueAt > end {
+				return s.p13UFTransferCancel(tx, task.MatchID, task.PlayerID, now)
 			}
 			var err error
 			ended, fresh, err = s.p13UFTransferFinishTx(tx, &task, now)
@@ -352,7 +371,11 @@ func (s *GameService) TickP13UnionFightTransfer(ctx context.Context, now time.Ti
 			return err
 		}
 		if fresh {
-			s.p13UFFieldBroadcast(ctx, candidate.MatchID, 0, ended)
+			if err := p13UFPublishBeforeAbort(ctx, candidate.MatchID, func() {
+				s.p13UFFieldBroadcast(ctx, candidate.MatchID, 0, ended)
+			}); err != nil {
+				return err
+			}
 		}
 	}
 	return nil

@@ -1,0 +1,32 @@
+CREATE TABLE IF NOT EXISTS p13_union_fight_tower_hits (
+ release_frame BLOB NULL,release_frame_hash CHAR(64) NOT NULL DEFAULT '',launch_occupancy_kind VARCHAR(16) NOT NULL DEFAULT '',launch_occupancy_id CHAR(64) NOT NULL DEFAULT '',launch_occupancy_input_hash CHAR(64) NOT NULL DEFAULT '',launch_occupancy_due_at BIGINT NOT NULL DEFAULT 0,
+
+ coalesced_into CHAR(64) NOT NULL DEFAULT '',cancel_frame BLOB NULL,cancel_frame_hash CHAR(64) NOT NULL DEFAULT '',cancel_left_at BIGINT NOT NULL DEFAULT 0,
+ cutoff_at BIGINT NOT NULL DEFAULT 0,
+ status VARCHAR(16) NOT NULL DEFAULT '',hit_at BIGINT NOT NULL DEFAULT 0,cancel_reason VARCHAR(64) NOT NULL DEFAULT '',actor_guid VARCHAR(128) NOT NULL DEFAULT '',actor_pose BIGINT NOT NULL DEFAULT 0,life_ordinal BIGINT NOT NULL DEFAULT 0,frozen_actor BLOB NULL,frozen_actor_hash CHAR(64) NOT NULL DEFAULT '',capture_frame BLOB NULL,capture_frame_hash CHAR(64) NOT NULL DEFAULT '',damage DOUBLE NOT NULL DEFAULT 0,occupancy_kind VARCHAR(16) NOT NULL DEFAULT '',occupancy_id CHAR(64) NOT NULL DEFAULT '',occupancy_input_hash CHAR(64) NOT NULL DEFAULT '',occupancy_due_at BIGINT NOT NULL DEFAULT 0,immutable_hash CHAR(64) NOT NULL DEFAULT '',
+
+ match_id CHAR(64) NOT NULL,
+ tower_guid BIGINT NOT NULL,
+ sequence BIGINT NOT NULL,
+ target_kind VARCHAR(8) NOT NULL,
+ target_guid BIGINT NOT NULL,
+ due_at BIGINT NOT NULL,
+ applied_at BIGINT NOT NULL,
+ x FLOAT NOT NULL,
+ y FLOAT NOT NULL,
+ z FLOAT NOT NULL,
+ `before` BLOB NOT NULL,
+ `after` BLOB NOT NULL,
+ before_hash CHAR(64) NOT NULL,
+ after_hash CHAR(64) NOT NULL,
+ dead_player_id BIGINT NOT NULL DEFAULT 0,
+ revive_seconds BIGINT NOT NULL DEFAULT 0,
+ revive_at BIGINT NOT NULL DEFAULT 0,
+ tower_source_hash CHAR(64) NOT NULL,
+ hit_hash CHAR(64) NOT NULL,
+ KEY p13_tower_occupancy (match_id,target_guid,occupancy_kind,occupancy_id,tower_guid,status),
+ KEY p13_tower_pending (match_id,target_guid,status,life_ordinal,occupancy_id),
+ PRIMARY KEY(match_id,tower_guid,sequence),
+ KEY p13_tower_target(match_id,target_kind,target_guid,due_at),
+ KEY p13_tower_death(match_id,dead_player_id,due_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

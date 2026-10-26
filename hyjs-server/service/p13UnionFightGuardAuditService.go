@@ -77,12 +77,25 @@ func p13UFGuardAuditMonster(offer *db.P13UnionFightGuardAuditOffer, guard *pb.In
 	monster.Inst.Anger = proto.Float64(hp.GetAnger())
 	return monster, nil
 }
-func (s *GameService) p13UFGuardAuditBuild(tx *gorm.DB, match *db.P13UnionFightMatch, buildings *pb.SCUFBuildingRefresh, original *GameService, now time.Time) error {
+func (s *GameService) p13UFGuardAuditBuild(tx *gorm.DB, match *db.P13UnionFightMatch, buildings *pb.SCUFBuildingRefresh, original *GameService, now time.Time, frozenRules ...string) error {
+	rule := ""
+	if len(frozenRules) > 1 {
+		return errors.New(constUtil.P13UFGuardConflict)
+	}
+	if len(frozenRules) == 1 {
+		rule = frozenRules[0]
+	}
+	if !p13UFGuardTemplateRuleKnown(rule) {
+		return errors.New(constUtil.P13UFGuardConflict)
+	}
 	var sources []db.P13UnionFightGuardAuditSource
 	if err := tx.Find(&sources, "day=? AND enabled=1", match.Day).Error; err != nil {
 		return err
 	}
 	if len(sources) == 0 {
+		if rule == constUtil.P13UFGuardMirrorRule {
+			return errors.New(constUtil.P13UFGuardConflict)
+		}
 		return nil
 	}
 	var common db.P13UnionFightBattleAuditOffer
@@ -113,7 +126,17 @@ func (s *GameService) p13UFGuardAuditBuild(tx *gorm.DB, match *db.P13UnionFightM
 		if len(guard.GetFightInfo().GetMaxHpPos()) != 1 {
 			return errors.New("原守卫单实体HP映射缺失")
 		}
-		offer := db.P13UnionFightGuardAuditOffer{MatchID: match.ID, GuardGUID: guard.GetGuid(), GuardID: source.GuardID, HeroID: row["HeroId"], Camp: int64(guard.GetCamp()), BindGUID: guard.GetBindGuid(), InitialHP: guard.GetFightInfo().GetMaxHpPos()[0], ArriveRange: distance, BattleOfferHash: common.SourceHash, Monster: append([]byte(nil), source.Monster...), MonsterHash: p6Digest(source.Monster), Source: constUtil.P13UnionFightGuardAuditSource + "；发布：" + source.Source}
+		heroID := row["HeroId"]
+		if rule == constUtil.P13UFGuardMirrorRule {
+			monster, e := p13UFGuardMirrorSource(&source, original, match, now)
+			if e != nil {
+				return e
+			}
+			heroID = monster.Formation[0].GetId()
+		} else if source.GuardRule != "" {
+			return errors.New(constUtil.P13UFGuardConflict)
+		}
+		offer := db.P13UnionFightGuardAuditOffer{GuardRule: rule, MatchID: match.ID, GuardGUID: guard.GetGuid(), GuardID: source.GuardID, HeroID: heroID, Camp: int64(guard.GetCamp()), BindGUID: guard.GetBindGuid(), InitialHP: guard.GetFightInfo().GetMaxHpPos()[0], ArriveRange: distance, BattleOfferHash: common.SourceHash, Monster: append([]byte(nil), source.Monster...), MonsterHash: p6Digest(source.Monster), Source: constUtil.P13UnionFightGuardAuditSource + "；发布：" + source.Source}
 		offer.SourceHash = p13UFGuardOfferHash(&offer)
 		if _, err = p13UFGuardAuditMonster(&offer, guard); err != nil {
 			return err
@@ -294,10 +317,14 @@ func p13UFGuardAuditVerifyRecord(tx *gorm.DB, attempt *db.P13UnionFightGuardAudi
 	if err := tx.First(&record, "id=?", attempt.P6RecordID).Error; err != nil {
 		return err
 	}
+	return p13UFGuardAuditVerifyLoaded(attempt, &record)
+}
+
+func p13UFGuardAuditVerifyLoaded(attempt *db.P13UnionFightGuardAuditAttempt, record *db.P6BattleRecord) error {
 	if record.PlayerID != attempt.PlayerID || record.Source != constUtil.P13UnionFightGuardAuditP6Source || record.SourceFight != strconv.FormatInt(attempt.GUID, 10) || record.Status != constUtil.P6BattleComputed || record.Authoritative || record.InputHash != attempt.InputHash || record.OutcomeHash != attempt.OutcomeHash || record.ReplayHash != attempt.ReplayHash || p6Digest(record.Outcome) != record.OutcomeHash {
 		return errors.New("守卫实际计算审计SHA/身份不符")
 	}
-	input, err := decodeP6Record(&record)
+	input, err := decodeP6Record(record)
 	if err != nil {
 		return err
 	}

@@ -2,10 +2,10 @@ package db
 
 // P13UnionFightPlayerBattleAttempt journals durable capture, certified calculation and timed application.
 type P13UnionFightPlayerBattleAttempt struct {
-	ID                  string `gorm:"primaryKey;type:char(64);index:p13_uf_player_battle_compute,priority:6" json:"id"`
-	MatchID             string `gorm:"type:char(64);not null;index:p13_uf_player_battle_match" json:"match_id"`
-	PlayerID            int64  `gorm:"not null;uniqueIndex:p13_uf_player_battle_stamp,priority:1;index;index:p13_uf_player_battle_client,priority:1" json:"player_id"`
-	TargetID            int64  `gorm:"not null;index:p13_uf_player_battle_target" json:"target_id"`
+	ID                  string `gorm:"primaryKey;type:char(64);index:p13_uf_player_battle_compute,priority:6;index:p13_uf_player_death_latest,priority:5,sort:desc" json:"id"`
+	MatchID             string `gorm:"type:char(64);not null;index:p13_uf_player_battle_match;index:p13_uf_player_death_latest,priority:1;index:p13_uf_player_active_att,priority:1;index:p13_uf_player_active_def,priority:1" json:"match_id"`
+	PlayerID            int64  `gorm:"not null;uniqueIndex:p13_uf_player_battle_stamp,priority:1;index;index:p13_uf_player_battle_client,priority:1;index:p13_uf_player_active_att,priority:2" json:"player_id"`
+	TargetID            int64  `gorm:"not null;index:p13_uf_player_battle_target;index:p13_uf_player_active_def,priority:2" json:"target_id"`
 	Stamp               int64  `gorm:"not null;uniqueIndex:p13_uf_player_battle_stamp,priority:2" json:"stamp"`
 	ClientStamp         int64  `gorm:"not null;index:p13_uf_player_battle_client,priority:2" json:"client_stamp"`
 	CalculationStage    string `gorm:"type:varchar(16);not null;default:'';index:p13_uf_player_battle_compute,priority:1" json:"calculation_stage,omitempty"`
@@ -14,7 +14,7 @@ type P13UnionFightPlayerBattleAttempt struct {
 	// Quarantine is an independent scheduler flag, excluded from authenticated
 	// source bytes so damaged payloads are never re-signed to defer their work.
 	CalculationQuarantined bool   `gorm:"not null;default:false;index:p13_uf_player_battle_compute,priority:3" json:"-"`
-	Status                 string `gorm:"type:varchar(16);not null;index:p13_uf_player_battle_due,priority:1;index:p13_uf_player_battle_compute,priority:2" json:"status"`
+	Status                 string `gorm:"type:varchar(16);not null;index:p13_uf_player_battle_due,priority:1;index:p13_uf_player_battle_compute,priority:2;index:p13_uf_player_death_latest,priority:3;index:p13_uf_player_active_att,priority:3;index:p13_uf_player_active_def,priority:3" json:"status"`
 	FightID                string `gorm:"type:varchar(128);not null;uniqueIndex:p13_uf_player_battle_fight_id" json:"fight_id"`
 	RequestHash            string `gorm:"type:char(64);not null" json:"request_hash"`
 	OfferHash              string `gorm:"type:char(64);not null" json:"offer_hash"`
@@ -28,11 +28,11 @@ type P13UnionFightPlayerBattleAttempt struct {
 	Terminal               []byte `gorm:"type:longblob;not null" json:"terminal"`
 	TerminalHash           string `gorm:"type:char(64);not null" json:"terminal_hash"`
 	ScopeProof             string `gorm:"type:char(64);not null" json:"scope_proof"`
-	DeadPlayerID           int64  `gorm:"not null;default:0" json:"dead_player_id"`
+	DeadPlayerID           int64  `gorm:"not null;default:0;index:p13_uf_player_death_latest,priority:2" json:"dead_player_id"`
 	RewardPlayerID         int64  `gorm:"not null;default:0" json:"reward_player_id"`
 	ReviveSeconds          int64  `gorm:"not null;default:0" json:"revive_seconds"`
 	CreatedAt              int64  `gorm:"not null;autoCreateTime:false;index:p13_uf_player_battle_compute,priority:5" json:"created_at"`
-	DueAt                  int64  `gorm:"not null;index:p13_uf_player_battle_due,priority:2" json:"due_at"`
+	DueAt                  int64  `gorm:"not null;index:p13_uf_player_battle_due,priority:2;index:p13_uf_player_death_latest,priority:4,sort:desc" json:"due_at"`
 	SettledAt              int64  `gorm:"not null;default:0" json:"settled_at"`
 	SourceHash             string `gorm:"type:char(64);not null" json:"source_hash"`
 }

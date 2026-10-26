@@ -21,7 +21,10 @@ import (
 
 // InitializeP13UnionFightGateItem 独立保存城门道具的已发布来源与实际动态门HP，不默认投放未知原数量。
 func (s *GameService) InitializeP13UnionFightGateItem(ctx context.Context) error {
-	return db.GetIns().WithContext(ctx).AutoMigrate(&db.P13UnionFightGateItemSource{}, &db.P13UnionFightGateItemOffer{}, &db.P13UnionFightGateState{})
+	if err := db.GetIns().WithContext(ctx).AutoMigrate(&db.P13UnionFightGateItemSource{}, &db.P13UnionFightGateItemOffer{}, &db.P13UnionFightGateState{}, &db.P13UnionFightGateImpact{}); err != nil {
+		return err
+	}
+	return s.InitializeP13UnionFightItemBudget(ctx)
 }
 func p13UFGateItemOfferHash(row *db.P13UnionFightGateItemOffer) string {
 	copy := *row
@@ -72,6 +75,9 @@ func (s *GameService) p13UFGateItemBuild(tx *gorm.DB, match *db.P13UnionFightMat
 		return errors.New("原地图8门实体不完整")
 	}
 	for _, source := range sources {
+		if err := p13UFItemBudgetValidate(source.ItemID, p13UFItemBudgetConfig{source.BudgetRule, source.TeamUseLimit, source.TargetCooldownMillis, source.EffectFamily}); err != nil {
+			return err
+		}
 		selector, effect := "", ""
 		switch source.ItemID {
 		case "ufitem_019":
@@ -91,7 +97,7 @@ func (s *GameService) p13UFGateItemBuild(tx *gorm.DB, match *db.P13UnionFightMat
 		if cdErr != nil || math.IsNaN(cd) || math.IsInf(cd, 0) || cd < 0.1 || cd > 3600 {
 			return errors.New("原城门普通道具5秒CD缺失")
 		}
-		quote := db.P13UnionFightGateItemOffer{MatchID: match.ID, ItemID: source.ItemID, HPPercent: source.HPPercent, Enemy: source.ItemID == "ufitem_020", Radius: 5, CooldownMillis: int64(cd * 1000), Source: constUtil.P13UnionFightGateItemSource + "；发布：" + source.Source}
+		quote := db.P13UnionFightGateItemOffer{BudgetRule: source.BudgetRule, TeamUseLimit: source.TeamUseLimit, TargetCooldownMillis: source.TargetCooldownMillis, EffectFamily: source.EffectFamily, MatchID: match.ID, ItemID: source.ItemID, HPPercent: source.HPPercent, Enemy: source.ItemID == "ufitem_020", Radius: 5, CooldownMillis: int64(cd * 1000), Source: constUtil.P13UnionFightGateItemSource + "；发布：" + source.Source}
 		quote.SourceHash = p13UFGateItemOfferHash(&quote)
 		if err := tx.Create(&quote).Error; err != nil {
 			return err
@@ -192,7 +198,7 @@ func (s *GameService) p13UFGateItemTarget(tx *gorm.DB, match *db.P13UnionFightMa
 		if err != nil {
 			return nil, nil, err
 		}
-		if (row.Camp != actor.Camp) != quote.Enemy || frame.GetHp() <= 0 {
+		if (row.Camp != actor.Camp) != quote.Enemy || frame.GetHp() <= 0 || !quote.Enemy && frame.GetHp() >= frame.GetMaxHp() {
 			continue
 		}
 		cfg := original.table("UnionFightGate", "UFGId", strconv.FormatInt(row.GateID, 10))
@@ -281,6 +287,9 @@ func (s *GameService) p13UFGateItemUse(ctx context.Context, id int64, request *p
 		if quote.SourceHash != p13UFGateItemOfferHash(&quote) || quote.Radius != 5 || (quote.CooldownMillis < 100 || quote.CooldownMillis > 3600000) || quote.HPPercent < 1 || quote.HPPercent > 100 || quote.Enemy != (quote.ItemID == "ufitem_020") || (quote.ItemID != "ufitem_019" && quote.ItemID != "ufitem_020") {
 			return errors.New("原城门道具目标或具名效果SHA损坏")
 		}
+		if err = p13UFItemBudgetValidate(quote.ItemID, p13UFItemBudgetConfig{quote.BudgetRule, quote.TeamUseLimit, quote.TargetCooldownMillis, quote.EffectFamily}); err != nil {
+			return err
+		}
 		state, err := p13UFItemProject(tx, scope, id, frame, now)
 		if err != nil {
 			return err
@@ -314,6 +323,19 @@ func (s *GameService) p13UFGateItemUse(ctx context.Context, id int64, request *p
 			target.Hp = proto.Float64(max(float64(0), target.GetHp()-delta))
 		} else {
 			target.Hp = proto.Float64(min(target.GetMaxHp(), target.GetHp()+delta))
+		}
+		if target.GetHp() == oldHP {
+			return errors.New("本次城门道具没有有效HP变化")
+		}
+		if err = p13UFItemBudgetConsume(tx, scope, actor.Camp, quote.ItemID, target.GetGuid(), quote.SourceHash, p13UFItemBudgetConfig{quote.BudgetRule, quote.TeamUseLimit, quote.TargetCooldownMillis, quote.EffectFamily}, now); err != nil {
+			return err
+		}
+		percent := quote.HPPercent
+		if quote.Enemy {
+			percent = -percent
+		}
+		if err = p13UFGateImpactRecord(tx, row, target, db.P13UnionFightGateImpact{Kind: constUtil.P13UFGateImpactItem, OfferHash: quote.SourceHash, PlayerID: id, Stamp: stamp, ItemID: quote.ItemID, InventoryBefore: item.GetLeftUseNum(), InventoryAfter: item.GetLeftUseNum() - 1, Percent: percent, LogicalAt: now.UnixMilli(), AppliedAt: now.UnixMilli()}); err != nil {
+			return err
 		}
 		if err = p13UFGateSave(tx, row, target); err != nil {
 			return err

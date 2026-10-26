@@ -11,6 +11,7 @@ import (
 	"gorm.io/gorm"
 	"hyjs-server/constUtil"
 	"hyjs-server/db"
+	"hyjs-server/model"
 	pb "hyjs-server/model/protocol"
 )
 
@@ -32,14 +33,28 @@ func (s *GameService) ProjectP13UnionFightFieldBattle(ctx context.Context, id in
 
 // p13UFFieldBattle 允许调用方在同一事务Capture/Compute使用准确的当前HP和已冻结范围来源。
 func (s *GameService) p13UFFieldBattle(tx *gorm.DB, id int64, now time.Time) (*pb.BattlePlayer, map[string][]string, error) {
-	battle, applied, err := s.p13UFDrumBattle(tx, id, now)
-	if err != nil {
-		return nil, nil, err
-	}
 	actor, match, _, frame, err := s.p13UFFieldCurrent(tx, id, now)
 	if err != nil {
 		return nil, nil, err
 	}
+	var profile db.Profile
+	if err = tx.First(&profile, id).Error; err != nil {
+		return nil, nil, err
+	}
+	_, game, err := decodeProfileForCalendarUpdate(tx, &profile)
+	if err != nil {
+		return nil, nil, err
+	}
+	return s.p13UFFieldBattleLoaded(tx, actor, match, frame, game, now)
+}
+
+// Loaded projects HP/AP onto a fresh frozen-Battle clone with actual drum inputs.
+func (s *GameService) p13UFFieldBattleLoaded(tx *gorm.DB, actor *db.P13UnionFightFieldPlayer, match *db.P13UnionFightMatch, frame *pb.InstUFPlayer, game *model.GameState, now time.Time) (*pb.BattlePlayer, map[string][]string, error) {
+	battle, applied, err := s.p13UFDrumBattleLoaded(tx, actor, match, frame, game, now)
+	if err != nil {
+		return nil, nil, err
+	}
+	id := actor.PlayerID
 	fight := frame.GetFightInfo()
 	if fight == nil || fight.GetGuid() != id || len(fight.Index) != len(battle.Formation) || len(fight.HpPos) != len(fight.Index) || len(fight.MaxHpPos) != len(fight.Index) {
 		return nil, nil, errors.New("原战场FightInfo pose/生命长度不符")
@@ -75,5 +90,9 @@ func (s *GameService) p13UFFieldBattle(tx *gorm.DB, id int64, now time.Time) (*p
 	if !alive {
 		return nil, nil, errors.New("原战场全阵容零生命不能冻结为存活参战者")
 	}
+	if battle.Inst == nil || !combatFinite(fight.GetAnger()) || fight.GetAnger() < 0 || fight.GetAnger() > 300 {
+		return nil, nil, errors.New("原战场当前怒气与冻结阵容不符")
+	}
+	battle.Inst.Anger = proto.Float64(fight.GetAnger())
 	return battle, applied, nil
 }

@@ -53,8 +53,18 @@ func TestP13UnionFightFieldAdvanceIsolatedNativeClock(t *testing.T) {
 	}
 }
 
-func p13UFFieldSetup(t *testing.T) (*p1Fixture, []int64, int64, *atomic.Int64, *db.P13UnionFightMatch) {
+func p13UFFieldSetup(t *testing.T, durationMillis ...int64) (*p1Fixture, []int64, int64, *atomic.Int64, *db.P13UnionFightMatch) {
 	t.Helper()
+	duration := int64(300000)
+	if len(durationMillis) > 1 {
+		t.Fatal("field fixture accepts at most one duration")
+	}
+	if len(durationMillis) == 1 {
+		duration = durationMillis[0]
+		if duration < 60000 || duration > 1800000 {
+			t.Fatal("field fixture duration must be1..30minutes")
+		}
+	}
 	f, ids := p13GuildSetup(t)
 	p13GuildOpen(t, false)
 	p13UFOpen(t)
@@ -107,7 +117,7 @@ func p13UFFieldSetup(t *testing.T) (*p1Fixture, []int64, int64, *atomic.Int64, *
 	}
 	next := now.Add(12 * time.Hour)
 	first := next.Add(20 * time.Hour).UnixMilli()
-	if err := db.GetIns().Create(&db.P13UnionFightSchedule{Day: "2026-10-20", FirstStartAt: first, SecondStartAt: first + 600000, DurationMillis: 300000, Source: "隔离完整场景日历，原运营日期未知"}).Error; err != nil {
+	if err := db.GetIns().Create(&db.P13UnionFightSchedule{Day: "2026-10-20", FirstStartAt: first, SecondStartAt: max(first+600000, first+duration+60000), DurationMillis: duration, Source: "隔离完整场景日历，原运营日期未知"}).Error; err != nil {
 		t.Fatal(err)
 	}
 	if err := f.s.TickP13UnionFight(f.ctx, next); err != nil {

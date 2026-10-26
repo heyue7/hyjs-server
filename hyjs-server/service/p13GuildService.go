@@ -113,6 +113,9 @@ func (s *GameService) InitializeP13Guild(ctx context.Context) error {
 	if err := s.InitializeP13GuildDonationBadge(ctx); err != nil {
 		return err
 	}
+	if err := s.InitializeP13GuildGiftMonthly(ctx); err != nil {
+		return err
+	}
 	return s.InitializeP13UnionFight(ctx)
 }
 
@@ -239,6 +242,9 @@ func (s *GameService) p13GuildLoginAt(ctx context.Context, id int64, now time.Ti
 		if m.GuildID == "" {
 			return nil
 		}
+		if _, err = s.P13GuildGiftBeforeMutation(tx, m.GuildID, now); err != nil {
+			return err
+		}
 		m.LastLoginAt = now.UnixMilli()
 		if policy.ManagementEnabled && policy.EconomyEnabled && m.LastLoginDay != p13GuildDay(now) {
 			var guild db.P13Guild
@@ -256,7 +262,13 @@ func (s *GameService) p13GuildLoginAt(ctx context.Context, id int64, now time.Ti
 			if int64(guild.ActiveScore)+int64(active) > math.MaxInt32 || int64(guild.Exp)+int64(score) > math.MaxInt32 {
 				return errors.New("公会登录积分溢出")
 			}
-			guild.ActiveScore += active
+			giftTracked, err := s.p13GuildGiftCredit(tx, &guild, m, now)
+			if err != nil {
+				return err
+			}
+			if !giftTracked {
+				guild.ActiveScore += active
+			}
 			guild.Exp += score
 			m.LastLoginDay = p13GuildDay(now)
 			if err = tx.Save(&guild).Error; err != nil {
@@ -375,6 +387,18 @@ func (s *GameService) p13GuildMutate(ctx context.Context, id int64, request, res
 		// Freeze due month identities before any post-cutoff membership or role mutation.
 		if err := s.P13MonthlyBeforeGuildMutation(tx, now); err != nil {
 			return err
+		}
+		giftMember, err := p13GuildMember(tx, id)
+		if err != nil {
+			return err
+		}
+		if _, err = s.P13GuildGiftBeforeMutation(tx, giftMember.GuildID, now); err != nil {
+			return err
+		}
+		if _, dissolve := request.(*pb.CSDissolveUnion); dissolve && giftMember.GuildID != "" {
+			if err = s.P13GuildGiftRetire(tx, giftMember.GuildID, now); err != nil {
+				return err
+			}
 		}
 		// 解散涉及全体成员位置，先按ID升序锁全员，避免与P10双角色业务逆序。
 		if _, dissolve := request.(*pb.CSDissolveUnion); dissolve {
@@ -627,7 +651,25 @@ func (s *GameService) p13GuildSimple(tx *gorm.DB, viewer int64, g db.P13Guild) (
 	if err != nil {
 		return nil, err
 	}
+	rank, err := p13GuildDisplayRank(tx, g)
+	if err != nil {
+		return nil, err
+	}
+	list[0].Rank = proto.Int32(rank)
 	return list[0], nil
+}
+
+// Display rank preserves the existing created_at,id directory order. It does
+// not recompute a global formation-power leaderboard or read any profile.
+func p13GuildDisplayRank(tx *gorm.DB, guild db.P13Guild) (int32, error) {
+	var earlier int64
+	if err := tx.Model(&db.P13Guild{}).Where("created_at<? OR (created_at=? AND id<?)", guild.CreatedAt, guild.CreatedAt, guild.ID).Count(&earlier).Error; err != nil {
+		return 0, err
+	}
+	if earlier >= math.MaxInt32 {
+		return 0, errors.New("公会展示序号超出原协议范围")
+	}
+	return int32(earlier + 1), nil
 }
 
 // p13GuildQuery 返回真实成员与申请数据，空会入口仍可供原登录初始化使用。
@@ -678,9 +720,25 @@ func (s *GameService) p13GuildQuery(ctx context.Context, id int64, request proto
 			if err != nil {
 				return err
 			}
+			for i, info := range reply.Unions {
+				rank := int32((b.GetPage()-1)*20) + int32(i+1)
+				if b.GetName() != "" {
+					// Name and canonical UUID are unique. One metadata count per
+					// exact result, never a count for every unfiltered page row.
+					rank, err = p13GuildDisplayRank(tx, guilds[i])
+					if err != nil {
+						return err
+					}
+				}
+				info.Rank = proto.Int32(rank)
+			}
 			response = reply
 			return nil
 		case *pb.CSGetUnionInfo:
+			var giftGate db.P13GuildPolicy
+			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&giftGate, 1).Error; err != nil {
+				return err
+			}
 			member, err := p13GuildMember(tx, id)
 			if err != nil {
 				return err
@@ -689,6 +747,9 @@ func (s *GameService) p13GuildQuery(ctx context.Context, id int64, request proto
 			response = reply
 			if member.GuildID == "" {
 				return nil
+			}
+			if _, err = s.P13GuildGiftBeforeMutation(tx, member.GuildID, now); err != nil {
+				return err
 			}
 			var guild db.P13Guild
 			if err = tx.First(&guild, "id=?", member.GuildID).Error; err != nil {

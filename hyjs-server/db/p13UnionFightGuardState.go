@@ -2,6 +2,7 @@ package db
 
 // P13UnionFightGuardState preserves the independent guard lifecycle; existing audit records remain untouched.
 type P13UnionFightGuardState struct {
+	GuardRule        string `gorm:"type:varchar(64);not null;default:''" json:"guard_rule,omitempty"`
 	MatchID          string `gorm:"primaryKey;type:char(64)" json:"match_id"`
 	GuardGUID        int64  `gorm:"primaryKey;autoIncrement:false" json:"guard_guid"`
 	GuardID          string `gorm:"type:varchar(64);not null" json:"guard_id"`

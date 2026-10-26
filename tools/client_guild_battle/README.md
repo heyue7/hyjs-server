@@ -6,6 +6,8 @@
 
 `RoomUnionFight._WaitForLoadComplete`只在原公会战SceneType9转入helper。Helper从`ServerConfig.GetServerUrl()`提取authority，以WWW POST `/guild-war/map`发送当前`playerId/sessionHex`，Content-Type为application/json，等待最多3秒。只有已认证响应`code0/data.mapProjection=re-flat-v1`创建自有场景与可恢复的DAO坐标投影。
 
+准备页的`GotoFightScene`仅在完整资源标志未就绪时，先向同一authority的`/guild-war/map-entry`读取本人真实对局的地图能力。该只读探测不建场、不入场、不改资源标志或发下载奖励。仅明确返回`re-flat-v1`时调用原`TrySceneTransfer("fight_union", Vector3.zero, "UIUnionFightRunMap", null, string.Empty)`；legacy空投影保留原资源提示，未知/超时失败关闭。请求绑定当前页面按钮、角色、会话和房间，关闭页面取消并Dispose，重复点击共用一项在途请求。入场后仍再次核对实际冻结地图。
+
 空projection通过精确原嵌套`<_WaitForLoadComplete>c__Iterator98`、无参构造、`<>f__this`及`$PC=0`恢复原加载协程，不递归调用被hook的方法。未知/解析/网络失败使用原`BoxManager.CreateNetError`，保留原反馈/重试流程，不调用假OnLoadComplete。请求与后续初始化绑定room实例、当前RoomManager.currentRoom、id/session和generation；旧响应丢弃。服务器负责从入场actor及冻结场次读取投影，客户端不能选择合同。
 
 其余hook只有SceneType9、自有root且room/id/session仍匹配时生效；其他地图完整回落原方法。原语使用灰石、木色和蓝/红阵营，保留原表节点名、原角色和NGUI交互，不新增弹窗工程说明。已有冲车model Bundle优先；仅缺失battle_obj_801/802时生成原语外观。粒子沿原注册协程，整批等待预算15秒；地图元信息WWW完成或取消后Dispose；不更改共享池。退出时恢复仅本helper投影的DAO字符串、小地图字段/纹理，销毁自有root/材质/纹理。
@@ -59,3 +61,11 @@ rtk proxy /Users/lirui/LR/hyjs/.analysis-venv/bin/python tools/client_guild_batt
 ```sh
 rtk proxy /Users/lirui/LR/hyjs/.analysis-venv/bin/python tools/client_guild_battle/build.py --base-apk build/guild-input-70.apk --output tools/client_guild_battle/overlay-r7
 ```
+
+## 当前交付候选：正式71基线及总开关
+
+接受正式71 SHA `7a648808558035ad76b11929fa8f7ed6299372dc657fe092e03a2e743bd3b482`，在其主程序集重新施加本层24个精确钩子，保留全部试炼UI钩子、试炼helpers及其余managed/Java内容；仍逐字节验证547个Battle.Engine方法。正式69/70旧证据保持原范围，r21精确六源快照另留analysis。
+
+TownPage原Update前缀安装独立availability owner，按当前角色/session/authority认证读取 `/guild-war/state`；五秒内同一请求只在途一项，三秒超时，关闭/未知时隐藏原公会战按钮。两个Town原入场入口在关闭/未知时拦截并使用原反馈。页面关闭取消请求并Dispose，旧身份响应丢弃；重新开放通过原MsgUFCheckState重算原时间/资格，无强制打开。总开关不参与已经入场场景的Active判定。
+
+平面导航真正抵达最后坐标时，通过原SolveSyncSelfToServer发送变化终点；原普通玩家Ask前同样补齐未发送坐标。保留原CSMove字段、时钟、同TCP顺序及服务端距离/速度/身份校验；未变化坐标不重复发送，其他地图保持原逻辑。普通玩家扫描仍用有界单项intent和原Begin/End消费后观察，场外目标不发Ask。

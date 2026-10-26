@@ -1,4 +1,5 @@
 CREATE TABLE IF NOT EXISTS p13_union_fight_heal_aura_sources (
+ effect_rule VARCHAR(64) NOT NULL DEFAULT '',
  day CHAR(10) NOT NULL,
  item_id VARCHAR(64) NOT NULL,
  enabled TINYINT(1) NOT NULL DEFAULT 0,

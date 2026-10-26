@@ -532,7 +532,7 @@ func run() error {
 	handler.RegisterAdminRoutes(r, os.Getenv("HYJS_ADMIN_ASSETS"))
 	routes.RouteRegister(r)
 	server := &http.Server{Handler: r, ReadTimeout: 15 * time.Second, WriteTimeout: 30 * time.Second, IdleTimeout: 60 * time.Second, BaseContext: func(net.Listener) context.Context { return ctx }}
-	const serviceWorkerCount = 14
+	const serviceWorkerCount = 17
 	errs := make(chan error, serviceWorkerCount)
 	go func() { errs <- handler.ServeGameTCP(ctx, tcpListener, s) }()
 	go func() { errs <- server.Serve(httpListener) }()
@@ -544,8 +544,17 @@ func run() error {
 	}()
 	// 公会战自动宣战与名单冻结沿同一服务ctx运行，退出时一并收口。
 	go func() { errs <- service.ServeBackgroundWorker(ctx, "p13-union-fight", s.ServeP13UnionFight) }()
+	go func() {
+		errs <- service.ServeBackgroundWorker(ctx, "p13-union-fight-finalization", s.ServeP13UnionFightFinalization)
+	}()
+	go func() {
+		errs <- service.ServeBackgroundWorker(ctx, "p13-guild-gift-monthly", s.ServeP13GuildGiftMonthly)
+	}()
 	// 同场位置与结束退场使用服务ctx，停启后恢复冻结实例和角色状态。
 	go func() { errs <- service.ServeBackgroundWorker(ctx, "p13-union-fight-field", s.ServeP13UnionFightField) }()
+	go func() {
+		errs <- service.ServeBackgroundWorker(ctx, "p13-union-fight-guard", s.ServeP13UnionFightGuardBattle)
+	}()
 	go func() { errs <- service.ServeBackgroundWorker(ctx, "p14-delivery", s.ServeP14Delivery) }()
 	go func() { errs <- service.ServeBackgroundWorker(ctx, "p10-voice", s.ServeP10Voice) }()
 	go func() {

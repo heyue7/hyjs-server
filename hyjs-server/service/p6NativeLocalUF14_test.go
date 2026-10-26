@@ -38,6 +38,18 @@ func TestP6NativeLocalUF14ActualOriginalCoreAndDynamic(t *testing.T) {
 // The originalPVP fixtures remain exactly14. This separately pinned one-case
 // typed UF14 callback evidence is scoped to the actual local frozen source.
 func p6NativeOriginalPerHitCaseCount(name string) int {
+	if count := p6UFPartyPVPPhone20261026HitCaseCount(name); count != 0 {
+		return count
+	}
+	if count := p6UFGuardPartyNew2Phone20261026HitCaseCount(name); count != 0 {
+		return count
+	}
+	if count := p6UFGuard14Phone20261026HitCaseCount(name); count != 0 {
+		return count
+	}
+	if count := p6UFGuardPhone20261026HitCaseCount(name); count != 0 {
+		return count
+	}
 	if count := p6GenericLocalNativeHitCaseCount(name); count != 0 {
 		return count
 	}

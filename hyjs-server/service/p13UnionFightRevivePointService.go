@@ -151,7 +151,18 @@ func (s *GameService) TickP13UnionFightRevivePoint(ctx context.Context, now time
 	if err := db.GetIns().WithContext(ctx).Find(&quotes).Error; err != nil {
 		return err
 	}
+	scopes := make([]string, 0, len(quotes))
+	for _, candidate := range quotes {
+		scopes = append(scopes, candidate.MatchID)
+	}
+	clocks, clockErr := p13UFWorldClockBatch(ctx, scopes, now)
+	if clockErr != nil {
+		return clockErr
+	}
 	for _, quote := range quotes {
+		if clocks.paused(quote.MatchID) {
+			continue
+		}
 		if err := ctx.Err(); err != nil {
 			return err
 		}
@@ -166,6 +177,11 @@ func (s *GameService) TickP13UnionFightRevivePoint(ctx context.Context, now time
 			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&policy, 1).Error; err != nil {
 				return err
 			}
+			if closed, err := p13UFWorldSealed(tx, quote.MatchID); err != nil {
+				return err
+			} else if closed {
+				return nil
+			}
 			var enrollment db.P13UnionFightPolicy
 			if err := tx.First(&enrollment, 1).Error; err != nil {
 				return err
@@ -178,7 +194,7 @@ func (s *GameService) TickP13UnionFightRevivePoint(ctx context.Context, now time
 			if err := tx.First(&match, "id=?", quote.MatchID).Error; err != nil {
 				return err
 			}
-			if now.UnixMilli() < match.StartAt || now.UnixMilli() >= match.EndAt {
+			if now.UnixMilli() < match.StartAt || now.UnixMilli() >= clocks.end(&match) {
 				return nil
 			}
 			var state db.P13UnionFightRevivePointState
@@ -258,12 +274,19 @@ func (s *GameService) TickP13UnionFightRevivePoint(ctx context.Context, now time
 		if err != nil {
 			return err
 		}
-		if update != nil {
-			s.p13UFFieldBroadcast(ctx, quote.MatchID, 0, update)
+		if update != nil || occupied != nil {
+			if err := p13UFPublishBeforeAbort(ctx, quote.MatchID, func() {
+				if update != nil {
+					s.p13UFFieldBroadcast(ctx, quote.MatchID, 0, update)
+				}
+				if occupied != nil {
+					s.p13UFFieldBroadcast(ctx, quote.MatchID, 0, occupied)
+				}
+			}); err != nil {
+				return err
+			}
 		}
-		if occupied != nil {
-			s.p13UFFieldBroadcast(ctx, quote.MatchID, 0, occupied)
-		}
+
 	}
 	return nil
 }

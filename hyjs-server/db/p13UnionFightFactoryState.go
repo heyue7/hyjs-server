@@ -19,9 +19,11 @@ type P13UnionFightFactoryState struct {
 	AnimationAt   int64   `gorm:"not null;default:0;index:p13_factory_pending,priority:3" json:"animation_at"`
 	DueAt         int64   `gorm:"not null;default:0;index:p13_factory_pending,priority:2" json:"due_at"`
 	// CompletedAt 0=待生产，-1=越过合法比赛窗口或公会撤销后归档，正数=原合法出车时刻。
-	CompletedAt int64  `gorm:"not null;default:0;index:p13_factory_pending,priority:1" json:"completed_at"`
-	CarFrame    []byte `gorm:"type:longblob" json:"car_frame"`
-	CarHash     string `gorm:"type:char(64);not null;default:''" json:"car_hash"`
+	CompletedAt     int64  `gorm:"not null;default:0;index:p13_factory_pending,priority:1" json:"completed_at"`
+	CarFrame        []byte `gorm:"type:longblob" json:"car_frame"`
+	CarHash         string `gorm:"type:char(64);not null;default:''" json:"car_hash"`
+	PausedAt        int64  `gorm:"not null;default:0" json:"paused_at,omitempty"`
+	RemainingMillis int64  `gorm:"not null;default:0" json:"remaining_millis,omitempty"`
 }
 
 func (P13UnionFightFactoryState) TableName() string { return "p13_union_fight_factory_states" }

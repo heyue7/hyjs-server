@@ -2,14 +2,17 @@ package db
 
 // P13UnionFightGuardBattleAttempt preserves the independent guard lifecycle; existing audit records remain untouched.
 type P13UnionFightGuardBattleAttempt struct {
+	BuildingKind        string `gorm:"type:varchar(16);not null;default:'';index:p13_guard_battle_base_barrier,priority:3" json:"building_kind,omitempty"`
+	BuildingAppliedAt   int64  `gorm:"not null;default:0" json:"building_applied_at,omitempty"`
+	BuildingProof       []byte `gorm:"type:blob" json:"building_proof,omitempty"`
 	GuardGeneration     int64  `gorm:"not null" json:"guard_generation"`
-	ID                  string `gorm:"primaryKey;type:char(64);index:p13_guard_battle_compute,priority:6;index:p13_guard_battle_due,priority:3" json:"id"`
-	MatchID             string `gorm:"type:char(64);not null;index:p13_guard_battle_guard,priority:1" json:"match_id"`
-	PlayerID            int64  `gorm:"not null;index:p13_guard_battle_client,priority:1;uniqueIndex:p13_guard_battle_stamp,priority:1" json:"player_id"`
+	ID                  string `gorm:"primaryKey;type:char(64);index:p13_guard_battle_compute,priority:6;index:p13_guard_battle_due,priority:3;index:p13_guard_battle_death,priority:6,sort:desc" json:"id"`
+	MatchID             string `gorm:"type:char(64);not null;index:p13_guard_battle_base_barrier,priority:1;index:p13_guard_battle_guard,priority:1;index:p13_guard_battle_death,priority:1" json:"match_id"`
+	PlayerID            int64  `gorm:"not null;index:p13_guard_battle_client,priority:1;index:p13_guard_battle_death,priority:2;uniqueIndex:p13_guard_battle_stamp,priority:1" json:"player_id"`
 	GuardGUID           int64  `gorm:"not null;index:p13_guard_battle_guard,priority:2" json:"guard_guid"`
 	Stamp               int64  `gorm:"not null;uniqueIndex:p13_guard_battle_stamp,priority:2" json:"stamp"`
 	ClientStamp         int64  `gorm:"not null;index:p13_guard_battle_client,priority:2" json:"client_stamp"`
-	Status              string `gorm:"type:varchar(16);not null;index:p13_guard_battle_compute,priority:1;index:p13_guard_battle_due,priority:1;index:p13_guard_battle_guard,priority:3" json:"status"`
+	Status              string `gorm:"type:varchar(16);not null;index:p13_guard_battle_base_barrier,priority:2;index:p13_guard_battle_compute,priority:1;index:p13_guard_battle_due,priority:1;index:p13_guard_battle_guard,priority:3;index:p13_guard_battle_death,priority:3" json:"status"`
 	CalculationStage    string `gorm:"type:varchar(16);not null;index:p13_guard_battle_compute,priority:2" json:"calculation_stage"`
 	NextCalculationAt   int64  `gorm:"not null;default:0;index:p13_guard_battle_compute,priority:4" json:"next_calculation_at"`
 	CalculationFailures int64  `gorm:"not null;default:0" json:"calculation_failures"`
@@ -27,12 +30,12 @@ type P13UnionFightGuardBattleAttempt struct {
 	TerminalHash        string `gorm:"type:char(64);not null;default:''" json:"terminal_hash"`
 	PlayerAfter         []byte `gorm:"type:longblob" json:"player_after"`
 	GuardAfter          []byte `gorm:"type:longblob" json:"guard_after"`
-	PlayerDied          bool   `gorm:"not null;default:false" json:"player_died"`
+	PlayerDied          bool   `gorm:"not null;default:false;index:p13_guard_battle_death,priority:4" json:"player_died"`
 	GuardDefeated       bool   `gorm:"not null;default:false" json:"guard_defeated"`
 	ReviveSeconds       int64  `gorm:"not null;default:0" json:"revive_seconds"`
 	BuildingEvent       string `gorm:"type:varchar(32);not null;default:''" json:"building_event"`
-	CreatedAt           int64  `gorm:"not null;autoCreateTime:false;index:p13_guard_battle_compute,priority:5" json:"created_at"`
-	DueAt               int64  `gorm:"not null;index:p13_guard_battle_due,priority:2" json:"due_at"`
+	CreatedAt           int64  `gorm:"not null;autoCreateTime:false;index:p13_guard_battle_compute,priority:5;index:p13_guard_battle_death,priority:5,sort:desc" json:"created_at"`
+	DueAt               int64  `gorm:"not null;index:p13_guard_battle_base_barrier,priority:4;index:p13_guard_battle_due,priority:2" json:"due_at"`
 	SettledAt           int64  `gorm:"not null;default:0" json:"settled_at"`
 	SourceHash          string `gorm:"type:char(64);not null" json:"source_hash"`
 }

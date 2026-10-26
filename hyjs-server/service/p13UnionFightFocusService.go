@@ -207,7 +207,18 @@ func (s *GameService) TickP13UnionFightFocus(ctx context.Context, now time.Time)
 	if err := db.GetIns().WithContext(ctx).Where("cleared_at=0").Order("match_id,guild_id").Find(&rows).Error; err != nil {
 		return err
 	}
+	scopes := make([]string, 0, len(rows))
+	for _, candidate := range rows {
+		scopes = append(scopes, candidate.MatchID)
+	}
+	clocks, clockErr := p13UFWorldClockBatch(ctx, scopes, now)
+	if clockErr != nil {
+		return clockErr
+	}
 	for _, row := range rows {
+		if clocks.paused(row.MatchID) {
+			continue
+		}
 		cleared := false
 		err := db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 			if err := ServerGameClockGuardTransaction(tx); err != nil {
@@ -218,6 +229,11 @@ func (s *GameService) TickP13UnionFightFocus(ctx context.Context, now time.Time)
 			var management db.P13GuildPolicy
 			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&management, 1).Error; err != nil {
 				return err
+			}
+			if closed, err := p13UFWorldSealed(tx, row.MatchID); err != nil {
+				return err
+			} else if closed {
+				return nil
 			}
 			var field db.P13UnionFightFieldPolicy
 			if err := tx.First(&field, 1).Error; err != nil {
@@ -235,7 +251,7 @@ func (s *GameService) TickP13UnionFightFocus(ctx context.Context, now time.Time)
 			if err != nil {
 				return err
 			}
-			active = active && management.ManagementEnabled && field.Enabled && enrollment.EnrollmentEnabled && enrollment.MatchEnabled
+			active = active && clocks.terminal[current.MatchID] == 0 && management.ManagementEnabled && field.Enabled && enrollment.EnrollmentEnabled && enrollment.MatchEnabled
 			if active || current.ClearedAt > 0 {
 				return nil
 			}
@@ -249,7 +265,11 @@ func (s *GameService) TickP13UnionFightFocus(ctx context.Context, now time.Time)
 			return err
 		}
 		if cleared {
-			s.p13UFFocusBroadcast(ctx, row.MatchID, row.GuildID, 0, &pb.SCUFFocusPointInfo{})
+			if err := p13UFPublishBeforeAbort(ctx, row.MatchID, func() {
+				s.p13UFFocusBroadcast(ctx, row.MatchID, row.GuildID, 0, &pb.SCUFFocusPointInfo{})
+			}); err != nil {
+				return err
+			}
 		}
 	}
 	return nil

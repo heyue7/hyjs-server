@@ -154,6 +154,7 @@ type AdminGuildDonationBadgePolicy struct {
 
 // AdminGuildUnionFightPolicyState 汇总公会战现有独立策略。
 type AdminGuildUnionFightPolicyState struct {
+	WarEnabled   bool                                     `json:"warEnabled"` // WarEnabled controls new declarations, applications and field entry; accepted rounds continue.
 	Enrollment   AdminGuildUnionFightEnrollmentPolicy     `json:"enrollment"`
 	Chat         AdminGuildUnionFightChatPolicy           `json:"chat"`         // Chat controls in-field text and original commands.
 	Item         AdminGuildUnionFightItemPolicy           `json:"item"`         // Item controls new union-fight item consumption.
@@ -163,6 +164,7 @@ type AdminGuildUnionFightPolicyState struct {
 
 // AdminGuildUnionFightPolicySave 只提交需要更新的公会战策略。
 type AdminGuildUnionFightPolicySave struct {
+	WarEnabled   *bool                                    `json:"warEnabled,omitempty"` // Omitted preserves the master switch; false closes only new admission.
 	Enrollment   *AdminGuildUnionFightEnrollmentPolicy    `json:"enrollment"`
 	Chat         *AdminGuildUnionFightChatPolicy          `json:"chat"`         // Chat controls in-field text and original commands.
 	Item         *AdminGuildUnionFightItemPolicy          `json:"item"`         // Item controls new union-fight item consumption.
@@ -193,6 +195,7 @@ type AdminGuildUnionFightItemPolicy struct {
 
 // AdminGuildUnionFightFieldPolicy 是已冻结到新场次的具名场景参数。
 type AdminGuildUnionFightFieldPolicy struct {
+	GuardHPMode        string  `json:"guardHpMode"`        // GuardHPMode is read-only uniform/template state derived from the stored source.
 	Enabled            bool    `json:"enabled"`            // Enabled=true opens the independent policy.
 	PreparationMillis  int64   `json:"preparationMillis"`  // PreparationMillis is the field preparation window.
 	LeftRevivePointID  int64   `json:"leftRevivePointId"`  // LeftRevivePointID is the original left fixed spawn.

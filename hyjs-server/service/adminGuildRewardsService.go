@@ -242,9 +242,15 @@ func (s *GameService) AdminSaveGuildReward(ctx context.Context, actor *model.Adm
 		// Only the mutable publication row is saved; frozen offers and receipts stay untouched.
 		switch v := value.(type) {
 		case db.P13UnionFightSettlementPolicy:
+			// The existing reward form edits amounts and ranks. Preserve the
+			// separately published combat contract when this older DTO omits it.
+			old := prior.(db.P13UnionFightSettlementPolicy)
+			v.TerminalRule, v.DrawPrestige = old.TerminalRule, old.DrawPrestige
+			v.AbortRule, v.FinalizationGraceMillis = old.AbortRule, old.FinalizationGraceMillis
 			if err = tx.Save(&v).Error; err != nil {
 				return err
 			}
+			value = v
 		case db.P13UnionFightWeeklyPolicy:
 			if err = tx.Save(&v).Error; err != nil {
 				return err
