@@ -5,6 +5,21 @@ spec=importlib.util.spec_from_file_location('activity_patch75', ROOT/'deploy/gro
 p=importlib.util.module_from_spec(spec);spec.loader.exec_module(p)
 
 class Activity75(unittest.TestCase):
+ def test_retired_sources_stay_retired_after_calendar_rewind(self):
+  stream=io.StringIO()
+  with contextlib.redirect_stdout(stream):p.export_sql()
+  lines=stream.getvalue().splitlines()
+  for table in ('admin_activity_occurrences','admin_character_activity_instances','p1_period_instances','p1_period_progress','gameplay_pool_rewards','turntable_rules'):
+   line=next(v for v in lines if v.startswith("SELECT '"+table+"',"))
+   self.assertNotIn('claim_end_at>',line)
+   self.assertNotIn('reward_end_at>',line)
+   self.assertIn('成长投放V12',line)
+  tables={k:[] for k in p.TABLES}
+  tables['admin_activity_occurrences']=[dict(id='expired-retired',consumer_key='expired-sale',form_json=p.compact({'mode':'limited-shop','source':'成长投放V12','options':{}}),enabled=1)]
+  tables['p4_commerce_rules']=[dict(id='expired-sale',kind='sale',source='成长投放V12',enabled=1)]
+  changes=p.make_plan(tables)
+  self.assertEqual({v['table'] for v in changes},{'admin_activity_occurrences','p4_commerce_rules'})
+  self.assertTrue(all(v['after']=={'enabled':0} for v in changes))
  def test_mysql_export_retains_numeric_prize_identity(self):
   stream=io.StringIO()
   with contextlib.redirect_stdout(stream):p.export_sql()

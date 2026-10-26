@@ -178,14 +178,14 @@ def adjust_period(raw, desired_tiers=None):
 
 def export_sql():
     now = '(UNIX_TIMESTAMP(NOW(3))*1000+(SELECT offset_days*86400000 FROM server_game_clocks WHERE server_id=1))'
-    pool_filter = "pool_id IN (SELECT id FROM gameplay_pools WHERE source LIKE '%成长投放V12%' AND reward_end_at>"+now+")"
+    pool_filter = "pool_id IN (SELECT id FROM gameplay_pools WHERE source LIKE '%成长投放V12%')"
     filters = {
         'admin_activity_templates': "CONVERT(form_json USING utf8mb4) LIKE '%成长投放V12%' AND archived=0",
-        'admin_activity_occurrences': "CONVERT(form_json USING utf8mb4) LIKE '%成长投放V12%' AND archived=0 AND claim_end_at>"+now,
-        'admin_character_activity_instances': "CONVERT(form_json USING utf8mb4) LIKE '%成长投放V12%' AND claim_end_at>"+now,
+        'admin_activity_occurrences': "CONVERT(form_json USING utf8mb4) LIKE '%成长投放V12%' AND archived=0",
+        'admin_character_activity_instances': "CONVERT(form_json USING utf8mb4) LIKE '%成长投放V12%'",
         'p4_commerce_rules': "source LIKE '%成长投放V12%'",
-        'p1_period_instances': "source LIKE '%成长投放V12%' AND reward_end_at>"+now,
-        'p1_period_progress': "instance_id IN (SELECT id FROM p1_period_instances WHERE source LIKE '%成长投放V12%' AND reward_end_at>"+now+")",
+        'p1_period_instances': "source LIKE '%成长投放V12%'",
+        'p1_period_progress': "instance_id IN (SELECT id FROM p1_period_instances WHERE source LIKE '%成长投放V12%')",
         'gameplay_pools': "source LIKE '%成长投放V12%'",
         'gameplay_pool_rewards': pool_filter, 'turntable_rules': pool_filter,
         'turntable_personals': pool_filter, 'turntable_globals': pool_filter, 'turntable_states': pool_filter,
