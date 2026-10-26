@@ -358,8 +358,9 @@ func serverGameClockPendingBattles(tx *gorm.DB, real time.Time, offset int64) er
 			return err
 		}
 	}
+	// Settled immutable PK receipts from a later virtual date cannot be live leases after a rewind.
 	if gameSchemaHasTable(tx, &db.P12FieldPVPReceipt{}) {
-		if err := busy(tx.Model(&db.P12FieldPVPReceipt{}).Where("busy_until>?", gameMS)); err != nil {
+		if err := busy(tx.Model(&db.P12FieldPVPReceipt{}).Where("busy_until>? AND created_at<=?", gameMS, gameMS)); err != nil {
 			return err
 		}
 	}
