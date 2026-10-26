@@ -104,6 +104,7 @@ def activate_growth75(mysql, compose, patch_script, backup_dir, revision, backup
     except Exception as error:
         record['state'] = 'failed-maintenance'
         record['failure'] = type(error).__name__
+        record['failureDetail'] = str(error)[-5000:]
         record['recovery'] = 'Keep app stopped. A failed uncommitted CAS connection rolls back. Prior candidate CLI domain edits remain audited; inspect this manifest and the encrypted pre-deploy backup before a bounded retry.'
         checkpoint()
         raise
