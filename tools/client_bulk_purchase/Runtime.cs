@@ -258,12 +258,18 @@ namespace HYJS.BulkPurchase
         {
             Transform existing = target.transform.Find("BulkResourceIcon");
             if (existing != null) existing.gameObject.SetActive(false);
-            Transform credit = target.transform.Find("GGOCreditCostIcon");
+            Transform legacyCredit = target.transform.Find("GGOCreditCostIcon");
+            if (legacyCredit != null) legacyCredit.gameObject.SetActive(false);
+            Transform credit = target.transform.parent == null ? null : target.transform.parent.Find("GGOCreditPopupIcon");
             if (credit != null) credit.gameObject.SetActive(id == "item_9710");
             if (id == "item_9710")
             {
+                // Original Show has already created a higher-depth quoted icon
+                // for this item. Hide it while the HUD credit glyph is in use.
+                Transform quoted = target.transform.Find("SoulFlowerQuotedCost");
+                if (quoted != null) quoted.gameObject.SetActive(false);
                 Type shop = Type.GetType("HYJS.GGO.GGOShop, SoulFlowerGGOShop", false);
-                MethodInfo bind = shop == null ? null : shop.GetMethod("BindCreditIcon", BindingFlags.Public | BindingFlags.Static);
+                MethodInfo bind = shop == null ? null : shop.GetMethod("BindCreditPopupIcon", BindingFlags.Public | BindingFlags.Static);
                 if (bind != null) { try { bind.Invoke(null, new object[] { target }); return; } catch (Exception error) { Debug.LogWarning("Credit icon fallback: " + error.GetType().Name); } }
                 CommonIcon icon = existing == null ? CommonMethod.CreateCommonIcon(target.transform) : existing.GetComponent<CommonIcon>();
                 icon.gameObject.name = "BulkResourceIcon"; icon.gameObject.SetActive(true);

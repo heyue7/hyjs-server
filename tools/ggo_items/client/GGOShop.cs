@@ -270,9 +270,8 @@ namespace HYJS.GGO
             balanceIcon.color = Color.white;
             nativeIcon.spriteName = ""; nativeIcon.enabled = true;
         }
-        public static void BindCreditIcon(UISprite nativeIcon)
+        static Texture2D CreditTexture()
         {
-            if (nativeIcon == null) return;
             if (balanceTexture == null)
             {
                 balanceTexture = new Texture2D(2, 2, TextureFormat.ARGB32, false);
@@ -282,13 +281,36 @@ namespace HYJS.GGO
                 }
                 balanceTexture.filterMode = FilterMode.Bilinear;
             }
+            return balanceTexture;
+        }
+        public static void BindCreditIcon(UISprite nativeIcon)
+        {
+            if (nativeIcon == null) return;
+            Texture2D texture = CreditTexture();
             Transform child = nativeIcon.transform.Find("GGOCreditCostIcon");
             GameObject go = child == null ? new GameObject("GGOCreditCostIcon") : child.gameObject;
             go.layer = nativeIcon.gameObject.layer; go.transform.parent = nativeIcon.transform;
             go.transform.localPosition = Vector3.zero; go.transform.localScale = Vector3.one;
             UITexture icon = go.GetComponent<UITexture>(); if (icon == null) icon = go.AddComponent<UITexture>();
-            icon.mainTexture = balanceTexture; icon.width = Math.Max(1, nativeIcon.width); icon.height = Math.Max(1, nativeIcon.height);
+            icon.mainTexture = texture; icon.width = Math.Max(1, nativeIcon.width); icon.height = Math.Max(1, nativeIcon.height);
             icon.depth = nativeIcon.depth + 1; icon.color = Color.white; go.SetActive(true);
+            nativeIcon.enabled = false;
+        }
+        public static void BindCreditPopupIcon(UISprite nativeIcon)
+        {
+            if (nativeIcon == null || nativeIcon.transform.parent == null) return;
+            Texture2D texture = CreditTexture();
+            Transform target = nativeIcon.transform, parent = target.parent;
+            Transform child = parent.Find("GGOCreditPopupIcon");
+            GameObject go = child == null ? new GameObject("GGOCreditPopupIcon") : child.gameObject;
+            // The popup animates ancestor alpha. Keep the disabled native sprite
+            // out of the new texture's NGUI parent chain.
+            go.layer = nativeIcon.gameObject.layer; go.transform.parent = parent;
+            go.transform.localPosition = target.localPosition; go.transform.localRotation = target.localRotation;
+            go.transform.localScale = target.localScale;
+            UITexture icon = go.GetComponent<UITexture>(); if (icon == null) icon = go.AddComponent<UITexture>();
+            icon.mainTexture = texture; icon.width = Math.Max(1, nativeIcon.width); icon.height = Math.Max(1, nativeIcon.height);
+            icon.pivot = nativeIcon.pivot; icon.depth = nativeIcon.depth + 1; icon.color = Color.white; go.SetActive(true);
             nativeIcon.enabled = false;
         }
         void SetNotice(string text)

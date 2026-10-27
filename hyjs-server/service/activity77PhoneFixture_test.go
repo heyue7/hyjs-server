@@ -66,6 +66,14 @@ func activity77PhoneRollout(t *testing.T, f *p1Fixture, actor *model.AdminPrinci
 		t.Fatal(err)
 	}
 	items := calendar.Items
+	// This isolated rehearsal replaces the verified defaults through the same
+	// saved calendar, after their one-time first-start import has completed.
+	for i := range items {
+		switch items[i].Mode {
+		case "login-total", "wanted-attempts", "trial-stars", constUtil.AdminKingRecruitMode:
+			items[i].Enabled = false
+		}
+	}
 	for i, pair := range pairs {
 		def, e := f.s.AdminSaveActivityDefinition(f.ctx, actor, "", model.AdminActivityDefinitionSaveRequest{Name: pair.old.Name, Form: pair.old, DefaultDays: 7, Enabled: true})
 		if e != nil {
@@ -191,6 +199,12 @@ func TestActivity77PhoneFixture(t *testing.T) {
 		if err := init(f.ctx); err != nil {
 			t.Fatal(err)
 		}
+	}
+	// This finite UI fixture represents the existing released realm. Its old
+	// catalogue import has already finished before growth templates are added;
+	// do not rerun that unrelated first-install import on the first app launch.
+	if err := db.GetIns().Create(&db.AdminAudit{Action: constUtil.ReActivityCatalogueCleanupAction, Target: constUtil.ReActivityCatalogueCleanupTarget + ":1", Actor: "QA release76 baseline", Detail: "Isolated existing-version fixture; historical catalogue import represented as completed"}).Error; err != nil {
+		t.Fatal(err)
 	}
 	// The isolated rehearsal explicitly opens the native point and score stores.
 	if err := db.GetIns().Model(&db.P4CommerceRule{}).Where("kind IN ?", []string{"point", "score"}).Update("enabled", true).Error; err != nil {
