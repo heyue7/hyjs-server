@@ -21,6 +21,7 @@ export interface ShopProduct {
   accountWeeklyLimit: number;
   stock: number;
   minLevel: number;
+  minTrialStars?: number;
   minVip: number;
   priority: number;
   weight: number;
@@ -140,6 +141,7 @@ export function newShopProduct(): ShopProduct {
     accountWeeklyLimit: 0,
     stock: -1,
     minLevel: 1,
+    minTrialStars: 0,
     minVip: 0,
     priority: 0,
     weight: 1,

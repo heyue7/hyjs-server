@@ -40,6 +40,7 @@ type AdminShopProduct struct {
 	TotalLimit         int64                   `json:"totalLimit"`              // Period cap; VIP uses lifetime per-role claims, 0 keeps its original daily rule.
 	Stock              int64                   `json:"stock"`                   // Shared stock, minus one unlimited.
 	MinLevel           int64                   `json:"minLevel"`                // Player level requirement.
+	MinTrialStars      *int64                  `json:"minTrialStars,omitempty"` // Historical trial star requirement; omitted requests preserve existing values.
 	MinVip             int64                   `json:"minVip"`                  // VIP requirement.
 	Priority           int64                   `json:"priority"`                // Original ordering.
 	Weight             int64                   `json:"weight"`                  // Refresh selection weight.

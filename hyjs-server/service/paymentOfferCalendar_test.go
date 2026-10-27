@@ -65,11 +65,36 @@ func TestLocalPlayPaymentOfferAsOfConfirmedTime(t *testing.T) {
 			t.Fatal("original chapter offer borrowed a future payment", tc.at, e)
 		}
 	}
+	var offer db.PaymentLuxuryOffer
+	if err = db.GetIns().Where("player_id=?", id).First(&offer).Error; err != nil {
+		t.Fatal(err)
+	}
+	for _, at := range []time.Time{time.UnixMilli(offer.StartAt - 1), time.UnixMilli(offer.EndAt)} {
+		info, e := f.s.paymentOffer(ctx, id, &pb.CSLuxuryEquipmentInfo{}, at)
+		if e != nil || info[0].(*pb.SCLuxuryEquipmentInfo).GetId() != 0 || info[0].(*pb.SCLuxuryEquipmentInfo).GetEndTime() != at.UnixMilli() {
+			t.Fatal("offer advertised outside its frozen window", e)
+		}
+		if _, e = f.s.paymentOffer(ctx, id, &pb.CSLuxuryEquipmentReward{}, at); e == nil {
+			t.Fatal("outside-window suit claim accepted")
+		}
+		opened, e := f.s.paymentOffer(ctx, id, &pb.CSOpenLuxuryEquipment{Chapter: proto.Int32(6), Mission: proto.Int32(1)}, at)
+		if e != nil || opened[0].(*pb.SCOpenLuxuryEquipment).GetOpenOrNot() != 0 {
+			t.Fatal("outside-window offer reopened", e)
+		}
+	}
 	if _, err = f.s.paymentOffer(ctx, id, &pb.CSLuxuryEquipmentReward{}, paidAt.Add(-time.Millisecond)); err == nil {
 		t.Fatal("future payment granted an early suit")
 	}
 	if _, err = f.s.paymentOffer(ctx, id, &pb.CSLuxuryEquipmentReward{}, paidAt); err != nil {
 		t.Fatal("actual confirmed-time suit claim", err)
+	}
+	info, err := f.s.paymentOffer(ctx, id, &pb.CSLuxuryEquipmentInfo{}, paidAt)
+	if err != nil || info[0].(*pb.SCLuxuryEquipmentInfo).GetRewardState() != 2 {
+		t.Fatal("claimed offer status lost", err)
+	}
+	opened, err := f.s.paymentOffer(ctx, id, &pb.CSOpenLuxuryEquipment{Chapter: proto.Int32(6), Mission: proto.Int32(1)}, paidAt)
+	if err != nil || opened[0].(*pb.SCOpenLuxuryEquipment).GetOpenOrNot() != 0 {
+		t.Fatal("claimed offer reopened", err)
 	}
 	var after db.PaymentOrder
 	if err = db.GetIns().First(&after, "id=?", orderID).Error; err != nil || after.ConfirmedAt != order.ConfirmedAt || after.Cents != order.Cents {

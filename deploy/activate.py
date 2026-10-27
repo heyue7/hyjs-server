@@ -20,8 +20,13 @@ parser.add_argument('--migrate-role-wallets', action='store_true')
 parser.add_argument('--expected-live-revision')
 parser.add_argument('--apply-growth74', action='store_true')
 parser.add_argument('--apply-growth75', action='store_true')
+parser.add_argument('--restore-activity-calendar')
 parser.add_argument('--warm-rush-history-player', action='append', type=int, default=[])
 args = parser.parse_args()
+if args.restore_activity_calendar:
+    import uuid
+    assert str(uuid.UUID(args.restore_activity_calendar)) == args.restore_activity_calendar
+    assert args.expected_live_revision and not any((args.initial_db, args.migrate_role_wallets, args.apply_growth74, args.apply_growth75)), 'Calendar restore requires a standalone maintenance cutover'
 assert not (args.apply_growth74 and args.apply_growth75), 'Choose one explicit growth deployment version'
 if args.apply_growth75:
     assert args.expected_live_revision and not args.initial_db and not args.migrate_role_wallets, 'Growth75 requires a pinned maintenance cutover'
@@ -132,6 +137,10 @@ os.replace(temporary_env, private_env)
 # Verify the encrypted snapshot before Compose can restart MySQL for new limits.
 wallet_baseline = None
 verified_backup = None
+if args.restore_activity_calendar:
+    compose('run', '--rm', '--no-deps', '-T', 'app', '--env', 'test', '--tables', '/app/tables', '--calendar-maintenance', 'begin', '--log-file', '/app/logs/calendar-maintenance.log')
+    assert mysql('SELECT maintenance FROM client_update_policy WHERE id=1;').strip() == '1'
+    compose('stop', '-t', '30', 'app')
 if args.apply_growth74 or args.apply_growth75:
     assert args.expected_live_revision and not args.initial_db
     assert mysql('SELECT maintenance FROM client_update_policy WHERE id=1;').strip() == '1', 'Growth apply requires maintenance'
@@ -226,6 +235,14 @@ if args.apply_growth75:
     except Exception:
         compose('stop', '-t', '30', 'app')
         raise RuntimeError('Growth75 failed under maintenance. App remains stopped; inspect private backups/growth75-*/manifest.json. Any failed uncommitted CAS transaction was rolled back; prior candidate CLI steps remain audited. Do not reopen or auto-restore the full database.') from None
+
+if args.restore_activity_calendar:
+    import calendar_restore_activation
+    try:
+        manifest['calendarRestore'] = calendar_restore_activation.activate_calendar_restore(mysql, compose, ROOT / 'backups', manifest['revision'], verified_backup, args.restore_activity_calendar)
+    except Exception as error:
+        compose('stop', '-t', '30', 'app')
+        raise RuntimeError('Calendar restore did not finish: ' + str(error) + '. Application remains stopped under maintenance; preserve the authenticated backup and calendar manifest, inspect the failure and retry the same request. Never auto-restore the database.') from None
 
 compose('up', '-d', '--no-deps', '--force-recreate', 'app')
 for _ in range(90):

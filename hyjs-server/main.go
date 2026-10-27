@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -36,23 +37,38 @@ func main() {
 
 func run() error {
 	var (
-		env            = flag.String("env", "dev", "config env: dev|test|prd")
-		bind           = flag.String("bind", "", "override listen address")
-		advertiseHost  = flag.String("advertise-host", "", "address reachable by the client")
-		tables         = flag.String("tables", "", "override APK tables directory")
-		serverID       = flag.Int64("server-id", 0, "trusted deployment server ID; 0 uses game.serverId")
-		database       = flag.String("db", "", "override SQLite database")
-		httpPort       = flag.Int("http-port", -1, "override HTTP port, 0 selects a free port")
-		tcpPort        = flag.Int("tcp-port", -1, "override TCP port, 0 selects a free port")
-		logFile        = flag.String("log-file", "", "isolated process log path; empty keeps configured path")
-		warmRushPlayer = flag.Int64("warm-rush-history-player", 0, "validate existing trial history and persist signed certificates, then exit")
-		testPayments   = flag.Bool("enable-test-payments", false, "enable loopback-only demo payment confirmation")
-		applyGrowth    = flag.Bool("apply-growth74", false, "apply the authorized growth configuration during maintenance, then exit")
-		applyGrowth75  = flag.Bool("apply-growth75", false, "apply audited publication, clock repair and growth75 economy during maintenance, then exit")
-		localWallet    = flag.Bool("enable-local-wallet", false, "enable local demo wallet payments in dev/test; no real charge")
+		env                 = flag.String("env", "dev", "config env: dev|test|prd")
+		bind                = flag.String("bind", "", "override listen address")
+		advertiseHost       = flag.String("advertise-host", "", "address reachable by the client")
+		tables              = flag.String("tables", "", "override APK tables directory")
+		serverID            = flag.Int64("server-id", 0, "trusted deployment server ID; 0 uses game.serverId")
+		database            = flag.String("db", "", "override SQLite database")
+		httpPort            = flag.Int("http-port", -1, "override HTTP port, 0 selects a free port")
+		tcpPort             = flag.Int("tcp-port", -1, "override TCP port, 0 selects a free port")
+		logFile             = flag.String("log-file", "", "isolated process log path; empty keeps configured path")
+		warmRushPlayer      = flag.Int64("warm-rush-history-player", 0, "validate existing trial history and persist signed certificates, then exit")
+		testPayments        = flag.Bool("enable-test-payments", false, "enable loopback-only demo payment confirmation")
+		applyGrowth         = flag.Bool("apply-growth74", false, "apply the authorized growth configuration during maintenance, then exit")
+		applyGrowth75       = flag.Bool("apply-growth75", false, "apply audited publication, clock repair and growth75 economy during maintenance, then exit")
+		restoreVIP10        = flag.Bool("restore-vip10-book", false, "restore the audited VIP10 book product during maintenance, then exit")
+		previewCalendar     = flag.Bool("preview-activity-calendar", false, "read the activity calendar restore candidate as JSON, then exit")
+		restoreCalendar     = flag.String("restore-activity-calendar", "", "apply the reviewed calendar restore request during maintenance, then exit")
+		calendarDigest      = flag.String("calendar-digest", "", "expected complete activity restore candidate digest")
+		calendarReal        = flag.Int64("calendar-real-millis", 0, "frozen real timestamp of the calendar preview")
+		calendarMaintenance = flag.String("calendar-maintenance", "", "begin or end the calendar maintenance through the audited server action")
+		localWallet         = flag.Bool("enable-local-wallet", false, "enable local demo wallet payments in dev/test; no real charge")
 	)
 	flag.Parse()
-	if (*applyGrowth && *applyGrowth75) || ((*applyGrowth || *applyGrowth75) && *warmRushPlayer != 0) {
+	maintenanceCommands := 0
+	for _, selected := range []bool{*applyGrowth, *applyGrowth75, *restoreVIP10, *warmRushPlayer != 0, *previewCalendar, *restoreCalendar != "", *calendarMaintenance != ""} {
+		if selected {
+			maintenanceCommands++
+		}
+	}
+	if maintenanceCommands > 1 {
+		return errors.New("每次只执行一个维护命令")
+	}
+	if (*applyGrowth && *applyGrowth75) || ((*applyGrowth || *applyGrowth75) && *warmRushPlayer != 0) || (*restoreVIP10 && (*applyGrowth || *applyGrowth75 || *warmRushPlayer != 0)) {
 		return errors.New("成长部署版本和试炼预热命令不能同时执行")
 	}
 	if err := config.Init(*env); err != nil {
@@ -102,7 +118,11 @@ func run() error {
 	switch cfg.Driver {
 	case "mysql":
 		mc := config.AppConfigIns.MysqlConfig
-		if err := db.InitGameMySQL(ctx, db.MySQLConfig{Host: mc.Host, User: mc.User, Password: mc.Pass, Database: mc.DbName}); err != nil {
+		connect := db.InitGameMySQL
+		if *previewCalendar || *restoreCalendar != "" || *calendarMaintenance != "" || *restoreVIP10 {
+			connect = db.InitExistingGameMySQL
+		}
+		if err := connect(ctx, db.MySQLConfig{Host: mc.Host, User: mc.User, Password: mc.Pass, Database: mc.DbName}); err != nil {
 			return err
 		}
 	case "sqlite":
@@ -129,6 +149,40 @@ func run() error {
 	if err = s.LoadTables(cfg.Tables); err != nil {
 		return err
 	}
+	s.InstallGrowth74Resources()
+	if err = s.InstallGGOItems(); err != nil {
+		return err
+	}
+	if *restoreVIP10 {
+		return s.ApplyVIP10BookRestore(ctx)
+	}
+	if *calendarMaintenance != "" {
+		if *calendarMaintenance != "begin" && *calendarMaintenance != "end" {
+			return errors.New("维护动作必须为begin或end")
+		}
+		return s.SetActivityCalendarMaintenanceCLI(ctx, *calendarMaintenance == "begin")
+	}
+	if *previewCalendar || *restoreCalendar != "" {
+		real := time.Now()
+		if *calendarReal > 0 {
+			real = time.UnixMilli(*calendarReal)
+		}
+		if *previewCalendar {
+			plan, err := s.PreviewActivityCalendarRestore(ctx, real)
+			if err != nil {
+				return err
+			}
+			return json.NewEncoder(os.Stdout).Encode(plan)
+		}
+		if *calendarReal <= 0 || *calendarDigest == "" {
+			return errors.New("活动恢复必须指定已预览时间和完整摘要")
+		}
+		result, err := s.ApplyActivityCalendarRestoreCLI(ctx, service.ActivityCalendarRestoreRequest{RequestID: *restoreCalendar, ExpectedDigest: *calendarDigest, RealMillis: *calendarReal})
+		if err != nil {
+			return err
+		}
+		return json.NewEncoder(os.Stdout).Encode(result)
+	}
 	if *warmRushPlayer != 0 {
 		if *warmRushPlayer < 1 {
 			return errors.New("trial history owner must be positive")
@@ -144,10 +198,6 @@ func run() error {
 		}
 		fmt.Println("Trial history certificates verified")
 		return nil
-	}
-	s.InstallGrowth74Resources()
-	if err = s.InstallGGOItems(); err != nil {
-		return err
 	}
 	// 全服日历独立于钱包；启动ctx也提供给后台业务定时器。
 	if err = s.InitializeServerGameClock(ctx); err != nil {

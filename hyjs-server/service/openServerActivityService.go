@@ -21,7 +21,7 @@ import (
 // InitializeOpenServerActivity 将APK原任务保存到SQL，仅补齐缺失记录并保留运营修改。
 func (s *GameService) InitializeOpenServerActivity(ctx context.Context) error {
 	d := db.GetIns().WithContext(ctx)
-	if err := d.AutoMigrate(&db.OpenServerActivityRule{}, &db.OpenServerActivityTask{}, &db.OpenServerActivityState{}, &db.OpenServerActivityCounter{}, &db.OpenServerActivityReceipt{}); err != nil {
+	if err := d.AutoMigrate(&db.OpenServerActivityRule{}, &db.OpenServerActivityTask{}, &db.OpenServerActivityState{}, &db.OpenServerActivityCounter{}, &db.OpenServerActivityReceipt{}, &db.OpeningCalendarCarry{}); err != nil {
 		return err
 	}
 	return d.Transaction(func(tx *gorm.DB) error {
@@ -183,6 +183,11 @@ func recordOpenServerCounterAt(tx *gorm.DB, id int64, key string, delta int32, n
 	if !cfg.Enabled || now.UnixMilli() < cfg.StartAt || now.UnixMilli() >= cfg.EndAt {
 		return nil
 	}
+	if strings.HasPrefix(key, constUtil.OpenServerActivityCounterLogin) {
+		if err := openingCalendarCarryLogin(tx, id, cfg, strings.TrimPrefix(key, constUtil.OpenServerActivityCounterLogin)); err != nil {
+			return err
+		}
+	}
 	counter, e := openServerReadCounter(tx, id, key)
 	if errors.Is(e, gorm.ErrRecordNotFound) {
 		counter = db.OpenServerActivityCounter{PlayerID: id, CounterKey: key}
@@ -233,6 +238,10 @@ func (s *GameService) refreshOpenServerProgressAt(tx *gorm.DB, player *pb.Player
 		return e
 	}
 	counters, e := openServerReadCounters(tx, player.GetPlayerId())
+	if e != nil {
+		return e
+	}
+	counters, e = openingCalendarCarryCounters(tx, player.GetPlayerId(), cfg, counters)
 	if e != nil {
 		return e
 	}

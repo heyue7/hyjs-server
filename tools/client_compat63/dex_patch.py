@@ -6,7 +6,6 @@ from loguru import logger
 logger.remove()
 from androguard.core.dex import DEX
 from tools.client_compat63.axml import require
-OLD_SHA='cfddb4d1b6ee15bfc8d51da311bfa7e6e1408c809c4ccd8b1e47049a85b45254'
 OWNER='Lcom/hyjs/wallet/LocalAssetOverlay;'
 
 def u16(b,p): return struct.unpack_from('<H',b,p)[0]
@@ -188,10 +187,12 @@ def typed_negative_tests(raw):
 
 def patch(raw,new_sha,new_size):
     before=layout(raw);d=DEX(raw);all_methods=methods(d);target=all_methods[(OWNER,'<clinit>','()V')];old_off=target.get_code_off()
+    oldpins=extract_pins(raw)
+    require(len(oldpins)==6 and oldpins[5]['path']=='smallassetmanifest','Expected manifest Pin is missing')
     old=before['codes'][old_off];require(u16(raw,old_off+6)==0,'clinit try handlers unsupported')
     ctor=[i for i in range(len(d.get_methods())) if d.get_cm_method(i)==['Ljava/lang/String;','<init>',['([B Ljava/lang/String;)','V']]]
     require(len(ctor)==1,'Existing byte[] String ctor required')
-    strings=list(d.get_strings());old_string=strings.index(OLD_SHA);utf8=strings.index('UTF-8')
+    strings=list(d.get_strings());old_string=strings.index(oldpins[5]['sha256']);utf8=strings.index('UTF-8')
     types=[d.get_cm_type(i) for i in range(u32(raw,64))]
     byte_type=types.index('[B');string_type=types.index('Ljava/lang/String;')
     ins=old['rawInstructions'];needle=struct.pack('<BBH',0x1a,2,old_string);require(ins.count(needle)==1,'One hash instruction required')
@@ -201,7 +202,7 @@ def patch(raw,new_sha,new_size):
     replacement+=struct.pack('<BBH',0x22,6,string_type)+struct.pack('<BBH',0x1a,7,utf8)
     replacement+=struct.pack('<BBHH',0x70,0x30,ctor[0],0x0726)+bytes([0x07,0x62])
     body=bytearray(ins[:pos]+replacement+ins[pos+4:])
-    size_needle=bytes([0x17,3])+struct.pack('<i',563672)
+    size_needle=bytes([0x17,3])+struct.pack('<i',oldpins[5]['bytes'])
     require(body.count(size_needle)==1,'One manifest size instruction required')
     at=body.index(size_needle);body[at+2:at+6]=struct.pack('<i',new_size)
     body+=b'\0'*(-len(body)%4);payload_at=len(body)
@@ -252,7 +253,7 @@ def patch(raw,new_sha,new_size):
     for start,stop,method,code in before['classCodes']:allowed.update(range(start,stop))
     for i in range(len(before['sections'])):allowed.update(range(mo+4+i*12+4,mo+4+i*12+12))
     require(all(x==y or i in allowed for i,(x,y) in enumerate(zip(raw,inherited))),'Unapproved original byte changed')
-    oldpins=extract_pins(raw);pins=extract_pins(output);expected=[dict(row) for row in oldpins];expected[5].update(sha256=new_sha,bytes=new_size)
+    pins=extract_pins(output);expected=[dict(row) for row in oldpins];expected[5].update(sha256=new_sha,bytes=new_size)
     require(pins==expected,'Actual patched DEX Pin values changed outside allowed entry')
     return output,{'insertionOffset':insert,'singleInsertionDelta':delta,'oldClinitCodeOff':old_off,'newClinitCodeOff':insert,
         'nonClinitMethodsInstructionsEHAndDebugExact':unchanged,'allOriginalIndexesAndReferencesExact':True,

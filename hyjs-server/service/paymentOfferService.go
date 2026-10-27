@@ -100,7 +100,16 @@ func (s *GameService) paymentOffer(ctx context.Context, id int64, request proto.
 			if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&offer).Error; err != nil {
 				return err
 			}
-			response = &pb.SCOpenLuxuryEquipment{OpenOrNot: proto.Int32(1)}
+			// An existing offer keeps its original window and claim, including when
+			// the game calendar moves backwards. Never advertise it outside that window.
+			if err := tx.First(&offer, "player_id = ? AND offer_id = ?", id, offerID).Error; err != nil {
+				return err
+			}
+			open := int32(0)
+			if !offer.Claimed && now.UnixMilli() >= offer.StartAt && now.UnixMilli() < offer.EndAt {
+				open = 1
+			}
+			response = &pb.SCOpenLuxuryEquipment{OpenOrNot: proto.Int32(open)}
 		case *pb.CSLuxuryEquipmentInfo, *pb.CSLuxuryEquipmentReward:
 			var offer db.PaymentLuxuryOffer
 			found := tx.Where("player_id = ?", id).Order("start_at DESC").First(&offer).Error
@@ -113,6 +122,13 @@ func (s *GameService) paymentOffer(ctx context.Context, id int64, request proto.
 			}
 			if found != nil {
 				return found
+			}
+			if now.UnixMilli() < offer.StartAt || now.UnixMilli() >= offer.EndAt {
+				if _, ok := request.(*pb.CSLuxuryEquipmentReward); ok {
+					return errors.New(constUtil.P3PaymentUnavailable)
+				}
+				response = &pb.SCLuxuryEquipmentInfo{Id: proto.Int32(0), CurrentTime: proto.Int64(now.UnixMilli()), EndTime: proto.Int64(now.UnixMilli()), RewardState: proto.Int32(0)}
+				return nil
 			}
 			end := offer.EndAt
 			// 个人日历回拨后，只展示当前游玩时刻已经发生的充值资格。

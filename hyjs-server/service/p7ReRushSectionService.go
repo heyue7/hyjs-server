@@ -169,7 +169,10 @@ func p7ReRushBonus(tx *gorm.DB, state *db.P7RushState) (*pb.BaseProp, error) {
 	}
 	if legacy != nil && legacy.Selected != "" {
 		stars, complete, hash, err := p7RushAdditionProgress(tx, legacy, policy)
-		if err != nil || !complete || stars < legacy.SpentStars || hash != legacy.AcceptanceHash {
+		if err != nil {
+			return nil, err
+		}
+		if !complete || stars < legacy.SpentStars || hash != legacy.AcceptanceHash {
 			return nil, errors.New("旧试炼加成冻结来源冲突")
 		}
 		key, rate, err := p7RushAdditionOption(legacy.Selected)
@@ -189,7 +192,10 @@ func p7ReRushBonus(tx *gorm.DB, state *db.P7RushState) (*pb.BaseProp, error) {
 	}
 	for _, section := range sections {
 		stars, hash, complete, err := p7ReRushSectionProof(tx, state, section.Section)
-		if err != nil || !complete || !section.Claimed || section.AcceptanceHash != hash || section.SpentStars > stars {
+		if err != nil {
+			return nil, err
+		}
+		if !complete || !section.Claimed || section.AcceptanceHash != hash || section.SpentStars > stars {
 			return nil, errors.New("Re试炼已选加成缺少真实分段来源")
 		}
 		switch section.Selected {

@@ -89,6 +89,21 @@ func TestLiveStandardShopMaterialsQuotesQuotaAndCold(t *testing.T) {
 		return f.s.p4Commerce(f.ctx, f.id, &pb.CSShopBuy{ShopType: proto.Int32(5), ShopItemId: p.Id, BuyCount: proto.Int32(1)}, stamp, time.Now())
 	}
 	old := list()
+	if old.GetCanBuy() != 0 || old.GetCondition().GetValue() != 100 {
+		t.Fatal("low-star trial eligibility not projected", old)
+	}
+	if _, e = buy(old, 909999); e == nil {
+		t.Fatal("low-star material purchase accepted")
+	}
+	p, g := f.profile(t)
+	if p4ResourceBalance(p, g, "MineItem_007") != 20 || simpleOwned(p, g, "item_005") != 0 {
+		t.Fatal("rejected low-star buy changed inventory")
+	}
+	// Explicit eligibility fixture; this does not claim natural 100-star progression.
+	if e = db.GetIns().Create(&db.P7RushState{PlayerID: f.id, RecordStars: 100}).Error; e != nil {
+		t.Fatal(e)
+	}
+	firstStable := strings.TrimPrefix(item.ID, "period:")
 	item.Cost = model.AdminResourceAmount{ResourceID: "MineItem_007", Amount: 3}
 	save()
 	if _, e = buy(old, 910001); e == nil {
@@ -102,24 +117,48 @@ func TestLiveStandardShopMaterialsQuotesQuotaAndCold(t *testing.T) {
 	if len(first) != 4 {
 		t.Fatal("current inventory reconciliation missing", len(first))
 	}
-	p, g := f.profile(t)
+	p, g = f.profile(t)
 	if p4ResourceBalance(p, g, "MineItem_007") != 17 || simpleOwned(p, g, "item_005") != 1 || simpleOwned(p, g, "frag_hero_001") != 20 {
 		t.Fatal("real material charge mismatch")
 	}
 	item.Cost = model.AdminResourceAmount{ResourceID: "FishItem_007", Amount: 4}
 	save()
-	next := list()
-	if next.GetDayLeftTimes() != 2 {
-		t.Fatal("edit reset quota")
+	if purchased := list(); purchased.GetCanBuy() != 2 || purchased.GetDayLeftTimes() != 0 {
+		t.Fatal("edit reopened lifetime quota", purchased)
 	}
-	if _, e = buy(next, 910002); e != nil {
+	if _, e = buy(list(), 910002); e == nil {
+		t.Fatal("edited trial SKU purchased twice")
+	}
+	var stock db.P4CommerceStock
+	if e = db.GetIns().First(&stock, "rule_id=? AND product_id=?", shop.Settings.PeriodID, firstStable).Error; e != nil || stock.Used != 1 {
+		t.Fatal("first product stock changed", stock, e)
+	}
+	// A distinct stable product keeps both material paths covered under one-time trial limits.
+	item = shop.Items[1]
+	item.Cost = model.AdminResourceAmount{ResourceID: "FishItem_007", Amount: 4}
+	item.Rewards = []model.AdminResourceAmount{{ResourceID: "item_005", Amount: 1}}
+	item.DailyLimit = 3
+	item.TotalLimit = 3
+	item.Stock = 3
+	item.MinLevel = 1
+	item.MinVip = 0
+	item.DiscountBps = 10000
+	stars := int64(100)
+	item.MinTrialStars = &stars
+	secondStable := strings.TrimPrefix(item.ID, "period:")
+	save()
+	next := list()
+	if next.GetDayLeftTimes() != 1 || next.GetCanBuy() != 1 {
+		t.Fatal("new trial product quota", next)
+	}
+	if _, e = buy(next, 910003); e != nil {
 		t.Fatal(e)
 	}
 	item.DailyLimit = 1
 	item.TotalLimit = 1
 	item.Stock = 1
 	save()
-	if list().GetCanBuy() != 0 {
+	if list().GetCanBuy() != 2 {
 		t.Fatal("lowered limits reopened inventory")
 	}
 	f.restart(t)
@@ -139,7 +178,7 @@ func TestLiveStandardShopMaterialsQuotesQuotaAndCold(t *testing.T) {
 		t.Fatal(e)
 	}
 	var progress p4CommerceProgress
-	if e = json.Unmarshal(row.Payload, &progress); e != nil || progress.Total[strings.TrimPrefix(item.ID, "period:")] != 2 {
+	if e = json.Unmarshal(row.Payload, &progress); e != nil || progress.Total[firstStable] != 1 || progress.Total[secondStable] != 1 {
 		t.Fatal("history changed", e)
 	}
 	// Preferred resources rank first without restricting search or pagination.

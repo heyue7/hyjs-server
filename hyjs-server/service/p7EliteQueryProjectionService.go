@@ -57,6 +57,9 @@ type p7EliteQueryProjection struct {
 	rePrepared         bool
 	reAttacker         *pb.BattlePlayer
 	reErr              error
+	manualBlobs        map[string]map[string]p7RushBlobDigest
+	scopedBlobs        map[string]map[string]p7RushBlobDigest
+	recordBlobs        map[string]map[string]p7RushBlobDigest
 	verified           int
 }
 
@@ -112,10 +115,10 @@ func (q *p7EliteQueryProjection) load() error {
 		to := min(from+128, len(ids))
 		var manual []db.P7RushManualCalculation
 		var scoped []db.P7RushScopedCalculation
-		if err := q.tx.Where("fight_id IN ?", ids[from:to]).Find(&manual).Error; err != nil {
+		if err := q.loadManualRows(ids[from:to], &manual); err != nil {
 			return err
 		}
-		if err := q.tx.Where("fight_id IN ?", ids[from:to]).Find(&scoped).Error; err != nil {
+		if err := q.loadScopedRows(ids[from:to], &scoped); err != nil {
 			return err
 		}
 		for _, r := range manual {
@@ -134,7 +137,7 @@ func (q *p7EliteQueryProjection) load() error {
 	for from := 0; from < len(ids); from += 128 {
 		to := min(from+128, len(ids))
 		var rows []db.P6BattleRecord
-		if err := q.tx.Where("id IN ?", ids[from:to]).Find(&rows).Error; err != nil {
+		if err := q.loadRecordRows(ids[from:to], &rows); err != nil {
 			return err
 		}
 		for _, r := range rows {
@@ -142,6 +145,9 @@ func (q *p7EliteQueryProjection) load() error {
 		}
 	}
 	q.loadCertificates()
+	if err := q.loadProofMissBlobs(); err != nil {
+		return err
+	}
 	q.loaded = true
 	return nil
 }
@@ -155,58 +161,58 @@ func (q *p7EliteQueryProjection) record(id string) (*db.P6BattleRecord, error) {
 }
 
 func (q *p7EliteQueryProjection) read(fight *db.P7RushFight, end *pb.CSRushFightEnd) (*model.CombatOutcome, bool, error) {
+	var stored pb.CSRushFightEnd
+	if err := proto.Unmarshal(fight.EndRequest, &stored); err != nil {
+		return nil, false, err
+	}
+	if end == nil {
+		end = &stored
+	} else if !proto.Equal(end, &stored) {
+		return nil, true, errors.New(constUtil.P7ScopedRushConflict)
+	}
 	if r, ok := q.reads[fight.ID]; ok {
-		return r.outcome, r.scoped, r.err
+		return p7RushDurableCloneOutcome(r.outcome), r.scoped, r.err
 	}
 	q.verified++
 	var r p7EliteQueryRead
 	if manual, ok := q.manuals[fight.ID]; ok {
-		// Reuse cross-request accepted history only after hashing all actual source
-		// rows loaded for this query, including hidden blobs and the supplied End.
-		var key p7RushHistoricalKey
 		fingerprint := ""
 		record, recordErr := q.record(manual.P6RecordID)
-		if recordErr == nil && manual.Status == constUtil.P7RushManualAccepted && manual.AcceptedAt > 0 && record.Status == constUtil.P6BattleComputed && record.Authoritative {
-			fingerprint, _ = p7RushCertificateFingerprint(fight, &manual, record, end)
-			if fingerprint != "" {
-				if q.certificateRuntime != nil {
-					if cert, ok := q.certificates[fight.ID]; ok {
-						if outcome := q.certificateRuntime.accepted(cert, q.serverID, q.state.PlayerID, fight.ID, fingerprint, record); outcome != nil {
-							r.outcome, r.scoped = outcome, true
-							q.reads[fight.ID] = r
-							return r.outcome, r.scoped, nil
-						}
-					}
-				}
-				if pool, e := q.tx.DB(); e == nil {
-					key = p7RushHistoricalKey{database: pool, fingerprint: fingerprint}
+		if recordErr == nil {
+			fingerprint, _ = p7RushDurableFingerprint(fight, &manual, record, end, q.manualBlobs[fight.ID], q.recordBlobs[record.ID])
+			if q.certificateRuntime != nil {
+				if outcome := q.certificateRuntime.acceptedProjection(q.certificates[fight.ID], q.serverID, q.state.PlayerID, fight.ID, fingerprint, record); outcome != nil {
+					r.outcome, r.scoped = outcome, true
+					q.reads[fight.ID] = r
+					return p7RushDurableCloneOutcome(outcome), true, nil
 				}
 			}
 		}
-		if key.database != nil {
-			if raw := p7RushHistoryCache.get(key, time.Now()); raw != nil {
-				r.outcome, r.err = p7DecodeHistoricalOutcome(raw)
-				r.scoped = r.err == nil
-			}
-		}
-		if r.outcome == nil || r.err != nil {
-			r.outcome, r.scoped, r.err = p7ReadManualRushRows(q.tx, fight, end, manual, q.record)
-			if key.database != nil && r.err == nil && r.scoped && r.outcome != nil && r.outcome.Authoritative {
-				if raw, e := p7EncodeHistoricalOutcome(r.outcome); e == nil {
-					p7RushHistoryCache.put(key, raw, time.Now())
-				}
-			}
-		}
+		r.outcome, r.scoped, r.err = p7ReadManualRushRows(q.tx, fight, end, manual, q.record)
 		if r.err == nil && r.scoped && r.outcome != nil && r.outcome.Authoritative && recordErr == nil {
-			// A derived-cache write failure cannot invalidate an otherwise valid
-			// directory read. The dedicated warmer reports persistence failures.
-			_ = q.certify(fight, record, fingerprint, r.outcome)
+			// Report proof persistence failures so bounded migration is resumable.
+			r.err = q.certify(fight, record, fingerprint, r.outcome)
 		}
 	} else if scoped, ok := q.scoped[fight.ID]; ok {
-		r.outcome, r.scoped, r.err = p7ReadScopedRushRows(fight, end, scoped, q.record)
+		record, recordErr := q.record(scoped.P6RecordID)
+		fingerprint := ""
+		if recordErr == nil {
+			fingerprint, _ = p7RushDurableFingerprint(fight, &scoped, record, end, q.scopedBlobs[fight.ID], q.recordBlobs[record.ID])
+			if q.certificateRuntime != nil {
+				r.outcome = q.certificateRuntime.acceptedProjection(q.certificates[fight.ID], q.serverID, q.state.PlayerID, fight.ID, fingerprint, record)
+			}
+		}
+		if r.outcome != nil {
+			r.scoped = true
+		} else {
+			r.outcome, r.scoped, r.err = p7ReadScopedRushRows(fight, end, scoped, q.record)
+			if r.err == nil && r.scoped && recordErr == nil {
+				r.err = q.certify(fight, record, fingerprint, r.outcome)
+			}
+		}
 	}
 	q.reads[fight.ID] = r
-	return r.outcome, r.scoped, r.err
+	return p7RushDurableCloneOutcome(r.outcome), r.scoped, r.err
 }
 
 func (q *p7EliteQueryProjection) parse(fight *db.P7RushFight) *p7EliteQueryParsed {

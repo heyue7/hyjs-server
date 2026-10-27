@@ -1,0 +1,320 @@
+{
+  "apkSHA256": "b1d99496c7ffe17c45ab7646c72023be406924997d471e3f18db169fb0dfd641",
+  "resources": {
+    "shopinnerpage/popularityshop": {
+      "entry": "assets/bin/Data/04550593ac345bd4983d660c7e402009",
+      "geometry": [
+        {
+          "depth": 1,
+          "object": "ShopItem",
+          "pathid": 27,
+          "active": false,
+          "position": [
+            -222.0,
+            106.0,
+            0.0
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "components": [
+            {
+              "class": ".UISprite",
+              "pivot": "Center",
+              "width": 312,
+              "height": 144
+            },
+            {
+              "class": "UI.ShopPopularityItem"
+            }
+          ]
+        },
+        {
+          "depth": 2,
+          "object": "IconRoot",
+          "pathid": 6,
+          "active": true,
+          "position": [
+            -102.0,
+            17.0,
+            0.0
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "components": [
+            {
+              "class": ".UIWidget",
+              "pivot": "Center",
+              "width": 100,
+              "height": 100
+            }
+          ]
+        },
+        {
+          "depth": 2,
+          "object": "Name",
+          "pathid": 31,
+          "active": true,
+          "position": [
+            -56.0,
+            32.0,
+            0.0
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "components": [
+            {
+              "class": ".UILabel",
+              "pivot": "Left",
+              "width": 40,
+              "height": 20,
+              "text": "名字",
+              "fontSize": 20
+            }
+          ]
+        },
+        {
+          "depth": 2,
+          "object": "Condition",
+          "pathid": 16,
+          "active": true,
+          "position": [
+            -146.0,
+            -50.0,
+            0.0
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "components": [
+            {
+              "class": ".UILabel",
+              "pivot": "Left",
+              "width": 94,
+              "height": 18,
+              "text": "竞技场前0名",
+              "fontSize": 17
+            }
+          ]
+        },
+        {
+          "depth": 2,
+          "object": "Condition",
+          "pathid": 19,
+          "active": false,
+          "position": [
+            65.69999694824219,
+            -8.0,
+            0.0
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "components": [
+            {
+              "class": ".UIWidget",
+              "pivot": "Center",
+              "width": 205,
+              "height": 40
+            }
+          ]
+        },
+        {
+          "depth": 2,
+          "object": "BtnBuy",
+          "pathid": 41,
+          "active": true,
+          "position": [
+            100.0,
+            -44.0,
+            0.0
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "components": [
+            {
+              "class": ".UISprite",
+              "pivot": "Center",
+              "width": 94,
+              "height": 40
+            },
+            {
+              "class": ".UIImageButton",
+              "pivot": "TopLeft",
+              "width": 0,
+              "height": 0
+            },
+            {
+              "class": "BoxCollider"
+            },
+            {
+              "class": ".PlayBtnAudio"
+            }
+          ]
+        }
+      ]
+    },
+    "shopinnerpage/pointshop": {
+      "entry": "assets/bin/Data/cedb2d6317aa4e0478b54aa5aa19260e",
+      "geometry": [
+        {
+          "depth": 1,
+          "object": "ShopItem (2)",
+          "pathid": 15,
+          "active": false,
+          "position": [
+            0.0,
+            82.0,
+            0.0
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "components": [
+            {
+              "class": ".UISprite",
+              "pivot": "Center",
+              "width": 312,
+              "height": 144
+            },
+            {
+              "class": "UI.ShopPointItem",
+              "pivot": 160,
+              "width": 0,
+              "height": 0
+            }
+          ]
+        },
+        {
+          "depth": 2,
+          "object": "IconRoot",
+          "pathid": 42,
+          "active": true,
+          "position": [
+            -102.0,
+            17.0,
+            0.0
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "components": [
+            {
+              "class": ".UIWidget",
+              "pivot": "Center",
+              "width": 100,
+              "height": 100
+            }
+          ]
+        },
+        {
+          "depth": 2,
+          "object": "Name",
+          "pathid": 5,
+          "active": true,
+          "position": [
+            -52.0,
+            45.0,
+            0.0
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "components": [
+            {
+              "class": ".UILabel",
+              "pivot": "Left",
+              "width": 202,
+              "height": 20,
+              "text": "名字",
+              "fontSize": 20
+            }
+          ]
+        },
+        {
+          "depth": 2,
+          "object": "Condition",
+          "pathid": 48,
+          "active": true,
+          "position": [
+            -146.0,
+            -50.0,
+            0.0
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "components": [
+            {
+              "class": ".UILabel",
+              "pivot": "Left",
+              "width": 126,
+              "height": 18,
+              "text": "达到100星可购买",
+              "fontSize": 17
+            }
+          ]
+        },
+        {
+          "depth": 2,
+          "object": "BtnBuy",
+          "pathid": 2,
+          "active": true,
+          "position": [
+            100.0,
+            -44.0,
+            0.0
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "components": [
+            {
+              "class": ".UISprite",
+              "pivot": "Center",
+              "width": 94,
+              "height": 40
+            },
+            {
+              "class": ".UIImageButton",
+              "pivot": 107,
+              "width": 0,
+              "height": 0
+            },
+            {
+              "class": "BoxCollider"
+            },
+            {
+              "class": ".PlayBtnAudio"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

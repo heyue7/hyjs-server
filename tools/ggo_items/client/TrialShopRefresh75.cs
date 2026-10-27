@@ -80,8 +80,9 @@ namespace HYJS.GGO
                 CreateLabel();
             }
             if (label == null) return;
-            if (!busy && Time.realtimeSinceStartup >= nextRead && origin.Length > 0) StartCoroutine(Read(generation));
-            Paint();
+            // The trial catalogue is a one-time reward shop. Do not show a
+            // daily or weekly reset timer for purchases that never reset.
+            label.text = "每件限购一次";
         }
         void CreateLabel()
         {
@@ -103,9 +104,7 @@ namespace HYJS.GGO
             label.pivot = UIWidget.Pivot.Left; label.alignment = NGUIText.Alignment.Left;
             label.fontSize = 18; label.width = 440; label.height = 24; label.maxLineCount = 1;
             label.overflowMethod = UILabel.Overflow.ShrinkContent; label.depth = theme.depth + 2;
-            label.text = "正在读取刷新时间…"; go.SetActive(true);
-            NGUITools.AddWidgetCollider(go);
-            UIEventListener.Get(go).onClick = delegate(GameObject ignored) { if (!busy && failed) { nextRead = 0f; failed = false; } };
+            label.text = "每件限购一次"; go.SetActive(true);
         }
         void Paint()
         {

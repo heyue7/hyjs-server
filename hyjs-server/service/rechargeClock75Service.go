@@ -112,6 +112,9 @@ func rechargeActivityRealStart75(tx *gorm.DB, playerID int64, key string) (int64
 }
 
 func rechargePeriodValue75(tx *gorm.DB, playerID int64, cfg db.PeriodInstance, now int64) (int64, string, error) {
+	if value, day, carried, err := rechargeCarryValue(tx, playerID, cfg, now); carried || err != nil {
+		return value, day, err
+	}
 	orders, err := localPlayActivityPaymentOrders(tx, playerID, cfg.ID, cfg.StartAt, min(cfg.EndAt, now+1))
 	if err != nil {
 		return 0, "", err

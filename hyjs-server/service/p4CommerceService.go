@@ -39,6 +39,7 @@ type p4Product struct {
 	TotalLimit         int32                         `json:"totalLimit"`
 	Stock              int32                         `json:"stock"`
 	MinLevel           int32                         `json:"minLevel"`
+	MinTrialStars      int32                         `json:"minTrialStars,omitempty"`
 	MinVIP             int32                         `json:"minVip"`
 	DiscountBps        int32                         `json:"discountBps"`
 	Weight             int64                         `json:"weight"`
@@ -222,7 +223,7 @@ func (s *GameService) validateP4Commerce(cfg db.P4CommerceRule) (p4CommerceRules
 	ids := map[string]bool{}
 	indices := map[int32]bool{}
 	for _, p := range rules.Products {
-		if p.ID == "" || len(p.ID) > 64 || len(p.Name) > 128 || ids[p.ID] || p.Index < 1 || indices[p.Index] || p.DailyLimit < 1 || p.DailyLimit > 10000 || p.AccountWeeklyLimit < 0 || p.AccountWeeklyLimit > math.MaxInt32 || p.TotalLimit < 0 || p.Stock < -1 || p.MinLevel < 1 || p.MinVIP < 0 || p.DiscountBps < 1 || p.DiscountBps > 10000 || p.Weight < 1 {
+		if p.ID == "" || len(p.ID) > 64 || len(p.Name) > 128 || ids[p.ID] || p.Index < 1 || indices[p.Index] || p.DailyLimit < 1 || p.DailyLimit > 10000 || p.AccountWeeklyLimit < 0 || p.AccountWeeklyLimit > math.MaxInt32 || p.TotalLimit < 0 || p.Stock < -1 || p.MinLevel < 1 || p.MinVIP < 0 || p.MinTrialStars < 0 || p.MinTrialStars > 306 || p.DiscountBps < 1 || p.DiscountBps > 10000 || p.Weight < 1 {
 			return rules, errors.New("商品库存/资格/折扣无效")
 		}
 		ids[p.ID] = true
@@ -590,6 +591,15 @@ func (s *GameService) p4Projection(tx *gorm.DB, p *pb.Player, cfg db.P4CommerceR
 	var shop []*pb.ShopItem
 	var activity []*pb.ActivityShopItem
 	rank := int64(0)
+	var lifetime *p4CommerceProgress
+	var trialStars int32
+	if cfg.Kind == "point" {
+		var err error
+		_, lifetime, trialStars, err = loadPointShopLifetime(tx, p.GetPlayerId())
+		if err != nil {
+			return nil, nil, err
+		}
+	}
 	if cfg.Kind == constUtil.P4PopularityRankKind {
 		var err error
 		rank, _, err = P11ArenaVerifiedBestWonRank(tx, p.GetPlayerId())
@@ -615,6 +625,10 @@ func (s *GameService) p4Projection(tx *gorm.DB, p *pb.Player, cfg db.P4CommerceR
 			allLeft = product.TotalLimit - state.Total[memorySource55(product)]
 			left = min(left, allLeft)
 		}
+		if lifetime != nil {
+			allLeft = min(allLeft, max(int32(0), 1-lifetime.Total[memorySource55(product)]))
+			left = min(left, allLeft)
+		}
 		if product.Stock >= 0 {
 			var stock db.P4CommerceStock
 			err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("rule_id = ? AND product_id = ?", cfg.ID, memorySource55(product)).First(&stock).Error
@@ -635,7 +649,7 @@ func (s *GameService) p4Projection(tx *gorm.DB, p *pb.Player, cfg db.P4CommerceR
 			return nil, nil, err
 		}
 		can := left
-		if p.GetLevel() < product.MinLevel || p.GetVip() < product.MinVIP {
+		if p.GetLevel() < product.MinLevel || p.GetVip() < product.MinVIP || lifetime != nil && trialStars < pointShopRequiredStars(product) {
 			can = 0
 		}
 		bps := product.DiscountBps
@@ -658,6 +672,9 @@ func (s *GameService) p4Projection(tx *gorm.DB, p *pb.Player, cfg db.P4CommerceR
 				}
 			}
 		}
+		if lifetime != nil {
+			condition = &pb.ShopCondition{Type: proto.String("star"), Value: proto.Int64(int64(pointShopRequiredStars(product)))}
+		}
 		publicID := product.ID
 		if rules.LiveEditable {
 			publicID = adminLiveP4SKU(cfg, product, nil)
@@ -673,11 +690,19 @@ func (s *GameService) p4Projection(tx *gorm.DB, p *pb.Player, cfg db.P4CommerceR
 			priority = s.pointShop48Priority(priority, rewards)
 		}
 		shopCanBuy := max(int32(0), can)
+		// The original trial item uses 2 for the purchased state, not 0.
+		if lifetime != nil && lifetime.Total[memorySource55(product)] >= 1 {
+			shopCanBuy = 2
+		}
 		// 原悬赏积分商品将canBuy作为状态枚举，剩余数量继续由dayLeftTimes携带。
 		if cfg.ShopType == 7 && shopCanBuy > 0 {
 			shopCanBuy = 1
 		}
-		shopItem := &pb.ShopItem{Id: proto.String(publicID), Item: rewards, Price: []*pb.BaseResource{price}, ExchangeList: []*pb.BaseResource{price}, Priority: proto.Int32(priority), CanBuy: proto.Int32(shopCanBuy), DayLeftTimes: proto.Int32(max(0, left)), DayTotalTimes: proto.Int32(dayTotal), TotalLeftTimes: proto.Int32(max(0, allLeft)), TotalTimes: proto.Int32(max(product.TotalLimit, allLeft)), PerDiscount: proto.String(strconv.Itoa(int(bps / 100))), Condition: condition}
+		totalTimes := max(product.TotalLimit, allLeft)
+		if lifetime != nil {
+			totalTimes = 1
+		}
+		shopItem := &pb.ShopItem{Id: proto.String(publicID), Item: rewards, Price: []*pb.BaseResource{price}, ExchangeList: []*pb.BaseResource{price}, Priority: proto.Int32(priority), CanBuy: proto.Int32(shopCanBuy), DayLeftTimes: proto.Int32(max(0, left)), DayTotalTimes: proto.Int32(dayTotal), TotalLeftTimes: proto.Int32(max(0, allLeft)), TotalTimes: proto.Int32(totalTimes), PerDiscount: proto.String(strconv.Itoa(int(bps / 100))), Condition: condition}
 		if err := s.p4BatchPurchasePrices(shopItem, product, state, min(bought+1, product.DailyLimit), max(0, left)); err != nil {
 			return nil, nil, err
 		}
@@ -1067,6 +1092,18 @@ func (s *GameService) p4Commerce(ctx context.Context, id int64, request proto.Me
 			if selected == nil || shopHasDirectStamina(selected.Rewards) || !p4Visible(cfg, state, *selected) {
 				return errors.New("当前目录无该商品")
 			}
+			var lifetimeRow *db.P4CommerceState
+			var lifetime *p4CommerceProgress
+			if cfg.Kind == "point" {
+				var stars int32
+				lifetimeRow, lifetime, stars, err = loadPointShopLifetime(tx, id)
+				if err != nil {
+					return err
+				}
+				if stars < pointShopRequiredStars(*selected) || count != 1 || lifetime.Total[memorySource55(*selected)] >= 1 {
+					return errors.New("试炼星数或终身限购不足")
+				}
+			}
 			selectedKey := p4SlotKey(cfg, state, *selected)
 			bought := state.Bought[selectedKey]
 			if state.Total[memorySource55(*selected)] < 0 || state.Total[memorySource55(*selected)] > math.MaxInt32-count || bought < 0 || bought > selected.DailyLimit-count || p.GetLevel() < selected.MinLevel || p.GetVip() < selected.MinVIP || (selected.TotalLimit > 0 && state.Total[memorySource55(*selected)] > selected.TotalLimit-count) {
@@ -1122,6 +1159,12 @@ func (s *GameService) p4Commerce(ctx context.Context, id int64, request proto.Me
 			gain, err = s.GrantFixedReward(p, g, totalContent)
 			if err != nil {
 				return err
+			}
+			if lifetime != nil {
+				lifetime.Total[memorySource55(*selected)] += count
+				if err = saveP4Commerce(tx, lifetimeRow, lifetime); err != nil {
+					return err
+				}
 			}
 			state.Bought[selectedKey] += count
 			state.Total[memorySource55(*selected)] += count

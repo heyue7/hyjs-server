@@ -42,7 +42,7 @@ type combatRoundTrigger struct {
 }
 
 func (a *combatRoundActor) attribute(key string) float64 {
-	if key == "damageAdd" || key == "damageReduce" {
+	if key == "damageAdd" || key == "damageReduce" || key == "lifestealHp" {
 		return a.originalFraction(key) * 100
 	}
 	if key == "blockDam" {
@@ -1427,7 +1427,7 @@ func (e *combatRoundEngine) dynamicRelease(skill *combatRoundSkill, cast map[str
 						if recipient.hasState("forbidAddHp") {
 							kind = 6
 						}
-						_, nominal, visible := e.changeHPWithOriginalExport(a, recipient, damage*a.attribute("lifestealHp")*.01*(1+float64(a.attribute("treatAdd")*.01))+a.attribute("cure")+recipient.attribute("heal"), "lifesteal")
+						_, nominal, visible := e.changeHPWithOriginalExport(a, recipient, originalLifestealAmount(damage, a.originalFraction("lifestealHp"), a.attribute("treatAdd"), a.attribute("cure"), recipient.attribute("heal")), "lifesteal")
 						e.originalExtraHPExport(recipient, nominal, visible, false, kind, []combatRoundHPExportOrigin{exportOrigin})
 					}
 				}
@@ -1517,6 +1517,13 @@ func (e *combatRoundEngine) dynamicRelease(skill *combatRoundSkill, cast map[str
 	}
 	return nil
 }
+
+// The original engine stores lifesteal as an accumulated fraction, including
+// Effect/UnEffect rounding residue. Consume that fraction without a percent round trip.
+func originalLifestealAmount(damage, fraction, treatAdd, cure, heal float64) float64 {
+	return damage*fraction*(1+float64(treatAdd*.01)) + cure + heal
+}
+
 func (e *combatRoundEngine) damageHP(source, target *combatRoundActor, damage float64, typ int32) (float64, bool, bool) {
 	return e.damageHPKind(source, target, damage, typ, "damage", source)
 }

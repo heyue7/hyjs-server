@@ -53,6 +53,7 @@ async function loadSchedule() {
   } catch { if (version === scheduleGeneration) scheduleError.value = '营业排期暂未载入'; }
 }
 function refreshText(row: ShopProduct) {
+  if (props.shopId === 'point') return ['每角色累计一次，跨日期与排期保留'];
   if (props.shopId === 'vip') return row.totalLimit > 0 ? ['每角色累计，跨日期保留'] : ['每日 00:00 恢复日限额'];
   const parts: string[] = [];
   if (showDailyLimit(row)) parts.push('每日 00:00 恢复日限额');
@@ -358,6 +359,7 @@ function renderLines(lines: string[]) {
   return h('div', { class: 'shop-cell-stack shop-rule-lines' }, lines.length ? lines.map(line => h('span', line)) : [h('span', { class: 'ops-muted' }, '不限')]);
 }
 function limitLines(row: ShopProduct) {
+  if (props.shopId === 'point') return ['每角色限购 1 次'];
   if (props.shopId === 'vip') return row.totalLimit > 0 ? [`每角色限购 ${shopCount75(row.totalLimit)} 次`, ...(row.totalLimit > 1 ? ['每日最多1次'] : [])] : ['每日 1 份'];
   return [
     ...(showDailyLimit(row) ? [`每日 ${row.dailyLimit.toLocaleString()} 次`] : []),
@@ -374,6 +376,7 @@ function showDailyLimit(row: ShopProduct) {
 function qualificationLines(row: ShopProduct) {
   return [
     ...(props.shopId === 'vip' ? ['需有已确认付款记录'] : []),
+    ...(props.shopId === 'point' && (row.minTrialStars || 0) > 0 ? [`试炼最高 ${row.minTrialStars} 星`] : []),
     ...(supports('minLevel') && row.minLevel > 1 ? [`角色 ${row.minLevel} 级`] : []),
     ...(supports('minVip') && row.minVip > 0 ? [`VIP ${row.minVip}`] : []),
     ...(supports('guildLevel') && row.guildLevel > 1 ? [`公会 ${row.guildLevel} 级`] : []),
@@ -653,7 +656,7 @@ watch(() => scope.serverId, () => { void loadSchedule(); });
           <section v-show="section === 'limits'">
             <h3 class="mb-20px">资格与限购</h3>
             <NGrid cols="1 m:2" responsive="screen" :x-gap="22">
-              <NGi v-if="supports('dailyLimit')">
+              <NGi v-if="supports('dailyLimit') && shopId !== 'point'">
                 <NFormItem label="每日限购">
                   <NInputNumber
                     v-model:value="draft.dailyLimit"
@@ -668,7 +671,7 @@ watch(() => scope.serverId, () => { void loadSchedule(); });
                   <NInputNumber v-model:value="draft.accountWeeklyLimit" :min="0" :max="2147483647" :precision="0" :disabled="readonly || saving" :input-props="{ 'aria-label': '账号每周限购' }" />
                 </NFormItem>
               </NGi>
-              <NGi v-if="supports('totalLimit')">
+              <NGi v-if="supports('totalLimit') && shopId !== 'point'">
                 <NFormItem :label="shopId === 'vip' ? '每角色总限购（0 为原每日一次）' : '当期累计限购（0 不限）'" :feedback="shopId === 'vip' ? '累计所有历史购买，改价格或切日期不重置；1 表示每角色只可购买一次。' : '换新排期后使用新一期额度；编辑商品保留当期已用次数。'">
                   <NInputNumber v-model:value="draft.totalLimit" :min="0" :precision="0" />
                 </NFormItem>
@@ -694,6 +697,11 @@ watch(() => scope.serverId, () => { void loadSchedule(); });
               <NGi v-if="supports('minLevel')">
                 <NFormItem label="最低角色等级">
                   <NInputNumber v-model:value="draft.minLevel" :min="1" :precision="0" />
+                </NFormItem>
+              </NGi>
+              <NGi v-if="supports('minTrialStars')">
+                <NFormItem label="试炼历史最高星数（0 使用默认 100 星）">
+                  <NInputNumber v-model:value="draft.minTrialStars" :min="0" :max="306" :precision="0" />
                 </NFormItem>
               </NGi>
               <NGi v-if="supports('minVip')">
@@ -944,11 +952,11 @@ watch(() => scope.serverId, () => { void loadSchedule(); });
   max-width: calc(100vw - 32px);
 }
 .trial-shop-mobile { display: none; }
-@media (max-width: 680px) {
+@media (max-width: 1660px) {
   .trial-shop-desktop { display: none; }
   .trial-shop-mobile { display: block; }
+  .trial-shop-mobile :deep(.n-spin-content) { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 24px; }
   .trial-shop-item { padding: 16px 0; border-bottom: 1px solid var(--n-border-color, #e2e5ec); }
-  .trial-shop-item:first-child { padding-top: 0; }
   .trial-shop-item h3 { margin: 0 0 8px; font-size: 14px; }
   .trial-shop-reward { display: flex; align-items: center; gap: 8px; }
   .trial-shop-reward > div { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; min-width: 0; }
@@ -959,5 +967,8 @@ watch(() => scope.serverId, () => { void loadSchedule(); });
   .trial-shop-item dd { margin: 0; overflow-wrap: anywhere; }
   .trial-shop-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
   .trial-shop-actions .ops-muted { margin-right: auto; }
+}
+@media (max-width: 680px) {
+  .trial-shop-mobile :deep(.n-spin-content) { grid-template-columns: minmax(0, 1fr); }
 }
 </style>

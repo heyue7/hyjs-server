@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS p7_rush_history_certificates (
  format BIGINT NOT NULL,
  validator CHAR(64) NOT NULL,
  fingerprint CHAR(64) NOT NULL,
+ winner INT NOT NULL DEFAULT 0,
  outcome_hash CHAR(64) NOT NULL,
  verified_at BIGINT NOT NULL,
  mac CHAR(64) NOT NULL,

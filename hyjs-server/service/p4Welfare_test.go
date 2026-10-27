@@ -35,6 +35,10 @@ func p4SetupWithOperations75(t *testing.T, operations bool) *p1Fixture {
 		f.mysql = db.MySQLConfig{Host: os.Getenv("HYJS_P4_MYSQL_HOST"), User: os.Getenv("HYJS_P4_MYSQL_USER"), Password: os.Getenv("HYJS_P4_MYSQL_PASSWORD"), Database: name}
 	}
 	f.open(t)
+	// 试炼商店资格读取同库真实试炼历史，隔离 fixture 建立其持久化表。
+	if err := db.GetIns().AutoMigrate(&db.P7RushState{}); err != nil {
+		t.Fatal(err)
+	}
 	f.s = &GameService{}
 	if err := f.s.LoadTables("../../analysis/tables"); err != nil {
 		t.Fatal(err)

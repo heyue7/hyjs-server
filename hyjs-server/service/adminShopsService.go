@@ -36,7 +36,8 @@ func AdminShopDefinitions() []model.AdminShopDefinition {
 			d.Fields = append(d.Fields, "maxRank")
 			d.Notes = "对应游戏声望商店的“奖励”页签。配置奖励道具、声望价格与最高排名门槛；每日/整期各1次，保留原排名证明。保存后生效，历史购买和排名资格保留。"
 		case "point":
-			d.Notes = "使用攻略点兑换试炼道具。商品、数量、价格与限购保存后用于后续购买，已用次数和历史交易保留。"
+			d.Fields = append(d.Fields, "minTrialStars")
+			d.Notes = "使用攻略点兑换试炼道具，每角色每件限购一次，历史购买和星数门槛持续生效。"
 		case "guild":
 			d.Fields = append(d.Fields, "contributionCost", "guildLevel")
 		case "pet-market":
@@ -92,6 +93,8 @@ func adminShopP4Product(p p4Product) model.AdminShopProduct {
 	v.AccountWeeklyLimit = p.AccountWeeklyLimit
 	v.Stock = int64(p.Stock)
 	v.MinLevel = int64(p.MinLevel)
+	stars := int64(p.MinTrialStars)
+	v.MinTrialStars = &stars
 	v.MinVip = int64(p.MinVIP)
 	v.Priority = int64(p.Priority)
 	v.Weight = p.Weight
@@ -217,7 +220,12 @@ func (s *GameService) adminReadShop(tx *gorm.DB, key string) (*model.AdminShopRe
 				if key == "ordinary" && shopHasDirectStamina(p.Rewards) {
 					continue
 				}
-				out.Items = append(out.Items, adminShopP4Product(p))
+				item := adminShopP4Product(p)
+				if key == "point" {
+					stars := int64(pointShopRequiredStars(p))
+					item.MinTrialStars = &stars
+				}
+				out.Items = append(out.Items, item)
 			}
 			if key == "guild" {
 				var gr p4GuildRules
@@ -493,10 +501,18 @@ func (s *GameService) AdminSaveShopProduct(ctx context.Context, actor *model.Adm
 				return fmt.Errorf("%w: 商品已不存在，请刷新", constUtil.ErrAdminInput)
 			}
 			value := p4Product{QuantityTiers: p.QuantityTiers, Enabled: &p.Enabled, ID: originalID, Name: p.Name, Index: nextIndex, Rewards: reward, Cost: cost, Priority: int32(p.Priority), DailyLimit: int32(p.DailyLimit), TotalLimit: int32(p.TotalLimit), AccountWeeklyLimit: p.AccountWeeklyLimit, Stock: int32(p.Stock), MinLevel: int32(p.MinLevel), MinVIP: int32(p.MinVip), Weight: p.Weight, DiscountBps: int32(p.DiscountBps), MaxRank: p.MaxRank}
+			if p.MinTrialStars != nil {
+				value.MinTrialStars = int32(*p.MinTrialStars)
+			} else if found >= 0 {
+				value.MinTrialStars = rules.Products[found].MinTrialStars
+			}
 			if found >= 0 {
 				value.Index = rules.Products[found].Index
 				old := rules.Products[found]
 				current := adminShopP4Product(old)
+				if p.MinTrialStars == nil {
+					current.MinTrialStars = nil
+				}
 				s.adminShopName(&current)
 				if key == "guild" {
 					var gr p4GuildRules

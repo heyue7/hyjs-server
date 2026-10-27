@@ -51,6 +51,15 @@ func TestP7EarnedTrialStarsActivityPointShopMaterialColdOnce(t *testing.T) {
 		t.Fatal("real activity source differs from local published100point reward")
 	}
 	request := &pb.CSShopBuy{ShopType: proto.Int32(5), ShopItemId: proto.String("p4Point_1"), BuyCount: proto.Int32(1)}
+	if _, err = f.s.p4Commerce(f.ctx, f.id, request, 18704, time.Now()); err == nil {
+		t.Fatal("three earned stars must not bypass the 100-star shop requirement")
+	}
+	// The first floor above earned the points naturally. Supply a separate
+	// qualification fixture so this test can still exercise the purchase and
+	// receipt without claiming that one floor earned 100 stars.
+	if err = db.GetIns().Model(&db.P7RushState{}).Where("player_id = ?", f.id).Update("record_stars", 100).Error; err != nil {
+		t.Fatal(err)
+	}
 	replies, err := f.s.p4Commerce(f.ctx, f.id, request, 18702, time.Now())
 	if err != nil {
 		t.Fatal(err)

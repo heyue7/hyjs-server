@@ -236,8 +236,12 @@ func TestEconomy76ActualCreditFifteenRefreshCapAndFrozenQuotes(t *testing.T) {
 	}
 }
 
-func TestEconomy76ActualTrialFourMenusScheduledWeeklyQuota(t *testing.T) {
+func TestEconomy76ActualTrialFourMenusLifetimeQuotaAcrossSchedules(t *testing.T) {
 	f, actor := economy76Fixture(t)
+	// Exercise the real catalogue with a player who meets the published star gate.
+	if err := db.GetIns().Where("player_id=?", f.id).Assign(db.P7RushState{RecordStars: 306}).FirstOrCreate(&db.P7RushState{PlayerID: f.id}).Error; err != nil {
+		t.Fatal(err)
+	}
 	shop, err := f.s.AdminShop(f.ctx, "point")
 	if err != nil {
 		t.Fatal(err)
@@ -332,16 +336,16 @@ func TestEconomy76ActualTrialFourMenusScheduledWeeklyQuota(t *testing.T) {
 	bound = serverClockBindTest(t, f, f.id)
 	var next *pb.ShopItem
 	for _, item := range read(bound) {
-		if item.GetPriority()/1000 == 4 && p1SameResources(item.GetItem(), red.GetItem()) {
+		if item.GetPriority()/1000 == 4 && item.GetId() != red.GetId() && p1SameResources(item.GetItem(), red.GetItem()) {
 			next = item
 			break
 		}
 	}
-	if next == nil || next.GetTotalLeftTimes() != red.GetTotalTimes() {
-		t.Fatal("next real weekly window missing original stock", next, red)
+	if next == nil || next.GetTotalLeftTimes() != 0 || next.GetCanBuy() != 2 {
+		t.Fatal("lifetime purchase must remain sold out in the next scheduled window", next)
 	}
-	if _, err = f.s.p4Commerce(bound, f.id, &pb.CSShopBuy{ShopType: proto.Int32(5), ShopItemId: next.Id, BuyCount: proto.Int32(1)}, 762012, LocalPlayNow(bound)); err != nil {
-		t.Fatal("next scheduled week purchase", err)
+	if _, err = f.s.p4Commerce(bound, f.id, &pb.CSShopBuy{ShopType: proto.Int32(5), ShopItemId: next.Id, BuyCount: proto.Int32(1)}, 762012, LocalPlayNow(bound)); err == nil {
+		t.Fatal("next scheduled window allowed a second lifetime purchase")
 	}
 }
 

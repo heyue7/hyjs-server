@@ -18,6 +18,7 @@ func RegisterAdminShopRoutes(a *gin.RouterGroup) {
 	a.PUT("/shops/:id/products/:productId", AdminShopProductSaveHandler)
 	a.DELETE("/shops/:id/products/:productId", AdminShopProductDeleteHandler)
 	a.PUT("/shops/:id/settings", AdminShopSettingsSaveHandler)
+	a.POST("/shops/point/trial-reprice", AdminTrialShopRepriceHandler)
 }
 
 // AdminShopsHandler lists actual original shop menus.
@@ -111,6 +112,10 @@ func AdminShopProductSaveHandler(c *gin.Context) {
 		return
 	}
 	if key != "ggo" && req.AccountWeeklyLimit != 0 {
+		adminError(c, constUtil.ErrAdminInput)
+		return
+	}
+	if req.MinTrialStars != nil && (*req.MinTrialStars < 0 || *req.MinTrialStars > 306 || (key != "point" && *req.MinTrialStars != 0)) {
 		adminError(c, constUtil.ErrAdminInput)
 		return
 	}

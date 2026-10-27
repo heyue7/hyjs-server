@@ -107,7 +107,9 @@ namespace HYJS.Feedback66
             value.EndPending = false;
             value.Recoverable = true;
             value.Rejected = error != null && packet.nOpCode == 10001 && error.code == "90003" &&
-                (error.msg == Conflict || error.msg != null && error.msg.StartsWith("录像操作不符合原技能时序:", StringComparison.Ordinal));
+                (error.msg == Conflict || error.msg != null &&
+                    (error.msg.StartsWith(Conflict + ":", StringComparison.Ordinal) ||
+                     error.msg.StartsWith("录像操作不符合原技能时序:", StringComparison.Ordinal)));
             LeaveBattle(value);
             Message(value.Rejected && value.PaidStart != null
                 ? "战斗录像校验未通过，请点击挑战重新进行本次战斗，次数不会重复扣除"

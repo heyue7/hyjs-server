@@ -155,7 +155,11 @@ func openServerSaveStock(tx *gorm.DB, task db.OpenServerActivityTask, id int64) 
 
 func openServerReadCounters(tx *gorm.DB, id int64) ([]db.OpenServerActivityCounter, error) {
 	if adminOpeningPeriod(tx) != nil {
-		return adminOpeningReadCounters(tx, id)
+		rows, err := adminOpeningReadCounters(tx, id)
+		if err != nil {
+			return nil, err
+		}
+		return openingCalendarMergePaymentCounters(tx, id, rows)
 	}
 	cycle, err := localPlayOpenServerCycle(tx)
 	if err != nil {
@@ -164,7 +168,10 @@ func openServerReadCounters(tx *gorm.DB, id int64) ([]db.OpenServerActivityCount
 	rows := []db.OpenServerActivityCounter{}
 	if cycle == nil {
 		err = tx.Where("player_id=?", id).Find(&rows).Error
-		return rows, err
+		if err != nil {
+			return nil, err
+		}
+		return openingCalendarMergePaymentCounters(tx, id, rows)
 	}
 	if cycle.PlayerID != id {
 		return nil, errLocalPlayActivitiesInvalid
@@ -176,7 +183,7 @@ func openServerReadCounters(tx *gorm.DB, id int64) ([]db.OpenServerActivityCount
 	for _, r := range scoped {
 		rows = append(rows, db.OpenServerActivityCounter{PlayerID: id, CounterKey: r.CounterKey, Value: r.Value})
 	}
-	return rows, nil
+	return openingCalendarMergePaymentCounters(tx, id, rows)
 }
 
 func openServerReadCounter(tx *gorm.DB, id int64, key string) (db.OpenServerActivityCounter, error) {

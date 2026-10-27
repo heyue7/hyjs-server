@@ -9,6 +9,43 @@ from tools.awake_diff_rows.build import methods
 from tools.local_asset_ready.remove_gate import exact_body
 import dnfile
 
+def verify_final_resource_pins(archive, payload):
+ """Fail packaging when the boot whitelist does not describe final APK assets."""
+ from tools.client_compat63.dex_patch import extract_pins
+ name="assets/local-resource-overrides.json"
+ if name not in archive.namelist() and name not in payload:
+  return
+ def final(entry):
+  return payload[entry] if entry in payload else archive.read(entry)
+ config=json.loads(final(name))
+ pins=extract_pins(final("classes2.dex"))
+ require(config.get("files")==pins,"Resource whitelist differs from final DEX pins")
+ for pin in pins:
+  data=final("assets/android/"+pin["path"])
+  require(len(data)==pin["bytes"] and hashlib.sha256(data).hexdigest()==pin["sha256"],"Final resource pin mismatch: "+pin["path"])
+
+def repair_final_manifest_pin(archive, payload):
+ """Rebind the existing boot whitelist to the final packaged manifest bytes."""
+ from tools.client_compat63.dex_patch import extract_pins, patch
+ def final(entry):
+  return payload[entry] if entry in payload else archive.read(entry)
+ config=json.loads(final("assets/local-resource-overrides.json"))
+ dex=final("classes2.dex")
+ pins=extract_pins(dex)
+ require(config.get("files")==pins and len(pins)==6 and pins[5]["path"]=="smallassetmanifest","Unexpected existing resource whitelist")
+ for pin in pins[:5]:
+  data=final("assets/android/"+pin["path"])
+  require(len(data)==pin["bytes"] and hashlib.sha256(data).hexdigest()==pin["sha256"],"Non-manifest resource pin mismatch: "+pin["path"])
+ data=final("assets/android/smallassetmanifest")
+ digest=hashlib.sha256(data).hexdigest()
+ if pins[5]["bytes"]==len(data) and pins[5]["sha256"]==digest:
+  return {"changed":False}
+ new_dex,proof=patch(dex,digest,len(data))
+ config["files"][5].update(sha256=digest,bytes=len(data))
+ payload["classes2.dex"]=new_dex
+ payload["assets/local-resource-overrides.json"]=(json.dumps(config,ensure_ascii=False,indent=2)+"\n").encode()
+ return {"changed":True,"manifestBytes":len(data),"manifestSHA256":digest,"dexProof":proof}
+
 def apply_compatibility_overlay(base,directory,payload,pins):
  """Reproduce reviewed compatibility bytes before the packaging lock/signing stage.
 
@@ -102,7 +139,7 @@ def verify_java_class_inventory(archive,payload):
  return {"DEXEntries":sorted(names),"classCount":len(headers),"noDuplicateClass":True,"noFinalSuperclass":True}
 
 def main():
- p=argparse.ArgumentParser(description=__doc__);p.add_argument("--base-apk",type=Path,required=True);p.add_argument("--overlay",type=Path,required=True);p.add_argument("--output",type=Path,required=True);p.add_argument("--record",type=Path,required=True);p.add_argument("--opening-font-overlay",type=Path);p.add_argument("--font-fallback-overlay",type=Path);p.add_argument("--dungeon-resource-overlay",type=Path);p.add_argument("--compat-overlay",type=Path,help="Reviewed formal62 startup/resource Pin compatibility overlay; composed after version patch");p.add_argument("--qa-wallet-origin");p.add_argument("--build-code",type=int);p.add_argument("--version-name");a=p.parse_args()
+ p=argparse.ArgumentParser(description=__doc__);p.add_argument("--base-apk",type=Path,required=True);p.add_argument("--overlay",type=Path,required=True);p.add_argument("--output",type=Path,required=True);p.add_argument("--record",type=Path,required=True);p.add_argument("--opening-font-overlay",type=Path);p.add_argument("--font-fallback-overlay",type=Path);p.add_argument("--dungeon-resource-overlay",type=Path);p.add_argument("--compat-overlay",type=Path,help="Reviewed formal62 startup/resource Pin compatibility overlay; composed after version patch");p.add_argument("--repair-compat-manifest-pin",action="store_true");p.add_argument("--qa-wallet-origin");p.add_argument("--build-code",type=int);p.add_argument("--version-name");a=p.parse_args()
  require((a.build_code is None)==(a.version_name is None),"Build code and version name must be supplied together")
  base,overlay,output,record=[x.resolve()for x in (a.base_apk,a.overlay,a.output,a.record)]
  proof=json.loads((overlay/"manifest.json").read_text());require(proof["inheritedJavaPublicProtectedABIExact"],"Qualified native ABI required")
@@ -177,6 +214,9 @@ def main():
   dungeon_report={"originalMapByteIdentical":True,"onlyRootDependencyDeclarationChanged":True,"previousDeclaredClosureBundles":len(dependencies),"entries":resource["replacementEntries"]}
  compatibility_report=None
  if a.compat_overlay:compatibility_report=apply_compatibility_overlay(base,a.compat_overlay,payload,pins)
+ with zipfile.ZipFile(base) as archive:
+  manifest_pin_repair=repair_final_manifest_pin(archive,payload) if a.repair_compat_manifest_pin else None
+  verify_final_resource_pins(archive,payload)
  require(bool(payload),"Empty overlay is not a release")
  hashes={n:hashlib.sha256(v).hexdigest()for n,v in payload.items()}
  for n,h in proof.get("replacementEntries",{}).items():require(hashes[n]==h,"Overlay payload differs: "+n)
@@ -229,7 +269,7 @@ def main():
     for name,info in dungeon_infos.items():require(z.getinfo(name).compress_type==info.compress_type,"Original bundle ZIP storage changed")
    for f,h in pins.items():require(common.digest(f)==h,"Source changed while packaging")
    require(common.digest(base)==proof["baseAPKSHA256"],"Base changed while packaging")
-   result={"status":"PASS_SIGN_ALIGN_SCOPED_OVERLAY_NOT_INSTALLED","binarySHA256":common.digest(signed),"baseAPKSHA256":proof["baseAPKSHA256"],"replacementEntries":hashes,"openingFontChanges":font_changes,"fontFallbackProof":fallback_report,"dungeonResourceProof":dungeon_report,"compatibilityProof":compatibility_report,"javaClassInventory":java_inventory,"inheritedJavaByteExact":original_java_exact,"javaByteExact":java_byte_exact,"allOtherEntriesAndCompressedPayloadsExact":True,"managedAssemblyByteExact":common.DLL not in payload,"qaOnly":bool(a.qa_wallet_origin),"neverPromote":bool(a.qa_wallet_origin),"signatureVerified":True,"zipalignVerified":True,"originalEngineMethodsExact":547,"outputAPK":str(output.relative_to(ROOT))}
+   result={"status":"PASS_SIGN_ALIGN_SCOPED_OVERLAY_NOT_INSTALLED","binarySHA256":common.digest(signed),"baseAPKSHA256":proof["baseAPKSHA256"],"replacementEntries":hashes,"openingFontChanges":font_changes,"fontFallbackProof":fallback_report,"dungeonResourceProof":dungeon_report,"compatibilityProof":compatibility_report,"manifestPinRepair":manifest_pin_repair,"javaClassInventory":java_inventory,"inheritedJavaByteExact":original_java_exact,"javaByteExact":java_byte_exact,"allOtherEntriesAndCompressedPayloadsExact":True,"managedAssemblyByteExact":common.DLL not in payload,"qaOnly":bool(a.qa_wallet_origin),"neverPromote":bool(a.qa_wallet_origin),"signatureVerified":True,"zipalignVerified":True,"originalEngineMethodsExact":547,"outputAPK":str(output.relative_to(ROOT))}
    # QA and diagnostic restrictions survive another scoped packaging layer.
    result["qaOnly"] = bool(proof.get("qaOnly") or a.qa_wallet_origin)
    result["neverPromote"] = bool(proof.get("neverPromote") or proof.get("diagnosticOnly") or a.qa_wallet_origin)

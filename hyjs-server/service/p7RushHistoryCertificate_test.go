@@ -21,7 +21,7 @@ func TestP7RushHistoryCertificateRejectsForgeryAndWrongScope(t *testing.T) {
 	if !valid(c, 1, 24, c.Fingerprint) {
 		t.Fatal("authentic certificate rejected")
 	}
-	for _, field := range []string{"mac", "version", "fingerprint", "outcome", "fight", "owner", "realm", "format", "time"} {
+	for _, field := range []string{"mac", "version", "fingerprint", "outcome", "fight", "owner", "realm", "format", "time", "winner"} {
 		t.Run(field, func(t *testing.T) {
 			bad := c
 			switch field {
@@ -41,6 +41,8 @@ func TestP7RushHistoryCertificateRejectsForgeryAndWrongScope(t *testing.T) {
 				bad.ServerID++
 			case "format":
 				bad.Format++
+			case "winner":
+				bad.Winner++
 			case "time":
 				bad.VerifiedAt++
 			}

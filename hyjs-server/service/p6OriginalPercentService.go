@@ -4,7 +4,7 @@ package service
 // UnEffect apply each delta in their actual order; summing only live Buff rows
 // loses the original rounding residue after stacks are removed.
 func (a *combatRoundActor) originalFraction(key string) float64 {
-	if key != "damageAdd" && key != "damageReduce" {
+	if key != "damageAdd" && key != "damageReduce" && key != "lifestealHp" {
 		return float64(a.attribute(key) * .01)
 	}
 	if a.originalPercent == nil {
@@ -36,7 +36,7 @@ func (e *combatRoundEngine) originalPercentEffect(b *combatRoundBuff, apply bool
 	x := float64(tableNumber(b.row, "Args1") * .01)
 	change := func(key string, value float64) { b.target.originalPercentChange(key, sign*value) }
 	switch b.row["Factor"] {
-	case "damageAdd", "damageReduce":
+	case "damageAdd", "damageReduce", "lifestealHp":
 		change(b.row["Factor"], x)
 	case "damageAddAndReduce":
 		change("damageAdd", x)

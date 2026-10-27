@@ -85,7 +85,7 @@ func (s *GameService) InitializePayments(ctx context.Context) error {
 	if len(s.Tables["Payment"]) == 0 || len(s.Tables["VipPerks"]) == 0 {
 		return errors.New(constUtil.P3PaymentConfigError)
 	}
-	if err := d.AutoMigrate(&db.PaymentProduct{}, &db.PaymentOrder{}, &db.LocalPlayPaymentTime{}, &db.PaymentConfirmation{}, &db.MembershipClaim{}, &db.PaymentActivityRule{}, &db.PaymentActivityState{}, &db.PaymentGiftCode{}, &db.PaymentLuxuryOffer{}, &db.VIPShopProduct{}); err != nil {
+	if err := d.AutoMigrate(&db.PaymentProduct{}, &db.PaymentOrder{}, &db.LocalPlayPaymentTime{}, &db.PaymentConfirmation{}, &db.MembershipClaim{}, &db.PaymentActivityRule{}, &db.PaymentActivityState{}, &db.PaymentGiftCode{}, &db.PaymentLuxuryOffer{}, &db.VIPShopProduct{}, &db.OpeningCalendarPaymentCarry{}); err != nil {
 		return err
 	}
 	return d.Transaction(func(tx *gorm.DB) error {
@@ -457,6 +457,11 @@ func (s *GameService) refreshP3OpenServer(tx *gorm.DB, p *pb.Player, g *model.Ga
 // refreshP3OpenServerCounters rechecks actual paid orders within the accepted
 // activity window; daily maximums never combine two small orders into one.
 func (s *GameService) refreshP3OpenServerCounters(tx *gorm.DB, id int64, cfg *db.OpenServerActivityRule, now time.Time) error {
+	if _, carried, err := openingCalendarPaymentCounters(tx, id, cfg, now); carried || err != nil {
+		// The repository reads the immutable carry projection. Preserve every
+		// original counter row instead of rebuilding it from the shifted window.
+		return err
+	}
 	if !gameSchemaHasTable(tx, &db.PaymentOrder{}) {
 		return nil
 	}

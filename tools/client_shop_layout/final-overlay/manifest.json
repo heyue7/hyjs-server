@@ -1,0 +1,19 @@
+{
+  "helperABIPreserved": true,
+  "onlyQuotaBodyChanged": true,
+  "schema": "hyjs-shop-layout-overlay-v1",
+  "baseAPKSHA256": "6f0702c07119bf87157963cba50fbd51ac18cb69e391cb4ca1853911701a9923",
+  "inputManagedSHA256": "5276278d3ca1da094814749ede4d8188b065d7d17f3d20373cfbf4fdd021a869",
+  "inputHelperSHA256": "897b6c1d0ad8e5b9231fd3988819f5227b9aed0dca20dcee71914edceac8d96e",
+  "replacementEntries": {
+    "assets/bin/Data/Managed/HYJS.Commerce66.dll": "b42d64447bb6b1b839d0cac1f5f523eadf44c1956b12979efd364f46a7743b9a"
+  },
+  "payloadFiles": {
+    "assets/bin/Data/Managed/HYJS.Commerce66.dll": "/Users/lirui/.codex/worktrees/hyjs-activity-trial/hyjs/tools/client_shop_layout/final-overlay/HYJS.Commerce66.dll"
+  },
+  "mainAssemblyUnchanged": true,
+  "purchaseProtocolUnchanged": true,
+  "apkBuilt": false,
+  "phoneVerified": false,
+  "sourceSHA256": "39fd7b7238739b73118937070322a25d42f37fcd16abd2db6b2ec05d7b4eed63"
+}
