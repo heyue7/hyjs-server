@@ -1,0 +1,25 @@
+{
+  "revision": "4386a3704a356e89e440662d5d07b4cd7be6cb54",
+  "runningBinarySHA256": "89f29114f65376cbe50f010e9a6b83860b69c02d668144305352312c44adb339",
+  "deployedAt": "2026-10-27T14:10:03Z",
+  "verification": {
+    "runningProcExeSHAEquals": true,
+    "publicHealthHTTP": 200,
+    "adminHTTP": 200,
+    "originalSAOCors": 204,
+    "clockOffset": 0,
+    "clockRevision": 13,
+    "maintenance": false
+  },
+  "postReleasePhone": {
+    "coldLaunchLoginAndCity": true,
+    "memberDailyCurrent10Next11": true,
+    "weeklyDiscountFalseLabelRemoved": true,
+    "vipBooksAndPurchasedStatePersistent": true,
+    "diamond": 42930,
+    "point": 30,
+    "trialRecordStars": 9,
+    "trialHighFloor": 3,
+    "phoneReturnedToCity": true
+  }
+}

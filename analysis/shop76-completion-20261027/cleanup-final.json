@@ -1,0 +1,12 @@
+{
+  "deploymentStageRemovedByScript": true,
+  "remoteIncomingEmpty": true,
+  "remoteObsoleteBackupsRemoved": 3,
+  "remoteBackupReclaimedBytes": 1424117309,
+  "remoteDiskAvailable": "5.2GiB",
+  "retainedAuthenticatedLatestBackup": "pre-deploy-4386a3704a35-1793110114267939648.sql.gz.aesgcm",
+  "localTestDatabasesCreated": 0,
+  "mysqlRedisResourcesCreated": 0,
+  "globalCleanupPerformed": false,
+  "ownedLocalDistAndPyCacheBytesRemoved": 34803198
+}
