@@ -122,7 +122,6 @@ onBeforeUnmount(() => { generation++; recordGeneration++; });
 
 <template>
   <div class="terminal-workspace">
-    <h2 class="terminal-page-title">蓝绿终端</h2>
     <NTabs type="line" animated>
       <NTabPane name="settings" tab="终端设置">
         <div class="ops-toolbar mb-16px"><span class="ops-muted">{{ scope.currentServer?.name }} · 按区服保存</span><NButton :loading="loading" :disabled="busy || !!pending" @click="loadSettings">重新读取设置</NButton></div>
@@ -187,7 +186,6 @@ onBeforeUnmount(() => { generation++; recordGeneration++; });
 
 <style scoped>
 .terminal-workspace { max-width: 1120px; container-type: inline-size; }
-.terminal-page-title { display: none; margin: 0 0 16px; font-size: 18px; }
 .terminal-section { padding: 20px 0 4px; border-top: 1px solid rgb(var(--base-text-color) / .1); }
 .terminal-section-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
 .terminal-section-heading h3 { margin: 0; font-size: 15px; font-weight: 600; }
@@ -205,7 +203,6 @@ onBeforeUnmount(() => { generation++; recordGeneration++; });
 .terminal-scope p { margin: 8px 0 0; opacity: .75; line-height: 1.6; }
 .terminal-distribute { max-width: 560px; }
 @container (max-width: 800px) {
-  .terminal-page-title { display: block; }
   .terminal-grid { grid-template-columns: 1fr; }
   .terminal-rule { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 12px; padding-bottom: 12px; }
   .terminal-rule-number { grid-column: 1 / -1; margin: 0 0 8px; }
