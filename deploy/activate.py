@@ -19,6 +19,7 @@ parser.add_argument('--provision-ingress', action='store_true')
 parser.add_argument('--migrate-role-wallets', action='store_true')
 parser.add_argument('--expected-live-revision')
 parser.add_argument('--apply-growth74', action='store_true')
+parser.add_argument('--apply-activity77', action='store_true', help='Apply activity77 under maintenance')
 parser.add_argument('--apply-growth75', action='store_true')
 parser.add_argument('--restore-activity-calendar')
 parser.add_argument('--warm-rush-history-player', action='append', type=int, default=[])
@@ -26,8 +27,10 @@ args = parser.parse_args()
 if args.restore_activity_calendar:
     import uuid
     assert str(uuid.UUID(args.restore_activity_calendar)) == args.restore_activity_calendar
-    assert args.expected_live_revision and not any((args.initial_db, args.migrate_role_wallets, args.apply_growth74, args.apply_growth75)), 'Calendar restore requires a standalone maintenance cutover'
-assert not (args.apply_growth74 and args.apply_growth75), 'Choose one explicit growth deployment version'
+    assert args.expected_live_revision and not any((args.initial_db, args.migrate_role_wallets, args.apply_growth74, args.apply_growth75, args.apply_activity77)), 'Calendar restore requires a standalone maintenance cutover'
+assert sum((args.apply_growth74, args.apply_growth75, args.apply_activity77)) <= 1, 'Choose one explicit growth deployment version'
+if args.apply_activity77:
+    assert args.expected_live_revision and not args.initial_db and not args.migrate_role_wallets, 'Activity77 requires a pinned maintenance cutover'
 if args.apply_growth75:
     assert args.expected_live_revision and not args.initial_db and not args.migrate_role_wallets, 'Growth75 requires a pinned maintenance cutover'
 os.umask(0o077)
@@ -148,7 +151,7 @@ if args.restore_activity_calendar:
     compose('run', '--rm', '--no-deps', '-T', 'app', '--env', 'test', '--tables', '/app/tables', '--calendar-maintenance', 'begin', '--log-file', '/app/logs/calendar-maintenance.log')
     assert mysql('SELECT maintenance FROM client_update_policy WHERE id=1;').strip() == '1'
     compose('stop', '-t', '30', 'app')
-if args.apply_growth74 or args.apply_growth75:
+if args.apply_growth74 or args.apply_growth75 or args.apply_activity77:
     assert args.expected_live_revision and not args.initial_db
     assert mysql('SELECT maintenance FROM client_update_policy WHERE id=1;').strip() == '1', 'Growth apply requires maintenance'
     compose('stop', '-t', '30', 'app')
@@ -243,6 +246,16 @@ if args.apply_growth75:
         compose('stop', '-t', '30', 'app')
         raise RuntimeError('Growth75 failed under maintenance. App remains stopped; inspect private backups/growth75-*/manifest.json. Any failed uncommitted CAS transaction was rolled back; prior candidate CLI steps remain audited. Do not reopen or auto-restore the full database.') from None
 
+if args.apply_activity77:
+    import activity77_activation
+    try:
+        manifest['activity77Applied'] = activity77_activation.activate_activity77(
+            mysql, compose, ROOT / 'backups', manifest['revision'], verified_backup,
+            manifest['files']['app/hyjs-server'])
+    except Exception:
+        compose('stop', '-t', '30', 'app')
+        raise RuntimeError('Activity77 failed under maintenance. App remains stopped; preserve the verified backup and private activity77 manifest for inspection; do not automatically restore the database.') from None
+
 if args.restore_activity_calendar:
     import calendar_restore_activation
     try:
@@ -260,9 +273,16 @@ for _ in range(90):
     except Exception:
         time.sleep(2)
 else:
-    if args.migrate_role_wallets:
+    if args.migrate_role_wallets or args.apply_activity77:
         compose('stop', '-t', '30', 'app')
     raise SystemExit('Application health failed; data and prior deployed.json preserved. Fix/retry this script, or deploy its recorded Git commit from a clean checkout; do not restore the database automatically.')
+
+if args.apply_activity77:
+    try:
+        assert mysql('SELECT maintenance FROM client_update_policy WHERE id=1;').strip() == '1', 'Activity77 service lost maintenance after health check'
+    except Exception:
+        compose('stop', '-t', '30', 'app')
+        raise
 
 if wallet_baseline is not None:
     try:

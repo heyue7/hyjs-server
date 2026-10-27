@@ -607,6 +607,15 @@ func (s *GameService) p4Projection(tx *gorm.DB, p *pb.Player, cfg db.P4CommerceR
 			return nil, nil, err
 		}
 	}
+	weekly := map[string]int64{}
+	weeklyAccount := int64(0)
+	if cfg.Kind == "score" {
+		var err error
+		weekly, weeklyAccount, err = ggoWeeklyCatalogue(tx, p.GetPlayerId(), rules.Products, time.Now())
+		if err != nil {
+			return nil, nil, err
+		}
+	}
 	for _, product := range memoryProducts55(cfg, rules, state) {
 		if shopHasDirectStamina(product.Rewards) || !p4Visible(cfg, state, product) {
 			continue
@@ -620,6 +629,13 @@ func (s *GameService) p4Projection(tx *gorm.DB, p *pb.Player, cfg db.P4CommerceR
 			return nil, nil, errors.New("商品日限购存档无效")
 		}
 		left := max(int32(0), product.DailyLimit-bought)
+		if cfg.Kind == "score" && product.AccountWeeklyLimit > 0 {
+			remaining := max(int64(0), product.AccountWeeklyLimit-weekly[ggoSourceProductID(product)])
+			if weeklyAccount < 1 {
+				remaining = 0
+			}
+			left = min(left, int32(remaining))
+		}
 		allLeft := int32(math.MaxInt32)
 		if product.TotalLimit > 0 {
 			allLeft = product.TotalLimit - state.Total[memorySource55(product)]
@@ -1138,6 +1154,11 @@ func (s *GameService) p4Commerce(ctx context.Context, id int64, request proto.Me
 			}
 			if err = s.p4PopularityRankBuy(tx, id, p, cfg, *selected, count, stamp, now); err != nil {
 				return err
+			}
+			if cfg.Kind == "score" && selected.AccountWeeklyLimit > 0 {
+				if err = useGGOAccountWeekly(tx, profile.AccountID, ggoSourceProductID(*selected), selected.AccountWeeklyLimit, int64(count), time.Now()); err != nil {
+					return err
+				}
 			}
 			var stock db.P4CommerceStock
 			if selected.Stock >= 0 {

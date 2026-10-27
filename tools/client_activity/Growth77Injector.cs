@@ -1,0 +1,27 @@
+using System;
+using System.Linq;
+using dnlib.DotNet;
+using dnlib.DotNet.Emit;
+using dnlib.DotNet.Writer;
+
+if (args.Length != 3) throw new ArgumentException("input managed, activity helper, output managed");
+using var module = ModuleDefMD.Load(args[0]);
+using var helper = ModuleDefMD.Load(args[1]);
+MethodDef M(string t, string n) => module.GetTypes().Single(x => x.FullName == t).Methods.Single(x => x.Name == n);
+var scope = new AssemblyRefUser(helper.Assembly.Name, helper.Assembly.Version, new PublicKeyToken(), helper.Assembly.Culture);
+var boss = new TypeRefUser(module, "HYJS.ActivitySafety", "BossMerged", scope);
+var recharge = new TypeRefUser(module, "HYJS.ActivitySafety", "RechargeDisplay", scope);
+var callback = M("UI.UIActivityBattleRace", "MsgCallback");
+var intercept = new MemberRefUser(module, "Intercept", MethodSig.CreateStatic(module.CorLibTypes.Boolean, callback.DeclaringType.ToTypeSig(), callback.MethodSig.Params[0], module.CorLibTypes.Boolean), boss);
+var start = callback.Body.Instructions[0];
+var prefix = new[] { Instruction.Create(OpCodes.Ldarg_0), Instruction.Create(OpCodes.Ldarg_1), Instruction.Create(OpCodes.Ldarg_2), Instruction.Create(OpCodes.Call, intercept), Instruction.Create(OpCodes.Brfalse, start), Instruction.Create(OpCodes.Ret) };
+for (int i = 0; i < prefix.Length; i++) callback.Body.Instructions.Insert(i, prefix[i]);
+callback.Body.MaxStack = Math.Max(callback.Body.MaxStack, (ushort)3); callback.Body.KeepOldMaxStack = true;
+var set = M("UI.AcRechargeSingleItem", "SetActivityItem");
+var apply = new MemberRefUser(module, "Apply", MethodSig.CreateStatic(module.CorLibTypes.Void, set.DeclaringType.ToTypeSig(), set.MethodSig.Params[0]), recharge);
+var ret = set.Body.Instructions.Single(i => i.OpCode == OpCodes.Ret);
+ret.OpCode = OpCodes.Ldarg_0; ret.Operand = null;
+set.Body.Instructions.Add(Instruction.Create(OpCodes.Ldarg_1)); set.Body.Instructions.Add(Instruction.Create(OpCodes.Call, apply)); set.Body.Instructions.Add(Instruction.Create(OpCodes.Ret));
+set.Body.MaxStack = Math.Max(set.Body.MaxStack, (ushort)2); set.Body.KeepOldMaxStack = true;
+var options = new ModuleWriterOptions(module); options.MetadataOptions.Flags |= MetadataFlags.PreserveAll | MetadataFlags.KeepOldMaxStack;
+module.Write(args[2], options);

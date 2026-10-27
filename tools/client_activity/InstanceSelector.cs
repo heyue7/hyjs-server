@@ -86,6 +86,13 @@ namespace HYJS.ActivitySafety
                 originalScale = adjustedTemplate.localScale;
                 originalPosition = adjustedTemplate.localPosition;
             }
+            if ((type == ActivityType.PrizeTask || type == ActivityType.PrizeBoss) && template is UIActivityBattleRace)
+            {
+                BossMerged merged = template.GetComponent<BossMerged>();
+                if (merged == null) merged = template.gameObject.AddComponent<BossMerged>();
+                merged.StartMerge((UIActivityBattleRace)template, list, id);
+                return;
+            }
             UILabel[] labels = template.GetComponentsInChildren<UILabel>(true);
             if (labels.Length == 0) labels = owner.GetComponentsInChildren<UILabel>(true);
             if (labels.Length == 0) return;
@@ -146,4 +153,130 @@ namespace HYJS.ActivitySafety
             finally { switching = false; }
         }
     }
+    public static class RechargeDisplay
+    {
+        public static void Apply(AcRechargeSingleItem row, ActivityItem item)
+        {
+            if (row == null || item == null || row.type != ActivityType.RechargeTotal) return;
+            decimal value;
+            if (!Decimal.TryParse(item.value, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out value)) return;
+            row.labTitle.text = String.Format(TableTextBlo.GetText("ChargeTotal_award_rmb_num"), (value / 100m).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture));
+            row.labLeftTimes.text = (item.left / 100m).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture) + "/" + (item.total / 100m).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+        }
+    }
+
+    public sealed class BossMerged : MonoBehaviour
+    {
+        const BindingFlags F = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
+        UIActivityBattleRace view; readonly List<string> ids = new List<string>();
+        readonly Dictionary<string, List<ActivityItem>> data = new Dictionary<string, List<ActivityItem>>();
+        readonly Dictionary<string, SCActivityInfo> infos = new Dictionary<string, SCActivityInfo>();
+        int generation; bool running;
+        static object Get(object o, string n) { return o.GetType().GetField(n, F).GetValue(o); }
+        bool Live(int stamp) { return stamp == generation && view != null && view.gameObject.activeInHierarchy && Get(view, "activity") != null; }
+        public void StartMerge(UIActivityBattleRace v, List<ActivityTab> tabs, string initial)
+        {
+            if (running) return;
+            bool retry = view == v && ids.Count > 0;
+            view = v; ids.Clear(); data.Clear(); infos.Clear();
+            foreach (ActivityTab tab in tabs) if (!ids.Contains(tab.activityId)) ids.Add(tab.activityId);
+            generation++; running = true;
+            // Initial Show has already sent its request; an in-place retry must send its own.
+            if (retry) Request(ids[0], generation);
+        }
+        void OnDisable() { generation++; running = false; data.Clear(); ids.Clear(); infos.Clear(); }
+        public static bool Intercept(UIActivityBattleRace v, NetWork.Packets.Packet p, bool ok)
+        {
+            BossMerged m = v == null ? null : v.GetComponent<BossMerged>();
+            if (m == null) return false;
+            if (m.running) m.Receive(p, ok, m.generation); return true;
+        }
+        void Receive(NetWork.Packets.Packet packet, bool ok, int stamp)
+        {
+            if (!Live(stamp)) return;
+            SCActivityInfo info = ok && packet != null ? packet.kBody as SCActivityInfo : null;
+            if (info == null || !ids.Contains(info.activityId)) { running = false; BoxManager.CreatePopupTextBox("活动加载失败，请重新打开", 0f); return; }
+            data[info.activityId] = info.itemList; infos[info.activityId] = info;
+            foreach (string id in ids) if (!data.ContainsKey(id)) { Request(id, stamp); return; }
+            Draw(stamp);
+        }
+        void Request(string id, int stamp)
+        {
+            CSActivityInfo request = new CSActivityInfo(); request.activityId = id;
+            if (!NetAPI.SendHttp(57007, request, delegate(NetWork.Packets.Packet p, bool ok) { Receive(p, ok, stamp); }))
+            { running = false; BoxManager.CreatePopupTextBox("活动加载失败，请重新打开", 0f); }
+        }
+        void Refresh(List<ActivityItem> ignored)
+        {
+            if (!Live(generation)) return;
+            data.Clear(); infos.Clear(); generation++; running = true; Request(ids[0], generation);
+        }
+        void Draw(int stamp)
+        {
+            if (!Live(stamp)) return;
+            long earliest = Int64.MaxValue, latest = Int64.MinValue;
+            float offset = 0f; bool firstHeading = true;
+            foreach (string id in ids)
+            {
+                SCActivityInfo info = infos[id];
+                if (info.startTime > 0 && info.endTime > info.startTime)
+                { earliest = Math.Min(earliest, info.startTime); latest = Math.Max(latest, info.endTime); }
+            }
+            UILabel activityTime = (UILabel)Get(view, "activityTime");
+            activityTime.text = earliest == Int64.MaxValue ? "" :
+                ServerTimerTool.Java2CSTimeLocale(earliest).ToString("M月d日HH:mm:ss") + "至" +
+                ServerTimerTool.Java2CSTimeLocale(latest).ToString("M月d日HH:mm:ss");
+            SimpleGrid grid = (SimpleGrid)Get(view, "simpleGrid");
+            GameObject single = (GameObject)Get(view, "vsGetItem"), multi = (GameObject)Get(view, "multiItem");
+            UIScrollView scroll = (UIScrollView)Get(view, "scrollView");
+            foreach (GameObject child in new List<GameObject>(grid.childs)) UnityEngine.Object.Destroy(child);
+            grid.childs.Clear();
+            typeof(UIActivityBattleRace).GetMethod("ResetCanGetNum", F).Invoke(view, null);
+            foreach (string id in ids)
+            {
+                SCActivityInfo info = infos[id];
+                if (info.endTime > info.startTime)
+                {
+                    DateTime start = ServerTimerTool.Java2CSTimeLocale(info.startTime);
+                    DateTime end = ServerTimerTool.Java2CSTimeLocale(info.endTime);
+                    long duration = info.endTime - info.startTime;
+                    string name = duration <= 86400000L ? "每日奖励  " : duration <= 604800000L && duration >= 518400000L ? "每周奖励  " : "";
+                    UILabel style = (UILabel)Get(view, "topTips");
+                    GameObject heading = (GameObject)UnityEngine.Object.Instantiate(style.gameObject);
+                    heading.name = "HYJSBossGroupHeading";
+                    foreach (MonoBehaviour component in heading.GetComponents<MonoBehaviour>())
+                        if (component != null && component.GetType().Name == "TextKit") UnityEngine.Object.DestroyImmediate(component);
+                    UILabel label = heading.GetComponent<UILabel>();
+                    label.leftAnchor.target = null; label.rightAnchor.target = null; label.topAnchor.target = null; label.bottomAnchor.target = null;
+                    string window = start.ToString("M月d日 HH:mm:ss") + " - " + end.ToString("M月d日 HH:mm:ss");
+                    if (info.param != "1")
+                    {
+                        DateTime deadline = ServerTimerTool.Java2CSTimeLocale(info.rewardEndTime);
+                        window = String.Format(TableTextBlo.GetText("getReward_DeadTime"), deadline.ToString("M月d日 HH:mm:ss"));
+                    }
+                    label.text = name + window;
+                    label.height = 32; label.maxLineCount = 1; label.overflowMethod = UILabel.Overflow.ShrinkContent;
+                    heading.SetActive(true); grid.AddChild(heading, 1f);
+                    // The native row origin is near its bottom; retain the first header's
+                    // original cell baseline, compress later header gaps to 32 units.
+                    if (!firstHeading) offset -= Math.Max(0f, grid.cellHeight - 32f);
+                    heading.transform.localPosition = new Vector3(0f, -offset, 0f); offset += grid.cellHeight;
+                    firstHeading = false;
+                }
+                foreach (ActivityItem item in data[id])
+                {
+                    GameObject go = (GameObject)UnityEngine.Object.Instantiate(item.rewardList.Count > 1 ? multi : single);
+                    go.SetActive(true); grid.AddChild(go, 1f);
+                    go.transform.localPosition = new Vector3(0f, -offset, 0f); offset += grid.cellHeight;
+                    VsGetItem row = go.GetComponent<VsGetItem>(); row.type = view.type;
+                    row.m_update = Refresh;
+                    row.m_addNum = delegate { typeof(UIActivityBattleRace).GetMethod("AddCanGetNum", F).Invoke(view, null); };
+                    if (item.rewardList.Count > 1) row.SetActivityMultiItem(item, id); else row.SetActivityItem(item, id);
+                }
+            }
+            typeof(UIActivityBattleRace).GetMethod("SetRedByNum", F).Invoke(view, null);
+            single.SetActive(false); multi.SetActive(false); scroll.enabled = grid.childs.Count >= 3; scroll.ResetPosition();
+        }
+    }
+
 }

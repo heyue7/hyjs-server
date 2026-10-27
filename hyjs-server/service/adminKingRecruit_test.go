@@ -157,7 +157,7 @@ func TestAdminKingRecruitOnceRepeatOwnershipAndCounters(t *testing.T) {
 			if _, err := f.s.warriorRecruit(bound, f.id, p2Recruit(1, 0), 95101); err != nil {
 				t.Fatal(err)
 			}
-			priorWorld := adminKingInfo(t, f, bound).GetSpace()
+			adminKingInfo(t, f, bound)
 			reuseClockDay(t, f, actor)
 			bound = serverClockBindTest(t, f, f.id)
 			info := adminKingInfo(t, f, bound)
@@ -167,12 +167,10 @@ func TestAdminKingRecruitOnceRepeatOwnershipAndCounters(t *testing.T) {
 				}
 				return
 			}
-			wantLuck := int32(0)
-			if info.GetSpace() == priorWorld {
-				wantLuck = 10
-			}
+			// The permanent shared balance survives a date and world change.
+			wantLuck := int32(10)
 			if info.GetOn() != 1 || info.GetLuck() != wantLuck {
-				t.Fatal("repeat occurrence did not retain its own world luck", info)
+				t.Fatal("repeat occurrence did not retain shared luck", info)
 			}
 			if _, err := f.s.warriorRecruit(bound, f.id, p2Recruit(1, 0), 95102); err != nil {
 				t.Fatal(err)

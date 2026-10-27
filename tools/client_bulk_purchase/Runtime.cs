@@ -257,16 +257,18 @@ namespace HYJS.BulkPurchase
         static void CostIcon(BuyShopItem view, UISprite target, string id)
         {
             Transform existing = target.transform.Find("BulkResourceIcon");
-            if (existing != null) existing.gameObject.SetActive(id == "item_9710");
+            if (existing != null) existing.gameObject.SetActive(false);
+            Transform credit = target.transform.Find("GGOCreditCostIcon");
+            if (credit != null) credit.gameObject.SetActive(id == "item_9710");
             if (id == "item_9710")
             {
+                Type shop = Type.GetType("HYJS.GGO.GGOShop, SoulFlowerGGOShop", false);
+                MethodInfo bind = shop == null ? null : shop.GetMethod("BindCreditIcon", BindingFlags.Public | BindingFlags.Static);
+                if (bind != null) { try { bind.Invoke(null, new object[] { target }); return; } catch (Exception error) { Debug.LogWarning("Credit icon fallback: " + error.GetType().Name); } }
                 CommonIcon icon = existing == null ? CommonMethod.CreateCommonIcon(target.transform) : existing.GetComponent<CommonIcon>();
-                icon.gameObject.name = "BulkResourceIcon";
-                icon.transform.localPosition = Vector3.zero;
-                icon.transform.localScale = Vector3.one * (Math.Max(1, Math.Min(target.width, target.height)) / 128f);
-                icon.SetData(id, false, -1, null);
-                target.enabled = false;
-                return;
+                icon.gameObject.name = "BulkResourceIcon"; icon.gameObject.SetActive(true);
+                icon.transform.localPosition = Vector3.zero; icon.transform.localScale = Vector3.one * (Math.Max(1, Math.Min(target.width, target.height)) / 128f);
+                icon.SetData(id, false, -1, null); target.enabled = false; return;
             }
             target.enabled = true;
             if (id != "unionFightToken") { Invoke(view, "UpdatePriceIcon", target, id); return; }

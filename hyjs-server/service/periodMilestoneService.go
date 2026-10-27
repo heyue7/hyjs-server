@@ -3,6 +3,7 @@ package service
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"math"
 	"strconv"
 	"time"
@@ -15,8 +16,9 @@ import (
 
 // p1PeriodMilestone keeps each original reward threshold in the frozen period contract.
 type p1PeriodMilestone struct {
-	Goal    int64  `json:"goal"`
-	Rewards string `json:"rewards"`
+	Goal      int64  `json:"goal"`
+	Rewards   string `json:"rewards"`
+	SourceKey string `json:"sourceKey,omitempty"`
 }
 
 func p1PeriodMilestones(cfg db.PeriodInstance) []p1PeriodMilestone {
@@ -34,7 +36,10 @@ func (s *GameService) validateP1Milestones(cfg db.PeriodInstance) error {
 		return errors.New("活动奖励档数无效")
 	}
 	previous := int64(0)
-	for _, tier := range tiers {
+	for index, tier := range tiers {
+		if tier.SourceKey != "" && (index >= 5 || tier.SourceKey != activity77PeriodSource(cfg.ID, index)) {
+			return errors.New("活动奖励来源无效")
+		}
 		if tier.Goal <= previous || tier.Goal > math.MaxInt32 {
 			return errors.New("活动目标须依次递增")
 		}
@@ -55,7 +60,11 @@ func (s *GameService) validateP1Milestones(cfg db.PeriodInstance) error {
 
 func p1PeriodSources(cfg db.PeriodInstance) []string {
 	out := []string{}
-	for index := range p1PeriodMilestones(cfg) {
+	for index, tier := range p1PeriodMilestones(cfg) {
+		if tier.SourceKey != "" {
+			out = append(out, tier.SourceKey)
+			continue
+		}
 		identity := cfg.ID
 		if cfg.RewardSourceID != "" {
 			identity = cfg.RewardSourceID
@@ -124,4 +133,8 @@ func (s *GameService) p1PeriodItems(tx *gorm.DB, playerID int64, progress *db.Pe
 		deliveries = append(deliveries, delivery)
 	}
 	return items, deliveries, nil
+}
+
+func activity77PeriodSource(id string, index int) string {
+	return fmt.Sprintf("activity:77:%s:tier:%d", p6Digest([]byte(id))[:32], index+1)
 }

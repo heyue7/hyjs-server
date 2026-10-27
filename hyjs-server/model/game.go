@@ -153,6 +153,8 @@ type EquipmentStarReceipt struct {
 	Response  *pb.SCEquipStar `json:"response"`
 }
 type FieldState struct {
+	// TownRecoveryAt records the real return time; HP is settled once on departure.
+	TownRecoveryAt int64 `json:"town_recovery_at,omitempty"`
 	// Marks the day namespace after one conservative legacy projection.
 	LifeCalendar75 bool                          `json:"life_calendar75,omitempty"`
 	Scene          string                        `json:"scene"`

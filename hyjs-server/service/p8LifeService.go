@@ -321,6 +321,11 @@ func (s *GameService) p8SafeZone(g *model.GameState) (bool, error) {
 
 // RefreshP8Survival 按原安全区矩形恢复血量，记录首次死亡及恢复时钟，退出区域不累积恢复。
 func (s *GameService) RefreshP8Survival(tx *gorm.DB, p *pb.Player, g *model.GameState, now time.Time) ([]proto.Message, error) {
+	// Town recovery is recorded only by a successful transfer. Passive town
+	// requests must neither move its baseline nor write the survival clock.
+	if p8TownScene(g.Position.GetScene()) {
+		return nil, nil
+	}
 	// Passive queries remain successful; only their HP/revive clock side effects
 	// pause while PK owns the side. Real DB failures still propagate.
 	if paused, err := s.pauseP12FieldPVPSurvival(tx, p.GetPlayerId(), now); err != nil {

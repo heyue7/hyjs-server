@@ -282,6 +282,7 @@ func (s *GameService) refreshField(id int64, g *model.GameState) error {
 func (s *GameService) fieldTransfer(ctx context.Context, id int64, b *pb.CSTransferScene) ([]proto.Message, error) {
 	var resolved *pb.PointNew
 	err := updateProfileWithTx(ctx, id, func(tx *gorm.DB, player *pb.Player, g *model.GameState) error {
+		previousScene := g.Position.GetScene()
 		if s.P12FieldPVPReady {
 			allowed, err := ShouldAllowP12PrisonTransfer(tx, id, b.GetTarget(), b.GetPoint(), time.Now())
 			if err != nil {
@@ -312,6 +313,14 @@ func (s *GameService) fieldTransfer(ctx context.Context, id int64, b *pb.CSTrans
 		}
 		if s.P8GatherReady {
 			if err := s.P8CancelGather(tx, id, g); err != nil {
+				return err
+			}
+		}
+		transferTime := time.Now()
+		if s.P8LifeReady && p8TownScene(b.GetTarget()) && !p8TownScene(previousScene) {
+			// Settle the old field-safe interval before changing its position.
+			// A rejected destination still rolls this back with the transfer.
+			if _, err := s.RefreshP8Survival(tx, player, g, transferTime); err != nil {
 				return err
 			}
 		}
@@ -368,11 +377,28 @@ func (s *GameService) fieldTransfer(ctx context.Context, id int64, b *pb.CSTrans
 		default:
 			return errors.New("This field scene is not available yet")
 		}
+		if s.P8LifeReady {
+			if err := s.p8TownTransferRecovery(player, g, previousScene, b.GetTarget(), transferTime); err != nil {
+				return err
+			}
+		}
 		g.Position = &pb.Position{PlayerId: proto.Int64(id), Scene: proto.String(b.GetTarget()), Current: point}
 		g.PositionLoading = true
 		resolved = proto.Clone(point).(*pb.PointNew)
 		if s.P8LifeReady {
-			if _, err := s.RefreshP8Survival(tx, player, g, time.Now()); err != nil {
+			// A town interval is settled above. Start a fresh field-safe clock
+			// so that the same elapsed interval cannot heal a second time.
+			if g.Field != nil && p8TownScene(previousScene) != p8TownScene(b.GetTarget()) {
+				life, err := p8LifeState(tx, id)
+				if err != nil {
+					return err
+				}
+				life.InSafe, life.SafeRecoveryAt = false, transferTime.UnixMilli()
+				if err = tx.Save(life).Error; err != nil {
+					return err
+				}
+			}
+			if _, err := s.RefreshP8Survival(tx, player, g, transferTime); err != nil {
 				return err
 			}
 		}

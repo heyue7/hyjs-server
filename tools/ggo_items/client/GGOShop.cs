@@ -18,6 +18,7 @@ namespace HYJS.GGO
         ShopPage shop;
         GameObject entry, content;
         TabScoreShop layout;
+        float scoreCellHeight; Vector3 scoreGridPosition;
         UILabel balanceLabel;
         TopBarItem balanceItem;
         UITexture balanceIcon;
@@ -125,7 +126,7 @@ namespace HYJS.GGO
             content = (GameObject)typeof(ShopPage).GetMethod("GetRightTab", Flags).Invoke(shop, new object[] { "ShopInnerPage/ScoreShop" });
             layout = content.GetComponent<TabScoreShop>();
             if (layout == null) { UnityEngine.Object.Destroy(content); content = null; return; }
-            layout.enabled = false;
+            layout.enabled = false; scoreCellHeight = layout.simpleGrid.cellHeight; scoreGridPosition = layout.simpleGrid.transform.localPosition;
             foreach (GameObject child in new List<GameObject>(layout.simpleGrid.childs)) UnityEngine.Object.Destroy(child);
             layout.simpleGrid.childs.Clear(); rows.Clear();
             Field(typeof(ShopPage), "curTab").SetValue(shop, content);
@@ -268,6 +269,27 @@ namespace HYJS.GGO
             balanceIcon.depth = nativeIcon.depth + 1;
             balanceIcon.color = Color.white;
             nativeIcon.spriteName = ""; nativeIcon.enabled = true;
+        }
+        public static void BindCreditIcon(UISprite nativeIcon)
+        {
+            if (nativeIcon == null) return;
+            if (balanceTexture == null)
+            {
+                balanceTexture = new Texture2D(2, 2, TextureFormat.ARGB32, false);
+                using (System.IO.Stream stream = typeof(GGOShop).Assembly.GetManifestResourceStream("credit_hud.png"))
+                {
+                    byte[] bytes = new byte[stream.Length]; stream.Read(bytes, 0, bytes.Length); balanceTexture.LoadImage(bytes);
+                }
+                balanceTexture.filterMode = FilterMode.Bilinear;
+            }
+            Transform child = nativeIcon.transform.Find("GGOCreditCostIcon");
+            GameObject go = child == null ? new GameObject("GGOCreditCostIcon") : child.gameObject;
+            go.layer = nativeIcon.gameObject.layer; go.transform.parent = nativeIcon.transform;
+            go.transform.localPosition = Vector3.zero; go.transform.localScale = Vector3.one;
+            UITexture icon = go.GetComponent<UITexture>(); if (icon == null) icon = go.AddComponent<UITexture>();
+            icon.mainTexture = balanceTexture; icon.width = Math.Max(1, nativeIcon.width); icon.height = Math.Max(1, nativeIcon.height);
+            icon.depth = nativeIcon.depth + 1; icon.color = Color.white; go.SetActive(true);
+            nativeIcon.enabled = false;
         }
         void SetNotice(string text)
         {
@@ -605,18 +627,33 @@ namespace HYJS.GGO
             }
             foreach (GameObject child in new List<GameObject>(layout.simpleGrid.childs)) UnityEngine.Object.Destroy(child);
             layout.simpleGrid.childs.Clear(); rows.Clear();
+            TabMemoryShop memory = null;
+            try { GameObject memoryPage = AssetLoad.ResourceManager.Instance.LoadResource("ShopInnerPage/MemoryShop") as GameObject; memory = memoryPage == null ? null : memoryPage.GetComponent<TabMemoryShop>(); }
+            catch (Exception error) { Debug.LogWarning("Memory shop template unavailable: " + error.GetType().Name); }
+            bool hasMemory = memory != null && memory.shopItemPrefab != null && memory.shopItemPrefab.GetComponent<ShopMemoryItem>() != null;
+            layout.simpleGrid.cellHeight = hasMemory && memory.simpleGrid != null ? memory.simpleGrid.cellHeight : scoreCellHeight;
             foreach (JsonData product in catalogue["items"])
             {
-                GameObject clone = (GameObject)UnityEngine.Object.Instantiate(layout.shopItemPrefab);
+                GameObject clone = (GameObject)UnityEngine.Object.Instantiate(hasMemory ? memory.shopItemPrefab : layout.shopItemPrefab);
                 clone.name = "GGOProduct-" + (string)product["id"];
-                ShopScoreItem original = clone.GetComponent<ShopScoreItem>();
                 GGOProductRow row = clone.AddComponent<GGOProductRow>();
-                row.Bind(this, original, product, currency, currencyName);
-                // Removing the native handler makes legacy score purchase messages impossible on our rows.
-                UnityEngine.Object.DestroyImmediate(original);
+                ShopMemoryItem original = hasMemory ? clone.GetComponent<ShopMemoryItem>() : null;
+                if (original != null) { row.Bind(this, original, product, currency, currencyName); UnityEngine.Object.DestroyImmediate(original); }
+                else
+                {
+                    ShopScoreItem fallback = clone.GetComponent<ShopScoreItem>();
+                    if (fallback == null) { UnityEngine.Object.Destroy(clone); throw new Exception("shop item prefab unavailable"); }
+                    row.Bind(this, fallback, product, currency, currencyName); UnityEngine.Object.DestroyImmediate(fallback);
+                }
                 clone.SetActive(true); layout.simpleGrid.AddChild(clone, 1f); rows.Add(row);
             }
-            layout.simpleGrid.Reposition(); layout.scrollView.ResetPosition(); RefreshButtons();
+            layout.simpleGrid.Reposition();
+            layout.simpleGrid.transform.localPosition = scoreGridPosition;
+            layout.scrollView.ResetPosition();
+            // The score viewport begins above the memory footer; reserve the
+            // original memory refresh bar before displaying product cards.
+            if (refreshEnabled) layout.simpleGrid.transform.localPosition -= new Vector3(0f, 65f, 0f);
+            RefreshButtons();
         }
         void RefreshButtons()
         {
@@ -645,36 +682,46 @@ namespace HYJS.GGO
         GGOShop shop; string product, rewardID; int rewardAmount; long price, remaining;
         public string ProductID { get { return product; } }
         GameObject button, soldLabel; UILabel buttonLabel; bool available;
-        public void Bind(GGOShop owner, ShopScoreItem original, JsonData data, string currency, string currencyName)
+        public void Bind(GGOShop owner, ShopMemoryItem original, JsonData data, string currency, string currencyName)
         {
             shop = owner; product = (string)data["id"]; button = original.btnBuy;
+            RemoveTextKit(original.labName); RemoveTextKit(original.labPriceName); RemoveTextKit(original.labPrice);
             original.labName.text = (string)data["name"];
-            original.discountRoot.SetActive(false); original.twoCostRoot.SetActive(false); original.oneCostRoot.SetActive(true);
-            original.labCostName.text = currencyName; original.labPrice.text = data["price"].ToString();
+            original.labPriceName.text = currencyName; original.labPrice.text = data["price"].ToString();
             soldLabel = original.labBuyed;
             UILabel soldText = soldLabel.GetComponent<UILabel>(); RemoveTextKit(soldText); if (soldText != null) soldText.text = "已兑换";
             buttonLabel = button.GetComponentInChildren<UILabel>(); RemoveTextKit(buttonLabel);
             remaining = Int64.Parse(data["remaining"].ToString()); price = Int64.Parse(data["price"].ToString());
             rewardID = (string)data["resourceId"]; rewardAmount = Int32.Parse(data["amount"].ToString()); available = remaining != 0 && price > 0 && rewardAmount > 0;
-            GameObject limitObject = (GameObject)UnityEngine.Object.Instantiate(original.labName.gameObject);
-            limitObject.name = "GGORemaining"; limitObject.transform.parent = transform;
-            limitObject.transform.localScale = Vector3.one; limitObject.transform.localRotation = Quaternion.identity;
-            UILabel limit = limitObject.GetComponent<UILabel>();
-            limit.pivot = UIWidget.Pivot.Left; limit.alignment = NGUIText.Alignment.Left;
-            limit.fontSize = 18; limit.width = 150; limit.height = 24; limit.maxLineCount = 1; limit.overflowMethod = UILabel.Overflow.ShrinkContent;
-            limit.text = remaining < 0 ? "不限购" : "剩余 " + remaining;
-            limitObject.transform.localPosition = new Vector3(-142f, -48f, 0f); limitObject.SetActive(true);
             NGUITools.DestroyChildren(original.iconRoot.transform);
             CommonIcon reward = CommonMethod.CreateCommonIcon(original.iconRoot.transform);
             reward.SetData((string)data["resourceId"], true, Int32.Parse(data["amount"].ToString()), null);
-            original.costLogo.enabled = false;
-            CommonIcon cost = CommonMethod.CreateCommonIcon(original.costLogo.transform);
-            cost.transform.localScale = Vector3.one * (Math.Min(original.costLogo.width, original.costLogo.height) / 128f);
-            cost.SetData(currency, false, -1, null);
+            GGOShop.BindCreditIcon(original.costLogo);
             foreach (UIButtonMessage old in button.GetComponents<UIButtonMessage>()) UnityEngine.Object.DestroyImmediate(old);
             UIEventListener.Get(button).onClick = null;
             UIButton uiButton = button.GetComponent<UIButton>();
             if (uiButton != null) { uiButton.onClick.Clear(); EventDelegate.Set(uiButton.onClick, OnBuyBtn); }
+            else UIEventListener.Get(button).onClick = delegate(GameObject ignored) { OnBuyBtn(); };
+            SetBusy(false);
+        }
+        public void Bind(GGOShop owner, ShopScoreItem original, JsonData data, string currency, string currencyName)
+        {
+            shop = owner; product = (string)data["id"]; button = original.btnBuy;
+            RemoveTextKit(original.labName); RemoveTextKit(original.labCostName); RemoveTextKit(original.labPrice);
+            original.labName.text = (string)data["name"]; original.discountRoot.SetActive(false);
+            original.twoCostRoot.SetActive(false); original.oneCostRoot.SetActive(true);
+            original.labCostName.text = currencyName; original.labPrice.text = data["price"].ToString();
+            soldLabel = original.labBuyed; UILabel sold = soldLabel.GetComponent<UILabel>(); RemoveTextKit(sold); if (sold != null) sold.text = "已兑换";
+            buttonLabel = button.GetComponentInChildren<UILabel>(); RemoveTextKit(buttonLabel);
+            remaining = Int64.Parse(data["remaining"].ToString()); price = Int64.Parse(data["price"].ToString());
+            rewardID = (string)data["resourceId"]; rewardAmount = Int32.Parse(data["amount"].ToString()); available = remaining != 0 && price > 0 && rewardAmount > 0;
+            NGUITools.DestroyChildren(original.iconRoot.transform);
+            CommonIcon reward = CommonMethod.CreateCommonIcon(original.iconRoot.transform); reward.SetData(rewardID, true, rewardAmount, null);
+            GGOShop.BindCreditIcon(original.costLogo);
+            foreach (UIButtonMessage old in button.GetComponents<UIButtonMessage>()) UnityEngine.Object.DestroyImmediate(old);
+            UIEventListener.Get(button).onClick = null;
+            UIButton ui = button.GetComponent<UIButton>();
+            if (ui != null) { ui.onClick.Clear(); EventDelegate.Set(ui.onClick, OnBuyBtn); }
             else UIEventListener.Get(button).onClick = delegate(GameObject ignored) { OnBuyBtn(); };
             SetBusy(false);
         }

@@ -50,6 +50,7 @@ func run() error {
 		testPayments        = flag.Bool("enable-test-payments", false, "enable loopback-only demo payment confirmation")
 		applyGrowth         = flag.Bool("apply-growth74", false, "apply the authorized growth configuration during maintenance, then exit")
 		applyGrowth75       = flag.Bool("apply-growth75", false, "apply audited publication, clock repair and growth75 economy during maintenance, then exit")
+		applyActivity77     = flag.Bool("apply-activity77", false, "apply reviewed activity, welfare and shop repairs during maintenance, then exit")
 		restoreVIP10        = flag.Bool("restore-vip10-book", false, "restore the audited VIP10 book product during maintenance, then exit")
 		previewCalendar     = flag.Bool("preview-activity-calendar", false, "read the activity calendar restore candidate as JSON, then exit")
 		restoreCalendar     = flag.String("restore-activity-calendar", "", "apply the reviewed calendar restore request during maintenance, then exit")
@@ -60,7 +61,7 @@ func run() error {
 	)
 	flag.Parse()
 	maintenanceCommands := 0
-	for _, selected := range []bool{*applyGrowth, *applyGrowth75, *restoreVIP10, *warmRushPlayer != 0, *previewCalendar, *restoreCalendar != "", *calendarMaintenance != ""} {
+	for _, selected := range []bool{*applyGrowth, *applyGrowth75, *applyActivity77, *restoreVIP10, *warmRushPlayer != 0, *previewCalendar, *restoreCalendar != "", *calendarMaintenance != ""} {
 		if selected {
 			maintenanceCommands++
 		}
@@ -138,6 +139,11 @@ func run() error {
 	}
 	defer sqlDB.Close()
 	s := &service.GameService{Host: cfg.AdvertiseHost, ServerID: cfg.ServerID}
+	if *applyActivity77 {
+		if err = s.CheckActivity77Maintenance(ctx); err != nil {
+			return err
+		}
+	}
 	if *applyGrowth75 {
 		if err = s.CheckGrowth75Maintenance(ctx); err != nil {
 			return err
@@ -567,6 +573,9 @@ func run() error {
 	}
 	if *applyGrowth75 {
 		return s.ApplyGrowth75(ctx)
+	}
+	if *applyActivity77 {
+		return s.ApplyActivity77(ctx)
 	}
 	httpListener, err := net.Listen("tcp", net.JoinHostPort(cfg.Bind, strconv.Itoa(cfg.HTTPPort)))
 	if err != nil {

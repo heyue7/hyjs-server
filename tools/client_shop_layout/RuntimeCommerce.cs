@@ -16,12 +16,19 @@ namespace HYJS.Feedback66
    if(row==null || item==null || !(owner is ShopPopularityItem || owner is ShopPointItem)) return;
    Transform previous=row.transform.Find("DailyQuota66");
    if(item.condition!=null && item.condition.type=="rank") { if(previous!=null) previous.gameObject.SetActive(false); return; }
-   UILabel style=Get(owner,"labName") as UILabel;
+   ShopProductItem nativeItem = null;
+   try {
+    GameObject itemShop = AssetLoad.ResourceManager.Instance.LoadResource("ShopInnerPage/ItemShop") as GameObject;
+    TabItemShop nativeShop = itemShop == null ? null : itemShop.GetComponent<TabItemShop>();
+    nativeItem = nativeShop == null || nativeShop.shopItemPrefab == null ? null : nativeShop.shopItemPrefab.GetComponent<ShopProductItem>();
+   } catch (Exception error) { Debug.LogWarning("Item shop label unavailable: " + error.GetType().Name); }
+   UILabel style = nativeItem == null ? Get(owner,"labName") as UILabel : nativeItem.labLeftBuyTimes;
+   if (style == null) style = Get(owner,"labName") as UILabel;
    GameObject button=Get(owner,"btnBuy") as GameObject;
    GameObject icon=Get(owner,"iconRoot") as GameObject;
    if(style==null || button==null || icon==null) return;
    // Original popularity/point cards have direct sibling widgets in row-local units.
-   if(style.transform.parent!=row.transform || button.transform.parent!=row.transform || icon.transform.parent!=row.transform) return;
+   if(button.transform.parent!=row.transform || icon.transform.parent!=row.transform) return;
    UILabel label;
    if(previous==null)
    {
@@ -30,6 +37,8 @@ namespace HYJS.Feedback66
     clone.transform.localRotation=Quaternion.identity; clone.transform.localScale=Vector3.one;
     foreach(Collider collider in clone.GetComponents<Collider>()) UnityEngine.Object.Destroy(collider);
     label=clone.GetComponent<UILabel>();
+    foreach(MonoBehaviour component in clone.GetComponents<MonoBehaviour>())
+     if(component != null && component.GetType().Name == "TextKit") UnityEngine.Object.DestroyImmediate(component);
    }
    else label=previous.GetComponent<UILabel>();
    if(label==null) return;
@@ -38,12 +47,12 @@ namespace HYJS.Feedback66
    float left=-146f;
    label.leftAnchor.target=null; label.rightAnchor.target=null; label.topAnchor.target=null; label.bottomAnchor.target=null;
    label.pivot=UIWidget.Pivot.Left; label.alignment=NGUIText.Alignment.Left;
-   label.fontSize=Math.Min(style.fontSize,24); label.maxLineCount=1;
+   label.fontSize=style.fontSize; label.maxLineCount=1;
    label.width=Math.Max(1,(int)(action.x-65f-left-10f)); label.height=Math.Max(30,label.fontSize+6);
    label.overflowMethod=UILabel.Overflow.ShrinkContent;
    label.text="今日剩余 "+Math.Max(0,item.dayLeftTimes)+"/"+Math.Max(0,item.dayTotalTimes);
    // Apply position last: UILabel geometry setters may move cloned widgets.
-   label.transform.localPosition=new Vector3(left,action.y,style.transform.localPosition.z);
+   label.transform.localPosition=new Vector3(left,action.y,0f);
    label.gameObject.SetActive(item.dayTotalTimes>0);
   }
  }
