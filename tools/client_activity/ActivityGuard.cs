@@ -113,6 +113,22 @@ namespace HYJS.ActivitySafety
             Empty(Panel(page), reason);
         }
 
+        // A closed built-in kitchen still has an original navigation tab. Only
+        // its current callback may replace the template with the shared empty state.
+        public static bool PrepareKitchenResponse(UIActivityAsunaKitchen page, Packet packet, bool success)
+        {
+            if (page == null || !page.gameObject.activeInHierarchy) return false;
+            UIActivityPanel panel = null;
+            for (Transform parent = page.transform; parent != null && panel == null; parent = parent.parent)
+                panel = parent.GetComponent<UIActivityPanel>();
+            if (panel == null || Current(panel) != page) return false;
+            SCStaminaRefill response = packet == null ? null : packet.kBody as SCStaminaRefill;
+            if (success && response != null && response.dataList != null && response.dataList.Count >= 2 &&
+                response.dataList[0] != null && response.dataList[1] != null) return true;
+            Empty(panel, "daily kitchen not open or missing two original windows");
+            return false;
+        }
+
         public static bool PrepareResponse(UIActivity page, Packet packet, bool success)
         {
             if (page == null || !page.gameObject.activeInHierarchy) return false;
