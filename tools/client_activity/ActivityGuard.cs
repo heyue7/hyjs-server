@@ -86,8 +86,7 @@ namespace HYJS.ActivitySafety
                     label.bitmapFont = fonts[0].bitmapFont; label.trueTypeFont = fonts[0].trueTypeFont;
                     label.fontStyle = fonts[0].fontStyle; label.fontSize = 24;
                     label.width = 520; label.height = 100; label.pivot = UIWidget.Pivot.Center;
-                    Color color = fonts[0].color; color.a = 1f;
-                    label.alignment = NGUIText.Alignment.Center; label.color = color;
+                    label.alignment = NGUIText.Alignment.Center; label.color = Color.white;
                     label.depth = depth + 5; label.text = "暂无开放活动";
                     Trace("empty-label created module=" + root.name + " active=" + root.gameObject.activeInHierarchy);
                 }
