@@ -106,8 +106,15 @@ if (ROOT / 'migration.json').exists():
     latest_backup = ROOT / 'backup-latest.json'
     previous_backup = (ROOT / 'backups' / json.loads(latest_backup.read_text())['file']
                        if latest_backup.exists() else ROOT / 'backups/initial-migration.sql.gz')
-    expected_backup_size = previous_backup.stat().st_size
-    assert shutil.disk_usage(ROOT).free > expected_backup_size * 2 + 400 * 1024 * 1024, 'Insufficient peak space for verified encrypted cutover backup'
+    if previous_backup.is_file():
+        required_backup_space = previous_backup.stat().st_size * 2
+    else:
+        # A previous snapshot may have been moved off-host. Use a conservative
+        # estimate for the new plaintext and encrypted snapshots, including hex dumps.
+        database_bytes = int(mysql("SELECT COALESCE(SUM(data_length + index_length), 0) FROM information_schema.tables WHERE table_schema=DATABASE();").strip())
+        assert database_bytes > 0, 'Cannot estimate database size for backup'
+        required_backup_space = database_bytes * 4
+    assert shutil.disk_usage(ROOT).free > required_backup_space + 400 * 1024 * 1024, 'Insufficient peak space for verified encrypted cutover backup'
 # Build before the maintenance window; MySQL and the old application stay live.
 shutil.copy2('/etc/ssl/certs/ca-certificates.crt', stage / 'ca-certificates.crt')
 old_image = subprocess.run(['docker', 'inspect', '--format={{.Image}}', 'hyjs-game'], capture_output=True, text=True).stdout.strip()

@@ -122,22 +122,29 @@ onBeforeUnmount(() => { generation++; recordGeneration++; });
 
 <template>
   <div class="terminal-workspace">
-    <div class="terminal-heading"><div><h2>蓝绿终端</h2><p class="ops-muted">{{ scope.currentServer?.name }} · 超频点数投放</p></div><NTag :bordered="false" type="info">按区服独立</NTag></div>
+    <h2 class="terminal-page-title">蓝绿终端</h2>
     <NTabs type="line" animated>
       <NTabPane name="settings" tab="终端设置">
         <div class="ops-toolbar mb-16px"><span class="ops-muted">{{ scope.currentServer?.name }} · 按区服保存</span><NButton :loading="loading" :disabled="busy || !!pending" @click="loadSettings">重新读取设置</NButton></div>
         <NAlert v-if="error" type="error" class="mb-16px">{{ error }}<template v-if="conflict"><br>设置已被更新。当前草稿保留，请重新读取后再修改。</template></NAlert>
         <NSpin :show="loading">
           <NForm v-if="draft" label-placement="top" :disabled="locked" @submit.prevent="saveSettings">
-            <div class="terminal-grid">
-              <NFormItem label="首次注册赠送（超频点数）"><NInputNumber v-model:value="draft.signupPoints" :min="0" :precision="0" class="w-full" /></NFormItem>
-              <NFormItem label="Burst Link！"><NSwitch v-model:value="draft.burstEnabled" /></NFormItem>
-              <NFormItem label="Burst 消耗（超频点数）"><NInputNumber v-model:value="draft.burstCostPoints" :min="0" :precision="0" class="w-full" /></NFormItem>
-              <NFormItem label="Burst 随机下限（超频点数）"><NInputNumber v-model:value="draft.burstMinPoints" :min="1" :precision="0" class="w-full" /></NFormItem>
-              <NFormItem label="Burst 随机上限（超频点数）"><NInputNumber v-model:value="draft.burstMaxPoints" :min="1" :precision="0" class="w-full" /></NFormItem>
-            </div>
-            <div class="ops-toolbar mb-12px"><strong>定期投放</strong><NButton v-if="canWrite" :disabled="locked" @click="addWeekly">添加规则</NButton></div>
-            <p class="ops-muted mb-16px">各行独立设置北京时间；到点后投放，当天重启会补本日。历史日期不追发，月末不存在的日期跳过。玩家看到的理由按原随机规则生成。</p>
+            <section class="terminal-section">
+              <div class="terminal-section-heading"><h3>注册赠送</h3></div>
+              <div class="terminal-single-field">
+                <NFormItem label="首次注册赠送（超频点数）"><NInputNumber v-model:value="draft.signupPoints" :min="0" :precision="0" class="w-full" /></NFormItem>
+              </div>
+            </section>
+            <section class="terminal-section">
+              <div class="terminal-section-heading"><h3>Burst Link！</h3><NFormItem label="启用" class="terminal-switch"><NSwitch v-model:value="draft.burstEnabled" /></NFormItem></div>
+              <div class="terminal-grid">
+                <NFormItem label="Burst 消耗（超频点数）"><NInputNumber v-model:value="draft.burstCostPoints" :min="0" :precision="0" class="w-full" /></NFormItem>
+                <NFormItem label="Burst 随机下限（超频点数）"><NInputNumber v-model:value="draft.burstMinPoints" :min="1" :precision="0" class="w-full" /></NFormItem>
+                <NFormItem label="Burst 随机上限（超频点数）"><NInputNumber v-model:value="draft.burstMaxPoints" :min="1" :precision="0" class="w-full" /></NFormItem>
+              </div>
+            </section>
+            <section class="terminal-section">
+              <div class="terminal-section-heading"><div><h3>定期投放</h3><p class="ops-muted">各行独立设置北京时间；到点后投放，当天重启会补本日。历史日期不追发，月末不存在的日期跳过。玩家看到的理由按原随机规则生成。</p></div><NButton v-if="canWrite" :disabled="locked" @click="addWeekly">添加规则</NButton></div>
             <NEmpty v-if="!draft.weekly.length" description="暂无定期投放规则" class="py-20px" />
             <div v-for="(rule, index) in draft.weekly" :key="rule.id" class="terminal-rule">
               <div class="terminal-rule-number">{{ index + 1 }}</div>
@@ -151,12 +158,13 @@ onBeforeUnmount(() => { generation++; recordGeneration++; });
               <NFormItem label="启用"><NSwitch v-model:value="rule.enabled" /></NFormItem>
               <NButton v-if="canWrite" :disabled="locked" quaternary type="error" @click="draft.weekly.splice(index, 1)">删除</NButton>
             </div>
+            </section>
             <div v-if="canWrite" class="ops-drawer-actions mt-16px"><NButton :disabled="locked" @click="cancelDraft">取消草稿</NButton><NButton type="primary" attr-type="submit" :loading="saving" :disabled="locked || conflict || !settingsDirty">保存整组设置</NButton></div>
           </NForm>
         </NSpin>
       </NTabPane>
       <NTabPane name="distribute" tab="单次全服投放">
-        <NAlert type="info" class="mb-20px">当前区服：{{ scope.currentServer?.name }}（{{ scope.serverId }}）。仅向本区服非保护账号的角色投放，包含离线角色；每服每账号 1 个角色，余额按区服独立。</NAlert>
+        <div class="terminal-scope"><span class="terminal-scope-label">投放区服</span><strong>{{ scope.currentServer?.name }}（{{ scope.serverId }}）</strong><p>向本区服非保护账号的角色投放，包含离线角色；每服每账号 1 个角色，余额按区服独立。</p></div>
         <NAlert v-if="settingsDirty && !pending" type="warning" class="mb-16px">请先保存或取消终端设置草稿，再提交投放。</NAlert>
         <NForm label-placement="top" :disabled="locked" class="terminal-distribute" @submit.prevent="confirmDistribution">
           <NFormItem label="每角色投放超频点数" required><NInputNumber v-model:value="points" :min="1" :precision="0" class="w-full" /></NFormItem>
@@ -178,13 +186,29 @@ onBeforeUnmount(() => { generation++; recordGeneration++; });
 </template>
 
 <style scoped>
+.terminal-workspace { max-width: 1120px; container-type: inline-size; }
+.terminal-page-title { display: none; margin: 0 0 16px; font-size: 18px; }
+.terminal-section { padding: 20px 0 4px; border-top: 1px solid rgb(var(--base-text-color) / .1); }
+.terminal-section-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
+.terminal-section-heading h3 { margin: 0; font-size: 15px; font-weight: 600; }
+.terminal-section-heading p { margin: 6px 0 0; line-height: 1.5; }
+.terminal-section-heading :deep(.terminal-switch) { margin: 0; }
+.terminal-section-heading :deep(.terminal-switch .n-form-item-blank) { min-height: 24px; }
+.terminal-single-field { max-width: 340px; }
 .terminal-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 20px; }
-.terminal-heading { display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; }
-.terminal-heading h2 { margin:0 0 4px; font-size:22px; line-height:1.4; }
-.terminal-heading p { margin:0; }
-.terminal-rule { display: grid; grid-template-columns: 26px minmax(110px,1fr) minmax(140px,1.2fr) 140px minmax(130px,1fr) 60px 60px; gap: 14px; align-items: center; padding:16px 0 0; border-top:1px solid var(--ops-border, rgba(128, 128, 128, .22)); }
-.terminal-rule-number { color:var(--ops-muted, #84909c); font-variant-numeric:tabular-nums; align-self:center; margin-top:-20px; }
-.terminal-rule :deep(.n-time-picker) { width:100%; }
+.terminal-rule { display: grid; grid-template-columns: 26px minmax(110px,1fr) minmax(140px,1.2fr) 140px minmax(130px,1fr) 60px 60px; gap: 14px; align-items: center; padding: 16px 0 0; border-top: 1px solid rgb(var(--base-text-color) / .1); }
+.terminal-rule-number { color: var(--ops-muted, #84909c); font-variant-numeric: tabular-nums; align-self: center; margin-top: -20px; }
+.terminal-rule :deep(.n-time-picker) { width: 100%; }
+.terminal-scope { max-width: 700px; margin-bottom: 24px; padding: 16px 18px; border: 1px solid rgb(var(--base-text-color) / .1); border-radius: 8px; }
+.terminal-scope-label { display: block; margin-bottom: 4px; opacity: .65; font-size: 12px; }
+.terminal-scope strong { font-size: 15px; }
+.terminal-scope p { margin: 8px 0 0; opacity: .75; line-height: 1.6; }
 .terminal-distribute { max-width: 560px; }
-@media (max-width: 700px) { .terminal-grid { grid-template-columns: 1fr; } .terminal-rule { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 12px; padding-bottom: 12px; } }
+@container (max-width: 800px) {
+  .terminal-page-title { display: block; }
+  .terminal-grid { grid-template-columns: 1fr; }
+  .terminal-rule { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 12px; padding-bottom: 12px; }
+  .terminal-rule-number { grid-column: 1 / -1; margin: 0 0 8px; }
+  .terminal-section-heading { flex-wrap: wrap; }
+}
 </style>
