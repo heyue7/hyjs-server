@@ -60,10 +60,12 @@ onMounted(load);
         </div>
         <OnlinePlayers />
         <NCard title="服务状态" :bordered="false" class="ops-panel">
-          <div v-if="auth.userInfo.roles.includes('admin')" class="ops-toolbar mb-16px">
+          <div v-if="auth.userInfo.roles.includes('admin')" class="service-controls">
             <span class="ops-muted">关服后拦截游戏登录并断开游戏连接，后台可继续使用。</span>
-            <NButton type="error" :disabled="controlBusy || (controlRequest && controlRequest.action !== 'server_stop') || (!controlRequest && overview.server.status === 'stopped')" :loading="controlBusy && controlRequest?.action === 'server_stop'" @click="control('server_stop')">{{ controlRequest?.action === 'server_stop' ? '重试关服' : '关服' }}</NButton>
-            <NButton type="primary" :disabled="controlBusy || (controlRequest && controlRequest.action !== 'server_start') || (!controlRequest && overview.server.status !== 'stopped')" :loading="controlBusy && controlRequest?.action === 'server_start'" @click="control('server_start')">{{ controlRequest?.action === 'server_start' ? '重试启动' : '启动' }}</NButton>
+            <NSpace>
+              <NButton type="error" :disabled="controlBusy || (controlRequest && controlRequest.action !== 'server_stop') || (!controlRequest && overview.server.status === 'stopped')" :loading="controlBusy && controlRequest?.action === 'server_stop'" @click="control('server_stop')">{{ controlRequest?.action === 'server_stop' ? '重试关服' : '关服' }}</NButton>
+              <NButton type="primary" :disabled="controlBusy || (controlRequest && controlRequest.action !== 'server_start') || (!controlRequest && overview.server.status !== 'stopped')" :loading="controlBusy && controlRequest?.action === 'server_start'" @click="control('server_start')">{{ controlRequest?.action === 'server_start' ? '重试启动' : '启动' }}</NButton>
+            </NSpace>
           </div>
           <NDescriptions :column="1" label-placement="left">
             <NDescriptionsItem label="运行状态">
@@ -96,3 +98,9 @@ onMounted(load);
     </NSpin>
   </div>
 </template>
+
+<style scoped>
+.service-controls { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px 20px; margin-bottom: 20px; }
+.service-controls > .ops-muted { max-width: 60ch; line-height: 1.6; }
+@media (max-width: 600px) { .service-controls { align-items: flex-start; flex-direction: column; } }
+</style>

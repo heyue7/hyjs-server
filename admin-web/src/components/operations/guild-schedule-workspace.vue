@@ -146,7 +146,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload));
       <NText v-else-if="!loading && data" depth="3" class="schedule-empty">暂无公会战排期</NText>
     </div>
     <NDrawer :show="open" width="min(760px, 100vw)" :mask-closable="!saving" :close-on-esc="!saving" :on-update:show="(value: boolean) => { if (!value) close(); }">
-      <NDrawerContent :title="`${creating ? '新增' : '查看 / 编辑'}公会战排期`" closable>
+      <NDrawerContent :title="`${creating ? '新增' : draft.editable && canWrite ? '编辑' : '查看'}公会战排期`" closable>
         <NAlert v-if="!draft.editable" type="info" class="mb-4">此排期已经开始、用于报名或属于旧日历，当前仅供查看。请新增未来排期。</NAlert>
         <NForm label-placement="top" :disabled="locked">
           <div class="schedule-grid">

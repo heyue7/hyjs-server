@@ -30,4 +30,13 @@ onMounted(load);
   </template><NEmpty v-else-if="!loading" description="配置读取失败，请刷新重试" /></NSpin></NCard>
  </div>
 </template>
-<style scoped>.copy-drops-page { max-width: 900px; } h2 { font-size: 18px; margin: 0 0 12px; } .ops-muted { line-height: 1.7; margin-bottom: 24px; } .cycle-input { width: 260px; max-width: 100%; } .actions { display: flex; justify-content: flex-end; gap: 12px; } @media(max-width:640px) { .cycle-input { width: 100%; } }</style>
+<style scoped>
+.copy-drops-page { max-width: 900px; }
+h2 { font-size: 18px; margin: 0 0 12px; }
+.ops-muted { max-width: 65ch; line-height: 1.7; margin-bottom: 24px; }
+.n-form { max-width: 620px; }
+.cycle-input { width: 260px; max-width: 100%; }
+.actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 12px; }
+@media(max-width:640px) { .cycle-input { width: 100%; } }
+@media(width < 640px) { h2 { display: none; } }
+</style>

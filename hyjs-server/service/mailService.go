@@ -8,6 +8,7 @@ import (
 
 	"google.golang.org/protobuf/proto"
 	"gorm.io/gorm"
+	"hyjs-server/constUtil"
 	"hyjs-server/db"
 	"hyjs-server/model"
 	pb "hyjs-server/model/protocol"
@@ -135,6 +136,9 @@ func (s *GameService) Mailbox(ctx context.Context, id int64, request proto.Messa
 					return err
 				}
 				if reward.ClaimedAt == 0 && (reward.ExpiresAt == 0 || reward.ExpiresAt > now) {
+					if strings.HasPrefix(reward.SourceKey, constUtil.P1ActivityRewardSourcePrefix) {
+						return errors.New(constUtil.P1ActivityRewardPageOnly)
+					}
 					return errors.New("请先在领奖中心领取附件")
 				}
 			}

@@ -226,8 +226,8 @@ func TestRechargeClock75PublicationGateAndHistoricalClaimPreservation(t *testing
 	if item := read(); item.GetLeft() != 1000 || item.GetStatus() != 1 {
 		t.Fatal("valid payment before first view did not qualify", item)
 	}
-	if points := inventoryPoints(t, f); points[constUtil.RedPointRewardCenter] != 1 {
-		t.Fatal("qualified actual payment reward lost shared red point", points)
+	if points := inventoryPoints(t, f); points[constUtil.RedPointRewardCenter] != 0 {
+		t.Fatal("qualified activity reward appeared in the reward center", points)
 	}
 	// A historical recipient's frozen threshold remains the claim contract even
 	// if a later operating change edits the live template for future recipients.
@@ -235,14 +235,17 @@ func TestRechargeClock75PublicationGateAndHistoricalClaimPreservation(t *testing
 		t.Fatal(err)
 	}
 	before, _ := f.profile(t)
+	if _, err := f.s.RewardCenter(f.ctx, f.id, &pb.CSAddRewardsToPlayer{RewardIds: []int64{delivery.ID}}); err == nil || err.Error() != constUtil.P1ActivityRewardPageOnly {
+		t.Fatal("qualified activity reward accepted through center", err)
+	}
 	for i := 0; i < 2; i++ {
-		if _, err := f.s.RewardCenter(f.ctx, f.id, &pb.CSAddRewardsToPlayer{RewardIds: []int64{delivery.ID}}); err != nil {
+		if _, err := f.s.P1Activity(f.ctx, f.id, claim); err != nil {
 			t.Fatal(err)
 		}
 	}
 	after, _ := f.profile(t)
 	if after.GetCoin() != before.GetCoin()+17 {
-		t.Fatal("repeated reward center request changed payout", before.GetCoin(), after.GetCoin())
+		t.Fatal("repeated activity request changed payout", before.GetCoin(), after.GetCoin())
 	}
 	// A later authoritative status change may lower unclaimed qualification;
 	// it does not erase or recover a historical already-paid reward.

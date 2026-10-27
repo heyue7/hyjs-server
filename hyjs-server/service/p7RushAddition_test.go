@@ -1,7 +1,9 @@
 package service
 
 import (
+	"fmt"
 	"math"
+	"reflect"
 	"testing"
 	"time"
 
@@ -12,6 +14,158 @@ import (
 	"hyjs-server/model"
 	pb "hyjs-server/model/protocol"
 )
+
+// 严格读取与已签发证书命中都必须返回原能力标识，旧星数摘要依赖此字段。
+func p7AssertCertifiedRushProofMatchesStrict(t *testing.T, f *p1Fixture, fightID string, manual bool) {
+	t.Helper()
+	err := db.GetIns().WithContext(f.ctx).Transaction(func(tx *gorm.DB) error {
+		var state db.P7RushState
+		var fight db.P7RushFight
+		if err := tx.First(&state, "player_id=?", f.id).Error; err != nil {
+			return err
+		}
+		if err := tx.First(&fight, "id=?", fightID).Error; err != nil {
+			return err
+		}
+		var end pb.CSRushFightEnd
+		if err := proto.Unmarshal(fight.EndRequest, &end); err != nil {
+			return err
+		}
+		strict, handled, err := p7ReadScopedRushUncached(tx, &fight, &end)
+		if err != nil || !handled || strict == nil || !strict.Authoritative || strict.CapabilityHash == "" {
+			return fmt.Errorf("strict accepted source: handled=%v outcome=%v error=%v", handled, strict, err)
+		}
+		bound, err := f.s.p7BindSettledQueryProjection(tx, &state)
+		if err != nil {
+			return err
+		}
+		q := p7EliteProjectionFor(bound)
+		if err = q.load(); err != nil {
+			return err
+		}
+		var source any
+		var blobs map[string]p7RushBlobDigest
+		if manual {
+			row, ok := q.manuals[fightID]
+			if !ok {
+				return fmt.Errorf("missing manual source")
+			}
+			source, blobs = &row, q.manualBlobs[fightID]
+		} else {
+			row, ok := q.scoped[fightID]
+			if !ok {
+				return fmt.Errorf("missing scoped source")
+			}
+			source, blobs = &row, q.scopedBlobs[fightID]
+		}
+		record, err := q.record(fight.ReplayID)
+		if err != nil {
+			return err
+		}
+		fingerprint, err := p7RushDurableFingerprint(&fight, source, record, &end, blobs, q.recordBlobs[record.ID])
+		if err != nil || q.certificateRuntime == nil || q.certificateRuntime.acceptedProjection(q.certificates[fightID], q.serverID, f.id, fightID, fingerprint, record) == nil {
+			return fmt.Errorf("actual source certificate was not accepted: %v", err)
+		}
+		if tx.Dialector.Name() == "mysql" && (len(blobs) == 0 || len(q.recordBlobs[record.ID]) == 0) {
+			return fmt.Errorf("certificate hit did not retain projected source digests")
+		}
+		projected, handled, err := p7ReadScopedRush(bound, &fight, &end)
+		if err != nil || !handled || projected == nil || projected.Authoritative != strict.Authoritative || projected.Winner != strict.Winner || projected.CapabilityHash != strict.CapabilityHash {
+			return fmt.Errorf("certified result differs from strict result: strict=%v projected=%v error=%v", strict, projected, err)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestP7RushAdditionCertifiedScopedLegacyPurchaseKeepsFrozenSources(t *testing.T) {
+	f := p7SectionFixture(t)
+	p7DurableHistoryFixture(t, f.ctx)
+	p7SectionPublish(t)
+	p7PublishRushAddition(t)
+	var fights []string
+	for floor := int32(1); floor <= 3; floor++ {
+		end := p7SectionPlayFloor(t, f, floor, 1, 18300+int64(floor))
+		fights = append(fights, end.GetFightId())
+		if p7HistoryCertificateCount(t, end.GetFightId()) != 1 {
+			t.Fatal("accepted floor missing durable certificate", floor)
+		}
+	}
+	request := &pb.CSRushAddition{Select: proto.String("peratt,0.03"), Star: proto.Int32(3)}
+	purchase, err := f.s.P7RushAddition(f.ctx, f.id, request, 18310, time.Now())
+	if err != nil || purchase[0].(*pb.SCRushAddition).GetProp().GetPeratt() != .03 {
+		t.Fatal("legacy real-star purchase", err)
+	}
+	var offer db.P7RushAdditionOffer
+	var state db.P7RushState
+	if err = db.GetIns().First(&offer, "player_id=?", f.id).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err = db.GetIns().First(&state, "player_id=?", f.id).Error; err != nil {
+		t.Fatal(err)
+	}
+	if offer.SpentStars != 3 || offer.AcceptanceHash == "" || state.TotalStars != 3 {
+		t.Fatal("purchase did not preserve earned and spent stars", offer, state)
+	}
+	p7AssertCertifiedRushProofMatchesStrict(t, f, fights[1], false)
+	if err = f.s.PublishP7ReRush(f.ctx); err != nil {
+		t.Fatal(err)
+	}
+	view := func() (*pb.SCRushAdditionView, error) {
+		out, handled, e := f.s.DispatchP7(f.ctx, f.id, &pb.CSRushAdditionView{}, 0)
+		if e != nil || !handled {
+			return nil, fmt.Errorf("legacy Re view handled=%v: %v", handled, e)
+		}
+		return out[0].(*pb.SCRushAdditionView), nil
+	}
+	if v, e := view(); e != nil || v.GetProp().GetPeratt() != .03 {
+		t.Fatal("certified Re view lost the purchased bonus", e)
+	}
+	f.restart(t)
+	p7InitializeDurableHistoryTest(t, f.ctx)
+	if v, e := view(); e != nil || v.GetProp().GetPeratt() != .03 {
+		t.Fatal("cold certified Re view lost the purchased bonus", e)
+	}
+	p7AssertCertifiedRushProofMatchesStrict(t, f, fights[1], false)
+	var source db.P7RushScopedCalculation
+	if err = db.GetIns().First(&source, "fight_id=?", fights[1]).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err = db.GetIns().Model(&db.P7RushScopedCalculation{}).Where("fight_id=?", source.FightID).Update("scope_proof", p6Digest([]byte("forged scoped proof"))).Error; err != nil {
+		t.Fatal(err)
+	}
+	if _, e := view(); e == nil {
+		t.Fatal("changed source bypassed certificate and strict verification")
+	}
+	if err = db.GetIns().Model(&db.P7RushScopedCalculation{}).Where("fight_id=?", source.FightID).Update("scope_proof", source.ScopeProof).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err = db.GetIns().Model(&db.P7RushAdditionOffer{}).Where("player_id=? AND run_id=?", offer.PlayerID, offer.RunID).Update("acceptance_hash", p6Digest([]byte("forged acceptance"))).Error; err != nil {
+		t.Fatal(err)
+	}
+	if _, e := view(); e == nil {
+		t.Fatal("changed purchase acceptance was accepted")
+	}
+	if err = db.GetIns().Model(&db.P7RushAdditionOffer{}).Where("player_id=? AND run_id=?", offer.PlayerID, offer.RunID).Update("acceptance_hash", offer.AcceptanceHash).Error; err != nil {
+		t.Fatal(err)
+	}
+	if v, e := view(); e != nil || v.GetProp().GetPeratt() != .03 {
+		t.Fatal("restored exact sources failed", e)
+	}
+	var afterOffer db.P7RushAdditionOffer
+	var afterState db.P7RushState
+	if err = db.GetIns().First(&afterOffer, "player_id=?", f.id).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err = db.GetIns().First(&afterState, "player_id=?", f.id).Error; err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(offer, afterOffer) || state.PlayerID != afterState.PlayerID || state.RunID != afterState.RunID || state.Floor != afterState.Floor || state.TotalStars != afterState.TotalStars || state.RecordStars != afterState.RecordStars || state.HighFloor != afterState.HighFloor || state.ActiveFight != afterState.ActiveFight || state.AdditionOfferSection != afterState.AdditionOfferSection {
+		t.Fatal("certificate reads or rejected changes modified frozen purchase or progress")
+	}
+}
 
 func p7PublishRushAddition(t *testing.T) {
 	t.Helper()

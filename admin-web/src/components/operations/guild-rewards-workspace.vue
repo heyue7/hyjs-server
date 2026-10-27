@@ -83,8 +83,9 @@ defineExpose({ hasUnsavedChanges: () => dirty.value, discardChanges: () => { ope
     <NAlert v-if="error" type="error">{{ error }}</NAlert>
     <NDataTable :columns="columns" :data="shown" :loading="loading" :scroll-x="650" :pagination="{ pageSize: 15 }" />
     <NDrawer :show="open" width="min(760px, 100vw)" :on-update:show="(value: boolean) => { if (!value) close(); }" :mask-closable="!saving" :close-on-esc="!saving">
-      <NDrawerContent :title="`${create ? '新建' : '编辑'}${labels[draft.kind]}`" closable>
+      <NDrawerContent :title="`${create ? '新建' : draft.editable && canWrite ? '编辑' : '查看'}${labels[draft.kind]}`" closable>
         <NAlert v-if="!draft.editable" type="info" class="mb-4">本期已开始或已用于奖励结算，仅供查看。</NAlert>
+        <p v-if="internalSettlementPublication" class="settlement-rules">当前仅支持无战斗记录、无击杀或死亡、生命未变化的到时结算，双方均须有人实际入场。比赛结束后，开战前冻结的报名总战力较低方胜出。奖励按本场开战前发布的奖档，于比赛当日北京时间 23:30 起通过邮件发放。同战力、撤回或一方缺席的胜负规则尚未确定，暂不结算。</p>
         <NForm label-placement="top" :disabled="locked">
           <div class="reward-grid">
             <NFormItem v-if="draft.kind !== 'monthly'" label="分组"><NSelect v-model:value="draft.group" :disabled="!create || locked" :options="['A','B','C','D'].map(value => ({ label: `${value} 组`, value }))" /></NFormItem>
@@ -131,7 +132,6 @@ defineExpose({ hasUnsavedChanges: () => dirty.value, discardChanges: () => { ope
         </NForm>
         <NAlert v-if="saveError" type="error">{{ saveError }}</NAlert>
         <template #footer>
-          <p v-if="internalSettlementPublication" class="settlement-rules">当前仅支持无战斗记录、无击杀或死亡、生命未变化的到时结算，双方均须有人实际入场。比赛结束后，开战前冻结的报名总战力较低方胜出。奖励按本场开战前发布的奖档，于比赛当日北京时间 23:30 起通过邮件发放。同战力、撤回或一方缺席的胜负规则尚未确定，暂不结算。</p>
           <NSpace justify="end"><NButton :disabled="saving" @click="close">关闭</NButton><NButton v-if="draft.editable && canWrite" type="primary" :loading="saving" :disabled="!dirty" @click="save">保存本项</NButton></NSpace>
         </template>
       </NDrawerContent>

@@ -57,7 +57,6 @@ async function submit(event?: Event) {
         </NFormItem>
         <NButton type="primary" block attr-type="submit" :loading="auth.loginLoading">登录</NButton>
       </NForm>
-      <div class="login-note">仅限已授权的运营账号</div>
     </NCard>
   </div>
 </template>
@@ -93,12 +92,6 @@ h1 {
   font-size: 18px;
   font-weight: 600;
   margin: 0 0 24px;
-}
-.login-note {
-  margin-top: 16px;
-  font-size: 13px;
-  color: rgb(var(--base-text-color) / .6);
-  text-align: center;
 }
 @media (max-width: 480px) {
   .hyjs-login { padding: 16px; }

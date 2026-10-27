@@ -319,7 +319,7 @@ function reset() {
             </NCard>
             <GuildScheduleWorkspace ref="scheduleWorkspace" />
           </NTabPane>
-          <NTabPane name="policies" tab="规则与门槛">
+          <NTabPane name="policies" tab="规则与门槛" class="guild-policies">
             <NCard :bordered="false" class="ops-panel mb-12px">
               <template #header>公会影响入口</template>
               <NForm label-placement="top" :disabled="!canWrite || saving">
@@ -344,7 +344,7 @@ function reset() {
                 <NFormItem label="祈祷池版本">
                   <NInput v-model:value="form.policies.prayer.version" placeholder="必填，启用前发布" />
                 </NFormItem>
-                <NFormItem label="祈祷奖励">
+                <NFormItem label="祈祷奖励" class="guild-policy-wide">
                   <GuildPrayerEditor v-model:value="form.policies.prayer.poolJson" :disabled="!canWrite || saving" @valid="setValidity('prayerPool', $event)" />
                 </NFormItem>
                 <NFormItem label="开放科技">
@@ -353,7 +353,7 @@ function reset() {
                 <NFormItem label="科技目录版本">
                   <NInput v-model:value="form.policies.tech.version" placeholder="必填，启用前发布" />
                 </NFormItem>
-                <NFormItem label="科技建筑分配">
+                <NFormItem label="科技建筑分配" class="guild-policy-wide">
                   <GuildTechDirectoryEditor v-model:value="form.policies.tech.directoryJson" :disabled="!canWrite || saving" @valid="setValidity('techDirectory', $event)" />
                 </NFormItem>
               </NForm>
@@ -446,7 +446,7 @@ function reset() {
         </NTabs>
 
         <NCard v-if="!['rewards', 'schedule'].includes(tab)" :bordered="false" class="ops-panel mt-12px">
-          <NForm label-placement="left" label-width="100">
+          <NForm label-placement="top">
             <NFormItem label="变更原因" required>
               <NInput v-model:value="reason" :disabled="!canWrite || saving" maxlength="500" show-count placeholder="用于审计" />
             </NFormItem>
@@ -466,7 +466,7 @@ function reset() {
 .guild-war-open-copy p { margin: 0; font-size: 13px; line-height: 1.65; color: rgb(var(--base-text-color) / .65); overflow-wrap: anywhere; }
 .guild-war-open-control { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .guild-war-open-error { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-top: 12px; overflow-wrap: anywhere; }
-.guild-actions { margin-bottom: 12px; }
+.guild-actions { margin-bottom: 0; }
 .guild-search { width: min(260px, 100%); }
 .guild-field-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 24px; }
 .guild-field-row { display: grid; grid-template-columns: minmax(110px, 1fr) minmax(120px, 1.2fr); align-items: start; gap: 12px; padding: 12px 0; border-bottom: 1px solid rgb(var(--base-text-color) / .09); min-width: 0; }
@@ -476,7 +476,10 @@ function reset() {
 .guild-field-row :deep(.n-input-number) { width: 100%; }
 .guild-reward-tier { border-top: 1px solid rgb(var(--base-text-color) / .09); padding-top: 12px; margin-top: 12px; }
 .guild-reward-tier h4 { margin: 0 0 16px; font-weight: 600; }
+.guild-policies :deep(.n-card__content > .n-form) { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 24px; }
+.guild-policies :deep(.guild-policy-wide), .guild-policies .guild-reward-tier { grid-column: 1 / -1; }
 @media (max-width: 1000px) { .guild-field-grid { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 900px) { .guild-policies :deep(.n-card__content > .n-form) { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 600px) {
   .guild-field-grid { grid-template-columns: minmax(0, 1fr); }
   .guild-search { width: 100%; }

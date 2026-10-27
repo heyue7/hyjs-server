@@ -79,6 +79,24 @@ func TestP13GuildDonationBadgePaidSourceMailClaimThenOriginalDonateBox(t *testin
 		t.Fatal(err)
 	}
 	f.restart(t)
+	listed, err := f.s.RewardCenter(f.ctx, id, &pb.CSQueryUserReward{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var donationNotices int
+	for _, item := range listed[0].(*pb.SCQueryUserReward).GetRewardItemInfoList() {
+		for _, rewardID := range rewardIDs {
+			if item.GetRewardId() == rewardID {
+				donationNotices++
+				if item.GetRewardContent() != "已完成公会金币捐献100000金币，奖励已发放。" {
+					t.Fatal("donation notice lost original condition", item)
+				}
+			}
+		}
+	}
+	if donationNotices != 15 {
+		t.Fatal("donation center entries changed", donationNotices)
+	}
 	claimed, err := f.s.RewardCenter(f.ctx, id, &pb.CSAddRewardsToPlayer{RewardIds: rewardIDs})
 	if err != nil {
 		t.Fatal(err)

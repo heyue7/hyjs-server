@@ -182,6 +182,9 @@ func (q *p7EliteQueryProjection) read(fight *db.P7RushFight, end *pb.CSRushFight
 			fingerprint, _ = p7RushDurableFingerprint(fight, &manual, record, end, q.manualBlobs[fight.ID], q.recordBlobs[record.ID])
 			if q.certificateRuntime != nil {
 				if outcome := q.certificateRuntime.acceptedProjection(q.certificates[fight.ID], q.serverID, q.state.PlayerID, fight.ID, fingerprint, record); outcome != nil {
+					// 严格校验接受终局时已绑定 ScopeProof 和 CapabilityHash；
+					// 证书的指纹覆盖该源行，旧分段摘要需要相同的能力标识。
+					outcome.CapabilityHash = manual.ScopeProof
 					r.outcome, r.scoped = outcome, true
 					q.reads[fight.ID] = r
 					return p7RushDurableCloneOutcome(outcome), true, nil
@@ -203,6 +206,8 @@ func (q *p7EliteQueryProjection) read(fight *db.P7RushFight, end *pb.CSRushFight
 			}
 		}
 		if r.outcome != nil {
+			// 证书覆盖完整 scoped 源行，恢复严格读取时的终局能力标识。
+			r.outcome.CapabilityHash = scoped.ScopeProof
 			r.scoped = true
 		} else {
 			r.outcome, r.scoped, r.err = p7ReadScopedRushRows(fight, end, scoped, q.record)

@@ -37,5 +37,5 @@ export function useActivitySelectorSummary(resources: () => ResourceAmount[]) {
 }
 
 export function renderActivityOption(option: SelectOption | SelectGroupOption) {
-  return h('span', { style: { whiteSpace: 'normal', overflowWrap: 'anywhere', lineHeight: '1.6' } }, String(option.label || ''));
+  return h('span', { class: 'activity-option-label', style: { whiteSpace: 'normal', overflowWrap: 'anywhere', lineHeight: '1.6' } }, String(option.label || ''));
 }

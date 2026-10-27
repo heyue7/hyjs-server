@@ -53,12 +53,12 @@ export function organizeOperationsMenus(menus: App.Global.Menu[]) {
     take('items', '道具与资源'),
     take('fields', '野外地图与部署'),
     take('trials', '试炼之地'),
-    take('sprout-settings', '小芽设置'),
     take('activities', '活动设置'),
     take('guild-settings', '公会设置'),
     group('growth-settings', '成长配置', [take('achievements'), take('titles')]),
     group('mechanism-settings', '游戏机制设置', [
       take('copy-drops', '副本碎片保底'),
+      take('sprout-settings', '小芽设置'),
       take('field-resources', '野外资源'),
       take('daily-tasks', '每日任务'),
       take('arena-prizes'),

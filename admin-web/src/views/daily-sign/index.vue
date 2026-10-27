@@ -292,7 +292,7 @@ onBeforeUnmount(() => { pendingDiscard?.dispose(); alive = false; loadGeneration
         </div>
         <NDataTable :columns="columns" :data="visibleRows" :loading="loading" :bordered="false" :row-key="(row: DailySignRow) => row.day" :scroll-x="700" size="small" />
       </NCard>
-      <div class="daily-sign-footer">
+      <div class="daily-sign-footer" :class="{ 'daily-sign-footer-active': canWrite && (dirty || !snapshot.configured) }">
         <span class="ops-muted">{{ selectedMonth > currentMonth ? '提前保存后，到月自动切换。' : '修改用于本月后续领取，已领取的奖励不变。' }}</span>
         <NButton v-if="canWrite" type="primary" :loading="saving" :disabled="disabled || (!dirty && snapshot.configured) || editorOpen" @click="save">保存安排</NButton>
       </div>
@@ -331,7 +331,8 @@ onBeforeUnmount(() => { pendingDiscard?.dispose(); alive = false; loadGeneration
 .daily-sign-settings { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px; margin-bottom: 20px; }
 .daily-sign-caption { color: rgb(var(--base-text-color) / .6); font-size: 13px; }
 .daily-sign-resource-error { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 16px; color: rgb(var(--base-text-color) / .65); }
-.daily-sign-footer { position: sticky; z-index: 20; bottom: 0; display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-top: 16px; padding: 12px 16px; border: 1px solid rgb(var(--base-text-color) / .08); border-radius: 6px; background: rgb(var(--container-bg-color)); }
+.daily-sign-footer { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-top: 16px; }
+.daily-sign-footer-active { position: sticky; z-index: 20; bottom: 0; padding: 12px 16px; border: 1px solid rgb(var(--base-text-color) / .08); border-radius: 6px; background: rgb(var(--container-bg-color)); }
 .daily-sign-loading { display: block; margin: 24px auto; }
 :global(.n-card.daily-sign-editor) { width: 720px; max-width: calc(100vw - 32px); }
 .daily-sign-editor :deep(.reward-list) { width: 100%; }

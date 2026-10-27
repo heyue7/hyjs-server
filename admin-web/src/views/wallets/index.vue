@@ -121,7 +121,7 @@ onBeforeUnmount(() => { generation++; recordGeneration++; });
 </script>
 
 <template>
-  <div class="terminal-workspace">
+  <div class="ops-page terminal-workspace">
     <NTabs type="line" animated>
       <NTabPane name="settings" tab="终端设置">
         <div class="ops-toolbar mb-16px"><span class="ops-muted">{{ scope.currentServer?.name }} · 按区服保存</span><NButton :loading="loading" :disabled="busy || !!pending" @click="loadSettings">重新读取设置</NButton></div>

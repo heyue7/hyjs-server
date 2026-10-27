@@ -4,6 +4,7 @@ import type { ActivityOccurrence, ActivitySchedule } from '@/service/activity-sc
 import { shopCount75, trialShopMenu75, trialShopMenus75 } from './shop-presentation75';
 import { useDraftGuard } from '@/composables/useDraftGuard';
 import { computed, h, onBeforeUnmount, ref, watch } from 'vue';
+import { useWindowSize } from '@vueuse/core';
 import { onBeforeRouteLeave, useRouter } from 'vue-router';
 import { NButton, NSpace, NSwitch } from 'naive-ui';
 import type { DataTableColumns } from 'naive-ui';
@@ -20,6 +21,7 @@ import ResourceImage from './resource-image.vue';
 import ItemQuality from './item-quality.vue';
 const props = defineProps<{ shopId: string }>();
 const router = useRouter();
+const { width: viewportWidth } = useWindowSize();
 const scope = useServerScopeStore();
 const trialMenu = ref(1);
 const schedule = ref<ActivitySchedule>();
@@ -427,7 +429,7 @@ const columns = computed<DataTableColumns<ShopProduct>>(() => [
     }), h('span', { class: 'ops-muted' }, row.enabled ? '已启用' : '已停用')])
   },
   {
-    title: '操作', key: 'action', width: props.shopId === 'memory' ? 120 : 135, fixed: 'right',
+    title: '操作', key: 'action', width: viewportWidth.value <= 680 ? 80 : props.shopId === 'memory' ? 120 : 135, fixed: 'right',
     render: row => h('div', { class: 'ops-table-actions' }, [
       h(NButton, { size: 'small', secondary: true, onClick: () => edit(row) }, () => productReadonly(row) ? '查看' : '编辑'),
       ...(!productReadonly(row) ? [h(NButton, { size: 'small', quaternary: true, type: 'error', onClick: () => remove(row) }, () => '移除')] : [])
@@ -873,12 +875,14 @@ watch(() => scope.serverId, () => { void loadSchedule(); });
           />
         </NFormItem>
       </NForm>
-      <div class="ops-drawer-actions">
-        <NButton :disabled="settingsSaving || !canWrite" @click="settingsGuard.requestClose()">取消</NButton>
-        <NButton type="primary" :loading="settingsSaving" @click="saveSettings">
-          保存设置
-        </NButton>
-      </div>
+      <template #footer>
+        <div class="shop-settings-actions">
+          <NButton :disabled="settingsSaving || !canWrite" @click="settingsGuard.requestClose()">取消</NButton>
+          <NButton type="primary" :loading="settingsSaving" @click="saveSettings">
+            保存设置
+          </NButton>
+        </div>
+      </template>
     </NModal>
   </div>
 </template>
@@ -951,6 +955,7 @@ watch(() => scope.serverId, () => { void loadSchedule(); });
   width: 680px;
   max-width: calc(100vw - 32px);
 }
+.shop-settings-actions { display: flex; justify-content: flex-end; gap: 12px; }
 .trial-shop-mobile { display: none; }
 @media (max-width: 1660px) {
   .trial-shop-desktop { display: none; }
@@ -970,5 +975,9 @@ watch(() => scope.serverId, () => { void loadSchedule(); });
 }
 @media (max-width: 680px) {
   .trial-shop-mobile :deep(.n-spin-content) { grid-template-columns: minmax(0, 1fr); }
+  .shop-workspace-root :deep(.ops-table-actions) { flex-direction: column; align-items: stretch; gap: 2px; }
+}
+@media (max-width: 480px) {
+  .shop-settings-actions > .n-button { flex: 1; }
 }
 </style>

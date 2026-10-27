@@ -116,9 +116,10 @@ onMounted(load);
 .sprout-preview strong { font-size: 16px; font-weight: 600; }
 .sprout-preview p { margin: 4px 0 0; line-height: 1.6; }
 .sprout-preview .n-tag { margin-left: auto; }
+.sprout-page .n-form { max-width: 620px; }
 .sprout-group { border-top: 1px solid var(--n-border-color, #e5e7eb); padding-top: 16px; margin-bottom: 20px; }
 .sprout-group h3 { font-size: 15px; margin: 0 0 16px; font-weight: 600; }
 .sprout-days { width: 260px; max-width: 100%; }
-.sprout-actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 8px; }
+.sprout-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 12px; margin-top: 8px; }
 @media (max-width: 640px) { .sprout-preview { grid-template-columns: 36px minmax(0, 1fr); gap: 10px 12px; } .sprout-preview img { width: 36px; height: 36px; } .sprout-preview .n-tag { grid-column: 2; justify-self: start; margin-left: 0; } .sprout-days { width: 100%; } }
 </style>

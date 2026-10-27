@@ -300,7 +300,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload));
             </NCollapseItem>
           </NCollapse>
         </NCard>
-        <div class="prize-footer">
+        <div class="prize-footer" :class="{ 'prize-footer-dirty': dirty }">
           <span class="ops-muted">{{ dirty ? '有未保存的修改' : '' }}</span>
           <NButton
             v-if="canWrite"
@@ -367,10 +367,12 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload));
   line-height: 1.7;
 }
 .prize-footer {
+  margin-top: 20px;
+}
+.prize-footer-dirty {
   position: sticky;
   bottom: 0;
   padding: 12px 16px;
-  margin-top: 20px;
   border-radius: 6px;
   background: rgb(var(--container-bg-color));
   border: 1px solid rgb(var(--base-text-color) / 0.08);

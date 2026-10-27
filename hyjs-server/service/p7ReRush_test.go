@@ -386,6 +386,7 @@ func TestP7ReRushMySQLPublishKeepsOldPendingFightSectionRewardAndBuff(t *testing
 		t.Skip("owned isolated P7 MySQL required")
 	}
 	f := p7PartyBusinessFixture(t)
+	p7DurableHistoryFixture(t, f.ctx)
 	p7SectionPublish(t)
 	p7PublishRushAddition(t)
 	// 本测试明确从尚未发布Re的新库状态开始，保留旧首层实际在途快照。
@@ -411,6 +412,7 @@ func TestP7ReRushMySQLPublishKeepsOldPendingFightSectionRewardAndBuff(t *testing
 	if len(pending.TaskInfoList) != 1 || pending.TaskInfoList[0].GetTaskId() != "local-section-1" {
 		t.Fatal("publishing Re replaced old in-flight task", pending)
 	}
+	var fights []string
 	for floor := int32(1); floor <= 3; floor++ {
 		start := first
 		if floor > 1 {
@@ -436,6 +438,10 @@ func TestP7ReRushMySQLPublishKeepsOldPendingFightSectionRewardAndBuff(t *testing
 			t.Fatal("old fixed original source did not win", err)
 		}
 		call(&pb.CSRushFightEnd{FightId: start.FightId, Result: proto.Int32(1), OptRecord: client.OriginalOperates}, 0)
+		fights = append(fights, start.GetFightId())
+		if p7HistoryCertificateCount(t, start.GetFightId()) != 1 {
+			t.Fatal("old accepted fight missing durable certificate", floor)
+		}
 	}
 	info := call(&pb.CSGetRushInfo{}, 0)[0].(*pb.SCGetRushInfo)
 	if info.GetCurFloor() != 4 || info.GetIsRewardNeedGet() != 1 || info.GetIsAdditionNeedGet() != 1 {
@@ -449,14 +455,45 @@ func TestP7ReRushMySQLPublishKeepsOldPendingFightSectionRewardAndBuff(t *testing
 	if options.GetStarResult3() != "peratt,0.03" {
 		t.Fatal("old frozen addition overwritten", options)
 	}
-	call(&pb.CSRushAddition{Star: proto.Int32(3), Select: options.StarResult3}, 19465)
+	request := &pb.CSRushAddition{Star: proto.Int32(3), Select: options.StarResult3}
+	purchased := call(request, 19465)[0]
+	var originalOffer db.P7RushAdditionOffer
+	if err = db.GetIns().First(&originalOffer, "player_id=?", f.id).Error; err != nil || originalOffer.SpentStars != 3 || originalOffer.AcceptanceHash == "" {
+		t.Fatal("old purchase did not retain its source and star cost", err)
+	}
+	p7AssertCertifiedRushProofMatchesStrict(t, f, fights[1], true)
 	bonus := call(&pb.CSRushAdditionView{}, 0)[0].(*pb.SCRushAdditionView).Prop
 	if bonus.GetPeratt() != .03 {
 		t.Fatal("old legitimately purchased buff lost on Re switch", bonus)
 	}
 	f.restart(t)
+	p7InitializeDurableHistoryTest(t, f.ctx)
+	p7AssertCertifiedRushProofMatchesStrict(t, f, fights[1], true)
 	if replay := call(&pb.CSRushGetSectionReward{}, 19464)[0]; !proto.Equal(claim, replay) {
 		t.Fatal("old original claim receipt lost after restart")
+	}
+	if replay := call(request, 19465)[0]; !proto.Equal(purchased, replay) {
+		t.Fatal("old purchase receipt changed after restart")
+	}
+	bonus = call(&pb.CSRushAdditionView{}, 0)[0].(*pb.SCRushAdditionView).Prop
+	if bonus.GetPeratt() != .03 {
+		t.Fatal("old purchased bonus lost after cold certificate read", bonus)
+	}
+	var manual db.P7RushManualCalculation
+	if err = db.GetIns().First(&manual, "fight_id=?", fights[1]).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err = db.GetIns().Model(&db.P7RushManualCalculation{}).Where("fight_id=?", manual.FightID).Update("scope_proof", p6Digest([]byte("forged manual proof"))).Error; err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err = f.s.DispatchP7(f.ctx, f.id, &pb.CSRushAdditionView{}, 0); err == nil {
+		t.Fatal("changed manual source bypassed certificate verification")
+	}
+	if err = db.GetIns().Model(&db.P7RushManualCalculation{}).Where("fight_id=?", manual.FightID).Update("scope_proof", manual.ScopeProof).Error; err != nil {
+		t.Fatal(err)
+	}
+	if bonus = call(&pb.CSRushAdditionView{}, 0)[0].(*pb.SCRushAdditionView).Prop; bonus.GetPeratt() != .03 {
+		t.Fatal("restored manual source failed", bonus)
 	}
 	tasks := call(&pb.CSRushCurrentInfo{}, 0)[0].(*pb.SCRushCurrentInfo).TaskInfoList
 	if len(tasks) != 3 || tasks[0].GetTaskId() != "local_rush_4" {
@@ -475,7 +512,38 @@ func TestP7ReRushMySQLPublishKeepsOldPendingFightSectionRewardAndBuff(t *testing
 	if err != nil || boosted.Formation[0].Prop.GetAtt() != math.RoundToEven(party.Formation[0].Prop.GetAtt()*1.03) {
 		t.Fatal("old frozen buff did not reach new Re battle snapshot", err)
 	}
-	t.Log("old first Start→publish full Re→same old End and remaining frozen first section→exact old reward/addition/cold receipts→Re4 with owned old buff preserved")
+	fourth := call(&pb.CSRushFightStart{RushType: proto.Int32(1), TaskId: proto.String("local_rush_4"), Star: proto.Int32(1)}, 19480)[0].(*pb.SCRushFightStart)
+	if len(fourth.GetBattlePlayer().GetFormation()) == 0 || fourth.GetBattlePlayer().GetFormation()[0].GetProp().GetAtt() != boosted.Formation[0].Prop.GetAtt() {
+		t.Fatal("paid Re4 start did not freeze the owned old bonus")
+	}
+	series, err := f.s.FreezeP6RushSeriesInput(fourth, true, false, nil, constUtil.P6OriginalClientHash)
+	if err != nil {
+		t.Fatal(err)
+	}
+	input, err := p7GenericMechanismRushInputAt(series, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client, err := f.s.ComputeOriginalP6ProtocolFinalHP(f.ctx, input, nil)
+	if err != nil || client.Outcome.Winner != 0 {
+		t.Fatal("real Re4 source did not win", err)
+	}
+	result := call(&pb.CSRushFightEnd{FightId: fourth.FightId, Result: proto.Int32(1), OptRecord: client.OriginalOperates}, 0)[0].(*pb.SCRushFightEnd)
+	if result.GetResult() != 1 || result.GetStar() != 1 {
+		t.Fatal("real Re4 end did not settle its earned star", result)
+	}
+	var finalState db.P7RushState
+	var finalOffer db.P7RushAdditionOffer
+	if err = db.GetIns().First(&finalState, "player_id=?", f.id).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err = db.GetIns().First(&finalOffer, "player_id=?", f.id).Error; err != nil {
+		t.Fatal(err)
+	}
+	if finalState.RunID != state.RunID || finalState.Floor != 5 || finalState.TotalStars != 4 || finalOffer.AcceptanceHash != originalOffer.AcceptanceHash || finalOffer.SpentStars != originalOffer.SpentStars || !bytes.Equal(finalOffer.StageRules, originalOffer.StageRules) || !bytes.Equal(finalOffer.Policy, originalOffer.Policy) {
+		t.Fatal("Re4 progression changed the old purchase or its frozen sources", finalState, finalOffer)
+	}
+	t.Log("old first Start→publish full Re→three accepted old fights→old purchase and cold certified reads→real Re4 Start/End with original star cost and frozen source retained")
 }
 
 func TestP7ReRushAdditionProjectionUsesOriginalPercentFields(t *testing.T) {

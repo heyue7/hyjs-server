@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import shlex
 import shutil
 import subprocess
@@ -23,6 +24,7 @@ parser.add_argument('--migrate-role-wallets', action='store_true', help='Quiesce
 parser.add_argument('--warm-rush-history-player', action='append', type=int, default=[], help='Prevalidate this existing owner with the exact candidate before application cutover')
 parser.add_argument('--apply-growth74', action='store_true', help='Apply reviewed growth configuration while game is in maintenance')
 parser.add_argument('--apply-activity77', action='store_true', help='Apply activity77 under maintenance')
+parser.add_argument('--apply-feedback78', action='store_true', help='Apply the reviewed feedback78 configuration under maintenance')
 parser.add_argument('--apply-growth75', action='store_true', help='Apply audited 75 publication, calendar, economy and fresh activity CAS while keeping maintenance')
 parser.add_argument('--expected-live-revision', help='Refuse activation if a different live release appeared')
 parser.add_argument('--restore-activity-calendar', help='Restore real game time and activity day one using this UUID under maintenance')
@@ -30,12 +32,15 @@ args = parser.parse_args()
 if args.restore_activity_calendar:
     import uuid
     assert str(uuid.UUID(args.restore_activity_calendar)) == args.restore_activity_calendar
-    assert args.expected_live_revision and not any((args.provision, args.initial_dump, args.migrate_role_wallets, args.apply_growth74, args.apply_growth75, args.apply_activity77)), 'Calendar restore requires a pinned standalone maintenance cutover'
-assert sum((args.apply_growth74, args.apply_growth75, args.apply_activity77)) <= 1, 'Choose one explicit growth deployment version'
+    assert args.expected_live_revision and not any((args.provision, args.initial_dump, args.migrate_role_wallets, args.apply_growth74, args.apply_growth75, args.apply_activity77, args.apply_feedback78)), 'Calendar restore requires a pinned standalone maintenance cutover'
+assert sum((args.apply_growth74, args.apply_growth75, args.apply_activity77, args.apply_feedback78)) <= 1, 'Choose one explicit maintenance deployment version'
 if args.apply_activity77:
     assert args.expected_live_revision and not args.provision and not args.initial_dump and not args.migrate_role_wallets, 'Activity77 requires a pinned existing release and its own maintenance window'
 if args.apply_growth75:
     assert args.expected_live_revision and not args.provision and not args.initial_dump and not args.migrate_role_wallets, 'Growth75 requires a pinned existing release and its own maintenance window'
+if args.apply_feedback78:
+    assert args.expected_live_revision and re.fullmatch(r'[0-9a-f]{40,64}', args.expected_live_revision), 'Feedback78 requires an exact live revision'
+    assert not any((args.provision, args.update_ingress, args.initial_dump, args.migrate_role_wallets, args.warm_rush_history_player)), 'Feedback78 requires a standalone maintenance cutover'
 settings = load(args.env_file)
 HOST = settings['HYJS_DEPLOY_SSH']
 REMOTE = settings['HYJS_DEPLOY_ROOT']
@@ -101,7 +106,7 @@ shutil.copytree(ROOT / 'analysis/tables', app / 'tables', ignore=shutil.ignore_p
 (app / 'config.test.yaml').write_text(render((ROOT / 'deploy/config.test.yaml').read_text(), settings))
 (stage / 'nginx.conf').write_text(render((ROOT / 'deploy/nginx.conf').read_text(), settings))
 (stage / 'deployment.env').write_text(''.join(key + '=' + settings[key] + '\n' for key in RUNTIME_KEYS))
-for name in ('Dockerfile', 'compose.yaml', 'activate.py', 'role_wallet_migration.py', 'growth75_activation.py', 'growth75_activity_patch.py', 'activity77_activation.py', 'calendar_restore_activation.py'):
+for name in ('Dockerfile', 'compose.yaml', 'activate.py', 'role_wallet_migration.py', 'growth75_activation.py', 'growth75_activity_patch.py', 'activity77_activation.py', 'feedback78_activation.py', 'calendar_restore_activation.py'):
     shutil.copy2(ROOT / 'deploy' / name, stage / name)
 files = {str(p.relative_to(stage)): sha(p) for p in sorted(stage.rglob('*')) if p.is_file() and p.name != '.hyjs-stage'}
 manifest = {'revision': revision, 'architecture': 'linux/amd64', 'database': 'MySQL8.4', 'files': files,
@@ -147,6 +152,8 @@ if args.apply_growth75:
     command += ' --apply-growth75'
 if args.apply_activity77:
     command += ' --apply-activity77'
+if args.apply_feedback78:
+    command += ' --apply-feedback78'
 if args.restore_activity_calendar:
     command += ' --restore-activity-calendar ' + shlex.quote(args.restore_activity_calendar)
 if args.migrate_role_wallets:

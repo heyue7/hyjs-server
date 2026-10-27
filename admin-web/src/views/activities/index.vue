@@ -26,5 +26,5 @@ async function beforeTabLeave(_name: string | number, oldName: string | number |
 </template>
 
 <style scoped>
-.activity-settings-tabs { padding: 0 20px; }
+.activity-settings-tabs { width: 100%; max-width: 1600px; margin: 0 auto; }
 </style>

@@ -83,7 +83,7 @@ func (s *GameService) RecordP13GuildDonationBadge(tx *gorm.DB, member *db.P13Gui
 	// 每笔来源保留当时参数；更新规则不会重写已发出的奖励。
 	rewards := fmt.Sprintf("item_089,%d", policy.BadgeAmount)
 	key := fmt.Sprintf("p13:coin-badge:%d:%d", member.PlayerID, stamp)
-	delivery, err := s.EnqueueReward(tx, member.PlayerID, key, constUtil.P13GuildDonationBadgeTitle, constUtil.P13GuildDonationBadgeContent, rewards, 0)
+	delivery, err := s.EnqueueReward(tx, member.PlayerID, key, constUtil.P13GuildDonationBadgeTitle, fmt.Sprintf(constUtil.P13GuildDonationBadgeNotice78, amount), rewards, 0)
 	if err != nil {
 		return err
 	}

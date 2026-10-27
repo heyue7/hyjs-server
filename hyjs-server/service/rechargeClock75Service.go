@@ -171,18 +171,18 @@ func rechargeEventRealAt75(tx *gorm.DB, playerID int64, source string) (int64, e
 	return row.RealAt, nil
 }
 
-// The shared reward center rechecks only unclaimed payment-period attachments.
-// Already claimed receipts remain untouched and retain their original retry result.
+// rechargeRewardEligibility75 保留历史充值资格核算供迁移回归复用；
+// 领奖中心已排除活动附件，活动页按冻结周期单独核验领取资格。
 func rechargeRewardEligibility75(tx *gorm.DB, rows []db.RewardDelivery, now int64) (map[int64]bool, error) {
 	allowed := map[int64]bool{}
 	keys := map[string]bool{}
 	byReward := map[int64]string{}
 	for _, row := range rows {
 		allowed[row.ID] = true
-		if row.ClaimedAt != 0 || !strings.HasPrefix(row.SourceKey, "activity:") {
+		if row.ClaimedAt != 0 || !strings.HasPrefix(row.SourceKey, constUtil.P1ActivityRewardSourcePrefix) {
 			continue
 		}
-		key := strings.TrimPrefix(row.SourceKey, "activity:")
+		key := strings.TrimPrefix(row.SourceKey, constUtil.P1ActivityRewardSourcePrefix)
 		if index := strings.LastIndex(key, ":tier:"); index >= 0 {
 			key = key[:index]
 		}
@@ -249,15 +249,19 @@ func rechargeRewardEligibility75(tx *gorm.DB, rows []db.RewardDelivery, now int6
 	return allowed, nil
 }
 
-// eligiblePendingRewards75 advances by ledger ID so rejected historical payment
-// notices cannot hide a later ordinary reward. Each read and qualification batch
-// is bounded; the client page remains capped by its original protocol limit.
+// eligiblePendingRewards75 在 SQL 内排除活动附件，按 ID 分批读取中心奖励；
+// 活动历史不占客户端页数，也不触发充值资格查询。
 func eligiblePendingRewards75(tx *gorm.DB, playerID, now int64, wanted int, brief bool) ([]db.RewardDelivery, error) {
+	if wanted < 1 {
+		return []db.RewardDelivery{}, nil
+	}
 	result := make([]db.RewardDelivery, 0, wanted)
 	var cursor int64
 	for len(result) < wanted {
 		var rows []db.RewardDelivery
-		query := tx.Where("player_id=? AND id>? AND claimed_at=0 AND (expires_at=0 OR expires_at>?)", playerID, cursor, now).Order("id ASC").Limit(constUtil.P1RewardMaximumBatch)
+		limit := min(wanted-len(result), constUtil.P1RewardMaximumBatch)
+		// 源键按字节区分大小写；SUBSTR 在 MySQL varbinary 和 SQLite 上均保留精确前缀语义。
+		query := tx.Where("player_id=? AND id>? AND claimed_at=0 AND (expires_at=0 OR expires_at>?) AND SUBSTR(source_key,1,?)<>?", playerID, cursor, now, len(constUtil.P1ActivityRewardSourcePrefix), constUtil.P1ActivityRewardSourcePrefix).Order("id ASC").Limit(limit)
 		if brief {
 			query = query.Select("id", "player_id", "source_key", "claimed_at")
 		}
@@ -267,20 +271,9 @@ func eligiblePendingRewards75(tx *gorm.DB, playerID, now int64, wanted int, brie
 		if len(rows) == 0 {
 			break
 		}
-		eligible, err := rechargeRewardEligibility75(tx, rows, now)
-		if err != nil {
-			return nil, err
-		}
-		for _, row := range rows {
-			if eligible[row.ID] {
-				result = append(result, row)
-				if len(result) == wanted {
-					break
-				}
-			}
-		}
+		result = append(result, rows...)
 		cursor = rows[len(rows)-1].ID
-		if len(rows) < constUtil.P1RewardMaximumBatch {
+		if len(rows) < limit {
 			break
 		}
 	}

@@ -8,8 +8,10 @@ import (
 	"testing"
 	"time"
 
+	"google.golang.org/protobuf/proto"
 	"gorm.io/gorm"
 
+	"hyjs-server/constUtil"
 	"hyjs-server/db"
 	"hyjs-server/model"
 	pb "hyjs-server/model/protocol"
@@ -194,6 +196,7 @@ func TestActivity77PeriodUnclaimedDailyReissued(t *testing.T) {
 		t.Fatal(err)
 	}
 	var newID int64
+	var firstResources []*pb.BaseResource
 	err = db.GetIns().Transaction(func(tx *gorm.DB) error {
 		items, deliveries, e := f.s.p1PeriodItems(tx, f.id, &progress, snapshot, time.Now().UnixMilli())
 		if e != nil {
@@ -203,6 +206,7 @@ func TestActivity77PeriodUnclaimedDailyReissued(t *testing.T) {
 			t.Fatal("tiers")
 		}
 		newID = deliveries[0].ID
+		firstResources = items[0].GetRewardList()
 		for _, r := range deliveries {
 			if r.ID == 0 || r.ClaimedAt != 0 {
 				t.Fatal("new entitlement", r)
@@ -214,15 +218,22 @@ func TestActivity77PeriodUnclaimedDailyReissued(t *testing.T) {
 		t.Fatal(err)
 	}
 	before, _ := f.profile(t)
-	if _, err = f.s.RewardCenter(f.ctx, f.id, &pb.CSAddRewardsToPlayer{RewardIds: []int64{newID}}); err != nil {
-		t.Fatal("new notice claim", err)
+	if _, err = f.s.RewardCenter(f.ctx, f.id, &pb.CSAddRewardsToPlayer{RewardIds: []int64{newID}}); err == nil || err.Error() != constUtil.P1ActivityRewardPageOnly {
+		t.Fatal("new activity notice accepted by center", err)
+	}
+	claim := &pb.CSActivityReward{ActivityId: proto.String(cfg.ID), Index: proto.Int32(1), GetResources: firstResources}
+	if _, err = f.s.P1Activity(f.ctx, f.id, claim); err != nil {
+		t.Fatal("new activity claim", err)
 	}
 	after, _ := f.profile(t)
 	if after.GetCoin()-before.GetCoin() != 3000000 {
 		t.Fatal("wrong new coin reward")
 	}
-	if _, err = f.s.RewardCenter(f.ctx, f.id, &pb.CSAddRewardsToPlayer{RewardIds: []int64{newID}}); err != nil {
-		t.Fatal("claim retry", err)
+	if _, err = f.s.P1Activity(f.ctx, f.id, claim); err != nil {
+		t.Fatal("activity claim retry", err)
+	}
+	if out, err := f.s.RewardCenter(f.ctx, f.id, &pb.CSAddRewardsToPlayer{RewardIds: []int64{newID}}); err != nil || len(out[0].(*pb.SCAddRewardsToPlayer).GetResult().GetSimps()) != 0 {
+		t.Fatal("claimed center retry changed", err)
 	}
 	retried, _ := f.profile(t)
 	if retried.GetCoin() != after.GetCoin() {

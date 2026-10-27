@@ -556,6 +556,7 @@ onUnmounted(() => {
 
 <style scoped>
 .template-inline { padding: 0; }
+.template-inline .template-footer { bottom: -20px; }
 .template-editor-actions { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
 .template-count { margin-left: auto; font-variant-numeric: tabular-nums; }
 .template-help { color: rgb(var(--base-text-color) / .65); font-size: 13px; line-height: 1.7; margin: 0 0 12px; }
@@ -603,6 +604,9 @@ onUnmounted(() => {
   margin-top: 20px;
   border-top: 1px solid rgb(var(--base-text-color) / 0.08);
   z-index: 3;
+}
+@media (max-width: 800px) {
+  .template-inline .template-footer { bottom: -16px; }
 }
 @media (max-width: 760px) {
   .template-count {

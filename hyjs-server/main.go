@@ -15,6 +15,7 @@ import (
 	"hyjs-server/handler"
 	"hyjs-server/httpClient"
 	"hyjs-server/middleware"
+	"hyjs-server/model"
 	"hyjs-server/routes"
 	"hyjs-server/service"
 	"net"
@@ -51,6 +52,7 @@ func run() error {
 		applyGrowth         = flag.Bool("apply-growth74", false, "apply the authorized growth configuration during maintenance, then exit")
 		applyGrowth75       = flag.Bool("apply-growth75", false, "apply audited publication, clock repair and growth75 economy during maintenance, then exit")
 		applyActivity77     = flag.Bool("apply-activity77", false, "apply reviewed activity, welfare and shop repairs during maintenance, then exit")
+		applyFeedback78     = flag.Bool("apply-feedback78", false, "apply the reviewed feedback78 configuration during maintenance, then exit")
 		restoreVIP10        = flag.Bool("restore-vip10-book", false, "restore the audited VIP10 book product during maintenance, then exit")
 		previewCalendar     = flag.Bool("preview-activity-calendar", false, "read the activity calendar restore candidate as JSON, then exit")
 		restoreCalendar     = flag.String("restore-activity-calendar", "", "apply the reviewed calendar restore request during maintenance, then exit")
@@ -61,7 +63,7 @@ func run() error {
 	)
 	flag.Parse()
 	maintenanceCommands := 0
-	for _, selected := range []bool{*applyGrowth, *applyGrowth75, *applyActivity77, *restoreVIP10, *warmRushPlayer != 0, *previewCalendar, *restoreCalendar != "", *calendarMaintenance != ""} {
+	for _, selected := range []bool{*applyGrowth, *applyGrowth75, *applyActivity77, *applyFeedback78, *restoreVIP10, *warmRushPlayer != 0, *previewCalendar, *restoreCalendar != "", *calendarMaintenance != ""} {
 		if selected {
 			maintenanceCommands++
 		}
@@ -120,7 +122,7 @@ func run() error {
 	case "mysql":
 		mc := config.AppConfigIns.MysqlConfig
 		connect := db.InitGameMySQL
-		if *previewCalendar || *restoreCalendar != "" || *calendarMaintenance != "" || *restoreVIP10 {
+		if *previewCalendar || *restoreCalendar != "" || *calendarMaintenance != "" || *restoreVIP10 || *applyFeedback78 {
 			connect = db.InitExistingGameMySQL
 		}
 		if err := connect(ctx, db.MySQLConfig{Host: mc.Host, User: mc.User, Password: mc.Pass, Database: mc.DbName}); err != nil {
@@ -139,6 +141,16 @@ func run() error {
 	}
 	defer sqlDB.Close()
 	s := &service.GameService{Host: cfg.AdvertiseHost, ServerID: cfg.ServerID}
+	if *applyFeedback78 {
+		// 仅使用既有管理员及全服日历；业务事务内部复核维护、管理员和时钟。
+		var user db.AdminUser
+		if err = db.GetIns().WithContext(ctx).Where("enabled=? AND role=?", true, constUtil.AdminRoleAdmin).Order("id").First(&user).Error; err != nil {
+			return err
+		}
+		ctx = context.WithValue(ctx, constUtil.AdminServerScopeContextKey, s.OriginalServerID())
+		s.ServerClockReady = true
+		return s.ApplyFeedback78Config(ctx, &model.AdminPrincipal{UserID: user.ID, Username: user.Username, Role: user.Role})
+	}
 	if *applyActivity77 {
 		if err = s.CheckActivity77Maintenance(ctx); err != nil {
 			return err

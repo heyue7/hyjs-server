@@ -135,7 +135,7 @@ func (s *GameService) RewardCenter(ctx context.Context, id int64, request proto.
 			if err != nil {
 				return err
 			}
-			if err := projectPeriodRewardNotices(tx, id, rows); err != nil {
+			if err := projectGuildDonationNotices78(tx, id, rows); err != nil {
 				return err
 			}
 			result := &pb.SCQueryUserReward{}
@@ -164,21 +164,17 @@ func (s *GameService) RewardCenter(ctx context.Context, id int64, request proto.
 				if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ? AND player_id = ?", rewardID, id).First(&row).Error; err != nil {
 					return errors.New("奖励不存在或不属于当前角色")
 				}
+				if row.ClaimedAt == 0 && strings.HasPrefix(row.SourceKey, constUtil.P1ActivityRewardSourcePrefix) {
+					return errors.New(constUtil.P1ActivityRewardPageOnly)
+				}
 				if row.ClaimedAt == 0 && row.ExpiresAt != 0 && row.ExpiresAt <= now {
 					return errors.New("奖励已过期")
 				}
 				rows = append(rows, row)
 			}
-			eligible, err := rechargeRewardEligibility75(tx, rows, now)
-			if err != nil {
-				return err
-			}
 			for _, row := range rows {
 				if row.ClaimedAt != 0 {
 					continue
-				}
-				if !eligible[row.ID] {
-					return errors.New("本期充值条件未达成")
 				}
 				current, err := s.GrantFixedReward(player, game, row.Rewards)
 				if err != nil {

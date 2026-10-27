@@ -8,4 +8,5 @@ const (
 	P13GuildDonationBadgeDailyLimit int64 = 15
 	P13GuildDonationBadgeTitle            = "公会金币捐献徽章"
 	P13GuildDonationBadgeContent          = "本地公会活动奖励：本次已实际捐献100000金币，领取2枚公会徽章。徽章可用于原公会捐献；每日最多15次，徽章捐献不再返还徽章。"
+	P13GuildDonationBadgeNotice78         = "已完成公会金币捐献%d金币，奖励已发放。"
 )

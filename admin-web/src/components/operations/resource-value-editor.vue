@@ -113,13 +113,18 @@ function reset() {
 </template>
 
 <style scoped>
-.resource-value-editor { display: grid; gap: 10px; min-width: 0; width: 100%; }
+.resource-value-editor { display: grid; gap: 10px; min-width: 0; width: 100%; container-type: inline-size; }
 .resource-value-row { display: grid; grid-template-columns: minmax(0, 1fr) 150px auto; gap: 10px; align-items: start; }
 .resource-value-resource { min-width: 0; }
 .resource-value-single .resource-value-row { grid-template-columns: minmax(0, 1fr) 96px; }
 .resource-value-error { margin: 0; color: var(--n-feedback-text-color-error, #d03050); font-size: 13px; line-height: 1.6; }
 .resource-value-editor > .n-button { justify-self: start; }
 @media (max-width: 640px) {
+  .resource-value-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .resource-value-resource { grid-column: 1 / -1; }
+  .resource-value-single .resource-value-row { grid-template-columns: minmax(0, 1fr); }
+}
+@container (max-width: 360px) {
   .resource-value-row { grid-template-columns: minmax(0, 1fr) auto; }
   .resource-value-resource { grid-column: 1 / -1; }
   .resource-value-single .resource-value-row { grid-template-columns: minmax(0, 1fr); }

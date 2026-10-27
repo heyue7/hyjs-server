@@ -1,12 +1,14 @@
 """Install one verified artifact set in place, preserving all persistent data."""
 from pathlib import Path
 import argparse
+import atexit
 import fcntl
 import gzip
 import hashlib
 import ipaddress
 import json
 import os
+import re
 import shutil
 import subprocess
 import time
@@ -20,6 +22,7 @@ parser.add_argument('--migrate-role-wallets', action='store_true')
 parser.add_argument('--expected-live-revision')
 parser.add_argument('--apply-growth74', action='store_true')
 parser.add_argument('--apply-activity77', action='store_true', help='Apply activity77 under maintenance')
+parser.add_argument('--apply-feedback78', action='store_true', help='Apply the reviewed feedback78 configuration under maintenance')
 parser.add_argument('--apply-growth75', action='store_true')
 parser.add_argument('--restore-activity-calendar')
 parser.add_argument('--warm-rush-history-player', action='append', type=int, default=[])
@@ -27,12 +30,15 @@ args = parser.parse_args()
 if args.restore_activity_calendar:
     import uuid
     assert str(uuid.UUID(args.restore_activity_calendar)) == args.restore_activity_calendar
-    assert args.expected_live_revision and not any((args.initial_db, args.migrate_role_wallets, args.apply_growth74, args.apply_growth75, args.apply_activity77)), 'Calendar restore requires a standalone maintenance cutover'
-assert sum((args.apply_growth74, args.apply_growth75, args.apply_activity77)) <= 1, 'Choose one explicit growth deployment version'
+    assert args.expected_live_revision and not any((args.initial_db, args.migrate_role_wallets, args.apply_growth74, args.apply_growth75, args.apply_activity77, args.apply_feedback78)), 'Calendar restore requires a standalone maintenance cutover'
+assert sum((args.apply_growth74, args.apply_growth75, args.apply_activity77, args.apply_feedback78)) <= 1, 'Choose one explicit maintenance deployment version'
 if args.apply_activity77:
     assert args.expected_live_revision and not args.initial_db and not args.migrate_role_wallets, 'Activity77 requires a pinned maintenance cutover'
 if args.apply_growth75:
     assert args.expected_live_revision and not args.initial_db and not args.migrate_role_wallets, 'Growth75 requires a pinned maintenance cutover'
+if args.apply_feedback78:
+    assert args.expected_live_revision and re.fullmatch(r'[0-9a-f]{40,64}', args.expected_live_revision), 'Feedback78 requires an exact live revision'
+    assert not any((args.initial_db, args.provision_ingress, args.migrate_role_wallets, args.warm_rush_history_player)), 'Feedback78 requires a standalone maintenance cutover'
 os.umask(0o077)
 stage = Path(args.stage).resolve()
 ROOT = stage.parent.parent
@@ -151,9 +157,16 @@ if args.restore_activity_calendar:
     compose('run', '--rm', '--no-deps', '-T', 'app', '--env', 'test', '--tables', '/app/tables', '--calendar-maintenance', 'begin', '--log-file', '/app/logs/calendar-maintenance.log')
     assert mysql('SELECT maintenance FROM client_update_policy WHERE id=1;').strip() == '1'
     compose('stop', '-t', '30', 'app')
-if args.apply_growth74 or args.apply_growth75 or args.apply_activity77:
+if args.apply_growth74 or args.apply_growth75 or args.apply_activity77 or args.apply_feedback78:
     assert args.expected_live_revision and not args.initial_db
     assert mysql('SELECT maintenance FROM client_update_policy WHERE id=1;').strip() == '1', 'Growth apply requires maintenance'
+    if args.apply_feedback78:
+        assert (ROOT / 'migration.json').is_file() and not (ROOT / 'migration.json').is_symlink(), 'Feedback78 requires an existing database and authenticated backup'
+        import feedback78_activation
+        feedback78_guard = feedback78_activation.Feedback78CutoverGuard(compose)
+        # Cover backup, CLI, startup, health and post-health failures until the release is recorded.
+        atexit.register(feedback78_guard.stop_if_unfinished)
+        feedback78_guard.install_signal_handlers()
     compose('stop', '-t', '30', 'app')
 if args.migrate_role_wallets:
     assert args.expected_live_revision and not args.initial_db and (ROOT / 'migration.json').exists()
@@ -256,6 +269,14 @@ if args.apply_activity77:
         compose('stop', '-t', '30', 'app')
         raise RuntimeError('Activity77 failed under maintenance. App remains stopped; preserve the verified backup and private activity77 manifest for inspection; do not automatically restore the database.') from None
 
+if args.apply_feedback78:
+    try:
+        manifest['feedback78Applied'] = feedback78_activation.activate_feedback78(
+            mysql, compose, ROOT / 'backups', manifest['revision'], verified_backup,
+            manifest['files']['app/hyjs-server'])
+    except Exception:
+        raise RuntimeError('Feedback78 failed under maintenance. App remains stopped; preserve the authenticated backup and private feedback78 manifest for inspection; do not automatically restore the database.') from None
+
 if args.restore_activity_calendar:
     import calendar_restore_activation
     try:
@@ -273,13 +294,13 @@ for _ in range(90):
     except Exception:
         time.sleep(2)
 else:
-    if args.migrate_role_wallets or args.apply_activity77:
+    if args.migrate_role_wallets or args.apply_activity77 or args.apply_feedback78:
         compose('stop', '-t', '30', 'app')
     raise SystemExit('Application health failed; data and prior deployed.json preserved. Fix/retry this script, or deploy its recorded Git commit from a clean checkout; do not restore the database automatically.')
 
-if args.apply_activity77:
+if args.apply_activity77 or args.apply_feedback78:
     try:
-        assert mysql('SELECT maintenance FROM client_update_policy WHERE id=1;').strip() == '1', 'Activity77 service lost maintenance after health check'
+        assert mysql('SELECT maintenance FROM client_update_policy WHERE id=1;').strip() == '1', 'Maintenance changed after health check'
     except Exception:
         compose('stop', '-t', '30', 'app')
         raise
@@ -325,4 +346,6 @@ if old_image:
     references = run('docker', 'ps', '-a', '--filter', 'ancestor=' + old_image, '--format={{.ID}}').stdout.strip()
     if not references:
         subprocess.run(['docker', 'image', 'rm', old_image], capture_output=True)
+if args.apply_feedback78:
+    feedback78_guard.complete = True
 print(json.dumps({'status': 'DEPLOYED', 'revision': installed, 'binarySHA256': manifest['files']['app/hyjs-server']}))

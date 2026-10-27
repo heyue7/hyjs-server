@@ -19,6 +19,7 @@ from hyjs_managed_mysql import ManagedMySQL
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--run', action='store_true')
+    parser.add_argument('--feedback78', action='store_true', help='Use the separate feedback78 fixture and artifacts')
     args = parser.parse_args()
     if not args.run:
         parser.print_help()
@@ -26,25 +27,30 @@ def main():
     for port in (18861, 18862):
         with socket.socket() as probe:
             probe.bind(('127.0.0.1', port))
-    private = ROOT / '.local-env/activity77-ui'
+    private = ROOT / ('.local-env/feedback78-ui' if args.feedback78 else '.local-env/activity77-ui')
     private.mkdir(mode=0o700, parents=True, exist_ok=True)
     credentials = private / 'credentials.json'
     if credentials.exists():
         raise RuntimeError('Existing owned fixture must be reconciled before retry')
-    evidence = ROOT / 'analysis/activity-growth77/qa-runtime'
+    evidence = ROOT / ('analysis/feedback78/qa-runtime' if args.feedback78 else 'analysis/activity-growth77/qa-runtime')
+    build = ROOT / ('build/feedback78' if args.feedback78 else 'build/activity-growth77')
+    fixture_name = 'TestFeedback78PhoneFixture' if args.feedback78 else 'TestActivity77PhoneFixture'
     evidence.mkdir(parents=True, exist_ok=True)
     pool = ManagedMySQL()
     process = None
     log = None
     try:
-        connection = pool.allocate('p1_activity77_phone')
+        connection = pool.allocate('p1_activity77_phone_f78' if args.feedback78 else 'p1_activity77_phone')
         env = dict(os.environ, **connection.env(), GOMAXPROCS='2', GOMEMLIMIT='768MiB',
                    HYJS_P1_MYSQL_HOST=connection.host, HYJS_P1_MYSQL_USER=connection.user,
                    HYJS_P1_MYSQL_PASSWORD=connection.password, HYJS_P1_MYSQL_DATABASE=connection.database,
                    HYJS_ACTIVITY77_PHONE_FIXTURE_FILE=str(credentials),
                    HYJS_GAME_ACCOUNTS_DATABASE='', HYJS_CONFIG_FILE=str(ROOT / 'hyjs-server/config.example.yaml'),
                    HYJS_LOG_MAX_AGE='1', HYJS_GORM_LOG_LEVEL='silent')
-        fixture = subprocess.run([str(ROOT / 'build/activity-growth77/service.test'), '-test.run', '^TestActivity77PhoneFixture$', '-test.v', '-test.timeout', '3m'],
+        if args.feedback78:
+            env.pop('HYJS_ACTIVITY77_PHONE_FIXTURE_FILE')
+            env['HYJS_FEEDBACK78_PHONE_FIXTURE_FILE'] = str(credentials)
+        fixture = subprocess.run([str(build / 'service.test'), '-test.run', '^' + fixture_name + '$', '-test.v', '-test.timeout', '3m'],
                                  cwd=ROOT / 'hyjs-server/service', env=env, text=True, capture_output=True, timeout=200)
         (evidence / 'fixture.log').write_text(pool.redact(fixture.stdout + fixture.stderr))
         if fixture.returncode != 0 or not credentials.is_file():
@@ -52,7 +58,7 @@ def main():
         login = json.loads(credentials.read_text())
         if login['schema'] != connection.database or login['playerId'] <= 1:
             raise RuntimeError('Isolated login identity mismatch')
-        binary = ROOT / 'build/activity-growth77/hyjs-server'
+        binary = build / 'hyjs-server'
         log = (evidence / 'server.stdout.log').open('w')
         process = subprocess.Popen([str(binary), '--env', 'test', '--bind', '127.0.0.1', '--advertise-host', '127.0.0.1',
                                     '--http-port', '18861', '--tcp-port', '18862', '--server-id', '1', '--tables', str(ROOT / 'analysis/tables'),

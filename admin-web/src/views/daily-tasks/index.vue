@@ -143,12 +143,14 @@ onBeforeUnmount(() => { alive = false; pendingDialog?.dispose(); window.removeEv
 .daily-tasks-page { gap: 16px; }
 .daily-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .daily-heading h1 { margin: 0; font-size: 20px; font-weight: 600; }
-.daily-list { min-width: 0; }
+.daily-list { min-width: 0; padding: 0 20px; border: 1px solid rgb(var(--base-text-color) / .08); border-radius: 6px; background: rgb(var(--container-bg-color)); }
 .daily-row { display: grid; grid-template-columns: minmax(200px, 1fr) minmax(0, 2fr); gap: 16px; align-items: start; padding: 16px 0; border-bottom: 1px solid var(--n-border-color, #d8dee8); }
+.daily-row:last-child { border-bottom: 0; }
 .daily-condition { min-width: 0; }
 .daily-condition h2 { margin: 0 0 4px; font-size: 15px; font-weight: 600; }
 .daily-condition p, .daily-save p { margin: 0; line-height: 1.65; }
-.daily-save { display: grid; gap: 16px; max-width: 760px; }
+.daily-save { display: grid; gap: 16px; max-width: 760px; padding-top: 20px; border-top: 1px solid rgb(var(--base-text-color) / .09); }
 .daily-save > .n-button { justify-self: start; }
-@media (max-width: 680px) { .daily-row { grid-template-columns: minmax(0, 1fr); gap: 8px; } }
+@media (max-width: 680px) { .daily-list { padding: 0 16px; } .daily-row { grid-template-columns: minmax(0, 1fr); gap: 8px; } }
+@media (width < 640px) { .daily-heading { justify-content: flex-end; } .daily-heading h1 { display: none; } }
 </style>

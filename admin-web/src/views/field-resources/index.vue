@@ -86,7 +86,9 @@ onMounted(load);
 .field-resource-page { max-width: 900px; }
 h3 { font-size: 16px; font-weight: 600; margin: 0 0 12px; }
 p { margin: 0 0 20px; line-height: 1.6; }
+.field-resource-page .n-form { max-width: 720px; }
 .resource-group { margin-bottom: 24px; }
+.resource-group + .resource-group { padding-top: 20px; border-top: 1px solid rgb(var(--base-text-color) / .09); }
 .n-select { max-width: 560px; }
 .n-input-number { width: 220px; max-width: 100%; }
 .resource-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 12px; }

@@ -18,6 +18,7 @@ const emit = defineEmits<{ amount: [id: string, value: number | null]; remove: [
   </div>
 </template>
 <style scoped>
-.batch-lines{margin:16px 0}.batch-heading{margin-bottom:8px}.batch-line{display:grid;grid-template-columns:40px minmax(0,1fr) 150px auto;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid rgb(var(--base-text-color)/.08)}.batch-name{min-width:0;overflow-wrap:anywhere}.batch-line :deep(.resource-thumb),.batch-line :deep(.resource-thumb-placeholder){flex:none;width:40px!important;max-width:40px;background:transparent}
+.batch-lines{margin:16px 0;container-type:inline-size}.batch-heading{margin-bottom:8px}.batch-line{display:grid;grid-template-columns:40px minmax(0,1fr) 150px auto;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid rgb(var(--base-text-color)/.08)}.batch-name{min-width:0;overflow-wrap:anywhere}.batch-line :deep(.resource-thumb),.batch-line :deep(.resource-thumb-placeholder){flex:none;width:40px!important;max-width:40px;background:transparent}
 @media(max-width:480px){.batch-line{grid-template-columns:40px minmax(0,1fr) auto}.batch-line :deep(.n-input-number){grid-column:2;grid-row:2;width:100%}.batch-line :deep(.n-button){grid-column:3;grid-row:1 / 3}}
+@container(max-width:420px){.batch-line{grid-template-columns:40px minmax(0,1fr) auto}.batch-line :deep(.n-input-number){grid-column:2;grid-row:2;width:100%}.batch-line :deep(.n-button){grid-column:3;grid-row:1 / 3}}
 </style>

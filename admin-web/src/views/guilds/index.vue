@@ -532,7 +532,7 @@ onMounted(async () => {
 
     <NModal :show="memberOpen" :closable="!busy" :mask-closable="!busy" @update:show="!$event && memberGuard.requestClose()" preset="card" title="编辑公会成员" style="width: min(560px, calc(100vw - 32px))">
       <NAlert v-if="memberError" type="error" :title="memberError" class="mb-12px" />
-      <NForm label-placement="left" label-width="130" :disabled="busy || !canWrite">
+      <NForm :label-placement="formLabelPlacement" :label-width="viewportWidth < 600 ? undefined : 130" :disabled="busy || !canWrite">
         <NFormItem label="角色"><span class="ops-mono">{{ memberTarget?.playerName }} · #{{ memberTarget?.playerId }}</span></NFormItem>
         <NFormItem label="累计贡献"><NInputNumber v-model:value="memberDraft.contribution" :min="0" /></NFormItem>
         <NFormItem label="可用贡献"><NInputNumber v-model:value="memberDraft.spendableContribution" :min="0" :max="2147483647" :precision="0" /></NFormItem>
@@ -561,7 +561,7 @@ onMounted(async () => {
     <NModal :show="Boolean(removeTarget)" preset="card" title="移除公会成员" style="width: min(540px, calc(100vw - 32px))" :closable="!busy" :mask-closable="!busy" @update:show="!$event && removeGuard.requestClose()">
       <NAlert v-if="removeError" type="error" :title="removeError" class="mb-12px" />
       <p>将 <strong>{{ removeTarget?.playerName }}</strong> 移出公会，24小时退会冷却和房间/公会战撤权立即生效；历史记录与奖励保留。</p>
-      <NForm label-placement="left" label-width="100" :disabled="busy || !canWrite">
+      <NForm :label-placement="formLabelPlacement" :label-width="viewportWidth < 600 ? undefined : 100" :disabled="busy || !canWrite">
         <NFormItem label="移除原因" required><NInput v-model:value="removeReason" maxlength="500" /></NFormItem>
       </NForm>
       <template #footer>
@@ -572,7 +572,7 @@ onMounted(async () => {
     <NModal :show="dissolveOpen" :closable="!busy" :mask-closable="!busy" @update:show="!$event && dissolveGuard.requestClose()" preset="card" title="二次确认：解散公会" style="width: min(620px, calc(100vw - 32px))">
       <NAlert type="error" title="解散会移除全部成员并撤销公会频道/公会战资格，且不能撤销。历史回执、祈祷、战争结算和已发奖励保留。" class="mb-12px" />
       <NAlert v-if="dissolveError" type="error" :title="dissolveError" class="mb-12px" />
-      <NForm label-placement="left" label-width="120" :disabled="busy || !canWrite">
+      <NForm :label-placement="formLabelPlacement" :label-width="viewportWidth < 600 ? undefined : 120" :disabled="busy || !canWrite">
         <NFormItem label="精确公会名" required><NInput v-model:value="dissolveName" :placeholder="detail?.name" /></NFormItem>
         <NFormItem label="解散原因" required><NInput v-model:value="dissolveReason" maxlength="500" /></NFormItem>
       </NForm>

@@ -117,3 +117,66 @@
 
 /* Shared by render callbacks as well as templates; scoped page rules cannot style h() siblings. */
 .ops-table-actions{display:flex;align-items:center;gap:8px;flex-wrap:nowrap}.ops-table-actions>.n-button{flex-shrink:0}
+
+/* Keep repeated operations on a stable reading axis across lists and overlays. */
+.ops-page .n-data-table,
+.n-drawer .n-data-table,
+.n-modal .n-data-table { min-width: 0; max-width: 100%; }
+.ops-page .n-data-table-th,
+.n-drawer .n-data-table-th,
+.n-modal .n-data-table-th { font-size: 13px; font-weight: 500; }
+.ops-page .n-data-table-td,
+.n-drawer .n-data-table-td,
+.n-modal .n-data-table-td { line-height: 1.55; vertical-align: middle; }
+.ops-page .n-data-table .n-button__content,
+.n-drawer .n-data-table .n-button__content,
+.n-modal .n-data-table .n-button__content { line-height: 1.5; }
+.ops-page .n-form-item-label,
+.n-modal .n-form-item-label,
+.n-drawer .n-form-item-label { font-weight: 500; }
+.ops-page .n-form-item-feedback-wrapper,
+.n-modal .n-form-item-feedback-wrapper,
+.n-drawer .n-form-item-feedback-wrapper { overflow-wrap: anywhere; }
+.ops-page .n-form-item-feedback-wrapper:not(:empty),
+.n-modal .n-form-item-feedback-wrapper:not(:empty),
+.n-drawer .n-form-item-feedback-wrapper:not(:empty) { padding-bottom: 8px; }
+.ops-filters { row-gap: 10px; }
+.ops-pagination { margin-top: 18px; }
+.reward-list { container-type: inline-size; }
+
+@container (max-width: 360px) {
+  .reward-list-line { grid-template-columns: minmax(0, 1fr) auto; }
+  .reward-list-line > :first-child { grid-column: 1 / -1; }
+}
+
+/* Keep a long editor's title and footer available while its content scrolls. */
+.n-card.n-modal {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100dvh - 32px);
+}
+.n-card.n-modal > .n-card-header,
+.n-card.n-modal > .n-card__footer { flex-shrink: 0; }
+.n-card.n-modal > .n-card__content { min-height: 0; overflow: auto; }
+.n-card.n-modal > .n-card__content:first-child { padding-top: 20px; }
+.n-card.n-modal > .n-card__content:last-child { padding-bottom: 20px; }
+.n-drawer .n-drawer-body-content-wrapper { min-width: 0; }
+.n-drawer .n-drawer-footer { gap: 12px; }
+
+@media (max-width: 800px) {
+  .ops-pagination { margin-top: 16px; }
+  .n-card.n-modal > .n-card__content:first-child { padding-top: 16px; }
+  .n-card.n-modal > .n-card__content:last-child { padding-bottom: 16px; }
+}
+@media (max-width: 480px) {
+  .ops-filters > .n-space { max-width: 100%; }
+  .ops-drawer-actions { flex-wrap: wrap; }
+  .n-modal .ops-drawer-actions > .n-button,
+  .n-drawer .ops-drawer-actions > .n-button { flex: 1 1 auto; }
+}
+.n-base-selection-input__content > .activity-option-label {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap !important;
+}

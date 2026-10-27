@@ -1154,7 +1154,7 @@ onUnmounted(() => {
       </template>
       <template #footer><NSpace justify="end"><NButton @click="activityPreview = null">关闭</NButton></NSpace></template>
     </NModal>
-    <NModal :show="definitionEditorOpen" preset="card" class="activity-editor-modal" :mask-closable="false" :close-on-esc="false" @update:show="!$event && closeDefinitionEditor()">
+    <NModal :show="definitionEditorOpen" preset="card" :title="canWrite ? '编辑活动模板' : '查看活动模板'" class="activity-editor-modal" :mask-closable="false" :close-on-esc="false" @update:show="!$event && closeDefinitionEditor()">
       <ActivityTemplateWorkspace ref="definitionEditor" inline @saved="definitionSaved" @deleted="definitionDeleted" @closed="definitionEditorOpen = false" />
     </NModal>
   </div>

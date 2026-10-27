@@ -67,15 +67,15 @@ func TestPeriodRewardNoticeHistoryBothListsPreserveReceipt(t *testing.T) {
 			t.Fatal(err)
 		}
 		list := messages[0].(*pb.SCQueryUserReward).GetRewardItemInfoList()
-		if len(list) != 1 || list[0].GetRewardId() != saved.ID || list[0].GetRewardTitle() != "主线通关" || list[0].GetRewardContent() != "主线通关达到3次，奖励已发放。" {
-			t.Fatal("reward copy", list)
+		if len(list) != 0 {
+			t.Fatal("activity receipt appeared at reward center", list)
 		}
 		messages, err = f.s.Mailbox(f.ctx, f.id, &pb.CSMailList{MailType: proto.String("allMail")})
 		if err != nil {
 			t.Fatal(err)
 		}
 		boxes := messages[0].(*pb.SCMailList).GetMailBoxList()
-		if len(boxes) != 1 || len(boxes[0].GetMailList()) != 1 || boxes[0].GetMailList()[0].GetTitle() != list[0].GetRewardTitle() || boxes[0].GetMailList()[0].GetContent() != list[0].GetRewardContent() {
+		if len(boxes) != 1 || len(boxes[0].GetMailList()) != 1 || boxes[0].GetMailList()[0].GetTitle() != "主线通关" || boxes[0].GetMailList()[0].GetContent() != "主线通关达到3次，奖励已发放。" {
 			t.Fatal("mail copy", boxes)
 		}
 	}
@@ -87,13 +87,44 @@ func TestPeriodRewardNoticeHistoryBothListsPreserveReceipt(t *testing.T) {
 	if !proto.Equal(before, after) {
 		t.Fatal("copy changed player resources")
 	}
+	if _, err := f.s.RewardCenter(f.ctx, f.id, &pb.CSAddRewardsToPlayer{RewardIds: []int64{saved.ID}}); err == nil || err.Error() != constUtil.P1ActivityRewardPageOnly {
+		t.Fatal("unclaimed activity receipt accepted at center", err)
+	}
+	deleteMail := &pb.CSDeleteMail{Type: proto.Int32(mail.Type), CreateTime: proto.Int64(mail.CreatedAt)}
+	if _, err := f.s.Mailbox(f.ctx, f.id, deleteMail); err == nil || err.Error() != constUtil.P1ActivityRewardPageOnly {
+		t.Fatal("unclaimed historical mail pointed to the wrong claim page", err)
+	}
+	info, err := f.s.P1Activity(f.ctx, f.id, &pb.CSActivityInfo{ActivityId: proto.String(cfg.ID)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	item := info[0].(*pb.SCActivityInfo).GetItemList()[0]
+	if item.GetStatus() != 1 {
+		t.Fatal("frozen activity no longer claimable", item)
+	}
+	claim := &pb.CSActivityReward{ActivityId: proto.String(cfg.ID), Index: proto.Int32(item.GetIndex()), GetResources: item.GetRewardList()}
 	for i := 0; i < 2; i++ {
-		if _, err := f.s.RewardCenter(f.ctx, f.id, &pb.CSAddRewardsToPlayer{RewardIds: []int64{saved.ID}}); err != nil {
+		if _, err := f.s.P1Activity(f.ctx, f.id, claim); err != nil {
 			t.Fatal(err)
 		}
 	}
 	after, _ = f.profile(t)
 	if after.GetCoin() != before.GetCoin()+17 {
 		t.Fatal("claim repeated or lost")
+	}
+	f.restart(t)
+	if out, err := f.s.RewardCenter(f.ctx, f.id, &pb.CSAddRewardsToPlayer{RewardIds: []int64{saved.ID}}); err != nil || len(out[0].(*pb.SCAddRewardsToPlayer).GetResult().GetSimps()) != 0 {
+		t.Fatal("claimed receipt did not remain idempotent at center", err)
+	}
+	info, err = f.s.P1Activity(f.ctx, f.id, &pb.CSActivityInfo{ActivityId: proto.String(cfg.ID)})
+	if err != nil || info[0].(*pb.SCActivityInfo).GetItemList()[0].GetStatus() != 2 {
+		t.Fatal("cold activity state lost claimed receipt", err)
+	}
+	cold, _ := f.profile(t)
+	if !proto.Equal(after, cold) {
+		t.Fatal("cold receipt retry changed assets")
+	}
+	if _, err = f.s.Mailbox(f.ctx, f.id, deleteMail); err != nil {
+		t.Fatal("claimed historical mail could not be deleted", err)
 	}
 }
