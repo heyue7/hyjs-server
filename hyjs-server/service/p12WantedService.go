@@ -278,7 +278,7 @@ func (s *GameService) DiscoverP12Wanted(tx *gorm.DB, id int64, player *pb.Player
 	}
 	record := db.P12WantedDiscovery{PlayerID: id, SourceKey: key, BusinessSource: businessSource, CreatedAt: now.UnixMilli(), Draw: -1, Odds: odds, Reason: "no-match", Source: constUtil.P12WantedLocalSource}
 	var active int64
-	if err = tx.Model(&db.P12WantedInstance{}).Where("finder_id=? AND server_id=? AND state=? AND expires_at>?", id, s.OriginalServerID(), constUtil.P12WantedActive, now.UnixMilli()).Count(&active).Error; err != nil {
+	if err = tx.Model(&db.P12WantedInstance{}).Where("finder_id=? AND server_id=? AND state=? AND created_at<=? AND expires_at>?", id, s.OriginalServerID(), constUtil.P12WantedActive, now.UnixMilli(), now.UnixMilli()).Count(&active).Error; err != nil {
 		return nil, nil, err
 	}
 	if active > 0 {
@@ -412,7 +412,7 @@ func (s *GameService) p12WantedList(ctx context.Context, id int64, now time.Time
 		}
 		out.Exploit, out.ExploitNum, out.MaxHurt, out.MaxHurtNum = proto.Int32(int32(min(own.Performance, math.MaxInt32))), proto.Int32(performanceRank), proto.Int32(int32(min(own.Damage, math.MaxInt32))), proto.Int32(damageRank)
 		var instances []db.P12WantedInstance
-		if err = tx.Where("server_id=? AND state=? AND expires_at>? AND (finder_id=? OR shared_at>0)", s.OriginalServerID(), constUtil.P12WantedActive, now.UnixMilli(), id).Order("created_at,id").Find(&instances).Error; err != nil {
+		if err = tx.Where("server_id=? AND state=? AND created_at<=? AND expires_at>? AND (finder_id=? OR (shared_at>0 AND shared_at<=?))", s.OriginalServerID(), constUtil.P12WantedActive, now.UnixMilli(), now.UnixMilli(), id, now.UnixMilli()).Order("created_at,id").Find(&instances).Error; err != nil {
 			return err
 		}
 		for index := range instances {
@@ -444,7 +444,7 @@ func (s *GameService) p12WantedShare(ctx context.Context, id int64, request *pb.
 		if err = tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&instance, "id=?", request.GetRebelId()).Error; err != nil {
 			return err
 		}
-		if instance.FinderID != id || instance.ServerID != s.OriginalServerID() || instance.State != constUtil.P12WantedActive || instance.ExpiresAt <= now.UnixMilli() || instance.CurrentHP <= 0 || instance.CurrentHP >= instance.MaxHP {
+		if instance.FinderID != id || instance.ServerID != s.OriginalServerID() || instance.State != constUtil.P12WantedActive || instance.CreatedAt > now.UnixMilli() || instance.ExpiresAt <= now.UnixMilli() || instance.CurrentHP <= 0 || instance.CurrentHP >= instance.MaxHP {
 			return errors.New(constUtil.P12WantedUnavailable)
 		}
 		if instance.SharedAt > 0 {
@@ -606,7 +606,7 @@ func (s *GameService) p12WantedStart(ctx context.Context, id int64, request *pb.
 		if err = tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&instance, "id=?", request.GetRebelId()).Error; err != nil {
 			return err
 		}
-		if instance.ServerID != s.OriginalServerID() || instance.FinderID != id && instance.SharedAt == 0 || instance.State != constUtil.P12WantedActive || instance.CreatedAt > now.UnixMilli() || instance.ExpiresAt <= now.UnixMilli() || instance.CurrentHP <= 0 {
+		if instance.ServerID != s.OriginalServerID() || instance.FinderID != id && (instance.SharedAt == 0 || instance.SharedAt > now.UnixMilli()) || instance.State != constUtil.P12WantedActive || instance.CreatedAt > now.UnixMilli() || instance.ExpiresAt <= now.UnixMilli() || instance.CurrentHP <= 0 {
 			return errors.New(constUtil.P12WantedUnavailable)
 		}
 		if err = p12WantedRecover(player, now); err != nil {

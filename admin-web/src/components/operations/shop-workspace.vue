@@ -150,7 +150,10 @@ async function load() {
     snapshot.value = { ...result.data, items: result.data.items || [] };
     catalogueError.value = '';
     const resources = Object.fromEntries((result.data.resources || []).map(item => [item.id, item]));
-    const ids = [...new Set(result.data.items.flatMap(row => [...row.rewards.map(reward => reward.resourceId), row.cost?.resourceId, ...(row.quantityTiers || []).map(tier => tier.cost.resourceId)]).filter(Boolean))].filter(id => !resources[id]);
+    const ids = [...new Set([
+      ...result.data.items.flatMap(row => [...row.rewards.map(reward => reward.resourceId), row.cost?.resourceId, ...(row.quantityTiers || []).map(tier => tier.cost.resourceId)]),
+      result.data.settings.refresh?.cost.resourceId
+    ].filter((id): id is string => Boolean(id)))].filter(id => !resources[id]);
     try {
       const batches = [];
       for (let index = 0; index < ids.length; index += 100)

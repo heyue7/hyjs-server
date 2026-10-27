@@ -2883,6 +2883,8 @@
   "credit_shop": {
     "slots": 6,
     "slot_stock": 1,
+    "source_shared_stock": -1,
+    "stock_semantics": "每个报价槽限购1次；来源共享库存不限量，保留角色日限与账号周限",
     "draw": "weighted_with_replacement",
     "weight_total": 10000,
     "initial_generation": 1,

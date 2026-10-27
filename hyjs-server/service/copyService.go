@@ -1012,7 +1012,7 @@ func (s *GameService) copyFightEnd(ctx context.Context, id int64, b *pb.CSCopyFi
 			}
 			if s.P12WantedReady {
 				// 整关成功才按原时段概率抽取；已结算回执在前段返回，不重复发现或奖励。
-				found, gain, err := s.DiscoverP12Wanted(tx, id, player, g, "copy-complete:"+fight.Start.GetFightId(), benefitAt)
+				found, gain, err := s.DiscoverP12Wanted(tx, id, player, g, "copy-complete:"+fight.Start.GetFightId(), LocalPlayAt(ctx, benefitAt))
 				if err != nil {
 					return err
 				}

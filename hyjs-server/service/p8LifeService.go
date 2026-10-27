@@ -169,7 +169,7 @@ func (s *GameService) p8SkillBook(ctx context.Context, id int64, b *pb.CSItemUse
 			return err
 		}
 		out.Cost = proto.Clone(cost).(*pb.BaseResource)
-		return s.RecordP1Event(tx, id, fmt.Sprintf("p8:skill-book:%d", stamp), constUtil.P8EventLifeBook, 1, time.UnixMilli(now))
+		return s.RecordP1Event(tx, id, fmt.Sprintf("p8:skill-book:%d", stamp), constUtil.P8EventLifeBook, 1, LocalPlayAt(tx.Statement.Context, time.UnixMilli(now)))
 	})
 }
 
@@ -451,7 +451,7 @@ func (s *GameService) p8HpRecover(ctx context.Context, id int64, b *pb.CSHpRecov
 		if stamp == 0 {
 			source = fmt.Sprintf("p8:food:ready:%d", state.FoodReadyAt)
 		}
-		return s.RecordP1Event(tx, id, source, constUtil.P8EventHpRecover, 1, time.UnixMilli(now))
+		return s.RecordP1Event(tx, id, source, constUtil.P8EventHpRecover, 1, LocalPlayAt(tx.Statement.Context, time.UnixMilli(now)))
 	})
 }
 

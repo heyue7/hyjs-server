@@ -271,7 +271,7 @@ func (s *GameService) p9PetHudongAt(ctx context.Context, id int64, request *pb.C
 		}
 		out.Pet = proto.Clone(pet).(*pb.Pet)
 		if s.P1Ready {
-			return s.RecordP1Event(tx, id, "p9:hudong:"+strconv.FormatInt(stamp, 10), "pet_hudong", 1, now)
+			return s.RecordP1Event(tx, id, "p9:hudong:"+strconv.FormatInt(stamp, 10), "pet_hudong", 1, LocalPlayAt(ctx, now))
 		}
 		return nil
 	})

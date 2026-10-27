@@ -97,6 +97,12 @@ func p12MechanismScope(input *model.FrozenBattleInput, mode int32) error {
 		}
 	}
 	maxHeroes := 4
+	if mode == 8 {
+		maxHeroes = constUtil.P12WantedMaxHeroes
+	}
+	if mode == 18 {
+		maxHeroes = constUtil.P12WorldBossMaxHeroes
+	}
 	if mode == 5 {
 		maxHeroes = constUtil.P12FieldPVPMaxHeroes
 	}

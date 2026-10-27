@@ -15,6 +15,11 @@ import (
 // RepairLegacyFirstMission 修复早期已结算首关漏发经验的存档。
 // 仅匹配已有首关通关记录但仍为 1 级零经验的早期存档，金币和物品保持原值。
 func (s *GameService) RepairLegacyFirstMission(ctx context.Context) error {
+	clockCtx, _, err := s.bindServerGameClockWorker75(ctx)
+	if err != nil {
+		return err
+	}
+	ctx = clockCtx
 	var rows []db.Profile
 	if err := db.GetIns().WithContext(ctx).Where("player IS NOT NULL AND game IS NOT NULL").Find(&rows).Error; err != nil {
 		return err

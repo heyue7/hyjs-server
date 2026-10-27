@@ -1,6 +1,7 @@
 package constUtil
 
 const (
+	P12WantedMaxHeroes = 5
 	// Exact round1 live-auto source proof; arbitrary recorded playback stays closed.
 	P12WantedRecordedCertified = true
 	P12WantedRecordedProof     = "420fe0def2b8e391d78a06781db2c18fdbb8abc859de2b731cbcc4360e60d97b"

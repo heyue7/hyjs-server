@@ -236,7 +236,7 @@ func (s *GameService) copySweepAt(ctx context.Context, id int64, request *pb.CSC
 		if s.P12WantedReady {
 			// 一包真实扫荡只抽一次；重复时间戳在前段返回已冻结完整回执。
 			source := "copy-sweep:" + strconv.FormatInt(stamp, 10) + ":" + request.GetChapterId() + "/" + request.GetMissionId()
-			found, gain, err := s.DiscoverP12Wanted(tx, id, player, game, source, now)
+			found, gain, err := s.DiscoverP12Wanted(tx, id, player, game, source, LocalPlayAt(ctx, now))
 			if err != nil {
 				return err
 			}

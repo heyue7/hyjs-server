@@ -375,7 +375,7 @@ func (s *GameService) p11GrabRandomAt(ctx context.Context, id int64, stamp int64
 func (s *GameService) DispatchP11GrabRandom(ctx context.Context, id int64, request proto.Message, stamp int64) ([]proto.Message, bool, error) {
 	switch request.(type) {
 	case *pb.CSGetGrabData:
-		now := time.Now()
+		now := LocalPlayNow(ctx)
 		result, err := s.p11GrabAt(ctx, id, request, stamp, now)
 		if err == nil {
 			// The original page refreshes82041 every minute and listens for20118
@@ -387,7 +387,7 @@ func (s *GameService) DispatchP11GrabRandom(ctx context.Context, id int64, reque
 		}
 		return result, true, err
 	case *pb.CSRedPoint:
-		result, err := s.p11GrabRandomAt(ctx, id, 0, false, time.Now())
+		result, err := s.p11GrabRandomAt(ctx, id, 0, false, LocalPlayNow(ctx))
 		if err == nil {
 			points, pointErr := s.InventoryMailRedPoints(ctx, id)
 			if pointErr != nil {
@@ -402,7 +402,7 @@ func (s *GameService) DispatchP11GrabRandom(ctx context.Context, id int64, reque
 		}
 		return result, true, err
 	case *pb.CSGetRandReward:
-		result, err := s.p11GrabRandomAt(ctx, id, stamp, true, time.Now())
+		result, err := s.p11GrabRandomAt(ctx, id, stamp, true, LocalPlayNow(ctx))
 		return result, true, err
 	}
 	return nil, false, nil

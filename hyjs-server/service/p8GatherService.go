@@ -735,7 +735,7 @@ func (s *GameService) p8ClaimGather(ctx context.Context, id int64, b *pb.CSField
 		if cfg.Kind == "fish" {
 			kind = constUtil.P8EventFishGather
 		}
-		if err = s.RecordP1Event(tx, id, "p8:gather:"+attempt.Token, kind, 1, time.UnixMilli(now)); err != nil {
+		if err = s.RecordP1Event(tx, id, "p8:gather:"+attempt.Token, kind, 1, LocalPlayAt(tx.Statement.Context, time.UnixMilli(now))); err != nil {
 			return err
 		}
 		out.Code = proto.Int32(constUtil.P8ResourceAvailable)

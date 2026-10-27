@@ -210,7 +210,8 @@ func (s *GameService) growth74Shop(ctx context.Context, a *model.AdminPrincipal,
 			} else {
 				q.DailyLimit = v.Limit
 			}
-			q.Stock = 1
+			// Quote.SlotBought limits each displayed slot; source stock is shared across all roles.
+			q.Stock = -1
 		}
 		next, err := s.AdminSaveShopProduct(ctx, a, key, id, model.AdminShopProductSaveRequest{AdminShopProduct: q, Version: shop.Version}, id == "")
 		if err != nil {

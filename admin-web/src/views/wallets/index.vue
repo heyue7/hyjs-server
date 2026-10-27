@@ -143,7 +143,7 @@ onBeforeUnmount(() => { generation++; recordGeneration++; });
               <div class="terminal-rule-number">{{ index + 1 }}</div>
               <NFormItem label="投放周期"><NSelect v-model:value="rule.kind" :options="scheduleKinds" :fallback-option="false" /></NFormItem>
               <NFormItem v-if="rule.kind === 'monthly'" label="每月几号"><NInputNumber v-model:value="rule.day" :min="1" :max="31" :precision="0" class="w-full" /></NFormItem>
-              <NFormItem v-else-if="rule.kind === 'once'" label="投放日期"><NDatePicker v-model:formatted-value="rule.date" type="date" value-format="yyyy-MM-dd" format="yyyy-MM-dd" :clearable="false" /></NFormItem>
+              <NFormItem v-else-if="rule.kind === 'once'" label="投放日期"><NDatePicker :formatted-value="rule.date || null" @update:formatted-value="rule.date = $event || ''" type="date" value-format="yyyy-MM-dd" format="yyyy-MM-dd" :clearable="false" /></NFormItem>
               <NFormItem v-else-if="rule.kind === 'daily'" label="生效日期"><span>每天</span></NFormItem>
               <NFormItem v-else label="每周几"><NSelect v-model:value="rule.weekday" :options="weekdays" /></NFormItem>
               <NFormItem label="投放时间"><NTimePicker v-model:formatted-value="rule.time" format="HH:mm" value-format="HH:mm" :clearable="false" /></NFormItem>

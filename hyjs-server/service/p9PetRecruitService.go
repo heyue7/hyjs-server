@@ -249,7 +249,7 @@ func (s *GameService) p9PetRecruit(ctx context.Context, id int64, request *pb.CS
 			return err
 		}
 		if s.P1Ready {
-			return s.RecordP1Event(tx, id, "p9:recruit:"+strconv.FormatInt(stamp, 10), constUtil.P9RecruitEvent, int64(count), time.UnixMilli(now))
+			return s.RecordP1Event(tx, id, "p9:recruit:"+strconv.FormatInt(stamp, 10), constUtil.P9RecruitEvent, int64(count), LocalPlayAt(ctx, time.UnixMilli(now)))
 		}
 		return nil
 	})

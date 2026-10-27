@@ -1,6 +1,7 @@
 package constUtil
 
 const (
+	P12WorldBossMaxHeroes       = 5
 	P12WorldBossIDPreviewSource = "local-original-worldboss-possible-id-preview-v1"
 	P12WorldBossScheduled       = "scheduled"
 	P12WorldBossActive          = "active"
