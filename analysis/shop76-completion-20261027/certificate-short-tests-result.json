@@ -1,0 +1,15 @@
+{
+  "command": [
+    "go",
+    "test",
+    "./service",
+    "-run",
+    "^TestP6(Arena047|Starter047|LinearPhysical|OwnedPartner)CertificatePinsActualProofAndPolicy$|^TestP6Certificate20261027",
+    "-count=1",
+    "-json"
+  ],
+  "exitCode": 0,
+  "wallSeconds": 35.11,
+  "fixtureRoot": "/Users/lirui/LR/hyjs/analysis",
+  "databaseMode": "isolated default SQLite fixture; no MySQL environment supplied"
+}

@@ -1,0 +1,189 @@
+{
+  "candidate": "ceeb3dea79162e8d2e62e3b419a2c704c1eaa720",
+  "date": "2026-10-27",
+  "kind": "current Go exact comparison against immutable original native recordings",
+  "originalRecaptured": false,
+  "nativeGoldenChanged": false,
+  "events": [
+    {
+      "source": "analysis/shop76-completion-20261027/full-tests.jsonl",
+      "event": {
+        "Time": "2026-10-27T21:28:13.880686+08:00",
+        "Action": "pass",
+        "Package": "hyjs-server/service",
+        "Test": "TestOriginalLifestealConvertsPercentBeforeDamage",
+        "Elapsed": 0
+      }
+    },
+    {
+      "source": "analysis/shop76-completion-20261027/full-tests.jsonl",
+      "event": {
+        "Time": "2026-10-27T21:28:19.621857+08:00",
+        "Action": "pass",
+        "Package": "hyjs-server/service",
+        "Test": "TestOriginalLifestealFractionResidueCompleteOriginalEnd",
+        "Elapsed": 1.27
+      }
+    },
+    {
+      "source": "analysis/shop76-completion-20261027/full-tests.jsonl",
+      "event": {
+        "Time": "2026-10-27T21:28:18.34988+08:00",
+        "Action": "pass",
+        "Package": "hyjs-server/service",
+        "Test": "TestOriginalLifestealStrictOriginalEndRegression",
+        "Elapsed": 4.47
+      }
+    },
+    {
+      "source": "analysis/shop76-completion-20261027/full-tests.jsonl",
+      "event": {
+        "Time": "2026-10-27T21:40:40.369171+08:00",
+        "Action": "pass",
+        "Package": "hyjs-server/service",
+        "Test": "TestP6NativeArenaV122OriginalAutomaticCoreAndDynamic",
+        "Elapsed": 1.81
+      }
+    },
+    {
+      "source": "analysis/shop76-completion-20261027/full-tests.jsonl",
+      "event": {
+        "Time": "2026-10-27T21:40:41.54138+08:00",
+        "Action": "pass",
+        "Package": "hyjs-server/service",
+        "Test": "TestP6NativeArenaV122OriginalAutomaticExports",
+        "Elapsed": 1.17
+      }
+    },
+    {
+      "source": "analysis/shop76-completion-20261027/full-tests.jsonl",
+      "event": {
+        "Time": "2026-10-27T21:40:42.081807+08:00",
+        "Action": "pass",
+        "Package": "hyjs-server/service",
+        "Test": "TestP6NativeArenaV122OriginalAutomaticFinalProtocolBytes",
+        "Elapsed": 0.54
+      }
+    },
+    {
+      "source": "analysis/shop76-completion-20261027/full-tests.jsonl",
+      "event": {
+        "Time": "2026-10-27T21:45:22.003727+08:00",
+        "Action": "pass",
+        "Package": "hyjs-server/service",
+        "Test": "TestP6NativeLinearFriendV113OriginalAutomaticCoreAndDynamic",
+        "Elapsed": 1.02
+      }
+    },
+    {
+      "source": "analysis/shop76-completion-20261027/full-tests.jsonl",
+      "event": {
+        "Time": "2026-10-27T21:45:22.858775+08:00",
+        "Action": "pass",
+        "Package": "hyjs-server/service",
+        "Test": "TestP6NativeLinearFriendV113OriginalAutomaticExports",
+        "Elapsed": 0.86
+      }
+    },
+    {
+      "source": "analysis/shop76-completion-20261027/full-tests.jsonl",
+      "event": {
+        "Time": "2026-10-27T21:45:23.095711+08:00",
+        "Action": "pass",
+        "Package": "hyjs-server/service",
+        "Test": "TestP6NativeLinearFriendV113OriginalAutomaticFinalProtocolBytes",
+        "Elapsed": 0.24
+      }
+    },
+    {
+      "source": "analysis/shop76-completion-20261027/full-tests.jsonl",
+      "event": {
+        "Time": "2026-10-27T21:45:27.634399+08:00",
+        "Action": "pass",
+        "Package": "hyjs-server/service",
+        "Test": "TestP6NativeLinearPhysicalV111OriginalAutomaticCoreAndDynamic",
+        "Elapsed": 4.54
+      }
+    },
+    {
+      "source": "analysis/shop76-completion-20261027/full-tests.jsonl",
+      "event": {
+        "Time": "2026-10-27T21:45:30.722577+08:00",
+        "Action": "pass",
+        "Package": "hyjs-server/service",
+        "Test": "TestP6NativeLinearPhysicalV111OriginalAutomaticExports",
+        "Elapsed": 3.09
+      }
+    },
+    {
+      "source": "analysis/shop76-completion-20261027/full-tests.jsonl",
+      "event": {
+        "Time": "2026-10-27T21:45:31.628341+08:00",
+        "Action": "pass",
+        "Package": "hyjs-server/service",
+        "Test": "TestP6NativeLinearPhysicalV111OriginalAutomaticFinalProtocolBytes",
+        "Elapsed": 0.91
+      }
+    },
+    {
+      "source": "analysis/shop76-completion-20261027/full-tests.jsonl",
+      "event": {
+        "Time": "2026-10-27T21:47:23.325006+08:00",
+        "Action": "pass",
+        "Package": "hyjs-server/service",
+        "Test": "TestP6NativeOwnedPartnerV124OriginalAutomaticCoreAndDynamic",
+        "Elapsed": 3.79
+      }
+    },
+    {
+      "source": "analysis/shop76-completion-20261027/full-tests.jsonl",
+      "event": {
+        "Time": "2026-10-27T21:47:25.144899+08:00",
+        "Action": "pass",
+        "Package": "hyjs-server/service",
+        "Test": "TestP6NativeOwnedPartnerV124OriginalAutomaticExports",
+        "Elapsed": 1.82
+      }
+    },
+    {
+      "source": "analysis/shop76-completion-20261027/full-tests.jsonl",
+      "event": {
+        "Time": "2026-10-27T21:47:25.727037+08:00",
+        "Action": "pass",
+        "Package": "hyjs-server/service",
+        "Test": "TestP6NativeOwnedPartnerV124OriginalAutomaticFinalProtocolBytes",
+        "Elapsed": 0.58
+      }
+    },
+    {
+      "source": "analysis/shop76-completion-20261027/remaining-tests.jsonl",
+      "event": {
+        "Time": "2026-10-27T21:54:09.838468+08:00",
+        "Action": "pass",
+        "Package": "hyjs-server/service",
+        "Test": "TestP6NativeStarterFriendV118OriginalAutomaticCoreAndDynamic",
+        "Elapsed": 4.83
+      }
+    },
+    {
+      "source": "analysis/shop76-completion-20261027/remaining-tests.jsonl",
+      "event": {
+        "Time": "2026-10-27T21:54:12.808942+08:00",
+        "Action": "pass",
+        "Package": "hyjs-server/service",
+        "Test": "TestP6NativeStarterFriendV118OriginalAutomaticExports",
+        "Elapsed": 2.97
+      }
+    },
+    {
+      "source": "analysis/shop76-completion-20261027/remaining-tests.jsonl",
+      "event": {
+        "Time": "2026-10-27T21:54:14.234025+08:00",
+        "Action": "pass",
+        "Package": "hyjs-server/service",
+        "Test": "TestP6NativeStarterFriendV118OriginalAutomaticFinalProtocolBytes",
+        "Elapsed": 1.43
+      }
+    }
+  ]
+}

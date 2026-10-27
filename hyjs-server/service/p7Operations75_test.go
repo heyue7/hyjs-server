@@ -23,6 +23,10 @@ func p7PointShopOperations75(t *testing.T, f *p1Fixture) {
 		p4BaseProduct("p4Point_1", "item_021,1", "point,100", 1, 1),
 		p4BaseProduct("p4Point_2", "frag_equip_037,10", "item_021,10", 2, 1),
 	}}
+	// 独立前段交易夹具使用三颗真实获得的星数，不借用正式目录默认100星。
+	for i := range rules.Products {
+		rules.Products[i].MinTrialStars = 3
+	}
 	raw, err := json.Marshal(rules)
 	if err != nil {
 		t.Fatal(err)

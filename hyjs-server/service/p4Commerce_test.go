@@ -147,6 +147,13 @@ func TestP4RealmCurrenciesAndRedEssenceExistingInstances(t *testing.T) {
 		t.Fatal("unearned red exchange")
 	}
 	p4Fund(t, f)
+	// 本例只核对独立货币兑换，显式准备试炼商店要求的有限历史星数。
+	if err := db.GetIns().AutoMigrate(&db.P7RushState{}); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.GetIns().Create(&db.P7RushState{PlayerID: f.id, RecordStars: 100}).Error; err != nil {
+		t.Fatal(err)
+	}
 	for i, spec := range []struct {
 		typ int32
 		sku string
@@ -177,10 +184,14 @@ func TestP4ActivitySharedStockFrozenQuotesAndMystic(t *testing.T) {
 	var rules p4CommerceRules
 	json.Unmarshal(cfg.Rules, &rules)
 	rules.Products[0].Stock = 1
+	rules.Products[0].DiscountBps = 4500
 	raw, _ := json.Marshal(rules)
 	db.GetIns().Model(&cfg).Update("rules", raw)
 	q := p4Trade(t, f, &pb.CSActivityShopInfo{ActivityId: proto.String(key)}, 0, now).(*pb.SCActivityShopInfo)
 	item := q.GetShopItemList()[0]
+	if item.GetDiscount() != "45" {
+		t.Fatal("native 4.5-fold display must receive integer percent", item.GetDiscount())
+	}
 	bad := &pb.CSGetActivityShopReward{ActivityId: proto.String(key), Index: proto.Int32(1), CostResources: []*pb.BaseResource{{Id: proto.String("diamond"), Num: proto.Int32(1)}}, GetResources: item.GetGetResource()}
 	if _, e := f.s.p4Commerce(f.ctx, f.id, bad, 1, now); e == nil {
 		t.Fatal("quote tamper")

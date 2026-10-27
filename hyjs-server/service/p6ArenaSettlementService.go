@@ -52,5 +52,5 @@ func (s *GameService) ComputeP6ArenaSettlement(ctx context.Context, input *model
 }
 
 func p6KnownArenaSettlementProof(input *model.FrozenBattleInput, proof string) bool {
-	return input != nil && input.BattleType == 2 && input.EngineVersion == constUtil.P6ArenaSettlementEngine && input.ClientVersion == constUtil.P6OriginalClientHash && input.ConfigurationHash == constUtil.P6LinearPhysicalTables && proof != "" && proof == constUtil.P6ArenaNativeProof
+	return input != nil && input.BattleType == 2 && input.EngineVersion == constUtil.P6ArenaSettlementEngine && input.ClientVersion == constUtil.P6OriginalClientHash && input.ConfigurationHash == constUtil.P6LinearPhysicalTables && proof != "" && (proof == constUtil.P6ArenaNativeProof || proof == constUtil.P6ArenaParentProof)
 }

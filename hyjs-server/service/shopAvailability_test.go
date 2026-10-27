@@ -20,6 +20,13 @@ import (
 func TestAdminShopUnlimitedFrozenCatalogueAndOriginalReceipt(t *testing.T) {
 	f, actor := adminModesFixture(t)
 	p4Fund(t, f)
+	// 本例只切换营业时间，先准备独立测试角色的试炼购买资格。
+	if err := db.GetIns().AutoMigrate(&db.P7RushState{}); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.GetIns().Create(&db.P7RushState{PlayerID: f.id, RecordStars: 100}).Error; err != nil {
+		t.Fatal(err)
+	}
 	var source db.P4CommerceRule
 	if err := db.GetIns().Where("kind=?", "point").Order("start_at DESC,id DESC").First(&source).Error; err != nil {
 		t.Fatal(err)

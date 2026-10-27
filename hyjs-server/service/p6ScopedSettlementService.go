@@ -181,7 +181,7 @@ func p6KnownScopedSettlementProof(input *model.FrozenBattleInput, proof string) 
 	if input == nil || input.ClientVersion != constUtil.P6OriginalClientHash || input.ConfigurationHash != constUtil.P6LinearPhysicalTables {
 		return false
 	}
-	if input.EngineVersion == constUtil.P6LinearPhysicalEngine && proof != "" && proof == constUtil.P6LinearPhysicalNativeProof {
+	if input.EngineVersion == constUtil.P6LinearPhysicalEngine && proof != "" && (proof == constUtil.P6LinearPhysicalNativeProof || proof == constUtil.P6LinearPhysicalParentProof) {
 		return input.BattleType == 2 || input.BattleType == 11
 	}
 	if input.EngineVersion != constUtil.P6LinearPhysicalOriginalEngine {

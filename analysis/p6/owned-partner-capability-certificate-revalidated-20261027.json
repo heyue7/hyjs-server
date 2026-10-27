@@ -1,0 +1,142 @@
+{
+  "status": "Actual original typedFriend11 owned047+069/070 four combinations all complete values/terminal protocol aligned. Independent twoactor structural scope plus strict executed-mechanism terminal closure.",
+  "scopeKey": "original-friend11-owned-starter047-and069070-pose3-7-v1",
+  "engine": "apk-10056262-p6-v117",
+  "configurationHash": "d42019bd92e54f140371fbf0a9a2e6d5b7ca925f6e2811c39639c4af0a8ffb2d",
+  "mechanismProof": [
+    "Two actually owned actors on each side: canonical047 main atpose3 followed by069or070 atpose7, complete original3skill fields retained; no mainGUID replacement.",
+    "Original actual P1 finite operational delivery -> reward claim -> formationOn source; not claimed natural recruit/private server projection.",
+    "Mode11 only, legal1/0 or0/1 initiative, max40, fullHP/AP0, allactorsbreach1, fixed original chance fields, integer basic panel<=1e6, no talents/awakening/weapon/percent/AIcompat/record/extraactor.",
+    "Executed closure preserves047 physicalcasts/float/AP/ultimate and380 Effect/UnEffect,069/070 normalcasts and target/order/death transition. Original all69/70pairings bothinitiative levels20/100 covertimeout/all-death bothwinner directions.",
+    "069/070 ultimate declarations remain intact but their execution is not original-observed. Any actual executed skill other than047_1/2/3,069_1/2,070_1/2 orBuffotherthan380 makes this API reject before consumer payment/settlement. No unobserved action is stripped or pretended certified.",
+    "No exact PB/seed/GUID/panel whitelist. Fresh structural inputs are calculated; independent whole terminal4actors/sourceSHA/originalrecord totals/max40 winner invariant and executedmechanism guard must also pass.",
+    "Generic/global capability staysfalse; separateconsumerowns current source/permission/idempotence/transaction."
+  ],
+  "scopePolicy": {
+    "source": "hyjs-server/service/p6OwnedPartnerSettlementService.go",
+    "sourceSHA256": "f8b1a438e3c11efd8798e1d087cd421edaae4daef68855ad53a226cef270284a",
+    "constantSource": "hyjs-server/constUtil/p6OwnedPartnerSettlement.go",
+    "constantSourceNormalizedSHA256": "9478abcd0c07147eefee97fdb57f74031ef9ba97a7b152cda25a0044ec9502c0"
+  },
+  "supportingPolicies": [
+    {
+      "path": "hyjs-server/service/p6StarterSettlementService.go",
+      "sha256": "d0643f39688137591bea5869b0bda4c1dd226d40ec6cf26dbc69543dbafe248e"
+    },
+    {
+      "path": "hyjs-server/service/p6ScopedSettlementService.go",
+      "sha256": "dd460681703fbbdfc6a7d2e5d42e443bb0ae45b144dfcdfe0bc2f4e89facb757"
+    }
+  ],
+  "runtimeSources": [
+    {
+      "path": "hyjs-server/service/combatReleaseService.go",
+      "sha256": "c9cbf180581b8bc5f4d6a62def3460cbf6bf1063730b197d8a2a83eba90b57be"
+    },
+    {
+      "path": "hyjs-server/service/combatRoundService.go",
+      "sha256": "7462d10bab49e0830717602a6c82d6363662a1261225bf4a59812096b9fb4585"
+    },
+    {
+      "path": "hyjs-server/service/combatRoundBuffService.go",
+      "sha256": "58d1508eea810e5375bdef687cf9a107405cd7d46cf8710acefdb0209eb1d136"
+    },
+    {
+      "path": "hyjs-server/service/combatBuffSuppressionService.go",
+      "sha256": "af233a9c4f8049e2c389519ed6cd716dfc90f8396c7cc849f0a3c9bfa4be73ba"
+    },
+    {
+      "path": "hyjs-server/service/p6OriginalPercentService.go",
+      "sha256": "b18296e92caa744bce4e20f9f0ed2aabfc480ca4d026646ebe9dbb979f87a1c2"
+    },
+    {
+      "path": "hyjs-server/service/p6ShareDamageService.go",
+      "sha256": "0bc277d5649bca02ac76b6e91161c2ac89ccf7d0101245fbfac319293aab9d47"
+    },
+    {
+      "path": "hyjs-server/service/combatRoundSpecialService.go",
+      "sha256": "dca1dc174a20d1d68b5e4798fe6e44bed9ba9ab3f8af124ca19e1fbeb9acd885"
+    },
+    {
+      "path": "hyjs-server/service/p6RoundExtraAttackService.go",
+      "sha256": "7c5cc85dcb76b511cb5a4c2919702172ddcd17f85de738eef47c5a113ff19780"
+    },
+    {
+      "path": "hyjs-server/constUtil/p6Combat.go",
+      "sha256": "f0a660b4d1247a1a2f66e7fb6e766f409ff4e329e035bac84f2a60d3b788a835"
+    }
+  ],
+  "originalNativeEvidence": [
+    {
+      "path": "analysis/p6/native-owned-partner-friend11-inputs-v118/manifest.json",
+      "sha256": "c16bd29c78d5c981f9e4d9cb59c052f40588953b9628ea77923cfe6a7b9cb72a"
+    },
+    {
+      "path": "analysis/p6/native-owned-partner-friend11-output-v118/manifest.json",
+      "sha256": "9d0ae2dae6dc9c2faaa1c013437fc6c6e4b3336a48bf21f67f92a0c2d540f38e"
+    },
+    {
+      "path": "analysis/p6/native-owned-partner-friend11-golden-v124.json",
+      "sha256": "83cc1ec6857472c356949f7ffa37f156ad4306341efcdf729ab975526f299dd1"
+    },
+    {
+      "path": "analysis/p6/native-owned-partner-friend11-hit-golden-v124.json",
+      "sha256": "38942ffb7ad31d201b440694bf3bf0732e2ea478c945e57e929b813006d211ee"
+    },
+    {
+      "path": "analysis/p6/native-owned-partner-friend11-manager-golden-v124.json",
+      "sha256": "d3f5b761db2a104a539f3f71cd1545a522bfab7818ca3da34e126290f0405e87"
+    },
+    {
+      "path": "analysis/p6/native-owned-partner-friend11-original-records-v124.json",
+      "sha256": "82219d4c239f0a146574381d16fbd20ca32698d38cbc1a6d785565d7ae04a154"
+    },
+    {
+      "path": "analysis/p6/v126-owned-partner-native-scope-validation.json",
+      "sha256": "cbbf10857a121873d96f4105fe9982b148fea0c6c6a189354db4a58c4e68ecbc"
+    },
+    {
+      "path": "analysis/p6/owned-partner-source-preparation-v118.json",
+      "sha256": "8f34e1241280ea82f3b580a7c67b9eb418ff7b60f726f0557131b7c39c3debfa"
+    },
+    {
+      "path": "analysis/p6/starter047-mechanism-source-v118.json",
+      "sha256": "685ff74c196b30a741982338de2c94c2e46b23cf09a5ecdc7189247d8230d989"
+    },
+    {
+      "path": "analysis/p6/v117-production-source-proof.json",
+      "sha256": "7f33e2acca8e20ee26e96678dc85d7ff764ba7a86e78b652f7b4e2b43e45821c"
+    }
+  ],
+  "validation": {
+    "command": "GOTOOLCHAIN=go1.27.2 GOMEMLIMIT=2GiB go test ./service -run ^TestP6NativeOwnedPartnerV124|^TestP6OwnedPartner|^TestP11FriendOwned -count=1",
+    "exitCode": 0,
+    "packageSeconds": 12.831,
+    "stdout": "ok hyjs-server/service 12.831s",
+    "scope": "Actual native4 full original core/44attrs/RNG/lifetimes/Buff metadata/managers/ordered cast numeric and collections/finalProto exactbytes/all4 actor current-maxHP; actual composition preconditions/terminalguard/newGUID/seed; wrongMode/partner/pose/extraactor/source/Talent/breach/injury reject; unobserved069 ultimate terminal rejects. New public2actor positive intentionally skipped while compiledproofblank."
+  },
+  "nativeCompared": true,
+  "authoritative": false,
+  "authorityMeaning": "Only ComputeP6OwnedPartnerSettlement may return an authoritative terminal for this structural and executed-mechanism family; unobserved partnerultimate rejects even after calculation. Existing diagnostic records never promoted; generic/global flags remainfalse.",
+  "revalidation": {
+    "date": "2026-10-27",
+    "candidate": "ceeb3dea79162e8d2e62e3b419a2c704c1eaa720",
+    "parentCertificate": {
+      "path": "analysis/p6/owned-partner-capability-certificate-v126.json",
+      "sha256": "6368b6910f699bdcf765cdc8ced1bbedb9c848417749d9f8691660a0288d3661"
+    },
+    "evidence": {
+      "path": "analysis/shop76-completion-20261027/certificate-revalidation-evidence.json",
+      "sha256": "a50113dcc3616b0622eee0ae367953375b339e867a523e9be4ed64a2b6861ffb"
+    },
+    "strictNativeGroups": [
+      "TestP6NativeOwnedPartnerV124"
+    ],
+    "scopeChanged": false,
+    "authorityChanged": false,
+    "originalEvidenceChanged": false,
+    "basis": "Exact original callback, actor properties, RNG, lifecycle, ordered exports/collections, final protocol bytes and terminal HP comparisons on current implementation; original assets retained. Lifesteal fraction correction has no producer within the closed family. Optional live record/control inputs remain absent. Earlier shared-source drift is covered by strict original comparisons, without attributing all drift to lifesteal.",
+    "historicalReceiptPolicy": "Exact parent proof retained under original mode/engine/client/config restrictions; persisted terminal and receipt integrity validation unchanged.",
+    "review": "analysis/shop76-completion-20261027/certificate-review.md"
+  }
+}

@@ -726,7 +726,8 @@ func (s *GameService) p4Projection(tx *gorm.DB, p *pb.Player, cfg db.P4CommerceR
 				}
 			}
 		}
-		activityItem := &pb.ActivityShopItem{Index: proto.Int32(product.Index), GetResource: rewards, CostResource: []*pb.BaseResource{price}, Total: proto.Int32(product.DailyLimit), Left: proto.Int32(max(0, left)), Discount: proto.String(strconv.FormatFloat(float64(bps)/10000, 'f', 2, 64)), PickOneOrGetAll: proto.Int32(1), Status: proto.Int32(status), Name: proto.String(name)}
+		// 原 ParseDiscount 读取整数百分比并除以10显示折数。
+		activityItem := &pb.ActivityShopItem{Index: proto.Int32(product.Index), GetResource: rewards, CostResource: []*pb.BaseResource{price}, Total: proto.Int32(product.DailyLimit), Left: proto.Int32(max(0, left)), Discount: proto.String(strconv.Itoa(int(bps / 100))), PickOneOrGetAll: proto.Int32(1), Status: proto.Int32(status), Name: proto.String(name)}
 		if err := s.p4BatchPurchasePrices(activityItem, product, state, min(bought+1, product.DailyLimit), max(0, left)); err != nil {
 			return nil, nil, err
 		}

@@ -16,6 +16,13 @@ import (
 
 func TestReRushShopNativeCataloguePurchaseAndCold(t *testing.T) {
 	f := p4Setup(t)
+	// 目录/报价测试显式准备当前试炼商品的100星资格。
+	if err := db.GetIns().AutoMigrate(&db.P7RushState{}); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.GetIns().Create(&db.P7RushState{PlayerID: f.id, RecordStars: 100}).Error; err != nil {
+		t.Fatal(err)
+	}
 	now := time.Now()
 	if err := updateProfile(f.ctx, f.id, func(p *pb.Player, _ *model.GameState) error {
 		p.Level = proto.Int32(22)
@@ -60,6 +67,10 @@ func TestReRushShopNativeCataloguePurchaseAndCold(t *testing.T) {
 	beforeP, beforeG := f.profile(t)
 	before := simpleOwned(beforeP, beforeG, "item_005")
 	request := &pb.CSShopBuy{ShopType: proto.Int32(5), ShopItemId: selected.Id, BuyCount: proto.Int32(2)}
+	if _, err := f.s.p4Commerce(f.ctx, f.id, request, 98000, now); err == nil {
+		t.Fatal("lifetime-one product accepted bulk purchase")
+	}
+	request.BuyCount = proto.Int32(1)
 	paid, err := f.s.p4Commerce(f.ctx, f.id, request, 98001, now)
 	if err != nil {
 		t.Fatal(err)
@@ -69,13 +80,13 @@ func TestReRushShopNativeCataloguePurchaseAndCold(t *testing.T) {
 		t.Fatal("source purchase retry", err)
 	}
 	p, g := f.profile(t)
-	if p.GetPoint() != 3000 || simpleOwned(p, g, "item_005")-before != 20 {
+	if p.GetPoint() != 3500 || simpleOwned(p, g, "item_005")-before != 10 {
 		t.Fatal("actual point charge/reward duplicated or wrong")
 	}
 	for _, item := range list() {
 		_, key, _ := adminLiveShopParseSKU(item.GetId())
-		if key == "offline_rush_shop_0" && item.GetDayLeftTimes() != 998 {
-			t.Fatal("daily source quota")
+		if key == "offline_rush_shop_0" && (item.GetDayLeftTimes() != 0 || item.GetTotalLeftTimes() != 0 || item.GetCanBuy() != 2) {
+			t.Fatal("lifetime sold state exposed an available purchase")
 		}
 	}
 	f.restart(t)

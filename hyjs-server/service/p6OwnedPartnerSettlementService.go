@@ -141,5 +141,5 @@ func validateP6OwnedPartnerTerminal(input *model.FrozenBattleInput, result *mode
 }
 
 func p6KnownOwnedPartnerSettlementProof(input *model.FrozenBattleInput, proof string) bool {
-	return input != nil && input.BattleType == 11 && input.EngineVersion == constUtil.P6OwnedPartnerSettlementEngine && input.ClientVersion == constUtil.P6OriginalClientHash && input.ConfigurationHash == constUtil.P6LinearPhysicalTables && proof != "" && proof == constUtil.P6OwnedPartnerNativeProof
+	return input != nil && input.BattleType == 11 && input.EngineVersion == constUtil.P6OwnedPartnerSettlementEngine && input.ClientVersion == constUtil.P6OriginalClientHash && input.ConfigurationHash == constUtil.P6LinearPhysicalTables && proof != "" && (proof == constUtil.P6OwnedPartnerNativeProof || proof == constUtil.P6OwnedPartnerParentProof)
 }

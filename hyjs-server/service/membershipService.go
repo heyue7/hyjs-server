@@ -137,7 +137,15 @@ func (s *GameService) vipBoon(tx *gorm.DB, p *pb.Player, now time.Time) ([]*pb.A
 		return nil, nil, errors.New(constUtil.P3PaymentConfigError)
 	}
 	daily := []*pb.ActivityDailyBoonItem{{Vip: proto.Int32(p.GetVip()), Reward: dailyRewards, Status: proto.Int32(dailyStatus), NeedRecharge: proto.Int64(60)}}
-	week := []*pb.ActivityShopItem{{Index: proto.Int32(1), GetResource: weekRewards, CostResource: weekCost, Total: proto.Int32(1), Left: proto.Int32(left), Status: proto.Int32(weekStatus), PickOneOrGetAll: proto.Int32(1), Discount: proto.String("1"), Name: proto.String("会员每周福利")}}
+	// 原会员页按 vip+1 查找下一档；缺少该行会回退显示当前档。
+	if next, found := adminNativeVIPTierFor(form, int64(p.GetVip())+1); found && next.Vip == int64(p.GetVip())+1 {
+		preview, err := adminNativePBResources(next.DailyRewards)
+		if err != nil {
+			return nil, nil, err
+		}
+		daily = append(daily, &pb.ActivityDailyBoonItem{Vip: proto.Int32(int32(next.Vip)), Reward: preview, Status: proto.Int32(0)})
+	}
+	week := []*pb.ActivityShopItem{{Index: proto.Int32(1), GetResource: weekRewards, CostResource: weekCost, Total: proto.Int32(1), Left: proto.Int32(left), Status: proto.Int32(weekStatus), PickOneOrGetAll: proto.Int32(1), Discount: proto.String("100"), Name: proto.String("会员每周福利")}}
 	return daily, week, nil
 }
 
