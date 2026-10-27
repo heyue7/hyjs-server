@@ -86,7 +86,7 @@ namespace HYJS.ActivitySafety
                 originalScale = adjustedTemplate.localScale;
                 originalPosition = adjustedTemplate.localPosition;
             }
-            if ((type == ActivityType.PrizeTask || type == ActivityType.PrizeBoss) && template is UIActivityBattleRace)
+            if ((type == ActivityType.PrizeTask || type == ActivityType.PrizeBoss || type == ActivityType.AincradStars) && template is UIActivityBattleRace)
             {
                 BossMerged merged = template.GetComponent<BossMerged>();
                 if (merged == null) merged = template.gameObject.AddComponent<BossMerged>();
@@ -188,8 +188,8 @@ namespace HYJS.ActivitySafety
         public static bool Intercept(UIActivityBattleRace v, NetWork.Packets.Packet p, bool ok)
         {
             BossMerged m = v == null ? null : v.GetComponent<BossMerged>();
-            if (m == null) return false;
-            if (m.running) m.Receive(p, ok, m.generation); return true;
+            if (m == null || !m.running) return false;
+            m.Receive(p, ok, m.generation); return true;
         }
         void Receive(NetWork.Packets.Packet packet, bool ok, int stamp)
         {
@@ -235,7 +235,7 @@ namespace HYJS.ActivitySafety
             foreach (string id in ids)
             {
                 SCActivityInfo info = infos[id];
-                if (info.endTime > info.startTime)
+                if (view.type != ActivityType.AincradStars && info.endTime > info.startTime)
                 {
                     DateTime start = ServerTimerTool.Java2CSTimeLocale(info.startTime);
                     DateTime end = ServerTimerTool.Java2CSTimeLocale(info.endTime);
