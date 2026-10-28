@@ -138,3 +138,26 @@ func TestAdminActivityScheduleHTTP(t *testing.T) {
 		t.Fatal("audit", audits)
 	}
 }
+
+func TestAdminActivityCalendarInputLongExistingWindow(t *testing.T) {
+	version := strings.Repeat("a", 64)
+	item := model.AdminActivityOccurrenceDTO{ID: "permanent-restaurant", TemplateID: "meal", Version: version, Timing: "calendar", StartAt: 1790784000000, EndAt: 2108736000000, ClaimEndAt: 2108736000000}
+	if !adminActivityCalendarInput(version, []model.AdminActivityOccurrenceDTO{item}) {
+		t.Fatal("existing permanent window blocks calendar")
+	}
+	item.ID = ""
+	item.TemplateVersion = version
+	if adminActivityCalendarInput(version, []model.AdminActivityOccurrenceDTO{item}) {
+		t.Fatal("new long window accepted")
+	}
+	item.EndAt = item.StartAt + 366*86400000
+	item.ClaimEndAt = item.EndAt
+	if !adminActivityCalendarInput(version, []model.AdminActivityOccurrenceDTO{item}) {
+		t.Fatal("366 day boundary rejected")
+	}
+	item.EndAt++
+	item.ClaimEndAt++
+	if adminActivityCalendarInput(version, []model.AdminActivityOccurrenceDTO{item}) {
+		t.Fatal("366 day boundary exceeded")
+	}
+}

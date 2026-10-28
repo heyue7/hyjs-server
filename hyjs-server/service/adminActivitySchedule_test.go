@@ -285,3 +285,66 @@ func TestAdminActivityScheduleScopeEmpty(t *testing.T) {
 		t.Fatal("no-instance legacy fallback reopened", key, err)
 	}
 }
+
+func TestAdminActivitySchedulePreservesLongCalendar(t *testing.T) {
+	f, operator := adminModesFixture(t)
+	f.ctx = context.WithValue(f.ctx, constUtil.GameServiceContextKey, f.s)
+	if err := f.s.InitializeAdminGameServers(f.ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.s.InitializeAdminActivitySchedules(f.ctx); err != nil {
+		t.Fatal(err)
+	}
+	form := adminModeForm("discount-shop")
+	form.Products = []model.AdminActivityProduct{{ID: "calendar_product", Name: "道具", Index: 1, Rewards: []model.AdminResourceAmount{{ResourceID: "item_005", Amount: 2}}, Cost: model.AdminResourceAmount{ResourceID: "diamond", Amount: 10}, DailyLimit: 2, TotalLimit: 2, Stock: -1, MinLevel: 1, DiscountBps: 10000, Weight: 1}}
+	definition, err := f.s.AdminSaveActivityDefinition(f.ctx, operator, "", model.AdminActivityDefinitionSaveRequest{Name: "长期活动", Form: form, DefaultDays: 2, Enabled: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	calendar, err := f.s.AdminActivitySchedule(f.ctx, operator, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	start := time.Now().Add(24 * time.Hour).UnixMilli()
+	saved, err := f.s.AdminSaveActivitySchedule(f.ctx, operator, 1, model.AdminActivityScheduleSaveRequest{Version: calendar.Version, Items: []model.AdminActivityOccurrenceDTO{{TemplateID: definition.ID, TemplateVersion: definition.Version, StartAt: start, EndAt: start + 2*86400000, ClaimEndAt: start + 2*86400000, Enabled: true}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Model an already imported permanent consumer. No new consumer is created by saving it.
+	longEnd := start + 3650*86400000
+	if err = db.GetIns().Model(&db.AdminActivityOccurrence{}).Where("id=?", saved.Items[0].ID).Updates(map[string]any{"end_at": longEnd, "claim_end_at": longEnd}).Error; err != nil {
+		t.Fatal(err)
+	}
+	calendar, err = f.s.AdminActivitySchedule(f.ctx, operator, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	preview, err := f.s.AdminPreviewActivitySchedule(f.ctx, operator, 1, model.AdminActivitySchedulePreviewRequest{Version: calendar.Version, Items: calendar.Items})
+	if err != nil || !preview.Valid {
+		t.Fatal("unchanged long preview", preview, err)
+	}
+	saved, err = f.s.AdminSaveActivitySchedule(f.ctx, operator, 1, model.AdminActivityScheduleSaveRequest{Version: calendar.Version, Items: calendar.Items})
+	if err != nil || saved.Items[0].EndAt != longEnd || saved.Items[0].ClaimEndAt != longEnd {
+		t.Fatal("long save", err)
+	}
+	for _, kind := range []string{"edit", "new", "unknown"} {
+		items := append([]model.AdminActivityOccurrenceDTO(nil), saved.Items...)
+		switch kind {
+		case "edit":
+			items[0].EndAt++
+			items[0].ClaimEndAt++
+		case "new":
+			items[0].ID = ""
+			items[0].TemplateVersion = definition.Version
+		case "unknown":
+			items[0].ID = "forged-existing"
+		}
+		preview, err = f.s.AdminPreviewActivitySchedule(f.ctx, operator, 1, model.AdminActivitySchedulePreviewRequest{Version: saved.Version, Items: items})
+		if err == nil && preview.Valid {
+			t.Fatal("long window bypass", kind)
+		}
+		if _, err = f.s.AdminSaveActivitySchedule(f.ctx, operator, 1, model.AdminActivityScheduleSaveRequest{Version: saved.Version, Items: items}); err == nil {
+			t.Fatal("long window saved", kind)
+		}
+	}
+}

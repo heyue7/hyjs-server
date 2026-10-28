@@ -29,7 +29,9 @@ func (s *GameService) computeP12WantedRecorded(ctx context.Context, input *model
 	}
 	out, err := s.computeP12WantedLiveAutoDiagnostic(ctx, input, supplied)
 	if err != nil {
-		return nil, err
+		// Keep the old driver and its receipt proof first; later per-round
+		// manual inputs use a separately bound exact player-record driver.
+		return s.computeP12WantedLiveRecorded(ctx, input, supplied)
 	}
 	if err = validateP12WantedRecorded(input, supplied, out); err != nil {
 		return nil, err
@@ -144,7 +146,7 @@ func validateP12WantedRecorded(input *model.FrozenBattleInput, supplied *pb.Batt
 }
 
 func p12WantedStoreRecorded(fight *db.P12WantedFight, request *pb.CSRebelFightEnd, terminal *model.CombatFinalHPOutcome) error {
-	if terminal == nil || terminal.Outcome == nil || !terminal.Outcome.Authoritative || terminal.Outcome.CapabilityHash != constUtil.P12WantedRecordedProof {
+	if terminal == nil || terminal.Outcome == nil || !terminal.Outcome.Authoritative || (terminal.Outcome.CapabilityHash != constUtil.P12WantedRecordedProof && terminal.Outcome.CapabilityHash != p12WantedLiveRecordedProof) {
 		return errors.New(constUtil.P6ReplayConflict)
 	}
 	raw, err := proto.MarshalOptions{Deterministic: true}.Marshal(request)
@@ -159,7 +161,7 @@ func p12WantedStoreRecorded(fight *db.P12WantedFight, request *pb.CSRebelFightEn
 	fight.RecordedTerminalJSON = string(body)
 	fight.RecordedTerminalHash = p6Digest(body)
 	fight.RecordedRecordHash = terminal.OriginalRecordSHA256
-	fight.RecordedProof = constUtil.P12WantedRecordedProof
+	fight.RecordedProof = terminal.Outcome.CapabilityHash
 	return nil
 }
 
@@ -180,13 +182,16 @@ func p12WantedRecordedReceipt(fight *db.P12WantedFight, request *pb.CSRebelFight
 	}
 	reject := func() error { return errors.New(constUtil.P6ReplayConflict) }
 	raw, err := proto.MarshalOptions{Deterministic: true}.Marshal(request)
-	if err != nil || !bytes.Equal(raw, fight.RecordedEndRequest) || p6Digest(raw) != fight.EndRequestHash || fight.RecordedProof != constUtil.P12WantedRecordedProof || p6Digest([]byte(fight.RecordedTerminalJSON)) != fight.RecordedTerminalHash || p6Digest([]byte(fight.InputJSON)) != fight.InputHash || p6Digest([]byte(fight.TerminalJSON)) != fight.TerminalHash || p6Digest(fight.StartProto) != fight.StartHash {
+	if err != nil || !bytes.Equal(raw, fight.RecordedEndRequest) || p6Digest(raw) != fight.EndRequestHash || (fight.RecordedProof != constUtil.P12WantedRecordedProof && fight.RecordedProof != p12WantedLiveRecordedProof) || p6Digest([]byte(fight.RecordedTerminalJSON)) != fight.RecordedTerminalHash || p6Digest([]byte(fight.InputJSON)) != fight.InputHash || p6Digest([]byte(fight.TerminalJSON)) != fight.TerminalHash || p6Digest(fight.StartProto) != fight.StartHash {
 		return reject()
 	}
 	var input model.FrozenBattleInput
 	var original, recorded model.CombatFinalHPOutcome
 	if json.Unmarshal([]byte(fight.InputJSON), &input) != nil || json.Unmarshal([]byte(fight.TerminalJSON), &original) != nil || json.Unmarshal([]byte(fight.RecordedTerminalJSON), &recorded) != nil || ValidateP12WantedCertifiedReceipt(&input, &original) != nil || recorded.Outcome == nil || !recorded.Outcome.Authoritative || recorded.Outcome.CapabilityHash != fight.RecordedProof || recorded.OriginalRecordSHA256 != fight.RecordedRecordHash {
 		return reject()
+	}
+	if fight.RecordedProof == p12WantedLiveRecordedProof {
+		return validateP12WantedLiveRecorded(&input, request.OptRecord, &recorded)
 	}
 	return validateP12WantedRecorded(&input, request.OptRecord, &recorded)
 }

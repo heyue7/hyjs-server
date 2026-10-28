@@ -11,6 +11,8 @@ type P12WantedFight struct {
 	CreatedAt            int64   `gorm:"not null" json:"created_at"`
 	Committed            bool    `gorm:"index:idx_p12_wanted_pending;not null" json:"committed"`
 	CommittedAt          int64   `gorm:"index;not null" json:"committed_at"`
+	RejectedAt           int64   `gorm:"not null;default:0" json:"rejected_at"`
+	RejectedReason       string  `gorm:"type:varchar(255);not null;default:''" json:"-"`
 	AbandonedAt          int64   `gorm:"not null" json:"abandoned_at"`
 	InputJSON            string  `gorm:"type:longtext;not null" json:"input_json"`
 	InputHash            string  `gorm:"type:varchar(64);not null" json:"input_hash"`

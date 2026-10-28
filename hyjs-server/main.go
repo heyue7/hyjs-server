@@ -48,6 +48,7 @@ func run() error {
 		httpPort            = flag.Int("http-port", -1, "override HTTP port, 0 selects a free port")
 		tcpPort             = flag.Int("tcp-port", -1, "override TCP port, 0 selects a free port")
 		logFile             = flag.String("log-file", "", "isolated process log path; empty keeps configured path")
+		warmRushAll         = flag.Bool("warm-rush-history-all", false, "revalidate stale settled trial histories in bounded transactions, then exit")
 		warmRushPlayer      = flag.Int64("warm-rush-history-player", 0, "validate existing trial history and persist signed certificates, then exit")
 		testPayments        = flag.Bool("enable-test-payments", false, "enable loopback-only demo payment confirmation")
 		ggoIntegration      = flag.Bool("enable-ggo-integration", false, "enable GGO only in an isolated loopback MySQL test environment")
@@ -238,8 +239,8 @@ func run() error {
 		}
 		return json.NewEncoder(os.Stdout).Encode(result)
 	}
-	if *warmRushPlayer != 0 {
-		if *warmRushPlayer < 1 {
+	if *warmRushPlayer != 0 || *warmRushAll {
+		if !*warmRushAll && *warmRushPlayer < 1 {
 			return errors.New("trial history owner must be positive")
 		}
 		if err = s.LoadP7Tables(cfg.Tables); err != nil {
@@ -247,6 +248,13 @@ func run() error {
 		}
 		if err = service.InitializeP7RushHistoryCertificates(ctx); err != nil {
 			return err
+		}
+		if *warmRushAll {
+			owners, warmErr := service.WarmPendingP7RushHistory(context.WithValue(ctx, constUtil.GameServiceContextKey, s))
+			if warmErr != nil {
+				return warmErr
+			}
+			return json.NewEncoder(os.Stdout).Encode(map[string]any{"trialHistoryOwnersVerified": owners})
 		}
 		if err = service.WarmP7RushHistory(context.WithValue(ctx, constUtil.GameServiceContextKey, s), *warmRushPlayer); err != nil {
 			return err

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"google.golang.org/protobuf/proto"
+	"gorm.io/gorm"
 	"hyjs-server/constUtil"
 	"hyjs-server/db"
 	"hyjs-server/model"
@@ -88,6 +89,18 @@ func TestP12Wanted65ManualAutoEndColdConflict(t *testing.T) {
 	var pending db.P12WantedFight
 	if err = db.GetIns().First(&pending, "id=?", fight.ID).Error; err != nil || pending.Committed || pending.RecordedProof != "" {
 		t.Fatal("failed End wrote receipt", err)
+	}
+	if pending.RejectedAt <= 0 || pending.RejectedReason != constUtil.P6ReplayConflict {
+		t.Fatal("definitive rejected End did not release its presentation lease")
+	}
+	if err = db.GetIns().WithContext(f.ctx).Transaction(func(tx *gorm.DB) error {
+		return P12WantedRequireIdle(tx, f.id, now)
+	}); err != nil {
+		t.Fatal("rejected Wanted still blocks other modes", err)
+	}
+	var recoverable db.P12WantedFight
+	if err = db.GetIns().First(&recoverable, "id=?", fight.ID).Error; err != nil || recoverable.AbandonedAt != 0 || recoverable.Committed {
+		t.Fatal("paid frozen fight was erased", err)
 	}
 	// Both concurrent requests carry the same actual source; only one commit may apply damage/score.
 	var wg sync.WaitGroup

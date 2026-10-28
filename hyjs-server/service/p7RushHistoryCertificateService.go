@@ -193,8 +193,9 @@ func (q *p7EliteQueryProjection) certify(fight *db.P7RushFight, record *db.P6Bat
 	return err
 }
 
-// WarmP7RushHistory validates bounded existing settled sources without running a
-// directory query, calendar recovery, resource changes, rewards or progress writes.
+// WarmP7RushHistory verifies one immutable settled source per transaction. A
+// cancellation or bad later source cannot discard proofs already revalidated.
+// No directory query, calendar recovery, rewards or progress writes run here.
 func WarmP7RushHistory(ctx context.Context, id int64) error {
 	if id < 1 {
 		return fmt.Errorf("invalid trial history owner")
@@ -202,33 +203,51 @@ func WarmP7RushHistory(ctx context.Context, id int64) error {
 	if p7RushCertificateRuntimeFor(db.GetIns()) == nil {
 		return constUtil.ErrP7RushHistoryCertificateUnavailable
 	}
+	realm := p7RushHistoryRealm(ctx)
+	cursor := ""
+	for {
+		var ids []string
+		err := db.GetIns().WithContext(ctx).Model(&db.P7RushFight{}).Where("player_id=? AND kind=? AND status=? AND diagnostic=? AND id>?", id, constUtil.P7RushTrial, constUtil.P7RushSettled, false, cursor).Order("id").Limit(constUtil.P7RushHistoryWarmLimit).Pluck("id", &ids).Error
+		if err != nil {
+			return err
+		}
+		if len(ids) == 0 {
+			return nil
+		}
+		for _, fightID := range ids {
+			if err := warmP7RushHistoryFight(ctx, id, realm, fightID); err != nil {
+				return err
+			}
+			cursor = fightID
+		}
+	}
+}
+
+func p7RushHistoryRealm(ctx context.Context) int64 {
+	realm := constUtil.GameDefaultServerID
+	if config.AppConfigIns != nil && config.AppConfigIns.Game.ServerID > 0 {
+		realm = config.AppConfigIns.Game.ServerID
+	}
+	if game, ok := ctx.Value(constUtil.GameServiceContextKey).(*GameService); ok {
+		realm = game.OriginalServerID()
+	}
+	return realm
+}
+
+func warmP7RushHistoryFight(ctx context.Context, id, realm int64, fightID string) error {
 	return db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var profile db.Profile
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&profile, id).Error; err != nil {
+		if err := tx.Select("id", "server_id").Clauses(clause.Locking{Strength: "UPDATE"}).First(&profile, id).Error; err != nil {
 			return err
+		}
+		if AdminProfileServerID(profile) != realm {
+			return fmt.Errorf("trial history owner belongs to another realm")
 		}
 		var state db.P7RushState
 		if err := tx.First(&state, "player_id=?", id).Error; err != nil {
 			return err
 		}
-		realm := constUtil.GameDefaultServerID
-		if config.AppConfigIns != nil && config.AppConfigIns.Game.ServerID > 0 {
-			realm = config.AppConfigIns.Game.ServerID
-		}
-		if game, ok := ctx.Value(constUtil.GameServiceContextKey).(*GameService); ok {
-			realm = game.OriginalServerID()
-		}
-		if AdminProfileServerID(profile) != realm {
-			return fmt.Errorf("trial history owner belongs to another realm")
-		}
-		var ids []db.P7RushFight
-		if err := tx.Select("id").Where("player_id=? AND kind=? AND status=? AND diagnostic=?", id, constUtil.P7RushTrial, constUtil.P7RushSettled, false).Limit(constUtil.P7RushHistoryWarmLimit + 1).Find(&ids).Error; err != nil {
-			return err
-		}
-		if len(ids) > constUtil.P7RushHistoryWarmLimit {
-			return constUtil.ErrP7RushHistoryWarmLimit
-		}
-		q := &p7EliteQueryProjection{tx: tx, state: &state, serverID: realm, reads: map[string]p7EliteQueryRead{}, parsed: map[string]*p7EliteQueryParsed{}}
+		q := &p7EliteQueryProjection{tx: tx, state: &state, serverID: realm, fightIDs: []string{fightID}, reads: map[string]p7EliteQueryRead{}, parsed: map[string]*p7EliteQueryParsed{}}
 		if err := q.load(); err != nil {
 			return err
 		}
@@ -250,8 +269,36 @@ func WarmP7RushHistory(ctx context.Context, id int64) error {
 			if !scoped || outcome == nil || !outcome.Authoritative {
 				return errors.New(constUtil.P7ScopedRushConflict)
 			}
-
 		}
 		return nil
 	}, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
+}
+
+// WarmPendingP7RushHistory is a release gate for a changed validator contract.
+// Discover existing source owners in this realm, then retain the original full
+// source verifier. Old certificates never become trusted by changing a version.
+func WarmPendingP7RushHistory(ctx context.Context) (int, error) {
+	runtime := p7RushCertificateRuntimeFor(db.GetIns())
+	if runtime == nil {
+		return 0, constUtil.ErrP7RushHistoryCertificateUnavailable
+	}
+	realm := p7RushHistoryRealm(ctx)
+	var owners []int64
+	err := db.GetIns().WithContext(ctx).Table("p7_rush_fights AS f").Distinct("f.player_id").
+		Joins("JOIN profiles AS p ON p.id=f.player_id").
+		Joins("LEFT JOIN p7_rush_history_certificates AS c ON c.server_id=? AND c.player_id=f.player_id AND c.fight_id=f.id", realm).
+		Where("f.kind=? AND f.status=? AND f.diagnostic=?", constUtil.P7RushTrial, constUtil.P7RushSettled, false).
+		Where("(p.server_id=? OR (p.server_id=0 AND ?=?))", realm, realm, constUtil.GameDefaultServerID).
+		Where("(c.fight_id IS NULL OR c.format<>? OR c.validator<>?)", constUtil.P7RushHistoryCertificateFormat, runtime.validator).
+		Where("(EXISTS (SELECT 1 FROM p7_rush_manual_calculations AS m WHERE m.fight_id=f.id AND m.status=?) OR EXISTS (SELECT 1 FROM p7_rush_scoped_calculations AS s WHERE s.fight_id=f.id))", constUtil.P7RushManualAccepted).
+		Order("f.player_id").Pluck("f.player_id", &owners).Error
+	if err != nil {
+		return 0, err
+	}
+	for i, id := range owners {
+		if err := WarmP7RushHistory(ctx, id); err != nil {
+			return i, fmt.Errorf("trial history owner %d: %w", id, err)
+		}
+	}
+	return len(owners), nil
 }
