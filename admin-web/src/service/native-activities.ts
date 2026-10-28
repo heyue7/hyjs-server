@@ -11,7 +11,9 @@ export interface NativeActivityForm {
   minVip: number; diamondCost: number; threshold: number;
   cents: number; charge: number; dailyDiamond: number;
   weekdayMask: number; startMinute: number; endMinute: number; currencyFactor: number; dropFactor: number;
-  rewards: ResourceAmount[]; milestones: NativeMilestone[]; prizes: ActivityPrize[];
+  rewards: ResourceAmount[]; milestones: NativeMilestone[];
+  /** 精灵扭蛋使用固定精灵名单，只有每项的 weight 可以编辑。 */
+  prizes: ActivityPrize[];
   vipTiers: NativeVIPTier[]; children: NativeActivityChild[];
 }
 export interface NativeActivity {

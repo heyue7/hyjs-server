@@ -66,7 +66,7 @@ type AdminNativeActivityForm struct {
 	Rewards []AdminResourceAmount `json:"rewards,omitempty"`
 	// Milestones 是开服基金、庆典活动等按档位保存的奖励。
 	Milestones []AdminNativeActivityMilestone `json:"milestones,omitempty"`
-	// Prizes 是橙卡招募的可编辑奖池，占用原GameplayPoolReward字段。
+	// Prizes 是橙卡招募或精灵扭蛋的奖池；精灵名单和身份固定，仅权重可编辑。
 	Prizes []AdminActivityPrize `json:"prizes,omitempty"`
 	// VipTiers 是会员福利固定13档配置。
 	VipTiers []AdminNativeVIPTier `json:"vipTiers,omitempty"`
@@ -78,7 +78,7 @@ type AdminNativeActivityForm struct {
 type AdminNativeActivityDTO struct {
 	// ID 是稳定后台配置ID，修改时须URL编码后放入路径。
 	ID string `json:"id"`
-	// Kind 是固定活动类型，取fund、payment-first、payment-single、payment-total、payment-continued、payment-consume、month-card、permanent-card、vip-benefits、copy-benefits、recruit-rotation、first-double、celebration、festival、update。
+	// Kind 是固定活动类型，取fund、payment-first、payment-single、payment-total、payment-continued、payment-consume、month-card、permanent-card、vip-benefits、copy-benefits、recruit-rotation、pet-recruit、first-double、celebration、festival、update。
 	Kind string `json:"kind"`
 	// Name 是服务端固定的正式名称，与客户端同步，不允许后台改写。
 	Name string `json:"name"`
@@ -90,7 +90,7 @@ type AdminNativeActivityDTO struct {
 	Enabled bool `json:"enabled"`
 	// Permanent 是true无活动到期时间，false按表单开放时间生效。
 	Permanent bool `json:"permanent"`
-	// Frozen 是true规则已被原消费者冻结，只能启停或修改别名。
+	// Frozen 是true规则已冻结；旧精灵奖池在迁移前只读，其他冻结配置可启停或修改别名。
 	Frozen bool `json:"frozen"`
 	// Note 是当前来源、生效边界及历史保留说明。
 	Note string `json:"note"`

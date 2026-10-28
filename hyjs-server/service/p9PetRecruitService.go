@@ -1,6 +1,7 @@
 package service
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -39,24 +40,9 @@ func (s *GameService) initializeP9Recruit(tx *gorm.DB) error {
 	if err := tx.AutoMigrate(&db.P9PetRecruitRule{}, &db.P9PetRecruitProgress{}); err != nil {
 		return err
 	}
-	counts := map[string]int64{}
-	for _, pet := range s.Tables["Pet"] {
-		if pet["quality"] == "18" || pet["quality"] == "20" || pet["quality"] == "23" {
-			counts[pet["quality"]]++
-		}
-	}
-	if counts["18"] != 21 || counts["20"] != 38 || counts["23"] != 19 {
-		return errors.New(constUtil.P9RecruitConfigurationError)
-	}
-	scale := counts["18"] * counts["20"] * counts["23"]
-	group := map[string]int64{"18": 70, "20": 29, "23": 1}
-	var pool []p9RecruitOption
-	for _, pet := range s.Tables["Pet"] {
-		quality := pet["quality"]
-		if group[quality] == 0 {
-			continue
-		}
-		pool = append(pool, p9RecruitOption{PetID: pet["id"], Weight: group[quality] * scale / counts[quality], Guarantee: quality == "20" || quality == "23"})
+	pool, err := s.p9RecruitDefaultPool80()
+	if err != nil {
+		return err
 	}
 	raw, err := json.Marshal(pool)
 	if err != nil {
@@ -88,7 +74,15 @@ func (s *GameService) p9RecruitInput(rule db.P9PetRecruitRule) (*p9RecruitInput,
 	input.FreeIntervalMS = int64(hours * 3600000)
 	input.GuaranteeEvery = int32(must + 1)
 	input.CoinPerDraw = int32(coin)
-	return input, s.validateP9RecruitInput(input)
+	if err := s.validateP9RecruitInput(input); err != nil {
+		return nil, err
+	}
+	for _, option := range input.Pool {
+		if s.table("Pet", "id", option.PetID)["quality"] == "23" {
+			return nil, errors.New(constUtil.P9RecruitConfigurationError)
+		}
+	}
+	return input, nil
 }
 
 func (s *GameService) validateP9RecruitInput(input *p9RecruitInput) error {
@@ -120,14 +114,15 @@ func (s *GameService) p9RecruitProgress(tx *gorm.DB, id int64, state *db.P9PetSt
 	if !live.Enabled {
 		return nil, nil, errors.New(constUtil.P9RecruitDisabled)
 	}
+	liveInput, err := s.p9RecruitInput(live)
+	if err != nil {
+		return nil, nil, err
+	}
 	var progress db.P9PetRecruitProgress
-	err := tx.First(&progress, "player_id=?", id).Error
+	err = tx.First(&progress, "player_id=?", id).Error
 	var input *p9RecruitInput
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		input, err = s.p9RecruitInput(live)
-		if err != nil {
-			return nil, nil, err
-		}
+		input = liveInput
 		raw, err := json.Marshal(input)
 		if err != nil {
 			return nil, nil, err
@@ -149,6 +144,18 @@ func (s *GameService) p9RecruitProgress(tx *gorm.DB, id int64, state *db.P9PetSt
 		}
 		if state.NextFree <= 0 || state.FreeRemaining < 0 || state.FreeRemaining > input.FreeCap || state.MustTimes != input.GuaranteeEvery-1-progress.SinceGuarantee {
 			return nil, nil, errors.New(constUtil.P9RecruitConfigurationError)
+		}
+		// Only future draws follow the saved pool; quota, pity and receipt history stay intact.
+		input.Pool, input.Source = liveInput.Pool, liveInput.Source
+		raw, err := json.Marshal(input)
+		if err != nil {
+			return nil, nil, err
+		}
+		if !bytes.Equal(raw, progress.Input) {
+			progress.Input, progress.InputHash = raw, p6Digest(raw)
+			if err := tx.Model(&progress).Updates(map[string]any{"input": raw, "input_hash": progress.InputHash}).Error; err != nil {
+				return nil, nil, err
+			}
 		}
 		if now >= state.NextFree {
 			cycles := (now-state.NextFree)/input.FreeIntervalMS + 1

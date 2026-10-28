@@ -37,6 +37,7 @@ type adminNativeSnapshot struct {
 	copyRule     db.P4CopyBenefitRule
 	rotation     db.P4RecruitRotation
 	recruitPool  db.GameplayPool
+	petRecruit   db.P9PetRecruitRule
 	firstDouble  db.FirstDoublePolicy
 	period       db.PeriodInstance
 	bundle       db.P15SeasonalBundle
@@ -69,6 +70,8 @@ func adminNativeKindName(kind string) string {
 		return "福利活动"
 	case "recruit-rotation":
 		return "橙卡招募"
+	case "pet-recruit":
+		return "精灵扭蛋"
 	case "first-double":
 		return "首充双倍"
 	case "celebration":
@@ -84,7 +87,7 @@ func adminNativeKindName(kind string) string {
 // adminNativePermanentKind 固定常驻活动没有排期；资格、领取周期和运营开关仍由各消费者管理。
 func adminNativePermanentKind(kind string) bool {
 	switch kind {
-	case "fund", "payment-first", "month-card", "permanent-card", "vip-benefits", "recruit-rotation", "first-double":
+	case "fund", "payment-first", "month-card", "permanent-card", "vip-benefits", "recruit-rotation", "pet-recruit", "first-double":
 		return true
 	}
 	return false
@@ -281,6 +284,28 @@ func (s *GameService) adminNativeLoad(tx *gorm.DB, id string, lock bool) (*admin
 		snap.dto.Enabled = snap.firstDouble.Enabled
 		snap.dto.Frozen = true
 		snap.dto.Note = "仅启停和别名；原SKU终身首单资格与已生成订单保持，不重置终身历史。"
+	case id == "pet-recruit:permanent":
+		query := tx
+		if lock {
+			query = query.Clauses(clause.Locking{Strength: "UPDATE"})
+		}
+		if err := query.First(&snap.petRecruit, "id = ?", constUtil.P9RecruitRuleID).Error; err != nil {
+			return nil, adminNativeLookupError(err)
+		}
+		prizes, err := s.adminNativePetRecruitPrizes(snap.petRecruit, false)
+		if err != nil {
+			prizes, err = s.adminNativePetRecruitPrizes(snap.petRecruit, true)
+			if err != nil {
+				return nil, err
+			}
+			snap.dto.Frozen = true
+			snap.dto.Note = "当前为旧版78精灵奖池，含红色精灵；请先完成奖池迁移，迁移前仅可查看。"
+		} else {
+			snap.dto.Note = "常驻开放；普通抽取按当前奖池权重执行，每10次保底橙色精灵。价格、免费次数与已有进度保留。"
+		}
+		snap.dto.Kind = "pet-recruit"
+		snap.dto.Form = model.AdminNativeActivityForm{Prizes: prizes}
+		snap.dto.Enabled = snap.petRecruit.Enabled
 	case strings.HasPrefix(id, "fund:"):
 		key := strings.TrimPrefix(id, "fund:")
 		if key != "open_server_fund" {
@@ -503,6 +528,10 @@ func (s *GameService) adminNativeLoad(tx *gorm.DB, id string, lock bool) (*admin
 	snap.dto.Permanent = adminNativePermanentKind(snap.dto.Kind) && (snap.dto.Kind != "recruit-rotation" || id == "recruit:permanent")
 	snap.dto.Alias = meta.Alias
 	snap.dto.Version = adminNativeVersion(snap.dto.Form, snap.dto.Enabled, snap.dto.Alias, snap.dto.Frozen)
+	if snap.dto.Kind == "pet-recruit" {
+		// 来源说明属于同一规则行，其他操作变更来源时也必须触发版本冲突。
+		snap.dto.Version = adminVersion(struct{ Version, Source string }{snap.dto.Version, snap.petRecruit.Source})
+	}
 	return snap, nil
 }
 
@@ -674,6 +703,14 @@ func (s *GameService) AdminNativeActivities(ctx context.Context, p *model.AdminP
 			ids = append(ids, "recruit:permanent")
 		}
 	}
+	if gameSchemaHasTable(tx, &db.P9PetRecruitRule{}) {
+		if err := tx.Model(&db.P9PetRecruitRule{}).Where("id = ?", constUtil.P9RecruitRuleID).Count(&count).Error; err != nil {
+			return nil, err
+		}
+		if count > 0 {
+			ids = append(ids, "pet-recruit:permanent")
+		}
+	}
 	if gameSchemaHasTable(tx, &db.FirstDoublePolicy{}) {
 		if err := tx.Model(&db.FirstDoublePolicy{}).Where("id = ?", 1).Count(&count).Error; err != nil {
 			return nil, err
@@ -771,7 +808,13 @@ func (s *GameService) AdminSaveNativeActivity(ctx context.Context, p *model.Admi
 		if snap.dto.Version != req.Version {
 			return constUtil.ErrAdminConfigConflict
 		}
+		if snap.dto.Kind == "pet-recruit" && snap.dto.Frozen {
+			return constUtil.ErrAdminConfigConflict
+		}
 		if req.RecruitSettings != nil {
+			if snap.dto.Kind == "pet-recruit" {
+				return constUtil.ErrAdminInput
+			}
 			kind := int32(0)
 			if snap.dto.Kind == "recruit-rotation" {
 				kind = constUtil.RecruitRuntimeKindStrong
@@ -825,6 +868,8 @@ func (s *GameService) adminNativeApply(tx *gorm.DB, snap *adminNativeSnapshot, r
 		return s.adminNativeApplyCopy(tx, snap, req)
 	case "recruit-rotation":
 		return s.adminNativeApplyRecruit(tx, snap, req)
+	case "pet-recruit":
+		return s.adminNativeApplyPetRecruit(tx, snap, req)
 	case "first-double":
 		return s.adminNativeApplyFirstDouble(tx, snap, req)
 	case "celebration":
@@ -1067,6 +1112,91 @@ func (s *GameService) adminNativeApplyPermanentRecruit(tx *gorm.DB, snap *adminN
 		return err
 	}
 	return tx.Model(&db.GameplayPool{}).Where("id = ?", "recruit_2").Update("enabled", req.Enabled).Error
+}
+
+// adminNativePetRecruitPrizes 按原精灵表行序构造固定奖位，旧78池只供迁移前查看。
+func (s *GameService) adminNativePetRecruitPrizes(rule db.P9PetRecruitRule, legacy bool) ([]model.AdminActivityPrize, error) {
+	var pool []p9RecruitOption
+	expected := 59
+	if legacy {
+		expected = 78
+	}
+	if len(rule.Pool) > 65536 || json.Unmarshal(rule.Pool, &pool) != nil || len(pool) != expected {
+		return nil, constUtil.ErrAdminInput
+	}
+	byPet := make(map[string]p9RecruitOption, len(pool))
+	for _, option := range pool {
+		if option.PetID == "" || option.Weight < 1 || option.Weight > 1000000000000 {
+			return nil, constUtil.ErrAdminInput
+		}
+		if _, exists := byPet[option.PetID]; exists {
+			return nil, constUtil.ErrAdminInput
+		}
+		byPet[option.PetID] = option
+	}
+	prizes := make([]model.AdminActivityPrize, 0, len(pool))
+	for index, pet := range s.Tables["Pet"] {
+		if pet["quality"] != "18" && pet["quality"] != "20" && !(legacy && pet["quality"] == "23") {
+			continue
+		}
+		option, exists := byPet[pet["id"]]
+		if !exists || pet["defaultTalent"] == "" || option.Guarantee != (pet["quality"] == "20" || legacy && pet["quality"] == "23") {
+			return nil, constUtil.ErrAdminInput
+		}
+		prizes = append(prizes, model.AdminActivityPrize{ID: int64(index), ResourceID: option.PetID, Amount: 1, Weight: option.Weight, Stock: 0, Guaranteed: option.Guarantee})
+		delete(byPet, pet["id"])
+	}
+	if len(prizes) != expected || len(byPet) != 0 {
+		return nil, constUtil.ErrAdminInput
+	}
+	return prizes, nil
+}
+
+// adminNativeApplyPetRecruit 只修改固定名单的权重与窗口开关，玩家历史和价格规则独立保留。
+func (s *GameService) adminNativeApplyPetRecruit(tx *gorm.DB, snap *adminNativeSnapshot, req model.AdminNativeActivitySaveRequest) error {
+	other := req.Form
+	other.Prizes = nil
+	if !adminNativeSameForm(other, model.AdminNativeActivityForm{}) || len(req.Form.Prizes) != len(snap.dto.Form.Prizes) {
+		return constUtil.ErrAdminInput
+	}
+	byID := make(map[int64]model.AdminActivityPrize, len(req.Form.Prizes))
+	for _, prize := range req.Form.Prizes {
+		if prize.Weight < 1 || prize.Weight > 1000000000000 {
+			return constUtil.ErrAdminInput
+		}
+		if _, exists := byID[prize.ID]; exists {
+			return constUtil.ErrAdminInput
+		}
+		byID[prize.ID] = prize
+	}
+	pool := make([]p9RecruitOption, 0, len(byID))
+	changed := false
+	for _, current := range snap.dto.Form.Prizes {
+		prize, exists := byID[current.ID]
+		if !exists || prize.ResourceID != current.ResourceID || prize.Amount != 1 || prize.Stock != 0 || prize.Guaranteed != current.Guaranteed {
+			return constUtil.ErrAdminInput
+		}
+		changed = changed || prize.Weight != current.Weight
+		pool = append(pool, p9RecruitOption{PetID: prize.ResourceID, Weight: prize.Weight, Guarantee: prize.Guaranteed})
+	}
+	updated := snap.petRecruit
+	updates := map[string]any{}
+	if changed {
+		updated.Pool = adminJSON(pool)
+		updated.Source = constUtil.P9RecruitSource
+		updates["pool"] = updated.Pool
+		updates["source"] = updated.Source
+	}
+	if req.Enabled != snap.petRecruit.Enabled {
+		updates["enabled"] = req.Enabled
+	}
+	if _, err := s.p9RecruitInput(updated); err != nil {
+		return constUtil.ErrAdminInput
+	}
+	if len(updates) == 0 {
+		return nil
+	}
+	return tx.Model(&db.P9PetRecruitRule{}).Where("id = ?", snap.petRecruit.ID).Updates(updates).Error
 }
 
 func (s *GameService) adminNativeApplyFirstDouble(tx *gorm.DB, snap *adminNativeSnapshot, req model.AdminNativeActivitySaveRequest) error {

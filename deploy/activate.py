@@ -24,6 +24,7 @@ parser.add_argument('--apply-growth74', action='store_true')
 parser.add_argument('--apply-activity77', action='store_true', help='Apply activity77 under maintenance')
 parser.add_argument('--apply-feedback78', action='store_true', help='Apply the reviewed feedback78 configuration under maintenance')
 parser.add_argument('--apply-feedback79', action='store_true', help='Apply the reviewed feedback79 configuration under maintenance')
+parser.add_argument('--apply-feedback80', action='store_true', help='Apply the reviewed feedback80 configuration under maintenance')
 parser.add_argument('--apply-growth75', action='store_true')
 parser.add_argument('--restore-activity-calendar')
 parser.add_argument('--warm-rush-history-player', action='append', type=int, default=[])
@@ -31,8 +32,8 @@ args = parser.parse_args()
 if args.restore_activity_calendar:
     import uuid
     assert str(uuid.UUID(args.restore_activity_calendar)) == args.restore_activity_calendar
-    assert args.expected_live_revision and not any((args.initial_db, args.migrate_role_wallets, args.apply_growth74, args.apply_growth75, args.apply_activity77, args.apply_feedback78, args.apply_feedback79)), 'Calendar restore requires a standalone maintenance cutover'
-assert sum((args.apply_growth74, args.apply_growth75, args.apply_activity77, args.apply_feedback78, args.apply_feedback79)) <= 1, 'Choose one explicit maintenance deployment version'
+    assert args.expected_live_revision and not any((args.initial_db, args.migrate_role_wallets, args.apply_growth74, args.apply_growth75, args.apply_activity77, args.apply_feedback78, args.apply_feedback79, args.apply_feedback80)), 'Calendar restore requires a standalone maintenance cutover'
+assert sum((args.apply_growth74, args.apply_growth75, args.apply_activity77, args.apply_feedback78, args.apply_feedback79, args.apply_feedback80)) <= 1, 'Choose one explicit maintenance deployment version'
 if args.apply_activity77:
     assert args.expected_live_revision and not args.initial_db and not args.migrate_role_wallets, 'Activity77 requires a pinned maintenance cutover'
 if args.apply_growth75:
@@ -43,6 +44,9 @@ if args.apply_feedback78:
 if args.apply_feedback79:
     assert args.expected_live_revision and re.fullmatch(r'[0-9a-f]{40,64}', args.expected_live_revision), 'Feedback79 requires an exact live revision'
     assert not any((args.initial_db, args.provision_ingress, args.migrate_role_wallets, args.warm_rush_history_player)), 'Feedback79 requires a standalone maintenance cutover'
+if args.apply_feedback80:
+    assert args.expected_live_revision and re.fullmatch(r'[0-9a-f]{40,64}', args.expected_live_revision), 'Feedback80 requires an exact live revision'
+    assert not any((args.initial_db, args.provision_ingress, args.migrate_role_wallets, args.warm_rush_history_player)), 'Feedback80 requires a standalone maintenance cutover'
 os.umask(0o077)
 stage = Path(args.stage).resolve()
 ROOT = stage.parent.parent
@@ -161,7 +165,7 @@ if args.restore_activity_calendar:
     compose('run', '--rm', '--no-deps', '-T', 'app', '--env', 'test', '--tables', '/app/tables', '--calendar-maintenance', 'begin', '--log-file', '/app/logs/calendar-maintenance.log')
     assert mysql('SELECT maintenance FROM client_update_policy WHERE id=1;').strip() == '1'
     compose('stop', '-t', '30', 'app')
-if args.apply_growth74 or args.apply_growth75 or args.apply_activity77 or args.apply_feedback78 or args.apply_feedback79:
+if args.apply_growth74 or args.apply_growth75 or args.apply_activity77 or args.apply_feedback78 or args.apply_feedback79 or args.apply_feedback80:
     assert args.expected_live_revision and not args.initial_db
     assert mysql('SELECT maintenance FROM client_update_policy WHERE id=1;').strip() == '1', 'Growth apply requires maintenance'
     if args.apply_feedback78:
@@ -176,6 +180,11 @@ if args.apply_growth74 or args.apply_growth75 or args.apply_activity77 or args.a
         feedback79_guard = feedback79_activation.Feedback79CutoverGuard(compose)
         atexit.register(feedback79_guard.stop_if_unfinished)
         feedback79_guard.install_signal_handlers()
+    if args.apply_feedback80:
+        import feedback80_activation
+        feedback80_guard = feedback80_activation.Feedback80CutoverGuard(compose)
+        atexit.register(feedback80_guard.stop_if_unfinished)
+        feedback80_guard.install_signal_handlers()
     compose('stop', '-t', '30', 'app')
 if args.migrate_role_wallets:
     assert args.expected_live_revision and not args.initial_db and (ROOT / 'migration.json').exists()
@@ -294,6 +303,14 @@ if args.apply_feedback79:
     except Exception:
         raise RuntimeError('Feedback79 failed under maintenance. App remains stopped; preserve the authenticated backup and private feedback79 manifest for inspection; do not automatically restore the database.') from None
 
+if args.apply_feedback80:
+    try:
+        manifest['feedback80Applied'] = feedback80_activation.activate_feedback80(
+            mysql, compose, ROOT / 'backups', manifest['revision'], verified_backup,
+            manifest['files']['app/hyjs-server'])
+    except Exception:
+        raise RuntimeError('Feedback80 failed under maintenance. App remains stopped; preserve the authenticated backup and private feedback80 manifest for inspection; do not automatically restore the database.') from None
+
 if args.restore_activity_calendar:
     import calendar_restore_activation
     try:
@@ -311,11 +328,11 @@ for _ in range(90):
     except Exception:
         time.sleep(2)
 else:
-    if args.migrate_role_wallets or args.apply_activity77 or args.apply_feedback78 or args.apply_feedback79:
+    if args.migrate_role_wallets or args.apply_activity77 or args.apply_feedback78 or args.apply_feedback79 or args.apply_feedback80:
         compose('stop', '-t', '30', 'app')
     raise SystemExit('Application health failed; data and prior deployed.json preserved. Fix/retry this script, or deploy its recorded Git commit from a clean checkout; do not restore the database automatically.')
 
-if args.apply_activity77 or args.apply_feedback78 or args.apply_feedback79:
+if args.apply_activity77 or args.apply_feedback78 or args.apply_feedback79 or args.apply_feedback80:
     try:
         assert mysql('SELECT maintenance FROM client_update_policy WHERE id=1;').strip() == '1', 'Maintenance changed after health check'
     except Exception:
@@ -367,4 +384,6 @@ if args.apply_feedback78:
     feedback78_guard.complete = True
 if args.apply_feedback79:
     feedback79_guard.complete = True
+if args.apply_feedback80:
+    feedback80_guard.complete = True
 print(json.dumps({'status': 'DEPLOYED', 'revision': installed, 'binarySHA256': manifest['files']['app/hyjs-server']}))

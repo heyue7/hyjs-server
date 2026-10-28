@@ -3,7 +3,9 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -20,9 +22,22 @@ import (
 func TestP9OrdinaryRecruitLifecycle(t *testing.T) {
 	ctx := context.Background()
 	path := filepath.Join(t.TempDir(), "p9-recruit.db")
-	if err := db.InitGame(ctx, path); err != nil {
-		t.Fatal(err)
+	open := func() {
+		t.Helper()
+		var err error
+		if name := os.Getenv("HYJS_P9_MYSQL_DATABASE"); name != "" {
+			if !strings.HasPrefix(name, "hyjs_test_p9_") {
+				t.Fatal("isolated p9 database required")
+			}
+			err = db.InitGameMySQL(ctx, db.MySQLConfig{Host: os.Getenv("HYJS_MYSQL_HOST"), User: os.Getenv("HYJS_MYSQL_USER"), Password: os.Getenv("HYJS_MYSQL_PASSWORD"), Database: name})
+		} else {
+			err = db.InitGame(ctx, path)
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
+	open()
 	defer func() { pool, _ := db.GetIns().DB(); pool.Close() }()
 	s := &GameService{}
 	for _, load := range []func(string) error{s.LoadTables, s.LoadP9Tables} {
@@ -47,8 +62,8 @@ func TestP9OrdinaryRecruitLifecycle(t *testing.T) {
 	for _, option := range input.Pool {
 		group[s.table("Pet", "id", option.PetID)["quality"]] += option.Weight
 	}
-	if len(input.Pool) != 78 || group["18"] != group["23"]*70 || group["20"] != group["23"]*29 {
-		t.Fatal("all78 declared local quality weights", len(input.Pool), group)
+	if len(input.Pool) != 59 || group["18"] != group["20"]*99 || group["23"] != 0 {
+		t.Fatal("non-red 99/1 declared quality weights", len(input.Pool), group)
 	}
 	a, err := LoginAccount(ctx, "p9-ordinary", "isolated-only")
 	if err != nil {
@@ -148,11 +163,45 @@ func TestP9OrdinaryRecruitLifecycle(t *testing.T) {
 	if !proto.Equal(beforeP, p) || string(raw) != string(beforeG) {
 		t.Fatal("invalid free partly changed profile")
 	}
-	// Freeze corruption in the live pool must not change an existing player's input.
+	// An already-started account follows the edited pool without resetting pity or replaying rewards.
+	var existing db.P9PetRecruitProgress
+	if err := db.GetIns().First(&existing, "player_id=?", a.Id).Error; err != nil {
+		t.Fatal(err)
+	}
+	oldDraws, oldSince := existing.Draws, existing.SinceGuarantee
+	legacy := *input
+	legacy.Pool = []p9RecruitOption{{PetID: "pet_009", Weight: 70}, {PetID: "pet_046", Weight: 1, Guarantee: true}}
+	legacy.Source = constUtil.P9RecruitLegacySource
+	legacyRaw, _ := json.Marshal(legacy)
+	if err := db.GetIns().Model(&existing).Updates(map[string]any{"input": legacyRaw, "input_hash": p6Digest(legacyRaw)}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if query().GetNum() != 0 {
+		t.Fatal("pool change reset free quota")
+	}
+	if err := db.GetIns().First(&existing, "player_id=?", a.Id).Error; err != nil {
+		t.Fatal(err)
+	}
+	var adopted p9RecruitInput
+	if json.Unmarshal(existing.Input, &adopted) != nil || len(adopted.Pool) != 59 || existing.Draws != oldDraws || existing.SinceGuarantee != oldSince {
+		t.Fatal("existing progress was reset or retained red pool")
+	}
+	replay, err := s.p9PetRecruit(ctx, a.Id, free, 3)
+	if err != nil || !proto.Equal(replay[0], first) {
+		t.Fatal("pool change altered committed receipt", err)
+	}
+	// Invalid live configuration fails closed; restoring it preserves quota and history.
 	if err := db.GetIns().Model(&rule).Update("pool", []byte(`[]`)).Error; err != nil {
 		t.Fatal(err)
 	}
 	five := &pb.CSPetRecruit{Free: proto.Int32(0), NumType: proto.Int32(2)}
+	if _, err := s.p9PetRecruit(ctx, a.Id, five, 4); err == nil {
+		t.Fatal("invalid live pool accepted")
+	}
+	restorePool, _ := json.Marshal(input.Pool)
+	if err := db.GetIns().Model(&rule).Update("pool", restorePool).Error; err != nil {
+		t.Fatal(err)
+	}
 	result, err := s.p9PetRecruit(ctx, a.Id, five, 4)
 	if err != nil {
 		t.Fatal(err)
@@ -178,7 +227,7 @@ func TestP9OrdinaryRecruitLifecycle(t *testing.T) {
 	}
 	pet := forced[0].(*pb.SCPetRecruit).GetGet().GetPets()[0]
 	quality := s.table("Pet", "id", pet.GetId())["quality"]
-	if quality != "20" && quality != "23" || query().GetMustTimes() != 9 {
+	if quality != "20" || query().GetMustTimes() != 9 {
 		t.Fatal("guaranteed local quality did not reset")
 	}
 	if err := db.GetIns().Model(&db.P9PetState{}).Where("player_id=?", a.Id).Update("next_free", time.Now().Add(-50*time.Hour).UnixMilli()).Error; err != nil {
@@ -216,12 +265,10 @@ func TestP9OrdinaryRecruitLifecycle(t *testing.T) {
 	}
 	pool, _ := db.GetIns().DB()
 	pool.Close()
-	if err := db.InitGame(ctx, path); err != nil {
-		t.Fatal(err)
-	}
+	open()
 	cold, e := s.p9PetRecruit(ctx, a.Id, five, 4)
 	if e != nil || !proto.Equal(paid, cold[0]) {
 		t.Fatal("disabled cold old paid receipt changed", e)
 	}
-	t.Log("all78 positive original IDs / declared70:29:1 pool, independent first gift, original150/700 prices and2000coin/card, eight-way exact/free races, frozen pool, local next10 pity, offline cap and disabled cold receipt passed")
+	t.Log("59 non-red original IDs / declared99:1 pool, independent first gift, original150/700 prices and2000coin/card, eight-way exact/free races, current pool, preserved next10 pity, offline cap and disabled cold receipt passed")
 }

@@ -19,7 +19,7 @@ func RegisterAdminNativeActivityRoutes(a *gin.RouterGroup) {
 
 // AdminNativeActivitiesHandler 返回真实活动来源及当前生效规则。
 // @Summary 精彩活动配置列表
-// @Description 列出开服基金、支付、卡类、会员、副本福利、招募、首充双倍、庆典及节日/新版活动的真实配置
+// @Description 列出开服基金、支付、卡类、会员、副本福利、角色招募、精灵扭蛋、首充双倍、庆典及节日/新版活动的真实配置
 // @Tags Admin
 // @Accept json
 // @Produce json

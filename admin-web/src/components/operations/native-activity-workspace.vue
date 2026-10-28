@@ -56,11 +56,13 @@ function syncDrawerWidth() {
 }
 const activityDirty = computed(() => Boolean(selected.value) && JSON.stringify(selected.value) !== original.value);
 const isRecruitRotation = computed(() => selected.value?.kind === 'recruit-rotation');
+const isPetRecruit = computed(() => selected.value?.kind === 'pet-recruit');
+const isLegacyPetRecruit = computed(() => isPetRecruit.value && Boolean(selected.value?.frozen));
 const ruleDirty = computed(() => isRecruitRotation.value && Boolean(recruitRules.value?.dirty));
 const ruleLoading = computed(() => isRecruitRotation.value && Boolean(recruitRules.value?.loading));
 const ruleInvalid = computed(() => isRecruitRotation.value && (!recruitRules.value || Boolean(recruitRules.value.invalid)));
 const dirty = computed(() => activityDirty.value || ruleDirty.value || Boolean(isDailySign.value && (dailySign.value?.dirty || luxurySign.value?.dirty)));
-const disabled = computed(() => !canWrite.value || saving.value || loading.value);
+const disabled = computed(() => !canWrite.value || saving.value || loading.value || isLegacyPetRecruit.value);
 const rulesDisabled = computed(() => disabled.value || selected.value?.frozen);
 const busy = computed(() => loading.value || saving.value || Boolean(removingId.value) || signBusy.value);
 const timed = computed(() => Boolean(selected.value) && isTimed(selected.value!));
@@ -70,6 +72,16 @@ const currentVIP = computed(() => selected.value?.form.vipTiers.filter(row => ro
 const currentPrize = computed(() => selected.value?.form.prizes.slice(selectedPrize.value, selectedPrize.value + 1) || []);
 const currentMilestone = computed(() => selected.value?.form.milestones.slice(selectedMilestone.value, selectedMilestone.value + 1) || []);
 const currentChild = computed(() => selected.value?.form.children.slice(selectedChild.value, selectedChild.value + 1) || []);
+const petPrizes = computed(() => isPetRecruit.value ? selected.value?.form.prizes || [] : []);
+const validPetWeight = (weight: number) => Number.isSafeInteger(weight) && weight >= 1 && weight <= 1000000000000;
+const petWeightInvalid = computed(() => isPetRecruit.value && !isLegacyPetRecruit.value && (petPrizes.value.length !== 59 || petPrizes.value.some(prize => !validPetWeight(prize.weight))));
+const petTotalWeight = computed(() => petPrizes.value.reduce((sum, prize) => sum + (validPetWeight(prize.weight) ? prize.weight : 0), 0));
+const petOrangeWeight = computed(() => petPrizes.value.reduce((sum, prize) => sum + (prize.guaranteed && validPetWeight(prize.weight) ? prize.weight : 0), 0));
+function petProbability(weight: number) {
+  if (petWeightInvalid.value || !petTotalWeight.value) return '—';
+  const percent = weight / petTotalWeight.value * 100;
+  return percent > 0 && percent < 0.0001 ? '<0.0001%' : `${Number(percent.toFixed(4))}%`;
+}
 const kindOrder = [
   'daily-sign',
   'fund',
@@ -83,6 +95,7 @@ const kindOrder = [
   'vip-benefits',
   'copy-benefits',
   'recruit-rotation',
+  'pet-recruit',
   'first-double',
   'celebration',
   'festival',
@@ -101,6 +114,7 @@ const kindLabels: Record<string, string> = {
   'vip-benefits': '会员福利',
   'copy-benefits': '福利活动',
   'recruit-rotation': '橙卡招募',
+  'pet-recruit': '精灵扭蛋',
   'first-double': '首充双倍',
   celebration: '庆典活动',
   festival: '节日活动',
@@ -156,7 +170,7 @@ const benefitVIPOptions = computed(() => Array.from({ length: 13 }, (_, value) =
 }));
 const prizeOptions = computed(() => (selected.value?.form.prizes || []).map((row, index) => ({
   value: index,
-  label: `${index + 1}. ${rewardsText([row])} · 权重 ${row.weight}${row.guaranteed ? ' · 橙色保底' : ''}`
+  label: `${index + 1}. ${rewardsText([row])} · 权重 ${row.weight}${isPetRecruit.value && !isLegacyPetRecruit.value ? ` · 普通概率 ${petProbability(row.weight)}` : ''}${row.guaranteed ? isLegacyPetRecruit.value ? ' · 原保底候选' : ' · 橙色保底' : ''}`
 })));
 const childOptions = computed(() => (selected.value?.form.children || []).map((child, index) => ({
   value: index,
@@ -226,11 +240,12 @@ const activityNotes: Record<string, string> = {
   'permanent-card': '修改用于新订单，已确认与待支付订单的价格及奖励保留。',
   'copy-benefits': '未冻结时保存即生效，冻结后仅可调整启停和后台别名。',
   'recruit-rotation': '奖池、每日次数与保底用于橙卡招募，费用、免费冷却与已有进度保留；轮换冻结后仅可调整启停、别名及全局招募规则。',
+  'pet-recruit': '修改后的权重用于后续抽取；已有结果、免费次数和保底进度保留。价格及免费规则沿用游戏配置。',
   celebration: '按本期累计进度与领奖周期执行，冻结后仅可调整启停和后台别名。',
   festival: '子活动类型固定，父子开放时间一致，全部配置完整后可启用。父或任一子活动冻结后仅可调整启停和别名；父子启停同步。',
   update: '子活动类型固定，父子开放时间一致，全部配置完整后可启用。父或任一子活动冻结后仅可调整启停和别名；父子启停同步。'
 };
-const selectedNote = computed(() => selected.value ? activityNotes[selected.value.kind] || selected.value.note : '');
+const selectedNote = computed(() => selected.value && !isLegacyPetRecruit.value ? activityNotes[selected.value.kind] || selected.value.note : '');
 
 function kindLabel(kind: string) {
   return kindLabels[kind] || kind;
@@ -357,6 +372,10 @@ async function load() {
 }
 async function save() {
   if (!selected.value || disabled.value || isDailySign.value) return;
+  if (petWeightInvalid.value) {
+    saveError.value = '请将每个精灵的权重设为 1 至 1000000000000 的整数。';
+    return;
+  }
   if (isRecruitRotation.value && (ruleLoading.value || ruleInvalid.value)) {
     saveError.value = '请先修正或重新载入招募规则后再保存。';
     return;
@@ -514,7 +533,8 @@ defineExpose({ beforeLeave: leaveWorkspace, confirmDiscard, dirty, saving });
           </div>
         </div>
 
-        <NAlert v-if="selected.frozen && !['first-double', 'recruit-rotation'].includes(selected.kind)" type="warning" :show-icon="false" class="mb-16px">
+        <NAlert v-if="isLegacyPetRecruit" type="warning" :show-icon="false" class="mb-16px">{{ selected.note }}</NAlert>
+        <NAlert v-else-if="selected.frozen && !['first-double', 'recruit-rotation'].includes(selected.kind)" type="warning" :show-icon="false" class="mb-16px">
           本期规则已被使用并冻结，可以调整启停及后台别名。
         </NAlert>
         <NAlert v-if="saveError" type="error" :title="saveError" class="mb-16px" />
@@ -596,6 +616,22 @@ defineExpose({ beforeLeave: leaveWorkspace, confirmDiscard, dirty, saving });
               <NFormItem label="保底品质"><NInput value="橙卡（固定）" disabled /></NFormItem>
             </section>
           </template>
+          <template v-if="isPetRecruit">
+            <div class="native-section-label">精灵奖池</div>
+            <div v-if="!isLegacyPetRecruit" class="native-pet-summary" aria-label="普通抽取概率汇总">
+              <span>紫色 {{ petProbability(petTotalWeight - petOrangeWeight) }}</span>
+              <span>橙色 {{ petProbability(petOrangeWeight) }}</span>
+              <span class="ops-muted">普通概率，不含十抽保底</span>
+            </div>
+            <NSelect v-model:value="selectedPrize" :options="prizeOptions" :render-label="renderActivityOption" aria-label="选择精灵" class="mb-20px" />
+            <section v-for="prize in currentPrize" :key="prize.id" class="activity-edit-section">
+              <NFormItem label="精灵"><ResourceSelect :value="prize.resourceId" category="pet" disabled /></NFormItem>
+              <NFormItem label="相对权重" :validation-status="validPetWeight(prize.weight) ? undefined : 'error'" :feedback="validPetWeight(prize.weight) ? undefined : '请输入 1 至 1000000000000 的整数'">
+                <NInputNumber v-model:value="prize.weight" :min="1" :max="1000000000000" :precision="0" :disabled="rulesDisabled" />
+              </NFormItem>
+              <NFormItem :label="isLegacyPetRecruit ? '保底资格' : '品质'"><NInput :value="isLegacyPetRecruit ? (prize.guaranteed ? '原保底候选' : '普通候选') : (prize.guaranteed ? '橙色（保底候选）' : '紫色')" disabled /></NFormItem>
+            </section>
+          </template>
           <template v-if="['festival', 'update'].includes(selected.kind)">
             <div class="native-section-label">子活动</div>
             <NSelect v-model:value="selectedChild" :options="childOptions" :render-label="renderActivityOption" aria-label="选择子活动" class="mb-20px" />
@@ -612,7 +648,7 @@ defineExpose({ beforeLeave: leaveWorkspace, confirmDiscard, dirty, saving });
           <div class="ops-drawer-actions">
             <span class="ops-muted">{{ saving ? '正在保存…' : dirty ? '有尚未保存的修改' : '配置已载入' }}</span>
             <NButton :disabled="saving" @click="closeDrawer">取消</NButton>
-            <NButton v-if="canWrite" type="primary" :loading="saving" :disabled="disabled || !dirty || ruleLoading || ruleInvalid" @click="save">保存配置</NButton>
+            <NButton v-if="canWrite" type="primary" :loading="saving" :disabled="disabled || !dirty || ruleLoading || ruleInvalid || petWeightInvalid" @click="save">保存配置</NButton>
           </div>
         </template>
       </NDrawerContent>
@@ -637,6 +673,7 @@ defineExpose({ beforeLeave: leaveWorkspace, confirmDiscard, dirty, saving });
 .native-enable span { color: rgb(var(--base-text-color) / .65); font-size: 13px; }
 .native-save-note { margin: 0 0 12px; line-height: 1.6; overflow-wrap: anywhere; color: rgb(var(--base-text-color) / .65); font-size: 13px; }
 .native-recruit-rules { margin-bottom: 24px; }
+.native-pet-summary { display: flex; flex-wrap: wrap; gap: 4px 20px; margin: 0 0 14px; font-size: 13px; font-variant-numeric: tabular-nums; }
 .native-section-label {
   margin: 4px 0 16px;
   font-size: 13px;
