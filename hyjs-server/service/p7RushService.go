@@ -71,6 +71,7 @@ func (s *GameService) loadP7Table(root, name string) error {
 }
 
 func (s *GameService) InitializeP7(ctx context.Context) error {
+	p7ResetRejectedEndEvidence()
 	if !s.P1Ready || len(s.Tables["RushEliteBoss"]) == 0 {
 		return errors.New("P7需要P1及精英首领原表")
 	}
@@ -1107,6 +1108,7 @@ func (s *GameService) p7End(ctx context.Context, id int64, request *pb.CSRushFig
 		if request != nil && (err.Error() == constUtil.P6ReplayConflict || strings.HasPrefix(err.Error(), constUtil.P6ReplayConflict+":")) {
 			if raw, encodeErr := proto.Marshal(request); encodeErr == nil {
 				fields := []zap.Field{zap.Int64("playerId", id), zap.String("fightId", request.GetFightId()), zap.String("requestSHA256", p6Digest(raw)), zap.Int("requestBytes", len(raw))}
+				fields = append(fields, zap.Bool("serverPrivateEvidenceSaved", p7CaptureRejectedEnd(raw)))
 				elog.Warn("trial rejected End evidence", fields...)
 			}
 		}
