@@ -39,6 +39,7 @@ type p7EliteQueryProjection struct {
 	tx                 *gorm.DB
 	state              *db.P7RushState
 	progress           map[int32]map[string]bool
+	fightIDs           []string // maintenance-only bounded source selection
 	fights             []db.P7RushFight
 	sweeps             []db.P7ReRushSweep
 	loaded             bool
@@ -96,7 +97,11 @@ func (q *p7EliteQueryProjection) load() error {
 	if q.loaded {
 		return nil
 	}
-	if err := q.tx.Where("player_id=? AND kind=? AND status=? AND diagnostic=?", q.state.PlayerID, constUtil.P7RushTrial, constUtil.P7RushSettled, false).Find(&q.fights).Error; err != nil {
+	fights := q.tx.Where("player_id=? AND kind=? AND status=? AND diagnostic=?", q.state.PlayerID, constUtil.P7RushTrial, constUtil.P7RushSettled, false)
+	if len(q.fightIDs) > 0 {
+		fights = fights.Where("id IN ?", q.fightIDs)
+	}
+	if err := fights.Find(&q.fights).Error; err != nil {
 		return err
 	}
 	if err := q.tx.Where("player_id=? AND run_id=?", q.state.PlayerID, q.state.RunID).Find(&q.sweeps).Error; err != nil {

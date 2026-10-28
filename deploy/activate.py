@@ -269,6 +269,12 @@ for player_id in args.warm_rush_history_player:
     compose('run', '--rm', '--no-deps', '-T', 'app', '--env', 'test', '--tables', '/app/tables',
             '--warm-rush-history-player', str(player_id), '--log-file', '/app/logs/rush-history-warm.log')
 manifest['prewarmedRushPlayers'] = sorted(set(args.warm_rush_history_player))
+# Validator changes invalidate old derived history. Finish their bounded strict
+# revalidation before exposing the candidate to a 15-second game request.
+compose('run', '--rm', '--no-deps', '-T', 'app', '--env', 'test', '--tables', '/app/tables',
+        '--warm-rush-history-all', '--log-file', '/app/logs/rush-history-warm.log')
+manifest['staleRushHistoriesVerified'] = True
+
 
 if args.apply_growth74:
     compose('run', '--rm', '--no-deps', '-T', 'app', '--env', 'test', '--tables', '/app/tables',

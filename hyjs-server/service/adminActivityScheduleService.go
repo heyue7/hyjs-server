@@ -692,6 +692,15 @@ func (s *GameService) adminActivityScheduleCheck(tx *gorm.DB, serverID int64, ve
 			}
 
 		}
+		// Imported permanent activities may outlive the editor's one-year window.
+		// Only their persisted dates are accepted; client IDs/frozen flags cannot
+		// grant a new or edited long calendar window.
+		if item.EndAt-item.StartAt > 366*86400000 {
+			row, exists := existing[item.ID]
+			if !exists || item.StartAt != row.StartAt || item.EndAt != row.EndAt || item.ClaimEndAt != row.ClaimEndAt {
+				add(i, -1, "新建或调整排期最多持续366天；已有长期活动请保留原时间")
+			}
+		}
 		if item.ID == "" && item.TemplateVersion != adminVersion(definition) {
 			return nil, nil, constUtil.ErrAdminConfigConflict
 		}
