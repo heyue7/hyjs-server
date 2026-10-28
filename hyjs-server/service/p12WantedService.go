@@ -811,6 +811,9 @@ func (s *GameService) p12WantedEnd(ctx context.Context, id int64, request *pb.CS
 		return nil
 	})
 	if err != nil {
+		if metadataErr := recordP12WantedRejectedEnd(ctx, id, request.GetFightId(), now, err); metadataErr != nil {
+			return nil, fmt.Errorf("%w: rejected battle recovery metadata: %v", err, metadataErr)
+		}
 		return nil, err
 	}
 	return []proto.Message{&out}, nil

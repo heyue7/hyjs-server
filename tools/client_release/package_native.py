@@ -139,7 +139,7 @@ def verify_java_class_inventory(archive,payload):
  return {"DEXEntries":sorted(names),"classCount":len(headers),"noDuplicateClass":True,"noFinalSuperclass":True}
 
 def main():
- p=argparse.ArgumentParser(description=__doc__);p.add_argument("--base-apk",type=Path,required=True);p.add_argument("--overlay",type=Path,required=True);p.add_argument("--output",type=Path,required=True);p.add_argument("--record",type=Path,required=True);p.add_argument("--opening-font-overlay",type=Path);p.add_argument("--font-fallback-overlay",type=Path);p.add_argument("--dungeon-resource-overlay",type=Path);p.add_argument("--compat-overlay",type=Path,help="Reviewed formal62 startup/resource Pin compatibility overlay; composed after version patch");p.add_argument("--os-selector-description-overlay",type=Path,help="Pinned feedback78 item_9760 description cells only");p.add_argument("--repair-compat-manifest-pin",action="store_true");p.add_argument("--qa-wallet-origin");p.add_argument("--build-code",type=int);p.add_argument("--version-name");a=p.parse_args()
+ p=argparse.ArgumentParser(description=__doc__);p.add_argument("--base-apk",type=Path,required=True);p.add_argument("--overlay",type=Path,required=True);p.add_argument("--output",type=Path,required=True);p.add_argument("--record",type=Path,required=True);p.add_argument("--opening-font-overlay",type=Path);p.add_argument("--font-fallback-overlay",type=Path);p.add_argument("--dungeon-resource-overlay",type=Path);p.add_argument("--compat-overlay",type=Path,help="Reviewed formal62 startup/resource Pin compatibility overlay; composed after version patch");p.add_argument("--king-selector-description-overlay",type=Path,help="Pinned item_9761 description cells only");p.add_argument("--os-selector-description-overlay",type=Path,help="Pinned feedback78 item_9760 description cells only");p.add_argument("--repair-compat-manifest-pin",action="store_true");p.add_argument("--qa-wallet-origin");p.add_argument("--build-code",type=int);p.add_argument("--version-name");a=p.parse_args()
  require((a.build_code is None)==(a.version_name is None),"Build code and version name must be supplied together")
  base,overlay,output,record=[x.resolve()for x in (a.base_apk,a.overlay,a.output,a.record)]
  proof=json.loads((overlay/"manifest.json").read_text());require(proof["inheritedJavaPublicProtectedABIExact"],"Qualified native ABI required")
@@ -220,6 +220,12 @@ def main():
   require(not any((a.opening_font_overlay,a.font_fallback_overlay,a.dungeon_resource_overlay,a.compat_overlay,a.repair_compat_manifest_pin,a.qa_wallet_origin)),"Feedback78 composition permits only its pinned overlays")
   from tools.client_feedback78.package78 import apply_os_selector_overlay
   os_selector_report=apply_os_selector_overlay(base,a.os_selector_description_overlay,payload,pins)
+ king_selector_report=None
+ if a.king_selector_description_overlay:
+  require(proof.get("schema")=="hyjs-feedback86-description-only-v1" and (a.build_code,a.version_name)==(2026102802,"1.0.79"),"Unexpected king description input or version")
+  require(not any((a.os_selector_description_overlay,a.opening_font_overlay,a.font_fallback_overlay,a.dungeon_resource_overlay,a.compat_overlay,a.qa_wallet_origin)),"King description permits only its exact table overlay")
+  from tools.client_feedback86.build_king_selector_text import apply_overlay
+  king_selector_report=apply_overlay(base,a.king_selector_description_overlay.resolve(),payload,pins)
  with zipfile.ZipFile(base) as archive:
   manifest_pin_repair=repair_final_manifest_pin(archive,payload) if a.repair_compat_manifest_pin else None
   verify_final_resource_pins(archive,payload)
@@ -278,6 +284,7 @@ def main():
    require(common.digest(base)==proof["baseAPKSHA256"],"Base changed while packaging")
    result={"status":"PASS_SIGN_ALIGN_SCOPED_OVERLAY_NOT_INSTALLED","binarySHA256":common.digest(signed),"baseAPKSHA256":proof["baseAPKSHA256"],"replacementEntries":hashes,"openingFontChanges":font_changes,"fontFallbackProof":fallback_report,"dungeonResourceProof":dungeon_report,"compatibilityProof":compatibility_report,"manifestPinRepair":manifest_pin_repair,"javaClassInventory":java_inventory,"inheritedJavaByteExact":original_java_exact,"javaByteExact":java_byte_exact,"allOtherEntriesAndCompressedPayloadsExact":True,"managedAssemblyByteExact":common.DLL not in payload,"qaOnly":bool(a.qa_wallet_origin),"neverPromote":bool(a.qa_wallet_origin),"signatureVerified":True,"zipalignVerified":True,"originalEngineMethodsExact":547,"outputAPK":str(output.relative_to(ROOT))}
    if os_selector_report is not None:result["osSelectorDescriptionProof"]=os_selector_report
+   if king_selector_report is not None:result["kingSelectorDescriptionProof"]=king_selector_report
    # QA and diagnostic restrictions survive another scoped packaging layer.
    result["qaOnly"] = bool(proof.get("qaOnly") or a.qa_wallet_origin)
    result["neverPromote"] = bool(proof.get("neverPromote") or proof.get("diagnosticOnly") or a.qa_wallet_origin)

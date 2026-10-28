@@ -348,7 +348,14 @@ func (s *GameService) computeFrozenBattleRecordLiveControlled(ctx context.Contex
 		if !originalRecordMode || supplied == nil || formation != nil || len(controls) != 0 {
 			return nil, errors.New(constUtil.P6ReplayConflict)
 		}
-		if err = validateP6LiveRecordedInput(&frozen, supplied); err != nil {
+		if frozen.BattleType == 8 {
+			// Wanted keeps its independent typed source and proof; trial
+			// admission and its historical receipt digests remain unchanged.
+			_, _, err = p12WantedLiveRecordedSource(&frozen, supplied)
+		} else {
+			err = validateP6LiveRecordedInput(&frozen, supplied)
+		}
+		if err != nil {
 			return nil, err
 		}
 	}
