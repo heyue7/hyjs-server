@@ -235,15 +235,14 @@ func p7GenericMechanismRushComputeEnd(ctx context.Context, _ *GameService, serie
 	// 原轮首布阵与LiveAuto技能驱动独立执行；完整记录只用于最终精确核对。
 	if supplied.AttackerTransOpt != nil {
 		out, err = engine.ComputeP6RoundOneLiveAutoFormation(ctx, input, supplied, supplied.AttackerTransOpt)
-		if err != nil {
-			return nil, err
+		if err == nil {
+			out.Outcome.Authoritative = true
+			out.Outcome.CapabilityHash = constUtil.P7GenericMechanismCompatibilityProof
+			if err = p7GenericMechanismRushValidateEnd(series, out, supplied, reported); err == nil {
+				return out, nil
+			}
 		}
-		out.Outcome.Authoritative = true
-		out.Outcome.CapabilityHash = constUtil.P7GenericMechanismCompatibilityProof
-		if err = p7GenericMechanismRushValidateEnd(series, out, supplied, reported); err != nil {
-			return nil, err
-		}
-		return out, nil
+		return p7FormationRecordedComputeEnd(ctx, engine, series, supplied, reported)
 	}
 	// Original live Auto can emit simultaneous presses which original PlaybackAI
 	// intentionally consumes one per Update. Try only its single recorded control
@@ -341,6 +340,9 @@ func (admission *p7GenericMechanismRushAdmission) validateEnd(series *model.Froz
 	}
 	if out == nil || out.Outcome == nil {
 		return errors.New(constUtil.P6ReplayConflict)
+	}
+	if out.Outcome.DiagnosticAIDriverPolicy == p7FormationRecordedDriver {
+		return p7FormationRecordedValidateEnd(series, out, supplied, reported)
 	}
 	if out.Outcome.DiagnosticAIDriverPolicy == constUtil.P6LiveRecordedDriver {
 		return p7LiveRecordedRushValidateEnd(series, out, supplied, reported)

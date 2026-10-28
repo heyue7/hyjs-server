@@ -24,7 +24,11 @@ func TestP7RoundOneAutoFormationMySQLFirstFloorEndRewardCold(t *testing.T) {
 	p7GenericMechanismFirstFloorTransaction(t, true)
 }
 
-func p7GenericMechanismFirstFloorTransaction(t *testing.T, formationAuto bool) {
+func TestP7FormationRecorded87MySQLFirstFloorEndRewardCold(t *testing.T) {
+	p7GenericMechanismFirstFloorTransaction(t, true, true)
+}
+
+func p7GenericMechanismFirstFloorTransaction(t *testing.T, formationAuto bool, delayed ...bool) {
 	t.Helper()
 	if !strings.HasPrefix(os.Getenv("HYJS_P7_MYSQL_DATABASE"), "hyjs_test_p7_") {
 		t.Skip("owned isolated MySQL P7 database required")
@@ -65,6 +69,10 @@ func p7GenericMechanismFirstFloorTransaction(t *testing.T, formationAuto bool) {
 		clientInput, err = cloneP6CalculationInput(series.Template)
 		if err != nil {
 			t.Fatal(err)
+		}
+		if len(delayed) > 0 && delayed[0] {
+			clientInput.DiagnosticAIDriverPolicy = constUtil.P6DiagnosticManualAutoStart
+			clientInput.DiagnosticManualAutoStartRoundTime = proto.Float64(.3)
 		}
 		control := &pb.BattleTransOperate{RoundNum: proto.Int32(1)}
 		if len(clientInput.Attacker.Formation) != 2 {
@@ -110,7 +118,11 @@ func p7GenericMechanismFirstFloorTransaction(t *testing.T, formationAuto bool) {
 			t.Fatal(err)
 		}
 		var terminal model.CombatFinalHPOutcome
-		if json.Unmarshal(pending.Terminal, &terminal) != nil || terminal.Outcome == nil || terminal.Outcome.DiagnosticAIDriverPolicy != constUtil.P6RoundOneLiveAutoFormationDriver {
+		expectedDriver := constUtil.P6RoundOneLiveAutoFormationDriver
+		if len(delayed) > 0 && delayed[0] {
+			expectedDriver = p7FormationRecordedDriver
+		}
+		if json.Unmarshal(pending.Terminal, &terminal) != nil || terminal.Outcome == nil || terminal.Outcome.DiagnosticAIDriverPolicy != expectedDriver {
 			t.Fatal("actual End did not freeze the independent formation/Auto driver")
 		}
 	}

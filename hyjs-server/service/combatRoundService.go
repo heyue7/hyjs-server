@@ -352,6 +352,8 @@ func (s *GameService) computeFrozenBattleRecordLiveControlled(ctx context.Contex
 			// Wanted keeps its independent typed source and proof; trial
 			// admission and its historical receipt digests remain unchanged.
 			_, _, err = p12WantedLiveRecordedSource(&frozen, supplied)
+		} else if supplied.AttackerTransOpt != nil {
+			err = validateP7FormationRecordedInput(&frozen, supplied)
 		} else {
 			err = validateP6LiveRecordedInput(&frozen, supplied)
 		}
