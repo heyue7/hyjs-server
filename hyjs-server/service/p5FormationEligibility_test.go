@@ -5,82 +5,178 @@ import (
 	"encoding/json"
 	"fmt"
 	"google.golang.org/protobuf/proto"
-	"hyjs-server/db"
 	"hyjs-server/model"
 	pb "hyjs-server/model/protocol"
-	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 )
 
-func TestP5OriginalGreenFormationDeniedWithoutMutation(t *testing.T) {
-	ctx := context.Background()
-	if err := db.InitGame(ctx, filepath.Join(t.TempDir(), "green-formation.db")); err != nil {
+func TestP5GreenBlueFormation88OwnedWireAndCold(t *testing.T) {
+	f := p1Setup(t)
+	if err := f.s.LoadP5Tables("../../analysis/tables"); err != nil {
 		t.Fatal(err)
 	}
-	defer func() { pool, _ := db.GetIns().DB(); pool.Close() }()
-	s := &GameService{}
-	for _, load := range []func(string) error{s.LoadTables, s.LoadP5Tables} {
-		if err := load("../../analysis/tables"); err != nil {
+	if err := f.s.ApplyP15GreenHeroCompatibility(); err != nil {
+		t.Fatal(err)
+	}
+	for _, init := range []func(context.Context) error{f.s.InitializeP5, f.s.InitializeGameplayPools, f.s.InitializeP2, f.s.InitializeOpenServerActivity, f.s.InitializeDailyTasks} {
+		if err := init(f.ctx); err != nil {
 			t.Fatal(err)
 		}
 	}
-	for _, init := range []func(context.Context) error{s.InitializeP1, s.InitializeP5, s.InitializeGameplayPools, s.InitializeP2, s.InitializeOpenServerActivity, s.InitializeDailyTasks} {
-		if err := init(ctx); err != nil {
-			t.Fatal(err)
-		}
-	}
-	s.P5Ready = true
-	account, err := LoginAccount(ctx, "original-green-eligibility", "isolated-test-only")
+	f.s.P5Ready = true
+	account, err := LoginAccount(f.ctx, "green-blue88-"+fmt.Sprint(f.id), "isolated-only")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = CreatePlayer(ctx, account.Id, "原绿色卡资格", "hero_043"); err != nil {
+	if _, err = CreatePlayer(f.ctx, account.Id, "绿蓝阵容验证", "hero_001"); err != nil {
 		t.Fatal(err)
 	}
-	var cards []*pb.Warrior
-	if err = updateProfile(ctx, account.Id, func(p *pb.Player, g *model.GameState) error {
+	f.id = account.Id
+	var ids []string
+	green, blue := 0, 0
+	for _, row := range f.s.Tables["Hero"] {
+		q := int(tableNumber(row, "quality"))
+		if strings.HasPrefix(row["id"], "hero_") && row["heroClass"] != "99" && (q == 12 || q == 13) {
+			ids = append(ids, row["id"])
+			if q == 12 {
+				green++
+			} else {
+				blue++
+			}
+		}
+	}
+	sort.Strings(ids)
+	if green != 6 || blue != 12 {
+		t.Fatal("finite green/blue inventory changed", green, blue)
+	}
+	if err = updateProfile(f.ctx, f.id, func(p *pb.Player, g *model.GameState) error {
 		p.Level = proto.Int32(100)
 		p.WarriorBagSize = proto.Int32(1000)
-		parts := []string{}
-		for number := 56; number <= 61; number++ {
-			parts = append(parts, fmt.Sprintf("hero_%03d,1", number))
+		var rewards []string
+		for _, id := range ids {
+			rewards = append(rewards, id+",1")
 		}
-		parts = append(parts, "hero_032,1")
-		gain, err := s.GrantFixedReward(p, g, strings.Join(parts, ";"))
-		if err == nil {
-			cards = gain.GetWars()
-		}
-		return err
+		_, e := f.s.GrantFixedReward(p, g, strings.Join(rewards, ";"))
+		return e
 	}); err != nil {
 		t.Fatal(err)
 	}
-	before := func() string {
+	initial, game := f.profile(t)
+	inventory, _ := json.Marshal(game.Warriors)
+	cards := map[string]*pb.Warrior{}
+	for _, w := range game.Warriors {
+		cards[w.GetId()] = w
+	}
+	check := func(id string) {
 		t.Helper()
-		var row db.Profile
-		if err := db.GetIns().First(&row, account.Id).Error; err != nil {
-			t.Fatal(err)
+		p, g := f.profile(t)
+		var found bool
+		for _, slot := range g.Formation {
+			if slot.GetFormatPos() == 2 && formationHero(slot) != nil {
+				found = formationHero(slot).GetGuid() == cards[id].GetGuid()
+			}
 		}
-		data, _ := json.Marshal(row)
-		return string(data)
-	}
-	for _, card := range cards[:6] {
-		if err := s.P5FormationHeroAllowed(card.GetId()); err == nil {
-			t.Fatal("original green qualification accepted", card.GetId())
+		if !found {
+			t.Fatal("saved slot", id)
 		}
-		saved := before()
-		if _, err := s.formationOn(ctx, account.Id, &pb.CSFormationOn{Id: card.Id, Guid: card.Guid, FormatPos: proto.Int32(2)}); err == nil {
-			t.Fatal("original green actual formation request accepted", card.GetId())
+		raw, _ := json.Marshal(g.Warriors)
+		if string(raw) != string(inventory) || p.GetCoin() != initial.GetCoin() || p.GetDiamond() != initial.GetDiamond() {
+			t.Fatal("on formation changed inventory or funds", id)
 		}
-		if before() != saved {
-			t.Fatal("denied green formation changed inventory or formation", card.GetId())
+		party, e := f.s.battlePlayer(p, g)
+		if e != nil {
+			t.Fatal("battle projection", id, e)
+		}
+		found = false
+		for _, a := range party.Formation {
+			if a.GetGuid() == cards[id].GetGuid() {
+				found = true
+				if strings.HasPrefix(id, "hero_05") || id == "hero_060" || id == "hero_061" {
+					row := f.s.table("Hero", "id", id)
+					if row["quality"] == "12" && (row["SkillId1"] == "" || !strings.Contains(a.GetSkillOrder(), row["SkillId1"])) {
+						t.Fatal("green approved normal attack missing", id)
+					}
+				}
+			}
+		}
+		if !found {
+			t.Fatal("battle actor missing", id)
 		}
 	}
-	blue := cards[6]
-	if err := s.P5FormationHeroAllowed(blue.GetId()); err != nil {
-		t.Fatal("original quality13 qualification", err)
+	for _, wire := range []bool{false, true} {
+		for _, id := range ids {
+			card := cards[id]
+			if card == nil || f.s.P5FormationHeroAllowed(id) != nil {
+				t.Fatal("owned eligibility", id)
+			}
+			request := &pb.CSFormationOn{Id: card.Id, Guid: card.Guid, FormatPos: proto.Int32(2)}
+			if wire {
+				out := copyOverflowWire(t, f, request)
+				if _, ok := out[0].(*pb.SCFormationOn); !ok {
+					t.Fatal("original popup on reply", id, out)
+				}
+			} else {
+				if _, e := f.s.formationOn(f.ctx, f.id, request); e != nil {
+					t.Fatal("legacy on", id, e)
+				}
+			}
+			check(id)
+			f.restart(t)
+			check(id)
+		}
 	}
-	if _, err := s.formationOn(ctx, account.Id, &pb.CSFormationOn{Id: blue.Id, Guid: blue.Guid, FormatPos: proto.Int32(2)}); err != nil {
-		t.Fatal("original blue actual formation request", err)
+	// Experience cards, missing GUIDs, mismatches, duplicates, helpers and busy
+	// dispatches remain rejected. The same original native route handles them.
+	if err = updateProfile(f.ctx, f.id, func(_ *pb.Player, g *model.GameState) error {
+		for n, id := range []string{"hero_exp_001", "hero_exp_002"} {
+			g.Warriors = append(g.Warriors, &pb.Warrior{Id: proto.String(id), Guid: proto.String(fmt.Sprintf("material88-%d", n)), Level: proto.Int32(1)})
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
 	}
+	reject := func(label string, b *pb.CSFormationOn) {
+		t.Helper()
+		p, g := f.profile(t)
+		before, _ := json.Marshal(g)
+		out := copyOverflowWire(t, f, b)
+		if _, ok := out[0].(*pb.ErrorMessage); !ok {
+			t.Fatal("invalid on accepted", label, out)
+		}
+		afterP, afterG := f.profile(t)
+		after, _ := json.Marshal(afterG)
+		if !proto.Equal(p, afterP) || string(before) != string(after) {
+			t.Fatal("rejected on changed state", label)
+		}
+	}
+	for n, id := range []string{"hero_exp_001", "hero_exp_002"} {
+		if f.s.P5FormationHeroAllowed(id) == nil {
+			t.Fatal("material eligible")
+		}
+		reject(id, &pb.CSFormationOn{Id: proto.String(id), Guid: proto.String(fmt.Sprintf("material88-%d", n)), FormatPos: proto.Int32(2)})
+	}
+	card := cards["hero_056"]
+	reject("missing", &pb.CSFormationOn{Id: card.Id, Guid: proto.String("foreign"), FormatPos: proto.Int32(2)})
+	reject("mismatch", &pb.CSFormationOn{Id: cards["hero_032"].Id, Guid: card.Guid, FormatPos: proto.Int32(2)})
+	// The current last actor cannot simultaneously occupy another slot.
+	last := cards[ids[len(ids)-1]]
+	reject("duplicate", &pb.CSFormationOn{Id: last.Id, Guid: last.Guid, FormatPos: proto.Int32(3)})
+	if err = updateProfile(f.ctx, f.id, func(_ *pb.Player, g *model.GameState) error {
+		p5SetKV(g, "p5.dispatch:"+card.GetGuid(), "owned-busy")
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	reject("busy", &pb.CSFormationOn{Id: card.Id, Guid: card.Guid, FormatPos: proto.Int32(2)})
+	if err = updateProfile(f.ctx, f.id, func(_ *pb.Player, g *model.GameState) error {
+		p5SetKV(g, "p5.dispatch:"+card.GetGuid(), "")
+		p5SetKV(g, "p5.helper:1", card.GetGuid())
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	reject("helper", &pb.CSFormationOn{Id: card.Id, Guid: card.Guid, FormatPos: proto.Int32(2)})
+	t.Log("6 green and12 blue: both formation entry points, original signed wire, cold reload and battle actors verified")
 }
