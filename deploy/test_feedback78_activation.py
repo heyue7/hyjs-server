@@ -199,7 +199,7 @@ class Feedback78ActivationTests(unittest.TestCase):
                    "feedback78_guard.complete = True"]
         positions = [activate.index(marker) for marker in ordered]
         self.assertEqual(positions, sorted(positions))
-        self.assertIn("if args.migrate_role_wallets or args.apply_activity77 or args.apply_feedback78:", activate)
+        self.assertIn("if args.migrate_role_wallets or args.apply_activity77 or args.apply_feedback78 or args.apply_feedback79:", activate)
 
 
 if __name__ == '__main__':

@@ -3,8 +3,6 @@ package service
 import (
 	"context"
 	"fmt"
-	"math"
-	"time"
 
 	"gorm.io/gorm"
 	"hyjs-server/constUtil"
@@ -12,8 +10,8 @@ import (
 	"hyjs-server/model"
 )
 
-// ApplyActivity77Member moves the approved weekly coin budget into the saved
-// daily tiers. The audit and policy commit together, so retries cannot add twice.
+// ApplyActivity77Member saves the daily coin curve in the existing policy.
+// The audit and policy commit together, so retries preserve later admin edits.
 func (s *GameService) ApplyActivity77Member(ctx context.Context, actor *model.AdminPrincipal) error {
 	return db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := ServerGameClockGuardTransaction(tx); err != nil {
@@ -42,52 +40,26 @@ func (s *GameService) ApplyActivity77Member(ctx context.Context, actor *model.Ad
 		}
 		form := snap.dto.Form
 		for i := range form.VipTiers {
+			amount, ok := constUtil.Activity77MemberDailyCoin(form.VipTiers[i].Vip)
+			if !ok {
+				return constUtil.ErrAdminConfiguration
+			}
 			found := false
 			for j := range form.VipTiers[i].DailyRewards {
 				r := &form.VipTiers[i].DailyRewards[j]
 				if r.ResourceID != "coin" {
 					continue
 				}
-				if r.Amount < 0 || r.Amount > math.MaxInt32-constUtil.Activity77MemberDayCoin-constUtil.Activity77MemberSundayCoin {
-					return constUtil.ErrAdminConfiguration
-				}
-				r.Amount += constUtil.Activity77MemberDayCoin
+				r.Amount = amount
 				found = true
 			}
 			if !found {
-				form.VipTiers[i].DailyRewards = append(form.VipTiers[i].DailyRewards, model.AdminResourceAmount{ResourceID: "coin", Amount: constUtil.Activity77MemberDayCoin})
+				form.VipTiers[i].DailyRewards = append(form.VipTiers[i].DailyRewards, model.AdminResourceAmount{ResourceID: "coin", Amount: amount})
 			}
 		}
 		if err = s.adminNativeApplyVIP(tx, snap, model.AdminNativeActivitySaveRequest{Form: form, Enabled: snap.dto.Enabled, Alias: snap.dto.Alias}); err != nil {
 			return err
 		}
-		return adminAudit(tx, actor, constUtil.Activity77MemberAudit, fmt.Sprint(s.OriginalServerID()), "原档位金币每天增加6428571；北京时间周日额外3，七天合计45000000；原付费资格与已领日回执保留")
+		return adminAudit(tx, actor, constUtil.Activity77MemberAudit, fmt.Sprint(s.OriginalServerID()), "会员每日金币按VIP0至12递增至300万；其他奖励、每周福利与领取回执保留")
 	})
-}
-
-// activity77MemberSunday projects the indivisible three-coin weekly remainder
-// from the same saved activation used by the maintenance operator.
-func (s *GameService) activity77MemberSunday(tx *gorm.DB, form model.AdminNativeActivityForm, now time.Time) (model.AdminNativeActivityForm, error) {
-	if now.In(time.FixedZone("UTC+8", 8*3600)).Weekday() != time.Sunday || !gameSchemaHasTable(tx, &db.AdminAudit{}) {
-		return form, nil
-	}
-	var applied int64
-	if err := tx.Model(&db.AdminAudit{}).Where("action=? AND target=?", constUtil.Activity77MemberAudit, fmt.Sprint(s.OriginalServerID())).Count(&applied).Error; err != nil {
-		return form, err
-	}
-	if applied == 0 {
-		return form, nil
-	}
-	for i := range form.VipTiers {
-		for j := range form.VipTiers[i].DailyRewards {
-			r := &form.VipTiers[i].DailyRewards[j]
-			if r.ResourceID == "coin" {
-				if r.Amount > math.MaxInt32-constUtil.Activity77MemberSundayCoin {
-					return form, constUtil.ErrAdminConfiguration
-				}
-				r.Amount += constUtil.Activity77MemberSundayCoin
-			}
-		}
-	}
-	return form, nil
 }

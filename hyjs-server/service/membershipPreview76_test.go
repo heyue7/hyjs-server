@@ -11,6 +11,7 @@ import (
 
 func TestMembership76NextTierPreviewAndMaximum(t *testing.T) {
 	f, id := p3DemoProviderFixture(t)
+	coins := []int32{100000, 200000, 300000, 400000, 550000, 700000, 900000, 1100000, 1300000, 1600000, 2000000, 2500000, 3000000}
 	for _, vip := range []int32{0, 10, 12} {
 		if err := updateProfile(f.ctx, id, func(p *pb.Player, _ *model.GameState) error {
 			p.Vip = proto.Int32(vip)
@@ -26,11 +27,11 @@ func TestMembership76NextTierPreviewAndMaximum(t *testing.T) {
 		if messages[0].(*pb.SCGetVipBoonInfo).GetWeek()[0].GetDiscount() != "100" {
 			t.Fatal("original integer discount contract changed")
 		}
-		if daily[0].GetVip() != vip || daily[0].GetReward()[0].GetNum() != (vip+1)*1000 {
+		if daily[0].GetVip() != vip || daily[0].GetReward()[0].GetNum() != coins[vip] {
 			t.Fatal("current membership tier changed", daily)
 		}
 		if vip < 12 {
-			if len(daily) != 2 || daily[1].GetVip() != vip+1 || daily[1].GetReward()[0].GetNum() != (vip+2)*1000 || daily[1].GetStatus() != 0 {
+			if len(daily) != 2 || daily[1].GetVip() != vip+1 || daily[1].GetReward()[0].GetNum() != coins[vip+1] || daily[1].GetStatus() != 0 {
 				t.Fatal("next tier missing or claimable", daily)
 			}
 		} else if len(daily) != 1 {

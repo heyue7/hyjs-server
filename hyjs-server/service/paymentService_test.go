@@ -420,7 +420,7 @@ func TestP3PaymentDomain(t *testing.T) {
 			t.Fatal("gift duplicate")
 		}
 		p, g := profile(id)
-		if p.GetDiamond() != 230 || p.GetCoin() != 3000 {
+		if p.GetDiamond() != 230 || p.GetCoin() != 300000 {
 			t.Fatal("welfare funds", p)
 		}
 		boxes := map[string]int32{}

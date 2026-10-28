@@ -1364,9 +1364,10 @@ func (s *GameService) adminNativeValidateEnable(tx *gorm.DB, snap *adminNativeSn
 func adminNativeDefaultVIPForm() model.AdminNativeActivityForm {
 	form := model.AdminNativeActivityForm{VipTiers: []model.AdminNativeVIPTier{}}
 	for vip := int64(0); vip <= 12; vip++ {
+		coin, _ := constUtil.Activity77MemberDailyCoin(vip)
 		form.VipTiers = append(form.VipTiers, model.AdminNativeVIPTier{
 			Vip:          vip,
-			DailyRewards: []model.AdminResourceAmount{{ResourceID: "coin", Amount: (vip + 1) * 1000}},
+			DailyRewards: []model.AdminResourceAmount{{ResourceID: "coin", Amount: coin}},
 			WeekCost:     model.AdminResourceAmount{ResourceID: "diamond", Amount: 100},
 			WeekRewards:  []model.AdminResourceAmount{{ResourceID: "item_005", Amount: 10}},
 		})

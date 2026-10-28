@@ -97,10 +97,6 @@ func (s *GameService) vipBoon(tx *gorm.DB, p *pb.Player, now time.Time) ([]*pb.A
 	if err != nil {
 		return nil, nil, err
 	}
-	form, err = s.activity77MemberSunday(tx, form, now)
-	if err != nil {
-		return nil, nil, err
-	}
 	tier, ok := adminNativeVIPTierFor(form, int64(p.GetVip()))
 	if !ok {
 		return nil, nil, errors.New(constUtil.P3PaymentConfigError)

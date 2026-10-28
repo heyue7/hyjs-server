@@ -193,7 +193,7 @@ func TestActivity77ApplyIntegrated(t *testing.T) {
 		t.Fatal(err)
 	}
 	tier, _ := adminNativeVIPTierFor(vip, 2)
-	if tier.DailyRewards[0].Amount != 3000+constUtil.Activity77MemberDayCoin {
+	if tier.DailyRewards[0].Amount != 300000 {
 		t.Fatal("vip policy", tier)
 	}
 	if err = db.GetIns().First(&point, "id=?", point.ID).Error; err != nil {

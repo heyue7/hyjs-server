@@ -22,7 +22,7 @@ func TestPersonalTurntableTwoOwnersInventoryJackpotAndColdReceipt(t *testing.T) 
 	}
 	key := "turntable_20261011"
 	now := time.Now().UnixMilli()
-	if err := db.GetIns().Model(&db.GameplayPool{}).Where("id=?", key).Updates(map[string]any{"enabled": true, "start_at": now - 60000, "end_at": now + 3600000, "reward_end_at": now + 7200000, "jackpot_per_million": 0, "free_per_day": 0}).Error; err != nil {
+	if err := db.GetIns().Model(&db.GameplayPool{}).Where("id=?", key).Updates(map[string]any{"enabled": true, "start_at": now - 60000, "end_at": now + 3600000, "reward_end_at": now + 7200000, "jackpot_per_million": 0, "free_per_day": 0, "initial_diamond_pool": 0}).Error; err != nil {
 		t.Fatal(err)
 	}
 	// Finite representative: all nine positions use ordinary coins, each allows one draw per owner.
@@ -66,8 +66,12 @@ func TestPersonalTurntableTwoOwnersInventoryJackpotAndColdReceipt(t *testing.T) 
 	if err := db.GetIns().First(&b, "pool_id=? AND player_id=?", key, other.Id).Error; err != nil {
 		t.Fatal(err)
 	}
-	if a.DiamondPool != 10001 || b.DiamondPool != 10001 || a.LegacyScore != 0 || b.LegacyScore != 0 {
+	if a.DiamondPool != 1 || b.DiamondPool != 1 || a.LegacyScore != 0 || b.LegacyScore != 0 {
 		t.Fatal("pool contributions shared", a, b)
+	}
+	info, err := f.s.bigTurnInfo(f.ctx, f.id)
+	if err != nil || info[0].(*pb.SCBigTurnTableInfo).GetDiamondPool() != 1 {
+		t.Fatal("paid draw did not refresh original jackpot display", err)
 	}
 	// Same timestamp fan-out must read a single committed cost/reward.
 	var wg sync.WaitGroup
