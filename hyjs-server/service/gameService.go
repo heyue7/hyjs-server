@@ -23,6 +23,8 @@ import (
 
 // GameService 编排账号、主城和当前已恢复的副本协议。
 type GameService struct {
+	// GGOIntegrationReady is set once by the isolated loopback test process.
+	GGOIntegrationReady bool
 	// RuntimeBase preserves live socket ownership across request-local table overlays.
 	RuntimeBase  *GameService
 	tableLookup  *gameTableLookup
@@ -33,6 +35,10 @@ type GameService struct {
 	HTTPPort int
 	TCPPort  int
 	Tables   map[string][]map[string]string
+	// GGOFieldConfig is the immutable published V4 snapshot for this request.
+	GGOFieldConfig   *model.AdminFieldGGOConfiguration
+	GGOFieldEconomy  *model.AdminFieldGGOConfiguration
+	GGOFieldRevision string
 	// AdminCatalogueData 是启动独立加载、运行只读的原目录，不加入战斗Tables。
 	AdminCatalogueData *model.AdminCatalogueData
 	// ServerClockReady 表示全服时钟表及缓存已初始化。
@@ -52,6 +58,12 @@ type GameService struct {
 	adminFieldRuntimeCache atomic.Pointer[adminFieldRuntimeSnapshot]
 	// 同一服务冷启动或发布后只构建一份覆盖表，避免并发请求重复分配整表。
 	adminFieldRuntimeBuild sync.Mutex
+	// ggoGatherTimers holds at most one deadline timer per active player.
+	ggoGatherTimers sync.Map
+	// ggoExtractionTimers holds at most one countdown timer per active player.
+	ggoExtractionTimers sync.Map
+	// ggoOfflineTimers track bounded per-character disconnect grace.
+	ggoOfflineTimers sync.Map
 	// P1Ready 仅在启动初始化全部成功后设置，运行中保持只读。
 	P1Ready bool
 	// P4Ready 在福利和商店规则初始化成功后启用存档事实钩子。
@@ -105,12 +117,8 @@ func (s *GameService) Dispatch(ctx context.Context, request *model.GamePacket, p
 			elog.Warn("slow game request", zap.String("message", name), zap.Int64("playerId", request.PlayerId), zap.Int64("elapsedMs", elapsed.Milliseconds()))
 		}
 	}()
-	// Keep failures and slow requests observable without writing every movement tick.
-	switch request.Body.(type) {
-	case *pb.CSMove, *pb.CSMoveConfirm, *pb.CSPingTcp, *pb.CSPingAckTcp, *pb.CSSpeedCheck:
-	default:
-		elog.Info("game request", zap.String("message", name), zap.Int64("playerId", request.PlayerId))
-	}
+	// Normal protocol traffic is available only during explicit debug diagnosis.
+	elog.Debug("game request", zap.String("message", name), zap.Int64("playerId", request.PlayerId))
 	ctx = context.WithValue(ctx, constUtil.GameServiceContextKey, s)
 	ctx = context.WithValue(ctx, constUtil.GameRequestContextKey, request.Body)
 	var (
@@ -301,6 +309,7 @@ func (s *GameService) dispatch(ctx context.Context, r *model.GamePacket, peer st
 	if int64(r.ZoneId) != s.OriginalServerID() || AdminProfileServerID(*row) != s.OriginalServerID() {
 		return nil, errors.New("请求区服与当前部署不一致")
 	}
+	ctx = context.WithValue(ctx, ggoNativeSessionKey{}, append([]byte(nil), session...))
 	if _, ok := r.Body.(*pb.CSMoveConfirm); ok {
 		// Original SCMovePush ends with this empty one-way acknowledgement.
 		// It must not start another scene handshake or mutate player state.

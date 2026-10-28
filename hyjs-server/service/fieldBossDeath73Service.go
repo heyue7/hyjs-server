@@ -267,6 +267,15 @@ func (s *GameService) CollectFieldBossPendingRewards(ctx context.Context, id int
 		return nil, err
 	}
 	err := updateProfileWithTx(ctx, id, func(tx *gorm.DB, p *pb.Player, g *model.GameState) error {
+		if expected, ok := ctx.Value(ggoBossClaimSessionKey{}).([]byte); ok {
+			var profile db.Profile
+			if err := tx.Select("id", "session").First(&profile, id).Error; err != nil {
+				return err
+			}
+			if len(expected) != 16 || subtle.ConstantTimeCompare(profile.Session, expected) != 1 {
+				return errors.New("会话已失效")
+			}
+		}
 		if g.Field == nil {
 			return nil
 		}
@@ -325,7 +334,7 @@ func (s *GameService) CollectFieldBossPendingRewards(ctx context.Context, id int
 						return err
 					}
 					p1AppendGain(gain, awarded)
-					if field.Fight != nil && field.Fight.Settled && field.Fight.BossUUID == r.SpawnUUID && field.Fight.BossResult != nil {
+					if field.Fight != nil && field.Fight.GGOBoss == nil && field.Fight.Settled && field.Fight.BossUUID == r.SpawnUUID && field.Fight.BossResult != nil {
 						if field.Fight.BossResult.Get == nil {
 							field.Fight.BossResult.Get = &pb.ResultObject{}
 						}
@@ -336,6 +345,9 @@ func (s *GameService) CollectFieldBossPendingRewards(ctx context.Context, id int
 					field.BossRewardClaims++
 				}
 				usedByDay[r.RewardDay]++
+			}
+			if err := ggoBossDeliverChipsLocked(tx, id, g, &r, eligible); err != nil {
+				return err
 			}
 			updates := map[string]any{"claimed": true}
 			if !eligible {
@@ -415,4 +427,10 @@ func (s *GameService) freezeFieldBossDeath73(tx *gorm.DB, scene string, boss *pb
 		}
 	}
 	return &rules, nil
+}
+
+// CollectFieldBossPendingRewardsWithSession binds a snapshot-triggered claim to
+// the authenticated session again while holding the recipient profile lock.
+func (s *GameService) CollectFieldBossPendingRewardsWithSession(ctx context.Context, id int64, session []byte) (*pb.ResultObject, error) {
+	return s.CollectFieldBossPendingRewards(context.WithValue(ctx, ggoBossClaimSessionKey{}, append([]byte(nil), session...)), id)
 }

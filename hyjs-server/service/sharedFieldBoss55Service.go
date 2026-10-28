@@ -12,6 +12,7 @@ import (
 	"google.golang.org/protobuf/proto"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
+	"hyjs-server/constUtil"
 	"hyjs-server/db"
 	"hyjs-server/model"
 	pb "hyjs-server/model/protocol"
@@ -186,6 +187,9 @@ func (s *GameService) refreshSharedFieldBosses55(tx *gorm.DB, g *model.GameState
 		return nil
 	}
 	f := g.Field
+	if f.Scene == constUtil.GGOFieldScene && g.GGOField != nil && s.GGOFieldEconomy != nil {
+		return nil
+	}
 	scene := s.fieldSceneRow(f.Scene)
 	if scene == nil || scene["adminOrdinaryBossEnabled"] == "false" {
 		return nil

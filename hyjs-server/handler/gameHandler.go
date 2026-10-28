@@ -1483,7 +1483,11 @@ func serveGameConnection(ctx context.Context, c net.Conn, s *service.GameService
 		if err != nil {
 			fields = append(fields, zap.Error(err))
 		}
-		elog.Info("game tcp closed", fields...)
+		if ctx.Err() != nil || (reason == "read-prefix" && (errors.Is(err, io.EOF) || errors.Is(err, net.ErrClosed))) {
+			elog.Debug("game tcp closed", fields...)
+		} else {
+			elog.Warn("game tcp closed", fields...)
+		}
 	}
 	peer, _, _ := net.SplitHostPort(c.RemoteAddr().String())
 	for {

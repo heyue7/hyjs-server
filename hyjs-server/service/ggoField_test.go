@@ -25,7 +25,7 @@ func TestGGOSeedPreservesExistingConfiguration(t *testing.T) {
 	if string(fields["custom"]) != `{"keep":true}` {
 		t.Fatal("unknown existing field lost")
 	}
-	if !cfg.GGO.Rules.UnlimitedCapacity || cfg.GGO.Rules.SearchEnabled || cfg.GGO.Rules.ProtectionSeconds != 30 || cfg.GGO.Rules.DeathLossPercent != nil || cfg.GGO.Rules.WeeklyLimit != nil || cfg.GGO.Rules.WeeklyResetTimezone != "Asia/Shanghai" {
+	if !cfg.GGO.Rules.UnlimitedCapacity || cfg.GGO.Rules.SearchEnabled || cfg.GGO.Rules.ProtectionSeconds != 30 || (cfg.GGO.Rules.DeathLossPercent == nil || *cfg.GGO.Rules.DeathLossPercent != 50) || cfg.GGO.Rules.WeeklyLimit != nil || cfg.GGO.Rules.WeeklyResetTimezone != "Asia/Shanghai" {
 		t.Fatal("rules defaults missing")
 	}
 	roles := map[string]model.AdminFieldGGONPC{}
@@ -38,10 +38,15 @@ func TestGGOSeedPreservesExistingConfiguration(t *testing.T) {
 	if roles["shino"].Role != "teleport" || roles["dane"].Role != "extraction" || roles["dane"].SettlesChips || roles["kuroe"].Role != "extraction" || roles["serra"].Role != "extraction" || roles["kohl"].HeroID != "clerk01_npc" || roles["kohl"].Role != "settlement" || !roles["kohl"].SettlesChips {
 		t.Fatal("npc duties not updated")
 	}
-	for _, chip := range cfg.GGO.Chips {
-		if chip.ExchangeValue != nil || chip.DropWeight != nil || chip.DropAmount != nil {
-			t.Fatal("fabricated chip value")
+	values := []int64{3, 9, 30, 90, 300, 900}
+	weights := []int64{5500, 2500, 1300, 500, 180, 20}
+	for i, chip := range cfg.GGO.Chips {
+		if chip.ExchangeValue == nil || *chip.ExchangeValue != values[i] || chip.DropWeight == nil || *chip.DropWeight != weights[i] || chip.DropAmount == nil || *chip.DropAmount != 1 {
+			t.Fatal("approved chip value missing")
 		}
+	}
+	if cfg.GGO.Runtime == nil || cfg.GGO.Runtime.Enabled || cfg.GGO.Runtime.Resource.MineCount != 18 || cfg.GGO.Runtime.Resource.FishCount != 12 {
+		t.Fatal("disabled V4 draft defaults missing")
 	}
 	cfg.GGO.NPCs[1].Dialogue = "用户编辑"
 	fields["ggo"], _ = json.Marshal(cfg.GGO)
@@ -124,8 +129,8 @@ func TestGGOLegacySchemaMigration(t *testing.T) {
 	if monsters["scavenger"] != 30000 || monsters["assault"] != 30000 || monsters["raider"] != 30000 || monsters["worm"] != 30000 || monsters["guard"] != 120000 {
 		t.Fatal("monster respawn migration wrong")
 	}
-	if cfg.GGO.Bosses[0].RespawnMS != 7200000 || cfg.GGO.Chips[0].ExchangeValue == nil || *cfg.GGO.Chips[0].ExchangeValue != 25 || cfg.GGO.Chips[0].DropWeight != nil {
-		t.Fatal("custom boss or chip value lost")
+	if cfg.GGO.Bosses[0].RespawnMS != 7200000 || cfg.GGO.Chips[0].ExchangeValue == nil || *cfg.GGO.Chips[0].ExchangeValue != 3 || cfg.GGO.Chips[0].DropWeight == nil || *cfg.GGO.Chips[0].DropWeight != 5500 {
+		t.Fatal("custom boss or approved V4 chip value lost")
 	}
 	if cfg.GGO.Extraction.Cancelled != "自定义取消提示" || cfg.GGO.Extraction.Arrival == "已抵达接应点，可交付芯片并撤离。" {
 		t.Fatal("extraction text migration wrong")
@@ -150,11 +155,131 @@ func TestGGOSproutMovesWithoutReset55(t *testing.T) {
 	if _, ok := g["sproutIcon"]; ok {
 		t.Fatal("sprout remained in desert")
 	}
-	if g["rules"].(map[string]interface{})["deathLossPercent"] != float64(42) || g["opaque"] == nil || doc["opaque"] == nil {
+	if g["rules"].(map[string]interface{})["deathLossPercent"] != float64(50) || g["opaque"] == nil || doc["opaque"] == nil {
 		t.Fatal("unrelated data changed")
 	}
 	again, changed, err := addGGOFieldConfiguration(updated)
 	if err != nil || changed || again != updated {
 		t.Fatal("migration repeated", changed, err)
+	}
+}
+
+func TestGGOV3MigrationPreservesOpaqueFieldsAndIsIdempotent(t *testing.T) {
+	base := defaultGGOFieldConfiguration()
+	base.SchemaVersion = 2
+	raw, err := json.Marshal(base)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var old map[string]json.RawMessage
+	if err = json.Unmarshal(raw, &old); err != nil {
+		t.Fatal(err)
+	}
+	old["opaque"] = json.RawMessage(`{"preserve":true}`)
+	var rules map[string]json.RawMessage
+	if err = json.Unmarshal(old["rules"], &rules); err != nil {
+		t.Fatal(err)
+	}
+	rules["otherPolicy"] = json.RawMessage(`{"custom":7}`)
+	old["rules"], _ = json.Marshal(rules)
+	var chips []map[string]json.RawMessage
+	if err = json.Unmarshal(old["chips"], &chips); err != nil {
+		t.Fatal(err)
+	}
+	chips[0]["opaque"] = json.RawMessage(`"keep"`)
+	old["chips"], _ = json.Marshal(chips)
+	wrapped, _ := json.Marshal(map[string]json.RawMessage{"scene": json.RawMessage(`"field_003"`), "ggo": mustGGOTestJSON(t, old)})
+	migrated, changed, err := addGGOFieldConfiguration(string(wrapped))
+	if err != nil || !changed {
+		t.Fatal("migration", changed, err)
+	}
+	var doc map[string]json.RawMessage
+	if err = json.Unmarshal([]byte(migrated), &doc); err != nil {
+		t.Fatal(err)
+	}
+	var g map[string]json.RawMessage
+	if err = json.Unmarshal(doc["ggo"], &g); err != nil {
+		t.Fatal(err)
+	}
+	if string(g["opaque"]) != `{"preserve":true}` {
+		t.Fatal("opaque GGO field lost")
+	}
+	if err = json.Unmarshal(g["rules"], &rules); err != nil {
+		t.Fatal(err)
+	}
+	if string(rules["otherPolicy"]) != `{"custom":7}` {
+		t.Fatal("opaque rule lost")
+	}
+	if err = json.Unmarshal(g["chips"], &chips); err != nil {
+		t.Fatal(err)
+	}
+	if string(chips[0]["opaque"]) != `"keep"` {
+		t.Fatal("opaque chip field lost")
+	}
+	again, changed, err := addGGOFieldConfiguration(migrated)
+	if err != nil || changed || again != migrated {
+		t.Fatal("migration repeated", changed, err)
+	}
+}
+
+func mustGGOTestJSON(t *testing.T, v any) json.RawMessage {
+	t.Helper()
+	b, err := json.Marshal(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return b
+}
+
+// Old schema-3 drafts receive only absent fields. Explicit zeros and custom
+// reward pools remain exactly as an operator saved them.
+func TestGGOBossDraftCompletesOnlyMissingFields(t *testing.T) {
+	boss := map[string]any{"partyRounds": int64(7), "sproutMax": int64(0), "custom": "keep"}
+	encoded, _ := json.Marshal(map[string]any{"runtime": map[string]any{"boss": boss}})
+	var ggo map[string]json.RawMessage
+	if err := json.Unmarshal(encoded, &ggo); err != nil {
+		t.Fatal(err)
+	}
+	changed, err := completeGGOV3Models(ggo)
+	if err != nil || !changed {
+		t.Fatal(changed, err)
+	}
+	var got struct {
+		Boss struct {
+			PartyRounds       int64                                `json:"partyRounds"`
+			SproutMax         int64                                `json:"sproutMax"`
+			SproutBonusBps    int64                                `json:"sproutBonusBps"`
+			ResourceDrops     []model.AdminFieldDrop               `json:"resourceDrops"`
+			RankResourceDrops []model.AdminFieldBossRank73         `json:"rankResourceDrops"`
+			TailResourceDrops []model.AdminFieldDrop               `json:"tailResourceDrops"`
+			OverclockRewards  []model.AdminFieldGGOOverclockReward `json:"overclockRewards"`
+			Custom            string                               `json:"custom"`
+		} `json:"boss"`
+	}
+	if err = json.Unmarshal(ggo["runtime"], &got); err != nil {
+		t.Fatal(err)
+	}
+	if got.Boss.PartyRounds != 7 || got.Boss.SproutMax != 0 || got.Boss.SproutBonusBps != 2500 || len(got.Boss.ResourceDrops) != 19 || len(got.Boss.RankResourceDrops) != 3 || len(got.Boss.TailResourceDrops) != 5 || len(got.Boss.OverclockRewards) != 3 || got.Boss.Custom != "keep" {
+		t.Fatal("draft migration changed explicit values or omitted defaults", got)
+	}
+	before := string(ggo["runtime"])
+	changed, err = completeGGOV3Models(ggo)
+	if err != nil || changed || string(ggo["runtime"]) != before {
+		t.Fatal("draft migration not idempotent", changed, err)
+	}
+}
+
+func TestGGOBossDefaultRewardCatalog(t *testing.T) {
+	s := &GameService{}
+	if err := s.LoadTables("../../analysis/tables"); err != nil {
+		t.Fatal(err)
+	}
+	boss := defaultGGORuntime().Boss
+	if boss.PartyRounds != 10 || boss.SproutMax != 2 || boss.SproutBonusBps != 2500 || !s.AdminGGOFieldBossResourceCatalogValid(boss) {
+		t.Fatal("default boss original reward catalog invalid")
+	}
+	boss.ResourceDrops[0].ResourceID = "MineItem_999"
+	if s.AdminGGOFieldBossResourceCatalogValid(boss) {
+		t.Fatal("unknown resource accepted")
 	}
 }

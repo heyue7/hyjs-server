@@ -15,6 +15,8 @@ var profileSchema string
 
 // Profile 保留 Python 原型中的表和列，保证现有账号、密码摘要和存档可直接读取。
 type Profile struct {
+	GGOCredit             int64   `gorm:"column:ggo_credit;not null;default:0" json:"-"`
+	GGOCreditMigrated     bool    `gorm:"column:ggo_credit_migrated;not null;default:false" json:"-"`
 	AccountID             int64   `gorm:"column:account_id;not null;default:0;index" json:"accountId"`
 	AccountAuthRevision   int64   `gorm:"column:account_auth_revision;not null;default:0" json:"-"`
 	ServerID              int64   `gorm:"column:server_id;not null;default:1;index" json:"serverId"`
@@ -60,6 +62,8 @@ func InitGame(ctx context.Context, path string) error {
 			existing[column.Name] = true
 		}
 		for _, column := range []struct{ name, definition string }{
+			{"ggo_credit", "INTEGER NOT NULL DEFAULT 0"},
+			{"ggo_credit_migrated", "INTEGER NOT NULL DEFAULT 0"},
 			{"server_id", "INTEGER NOT NULL DEFAULT 1"},
 			{"account_id", "INTEGER NOT NULL DEFAULT 0"},
 			{"account_auth_revision", "INTEGER NOT NULL DEFAULT 0"},

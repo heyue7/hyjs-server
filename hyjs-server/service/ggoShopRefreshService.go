@@ -24,13 +24,15 @@ type ggoQuoteSlot struct {
 	Product         p4Product `json:"product"`
 }
 type ggoQuoteState struct {
-	Generation int64            `json:"generation"`
-	Day        string           `json:"day"`
-	FreeLeft   int64            `json:"freeLeft"`
-	FreeAt     int64            `json:"freeAt"`
-	PaidUsed   int64            `json:"paidUsed"`
-	Slots      []ggoQuoteSlot   `json:"slots"`
-	SlotBought map[string]int64 `json:"slotBought"`
+	RefreshCost string           `json:"refreshCost,omitempty"`
+	DayDrawn    string           `json:"dayDrawn,omitempty"`
+	Generation  int64            `json:"generation"`
+	Day         string           `json:"day"`
+	FreeLeft    int64            `json:"freeLeft"`
+	FreeAt      int64            `json:"freeAt"`
+	PaidUsed    int64            `json:"paidUsed"`
+	Slots       []ggoQuoteSlot   `json:"slots"`
+	SlotBought  map[string]int64 `json:"slotBought"`
 }
 
 func ggoQuoteRuleID(ruleID string) string { return "ggoq:" + p6Digest([]byte(ruleID))[:40] }
@@ -102,7 +104,11 @@ func ggoDrawQuoteSlots(rules p4CommerceRules, state *ggoQuoteState) error {
 	return nil
 }
 func ggoSaveQuote(tx *gorm.DB, row *db.P4CommerceState, state *ggoQuoteState) error {
-	row.Payload = adminJSON(state)
+	next := adminJSON(state)
+	if bytes.Equal(row.Payload, next) {
+		return nil
+	}
+	row.Payload = next
 	return tx.Save(row).Error
 }
 
@@ -128,12 +134,15 @@ func (s *GameService) ggoLoadQuote(tx *gorm.DB, playerID int64, cfg db.P4Commerc
 		state.Day = day
 		state.FreeLeft = int64(rules.FreeCap)
 		state.FreeAt = now.UnixMilli()
-		if err := ggoDrawQuoteSlots(rules, state); err != nil {
+		if err := s.ggoDrawRuntimeQuote(tx, rules, state); err != nil {
 			return nil, nil, err
 		}
 	} else {
 		if len(row.Payload) > 262144 || json.Unmarshal(row.Payload, state) != nil {
 			return nil, nil, errors.New("信用商店报价存档无效")
+		}
+		if state.DayDrawn == "" {
+			state.DayDrawn = state.Day
 		}
 		if err = calendarGGODay75(tx, playerID, cfg.ID, state, now); err != nil {
 			return nil, nil, err
@@ -165,6 +174,17 @@ func (s *GameService) ggoLoadQuote(tx *gorm.DB, playerID int64, cfg db.P4Commerc
 				state.FreeLeft = min(int64(rules.FreeCap), state.FreeLeft+elapsed)
 				state.FreeAt += elapsed * seconds
 			}
+		}
+	}
+	if state.RefreshCost == "" {
+		state.RefreshCost = rules.RefreshCost
+	}
+	if state.DayDrawn == "" {
+		state.DayDrawn = state.Day
+	}
+	if state.DayDrawn != day {
+		if err := s.ggoDrawRuntimeQuote(tx, rules, state); err != nil {
+			return nil, nil, err
 		}
 	}
 	if err := ggoSaveQuote(tx, row, state); err != nil {
@@ -243,6 +263,11 @@ func (s *GameService) GGOShopRefresh(ctx context.Context, req model.GGOShopRefre
 	if err != nil {
 		return nil, err
 	}
+	s, err = s.ggoShopPricingService(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	var out model.GGOShopRefreshResponse
 	err = db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := ServerGameClockGuardTransaction(tx); err != nil {
@@ -301,6 +326,7 @@ func (s *GameService) GGOShopRefresh(ctx context.Context, req model.GGOShopRefre
 		if state == nil {
 			return errors.New("信用商店刷新未配置")
 		}
+		rules.RefreshCost = state.RefreshCost
 		now := LocalPlayNow(ctx)
 		if state.FreeLeft > 0 {
 			state.FreeLeft--
@@ -319,7 +345,7 @@ func (s *GameService) GGOShopRefresh(ctx context.Context, req model.GGOShopRefre
 			out.CostAmount = int64(cost.GetNum())
 			state.PaidUsed++
 		}
-		if err = ggoDrawQuoteSlots(rules, state); err != nil {
+		if err = s.ggoDrawRuntimeQuote(tx, rules, state); err != nil {
 			return err
 		}
 		if err = ggoSaveQuote(tx, row, state); err != nil {

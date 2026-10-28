@@ -14,21 +14,25 @@ func (s *GameService) fieldRuntimeForRequest(ctx context.Context, r *model.GameP
 		name = string(r.Body.ProtoReflect().Descriptor().Name())
 	}
 	// Original 30000..30099 contains scene, mine/fish, PVE/PK and heartbeat consumers.
-	relevant := (r.Opcode >= 30000 && r.Opcode < 30100) || strings.Contains(name, "WorldBoss") || strings.Contains(name, "Side") || strings.Contains(name, "Field") || name == "CSGatherCost" || name == "CSGuideMine" || name == "CSGuideFish" || name == "CSPingTcp" || name == "CSTransferScene"
+	relevant := (r.Opcode >= 30000 && r.Opcode < 30100) || strings.Contains(name, "WorldBoss") || strings.Contains(name, "Side") || strings.Contains(name, "Field") || name == "CSGatherCost" || name == "CSGuideMine" || name == "CSGuideFish" || name == "CSPingTcp" || name == "CSTransferScene" || name == "CSTransferLine"
 
 	if !relevant {
 		return s, nil
 	}
-	tables, err := s.AdminFieldRuntimeTables(ctx, s.OriginalServerID())
+	snapshot, err := s.adminFieldRuntimeSnapshotForRequest(ctx, s.OriginalServerID())
 	if err != nil {
 		return nil, err
 	}
-	return s.withRuntimeTables(tables), nil
+	runtime := s.withRuntimeTables(snapshot.tables)
+	runtime.GGOFieldConfig = snapshot.ggo
+	runtime.GGOFieldEconomy = snapshot.ggoEconomy
+	runtime.GGOFieldRevision = snapshot.ggoRevision
+	return runtime, nil
 }
 
 // withRuntimeTables 只复制运行期只读字段，socket及缓存所有权继续由基础服务持有。
 func (s *GameService) withRuntimeTables(tables map[string][]map[string]string) *GameService {
-	clone := &GameService{RuntimeBase: s.p10ClientOwner(), ServerID: s.ServerID, Host: s.Host, HTTPPort: s.HTTPPort, TCPPort: s.TCPPort, Tables: tables, AdminCatalogueData: s.AdminCatalogueData, ServerClockReady: s.ServerClockReady, FieldResourcePolicyReady: s.FieldResourcePolicyReady, SharedFieldBoss55Ready: s.SharedFieldBoss55Ready, FieldBossDeath73Ready: s.FieldBossDeath73Ready, P1Ready: s.P1Ready, P4Ready: s.P4Ready, P5Ready: s.P5Ready, P8GatherReady: s.P8GatherReady, P8LifeReady: s.P8LifeReady, P9PetsReady: s.P9PetsReady, P9IntimacyReady: s.P9IntimacyReady, P10VoiceReady: s.P10VoiceReady, P12WorldBossBattleReady: s.P12WorldBossBattleReady, P12FieldPVPReady: s.P12FieldPVPReady, P12WantedReady: s.P12WantedReady, P3AutoConfirmDemoPayments: s.P3AutoConfirmDemoPayments, P3LocalWalletEnabled: s.P3LocalWalletEnabled, LocalPlayToolsEnabled: s.LocalPlayToolsEnabled}
+	clone := &GameService{GGOIntegrationReady: s.GGOIntegrationReady, RuntimeBase: s.p10ClientOwner(), ServerID: s.ServerID, Host: s.Host, HTTPPort: s.HTTPPort, TCPPort: s.TCPPort, Tables: tables, GGOFieldConfig: s.GGOFieldConfig, GGOFieldEconomy: s.GGOFieldEconomy, GGOFieldRevision: s.GGOFieldRevision, AdminCatalogueData: s.AdminCatalogueData, ServerClockReady: s.ServerClockReady, FieldResourcePolicyReady: s.FieldResourcePolicyReady, SharedFieldBoss55Ready: s.SharedFieldBoss55Ready, FieldBossDeath73Ready: s.FieldBossDeath73Ready, P1Ready: s.P1Ready, P4Ready: s.P4Ready, P5Ready: s.P5Ready, P8GatherReady: s.P8GatherReady, P8LifeReady: s.P8LifeReady, P9PetsReady: s.P9PetsReady, P9IntimacyReady: s.P9IntimacyReady, P10VoiceReady: s.P10VoiceReady, P12WorldBossBattleReady: s.P12WorldBossBattleReady, P12FieldPVPReady: s.P12FieldPVPReady, P12WantedReady: s.P12WantedReady, P3AutoConfirmDemoPayments: s.P3AutoConfirmDemoPayments, P3LocalWalletEnabled: s.P3LocalWalletEnabled, LocalPlayToolsEnabled: s.LocalPlayToolsEnabled}
 	clone.ServerClockState.Store(s.ServerClockState.Load())
 	clone.tableLookup = s.tableLookup
 	return clone

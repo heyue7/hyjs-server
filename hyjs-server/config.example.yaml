@@ -14,7 +14,7 @@ logConfig:
   gormLogFile: logs/sql.log
   maxSize: 10
   maxBackups: 3
-  maxAge: 7
+  maxAge: 1
   compress: false
   logLevel: info
   gormLogLevel: warn

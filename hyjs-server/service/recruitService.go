@@ -347,6 +347,9 @@ func choosePoolReward(rewards []db.GameplayPoolReward, guaranteed bool) (*db.Gam
 }
 
 func simpleOwned(player *pb.Player, g *model.GameState, key string) int64 {
+	if key == constUtil.GGOCurrencyID {
+		return ggoCreditBalance(g)
+	}
 	switch key {
 	case "coin":
 		return player.GetCoin()
@@ -379,6 +382,8 @@ func deductPoolCost(player *pb.Player, g *model.GameState, cost *pb.BaseResource
 		return errors.New("招募或抽奖资源不足")
 	}
 	switch cost.GetId() {
+	case constUtil.GGOCurrencyID:
+		return ggoCreditDeduct(g, int64(cost.GetNum()))
 	case "coin":
 		player.Coin = proto.Int64(player.GetCoin() - int64(cost.GetNum()))
 	case "diamond":

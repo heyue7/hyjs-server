@@ -98,8 +98,11 @@ func (s *GameService) TickP12FieldPVPPresentation(ctx context.Context, now time.
 	}
 	for _, candidate := range pending {
 		var side *pb.PlayerSide
+		var returned bool
 		var scene string
 		var line int32
+		var oldScene string
+		var oldLine int32
 		p10SceneMutation.Lock()
 		err := db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 			if _, err := p10LockProfiles(tx, candidate.PlayerID, candidate.PlayerID); err != nil {
@@ -116,9 +119,24 @@ func (s *GameService) TickP12FieldPVPPresentation(ctx context.Context, now time.
 			if err := tx.First(&row, candidate.PlayerID).Error; err != nil {
 				return err
 			}
-			_, g, err := decodeProfile(&row)
+			player, g, err := decodeProfile(&row)
 			if err != nil {
 				return err
+			}
+			returned, err = s.ggoPVPFinishReturn(tx, player, g, state.LastFightID, now.UnixMilli())
+			if err != nil {
+				return err
+			}
+			if returned {
+				var presence db.P10ScenePresence
+				if e := tx.First(&presence, "player_id=?", candidate.PlayerID).Error; e == nil {
+					oldScene, oldLine = presence.Scene, presence.Line
+				} else if !errors.Is(e, gorm.ErrRecordNotFound) {
+					return e
+				}
+				if err = saveProfile(tx, &row, player, g); err != nil {
+					return err
+				}
 			}
 			if g.Field != nil && g.Field.Side != nil {
 				side = proto.Clone(g.Field.Side).(*pb.PlayerSide)
@@ -138,6 +156,15 @@ func (s *GameService) TickP12FieldPVPPresentation(ctx context.Context, now time.
 		}
 		if side != nil {
 			sendCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 2*time.Second)
+			if returned {
+				_, online := p10ClientSinks.Load(p10ClientKey{s.p10ClientOwner(), candidate.PlayerID})
+				if online {
+					_ = s.SyncP10Scene(sendCtx, candidate.PlayerID, false)
+				} else if oldScene != "" {
+					s.p10SceneBroadcast(sendCtx, oldScene, oldLine, candidate.PlayerID, &pb.SCPlayerDisappear{PlayerId: []int64{candidate.PlayerID}})
+				}
+				s.p10SceneSend(sendCtx, candidate.PlayerID, &pb.SCRefreshScene{})
+			}
 			message := &pb.SCFieldPlayerState{Player: []*pb.PlayerSide{side}}
 			s.publishP10Private(sendCtx, candidate.PlayerID, message)
 			if scene != "" {

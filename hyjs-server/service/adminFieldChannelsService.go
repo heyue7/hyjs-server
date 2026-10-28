@@ -44,6 +44,11 @@ func (s *GameService) initializeAdminFieldChannelPolicy(ctx context.Context) err
 
 // adminFieldSceneConfig overlays only this map's line capacity onto the existing original presence policy.
 func (s *GameService) adminFieldSceneConfig(tx *gorm.DB, scene string, base *db.P10ScenePolicy) (*db.P10ScenePolicy, error) {
+	if base != nil && scene == constUtil.GGOFieldScene {
+		copy := *base
+		copy.MaxPlayers = min(copy.MaxPlayers, int32(20))
+		base = &copy
+	}
 	if base == nil || !constUtil.P8OriginalFieldScene(scene) || !gameSchemaHasTable(tx, &db.AdminFieldChannel{}) {
 		return base, nil
 	}
@@ -60,6 +65,9 @@ func (s *GameService) adminFieldSceneConfig(tx *gorm.DB, scene string, base *db.
 	}
 	result := *base
 	result.LineCount, result.MaxPlayers = int32(row.LineCount), int32(row.MaxPlayers)
+	if scene == constUtil.GGOFieldScene {
+		result.MaxPlayers = min(result.MaxPlayers, int32(20))
+	}
 	return &result, nil
 }
 

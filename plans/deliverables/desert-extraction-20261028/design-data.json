@@ -1,0 +1,1348 @@
+{
+  "date": "2026-10-28",
+  "status": "design_only",
+  "sourceVersion": "V13-economy-75",
+  "sourceSHA256": "f76652d04928e1a199ac865433835a617a36609ce6f00b31bcdbe55a8adec703",
+  "shop": {
+    "slots": 6,
+    "slot_stock": 1,
+    "source_shared_stock": -1,
+    "stock_semantics": "每个报价槽限购1次；来源共享库存不限量，保留角色日限与账号周限",
+    "draw": "weighted_with_replacement",
+    "weight_total": 10000,
+    "initial_generation": 1,
+    "daily_manual_refresh_max": 15,
+    "refresh_cost_credit": 10,
+    "free_refresh_cap": 0,
+    "daily_max_observed_slots": 96,
+    "weekly_limits_scope": "account_all_roles_servers",
+    "red_group_limits": "Holy each part 10/week; Glory each part 10/week; red treasure each original puzzle part 1/week; all quantities max10",
+    "products": [
+      {
+        "name": "解放之石",
+        "reward": "item_005",
+        "quantity": 25,
+        "price": 20,
+        "limit": 2,
+        "currency": "credit",
+        "period": "day",
+        "weight": 1600,
+        "proposedPrice": 30
+      },
+      {
+        "name": "突破水晶",
+        "reward": "item_006",
+        "quantity": 200,
+        "price": 80,
+        "limit": 2,
+        "currency": "credit",
+        "period": "day",
+        "weight": 1350,
+        "proposedPrice": 115
+      },
+      {
+        "name": "极品精炼石",
+        "reward": "item_008",
+        "quantity": 50,
+        "price": 80,
+        "limit": 2,
+        "currency": "credit",
+        "period": "day",
+        "weight": 1350,
+        "proposedPrice": 115
+      },
+      {
+        "name": "饰品精炼石",
+        "reward": "item_012",
+        "quantity": 100,
+        "price": 40,
+        "limit": 2,
+        "currency": "credit",
+        "period": "day",
+        "weight": 1020,
+        "proposedPrice": 60
+      },
+      {
+        "name": "高级经验水晶",
+        "reward": "hero_exp_004",
+        "quantity": 5,
+        "price": 80,
+        "limit": 2,
+        "currency": "credit",
+        "period": "day",
+        "weight": 1000,
+        "proposedPrice": 115
+      },
+      {
+        "name": "紫色精灵之花",
+        "reward": "item_126",
+        "quantity": 25,
+        "price": 30,
+        "limit": 2,
+        "currency": "credit",
+        "period": "day",
+        "weight": 800,
+        "proposedPrice": 45
+      },
+      {
+        "name": "阵法原石",
+        "reward": "item_373",
+        "quantity": 5,
+        "price": 40,
+        "limit": 2,
+        "currency": "credit",
+        "period": "day",
+        "weight": 500,
+        "proposedPrice": 60
+      },
+      {
+        "name": "超频点",
+        "reward": "item_9711",
+        "quantity": 6,
+        "price": 90,
+        "limit": 7,
+        "currency": "credit",
+        "period": "week",
+        "weight": 400,
+        "proposedPrice": 130
+      },
+      {
+        "name": "新手技能秘笈",
+        "reward": "item_442",
+        "quantity": 1,
+        "price": 300,
+        "limit": 1,
+        "currency": "credit",
+        "period": "day",
+        "weight": 200,
+        "proposedPrice": 420
+      },
+      {
+        "name": "奥义之证",
+        "reward": "item_378",
+        "quantity": 1,
+        "price": 800,
+        "limit": 1,
+        "currency": "credit",
+        "period": "day",
+        "weight": 100,
+        "proposedPrice": 1120
+      },
+      {
+        "name": "卓越装备碎片",
+        "reward": "frag_equip_025",
+        "quantity": 10,
+        "price": 350,
+        "limit": 2,
+        "currency": "credit",
+        "period": "week",
+        "weight": 200,
+        "proposedPrice": 490
+      },
+      {
+        "name": "卓越装备碎片",
+        "reward": "frag_equip_026",
+        "quantity": 10,
+        "price": 350,
+        "limit": 2,
+        "currency": "credit",
+        "period": "week",
+        "weight": 200,
+        "proposedPrice": 490
+      },
+      {
+        "name": "卓越装备碎片",
+        "reward": "frag_equip_027",
+        "quantity": 10,
+        "price": 350,
+        "limit": 2,
+        "currency": "credit",
+        "period": "week",
+        "weight": 200,
+        "proposedPrice": 490
+      },
+      {
+        "name": "卓越装备碎片",
+        "reward": "frag_equip_028",
+        "quantity": 10,
+        "price": 350,
+        "limit": 2,
+        "currency": "credit",
+        "period": "week",
+        "weight": 200,
+        "proposedPrice": 490
+      },
+      {
+        "name": "神圣之剑碎片",
+        "reward": "frag_equip_037",
+        "quantity": 10,
+        "price": 600,
+        "limit": 1,
+        "currency": "credit",
+        "period": "week",
+        "weight": 80,
+        "rare_tier": "holy",
+        "release_stage": "成长阶段运营上架，不增加真实四橙资格",
+        "proposedPrice": 840
+      },
+      {
+        "name": "神圣战甲碎片",
+        "reward": "frag_equip_038",
+        "quantity": 10,
+        "price": 600,
+        "limit": 1,
+        "currency": "credit",
+        "period": "week",
+        "weight": 80,
+        "rare_tier": "holy",
+        "release_stage": "成长阶段运营上架，不增加真实四橙资格",
+        "proposedPrice": 840
+      },
+      {
+        "name": "神圣护腕碎片",
+        "reward": "frag_equip_039",
+        "quantity": 10,
+        "price": 600,
+        "limit": 1,
+        "currency": "credit",
+        "period": "week",
+        "weight": 80,
+        "rare_tier": "holy",
+        "release_stage": "成长阶段运营上架，不增加真实四橙资格",
+        "proposedPrice": 840
+      },
+      {
+        "name": "神圣之靴碎片",
+        "reward": "frag_equip_040",
+        "quantity": 10,
+        "price": 600,
+        "limit": 1,
+        "currency": "credit",
+        "period": "week",
+        "weight": 80,
+        "rare_tier": "holy",
+        "release_stage": "成长阶段运营上架，不增加真实四橙资格",
+        "proposedPrice": 840
+      },
+      {
+        "name": "巨龙之戒碎片·1",
+        "reward": "frag_trea_015_1",
+        "quantity": 1,
+        "price": 600,
+        "limit": 1,
+        "currency": "credit",
+        "period": "week",
+        "weight": 20,
+        "rare_tier": "treasure",
+        "release_stage": "成长阶段运营上架，不增加真实四橙资格",
+        "proposedPrice": 840
+      },
+      {
+        "name": "巨龙之戒碎片·2",
+        "reward": "frag_trea_015_2",
+        "quantity": 1,
+        "price": 600,
+        "limit": 1,
+        "currency": "credit",
+        "period": "week",
+        "weight": 20,
+        "rare_tier": "treasure",
+        "release_stage": "成长阶段运营上架，不增加真实四橙资格",
+        "proposedPrice": 840
+      },
+      {
+        "name": "巨龙之戒碎片·3",
+        "reward": "frag_trea_015_3",
+        "quantity": 1,
+        "price": 600,
+        "limit": 1,
+        "currency": "credit",
+        "period": "week",
+        "weight": 20,
+        "rare_tier": "treasure",
+        "release_stage": "成长阶段运营上架，不增加真实四橙资格",
+        "proposedPrice": 840
+      },
+      {
+        "name": "巨龙之戒碎片·4",
+        "reward": "frag_trea_015_4",
+        "quantity": 1,
+        "price": 600,
+        "limit": 1,
+        "currency": "credit",
+        "period": "week",
+        "weight": 20,
+        "rare_tier": "treasure",
+        "release_stage": "成长阶段运营上架，不增加真实四橙资格",
+        "proposedPrice": 840
+      },
+      {
+        "name": "巨龙之戒碎片·5",
+        "reward": "frag_trea_015_5",
+        "quantity": 1,
+        "price": 600,
+        "limit": 1,
+        "currency": "credit",
+        "period": "week",
+        "weight": 20,
+        "rare_tier": "treasure",
+        "release_stage": "成长阶段运营上架，不增加真实四橙资格",
+        "proposedPrice": 840
+      },
+      {
+        "name": "巨龙之戒碎片·6",
+        "reward": "frag_trea_015_6",
+        "quantity": 1,
+        "price": 600,
+        "limit": 1,
+        "currency": "credit",
+        "period": "week",
+        "weight": 20,
+        "rare_tier": "treasure",
+        "release_stage": "成长阶段运营上架，不增加真实四橙资格",
+        "proposedPrice": 840
+      },
+      {
+        "name": "死神指环碎片·1",
+        "reward": "frag_trea_016_1",
+        "quantity": 1,
+        "price": 600,
+        "limit": 1,
+        "currency": "credit",
+        "period": "week",
+        "weight": 20,
+        "rare_tier": "treasure",
+        "release_stage": "成长阶段运营上架，不增加真实四橙资格",
+        "proposedPrice": 840
+      },
+      {
+        "name": "死神指环碎片·2",
+        "reward": "frag_trea_016_2",
+        "quantity": 1,
+        "price": 600,
+        "limit": 1,
+        "currency": "credit",
+        "period": "week",
+        "weight": 20,
+        "rare_tier": "treasure",
+        "release_stage": "成长阶段运营上架，不增加真实四橙资格",
+        "proposedPrice": 840
+      },
+      {
+        "name": "死神指环碎片·3",
+        "reward": "frag_trea_016_3",
+        "quantity": 1,
+        "price": 600,
+        "limit": 1,
+        "currency": "credit",
+        "period": "week",
+        "weight": 20,
+        "rare_tier": "treasure",
+        "release_stage": "成长阶段运营上架，不增加真实四橙资格",
+        "proposedPrice": 840
+      },
+      {
+        "name": "死神指环碎片·4",
+        "reward": "frag_trea_016_4",
+        "quantity": 1,
+        "price": 600,
+        "limit": 1,
+        "currency": "credit",
+        "period": "week",
+        "weight": 20,
+        "rare_tier": "treasure",
+        "release_stage": "成长阶段运营上架，不增加真实四橙资格",
+        "proposedPrice": 840
+      },
+      {
+        "name": "死神指环碎片·5",
+        "reward": "frag_trea_016_5",
+        "quantity": 1,
+        "price": 600,
+        "limit": 1,
+        "currency": "credit",
+        "period": "week",
+        "weight": 20,
+        "rare_tier": "treasure",
+        "release_stage": "成长阶段运营上架，不增加真实四橙资格",
+        "proposedPrice": 840
+      },
+      {
+        "name": "死神指环碎片·6",
+        "reward": "frag_trea_016_6",
+        "quantity": 1,
+        "price": 600,
+        "limit": 1,
+        "currency": "credit",
+        "period": "week",
+        "weight": 20,
+        "rare_tier": "treasure",
+        "release_stage": "成长阶段运营上架，不增加真实四橙资格",
+        "proposedPrice": 840
+      },
+      {
+        "name": "魔力项链碎片·1",
+        "reward": "frag_trea_017_1",
+        "quantity": 1,
+        "price": 600,
+        "limit": 1,
+        "currency": "credit",
+        "period": "week",
+        "weight": 20,
+        "rare_tier": "treasure",
+        "release_stage": "成长阶段运营上架，不增加真实四橙资格",
+        "proposedPrice": 840
+      },
+      {
+        "name": "魔力项链碎片·2",
+        "reward": "frag_trea_017_2",
+        "quantity": 1,
+        "price": 600,
+        "limit": 1,
+        "currency": "credit",
+        "period": "week",
+        "weight": 20,
+        "rare_tier": "treasure",
+        "release_stage": "成长阶段运营上架，不增加真实四橙资格",
+        "proposedPrice": 840
+      },
+      {
+        "name": "魔力项链碎片·3",
+        "reward": "frag_trea_017_3",
+        "quantity": 1,
+        "price": 600,
+        "limit": 1,
+        "currency": "credit",
+        "period": "week",
+        "weight": 20,
+        "rare_tier": "treasure",
+        "release_stage": "成长阶段运营上架，不增加真实四橙资格",
+        "proposedPrice": 840
+      },
+      {
+        "name": "魔力项链碎片·4",
+        "reward": "frag_trea_017_4",
+        "quantity": 1,
+        "price": 600,
+        "limit": 1,
+        "currency": "credit",
+        "period": "week",
+        "weight": 20,
+        "rare_tier": "treasure",
+        "release_stage": "成长阶段运营上架，不增加真实四橙资格",
+        "proposedPrice": 840
+      },
+      {
+        "name": "魔力项链碎片·5",
+        "reward": "frag_trea_017_5",
+        "quantity": 1,
+        "price": 600,
+        "limit": 1,
+        "currency": "credit",
+        "period": "week",
+        "weight": 20,
+        "rare_tier": "treasure",
+        "release_stage": "成长阶段运营上架，不增加真实四橙资格",
+        "proposedPrice": 840
+      },
+      {
+        "name": "魔力项链碎片·6",
+        "reward": "frag_trea_017_6",
+        "quantity": 1,
+        "price": 600,
+        "limit": 1,
+        "currency": "credit",
+        "period": "week",
+        "weight": 20,
+        "rare_tier": "treasure",
+        "release_stage": "成长阶段运营上架，不增加真实四橙资格",
+        "proposedPrice": 840
+      },
+      {
+        "name": "兽王项链碎片·1",
+        "reward": "frag_trea_018_1",
+        "quantity": 1,
+        "price": 600,
+        "limit": 1,
+        "currency": "credit",
+        "period": "week",
+        "weight": 20,
+        "rare_tier": "treasure",
+        "release_stage": "成长阶段运营上架，不增加真实四橙资格",
+        "proposedPrice": 840
+      },
+      {
+        "name": "兽王项链碎片·2",
+        "reward": "frag_trea_018_2",
+        "quantity": 1,
+        "price": 600,
+        "limit": 1,
+        "currency": "credit",
+        "period": "week",
+        "weight": 20,
+        "rare_tier": "treasure",
+        "release_stage": "成长阶段运营上架，不增加真实四橙资格",
+        "proposedPrice": 840
+      },
+      {
+        "name": "兽王项链碎片·3",
+        "reward": "frag_trea_018_3",
+        "quantity": 1,
+        "price": 600,
+        "limit": 1,
+        "currency": "credit",
+        "period": "week",
+        "weight": 20,
+        "rare_tier": "treasure",
+        "release_stage": "成长阶段运营上架，不增加真实四橙资格",
+        "proposedPrice": 840
+      },
+      {
+        "name": "兽王项链碎片·4",
+        "reward": "frag_trea_018_4",
+        "quantity": 1,
+        "price": 600,
+        "limit": 1,
+        "currency": "credit",
+        "period": "week",
+        "weight": 20,
+        "rare_tier": "treasure",
+        "release_stage": "成长阶段运营上架，不增加真实四橙资格",
+        "proposedPrice": 840
+      },
+      {
+        "name": "兽王项链碎片·5",
+        "reward": "frag_trea_018_5",
+        "quantity": 1,
+        "price": 600,
+        "limit": 1,
+        "currency": "credit",
+        "period": "week",
+        "weight": 20,
+        "rare_tier": "treasure",
+        "release_stage": "成长阶段运营上架，不增加真实四橙资格",
+        "proposedPrice": 840
+      },
+      {
+        "name": "兽王项链碎片·6",
+        "reward": "frag_trea_018_6",
+        "quantity": 1,
+        "price": 600,
+        "limit": 1,
+        "currency": "credit",
+        "period": "week",
+        "weight": 20,
+        "rare_tier": "treasure",
+        "release_stage": "成长阶段运营上架，不增加真实四橙资格",
+        "proposedPrice": 840
+      },
+      {
+        "name": "荣耀之刃碎片",
+        "reward": "frag_equip_041",
+        "quantity": 10,
+        "price": 1200,
+        "limit": 1,
+        "currency": "credit",
+        "period": "week",
+        "weight": 20,
+        "rare_tier": "glory",
+        "release_stage": "成长阶段运营上架，不增加真实四橙资格",
+        "proposedPrice": 1680
+      },
+      {
+        "name": "荣耀战甲碎片",
+        "reward": "frag_equip_042",
+        "quantity": 10,
+        "price": 1200,
+        "limit": 1,
+        "currency": "credit",
+        "period": "week",
+        "weight": 20,
+        "rare_tier": "glory",
+        "release_stage": "成长阶段运营上架，不增加真实四橙资格",
+        "proposedPrice": 1680
+      },
+      {
+        "name": "荣耀护手碎片",
+        "reward": "frag_equip_043",
+        "quantity": 10,
+        "price": 1200,
+        "limit": 1,
+        "currency": "credit",
+        "period": "week",
+        "weight": 20,
+        "rare_tier": "glory",
+        "release_stage": "成长阶段运营上架，不增加真实四橙资格",
+        "proposedPrice": 1680
+      },
+      {
+        "name": "荣耀战靴碎片",
+        "reward": "frag_equip_044",
+        "quantity": 10,
+        "price": 1200,
+        "limit": 1,
+        "currency": "credit",
+        "period": "week",
+        "weight": 20,
+        "rare_tier": "glory",
+        "release_stage": "成长阶段运营上架，不增加真实四橙资格",
+        "proposedPrice": 1680
+      }
+    ],
+    "max_refresh_cost_day": 150,
+    "locked_stock_draw_policy": "weight_retained_sold_out_or_locked_shown_not_rerolled",
+    "point_budget_60_week": 42,
+    "point_budget_120_week": 42,
+    "point_stock_not_guaranteed": true,
+    "daily_auto_new_first_board": true,
+    "ordinary_initial_budgets": {
+      "60": 100,
+      "120": 250
+    },
+    "ordinary_scope": [
+      "item_005",
+      "item_006",
+      "item_008",
+      "item_012",
+      "hero_exp_004",
+      "item_126",
+      "item_373"
+    ],
+    "point_supply_mean_before_funds": {
+      "60": 98.97,
+      "120": 253.57
+    },
+    "point_supply_p10_before_funds": {
+      "60": 60,
+      "120": 200
+    },
+    "rare_fragment_ids": [
+      "frag_equip_037",
+      "frag_equip_038",
+      "frag_equip_039",
+      "frag_equip_040",
+      "frag_trea_015_1",
+      "frag_trea_015_2",
+      "frag_trea_015_3",
+      "frag_trea_015_4",
+      "frag_trea_015_5",
+      "frag_trea_015_6",
+      "frag_trea_016_1",
+      "frag_trea_016_2",
+      "frag_trea_016_3",
+      "frag_trea_016_4",
+      "frag_trea_016_5",
+      "frag_trea_016_6",
+      "frag_trea_017_1",
+      "frag_trea_017_2",
+      "frag_trea_017_3",
+      "frag_trea_017_4",
+      "frag_trea_017_5",
+      "frag_trea_017_6",
+      "frag_trea_018_1",
+      "frag_trea_018_2",
+      "frag_trea_018_3",
+      "frag_trea_018_4",
+      "frag_trea_018_5",
+      "frag_trea_018_6",
+      "frag_equip_041",
+      "frag_equip_042",
+      "frag_equip_043",
+      "frag_equip_044"
+    ],
+    "full_buy_daily_target": false,
+    "purchase_policy": "Six displayed random quotes are optional; refresh and rare-fragment savings share earned chip credits, no guaranteed full 96-slot buyout"
+  },
+  "bossInherited": {
+    "daily_shared_qualifications": 3,
+    "refresh": {
+      "grass_hourly": true,
+      "snow_hourly": true,
+      "desert_day_hourly_evening_halfhour": true
+    },
+    "maps": {
+      "grass": {
+        "name": "草原",
+        "participation_diamond": 500,
+        "coin": 2000000,
+        "rank1": 500,
+        "rank2_3": 250,
+        "rank4_10": 100,
+        "tail": 300
+      },
+      "snow": {
+        "name": "雪地",
+        "participation_diamond": 800,
+        "coin": 4000000,
+        "rank1": 300,
+        "rank2_3": 150,
+        "rank4_10": 60,
+        "tail": 200
+      },
+      "desert": {
+        "name": "沙漠",
+        "participation_diamond": 1500,
+        "coin": 8000000,
+        "rank1": 500,
+        "rank2_3": 250,
+        "rank4_10": 100,
+        "tail": 300
+      }
+    },
+    "point_values": [
+      6,
+      18,
+      28,
+      64,
+      128
+    ],
+    "point_probabilities": {
+      "0": [
+        0.4,
+        0.3,
+        0.2,
+        0.08,
+        0.02
+      ],
+      "1": [
+        0.35,
+        0.3,
+        0.22,
+        0.1,
+        0.03
+      ],
+      "2": [
+        0.3,
+        0.3,
+        0.23,
+        0.13,
+        0.04
+      ]
+    },
+    "sprout_max": 2,
+    "sprout_extra_mineral_fish_copy": [
+      0,
+      0.25,
+      0.5
+    ]
+  },
+  "qualityNames": [
+    "白",
+    "绿",
+    "蓝",
+    "紫",
+    "橙",
+    "红"
+  ],
+  "values": [
+    3,
+    9,
+    30,
+    90,
+    300,
+    900
+  ],
+  "qualityProb": [
+    0.55,
+    0.25,
+    0.13,
+    0.05,
+    0.018,
+    0.002
+  ],
+  "gatherTrigger": [
+    0.1,
+    0.12,
+    0.15,
+    0.18
+  ],
+  "tierMix": [
+    0.6,
+    0.28,
+    0.1,
+    0.02
+  ],
+  "secureCount": 3,
+  "deathLoss": 0.5,
+  "deathRounding": "floor_total_capped_by_unprotected",
+  "normalTripMinutes": 20,
+  "defaultTripDeathProbability": 0.3,
+  "pveShareOfLoss": 0.3,
+  "simulations": [
+    {
+      "minutes": 30,
+      "mobs": 10,
+      "gathers": 8,
+      "bosses": 0,
+      "trips": 2,
+      "samples": 16000,
+      "gross": 75.1907,
+      "sampleGross": 75.01875,
+      "rawSampleMean": 74.6338125,
+      "mean": 74.8057625,
+      "p10": 9,
+      "p50": 39,
+      "p90": 153,
+      "meanLoss": 0.3849375,
+      "redProbability": 0.0073125
+    },
+    {
+      "minutes": 60,
+      "mobs": 20,
+      "gathers": 16,
+      "bosses": 1,
+      "trips": 3,
+      "samples": 16000,
+      "gross": 210.3814,
+      "sampleGross": 209.3728125,
+      "rawSampleMean": 205.884375,
+      "mean": 206.8929625,
+      "p10": 90,
+      "p50": 153,
+      "p90": 411,
+      "meanLoss": 3.4884375,
+      "redProbability": 0.0159375
+    },
+    {
+      "minutes": 120,
+      "mobs": 40,
+      "gathers": 32,
+      "bosses": 2,
+      "trips": 6,
+      "samples": 16000,
+      "gross": 420.7628,
+      "sampleGross": 417.2281875,
+      "rawSampleMean": 410.33925,
+      "mean": 413.87386250000003,
+      "p10": 210,
+      "p50": 333,
+      "p90": 669,
+      "meanLoss": 6.8889375,
+      "redProbability": 0.03
+    },
+    {
+      "minutes": 180,
+      "mobs": 60,
+      "gathers": 48,
+      "bosses": 3,
+      "trips": 9,
+      "samples": 16000,
+      "gross": 631.1442,
+      "sampleGross": 627.531375,
+      "rawSampleMean": 616.9374375,
+      "mean": 620.5502624999999,
+      "p10": 348,
+      "p50": 537,
+      "p90": 966,
+      "meanLoss": 10.5939375,
+      "redProbability": 0.042125
+    }
+  ],
+  "mapMarkers": [
+    {
+      "id": "S",
+      "kind": "safe",
+      "x": 105,
+      "y": 417,
+      "title": "初始安全区",
+      "text": "诗乃随机传送，柯尔结算；同服同线安全区交易。安全边界须按实际碰撞核定。"
+    },
+    {
+      "id": "M01",
+      "kind": "mob",
+      "x": 132,
+      "y": 389,
+      "title": "35级公共小怪 · 大桥巡逻",
+      "text": "此点只放1只，相邻扎堆最多2只。35级，额外芯片20%出1枚，死亡30秒刷新；场景1只对应战斗1个敌方成员。M01—04沿大桥分段摆放，保持绕行，不聚在安全区口。"
+    },
+    {
+      "id": "M02",
+      "kind": "mob",
+      "x": 132,
+      "y": 365,
+      "title": "35级公共小怪 · 大桥巡逻",
+      "text": "此点只放1只，相邻扎堆最多2只。35级，额外芯片20%出1枚，死亡30秒刷新；场景1只对应战斗1个敌方成员。M01—04沿大桥分段摆放，保持绕行，不聚在安全区口。"
+    },
+    {
+      "id": "M03",
+      "kind": "mob",
+      "x": 132,
+      "y": 312,
+      "title": "35级公共小怪 · 大桥巡逻",
+      "text": "此点只放1只，相邻扎堆最多2只。35级，额外芯片20%出1枚，死亡30秒刷新；场景1只对应战斗1个敌方成员。M01—04沿大桥分段摆放，保持绕行，不聚在安全区口。"
+    },
+    {
+      "id": "M04",
+      "kind": "mob",
+      "x": 132,
+      "y": 290,
+      "title": "35级公共小怪 · 大桥巡逻",
+      "text": "此点只放1只，相邻扎堆最多2只。35级，额外芯片20%出1枚，死亡30秒刷新；场景1只对应战斗1个敌方成员。M01—04沿大桥分段摆放，保持绕行，不聚在安全区口。"
+    },
+    {
+      "id": "M05",
+      "kind": "mob",
+      "x": 132,
+      "y": 259,
+      "title": "35级公共小怪",
+      "text": "此点只放1只，相邻扎堆最多2只。35级，额外芯片20%出1枚，死亡30秒刷新；场景1只对应战斗1个敌方成员。M01—04沿大桥分段摆放，保持绕行，不聚在安全区口。"
+    },
+    {
+      "id": "M06",
+      "kind": "mob",
+      "x": 151,
+      "y": 242,
+      "title": "35级公共小怪",
+      "text": "此点只放1只，相邻扎堆最多2只。35级，额外芯片20%出1枚，死亡30秒刷新；场景1只对应战斗1个敌方成员。M01—04沿大桥分段摆放，保持绕行，不聚在安全区口。"
+    },
+    {
+      "id": "M07",
+      "kind": "mob",
+      "x": 145,
+      "y": 205,
+      "title": "35级公共小怪",
+      "text": "此点只放1只，相邻扎堆最多2只。35级，额外芯片20%出1枚，死亡30秒刷新；场景1只对应战斗1个敌方成员。M01—04沿大桥分段摆放，保持绕行，不聚在安全区口。"
+    },
+    {
+      "id": "M08",
+      "kind": "mob",
+      "x": 163,
+      "y": 176,
+      "title": "35级公共小怪",
+      "text": "此点只放1只，相邻扎堆最多2只。35级，额外芯片20%出1枚，死亡30秒刷新；场景1只对应战斗1个敌方成员。M01—04沿大桥分段摆放，保持绕行，不聚在安全区口。"
+    },
+    {
+      "id": "M09",
+      "kind": "mob",
+      "x": 184,
+      "y": 152,
+      "title": "35级公共小怪",
+      "text": "此点只放1只，相邻扎堆最多2只。35级，额外芯片20%出1枚，死亡30秒刷新；场景1只对应战斗1个敌方成员。M01—04沿大桥分段摆放，保持绕行，不聚在安全区口。"
+    },
+    {
+      "id": "M10",
+      "kind": "mob",
+      "x": 216,
+      "y": 130,
+      "title": "35级公共小怪",
+      "text": "此点只放1只，相邻扎堆最多2只。35级，额外芯片20%出1枚，死亡30秒刷新；场景1只对应战斗1个敌方成员。M01—04沿大桥分段摆放，保持绕行，不聚在安全区口。"
+    },
+    {
+      "id": "M11",
+      "kind": "mob",
+      "x": 249,
+      "y": 130,
+      "title": "45级公共小怪",
+      "text": "此点只放1只，相邻扎堆最多2只。45级，额外芯片30%出1枚，死亡30秒刷新；场景1只对应战斗1个敌方成员。M01—04沿大桥分段摆放，保持绕行，不聚在安全区口。"
+    },
+    {
+      "id": "M12",
+      "kind": "mob",
+      "x": 281,
+      "y": 138,
+      "title": "45级公共小怪",
+      "text": "此点只放1只，相邻扎堆最多2只。45级，额外芯片30%出1枚，死亡30秒刷新；场景1只对应战斗1个敌方成员。M01—04沿大桥分段摆放，保持绕行，不聚在安全区口。"
+    },
+    {
+      "id": "M13",
+      "kind": "mob",
+      "x": 307,
+      "y": 170,
+      "title": "45级公共小怪",
+      "text": "此点只放1只，相邻扎堆最多2只。45级，额外芯片30%出1枚，死亡30秒刷新；场景1只对应战斗1个敌方成员。M01—04沿大桥分段摆放，保持绕行，不聚在安全区口。"
+    },
+    {
+      "id": "M14",
+      "kind": "mob",
+      "x": 327,
+      "y": 196,
+      "title": "45级公共小怪",
+      "text": "此点只放1只，相邻扎堆最多2只。45级，额外芯片30%出1枚，死亡30秒刷新；场景1只对应战斗1个敌方成员。M01—04沿大桥分段摆放，保持绕行，不聚在安全区口。"
+    },
+    {
+      "id": "M15",
+      "kind": "mob",
+      "x": 365,
+      "y": 220,
+      "title": "45级公共小怪",
+      "text": "此点只放1只，相邻扎堆最多2只。45级，额外芯片30%出1枚，死亡30秒刷新；场景1只对应战斗1个敌方成员。M01—04沿大桥分段摆放，保持绕行，不聚在安全区口。"
+    },
+    {
+      "id": "M16",
+      "kind": "mob",
+      "x": 378,
+      "y": 247,
+      "title": "45级公共小怪",
+      "text": "此点只放1只，相邻扎堆最多2只。45级，额外芯片30%出1枚，死亡30秒刷新；场景1只对应战斗1个敌方成员。M01—04沿大桥分段摆放，保持绕行，不聚在安全区口。"
+    },
+    {
+      "id": "M17",
+      "kind": "mob",
+      "x": 377,
+      "y": 278,
+      "title": "45级公共小怪",
+      "text": "此点只放1只，相邻扎堆最多2只。45级，额外芯片30%出1枚，死亡30秒刷新；场景1只对应战斗1个敌方成员。M01—04沿大桥分段摆放，保持绕行，不聚在安全区口。"
+    },
+    {
+      "id": "M18",
+      "kind": "mob",
+      "x": 360,
+      "y": 300,
+      "title": "45级公共小怪",
+      "text": "此点只放1只，相邻扎堆最多2只。45级，额外芯片30%出1枚，死亡30秒刷新；场景1只对应战斗1个敌方成员。M01—04沿大桥分段摆放，保持绕行，不聚在安全区口。"
+    },
+    {
+      "id": "M19",
+      "kind": "mob",
+      "x": 389,
+      "y": 330,
+      "title": "60级公共小怪",
+      "text": "此点只放1只，相邻扎堆最多2只。60级，额外芯片45%出1枚，死亡30秒刷新；场景1只对应战斗1个敌方成员。M01—04沿大桥分段摆放，保持绕行，不聚在安全区口。"
+    },
+    {
+      "id": "M20",
+      "kind": "mob",
+      "x": 390,
+      "y": 352,
+      "title": "60级公共小怪",
+      "text": "此点只放1只，相邻扎堆最多2只。60级，额外芯片45%出1枚，死亡30秒刷新；场景1只对应战斗1个敌方成员。M01—04沿大桥分段摆放，保持绕行，不聚在安全区口。"
+    },
+    {
+      "id": "M21",
+      "kind": "mob",
+      "x": 363,
+      "y": 374,
+      "title": "60级公共小怪",
+      "text": "此点只放1只，相邻扎堆最多2只。60级，额外芯片45%出1枚，死亡30秒刷新；场景1只对应战斗1个敌方成员。M01—04沿大桥分段摆放，保持绕行，不聚在安全区口。"
+    },
+    {
+      "id": "M22",
+      "kind": "mob",
+      "x": 338,
+      "y": 352,
+      "title": "60级公共小怪",
+      "text": "此点只放1只，相邻扎堆最多2只。60级，额外芯片45%出1枚，死亡30秒刷新；场景1只对应战斗1个敌方成员。M01—04沿大桥分段摆放，保持绕行，不聚在安全区口。"
+    },
+    {
+      "id": "M23",
+      "kind": "mob",
+      "x": 254,
+      "y": 354,
+      "title": "60级公共小怪",
+      "text": "此点只放1只，相邻扎堆最多2只。60级，额外芯片45%出1枚，死亡30秒刷新；场景1只对应战斗1个敌方成员。M01—04沿大桥分段摆放，保持绕行，不聚在安全区口。"
+    },
+    {
+      "id": "M24",
+      "kind": "mob",
+      "x": 205,
+      "y": 358,
+      "title": "60级公共小怪",
+      "text": "此点只放1只，相邻扎堆最多2只。60级，额外芯片45%出1枚，死亡30秒刷新；场景1只对应战斗1个敌方成员。M01—04沿大桥分段摆放，保持绕行，不聚在安全区口。"
+    },
+    {
+      "id": "O01",
+      "kind": "mine",
+      "x": 147,
+      "y": 384,
+      "title": "3—6阶随机公共矿",
+      "text": "出现概率60/28/10/2%，5次公共额度。耗尽90秒刷新；每偶数整点重抽并补满。候选路肩，正式点位须校验可走地面。"
+    },
+    {
+      "id": "O02",
+      "kind": "mine",
+      "x": 147,
+      "y": 339,
+      "title": "3—6阶随机公共矿",
+      "text": "出现概率60/28/10/2%，5次公共额度。耗尽90秒刷新；每偶数整点重抽并补满。候选路肩，正式点位须校验可走地面。"
+    },
+    {
+      "id": "O03",
+      "kind": "mine",
+      "x": 116,
+      "y": 305,
+      "title": "3—6阶随机公共矿",
+      "text": "出现概率60/28/10/2%，5次公共额度。耗尽90秒刷新；每偶数整点重抽并补满。候选路肩，正式点位须校验可走地面。"
+    },
+    {
+      "id": "O04",
+      "kind": "mine",
+      "x": 154,
+      "y": 274,
+      "title": "3—6阶随机公共矿",
+      "text": "出现概率60/28/10/2%，5次公共额度。耗尽90秒刷新；每偶数整点重抽并补满。候选路肩，正式点位须校验可走地面。"
+    },
+    {
+      "id": "O05",
+      "kind": "mine",
+      "x": 157,
+      "y": 220,
+      "title": "3—6阶随机公共矿",
+      "text": "出现概率60/28/10/2%，5次公共额度。耗尽90秒刷新；每偶数整点重抽并补满。候选路肩，正式点位须校验可走地面。"
+    },
+    {
+      "id": "O06",
+      "kind": "mine",
+      "x": 178,
+      "y": 183,
+      "title": "3—6阶随机公共矿",
+      "text": "出现概率60/28/10/2%，5次公共额度。耗尽90秒刷新；每偶数整点重抽并补满。候选路肩，正式点位须校验可走地面。"
+    },
+    {
+      "id": "O07",
+      "kind": "mine",
+      "x": 202,
+      "y": 150,
+      "title": "3—6阶随机公共矿",
+      "text": "出现概率60/28/10/2%，5次公共额度。耗尽90秒刷新；每偶数整点重抽并补满。候选路肩，正式点位须校验可走地面。"
+    },
+    {
+      "id": "O08",
+      "kind": "mine",
+      "x": 235,
+      "y": 146,
+      "title": "3—6阶随机公共矿",
+      "text": "出现概率60/28/10/2%，5次公共额度。耗尽90秒刷新；每偶数整点重抽并补满。候选路肩，正式点位须校验可走地面。"
+    },
+    {
+      "id": "O09",
+      "kind": "mine",
+      "x": 270,
+      "y": 154,
+      "title": "3—6阶随机公共矿",
+      "text": "出现概率60/28/10/2%，5次公共额度。耗尽90秒刷新；每偶数整点重抽并补满。候选路肩，正式点位须校验可走地面。"
+    },
+    {
+      "id": "O10",
+      "kind": "mine",
+      "x": 298,
+      "y": 188,
+      "title": "3—6阶随机公共矿",
+      "text": "出现概率60/28/10/2%，5次公共额度。耗尽90秒刷新；每偶数整点重抽并补满。候选路肩，正式点位须校验可走地面。"
+    },
+    {
+      "id": "O11",
+      "kind": "mine",
+      "x": 342,
+      "y": 218,
+      "title": "3—6阶随机公共矿",
+      "text": "出现概率60/28/10/2%，5次公共额度。耗尽90秒刷新；每偶数整点重抽并补满。候选路肩，正式点位须校验可走地面。"
+    },
+    {
+      "id": "O12",
+      "kind": "mine",
+      "x": 360,
+      "y": 257,
+      "title": "3—6阶随机公共矿",
+      "text": "出现概率60/28/10/2%，5次公共额度。耗尽90秒刷新；每偶数整点重抽并补满。候选路肩，正式点位须校验可走地面。"
+    },
+    {
+      "id": "O13",
+      "kind": "mine",
+      "x": 400,
+      "y": 281,
+      "title": "3—6阶随机公共矿",
+      "text": "出现概率60/28/10/2%，5次公共额度。耗尽90秒刷新；每偶数整点重抽并补满。候选路肩，正式点位须校验可走地面。"
+    },
+    {
+      "id": "O14",
+      "kind": "mine",
+      "x": 401,
+      "y": 311,
+      "title": "3—6阶随机公共矿",
+      "text": "出现概率60/28/10/2%，5次公共额度。耗尽90秒刷新；每偶数整点重抽并补满。候选路肩，正式点位须校验可走地面。"
+    },
+    {
+      "id": "O15",
+      "kind": "mine",
+      "x": 404,
+      "y": 346,
+      "title": "3—6阶随机公共矿",
+      "text": "出现概率60/28/10/2%，5次公共额度。耗尽90秒刷新；每偶数整点重抽并补满。候选路肩，正式点位须校验可走地面。"
+    },
+    {
+      "id": "O16",
+      "kind": "mine",
+      "x": 371,
+      "y": 357,
+      "title": "3—6阶随机公共矿",
+      "text": "出现概率60/28/10/2%，5次公共额度。耗尽90秒刷新；每偶数整点重抽并补满。候选路肩，正式点位须校验可走地面。"
+    },
+    {
+      "id": "O17",
+      "kind": "mine",
+      "x": 277,
+      "y": 339,
+      "title": "3—6阶随机公共矿",
+      "text": "出现概率60/28/10/2%，5次公共额度。耗尽90秒刷新；每偶数整点重抽并补满。候选路肩，正式点位须校验可走地面。"
+    },
+    {
+      "id": "O18",
+      "kind": "mine",
+      "x": 230,
+      "y": 372,
+      "title": "3—6阶随机公共矿",
+      "text": "出现概率60/28/10/2%，5次公共额度。耗尽90秒刷新；每偶数整点重抽并补满。候选路肩，正式点位须校验可走地面。"
+    },
+    {
+      "id": "F01",
+      "kind": "fish",
+      "x": 75,
+      "y": 336,
+      "title": "3—6阶随机公共鱼群",
+      "text": "出现概率60/28/10/2%，5次公共额度。耗尽60秒刷新；每偶数整点重抽并补满。标记为水域，角色站位须另核可走岸线。"
+    },
+    {
+      "id": "F02",
+      "kind": "fish",
+      "x": 94,
+      "y": 349,
+      "title": "3—6阶随机公共鱼群",
+      "text": "出现概率60/28/10/2%，5次公共额度。耗尽60秒刷新；每偶数整点重抽并补满。标记为水域，角色站位须另核可走岸线。"
+    },
+    {
+      "id": "F03",
+      "kind": "fish",
+      "x": 114,
+      "y": 357,
+      "title": "3—6阶随机公共鱼群",
+      "text": "出现概率60/28/10/2%，5次公共额度。耗尽60秒刷新；每偶数整点重抽并补满。标记为水域，角色站位须另核可走岸线。"
+    },
+    {
+      "id": "F04",
+      "kind": "fish",
+      "x": 162,
+      "y": 342,
+      "title": "3—6阶随机公共鱼群",
+      "text": "出现概率60/28/10/2%，5次公共额度。耗尽60秒刷新；每偶数整点重抽并补满。标记为水域，角色站位须另核可走岸线。"
+    },
+    {
+      "id": "F05",
+      "kind": "fish",
+      "x": 288,
+      "y": 241,
+      "title": "3—6阶随机公共鱼群",
+      "text": "出现概率60/28/10/2%，5次公共额度。耗尽60秒刷新；每偶数整点重抽并补满。标记为水域，角色站位须另核可走岸线。"
+    },
+    {
+      "id": "F06",
+      "kind": "fish",
+      "x": 289,
+      "y": 261,
+      "title": "3—6阶随机公共鱼群",
+      "text": "出现概率60/28/10/2%，5次公共额度。耗尽60秒刷新；每偶数整点重抽并补满。标记为水域，角色站位须另核可走岸线。"
+    },
+    {
+      "id": "F07",
+      "kind": "fish",
+      "x": 310,
+      "y": 290,
+      "title": "3—6阶随机公共鱼群",
+      "text": "出现概率60/28/10/2%，5次公共额度。耗尽60秒刷新；每偶数整点重抽并补满。标记为水域，角色站位须另核可走岸线。"
+    },
+    {
+      "id": "F08",
+      "kind": "fish",
+      "x": 350,
+      "y": 287,
+      "title": "3—6阶随机公共鱼群",
+      "text": "出现概率60/28/10/2%，5次公共额度。耗尽60秒刷新；每偶数整点重抽并补满。标记为水域，角色站位须另核可走岸线。"
+    },
+    {
+      "id": "F09",
+      "kind": "fish",
+      "x": 309,
+      "y": 404,
+      "title": "3—6阶随机公共鱼群",
+      "text": "出现概率60/28/10/2%，5次公共额度。耗尽60秒刷新；每偶数整点重抽并补满。标记为水域，角色站位须另核可走岸线。"
+    },
+    {
+      "id": "F10",
+      "kind": "fish",
+      "x": 337,
+      "y": 405,
+      "title": "3—6阶随机公共鱼群",
+      "text": "出现概率60/28/10/2%，5次公共额度。耗尽60秒刷新；每偶数整点重抽并补满。标记为水域，角色站位须另核可走岸线。"
+    },
+    {
+      "id": "F11",
+      "kind": "fish",
+      "x": 422,
+      "y": 356,
+      "title": "3—6阶随机公共鱼群",
+      "text": "出现概率60/28/10/2%，5次公共额度。耗尽60秒刷新；每偶数整点重抽并补满。标记为水域，角色站位须另核可走岸线。"
+    },
+    {
+      "id": "F12",
+      "kind": "fish",
+      "x": 440,
+      "y": 375,
+      "title": "3—6阶随机公共鱼群",
+      "text": "出现概率60/28/10/2%，5次公共额度。耗尽60秒刷新；每偶数整点重抽并补满。标记为水域，角色站位须另核可走岸线。"
+    },
+    {
+      "id": "B1",
+      "kind": "boss",
+      "x": 308,
+      "y": 313,
+      "title": "唯一Boss · 中央宽阔交汇地",
+      "text": "复用猛兽模型作为唯一首领，固定中央交汇地偏西宽面，取消三个位置轮换。全服一个事件，各线共享血量与排行。须实测模型包围盒与四向绕行宽度，碰撞不得堵路。"
+    },
+    {
+      "id": "E1",
+      "kind": "exit",
+      "x": 176,
+      "y": 252,
+      "title": "西侧接应",
+      "text": "站定10秒，移动／受击／主动操作中断；返回安全区另行结算。接应没有无敌圈，接近路线待实测。"
+    },
+    {
+      "id": "E2",
+      "kind": "exit",
+      "x": 403,
+      "y": 250,
+      "title": "东环接应",
+      "text": "站定10秒，移动／受击／主动操作中断；返回安全区另行结算。接应没有无敌圈，接近路线待实测。"
+    },
+    {
+      "id": "E3",
+      "kind": "exit",
+      "x": 276,
+      "y": 356,
+      "title": "南部接应",
+      "text": "站定10秒，移动／受击／主动操作中断；返回安全区另行结算。接应没有无敌圈，接近路线待实测。"
+    }
+  ],
+  "sourceSnapshotNote": "shop中price、refresh_cost_credit=10、max_refresh_cost_day=150保留旧来源快照；proposedPrice为本版商品价、shopRefreshPrice=15及proposedRefreshCostDay=225为本版刷新价。point_supply等旧派生统计未参与方案；超频周限42点。",
+  "revision": 4,
+  "resourceTiers": [
+    3,
+    4,
+    5,
+    6
+  ],
+  "mobMix": [
+    0.4166666666666667,
+    0.3333333333333333,
+    0.25
+  ],
+  "mobTriggers": [
+    0.2,
+    0.3,
+    0.45
+  ],
+  "bossParticipation": 60,
+  "bossTailProb": [
+    0.8,
+    0.18,
+    0.02
+  ],
+  "bossTailValues": [
+    90,
+    300,
+    900
+  ],
+  "deathBasis": "total",
+  "shopPriceMultiplier": 1.4,
+  "shopRefreshPrice": 15,
+  "proposedRefreshCostDay": 225
+}

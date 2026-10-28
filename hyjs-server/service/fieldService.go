@@ -136,7 +136,7 @@ func (s *GameService) fieldSceneRow(scene string) map[string]string {
 
 func (s *GameService) P8FieldSceneAvailable(scene string) bool {
 	row := s.fieldSceneRow(scene)
-	return constUtil.P8PackagedFieldScene(scene) && row != nil && row["adminEnabled"] != "false"
+	return (constUtil.P8PackagedFieldScene(scene) || scene == constUtil.GGOFieldScene && s.ggoExtractionEnabled() && s.GGOFieldConfig != nil) && row != nil && row["adminEnabled"] != "false"
 }
 
 // fieldSelectScene archives only area-local objects. Changing maps preserves
@@ -217,6 +217,15 @@ func (s *GameService) refreshField(id int64, g *model.GameState) error {
 		f.Side.MaxTiredness = proto.Int32(int32(tiredness))
 		f.Side.TiredNessLastRefreshDate = proto.String(day)
 	}
+	// Desert V4 monsters and bosses are owned by the public line/event stores.
+	// Do not spawn the legacy per-player field objects for this scene.
+	if f.Scene == constUtil.GGOFieldScene && g.GGOField != nil && s.GGOFieldEconomy != nil {
+		if f.Fight == nil || f.Fight.Settled {
+			f.Monsters = nil
+		}
+		f.Bosses = nil
+		return nil
+	}
 	row := s.table("Field", "FieldId", f.Scene)
 	if row == nil {
 		return errors.New("Missing field map configuration")
@@ -283,6 +292,14 @@ func (s *GameService) fieldTransfer(ctx context.Context, id int64, b *pb.CSTrans
 	var resolved *pb.PointNew
 	err := updateProfileWithTx(ctx, id, func(tx *gorm.DB, player *pb.Player, g *model.GameState) error {
 		previousScene := g.Position.GetScene()
+		if previousScene == constUtil.GGOFieldScene && g.GGOField != nil {
+			if b.GetTarget() == constUtil.GGOFieldScene {
+				return ggoFieldError(constUtil.GGOFieldInvalidLocation, "请通过安全区向导出发")
+			}
+			if err := ggoCommitLeave(tx, s, id, g, "scene", b.GetTarget(), 0, time.Now().UnixMilli()); err != nil {
+				return err
+			}
+		}
 		if s.P12FieldPVPReady {
 			allowed, err := ShouldAllowP12PrisonTransfer(tx, id, b.GetTarget(), b.GetPoint(), time.Now())
 			if err != nil {
@@ -341,6 +358,25 @@ func (s *GameService) fieldTransfer(ctx context.Context, id int64, b *pb.CSTrans
 			point, err = fieldPoint(row["Resurrection"])
 			if err != nil {
 				return err
+			}
+			if b.GetTarget() == constUtil.GGOFieldScene && s.GGOFieldConfig != nil {
+				profile, e := ggoNativeProfileSession(tx, id)
+				if e != nil {
+					return e
+				}
+				if e = ggoCheckClientBuildLocked(tx, id, profile.Session, s.GGOFieldConfig); e != nil {
+					return e
+				}
+				point, err = ggoWirePoint(s.GGOFieldConfig.Runtime.SafeReturn)
+				if err != nil {
+					return err
+				}
+				if g.GGOField == nil {
+					g.GGOField = &model.GGOFieldState{}
+				}
+				if err = ggoPositionBump(g); err != nil {
+					return err
+				}
 			}
 			g.Position = &pb.Position{PlayerId: proto.Int64(id), Scene: proto.String(b.GetTarget()), Current: point}
 			if err := s.refreshField(id, g); err != nil {
@@ -406,7 +442,7 @@ func (s *GameService) fieldTransfer(ctx context.Context, id int64, b *pb.CSTrans
 	})
 	if err == nil {
 		// 仅记录成功转场的非敏感空间坐标，追踪原请求到最终入口的映射。
-		elog.Info("scene transfer committed", zap.Int64("playerId", id), zap.String("scene", b.GetTarget()),
+		elog.Debug("scene transfer committed", zap.Int64("playerId", id), zap.String("scene", b.GetTarget()),
 			zap.Float32s("requestedPoint", []float32{b.GetPoint().GetX(), b.GetPoint().GetY(), b.GetPoint().GetZ()}),
 			zap.Float32s("resolvedPoint", []float32{resolved.GetX(), resolved.GetY(), resolved.GetZ()}))
 	}
@@ -469,9 +505,14 @@ func (s *GameService) fieldScene(ctx context.Context, id int64, login bool) ([]p
 			if err := s.refreshSharedFieldBosses55(tx, g); err != nil {
 				return err
 			}
+			if g.Position.GetScene() == constUtil.GGOFieldScene && g.GGOField != nil {
+				if _, err := s.ggoExpireMonsterFightLocked(tx, id, g, time.Now().UnixMilli()); err != nil {
+					return err
+				}
+			}
 			// 原客户端重连会重建野外房间，不会重放正在加载的小怪战斗。
 			// 释放未结算占用，保留战前HP/怒气/疲劳与奖励计数，旧fightId随之失效。
-			if login && g.Field.Fight != nil && !g.Field.Fight.Settled {
+			if login && g.Field.Fight != nil && !g.Field.Fight.Settled && !(g.Position.GetScene() == constUtil.GGOFieldScene && g.GGOField != nil && g.GGOField.MonsterFight != nil) {
 				releaseFieldBossFight(g)
 				if monster := fieldFind(g, g.Field.Fight.MonsterUUID); monster != nil {
 					monster.State = proto.Int32(1)
@@ -514,6 +555,19 @@ func (s *GameService) fieldScene(ctx context.Context, id int64, login bool) ([]p
 			// 原客户端在新房间加载完成后通过TCP请求此帧。旧房间移动
 			// 排在该请求前，先保留转场入口，握手后再接受新角色移动。
 			g.PositionLoading = false
+			if g.Position.GetScene() == constUtil.GGOFieldScene && g.GGOField != nil {
+				profile, e := ggoNativeProfileSession(tx, id)
+				if e != nil {
+					return e
+				}
+				if g.GGOField.PositionRevision < 1 {
+					if e = ggoPositionBump(g); e != nil {
+						return e
+					}
+				}
+				g.GGOField.PositionConfirmed = g.GGOField.PositionRevision
+				g.GGOField.PositionSession = clientUpdateSessionHash(profile.Session)
+			}
 		}
 		if isUnion {
 			// 用公会持久建设事实恢复场景，避免重登退回未创建投影。
@@ -573,6 +627,11 @@ func (s *GameService) fieldMonsterCheck(ctx context.Context, id int64, b *pb.CSS
 			return errors.New(constUtil.P8FieldSceneUnavailable)
 		}
 		if err := s.refreshField(id, g); err != nil {
+			return err
+		}
+		if g.Position.GetScene() == constUtil.GGOFieldScene && g.GGOField != nil && s.GGOFieldConfig != nil {
+			var err error
+			result, err = s.ggoMonsterCheckLocked(tx, id, g, b.GetUuid())
 			return err
 		}
 		// 小怪仅使用角色本地怪物；共享首领在专属入口和心跳刷新，避免无关行锁。
@@ -656,6 +715,11 @@ func (s *GameService) fieldHeartbeat(ctx context.Context, id int64) ([]proto.Mes
 func (s *GameService) fieldFightStart(ctx context.Context, id int64, b *pb.CSSidePveFightStart) ([]proto.Message, error) {
 	var result *pb.SCSidePveFightStart
 	err := updateProfileWithTx(ctx, id, func(tx *gorm.DB, player *pb.Player, g *model.GameState) error {
+		if g.Position.GetScene() == constUtil.GGOFieldScene && g.GGOField != nil {
+			var err error
+			result, err = s.ggoMonsterStartLocked(tx, id, player, g, b)
+			return err
+		}
 		if !s.P8FieldSceneAvailable(g.Position.GetScene()) || g.Run != nil && !g.Run.Complete {
 			return errors.New("Enter the field before starting a battle")
 		}
@@ -749,6 +813,9 @@ func (s *GameService) fieldFightStart(ctx context.Context, id int64, b *pb.CSSid
 		}
 		result = &pb.SCSidePveFightStart{FightId: proto.String(token), RandSeed: proto.Int64(seed.Int64()), BattlePlayer: party, BattleMonsterList: monsters, FightScene: proto.String(""), Code: proto.Int32(1), Maxround: proto.Int32(int32(rounds))}
 		if err := s.adminFieldFreezeBattle(tx, id, f.Scene, token, monster.GetMonId()); err != nil {
+			return err
+		}
+		if err := ggoInterruptExtractionLocked(tx, id, g, time.Now().UnixMilli()); err != nil {
 			return err
 		}
 		f.Fight = &model.FieldFight{MonsterUUID: monster.GetUuid(), Start: result, StartedAt: time.Now().UnixMilli()}
@@ -868,10 +935,30 @@ func (s *GameService) fieldReward(id int64, player *pb.Player, g *model.GameStat
 // fieldFightEnd 校验客户端真实战斗快照；客户端技能引擎的权威重放仍待恢复。
 func (s *GameService) fieldFightEnd(ctx context.Context, id int64, b *pb.CSSidePveFightEnd) ([]proto.Message, error) {
 	var (
-		result *pb.SCSidePveFightEnd
-		side   *pb.PlayerSide
+		result         *pb.SCSidePveFightEnd
+		side           *pb.PlayerSide
+		needGGORefresh bool
+		ggoReplay      bool
 	)
 	err := updateProfileWithTx(ctx, id, func(tx *gorm.DB, player *pb.Player, g *model.GameState) error {
+		if g.GGOField != nil {
+			stored, found, err := ggoMonsterRecordedEnd(tx, id, b)
+			if err != nil {
+				return err
+			}
+			if found {
+				if _, err = ggoNativeProfileSession(tx, id); err != nil {
+					return err
+				}
+				result, ggoReplay = stored, true
+				return nil
+			}
+		}
+		if g.Position.GetScene() == constUtil.GGOFieldScene && g.GGOField != nil && g.Field != nil && g.Field.Fight != nil && g.Field.Fight.BossStart == nil {
+			var err error
+			result, side, needGGORefresh, err = s.ggoMonsterEndLocked(tx, id, player, g, b)
+			return err
+		}
 		if g.Field == nil {
 			return errors.New("Unknown field battle")
 		}
@@ -1009,13 +1096,22 @@ func (s *GameService) fieldFightEnd(ctx context.Context, id int64, b *pb.CSSideP
 		}
 		return nil
 	})
+	if err == nil && ggoReplay {
+		// A historical 30050 must not project an unrelated current scene's side.
+		return []proto.Message{result}, nil
+	}
 	// CopyBalance 在展示结束时通过 AddResultObj 增加奖励，避免提前覆盖 Player 后再次加币。
-	return []proto.Message{result, &pb.SCFieldPlayerState{Player: []*pb.PlayerSide{side}}}, err
+	messages := []proto.Message{result, &pb.SCFieldPlayerState{Player: []*pb.PlayerSide{side}}}
+	if err == nil && needGGORefresh {
+		messages = append(messages, &pb.SCRefreshScene{})
+	}
+	return messages, err
 }
 
 // fieldMove keeps movement, survival and gather updates in the original profile transaction.
 func (s *GameService) fieldMove(ctx context.Context, id int64, b *pb.CSMove) error {
-	return updateProfileWithTx(ctx, id, func(tx *gorm.DB, p *pb.Player, g *model.GameState) error {
+	var tradePeer int64
+	err := updateProfileWithTx(ctx, id, func(tx *gorm.DB, p *pb.Player, g *model.GameState) error {
 		if s.P12FieldPVPReady {
 			allowed, err := ShouldAllowP12PrisonTransfer(tx, id, g.Position.GetScene(), b.GetPointNew(), time.Now())
 			if err != nil {
@@ -1041,10 +1137,25 @@ func (s *GameService) fieldMove(ctx context.Context, id int64, b *pb.CSMove) err
 				return err
 			}
 		}
+		if g.GGOField != nil && g.GGOField.Extraction != nil {
+			current, next := g.Position.GetCurrent(), b.GetPointNew()
+			if next == nil || current == nil || current.GetX() != next.GetX() || current.GetY() != next.GetY() || current.GetZ() != next.GetZ() {
+				if err := ggoInterruptExtractionLocked(tx, id, g, time.Now().UnixMilli()); err != nil {
+					return err
+				}
+			}
+		}
 		if s.P8GatherReady {
 			if err := s.P8ObserveGatherMove(tx, id, g, b.GetPointNew()); err != nil {
 				return err
 			}
+		}
+		if g.GGOField != nil && g.GGOField.Trade != nil && g.Position.GetScene() == constUtil.GGOFieldScene {
+			var area *model.AdminFieldGGOSafeArea
+			if s.GGOFieldEconomy != nil && s.GGOFieldEconomy.Runtime != nil {
+				area = s.GGOFieldEconomy.Runtime.SafeArea
+			}
+			tradePeer = ggoCancelTradeOnPosition(id, g, area, b.GetPointNew())
 		}
 		g.Position.Current = b.GetPointNew()
 		if s.P8LifeReady {
@@ -1054,4 +1165,8 @@ func (s *GameService) fieldMove(ctx context.Context, id int64, b *pb.CSMove) err
 		}
 		return nil
 	})
+	if err == nil && tradePeer > 0 {
+		ggoTradeNotify(s, ctx, tradePeer)
+	}
+	return err
 }

@@ -338,6 +338,25 @@ func p8Near(point *pb.PointNew, cfg *p8GatherConfig) bool {
 
 // P8CancelGather 与移动/离场/开战共用原玩家事务；取消不扣疲劳也不生成奖励。
 func (s *GameService) P8CancelGather(tx *gorm.DB, id int64, g *model.GameState) error {
+	if g != nil && g.GGOField != nil {
+		var attempt db.P8GatherAttempt
+		err := tx.First(&attempt, "player_id=? AND active=?", id, true).Error
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+		if err == nil && attempt.Scene == constUtil.GGOFieldScene && strings.Contains(attempt.Snapshot, "ggoStartRequestId") {
+			frozen, e := ggoFrozenAttempt(&attempt)
+			if e != nil {
+				return e
+			}
+			if time.Now().UnixMilli() >= attempt.ReadyAt {
+				return errors.New("沙漠采集结算中，请稍后重试")
+			}
+			requestID := ggoSystemReceiptID("cancel", attempt.Token)
+			_, e = s.ggoCancelGatherFromAction(tx, id, g, &attempt, frozen, requestID)
+			return e
+		}
+	}
 	if err := tx.Model(&db.P8GatherAttempt{}).Where("player_id=? AND active=?", id, true).Update("active", false).Error; err != nil {
 		return err
 	}
@@ -379,6 +398,9 @@ func (s *GameService) RefreshP8Resources(tx *gorm.DB, p *pb.Player, g *model.Gam
 
 // fieldRefreshed 仅由同一事务中已完成野外刷新的调用者传入。
 func (s *GameService) refreshP8Resources(tx *gorm.DB, p *pb.Player, g *model.GameState, now time.Time, force, fieldRefreshed bool) ([]proto.Message, error) {
+	if s.GGOFieldConfig != nil && g.Position.GetScene() == constUtil.GGOFieldScene {
+		return nil, nil
+	}
 	if s.p8GatherMap(g.Position.GetScene()) == nil || !s.P8FieldSceneAvailable(g.Position.GetScene()) {
 		return nil, nil
 	}
@@ -575,6 +597,9 @@ func (s *GameService) p8GatherMutationProjected(ctx context.Context, id int64, o
 			} else if !errors.Is(e, gorm.ErrRecordNotFound) {
 				return e
 			}
+		}
+		if s.GGOFieldConfig != nil && g.Position.GetScene() == constUtil.GGOFieldScene {
+			return errors.New("沙漠采集需要更新客户端")
 		}
 		if err = s.p8GatherOpen(id, p, g, acceptedClaim); err != nil {
 			return err

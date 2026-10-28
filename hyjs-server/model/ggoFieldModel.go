@@ -2,7 +2,7 @@ package model
 
 // AdminFieldGGOConfiguration 保存沙漠搜打撤的设计配置，供后台准备。
 type AdminFieldGGOConfiguration struct {
-	SchemaVersion int64                   `json:"schemaVersion"` // SchemaVersion 为配置结构版本，当前固定为2。
+	SchemaVersion int64                   `json:"schemaVersion"` // SchemaVersion 为配置结构版本，当前为3。
 	Title         string                  `json:"title"`
 	ModeName      string                  `json:"modeName"`
 	CurrencyID    string                  `json:"currencyId"`
@@ -13,7 +13,8 @@ type AdminFieldGGOConfiguration struct {
 	Bosses        []AdminFieldGGOEnemy    `json:"bosses"`
 	Chips         []AdminFieldGGOChip     `json:"chips"`
 	Extraction    AdminFieldGGOExtraction `json:"extraction"`
-	Rules         AdminFieldGGORules      `json:"rules"` // Rules 为搜打撤政策与经济规则，尚未接入运行时消费。
+	Rules         AdminFieldGGORules      `json:"rules"`             // Rules 为搜打撤政策与经济规则。
+	Runtime       *AdminFieldGGORuntime   `json:"runtime,omitempty"` // Runtime 为版本化运行参数，缺省沿用旧行为。
 }
 
 // AdminFieldGGORules 保存已确认的固定政策、可调参数和仍待决定的项目。

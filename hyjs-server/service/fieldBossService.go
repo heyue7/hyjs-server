@@ -182,6 +182,9 @@ func fieldBossCountdownProjection(field *model.FieldState, now time.Time) []prot
 }
 
 func (s *GameService) fieldBossCheck(ctx context.Context, id int64, b *pb.CSSideBossCheck) ([]proto.Message, error) {
+	if strings.HasPrefix(b.GetUuid(), "ggo-") {
+		return s.ggoBossCheck(ctx, id, b)
+	}
 	if b.GetUuid() == "" {
 		return nil, errors.New("缺少野外首领实例")
 	}
@@ -260,6 +263,9 @@ func fieldBossRewardText(raw string) (string, error) {
 
 // fieldBossFightStart 与野外小怪共用 FieldFight 占用，冻结完整表行、奖励和重生间隔。
 func (s *GameService) fieldBossFightStart(ctx context.Context, id int64, b *pb.CSSidePveBossFightStart) ([]proto.Message, error) {
+	if strings.HasPrefix(b.GetUuid(), "ggo-") {
+		return s.ggoBossFightStart(ctx, id, b)
+	}
 	if b.GetUuid() == "" {
 		return nil, errors.New("缺少野外首领实例")
 	}
@@ -388,6 +394,9 @@ func (s *GameService) fieldBossFightStart(ctx context.Context, id int64, b *pb.C
 
 // fieldBossFightEnd 只用原计算回放终局，客户端 result 仅作胜败映射校验。
 func (s *GameService) fieldBossFightEnd(ctx context.Context, id int64, b *pb.CSSidePveBossFightEnd) ([]proto.Message, error) {
+	if strings.HasPrefix(b.GetUuid(), "ggo-") {
+		return s.ggoBossFightEnd(ctx, id, b)
+	}
 	var (
 		result     *pb.SCSidePveBossFightEnd
 		side       *pb.PlayerSide

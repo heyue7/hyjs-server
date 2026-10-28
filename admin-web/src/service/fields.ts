@@ -168,7 +168,7 @@ export interface FieldGGONPC {
   role: FieldGGONPCRole;
   pointLabel: string;
   dialogue: string;
-  /** 坐标沿用旧配置；本版后台不提供坐标编辑。 */
+  /** 场景世界坐标；三个轴同时填写，运行前核验导航可达。 */
   position: { x: number | null; y: number | null; z: number | null } | null;
   settlesChips: boolean;
 }
@@ -185,7 +185,7 @@ export interface FieldGGORules {
   terminalName: string;
   unlimitedCapacity: true;
   searchEnabled: false;
-  initialSource: 'monsters';
+  initialSource: 'monsters' | 'monsters_and_gathering';
   pvpTransfer: 'winner_terminal';
   deathReturn: 'safe_area';
   deathLossPercent: number | null;
@@ -211,7 +211,8 @@ export interface FieldGGORules {
   leaveCancelButton: string;
 }
 export interface FieldGGOConfiguration {
-  schemaVersion: 2;
+  runtime?: FieldGGORuntime;
+  schemaVersion: 2 | 3;
   title: string;
   modeName: string;
   currencyId: string;
@@ -237,4 +238,108 @@ export interface FieldGGOConfiguration {
     countdown: string;
     cancelled: string;
   };
+}
+
+export interface FieldGGOWorldPoint {
+  id: string;
+  kind: 'monster' | 'mine' | 'fish' | 'boss' | 'exit';
+  level: number;
+  position: FieldGGOWorldPosition | null;
+  standPosition: FieldGGOWorldPosition | null;
+  radius: number;
+}
+export interface FieldGGOWorldPosition {
+  x: number | null;
+  y: number | null;
+  z: number | null;
+}
+export interface FieldGGORuntime {
+  points: FieldGGOWorldPoint[];
+  safeArea: { minX: number; maxX: number; minZ: number; maxZ: number } | null;
+  safeReturn: FieldGGOWorldPosition | null;
+  entryPoints: FieldGGOWorldPosition[];
+  enabled: boolean;
+  economyVersion: string;
+  protectedChips: number;
+  resource: FieldGGOResource;
+  monsterTiers: FieldGGOMobTier[];
+  boss: FieldGGOBoss;
+  shop: FieldGGOShop;
+}
+export interface FieldGGOResource {
+  mineCount: number;
+  fishCount: number;
+  capacity: number;
+  cycleSeconds: number;
+  mineCooldownSeconds: number;
+  fishCooldownSeconds: number;
+  mineGatherMillis: number;
+  fishGatherMillis: number;
+  fatigue: number;
+  materialNumerator: number;
+  materialDenominator: number;
+  tiers: FieldGGOResourceTier[];
+}
+export interface FieldGGOResourceTier {
+  mineDrops: FieldDrop[];
+  fishDrops: FieldDrop[];
+  level: number;
+  weight: number;
+  chipTriggerBps: number;
+}
+export interface FieldGGOMobTier {
+  heroId: string;
+  level: number;
+  count: number;
+  hp: number;
+  attack: number;
+  phyDefend: number;
+  magicDefend: number;
+  respawnSeconds: number;
+  chipTriggerBps: number;
+  rewardNumerator: number;
+  rewardDenominator: number;
+}
+export interface FieldGGOBoss {
+  level: number;
+  partyRounds: number;
+  resourceDrops: FieldDrop[];
+  rankResourceDrops: { from: number; to: number; drops: FieldDrop[] }[];
+  tailResourceDrops: FieldDrop[];
+  sproutMax: number;
+  sproutBonusBps: number;
+  overclockRewards: { sprouts: number; quantities: { amount: number; weight: number }[] }[];
+  heroId: string;
+  hp: number;
+  attack: number;
+  phyDefend: number;
+  magicDefend: number;
+  participationThresholdBps: number;
+  dailyLimit: number;
+  activeSeconds: number;
+  warningSeconds: number;
+  eveningStartHour: number;
+  dayIntervalMinutes: number;
+  eveningIntervalMinutes: number;
+  participationItemId: string;
+  participationAmount: number;
+  thresholdAmount: number;
+  rankRewards: FieldGGORankReward[];
+  tailRewards: FieldGGOWeight[];
+}
+export interface FieldGGORankReward {
+  from: number;
+  to: number;
+  itemId: string;
+  amount: number;
+}
+export interface FieldGGOWeight {
+  itemId: string;
+  weight: number;
+}
+export interface FieldGGOShop {
+  priceNumerator: number;
+  priceDenominator: number;
+  roundTo: number;
+  refreshCost: number;
 }

@@ -54,16 +54,30 @@ func addGGOFieldConfiguration(raw string) (string, bool, error) {
 		if err := json.Unmarshal(value, ggo); err != nil {
 			return raw, false, err
 		}
+		if ggo.SchemaVersion == 2 {
+			return migrateGGOV3(cfg, value)
+		}
 		if ggo.SchemaVersion >= constUtil.AdminFieldGGOSchemaVersion {
 			// 小芽迁到全局设置；只移除此字段，保留当前沙漠规则及未知配置。
 			var existing map[string]json.RawMessage
 			if err := json.Unmarshal(value, &existing); err != nil {
 				return raw, false, err
 			}
-			if _, exists := existing["sproutIcon"]; !exists {
+			changed := false
+			if ggo.SchemaVersion == constUtil.AdminFieldGGOSchemaVersion {
+				var err error
+				changed, err = completeGGOV3Models(existing)
+				if err != nil {
+					return raw, false, err
+				}
+			}
+			if _, exists := existing["sproutIcon"]; exists {
+				delete(existing, "sproutIcon")
+				changed = true
+			}
+			if !changed {
 				return raw, false, nil
 			}
-			delete(existing, "sproutIcon")
 			updated, err := json.Marshal(existing)
 			if err != nil {
 				return raw, false, err
@@ -73,6 +87,11 @@ func addGGOFieldConfiguration(raw string) (string, bool, error) {
 			return string(result), err == nil, err
 		}
 		migrateGGOConfiguration(ggo)
+		legacy, err := json.Marshal(ggo)
+		if err != nil {
+			return raw, false, err
+		}
+		return migrateGGOV3(cfg, legacy)
 	} else {
 		ggo = defaultGGOFieldConfiguration()
 	}
@@ -223,15 +242,18 @@ func defaultGGORules() model.AdminFieldGGORules {
 		ProtectionSeconds:   30,
 		TerminalName:        "临时终端",
 		UnlimitedCapacity:   true,
-		InitialSource:       "monsters",
+		InitialSource:       "monsters_and_gathering",
 		PvpTransfer:         "winner_terminal",
 		DeathReturn:         "safe_area",
-		PveLossMode:         "pending",
+		PveLossMode:         "destroy",
 		ExtractionReturn:    "safe_area",
 		SettlementMode:      "safe_npc_or_confirm_leave",
 		RetainAfterDeath:    true,
 		SafeTradeEnabled:    true,
-		TradeAssets:         "pending",
+		TradeAssets:         "chips_only",
+		AllowGift:           ggoBool(true),
+		DeathLossPercent:    ggoInt64(50),
+		ExtractionSeconds:   ggoInt64(10),
 		CreditCap:           "none",
 		ShopLimitScope:      "account_weekly",
 		WeeklyResetTimezone: "Asia/Shanghai",
@@ -246,7 +268,7 @@ func defaultGGOFieldConfiguration() *model.AdminFieldGGOConfiguration {
 	return &model.AdminFieldGGOConfiguration{
 		SchemaVersion: constUtil.AdminFieldGGOSchemaVersion,
 		Title:         "GGO·残响沙域", ModeName: "遗迹回收行动", CurrencyID: "item_9710", ShopKey: "ggo", CarryIcon: "ggo_chip_marker",
-		Rules: defaultGGORules(),
+		Rules: defaultGGORules(), Runtime: defaultGGORuntime(),
 		NPCs: []model.AdminFieldGGONPC{
 			{ID: "shino", Name: "行动向导·诗乃", HeroID: "hero_005", Role: "teleport", PointLabel: "入口", Dialogue: "先记住接应点的位置。拿到好东西以后，你会需要它。"},
 			{ID: "dane", Name: "荒原接应人·戴恩", HeroID: "hero_029", Role: "extraction", PointLabel: "断桥接应点", Dialogue: "我会把你送回初始安全区；芯片结算请找终端结算员·柯尔。"},
@@ -266,7 +288,7 @@ func defaultGGOFieldConfiguration() *model.AdminFieldGGOConfiguration {
 			{ID: "pale_rider", Name: "疾行猎手·苍白骑士", HeroID: "hero_016", RespawnMS: 3600000},
 			{ID: "death_gun", Name: "幽灵追猎者·死枪", HeroID: "hero_006", RespawnMS: 3600000},
 		},
-		Chips:      []model.AdminFieldGGOChip{{ItemID: "item_9701", Name: "残损芯片"}, {ItemID: "item_9702", Name: "标准芯片"}, {ItemID: "item_9703", Name: "军用芯片"}, {ItemID: "item_9704", Name: "机密芯片"}, {ItemID: "item_9705", Name: "核心芯片"}, {ItemID: "item_9706", Name: "原型芯片"}},
+		Chips:      defaultGGOChips(),
 		Extraction: model.AdminFieldGGOExtraction{Arrival: "已抵达撤离点，可返回初始安全区。", Confirmation: "返回初始安全区？芯片结算请找终端结算员·柯尔。", ConfirmButton: "返回安全区", ContinueButton: "继续探索", Countdown: "撤离中，请留在区域内。剩余 {秒数} 秒。", Cancelled: "你已离开撤离范围，本次撤离已取消。"},
 	}
 }

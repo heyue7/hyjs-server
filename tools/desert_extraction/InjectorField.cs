@@ -1,0 +1,103 @@
+using System;
+using System.Linq;
+using dnlib.DotNet;
+using dnlib.DotNet.Emit;
+using dnlib.DotNet.Writer;
+
+// Static preview only. Server routes, map audit and Android acceptance remain gates.
+if (args.Length!=2) throw new ArgumentException("input and output managed assemblies required");
+using var module=ModuleDefMD.Load(args[0]);
+var reference=new AssemblyRefUser(new AssemblyNameInfo("SoulFlowerDesertV4, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null"));
+var hooks=new TypeRefUser(module,"HYJS.DesertV4","FieldHooks",reference);
+MemberRef Hook(string name,TypeSig ret,params TypeSig[] p) => new MemberRefUser(module,name,MethodSig.CreateStatic(ret,p),hooks);
+var b=module.CorLibTypes.Boolean; var v=module.CorLibTypes.Void; var i4=module.CorLibTypes.Int32;
+var str=module.CorLibTypes.String; var obj=module.CorLibTypes.Object;
+var changed=Hook("ResourceChanged",b); var check=Hook("ResourceCheck",b);
+var gather=Hook("Gather",b,str,str); var monsterChanged=Hook("MonsterChanged",b);
+var npcType=module.GetTypes().Single(t=>t.FullName=="Room.RCUINormalNPC");
+var openNpc=Hook("OpenNpc",b,new ClassSig(npcType));
+var beforeEncounter=Hook("BeforeEncounter",b,i4,str); var fightStart=Hook("FightStartResponse",v,i4,obj);
+var patrol=Hook("MonsterPatrolTick",v,obj); var preserve=Hook("PreserveBattle",b);
+var tcpConnecting=Hook("TcpConnecting",v); var tcpLogin=Hook("TcpLoginResponse",v,obj);
+var endSend=Hook("FightEndSend",v,i4,obj,obj); var endResponse=Hook("FightEndResponse",b,i4,obj,obj);
+var legacyObserve=Hook("LegacyBossObserve",v,obj,obj); var legacyCompleted=Hook("LegacyBossCompleted",v,obj,obj);
+
+MethodDef Get(string type,string name) => module.GetTypes().Single(t=>t.FullName==type).Methods.Single(m=>m.Name==name);
+void Head(MethodDef m,params Instruction[] add)
+{
+ if(!m.HasBody) throw new InvalidOperationException("Missing body: "+m.FullName);
+ for(int x=add.Length-1;x>=0;x--) m.Body.Instructions.Insert(0,add[x]);
+ m.Body.MaxStack=(ushort)Math.Max(8,(int)m.Body.MaxStack);
+}
+void GuardNoArg(MethodDef m,IMethod hook)
+{ var first=m.Body.Instructions[0]; Head(m,Instruction.Create(OpCodes.Call,hook),Instruction.Create(OpCodes.Brfalse,first),Instruction.Create(OpCodes.Ret)); }
+bool Match(Instruction x,string type,string name)
+{ return x.Operand is IMethod m && m.DeclaringType.FullName==type && m.Name==name; }
+
+var field=module.GetTypes().Single(t=>t.FullName=="Room.RoomNetField");
+foreach(string name in new[]{"SCFieldResourceInfo","SCSideResourceCheck","SCFieldResourceStartGather","SCFieldGetResource","SendResourceCheck","SendGetFieldRes"})
+{
+ var m=field.Methods.Single(x=>x.Name==name);
+ if(!m.HasBody || m.MethodSig.RetType.ElementType!=ElementType.Void) throw new InvalidOperationException("Unknown resource signature "+name);
+ if(name=="SendGetFieldRes")
+ {
+  if(m.MethodSig.Params.Count!=2 || m.MethodSig.Params.Any(t=>t.ElementType!=ElementType.String)) throw new InvalidOperationException("Gather signature changed");
+  var first=m.Body.Instructions[0];
+  Head(m,Instruction.Create(OpCodes.Ldarg_1),Instruction.Create(OpCodes.Ldarg_2),Instruction.Create(OpCodes.Call,gather),Instruction.Create(OpCodes.Brfalse,first),Instruction.Create(OpCodes.Ret));
+ }
+ else GuardNoArg(m,name=="SCFieldResourceInfo" ? changed : check);
+}
+var onLoaded=Get("Room.RoomField","OnMainCharactorLoaded");
+Head(onLoaded,Instruction.Create(OpCodes.Call,changed),Instruction.Create(OpCodes.Pop));
+GuardNoArg(Get("Room.RoomNetField","SCSideMonster"),monsterChanged);
+{
+ var m=Get("Room.RCUINormalNPC","OpenPage"); var first=m.Body.Instructions[0];
+ Head(m,Instruction.Create(OpCodes.Ldarg_0),Instruction.Create(OpCodes.Call,openNpc),Instruction.Create(OpCodes.Brfalse,first),Instruction.Create(OpCodes.Ret));
+}
+foreach(var item in new[]{(Type:6,Send:"SendPve",Reply:"SCSidePveFightStart"),(Type:12,Send:"SendPveBoss",Reply:"SCSidePveBossFightStart")})
+{
+ var m=Get("Room.RoomNetField",item.Send); var first=m.Body.Instructions[0];
+ Head(m,Instruction.Create(OpCodes.Ldc_I4,item.Type),Instruction.Create(OpCodes.Ldarg_1),Instruction.Create(OpCodes.Call,beforeEncounter),Instruction.Create(OpCodes.Brfalse,first),Instruction.Create(OpCodes.Ret));
+ var reply=Get("Room.RoomNetField",item.Reply);
+ Head(reply,Instruction.Create(OpCodes.Ldc_I4,item.Type),Instruction.Create(OpCodes.Ldarg_1),Instruction.Create(OpCodes.Call,fightStart));
+}
+{
+ var m=Get("Room.RCAIServerMonster","Tick"); var matches=m.Body.Instructions.Where(x=>Match(x,"HYJS.Field63.Runtime","PatrolTick")).ToArray();
+ if(matches.Length!=1) throw new InvalidOperationException("Original patrol call changed");
+ matches[0].Operand=patrol;
+}
+{
+ var m=Get("BoxManager","CreateSocketReconnect");
+ var normal=m.Body.Instructions.Single(x=>x.OpCode==OpCodes.Ldstr && (string)x.Operand=="UI/MessageBox/NetError");
+ var clear=m.Body.Instructions.Single(x=>Match(x,"BoxManager","ClearSocketBox"));
+ int pos=m.Body.Instructions.IndexOf(clear)+1;
+ m.Body.Instructions.Insert(pos++,Instruction.Create(OpCodes.Call,preserve));
+ m.Body.Instructions.Insert(pos,Instruction.Create(OpCodes.Brtrue,normal));
+ m.Body.MaxStack=(ushort)Math.Max(8,(int)m.Body.MaxStack);
+}
+foreach(string name in new[]{"Reconnect","SendSocketLogin","Disconnect"})
+ Head(Get("NetAPI",name),Instruction.Create(OpCodes.Call,tcpConnecting));
+Head(Get("NetAPI","SCLoginTcpCallback"),Instruction.Create(OpCodes.Ldarg_0),Instruction.Create(OpCodes.Call,tcpLogin));
+foreach(var item in new[]{(Type:6,Class:"Battle.FieldPVEBattleOver",Reply:"FieldPVEFightResultHandler"),(Type:12,Class:"Battle.FieldPVEBossBattleOver",Reply:"FieldPVEBossFightResultHandler")})
+{
+ var send=Get(item.Class,"AskFieldPVEFightResult");
+ var calls=send.Body.Instructions.Where(x=>Match(x,"NetAPI","SendSocket")).ToArray();
+ if(calls.Length!=1) throw new InvalidOperationException("Original end send changed: "+item.Class);
+ int index=send.Body.Instructions.IndexOf(calls[0]);
+ send.Body.Instructions.Insert(index,Instruction.Create(OpCodes.Ldarg_0)); calls[0].Operand=endSend;
+ send.Body.MaxStack=(ushort)Math.Max(8,(int)send.Body.MaxStack);
+ var reply=Get(item.Class,item.Reply); var first=reply.Body.Instructions[0];
+ Head(reply,Instruction.Create(OpCodes.Ldc_I4,item.Type),Instruction.Create(OpCodes.Ldarg_0),Instruction.Create(OpCodes.Ldarg_1),
+      Instruction.Create(OpCodes.Call,endResponse),Instruction.Create(OpCodes.Brfalse,first),Instruction.Create(OpCodes.Ret));
+ if(item.Type==12)
+ {
+  var observe=send.Body.Instructions.Where(x=>Match(x,"LocalFieldSettlement","Observe")).ToArray();
+  var complete=reply.Body.Instructions.Where(x=>Match(x,"LocalFieldSettlement","Completed")).ToArray();
+  if(observe.Length!=1 || complete.Length!=1) throw new InvalidOperationException("Original boss settlement bridge changed");
+  observe[0].Operand=legacyObserve; complete[0].Operand=legacyCompleted;
+ }
+}
+var options=new ModuleWriterOptions(module);
+options.MetadataOptions.Flags |= MetadataFlags.PreserveAll | MetadataFlags.KeepOldMaxStack;
+module.Write(args[1],options);
+Console.WriteLine("Field V4 static hooks written; no original combat engine method is patched");

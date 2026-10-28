@@ -353,6 +353,9 @@ func (s *GameService) adminInventoryRows(tx *gorm.DB, row db.Profile, p *pb.Play
 		}
 		entries = append(entries, entry)
 	}
+	if ggoCreditBalance(g) > 0 {
+		add("item", constUtil.GGOCurrencyID, "", ggoCreditBalance(g), nil)
+	}
 	for _, v := range g.Warriors {
 		add("warrior", v.GetId(), v.GetGuid(), 1, v)
 	}
@@ -490,6 +493,7 @@ func (s *GameService) adminApplyPlayerInventory(tx *gorm.DB, actor *model.AdminP
 	if err = json.Unmarshal(raw, beforeG); err != nil {
 		return err
 	}
+	beforeG.GGOCredit, beforeG.GGOCreditLoaded = g.GGOCredit, g.GGOCreditLoaded
 	var selected *model.AdminInventoryRow
 	for i := range rows {
 		if rows[i].Category == req.Category && rows[i].Key == req.Key {
@@ -525,7 +529,16 @@ func (s *GameService) adminApplyPlayerInventory(tx *gorm.DB, actor *model.AdminP
 		if req.Operation == "update" && !selected.Editable {
 			return adminInventoryError(selected.BlockedReason)
 		}
-		if selected.GUID == "" {
+		if selected.Category == "item" && selected.ResourceID == constUtil.GGOCurrencyID {
+			if len(req.Attributes) != 0 {
+				return adminInventoryError("信用点仅支持数量修改")
+			}
+			if req.Operation == "remove" {
+				g.GGOCredit = 0
+			} else {
+				g.GGOCredit = *req.Amount
+			}
+		} else if selected.GUID == "" {
 			if len(req.Attributes) != 0 {
 				return adminInventoryError("堆叠道具仅支持数量修改")
 			}

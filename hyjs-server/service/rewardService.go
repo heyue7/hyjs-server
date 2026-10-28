@@ -52,6 +52,7 @@ func (s *GameService) GrantFixedReward(player *pb.Player, game *model.GameState,
 	// Preserve only the transaction-local source across this internal JSON clone.
 	copyGame.GuildPrayerProjection = game.GuildPrayerProjection.Clone()
 	copyGame.FieldCalendarDay = game.FieldCalendarDay
+	copyGame.GGOCredit, copyGame.GGOCreditLoaded = game.GGOCredit, game.GGOCreditLoaded
 	gain, err := s.openServerGain(copyPlayer, &copyGame, content)
 	if err != nil {
 		return nil, err

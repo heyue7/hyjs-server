@@ -23,6 +23,10 @@ type adminFieldRuntimeSnapshot struct {
 	sqlDatabase *sql.DB
 	signature   [sha256.Size]byte
 	tables      map[string][]map[string]string
+	ggo         *model.AdminFieldGGOConfiguration
+	// ggoEconomy preserves the last published economy even when map gameplay is disabled.
+	ggoEconomy  *model.AdminFieldGGOConfiguration
+	ggoRevision string
 }
 
 // adminFieldDeploymentSignature 按全局有序的已提交行和全部影响字段计算内容签名。

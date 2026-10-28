@@ -163,6 +163,9 @@ func decodeProfile(row *db.Profile) (*pb.Player, *model.GameState, error) {
 	if err := json.Unmarshal([]byte(*row.Game), &game); err != nil {
 		return nil, nil, err
 	}
+	if err := projectGGOCredit(row, &game); err != nil {
+		return nil, nil, err
+	}
 	PrepareWarriors(&game)
 	if err := prepareBagCapacity(&player, &game); err != nil {
 		return nil, nil, err
@@ -177,6 +180,14 @@ func saveProfile(tx *gorm.DB, row *db.Profile, player *pb.Player, game *model.Ga
 // saveProfileAgainst compares hot-path output with the actual persisted row,
 // before resource recovery rewrites the transaction's consumption baseline.
 func saveProfileAgainst(tx *gorm.DB, row *db.Profile, player *pb.Player, game *model.GameState, persisted *db.Profile) error {
+	if !game.GGOCreditLoaded {
+		if err := projectGGOCredit(row, game); err != nil {
+			return err
+		}
+	}
+	if err := normalizeGGOCredit(game); err != nil {
+		return err
+	}
 	if err := ConvertGGOOverclockItem(tx, row, player, game); err != nil {
 		return err
 	}
@@ -241,6 +252,10 @@ func saveProfileAgainst(tx *gorm.DB, row *db.Profile, player *pb.Player, game *m
 		return err
 	}
 	updates := map[string]any{}
+	if !row.GGOCreditMigrated || row.GGOCredit != game.GGOCredit {
+		updates["ggo_credit"] = game.GGOCredit
+		updates["ggo_credit_migrated"] = true
+	}
 	if persisted == nil || persisted.Player == nil || *persisted.Player != string(p) {
 		updates["player"] = string(p)
 	}

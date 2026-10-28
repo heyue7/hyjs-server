@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-// adminFieldValidGGO 限定设计配置引用和输入边界，配置不接入地图运行逻辑。
+// adminFieldValidGGO 限定沙漠配置引用和输入边界。
 func adminFieldValidGGO(cfg *model.AdminFieldConfiguration) bool {
 	g := cfg.GGO
 	if g == nil {
@@ -16,7 +16,10 @@ func adminFieldValidGGO(cfg *model.AdminFieldConfiguration) bool {
 	if cfg.Scene != "field_003" || g.SchemaVersion != constUtil.AdminFieldGGOSchemaVersion || g.CurrencyID != "item_9710" || g.ShopKey != "ggo" || g.CarryIcon != "ggo_chip_marker" || !ggoText(g.Title, 80) || !ggoText(g.ModeName, 80) {
 		return false
 	}
-	if !adminFieldValidGGORules(g.Rules) {
+	if !adminFieldValidGGORules(g.Rules) || g.Runtime != nil && !model.ValidAdminFieldGGORuntime(g) {
+		return false
+	}
+	if g.Runtime != nil && (gameService == nil || !gameService.AdminGGOFieldBossResourceCatalogValid(g.Runtime.Boss)) {
 		return false
 	}
 	if len(g.NPCs) != 5 || len(g.Monsters) != 5 || len(g.Bosses) != 3 || len(g.Chips) != 6 {
@@ -79,7 +82,7 @@ func adminFieldValidGGO(cfg *model.AdminFieldConfiguration) bool {
 
 // adminFieldValidGGORules 套用已确认政策，并允许仍待决定的数值保持为空。
 func adminFieldValidGGORules(r model.AdminFieldGGORules) bool {
-	if r.EntryMethod != "npc_random" || r.ProtectionSeconds < 0 || r.ProtectionSeconds > 300 || r.TerminalName != "临时终端" || !r.UnlimitedCapacity || r.SearchEnabled || r.InitialSource != "monsters" || r.PvpTransfer != "winner_terminal" || r.DeathReturn != "safe_area" || r.ExtractionReturn != "safe_area" || r.SettlementMode != "safe_npc_or_confirm_leave" || !r.RetainAfterDeath || r.CreditCap != "none" || r.ShopLimitScope != "account_weekly" || r.WeeklyResetTimezone != "Asia/Shanghai" {
+	if r.EntryMethod != "npc_random" || r.ProtectionSeconds < 0 || r.ProtectionSeconds > 300 || r.TerminalName != "临时终端" || !r.UnlimitedCapacity || r.SearchEnabled || (r.InitialSource != "monsters" && r.InitialSource != "monsters_and_gathering") || r.PvpTransfer != "winner_terminal" || r.DeathReturn != "safe_area" || r.ExtractionReturn != "safe_area" || r.SettlementMode != "safe_npc_or_confirm_leave" || !r.RetainAfterDeath || r.CreditCap != "none" || r.ShopLimitScope != "account_weekly" || r.WeeklyResetTimezone != "Asia/Shanghai" {
 		return false
 	}
 	if r.PveLossMode != "pending" && r.PveLossMode != "destroy" {

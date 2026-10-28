@@ -1,4 +1,7 @@
 CREATE TABLE IF NOT EXISTS field_boss_contributions73 (
+  ggo_chips BLOB NULL,
+  ggo_chips_claimed BOOLEAN NOT NULL DEFAULT FALSE,
+
  id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
  server_id BIGINT NOT NULL,
  spawn_uuid VARBINARY(128) NOT NULL,

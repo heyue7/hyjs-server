@@ -18,10 +18,12 @@ import (
 
 func adminPlayerVersion(row db.Profile) string {
 	return adminDigest(string(adminJSON(struct {
-		Player, Game *string
-		Session      string
-		CreatedAt    *int64
-	}{row.Player, row.Game, hex.EncodeToString(row.Session), row.CreatedAt})))
+		Player, Game   *string
+		Session        string
+		CreatedAt      *int64
+		Credit         int64
+		CreditMigrated bool
+	}{row.Player, row.Game, hex.EncodeToString(row.Session), row.CreatedAt, row.GGOCredit, row.GGOCreditMigrated})))
 }
 func adminPlayerProjection(row db.Profile, details bool) (model.AdminGamePlayerDTO, error) {
 	p, g, err := decodeProfile(&row)
@@ -32,8 +34,15 @@ func adminPlayerProjection(row db.Profile, details bool) (model.AdminGamePlayerD
 	if row.CreatedAt != nil {
 		out.CreatedAt = *row.CreatedAt
 	}
+	out.Balances[constUtil.GGOCurrencyID] = ggoCreditBalance(g)
+	if ggoCreditBalance(g) > 0 {
+		out.Counts["items"]++
+	}
 	if details {
 		out.Inventory = []model.AdminPlayerInventoryItem{}
+		if ggoCreditBalance(g) > 0 {
+			out.Inventory = append(out.Inventory, model.AdminPlayerInventoryItem{ResourceID: constUtil.GGOCurrencyID, Amount: ggoCreditBalance(g)})
+		}
 		for _, w := range g.Warriors {
 			out.Inventory = append(out.Inventory, model.AdminPlayerInventoryItem{ResourceID: w.GetId(), Amount: 1, Guid: w.GetGuid(), Level: int64(w.GetLevel())})
 		}
@@ -80,7 +89,7 @@ func AdminGamePlayers(ctx context.Context, q string, page, size int64) (*model.A
 		return nil, err
 	}
 	var rows []db.Profile
-	if err := query.Select("id", "server_id", "account_id", "uid", "player", "game", "session", "created_at").Order("id DESC").Offset(int((page - 1) * size)).Limit(int(size)).Find(&rows).Error; err != nil {
+	if err := query.Select("id", "server_id", "account_id", "uid", "player", "game", "session", "created_at", "ggo_credit", "ggo_credit_migrated").Order("id DESC").Offset(int((page - 1) * size)).Limit(int(size)).Find(&rows).Error; err != nil {
 		return nil, err
 	}
 	out := &model.AdminGamePlayersResponse{Items: []model.AdminGamePlayerDTO{}, Total: total}
@@ -104,7 +113,7 @@ func AdminGamePlayers(ctx context.Context, q string, page, size int64) (*model.A
 // AdminGamePlayer 读取一名游戏角色的有限运营详情。
 func AdminGamePlayer(ctx context.Context, id int64) (*model.AdminGamePlayerDTO, error) {
 	var row db.Profile
-	if err := db.GetIns().WithContext(ctx).Select("id", "server_id", "account_id", "uid", "player", "game", "session", "created_at").First(&row, id).Error; err != nil {
+	if err := db.GetIns().WithContext(ctx).Select("id", "server_id", "account_id", "uid", "player", "game", "session", "created_at", "ggo_credit", "ggo_credit_migrated").First(&row, id).Error; err != nil {
 		return nil, err
 	}
 	if err := AdminCheckProfileScope(ctx, row); err != nil {

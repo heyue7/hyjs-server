@@ -22,6 +22,9 @@ type GamePacket struct {
 
 // GameState 与已经产生的 SQLite 存档兼容，协议对象使用原始字段名。
 type GameState struct {
+	// GGOCredit is a transaction-local projection of profiles.ggo_credit, never a second wallet in the save JSON.
+	GGOCredit       int64 `json:"-"`
+	GGOCreditLoaded bool  `json:"-"`
 	// BagCapacityScale pairs the one-time capacity expansion with all three saved bag limits.
 	BagCapacityScale int32 `json:"bag_capacity_scale,omitempty"`
 	// WarriorBagCapacityScale reads the unreleased hero-only fivefold candidate without multiplying it again.
@@ -46,6 +49,7 @@ type GameState struct {
 	EquipmentRefineReceipts map[string]*EquipmentRefineReceipt `json:"equipment_refine_receipts,omitempty"`
 	EquipmentStarReceipts   map[string]*EquipmentStarReceipt   `json:"equipment_star_receipts,omitempty"`
 	Field                   *FieldState                        `json:"field,omitempty"`
+	GGOField                *GGOFieldState                     `json:"ggo_field,omitempty"`
 
 	TacticalUnlockReceipts   map[string]*TacticalUnlockReceipt  `json:"tactical_unlock_receipts,omitempty"`
 	Equipment                []*pb.Equipment                    `json:"equipment,omitempty"`
@@ -182,6 +186,7 @@ type FieldAreaState struct {
 	Fight     *FieldFight                   `json:"fight,omitempty"`
 }
 type FieldFight struct {
+	GGOBoss          *GGOFieldBossFight   `json:"ggo_boss,omitempty"`
 	BossDeathRules73 *AdminFieldBossGroup `json:"boss_death_rules73,omitempty"`
 	BossSprouts73    int64                `json:"boss_sprouts73,omitempty"`
 

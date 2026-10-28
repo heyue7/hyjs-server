@@ -2,6 +2,7 @@ package db
 
 // SharedFieldBoss55 owns one ordinary boss generation per realm, scene and position.
 type SharedFieldBoss55 struct {
+	GGOEvent     []byte `gorm:"type:longblob"`
 	DeathRules73 []byte `gorm:"type:longblob"`
 
 	ServerID  int64  `gorm:"primaryKey;autoIncrement:false"`

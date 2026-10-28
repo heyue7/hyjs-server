@@ -83,6 +83,9 @@ func (s *GameService) p8LifeMutation(ctx context.Context, id int64, operation st
 		if err = action(tx, p, g, time.Now().UnixMilli()); err != nil {
 			return err
 		}
+		if err = ggoInterruptExtractionLocked(tx, id, g, time.Now().UnixMilli()); err != nil {
+			return err
+		}
 		if err = saveProfile(tx, row, p, g); err != nil {
 			return err
 		}
@@ -287,6 +290,9 @@ func (s *GameService) p8Heal(p *pb.Player, g *model.GameState, gain float64, rep
 }
 
 func (s *GameService) p8SafeZone(g *model.GameState) (bool, error) {
+	if g.Position.GetScene() == constUtil.GGOFieldScene && g.GGOField != nil && s.GGOFieldEconomy != nil && s.GGOFieldEconomy.Runtime != nil {
+		return ggoPointInsideSafe(g.Position.GetCurrent(), s.GGOFieldEconomy.Runtime.SafeArea), nil
+	}
 	point := g.Position.GetCurrent()
 	if point == nil {
 		return false, p8GatherError()

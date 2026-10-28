@@ -77,7 +77,7 @@ func (s *GameService) p12FieldPVPMapPolicy(tx *gorm.DB, scene string) (*db.P12Fi
 			if json.Unmarshal([]byte(deployment.Configuration), &cfg) != nil || cfg.Scene != scene {
 				return nil, errors.New(constUtil.P12FieldPVPConflict)
 			}
-			if !deployment.Enabled || !cfg.AllowPK || !constUtil.P8PackagedFieldScene(scene) {
+			if !deployment.Enabled || !cfg.AllowPK || !s.P8FieldSceneAvailable(scene) {
 				return nil, errors.New(constUtil.P12FieldPVPMapClosed)
 			}
 			return policy, nil
@@ -396,6 +396,14 @@ func p12FieldPVPApplyTerminal(party *pb.BattlePlayer, side *pb.PlayerSide, out *
 }
 
 func (s *GameService) p12FieldPVPQualify(tx *gorm.DB, p *pb.Player, g *model.GameState, now time.Time) (int32, error) {
+	if g.Position.GetScene() == constUtil.GGOFieldScene && g.GGOField != nil {
+		if s.GGOFieldConfig == nil || s.GGOFieldConfig.Runtime == nil {
+			return 2002, nil
+		}
+		if ggoPointInsideSafe(g.Position.GetCurrent(), s.GGOFieldConfig.Runtime.SafeArea) || g.GGOField.ProtectionUntil > now.UnixMilli() {
+			return 2007, nil
+		}
+	}
 	if s.table("Field", "FieldId", g.Position.GetScene())["allSafe"] == "1" {
 		return 2007, nil
 	}
@@ -491,6 +499,14 @@ func (s *GameService) p12FieldPVPFightAt(ctx context.Context, id int64, session 
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return err
 		}
+		if g.Position.GetScene() == constUtil.GGOFieldScene && g.GGOField != nil {
+			if err = ggoCheckClientBuildLocked(tx, id, session, s.GGOFieldConfig); err != nil {
+				return err
+			}
+			if err = ggoCheckClientBuildLocked(tx, peerRow.Id, peerRow.Session, s.GGOFieldConfig); err != nil {
+				return err
+			}
+		}
 		if field := s.fieldSceneRow(g.Position.GetScene()); field != nil && (field["adminEnabled"] == "false" || field["adminPK"] == "false") {
 			return errors.New("该野外地图禁止PK")
 		}
@@ -505,11 +521,15 @@ func (s *GameService) p12FieldPVPFightAt(ctx context.Context, id int64, session 
 			return errors.New(constUtil.P10SceneClosed)
 		}
 		var op, pp db.P10ScenePresence
-		if tx.First(&op, "player_id=?", id).Error != nil || tx.First(&pp, "player_id=?", b.GetPlayerId()).Error != nil {
+		if tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&op, "player_id=?", id).Error != nil || tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&pp, "player_id=?", b.GetPlayerId()).Error != nil {
 			return errors.New("双方必须真实在线同屏")
 		}
-		if _, ok := s.p10SceneLive(tx, op); !ok {
+		if _, ok := s.p10SceneLive(tx, op); !ok || op.SessionHash == "" {
 			return errors.New("发起方当前会话已失效")
+		}
+		offlineTarget := pp.SessionHash == ""
+		if offlineTarget && (pp.Scene != constUtil.GGOFieldScene || pp.OfflineUntil <= now.UnixMilli() || pp.OfflinePKUsed) {
+			return errors.New("目标暂不可挑战")
 		}
 		if _, ok := s.p10SceneLive(tx, pp); !ok {
 			return errors.New("目标当前会话已失效")
@@ -544,11 +564,33 @@ func (s *GameService) p12FieldPVPFightAt(ctx context.Context, id int64, session 
 			response = &pb.SCSidePvpFightResult{Code: proto.Int32(2001)}
 			return nil
 		}
+		desertScene := g.Position.GetScene() == constUtil.GGOFieldScene || pg.Position.GetScene() == constUtil.GGOFieldScene
+		desert := g.Position.GetScene() == constUtil.GGOFieldScene && pg.Position.GetScene() == constUtil.GGOFieldScene && g.GGOField != nil && pg.GGOField != nil
+		if desertScene && !desert {
+			return errors.New("沙漠PK状态不一致")
+		}
+		if offlineTarget {
+			if !desert {
+				return errors.New("目标暂不可挑战")
+			}
+			pp.OfflinePKUsed = true
+			if err = tx.Save(&pp).Error; err != nil {
+				return err
+			}
+		}
+		if desert {
+			if err = ggoInterruptExtractionLocked(tx, id, g, now.UnixMilli()); err != nil {
+				return err
+			}
+			if err = ggoInterruptExtractionLocked(tx, peer.GetPlayerId(), pg, now.UnixMilli()); err != nil {
+				return err
+			}
+		}
 		red, _, err := s.p12FieldPVPKiller(states[1].Kills)
 		if err != nil {
 			return err
 		}
-		if b.GetFightType() == 1 && !red || b.GetFightType() == 0 && red {
+		if !desert && (b.GetFightType() == 1 && !red || b.GetFightType() == 0 && red) {
 			return errors.New("当前目标红名类别不匹配")
 		}
 		limit, err := s.fieldConfigInt("MaxKillLimit")
@@ -558,7 +600,7 @@ func (s *GameService) p12FieldPVPFightAt(ctx context.Context, id int64, session 
 		if limit != 60 {
 			return errors.New(constUtil.P12FieldPVPConflict)
 		}
-		if int64(states[0].DailyKills) >= limit {
+		if !desert && int64(states[0].DailyKills) >= limit {
 			return errors.New("原每日击败上限已到")
 		}
 		for _, pair := range []struct {
@@ -632,8 +674,10 @@ func (s *GameService) p12FieldPVPFightAt(ctx context.Context, id int64, session 
 		loot := int64(0)
 		if terminal.Outcome.Winner == 0 {
 			win = id
-			states[0].DailyKills++
-			if b.GetFightType() == 0 {
+			if !desert {
+				states[0].DailyKills++
+			}
+			if !desert && b.GetFightType() == 0 {
 				if states[0].Kills == math.MaxInt32 {
 					return errors.New(constUtil.P12FieldPVPConflict)
 				}
@@ -650,6 +694,17 @@ func (s *GameService) p12FieldPVPFightAt(ctx context.Context, id int64, session 
 				states[0].LootCoin += loot
 			}
 		}
+		if desert {
+			winner, loser := g, pg
+			winnerID, loserID := id, peer.GetPlayerId()
+			if win != id {
+				winner, loser = pg, g
+				winnerID, loserID = peer.GetPlayerId(), id
+			}
+			if err = s.ggoSettlePVP(tx, winnerID, loserID, winner, loser, fightID, now.UnixMilli()); err != nil {
+				return err
+			}
+		}
 		// Red death applies to either participant, using the pre-reduction jail tier.
 		for i, pair := range []struct {
 			p *pb.Player
@@ -658,7 +713,7 @@ func (s *GameService) p12FieldPVPFightAt(ctx context.Context, id int64, session 
 			st := states[i]
 			st.LastFightID = fightID
 			st.BusyUntil = now.UnixMilli() + constUtil.P12FieldPVPBusyMS
-			if pair.g.Field.Side.GetCurHp() == 0 {
+			if !desert && pair.g.Field.Side.GetCurHp() == 0 {
 				jailed, jailMS, e := s.p12FieldPVPKiller(st.Kills)
 				if e != nil {
 					return e

@@ -24,6 +24,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 )
@@ -49,6 +50,7 @@ func run() error {
 		logFile             = flag.String("log-file", "", "isolated process log path; empty keeps configured path")
 		warmRushPlayer      = flag.Int64("warm-rush-history-player", 0, "validate existing trial history and persist signed certificates, then exit")
 		testPayments        = flag.Bool("enable-test-payments", false, "enable loopback-only demo payment confirmation")
+		ggoIntegration      = flag.Bool("enable-ggo-integration", false, "enable GGO only in an isolated loopback MySQL test environment")
 		applyGrowth         = flag.Bool("apply-growth74", false, "apply the authorized growth configuration during maintenance, then exit")
 		applyGrowth75       = flag.Bool("apply-growth75", false, "apply audited publication, clock repair and growth75 economy during maintenance, then exit")
 		applyActivity77     = flag.Bool("apply-activity77", false, "apply reviewed activity, welfare and shop repairs during maintenance, then exit")
@@ -113,10 +115,20 @@ func run() error {
 	if cfg.Bind == "" || cfg.AdvertiseHost == "" || (cfg.Driver == "sqlite" && cfg.Database == "") || cfg.Tables == "" {
 		return errors.New("Incomplete game configuration")
 	}
+	if *ggoIntegration {
+		if maintenanceCommands != 0 {
+			return errors.New("沙漠联调不能与维护命令同时运行")
+		}
+		if err := validateGGOIntegration(config.Env, cfg.Bind, cfg.Driver, config.AppConfigIns.MysqlConfig.Host, config.AppConfigIns.MysqlConfig.DbName, cfg.AccountsDatabase); err != nil {
+			return err
+		}
+	}
 	if *logFile != "" {
 		config.AppConfigIns.LogConfig.LogFile = *logFile
 	}
-	elog.LogInit()
+	if err := elog.LogInit(); err != nil {
+		return err
+	}
 	defer elog.Sync()
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
@@ -143,7 +155,7 @@ func run() error {
 		return err
 	}
 	defer sqlDB.Close()
-	s := &service.GameService{Host: cfg.AdvertiseHost, ServerID: cfg.ServerID}
+	s := &service.GameService{Host: cfg.AdvertiseHost, ServerID: cfg.ServerID, GGOIntegrationReady: *ggoIntegration}
 	if *applyFeedback78 || *applyFeedback79 || *applyFeedback80 || *applyFeedback81 {
 		// 仅使用既有管理员及全服日历；业务事务内部复核维护、管理员和时钟。
 		if *applyFeedback79 || *applyFeedback80 || *applyFeedback81 {
@@ -648,8 +660,10 @@ func run() error {
 	handler.RegisterAdminRoutes(r, os.Getenv("HYJS_ADMIN_ASSETS"))
 	routes.RouteRegister(r)
 	server := &http.Server{Handler: r, ReadTimeout: 15 * time.Second, WriteTimeout: 30 * time.Second, IdleTimeout: 60 * time.Second, BaseContext: func(net.Listener) context.Context { return ctx }}
-	const serviceWorkerCount = 17
+	const serviceWorkerCount = 19
 	errs := make(chan error, serviceWorkerCount)
+	go func() { errs <- elog.ServeMaintenance(ctx) }()
+	go func() { errs <- s.ServeGGOFieldGather(ctx) }()
 	go func() { errs <- handler.ServeGameTCP(ctx, tcpListener, s) }()
 	go func() { errs <- server.Serve(httpListener) }()
 	go func() { errs <- s.ServeTurntableSettlement(ctx) }()
@@ -706,6 +720,39 @@ func run() error {
 	}
 	if err != nil && !errors.Is(err, http.ErrServerClosed) {
 		return err
+	}
+	return nil
+}
+
+// validateGGOIntegration is checked before opening any database or listener.
+// It cannot enable the feature on a remote host, production environment,
+// shared identity schema, or non-test database.
+func validateGGOIntegration(env, bind, driver, mysqlHost, database, accountsDatabase string) error {
+	if env != "dev" && env != "test" {
+		return errors.New("沙漠联调仅允许 dev/test")
+	}
+	bindIP := net.ParseIP(bind)
+	if bindIP == nil || !bindIP.IsLoopback() {
+		return errors.New("沙漠联调仅允许 loopback 监听")
+	}
+	if driver != "mysql" || !strings.HasPrefix(database, "hyjs_test_") || len(database) <= len("hyjs_test_") {
+		return errors.New("沙漠联调仅允许独立 hyjs_test_ MySQL 库")
+	}
+	for _, c := range database {
+		if !(c >= 'a' && c <= 'z' || c >= '0' && c <= '9' || c == '_') {
+			return errors.New("沙漠联调数据库名称无效")
+		}
+	}
+	if accountsDatabase != "" && accountsDatabase != database {
+		return errors.New("沙漠联调不可连接其他身份数据库")
+	}
+	host := mysqlHost
+	if parsed, _, err := net.SplitHostPort(mysqlHost); err == nil {
+		host = parsed
+	}
+	mysqlIP := net.ParseIP(host)
+	if mysqlIP == nil || !mysqlIP.IsLoopback() {
+		return errors.New("沙漠联调仅允许本机 MySQL")
 	}
 	return nil
 }

@@ -4,6 +4,10 @@ import (
 	"context"
 	"hyjs-server/constUtil"
 	"sync"
+	"sync/atomic"
+
+	"go.uber.org/zap"
+	"hyjs-server/elog"
 
 	"google.golang.org/protobuf/proto"
 )
@@ -13,9 +17,10 @@ type p10ClientKey struct {
 	playerID int64
 }
 type p10ClientSink struct {
-	session []byte
-	send    func(proto.Message) error
-	close   func()
+	session    []byte
+	send       func(proto.Message) error
+	close      func()
+	tradeReady atomic.Bool
 }
 
 var p10ClientSinks sync.Map
@@ -36,8 +41,21 @@ func (s *GameService) RegisterP10Client(ctx context.Context, id int64, session [
 		sink.close = closeConnection[0]
 	}
 	p10ClientSinks.Store(key, sink)
+	// A newly connected socket cannot inherit an uncompleted trade from a
+	// disconnected/replaced socket, even if its account session is unchanged.
+	if s.ggoExtractionEnabled() {
+		if err := s.ggoTradeCancelSession(ctx, id, session); err != nil {
+			elog.Warn("ggo trade reconnect invalidation failed", zap.Error(err))
+		} else {
+			sink.tradeReady.Store(true)
+		}
+	} else {
+		sink.tradeReady.Store(true)
+	}
 	s.ClientUpdateConnected(ctx, id, session)
-	_ = s.SyncP10Scene(ctx, id, false)
+	if err := s.SyncP10Scene(ctx, id, false); err == nil {
+		s.ggoCancelOfflineTimer(id)
+	}
 	return func() {
 		if p10ClientSinks.CompareAndDelete(key, sink) {
 			cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), constUtil.P10SceneCleanupTimeout)

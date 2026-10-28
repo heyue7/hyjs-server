@@ -1,0 +1,481 @@
+{
+  "schema": "hyjs-desert-v4-candidate-audit-input-v1",
+  "designSha256": "b56b0bd3159cb9fb43f70bf83a2e08c95ed3e8f07617919cab98e875f0fceb1b",
+  "minimapSha256": "fa782742e75fccf9e27b7ce8e44150d7f7ff9c0da74b58fbd88a661492ec42b7",
+  "bundleSha256": "2d696b559ae5990b1be9978968e11fbb181ccfe1004a4cdd21cd8d1b435d05d1",
+  "sourceTransform": "build_layout.py: worldX=(pixelX-256)/4.096+30.4; worldZ=(256-pixelY)/4.096+35.5",
+  "points": [
+    {
+      "id": "S",
+      "kind": "safe",
+      "pixelX": 105,
+      "pixelY": 417,
+      "worldX": -6.465234375000001,
+      "worldZ": -3.806640625
+    },
+    {
+      "id": "M01",
+      "kind": "mob",
+      "pixelX": 132,
+      "pixelY": 389,
+      "worldX": 0.12656249999999858,
+      "worldZ": 3.029296875
+    },
+    {
+      "id": "M02",
+      "kind": "mob",
+      "pixelX": 132,
+      "pixelY": 365,
+      "worldX": 0.12656249999999858,
+      "worldZ": 8.888671875
+    },
+    {
+      "id": "M03",
+      "kind": "mob",
+      "pixelX": 132,
+      "pixelY": 312,
+      "worldX": 0.12656249999999858,
+      "worldZ": 21.828125
+    },
+    {
+      "id": "M04",
+      "kind": "mob",
+      "pixelX": 132,
+      "pixelY": 290,
+      "worldX": 0.12656249999999858,
+      "worldZ": 27.19921875
+    },
+    {
+      "id": "M05",
+      "kind": "mob",
+      "pixelX": 132,
+      "pixelY": 259,
+      "worldX": 0.12656249999999858,
+      "worldZ": 34.767578125
+    },
+    {
+      "id": "M06",
+      "kind": "mob",
+      "pixelX": 151,
+      "pixelY": 242,
+      "worldX": 4.765234374999999,
+      "worldZ": 38.91796875
+    },
+    {
+      "id": "M07",
+      "kind": "mob",
+      "pixelX": 145,
+      "pixelY": 205,
+      "worldX": 3.3003906249999986,
+      "worldZ": 47.951171875
+    },
+    {
+      "id": "M08",
+      "kind": "mob",
+      "pixelX": 163,
+      "pixelY": 176,
+      "worldX": 7.694921874999999,
+      "worldZ": 55.03125
+    },
+    {
+      "id": "M09",
+      "kind": "mob",
+      "pixelX": 184,
+      "pixelY": 152,
+      "worldX": 12.821874999999999,
+      "worldZ": 60.890625
+    },
+    {
+      "id": "M10",
+      "kind": "mob",
+      "pixelX": 216,
+      "pixelY": 130,
+      "worldX": 20.634375,
+      "worldZ": 66.26171875
+    },
+    {
+      "id": "M11",
+      "kind": "mob",
+      "pixelX": 249,
+      "pixelY": 130,
+      "worldX": 28.691015625,
+      "worldZ": 66.26171875
+    },
+    {
+      "id": "M12",
+      "kind": "mob",
+      "pixelX": 281,
+      "pixelY": 138,
+      "worldX": 36.503515625,
+      "worldZ": 64.30859375
+    },
+    {
+      "id": "M13",
+      "kind": "mob",
+      "pixelX": 307,
+      "pixelY": 170,
+      "worldX": 42.851171875,
+      "worldZ": 56.49609375
+    },
+    {
+      "id": "M14",
+      "kind": "mob",
+      "pixelX": 327,
+      "pixelY": 196,
+      "worldX": 47.733984375,
+      "worldZ": 50.1484375
+    },
+    {
+      "id": "M15",
+      "kind": "mob",
+      "pixelX": 365,
+      "pixelY": 220,
+      "worldX": 57.011328125,
+      "worldZ": 44.2890625
+    },
+    {
+      "id": "M16",
+      "kind": "mob",
+      "pixelX": 378,
+      "pixelY": 247,
+      "worldX": 60.18515625,
+      "worldZ": 37.697265625
+    },
+    {
+      "id": "M17",
+      "kind": "mob",
+      "pixelX": 377,
+      "pixelY": 278,
+      "worldX": 59.941015625,
+      "worldZ": 30.12890625
+    },
+    {
+      "id": "M18",
+      "kind": "mob",
+      "pixelX": 360,
+      "pixelY": 300,
+      "worldX": 55.790625,
+      "worldZ": 24.7578125
+    },
+    {
+      "id": "M19",
+      "kind": "mob",
+      "pixelX": 389,
+      "pixelY": 330,
+      "worldX": 62.870703125,
+      "worldZ": 17.43359375
+    },
+    {
+      "id": "M20",
+      "kind": "mob",
+      "pixelX": 390,
+      "pixelY": 352,
+      "worldX": 63.11484375,
+      "worldZ": 12.0625
+    },
+    {
+      "id": "M21",
+      "kind": "mob",
+      "pixelX": 363,
+      "pixelY": 374,
+      "worldX": 56.523046875,
+      "worldZ": 6.69140625
+    },
+    {
+      "id": "M22",
+      "kind": "mob",
+      "pixelX": 338,
+      "pixelY": 352,
+      "worldX": 50.41953125,
+      "worldZ": 12.0625
+    },
+    {
+      "id": "M23",
+      "kind": "mob",
+      "pixelX": 254,
+      "pixelY": 354,
+      "worldX": 29.91171875,
+      "worldZ": 11.57421875
+    },
+    {
+      "id": "M24",
+      "kind": "mob",
+      "pixelX": 205,
+      "pixelY": 358,
+      "worldX": 17.948828125,
+      "worldZ": 10.59765625
+    },
+    {
+      "id": "O01",
+      "kind": "mine",
+      "pixelX": 147,
+      "pixelY": 384,
+      "worldX": 3.7886718749999986,
+      "worldZ": 4.25
+    },
+    {
+      "id": "O02",
+      "kind": "mine",
+      "pixelX": 147,
+      "pixelY": 339,
+      "worldX": 3.7886718749999986,
+      "worldZ": 15.236328125
+    },
+    {
+      "id": "O03",
+      "kind": "mine",
+      "pixelX": 116,
+      "pixelY": 305,
+      "worldX": -3.7796875000000014,
+      "worldZ": 23.537109375
+    },
+    {
+      "id": "O04",
+      "kind": "mine",
+      "pixelX": 154,
+      "pixelY": 274,
+      "worldX": 5.497656249999999,
+      "worldZ": 31.10546875
+    },
+    {
+      "id": "O05",
+      "kind": "mine",
+      "pixelX": 157,
+      "pixelY": 220,
+      "worldX": 6.230078124999999,
+      "worldZ": 44.2890625
+    },
+    {
+      "id": "O06",
+      "kind": "mine",
+      "pixelX": 178,
+      "pixelY": 183,
+      "worldX": 11.357031249999999,
+      "worldZ": 53.322265625
+    },
+    {
+      "id": "O07",
+      "kind": "mine",
+      "pixelX": 202,
+      "pixelY": 150,
+      "worldX": 17.21640625,
+      "worldZ": 61.37890625
+    },
+    {
+      "id": "O08",
+      "kind": "mine",
+      "pixelX": 235,
+      "pixelY": 146,
+      "worldX": 25.273046875,
+      "worldZ": 62.35546875
+    },
+    {
+      "id": "O09",
+      "kind": "mine",
+      "pixelX": 270,
+      "pixelY": 154,
+      "worldX": 33.81796875,
+      "worldZ": 60.40234375
+    },
+    {
+      "id": "O10",
+      "kind": "mine",
+      "pixelX": 298,
+      "pixelY": 188,
+      "worldX": 40.65390625,
+      "worldZ": 52.1015625
+    },
+    {
+      "id": "O11",
+      "kind": "mine",
+      "pixelX": 342,
+      "pixelY": 218,
+      "worldX": 51.39609375,
+      "worldZ": 44.77734375
+    },
+    {
+      "id": "O12",
+      "kind": "mine",
+      "pixelX": 360,
+      "pixelY": 257,
+      "worldX": 55.790625,
+      "worldZ": 35.255859375
+    },
+    {
+      "id": "O13",
+      "kind": "mine",
+      "pixelX": 400,
+      "pixelY": 281,
+      "worldX": 65.55625,
+      "worldZ": 29.396484375
+    },
+    {
+      "id": "O14",
+      "kind": "mine",
+      "pixelX": 401,
+      "pixelY": 311,
+      "worldX": 65.800390625,
+      "worldZ": 22.072265625
+    },
+    {
+      "id": "O15",
+      "kind": "mine",
+      "pixelX": 404,
+      "pixelY": 346,
+      "worldX": 66.5328125,
+      "worldZ": 13.52734375
+    },
+    {
+      "id": "O16",
+      "kind": "mine",
+      "pixelX": 371,
+      "pixelY": 357,
+      "worldX": 58.476171875,
+      "worldZ": 10.841796875
+    },
+    {
+      "id": "O17",
+      "kind": "mine",
+      "pixelX": 277,
+      "pixelY": 339,
+      "worldX": 35.526953125,
+      "worldZ": 15.236328125
+    },
+    {
+      "id": "O18",
+      "kind": "mine",
+      "pixelX": 230,
+      "pixelY": 372,
+      "worldX": 24.05234375,
+      "worldZ": 7.1796875
+    },
+    {
+      "id": "F01",
+      "kind": "fish",
+      "pixelX": 75,
+      "pixelY": 336,
+      "worldX": -13.789453125000001,
+      "worldZ": 15.96875
+    },
+    {
+      "id": "F02",
+      "kind": "fish",
+      "pixelX": 94,
+      "pixelY": 349,
+      "worldX": -9.150781250000001,
+      "worldZ": 12.794921875
+    },
+    {
+      "id": "F03",
+      "kind": "fish",
+      "pixelX": 114,
+      "pixelY": 357,
+      "worldX": -4.267968750000001,
+      "worldZ": 10.841796875
+    },
+    {
+      "id": "F04",
+      "kind": "fish",
+      "pixelX": 162,
+      "pixelY": 342,
+      "worldX": 7.450781249999999,
+      "worldZ": 14.50390625
+    },
+    {
+      "id": "F05",
+      "kind": "fish",
+      "pixelX": 288,
+      "pixelY": 241,
+      "worldX": 38.2125,
+      "worldZ": 39.162109375
+    },
+    {
+      "id": "F06",
+      "kind": "fish",
+      "pixelX": 289,
+      "pixelY": 261,
+      "worldX": 38.456640625,
+      "worldZ": 34.279296875
+    },
+    {
+      "id": "F07",
+      "kind": "fish",
+      "pixelX": 310,
+      "pixelY": 290,
+      "worldX": 43.58359375,
+      "worldZ": 27.19921875
+    },
+    {
+      "id": "F08",
+      "kind": "fish",
+      "pixelX": 350,
+      "pixelY": 287,
+      "worldX": 53.34921875,
+      "worldZ": 27.931640625
+    },
+    {
+      "id": "F09",
+      "kind": "fish",
+      "pixelX": 309,
+      "pixelY": 404,
+      "worldX": 43.339453125,
+      "worldZ": -0.6328125
+    },
+    {
+      "id": "F10",
+      "kind": "fish",
+      "pixelX": 337,
+      "pixelY": 405,
+      "worldX": 50.175390625,
+      "worldZ": -0.876953125
+    },
+    {
+      "id": "F11",
+      "kind": "fish",
+      "pixelX": 422,
+      "pixelY": 356,
+      "worldX": 70.92734375,
+      "worldZ": 11.0859375
+    },
+    {
+      "id": "F12",
+      "kind": "fish",
+      "pixelX": 440,
+      "pixelY": 375,
+      "worldX": 75.321875,
+      "worldZ": 6.447265625
+    },
+    {
+      "id": "B1",
+      "kind": "boss",
+      "pixelX": 308,
+      "pixelY": 313,
+      "worldX": 43.0953125,
+      "worldZ": 21.583984375
+    },
+    {
+      "id": "E1",
+      "kind": "exit",
+      "pixelX": 176,
+      "pixelY": 252,
+      "worldX": 10.868749999999999,
+      "worldZ": 36.4765625
+    },
+    {
+      "id": "E2",
+      "kind": "exit",
+      "pixelX": 403,
+      "pixelY": 250,
+      "worldX": 66.288671875,
+      "worldZ": 36.96484375
+    },
+    {
+      "id": "E3",
+      "kind": "exit",
+      "pixelX": 276,
+      "pixelY": 356,
+      "worldX": 35.2828125,
+      "worldZ": 11.0859375
+    }
+  ]
+}

@@ -713,6 +713,9 @@ func (s *GameService) p13UFFieldEnter(ctx context.Context, id int64, now time.Ti
 		if err != nil {
 			return err
 		}
+		if game.Position.GetScene() == constUtil.GGOFieldScene && game.GGOField != nil {
+			return ggoFieldError(constUtil.GGOFieldInvalidLocation, "请先在沙漠安全区确认离开")
+		}
 		if s.P12FieldPVPReady || s.P12WantedReady {
 			if err = s.ensureNoActiveDailyCopy(tx, id, now); err != nil {
 				return err

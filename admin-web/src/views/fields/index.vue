@@ -176,7 +176,7 @@ async function save(asNew = false) {
     const data = await api<FieldTemplate>('/fields/templates', json('POST', body));
     accept(data);
     await loadTemplates();
-    success.value = activeTab.value === 'ggo' ? '搜打撤配置已保存' : '方案已保存，发布到区服后生效';
+    success.value = activeTab.value === 'ggo' ? '搜打撤草稿已保存，发布到区服后生效' : '方案已保存，发布到区服后生效';
   } catch (e) {
     error.value = errorMessage(e);
     conflict.value = e instanceof ApiError && e.status === 409;
@@ -321,7 +321,7 @@ onMounted(load);
             </button>
           </div>
         </NCard>
-        <NCard v-if="selected && cfg" :key="selected.id" size="small" :bordered="false" class="ops-panel field-editor">
+        <NCard v-if="selected && cfg" :key="selected.id" size="small" :bordered="false" class="ops-panel field-editor" :class="{ 'has-ggo-actions': activeTab === 'ggo' && cfg.ggo }">
           <div class="mb-4 flex flex-wrap items-center gap-2">
             <NInput
               v-model:value="selected.name"
@@ -360,27 +360,29 @@ onMounted(load);
                 </NFormItem>
                 <NFormItem label="同时存在矿点">
                   <NInputNumber
-                    v-model:value="cfg.mineCount"
+                    :value="cfg.ggo?.runtime?.resource.mineCount ?? cfg.mineCount"
+                    @update:value="cfg.mineCount = $event ?? 0"
                     :min="0"
                     :max="cfg.minePoints.length"
-                    :disabled="readonly"
+                    :disabled="readonly || Boolean(cfg.ggo?.runtime)"
                   />
                 </NFormItem>
                 <NFormItem label="同时存在钓鱼点">
                   <NInputNumber
-                    v-model:value="cfg.fishCount"
+                    :value="cfg.ggo?.runtime?.resource.fishCount ?? cfg.fishCount"
+                    @update:value="cfg.fishCount = $event ?? 0"
                     :min="0"
                     :max="cfg.fishPoints.length"
-                    :disabled="readonly"
+                    :disabled="readonly || Boolean(cfg.ggo?.runtime)"
                   />
                 </NFormItem>
               </NForm>
-              <p class="ops-muted">矿物和鱼群从候选位置随机刷新，同一轮不会占用重复位置。</p>
+              <p v-if="cfg.ggo?.runtime" class="ops-muted">沙漠公共资源数量与点位在“搜打撤配置”中设置。</p><p v-else class="ops-muted">矿物和鱼群从候选位置随机刷新，同一轮不会占用重复位置。</p>
             </NTabPane>
             <NTabPane v-if="cfg.scene === 'field_003'" name="ggo" tab="搜打撤配置">
-              <GgoConfigEditor v-if="cfg.ggo" v-model:value="cfg.ggo" :disabled="readonly" />
+              <GgoConfigEditor v-if="cfg.ggo" v-model:value="cfg.ggo" :disabled="readonly" :resources="gatherResources" :boss-resources="bossResources" />
               <div v-if="cfg.ggo" class="ggo-save-bar">
-                <span class="text-sm text-gray-500">{{ dirty ? '当前方案有未保存修改' : '当前方案已保存' }}</span>
+                <span class="ops-muted" role="status">{{ dirty ? '有未保存修改' : '当前方案已保存' }}</span>
                 <NButton :disabled="readonly || !dirty" :loading="saving" type="primary" @click="save()">
                   保存搜打撤配置
                 </NButton>
@@ -693,6 +695,23 @@ onMounted(load);
   margin-top: 20px;
   padding-top: 12px;
   border-top: 1px solid var(--n-border-color);
+}
+@media (max-width: 640px) {
+  .has-ggo-actions { padding-bottom: 88px; }
+  .ggo-save-bar {
+    position: fixed;
+    z-index: 100;
+    left: 12px;
+    right: 12px;
+    bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+    margin: 0;
+    padding: 12px;
+    border: 1px solid var(--n-border-color);
+    border-radius: var(--n-border-radius);
+    background: var(--n-color);
+    box-shadow: 0 4px 18px rgb(0 0 0 / .12);
+  }
+  .ggo-save-bar .ops-muted { font-size: 12px; }
 }
 .world-state {
   padding: 10px 12px;

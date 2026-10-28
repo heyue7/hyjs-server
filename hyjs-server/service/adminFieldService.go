@@ -397,8 +397,22 @@ func (s *GameService) AdminDeployField(ctx context.Context, actor *model.AdminPr
 		if t.Scene != req.Scene || adminVersion(t) != req.TemplateVersion {
 			return constUtil.ErrAdminConfigConflict
 		}
-		if req.Enabled && !constUtil.P8PackagedFieldScene(req.Scene) {
+		if req.Enabled && !constUtil.P8PackagedFieldScene(req.Scene) && !(req.Scene == constUtil.GGOFieldScene && s.ggoExtractionEnabled()) {
 			return errors.New(constUtil.AdminFieldUnavailable)
+		}
+		if req.Enabled && req.Scene == "field_003" {
+			var config model.AdminFieldConfiguration
+			if err := json.Unmarshal([]byte(t.Configuration), &config); err != nil {
+				return constUtil.ErrAdminConfiguration
+			}
+			if config.GGO != nil && config.GGO.Runtime != nil && config.GGO.Runtime.Enabled {
+				if !model.ValidAdminFieldGGORuntime(config.GGO) || !s.AdminGGOFieldBossResourceCatalogValid(config.GGO.Runtime.Boss) {
+					return constUtil.ErrAdminConfiguration
+				}
+				if !s.ggoExtractionEnabled() {
+					return errors.New("沙漠搜打撤运行链尚未完成验收")
+				}
+			}
 		}
 		var row db.AdminFieldDeployment
 		err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&row, "server_id=? AND scene=?", req.ServerID, req.Scene).Error
@@ -407,6 +421,22 @@ func (s *GameService) AdminDeployField(ctx context.Context, actor *model.AdminPr
 		}
 		if err == nil && adminVersion(row) != req.Version || errors.Is(err, gorm.ErrRecordNotFound) && req.Version != "" {
 			return constUtil.ErrAdminConfigConflict
+		}
+		if req.Scene == constUtil.GGOFieldScene {
+			var before, after model.AdminFieldConfiguration
+			if row.Configuration != "" && json.Unmarshal([]byte(row.Configuration), &before) != nil || json.Unmarshal([]byte(t.Configuration), &after) != nil {
+				return constUtil.ErrAdminConfiguration
+			}
+			if before.GGO != nil && before.GGO.SchemaVersion >= constUtil.AdminFieldGGOSchemaVersion && before.GGO.Runtime != nil &&
+				(after.GGO == nil || after.GGO.SchemaVersion < constUtil.AdminFieldGGOSchemaVersion || after.GGO.Runtime == nil) {
+				return errors.New("已发布沙漠经济不能删除或降级")
+			}
+			if req.Enabled && (after.GGO == nil || after.GGO.Runtime == nil || !after.GGO.Runtime.Enabled) {
+				return errors.New("沙漠运行配置未启用")
+			}
+			if err = s.validateGGOShopPricingChange(tx, before.GGO, after.GGO); err != nil {
+				return err
+			}
 		}
 		row.ServerID, row.Scene, row.TemplateID, row.Enabled, row.Configuration = req.ServerID, req.Scene, t.ID, req.Enabled, t.Configuration
 		row.Revision++
@@ -427,12 +457,22 @@ func (s *GameService) AdminDeployField(ctx context.Context, actor *model.AdminPr
 // heartbeat and field traffic reuse the same tables while each call still observes new
 // deployment content. Original maps and frozen gathering/fight receipts keep their own data.
 func (s *GameService) AdminFieldRuntimeTables(ctx context.Context, serverID int64) (map[string][]map[string]string, error) {
+	snapshot, err := s.adminFieldRuntimeSnapshotForRequest(ctx, serverID)
+	if err != nil {
+		return nil, err
+	}
+	return snapshot.tables, nil
+}
+
+// adminFieldRuntimeSnapshotForRequest keeps the GGO parameters and the tables
+// from the same immutable deployment revision, including concurrent publishes.
+func (s *GameService) adminFieldRuntimeSnapshotForRequest(ctx context.Context, serverID int64) (*adminFieldRuntimeSnapshot, error) {
 	base := s.p10ClientOwner()
 	database := db.GetIns()
 	tx := database.WithContext(ctx)
 	// 正式启动完成初始化后直接查已提交行；未初始化的隔离兼容调用保留原表缺失回退。
 	if !base.adminFieldRuntimeReady.Load() && !gameSchemaHasTable(tx, &db.AdminFieldDeployment{}) {
-		return base.Tables, nil
+		return &adminFieldRuntimeSnapshot{tables: base.Tables}, nil
 	}
 	var deployments []db.AdminFieldDeployment
 	if err := tx.Where("server_id=?", serverID).Order("scene").Find(&deployments).Error; err != nil {
@@ -446,26 +486,52 @@ func (s *GameService) AdminFieldRuntimeTables(ctx context.Context, serverID int6
 	// 同一基础服务、区服和数据库连接上的相同有序内容直接复用不可变快照。
 	if cached := base.adminFieldRuntimeCache.Load(); cached != nil &&
 		cached.serverID == serverID && cached.database == database && cached.sqlDatabase == sqlDatabase && cached.signature == signature {
-		return cached.tables, nil
+		return cached, nil
 	}
 	// 只串行化缓存未命中的纯内存构建；查询已结束，正常命中不经过此锁。
 	base.adminFieldRuntimeBuild.Lock()
 	defer base.adminFieldRuntimeBuild.Unlock()
 	if cached := base.adminFieldRuntimeCache.Load(); cached != nil &&
 		cached.serverID == serverID && cached.database == database && cached.sqlDatabase == sqlDatabase && cached.signature == signature {
-		return cached.tables, nil
+		return cached, nil
 	}
 	if len(deployments) == 0 {
-		base.adminFieldRuntimeCache.Store(&adminFieldRuntimeSnapshot{serverID: serverID, database: database, sqlDatabase: sqlDatabase, signature: signature, tables: base.Tables})
-		return base.Tables, nil
+		snapshot := &adminFieldRuntimeSnapshot{serverID: serverID, database: database, sqlDatabase: sqlDatabase, signature: signature, tables: base.Tables}
+		base.adminFieldRuntimeCache.Store(snapshot)
+		return snapshot, nil
 	}
 	// 构建失败直接返回错误并保留旧快照不参与命中，避免旧配置冒充新发布成功。
 	tables, err := base.buildAdminFieldRuntimeTables(deployments)
 	if err != nil {
 		return nil, err
 	}
-	base.adminFieldRuntimeCache.Store(&adminFieldRuntimeSnapshot{serverID: serverID, database: database, sqlDatabase: sqlDatabase, signature: signature, tables: tables})
-	return tables, nil
+	var ggo, ggoEconomy *model.AdminFieldGGOConfiguration
+	var ggoRevision string
+	for _, deployment := range deployments {
+		if deployment.Scene != "field_003" {
+			continue
+		}
+		var cfg model.AdminFieldConfiguration
+		if err := json.Unmarshal([]byte(deployment.Configuration), &cfg); err != nil {
+			return nil, constUtil.ErrAdminConfiguration
+		}
+		if cfg.GGO != nil && cfg.GGO.SchemaVersion == constUtil.AdminFieldGGOSchemaVersion && cfg.GGO.Runtime != nil {
+			ggoEconomy = cfg.GGO
+		}
+		if deployment.Enabled && cfg.GGO != nil && cfg.GGO.Runtime != nil && cfg.GGO.Runtime.Enabled {
+			if !base.ggoExtractionEnabled() {
+				return nil, errors.New("沙漠搜打撤运行链尚未完成验收")
+			}
+			if cfg.GGO.SchemaVersion != constUtil.AdminFieldGGOSchemaVersion || !model.ValidAdminFieldGGORuntime(cfg.GGO) || !base.AdminGGOFieldBossResourceCatalogValid(cfg.GGO.Runtime.Boss) {
+				return nil, constUtil.ErrAdminConfiguration
+			}
+			ggo = cfg.GGO
+			ggoRevision = adminVersion(deployment)
+		}
+	}
+	snapshot := &adminFieldRuntimeSnapshot{serverID: serverID, database: database, sqlDatabase: sqlDatabase, signature: signature, tables: tables, ggo: ggo, ggoEconomy: ggoEconomy, ggoRevision: ggoRevision}
+	base.adminFieldRuntimeCache.Store(snapshot)
+	return snapshot, nil
 }
 
 // AdminFieldOriginalReference returns immutable source options to HTTP validation.

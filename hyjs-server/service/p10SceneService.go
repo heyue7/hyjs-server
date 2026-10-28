@@ -6,6 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+
+	"go.uber.org/zap"
+	"hyjs-server/elog"
 	"time"
 
 	"google.golang.org/protobuf/proto"
@@ -51,8 +54,12 @@ func p10SceneScope(g *model.GameState) string {
 	case "town", "town_main":
 		return "town_main"
 	case "field_001", "field_002":
-		// Both public fields join only after the original CurrentPosition handshake.
 		if !g.PositionLoading {
+			return g.Position.GetScene()
+		}
+	case constUtil.GGOFieldScene:
+		// A V4 terminal proves this character entered the published desert path.
+		if g.GGOField != nil && !g.PositionLoading {
 			return g.Position.GetScene()
 		}
 	}
@@ -92,7 +99,7 @@ func (s *GameService) p10SceneMovePlayer(p *pb.Player, g *model.GameState, proje
 	}
 	var side *pb.PlayerSide
 	fieldScope := p10SceneScope(g)
-	if g.Field != nil && g.Field.Side != nil && (fieldScope == "field_001" || fieldScope == "field_002") && g.Field.Scene == fieldScope {
+	if g.Field != nil && g.Field.Side != nil && (fieldScope == "field_001" || fieldScope == "field_002" || fieldScope == constUtil.GGOFieldScene) && g.Field.Scene == fieldScope {
 		side = proto.Clone(g.Field.Side).(*pb.PlayerSide)
 	} else {
 		side = &pb.PlayerSide{PlayerId: p.PlayerId}
@@ -150,16 +157,30 @@ func (s *GameService) p10CurrentScenePeers(ctx context.Context, id int64) ([]*pb
 }
 func (s *GameService) p10SceneLive(tx *gorm.DB, row db.P10ScenePresence) (*pb.MovePlayer, bool) {
 	value, ok := p10ClientSinks.Load(p10ClientKey{s.p10ClientOwner(), row.PlayerID})
-	if !ok || row.SessionHash == "" {
+	offline := !ok && row.Scene == constUtil.GGOFieldScene && row.SessionHash == "" && row.OfflineUntil > time.Now().UnixMilli()
+	if !offline && (!ok || row.SessionHash == "") {
 		return nil, false
 	}
-	sink := value.(*p10ClientSink)
 	var profile db.Profile
-	if tx.First(&profile, row.PlayerID).Error != nil || subtle.ConstantTimeCompare(profile.Session, sink.session) != 1 || row.SessionHash != p6Digest(sink.session) {
+	if tx.First(&profile, row.PlayerID).Error != nil {
 		return nil, false
+	}
+	if !offline {
+		sink := value.(*p10ClientSink)
+		if subtle.ConstantTimeCompare(profile.Session, sink.session) != 1 || row.SessionHash != p6Digest(sink.session) {
+			return nil, false
+		}
+	} else if profile.AccountID > 0 {
+		account, err := AccountForProfile(tx, &profile)
+		if err != nil || !account.Enabled || account.AuthRevision != profile.AccountAuthRevision {
+			return nil, false
+		}
 	}
 	_, game, err := decodeProfile(&profile)
 	if err != nil {
+		return nil, false
+	}
+	if offline && (game.GGOField == nil || game.Position.GetScene() != constUtil.GGOFieldScene || game.PositionLoading) {
 		return nil, false
 	}
 	expected, scopeErr := s.P13GuildRoomPresenceScope(tx, row.PlayerID, game)
@@ -174,17 +195,26 @@ func (s *GameService) p10SceneLive(tx *gorm.DB, row db.P10ScenePresence) (*pb.Mo
 }
 func (s *GameService) p10ScenePeers(tx *gorm.DB, scene string, line int32, exclude int64) ([]*pb.MovePlayer, error) {
 	var rows []db.P10ScenePresence
-	if err := tx.Where("scene=? AND line=? AND player_id<>? AND session_hash<>?", scene, line, exclude, "").Order("player_id").Find(&rows).Error; err != nil {
+	base := func() *gorm.DB { return tx.Where("scene=? AND line=? AND player_id<>?", scene, line, exclude) }
+	if err := base().Where("session_hash<>?", "").Order("player_id").Find(&rows).Error; err != nil {
 		return nil, err
+	}
+	if scene == constUtil.GGOFieldScene {
+		var offline []db.P10ScenePresence
+		if err := base().Where("session_hash=? AND offline_until>?", "", time.Now().UnixMilli()).Order("player_id").Find(&offline).Error; err != nil {
+			return nil, err
+		}
+		rows = append(rows, offline...)
 	}
 	var peers []*pb.MovePlayer
 	for _, row := range rows {
-		if frame, ok := s.p10SceneLive(tx, row); ok {
+		if frame, live := s.p10SceneLive(tx, row); live {
 			peers = append(peers, frame)
 		}
 	}
 	return peers, nil
 }
+
 func (s *GameService) p10SceneSend(ctx context.Context, id int64, message proto.Message) {
 	s.publishP10Private(ctx, id, message)
 }
@@ -254,7 +284,30 @@ func (s *GameService) SyncP10Scene(ctx context.Context, id int64, movement bool)
 	if err != nil {
 		return err
 	}
+	// New desert arrivals prefer a line below 16 players, preserving the hard 20 cap.
+	if scope == constUtil.GGOFieldScene && old.Scene != scope && len(peers) >= 16 {
+		bestLine, bestPeers := line, peers
+		for candidate := int32(1); candidate <= cfg.LineCount; candidate++ {
+			if candidate == line {
+				continue
+			}
+			available, e := s.p10ScenePeers(tx, scope, candidate, id)
+			if e != nil {
+				return e
+			}
+			if len(available) < len(bestPeers) {
+				bestLine, bestPeers = candidate, available
+			}
+			if len(bestPeers) < 16 {
+				break
+			}
+		}
+		line, peers = bestLine, bestPeers
+	}
 	if len(peers) >= int(cfg.MaxPlayers) {
+		if scope == constUtil.GGOFieldScene && old.Scene == scope {
+			return errors.New("原沙漠线路已满，请稍后重连")
+		}
 		found := false
 		for candidate := int32(1); candidate <= cfg.LineCount; candidate++ {
 			available, err := s.p10ScenePeers(tx, scope, candidate, id)
@@ -322,6 +375,28 @@ func (s *GameService) DisconnectP10Scene(ctx context.Context, id int64, session 
 	}
 	var row db.P10ScenePresence
 	if tx.Where("player_id=? AND session_hash=?", id, p6Digest(session)).First(&row).Error != nil {
+		return
+	}
+	if row.Scene == constUtil.GGOFieldScene {
+		if err := s.ggoTradeCancelSession(ctx, id, session); err != nil {
+			elog.Warn("ggo trade disconnect invalidation failed", zap.Error(err))
+		}
+		completed, err := s.ggoExtractionDisconnect(ctx, id, session)
+		if err != nil {
+			elog.Warn("ggo extraction disconnect recovery failed", zap.Error(err))
+		}
+		if completed {
+			result := tx.Model(&db.P10ScenePresence{}).Where("player_id=? AND session_hash=?", id, p6Digest(session)).Updates(map[string]any{"session_hash": "", "offline_until": 0, "offline_pk_used": false})
+			if result.Error == nil && result.RowsAffected == 1 {
+				s.p10SceneBroadcast(ctx, row.Scene, row.Line, id, &pb.SCPlayerDisappear{PlayerId: []int64{id}})
+			}
+			return
+		}
+		until := time.Now().UnixMilli() + 60000
+		result := tx.Model(&db.P10ScenePresence{}).Where("player_id=? AND session_hash=?", id, p6Digest(session)).Updates(map[string]any{"session_hash": "", "offline_until": until, "offline_pk_used": false, "updated_at": time.Now().UnixMilli()})
+		if result.Error == nil && result.RowsAffected == 1 {
+			s.ggoScheduleOfflineExpiry(id, until)
+		}
 		return
 	}
 	if tx.Model(&db.P10ScenePresence{}).Where("player_id=? AND session_hash=?", id, p6Digest(session)).Update("session_hash", "").Error == nil {
@@ -421,7 +496,7 @@ func (s *GameService) DispatchP10Scene(ctx context.Context, id int64, request pr
 				return err
 			}
 			// Original success clears actors before requesting CurrentPosition. Do not tear down an accepted action.
-			_, game, decodeErr := decodeProfile(&row)
+			player, game, decodeErr := decodeProfile(&row)
 			if decodeErr != nil {
 				return decodeErr
 			}
@@ -463,6 +538,25 @@ func (s *GameService) DispatchP10Scene(ctx context.Context, id int64, request pr
 			}
 			if len(peers) >= int(cfg.MaxPlayers) {
 				return errors.New("目标分线已满")
+			}
+			if oldLine != b.GetLine() && game.Position.GetScene() == constUtil.GGOFieldScene && game.GGOField != nil {
+				var locked db.P10ScenePresence
+				if err = tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&locked, "player_id=?", id).Error; err != nil {
+					return err
+				}
+				if locked.Scene != own.Scene || locked.Line != oldLine || locked.SessionHash != p6Digest(row.Session) {
+					return errors.New("场景会话已变化")
+				}
+				if err = ggoCommitLeave(tx, s, id, game, "line", "", b.GetLine(), time.Now().UnixMilli()); err != nil {
+					return err
+				}
+				if err = ggoPositionBump(game); err != nil {
+					return err
+				}
+				if err = saveProfile(tx, &row, player, game); err != nil {
+					return err
+				}
+				own = locked
 			}
 			own.Line = b.GetLine()
 			if err = tx.Save(&own).Error; err != nil {

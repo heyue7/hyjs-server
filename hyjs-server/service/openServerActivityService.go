@@ -841,6 +841,11 @@ func (s *GameService) openServerGain(player *pb.Player, g *model.GameState, cont
 		n64, _ := strconv.ParseInt(pair[1], 10, 32)
 		n := int32(n64)
 		switch {
+		case key == constUtil.GGOCurrencyID:
+			if err := ggoCreditAdd(g, n64); err != nil {
+				return nil, err
+			}
+			gain.Simps = append(gain.Simps, &pb.SimpleItem{Id: proto.String(key), Num: proto.Int32(n)})
 		case strings.HasPrefix(key, "MineItem_"):
 			// 原 AddSimpleItem 按前缀更新宝石库存；奖励与开箱共用真实堆叠校验。
 			if err := s.gemInventoryDelta(player, g, map[string]int64{key: n64}); err != nil {

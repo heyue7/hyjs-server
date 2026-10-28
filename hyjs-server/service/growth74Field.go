@@ -79,7 +79,7 @@ func (s *GameService) growth74Field(ctx context.Context, a *model.AdminPrincipal
 					b.RankDrops = []model.AdminFieldBossRank73{{From: 1, To: 1, Drops: []model.AdminFieldDrop{growth74Drop("diamond", rank1)}}, {From: 2, To: 3, Drops: []model.AdminFieldDrop{growth74Drop("diamond", rank23)}}, {From: 4, To: 10, Drops: []model.AdminFieldDrop{growth74Drop("diamond", rank410)}}}
 				}
 			}
-			if cfg.GGO != nil {
+			if cfg.GGO != nil && cfg.GGO.Runtime == nil {
 				for i := range cfg.GGO.Chips {
 					v := &cfg.GGO.Chips[i]
 					n := []int64{3, 9, 30, 90, 300, 900}[i]

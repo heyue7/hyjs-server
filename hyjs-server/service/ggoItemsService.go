@@ -92,7 +92,7 @@ func (s *GameService) InitializeGGO(ctx context.Context) error {
 	if err := initializeGGOAccountWeekly(tx); err != nil {
 		return err
 	}
-	if err := tx.AutoMigrate(&db.GGOShopReceipt{}); err != nil {
+	if err := tx.AutoMigrate(&db.GGOShopReceipt{}, &db.GGOFieldLine{}, &db.GGOFieldReceipt{}); err != nil {
 		return err
 	}
 	var count int64
@@ -167,6 +167,9 @@ func (s *GameService) ggoCatalogue(tx *gorm.DB, player *pb.Player, game *model.G
 	_, quote, err := s.ggoLoadQuote(tx, player.GetPlayerId(), *raw.Period, rules, out.Enabled)
 	if err != nil {
 		return nil, err
+	}
+	if quote != nil {
+		rules.RefreshCost = quote.RefreshCost
 	}
 	products := ggoQuoteProducts(rules, quote)
 	weekly, weeklyAccount, err := ggoWeeklyCatalogue(tx, player.GetPlayerId(), products, time.Now())
@@ -265,6 +268,11 @@ func (s *GameService) GGOShopCatalogue(ctx context.Context, playerID int64, sess
 	if err != nil {
 		return nil, err
 	}
+	s, err = s.ggoShopPricingService(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	var out *model.GGOShopCatalogueResponse
 	err = db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := ServerGameClockGuardTransaction(tx); err != nil {
@@ -308,6 +316,11 @@ func (s *GameService) GGOShopBuy(ctx context.Context, req model.GGOShopBuyReques
 	if err != nil {
 		return nil, err
 	}
+	s, err = s.ggoShopPricingService(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	var out model.GGOShopBuyResponse
 	err = db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := ServerGameClockGuardTransaction(tx); err != nil {
@@ -389,7 +402,7 @@ func (s *GameService) GGOShopBuy(ctx context.Context, req model.GGOShopBuyReques
 				return errors.New("该槽已购买或数量无效")
 			}
 		}
-		if offer.Price < 1 || offer.Amount < 1 || offer.Price > math.MaxInt32/count || offer.Amount > math.MaxInt32/count {
+		if offer.Price < 1 || offer.Amount < 1 || offer.Price > math.MaxInt64/count || offer.Amount > math.MaxInt32/count {
 			return errors.New("批量信用商店价格或奖励溢出")
 		}
 		// Keep source stock locking ahead of wallet/reward writes. Catalogue reads
@@ -425,12 +438,11 @@ func (s *GameService) GGOShopBuy(ctx context.Context, req model.GGOShopBuyReques
 			return err
 		}
 		totalPrice, totalReward := offer.Price*count, offer.Amount*count
-		cost, err := s.p4ParseCost(fmt.Sprintf("%s,%d", constUtil.GGOCurrencyID, totalPrice))
-		if err != nil {
+		now := LocalPlayNow(ctx)
+		if err = ggoCreditDeduct(game, totalPrice); err != nil {
 			return err
 		}
-		now := LocalPlayNow(ctx)
-		if err = s.p4Deduct(tx, row.Id, player, game, cost, "ggo-shop:"+req.RequestID, now); err != nil {
+		if err = s.RecordP1Event(tx, row.Id, "ggo-shop:"+req.RequestID, "spend:"+constUtil.GGOCurrencyID, totalPrice, now); err != nil {
 			return err
 		}
 		if _, err = s.GrantFixedReward(player, game, fmt.Sprintf("%s,%d", offer.ResourceID, totalReward)); err != nil {
