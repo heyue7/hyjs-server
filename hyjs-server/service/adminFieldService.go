@@ -193,7 +193,7 @@ func (s *GameService) adminFieldTemplateDTO(row db.AdminFieldTemplate) (model.Ad
 	if source, err := s.adminOriginalField(row.Scene); err == nil {
 		adminFieldNormalizeConfiguration(&cfg, source)
 	}
-	available := constUtil.P8PackagedFieldScene(row.Scene)
+	available := constUtil.P8PackagedFieldScene(row.Scene) || row.Scene == constUtil.GGOFieldScene && s.ggoExtractionEnabled()
 	reason := ""
 	if !available {
 		reason = constUtil.AdminFieldUnavailable
@@ -370,7 +370,7 @@ func (s *GameService) AdminFieldDeployments(ctx context.Context, actor *model.Ad
 	for _, field := range s.Tables["Field"] {
 		scene := field["FieldId"]
 		r, ok := byScene[scene]
-		v := model.AdminFieldDeploymentDTO{Scene: scene, Name: s.adminFieldName(scene), TemplateID: "original-" + scene, Enabled: constUtil.P8PackagedFieldScene(scene), Available: constUtil.P8PackagedFieldScene(scene)}
+		v := model.AdminFieldDeploymentDTO{Scene: scene, Name: s.adminFieldName(scene), TemplateID: "original-" + scene, Enabled: constUtil.P8PackagedFieldScene(scene), Available: constUtil.P8PackagedFieldScene(scene) || scene == constUtil.GGOFieldScene && s.ggoExtractionEnabled()}
 		if ok {
 			t, found := templates[r.TemplateID]
 			if !found {

@@ -7,54 +7,54 @@ defineProps<{ disabled: boolean; resources?: FieldResource[]; bossResources?: Fi
 const runtime = computed(() => value.value.runtime!);
 type Field = { key: string; label: string; min?: number; max?: number };
 const resourceFields: Field[] = [
-  { key: 'mineCount', label: '公共矿位数量', min: 1 },
-  { key: 'fishCount', label: '公共鱼位数量', min: 1 },
-  { key: 'capacity', label: '每节点公共可采次数', min: 1 },
-  { key: 'cycleSeconds', label: '强制刷新周期（秒）', min: 1 },
-  { key: 'mineCooldownSeconds', label: '矿耗尽刷新（秒）', min: 1 },
-  { key: 'fishCooldownSeconds', label: '鱼耗尽刷新（秒）', min: 1 },
-  { key: 'mineGatherMillis', label: '挖矿读条（毫秒）', min: 1 },
-  { key: 'fishGatherMillis', label: '钓鱼读条（毫秒）', min: 1 },
-  { key: 'fatigue', label: '每次消耗疲劳', min: 0 },
-  { key: 'materialNumerator', label: '材料倍率分子', min: 1 },
+  { key: 'mineCount', label: '公共矿位数量', min: 1, max: 50 },
+  { key: 'fishCount', label: '公共鱼位数量', min: 1, max: 50 },
+  { key: 'capacity', label: '每节点公共可采次数', min: 1, max: 100 },
+  { key: 'cycleSeconds', label: '强制刷新周期（秒）', min: 60, max: 86400 },
+  { key: 'mineCooldownSeconds', label: '矿耗尽刷新（秒）', min: 1, max: 86400 },
+  { key: 'fishCooldownSeconds', label: '鱼耗尽刷新（秒）', min: 1, max: 86400 },
+  { key: 'mineGatherMillis', label: '挖矿读条（毫秒）', min: 1, max: 300000 },
+  { key: 'fishGatherMillis', label: '钓鱼读条（毫秒）', min: 1, max: 300000 },
+  { key: 'fatigue', label: '每次消耗疲劳', min: 1, max: 200 },
+  { key: 'materialNumerator', label: '材料倍率分子', min: 1, max: 1000 },
   { key: 'materialDenominator', label: '材料倍率分母（四分之一余数）', min: 4, max: 4 }
 ];
 const mobFields: Field[] = [
-  { key: 'level', label: '等级', min: 1 },
-  { key: 'count', label: '点位数量', min: 1 },
-  { key: 'hp', label: '生命', min: 1 },
-  { key: 'attack', label: '攻击', min: 1 },
-  { key: 'phyDefend', label: '物理防御', min: 0 },
-  { key: 'magicDefend', label: '魔法防御', min: 0 },
-  { key: 'respawnSeconds', label: '死亡刷新（秒）', min: 1 },
+  { key: 'level', label: '等级', min: 1, max: 1000 },
+  { key: 'count', label: '点位数量', min: 1, max: 50 },
+  { key: 'hp', label: '生命', min: 1, max: 2000000000 },
+  { key: 'attack', label: '攻击', min: 1, max: 2000000000 },
+  { key: 'phyDefend', label: '物理防御', min: 0, max: 2000000000 },
+  { key: 'magicDefend', label: '魔法防御', min: 0, max: 2000000000 },
+  { key: 'respawnSeconds', label: '死亡刷新（秒）', min: 1, max: 604800 },
   { key: 'chipTriggerBps', label: '芯片触发（万分比）', min: 0, max: 10000 },
-  { key: 'rewardNumerator', label: '普通奖励倍率分子', min: 1 },
-  { key: 'rewardDenominator', label: '普通奖励倍率分母', min: 1 }
+  { key: 'rewardNumerator', label: '普通奖励倍率分子', min: 1, max: 1000 },
+  { key: 'rewardDenominator', label: '普通奖励倍率分母', min: 1, max: 1000 }
 ];
 const bossFields: Field[] = [
   { key: 'level', label: '等级', min: 1, max: 1000 },
   { key: 'partyRounds', label: '每名玩家己方轮数', min: 1, max: 20 },
   { key: 'sproutMax', label: '有效小芽上限', min: 0, max: 2 },
-  { key: 'sproutBonusBps', label: '每名小芽矿鱼加成（万分比）', min: 0, max: 5000 },
-  { key: 'hp', label: '生命', min: 1 },
-  { key: 'attack', label: '攻击', min: 1 },
-  { key: 'phyDefend', label: '物理防御', min: 0 },
-  { key: 'magicDefend', label: '魔法防御', min: 0 },
+  { key: 'sproutBonusBps', label: '每名小芽矿鱼加成（万分比）', min: 0, max: 10000 },
+  { key: 'hp', label: '生命', min: 1, max: 2000000000 },
+  { key: 'attack', label: '攻击', min: 1, max: 2000000000 },
+  { key: 'phyDefend', label: '物理防御', min: 0, max: 2000000000 },
+  { key: 'magicDefend', label: '魔法防御', min: 0, max: 2000000000 },
   { key: 'participationThresholdBps', label: '蓝芯升档贡献（万分比）', min: 1, max: 10000 },
-  { key: 'dailyLimit', label: '跨三图每日奖励次数', min: 1 },
-  { key: 'participationAmount', label: '参与蓝芯数量', min: 1 },
-  { key: 'thresholdAmount', label: '贡献达标蓝芯数量', min: 1 },
-  { key: 'activeSeconds', label: '存活时间（秒）', min: 1 },
-  { key: 'warningSeconds', label: '提前提示（秒）', min: 0 },
+  { key: 'dailyLimit', label: '跨三图每日奖励次数', min: 1, max: 100 },
+  { key: 'participationAmount', label: '参与蓝芯数量', min: 1, max: 100 },
+  { key: 'thresholdAmount', label: '贡献达标蓝芯数量', min: 1, max: 100 },
+  { key: 'activeSeconds', label: '存活时间（秒）', min: 1, max: 86400 },
+  { key: 'warningSeconds', label: '提前提示（秒）', min: 0, max: 86400 },
   { key: 'eveningStartHour', label: '晚间开始（北京时间）', min: 0, max: 23 },
-  { key: 'dayIntervalMinutes', label: '白天刷新间隔（分钟）', min: 1 },
-  { key: 'eveningIntervalMinutes', label: '晚间刷新间隔（分钟）', min: 1 }
+  { key: 'dayIntervalMinutes', label: '白天刷新间隔（分钟）', min: 1, max: 1440 },
+  { key: 'eveningIntervalMinutes', label: '晚间刷新间隔（分钟）', min: 1, max: 1440 }
 ];
 const shopFields: Field[] = [
-  { key: 'priceNumerator', label: '售价倍率分子', min: 1 },
-  { key: 'priceDenominator', label: '售价倍率分母', min: 1 },
-  { key: 'roundTo', label: '售价向上取整单位', min: 1 },
-  { key: 'refreshCost', label: '每次刷新信用点', min: 1 }
+  { key: 'priceNumerator', label: '售价倍率分子', min: 1, max: 1000 },
+  { key: 'priceDenominator', label: '售价倍率分母', min: 1, max: 1000 },
+  { key: 'roundTo', label: '售价向上取整单位', min: 1, max: 1000 },
+  { key: 'refreshCost', label: '每次刷新信用点', min: 0, max: 2000000000 }
 ];
 function read(target: object, key: string): number {
   return Number((target as Record<string, unknown>)[key]);
@@ -66,6 +66,7 @@ const totalWeight = computed(() => runtime.value.resource.tiers.reduce((n, row) 
 const chipWeight = computed(() => value.value.chips.reduce((n, row) => n + (row.dropWeight ?? 0), 0));
 const tailWeight = computed(() => runtime.value.boss.tailRewards.reduce((n, row) => n + row.weight, 0));
 const chipOptions = computed(() => value.value.chips.map(c => ({ label: c.name, value: c.itemId })));
+const minPositive = Number.MIN_VALUE;
 const axes = ['x', 'y', 'z'] as const;
 const pointKinds = [
   { label: '小怪', value: 'monster' },
@@ -74,6 +75,10 @@ const pointKinds = [
   { label: 'Boss', value: 'boss' },
   { label: '接应', value: 'exit' }
 ];
+function lowestMonsterLevel() {
+  const levels = runtime.value.monsterTiers.map(tier => tier.level).filter(level => Number.isSafeInteger(level) && level >= 1 && level <= 1000);
+  return levels.length ? Math.min(...levels) : 0;
+}
 function addPoint() {
   let i = 1;
   const ids = new Set(runtime.value.points.map(p => p.id));
@@ -81,7 +86,7 @@ function addPoint() {
   runtime.value.points.push({
     id: `new-${i}`,
     kind: 'monster',
-    level: 35,
+    level: lowestMonsterLevel(),
     position: null,
     standPosition: null,
     radius: 2
@@ -89,6 +94,22 @@ function addPoint() {
 }
 function kindText(kind: FieldGGOWorldPoint['kind']) {
   return pointKinds.find(p => p.value === kind)?.label ?? kind;
+}
+function updatePointKind(point: FieldGGOWorldPoint, kind: FieldGGOWorldPoint['kind']) {
+  if (point.kind === kind) return;
+  point.kind = kind;
+  if (kind === 'monster') {
+    point.level = lowestMonsterLevel();
+  } else {
+    point.level = 0;
+    delete point.patrol;
+  }
+}
+function addPatrol(point: FieldGGOWorldPoint) {
+  point.patrol = {
+    speed: 3.2,
+    waypoints: point.position ? [{ ...point.position }] : []
+  };
 }
 const npcRoles: Record<string, string> = { teleport: '随机传送', extraction: '撤离接应', settlement: '安全区结算' };
 </script>
@@ -106,6 +127,15 @@ const npcRoles: Record<string, string> = { teleport: '随机传送', extraction:
         <h3>入口与结算</h3>
         <div class="runtime-grid">
           <NFormItem label="沙漠玩法开关"><NSwitch v-model:value="runtime.enabled" /></NFormItem>
+          <NFormItem label="最低客户端构建号">
+            <NInputNumber
+              v-model:value="runtime.minClientBuild"
+              :min="0"
+              :max="2100000000"
+              :precision="0"
+              :input-props="{ 'aria-label': '最低客户端构建号' }"
+            />
+          </NFormItem>
           <NFormItem label="经济版本"><NInput v-model:value="runtime.economyVersion" :maxlength="64" /></NFormItem>
           <NFormItem label="地图标题"><NInput v-model:value="value.title" :maxlength="80" /></NFormItem>
           <NFormItem label="玩法名称"><NInput v-model:value="value.modeName" :maxlength="80" /></NFormItem>
@@ -116,7 +146,7 @@ const npcRoles: Record<string, string> = { teleport: '随机传送', extraction:
             <NInputNumber v-model:value="value.rules.extractionSeconds" :min="0" :max="300" :precision="0" />
           </NFormItem>
           <NFormItem label="保护最高品质芯片（枚）">
-            <NInputNumber v-model:value="runtime.protectedChips" :min="0" :precision="0" />
+            <NInputNumber v-model:value="runtime.protectedChips" :min="0" :max="100" :precision="0" />
           </NFormItem>
           <NFormItem label="死亡扣除比例（%）">
             <NInputNumber v-model:value="value.rules.deathLossPercent" :min="0" :max="100" :precision="0" />
@@ -196,6 +226,8 @@ const npcRoles: Record<string, string> = { teleport: '随机传送', extraction:
             v-if="tier.mineDrops"
             v-model:value="tier.mineDrops"
             :disabled="disabled"
+            resource-locked
+            :max-amount="10000"
             :resources="resources ?? []"
           />
           <h4 class="mb-2 mt-4">鱼种与独立命中</h4>
@@ -203,6 +235,8 @@ const npcRoles: Record<string, string> = { teleport: '随机传送', extraction:
             v-if="tier.fishDrops"
             v-model:value="tier.fishDrops"
             :disabled="disabled"
+            resource-locked
+            :max-amount="10000"
             :resources="resources ?? []"
           />
           <p class="context mt-3">
@@ -223,7 +257,7 @@ const npcRoles: Record<string, string> = { teleport: '随机传送', extraction:
               <NFormItem label="怪物模型">
                 <NSelect
                   v-model:value="tier.heroId"
-                  :options="value.monsters.map(enemy => ({ label: enemy.name, value: enemy.heroId }))"
+                  :options="value.monsters.filter(enemy => ['monster_026', 'monster_032', 'monster_031'].includes(enemy.heroId)).map(enemy => ({ label: enemy.name, value: enemy.heroId }))"
                 />
               </NFormItem>
               <NFormItem v-for="f in mobFields" :key="f.key" :label="f.label">
@@ -244,7 +278,12 @@ const npcRoles: Record<string, string> = { teleport: '随机传送', extraction:
       <section class="runtime-section">
         <h3>唯一公共 Boss</h3>
         <div class="runtime-grid">
-          <NFormItem label="Boss 模型"><NInput v-model:value="runtime.boss.heroId" /></NFormItem>
+          <NFormItem label="Boss 模型">
+            <NSelect
+              v-model:value="runtime.boss.heroId"
+              :options="value.bosses.filter(enemy => enemy.heroId === 'hero_017').map(enemy => ({ label: enemy.name, value: enemy.heroId }))"
+            />
+          </NFormItem>
           <NFormItem v-for="f in bossFields" :key="f.key" :label="f.label">
             <NInputNumber
               :value="read(runtime.boss, f.key)"
@@ -265,21 +304,23 @@ const npcRoles: Record<string, string> = { teleport: '随机传送', extraction:
             <DropEditor
               v-model:value="runtime.boss.resourceDrops"
               :disabled="disabled"
+              :min-weight="0"
               :resources="bossResources ?? []"
             />
             <div v-for="(band, index) in runtime.boss.rankResourceDrops" :key="index" class="boss-resource-band">
               <div class="runtime-grid">
                 <NFormItem label="起始名次">
-                  <NInputNumber v-model:value="band.from" :min="1" :precision="0" />
+                  <NInputNumber v-model:value="band.from" :min="1" :max="100" :precision="0" />
                 </NFormItem>
-                <NFormItem label="结束名次"><NInputNumber v-model:value="band.to" :min="1" :precision="0" /></NFormItem>
+                <NFormItem label="结束名次"><NInputNumber v-model:value="band.to" :min="1" :max="100" :precision="0" /></NFormItem>
               </div>
-              <DropEditor v-model:value="band.drops" :disabled="disabled" :resources="bossResources ?? []" />
+              <DropEditor v-model:value="band.drops" :disabled="disabled" :min-weight="0" :resources="bossResources ?? []" />
             </div>
             <h4>尾刀资源包</h4>
             <DropEditor
               v-model:value="runtime.boss.tailResourceDrops"
               :disabled="disabled"
+              :min-weight="0"
               :resources="bossResources ?? []"
             />
             <p class="context">
@@ -298,12 +339,12 @@ const npcRoles: Record<string, string> = { teleport: '随机传送', extraction:
                 </thead>
                 <tbody>
                   <tr v-for="(q, index) in tier.quantities" :key="index">
-                    <td><NInputNumber v-model:value="q.amount" :min="1" :precision="0" :disabled="disabled" /></td>
+                    <td><NInputNumber v-model:value="q.amount" :min="1" :max="2147483647" :precision="0" :disabled="disabled" /></td>
                     <td>
                       <NInputNumber
                         v-model:value="q.weight"
-                        :min="1"
-                        :max="1000000"
+                        :min="0"
+                        :max="10000"
                         :precision="0"
                         :disabled="disabled"
                       />
@@ -327,10 +368,10 @@ const npcRoles: Record<string, string> = { teleport: '随机传送', extraction:
                 </thead>
                 <tbody>
                   <tr v-for="(row, index) in runtime.boss.rankRewards" :key="index">
-                    <td><NInputNumber v-model:value="row.from" :min="1" :precision="0" /></td>
-                    <td><NInputNumber v-model:value="row.to" :min="1" :precision="0" /></td>
+                    <td><NInputNumber v-model:value="row.from" :min="1" :max="100" :precision="0" /></td>
+                    <td><NInputNumber v-model:value="row.to" :min="1" :max="100" :precision="0" /></td>
                     <td><NSelect v-model:value="row.itemId" :options="chipOptions" /></td>
-                    <td><NInputNumber v-model:value="row.amount" :min="1" :precision="0" /></td>
+                    <td><NInputNumber v-model:value="row.amount" :min="1" :max="100" :precision="0" /></td>
                   </tr>
                 </tbody>
               </table>
@@ -362,7 +403,7 @@ const npcRoles: Record<string, string> = { teleport: '随机传送', extraction:
       <section class="runtime-section">
         <h3>六品质芯片与信用商店</h3>
         <div class="table-wrap">
-          <table>
+          <table class="chip-table">
             <caption>
               条件品质池
               <span :class="{ invalid: chipWeight !== 10000 }">权重合计 {{ chipWeight }} / 10000</span>
@@ -379,8 +420,8 @@ const npcRoles: Record<string, string> = { teleport: '随机传送', extraction:
               <tr v-for="chip in value.chips" :key="chip.itemId">
                 <th scope="row">{{ chip.name }}</th>
                 <td><NInputNumber v-model:value="chip.dropWeight" :min="0" :max="10000" :precision="0" /></td>
-                <td><NInputNumber v-model:value="chip.dropAmount" :min="1" :precision="0" /></td>
-                <td><NInputNumber v-model:value="chip.exchangeValue" :min="0" :precision="0" /></td>
+                <td><NInputNumber v-model:value="chip.dropAmount" :min="1" :max="1" :precision="0" /></td>
+                <td><NInputNumber v-model:value="chip.exchangeValue" :min="1" :precision="0" /></td>
               </tr>
             </tbody>
           </table>
@@ -390,6 +431,7 @@ const npcRoles: Record<string, string> = { teleport: '随机传送', extraction:
             <NInputNumber
               :value="read(runtime.shop, f.key)"
               :min="f.min"
+              :max="f.max"
               :precision="0"
               @update:value="update(runtime.shop, f.key, $event)"
             />
@@ -403,7 +445,7 @@ const npcRoles: Record<string, string> = { teleport: '随机传送', extraction:
       <section class="runtime-section">
         <h3>地图点位与安全区</h3>
         <p class="context">
-          填写 Unity 已核验的世界坐标。底图像素不能直接填入；鱼模型与岸上站位分开。空坐标可存草稿，启用前须补齐。
+          填写 Unity 已核验的世界坐标。底图像素不能直接填入；鱼模型与岸上站位分开。空坐标可存草稿，启用前须补齐且交互半径大于 0。
         </p>
         <NCollapse>
           <NCollapseItem title="安全区边界与返回位置" name="safe-coordinates">
@@ -413,7 +455,7 @@ const npcRoles: Record<string, string> = { teleport: '随机传送', extraction:
                 :key="key"
                 :label="label"
               >
-                <NInputNumber v-model:value="runtime.safeArea[key]" :precision="3" />
+                <NInputNumber v-model:value="runtime.safeArea[key]" :min="-100000" :max="100000" />
               </NFormItem>
             </div>
             <NButton
@@ -426,7 +468,7 @@ const npcRoles: Record<string, string> = { teleport: '随机传送', extraction:
             </NButton>
             <div v-if="runtime.safeReturn" class="runtime-grid">
               <NFormItem v-for="axis in axes" :key="axis" :label="`返回位置 ${axis.toUpperCase()}`">
-                <NInputNumber v-model:value="runtime.safeReturn[axis]" :precision="3" />
+                <NInputNumber v-model:value="runtime.safeReturn[axis]" :min="-100000" :max="100000" />
               </NFormItem>
             </div>
             <NButton v-else :disabled="disabled" secondary @click="runtime.safeReturn = { x: null, y: null, z: null }">
@@ -437,7 +479,7 @@ const npcRoles: Record<string, string> = { teleport: '随机传送', extraction:
             <div v-for="(position, index) in runtime.entryPoints" :key="index" class="point-entry">
               <div class="runtime-grid">
                 <NFormItem v-for="axis in axes" :key="axis" :label="`落点${index + 1} ${axis.toUpperCase()}`">
-                  <NInputNumber v-model:value="position[axis]" :precision="3" />
+                  <NInputNumber v-model:value="position[axis]" :min="-100000" :max="100000" />
                 </NFormItem>
               </div>
               <NButton :disabled="disabled" size="small" secondary @click="runtime.entryPoints.splice(index, 1)">
@@ -458,17 +500,18 @@ const npcRoles: Record<string, string> = { teleport: '随机传送', extraction:
               >
                 <div class="runtime-grid">
                   <NFormItem label="点位编号"><NInput v-model:value="point.id" /></NFormItem>
-                  <NFormItem label="类型"><NSelect v-model:value="point.kind" :options="pointKinds" /></NFormItem>
+                  <NFormItem label="类型"><NSelect :value="point.kind" :options="pointKinds" @update:value="updatePointKind(point, $event)" /></NFormItem>
                   <NFormItem v-if="point.kind === 'monster'" label="小怪等级">
-                    <NInputNumber v-model:value="point.level" :min="1" :precision="0" />
+                    <NInputNumber v-model:value="point.level" :min="1" :max="1000" :precision="0" />
                   </NFormItem>
                   <NFormItem label="交互半径（米）">
-                    <NInputNumber v-model:value="point.radius" :min="0.1" :precision="2" />
+                    <NInputNumber v-model:value="point.radius" :min="0" :max="100" />
                   </NFormItem>
                 </div>
+                <p v-if="point.kind === 'monster' && point.patrol" class="context">切换为非小怪会清除该点位的巡逻路径。</p>
                 <div v-if="point.position" class="runtime-grid">
                   <NFormItem v-for="axis in axes" :key="axis" :label="`模型 ${axis.toUpperCase()}`">
-                    <NInputNumber v-model:value="point.position[axis]" :precision="3" />
+                    <NInputNumber v-model:value="point.position[axis]" :min="-100000" :max="100000" />
                   </NFormItem>
                 </div>
                 <NButton v-else :disabled="disabled" secondary @click="point.position = { x: null, y: null, z: null }">
@@ -476,7 +519,7 @@ const npcRoles: Record<string, string> = { teleport: '随机传送', extraction:
                 </NButton>
                 <div v-if="point.standPosition" class="runtime-grid">
                   <NFormItem v-for="axis in axes" :key="axis" :label="`交互站位 ${axis.toUpperCase()}`">
-                    <NInputNumber v-model:value="point.standPosition[axis]" :precision="3" />
+                    <NInputNumber v-model:value="point.standPosition[axis]" :min="-100000" :max="100000" />
                   </NFormItem>
                 </div>
                 <NButton
@@ -496,6 +539,38 @@ const npcRoles: Record<string, string> = { teleport: '随机传送', extraction:
                 >
                   移除此点位
                 </NButton>
+                <div v-if="point.kind === 'monster'" class="point-entry">
+                  <template v-if="point.patrol">
+                    <h4>公共巡逻路径</h4>
+                    <p class="context">仅最低等级小怪可巡逻，启用须至少四只。首个路点须与模型位置一致；路径须经过 Unity 导航核验。</p>
+                    <NFormItem label="巡逻速度（米/秒）">
+                      <NInputNumber
+                        v-model:value="point.patrol.speed"
+                        :min="minPositive"
+                        :max="50"
+                        :input-props="{ 'aria-label': `${point.id}巡逻速度` }"
+                      />
+                    </NFormItem>
+                    <div v-for="(waypoint, waypointIndex) in point.patrol.waypoints" :key="waypointIndex" class="point-entry">
+                      <div class="runtime-grid">
+                        <NFormItem v-for="axis in axes" :key="axis" :label="`路点${waypointIndex + 1} ${axis.toUpperCase()}`">
+                          <NInputNumber
+                            v-model:value="waypoint[axis]"
+                            :min="-100000"
+                            :max="100000"
+                            :input-props="{ 'aria-label': `${point.id}路点${waypointIndex + 1} ${axis.toUpperCase()}` }"
+                          />
+                        </NFormItem>
+                      </div>
+                      <NButton :disabled="disabled" secondary size="small" @click="point.patrol.waypoints.splice(waypointIndex, 1)">移除此路点</NButton>
+                    </div>
+                    <NSpace class="mt-3">
+                      <NButton :disabled="disabled || point.patrol.waypoints.length >= 32" secondary size="small" @click="point.patrol.waypoints.push({ x: null, y: null, z: null })">添加路点</NButton>
+                      <NButton :disabled="disabled" secondary size="small" @click="delete point.patrol">取消巡逻</NButton>
+                    </NSpace>
+                  </template>
+                  <NButton v-else :disabled="disabled" secondary size="small" @click="addPatrol(point)">设置巡逻路径</NButton>
+                </div>
               </NCollapseItem>
             </NCollapse>
             <NButton :disabled="disabled" secondary class="mt-4" @click="addPoint">添加公共点位</NButton>
@@ -526,7 +601,8 @@ const npcRoles: Record<string, string> = { teleport: '随机传送', extraction:
               <NFormItem v-for="axis in ['x', 'y', 'z'] as const" :key="axis" :label="`世界坐标 ${axis.toUpperCase()}`">
                 <NInputNumber
                   v-model:value="npc.position[axis]"
-                  :precision="3"
+                  :min="-100000"
+                  :max="100000"
                   :input-props="{ 'aria-label': `${npc.name}坐标${axis}` }"
                 />
               </NFormItem>
@@ -606,7 +682,7 @@ const npcRoles: Record<string, string> = { teleport: '随机传送', extraction:
 .runtime-section {
   margin-top: 24px;
   padding-top: 20px;
-  border-top: 1px solid #e5e7eb;
+  border-top: 1px solid var(--n-border-color, #e5e7eb);
 }
 .runtime-section h3 {
   margin: 0 0 16px;
@@ -655,7 +731,7 @@ th {
 th,
 td {
   padding: 10px 12px;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--n-border-color, #e5e7eb);
   vertical-align: middle;
 }
 th:first-child,
@@ -668,11 +744,6 @@ td :deep(.n-input-number) {
 td :deep(.n-select) {
   min-width: 136px;
 }
-:global(.dark) .runtime-section,
-:global(.dark) th,
-:global(.dark) td {
-  border-color: #374151;
-}
 @media (max-width: 600px) {
   .runtime-grid {
     grid-template-columns: minmax(0, 1fr);
@@ -684,6 +755,12 @@ td :deep(.n-select) {
   caption span {
     display: block;
     margin: 4px 0 0;
+  }
+  .chip-table th:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    background: var(--n-color, #fff);
   }
 }
 </style>

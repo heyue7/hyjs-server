@@ -1,4 +1,4 @@
-"""Prepare a desert release overlay from v80 after reviewed, pinned QA evidence.
+"""Prepare a desert and trial release overlay from v80 after reviewed, pinned QA evidence.
 
 This script does not sign, install, deploy, or promote a QA overlay/APK.
 """
@@ -15,18 +15,19 @@ import zipfile
 ROOT = Path(__file__).resolve().parents[2]
 BASE_SHA = '25026a1f180d164ba2b191e4cc7e558e20f7a761b740fb7b28d6205d6756112a'
 QA_ORIGIN = 'http://127.0.0.1:28979'
-BUILD_CODE = 2026102804
-VERSION_NAME = '1.0.81'
+BUILD_CODE = 2026102901
+VERSION_NAME = '1.0.83'
 ENTRY = 'assets/bin/Data/Managed/Assembly-CSharp.dll'
 MAP_HELPER = 'assets/bin/Data/Managed/SoulFlowerDesert53.dll'
 V4_HELPER = 'assets/bin/Data/Managed/SoulFlowerDesertV4.dll'
+SHOP_HELPER = 'assets/bin/Data/Managed/SoulFlowerGGOShop.dll'
 REQUIRED_CASES = (
     'entry_position_protection', 'map_points_visibility_navigation',
     'mine_fish_gather_balance_reward', 'gather_first_frame',
     'shared_monster_patrol_battle', 'monster_first_frame',
     'boss_battle_and_settlement', 'six_color_trade', 'pvp_protection_balance',
     'extraction_cancel_complete', 'disconnect_and_process_recovery',
-    'server_load_and_integration', 'admin_configuration',
+    'server_load_and_integration', 'admin_configuration', 'trial_store_refresh_points',
 )
 
 
@@ -113,7 +114,8 @@ def load_inputs(args, qa_sha, review, pins):
     from dncil.cil.body.reader import read_method_body_from_bytes
     from tools.awake_diff_rows.build import methods
     from tools.client_remote import build as remote
-    from tools.desert_extraction import build_v78_adapter, build_field_patch, package_resources
+    from tools.desert_extraction import build_v78_adapter, build_field_patch, build_combined83, package_resources
+    from tools.client_trial_refresh82 import build as trial82
     from tools.local_asset_ready.remove_gate import exact_body
 
     base, map_dir, preview_dir, bundle, qa_apk = (
@@ -134,7 +136,7 @@ def load_inputs(args, qa_sha, review, pins):
             and not qa_record.get('diagnosticOnly'),
             'QA packaging record differs')
     require((qa_record.get('buildCode'), qa_record.get('versionName')) == (BUILD_CODE, VERSION_NAME),
-            'QA version differs from planned 1.0.81')
+            'QA version differs from tested 1.0.83')
     add_pin(pins, qa_apk, qa_sha)
     for path in (qa_manifest_path, qa_record_path):
         add_pin(pins, path)
@@ -164,12 +166,12 @@ def load_inputs(args, qa_sha, review, pins):
             sources[name] = digest
 
     native_map = (map_dir / 'Assembly-CSharp.dll').read_bytes()
-    native_final = (preview_dir / 'Assembly-CSharp.dll').read_bytes()
+    native_a = (preview_dir / 'Assembly-CSharp.dll').read_bytes()
     map_helper = (map_dir / 'SoulFlowerDesert53.dll').read_bytes()
     v4_helper = (preview_dir / 'SoulFlowerDesertV4.dll').read_bytes()
     map_raw = bundle.read_bytes()
     require(sha_bytes(native_map) == m['outputManagedSHA256'] == v['inputManagedSHA256']
-            and sha_bytes(native_final) == v['outputManagedSHA256']
+            and sha_bytes(native_a) == v['outputManagedSHA256']
             and sha_bytes(map_helper) == m['helperSHA256']
             and sha_bytes(v4_helper) == v['helperSHA256'], 'Static output identity differs')
     with zipfile.ZipFile(base) as z:
@@ -177,7 +179,7 @@ def load_inputs(args, qa_sha, review, pins):
         require(len(names) == len(set(names)) and ENTRY in names
                 and all(name not in names for name in (package_resources.BUNDLE_ENTRY, MAP_HELPER, V4_HELPER)),
                 'Base APK entries differ')
-        original, dex = z.read(ENTRY), z.read('classes2.dex')
+        original, original_shop, dex = z.read(ENTRY), z.read(SHOP_HELPER), z.read('classes2.dex')
         catalog = z.read(package_resources.CATALOG_ENTRY)
         production_origin = json.loads(z.read('assets/local-wallet.json'))['origin'].rstrip('/')
         require(production_origin and production_origin != QA_ORIGIN, 'Invalid base production origin')
@@ -189,24 +191,55 @@ def load_inputs(args, qa_sha, review, pins):
         inherited = {name: sha_bytes(z.read(name)) for name in names
                      if name.startswith('lib/') or (name.startswith('classes') and name.endswith('.dex'))}
     map_check = build_v78_adapter.verify(original, native_map, len(map_raw), False, True, True)
-    field_check = build_field_patch.verify(native_map, native_final)
+    field_check = build_field_patch.verify(native_map, native_a)
     require(map_check['originalEngineMethodsUnchanged'] == field_check['originalEngineMethodsUnchanged'] == 547
             and map_check['qualityFilterV80Exact'] and field_check['qualityFilterV80Exact'],
             'Original battle engine or v80 quality fix differs')
-    pe1, pe2 = dnfile.dnPE(data=original), dnfile.dnPE(data=native_final)
-    old, new = methods(pe1), methods(pe2)
-    require(len(old) == len(new), 'Managed method inventory differs')
-    changed = []
-    for (name, rid, x), (other, rid2, y) in zip(old, new):
-        require((name, rid, x.Signature.value, x.struct.Flags, x.struct.ImplFlags)
-                == (other, rid2, y.Signature.value, y.struct.Flags, y.struct.ImplFlags), 'Managed ABI differs')
-        if x.Rva and exact_body(pe1, x) != exact_body(pe2, y):
-            changed.append(name)
-    expected = {build_v78_adapter.TARGET, build_v78_adapter.RAY_TARGET}
-    expected.update(item['method'] for key in ('loaderChanges', 'desertEntryChanges', 'desertLoginResumeChanges')
-                    for item in map_check[key])
-    expected.update(item['method'] for item in field_check['fieldHooks'])
-    require(set(changed) == expected, 'Composite changed-method scope differs')
+
+    combined_dir = args.combined_static.resolve()
+    require(combined_dir.is_relative_to(ROOT / 'analysis/desert-extraction-v4-client')
+            and combined_dir.name == 'static' and combined_dir.parent.name.startswith('combined83')
+            and not (combined_dir / 'manifest.json').exists()
+            and not (combined_dir / 'resource-manifest.json').exists(),
+            'Independent combined static input required; QA overlays cannot be promoted')
+    combined_proof_path = local_file(combined_dir / 'build-proof.json')
+    combined_proof = read_json(combined_proof_path)
+    reject_qa_inputs(combined_proof)
+    require(combined_proof.get('status') == 'STATIC_PREVIEW_NOT_FOR_RELEASE'
+            and combined_proof.get('baseAPKSHA256') == BASE_SHA
+            and combined_proof.get('desertInputManagedSHA256') == sha_bytes(native_a),
+            'Combined static proof differs')
+    combined_sources = combined_proof.get('sourcePins')
+    require(isinstance(combined_sources, dict) and combined_sources, 'Combined source pins missing')
+    for name, digest in combined_sources.items():
+        require(qa_sources.get(name) == digest, 'Tested combined source differs: ' + name)
+        add_pin(pins, local_file(name), digest)
+    proof_name = str(combined_proof_path.relative_to(ROOT))
+    require(qa_sources.get(proof_name) is not None, 'QA did not pin combined build proof')
+    add_pin(pins, combined_proof_path, qa_sources[proof_name])
+    combined_path = local_file(combined_dir / 'Assembly-CSharp.dll')
+    shop_path = local_file(combined_dir / 'SoulFlowerGGOShop.dll')
+    native_final, shop_helper = combined_path.read_bytes(), shop_path.read_bytes()
+    require(sha_bytes(native_final) == combined_proof.get('combinedManagedSHA256')
+            and sha_bytes(shop_helper) == combined_proof.get('shopHelperSHA256'),
+            'Combined static payload differs')
+    add_pin(pins, combined_path, combined_proof['combinedManagedSHA256'])
+    add_pin(pins, shop_path, combined_proof['shopHelperSHA256'])
+    trial_check = trial82.check_main(native_a, native_final)
+    changed = build_combined83.composite_check(original, native_final, map_check, field_check)
+    require(trial_check == combined_proof.get('trialHookCheck')
+            and changed == combined_proof.get('allChangedMethods'), 'Combined method proof differs')
+    shop_audit = build_combined83.audit_shop(shop_helper)
+    require(shop_audit == combined_proof.get('shopOriginAudit'), 'Combined shop audit differs')
+    def icon_signature(raw):
+        candidates = [method for name, _, method in methods(dnfile.dnPE(data=raw))
+                      if name == 'HYJS.GGO.GGOShop::RegisterIcons']
+        require(len(candidates) == 1, 'Icon registration method differs')
+        method = candidates[0]
+        return method.Signature.value, method.Flags.mdPrivate, method.Flags.mdStatic
+    require(icon_signature(original_shop) == icon_signature(shop_helper), 'Private icon registration ABI differs')
+    pe2 = dnfile.dnPE(data=native_final)
+    new = methods(pe2)
 
     with zipfile.ZipFile(qa_apk) as z:
         names = z.namelist()
@@ -216,13 +249,15 @@ def load_inputs(args, qa_sha, review, pins):
         require(isinstance(qa_replacements, dict) and qa_replacements, 'QA packaged entry pins missing')
         for name, digest in qa_replacements.items():
             require(name in names and sha_bytes(z.read(name)) == digest, 'QA APK entry differs: ' + name)
-        for name, raw in ((MAP_HELPER, map_helper), (V4_HELPER, v4_helper),
+        for name, raw in ((MAP_HELPER, map_helper), (V4_HELPER, v4_helper), (SHOP_HELPER, shop_helper),
                           (package_resources.BUNDLE_ENTRY, map_raw),
                           (package_resources.CATALOG_ENTRY, expected_catalog)):
             require(z.read(name) == raw, 'QA-tested payload differs: ' + name)
         require(json.loads(z.read('assets/local-wallet.json')).get('origin') == QA_ORIGIN,
                 'QA wallet origin differs')
-    for name in (ENTRY, MAP_HELPER, V4_HELPER):
+    require(qa_manifest.get('qaOriginProof', {}).get('shopActualPayloadAudit') == shop_audit,
+            'QA actual shop helper audit differs')
+    for name in (ENTRY, MAP_HELPER, V4_HELPER, SHOP_HELPER):
         require(qa_manifest.get('replacementEntries', {}).get(name) == qa_replacements.get(name),
                 'QA source/package mismatch: ' + name)
     targets = {name: (old.replace('http://127.0.0.1:8088', production_origin), new)
@@ -257,7 +292,7 @@ def load_inputs(args, qa_sha, review, pins):
                      'tools/client_compat63/dex_patch.py'):
         add_pin(pins, local_file(relative))
     data = {'Assembly-CSharp.dll': native_final, 'SoulFlowerDesert53.dll': map_helper,
-            'SoulFlowerDesertV4.dll': v4_helper, 'smallassetmanifest': expected_catalog,
+            'SoulFlowerDesertV4.dll': v4_helper, 'SoulFlowerGGOShop.dll': shop_helper, 'smallassetmanifest': expected_catalog,
             'map_desertfield_001': map_raw}
     return locals()
 
@@ -287,9 +322,9 @@ def prepare(args):
             target.write_bytes(raw)
             add_pin(pins, target)
         files = {ENTRY: 'Assembly-CSharp.dll', MAP_HELPER: 'SoulFlowerDesert53.dll',
-                 V4_HELPER: 'SoulFlowerDesertV4.dll'}
+                 V4_HELPER: 'SoulFlowerDesertV4.dll', SHOP_HELPER: 'SoulFlowerGGOShop.dll'}
         payload = {entry: str((out / name).relative_to(ROOT)) for entry, name in files.items()}
-        proof = {'schema': 'hyjs-desert-v4-formal-managed-v1', 'status': 'READY_FOR_SIGNING_NOT_RELEASED',
+        proof = {'schema': 'hyjs-desert-trial83-formal-managed-v1', 'status': 'READY_FOR_SIGNING_NOT_RELEASED',
                  'qaOnly': False, 'neverPromote': False, 'managedOnly': True, 'baseAPKSHA256': BASE_SHA,
                  'inputManagedSHA256': sha_bytes(state['original']), 'outputManagedSHA256': sha_bytes(data['Assembly-CSharp.dll']),
                  'inputDexSHA256': sha_bytes(state['dex']), 'inheritedJavaByteExact': True,
@@ -329,6 +364,7 @@ def main():
     parser.add_argument('--base-apk', type=Path)
     parser.add_argument('--map-overlay', type=Path)
     parser.add_argument('--preview', type=Path)
+    parser.add_argument('--combined-static', type=Path)
     parser.add_argument('--bundle', type=Path)
     parser.add_argument('--qa-apk', type=Path)
     parser.add_argument('--qa-manifest', type=Path)
@@ -339,7 +375,7 @@ def main():
     if args.list_gates:
         print('\n'.join(REQUIRED_CASES))
         return
-    for name in ('base_apk', 'map_overlay', 'preview', 'bundle', 'qa_apk', 'qa_manifest', 'qa_record', 'acceptance', 'output'):
+    for name in ('base_apk', 'map_overlay', 'preview', 'combined_static', 'bundle', 'qa_apk', 'qa_manifest', 'qa_record', 'acceptance', 'output'):
         require(getattr(args, name) is not None, 'Missing --' + name.replace('_', '-'))
     prepare(args)
 

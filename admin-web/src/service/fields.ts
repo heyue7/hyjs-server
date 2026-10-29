@@ -247,6 +247,7 @@ export interface FieldGGOWorldPoint {
   position: FieldGGOWorldPosition | null;
   standPosition: FieldGGOWorldPosition | null;
   radius: number;
+  patrol?: { waypoints: FieldGGOWorldPosition[]; speed: number };
 }
 export interface FieldGGOWorldPosition {
   x: number | null;
@@ -254,6 +255,7 @@ export interface FieldGGOWorldPosition {
   z: number | null;
 }
 export interface FieldGGORuntime {
+  minClientBuild: number;
   points: FieldGGOWorldPoint[];
   safeArea: { minX: number; maxX: number; minZ: number; maxZ: number } | null;
   safeReturn: FieldGGOWorldPosition | null;
