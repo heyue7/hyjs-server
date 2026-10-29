@@ -569,6 +569,7 @@ func (s *GameService) adminApplyPlayerInventory(tx *gorm.DB, actor *model.AdminP
 					for i, v := range g.Warriors {
 						if v.GetGuid() == req.Key {
 							g.Warriors = append(g.Warriors[:i], g.Warriors[i+1:]...)
+							retireWarriorBreachPity(g, req.Key)
 							break
 						}
 					}

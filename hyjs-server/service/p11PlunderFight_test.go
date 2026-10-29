@@ -111,8 +111,13 @@ func TestP11PlunderRealHolderFreezeProtectionConsumeAndIndependentPending(t *tes
 		t.Fatal(err)
 	}
 	list, err = f.s.p11PlunderListAt(f.ctx, f.id, query.GetFragTreasId(), now)
-	if err != nil || len(list[0].(*pb.SCTreasureBattleList).InfoList) != 0 {
-		t.Fatal("actually protected holder remained selectable", err)
+	if err != nil || len(list[0].(*pb.SCTreasureBattleList).InfoList) != 3 {
+		t.Fatal("protected holder should yield the local empty-realm candidates", err)
+	}
+	for _, item := range list[0].(*pb.SCTreasureBattleList).InfoList {
+		if item.GetIsRobot() != 1 || item.GetSimplePlayerInfo().GetPlayerId() == b {
+			t.Fatal("actually protected holder remained selectable")
+		}
 	}
 	if _, err = f.s.p11PlunderFightAt(f.ctx, f.id, request, 103, now); err == nil || !strings.Contains(err.Error(), constUtil.P11PlunderFightRefresh) {
 		t.Fatal("cached candidate bypassed current real protection", err)
@@ -145,8 +150,13 @@ func TestP11PlunderRealHolderFreezeProtectionConsumeAndIndependentPending(t *tes
 		t.Fatal("original full fragment consumption/real treasure entity", err)
 	}
 	list, err = f.s.p11PlunderListAt(f.ctx, f.id, query.GetFragTreasId(), later)
-	if err != nil || len(list[0].(*pb.SCTreasureBattleList).InfoList) != 0 {
-		t.Fatal("spent real fragment remained a candidate", err)
+	if err != nil || len(list[0].(*pb.SCTreasureBattleList).InfoList) != 3 {
+		t.Fatal("spent real fragment should yield local candidates", err)
+	}
+	for _, item := range list[0].(*pb.SCTreasureBattleList).InfoList {
+		if item.GetIsRobot() != 1 || item.GetSimplePlayerInfo().GetPlayerId() == b {
+			t.Fatal("spent real fragment remained a candidate")
+		}
 	}
 	if _, err = f.s.p11PlunderFightAt(f.ctx, f.id, request, 105, later); err == nil || !strings.Contains(err.Error(), constUtil.P11PlunderFightRefresh) {
 		t.Fatal("old candidate transferred consumed inventory", err)

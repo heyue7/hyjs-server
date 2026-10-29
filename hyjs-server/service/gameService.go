@@ -139,6 +139,10 @@ func (s *GameService) Dispatch(ctx context.Context, request *model.GamePacket, p
 	}
 	if err != nil {
 		elog.Warn("game request failed", zap.String("message", name), zap.Error(err))
+		var wantedRetry *P12WantedRetryableEndError
+		if errors.As(err, &wantedRetry) {
+			return GameError(constUtil.P12WantedRetryableEndCode, err.Error())
+		}
 		return GameError(constUtil.ErrGameRequest, err.Error())
 	}
 	s.resumeRecruitGuide(ctx, result)

@@ -445,38 +445,69 @@ func (s *GameService) refreshCopyProgress(g *model.GameState) {
 	if g.Copy == nil {
 		g.Copy = &pb.SCCopyPassedInfo{}
 	}
-	stars := map[string]int32{}
-	for _, mission := range s.Tables["CopyMission"] {
-		var info *pb.CopySimpleInfo
-		for _, saved := range g.Copy.GetPassedCopyInfo() {
-			if saved.GetChapterId() == mission["ChapterId"] && saved.GetMissionId() == mission["MissionId"] {
-				info = saved
-				break
-			}
+	type missionKey struct{ chapter, mission string }
+	var (
+		infos         = make(map[missionKey]*pb.CopySimpleInfo, len(g.Copy.PassedCopyInfo))
+		passed        = make(map[missionKey]bool, len(g.Copy.PassedCopyInfo))
+		chapters      = make(map[string]*pb.CopyChapterInfo, len(g.Copy.PassedChapterInfo))
+		knownChapters = make(map[string]bool, len(s.Tables["CopyChapter"]))
+		quests        = make(map[string]bool, len(g.Quests))
+		predecessors  = make(map[string]map[string]string, len(s.Tables["CopyMission"]))
+		stars         = make(map[string]int32)
+	)
+	for _, saved := range g.Copy.PassedCopyInfo {
+		key := missionKey{saved.GetChapterId(), saved.GetMissionId()}
+		if _, exists := infos[key]; !exists {
+			infos[key] = saved
 		}
-		if info == nil {
-			info = &pb.CopySimpleInfo{ChapterId: proto.String(mission["ChapterId"]), MissionId: proto.String(mission["MissionId"]), Star: proto.Int32(0), ChallengeTimes: proto.Int32(0)}
-			g.Copy.PassedCopyInfo = append(g.Copy.PassedCopyInfo, info)
+		passed[key] = passed[key] || saved.GetStar() > 0
+	}
+	for _, chapter := range g.Copy.PassedChapterInfo {
+		if _, exists := chapters[chapter.GetChapterId()]; !exists {
+			chapters[chapter.GetChapterId()] = chapter
 		}
-		info.IsOpen = proto.Int32(0)
-		if s.copyMissionOpen(g, mission) || info.GetStar() > 0 {
-			info.IsOpen = proto.Int32(1)
-			g.Copy.CurrentChapterId = proto.String(mission["ChapterId"])
-			g.Copy.CurrentMissionId = proto.String(mission["MissionId"])
-		}
-		stars[mission["ChapterId"]] += info.GetStar()
 	}
 	for _, row := range s.Tables["CopyChapter"] {
-		var chapter *pb.CopyChapterInfo
-		for _, info := range g.Copy.GetPassedChapterInfo() {
-			if info.GetChapterId() == row["ChapterId"] {
-				chapter = info
-				break
-			}
+		if row != nil {
+			knownChapters[row["ChapterId"]] = true
 		}
+	}
+	for _, quest := range g.Quests {
+		quests[quest] = true
+	}
+	var previous map[string]string
+	for _, mission := range s.Tables["CopyMission"] {
+		if _, exists := predecessors[mission["MissionId"]]; !exists {
+			predecessors[mission["MissionId"]] = previous
+		}
+		previous = mission
+	}
+	// Index existing progress once; table order still determines prerequisites
+	// across chapters, the current mission and the original serialized ordering.
+	for _, mission := range s.Tables["CopyMission"] {
+		key := missionKey{mission["ChapterId"], mission["MissionId"]}
+		info := infos[key]
+		if info == nil {
+			info = &pb.CopySimpleInfo{ChapterId: proto.String(key.chapter), MissionId: proto.String(key.mission), Star: proto.Int32(0), ChallengeTimes: proto.Int32(0)}
+			g.Copy.PassedCopyInfo = append(g.Copy.PassedCopyInfo, info)
+			infos[key] = info
+		}
+		prior := predecessors[key.mission]
+		open := mission != nil && knownChapters[key.chapter] && (mission["OpenId"] == "" || quests[mission["OpenId"]]) && (prior == nil || passed[missionKey{prior["ChapterId"], prior["MissionId"]}])
+		info.IsOpen = proto.Int32(0)
+		if open || info.GetStar() > 0 {
+			info.IsOpen = proto.Int32(1)
+			g.Copy.CurrentChapterId = proto.String(key.chapter)
+			g.Copy.CurrentMissionId = proto.String(key.mission)
+		}
+		stars[key.chapter] += info.GetStar()
+	}
+	for _, row := range s.Tables["CopyChapter"] {
+		chapter := chapters[row["ChapterId"]]
 		if chapter == nil {
 			chapter = &pb.CopyChapterInfo{ChapterId: proto.String(row["ChapterId"])}
 			g.Copy.PassedChapterInfo = append(g.Copy.PassedChapterInfo, chapter)
+			chapters[row["ChapterId"]] = chapter
 		}
 		chapter.Star = proto.Int32(stars[row["ChapterId"]])
 	}

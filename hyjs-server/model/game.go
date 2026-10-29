@@ -26,6 +26,8 @@ type GameState struct {
 	BagCapacityScale int32 `json:"bag_capacity_scale,omitempty"`
 	// WarriorBagCapacityScale reads the unreleased hero-only fivefold candidate without multiplying it again.
 	WarriorBagCapacityScale int32 `json:"warrior_bag_capacity_scale,omitempty"`
+	// WarriorBreachPity follows each owned GUID through ordinary breach growth.
+	WarriorBreachPity map[string]*WarriorBreachPity `json:"warrior_breach_pity,omitempty"`
 	// Guild prayer attributes are recaptured from the current transaction and never persisted.
 	GuildPrayerProjection *P5GuildPrayerProjection `json:"-"`
 	// Authenticated request projection; absolute field cooldowns keep wall time.

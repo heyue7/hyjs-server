@@ -13,6 +13,14 @@ import (
 const p12WantedLiveRecordedDriver = "original-wanted8-recorded-player-live-npc-exact-v1"
 const p12WantedLiveRecordedProof = "87598dfe7341455b589f327139aa0e3930f53fd48997e6aaebb6f6aa7b93db66"
 
+// Only a complete independent computation with a different final recording
+// identifies a replayable recording mismatch. Other conflicts may indicate
+// invalid or damaged frozen data and must retain their normal error class.
+type p12WantedRecordingMismatchError struct{ cause error }
+
+func (e *p12WantedRecordingMismatchError) Error() string { return e.cause.Error() }
+func (e *p12WantedRecordingMismatchError) Unwrap() error { return e.cause }
+
 func p12WantedLiveRecordedSource(input *model.FrozenBattleInput, record *pb.BattleOperate) (string, string, error) {
 	if _, err := P12WantedProofForInput(input); err != nil {
 		return "", "", err
@@ -57,13 +65,20 @@ func (s *GameService) computeP12WantedLiveRecorded(ctx context.Context, input *m
 	}
 	out, err := s.computeFrozenBattleFinalHPLiveControlled(ctx, input, record, true, nil, nil, true)
 	if err != nil {
+		var mismatch *p6CompletedRecordedMismatchError
+		if errors.As(err, &mismatch) {
+			if terminalErr := validateP6GenericMechanismTerminal(input, out); terminalErr != nil {
+				return nil, terminalErr
+			}
+			return nil, &p12WantedRecordingMismatchError{cause: err}
+		}
 		return nil, err
-	}
-	if !proto.Equal(record, out.OriginalOperates) {
-		return nil, errors.New(constUtil.P6ReplayConflict)
 	}
 	if err = validateP6GenericMechanismTerminal(input, out); err != nil {
 		return nil, err
+	}
+	if !proto.Equal(record, out.OriginalOperates) {
+		return nil, &p12WantedRecordingMismatchError{cause: errors.New(constUtil.P6ReplayConflict)}
 	}
 	out.OriginalRecordSHA256, out.CalculationSourceSHA256, err = p12WantedLiveRecordedSource(input, record)
 	if err != nil {

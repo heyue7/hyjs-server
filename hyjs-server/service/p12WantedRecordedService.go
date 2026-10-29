@@ -195,3 +195,31 @@ func p12WantedRecordedReceipt(fight *db.P12WantedFight, request *pb.CSRebelFight
 	}
 	return validateP12WantedRecorded(&input, request.OptRecord, &recorded)
 }
+
+// Older automatic rows do not retain the full End request. Reconstruct both
+// original zero-result presence forms and require their deterministic hash to
+// match before treating missing recorded columns as a genuine auto receipt.
+func p12WantedAutomaticCommittedReceipt(fight *db.P12WantedFight, terminal *model.CombatFinalHPOutcome) error {
+	reject := func() error { return errors.New(constUtil.P6ReplayConflict) }
+	if fight == nil || terminal == nil || terminal.Outcome == nil || terminal.OriginalOperates == nil {
+		return reject()
+	}
+	result := int32(0)
+	if terminal.Outcome.Winner == 0 {
+		result = 1
+	}
+	request := &pb.CSRebelFightEnd{FightId: proto.String(fight.ID), Result: proto.Int32(result), OptRecord: terminal.OriginalOperates}
+	candidates := []*pb.CSRebelFightEnd{request}
+	if result == 0 {
+		omitted := proto.Clone(request).(*pb.CSRebelFightEnd)
+		omitted.Result = nil
+		candidates = append(candidates, omitted)
+	}
+	for _, candidate := range candidates {
+		raw, err := proto.MarshalOptions{Deterministic: true}.Marshal(candidate)
+		if err == nil && p6Digest(raw) == fight.EndRequestHash {
+			return p12WantedRecordedReceipt(fight, candidate)
+		}
+	}
+	return reject()
+}

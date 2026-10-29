@@ -210,6 +210,9 @@ func (s *GameService) p5Refund(p *pb.Player, g *model.GameState, guid string, cu
 		return nil, err
 	}
 	p5SetKV(g, "p5.invest:"+guid, "")
+	if _, ok := current.(*pb.Warrior); ok {
+		retireWarriorBreachPity(g, guid)
+	}
 	return gain, nil
 }
 
@@ -316,6 +319,7 @@ func (s *GameService) p5WarriorReset(ctx context.Context, id int64, b *pb.CSWarr
 			redMergeGain(gain, base)
 			out.Cost = append(out.Cost, &pb.BaseResource{Id: proto.String(heroID), Guid: b.Guid, Num: proto.Int32(1)})
 		}
+		retireWarriorBreachPity(g, b.GetGuid())
 		out.Get = gain
 		return s.RecordP1Event(tx, id, fmt.Sprintf("p5:warrior-reset:%d", stamp), constUtil.P1EventDiamondSpent, int64(costs[0].GetNum()), LocalPlayNow(ctx))
 	})
@@ -449,6 +453,9 @@ func (s *GameService) p5WarriorRecycle(ctx context.Context, id int64, guids []st
 			}
 		}
 		g.Warriors = filtered
+		for guid := range seen {
+			retireWarriorBreachPity(g, guid)
+		}
 		if len(decomposition) > 0 {
 			reward, err := s.p5GrantTrackedRefund(p, g, decomposition)
 			if err != nil {

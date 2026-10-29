@@ -559,8 +559,15 @@ func (s *GameService) computeFrozenBattleRecordLiveControlled(ctx context.Contex
 			recordMatches = p6OriginalOperateEqual(supplied, comparison)
 		}
 	}
+	var completedMismatch error
 	if !recordMatches {
-		return nil, fmt.Errorf("%s: 原录像终局或完整技能记录不符 round=%d hp=%g/%g，计算 round=%d hp=%g/%g", constUtil.P6ReplayConflict, supplied.GetFinalRoundNum(), supplied.GetAttackerTotalLeftHp(), supplied.GetDefenderTotalLeftHp(), e.operate.GetFinalRoundNum(), e.operate.GetAttackerTotalLeftHp(), e.operate.GetDefenderTotalLeftHp())
+		mismatch := fmt.Errorf("%s: 原录像终局或完整技能记录不符 round=%d hp=%g/%g，计算 round=%d hp=%g/%g", constUtil.P6ReplayConflict, supplied.GetFinalRoundNum(), supplied.GetAttackerTotalLeftHp(), supplied.GetDefenderTotalLeftHp(), e.operate.GetFinalRoundNum(), e.operate.GetAttackerTotalLeftHp(), e.operate.GetDefenderTotalLeftHp())
+		if !liveRecorded || frozen.BattleType != 8 {
+			return nil, mismatch
+		}
+		// Wanted must validate the independently computed terminal before it
+		// can classify this mismatch as a recoverable paid fight.
+		completedMismatch = &p6CompletedRecordedMismatchError{cause: mismatch}
 	}
 	if terminalObserver != nil {
 		terminalObserver(e)
@@ -577,7 +584,7 @@ func (s *GameService) computeFrozenBattleRecordLiveControlled(ctx context.Contex
 			actor.hero.Inst.CurHp = proto.Float64(actor.hp)
 		}
 	}
-	return output, nil
+	return output, completedMismatch
 }
 
 // cloneP6CalculationInput isolates every mutable input before simulation. Table

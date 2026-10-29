@@ -36,7 +36,7 @@ func P12WantedRequireIdle(tx *gorm.DB, id int64, now time.Time) error {
 		// A definitive rejected End has already returned the client to the room.
 		// Keep its paid immutable fight recoverable, while releasing only the
 		// presentation lease so another mode is not blocked by a failed replay.
-		if fight.RejectedAt > 0 {
+		if fight.RejectedAt > 0 && !fight.RecoveryLeaseActive {
 			continue
 		}
 		if instance.State == constUtil.P12WantedActive && instance.ExpiresAt > now.UnixMilli() && instance.CurrentHP > 0 {
@@ -51,21 +51,61 @@ func P12WantedRequireIdle(tx *gorm.DB, id int64, now time.Time) error {
 	return nil
 }
 
+// P12WantedRetryableEndError retains the original recording error for logging
+// and the original client message while identifying a paid, uncommitted fight.
+type P12WantedRetryableEndError struct {
+	cause error
+}
+
+func (e *P12WantedRetryableEndError) Error() string { return e.cause.Error() }
+func (e *P12WantedRetryableEndError) Unwrap() error { return e.cause }
+
 // Persist rejection metadata after the settlement transaction rolled back.
-// Network/DB failures remain recoverable and do not release an active battle.
-func recordP12WantedRejectedEnd(ctx context.Context, id int64, fightID string, now time.Time, rejected error) error {
+// Lock Profile then the fight so callers can distinguish a still-pending fight
+// from a committed/abandoned one without relying on an error message alone.
+func recordP12WantedRejectedEnd(ctx context.Context, id int64, fightID string, now time.Time, rejected error) (bool, error) {
 	if fightID == "" || rejected == nil {
-		return nil
+		return false, nil
 	}
 	reason := rejected.Error()
-	if reason != constUtil.P6ReplayConflict && reason != constUtil.P12WantedInvalid && reason != constUtil.CombatUnsupported {
-		return nil
+	var mismatch *p12WantedRecordingMismatchError
+	if errors.As(rejected, &mismatch) {
+		// Keep a bounded stable category in the fight row. The returned error
+		// and request log retain the complete original mismatch details.
+		reason = constUtil.P6ReplayConflict
 	}
-	return db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	if reason != constUtil.P6ReplayConflict && reason != constUtil.P12WantedInvalid && reason != constUtil.CombatUnsupported {
+		return false, nil
+	}
+	var pending bool
+	err := db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var profile db.Profile
 		if err := tx.Select("id").Clauses(clause.Locking{Strength: "UPDATE"}).First(&profile, id).Error; err != nil {
 			return err
 		}
-		return tx.Model(&db.P12WantedFight{}).Where("id=? AND player_id=? AND committed=? AND abandoned_at=0", fightID, id, false).Updates(map[string]any{"rejected_at": now.UnixMilli(), "rejected_reason": reason}).Error
+		var fight db.P12WantedFight
+		err := tx.Select("id", "player_id", "committed", "abandoned_at", "recovery_lease_active").Clauses(clause.Locking{Strength: "UPDATE"}).First(&fight, "id=? AND player_id=?", fightID, id).Error
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		if fight.Committed || fight.AbandonedAt > 0 {
+			return nil
+		}
+		if fight.RecoveryLeaseActive {
+			// A late failed End from an earlier presentation cannot release the
+			// lease already reacquired by the same paid fight or replace its
+			// original rejection evidence.
+			pending = true
+			return nil
+		}
+		if err = tx.Model(&fight).Updates(map[string]any{"rejected_at": now.UnixMilli(), "rejected_reason": reason, "recovery_lease_active": false}).Error; err != nil {
+			return err
+		}
+		pending = true
+		return nil
 	})
+	return pending && err == nil, err
 }
