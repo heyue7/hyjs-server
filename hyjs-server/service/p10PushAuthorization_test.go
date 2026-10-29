@@ -202,7 +202,7 @@ func TestP10PushAuthorizationProjectsColumnsAndPinsBatch(t *testing.T) {
 	var profileQueries []string
 	callback := f.d.Callback().Query()
 	if err := callback.After("gorm:query").Register("p10_push_projection_check", func(tx *gorm.DB) {
-		if tx.Statement.Table == "profiles" {
+		if tx.Statement.SQL.Len() > 0 {
 			profileQueries = append(profileQueries, strings.ToLower(tx.Statement.SQL.String()))
 		}
 	}); err != nil {
@@ -223,17 +223,20 @@ func TestP10PushAuthorizationProjectsColumnsAndPinsBatch(t *testing.T) {
 		t.Fatalf("expected one profile read per batch: %v", profileQueries)
 	}
 	query := profileQueries[0]
-	for _, field := range []string{"`id`", "`session`", "`account_id`", "`account_auth_revision`"} {
+	for _, field := range []string{"p.id as profile_id", "p.session as profile_session", "p.account_id as profile_account_id", "p.account_auth_revision as profile_account_revision"} {
 		if !strings.Contains(query, field) {
 			t.Fatalf("missing identity column %s in %s", field, query)
 		}
 	}
-	for _, extra := range []string{"`player`", "`game`", "select *", " join "} {
+	for _, extra := range []string{"p.player", "p.game", "password", "select *"} {
 		if strings.Contains(query, extra) {
-			t.Fatalf("unneeded profile data or join in %s", query)
+			t.Fatalf("unneeded profile data or credential in %s", query)
 		}
 	}
-	t.Logf("push authorization profile read uses four identity columns, 0 JOIN")
+	if joins := strings.Count(query, " join "); joins != 3 {
+		t.Fatalf("expected exactly three bounded joins, got %d in %s", joins, query)
+	}
+	t.Logf("one indexed push authorization SELECT, 3 JOIN; no player/game/credential columns")
 	replacement := &p10ClientSink{session: append([]byte(nil), f.profile.Session...), send: func(m proto.Message) error { sent = append(sent, m); return nil }}
 	p10ClientSinks.Store(key, replacement)
 	f.s.publishP10PrivateBatchPinned(f.ctx, f.profile.Id, sink, batch)
@@ -685,5 +688,188 @@ func TestGGOReconnectSerializesOriginalExtractionCleanup(t *testing.T) {
 				t.Fatal("completed extraction did not preserve safe return")
 			}
 		})
+	}
+}
+
+func TestP10PushAuthorizationPolicyTransitionAndMissingRows(t *testing.T) {
+	f := p10PushAuthSetup(t)
+	if err := f.d.Model(&db.ClientUpdatePolicy{}).Where("id=1").Update("maintenance_start_at", time.Now().UnixMilli()-1000).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := authorizeP10Push(f.ctx, f.profile.Id, f.profile.Session); !errors.Is(err, constUtil.ErrClientUpdateMaintenance) {
+		t.Fatalf("scheduled maintenance bypass: %v", err)
+	}
+	var policy db.ClientUpdatePolicy
+	if err := f.d.First(&policy, 1).Error; err != nil || !policy.Maintenance || policy.MaintenanceEpoch != 1 {
+		t.Fatalf("maintenance transition not applied: %+v, %v", policy, err)
+	}
+	f.reset(t)
+	if err := f.d.Where("player_id=?", f.profile.Id).Delete(&db.ClientUpdateSession{}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if _, err := AuthorizeAccount(f.ctx, f.profile.Id, f.profile.Session); err != nil {
+		t.Fatal(err)
+	}
+	if err := authorizeP10Push(f.ctx, f.profile.Id, f.profile.Session); err != nil {
+		t.Fatalf("zero binding with zero gates changed: %v", err)
+	}
+	if err := f.d.Model(&db.ClientUpdatePolicy{}).Where("id=1").Update("min_login_build", 1).Error; err != nil {
+		t.Fatal(err)
+	}
+	_, fullErr := AuthorizeAccount(f.ctx, f.profile.Id, f.profile.Session)
+	pushErr := authorizeP10Push(f.ctx, f.profile.Id, f.profile.Session)
+	if !errors.Is(fullErr, constUtil.ErrClientUpdateRequired) || !errors.Is(pushErr, constUtil.ErrClientUpdateRequired) {
+		t.Fatalf("missing binding bypassed login gate: %v, %v", fullErr, pushErr)
+	}
+	if err := f.d.Where("id=1").Delete(&db.ClientUpdatePolicy{}).Error; err != nil {
+		t.Fatal(err)
+	}
+	_, fullErr = AuthorizeAccount(f.ctx, f.profile.Id, f.profile.Session)
+	pushErr = authorizeP10Push(f.ctx, f.profile.Id, f.profile.Session)
+	if !errors.Is(fullErr, gorm.ErrRecordNotFound) || !errors.Is(pushErr, gorm.ErrRecordNotFound) {
+		t.Fatalf("missing policy did not fail: %v, %v", fullErr, pushErr)
+	}
+}
+
+func TestP10PushAuthorizationLegacyAndQueryErrors(t *testing.T) {
+	t.Run("client updates disabled", func(t *testing.T) {
+		f := p10PushAuthSetup(t)
+		key := clientUpdateDBKey(f.d)
+		clientUpdateReady.Delete(key)
+		defer clientUpdateReady.Store(key, f.s)
+		var queries []string
+		callback := f.d.Callback().Query()
+		if err := callback.After("gorm:query").Register("p10_push_narrow_only", func(tx *gorm.DB) { queries = append(queries, strings.ToLower(tx.Statement.SQL.String())) }); err != nil {
+			t.Fatal(err)
+		}
+		defer callback.Remove("p10_push_narrow_only")
+		if err := authorizeP10Push(f.ctx, f.profile.Id, f.profile.Session); err != nil {
+			t.Fatal(err)
+		}
+		if len(queries) != 2 || !strings.Contains(queries[0], "profiles") || strings.Contains(queries[0], " join ") {
+			t.Fatalf("disabled path changed: %v", queries)
+		}
+	})
+	t.Run("missing legacy accounts table", func(t *testing.T) {
+		f := p10PushAuthSetup(t)
+		if err := f.d.Model(&db.Profile{}).Where("id=?", f.profile.Id).Update("account_id", 0).Error; err != nil {
+			t.Fatal(err)
+		}
+		if err := f.d.Migrator().DropTable(&db.GameAccount{}); err != nil {
+			t.Fatal(err)
+		}
+		if err := authorizeP10Push(f.ctx, f.profile.Id, f.profile.Session); err != nil {
+			t.Fatalf("legacy fallback failed: %v", err)
+		}
+		if err := f.d.Model(&db.Profile{}).Where("id=?", f.profile.Id).Update("account_id", f.account.ID).Error; err != nil {
+			t.Fatal(err)
+		}
+		_, fullErr := AuthorizeAccount(f.ctx, f.profile.Id, f.profile.Session)
+		pushErr := authorizeP10Push(f.ctx, f.profile.Id, f.profile.Session)
+		if fullErr == nil || pushErr == nil || fullErr.Error() != pushErr.Error() {
+			t.Fatalf("missing linked account bypass: %v, %v", fullErr, pushErr)
+		}
+	})
+	t.Run("unrelated SQL error", func(t *testing.T) {
+		f := p10PushAuthSetup(t)
+		injected := errors.New("injected query failure")
+		callback := f.d.Callback().Query()
+		if err := callback.Before("gorm:query").Register("p10_push_query_failure", func(tx *gorm.DB) { tx.AddError(injected) }); err != nil {
+			t.Fatal(err)
+		}
+		defer callback.Remove("p10_push_query_failure")
+		if err := authorizeP10Push(f.ctx, f.profile.Id, f.profile.Session); !errors.Is(err, injected) {
+			t.Fatalf("SQL error was swallowed: %v", err)
+		}
+	})
+	t.Run("missing policy table", func(t *testing.T) {
+		f := p10PushAuthSetup(t)
+		if err := f.d.Migrator().DropTable(&db.ClientUpdatePolicy{}); err != nil {
+			t.Fatal(err)
+		}
+		if err := authorizeP10Push(f.ctx, f.profile.Id, f.profile.Session); err == nil {
+			t.Fatal("missing policy table authorized push")
+		}
+	})
+}
+
+func TestP10PushAuthorizationCrossSchemaSQL(t *testing.T) {
+	f := p10PushAuthSetup(t)
+	var row p10PushAuthorization
+	query := p10PushAuthorizationQuery(f.d.Session(&gorm.Session{DryRun: true}), "identity_schema.game_accounts", f.profile.Id).Take(&row)
+	if query.Error != nil {
+		t.Fatal(query.Error)
+	}
+	sql := strings.ToLower(query.Statement.SQL.String())
+	if !strings.Contains(sql, "`identity_schema`.`game_accounts` as a") || strings.Count(sql, " join ") != 3 {
+		t.Fatalf("cross-schema account join is not quoted correctly: %s", sql)
+	}
+}
+
+func TestP10PushAuthorizationRechecksEachSend(t *testing.T) {
+	for _, kind := range []string{"account disabled", "account revision", "session rotated", "minimum run build"} {
+		t.Run(kind, func(t *testing.T) {
+			f := p10PushAuthSetup(t)
+			var sends, closed atomic.Int32
+			sink := &p10ClientSink{session: append([]byte(nil), f.profile.Session...), send: func(proto.Message) error { sends.Add(1); return nil }, close: func() { closed.Add(1) }}
+			key := p10ClientKey{f.s.p10ClientOwner(), f.profile.Id}
+			p10ClientSinks.Store(key, sink)
+			t.Cleanup(func() { p10ClientSinks.CompareAndDelete(key, sink) })
+			f.s.publishP10PrivateBatchPinned(f.ctx, f.profile.Id, sink, []proto.Message{&pb.SCRefreshScene{}})
+			if sends.Load() != 1 {
+				t.Fatal("first authorized frame missing")
+			}
+			switch kind {
+			case "account disabled":
+				if err := f.d.Model(&db.GameAccount{}).Where("id=?", f.account.ID).Update("enabled", false).Error; err != nil {
+					t.Fatal(err)
+				}
+			case "account revision":
+				if err := f.d.Model(&db.GameAccount{}).Where("id=?", f.account.ID).Update("auth_revision", f.account.AuthRevision+1).Error; err != nil {
+					t.Fatal(err)
+				}
+			case "session rotated":
+				if err := f.d.Model(&db.Profile{}).Where("id=?", f.profile.Id).Update("session", []byte("fedcba0987654321")).Error; err != nil {
+					t.Fatal(err)
+				}
+			case "minimum run build":
+				if err := f.d.Model(&db.ClientUpdatePolicy{}).Where("id=1").Update("min_run_build", 101).Error; err != nil {
+					t.Fatal(err)
+				}
+			}
+			f.s.publishP10PrivateBatchPinned(f.ctx, f.profile.Id, sink, []proto.Message{&pb.SCRefreshScene{}})
+			if sends.Load() != 1 || closed.Load() != 1 {
+				t.Fatalf("revocation not applied before next send: sends=%d closed=%d", sends.Load(), closed.Load())
+			}
+			p10WaitRetired(t, key, sink)
+		})
+	}
+}
+
+func TestP10PushAuthorizationRechecksAfterPolicyRace(t *testing.T) {
+	f := p10PushAuthSetup(t)
+	if err := f.d.Model(&db.ClientUpdatePolicy{}).Where("id=1").Update("maintenance_start_at", time.Now().UnixMilli()-1000).Error; err != nil {
+		t.Fatal(err)
+	}
+	var changed atomic.Bool
+	callback := f.d.Callback().Query()
+	if err := callback.Before("gorm:query").Register("p10_push_policy_race", func(tx *gorm.DB) {
+		if tx.Statement.Table != "client_update_policy" || !changed.CompareAndSwap(false, true) {
+			return
+		}
+		if err := f.d.Model(&db.ClientUpdatePolicy{}).Where("id=1").Update("maintenance_start_at", 0).Error; err != nil {
+			tx.AddError(err)
+			return
+		}
+		if err := f.d.Model(&db.GameAccount{}).Where("id=?", f.account.ID).Update("enabled", false).Error; err != nil {
+			tx.AddError(err)
+		}
+	}); err != nil {
+		t.Fatal(err)
+	}
+	defer callback.Remove("p10_push_policy_race")
+	err := authorizeP10Push(f.ctx, f.profile.Id, f.profile.Session)
+	if !changed.Load() || err == nil || err.Error() != "账号登录已失效，请重新登录" {
+		t.Fatalf("policy race accepted a stale account: changed=%v err=%v", changed.Load(), err)
 	}
 }

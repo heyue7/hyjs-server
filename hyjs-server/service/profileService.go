@@ -17,6 +17,7 @@ import (
 	"hyjs-server/model"
 	pb "hyjs-server/model/protocol"
 	"hyjs-server/utils"
+	"strings"
 	"time"
 )
 
@@ -139,8 +140,51 @@ func AuthorizeAccount(ctx context.Context, id int64, session []byte) (*db.Profil
 	return &row, nil
 }
 
-// authorizeP10Push reads only the identity columns required for a fresh push check.
-func authorizeP10Push(ctx context.Context, id int64, session []byte) error {
+// p10PushAuthorization reads only the identity, policy and bound-session data
+// required for this one send. No game save or credential columns are loaded.
+type p10PushAuthorization struct {
+	ProfileID, ProfileAccountID, ProfileAccountRevision          int64
+	ProfileSession                                               []byte
+	AccountRowID, AccountRevision                                int64
+	AccountEnabled                                               bool
+	UpdatePlayerID, UpdateBuild, UpdateLoginAt, UpdateLastSeenAt int64
+	UpdateDisconnectedAt, UpdateEpoch                            int64
+	UpdateSessionHash                                            string
+	UpdateConnected                                              bool
+	PolicyID, PolicyMinRun, PolicyMinLogin, PolicyLoginGateAt    int64
+	PolicyMaintenanceStartAt, PolicyMaintenanceEpoch             int64
+	PolicyMaintenance                                            bool
+}
+
+func p10PushAuthorizationQuery(tx *gorm.DB, accountTable string, id int64) *gorm.DB {
+	account := tx.Statement.Quote(accountTable)
+	return tx.Table("profiles AS p").Select(`p.id AS profile_id, p.session AS profile_session,
+		p.account_id AS profile_account_id, p.account_auth_revision AS profile_account_revision,
+		COALESCE(a.id,0) AS account_row_id, COALESCE(a.enabled,0) AS account_enabled,
+		COALESCE(a.auth_revision,0) AS account_revision,
+		COALESCE(u.player_id,0) AS update_player_id, COALESCE(u.session_hash,'') AS update_session_hash,
+		COALESCE(u.build_code,0) AS update_build, COALESCE(u.login_at,0) AS update_login_at,
+		COALESCE(u.last_seen_at,0) AS update_last_seen_at, COALESCE(u.disconnected_at,0) AS update_disconnected_at,
+		COALESCE(u.maintenance_epoch,0) AS update_epoch, COALESCE(u.connected,0) AS update_connected,
+		COALESCE(c.id,0) AS policy_id, COALESCE(c.min_run_build,0) AS policy_min_run,
+		COALESCE(c.min_login_build,0) AS policy_min_login, COALESCE(c.login_gate_at,0) AS policy_login_gate_at,
+		COALESCE(c.maintenance,0) AS policy_maintenance, COALESCE(c.maintenance_start_at,0) AS policy_maintenance_start_at,
+		COALESCE(c.maintenance_epoch,0) AS policy_maintenance_epoch`).
+		Joins("LEFT JOIN "+account+" AS a ON a.id=p.account_id").
+		Joins("LEFT JOIN client_update_sessions AS u ON u.player_id=p.id").
+		Joins("LEFT JOIN client_update_policy AS c ON c.id=1").
+		Where("p.id=?", id)
+}
+
+func p10MissingAccountTable(tx *gorm.DB, err error) bool {
+	if tx.Dialector.Name() == "sqlite" {
+		return err != nil && err.Error() == "no such table: game_accounts"
+	}
+	var mysqlErr *mysqlDriver.MySQLError
+	return errors.As(err, &mysqlErr) && mysqlErr.Number == 1146 && strings.HasSuffix(strings.ToLower(mysqlErr.Message), ".game_accounts' doesn't exist")
+}
+
+func authorizeP10PushNarrow(ctx context.Context, id int64, session []byte) error {
 	var row db.Profile
 	if err := db.GetIns().WithContext(ctx).Select("id", "session", "account_id", "account_auth_revision").First(&row, id).Error; err != nil {
 		return err
@@ -148,15 +192,86 @@ func authorizeP10Push(ctx context.Context, id int64, session []byte) error {
 	return authorizeProfileSession(ctx, &row, session)
 }
 
-// authorizeProfileSession keeps all authorization gates shared by full and push reads.
-func authorizeProfileSession(ctx context.Context, row *db.Profile, session []byte) error {
+// Every recipient is checked separately at send time, including account and
+// client gates; only a legacy installation without accounts falls back.
+func authorizeP10Push(ctx context.Context, id int64, session []byte) error {
+	if !clientUpdatesEnabled() {
+		return authorizeP10PushNarrow(ctx, id, session)
+	}
+	tx := db.GetIns().WithContext(ctx)
+	var value p10PushAuthorization
+	if err := p10PushAuthorizationQuery(tx, db.AccountsTableName("game_accounts"), id).Take(&value).Error; err != nil {
+		if p10MissingAccountTable(tx, err) {
+			return authorizeP10PushNarrow(ctx, id, session)
+		}
+		return err
+	}
+	row := db.Profile{Id: value.ProfileID, Session: value.ProfileSession, AccountID: value.ProfileAccountID, AccountAuthRevision: value.ProfileAccountRevision}
+	if err := validateProfileSession(&row, session); err != nil {
+		return err
+	}
+	account := db.GameAccount{ID: value.AccountRowID, Enabled: value.AccountEnabled, AuthRevision: value.AccountRevision}
+	if err := validateProfileAccount(&row, &account); err != nil {
+		return err
+	}
+	if value.PolicyID == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	policy := db.ClientUpdatePolicy{ID: value.PolicyID, MinRunBuild: value.PolicyMinRun, MinLoginBuild: value.PolicyMinLogin,
+		LoginGateAt: value.PolicyLoginGateAt, Maintenance: value.PolicyMaintenance,
+		MaintenanceStartAt: value.PolicyMaintenanceStartAt, MaintenanceEpoch: value.PolicyMaintenanceEpoch}
+	if !policy.Maintenance && policy.MaintenanceStartAt > 0 && policy.MaintenanceStartAt <= time.Now().UnixMilli() {
+		var err error
+		policy, err = clientUpdatePolicy(ctx)
+		if err != nil {
+			return err
+		}
+		if policy.Maintenance {
+			return constUtil.ErrClientUpdateMaintenance
+		}
+		// A concurrent policy change may have waited on the update; re-read
+		// identity and binding before allowing any send in this rare branch.
+		return authorizeP10PushNarrow(ctx, id, session)
+	}
+	binding := db.ClientUpdateSession{}
+	if value.UpdateSessionHash == clientUpdateSessionHash(row.Session) {
+		binding = db.ClientUpdateSession{PlayerID: value.UpdatePlayerID, SessionHash: value.UpdateSessionHash, BuildCode: value.UpdateBuild,
+			LoginAt: value.UpdateLoginAt, LastSeenAt: value.UpdateLastSeenAt, DisconnectedAt: value.UpdateDisconnectedAt,
+			MaintenanceEpoch: value.UpdateEpoch, Connected: value.UpdateConnected}
+	}
+	if err := clientUpdateSessionError(policy, binding); err != nil {
+		return err
+	}
+	clientUpdateTouchSession(ctx, &row, binding)
+	return nil
+}
+
+func validateProfileSession(row *db.Profile, session []byte) error {
 	if len(session) != 16 || subtle.ConstantTimeCompare(row.Session, session) != 1 {
 		return errors.New("本地会话无效，请重新登录")
 	}
+	return nil
+}
+
+func validateProfileAccount(row *db.Profile, account *db.GameAccount) error {
+	if row.AccountID > 0 && (account == nil || account.ID != row.AccountID || !account.Enabled || row.AccountAuthRevision != account.AuthRevision) {
+		return errors.New("账号登录已失效，请重新登录")
+	}
+	return nil
+}
+
+// authorizeProfileSession keeps all authorization gates shared by full and push reads.
+func authorizeProfileSession(ctx context.Context, row *db.Profile, session []byte) error {
+	if err := validateProfileSession(row, session); err != nil {
+		return err
+	}
 	if row.AccountID > 0 {
 		account, err := AccountForProfile(db.GetIns().WithContext(ctx), row)
-		if err != nil || !account.Enabled || row.AccountAuthRevision != account.AuthRevision {
-			return errors.New("账号登录已失效，请重新登录")
+		if err != nil {
+			return validateProfileAccount(row, nil)
+		}
+		if err := validateProfileAccount(row, account); err != nil {
+			return err
 		}
 	}
 	// 原协议和附加HTTP入口共享客户端运行资格。

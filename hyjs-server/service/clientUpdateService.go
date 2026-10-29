@@ -192,18 +192,30 @@ func CheckClientUpdateSession(ctx context.Context, row *db.Profile) error {
 	if err != nil {
 		return err
 	}
-	if err = clientUpdateRunError(p, r); err != nil {
+	if err = clientUpdateSessionError(p, r); err != nil {
+		return err
+	}
+	clientUpdateTouchSession(ctx, row, r)
+	return nil
+}
+
+// Both full and push authorization use these exact run/reconnect gates.
+func clientUpdateSessionError(p db.ClientUpdatePolicy, r db.ClientUpdateSession) error {
+	if err := clientUpdateRunError(p, r); err != nil {
 		return err
 	}
 	if r.BuildCode < p.MinLoginBuild && (r.PlayerID == 0 || r.LoginAt > p.LoginGateAt || (!r.Connected && (r.DisconnectedAt == 0 || r.DisconnectedAt < p.LoginGateAt || time.Now().UnixMilli()-r.DisconnectedAt > constUtil.ClientUpdateReconnectMS))) {
 		return constUtil.ErrClientUpdateRequired
 	}
+	return nil
+}
+
+func clientUpdateTouchSession(ctx context.Context, row *db.Profile, r db.ClientUpdateSession) {
 	// 在线活跃时间最多每十秒落库一次，断连轮询始终不能延长重连宽限。
 	now := time.Now().UnixMilli()
 	if r.Connected && now-r.LastSeenAt >= constUtil.ClientUpdateSeenIntervalMS {
 		_ = db.GetIns().WithContext(ctx).Model(&db.ClientUpdateSession{}).Where("player_id=? AND session_hash=? AND connected=? AND last_seen_at<=?", row.Id, clientUpdateSessionHash(row.Session), true, now-constUtil.ClientUpdateSeenIntervalMS).Update("last_seen_at", now).Error
 	}
-	return nil
 }
 
 // CheckClientReconnect 只保留发布时在线的同一会话，首次断线最多保留五分钟。
