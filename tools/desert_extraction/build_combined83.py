@@ -29,8 +29,8 @@ ENTRY = 'assets/bin/Data/Managed/Assembly-CSharp.dll'
 MAP_HELPER = 'assets/bin/Data/Managed/SoulFlowerDesert53.dll'
 V4_HELPER = 'assets/bin/Data/Managed/SoulFlowerDesertV4.dll'
 SHOP = 'assets/bin/Data/Managed/SoulFlowerGGOShop.dll'
-R8I_MAIN = 'ed7c7dd45800b50bc97930b77976e4786a1119c51259c048f1457896fe2e9e7e'
-R8I_HELPER = '719ca100dc23146794f35d9f010c6522ad51b25623b88689dbcc1b0cba8c6874'
+R8J_MAIN = 'ed7c7dd45800b50bc97930b77976e4786a1119c51259c048f1457896fe2e9e7e'
+R8J_HELPER = 'acff84fe406f31ca86de7069fe60d18ac568aa3583a806f6b7f516777fc4790b'
 QA_ORIGIN = 'http://127.0.0.1:28979'
 
 
@@ -187,9 +187,9 @@ def main():
     field_helper = (field_dir/'SoulFlowerDesertV4.dll').read_bytes()
     map_bundle = bundle.read_bytes()
     require(sha(native_map) == m['outputManagedSHA256'] == v['inputManagedSHA256']
-            and sha(native_a) == v['outputManagedSHA256'] == R8I_MAIN
-            and sha(map_helper) == m['helperSHA256'] and sha(field_helper) == v['helperSHA256'] == R8I_HELPER,
-            'Raw r8i static payload differs')
+            and sha(native_a) == v['outputManagedSHA256'] == R8J_MAIN
+            and sha(map_helper) == m['helperSHA256'] and sha(field_helper) == v['helperSHA256'] == R8J_HELPER,
+            'Raw r8j static payload differs')
     with zipfile.ZipFile(base) as z:
         names = z.namelist()
         require(len(names) == len(set(names)) and all(x in names for x in (ENTRY, SHOP, 'classes2.dex', package_resources.CATALOG_ENTRY))

@@ -13,7 +13,7 @@ namespace HYJS.DesertV4
         static TradePanel instance;
         static readonly string[] Colors={"白","绿","蓝","紫","橙","红"};
         GameObject root,amountRoot;
-        UILabel title,ownText,peerText,valuesText,protectionText;
+        UILabel title,ownText,peerText,valuesText,afterText;
         CommonIcon[] own=new CommonIcon[6],peer=new CommonIcon[6];
         TradeQuote quote;
         long playerId,amount,maximum,amountVersion;
@@ -108,12 +108,12 @@ namespace HYJS.DesertV4
             UIWidget bg=Find(root,"Window/BG").GetComponent<UIWidget>(); if (bg==null) { Destroy(root); throw new InvalidOperationException("Native panel background unavailable"); }
             bg.width=600; bg.height=414;
             panel.title=native.titleLable; Unlocalize(panel.title); panel.title.gameObject.SetActive(true); panel.title.text="芯片交易";
-            panel.title.transform.localPosition=new Vector3(0,182,0);
+            panel.title.transform.localPosition=new Vector3(0,163,0);
             UILabel original=native.m_kLabel;
-            panel.ownText=CloneLabel(original,main,"TradeSelf",new Vector3(0,151,0),20,510);
+            panel.ownText=CloneLabel(original,main,"TradeSelf",new Vector3(0,120,0),20,510);
             panel.peerText=CloneLabel(original,main,"TradePeer",new Vector3(0,22,0),20,510);
             panel.valuesText=CloneLabel(original,main,"TradeValues",new Vector3(0,-92,0),18,540);
-            panel.protectionText=CloneLabel(original,main,"TradeProtected",new Vector3(0,-121,0),17,540);
+            panel.afterText=CloneLabel(original,main,"TradeAfterBalance",new Vector3(0,-121,0),17,540);
             original.gameObject.SetActive(false);
             native.m_kOKBtn.transform.localPosition=new Vector3(-105,-171,0);
             native.m_kCancelBtn.transform.localPosition=new Vector3(105,-171,0);
@@ -125,7 +125,7 @@ namespace HYJS.DesertV4
                 CommonIcon a=CommonMethod.CreateCommonIcon(main),b=CommonMethod.CreateCommonIcon(main);
                 if (a==null || b==null) { Destroy(root); throw new InvalidOperationException("Native item cell unavailable"); }
                 a.transform.localScale=b.transform.localScale=Vector3.one*.47f;
-                a.transform.localPosition=new Vector3(-195+i*78,103,0); b.transform.localPosition=new Vector3(-195+i*78,-27,0);
+                a.transform.localPosition=new Vector3(-195+i*78,76,0); b.transform.localPosition=new Vector3(-195+i*78,-27,0);
                 a.SetData("item_970"+(i+1),false,-1,null); b.SetData("item_970"+(i+1),false,-1,null);
                 ClearHandlers(a.gameObject); ClearHandlers(b.gameObject);
                 NGUITools.AddWidgetCollider(a.gameObject);
@@ -160,10 +160,10 @@ namespace HYJS.DesertV4
             ownText.text="我的付出"+(q.confirmed[me] ? "（已确认）" : "（点击芯片修改）");
             peerText.text="对方付出"+(q.confirmed[other] ? "（已确认）" : "（待确认）");
             valuesText.text="预计信用：我的 "+(String.IsNullOrEmpty(q.values[me]) ? "--":q.values[me])+"   对方 "+(String.IsNullOrEmpty(q.values[other]) ? "--":q.values[other]);
-            string protection="成交后保护：";
-            if (q.preview) for (int i=0;i<6;i++) protection+=Colors[i]+q.afterProtected[i].ToString(CultureInfo.InvariantCulture)+(i==5 ? "":"  ");
-            else protection+="待双方填写有效数量";
-            protectionText.text=protection;
+            string after="成交后持有：";
+            if (q.preview) for (int i=0;i<6;i++) after+=Colors[i]+q.after[i].ToString(CultureInfo.InvariantCulture)+(i==5 ? "":"  ");
+            else after+="填写数量后显示";
+            afterText.text=after;
             for (int i=0;i<6;i++) { own[i].UpdateCountNum(q.offers[me][i].ToString(CultureInfo.InvariantCulture)); peer[i].UpdateCountNum(q.offers[other][i].ToString(CultureInfo.InvariantCulture)); }
         }
         void Confirm()
@@ -171,7 +171,7 @@ namespace HYJS.DesertV4
             if (amountRoot!=null) return;
             if (quote==null || busy || !quote.preview) { Notice("请等待有效的交易报价"); return; }
             long version=quote.version; string id=quote.id;
-            BoxManager.CreateMessageBoxWithCofirmAndCancelButton("确认当前双方数量和保护结果？",delegate(bool yes)
+            BoxManager.CreateMessageBoxWithCofirmAndCancelButton("确认按以上数量交换芯片？",delegate(bool yes)
             { if (yes && quote!=null && quote.id==id && quote.version==version) TradeController.Action("confirm",null); else if (yes) Notice("报价已变化，请重新确认"); });
             RaiseConfirmation();
         }
