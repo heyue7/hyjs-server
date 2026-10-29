@@ -114,6 +114,12 @@ type AdminFieldGGOPoint struct {
 	Position      *AdminFieldGGOPosition `json:"position"`
 	StandPosition *AdminFieldGGOPosition `json:"standPosition"`
 	Radius        float64                `json:"radius"`
+	Patrol        *AdminFieldGGOPatrol   `json:"patrol,omitempty"`
+}
+
+type AdminFieldGGOPatrol struct {
+	Waypoints []*AdminFieldGGOPosition `json:"waypoints"`
+	Speed     float64                  `json:"speed"`
 }
 
 type AdminFieldGGOSafeArea struct {

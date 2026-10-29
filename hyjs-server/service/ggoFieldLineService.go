@@ -16,9 +16,41 @@ import (
 type ggoLineState struct {
 	DeploymentRevision string            `json:"deploymentRevision"`
 	NextGeneration     int64             `json:"nextGeneration"`
+	CycleMS            int64             `json:"cycleMs"`
 	Resources          []ggoResourceNode `json:"resources"`
 	Monsters           []ggoMonsterNode  `json:"monsters"`
+	LegacyBlocks       []ggoLegacyBlock  `json:"legacyBlocks,omitempty"`
 }
+
+// A published revision can replace visible nodes while earlier accepted
+// actions retain their independently frozen results. At most one prior action
+// blocks any point present in the new version.
+type ggoLegacyBlock struct {
+	PointID    string `json:"pointId"`
+	Kind       string `json:"kind"`
+	PlayerID   int64  `json:"playerId"`
+	Token      string `json:"token"`
+	Generation int64  `json:"generation"`
+}
+
+func ggoLegacyBlocked(state *ggoLineState, pointID string) bool {
+	for _, b := range state.LegacyBlocks {
+		if b.PointID == pointID {
+			return true
+		}
+	}
+	return false
+}
+func ggoReleaseLegacyBlock(state *ggoLineState, pointID, kind string, playerID int64, token string, generation int64) bool {
+	for i, b := range state.LegacyBlocks {
+		if b.PointID == pointID && b.Kind == kind && b.PlayerID == playerID && b.Token == token && b.Generation == generation {
+			state.LegacyBlocks = append(state.LegacyBlocks[:i], state.LegacyBlocks[i+1:]...)
+			return true
+		}
+	}
+	return false
+}
+
 type ggoResourceNode struct {
 	PointID       string `json:"pointId"`
 	Kind          string `json:"kind"`
@@ -32,16 +64,18 @@ type ggoResourceNode struct {
 	ReadyAtMS     int64  `json:"readyAtMs,omitempty"`
 }
 type ggoMonsterNode struct {
-	PointID         string `json:"pointId"`
-	Level           int64  `json:"level"`
-	HeroID          string `json:"heroId"`
-	MonID           string `json:"monId"`
-	UUID            string `json:"uuid"`
-	Generation      int64  `json:"generation"`
-	RefreshAtMS     int64  `json:"refreshAtMs"`
-	ReservedBy      int64  `json:"reservedBy,omitempty"`
-	FightID         string `json:"fightId,omitempty"`
-	ReservedUntilMS int64  `json:"reservedUntilMs,omitempty"`
+	PointID          string `json:"pointId"`
+	Level            int64  `json:"level"`
+	HeroID           string `json:"heroId"`
+	MonID            string `json:"monId"`
+	UUID             string `json:"uuid"`
+	Generation       int64  `json:"generation"`
+	RefreshAtMS      int64  `json:"refreshAtMs"`
+	ReservedBy       int64  `json:"reservedBy,omitempty"`
+	FightID          string `json:"fightId,omitempty"`
+	ReservedUntilMS  int64  `json:"reservedUntilMs,omitempty"`
+	PatrolEpochMS    int64  `json:"patrolEpochMs,omitempty"`
+	PatrolPausedAtMS int64  `json:"patrolPausedAtMs,omitempty"`
 }
 
 // Each id is an original FieldMonster group with the intended displayed
@@ -94,7 +128,7 @@ func ggoNewLineState(cfg *model.AdminFieldGGOConfiguration, revision string, now
 	if cfg == nil || cfg.Runtime == nil || revision == "" || !model.ValidAdminFieldGGORuntime(cfg) {
 		return nil, errors.New("沙漠运行配置无效")
 	}
-	state := &ggoLineState{DeploymentRevision: revision, NextGeneration: 1, Resources: []ggoResourceNode{}, Monsters: []ggoMonsterNode{}}
+	state := &ggoLineState{DeploymentRevision: revision, NextGeneration: 1, CycleMS: cfg.Runtime.Resource.CycleSeconds * 1000, Resources: []ggoResourceNode{}, Monsters: []ggoMonsterNode{}}
 	boundary := ggoCycleBoundary(now, cfg.Runtime.Resource.CycleSeconds)
 	tiers := map[int64]string{}
 	for _, tier := range cfg.Runtime.MonsterTiers {
@@ -121,7 +155,7 @@ func ggoNewLineState(cfg *model.AdminFieldGGOConfiguration, revision string, now
 			if err != nil {
 				return nil, err
 			}
-			state.Monsters = append(state.Monsters, ggoMonsterNode{PointID: point.ID, Level: point.Level, HeroID: tiers[point.Level], MonID: ggoMonsterGroup(tiers[point.Level]), UUID: token, Generation: generation})
+			state.Monsters = append(state.Monsters, ggoMonsterNode{PointID: point.ID, Level: point.Level, HeroID: tiers[point.Level], MonID: ggoMonsterGroup(tiers[point.Level]), UUID: token, Generation: generation, PatrolEpochMS: now})
 		}
 	}
 	sort.Slice(state.Resources, func(i, j int) bool { return state.Resources[i].PointID < state.Resources[j].PointID })
@@ -138,6 +172,40 @@ func ggoNextGeneration(state *ggoLineState) (int64, error) {
 	return value, nil
 }
 
+// The persisted deadline makes restart recovery an indexed bounded query.
+// Zero schedules one migration pass for snapshots written before this field.
+func ggoNextLineDue(state *ggoLineState) int64 {
+	if state == nil || state.CycleMS <= 0 {
+		return 0
+	}
+	due := int64(math.MaxInt64)
+	add := func(at int64) {
+		if at > 0 && at < due {
+			due = at
+		}
+	}
+	for _, node := range state.Resources {
+		if node.ReservedBy != 0 {
+			continue
+		}
+		if node.ScheduledAtMS > math.MaxInt64-state.CycleMS {
+			return 0
+		}
+		add(node.ScheduledAtMS + state.CycleMS)
+		if node.Remaining == 0 {
+			add(node.RefreshAtMS)
+		}
+	}
+	for _, node := range state.Monsters {
+		if node.ReservedBy == 0 {
+			add(node.RefreshAtMS)
+		} else {
+			add(node.ReservedUntilMS)
+		}
+	}
+	return due
+}
+
 func ggoLineSave(tx *gorm.DB, row *db.GGOFieldLine, state *ggoLineState, now int64) error {
 	if row.Revision < 0 || row.Revision == math.MaxInt64 {
 		return errors.New("沙漠场景版本无效")
@@ -149,7 +217,8 @@ func ggoLineSave(tx *gorm.DB, row *db.GGOFieldLine, state *ggoLineState, now int
 	row.Revision++
 	row.Payload = payload
 	row.UpdatedAt = now
-	return tx.Model(&db.GGOFieldLine{}).Where("server_id=? AND line=?", row.ServerID, row.Line).Updates(map[string]any{"revision": row.Revision, "payload": row.Payload, "updated_at": row.UpdatedAt}).Error
+	row.NextDueAt = ggoNextLineDue(state)
+	return tx.Model(&db.GGOFieldLine{}).Where("server_id=? AND line=?", row.ServerID, row.Line).Updates(map[string]any{"revision": row.Revision, "payload": row.Payload, "updated_at": row.UpdatedAt, "next_due_at": row.NextDueAt}).Error
 }
 
 // ggoLoadLine obtains a single line row lock before changing a node, so a
@@ -170,7 +239,7 @@ func ggoLoadLine(tx *gorm.DB, serverID, line int64, cfg *model.AdminFieldGGOConf
 		if e != nil {
 			return nil, nil, false, e
 		}
-		row = db.GGOFieldLine{ServerID: serverID, Line: line, Revision: 1, Payload: payload, UpdatedAt: now}
+		row = db.GGOFieldLine{ServerID: serverID, Line: line, Revision: 1, Payload: payload, UpdatedAt: now, NextDueAt: ggoNextLineDue(initial)}
 		if e = tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&row).Error; e != nil {
 			return nil, nil, false, e
 		}
@@ -202,6 +271,7 @@ func ggoLoadLine(tx *gorm.DB, serverID, line int64, cfg *model.AdminFieldGGOConf
 			n.ReservedBy = 0
 			n.FightID = ""
 			n.ReservedUntilMS = 0
+			n.PatrolEpochMS, n.PatrolPausedAtMS = now, 0
 			expiredMonster = true
 		}
 	}
@@ -211,19 +281,31 @@ func ggoLoadLine(tx *gorm.DB, serverID, line int64, cfg *model.AdminFieldGGOConf
 		}
 	}
 	if state.DeploymentRevision != revision {
-		for _, n := range state.Resources {
-			if n.ReservedBy != 0 {
-				return nil, nil, false, errors.New("沙漠旧版本采集仍在处理")
-			}
-		}
-		for _, n := range state.Monsters {
-			if n.ReservedBy != 0 {
-				return nil, nil, false, errors.New("沙漠旧版本战斗仍在处理")
-			}
-		}
 		next, e := ggoNewLineState(cfg, revision, now)
 		if e != nil {
 			return nil, nil, false, e
+		}
+		currentPoints := map[string]bool{}
+		for _, point := range cfg.Runtime.Points {
+			currentPoints[point.ID] = true
+		}
+		addBlock := func(b ggoLegacyBlock) {
+			if currentPoints[b.PointID] && !ggoLegacyBlocked(next, b.PointID) {
+				next.LegacyBlocks = append(next.LegacyBlocks, b)
+			}
+		}
+		for _, b := range state.LegacyBlocks {
+			addBlock(b)
+		}
+		for _, n := range state.Resources {
+			if n.ReservedBy > 0 {
+				addBlock(ggoLegacyBlock{PointID: n.PointID, Kind: "gather", PlayerID: n.ReservedBy, Token: n.AttemptToken, Generation: n.Generation})
+			}
+		}
+		for _, n := range state.Monsters {
+			if n.ReservedBy > 0 {
+				addBlock(ggoLegacyBlock{PointID: n.PointID, Kind: "monster", PlayerID: n.ReservedBy, Token: n.FightID, Generation: n.Generation})
+			}
 		}
 		next.NextGeneration = state.NextGeneration
 		for i := range next.Resources {
@@ -238,6 +320,9 @@ func ggoLoadLine(tx *gorm.DB, serverID, line int64, cfg *model.AdminFieldGGOConf
 				return nil, nil, false, e
 			}
 		}
+		if e = ggoValidateLineState(next, cfg); e != nil {
+			return nil, nil, false, e
+		}
 		if e = ggoLineSave(tx, &row, next, now); e != nil {
 			return nil, nil, false, e
 		}
@@ -245,6 +330,28 @@ func ggoLoadLine(tx *gorm.DB, serverID, line int64, cfg *model.AdminFieldGGOConf
 	}
 	if err := ggoValidateLineState(&state, cfg); err != nil {
 		return nil, nil, false, err
+	}
+	updated := false
+	if state.CycleMS == 0 {
+		state.CycleMS = cfg.Runtime.Resource.CycleSeconds * 1000
+		updated = true
+	} else if state.CycleMS != cfg.Runtime.Resource.CycleSeconds*1000 {
+		return nil, nil, false, errors.New("沙漠资源刷新周期与发布版本不匹配")
+	}
+	for i := range state.Monsters {
+		n := &state.Monsters[i]
+		if n.PatrolEpochMS == 0 {
+			n.PatrolEpochMS = now
+			if n.ReservedBy > 0 || n.RefreshAtMS > 0 {
+				n.PatrolPausedAtMS = now
+			}
+			updated = true
+		}
+	}
+	if updated {
+		if err := ggoLineSave(tx, &row, &state, now); err != nil {
+			return nil, nil, false, err
+		}
 	}
 	boundary := ggoCycleBoundary(now, cfg.Runtime.Resource.CycleSeconds)
 	changed := false
@@ -282,6 +389,7 @@ func ggoLoadLine(tx *gorm.DB, serverID, line int64, cfg *model.AdminFieldGGOConf
 			}
 			monster.UUID = token
 			monster.RefreshAtMS = 0
+			monster.PatrolEpochMS, monster.PatrolPausedAtMS = now, 0
 			changed = true
 		}
 	}
@@ -300,6 +408,16 @@ func ggoValidateLineState(state *ggoLineState, cfg *model.AdminFieldGGOConfigura
 	points := map[string]model.AdminFieldGGOPoint{}
 	for _, point := range cfg.Runtime.Points {
 		points[point.ID] = point
+	}
+	blocks := map[string]bool{}
+	if len(state.LegacyBlocks) > len(points) {
+		return errors.New("沙漠旧版占用数量无效")
+	}
+	for _, b := range state.LegacyBlocks {
+		if _, exists := points[b.PointID]; !exists || blocks[b.PointID] || (b.Kind != "gather" && b.Kind != "monster") || b.PlayerID < 1 || b.Token == "" || b.Generation < 1 || b.Generation >= state.NextGeneration {
+			return errors.New("沙漠旧版占用状态无效")
+		}
+		blocks[b.PointID] = true
 	}
 	seen := map[string]bool{}
 	for _, node := range state.Resources {
@@ -324,7 +442,7 @@ func ggoValidateLineState(state *ggoLineState, cfg *model.AdminFieldGGOConfigura
 		point, ok := points[monster.PointID]
 		if !ok || monster.MonID != ggoMonsterGroup(monster.HeroID) || seen[monster.PointID] || point.Kind != "monster" || point.Level != monster.Level || monster.HeroID == "" ||
 			monster.UUID == "" || monster.Generation < 1 || monster.Generation >= state.NextGeneration ||
-			monster.ReservedBy < 0 || monster.RefreshAtMS < 0 ||
+			monster.ReservedBy < 0 || monster.RefreshAtMS < 0 || monster.PatrolEpochMS < 0 || monster.PatrolPausedAtMS < 0 ||
 			monster.ReservedBy == 0 && (monster.FightID != "" || monster.ReservedUntilMS != 0) ||
 			monster.ReservedBy > 0 && (monster.FightID == "" || monster.ReservedUntilMS < 0 || monster.RefreshAtMS != 0) {
 			return errors.New("沙漠小怪状态无效")

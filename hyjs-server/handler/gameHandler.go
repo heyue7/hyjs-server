@@ -782,7 +782,9 @@ func ValidateGameRequest(p *model.GamePacket) error {
 			return errors.New("Invalid field battle result")
 		}
 		record := b.GetOptRecord()
-		if record.GetFinalRoundNum() < 0 || record.GetFinalRoundNum() > 40 {
+		// Original RoundEnd increments once before a 40-round timeout settles.
+		// The frozen battle replay verifies the exact per-fight maximum later.
+		if record.GetFinalRoundNum() < 0 || record.GetFinalRoundNum() > 41 {
 			return errors.New("Missing field battle record")
 		}
 		values := []float64{record.GetAttackerTotalLeftHp(), record.GetDefenderTotalLeftHp(), b.GetBattlePlayer().GetInst().GetAnger()}

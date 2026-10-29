@@ -1,6 +1,7 @@
 package service
 
 import (
+	"bytes"
 	"context"
 	"crypto/subtle"
 	"errors"
@@ -76,7 +77,7 @@ func (s *GameService) p10SceneMovePlayer(p *pb.Player, g *model.GameState, proje
 	if err != nil {
 		return nil, err
 	}
-	power, err := s.formationFightPower(p, g)
+	power, err := s.formationFightPowerFromParty(info)
 	if err != nil {
 		return nil, err
 	}
@@ -155,43 +156,112 @@ func (s *GameService) p10CurrentScenePeers(ctx context.Context, id int64) ([]*pb
 	}
 	return s.p10ScenePeers(tx, own.Scene, own.Line, id)
 }
+
+// p10SceneLiveRows reads each current profile and offline account by indexed ID
+// in bounded batches. The directory lives only for this call; each invocation
+// reads the current session, scene and account state again.
+func (s *GameService) p10SceneLiveRows(tx *gorm.DB, rows []db.P10ScenePresence) ([]*pb.MovePlayer, error) {
+	type candidate struct {
+		row     db.P10ScenePresence
+		sink    *p10ClientSink
+		offline bool
+	}
+	var candidates []candidate
+	var ids []int64
+	for _, row := range rows {
+		value, ok := p10ClientSinks.Load(p10ClientKey{s.p10ClientOwner(), row.PlayerID})
+		offline := !ok && row.Scene == constUtil.GGOFieldScene && row.SessionHash == "" && row.OfflineUntil > time.Now().UnixMilli()
+		if !offline && (!ok || row.SessionHash == "") {
+			continue
+		}
+		entry := candidate{row: row, offline: offline}
+		if !offline {
+			entry.sink = value.(*p10ClientSink)
+		}
+		candidates = append(candidates, entry)
+		ids = append(ids, row.PlayerID)
+	}
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	profiles := make(map[int64]db.Profile, len(ids))
+	// Limit IN parameters for both SQLite and MySQL, including stale directories.
+	const batchSize = 400
+	for start := 0; start < len(ids); start += batchSize {
+		end := min(start+batchSize, len(ids))
+		var batch []db.Profile
+		if err := tx.Select("id", "session", "account_id", "account_auth_revision", "player", "game", "ggo_credit", "ggo_credit_migrated").Where("id IN ?", ids[start:end]).Find(&batch).Error; err != nil {
+			return nil, err
+		}
+		for _, profile := range batch {
+			profiles[profile.Id] = profile
+		}
+	}
+	var accountIDs []int64
+	accountSeen := make(map[int64]bool)
+	for _, entry := range candidates {
+		profile, exists := profiles[entry.row.PlayerID]
+		if entry.offline && exists && profile.AccountID > 0 && !accountSeen[profile.AccountID] {
+			accountSeen[profile.AccountID] = true
+			accountIDs = append(accountIDs, profile.AccountID)
+		}
+	}
+	accounts := make(map[int64]db.GameAccount, len(accountIDs))
+	for start := 0; start < len(accountIDs); start += batchSize {
+		end := min(start+batchSize, len(accountIDs))
+		var batch []db.GameAccount
+		if err := db.AccountsTable(tx, "game_accounts").Select("id", "enabled", "auth_revision").Where("id IN ?", accountIDs[start:end]).Find(&batch).Error; err != nil {
+			return nil, err
+		}
+		for _, account := range batch {
+			accounts[account.ID] = account
+		}
+	}
+	var peers []*pb.MovePlayer
+	for _, entry := range candidates {
+		row := entry.row
+		profile, exists := profiles[row.PlayerID]
+		if !exists {
+			continue
+		}
+		if !entry.offline {
+			if subtle.ConstantTimeCompare(profile.Session, entry.sink.session) != 1 || row.SessionHash != p6Digest(entry.sink.session) {
+				continue
+			}
+		} else if row.OfflineUntil <= time.Now().UnixMilli() {
+			continue
+		} else if profile.AccountID > 0 {
+			account, exists := accounts[profile.AccountID]
+			if !exists || !account.Enabled || account.AuthRevision != profile.AccountAuthRevision {
+				continue
+			}
+		}
+		_, game, err := decodeProfile(&profile)
+		if err != nil {
+			continue
+		}
+		if entry.offline && (game.GGOField == nil || game.Position.GetScene() != constUtil.GGOFieldScene || game.PositionLoading) {
+			continue
+		}
+		expected, scopeErr := s.P13GuildRoomPresenceScope(tx, row.PlayerID, game)
+		if scopeErr != nil || expected != row.Scene {
+			continue
+		}
+		frame := &pb.MovePlayer{}
+		if proto.Unmarshal(row.Frame, frame) != nil || frame.GetInfo().GetPlayerId() != row.PlayerID {
+			continue
+		}
+		peers = append(peers, frame)
+	}
+	return peers, nil
+}
+
 func (s *GameService) p10SceneLive(tx *gorm.DB, row db.P10ScenePresence) (*pb.MovePlayer, bool) {
-	value, ok := p10ClientSinks.Load(p10ClientKey{s.p10ClientOwner(), row.PlayerID})
-	offline := !ok && row.Scene == constUtil.GGOFieldScene && row.SessionHash == "" && row.OfflineUntil > time.Now().UnixMilli()
-	if !offline && (!ok || row.SessionHash == "") {
+	peers, err := s.p10SceneLiveRows(tx, []db.P10ScenePresence{row})
+	if err != nil || len(peers) != 1 {
 		return nil, false
 	}
-	var profile db.Profile
-	if tx.First(&profile, row.PlayerID).Error != nil {
-		return nil, false
-	}
-	if !offline {
-		sink := value.(*p10ClientSink)
-		if subtle.ConstantTimeCompare(profile.Session, sink.session) != 1 || row.SessionHash != p6Digest(sink.session) {
-			return nil, false
-		}
-	} else if profile.AccountID > 0 {
-		account, err := AccountForProfile(tx, &profile)
-		if err != nil || !account.Enabled || account.AuthRevision != profile.AccountAuthRevision {
-			return nil, false
-		}
-	}
-	_, game, err := decodeProfile(&profile)
-	if err != nil {
-		return nil, false
-	}
-	if offline && (game.GGOField == nil || game.Position.GetScene() != constUtil.GGOFieldScene || game.PositionLoading) {
-		return nil, false
-	}
-	expected, scopeErr := s.P13GuildRoomPresenceScope(tx, row.PlayerID, game)
-	if scopeErr != nil || expected != row.Scene {
-		return nil, false
-	}
-	frame := &pb.MovePlayer{}
-	if proto.Unmarshal(row.Frame, frame) != nil || frame.GetInfo().GetPlayerId() != row.PlayerID {
-		return nil, false
-	}
-	return frame, true
+	return peers[0], true
 }
 func (s *GameService) p10ScenePeers(tx *gorm.DB, scene string, line int32, exclude int64) ([]*pb.MovePlayer, error) {
 	var rows []db.P10ScenePresence
@@ -206,13 +276,7 @@ func (s *GameService) p10ScenePeers(tx *gorm.DB, scene string, line int32, exclu
 		}
 		rows = append(rows, offline...)
 	}
-	var peers []*pb.MovePlayer
-	for _, row := range rows {
-		if frame, live := s.p10SceneLive(tx, row); live {
-			peers = append(peers, frame)
-		}
-	}
-	return peers, nil
+	return s.p10SceneLiveRows(tx, rows)
 }
 
 func (s *GameService) p10SceneSend(ctx context.Context, id int64, message proto.Message) {
@@ -223,7 +287,11 @@ func (s *GameService) p10SceneBroadcast(ctx context.Context, scene string, line 
 	if err != nil {
 		return
 	}
+	s.p10SceneSendPeers(ctx, peers, message)
+}
+func (s *GameService) p10SceneSendPeers(ctx context.Context, peers []*pb.MovePlayer, message proto.Message) {
 	for _, peer := range peers {
+		// Sending still rechecks the current account, session and client-update gate.
 		s.p10SceneSend(ctx, peer.GetInfo().GetPlayerId(), message)
 	}
 }
@@ -261,6 +329,7 @@ func (s *GameService) SyncP10Scene(ctx context.Context, id int64, movement bool)
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		return err
 	}
+	existed := err == nil
 	scope := p10SceneScope(g)
 	if scope == "" {
 		if old.SessionHash != "" {
@@ -280,7 +349,18 @@ func (s *GameService) SyncP10Scene(ctx context.Context, id int64, movement bool)
 	if line < 1 || line > cfg.LineCount {
 		line = 1
 	}
-	peers, err := s.p10ScenePeers(tx, scope, line, id)
+	linePeers := make(map[int32][]*pb.MovePlayer)
+	loadLine := func(candidate int32) ([]*pb.MovePlayer, error) {
+		if peers, ok := linePeers[candidate]; ok {
+			return peers, nil
+		}
+		peers, err := s.p10ScenePeers(tx, scope, candidate, id)
+		if err == nil {
+			linePeers[candidate] = peers
+		}
+		return peers, err
+	}
+	peers, err := loadLine(line)
 	if err != nil {
 		return err
 	}
@@ -291,7 +371,7 @@ func (s *GameService) SyncP10Scene(ctx context.Context, id int64, movement bool)
 			if candidate == line {
 				continue
 			}
-			available, e := s.p10ScenePeers(tx, scope, candidate, id)
+			available, e := loadLine(candidate)
 			if e != nil {
 				return e
 			}
@@ -310,7 +390,7 @@ func (s *GameService) SyncP10Scene(ctx context.Context, id int64, movement bool)
 		}
 		found := false
 		for candidate := int32(1); candidate <= cfg.LineCount; candidate++ {
-			available, err := s.p10ScenePeers(tx, scope, candidate, id)
+			available, err := loadLine(candidate)
 			if err != nil {
 				return err
 			}
@@ -340,22 +420,70 @@ func (s *GameService) SyncP10Scene(ctx context.Context, id int64, movement bool)
 		return err
 	}
 	current := db.P10ScenePresence{PlayerID: id, Scene: scope, Line: line, SessionHash: p6Digest(sink.session), Frame: raw, UpdatedAt: time.Now().UnixMilli()}
-	if err = tx.Save(&current).Error; err != nil {
-		return err
-	}
 	changed := old.Scene != scope || old.Line != line || old.SessionHash != current.SessionHash
+	wrote := !existed
+	if !existed {
+		if err = tx.Save(&current).Error; err != nil {
+			return err
+		}
+	} else {
+		updates := make(map[string]any)
+		if old.Scene != current.Scene {
+			updates["scene"] = current.Scene
+		}
+		if old.Line != current.Line {
+			updates["line"] = current.Line
+		}
+		if old.SessionHash != current.SessionHash {
+			updates["session_hash"] = current.SessionHash
+		}
+		if !bytes.Equal(old.Frame, current.Frame) {
+			updates["frame"] = current.Frame
+		}
+		if old.OfflineUntil != 0 {
+			updates["offline_until"] = 0
+		}
+		if old.OfflinePKUsed {
+			updates["offline_pk_used"] = false
+		}
+		// Return-sprout eligibility uses this exact last-active timestamp.
+		if old.UpdatedAt != current.UpdatedAt {
+			updates["updated_at"] = current.UpdatedAt
+		}
+		if len(updates) > 0 {
+			wrote = true
+			result := tx.Model(&db.P10ScenePresence{}).Where("player_id=?", id).Updates(updates)
+			if result.Error != nil {
+				return result.Error
+			}
+			if result.RowsAffected == 0 {
+				// Match Save's existing-row fallback if the row disappeared concurrently.
+				if err = tx.Save(&current).Error; err != nil {
+					return err
+				}
+			}
+		}
+	}
 	if changed && old.SessionHash != "" {
 		s.p10SceneBroadcast(ctx, old.Scene, old.Line, id, &pb.SCPlayerDisappear{PlayerId: []int64{id}})
 	}
+	broadcast := func(message proto.Message) {
+		if wrote {
+			// The frame write may have waited while another profile changed scope.
+			s.p10SceneBroadcast(ctx, scope, line, id, message)
+			return
+		}
+		s.p10SceneSendPeers(ctx, peers, message)
+	}
 	if changed {
-		s.p10SceneBroadcast(ctx, scope, line, id, &pb.SCPlayerAppear{Player: []*pb.MovePlayer{frame}})
+		broadcast(&pb.SCPlayerAppear{Player: []*pb.MovePlayer{frame}})
 		if len(peers) > 0 {
 			s.p10SceneSend(ctx, id, &pb.SCPlayerAppear{Player: peers})
 		}
 	} else if movement {
-		s.p10SceneBroadcast(ctx, scope, line, id, &pb.SCMovePush{Position: []*pb.Position{frame.Position}})
-	} else if p6Digest(old.Frame) != p6Digest(current.Frame) {
-		s.p10SceneBroadcast(ctx, scope, line, id, &pb.SCMovePlayerInfo{PlayerInfos: []*pb.MovePlayer{frame}})
+		broadcast(&pb.SCMovePush{Position: []*pb.Position{frame.Position}})
+	} else if !bytes.Equal(old.Frame, current.Frame) {
+		broadcast(&pb.SCMovePlayerInfo{PlayerInfos: []*pb.MovePlayer{frame}})
 	}
 	return nil
 }
@@ -547,16 +675,23 @@ func (s *GameService) DispatchP10Scene(ctx context.Context, id int64, request pr
 				if locked.Scene != own.Scene || locked.Line != oldLine || locked.SessionHash != p6Digest(row.Session) {
 					return errors.New("场景会话已变化")
 				}
-				if err = ggoCommitLeave(tx, s, id, game, "line", "", b.GetLine(), time.Now().UnixMilli()); err != nil {
+				if err = ggoCommitLeave(tx, s, id, game, "line", "", b.GetLine(), time.Now().UnixMilli(), b, &reply); err != nil {
 					return err
 				}
-				if err = ggoPositionBump(game); err != nil {
-					return err
-				}
+				game.PositionLoading = true
 				if err = saveProfile(tx, &row, player, game); err != nil {
 					return err
 				}
 				own = locked
+			}
+			if oldLine != b.GetLine() && game.GGOField != nil && game.Position.GetScene() != constUtil.GGOFieldScene {
+				if err = ggoPositionBump(game); err != nil {
+					return err
+				}
+				game.PositionLoading = true
+				if err = saveProfile(tx, &row, player, game); err != nil {
+					return err
+				}
 			}
 			own.Line = b.GetLine()
 			if err = tx.Save(&own).Error; err != nil {

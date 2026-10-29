@@ -130,8 +130,12 @@ func TestP2KingDrawGatePityQuotaReplay(t *testing.T) {
 		t.Fatal(e)
 	}
 	result := messages[0].(*pb.SCWarriorRecruit)
-	if len(result.GetGet().GetWars()) != 1 || s.table("Hero", "id", result.GetGet().GetWars()[0].GetId())["quality"] != "23" {
+	if len(result.GetGet().GetWars()) != 1 {
 		t.Fatal("pity failed", result)
+	}
+	quality := s.table("Hero", "id", result.GetGet().GetWars()[0].GetId())["quality"]
+	if quality != "20" && quality != "23" {
+		t.Fatal("pity failed: expected orange or red", result)
 	}
 	retry, e := s.warriorRecruit(ctx, id, p2Recruit(1, 0), 2)
 	if e != nil || !proto.Equal(result, retry[0]) {

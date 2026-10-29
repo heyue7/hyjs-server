@@ -1,6 +1,6 @@
-"""Build a static, non-release 1.0.78 desert resource hook overlay.
+"""Build a static, non-release 1.0.79 desert resource hook overlay.
 
-Requires the pinned v78 desert map adapter; does not create or install an APK.
+Requires the pinned v80 desert map adapter; does not create or install an APK.
 Server implementation, all other V4 gameplay and device acceptance remain gates.
 """
 import argparse
@@ -20,14 +20,17 @@ import dnfile
 from tools.awake_diff_rows.build import methods
 from tools.client_activity.build import decoded
 from tools.local_asset_ready.remove_gate import exact_body,require
+from tools.desert_extraction.build_v78_adapter import QUALITY_METHOD,QUALITY_PIN
 
 HERE=Path(__file__).resolve().parent
-APK_SHA='fe67aea7d584199119a04f10edcd8baa54207a70717e295d377ce3dd67b8affc'
-MAP_MANAGED_SHA='4eaa1d47b1d822f579e0c7bb3bfa2d9cb5b08f75a32f194be7420fc44a1a1c97'
+APK_SHA='25026a1f180d164ba2b191e4cc7e558e20f7a761b740fb7b28d6205d6756112a'
+MAP_MANAGED_SHA='ba402ea01a9cd4fb3db03e57f6a9335a738a8a48a212cb83cd7935fbce66668f'
 # Exact map overlay is pinned above; every original method outside this list
 # must remain byte-identical, including all original Battle.Engine methods.
 HEADS={
- 'Room.RoomNetField::SCFieldResourceInfo':('ResourceChanged',['call','brfalse','ret']),
+ 'Room.RoomNetField::SCFieldResourceInfo':('ResourceNotification',['ldarg.1','call','brfalse','ret']),
+ 'Room.RCUIPlayer::OnClick':('OpenPlayer',['ldarg.0','call','brfalse','ret']),
+ 'Room.RoomNetField::SCSidePvpFightResult':('PvpResponse',['ldarg.1','call','brfalse','ret']),
  'Room.RoomNetField::SCFieldGetResource':('ResourceCheck',['call','brfalse','ret']),
  'Room.RoomNetField::SCFieldResourceStartGather':('ResourceCheck',['call','brfalse','ret']),
  'Room.RoomNetField::SCSideResourceCheck':('ResourceCheck',['call','brfalse','ret']),
@@ -35,6 +38,9 @@ HEADS={
  'Room.RoomNetField::SendGetFieldRes':('Gather',['ldarg.1','ldarg.2','call','brfalse','ret']),
  'Room.RoomField::OnMainCharactorLoaded':('ResourceChanged',['call','pop']),
  'Room.RoomNetField::SCSideMonster':('MonsterChanged',['call','brfalse','ret']),
+ 'Room.RoomNetField::SCSideBoss':('MonsterChanged',['call','brfalse','ret']),
+ 'Room.RoomNetField::SCSideWorldBoss':('MonsterChanged',['call','brfalse','ret']),
+ 'Room.RoomNetField::SCSideBossCountdown':('MonsterChanged',['call','brfalse','ret']),
  'Room.RCUINormalNPC::OpenPage':('OpenNpc',['ldarg.0','call','brfalse','ret']),
  'Room.RoomNetField::SendPve':('BeforeEncounter',['ldc.i4','ldarg.1','call','brfalse','ret']),
  'Room.RoomNetField::SendPveBoss':('BeforeEncounter',['ldc.i4','ldarg.1','call','brfalse','ret']),
@@ -44,19 +50,30 @@ HEADS={
  'NetAPI::SendSocketLogin':('TcpConnecting',['call']),
  'NetAPI::Disconnect':('TcpConnecting',['call']),
  'NetAPI::SCLoginTcpCallback':('TcpLoginResponse',['ldarg.0','call']),
+ 'NetAPI::SendSocket':('TransferSend',['ldarg.0','ldarg.1','call','brfalse','ret']),
+ 'ManagerController::SceneTransferCallback':('TransferResponse',['ldc.i4','ldarg.0','ldarg.1','call','brfalse','ret']),
+ 'Room.RoomNetField::SCTransferLine':('TransferResponse',['ldc.i4','ldarg.0','ldarg.1','call','brfalse','ret']),
+ 'NetWork.Sockets.Event.EventManger::AddPacket':('TrackPositionPacket',['ldarg.1','call']),
+ 'NetWork.Layer.SocketTool::ReceiveHandler':('DropOldSocket',['ldarg.0','ldarg.1','call','brfalse','ret']),
+ 'Room.RoomCharactor::MoveTo':('BlockMove',['ldarg.0','call','brfalse','ret']),
  'Battle.FieldPVEBattleOver::FieldPVEFightResultHandler':('FightEndResponse',['ldc.i4','ldarg.0','ldarg.1','call','brfalse','ret']),
  'Battle.FieldPVEBossBattleOver::FieldPVEBossFightResultHandler':('FightEndResponse',['ldc.i4','ldarg.0','ldarg.1','call','brfalse','ret']),
 }
 REPLACEMENTS={
- 'Room.RCAIServerMonster::Tick':{'MonsterPatrolTick':'PatrolTick'},
+ 'Room.RCAIServerMonster::Tick':{'MonsterPatrolTick':'PatrolTick','MonsterMoving':'IsMoving'},
  'Battle.FieldPVEBattleOver::AskFieldPVEFightResult':{'FightEndSend':'SendSocket'},
  'Battle.FieldPVEBossBattleOver::AskFieldPVEFightResult':{'FightEndSend':'SendSocket','LegacyBossObserve':'Observe'},
  'Battle.FieldPVEBossBattleOver::FieldPVEBossFightResultHandler':{'LegacyBossCompleted':'Completed'},
 }
-EXTRAS={'BoxManager::CreateSocketReconnect'} | set(REPLACEMENTS)
-SOURCES=('GatherAttempt.cs','FieldWire.cs','GatherJournalStore.cs','FieldResources.cs','GatherPreload.cs','NativeGatherUI.cs','GatherCoordinator.cs','ProtectionRelease.cs','FieldRuntime.cs','PendingRequest.cs','TerminalController.cs','FieldNpcs.cs','FieldMonsters.cs','FightEndJournal.cs','BattleRecovery.cs')
+EXTRAS={'BoxManager::CreateSocketReconnect','NetWork.Sockets.Event.EventManger::Tick','Room.RoomNetBase::SCCurrentPosition','Room.RoomNetField::SCCurrentPosition'} | set(REPLACEMENTS)
+SOURCES=('GatherAttempt.cs','NestedArrayJson.cs','FieldWire.cs','GatherJournalStore.cs','FieldResources.cs','GatherPreload.cs','NativeGatherUI.cs','GatherCoordinator.cs','ProtectionRelease.cs','FieldRuntime.cs','PendingRequest.cs','TerminalController.cs','FieldNpcs.cs','FieldMonsters.cs','FieldBoss.cs','PositionSync.cs','TravelController.cs','LeaveController.cs','TradeController.cs','TradePanel.cs','FightEndJournal.cs','BattleRecovery.cs','PvpBridge.cs')
 
 def sha(raw): return hashlib.sha256(raw).hexdigest()
+def sha_file(path):
+    h=hashlib.sha256()
+    with Path(path).open('rb') as f:
+        for block in iter(lambda:f.read(1024*1024),b''): h.update(block)
+    return h.hexdigest()
 def name_for(pe,token,old_methods):
     if not isinstance(token,int): return ''
     table=token>>24; index=(token&0xffffff)-1
@@ -80,12 +97,16 @@ def verify(before,after):
     require(not getattr(right.net.mdtables,'FieldPtr',None),'Unexpected FieldPtr')
     old,new=methods(left),methods(right); old_names={rid:name for name,rid,row in old}
     require(len(old)==len(new),'Method inventory differs')
-    changed=[]; unchanged=engine=0; expected=set(HEADS)|EXTRAS
+    changed=[]; unchanged=engine=0; quality=False; expected=set(HEADS)|EXTRAS
     for (name,rid,a),(name2,rid2,b) in zip(old,new):
         require((name,rid)==(name2,rid2),'Method identity differs')
         require(a.Signature.value==b.Signature.value and a.struct.Flags==b.struct.Flags and a.struct.ImplFlags==b.struct.ImplFlags,'Original ABI changed: '+name)
         if not a.Rva: require(not b.Rva,'Unexpected new body: '+name); continue
         raw_a,raw_b=exact_body(left,a),exact_body(right,b)
+        if name==QUALITY_METHOD:
+            _, instructions=decoded(left,a)
+            require(sha(raw_a)==QUALITY_PIN and raw_a==raw_b and instructions[74]==('ldc.i4.s',11),'Released quality filter changed')
+            quality=True
         if name not in expected:
             require(raw_a==raw_b,'Unexpected body change: '+name)
             unchanged+=1; engine+=name.startswith('Battle.Engine'); continue
@@ -97,6 +118,8 @@ def verify(before,after):
             ci=ops.index('call'); require(hook_for(right,y[ci])==hook,'Wrong hook target: '+name)
             for j,op in enumerate(ops):
                 if op=='brfalse': require(y[j][1]==len(ops),'Guard does not branch to original: '+name)
+            if name=='ManagerController::SceneTransferCallback': require(y[0][1]==30033,'Wrong scene response opcode')
+            if name=='Room.RoomNetField::SCTransferLine': require(y[0][1]==30062,'Wrong line response opcode')
             if name in ('Room.RoomNetField::SendPve','Room.RoomNetField::SCSidePveFightStart','Battle.FieldPVEBattleOver::FieldPVEFightResultHandler'): require(y[0][1]==6,'Wrong fight type')
             if name in ('Room.RoomNetField::SendPveBoss','Room.RoomNetField::SCSidePveBossFightStart','Battle.FieldPVEBossBattleOver::FieldPVEBossFightResultHandler'): require(y[0][1]==12,'Wrong boss type')
             remove.update(range(len(ops)))
@@ -106,6 +129,19 @@ def verify(before,after):
             require(j>0 and name_for(right,y[j-1][1],old_names)=='ClearSocketBox' and y[j+1][0]=='brtrue','Wrong reconnect guard placement')
             target=y[j+1][1]; require(y[target]==('ldstr','UI/MessageBox/NetError'),'Wrong original reconnect view')
             remove.update((j,j+1))
+        if name=='NetWork.Sockets.Event.EventManger::Tick':
+            found=[j for j,q in enumerate(y) if hook_for(right,q)=='DropPositionPacket']
+            require(len(found)==1,'Missing position event epoch guard'); j=found[0]
+            require(j>0 and y[j-1][0]=='ldloc.0' and y[j+1][0]=='brtrue' and y[j+1][1]==y[0][1],'Wrong event guard')
+            remove.update((j-1,j,j+1))
+        if name in ('Room.RoomNetBase::SCCurrentPosition','Room.RoomNetField::SCCurrentPosition'):
+            expected_hook='TrackPositionBase' if name=='Room.RoomNetBase::SCCurrentPosition' else 'TrackPositionField'
+            found=[j for j,q in enumerate(y) if hook_for(right,q)==expected_hook]
+            require(len(found)==1,'Missing position response observation'); j=found[0]
+            ops=['ldarg.0','ldarg.1','call'] if expected_hook=='TrackPositionBase' else ['ldarg.1','call']
+            start=j-len(ops)+1
+            require([q[0] for q in y[start:j+1]]==ops and j+1==len(y)-1 and y[-1][0]=='ret','Wrong position response tail')
+            remove.update(range(start,j+1))
         replacements=REPLACEMENTS.get(name,{})
         hit={k:0 for k in replacements}
         for j,q in enumerate(y):
@@ -121,8 +157,8 @@ def verify(before,after):
         after_to_old={j:k for k,j in enumerate(kept)}
         for k,j in enumerate(kept):
             old_op,old_value=x[k]; new_op,new_value=y[j]
-            require(old_op==new_op,'Original opcode changed: '+name)
             h=hook_for(right,y[j])
+            require(old_op==new_op or (h=='MonsterMoving' and old_op=='callvirt' and new_op=='call'),'Original opcode changed: '+name)
             if h in replacements:
                 require(name_for(left,old_value,old_names)==replacements[h],'Unexpected original call: '+name)
                 continue
@@ -135,7 +171,7 @@ def verify(before,after):
         require(len(ob.exception_handlers)==len(nb.exception_handlers),'Original exception handler count changed: '+name)
         old_offsets={q.offset-ob.header_size:k for k,q in enumerate(ob.instructions)}
         for oe,ne in zip(ob.exception_handlers,nb.exception_handlers):
-            require(oe.exception_type==ne.exception_type and oe.catch_type==ne.catch_type,'Original exception handler type changed: '+name)
+            require(oe.exception_type==ne.exception_type and getattr(oe.catch_type,'value',None)==getattr(ne.catch_type,'value',None),'Original exception handler type changed: '+name)
             for key in ('try_start','try_end','handler_start','handler_end'):
                 off=getattr(oe,key)
                 if off==ob.code_size: mapped=nb.code_size
@@ -149,8 +185,8 @@ def verify(before,after):
                 require(ne.filter_start==mapped,'Original filter changed: '+name)
             else: require(ne.filter_start==oe.filter_start,'Original filter changed: '+name)
         changed.append(dict(method=name,beforeSHA256=sha(raw_a),afterSHA256=sha(raw_b)))
-    require(len(changed)==len(expected) and engine==547,'Missing field hook or changed combat engine')
-    return dict(originalEngineMethodsUnchanged=engine,unrelatedRawMethodBodiesUnchanged=unchanged,originalTokensAndABI=True,fieldHooks=changed)
+    require(len(changed)==len(expected) and engine==547 and quality,'Missing field hook, released quality fix or changed combat engine')
+    return dict(originalEngineMethodsUnchanged=engine,unrelatedRawMethodBodiesUnchanged=unchanged,originalTokensAndABI=True,qualityFilterV80Exact=True,fieldHooks=changed)
 
 def main():
     ap=argparse.ArgumentParser(description=__doc__)
@@ -159,8 +195,8 @@ def main():
     ap.add_argument('--runtime',type=Path,required=True)
     ap.add_argument('--output',type=Path,required=True)
     args=ap.parse_args()
-    require(sha(args.base_apk.read_bytes())==APK_SHA,'Wrong pinned APK')
-    before=args.map_managed.read_bytes(); require(sha(before)==MAP_MANAGED_SHA,'Wrong pinned v78 map overlay')
+    require(sha_file(args.base_apk)==APK_SHA,'Wrong pinned APK')
+    before=args.map_managed.read_bytes(); require(sha(before)==MAP_MANAGED_SHA,'Wrong pinned v80 map overlay')
     require(not args.output.exists(),'Use a fresh output directory'); args.output.mkdir(parents=True)
     runtime=args.runtime.resolve(); dotnet=runtime/'dotnet/dotnet'; compiler=next((runtime/'dotnet/sdk').glob('*/Roslyn/bincore/csc.dll'))
     dnlib=runtime/'injector/bin/Debug/net8.0/dnlib.dll'

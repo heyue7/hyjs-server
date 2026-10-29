@@ -171,7 +171,16 @@ func (s *GameService) fieldSelectScene(g *model.GameState, scene string) error {
 	return nil
 }
 
-// refreshField 保存单人本地六张原野外实例。多人共享怪物和 PK 尚未接入。
+// An accepted V4 fight remains recoverable even if the published runtime is
+// temporarily disabled or absent during a restart.
+func ggoPendingFieldFight(g *model.GameState) bool {
+	if g == nil || g.Field == nil || g.Field.Scene != constUtil.GGOFieldScene || g.Field.Fight == nil || g.Field.Fight.Settled {
+		return false
+	}
+	return g.Field.Fight.GGOBoss != nil || g.GGOField != nil && g.GGOField.MonsterFight != nil
+}
+
+// refreshField 保存原野外实例，并保留公共沙漠的在途战斗。
 func (s *GameService) refreshField(id int64, g *model.GameState) error {
 	if g.Field == nil {
 		scene := constUtil.P8FirstFieldScene
@@ -219,7 +228,7 @@ func (s *GameService) refreshField(id int64, g *model.GameState) error {
 	}
 	// Desert V4 monsters and bosses are owned by the public line/event stores.
 	// Do not spawn the legacy per-player field objects for this scene.
-	if f.Scene == constUtil.GGOFieldScene && g.GGOField != nil && s.GGOFieldEconomy != nil {
+	if f.Scene == constUtil.GGOFieldScene && (ggoPendingFieldFight(g) || g.GGOField != nil && s.GGOFieldEconomy != nil) {
 		if f.Fight == nil || f.Fight.Settled {
 			f.Monsters = nil
 		}
@@ -290,13 +299,14 @@ func (s *GameService) refreshField(id int64, g *model.GameState) error {
 
 func (s *GameService) fieldTransfer(ctx context.Context, id int64, b *pb.CSTransferScene) ([]proto.Message, error) {
 	var resolved *pb.PointNew
+	reply := &pb.SCTransferScene{Result: proto.Int32(1)}
 	err := updateProfileWithTx(ctx, id, func(tx *gorm.DB, player *pb.Player, g *model.GameState) error {
 		previousScene := g.Position.GetScene()
 		if previousScene == constUtil.GGOFieldScene && g.GGOField != nil {
 			if b.GetTarget() == constUtil.GGOFieldScene {
 				return ggoFieldError(constUtil.GGOFieldInvalidLocation, "请通过安全区向导出发")
 			}
-			if err := ggoCommitLeave(tx, s, id, g, "scene", b.GetTarget(), 0, time.Now().UnixMilli()); err != nil {
+			if err := ggoCommitLeave(tx, s, id, g, "scene", b.GetTarget(), 0, time.Now().UnixMilli(), b, reply); err != nil {
 				return err
 			}
 		}
@@ -418,6 +428,11 @@ func (s *GameService) fieldTransfer(ctx context.Context, id int64, b *pb.CSTrans
 				return err
 			}
 		}
+		if previousScene != constUtil.GGOFieldScene && b.GetTarget() != constUtil.GGOFieldScene && g.GGOField != nil {
+			if err := ggoPositionBump(g); err != nil {
+				return err
+			}
+		}
 		g.Position = &pb.Position{PlayerId: proto.Int64(id), Scene: proto.String(b.GetTarget()), Current: point}
 		g.PositionLoading = true
 		resolved = proto.Clone(point).(*pb.PointNew)
@@ -446,7 +461,7 @@ func (s *GameService) fieldTransfer(ctx context.Context, id int64, b *pb.CSTrans
 			zap.Float32s("requestedPoint", []float32{b.GetPoint().GetX(), b.GetPoint().GetY(), b.GetPoint().GetZ()}),
 			zap.Float32s("resolvedPoint", []float32{resolved.GetX(), resolved.GetY(), resolved.GetZ()}))
 	}
-	return []proto.Message{&pb.SCTransferScene{Result: proto.Int32(1)}}, err
+	return []proto.Message{reply}, err
 }
 
 // fieldScene 把怪物和持久化血量附在原场景回复之后，客户端据此创建野外模型。
@@ -510,9 +525,9 @@ func (s *GameService) fieldScene(ctx context.Context, id int64, login bool) ([]p
 					return err
 				}
 			}
-			// 原客户端重连会重建野外房间，不会重放正在加载的小怪战斗。
-			// 释放未结算占用，保留战前HP/怒气/疲劳与奖励计数，旧fightId随之失效。
-			if login && g.Field.Fight != nil && !g.Field.Fight.Settled && !(g.Position.GetScene() == constUtil.GGOFieldScene && g.GGOField != nil && g.GGOField.MonsterFight != nil) {
+			// Legacy field battles have their original reconnect behavior. V4
+			// accepted battles retain the same frozen input across reconnect.
+			if login && g.Field.Fight != nil && !g.Field.Fight.Settled && !ggoPendingFieldFight(g) {
 				releaseFieldBossFight(g)
 				if monster := fieldFind(g, g.Field.Fight.MonsterUUID); monster != nil {
 					monster.State = proto.Int32(1)
@@ -555,18 +570,20 @@ func (s *GameService) fieldScene(ctx context.Context, id int64, login bool) ([]p
 			// 原客户端在新房间加载完成后通过TCP请求此帧。旧房间移动
 			// 排在该请求前，先保留转场入口，握手后再接受新角色移动。
 			g.PositionLoading = false
-			if g.Position.GetScene() == constUtil.GGOFieldScene && g.GGOField != nil {
+			if g.GGOField != nil {
 				profile, e := ggoNativeProfileSession(tx, id)
-				if e != nil {
+				if e != nil && g.Position.GetScene() == constUtil.GGOFieldScene {
 					return e
 				}
-				if g.GGOField.PositionRevision < 1 {
-					if e = ggoPositionBump(g); e != nil {
-						return e
+				if e == nil {
+					if g.GGOField.PositionRevision < 1 {
+						if e = ggoPositionBump(g); e != nil {
+							return e
+						}
 					}
+					g.GGOField.PositionConfirmed = g.GGOField.PositionRevision
+					g.GGOField.PositionSession = clientUpdateSessionHash(profile.Session)
 				}
-				g.GGOField.PositionConfirmed = g.GGOField.PositionRevision
-				g.GGOField.PositionSession = clientUpdateSessionHash(profile.Session)
 			}
 		}
 		if isUnion {
@@ -1157,7 +1174,13 @@ func (s *GameService) fieldMove(ctx context.Context, id int64, b *pb.CSMove) err
 			}
 			tradePeer = ggoCancelTradeOnPosition(id, g, area, b.GetPointNew())
 		}
-		g.Position.Current = b.GetPointNew()
+		current, next := g.Position.GetCurrent(), b.GetPointNew()
+		if g.GGOField != nil && next != nil && (current == nil || current.GetX() != next.GetX() || current.GetY() != next.GetY() || current.GetZ() != next.GetZ()) {
+			if err := ggoPositionBump(g); err != nil {
+				return err
+			}
+		}
+		g.Position.Current = next
 		if s.P8LifeReady {
 			if _, err := s.RefreshP8Survival(tx, p, g, time.Now()); err != nil {
 				return err

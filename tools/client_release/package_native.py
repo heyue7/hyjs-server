@@ -1,5 +1,5 @@
 """Package qualified native/runtime overlays with explicit managed method boundaries."""
-import argparse,copy,fcntl,hashlib,json,os,re,shutil,sys,tempfile,zipfile
+import argparse,copy,fcntl,hashlib,json,os,re,shutil,struct,sys,tempfile,zipfile,zlib
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT))
@@ -8,6 +8,36 @@ from tools.client_branding.package_release import compressed_hash,copy_original_
 from tools.awake_diff_rows.build import methods
 from tools.local_asset_ready.remove_gate import exact_body
 import dnfile
+
+def rebind_generated_manifest_pin(raw,new_sha,new_size):
+ """Change the existing generated 64-byte hash payload without moving DEX data."""
+ from tools.client_compat63 import dex_patch as dex
+ require(re.fullmatch(r"[0-9a-f]{64}",new_sha) and 0<new_size<2**31,"Invalid manifest hash/size")
+ before=dex.layout(raw);vm=dex.DEX(raw);oldpins=dex.extract_pins(raw)
+ require(len(oldpins)==6 and oldpins[5]["path"]=="smallassetmanifest","Unexpected existing pins")
+ key=(dex.OWNER,"<clinit>","()V");all_methods=dex.methods(vm);off=all_methods[key].get_code_off()
+ require(dex.u16(raw,off)==8 and dex.u16(raw,off+6)==0,"Unexpected generated clinit register/handler shape")
+ instructions=before["codes"][off]["rawInstructions"]
+ array=struct.pack("<HHI",0x300,1,64)+oldpins[5]["sha256"].encode("ascii")
+ size=bytes([0x17,3])+struct.pack("<i",oldpins[5]["bytes"])
+ require(instructions.count(array)==1 and instructions.count(size)==1,"Expected one active generated hash payload and size")
+ hash_at=off+16+instructions.index(array)+8;size_at=off+16+instructions.index(size)+2
+ output=bytearray(raw);output[hash_at:hash_at+64]=new_sha.encode("ascii");struct.pack_into("<i",output,size_at,new_size)
+ output[12:32]=hashlib.sha1(output[32:]).digest();struct.pack_into("<I",output,8,zlib.adler32(output[12:])&0xffffffff);output=bytes(output)
+ allowed=set(range(8,32))|set(range(hash_at,hash_at+64))|set(range(size_at,size_at+4))
+ require(len(output)==len(raw) and all(a==b or i in allowed for i,(a,b) in enumerate(zip(raw,output))),"Unapproved DEX byte changed")
+ expected=[dict(p) for p in oldpins];expected[5].update(sha256=new_sha,bytes=new_size)
+ require(dex.extract_pins(output)==expected,"Typed DEX pin execution differs")
+ after=dex.layout(output);new_methods=dex.methods(dex.DEX(output));unchanged=0
+ require(before["sections"]==after["sections"] and list(all_methods)==list(new_methods),"DEX inventory/layout changed")
+ for name,m in all_methods.items():
+  other=new_methods[name];require(m.get_code_off()==other.get_code_off() and m.get_access_flags()==other.get_access_flags(),"Method layout/API changed")
+  if name==key or not m.get_code_off():continue
+  a=before["codes"][m.get_code_off()];b=after["codes"][other.get_code_off()]
+  require(a["rawInstructions"]==b["rawInstructions"] and a["rawEH"]==b["rawEH"] and before["debug"].get(a["debugOff"])==after["debug"].get(b["debugOff"]),"Unrelated DEX method changed")
+  unchanged+=1
+ require(unchanged==553,"Unexpected v79 inherited DEX method count")
+ return output,{"schema":"hyjs-generated-manifest-pin-rebind-v1","inPlace":True,"allIndexesReferencesOffsetsAndOtherBytesExact":True,"activeClinitOnlyHashPayloadAndSizeChanged":True,"nonClinitMethodsInstructionsEHAndDebugExact":unchanged}
 
 def verify_final_resource_pins(archive, payload):
  """Fail packaging when the boot whitelist does not describe final APK assets."""
@@ -40,7 +70,9 @@ def repair_final_manifest_pin(archive, payload):
  digest=hashlib.sha256(data).hexdigest()
  if pins[5]["bytes"]==len(data) and pins[5]["sha256"]==digest:
   return {"changed":False}
- new_dex,proof=patch(dex,digest,len(data))
+ from tools.client_compat63.dex_patch import DEX
+ if pins[5]["sha256"] in list(DEX(dex).get_strings()):new_dex,proof=patch(dex,digest,len(data))
+ else:new_dex,proof=rebind_generated_manifest_pin(dex,digest,len(data))
  config["files"][5].update(sha256=digest,bytes=len(data))
  payload["classes2.dex"]=new_dex
  payload["assets/local-resource-overrides.json"]=(json.dumps(config,ensure_ascii=False,indent=2)+"\n").encode()
@@ -139,7 +171,7 @@ def verify_java_class_inventory(archive,payload):
  return {"DEXEntries":sorted(names),"classCount":len(headers),"noDuplicateClass":True,"noFinalSuperclass":True}
 
 def main():
- p=argparse.ArgumentParser(description=__doc__);p.add_argument("--base-apk",type=Path,required=True);p.add_argument("--overlay",type=Path,required=True);p.add_argument("--output",type=Path,required=True);p.add_argument("--record",type=Path,required=True);p.add_argument("--opening-font-overlay",type=Path);p.add_argument("--font-fallback-overlay",type=Path);p.add_argument("--dungeon-resource-overlay",type=Path);p.add_argument("--compat-overlay",type=Path,help="Reviewed formal62 startup/resource Pin compatibility overlay; composed after version patch");p.add_argument("--king-selector-description-overlay",type=Path,help="Pinned item_9761 description cells only");p.add_argument("--os-selector-description-overlay",type=Path,help="Pinned feedback78 item_9760 description cells only");p.add_argument("--repair-compat-manifest-pin",action="store_true");p.add_argument("--qa-wallet-origin");p.add_argument("--build-code",type=int);p.add_argument("--version-name");a=p.parse_args()
+ p=argparse.ArgumentParser(description=__doc__);p.add_argument("--base-apk",type=Path,required=True);p.add_argument("--overlay",type=Path,required=True);p.add_argument("--output",type=Path,required=True);p.add_argument("--record",type=Path,required=True);p.add_argument("--opening-font-overlay",type=Path);p.add_argument("--font-fallback-overlay",type=Path);p.add_argument("--dungeon-resource-overlay",type=Path);p.add_argument("--compat-overlay",type=Path,help="Reviewed formal62 startup/resource Pin compatibility overlay; composed after version patch");p.add_argument("--king-selector-description-overlay",type=Path,help="Pinned item_9761 description cells only");p.add_argument("--os-selector-description-overlay",type=Path,help="Pinned feedback78 item_9760 description cells only");p.add_argument("--repair-compat-manifest-pin",action="store_true");p.add_argument("--qa-wallet-origin");p.add_argument("--build-code",type=int);p.add_argument("--version-name");p.add_argument("--desert-resource-overlay",type=Path,help="Pinned v79 desert bundle plus single catalog entry");a=p.parse_args()
  require((a.build_code is None)==(a.version_name is None),"Build code and version name must be supplied together")
  base,overlay,output,record=[x.resolve()for x in (a.base_apk,a.overlay,a.output,a.record)]
  proof=json.loads((overlay/"manifest.json").read_text());require(proof["inheritedJavaPublicProtectedABIExact"],"Qualified native ABI required")
@@ -212,6 +244,12 @@ def main():
    payload[name]=data
   pins[Path(dungeon_resources.__file__).resolve()]=common.digest(Path(dungeon_resources.__file__))
   dungeon_report={"originalMapByteIdentical":True,"onlyRootDependencyDeclarationChanged":True,"previousDeclaredClosureBundles":len(dependencies),"entries":resource["replacementEntries"]}
+ desert_report=None
+ if a.desert_resource_overlay:
+  require(proof.get("managedOnly") is True and a.repair_compat_manifest_pin,"Desert resource composition requires a managed-only proof and exact manifest pin repair")
+  require(not any((a.opening_font_overlay,a.font_fallback_overlay,a.dungeon_resource_overlay,a.compat_overlay,a.king_selector_description_overlay,a.os_selector_description_overlay)),"Desert resources cannot overlap unrelated optional resource overlays")
+  from tools.desert_extraction.package_resources import apply_overlay as apply_desert_overlay
+  desert_report=apply_desert_overlay(base,a.desert_resource_overlay.resolve(),payload,pins)
  compatibility_report=None
  if a.compat_overlay:compatibility_report=apply_compatibility_overlay(base,a.compat_overlay,payload,pins)
  os_selector_report=None
@@ -279,10 +317,11 @@ def main():
     for n,h in {**inherited,**hashes}.items():require(common._hash_entry(z,n)==h,"Entry differs: "+n)
     for n,h in compressed.items():require(compressed_hash(stream,z.getinfo(n))==h,"Compressed inherited entry differs: "+n)
     for name,info in dungeon_infos.items():require(z.getinfo(name).compress_type==info.compress_type,"Original bundle ZIP storage changed")
-    if os_selector_report is not None:verify_final_resource_pins(z,{})
+    if os_selector_report is not None or desert_report is not None:verify_final_resource_pins(z,{})
    for f,h in pins.items():require(common.digest(f)==h,"Source changed while packaging")
    require(common.digest(base)==proof["baseAPKSHA256"],"Base changed while packaging")
    result={"status":"PASS_SIGN_ALIGN_SCOPED_OVERLAY_NOT_INSTALLED","binarySHA256":common.digest(signed),"baseAPKSHA256":proof["baseAPKSHA256"],"replacementEntries":hashes,"openingFontChanges":font_changes,"fontFallbackProof":fallback_report,"dungeonResourceProof":dungeon_report,"compatibilityProof":compatibility_report,"manifestPinRepair":manifest_pin_repair,"javaClassInventory":java_inventory,"inheritedJavaByteExact":original_java_exact,"javaByteExact":java_byte_exact,"allOtherEntriesAndCompressedPayloadsExact":True,"managedAssemblyByteExact":common.DLL not in payload,"qaOnly":bool(a.qa_wallet_origin),"neverPromote":bool(a.qa_wallet_origin),"signatureVerified":True,"zipalignVerified":True,"originalEngineMethodsExact":547,"outputAPK":str(output.relative_to(ROOT))}
+   if desert_report is not None:result["desertResourceProof"]=desert_report
    if os_selector_report is not None:result["osSelectorDescriptionProof"]=os_selector_report
    if king_selector_report is not None:result["kingSelectorDescriptionProof"]=king_selector_report
    # QA and diagnostic restrictions survive another scoped packaging layer.

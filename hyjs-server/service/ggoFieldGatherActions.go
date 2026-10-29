@@ -52,22 +52,18 @@ func ggoCancelAttempt(tx *gorm.DB, s *GameService, id int64, g *model.GameState,
 	if json.Unmarshal(row.Payload, &state) != nil {
 		return nil, errors.New("沙漠场景状态损坏")
 	}
-	var node *ggoResourceNode
-	for i := range state.Resources {
-		if state.Resources[i].PointID == attempt.PosID {
-			node = &state.Resources[i]
-			break
-		}
-	}
-	if node == nil || node.Generation != attempt.Generation || node.ReservedBy != id || node.AttemptToken != attempt.Token {
-		return nil, errors.New("沙漠采集预约状态不一致")
-	}
-	node.ReservedBy = 0
-	node.AttemptToken = ""
-	node.ReadyAtMS = 0
-	attempt.Active = false
-	if err = ggoLineSave(tx, &row, &state, now); err != nil {
+	node, detached, released, err := ggoResolveGatherReservation(&state, attempt, frozen)
+	if err != nil {
 		return nil, err
+	}
+	if !detached {
+		node.ReservedBy, node.AttemptToken, node.ReadyAtMS = 0, "", 0
+	}
+	attempt.Active = false
+	if !detached || released {
+		if err = ggoLineSave(tx, &row, &state, now); err != nil {
+			return nil, err
+		}
 	}
 	if err = tx.Save(attempt).Error; err != nil {
 		return nil, err

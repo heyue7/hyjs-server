@@ -13,7 +13,7 @@ services:
     # Keep the existing data directory and InnoDB durability settings intact.
     command:
       # Bound retained binary logs on the shared 50 GiB production disk.
-      - --binlog-expire-logs-seconds=172800
+      - --binlog-expire-logs-seconds=86400
       - --innodb-buffer-pool-size=128M
       - --innodb-log-buffer-size=16M
       - --key-buffer-size=1M

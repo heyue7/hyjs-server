@@ -11,7 +11,7 @@ import (
 func TestGGODeathProtectsHighestAndConservesTransfer(t *testing.T) {
 	for _, n := range []int64{0, 2, 3, 4, 5, 6, 9, 10, 20} {
 		chips := [6]int64{n, 0, 0, 0, 0, 0}
-		got, err := ggoDeathLoss(chips, 3, rand.New(rand.NewPCG(23, uint64(n)+1)))
+		got, err := ggoDeathLoss(chips, 3, nil, rand.New(rand.NewPCG(23, uint64(n)+1)))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -25,7 +25,7 @@ func TestGGODeathProtectsHighestAndConservesTransfer(t *testing.T) {
 	if err != nil || total != 17 || protected != ([6]int64{0, 0, 0, 0, 1, 2}) {
 		t.Fatal(protected, total, err)
 	}
-	lost, err := ggoDeathLoss(chips, 3, rand.New(rand.NewPCG(1, 2)))
+	lost, err := ggoDeathLoss(chips, 3, nil, rand.New(rand.NewPCG(1, 2)))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -53,7 +53,7 @@ func TestGGODeathSamplingUsesUnprotectedCounts(t *testing.T) {
 	counts := [6]int64{3, 1, 0, 3, 0, 0}
 	matches := 0
 	for i := 0; i < 10000; i++ {
-		lost, err := ggoDeathLoss(counts, 3, random)
+		lost, err := ggoDeathLoss(counts, 3, nil, random)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -120,5 +120,42 @@ func TestGGOSettlementUsesFrozenPricesAndChecksOverflow(t *testing.T) {
 	}
 	if game.GGOCredit != math.MaxInt64-1 || game.GGOField.Chips != beforeChips || game.GGOField.Revision != beforeRevision {
 		t.Fatal("overflow mutated terminal or credit")
+	}
+}
+
+func TestGGODeathLossConfiguredPercentageAndOverflow(t *testing.T) {
+	chips := [6]int64{9, 0, 0, 0, 0, 3}
+	cases := []struct {
+		name    string
+		percent *int64
+		want    int64
+	}{
+		{"legacy", nil, 6},
+		{"zero", ggoInt64(0), 0},
+		{"round-down", ggoInt64(1), 0},
+		{"quarter", ggoInt64(25), 3},
+		{"half", ggoInt64(50), 6},
+		{"three-quarter", ggoInt64(75), 9},
+		{"all-unprotected", ggoInt64(100), 9},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			lost, err := ggoDeathLoss(chips, 3, tc.percent, rand.New(rand.NewPCG(7, 11)))
+			if err != nil || lost != ([6]int64{tc.want}) {
+				t.Fatalf("lost=%v want=%d err=%v", lost, tc.want, err)
+			}
+		})
+	}
+	for _, rate := range []int64{-1, 101} {
+		if _, err := ggoDeathLoss(chips, 3, &rate, nil); err == nil {
+			t.Fatalf("invalid percentage %d accepted", rate)
+		}
+	}
+	for _, rate := range []int64{0, 1, 25, 50, 75, 100} {
+		lost, err := ggoDeathLoss([6]int64{math.MaxInt64}, 3, &rate, rand.New(rand.NewPCG(13, uint64(rate)+1)))
+		want := min((int64(math.MaxInt64)/100)*rate+(int64(math.MaxInt64)%100)*rate/100, int64(math.MaxInt64)-3)
+		if err != nil || lost[0] != want {
+			t.Fatalf("rate=%d lost=%v want=%d err=%v", rate, lost, want, err)
+		}
 	}
 }

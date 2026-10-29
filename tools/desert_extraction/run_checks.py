@@ -8,7 +8,7 @@ import tempfile
 import zipfile
 
 HERE = Path(__file__).resolve().parent
-APK_SHA = 'fe67aea7d584199119a04f10edcd8baa54207a70717e295d377ce3dd67b8affc'
+APK_SHA = '60075046b9dfde0a00083b07a3cca878d071b604fcb31bad63d8c21be821eff8'
 
 def digest(path):
     h = hashlib.sha256()
@@ -27,18 +27,18 @@ def main():
     parser.add_argument('--base-apk', type=Path, required=True)
     parser.add_argument('--runtime', type=Path, required=True, help='native-batch root')
     args=parser.parse_args()
-    if digest(args.base_apk) != APK_SHA: raise ValueError('Expected pinned formal 1.0.78 APK')
+    if digest(args.base_apk) != APK_SHA: raise ValueError('Expected pinned formal 1.0.79 APK')
     rt=args.runtime/'dotnet'; dotnet=rt/'dotnet'
     csc=next((rt/'sdk').glob('*/Roslyn/bincore/csc.dll'))
     ref=next((rt/'packs/Microsoft.NETCore.App.Ref').glob('*/ref/net8.0'))
     framework=ref.parents[1].name
     with tempfile.TemporaryDirectory(prefix='hyjs-v4-client-check-') as tmp:
         tmp=Path(tmp)
-        names=['Assembly-CSharp.dll','Assembly-CSharp-firstpass.dll','UnityEngine.dll','mscorlib.dll','System.dll','System.Core.dll','LitJson.dll']
+        names=['Assembly-CSharp.dll','Assembly-CSharp-firstpass.dll','UnityEngine.dll','mscorlib.dll','System.dll','System.Core.dll','LitJson.dll','HYJS.Field63.dll','LocalFieldSettlement.dll']
         with zipfile.ZipFile(args.base_apk) as archive:
             for name in names: (tmp/name).write_bytes(archive.read('assets/bin/Data/Managed/'+name))
         oldrefs=['/reference:'+str(tmp/name) for name in names]
-        sources=[HERE/name for name in ('GatherAttempt.cs','FieldWire.cs','GatherJournalStore.cs','FieldResources.cs','GatherPreload.cs','NativeGatherUI.cs','GatherCoordinator.cs','ProtectionRelease.cs','FieldRuntime.cs')]
+        sources=[HERE/name for name in ('GatherAttempt.cs','NestedArrayJson.cs','FieldWire.cs','GatherJournalStore.cs','FieldResources.cs','GatherPreload.cs','NativeGatherUI.cs','GatherCoordinator.cs','ProtectionRelease.cs','FieldRuntime.cs','PendingRequest.cs','TerminalController.cs','FieldNpcs.cs','FieldMonsters.cs','FieldBoss.cs','PositionSync.cs','TravelController.cs','LeaveController.cs','TradeController.cs','TradePanel.cs','FightEndJournal.cs','BattleRecovery.cs')]
         run([dotnet,csc,'/nologo','/target:library','/nostdlib+','/langversion:3','/out:'+str(tmp/'BridgeCheck.dll'),*oldrefs,*sources])
         (tmp/'EditorStub.cs').write_text('namespace UnityEditor {} namespace UnityEditor.SceneManagement { public static class EditorSceneManager { public static void OpenScene(string path) {} } }')
         run([dotnet,csc,'/nologo','/target:library','/nostdlib+','/langversion:3','/out:'+str(tmp/'AuditCheck.dll'),*oldrefs,tmp/'EditorStub.cs',HERE/'HyjsDesertV4PointAudit.cs',HERE/'HyjsDesertV4Suggest.cs',HERE/'HyjsDesertV4F09.cs',HERE/'HyjsDesertV4FishOptions.cs'])

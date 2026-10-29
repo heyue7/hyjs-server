@@ -447,7 +447,7 @@ func (s *GameService) p12FieldPVPFightAt(ctx context.Context, id int64, session 
 	// Presence writers use this mutex. Profiles then lock by ascending ID, before
 	// any consistent snapshot or domain row is read, including zero-stamp replay.
 	p10SceneMutation.Lock()
-	err := db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	err := db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) (retErr error) {
 		if err := ServerGameClockGuardTransaction(tx); err != nil {
 			return err
 		}
@@ -478,19 +478,53 @@ func (s *GameService) p12FieldPVPFightAt(ctx context.Context, id int64, session 
 			return err
 		}
 		requestHash := p6Digest(requestRaw)
+		if stamp > 0 && gameSchemaHasTable(tx, &db.GGOFieldReceipt{}) {
+			rejected, found, e := ggoReadPVPRejection(tx, id, stamp, b.GetPlayerId(), requestHash)
+			if e != nil {
+				return e
+			}
+			if found {
+				response = rejected
+				return nil
+			}
+		}
+		desertRequest := g.Position.GetScene() == constUtil.GGOFieldScene && g.GGOField != nil
+		if desertRequest && stamp == 0 {
+			return ggoFieldError(constUtil.GGOFieldClientUpdateRequired, "沙漠PK需要使用带请求编号的新版客户端")
+		}
+		// A deterministic refusal belongs to this same request forever. Storage
+		// errors and indeterminate failures remain retryable with the same stamp.
+		if desertRequest {
+			defer func() {
+				if retErr != nil || response == nil || response.GetCode() == 1 {
+					return
+				}
+				code := response.GetCode()
+				if code != 2001 && code != 2002 && code != 2007 {
+					return
+				}
+				wire, e := proto.MarshalOptions{Deterministic: true}.Marshal(response)
+				if e != nil {
+					retErr = e
+					return
+				}
+				saved := ggoPVPRejectedReceipt{Stamp: stamp, OpponentID: b.GetPlayerId(), NativeResponse: wire}
+				retErr = ggoSaveReceipt(tx, id, ggoPVPRejectID(stamp), constUtil.GGOFieldOpPVPReject, requestHash, "", nil, [6]int64{}, b.GetPlayerId(), now.UnixMilli(), saved)
+			}()
+		}
 		var previous db.P12FieldPVPReceipt
-		q := tx.Where("player_id=? AND opponent_id=?", id, b.GetPlayerId())
+		q := tx.Where("player_id=?", id)
 		if stamp > 0 {
 			q = q.Where("stamp=?", stamp)
 		} else {
-			q = q.Where("busy_until>?", now.UnixMilli())
+			q = q.Where("opponent_id=? AND busy_until>?", b.GetPlayerId(), now.UnixMilli())
 		}
 		if !gameSchemaHasTable(tx, &db.P12FieldPVPReceipt{}) {
 			return errors.New(constUtil.P12FieldPVPClosed)
 		}
 		err = q.Order("created_at DESC").First(&previous).Error
 		if err == nil {
-			if previous.RequestHash != requestHash {
+			if previous.OpponentID != b.GetPlayerId() || previous.RequestHash != requestHash {
 				return errors.New(constUtil.P12FieldPVPConflict)
 			}
 			response, _, err = s.p12FieldPVPReadReceipt(tx, &previous)
@@ -630,6 +664,9 @@ func (s *GameService) p12FieldPVPFightAt(ctx context.Context, id int64, session 
 		fightID := uuid.NewString()
 		policyHash := p6Digest([]byte(constUtil.P12FieldPVPSource))
 		input := model.FrozenBattleInput{Attacker: attacker, Defender: defender, BattleType: 5, Seed: seed.Int64(), MaxRound: 40, AttackerDamageFactor: proto.Float64(1), DefenderDamageFactor: proto.Float64(1), AppliedProperties: map[string][]string{"fieldPVP": {fightID, requestHash, policyHash, strconv.FormatInt(int64(b.GetFightType()), 10)}, "fieldPVPEconomy": {strconv.FormatInt(own.GetCoin(), 10), strconv.FormatInt(peer.GetCoin(), 10), strconv.FormatInt(states[0].LootCoin, 10)}, "fieldPVPKills": {strconv.FormatInt(int64(states[0].Kills), 10), strconv.FormatInt(int64(states[1].Kills), 10), strconv.FormatInt(int64(states[0].DailyKills), 10), states[0].Day}}}
+		if desert {
+			input.AppliedProperties["fieldPVPScope"] = []string{constUtil.GGOFieldScene}
+		}
 		frozen, err := s.FreezeBattleInput(input)
 		if err != nil {
 			return err
@@ -963,8 +1000,15 @@ func (s *GameService) p12FieldPVPReadReceipt(tx *gorm.DB, row *db.P12FieldPVPRec
 		}
 		coins[i] = v
 	}
+	desert := false
+	if scope, present := input.AppliedProperties["fieldPVPScope"]; present {
+		if len(scope) != 1 || scope[0] != constUtil.GGOFieldScene {
+			return bad()
+		}
+		desert = true
+	}
 	expectedLoot := int64(0)
-	if winner == row.PlayerID && row.FightType == 0 {
+	if !desert && winner == row.PlayerID && row.FightType == 0 {
 		frozenService := &GameService{Tables: input.Tables}
 		expectedLoot, err = frozenService.p12FieldPVPLoot(coins[1], coins[2])
 		if err != nil {

@@ -154,7 +154,10 @@ func (s *GameService) GGOFieldSnapshot(ctx context.Context, auth model.GGOFieldA
 		if err != nil {
 			return err
 		}
-		out = &model.GGOFieldSnapshotResponse{ServerTimeMS: a.Now, Scene: constUtil.GGOFieldScene, Line: int64(a.Presence.Line), EconomyVersion: cfg.Runtime.EconomyVersion, Revision: row.Revision, ResourceMineCount: cfg.Runtime.Resource.MineCount, ResourceFishCount: cfg.Runtime.Resource.FishCount,
+		// Timestamp and patrol projection share one instant after acquiring the
+		// public line lock, minimizing queueing drift in client interpolation.
+		projectionNow := time.Now().UnixMilli()
+		out = &model.GGOFieldSnapshotResponse{ServerTimeMS: projectionNow, Scene: constUtil.GGOFieldScene, Line: int64(a.Presence.Line), EconomyVersion: cfg.Runtime.EconomyVersion, Revision: row.Revision, ResourceMineCount: cfg.Runtime.Resource.MineCount, ResourceFishCount: cfg.Runtime.Resource.FishCount,
 			Safe:      ggoPointInsideSafe(a.Game.Position.GetCurrent(), cfg.Runtime.SafeArea),
 			Resources: []model.GGOFieldResourceView{}, Monsters: []model.GGOFieldMonsterView{}, Exits: []model.GGOFieldExitView{}}
 		if a.Game.GGOField != nil {
@@ -203,7 +206,7 @@ func (s *GameService) GGOFieldSnapshot(ctx context.Context, auth model.GGOFieldA
 			return errors.New("沙漠接应点与NPC位置不匹配")
 		}
 		out.SafeArea = cfg.Runtime.SafeArea
-		out.Boss, err = a.Service.ggoBossSnapshotLocked(tx, cfg, a.Now)
+		out.Boss, err = a.Service.ggoBossSnapshotLocked(tx, cfg, projectionNow)
 		if err != nil {
 			return err
 		}
@@ -246,7 +249,15 @@ func (s *GameService) GGOFieldSnapshot(ctx context.Context, auth model.GGOFieldA
 			if n.RefreshAtMS > 0 {
 				hp = 0
 			}
-			out.Monsters = append(out.Monsters, model.GGOFieldMonsterView{UUID: n.UUID, MonID: n.MonID, PointID: n.PointID, Level: n.Level, HeroID: n.HeroID, Generation: n.Generation, Position: p.Position, HPRatio: hp, Available: n.ReservedBy == 0 && n.RefreshAtMS == 0, RefreshAtMS: n.RefreshAtMS})
+			position, err := ggoPatrolPosition(&n, &p, projectionNow)
+			if err != nil {
+				return err
+			}
+			var patrol *model.GGOFieldPatrolView
+			if p.Patrol != nil {
+				patrol = &model.GGOFieldPatrolView{Waypoints: p.Patrol.Waypoints, Speed: p.Patrol.Speed, EpochMS: n.PatrolEpochMS, PausedAtMS: n.PatrolPausedAtMS}
+			}
+			out.Monsters = append(out.Monsters, model.GGOFieldMonsterView{UUID: n.UUID, MonID: n.MonID, PointID: n.PointID, Level: n.Level, HeroID: n.HeroID, Generation: n.Generation, Position: position, HPRatio: hp, Available: n.ReservedBy == 0 && n.RefreshAtMS == 0 && !ggoLegacyBlocked(state, n.PointID), RefreshAtMS: n.RefreshAtMS, Patrol: patrol})
 		}
 		return nil
 	})

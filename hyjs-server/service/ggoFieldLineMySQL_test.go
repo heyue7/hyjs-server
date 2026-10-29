@@ -32,7 +32,11 @@ func ggoLineTestConfiguration(t *testing.T) *model.AdminFieldGGOConfiguration {
 	add := func(kind string, level int64, count int) {
 		for i := 0; i < count; i++ {
 			p := position(float64(i + 10))
-			cfg.Runtime.Points = append(cfg.Runtime.Points, model.AdminFieldGGOPoint{ID: fmt.Sprintf("%s-%d-%d", kind, level, i), Kind: kind, Level: level, Position: p, StandPosition: p, Radius: 3})
+			point := model.AdminFieldGGOPoint{ID: fmt.Sprintf("%s-%d-%d", kind, level, i), Kind: kind, Level: level, Position: p, StandPosition: p, Radius: 3}
+			if kind == "monster" && level == 35 && i < 4 {
+				point.Patrol = &model.AdminFieldGGOPatrol{Waypoints: []*model.AdminFieldGGOPosition{p, position(float64(i + 11))}, Speed: 3.2}
+			}
+			cfg.Runtime.Points = append(cfg.Runtime.Points, point)
 		}
 	}
 	add("mine", 0, 18)

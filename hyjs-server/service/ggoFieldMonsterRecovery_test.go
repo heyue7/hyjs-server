@@ -123,3 +123,49 @@ func TestGGOMonsterReservationSurvivesElapsedTime(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// Login and the missing-config recovery path must not run the legacy timeout
+// against a frozen V4 battle. A disconnect can exceed that old three-minute
+// limit while the client's accepted fight still has a durable identity.
+func TestGGOMonsterAndBossLoginPreserveFrozenFight(t *testing.T) {
+	t.Setenv("HYJS_P1_MYSQL_DATABASE", "")
+	fixture := ggoTradeSetup(t)
+	id := fixture.ids[0]
+	fixture.s.GGOFieldEconomy = nil
+	for _, kind := range []string{"monster", "boss"} {
+		t.Run(kind, func(t *testing.T) {
+			err := updateProfileWithTx(fixture.ctx, id, func(tx *gorm.DB, _ *pb.Player, game *model.GameState) error {
+				game.Position = &pb.Position{PlayerId: proto.Int64(id), Scene: proto.String(constUtil.GGOFieldScene), Current: &pb.PointNew{X: proto.Float32(-7), Y: proto.Float32(0), Z: proto.Float32(-6)}}
+				game.PositionLoading = false
+				game.Field.Scene = constUtil.GGOFieldScene
+				game.Field.Fight = &model.FieldFight{StartedAt: time.Now().Add(-time.Hour).UnixMilli(), Start: &pb.SCSidePveFightStart{FightId: proto.String("test-frozen-fight")}}
+				game.GGOField.MonsterFight = nil
+				if kind == "boss" {
+					game.Field.Fight.GGOBoss = &model.GGOFieldBossFight{}
+				} else {
+					game.GGOField.MonsterFight = &model.GGOFieldMonsterFight{FightID: "test-frozen-fight"}
+				}
+				return nil
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			for i := 0; i < 2; i++ {
+				if _, err = fixture.s.fieldScene(fixture.ctx, id, true); err != nil {
+					t.Fatal(err)
+				}
+			}
+			var row db.Profile
+			if err = db.GetIns().First(&row, id).Error; err != nil {
+				t.Fatal(err)
+			}
+			_, game, err := decodeProfile(&row)
+			if err != nil || game.Field.Fight == nil || game.Field.Fight.Settled || game.Field.Fight.Start.GetFightId() != "test-frozen-fight" {
+				t.Fatal("frozen fight lost on reconnect", err)
+			}
+			if kind == "boss" && game.Field.Fight.GGOBoss == nil || kind == "monster" && game.GGOField.MonsterFight == nil {
+				t.Fatal("fight identity lost on reconnect")
+			}
+		})
+	}
+}

@@ -710,7 +710,7 @@ func (s *GameService) p12WantedEnd(ctx context.Context, id int64, request *pb.CS
 		if !proto.Equal(request.OptRecord, terminal.OriginalOperates) {
 			recorded, err := s.computeP12WantedRecorded(ctx, &input, request.OptRecord)
 			if err != nil {
-				return err
+				return p12WantedRecordedReplayError(err)
 			}
 			if err := p12WantedStoreRecorded(&fight, request, recorded); err != nil {
 				return err

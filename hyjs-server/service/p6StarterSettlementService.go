@@ -163,5 +163,5 @@ func validateP6Starter047Terminal(input *model.FrozenBattleInput, result *model.
 }
 
 func p6KnownStarterSettlementProof(input *model.FrozenBattleInput, proof string) bool {
-	return input != nil && input.BattleType == 11 && input.EngineVersion == constUtil.P6LinearPhysicalEngine && input.ClientVersion == constUtil.P6OriginalClientHash && input.ConfigurationHash == constUtil.P6LinearPhysicalTables && proof != "" && (proof == constUtil.P6StarterNativeProof || proof == constUtil.P6StarterParentProof)
+	return input != nil && input.BattleType == 11 && input.EngineVersion == constUtil.P6LinearPhysicalEngine && input.ClientVersion == constUtil.P6OriginalClientHash && input.ConfigurationHash == constUtil.P6LinearPhysicalTables && proof != "" && (proof == constUtil.P6StarterNativeProof || proof == constUtil.P6StarterParentProof || proof == constUtil.P6StarterRevalidated20261027Proof)
 }

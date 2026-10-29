@@ -28,7 +28,7 @@ type AdminFieldGGORules struct {
 	InitialSource       string `json:"initialSource"`       // InitialSource 固定为monsters。
 	PvpTransfer         string `json:"pvpTransfer"`         // PvpTransfer 固定为winner_terminal。
 	DeathReturn         string `json:"deathReturn"`         // DeathReturn 固定为safe_area。
-	DeathLossPercent    *int64 `json:"deathLossPercent"`    // DeathLossPercent 为死亡损失百分比，0至100；nil表示待决定。
+	DeathLossPercent    *int64 `json:"deathLossPercent"`    // DeathLossPercent 为死亡损失百分比，0至100；nil按50处理。
 	PveLossMode         string `json:"pveLossMode"`         // PveLossMode 为pending待决定或destroy。
 	ExtractionReturn    string `json:"extractionReturn"`    // ExtractionReturn 固定为safe_area。
 	ExtractionSeconds   *int64 `json:"extractionSeconds"`   // ExtractionSeconds 为撤离秒数，0至300；nil表示待决定。

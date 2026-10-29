@@ -1,6 +1,7 @@
 package service
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -21,6 +22,27 @@ func TestP7EarnedTrialStarsActivityPointShopMaterialColdOnce(t *testing.T) {
 	}
 	p7StarActivityOperations75(t, f)
 	p7PointShopOperations75(t, f)
+	// This case verifies the 100-star gate; the shared prerequisite deliberately
+	// uses three stars for other earned-point scenarios.
+	var pointShop db.P4CommerceRule
+	if err := db.GetIns().First(&pointShop, "id=?", "p7-point-fixture75").Error; err != nil {
+		t.Fatal(err)
+	}
+	var rules p4CommerceRules
+	if err := json.Unmarshal(pointShop.Rules, &rules); err != nil {
+		t.Fatal(err)
+	}
+	for i := range rules.Products {
+		rules.Products[i].MinTrialStars = 100
+	}
+	var err error
+	pointShop.Rules, err = json.Marshal(rules)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = db.GetIns().Save(&pointShop).Error; err != nil {
+		t.Fatal(err)
+	}
 	initial, game := f.profile(t)
 	if initial.GetPoint() != 0 || simpleOwned(initial, game, "item_021") != 0 {
 		t.Fatal("source account must have no pre-funded point or essence")

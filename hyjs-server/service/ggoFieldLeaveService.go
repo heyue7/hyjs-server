@@ -7,7 +7,9 @@ import (
 	"math"
 	"time"
 
+	"google.golang.org/protobuf/proto"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 	"hyjs-server/constUtil"
 	"hyjs-server/db"
 	"hyjs-server/model"
@@ -105,10 +107,17 @@ func (s *GameService) GGOFieldLeavePrepare(ctx context.Context, req model.GGOFie
 	return &out, nil
 }
 
+type ggoLeaveCompletion struct {
+	model.GGOFieldSettlementResponse
+	NativeRequestHash string `json:"nativeRequestHash,omitempty"`
+	NativeResponse    []byte `json:"nativeResponse"`
+	PositionRevision  int64  `json:"positionRevision,omitempty"`
+}
+
 // Called from the native transfer transaction after its target checks. Failure
 // rolls back both settlement and transition; a successful receipt records the
 // converted chips alongside the same committed profile mutation.
-func ggoCommitLeave(tx *gorm.DB, s *GameService, id int64, g *model.GameState, mode, scene string, line int32, now int64) error {
+func ggoCommitLeave(tx *gorm.DB, s *GameService, id int64, g *model.GameState, mode, scene string, line int32, now int64, request, reply proto.Message) error {
 	if g == nil || g.GGOField == nil || g.Position == nil || s.GGOFieldEconomy == nil || s.GGOFieldEconomy.Runtime == nil {
 		return ggoFieldError(constUtil.GGOFieldUnavailable, "沙漠结算配置不可用")
 	}
@@ -133,8 +142,28 @@ func ggoCommitLeave(tx *gorm.DB, s *GameService, id int64, g *model.GameState, m
 	for i, count := range result.Chips {
 		delta[i] = -count
 	}
+	if request == nil || reply == nil {
+		return errors.New("沙漠离开原始请求或回包缺失")
+	}
+	requestBytes, err := proto.MarshalOptions{Deterministic: true}.Marshal(request)
+	if err != nil {
+		return err
+	}
+	replyBytes, err := proto.MarshalOptions{Deterministic: true}.Marshal(reply)
+	if err != nil {
+		return err
+	}
+	// Empty protobuf messages are valid native responses; retain [] rather
+	// than nil so JSON encodes a replayable empty base64 string.
+	if replyBytes == nil {
+		replyBytes = []byte{}
+	}
+	if err = ggoPositionBump(g); err != nil {
+		return err
+	}
+	completed := ggoLeaveCompletion{GGOFieldSettlementResponse: *result, NativeRequestHash: p6Digest(requestBytes), NativeResponse: replyBytes, PositionRevision: g.GGOField.PositionRevision}
 	key := intent.RequestID
-	if err = ggoSaveReceipt(tx, id, ggoSystemReceiptID("leave", key), constUtil.GGOFieldOpLeaveComplete, ggoLeaveHash(mode, scene, line), result.EconomyVersion, &key, delta, 0, now, result); err != nil {
+	if err = ggoSaveReceipt(tx, id, ggoSystemReceiptID("leave", key), constUtil.GGOFieldOpLeaveComplete, ggoLeaveHash(mode, scene, line), result.EconomyVersion, &key, delta, 0, now, completed); err != nil {
 		return err
 	}
 	g.GGOField.LeaveIntent = nil
@@ -159,7 +188,7 @@ func (s *GameService) GGOFieldLeaveStatus(ctx context.Context, req model.GGOFiel
 			return err
 		}
 		out.Mode, out.TargetScene, out.TargetLine, out.ExpiresAtMS = prepared.Mode, prepared.TargetScene, prepared.TargetLine, prepared.ExpiresAtMS
-		var completed model.GGOFieldSettlementResponse
+		var completed ggoLeaveCompletion
 		found, err := ggoFindBusinessReceipt(tx, a.Row.Id, constUtil.GGOFieldOpLeaveComplete, req.LeaveRequestID, &completed)
 		if err != nil {
 			return err
@@ -173,7 +202,22 @@ func (s *GameService) GGOFieldLeaveStatus(ctx context.Context, req model.GGOFiel
 			if a.Game.GGOField != nil {
 				completed.TerminalRevision = a.Game.GGOField.Revision
 			}
-			out.Settlement = &completed
+			out.Settlement = &completed.GGOFieldSettlementResponse
+			out.NativeRequestHash, out.NativeResponse, out.PositionRevision = completed.NativeRequestHash, completed.NativeResponse, completed.PositionRevision
+			if completed.NativeRequestHash == "" || completed.NativeResponse == nil || completed.PositionRevision < 1 || a.Game.Position == nil || a.Game.GGOField == nil || a.Game.GGOField.PositionRevision != completed.PositionRevision {
+				return nil
+			}
+			switch prepared.Mode {
+			case "scene":
+				out.TargetCurrent = a.Game.Position.GetScene() == prepared.TargetScene
+			case "line":
+				var presence db.P10ScenePresence
+				err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&presence, "player_id=?", a.Row.Id).Error
+				if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+					return err
+				}
+				out.TargetCurrent = err == nil && a.Game.Position.GetScene() == constUtil.GGOFieldScene && presence.Scene == constUtil.GGOFieldScene && presence.Line == prepared.TargetLine && presence.SessionHash == p6Digest(session)
+			}
 			return nil
 		}
 		if a.Game.GGOField != nil && a.Game.GGOField.LeaveIntent != nil && a.Game.GGOField.LeaveIntent.RequestID == req.LeaveRequestID {

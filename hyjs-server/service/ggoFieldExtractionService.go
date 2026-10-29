@@ -132,9 +132,6 @@ func ggoExtractionCancelLocked(tx *gorm.DB, id int64, g *model.GameState, reason
 		return nil, errors.New("撤离倒计时缺失")
 	}
 	x := g.GGOField.Extraction
-	if err = ggoPositionBump(a.Game); err != nil {
-		return nil, err
-	}
 	result := &model.GGOFieldExtractionStatusResponse{RequestID: x.RequestID, StartRequestID: x.RequestID, Status: "cancelled", AcceptedAtMS: x.AcceptedAt, ReadyAtMS: x.ReadyAt, Reason: reason}
 	changed := tx.Model(&db.GGOFieldReceipt{}).Where("player_id=? AND request_id=? AND operation=? AND active=?", id, x.RequestID, constUtil.GGOFieldOpExtractStart, true).Update("active", false)
 	if changed.Error != nil {
@@ -232,6 +229,9 @@ func ggoExtractionFinishWithSessionLocked(tx *gorm.DB, a *ggoFieldActor, disconn
 	}
 	point, err := ggoWirePoint(x.SafeReturn)
 	if err != nil {
+		return nil, err
+	}
+	if err = ggoPositionBump(a.Game); err != nil {
 		return nil, err
 	}
 	result := &model.GGOFieldExtractionStatusResponse{RequestID: x.RequestID, StartRequestID: x.RequestID, Status: "completed", AcceptedAtMS: x.AcceptedAt, ReadyAtMS: x.ReadyAt, CompletedAtMS: a.Now, Position: x.SafeReturn, PositionRevision: a.Game.GGOField.PositionRevision}

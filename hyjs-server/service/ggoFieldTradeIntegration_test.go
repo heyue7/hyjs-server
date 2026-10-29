@@ -30,14 +30,18 @@ func ggoTradeSetup(t *testing.T) *ggoTradeTestFixture {
 	if err := db.GetIns().AutoMigrate(&db.AdminFieldDeployment{}, &db.GGOFieldReceipt{}, &db.P8GatherAttempt{}, &db.P10ScenePresence{}, &db.ClientUpdateSession{}); err != nil {
 		t.Fatal(err)
 	}
-	other, err := LoginAccount(f.ctx, fmt.Sprintf("trade-%d", time.Now().UnixNano()), "isolated-test-password")
-	if err != nil {
-		t.Fatal(err)
+	var ids [2]int64
+	for i := range ids {
+		account, err := LoginAccount(f.ctx, fmt.Sprintf("trade-%d-%d", i, time.Now().UnixNano()), "isolated-test-password")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err = CreatePlayer(f.ctx, account.Id, fmt.Sprintf("交易测试%d", i), "hero_043"); err != nil {
+			t.Fatal(err)
+		}
+		ids[i] = account.Id
 	}
-	if _, err = CreatePlayer(f.ctx, other.Id, "交易另一方", "hero_043"); err != nil {
-		t.Fatal(err)
-	}
-	fixture := &ggoTradeTestFixture{s: f.s, ctx: f.ctx, ids: [2]int64{f.id, other.Id}, config: ggoLineTestConfiguration(t)}
+	fixture := &ggoTradeTestFixture{s: f.s, ctx: f.ctx, ids: ids, config: ggoLineTestConfiguration(t)}
 	values, err := ggoChipValues(fixture.config)
 	if err != nil {
 		t.Fatal(err)
@@ -71,7 +75,11 @@ func ggoTradeSetup(t *testing.T) *ggoTradeTestFixture {
 		key := p10ClientKey{fixture.s.p10ClientOwner(), id}
 		p10ClientSinks.Store(key, sink)
 		t.Cleanup(func() { p10ClientSinks.CompareAndDelete(key, sink) })
-		presence := db.P10ScenePresence{PlayerID: id, Scene: constUtil.GGOFieldScene, Line: 1, SessionHash: p6Digest(profile.Session)}
+		frame, err := proto.Marshal(&pb.MovePlayer{Info: &pb.MovePlayerInfo{PlayerId: proto.Int64(id)}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		presence := db.P10ScenePresence{PlayerID: id, Scene: constUtil.GGOFieldScene, Line: 1, SessionHash: p6Digest(profile.Session), Frame: frame}
 		if err = db.GetIns().Save(&presence).Error; err != nil {
 			t.Fatal(err)
 		}

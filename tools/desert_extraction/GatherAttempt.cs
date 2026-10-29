@@ -1,4 +1,6 @@
 using System;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace HYJS.DesertV4
 {
@@ -125,11 +127,31 @@ namespace HYJS.DesertV4
             if (Journal.phase!=GatherPhase.PendingDelivery || String.IsNullOrEmpty(Journal.attemptToken)) throw new InvalidOperationException("No pending delivery");
             Journal.phase=GatherPhase.Claiming;
         }
+        public static string SystemClaimReceiptId(string token)
+        {
+            if (String.IsNullOrEmpty(token)) throw new ArgumentException("Missing attempt token");
+            // UUIDv5 over the same OID namespace and UTF-8 name as the server.
+            byte[] prefix={0x6b,0xa7,0xb8,0x12,0x9d,0xad,0x11,0xd1,0x80,0xb4,0x00,0xc0,0x4f,0xd4,0x30,0xc8};
+            byte[] name=Encoding.UTF8.GetBytes("hyjs-ggo:claim:"+token), raw=new byte[prefix.Length+name.Length];
+            Buffer.BlockCopy(prefix,0,raw,0,prefix.Length); Buffer.BlockCopy(name,0,raw,prefix.Length,name.Length);
+            byte[] hash; using (SHA1 sha=SHA1.Create()) hash=sha.ComputeHash(raw);
+            hash[6]=(byte)((hash[6]&15)|80); hash[8]=(byte)((hash[8]&63)|128);
+            var value=new StringBuilder(36);
+            for (int i=0;i<16;i++) { if (i==4 || i==6 || i==8 || i==10) value.Append('-'); value.Append(hash[i].ToString("x2")); }
+            return value.ToString();
+        }
+        public bool MatchesClaimReceipt(string requestId,string startRequestId,string attemptToken)
+        {
+            if ((Journal.phase!=GatherPhase.Claiming && Journal.phase!=GatherPhase.RecoverReceipt) ||
+                startRequestId!=Journal.startRequestId || String.IsNullOrEmpty(attemptToken) || attemptToken!=Journal.attemptToken)
+                return false;
+            // The worker can settle first; accept only that token's exact system
+            // UUID or our own persisted request UUID, never an unrelated receipt.
+            return requestId==Journal.claimRequestId || requestId==SystemClaimReceiptId(attemptToken);
+        }
         public void ClaimReceipt(string requestId, string startRequestId, string attemptToken)
         {
-            if ((Journal.phase != GatherPhase.Claiming && Journal.phase != GatherPhase.RecoverReceipt) || requestId != Journal.claimRequestId ||
-                startRequestId != Journal.startRequestId || attemptToken != Journal.attemptToken || String.IsNullOrEmpty(attemptToken))
-                throw new InvalidOperationException("Unexpected claim receipt");
+            if (!MatchesClaimReceipt(requestId,startRequestId,attemptToken)) throw new InvalidOperationException("Unexpected claim receipt");
             Journal.phase = GatherPhase.Finished;
         }
     }

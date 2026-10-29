@@ -31,8 +31,15 @@ func ggoProtectedChips(chips [6]int64, slots int64) ([6]int64, int64, error) {
 
 // ggoDeathLoss samples uniformly without replacement from the unprotected
 // six-color counts, using constant memory and cryptographically seeded randomness.
-func ggoDeathLoss(chips [6]int64, slots int64, random *mathrand.Rand) ([6]int64, error) {
+func ggoDeathLoss(chips [6]int64, slots int64, percent *int64, random *mathrand.Rand) ([6]int64, error) {
 	var result [6]int64
+	rate := int64(50)
+	if percent != nil {
+		rate = *percent
+	}
+	if rate < 0 || rate > 100 {
+		return result, errors.New("死亡损失比例无效")
+	}
 	protected, total, err := ggoProtectedChips(chips, slots)
 	if err != nil {
 		return result, err
@@ -43,7 +50,9 @@ func ggoDeathLoss(chips [6]int64, slots int64, random *mathrand.Rand) ([6]int64,
 		pool[i] = chips[i] - protected[i]
 		remaining += pool[i]
 	}
-	lose := min(total/2, remaining)
+	// Divide before multiplying so the configured percentage remains safe
+	// even when the total is near math.MaxInt64.
+	lose := min((total/100)*rate+(total%100)*rate/100, remaining)
 	if lose == 0 {
 		return result, nil
 	}

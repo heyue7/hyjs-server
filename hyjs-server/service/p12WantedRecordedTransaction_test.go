@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"sync"
 	"testing"
 	"time"
@@ -77,6 +78,17 @@ func TestP12Wanted65ManualAutoEndColdConflict(t *testing.T) {
 	}
 	end := &pb.CSRebelFightEnd{FightId: start.FightId, Result: proto.Int32(result), OptRecord: proto.Clone(manual.OriginalOperates).(*pb.BattleOperate)}
 	endCtx := context.WithValue(f.ctx, constUtil.GameRequestContextKey, end)
+	// Only a mismatch returned from the actual replay boundary may release the
+	// lease. Transport/DB failures and an untyped similar message must not.
+	for _, transient := range []error{context.DeadlineExceeded, errors.New("database connection lost"), errors.New(constUtil.P6ReplayConflict + ": 原录像终局或完整技能记录不符 round=untrusted")} {
+		if err = recordP12WantedRejectedEnd(f.ctx, f.id, fight.ID, now, transient); err != nil {
+			t.Fatal(err)
+		}
+		var active db.P12WantedFight
+		if err = db.GetIns().First(&active, "id=?", fight.ID).Error; err != nil || active.RejectedAt != 0 || active.RejectedReason != "" {
+			t.Fatal("transient error released lease", err)
+		}
+	}
 	invalid := proto.Clone(end).(*pb.CSRebelFightEnd)
 	invalid.OptRecord.DefenderTotalLeftHp = proto.Float64(invalid.OptRecord.GetDefenderTotalLeftHp() + 1)
 	if _, err = f.s.p12WantedEnd(endCtx, f.id, invalid, now); err == nil {

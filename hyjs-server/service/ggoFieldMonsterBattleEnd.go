@@ -141,7 +141,7 @@ func (s *GameService) ggoPVEDeathLocked(tx *gorm.DB, id int64, p *pb.Player, g *
 	if frozen == nil || g.GGOField == nil || g.Field == nil || g.Field.Side == nil {
 		return zero, errors.New("沙漠死亡状态缺失")
 	}
-	lost, err := ggoDeathLoss(g.GGOField.Chips, frozen.ProtectedChips, nil)
+	lost, err := ggoDeathLoss(g.GGOField.Chips, frozen.ProtectedChips, frozen.DeathLossPercent, nil)
 	if err != nil {
 		return zero, err
 	}
@@ -247,9 +247,11 @@ func (s *GameService) ggoMonsterEndLocked(tx *gorm.DB, id int64, p *pb.Player, g
 	if err = validateP6GenericMechanismTerminal(input, terminal); err != nil {
 		return nil, nil, false, err
 	}
-	// The replay must reproduce the entire submitted original operation record,
-	// including round clocks, transforms and terminal totals.
-	if !proto.Equal(b.GetOptRecord(), terminal.OriginalOperates) {
+	// Playback processes one queued player action per tick; a rerecorded player
+	// clock can move by one frame. The original comparator still checks command
+	// identity and order, NPC clocks, transforms, final round and both HP totals.
+	// ggoMonsterEndHash binds the exact submitted bytes for every retry.
+	if !p6OriginalProtocolRecordEqual(b.GetOptRecord(), terminal.OriginalOperates) {
 		return nil, nil, false, errors.New(constUtil.P6ReplayConflict)
 	}
 	if terminal.Outcome.Winner != 0 && terminal.Outcome.Winner != 1 {
@@ -277,14 +279,8 @@ func (s *GameService) ggoMonsterEndLocked(tx *gorm.DB, id int64, p *pb.Player, g
 	if json.Unmarshal(line.Payload, &shared) != nil {
 		return nil, nil, false, errors.New("沙漠场景状态损坏")
 	}
-	var node *ggoMonsterNode
-	for i := range shared.Monsters {
-		if shared.Monsters[i].PointID == frozenFight.PointID {
-			node = &shared.Monsters[i]
-			break
-		}
-	}
-	if node == nil || node.UUID != frozenFight.MonsterUUID || node.Generation != frozenFight.Generation || node.ReservedBy != id || node.FightID != frozenFight.FightID || node.ReservedUntilMS > 0 && node.ReservedUntilMS < now {
+	node, detached, err := ggoResolveMonsterReservation(&shared, &frozenFight, id, now)
+	if err != nil {
 		return nil, nil, false, ggoFieldError(constUtil.GGOFieldStaleGeneration, "沙漠小怪战斗占用已失效")
 	}
 	monster := fieldFind(g, frozenFight.MonsterUUID)
@@ -302,6 +298,9 @@ func (s *GameService) ggoMonsterEndLocked(tx *gorm.DB, id int64, p *pb.Player, g
 			return nil, nil, false, errors.New("沙漠小怪重生时间无效")
 		}
 		node.RefreshAtMS = now + frozenFight.CooldownMS
+		if detached && node.PointID != "" && node.PatrolEpochMS > 0 {
+			node.PatrolPausedAtMS = now
+		}
 		monster.State = proto.Int32(3)
 		monster.CurHp = proto.Float64(0)
 		// Daily ordinary rewards stay shared across all original field maps.
@@ -348,6 +347,9 @@ func (s *GameService) ggoMonsterEndLocked(tx *gorm.DB, id int64, p *pb.Player, g
 			return nil, nil, false, e
 		}
 	} else {
+		if err = ggoPatrolResume(node, now); err != nil {
+			return nil, nil, false, err
+		}
 		monster.State = proto.Int32(1)
 		monster.CurHp = proto.Float64(1)
 		if f.Side.GetCurHp() <= 0 {

@@ -34,6 +34,9 @@ func (s *GameService) ggoBossCheck(ctx context.Context, id int64, request *pb.CS
 		if g.GGOField == nil || g.Position.GetScene() != constUtil.GGOFieldScene || s.GGOFieldConfig == nil {
 			return nil
 		}
+		if err := ggoCheckClientBuildLocked(tx, id, profile.Session, s.GGOFieldConfig); err != nil {
+			return err
+		}
 		a := &ggoFieldActor{Service: s, Row: profile, Player: p, Game: g, Now: time.Now().UnixMilli()}
 		if err = ggoCurrentPresence(tx, a, profile.Session); err != nil {
 			return err
@@ -99,6 +102,9 @@ func (s *GameService) ggoBossFightStart(ctx context.Context, id int64, request *
 		}
 		if g.Field == nil || g.Field.Side == nil || g.GGOField == nil {
 			return errors.New("沙漠战斗状态不存在")
+		}
+		if err := ggoCheckClientBuildLocked(tx, id, profile.Session, s.GGOFieldEconomy); err != nil {
+			return err
 		}
 		field := g.Field
 		if field.Fight != nil && !field.Fight.Settled {
@@ -200,7 +206,11 @@ func (s *GameService) ggoBossFightStart(ctx context.Context, id int64, request *
 		if limit < 0 || event.Boss.DailyLimit < limit {
 			limit = event.Boss.DailyLimit
 		}
-		field.Fight = &model.FieldFight{StartedAt: now, BossUUID: event.ID, BossLeaderGUID: ggoBossGUID(event.ID), Start: compat, BossStart: result, BossInput: input, BossRewardDailyLimit: &limit, GGOBoss: &model.GGOFieldBossFight{InputHash: p6Digest(raw), Boss: proto.Clone(boss).(*pb.SideBoss), EventID: event.ID, EndsAtMS: event.EndsAtMS, EconomyVersion: event.EconomyVersion, ExchangeValues: event.ExchangeValues, ProtectedChips: cfg.Runtime.ProtectedChips, SafeReturn: cfg.Runtime.SafeReturn, HealRatio: heal}}
+		deathLossPercent := int64(50)
+		if cfg.Rules.DeathLossPercent != nil {
+			deathLossPercent = *cfg.Rules.DeathLossPercent
+		}
+		field.Fight = &model.FieldFight{StartedAt: now, BossUUID: event.ID, BossLeaderGUID: ggoBossGUID(event.ID), Start: compat, BossStart: result, BossInput: input, BossRewardDailyLimit: &limit, GGOBoss: &model.GGOFieldBossFight{InputHash: p6Digest(raw), Boss: proto.Clone(boss).(*pb.SideBoss), EventID: event.ID, EndsAtMS: event.EndsAtMS, EconomyVersion: event.EconomyVersion, ExchangeValues: event.ExchangeValues, ProtectedChips: cfg.Runtime.ProtectedChips, DeathLossPercent: ggoInt64(deathLossPercent), SafeReturn: cfg.Runtime.SafeReturn, HealRatio: heal}}
 		field.Side.State = proto.Int32(6)
 		projection := proto.Clone(boss).(*pb.SideBoss)
 		projection.State = proto.Int32(2)
@@ -389,6 +399,7 @@ func (s *GameService) ggoBossFightEnd(ctx context.Context, id int64, request *pb
 	var side *pb.PlayerSide
 	var session []byte
 	replayed := false
+	changed := false
 	err := updateProfileWithTx(ctx, id, func(tx *gorm.DB, player *pb.Player, g *model.GameState) error {
 		profile, err := ggoNativeProfileSession(tx, id)
 		if err != nil {
@@ -454,11 +465,12 @@ func (s *GameService) ggoBossFightEnd(ctx context.Context, id int64, request *pb
 		if err != nil {
 			return err
 		}
+		changed = damage > 0
 		var lost [6]int64
 		// Reaching the ten-own-turn limit with surviving heroes is a contribution,
 		// not a player death. Only an actually defeated party loses carried chips.
 		if side.GetCurHp() <= 0 {
-			lost, err = s.ggoPVEDeathLocked(tx, id, player, g, &model.GGOFieldMonsterFight{FightID: request.GetFightId(), EconomyVersion: frozen.EconomyVersion, ExchangeValues: frozen.ExchangeValues, ProtectedChips: frozen.ProtectedChips, SafeReturn: frozen.SafeReturn, HealRatio: frozen.HealRatio}, now)
+			lost, err = s.ggoPVEDeathLocked(tx, id, player, g, &model.GGOFieldMonsterFight{FightID: request.GetFightId(), EconomyVersion: frozen.EconomyVersion, ExchangeValues: frozen.ExchangeValues, ProtectedChips: frozen.ProtectedChips, DeathLossPercent: frozen.DeathLossPercent, SafeReturn: frozen.SafeReturn, HealRatio: frozen.HealRatio}, now)
 			if err != nil {
 				return err
 			}
@@ -509,6 +521,9 @@ func (s *GameService) ggoBossFightEnd(ctx context.Context, id int64, request *pb
 	}
 	if side != nil {
 		out = append(out, &pb.SCFieldPlayerState{Player: []*pb.PlayerSide{side}})
+	}
+	if changed {
+		s.ggoNotifyFieldChange(ctx, 0)
 	}
 	// Award collection owns only this recipient profile and is retried by the
 	// existing snapshot/login path if delivery fails after the battle committed.

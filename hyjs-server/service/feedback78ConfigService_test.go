@@ -413,7 +413,7 @@ func TestFeedback78PublishedInputOmitsWeeklyBonus(t *testing.T) {
 		t.Fatal("starter D1-D3 login rewards missing")
 	}
 	want := []model.AdminActivityMilestone{
-		{Goal: 1, Rewards: []model.AdminResourceAmount{{ResourceID: "item_9760", Amount: 1}}},
+		{Goal: 1, Rewards: []model.AdminResourceAmount{{ResourceID: "item_9760", Amount: 1}, {ResourceID: "equip_041", Amount: 1}}},
 		{Goal: 2, Rewards: []model.AdminResourceAmount{{ResourceID: "equip_025", Amount: 1}, {ResourceID: "equip_026", Amount: 1}}},
 		{Goal: 3, Rewards: []model.AdminResourceAmount{{ResourceID: "equip_027", Amount: 1}, {ResourceID: "equip_028", Amount: 1}}},
 	}

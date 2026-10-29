@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Reflection;
 using System.Diagnostics;
 using LitJson;
 using ProtoBuf.Message;
@@ -17,6 +18,13 @@ namespace HYJS.DesertV4
         public static bool ResourceChanged()
         {
             if (!Target()) return false;
+            FieldRuntime.Require().RequestSnapshot(); return true;
+        }
+        public static bool ResourceNotification(object value)
+        {
+            if (!Target()) return false;
+            SCFieldResourceInfo packet=value as SCFieldResourceInfo;
+            if (packet!=null && (packet.resource==null || packet.resource.Count==0)) TradeController.SignalChange();
             FieldRuntime.Require().RequestSnapshot(); return true;
         }
         public static bool ResourceCheck()
@@ -39,8 +47,18 @@ namespace HYJS.DesertV4
         public static void MonsterPatrolTick(object component)
         {
             if (!Target()) HYJS.Field63.Runtime.PatrolTick(component);
-            // Public patrol needs server-authoritative shared movement. The
-            // current development preview deliberately keeps models stationary.
+            // The shared position is advanced by FieldMonsters from the
+            // authoritative path and clock, never by the old random wander.
+        }
+        public static bool MonsterMoving(RoomCharactor actor)
+        {
+            if (actor==null) return false;
+            return (Target() && FieldRuntime.PatrolMoving(actor)) || actor.IsMoving();
+        }
+        public static bool OpenPlayer(RCUIPlayer player)
+        {
+            if (!Target() || !(RoomManager.currentRoom is RoomField) || player==null) return false;
+            return FieldRuntime.Require().OpenPlayer(player);
         }
         public static bool OpenNpc(RCUINormalNPC npc)
         {
@@ -61,8 +79,33 @@ namespace HYJS.DesertV4
             if (code==1) BattleRecovery.StartResponse(type,value);
         }
         public static bool PreserveBattle() { return BattleRecovery.PreserveBattle(); }
-        public static void TcpConnecting() { BattleRecovery.BeforeTcpLogin(); }
-        public static void TcpLoginResponse(object value) { BattleRecovery.LoginResponse(value); }
+        public static void TcpConnecting() { PositionSync.ConnectionStarting(); BattleRecovery.BeforeTcpLogin(); PvpBridge.ConnectionStarting(); }
+        public static bool TransferSend(int opcode,object value)
+        {
+            if (PvpBridge.Capture(opcode,value)) return true;
+            if (Target() && (opcode==30032 || opcode==30061) && PvpBridge.HasPending())
+            { BoxManager.CreatePopupTextBox("上次挑战仍在确认",0f); return true; }
+            return LeaveController.Send(opcode,value);
+        }
+        public static bool PvpResponse(object value) { return PvpBridge.Intercept(value); }
+        public static bool TransferResponse(int opcode,object owner,object value) { return LeaveController.Response(opcode,owner,value); }
+        public static void TrackPositionBase(object net,object value) { PositionSync.TrackBaseResponse(net,value); LeaveController.SceneReady(); }
+        public static void TrackPositionField(object value) { PositionSync.TrackFieldResponse(value); LeaveController.SceneReady(); }
+        public static void TrackPositionPacket(object value) { PositionSync.TrackPacket(value); }
+        public static bool DropPositionPacket(object value) { return PositionSync.DropPacket(value); }
+        public static bool DropOldSocket(object tool,object value) { return PositionSync.DropOldSocket(tool,value as IAsyncResult); }
+        public static bool BlockMove(RoomCharactor actor)
+        {
+            if (PositionSync.BlocksMove(actor)) return true;
+            RoomBase room=RoomManager.currentRoom;
+            if (Target() && room!=null && room.charactorManager!=null && room.charactorManager.GetSelfCharactor()==actor)
+            {
+                if (PvpBridge.HasPending()) return true;
+                TravelController.InterruptExtraction();
+            }
+            return false;
+        }
+        public static void TcpLoginResponse(object value) { PositionSync.LoginResponse(value); BattleRecovery.LoginResponse(value); PvpBridge.LoginResponse(value); }
         public static void FightEndSend(int opcode,object value,object over) { BattleRecovery.SendEnd(opcode,value,over); }
         public static bool FightEndResponse(int type,object over,object value) { return BattleRecovery.InterceptEnd(type,over,value); }
         public static void LegacyBossObserve(object over,object value)
@@ -86,10 +129,17 @@ namespace HYJS.DesertV4
         ProtectionRelease protection;
         FieldNpcs npcs;
         FieldMonsters monsters;
+        FieldBoss boss;
         TerminalController terminal;
-        bool dirty, inFlight, snapshotReady, askingProtection, awaitingEncounter, encounterTimedOut;
+        bool dirty, inFlight, snapshotReady, worldReady, askingProtection, awaitingEncounter, encounterTimedOut, safe;
+        bool safeAreaKnown,lastLocalSafe;
+        double safeMinX,safeMaxX,safeMinZ,safeMaxZ;
         int sceneSerial, requestVersion;
         long nextSnapshot, protectionDeadline, encounterDeadline;
+        static readonly MethodInfo SetNativeTired=typeof(UI.UIFieldRunMapHeroInfo).GetMethod("SetHeroTired",BindingFlags.Instance|BindingFlags.NonPublic);
+        UI.UIFieldRunMap tiredHudPage;
+        UI.UIFieldRunMapHeroInfo tiredHudInfo;
+        int tiredHudValue=Int32.MinValue;
         public static FieldRuntime Require()
         {
             if (singleton!=null) return singleton;
@@ -100,6 +150,8 @@ namespace HYJS.DesertV4
             singleton.dirty=true;
             return singleton;
         }
+        public static bool PatrolMoving(RoomCharactor actor)
+        { return singleton!=null && singleton.monsters!=null && singleton.monsters.IsPatrolling(actor); }
         static bool Same(FieldWire.Session a,FieldWire.Session b)
         { return a!=null && b!=null && a.playerId==b.playerId && a.sessionHex==b.sessionHex && a.origin==b.origin; }
         void Update()
@@ -119,20 +171,28 @@ namespace HYJS.DesertV4
                     var nextResources=new FieldResources(current.charactorManager);
                     var nextNpcs=new FieldNpcs(current.charactorManager);
                     var nextMonsters=new FieldMonsters(net,current.charactorManager);
+                    var nextBoss=new FieldBoss(current.charactorManager,RequestSnapshot);
                     var nextTerminal=new TerminalController(wire,currentSession,this);
                     var nextPreload=new GatherPreload(this,self);
                     var nextNative=new NativeGatherUI(self,nextPreload);
                     var nextProtection=new ProtectionRelease(wire,currentSession,ProtectionNotice);
                     var nextGather=new GatherCoordinator(wire,currentSession,nextResources,self,nextPreload,nextNative,this);
                     room=current; actor=self; session=currentSession; resources=nextResources; preload=nextPreload;
-                    protection=nextProtection; gather=nextGather; npcs=nextNpcs; monsters=nextMonsters; terminal=nextTerminal;
+                    protection=nextProtection; gather=nextGather; npcs=nextNpcs; monsters=nextMonsters; boss=nextBoss; terminal=nextTerminal;
                     sceneSerial++; dirty=true; requestVersion++;
+                    PositionSync.SetFieldActive(true);
                     if (protection.Pending) protection.RetryPending();
-                    BattleRecovery.SceneReady();
+                    BattleRecovery.SceneReady(); TravelController.SceneReady(); LeaveController.SceneReady(); TradeController.SceneReady(); PvpBridge.SceneReady();
                 }
                 catch (Exception) { return; } // actor assets/session may not yet be ready
             }
-            try { preload.Tick(); gather.Tick(); } catch (Exception) { Notice("采集状态需要确认，请重新进入"); ReleaseScene(); return; }
+            try { PositionSync.Tick(); preload.Tick(); gather.Tick(); if (monsters!=null) monsters.Tick(); if (boss!=null) boss.Tick(); } catch (Exception) { Notice("采集状态需要确认，请重新进入"); ReleaseScene(); return; }
+            RefreshTiredHud();
+            if (safeAreaKnown)
+            {
+                bool local=InsideSafe(actor.transform.position,safeMinX,safeMaxX,safeMinZ,safeMaxZ);
+                if (local!=lastLocalSafe) { lastLocalSafe=local; snapshotReady=false; RequestSnapshot(); }
+            }
             if (awaitingEncounter && !encounterTimedOut && Stopwatch.GetTimestamp()>=encounterDeadline)
             {
                 encounterTimedOut=true;
@@ -143,34 +203,75 @@ namespace HYJS.DesertV4
         }
         void ReleaseScene()
         {
-            sceneSerial++; inFlight=false; dirty=true; nextSnapshot=0; snapshotReady=false;
+            if (!PositionSync.Locked) PositionSync.SetFieldActive(false);
+            sceneSerial++; inFlight=false; dirty=true; nextSnapshot=0; snapshotReady=false; worldReady=false; safeAreaKnown=false;
             awaitingEncounter=false; encounterTimedOut=false; askingProtection=false; protectionDeadline=0;
+            tiredHudPage=null; tiredHudInfo=null; tiredHudValue=Int32.MinValue;
             if (gather!=null) try { gather.Suspend(); } catch (Exception) { }
             if (protection!=null) protection.Suspend();
             if (resources!=null) try { resources.Clear(); } catch (Exception) { }
             if (monsters!=null) try { monsters.Clear(); } catch (Exception) { }
+            if (boss!=null) try { boss.Clear(); } catch (Exception) { }
             if (npcs!=null) try { npcs.Clear(); } catch (Exception) { }
             if (terminal!=null) terminal.Suspend();
+            TradeController.SceneExit();
             if (preload!=null) try { preload.Dispose(); } catch (Exception) { }
             room=null; actor=null; session=null; resources=null; preload=null; gather=null; protection=null;
-            npcs=null; monsters=null; terminal=null;
+            npcs=null; monsters=null; boss=null; terminal=null;
         }
         void OnDestroy() { ReleaseScene(); if (singleton==this) singleton=null; }
         public void Trigger(string groupId,string posId)
         {
             if (gather==null) { Notice("沙漠资源准备中，请稍候"); return; }
+            if (PvpBridge.HasPending()) { Notice("上次挑战仍在确认"); return; }
+            if (LeaveController.Pending) { Notice("离图正在确认"); return; }
+            if (TravelController.InterruptExtraction()) { Notice("撤离正在中断，请再次采集"); return; }
             gather.Trigger(groupId,posId);
         }
         public void RequestSnapshot() { dirty=true; requestVersion++; }
+        // The original read-state closes and refreshes its HUD before the
+        // authoritative HTTP claim returns. Its tiredness setter does not
+        // subscribe this HUD; refresh the original hero widget after each
+        // actual value change and whenever the field page is recreated.
+        void RefreshTiredHud()
+        {
+            if (!worldReady || StaticData.playerData==null || UI.PageManager.instance==null) return;
+            UI.UIFieldRunMap page=UI.PageManager.instance.currentPage as UI.UIFieldRunMap;
+            if (page==null || page.heroInfo==null) { tiredHudPage=null; tiredHudInfo=null; return; }
+            int value=StaticData.playerData.Tiredness;
+            if (page==tiredHudPage && page.heroInfo==tiredHudInfo && value==tiredHudValue) return;
+            try
+            {
+                if (SetNativeTired==null) throw new InvalidOperationException("Native tiredness HUD unavailable");
+                SetNativeTired.Invoke(page.heroInfo,null); tiredHudPage=page; tiredHudInfo=page.heroInfo; tiredHudValue=value;
+            }
+            catch (Exception) { tiredHudPage=null; tiredHudInfo=null; } // native page may still be initializing
+        }
+        bool SafeReady()
+        {
+            if (!snapshotReady || !safeAreaKnown || actor==null) return false;
+            bool local=InsideSafe(actor.transform.position,safeMinX,safeMaxX,safeMinZ,safeMaxZ);
+            if (local==safe) return true;
+            lastLocalSafe=local; snapshotReady=false; RequestSnapshot(); return false;
+        }
+        static double SafeNumber(JsonData value)
+        {
+            double n=Double.Parse(value.ToString(),CultureInfo.InvariantCulture);
+            if (Double.IsNaN(n) || Double.IsInfinity(n) || Math.Abs(n)>100000) throw new InvalidOperationException("Invalid safe area");
+            return n;
+        }
+        static bool InsideSafe(Vector3 p,double minX,double maxX,double minZ,double maxZ)
+        { return p.x>=minX && p.x<=maxX && p.z>=minZ && p.z<=maxZ; }
         void StartSnapshot()
         {
             if (session==null || room==null) return;
             int serial=sceneSerial, version=requestVersion; FieldWire.Session owner=session;
-            inFlight=true; dirty=false;
+            inFlight=true; dirty=false; long snapshotSent=Stopwatch.GetTimestamp();
             try
             {
                 wire.Snapshot(owner,delegate(FieldWireResult result)
                 {
+                    long snapshotReceived=Stopwatch.GetTimestamp();
                     if (serial!=sceneSerial || !Same(session,owner)) return;
                     inFlight=false;
                     // A later notification/claim invalidates the entire older
@@ -184,12 +285,21 @@ namespace HYJS.DesertV4
                         long untilMs=Int64.Parse(result.data["protectionUntilMs"].ToString(),CultureInfo.InvariantCulture);
                         if (nowMs<0 || untilMs<0 || untilMs>nowMs+300000) throw new InvalidOperationException("Invalid protection expiry");
                         long remain=Math.Max(0,untilMs-nowMs);
+                        if (!result.data["safe"].IsBoolean) throw new InvalidOperationException("Missing safe state");
+                        bool nextSafe=(bool)result.data["safe"];
+                        JsonData area=result.data["safeArea"];
+                        double minX=SafeNumber(area["minX"]), maxX=SafeNumber(area["maxX"]), minZ=SafeNumber(area["minZ"]), maxZ=SafeNumber(area["maxZ"]);
+                        if (minX>=maxX || minZ>=maxZ) throw new InvalidOperationException("Invalid safe area bounds");
                         resources.ApplySnapshot(result.data);
-                        monsters.ApplySnapshot(result.data);
+                        monsters.ApplySnapshot(result.data,snapshotSent,snapshotReceived);
+                        boss.ApplySnapshot(result.data);
                         npcs.ApplySnapshot(result.data);
                         terminal.ApplySnapshot(result.data);
                         protectionDeadline=Stopwatch.GetTimestamp()+remain*Stopwatch.Frequency/1000;
-                        snapshotReady=true;
+                        safe=nextSafe; safeMinX=minX; safeMaxX=maxX; safeMinZ=minZ; safeMaxZ=maxZ; safeAreaKnown=true;
+                        lastLocalSafe=InsideSafe(actor.transform.position,minX,maxX,minZ,maxZ);
+                        worldReady=true; snapshotReady=lastLocalSafe==nextSafe;
+                        if (!snapshotReady) { dirty=true; nextSnapshot=Stopwatch.GetTimestamp()+Stopwatch.Frequency; }
                         StaticData.playerData.UpdateSimpleItem(update.items);
                         StaticData.playerData.Tiredness=update.fatigue;
                     }
@@ -220,20 +330,52 @@ namespace HYJS.DesertV4
             if (result.items.Count==0) throw new InvalidOperationException("Empty material snapshot");
             return result;
         }
+        public bool OpenPlayer(RCUIPlayer player)
+        {
+            if (!SafeReady()) { Notice("场景正在同步，请稍候"); RequestSnapshot(); return true; }
+            if (!safe) return !CanAttackPvp();
+            if (PvpBridge.HasPending()) { Notice("上次挑战仍在确认"); return true; }
+            long id;
+            if (player.owner==null || !Int64.TryParse(player.owner.name,out id) || id<=0 || session==null || id==session.playerId)
+            { Notice("无法识别交易对象"); return true; }
+            TradeController.Invite(id); return true;
+        }
         public void OpenNpc(RCUINormalNPC npc)
         {
+            if (!SafeReady()) { Notice("场景正在同步，请稍候"); RequestSnapshot(); return; }
+            if (PvpBridge.HasPending()) { Notice("上次挑战仍在确认"); return; }
             FieldNpcs.Point p=npcs==null || npc==null ? null : npcs.Find(npc.owner);
             if (p==null || actor==null) { Notice("向导正在同步，请稍候"); RequestSnapshot(); return; }
             if ((actor.transform.position-p.interactionPosition).sqrMagnitude>p.radius*p.radius)
             { Notice("请靠近后再交互"); return; }
             if (p.role=="settlement" && terminal!=null) terminal.Open();
-            else Notice(p.role=="teleport" ? "传送正在准备" : "撤离正在准备");
+            else if (p.role=="teleport") TravelController.Entry();
+            else if (p.role=="extraction") TravelController.Extraction(p.pointId);
+        }
+        public bool CanAttackPvp()
+        {
+            if (!SafeReady()) { Notice("场景正在同步，请稍候"); RequestSnapshot(); return false; }
+            if (safe) { Notice("安全区不能挑战"); return false; }
+            if (PvpBridge.HasPending() || LeaveController.Pending || BattleRecovery.HasUnsettled())
+            { Notice("请先完成当前行动"); return false; }
+            if (TravelController.InterruptExtraction()) { Notice("撤离正在中断，请再次触碰"); return false; }
+            if (Stopwatch.GetTimestamp()<protectionDeadline) { AskProtectionForAttack(); return false; }
+            return true;
+        }
+        public bool PvpRejected(int code)
+        {
+            if (code==2007 && Stopwatch.GetTimestamp()<protectionDeadline) { AskProtectionForAttack(); return true; }
+            return false;
         }
         public bool StartEncounter(int type,string uuid)
         {
-            if ((type!=6 && type!=12) || String.IsNullOrEmpty(uuid) || actor==null || !snapshotReady)
+            if ((type!=6 && type!=12) || String.IsNullOrEmpty(uuid) || actor==null || !worldReady)
             { Notice("场景正在同步，请稍候"); RequestSnapshot(); return false; }
+            if (PvpBridge.HasPending()) { Notice("上次挑战仍在确认"); return false; }
+            if (LeaveController.Pending) { Notice("离图正在确认"); return false; }
             if (BattleRecovery.HasUnsettled()) { Notice("上次战斗结果尚待确认"); return false; }
+            if (TravelController.InterruptExtraction()) { Notice("撤离正在中断，请再次触碰"); return false; }
+            if (type==12 && (boss==null || !boss.CanInteract(uuid,actor))) return false;
             if (awaitingEncounter) return false;
             if (Stopwatch.GetTimestamp()<protectionDeadline)
             { AskProtectionForAttack(); return false; }
@@ -275,12 +417,52 @@ namespace HYJS.DesertV4
             BoxManager.CreateMessageBoxWithCofirmAndCancelButton("请先整理背包，确认后重试领取上次采集。",delegate(bool confirmed)
             { if (confirmed && serial==sceneSerial && gather!=null) gather.RetryPendingDelivery(); });
         }
+        sealed class GatherRewardView
+        {
+            public readonly List<BaseResource> rewards=new List<BaseResource>();
+            public bool chips;
+            public string largeChips="";
+        }
+        static GatherRewardView ParseGatherRewards(JsonData receipt)
+        {
+            if (receipt==null || receipt["resources"]==null || !receipt["resources"].IsArray ||
+                receipt["chips"]==null || !receipt["chips"].IsArray || receipt["chips"].Count!=6)
+                throw new InvalidOperationException("Missing gather receipt rewards");
+            var view=new GatherRewardView();
+            foreach (JsonData row in receipt["resources"])
+            {
+                string id=(string)row["id"]; long count=Int64.Parse(row["amount"].ToString(),CultureInfo.InvariantCulture);
+                if (String.IsNullOrEmpty(id) || (!id.StartsWith("FishItem_",StringComparison.Ordinal) && !id.StartsWith("MineItem_",StringComparison.Ordinal)) || count<0 || count>Int32.MaxValue)
+                    throw new InvalidOperationException("Invalid gather material reward");
+                if (count>0) view.rewards.Add(new BaseResource { id=id,num=(int)count });
+            }
+            string[] colors={"白","绿","蓝","紫","橙","红"};
+            for (int i=0;i<6;i++)
+            {
+                long count=Int64.Parse(receipt["chips"][i].ToString(),CultureInfo.InvariantCulture);
+                if (count<0) throw new InvalidOperationException("Invalid gather chip reward");
+                if (count>Int32.MaxValue) { view.largeChips+=(view.largeChips.Length==0 ? "":"，")+colors[i]+"色芯片 "+count.ToString(CultureInfo.InvariantCulture); continue; }
+                if (count>0) { view.chips=true; view.rewards.Add(new BaseResource { id="item_970"+(i+1),num=(int)count }); }
+            }
+            return view;
+        }
         public void ApplyOriginalReceipt(JsonData receipt)
         {
-            // Receipt quantities are display-only deltas. The next snapshot
-            // provides the current absolute balances, even on replay/restart.
-            if (receipt==null || receipt["resources"]==null) throw new InvalidOperationException("Missing original receipt");
-            Notice("采集完成"); RequestSnapshot();
+            // The native DisplayGetResource also adds inventory. Use only its
+            // display component: the next snapshot supplies absolute balances.
+            GatherRewardView view=ParseGatherRewards(receipt);
+            RequestSnapshot();
+            try
+            {
+                if (view.rewards.Count>0 && UI.PageManager.instance!=null && UI.PageManager.instance.currentPage is UI.UIFieldRunMap)
+                {
+                    if (view.chips) TradePanel.RegisterIcons();
+                    CommonMethod.ShowGetObjs(view.rewards,String.Empty);
+                    if (view.largeChips.Length>0) Notice("获得 "+view.largeChips);
+                }
+                else Notice(view.largeChips.Length>0 ? "获得 "+view.largeChips : view.rewards.Count>0 ? "采集完成，奖励已到账" : "采集完成");
+            }
+            catch (Exception) { try { Notice("采集完成，奖励已到账"); } catch (Exception) { } }
         }
     }
 }

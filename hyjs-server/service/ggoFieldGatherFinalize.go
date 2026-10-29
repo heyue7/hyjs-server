@@ -268,32 +268,30 @@ func ggoEndAttempt(tx *gorm.DB, a *ggoFieldActor, attempt *db.P8GatherAttempt, r
 	if json.Unmarshal(row.Payload, &state) != nil {
 		return nil, false, errors.New("沙漠场景状态损坏")
 	}
-	var node *ggoResourceNode
-	for i := range state.Resources {
-		if state.Resources[i].PointID == attempt.PosID {
-			node = &state.Resources[i]
-			break
-		}
-	}
-	if node == nil || node.ReservedBy != a.Row.Id || node.AttemptToken != attempt.Token || node.Generation != attempt.Generation || node.Remaining < 1 {
+	node, detached, released, err := ggoResolveGatherReservation(&state, attempt, frozen)
+	if err != nil || node != nil && node.Remaining < 1 {
 		return nil, false, ggoFieldError(constUtil.GGOFieldStaleGeneration, "采集资源代次已变化")
 	}
 	claim, pending, err := ggoAwardGather(a, frozen, attempt.Rewards, requestID, frozen.StartRequestID, attempt.Token)
 	if err != nil {
 		return nil, false, err
 	}
-	node.Remaining--
-	node.ReservedBy = 0
-	node.AttemptToken = ""
-	node.ReadyAtMS = 0
-	if node.Remaining == 0 {
-		node.RefreshAtMS = attempt.ReadyAt + frozen.CooldownMS
+	if node != nil {
+		node.Remaining--
+		if !detached {
+			node.ReservedBy, node.AttemptToken, node.ReadyAtMS = 0, "", 0
+		}
+		if node.Remaining == 0 {
+			node.RefreshAtMS = attempt.ReadyAt + frozen.CooldownMS
+		}
 	}
 	attempt.Active = false
 	a.Game.Field.Side.Tiredness = proto.Int32(a.Game.Field.Side.GetTiredness() - frozen.Fatigue)
 	a.Game.Field.Side.State = proto.Int32(constUtil.P8FieldIdle)
-	if err = ggoLineSave(tx, &row, &state, a.Now); err != nil {
-		return nil, false, err
+	if !detached || released {
+		if err = ggoLineSave(tx, &row, &state, a.Now); err != nil {
+			return nil, false, err
+		}
 	}
 	if err = tx.Save(attempt).Error; err != nil {
 		return nil, false, err

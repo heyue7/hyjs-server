@@ -69,7 +69,7 @@ func run() error {
 	)
 	flag.Parse()
 	maintenanceCommands := 0
-	for _, selected := range []bool{*applyGrowth, *applyGrowth75, *applyActivity77, *applyFeedback78, *applyFeedback79, *applyFeedback80, *applyFeedback81, *restoreVIP10, *warmRushPlayer != 0, *previewCalendar, *restoreCalendar != "", *calendarMaintenance != ""} {
+	for _, selected := range []bool{*applyGrowth, *applyGrowth75, *applyActivity77, *applyFeedback78, *applyFeedback79, *applyFeedback80, *applyFeedback81, *restoreVIP10, *warmRushPlayer != 0, *warmRushAll, *previewCalendar, *restoreCalendar != "", *calendarMaintenance != ""} {
 		if selected {
 			maintenanceCommands++
 		}

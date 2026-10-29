@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"reflect"
 	"testing"
 	"time"
@@ -291,5 +292,22 @@ func TestWantedClock75LegacyForwardRecoveryAnchorRepairNoGrantAndIdempotent(t *t
 	after, afterGame := f.profile(t)
 	if !proto.Equal(before, after) || !p6CopySeriesJSONEqual(t, beforeGame, afterGame) || p1Count(t, &db.AdminAudit{}, "action=? AND target=?", "calendar75.anchors", "1") != 1 {
 		t.Fatal("repeat repair changed profile, granted resources or duplicated repair audit")
+	}
+}
+
+// A future instance is just as inert as a future fight after a clock rewind.
+func TestWantedClock75RejectedMetadataKeepsFutureInstanceInert(t *testing.T) {
+	f, actor := wantedClock75Setup(t)
+	ctx := wantedClock75Move(t, f, actor, 6)
+	now := LocalPlayNow(ctx)
+	fight := wantedClock75Start(t, f, ctx, f.id, now.Add(-time.Hour), "future-instance-only", 7509601)
+	if err := db.GetIns().Model(&db.P12WantedInstance{}).Where("id=?", fight.InstanceID).Update("created_at", now.Add(time.Hour).UnixMilli()).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := recordP12WantedRejectedEnd(ctx, f.id, fight.ID, now, errors.New(constUtil.P12WantedInvalid)); err != nil {
+		t.Fatal(err)
+	}
+	if got := wantedClock75Read(t, fight.ID); !reflect.DeepEqual(fight, got) {
+		t.Fatal("future instance rejection changed fight metadata")
 	}
 }

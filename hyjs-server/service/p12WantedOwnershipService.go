@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"gorm.io/gorm"
@@ -51,6 +52,20 @@ func P12WantedRequireIdle(tx *gorm.DB, id int64, now time.Time) error {
 	return nil
 }
 
+// The detailed P6 mismatch can only be marked at the recorded-computation
+// boundary. A similarly worded DB or network error stays unclassified.
+type p12WantedRecordedReplayMismatch struct{ cause error }
+
+func (e *p12WantedRecordedReplayMismatch) Error() string { return e.cause.Error() }
+func (e *p12WantedRecordedReplayMismatch) Unwrap() error { return e.cause }
+
+func p12WantedRecordedReplayError(err error) error {
+	if err != nil && strings.HasPrefix(err.Error(), constUtil.P6ReplayConflict+": 原录像终局或完整技能记录不符 round=") {
+		return &p12WantedRecordedReplayMismatch{cause: err}
+	}
+	return err
+}
+
 // Persist rejection metadata after the settlement transaction rolled back.
 // Network/DB failures remain recoverable and do not release an active battle.
 func recordP12WantedRejectedEnd(ctx context.Context, id int64, fightID string, now time.Time, rejected error) error {
@@ -58,6 +73,10 @@ func recordP12WantedRejectedEnd(ctx context.Context, id int64, fightID string, n
 		return nil
 	}
 	reason := rejected.Error()
+	var replayMismatch *p12WantedRecordedReplayMismatch
+	if errors.As(rejected, &replayMismatch) {
+		reason = constUtil.P6ReplayConflict
+	}
 	if reason != constUtil.P6ReplayConflict && reason != constUtil.P12WantedInvalid && reason != constUtil.CombatUnsupported {
 		return nil
 	}
@@ -66,6 +85,31 @@ func recordP12WantedRejectedEnd(ctx context.Context, id int64, fightID string, n
 		if err := tx.Select("id").Clauses(clause.Locking{Strength: "UPDATE"}).First(&profile, id).Error; err != nil {
 			return err
 		}
-		return tx.Model(&db.P12WantedFight{}).Where("id=? AND player_id=? AND committed=? AND abandoned_at=0", fightID, id, false).Updates(map[string]any{"rejected_at": now.UnixMilli(), "rejected_reason": reason}).Error
+		query := tx.Model(&db.P12WantedFight{}).Where("id=? AND player_id=? AND committed=? AND abandoned_at=0", fightID, id, false)
+		if calendar75Adjusted(tx) {
+			var fight db.P12WantedFight
+			err := tx.Select("id", "instance_id", "created_at").Where("id=? AND player_id=? AND committed=? AND abandoned_at=0", fightID, id, false).First(&fight).Error
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return nil
+			}
+			if err != nil {
+				return err
+			}
+			if fight.CreatedAt > now.UnixMilli() {
+				return nil
+			}
+			var instance db.P12WantedInstance
+			err = tx.Select("id", "created_at").First(&instance, "id=?", fight.InstanceID).Error
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return nil
+			}
+			if err != nil {
+				return err
+			}
+			if instance.CreatedAt > now.UnixMilli() {
+				return nil
+			}
+		}
+		return query.Updates(map[string]any{"rejected_at": now.UnixMilli(), "rejected_reason": reason}).Error
 	})
 }

@@ -2,6 +2,7 @@ package service
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -59,5 +60,34 @@ func TestGGOPVPSixColorTransferAndReceiptRollback(t *testing.T) {
 	var count int64
 	if err = db.GetIns().Model(&db.GGOFieldReceipt{}).Where("player_id IN ?", []int64{10003, 10004}).Count(&count).Error; err != nil || count != 0 {
 		t.Fatal("rolled-back PvP receipts persisted", count, err)
+	}
+}
+
+func TestGGOPVPUsesPublishedDeathLossPercentage(t *testing.T) {
+	t.Setenv("HYJS_P1_MYSQL_DATABASE", "")
+	f := p1Setup(t)
+	if err := db.GetIns().AutoMigrate(&db.GGOFieldReceipt{}); err != nil {
+		t.Fatal(err)
+	}
+	cfg := ggoLineTestConfiguration(t)
+	f.s.GGOFieldConfig = cfg
+	values, err := ggoChipValues(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i, tc := range []struct {
+		percent *int64
+		want    int64
+	}{{nil, 4}, {ggoInt64(0), 0}, {ggoInt64(25), 2}, {ggoInt64(100), 5}} {
+		cfg.Rules.DeathLossPercent = tc.percent
+		winner := &model.GameState{GGOField: &model.GGOFieldState{EconomyVersion: cfg.Runtime.EconomyVersion, ExchangeValues: values}}
+		loser := &model.GameState{GGOField: &model.GGOFieldState{Chips: [6]int64{5, 0, 0, 0, 0, 3}, EconomyVersion: cfg.Runtime.EconomyVersion, ExchangeValues: values}, Field: &model.FieldState{Side: &pb.PlayerSide{CurHp: proto.Float64(1), State: proto.Int32(0)}}}
+		fightID := fmt.Sprintf("10000000-0000-4000-8000-%012d", i+1)
+		err = db.GetIns().Transaction(func(tx *gorm.DB) error {
+			return f.s.ggoSettlePVP(tx, int64(10001+2*i), int64(10002+2*i), winner, loser, fightID, time.Now().UnixMilli())
+		})
+		if err != nil || winner.GGOField.Chips[0] != tc.want || loser.GGOField.Chips[0] != 5-tc.want || loser.GGOField.Chips[5] != 3 || loser.GGOField.PVPReturn == nil {
+			t.Fatalf("percent=%v winner=%v loser=%v err=%v", tc.percent, winner.GGOField, loser.GGOField, err)
+		}
 	}
 }

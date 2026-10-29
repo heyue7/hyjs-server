@@ -27,6 +27,10 @@ PIN = '70552a0caa2d9866c10ab8dbd11b8f086484a0ead965cc1acc3f9978bc663324'
 RAY_TARGET = 'CameraTool::Update'
 RAY_PIN = '18b7963319d92fbad10e813a67533ea37c8d7b2dbf7c7e056f8b022f345ef54a'
 ENTRY = 'assets/bin/Data/Managed/Assembly-CSharp.dll'
+BASE_APK_SHA = '25026a1f180d164ba2b191e4cc7e558e20f7a761b740fb7b28d6205d6756112a'
+BASE_MANAGED_SHA = '8b732cce869cad9a9a06c75d3ba4891b4084a3ac646848fc99a933148e300437'
+QUALITY_METHOD = 'UI.UIInstPlayerData::GetAvailableHerosForFormation'
+QUALITY_PIN = '8c1cec4f57ef5a748045cf62308deb3e903e375f1a63579f55010c1c804952a5'
 LOADER = 'AssetLoad.AssetBundleManager::'
 DEPENDENCIES = {
     'LoadAssetBundle': ('f2bb2bd7c5fb3907504016364ab8213cb1b2bbdacbf4f4973136985eed8dea52', 45),
@@ -57,6 +61,12 @@ ENTRY_GUARDS = {
 def sha(raw):
     return hashlib.sha256(raw).hexdigest()
 
+def sha_file(path):
+    h=hashlib.sha256()
+    with Path(path).open('rb') as f:
+        for block in iter(lambda:f.read(1024*1024),b''): h.update(block)
+    return h.hexdigest()
+
 
 def verify(before, after, bundle_size=None, walk_only=False, desert_entry=False, resume_login=False):
     require(not resume_login or desert_entry, 'Login resume requires desert entry')
@@ -68,6 +78,7 @@ def verify(before, after, bundle_size=None, walk_only=False, desert_entry=False,
     require(len(old_methods) == len(new_methods), 'Method count changed')
     unchanged = engine = 0
     target_verified = False
+    quality_verified = False
     ray_verified = False
     loader_changes = []
     walk_changes = []
@@ -91,6 +102,10 @@ def verify(before, after, bundle_size=None, walk_only=False, desert_entry=False,
             require(not new.Rva, 'New body: ' + name)
             continue
         a, b = exact_body(left, old), exact_body(right, new)
+        if name == QUALITY_METHOD:
+            _, quality = decoded(left, old)
+            require(sha(a)==QUALITY_PIN and a==b and quality[74]==('ldc.i4.s',11), 'Released quality filter changed')
+            quality_verified = True
         if name == RAY_TARGET:
             require(sha(a)==RAY_PIN, 'Unknown original camera ray body')
             ob,x=decoded(left,old)
@@ -239,13 +254,13 @@ def verify(before, after, bundle_size=None, walk_only=False, desert_entry=False,
             require(str(old_ref.Name) == original and str(new_ref.Name) == helper, 'Wrong setter helper')
             require(str(new_ref.Class.row.TypeNamespace) == 'HYJS.Desert53' and str(new_ref.Class.row.TypeName) == 'DesertOcclusion', 'Wrong helper type')
         target_verified = True
-    require(target_verified and ray_verified and engine == 547, 'Missing camera or original engine methods')
+    require(target_verified and ray_verified and quality_verified and engine == 547, 'Missing camera, v80 quality fix or original engine methods')
     require(len(loader_changes) == (7 if bundle_size is not None else 0), 'Loader target inventory differs')
     require(len(walk_changes) == (6 if walk_only else 0), 'Content guard inventory differs')
     require(len(entry_changes)==(4 if desert_entry else 0),'Entry target inventory differs')
     require(len(resume_changes)==(1 if resume_login else 0),'Login resume target inventory differs')
     return dict(originalEngineMethodsUnchanged=engine, unrelatedRawMethodBodiesUnchanged=unchanged,
-                originalTokensAndABI=True, cameraInstructionSubstitutions=[35, 44], cameraRaySubstitution=dict(method=RAY_TARGET,instruction=40,originalSignature='RaycastAll(Ray,float,int)',targetExtraLayer=11,targetExtraAncestor='Observed bridge',extraEndpointExclusion=.2,originalMaskPreserved=True), loaderChanges=loader_changes,walkOnlyChanges=walk_changes,desertEntryChanges=entry_changes,desertLoginResumeChanges=resume_changes)
+                originalTokensAndABI=True, qualityFilterV80Exact=True, cameraInstructionSubstitutions=[35, 44], cameraRaySubstitution=dict(method=RAY_TARGET,instruction=40,originalSignature='RaycastAll(Ray,float,int)',targetExtraLayer=11,targetExtraAncestor='Observed bridge',extraEndpointExclusion=.2,originalMaskPreserved=True), loaderChanges=loader_changes,walkOnlyChanges=walk_changes,desertEntryChanges=entry_changes,desertLoginResumeChanges=resume_changes)
 
 
 def main():
@@ -260,8 +275,7 @@ def main():
     parser.add_argument('--enable-desert-entry',action='store_true')
     parser.add_argument('--resume-desert-login',action='store_true')
     args = parser.parse_args()
-    raw = args.base_apk.read_bytes()
-    require(sha(raw) == args.apk_sha256, 'Pin the current APK explicitly')
+    require(args.apk_sha256 == BASE_APK_SHA and sha_file(args.base_apk) == BASE_APK_SHA, 'Wrong pinned v80 APK')
     require(bool(args.bundle) == bool(args.bundle_sha256), 'Bundle and exact SHA must be supplied together')
     require(not args.walk_only or args.bundle is not None, 'Walk-only requires the verified desert bundle')
     require(not args.enable_desert_entry or args.bundle is not None,'Desert entry requires the verified bundle')
@@ -291,7 +305,7 @@ def main():
                 p = work / name
                 p.write_bytes(archive.read('assets/bin/Data/Managed/' + name))
                 references.append(p)
-        require(sha(args.base_apk.read_bytes()) == args.apk_sha256, 'APK changed during extraction')
+        require(sha_file(args.base_apk) == BASE_APK_SHA and sha(before)==BASE_MANAGED_SHA, 'APK or released managed baseline changed')
         host = work / 'Assembly-CSharp.dll'
         host.write_bytes(before)
         bridge = args.output.resolve() / 'SoulFlowerDesert53.dll'

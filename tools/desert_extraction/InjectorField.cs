@@ -12,15 +12,25 @@ var hooks=new TypeRefUser(module,"HYJS.DesertV4","FieldHooks",reference);
 MemberRef Hook(string name,TypeSig ret,params TypeSig[] p) => new MemberRefUser(module,name,MethodSig.CreateStatic(ret,p),hooks);
 var b=module.CorLibTypes.Boolean; var v=module.CorLibTypes.Void; var i4=module.CorLibTypes.Int32;
 var str=module.CorLibTypes.String; var obj=module.CorLibTypes.Object;
-var changed=Hook("ResourceChanged",b); var check=Hook("ResourceCheck",b);
+var changed=Hook("ResourceChanged",b); var notification=Hook("ResourceNotification",b,obj); var check=Hook("ResourceCheck",b);
 var gather=Hook("Gather",b,str,str); var monsterChanged=Hook("MonsterChanged",b);
+var pvpResponse=Hook("PvpResponse",b,obj);
 var npcType=module.GetTypes().Single(t=>t.FullName=="Room.RCUINormalNPC");
 var openNpc=Hook("OpenNpc",b,new ClassSig(npcType));
+var playerType=module.GetTypes().Single(t=>t.FullName=="Room.RCUIPlayer");
+var openPlayer=Hook("OpenPlayer",b,new ClassSig(playerType));
 var beforeEncounter=Hook("BeforeEncounter",b,i4,str); var fightStart=Hook("FightStartResponse",v,i4,obj);
 var patrol=Hook("MonsterPatrolTick",v,obj); var preserve=Hook("PreserveBattle",b);
 var tcpConnecting=Hook("TcpConnecting",v); var tcpLogin=Hook("TcpLoginResponse",v,obj);
 var endSend=Hook("FightEndSend",v,i4,obj,obj); var endResponse=Hook("FightEndResponse",b,i4,obj,obj);
 var legacyObserve=Hook("LegacyBossObserve",v,obj,obj); var legacyCompleted=Hook("LegacyBossCompleted",v,obj,obj);
+var transferSend=Hook("TransferSend",b,i4,obj); var transferResponse=Hook("TransferResponse",b,i4,obj,obj);
+var trackBase=Hook("TrackPositionBase",v,obj,obj);
+var trackField=Hook("TrackPositionField",v,obj); var trackPacket=Hook("TrackPositionPacket",v,obj);
+var dropPacket=Hook("DropPositionPacket",b,obj); var dropSocket=Hook("DropOldSocket",b,obj,obj);
+var actorType=module.GetTypes().Single(t=>t.FullName=="Room.RoomCharactor");
+var blockMove=Hook("BlockMove",b,new ClassSig(actorType));
+var monsterMoving=Hook("MonsterMoving",b,new ClassSig(actorType));
 
 MethodDef Get(string type,string name) => module.GetTypes().Single(t=>t.FullName==type).Methods.Single(m=>m.Name==name);
 void Head(MethodDef m,params Instruction[] add)
@@ -45,11 +55,25 @@ foreach(string name in new[]{"SCFieldResourceInfo","SCSideResourceCheck","SCFiel
   var first=m.Body.Instructions[0];
   Head(m,Instruction.Create(OpCodes.Ldarg_1),Instruction.Create(OpCodes.Ldarg_2),Instruction.Create(OpCodes.Call,gather),Instruction.Create(OpCodes.Brfalse,first),Instruction.Create(OpCodes.Ret));
  }
- else GuardNoArg(m,name=="SCFieldResourceInfo" ? changed : check);
+ else if(name=="SCFieldResourceInfo")
+ {
+  var first=m.Body.Instructions[0];
+  Head(m,Instruction.Create(OpCodes.Ldarg_1),Instruction.Create(OpCodes.Call,notification),Instruction.Create(OpCodes.Brfalse,first),Instruction.Create(OpCodes.Ret));
+ }
+ else GuardNoArg(m,check);
 }
 var onLoaded=Get("Room.RoomField","OnMainCharactorLoaded");
 Head(onLoaded,Instruction.Create(OpCodes.Call,changed),Instruction.Create(OpCodes.Pop));
-GuardNoArg(Get("Room.RoomNetField","SCSideMonster"),monsterChanged);
+foreach(string name in new[]{"SCSideMonster","SCSideBoss","SCSideWorldBoss","SCSideBossCountdown"})
+ GuardNoArg(Get("Room.RoomNetField",name),monsterChanged);
+{
+ var m=Get("Room.RoomNetField","SCSidePvpFightResult"); var first=m.Body.Instructions[0];
+ Head(m,Instruction.Create(OpCodes.Ldarg_1),Instruction.Create(OpCodes.Call,pvpResponse),Instruction.Create(OpCodes.Brfalse,first),Instruction.Create(OpCodes.Ret));
+}
+{
+ var m=Get("Room.RCUIPlayer","OnClick"); var first=m.Body.Instructions[0];
+ Head(m,Instruction.Create(OpCodes.Ldarg_0),Instruction.Create(OpCodes.Call,openPlayer),Instruction.Create(OpCodes.Brfalse,first),Instruction.Create(OpCodes.Ret));
+}
 {
  var m=Get("Room.RCUINormalNPC","OpenPage"); var first=m.Body.Instructions[0];
  Head(m,Instruction.Create(OpCodes.Ldarg_0),Instruction.Create(OpCodes.Call,openNpc),Instruction.Create(OpCodes.Brfalse,first),Instruction.Create(OpCodes.Ret));
@@ -65,6 +89,9 @@ foreach(var item in new[]{(Type:6,Send:"SendPve",Reply:"SCSidePveFightStart"),(T
  var m=Get("Room.RCAIServerMonster","Tick"); var matches=m.Body.Instructions.Where(x=>Match(x,"HYJS.Field63.Runtime","PatrolTick")).ToArray();
  if(matches.Length!=1) throw new InvalidOperationException("Original patrol call changed");
  matches[0].Operand=patrol;
+ var moving=m.Body.Instructions.Where(x=>Match(x,"Room.RoomCharactor","IsMoving")).ToArray();
+ if(moving.Length!=1) throw new InvalidOperationException("Original monster animation call changed");
+ moving[0].OpCode=OpCodes.Call; moving[0].Operand=monsterMoving;
 }
 {
  var m=Get("BoxManager","CreateSocketReconnect");
@@ -78,6 +105,50 @@ foreach(var item in new[]{(Type:6,Send:"SendPve",Reply:"SCSidePveFightStart"),(T
 foreach(string name in new[]{"Reconnect","SendSocketLogin","Disconnect"})
  Head(Get("NetAPI",name),Instruction.Create(OpCodes.Call,tcpConnecting));
 Head(Get("NetAPI","SCLoginTcpCallback"),Instruction.Create(OpCodes.Ldarg_0),Instruction.Create(OpCodes.Call,tcpLogin));
+{
+ var m=Get("NetAPI","SendSocket"); var first=m.Body.Instructions[0];
+ Head(m,Instruction.Create(OpCodes.Ldarg_0),Instruction.Create(OpCodes.Ldarg_1),Instruction.Create(OpCodes.Call,transferSend),Instruction.Create(OpCodes.Brfalse,first),Instruction.Create(OpCodes.Ret));
+}
+foreach(var item in new[]{(Class:"ManagerController",Name:"SceneTransferCallback",Opcode:30033),(Class:"Room.RoomNetField",Name:"SCTransferLine",Opcode:30062)})
+{
+ var m=Get(item.Class,item.Name); var first=m.Body.Instructions[0];
+ Head(m,Instruction.Create(OpCodes.Ldc_I4,item.Opcode),Instruction.Create(OpCodes.Ldarg_0),Instruction.Create(OpCodes.Ldarg_1),
+      Instruction.Create(OpCodes.Call,transferResponse),Instruction.Create(OpCodes.Brfalse,first),Instruction.Create(OpCodes.Ret));
+}
+Head(Get("NetWork.Sockets.Event.EventManger","AddPacket"),Instruction.Create(OpCodes.Ldarg_1),Instruction.Create(OpCodes.Call,trackPacket));
+{
+ var m=Get("NetWork.Layer.SocketTool","ReceiveHandler"); var first=m.Body.Instructions[0];
+ Head(m,Instruction.Create(OpCodes.Ldarg_0),Instruction.Create(OpCodes.Ldarg_1),Instruction.Create(OpCodes.Call,dropSocket),
+      Instruction.Create(OpCodes.Brfalse,first),Instruction.Create(OpCodes.Ret));
+}
+{
+ var m=Get("NetWork.Sockets.Event.EventManger","Tick"); var ins=m.Body.Instructions;
+ var first=ins[0]; if(first.OpCode.FlowControl!=FlowControl.Branch || !(first.Operand is Instruction condition)) throw new InvalidOperationException("Unexpected event loop");
+ var q=ins.Where(x=>Match(x,"System.Collections.Generic.Queue`1<NetWork.Packets.Packet>","Dequeue")).ToArray();
+ if(q.Length!=1) q=ins.Where(x=>x.Operand is IMethod cm && cm.Name=="Dequeue" && x.OpCode==OpCodes.Callvirt).ToArray();
+ if(q.Length!=1) throw new InvalidOperationException("Unexpected event dequeue");
+ int pos=ins.IndexOf(q[0])+1;
+ if(ins[pos].OpCode!=OpCodes.Stloc_0) throw new InvalidOperationException("Unexpected event local");
+ pos++;
+ ins.Insert(pos++,Instruction.Create(OpCodes.Ldloc_0));
+ ins.Insert(pos++,Instruction.Create(OpCodes.Call,dropPacket));
+ ins.Insert(pos,Instruction.Create(OpCodes.Brtrue,condition));
+ m.Body.MaxStack=(ushort)Math.Max(8,(int)m.Body.MaxStack);
+}
+foreach(var item in new[]{(Class:"Room.RoomNetBase",Hook:trackBase,WithThis:true),(Class:"Room.RoomNetField",Hook:trackField,WithThis:false)})
+{
+ var m=Get(item.Class,"SCCurrentPosition"); var ret=m.Body.Instructions.Last();
+ if(ret.OpCode!=OpCodes.Ret || m.Body.Instructions.Count(x=>x.OpCode==OpCodes.Ret)!=1 || m.Body.Instructions.Any(x=>ReferenceEquals(x.Operand,ret))) throw new InvalidOperationException("Unexpected position handler tail");
+ int pos=m.Body.Instructions.Count-1;
+ if(item.WithThis) m.Body.Instructions.Insert(pos++,Instruction.Create(OpCodes.Ldarg_0));
+ m.Body.Instructions.Insert(pos++,Instruction.Create(OpCodes.Ldarg_1));
+ m.Body.Instructions.Insert(pos,Instruction.Create(OpCodes.Call,item.Hook));
+ m.Body.MaxStack=(ushort)Math.Max(8,(int)m.Body.MaxStack);
+}
+{
+ var m=Get("Room.RoomCharactor","MoveTo"); var first=m.Body.Instructions[0];
+ Head(m,Instruction.Create(OpCodes.Ldarg_0),Instruction.Create(OpCodes.Call,blockMove),Instruction.Create(OpCodes.Brfalse,first),Instruction.Create(OpCodes.Ret));
+}
 foreach(var item in new[]{(Type:6,Class:"Battle.FieldPVEBattleOver",Reply:"FieldPVEFightResultHandler"),(Type:12,Class:"Battle.FieldPVEBossBattleOver",Reply:"FieldPVEBossFightResultHandler")})
 {
  var send=Get(item.Class,"AskFieldPVEFightResult");

@@ -15,6 +15,23 @@ public static class GatherAttemptChecks
         a.Claim(); a.ClaimReceipt(a.Journal.claimRequestId,a.Journal.startRequestId,"frozen-token");
         Check(a.Journal.phase==GatherPhase.Finished,"authoritative claim finishes");
 
+        // ReadyAt worker may settle before the client's claim, retaining the
+        // system UUIDv5 bound to this frozen token in the business receipt.
+        a=New(); Check(Accept(a,1500),"system receipt start"); a.Claim();
+        string system=GatherAttempt.SystemClaimReceiptId("frozen-token");
+        Check(system=="381997e6-1d01-5114-837b-0ad86d4ed1ff","Go UUIDv5 parity");
+        try { a.ClaimReceipt(system,Guid.NewGuid().ToString("D"),"frozen-token"); throw new Exception("wrong start accepted"); }
+        catch (InvalidOperationException) { }
+        try { a.ClaimReceipt(system,a.Journal.startRequestId,"other-token"); throw new Exception("wrong token accepted"); }
+        catch (InvalidOperationException) { }
+        try { a.ClaimReceipt(Guid.NewGuid().ToString("D"),a.Journal.startRequestId,"frozen-token"); throw new Exception("wrong UUID accepted"); }
+        catch (InvalidOperationException) { }
+        Check(a.Journal.phase==GatherPhase.Claiming,"mismatches keep claim pending");
+        a.ClaimReceipt(system,a.Journal.startRequestId,"frozen-token");
+        Check(a.Journal.phase==GatherPhase.Finished,"system business receipt finalizes once");
+        try { a.ClaimReceipt(system,a.Journal.startRequestId,"frozen-token"); throw new Exception("duplicate finalization accepted"); }
+        catch (InvalidOperationException) { }
+
         a=New(); Check(!a.Expire(1999) && a.Expire(2000),"deadline transition");
         Check(!Accept(a,2001) && a.Journal.phase==GatherPhase.Cancelling,"late start never animates");
         string cancelId=a.Journal.cancelRequestId;

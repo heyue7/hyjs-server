@@ -255,6 +255,7 @@ namespace HYJS.DesertV4
                     try
                     {
                         JsonData d=result.data; string status=Optional(d,"status");
+                        if (String.IsNullOrEmpty(status) && type==12) status=Optional(d,"state");
                         if (status=="active" || status=="unknown") { QueryActive(expected); return; }
                         if (status!="settled") { Warning("战斗结果待确认"); return; }
                         string hash=Optional(d,"inputHash"), endHash=Optional(d,"endRequestHash"), encoded=Optional(d,"nativeEnd");

@@ -195,7 +195,7 @@ func (s *GameService) GGOFieldGatherStart(ctx context.Context, req model.GGOFiel
 		if node == nil || node.Generation != req.Generation {
 			return ggoFieldError(constUtil.GGOFieldStaleGeneration, "资源已刷新")
 		}
-		if node.Remaining < 1 || node.ReservedBy != 0 {
+		if node.Remaining < 1 || node.ReservedBy != 0 || ggoLegacyBlocked(state, node.PointID) {
 			return ggoFieldError(constUtil.GGOFieldBusy, "资源点已耗尽或被占用")
 		}
 		var point *model.AdminFieldGGOPoint

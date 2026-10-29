@@ -39,7 +39,7 @@ func TestGGODeathLossSupportsInt64Population(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		lost, err := ggoDeathLoss(chips, 3, random)
+		lost, err := ggoDeathLoss(chips, 3, nil, random)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -62,7 +62,7 @@ func BenchmarkGGODeathLossInt64Balanced(b *testing.B) {
 	chips := [6]int64{math.MaxInt64 / 6, math.MaxInt64 / 6, math.MaxInt64 / 6, math.MaxInt64 / 6, math.MaxInt64 / 6, math.MaxInt64 / 6}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		if _, err := ggoDeathLoss(chips, 3, random); err != nil {
+		if _, err := ggoDeathLoss(chips, 3, nil, random); err != nil {
 			b.Fatal(err)
 		}
 	}

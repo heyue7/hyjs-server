@@ -24,6 +24,7 @@ const (
 	GGOFieldOpExtractComplete   = "extract_complete"
 	GGOFieldOpExtractCancel     = "extract_cancel"
 	GGOFieldOpExtractTombstone  = "extract_tombstone"
+	GGOFieldOpPVPReject         = "pvp_reject"
 	GGOFieldOpPVPLoss           = "pvp_loss"
 	GGOFieldOpPVPWin            = "pvp_win"
 	GGOFieldOpPVELoss           = "pve_loss"

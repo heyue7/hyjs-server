@@ -4,11 +4,14 @@ import (
 	"context"
 	"errors"
 	"math"
+	"strconv"
 	"strings"
+	"time"
 
 	"google.golang.org/protobuf/proto"
 	"gorm.io/gorm"
 	"hyjs-server/constUtil"
+	"hyjs-server/db"
 	"hyjs-server/model"
 	pb "hyjs-server/model/protocol"
 )
@@ -38,7 +41,7 @@ func (s *GameService) ggoSettlePVP(tx *gorm.DB, winnerID, loserID int64, winner,
 	if err != nil {
 		return err
 	}
-	lost, err := ggoDeathLoss(loser.GGOField.Chips, cfg.Runtime.ProtectedChips, nil)
+	lost, err := ggoDeathLoss(loser.GGOField.Chips, cfg.Runtime.ProtectedChips, cfg.Rules.DeathLossPercent, nil)
 	if err != nil {
 		return err
 	}
@@ -126,6 +129,138 @@ func (s *GameService) GGOFieldPVPReceipt(ctx context.Context, req model.GGOField
 		return nil, err
 	}
 	return &out, nil
+}
+
+type ggoPVPRejectedReceipt struct {
+	Stamp          int64  `json:"stamp"`
+	OpponentID     int64  `json:"opponentId"`
+	NativeResponse []byte `json:"nativeResponse"`
+}
+
+func ggoPVPRejectID(stamp int64) string {
+	return ggoSystemReceiptID("pvp-reject", strconv.FormatInt(stamp, 10))
+}
+
+func ggoReadPVPRejection(tx *gorm.DB, id, stamp, opponent int64, hash string) (*pb.SCSidePvpFightResult, bool, error) {
+	var saved ggoPVPRejectedReceipt
+	found, err := ggoReadReceipt(tx, id, ggoPVPRejectID(stamp), constUtil.GGOFieldOpPVPReject, hash, &saved)
+	if err != nil || !found {
+		return nil, found, err
+	}
+	if saved.Stamp != stamp || saved.OpponentID != opponent {
+		return nil, true, ggoFieldError(constUtil.GGOFieldRequestConflict, "PK请求编号与原请求不一致")
+	}
+	var response pb.SCSidePvpFightResult
+	if proto.Unmarshal(saved.NativeResponse, &response) != nil || (response.GetCode() != 2001 && response.GetCode() != 2002 && response.GetCode() != 2007) || response.GetFightId() != "" {
+		return nil, true, errors.New("沙漠PK拒绝回执损坏")
+	}
+	return &response, true, nil
+}
+
+// GGOFieldPVPStatus recovers the initiator's committed native result even
+// after a reconnect or scene change. Unknown means retry the same stamp/body.
+func (s *GameService) GGOFieldPVPStatus(ctx context.Context, req model.GGOFieldPVPStatusRequest, session []byte) (*model.GGOFieldPVPStatusResponse, error) {
+	var request pb.CSSidePvpFightResult
+	if req.Stamp < 1 || len(req.NativeRequest) < 1 || len(req.NativeRequest) > 1024 || proto.Unmarshal(req.NativeRequest, &request) != nil || request.GetPlayerId() < 1 || request.GetPlayerId() == req.PlayerID || request.GetServerId() < 0 || request.GetFightType() < 0 || request.GetFightType() > 1 {
+		return nil, model.NewErrParamsError()
+	}
+	canonical, err := proto.MarshalOptions{Deterministic: true}.Marshal(&request)
+	if err != nil {
+		return nil, err
+	}
+	hash, opponent := p6Digest(canonical), request.GetPlayerId()
+	out := &model.GGOFieldPVPStatusResponse{Status: "unknown", Stamp: req.Stamp, OpponentID: opponent, RequestHash: hash}
+	err = s.ggoWithProfile(ctx, req.GGOFieldAuth, session, false, false, func(tx *gorm.DB, a *ggoFieldActor) error {
+		out.ServerTimeMS = time.Now().UnixMilli()
+		if a.Game.GGOField != nil {
+			out.PositionRevision = a.Game.GGOField.PositionRevision
+		}
+		var row db.P12FieldPVPReceipt
+		if err := tx.Where("player_id=? AND stamp=?", a.Row.Id, req.Stamp).First(&row).Error; err != nil {
+			if !errors.Is(err, gorm.ErrRecordNotFound) {
+				return err
+			}
+			rejected, found, e := ggoReadPVPRejection(tx, a.Row.Id, req.Stamp, opponent, hash)
+			if e != nil || !found {
+				return e
+			}
+			wire, e := proto.MarshalOptions{Deterministic: true}.Marshal(rejected)
+			if e != nil {
+				return e
+			}
+			out.Status, out.NativeResponse = "rejected", wire
+			return nil
+		}
+		if row.OpponentID != opponent || row.RequestHash != hash {
+			return ggoFieldError(constUtil.GGOFieldRequestConflict, "PK请求编号与原请求不一致")
+		}
+		var proof db.GGOFieldReceipt
+		if err := tx.Where("player_id=? AND business_key=? AND operation IN ?", a.Row.Id, row.FightID, []string{constUtil.GGOFieldOpPVPWin, constUtil.GGOFieldOpPVPLoss}).First(&proof).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return ggoFieldError(constUtil.GGOFieldRequestConflict, "请求编号不属于沙漠PK")
+			}
+			return err
+		}
+		if _, _, err := a.Service.p12FieldPVPReadReceipt(tx, &row); err != nil {
+			return err
+		}
+		out.Status, out.FightID, out.WinnerID, out.NativeResponse = "settled", row.FightID, row.WinnerID, append([]byte(nil), row.Response...)
+		// Native presentation leases use the realm game clock; return a real
+		// server-clock deadline so a device does not inherit its day offset.
+		remaining := row.BusyUntil - LocalPlayNow(tx.Statement.Context).UnixMilli()
+		if remaining > 0 && remaining <= constUtil.P12FieldPVPBusyMS {
+			out.PresentationUntilMS = out.ServerTimeMS + remaining
+		}
+		var ownState, peerState db.P12FieldPVPState
+		if err := tx.First(&ownState, "player_id=?", a.Row.Id).Error; err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+		if err := tx.First(&peerState, "player_id=?", opponent).Error; err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+		if a.Game.Position == nil || a.Game.Position.GetScene() != constUtil.GGOFieldScene || a.Game.Field == nil || a.Game.Field.Side == nil || ownState.LastFightID != row.FightID || ownState.BusyUntil != row.BusyUntil || peerState.LastFightID != row.FightID || peerState.BusyUntil != row.BusyUntil || remaining <= 0 || remaining > constUtil.P12FieldPVPBusyMS {
+			return nil
+		}
+		var peerRow db.Profile
+		if err := tx.First(&peerRow, "id=?", opponent).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return nil
+			}
+			return err
+		}
+		_, peerGame, err := decodeProfile(&peerRow)
+		if err != nil {
+			return err
+		}
+		if peerGame.Position == nil || peerGame.Position.GetScene() != constUtil.GGOFieldScene || peerGame.Field == nil || peerGame.Field.Side == nil {
+			return nil
+		}
+		at := LocalPlayNow(tx.Statement.Context)
+		ownSide, err := a.Service.ProjectP12FieldPVPSide(tx, a.Row.Id, a.Game.Field.Side, at)
+		if err != nil {
+			return err
+		}
+		peerSide, err := a.Service.ProjectP12FieldPVPSide(tx, opponent, peerGame.Field.Side, at)
+		if err != nil {
+			return err
+		}
+		out.ServerTimeMS = time.Now().UnixMilli()
+		remaining = row.BusyUntil - LocalPlayNow(tx.Statement.Context).UnixMilli()
+		if remaining <= 0 || remaining > constUtil.P12FieldPVPBusyMS {
+			return nil
+		}
+		out.PresentationUntilMS = out.ServerTimeMS + remaining
+		out.NativeState, err = proto.MarshalOptions{Deterministic: true}.Marshal(&pb.SCFieldPlayerState{Player: []*pb.PlayerSide{ownSide, peerSide}})
+		if err != nil {
+			return err
+		}
+		out.PresentationCurrent = true
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 // ggoPVPFinishReturn runs under the profile lock after the native animation lease.

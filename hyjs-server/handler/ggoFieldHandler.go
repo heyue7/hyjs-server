@@ -23,6 +23,7 @@ func init() {
 	routes.RegisterPostRouter("/ggo-field/extraction/cancel", wrapper.Wrapper(GGOFieldExtractionCancelHandler))
 	routes.RegisterPostRouter("/ggo-field/extraction/status", wrapper.Wrapper(GGOFieldExtractionStatusHandler))
 	routes.RegisterPostRouter("/ggo-field/pvp/receipt", wrapper.Wrapper(GGOFieldPVPReceiptHandler))
+	routes.RegisterPostRouter("/ggo-field/pvp/status", wrapper.Wrapper(GGOFieldPVPStatusHandler))
 	routes.RegisterPostRouter("/ggo-field/monster/receipt", wrapper.Wrapper(GGOFieldMonsterReceiptHandler))
 	routes.RegisterPostRouter("/ggo-field/monster/active", wrapper.Wrapper(GGOFieldMonsterActiveHandler))
 	routes.RegisterPostRouter("/ggo-field/monster/claim", wrapper.Wrapper(GGOFieldMonsterClaimHandler))
@@ -541,5 +542,32 @@ func GGOFieldPositionStatusHandler(c *gin.Context) error {
 	}
 	c.Header("Cache-Control", "no-store")
 	c.JSON(http.StatusOK, model.NewBizCodeData(result))
+	return nil
+}
+
+// GGOFieldPVPStatusHandler recovers the original committed PK response by stamp.
+// @Summary 查询沙漠PK原生回执
+// @Tags GGOField
+// @Accept json
+// @Produce json
+// @Param body body model.GGOFieldPVPStatusRequest true "角色、会话、原始请求和正stamp"
+// @Success 200 {object} model.GGOFieldPVPStatusResponse
+// @Router /ggo-field/pvp/status [post]
+func GGOFieldPVPStatusHandler(c *gin.Context) error {
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 2048)
+	var req model.GGOFieldPVPStatusRequest
+	if c.ShouldBindJSON(&req) != nil || gameService == nil || req.Stamp < 1 || len(req.NativeRequest) < 1 || len(req.NativeRequest) > 1024 {
+		return model.NewErrParamsError()
+	}
+	session, err := ggoFieldSession(req.GGOFieldAuth)
+	if err != nil {
+		return err
+	}
+	out, err := gameService.GGOFieldPVPStatus(c.Request.Context(), req, session)
+	if err != nil {
+		return err
+	}
+	c.Header("Cache-Control", "no-store")
+	c.JSON(http.StatusOK, model.NewBizCodeData(out))
 	return nil
 }

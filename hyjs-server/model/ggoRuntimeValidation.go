@@ -234,6 +234,13 @@ func validAdminGGOPlacement(g *AdminFieldGGOConfiguration) bool {
 	ids := map[string]bool{}
 	kinds := map[string]int64{}
 	levels := map[int64]int64{}
+	lowestLevel := int64(math.MaxInt64)
+	for _, tier := range r.MonsterTiers {
+		if tier.Level < lowestLevel {
+			lowestLevel = tier.Level
+		}
+	}
+	patrols := 0
 	for _, p := range r.Points {
 		if strings.TrimSpace(p.ID) == "" || strings.TrimSpace(p.ID) != p.ID || len(p.ID) > 64 || ids[p.ID] ||
 			(p.Kind != "monster" && p.Kind != "mine" && p.Kind != "fish" && p.Kind != "boss" && p.Kind != "exit") ||
@@ -253,9 +260,42 @@ func validAdminGGOPlacement(g *AdminFieldGGOConfiguration) bool {
 		if p.StandPosition != nil && !validAdminGGOPosition(p.StandPosition) || r.Enabled && p.Kind == "fish" && p.StandPosition == nil {
 			return false
 		}
+		if p.Patrol != nil {
+			if p.Kind != "monster" || p.Level != lowestLevel || math.IsNaN(p.Patrol.Speed) || math.IsInf(p.Patrol.Speed, 0) || p.Patrol.Speed <= 0 || p.Patrol.Speed > 50 || len(p.Patrol.Waypoints) > 32 || r.Enabled && len(p.Patrol.Waypoints) < 2 {
+				return false
+			}
+			var length float64
+			for i, waypoint := range p.Patrol.Waypoints {
+				if !validAdminGGOPosition(waypoint) {
+					return false
+				}
+				if i == 0 {
+					if p.Position != nil && math.Abs(*p.Position.X-*waypoint.X)+math.Abs(*p.Position.Y-*waypoint.Y)+math.Abs(*p.Position.Z-*waypoint.Z) > .001 {
+						return false
+					}
+					continue
+				}
+				prev := p.Patrol.Waypoints[i-1]
+				dx, dy, dz := *waypoint.X-*prev.X, *waypoint.Y-*prev.Y, *waypoint.Z-*prev.Z
+				segment := math.Sqrt(dx*dx + dy*dy + dz*dz)
+				if segment < .001 {
+					return false
+				}
+				length += segment
+			}
+			if length > 10000 || len(p.Patrol.Waypoints) == 1 {
+				return false
+			}
+			if len(p.Patrol.Waypoints) >= 2 {
+				patrols++
+			}
+		}
 	}
 	if !r.Enabled {
 		return true
+	}
+	if patrols < 4 {
+		return false
 	}
 	if kinds["mine"] != r.Resource.MineCount || kinds["fish"] != r.Resource.FishCount || kinds["boss"] != 1 || kinds["exit"] != 3 {
 		return false

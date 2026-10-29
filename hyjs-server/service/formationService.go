@@ -857,6 +857,11 @@ func (s *GameService) formationFightPower(player *pb.Player, g *model.GameState)
 	if err != nil {
 		return 0, err
 	}
+	return s.formationFightPowerFromParty(party)
+}
+
+// formationFightPowerFromParty reuses the current request's authoritative battle projection.
+func (s *GameService) formationFightPowerFromParty(party *pb.BattlePlayer) (int32, error) {
 	var total float64
 	for _, actor := range party.GetFormation() {
 		prop := actor.GetProp()

@@ -4,5 +4,7 @@ CREATE TABLE IF NOT EXISTS ggo_field_lines (
  revision BIGINT NOT NULL,
  payload LONGBLOB NOT NULL,
  updated_at BIGINT NOT NULL,
- PRIMARY KEY (server_id, line)
+ next_due_at BIGINT NOT NULL DEFAULT 0,
+ PRIMARY KEY (server_id, line),
+ KEY idx_ggo_lines_due (server_id, next_due_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

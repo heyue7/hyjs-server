@@ -37,6 +37,17 @@ func TestFieldEndOriginalZeroDefaults31(t *testing.T) {
 	if err = ValidateGameRequest(packet); err != nil {
 		t.Fatal("legitimate native loss closes TCP", err)
 	}
+	// The original engine reports MaxRound+1 on natural exhaustion.
+	for _, tc := range []struct {
+		round int32
+		valid bool
+	}{{40, true}, {41, true}, {42, false}} {
+		got.OptRecord.FinalRoundNum = proto.Int32(tc.round)
+		if (ValidateGameRequest(packet) == nil) != tc.valid {
+			t.Fatalf("round %d validation mismatch", tc.round)
+		}
+	}
+	got.OptRecord.FinalRoundNum = proto.Int32(9)
 	for _, bad := range []float64{-1, math.NaN(), math.Inf(1)} {
 		got.BattlePlayer.Formation[0].Inst.CurHp = proto.Float64(bad)
 		if ValidateGameRequest(packet) == nil {

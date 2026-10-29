@@ -89,10 +89,18 @@ type GGOFieldMonsterView struct {
 	HPRatio     float64                `json:"hpRatio"`
 	Available   bool                   `json:"available"`
 	RefreshAtMS int64                  `json:"refreshAtMs"`
+	Patrol      *GGOFieldPatrolView    `json:"patrol,omitempty"`
+}
+type GGOFieldPatrolView struct {
+	Waypoints  []*AdminFieldGGOPosition `json:"waypoints"`
+	Speed      float64                  `json:"speed"`
+	EpochMS    int64                    `json:"epochMs"`
+	PausedAtMS int64                    `json:"pausedAtMs"`
 }
 type GGOFieldBossView struct {
 	HeroID      string                 `json:"heroId"`
 	BossID      string                 `json:"bossId"`
+	Nature      int64                  `json:"nature"`
 	Level       int64                  `json:"level"`
 	WarningAtMS int64                  `json:"warningAtMs"`
 	Radius      float64                `json:"radius"`
@@ -213,13 +221,17 @@ type GGOFieldLeavePrepareResponse struct {
 	ExpiresAtMS int64  `json:"expiresAtMs"`
 }
 type GGOFieldLeaveStatusResponse struct {
-	RequestID   string                      `json:"requestId"`
-	Status      string                      `json:"status"`
-	Mode        string                      `json:"mode,omitempty"`
-	TargetScene string                      `json:"targetScene,omitempty"`
-	TargetLine  int32                       `json:"targetLine,omitempty"`
-	ExpiresAtMS int64                       `json:"expiresAtMs,omitempty"`
-	Settlement  *GGOFieldSettlementResponse `json:"settlement,omitempty"`
+	RequestID         string                      `json:"requestId"`
+	Status            string                      `json:"status"`
+	Mode              string                      `json:"mode,omitempty"`
+	TargetScene       string                      `json:"targetScene,omitempty"`
+	TargetLine        int32                       `json:"targetLine,omitempty"`
+	ExpiresAtMS       int64                       `json:"expiresAtMs,omitempty"`
+	Settlement        *GGOFieldSettlementResponse `json:"settlement,omitempty"`
+	NativeRequestHash string                      `json:"nativeRequestHash,omitempty"`
+	NativeResponse    []byte                      `json:"nativeResponse"`
+	PositionRevision  int64                       `json:"positionRevision,omitempty"`
+	TargetCurrent     bool                        `json:"targetCurrent"`
 }
 
 type GGOFieldExtractionStartResponse struct {
@@ -238,6 +250,28 @@ type GGOFieldExtractionStatusResponse struct {
 	CompletedAtMS    int64                  `json:"completedAtMs,omitempty"`
 	PositionRevision int64                  `json:"positionRevision,omitempty"`
 	Position         *AdminFieldGGOPosition `json:"position,omitempty"`
+}
+
+// PVPStatus recovers the original 30046 by the positive HTTP stamp chosen
+// before sending. Unknown never proves the request cannot still arrive.
+type GGOFieldPVPStatusRequest struct {
+	GGOFieldAuth
+	Stamp         int64  `json:"stamp" binding:"required"`
+	NativeRequest []byte `json:"nativeRequest" binding:"required"`
+}
+type GGOFieldPVPStatusResponse struct {
+	Status              string `json:"status"`
+	Stamp               int64  `json:"stamp"`
+	OpponentID          int64  `json:"opponentId"`
+	RequestHash         string `json:"requestHash"`
+	FightID             string `json:"fightId,omitempty"`
+	WinnerID            int64  `json:"winnerId,omitempty"`
+	NativeResponse      []byte `json:"nativeResponse,omitempty"`
+	NativeState         []byte `json:"nativeState,omitempty"`
+	ServerTimeMS        int64  `json:"serverTimeMs"`
+	PresentationUntilMS int64  `json:"presentationUntilMs,omitempty"`
+	PresentationCurrent bool   `json:"presentationCurrent"`
+	PositionRevision    int64  `json:"positionRevision,omitempty"`
 }
 
 type GGOFieldPVPReceiptRequest struct {

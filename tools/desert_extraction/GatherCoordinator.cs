@@ -187,7 +187,7 @@ namespace HYJS.DesertV4
                 try
                 {
                     JsonData receipt=result.data;
-                    if (Text(receipt["requestId"])!=attempt.Journal.claimRequestId || Text(receipt["startRequestId"])!=id || Text(receipt["attemptToken"])!=attempt.Journal.attemptToken) throw new InvalidOperationException("Claim receipt mismatch");
+                    if (!attempt.MatchesClaimReceipt(Text(receipt["requestId"]),Text(receipt["startRequestId"]),Text(receipt["attemptToken"]))) throw new InvalidOperationException("Claim receipt mismatch");
                     view.ApplyOriginalReceipt(receipt);
                     attempt.ClaimReceipt(Text(receipt["requestId"]),Text(receipt["startRequestId"]),Text(receipt["attemptToken"]));
                     Finished();

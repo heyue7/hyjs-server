@@ -183,7 +183,7 @@ func (s *GameService) ggoBossCurrent(tx *gorm.DB, cfg *model.AdminFieldGGOConfig
 }
 
 func (s *GameService) ggoBossSnapshotLocked(tx *gorm.DB, cfg *model.AdminFieldGGOConfiguration, now int64) (*model.GGOFieldBossView, error) {
-	row, event, _, hp, err := s.ggoBossCurrent(tx, cfg, now, false)
+	row, event, boss, hp, err := s.ggoBossCurrent(tx, cfg, now, false)
 	if err != nil {
 		return nil, err
 	}
@@ -195,5 +195,5 @@ func (s *GameService) ggoBossSnapshotLocked(tx *gorm.DB, cfg *model.AdminFieldGG
 	} else if row.KillerID > 0 {
 		state = "defeated"
 	}
-	return &model.GGOFieldBossView{Level: event.Boss.Level, WarningAtMS: event.StartsAtMS - event.Boss.WarningSeconds*1000, HeroID: event.Boss.HeroID, BossID: constUtil.GGOFieldBossID, Radius: event.Radius, PointID: event.PointID, EventID: event.ID, Position: event.Position, HP: int64(math.Ceil(hp[ggoBossGUID(event.ID)])), MaxHP: event.Boss.HP, StartsAtMS: event.StartsAtMS, EndsAtMS: event.EndsAtMS, State: state}, nil
+	return &model.GGOFieldBossView{Nature: int64(boss.GetNature()), Level: event.Boss.Level, WarningAtMS: event.StartsAtMS - event.Boss.WarningSeconds*1000, HeroID: event.Boss.HeroID, BossID: constUtil.GGOFieldBossID, Radius: event.Radius, PointID: event.PointID, EventID: event.ID, Position: event.Position, HP: int64(math.Ceil(hp[ggoBossGUID(event.ID)])), MaxHP: event.Boss.HP, StartsAtMS: event.StartsAtMS, EndsAtMS: event.EndsAtMS, State: state}, nil
 }

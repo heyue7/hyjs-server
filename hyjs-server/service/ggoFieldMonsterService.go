@@ -34,11 +34,15 @@ func ggoNativeProfileSession(tx *gorm.DB, id int64) (*db.Profile, error) {
 	return &row, nil
 }
 
-func ggoMonsterSide(node *ggoMonsterNode, point *model.AdminFieldGGOPoint) (*pb.SideMonster, error) {
+func ggoMonsterSide(node *ggoMonsterNode, point *model.AdminFieldGGOPoint, now int64) (*pb.SideMonster, error) {
 	if node == nil || point == nil {
 		return nil, errors.New("沙漠小怪点位缺失")
 	}
-	position, err := ggoWirePoint(point.Position)
+	shared, err := ggoPatrolPosition(node, point, now)
+	if err != nil {
+		return nil, err
+	}
+	position, err := ggoWirePoint(shared)
 	if err != nil {
 		return nil, err
 	}
@@ -78,10 +82,12 @@ func (s *GameService) ggoMonsterLineLocked(tx *gorm.DB, id int64, g *model.GameS
 }
 
 func (s *GameService) ggoMonsterCheckLocked(tx *gorm.DB, id int64, g *model.GameState, uuid string) (*pb.SCSideMonsterCheck, error) {
-	_, state, err := s.ggoMonsterLineLocked(tx, id, g, time.Now().UnixMilli())
+	now := time.Now().UnixMilli()
+	_, state, err := s.ggoMonsterLineLocked(tx, id, g, now)
 	if err != nil {
 		return nil, err
 	}
+	now = time.Now().UnixMilli()
 	result := &pb.SCSideMonsterCheck{Code: proto.Int32(2003), Monster: &pb.SideMonster{Uuid: proto.String(uuid), State: proto.Int32(3), CurHp: proto.Float64(0)}}
 	for i := range state.Monsters {
 		node := &state.Monsters[i]
@@ -93,11 +99,11 @@ func (s *GameService) ggoMonsterCheckLocked(tx *gorm.DB, id int64, g *model.Game
 			if point.ID != node.PointID {
 				continue
 			}
-			result.Monster, err = ggoMonsterSide(node, point)
+			result.Monster, err = ggoMonsterSide(node, point, now)
 			if err != nil {
 				return nil, err
 			}
-			if node.RefreshAtMS == 0 && (node.ReservedBy == 0 || node.ReservedBy == id) {
+			if node.RefreshAtMS == 0 && !ggoLegacyBlocked(state, node.PointID) && (node.ReservedBy == 0 || node.ReservedBy == id) {
 				result.Code = proto.Int32(1)
 			}
 			return result, nil
@@ -154,6 +160,8 @@ func (s *GameService) ggoMonsterStartLocked(tx *gorm.DB, id int64, player *pb.Pl
 	if err != nil {
 		return nil, err
 	}
+	// Position authority is evaluated after the potentially contended line lock.
+	now = time.Now().UnixMilli()
 	var node *ggoMonsterNode
 	for i := range state.Monsters {
 		if state.Monsters[i].UUID == b.GetMonsterId() {
@@ -161,7 +169,7 @@ func (s *GameService) ggoMonsterStartLocked(tx *gorm.DB, id int64, player *pb.Pl
 			break
 		}
 	}
-	if node == nil || node.ReservedBy != 0 || node.RefreshAtMS != 0 {
+	if node == nil || node.ReservedBy != 0 || node.RefreshAtMS != 0 || ggoLegacyBlocked(state, node.PointID) {
 		return nil, ggoFieldError(constUtil.GGOFieldBusy, "小怪已被占用或刷新")
 	}
 	var point *model.AdminFieldGGOPoint
@@ -174,7 +182,7 @@ func (s *GameService) ggoMonsterStartLocked(tx *gorm.DB, id int64, player *pb.Pl
 	if point == nil {
 		return nil, errors.New("沙漠小怪点位缺失")
 	}
-	side, err := ggoMonsterSide(node, point)
+	side, err := ggoMonsterSide(node, point, now)
 	if err != nil {
 		return nil, err
 	}
@@ -270,6 +278,9 @@ func (s *GameService) ggoMonsterStartLocked(tx *gorm.DB, id int64, player *pb.Pl
 	result := &pb.SCSidePveFightStart{FightId: proto.String(fightID), RandSeed: proto.Int64(frozen.Seed), BattlePlayer: frozen.Attacker, BattleMonsterList: []*pb.BattleMonster{frozen.Monster}, FightScene: proto.String(""), Code: proto.Int32(1), Maxround: proto.Int32(frozen.MaxRound)}
 	node.ReservedBy = id
 	node.FightID = fightID
+	if point.Patrol != nil {
+		node.PatrolPausedAtMS = now
+	}
 	// Zero means the in-flight reservation has no wall-clock expiry. A late
 	// accepted result must not consume a replacement generation.
 	node.ReservedUntilMS = 0
@@ -284,7 +295,11 @@ func (s *GameService) ggoMonsterStartLocked(tx *gorm.DB, id int64, player *pb.Pl
 	if math.IsNaN(heal) || math.IsInf(heal, 0) || heal <= 0 || heal > 1 {
 		return nil, errors.New("沙漠死亡返回恢复值无效")
 	}
-	g.GGOField.MonsterFight = &model.GGOFieldMonsterFight{FightID: fightID, MonsterUUID: node.UUID, PointID: node.PointID, Generation: node.Generation, ReservedUntilMS: node.ReservedUntilMS, Line: line.Line, Reward: reward, RewardNumerator: tier.RewardNumerator, RewardDenominator: tier.RewardDenominator, CooldownMS: tier.RespawnSeconds * 1000, Chips: chips, EconomyVersion: s.GGOFieldConfig.Runtime.EconomyVersion, ExchangeValues: values, ProtectedChips: s.GGOFieldConfig.Runtime.ProtectedChips, SafeReturn: s.GGOFieldConfig.Runtime.SafeReturn, HealRatio: heal}
+	deathLossPercent := int64(50)
+	if s.GGOFieldConfig.Rules.DeathLossPercent != nil {
+		deathLossPercent = *s.GGOFieldConfig.Rules.DeathLossPercent
+	}
+	g.GGOField.MonsterFight = &model.GGOFieldMonsterFight{FightID: fightID, MonsterUUID: node.UUID, DeploymentRevision: s.GGOFieldRevision, PointID: node.PointID, Generation: node.Generation, ReservedUntilMS: node.ReservedUntilMS, Line: line.Line, Reward: reward, RewardNumerator: tier.RewardNumerator, RewardDenominator: tier.RewardDenominator, CooldownMS: tier.RespawnSeconds * 1000, Chips: chips, EconomyVersion: s.GGOFieldConfig.Runtime.EconomyVersion, ExchangeValues: values, ProtectedChips: s.GGOFieldConfig.Runtime.ProtectedChips, DeathLossPercent: ggoInt64(deathLossPercent), SafeReturn: s.GGOFieldConfig.Runtime.SafeReturn, HealRatio: heal}
 	return result, nil
 }
 
@@ -349,6 +364,7 @@ func (s *GameService) ggoExpireMonsterFightLocked(tx *gorm.DB, id int64, g *mode
 	if json.Unmarshal(line.Payload, &shared) != nil {
 		return false, errors.New("沙漠场景状态损坏")
 	}
+	released := false
 	for i := range shared.Monsters {
 		node := &shared.Monsters[i]
 		if node.PointID == pending.PointID && node.Generation == pending.Generation && node.UUID == pending.MonsterUUID && node.ReservedBy == id && node.FightID == pending.FightID {
@@ -364,10 +380,17 @@ func (s *GameService) ggoExpireMonsterFightLocked(tx *gorm.DB, id int64, g *mode
 			node.ReservedBy = 0
 			node.FightID = ""
 			node.ReservedUntilMS = 0
+			node.PatrolEpochMS, node.PatrolPausedAtMS = now, 0
 			if err = ggoLineSave(tx, &line, &shared, now); err != nil {
 				return false, err
 			}
+			released = true
 			break
+		}
+	}
+	if !released && ggoReleaseLegacyBlock(&shared, pending.PointID, "monster", id, pending.FightID, pending.Generation) {
+		if err := ggoLineSave(tx, &line, &shared, now); err != nil {
+			return false, err
 		}
 	}
 	if g.Field != nil && g.Field.Fight != nil && g.Field.Fight.Start.GetFightId() == pending.FightID {

@@ -52,20 +52,22 @@ type GGOFieldPVPReturn struct {
 // GGOFieldMonsterFight freezes the public reservation and economic draw while
 // the original engine's compressed input is held by FieldFight.BossInputStored.
 type GGOFieldMonsterFight struct {
-	FightID           string                 `json:"fight_id"`
-	MonsterUUID       string                 `json:"monster_uuid"`
-	PointID           string                 `json:"point_id"`
-	Generation        int64                  `json:"generation"`
-	ReservedUntilMS   int64                  `json:"reserved_until_ms"`
-	Line              int64                  `json:"line"`
-	Reward            string                 `json:"reward"`
-	RewardNumerator   int64                  `json:"reward_numerator"`
-	RewardDenominator int64                  `json:"reward_denominator"`
-	CooldownMS        int64                  `json:"cooldown_ms"`
-	Chips             [6]int64               `json:"chips"`
-	EconomyVersion    string                 `json:"economy_version"`
-	ExchangeValues    [6]int64               `json:"exchange_values"`
-	ProtectedChips    int64                  `json:"protected_chips"`
-	SafeReturn        *AdminFieldGGOPosition `json:"safe_return"`
-	HealRatio         float64                `json:"heal_ratio"`
+	FightID            string                 `json:"fight_id"`
+	MonsterUUID        string                 `json:"monster_uuid"`
+	DeploymentRevision string                 `json:"deployment_revision,omitempty"`
+	PointID            string                 `json:"point_id"`
+	Generation         int64                  `json:"generation"`
+	ReservedUntilMS    int64                  `json:"reserved_until_ms"`
+	Line               int64                  `json:"line"`
+	Reward             string                 `json:"reward"`
+	RewardNumerator    int64                  `json:"reward_numerator"`
+	RewardDenominator  int64                  `json:"reward_denominator"`
+	CooldownMS         int64                  `json:"cooldown_ms"`
+	Chips              [6]int64               `json:"chips"`
+	EconomyVersion     string                 `json:"economy_version"`
+	ExchangeValues     [6]int64               `json:"exchange_values"`
+	ProtectedChips     int64                  `json:"protected_chips"`
+	DeathLossPercent   *int64                 `json:"death_loss_percent,omitempty"`
+	SafeReturn         *AdminFieldGGOPosition `json:"safe_return"`
+	HealRatio          float64                `json:"heal_ratio"`
 }

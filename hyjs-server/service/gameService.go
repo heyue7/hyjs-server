@@ -58,6 +58,9 @@ type GameService struct {
 	adminFieldRuntimeCache atomic.Pointer[adminFieldRuntimeSnapshot]
 	// 同一服务冷启动或发布后只构建一份覆盖表，避免并发请求重复分配整表。
 	adminFieldRuntimeBuild sync.Mutex
+	// ggoNoticeTimers coalesces public scene hints for each realm line.
+	ggoNoticeTimers  sync.Map
+	ggoNoticeStopped atomic.Bool
 	// ggoGatherTimers holds at most one deadline timer per active player.
 	ggoGatherTimers sync.Map
 	// ggoExtractionTimers holds at most one countdown timer per active player.
@@ -108,7 +111,12 @@ func GameError(code, text string) []proto.Message {
 // Dispatch 在已验证的协议请求上执行操作，只记录消息名和角色编号。
 func (s *GameService) Dispatch(ctx context.Context, request *model.GamePacket, peer string) []proto.Message {
 	if err := GuardP16UnavailableContent(request.Body); err != nil {
-		return GameError(constUtil.ErrGameRequest, err.Error())
+		transfer, desert := request.Body.(*pb.CSTransferScene)
+		// The published runtime and client/session are checked in fieldTransfer
+		// after authentication and after the request-local snapshot is loaded.
+		if !desert || transfer.GetTarget() != constUtil.GGOFieldScene || !s.ggoExtractionEnabled() {
+			return GameError(constUtil.ErrGameRequest, err.Error())
+		}
 	}
 	name := model.OpcodeNames[request.Opcode]
 	started := time.Now()

@@ -5,15 +5,16 @@ import pb "hyjs-server/model/protocol"
 // GGOFieldBossFight keeps only the active battle's event and death policy.
 // The canonical combat input stays in FieldFight's existing compressed payload.
 type GGOFieldBossFight struct {
-	InputHash      string                 `json:"input_hash"`
-	Boss           *pb.SideBoss           `json:"boss"`
-	EventID        string                 `json:"event_id"`
-	EndsAtMS       int64                  `json:"ends_at_ms"`
-	EconomyVersion string                 `json:"economy_version"`
-	ExchangeValues [6]int64               `json:"exchange_values"`
-	ProtectedChips int64                  `json:"protected_chips"`
-	SafeReturn     *AdminFieldGGOPosition `json:"safe_return"`
-	HealRatio      float64                `json:"heal_ratio"`
+	InputHash        string                 `json:"input_hash"`
+	Boss             *pb.SideBoss           `json:"boss"`
+	EventID          string                 `json:"event_id"`
+	EndsAtMS         int64                  `json:"ends_at_ms"`
+	EconomyVersion   string                 `json:"economy_version"`
+	ExchangeValues   [6]int64               `json:"exchange_values"`
+	ProtectedChips   int64                  `json:"protected_chips"`
+	DeathLossPercent *int64                 `json:"death_loss_percent,omitempty"`
+	SafeReturn       *AdminFieldGGOPosition `json:"safe_return"`
+	HealRatio        float64                `json:"heal_ratio"`
 }
 
 // GGOFieldBossActiveRequest authenticates a read of the current accepted fight.
@@ -37,7 +38,7 @@ type GGOFieldBossActiveResponse struct {
 
 // GGOFieldBossBattleReceipt preserves the exact native end reply and input binding.
 type GGOFieldBossBattleReceipt struct {
-	State            string   `json:"state"` // unknown, active or settled.
+	State            string   `json:"status"` // unknown, active or settled.
 	FightID          string   `json:"fightId"`
 	EventID          string   `json:"eventId,omitempty"`
 	InputHash        string   `json:"inputHash,omitempty"`
