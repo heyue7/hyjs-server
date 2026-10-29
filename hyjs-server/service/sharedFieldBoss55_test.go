@@ -33,7 +33,7 @@ func TestSharedFieldBoss55TwoPlayersDeadlineColdGenerationAndSingleKill(t *testi
 			t.Fatal(err)
 		}
 	}
-	run(func(tx *gorm.DB) error { return f.s.refreshSharedFieldBosses55(tx, a) })
+	run(func(tx *gorm.DB) error { return f.s.refreshSharedFieldBosses55(tx, f.id, a) })
 	boss := a.Field.Bosses[0]
 	monster, err := f.s.fieldBossMonster(boss.GetUuid(), a, boss)
 	if err != nil {
@@ -82,7 +82,7 @@ func TestSharedFieldBoss55TwoPlayersDeadlineColdGenerationAndSingleKill(t *testi
 	if due <= time.Now().UnixMilli() {
 		t.Fatal("missing deadline")
 	}
-	run(func(tx *gorm.DB) error { return f.s.refreshSharedFieldBosses55(tx, b) })
+	run(func(tx *gorm.DB) error { return f.s.refreshSharedFieldBosses55(tx, f.id, b) })
 	if b.Field.Bosses[0].GetUuid() != boss.GetUuid() || b.Field.RespawnAt[boss.GetUuid()] != due || b.Field.Bosses[0].GetState() != 3 {
 		t.Fatal("second player did not share death")
 	}
@@ -103,7 +103,7 @@ func TestSharedFieldBoss55TwoPlayersDeadlineColdGenerationAndSingleKill(t *testi
 		t.Fatal(err)
 	}
 	c := makeGame()
-	run(func(tx *gorm.DB) error { return cold.refreshSharedFieldBosses55(tx, c) })
+	run(func(tx *gorm.DB) error { return cold.refreshSharedFieldBosses55(tx, f.id, c) })
 	if c.Field.RespawnAt[boss.GetUuid()] != due {
 		t.Fatal("cold lost deadline")
 	}
@@ -113,7 +113,7 @@ func TestSharedFieldBoss55TwoPlayersDeadlineColdGenerationAndSingleKill(t *testi
 	c.Field.RespawnAt["monster-preserved"] = due
 	c.Field.BossHP["obsolete-boss"] = map[string]float64{}
 	c.Field.RespawnAt["obsolete-boss"] = due
-	run(func(tx *gorm.DB) error { return cold.refreshSharedFieldBosses55(tx, c) })
+	run(func(tx *gorm.DB) error { return cold.refreshSharedFieldBosses55(tx, f.id, c) })
 	if _, ok := c.Field.BossHP[boss.GetUuid()]; ok {
 		t.Fatal("old generation hp retained")
 	}
@@ -158,7 +158,7 @@ func TestSharedFieldBoss55OriginalEngineKillAndColdReceipt(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := updateProfileWithTx(f.ctx, f.id, func(tx *gorm.DB, _ *pb.Player, g *model.GameState) error {
-		return f.s.refreshSharedFieldBosses55(tx, g)
+		return f.s.refreshSharedFieldBosses55(tx, f.id, g)
 	}); err != nil {
 		t.Fatal(err)
 	}

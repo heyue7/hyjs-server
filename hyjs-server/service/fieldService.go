@@ -301,7 +301,7 @@ func (s *GameService) fieldTransfer(ctx context.Context, id int64, b *pb.CSTrans
 			if err := s.refreshField(id, g); err != nil {
 				return err
 			}
-			if err := s.refreshSharedFieldBosses55(tx, g); err != nil {
+			if err := s.refreshSharedFieldBosses55(tx, id, g); err != nil {
 				return err
 			}
 		}
@@ -346,7 +346,7 @@ func (s *GameService) fieldTransfer(ctx context.Context, id int64, b *pb.CSTrans
 			if err := s.refreshField(id, g); err != nil {
 				return err
 			}
-			if err := s.refreshSharedFieldBosses55(tx, g); err != nil {
+			if err := s.refreshSharedFieldBosses55(tx, id, g); err != nil {
 				return err
 			}
 		case constUtil.P13GuildRoomTarget:
@@ -466,7 +466,7 @@ func (s *GameService) fieldScene(ctx context.Context, id int64, login bool) ([]p
 			if err := s.refreshField(id, g); err != nil {
 				return err
 			}
-			if err := s.refreshSharedFieldBosses55(tx, g); err != nil {
+			if err := s.refreshSharedFieldBosses55(tx, id, g); err != nil {
 				return err
 			}
 			// 原客户端重连会重建野外房间，不会重放正在加载的小怪战斗。
@@ -604,7 +604,7 @@ func (s *GameService) fieldHeartbeat(ctx context.Context, id int64) ([]proto.Mes
 		if err := s.refreshField(id, g); err != nil {
 			return err
 		}
-		if err := s.refreshSharedFieldBosses55(tx, g); err != nil {
+		if err := s.refreshSharedFieldBosses55(tx, id, g); err != nil {
 			return err
 		}
 		if s.P8GatherReady {
@@ -878,7 +878,7 @@ func (s *GameService) fieldFightEnd(ctx context.Context, id int64, b *pb.CSSideP
 		if err := s.refreshField(id, g); err != nil {
 			return err
 		}
-		if err := s.refreshSharedFieldBosses55(tx, g); err != nil {
+		if err := s.refreshSharedFieldBosses55(tx, id, g); err != nil {
 			return err
 		}
 		if g.Field.Fight == nil || g.Field.Fight.Start.GetFightId() != b.GetFightId() {
@@ -906,7 +906,7 @@ func (s *GameService) fieldFightEnd(ctx context.Context, id int64, b *pb.CSSideP
 		if err := s.refreshField(id, g); err != nil {
 			return err
 		}
-		if err := s.refreshSharedFieldBosses55(tx, g); err != nil {
+		if err := s.refreshSharedFieldBosses55(tx, id, g); err != nil {
 			return err
 		}
 		monster := fieldFind(g, fight.MonsterUUID)

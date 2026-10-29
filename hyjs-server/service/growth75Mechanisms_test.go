@@ -100,7 +100,7 @@ func TestFieldRuntime75SharedDeathRuleBinding(t *testing.T) {
 	rule := model.AdminFieldBossGroup{DeathSettlement: true}
 	ruleRaw, _ := json.Marshal(rule)
 	if e := db.GetIns().Transaction(func(tx *gorm.DB) error {
-		bound, e := clone.freezeFieldBossDeath73(tx, "field_001", boss, map[string]string{"adminDeathRules73": string(ruleRaw)})
+		bound, e := clone.freezeFieldBossDeath73(tx, "field_001", 1, boss, map[string]string{"adminDeathRules73": string(ruleRaw)})
 		if e == nil && (bound == nil || !bound.DeathSettlement) {
 			t.Fatal("published death rule not bound")
 		}
