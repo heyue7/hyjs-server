@@ -1,6 +1,6 @@
 # 批84夺宝原引擎对照准备
 
-本入口固定十套 NPC 的真实 `BattlePlayer`、各自显示战力、Go 战斗结果与资格信息，另外固定一次 NPC 单战和一次扫荡子战的实际回执输入。原引擎宿主使用原 `SCFightTreasureStartResult`、目标碎片和 56011 对应的 type3 自动战斗入口。全部输入在测试导出后按 SHA-256 冻结，重复运行须使用新目录。
+本入口固定十套 NPC 的真实 `BattlePlayer`、各自显示战力、Go 战斗结果与资格信息，另外固定一次 NPC 单战和一次扫荡子战的实际回执输入。原引擎宿主使用原 `SCFightTreasureStartResult` 的初始战斗字段、目标碎片和 56011 对应的 type3 自动战斗入口。已结算单战/扫荡回包原始字节单独完整保留；宿主输入只投影其 fightId、roomId、seed、两侧队伍和 maxRound，不携带预设胜负、奖励或费用。全部输入在测试导出后按 SHA-256 冻结，重复运行须使用新目录。
 
 ## 运行前提
 
@@ -35,3 +35,7 @@ rtk proxy /Users/lirui/LR/hyjs/.analysis-venv/bin/python tools/plunder84/native_
 - `PlunderResultPage.AutoSweepCallback`（`0x0600515e`）先应用 `get` 和 `cost`，以首条 reward 的 `isGetFrag` 推进目标，再跳过本地已有片。`<SendAutoOnce>c__IteratorF6.MoveNext`（`0x060069d2`）等待后以当前目标、次数 1 及原补药勾选值发送下一个 `56009`。`UIPlayerData.AddSimpleItem`（`0x06003afe`）将 `frag_trea` 更新到 `UITreasureFrag.AddFrag`。相关 REA evidence：`ev_ac7e89dd0101ce1f33c7538efe25fa50577e6becdac5d2adf2459c5256b388a6`、`ev_e12d0bd2cfa3a86267b529bce06c1d9959c2dd4dcd7901a8227930e592812ad3`。
 - 普通单战的 `PlunderSelectPage.DoReopen`（`0x06005169`）清除旧候选并重新 `GetRivals`；`OnCoverPageRemove`（`0x0600516f`）发现已有目标片时关闭选择页。`HTTPManager.Tick` 先派发响应首帧给 callback，再将额外 `20102 SCPlayer` 帧交 `UIPlayerData.RefreshData`；静态证据 `ev_222c3ce8bb79a816dd3fd91f953e82d65d06fa24d2437692c6f85230cf68d64d`。
 - 待原机确认的显示风险：单战现有响应在战斗前附最终 `SCPlayer`，战斗结果 `Battle.BalanceBase.Refresh` 随后虚调用 `CopyBalance.AddBalanceReward`，其 type3 分支再次应用 `get`，其中 `coin` 分支调用 `AddCoin`。这可能让客户端暂时重复显示本次金币，数据库结算仍由原一次事务及回执约束。`BattleData.SetData` 的该重载与 `FightCallback` 未观察到应用 `cost`，因此单纯移除额外 `SCPlayer` 会影响能量显示。相关 REA evidence：`ev_bccec7699ba7945121873b650843b8a161608129f11fe3c05bdad32a6e04dad5`、`ev_578075cb0d997d96ff0dfff096b4a211bbae3f3f438317624533feb86189b21c`。客户端处理需通过原机、真实协议与资源同步共同验收。
+
+## 已结算回包的独立计算输入
+
+固定原宿主 `OriginalHeadlessPlaybackCaller.RunPlunderAutomatic` 拒绝预设 `isWin/isGetFrag/get/cost/reward/rewardFake1/rewardFake2`，以免把已知结果喂给独立计算。`prepare` 先核 `.actual-response.pb` 的完整摘要、规范字节及冻结身份/队伍，再构造仅含原始初始战斗字段的 `.plunder-start.bin`。两份字节分别固定摘要；完整业务回包不被改写，投影标签写入manifest。这只调整验证适配器，不改服务、原宿主、计算胜负或数值容差。

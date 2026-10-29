@@ -145,12 +145,21 @@ def prepare(exports, output):
         require(result["configurationHash"] == frozen["configurationHash"] == qualification["configurationHash"] and result["engineVersion"] == frozen["engineVersion"] == qualification["engineVersion"], name + ": source/qualification mismatch")
         require(result["outcome"]["authoritative"] and result["outcome"]["capabilityHash"] and qualification["actorCount"] == len(attacker.formation) + len(defender.formation), name + ": accepted type3 result missing")
         if ".actual-response.pb" in files:
-            callback_bytes = files[".actual-response.pb"].read_bytes()
+            accepted_bytes = files[".actual-response.pb"].read_bytes()
             callback = message("SCFightTreasureStartResult")
-            callback.ParseFromString(callback_bytes)
+            callback.ParseFromString(accepted_bytes)
             require(template["fightID"] == wire.fightid == callback.fightId and template["receiptResponseSHA256"] == sha(files[".actual-response.pb"]) and template["recordID"] and template["matchHash"], name + ": accepted fight identity mismatch")
             require(callback.randSeed == wire.randSeed and callback.maxRoundNum == wire.maxRound and len(callback.playerList) == 2 and callback.playerList[0].SerializeToString(deterministic=True) == attacker.SerializeToString(deterministic=True) and callback.playerList[1].SerializeToString(deterministic=True) == defender.SerializeToString(deterministic=True), name + ": accepted callback differs from frozen actors")
-            require(callback.SerializeToString(deterministic=True) == callback_bytes, name + ": accepted callback is not canonical")
+            require(callback.SerializeToString(deterministic=True) == accepted_bytes, name + ": accepted callback is not canonical")
+            require(callback.roomId == "map_arena_001", name + ": accepted room differs")
+            # Preserve the full accepted receipt below. Feed only its original
+            # initial combat fields to the independent host, whose typed caller
+            # rejects preset winners, rewards and costs before calculating.
+            initial = message("SCFightTreasureStartResult", fightId=callback.fightId, roomId=callback.roomId,
+                              randSeed=callback.randSeed, maxRoundNum=callback.maxRoundNum)
+            for player in callback.playerList:
+                initial.playerList.add().CopyFrom(player)
+            callback_bytes = initial.SerializeToString(deterministic=True)
         else:
             callback = message("SCFightTreasureStartResult", fightId=wire.fightid, roomId="map_arena_001", randSeed=wire.randSeed, maxRoundNum=20)
             callback.playerList.add().CopyFrom(attacker)
@@ -167,7 +176,8 @@ def prepare(exports, output):
             require(sha(source) == sha(destination), name + ": export changed while freezing")
             pins[destination.name] = sha(destination)
         pins[typed.name], pins[target.name] = sha(typed), sha(target)
-        rows.append({"case": name, "pins": pins, "template": template, "qualificationHash": qualification["mechanismHash"], "seed": wire.randSeed})
+        rows.append({"case": name, "pins": pins, "template": template, "qualificationHash": qualification["mechanismHash"], "seed": wire.randSeed,
+                     "typedInputProjection": "accepted-receipt-initial-combat-fields-only" if ".actual-response.pb" in files else "standalone-roster-initial-combat-fields"})
     manifest = {"schema": "hyjs-plunder84-frozen-native-input-v1", "source": SOURCE, "cases": rows,
                 "caseCount": len(rows), "numericTolerance": 0, "phoneCapture": False, "businessAuthority": False,
                 "sourceCodeSHA256": {path: sha(ROOT / path) for path in CODE_PATHS}, "goSourceTree": go_source_digest(),

@@ -59,7 +59,7 @@ func TestFeedback84WantedSignedHTTPRecoveryAndErrorCodes(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	for _, init := range []func(context.Context) error{s.InitializeGameplayPools, s.InitializeP1, s.InitializeP6, s.InitializeP4, s.InitializeP5, s.InitializeOpenServerActivity, s.InitializeDailyTasks, s.InitializeP12Wanted} {
+	for _, init := range []func(context.Context) error{s.InitializeGameplayPools, s.InitializeP1, s.InitializeP6, s.InitCooking, s.InitializeDailyCopy, s.InitializeP4, s.InitializeP5, s.InitializeOpenServerActivity, s.InitializeDailyTasks, s.InitializeP12Wanted} {
 		if err := init(ctx); err != nil {
 			t.Fatal(err)
 		}
