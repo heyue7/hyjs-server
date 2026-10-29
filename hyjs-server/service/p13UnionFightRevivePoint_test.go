@@ -44,6 +44,7 @@ func TestP13UnionFightRevivePointActualLiveNeutralCaptureContestEnemyColdGapAndI
 		t.Fatal("actual opposite roster missing")
 	}
 	captured := map[int64][]proto.Message{}
+	var mu sync.Mutex
 	for _, player := range []int64{id, ids[11], enemy} {
 		if _, err := f.s.p13UFFieldEnter(f.ctx, player, now()); err != nil {
 			t.Fatal(err)
@@ -56,7 +57,12 @@ func TestP13UnionFightRevivePointActualLiveNeutralCaptureContestEnemyColdGapAndI
 			t.Fatal(err)
 		}
 		p := player
-		t.Cleanup(f.s.RegisterP10Client(f.ctx, player, profile.Session, func(m proto.Message) error { captured[p] = append(captured[p], proto.Clone(m)); return nil }))
+		t.Cleanup(f.s.RegisterP10Client(f.ctx, player, profile.Session, func(m proto.Message) error {
+			mu.Lock()
+			defer mu.Unlock()
+			captured[p] = append(captured[p], proto.Clone(m))
+			return nil
+		}))
 		if _, err := f.s.SyncP13UnionFightField(f.ctx, player, false); err != nil {
 			t.Fatal(err)
 		}
@@ -103,19 +109,7 @@ func TestP13UnionFightRevivePointActualLiveNeutralCaptureContestEnemyColdGapAndI
 	if frame := read(); frame.GetCamp() != 2 || frame.GetLeftOccupyProgress() != 0 || frame.GetRightOccupyProgress() != 0 {
 		t.Fatal("first observation credited prior time", frame)
 	}
-	// 八个worker在相同边界仍只结算一次。广播收集加锁，使race验证真实并发业务。
-	var mu sync.Mutex
-	for _, player := range []int64{id, ids[11], enemy} {
-		var profile db.Profile
-		db.GetIns().First(&profile, player)
-		p := player
-		t.Cleanup(f.s.RegisterP10Client(f.ctx, player, profile.Session, func(m proto.Message) error {
-			mu.Lock()
-			defer mu.Unlock()
-			captured[p] = append(captured[p], proto.Clone(m))
-			return nil
-		}))
-	}
+	// 八个worker在相同边界仍只结算一次，广播从首次注册起就加锁收集。
 	clock.Store(first + 101000)
 	var group sync.WaitGroup
 	failures := make(chan error, 8)

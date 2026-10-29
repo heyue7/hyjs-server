@@ -120,8 +120,9 @@ func TestRedPointLatency62SelectionAndBatchAuthorization(t *testing.T) {
 	key := p10ClientKey{f.s, f.id}
 	defer p10ClientSinks.Delete(key)
 	points := []proto.Message{&pb.SCRedPoint{}, &pb.SCRedPoint{}}
+	validSession := append([]byte(nil), owner.Session...)
 	calls := 0
-	sink := &p10ClientSink{session: owner.Session, send: func(proto.Message) error { calls++; return nil }}
+	sink := &p10ClientSink{session: validSession, send: func(proto.Message) error { calls++; return nil }}
 	p10ClientSinks.Store(key, sink)
 	f.s.publishP10PrivateBatch(f.ctx, f.id, points)
 	if calls != 2 {
@@ -130,10 +131,14 @@ func TestRedPointLatency62SelectionAndBatchAuthorization(t *testing.T) {
 	if err := db.GetIns().Model(&owner).Update("session", []byte("rotated-session!")).Error; err != nil {
 		t.Fatal(err)
 	}
-	f.s.publishP10PrivateBatch(f.ctx, f.id, points)
-	if calls != 2 {
-		t.Fatal("rotated session received batch")
+	if err := authorizeP10Push(f.ctx, f.id, validSession); err == nil || err.Error() != "本地会话无效，请重新登录" {
+		t.Fatalf("rotation did not reject the old session: %v", err)
 	}
+	f.s.publishP10PrivateBatch(f.ctx, f.id, points)
+	if calls != 2 || sink.disconnectedAt.Load() == 0 {
+		t.Fatal("rotated session received batch or was not retired")
+	}
+	p10WaitRetired(t, key, sink)
 	// A current profile session still loses push rights when its account is disabled or revised.
 	if err := db.GetIns().AutoMigrate(&db.GameAccount{}); err != nil {
 		t.Fatal(err)
@@ -142,32 +147,42 @@ func TestRedPointLatency62SelectionAndBatchAuthorization(t *testing.T) {
 	if err := db.GetIns().Create(&account).Error; err != nil {
 		t.Fatal(err)
 	}
-	if err := db.GetIns().Model(&owner).Updates(map[string]any{"session": owner.Session, "account_id": account.ID, "account_auth_revision": int64(1)}).Error; err != nil {
+	if err := db.GetIns().Model(&owner).Updates(map[string]any{"session": validSession, "account_id": account.ID, "account_auth_revision": int64(1)}).Error; err != nil {
 		t.Fatal(err)
 	}
-	sink.session = owner.Session
+	if err := authorizeP10Push(f.ctx, f.id, validSession); err != nil {
+		t.Fatalf("valid account rejected: %v", err)
+	}
 	for _, change := range []map[string]any{{"enabled": false}, {"enabled": true, "auth_revision": int64(2)}} {
 		if err := db.GetIns().Model(&account).Updates(change).Error; err != nil {
 			t.Fatal(err)
 		}
+		sink = &p10ClientSink{session: validSession, send: func(proto.Message) error { calls++; return nil }}
 		p10ClientSinks.Store(key, sink)
-		f.s.publishP10PrivateBatch(f.ctx, f.id, points)
-		if calls != 2 {
-			t.Fatal("disabled/revised account received batch")
+		if err := authorizeP10Push(f.ctx, f.id, validSession); err == nil || err.Error() != "账号登录已失效，请重新登录" {
+			t.Fatalf("disabled/revised account was not rejected: %v", err)
 		}
+		f.s.publishP10PrivateBatch(f.ctx, f.id, points)
+		if calls != 2 || sink.disconnectedAt.Load() == 0 {
+			t.Fatal("disabled/revised account received batch or was not retired")
+		}
+		p10WaitRetired(t, key, sink)
 	}
 	if err := db.GetIns().Model(&account).Updates(map[string]any{"enabled": true, "auth_revision": int64(1)}).Error; err != nil {
 		t.Fatal(err)
 	}
+	if err := authorizeP10Push(f.ctx, f.id, validSession); err != nil {
+		t.Fatalf("restored account rejected: %v", err)
+	}
 	// Send failure preserves the previous stop/cleanup behavior.
-	sink.session = owner.Session
 	calls = 0
-	sink.send = func(proto.Message) error { calls++; return errors.New("closed fixture sink") }
+	sink = &p10ClientSink{session: validSession, send: func(proto.Message) error { calls++; return errors.New("closed fixture sink") }}
 	p10ClientSinks.Store(key, sink)
 	f.s.publishP10PrivateBatch(f.ctx, f.id, points)
-	if calls != 1 {
-		t.Fatal("send failure continued batch")
+	if calls != 1 || sink.disconnectedAt.Load() == 0 {
+		t.Fatal("send failure continued batch or was not retired")
 	}
+	p10WaitRetired(t, key, sink)
 }
 
 type latency62Pool struct {
