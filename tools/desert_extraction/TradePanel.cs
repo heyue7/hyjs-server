@@ -52,20 +52,6 @@ namespace HYJS.DesertV4
             int orderShift=checked((int)Math.Max(0L,(long)maxOrder-minOrder+1));
             foreach (UIPanel panel in upper)
             { panel.depth=checked(panel.depth+depthShift); panel.sortingOrder=checked(panel.sortingOrder+orderShift); }
-            int maxHit=Int32.MinValue,minHit=Int32.MaxValue;
-            foreach (UIWidget widget in back.GetComponentsInChildren<UIWidget>(true))
-                if (widget.enabled && widget.gameObject.activeInHierarchy) maxHit=Math.Max(maxHit,widget.raycastDepth);
-            foreach (UIWidget widget in front.GetComponentsInChildren<UIWidget>(true))
-                if (widget.enabled && widget.gameObject.activeInHierarchy) minHit=Math.Min(minHit,widget.raycastDepth);
-            if (maxHit==Int32.MinValue || minHit==Int32.MaxValue) throw new InvalidOperationException("Native modal widgets unavailable");
-            if (minHit<=maxHit)
-            {
-                int extra=checked((int)(((long)maxHit-minHit)/1000+1));
-                foreach (UIPanel panel in upper) panel.depth=checked(panel.depth+extra);
-            }
-            foreach (UIWidget widget in front.GetComponentsInChildren<UIWidget>(true))
-                if (widget.enabled && widget.gameObject.activeInHierarchy && widget.raycastDepth<=maxHit)
-                    throw new InvalidOperationException("Native modal hit ordering unavailable");
         }
         void RaiseConfirmation()
         {
@@ -75,7 +61,7 @@ namespace HYJS.DesertV4
             {
                 if (modal!=null) modal.SetActive(false);
                 BoxManager.CleanAllBox();
-                Debug.LogWarning("Trade confirmation: "+e.GetType().FullName);
+                Debug.LogWarning("Trade confirmation: "+e.GetType().FullName+": "+e.Message);
                 Notice("确认窗口暂不可用，请稍后重试");
             }
         }
@@ -158,7 +144,7 @@ namespace HYJS.DesertV4
                 if (instance==null) instance=Create();
                 instance.Render(q,owner,waiting);
             }
-            catch (Exception e) { Debug.LogWarning("Trade panel: "+e.GetType().FullName); Notice("交易界面暂不可用，请稍后重试"); }
+            catch (Exception e) { Debug.LogWarning("Trade panel: "+e.GetType().FullName+": "+e.Message); Notice("交易界面暂不可用，请稍后重试"); }
         }
         public static void CloseLocal()
         {
@@ -227,7 +213,7 @@ namespace HYJS.DesertV4
                 foreach (UIWidget widget in amountRoot.GetComponentsInChildren<UIWidget>(true)) widget.depth+=100;
                 amountRoot.SetActive(true); RaiseAbove(amountRoot,root);
             }
-            catch (Exception e) { Debug.LogWarning("Trade quantity: "+e.GetType().FullName); CloseAmount(); Notice("数量窗口暂不可用"); }
+            catch (Exception e) { Debug.LogWarning("Trade quantity: "+e.GetType().FullName+": "+e.Message); CloseAmount(); Notice("数量窗口暂不可用"); }
         }
         void BindStep(GameObject button,int delta)
         {
