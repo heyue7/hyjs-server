@@ -107,3 +107,19 @@ services:
 候选CLI成功之后才新鲜导出活动原数据；用同一制品中的 `growth75_activity_patch.py` 生成带原值CAS的SQL，在一个utf8mb4 MySQL连接内执行。私有 `backups/growth75-*/manifest.json` 记录本轮加密备份、快照/SQL摘要、修改条数和结果。任一CAS失败时，未提交事务随连接关闭回滚，应用保持停止；此前CLI已提交的领域步骤保留审计，可核对证据后重试。脚本不会自动恢复整个数据库或自动开服。维护服务恢复运行仅用于健康检查，开服由后台人工执行。
 
 本地脚本编排检查：`python3 -m unittest discover -s deploy -p test_growth75_activation.py`，不连接SSH、Docker或数据库。实际区服核账和原协议验收另行执行。
+
+## 试炼 82 维护投放
+
+从已审核的干净提交执行现有部署入口，指定完整的当前线上提交：
+
+```bash
+bash deploy_test.sh --revision <候选提交> --expected-live-revision <完整当前提交> --apply-trial82
+# 同批更新已审核的沙漠入口规则，仅针对已有本项目 ingress
+bash deploy_test.sh --revision <候选提交> --expected-live-revision <完整当前提交> --apply-trial82 --update-ingress
+```
+
+`--apply-trial82` 仅允许已有环境，禁止与首次 `--provision`、初始导库、钱包迁移、显式 `--warm-rush-history-player`、日历恢复及其他投放参数混用。既有 `--warm-rush-history-all` 发布门禁仍会执行：候选程序不监听网络，按有界事务重验过期派生证明，不改资源、进度和回执。`--update-ingress` 可与本次投放同批使用；远端要求已有本项目站点配置及其启用链接，检查 Nginx 后只在配置变更时重载。该参数不执行首次基础设施或入口创建。
+
+脚本先确认维护状态、建立私密试炼投放 manifest 并停应用，完成本轮加密备份和认证校验后执行候选程序的显式 `--apply-trial82`。manifest 保存候选程序与备份摘要、目标提交及阶段状态。备份校验、候选命令、启动、健康检查或中断失败时，守卫保持应用停止并记录失败；若停止命令失败会明确报错。保留备份和证据，核查后重试，不自动恢复数据库。成功记录部署前也会复核维护状态，正常启动不自动执行试炼投放；维护解除沿用现有流程。SIGHUP、SIGTERM 和键盘中断可触发进程内守卫；SIGKILL 或宿主机断电无法执行该守卫，恢复前需检查服务状态和私密 manifest。
+
+本地编排检查：`python3 -m unittest discover -s deploy -p test_trial82_activation.py`。该检查使用本地夹具，不连接 SSH、Docker 或数据库；实际发布和区服验收另行完成。

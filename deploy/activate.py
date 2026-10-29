@@ -26,6 +26,7 @@ parser.add_argument('--apply-feedback78', action='store_true', help='Apply the r
 parser.add_argument('--apply-feedback79', action='store_true', help='Apply the reviewed feedback79 configuration under maintenance')
 parser.add_argument('--apply-feedback80', action='store_true', help='Apply the reviewed feedback80 configuration under maintenance')
 parser.add_argument('--apply-feedback81', action='store_true', help='Apply the reviewed feedback81 configuration under maintenance')
+parser.add_argument('--apply-trial82', action='store_true', help='Apply the reviewed trial82 configuration under maintenance')
 parser.add_argument('--apply-growth75', action='store_true')
 parser.add_argument('--restore-activity-calendar')
 parser.add_argument('--warm-rush-history-player', action='append', type=int, default=[])
@@ -33,8 +34,8 @@ args = parser.parse_args()
 if args.restore_activity_calendar:
     import uuid
     assert str(uuid.UUID(args.restore_activity_calendar)) == args.restore_activity_calendar
-    assert args.expected_live_revision and not any((args.initial_db, args.migrate_role_wallets, args.apply_growth74, args.apply_growth75, args.apply_activity77, args.apply_feedback78, args.apply_feedback79, args.apply_feedback80, args.apply_feedback81)), 'Calendar restore requires a standalone maintenance cutover'
-assert sum((args.apply_growth74, args.apply_growth75, args.apply_activity77, args.apply_feedback78, args.apply_feedback79, args.apply_feedback80, args.apply_feedback81)) <= 1, 'Choose one explicit maintenance deployment version'
+    assert args.expected_live_revision and not any((args.initial_db, args.migrate_role_wallets, args.apply_growth74, args.apply_growth75, args.apply_activity77, args.apply_feedback78, args.apply_feedback79, args.apply_feedback80, args.apply_feedback81, args.apply_trial82)), 'Calendar restore requires a standalone maintenance cutover'
+assert sum((args.apply_growth74, args.apply_growth75, args.apply_activity77, args.apply_feedback78, args.apply_feedback79, args.apply_feedback80, args.apply_feedback81, args.apply_trial82)) <= 1, 'Choose one explicit maintenance deployment version'
 if args.apply_activity77:
     assert args.expected_live_revision and not args.initial_db and not args.migrate_role_wallets, 'Activity77 requires a pinned maintenance cutover'
 if args.apply_growth75:
@@ -51,6 +52,9 @@ if args.apply_feedback80:
 if args.apply_feedback81:
     assert args.expected_live_revision and re.fullmatch(r'[0-9a-f]{40,64}', args.expected_live_revision), 'Feedback81 requires an exact live revision'
     assert not any((args.initial_db, args.provision_ingress, args.migrate_role_wallets, args.warm_rush_history_player)), 'Feedback81 requires a standalone maintenance cutover'
+if args.apply_trial82:
+    assert args.expected_live_revision and re.fullmatch(r'(?:[0-9a-f]{40}|[0-9a-f]{64})', args.expected_live_revision), 'Trial82 requires an exact live revision'
+    assert not any((args.initial_db, args.migrate_role_wallets, args.warm_rush_history_player)), 'Trial82 requires an existing standalone maintenance cutover'
 os.umask(0o077)
 stage = Path(args.stage).resolve()
 ROOT = stage.parent.parent
@@ -121,6 +125,11 @@ def backup_existing_database():
 for name, digest in manifest['files'].items():
     path = stage / name
     assert path.resolve().is_relative_to(stage) and sha(path) == digest, name
+if args.apply_trial82:
+    assert 'trial82_activation.py' in manifest['files'], 'Trial82 activation missing from verified artifact'
+    if args.provision_ingress:
+        import trial82_activation
+        trial82_activation.require_existing_ingress(Path('/etc/nginx/sites-available/hyjs-test.conf'), Path('/etc/nginx/sites-enabled/hyjs-test.conf'))
 if not args.provision_ingress:
     assert Path('/etc/nginx/sites-enabled/hyjs-test.conf').read_bytes() == (stage / 'nginx.conf').read_bytes(), 'Ingress differs; explicit provision-ingress required'
 if (ROOT / 'migration.json').exists():
@@ -169,7 +178,7 @@ if args.restore_activity_calendar:
     compose('run', '--rm', '--no-deps', '-T', 'app', '--env', 'test', '--tables', '/app/tables', '--calendar-maintenance', 'begin', '--log-file', '/app/logs/calendar-maintenance.log')
     assert mysql('SELECT maintenance FROM client_update_policy WHERE id=1;').strip() == '1'
     compose('stop', '-t', '30', 'app')
-if args.apply_growth74 or args.apply_growth75 or args.apply_activity77 or args.apply_feedback78 or args.apply_feedback79 or args.apply_feedback80 or args.apply_feedback81:
+if args.apply_growth74 or args.apply_growth75 or args.apply_activity77 or args.apply_feedback78 or args.apply_feedback79 or args.apply_feedback80 or args.apply_feedback81 or args.apply_trial82:
     assert args.expected_live_revision and not args.initial_db
     assert mysql('SELECT maintenance FROM client_update_policy WHERE id=1;').strip() == '1', 'Growth apply requires maintenance'
     if args.apply_feedback78:
@@ -194,6 +203,14 @@ if args.apply_growth74 or args.apply_growth75 or args.apply_activity77 or args.a
         feedback81_guard = feedback81_activation.Feedback81CutoverGuard(compose)
         atexit.register(feedback81_guard.stop_if_unfinished)
         feedback81_guard.install_signal_handlers()
+    if args.apply_trial82:
+        import trial82_activation
+        trial82_guard = trial82_activation.Trial82CutoverGuard(
+            compose, ROOT / 'backups', manifest['revision'], manifest['files']['app/hyjs-server'], args.expected_live_revision)
+        atexit.register(trial82_guard.stop_if_unfinished)
+        trial82_guard.install_signal_handlers()
+        trial82_guard.prepare()
+        assert (ROOT / 'migration.json').is_file() and not (ROOT / 'migration.json').is_symlink(), 'Trial82 requires an existing database'
     compose('stop', '-t', '30', 'app')
 if args.migrate_role_wallets:
     assert args.expected_live_revision and not args.initial_db and (ROOT / 'migration.json').exists()
@@ -334,6 +351,12 @@ if args.apply_feedback81:
     except Exception:
         raise RuntimeError('Feedback81 failed under maintenance. App remains stopped; preserve the authenticated backup and private feedback81 manifest for inspection; do not automatically restore the database.') from None
 
+if args.apply_trial82:
+    try:
+        manifest['trial82Applied'] = trial82_activation.activate_trial82(mysql, compose, trial82_guard, verified_backup)
+    except Exception:
+        raise RuntimeError('Trial82 failed under maintenance. The stop guard will attempt to keep the app stopped; preserve the authenticated backup and private trial82 manifest for inspection; do not automatically restore the database.') from None
+
 if args.restore_activity_calendar:
     import calendar_restore_activation
     try:
@@ -353,9 +376,11 @@ for _ in range(90):
 else:
     if args.migrate_role_wallets or args.apply_activity77 or args.apply_feedback78 or args.apply_feedback79 or args.apply_feedback80 or args.apply_feedback81:
         compose('stop', '-t', '30', 'app')
+    elif args.apply_trial82:
+        compose('stop', '-t', '30', 'app')
     raise SystemExit('Application health failed; data and prior deployed.json preserved. Fix/retry this script, or deploy its recorded Git commit from a clean checkout; do not restore the database automatically.')
 
-if args.apply_activity77 or args.apply_feedback78 or args.apply_feedback79 or args.apply_feedback80 or args.apply_feedback81:
+if args.apply_activity77 or args.apply_feedback78 or args.apply_feedback79 or args.apply_feedback80 or args.apply_feedback81 or args.apply_trial82:
     try:
         assert mysql('SELECT maintenance FROM client_update_policy WHERE id=1;').strip() == '1', 'Maintenance changed after health check'
     except Exception:
@@ -373,6 +398,8 @@ if wallet_baseline is not None:
 
 if args.provision_ingress:
     destination = Path('/etc/nginx/sites-available/hyjs-test.conf')
+    if args.apply_trial82:
+        trial82_activation.require_existing_ingress(destination, Path('/etc/nginx/sites-enabled/hyjs-test.conf'))
     desired = (stage / 'nginx.conf').read_bytes()
     changed = not destination.exists() or destination.read_bytes() != desired
     destination.write_bytes(desired)
@@ -411,4 +438,6 @@ if args.apply_feedback80:
     feedback80_guard.complete = True
 if args.apply_feedback81:
     feedback81_guard.complete = True
+if args.apply_trial82:
+    trial82_guard.complete = True
 print(json.dumps({'status': 'DEPLOYED', 'revision': installed, 'binarySHA256': manifest['files']['app/hyjs-server']}))
