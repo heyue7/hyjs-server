@@ -58,6 +58,7 @@ func run() error {
 		applyFeedback78     = flag.Bool("apply-feedback78", false, "apply the reviewed feedback78 configuration during maintenance, then exit")
 		applyFeedback79     = flag.Bool("apply-feedback79", false, "apply the reviewed feedback79 wheel and membership configuration during maintenance, then exit")
 		applyFeedback80     = flag.Bool("apply-feedback80", false, "apply the reviewed feedback80 pet recruit configuration during maintenance, then exit")
+		applyTrial82        = flag.Bool("apply-trial82", false, "apply reviewed trial shop and point economy during maintenance, then exit")
 		applyFeedback81     = flag.Bool("apply-feedback81", false, "apply the reviewed feedback81 three day login configuration during maintenance, then exit")
 		restoreVIP10        = flag.Bool("restore-vip10-book", false, "restore the audited VIP10 book product during maintenance, then exit")
 		previewCalendar     = flag.Bool("preview-activity-calendar", false, "read the activity calendar restore candidate as JSON, then exit")
@@ -69,7 +70,7 @@ func run() error {
 	)
 	flag.Parse()
 	maintenanceCommands := 0
-	for _, selected := range []bool{*applyGrowth, *applyGrowth75, *applyActivity77, *applyFeedback78, *applyFeedback79, *applyFeedback80, *applyFeedback81, *restoreVIP10, *warmRushPlayer != 0, *warmRushAll, *previewCalendar, *restoreCalendar != "", *calendarMaintenance != ""} {
+	for _, selected := range []bool{*applyGrowth, *applyGrowth75, *applyActivity77, *applyFeedback78, *applyFeedback79, *applyFeedback80, *applyFeedback81, *applyTrial82, *restoreVIP10, *warmRushAll, *warmRushPlayer != 0, *previewCalendar, *restoreCalendar != "", *calendarMaintenance != ""} {
 		if selected {
 			maintenanceCommands++
 		}
@@ -138,7 +139,7 @@ func run() error {
 	case "mysql":
 		mc := config.AppConfigIns.MysqlConfig
 		connect := db.InitGameMySQL
-		if *previewCalendar || *restoreCalendar != "" || *calendarMaintenance != "" || *restoreVIP10 || *applyFeedback78 || *applyFeedback79 || *applyFeedback80 || *applyFeedback81 {
+		if *previewCalendar || *restoreCalendar != "" || *calendarMaintenance != "" || *restoreVIP10 || *applyFeedback78 || *applyFeedback79 || *applyFeedback80 || *applyFeedback81 || *applyTrial82 {
 			connect = db.InitExistingGameMySQL
 		}
 		if err := connect(ctx, db.MySQLConfig{Host: mc.Host, User: mc.User, Password: mc.Pass, Database: mc.DbName}); err != nil {
@@ -157,9 +158,9 @@ func run() error {
 	}
 	defer sqlDB.Close()
 	s := &service.GameService{Host: cfg.AdvertiseHost, ServerID: cfg.ServerID, GGOIntegrationReady: *ggoIntegration}
-	if *applyFeedback78 || *applyFeedback79 || *applyFeedback80 || *applyFeedback81 {
+	if *applyFeedback78 || *applyFeedback79 || *applyFeedback80 || *applyFeedback81 || *applyTrial82 {
 		// 仅使用既有管理员及全服日历；业务事务内部复核维护、管理员和时钟。
-		if *applyFeedback79 || *applyFeedback80 || *applyFeedback81 {
+		if *applyFeedback79 || *applyFeedback80 || *applyFeedback81 || *applyTrial82 {
 			// 会员原奖励可能包含道具；加载静态目录供既有策略校验，不启动游戏。
 			if err = s.LoadTables(cfg.Tables); err != nil {
 				return err
@@ -175,6 +176,9 @@ func run() error {
 		}
 		ctx = context.WithValue(ctx, constUtil.AdminServerScopeContextKey, s.OriginalServerID())
 		s.ServerClockReady = true
+		if *applyTrial82 {
+			return s.ApplyTrial82Config(ctx, &model.AdminPrincipal{UserID: user.ID, Username: user.Username, Role: user.Role})
+		}
 		if *applyFeedback81 {
 			return s.ApplyFeedback81Config(ctx, &model.AdminPrincipal{UserID: user.ID, Username: user.Username, Role: user.Role})
 		}

@@ -52,6 +52,7 @@ func (p p4Product) isEnabled() bool {
 type p4CommerceRules struct {
 	RefreshEnabled      *bool       `json:"refreshEnabled,omitempty"`
 	MemoryPolicyVersion int         `json:"memoryPolicyVersion,omitempty"`
+	TrialRefreshVersion int         `json:"trialRefreshVersion,omitempty"`
 	LiveEditable        bool        `json:"liveEditable,omitempty"`
 	Products            []p4Product `json:"products"`
 	RankPublishedAt     int64       `json:"rankPublishedAt,omitempty"`
@@ -74,6 +75,8 @@ type p4CommerceProgress struct {
 	FreeAt       int64            `json:"freeAt"`
 	ResourceUsed int32            `json:"resourceUsed"`
 	DiscountBps  int32            `json:"discountBps"`
+	trialRow     *db.P4CommerceState
+	trial        *trialRefresh82State
 }
 
 func p4BaseProduct(id, reward, cost string, index, level int32) p4Product {
@@ -250,6 +253,17 @@ func (s *GameService) validateP4Commerce(cfg db.P4CommerceRule) (p4CommerceRules
 				return rules, err
 			}
 		}
+		if trialRefresh82Enabled(cfg, rules) && len(p.QuantityTiers) > 0 {
+			group, err := s.trialRefresh82Group(p)
+			if err != nil {
+				return rules, err
+			}
+			if group == 1 {
+				if err := s.trialRefresh82ValidateTiers(p); err != nil {
+					return rules, err
+				}
+			}
+		}
 		if p.TierID {
 			if _, err = s.p4TierCost(p.ID, 1, p.DailyLimit); err != nil {
 				return rules, err
@@ -264,6 +278,14 @@ func (s *GameService) validateP4Commerce(cfg db.P4CommerceRule) (p4CommerceRules
 			return rules, err
 		}
 
+	}
+	if trialRefresh82Enabled(cfg, rules) {
+		if rules.Slots != constUtil.TrialRefresh82Slots {
+			return rules, errors.New("试炼商店固定六个商品位")
+		}
+		if err := s.validateShopRefreshSettings("memory", shopP4RefreshSettings("memory", rules)); err != nil {
+			return rules, err
+		}
 	}
 	for _, bps := range rules.Discounts {
 		if bps < 1 || bps > 10000 {
@@ -488,6 +510,12 @@ func (s *GameService) loadP4Commerce(tx *gorm.DB, id int64, key string, shopType
 			}
 		}
 		_ = memoryProducts55(cfg, rules, state) // Capture legacy fixed quotes before the query saves state.
+		if trialRefresh82Enabled(cfg, rules) {
+			state.trialRow, state.trial, err = s.trialRefresh82Load(tx, id, cfg, rules, now)
+			if err != nil {
+				return cfg, rules, nil, nil, err
+			}
+		}
 		return cfg, rules, row, state, nil
 	}
 	return cfg, rules, nil, nil, constUtil.ErrP4CommerceNotOpen
@@ -616,13 +644,25 @@ func (s *GameService) p4Projection(tx *gorm.DB, p *pb.Player, cfg db.P4CommerceR
 			return nil, nil, err
 		}
 	}
-	for _, product := range memoryProducts55(cfg, rules, state) {
+	offers := memoryProducts55(cfg, rules, state)
+	if state.trial != nil {
+		var err error
+		offers, err = s.trialRefresh82Products(rules, state.trial)
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+	for _, product := range offers {
 		if shopHasDirectStamina(product.Rewards) || !p4Visible(cfg, state, product) {
 			continue
 		}
 		key := p4SlotKey(cfg, state, product)
 		bought := state.Bought[key]
-		if state.Total[memorySource55(product)] < 0 {
+		trialSlot := trialRefresh82Slot(state.trial, product.ID)
+		if trialSlot {
+			bought = state.trial.Bought[product.ID]
+		}
+		if !trialSlot && state.Total[memorySource55(product)] < 0 {
 			return nil, nil, errors.New("商品总限购存档无效")
 		}
 		if bought < 0 || !rules.LiveEditable && bought > product.DailyLimit {
@@ -637,11 +677,13 @@ func (s *GameService) p4Projection(tx *gorm.DB, p *pb.Player, cfg db.P4CommerceR
 			left = min(left, int32(remaining))
 		}
 		allLeft := int32(math.MaxInt32)
-		if product.TotalLimit > 0 {
+		if trialSlot {
+			allLeft = max(int32(0), 1-bought)
+		} else if product.TotalLimit > 0 {
 			allLeft = product.TotalLimit - state.Total[memorySource55(product)]
 			left = min(left, allLeft)
 		}
-		if lifetime != nil {
+		if lifetime != nil && !trialSlot {
 			allLeft = min(allLeft, max(int32(0), 1-lifetime.Total[memorySource55(product)]))
 			left = min(left, allLeft)
 		}
@@ -703,11 +745,15 @@ func (s *GameService) p4Projection(tx *gorm.DB, p *pb.Player, cfg db.P4CommerceR
 		}
 		priority := product.Priority
 		if cfg.ShopType == 5 {
-			priority = s.pointShop48Priority(priority, rewards)
+			if state.trial != nil {
+				priority = s.trialRefresh82Priority(priority, rewards)
+			} else {
+				priority = s.pointShop48Priority(priority, rewards)
+			}
 		}
 		shopCanBuy := max(int32(0), can)
 		// The original trial item uses 2 for the purchased state, not 0.
-		if lifetime != nil && lifetime.Total[memorySource55(product)] >= 1 {
+		if trialSlot && bought >= 1 || lifetime != nil && !trialSlot && lifetime.Total[memorySource55(product)] >= 1 {
 			shopCanBuy = 2
 		}
 		// 原悬赏积分商品将canBuy作为状态枚举，剩余数量继续由dayLeftTimes携带。
@@ -1061,13 +1107,23 @@ func (s *GameService) p4Commerce(ctx context.Context, id int64, request proto.Me
 			}
 			response = &pb.SCMysticDiscount{Discount: proto.Float64(float64(state.DiscountBps) / 10000)}
 		} else if refresh {
-			if cfg.Kind != "memory" || p.GetLevel() < 16 || !shopRefreshEnabled(rules.RefreshEnabled, true) {
+			trial := state.trial != nil
+			if trial && (p.GetLevel() < constUtil.TrialRefresh82MinLevel || !shopRefreshEnabled(rules.RefreshEnabled, true)) {
+				return errors.New("试炼商店刷新未解锁")
+			}
+			if !trial && (cfg.Kind != "memory" || p.GetLevel() < 16 || !shopRefreshEnabled(rules.RefreshEnabled, true)) {
 				return errors.New("回忆圣坛刷新未解锁")
 			}
-			if state.FreeLeft > 0 {
-				state.FreeLeft--
+			freeLeft := &state.FreeLeft
+			resourceUsed := &state.ResourceUsed
+			if trial {
+				freeLeft = &state.trial.FreeLeft
+				resourceUsed = &state.trial.ResourceUsed
+			}
+			if *freeLeft > 0 {
+				*freeLeft--
 			} else {
-				if state.ResourceUsed >= rules.ResourceRefreshCap {
+				if *resourceUsed >= rules.ResourceRefreshCap {
 					return errors.New("今日资源刷新次数已耗尽")
 				}
 				cost = nil
@@ -1086,10 +1142,14 @@ func (s *GameService) p4Commerce(ctx context.Context, id int64, request proto.Me
 				if err = s.p4Deduct(tx, id, p, g, cost, source, now); err != nil {
 					return err
 				}
-				state.ResourceUsed++
+				*resourceUsed++
 			}
-			state.Version++
-			err = memoryRefresh55(rules, state)
+			if trial {
+				err = s.trialRefresh82Draw(cfg, rules, state.trial)
+			} else {
+				state.Version++
+				err = memoryRefresh55(rules, state)
+			}
 			if err != nil {
 				return err
 			}
@@ -1099,6 +1159,12 @@ func (s *GameService) p4Commerce(ctx context.Context, id int64, request proto.Me
 			}
 			var selected *p4Product
 			offers := memoryProducts55(cfg, rules, state)
+			if state.trial != nil {
+				offers, err = s.trialRefresh82Products(rules, state.trial)
+				if err != nil {
+					return err
+				}
+			}
 			for i := range offers {
 				product := &offers[i]
 				if (productID != "" && product.ID == productID) || (index > 0 && product.Index == index) {
@@ -1111,19 +1177,23 @@ func (s *GameService) p4Commerce(ctx context.Context, id int64, request proto.Me
 			}
 			var lifetimeRow *db.P4CommerceState
 			var lifetime *p4CommerceProgress
+			trialSlot := trialRefresh82Slot(state.trial, selected.ID)
 			if cfg.Kind == "point" {
 				var stars int32
 				lifetimeRow, lifetime, stars, err = loadPointShopLifetime(tx, id)
 				if err != nil {
 					return err
 				}
-				if stars < pointShopRequiredStars(*selected) || count != 1 || lifetime.Total[memorySource55(*selected)] >= 1 {
+				if stars < pointShopRequiredStars(*selected) || count != 1 || !trialSlot && lifetime.Total[memorySource55(*selected)] >= 1 {
 					return errors.New("试炼星数或终身限购不足")
 				}
 			}
 			selectedKey := p4SlotKey(cfg, state, *selected)
 			bought := state.Bought[selectedKey]
-			if state.Total[memorySource55(*selected)] < 0 || state.Total[memorySource55(*selected)] > math.MaxInt32-count || bought < 0 || bought > selected.DailyLimit-count || p.GetLevel() < selected.MinLevel || p.GetVip() < selected.MinVIP || (selected.TotalLimit > 0 && state.Total[memorySource55(*selected)] > selected.TotalLimit-count) {
+			if trialSlot {
+				bought = state.trial.Bought[selected.ID]
+			}
+			if !trialSlot && (state.Total[memorySource55(*selected)] < 0 || state.Total[memorySource55(*selected)] > math.MaxInt32-count || selected.TotalLimit > 0 && state.Total[memorySource55(*selected)] > selected.TotalLimit-count) || bought < 0 || bought > selected.DailyLimit-count || p.GetLevel() < selected.MinLevel || p.GetVip() < selected.MinVIP {
 				return errors.New("商品资格或限购不足")
 			}
 			cost, err = s.p4Price(*selected, state, bought+1, count)
@@ -1182,20 +1252,29 @@ func (s *GameService) p4Commerce(ctx context.Context, id int64, request proto.Me
 			if err != nil {
 				return err
 			}
-			if lifetime != nil {
+			if lifetime != nil && !trialSlot {
 				lifetime.Total[memorySource55(*selected)] += count
 				if err = saveP4Commerce(tx, lifetimeRow, lifetime); err != nil {
 					return err
 				}
 			}
-			state.Bought[selectedKey] += count
-			state.Total[memorySource55(*selected)] += count
+			if trialSlot {
+				state.trial.Bought[selected.ID] += count
+			} else {
+				state.Bought[selectedKey] += count
+				state.Total[memorySource55(*selected)] += count
+			}
 			if err = s.RecordP1Event(tx, id, source, constUtil.P1EventPurchase, int64(count), now); err != nil {
 				return err
 			}
 		}
 		if err = saveP4Commerce(tx, row, state); err != nil {
 			return err
+		}
+		if state.trial != nil {
+			if err = trialRefresh82Save(tx, state.trialRow, state.trial); err != nil {
+				return err
+			}
 		}
 		items, activity, err := s.p4Projection(tx, p, cfg, rules, state)
 		if err != nil {
@@ -1213,6 +1292,11 @@ func (s *GameService) p4Commerce(ctx context.Context, id int64, request proto.Me
 		next := int64(0)
 		if cfg.Kind == "memory" && state.FreeLeft < rules.FreeCap {
 			next = state.FreeAt + rules.FreeSeconds*1000
+		}
+		freeLeft, resourceUsed := state.FreeLeft, state.ResourceUsed
+		if state.trial != nil {
+			freeLeft, resourceUsed = state.trial.FreeLeft, state.trial.ResourceUsed
+			next = trialRefresh82Next(tx, rules, state.trial)
 		}
 		var costs []*pb.BaseResource
 		if cost.GetNum() > 0 {
@@ -1232,11 +1316,11 @@ func (s *GameService) p4Commerce(ctx context.Context, id int64, request proto.Me
 			}
 			response = &pb.SCShopBuy{ShopType: proto.Int32(shopType), ShopItemList: items, Get: gain, Cost: costs}
 		case *pb.CSRefreshShopQuery:
-			response = &pb.SCRefreshShopQuery{ShopType: proto.Int32(3), ShopItemList: items, FreeLeftTimes: proto.Int32(state.FreeLeft), FreeMaxTimes: proto.Int32(rules.FreeCap), ResLeftTimes: proto.Int32(max(int32(0), rules.ResourceRefreshCap-state.ResourceUsed)), ResMaxTimes: proto.Int32(rules.ResourceRefreshCap), NextUpdateTime: proto.Int64(next)}
+			response = &pb.SCRefreshShopQuery{ShopType: proto.Int32(shopType), ShopItemList: items, FreeLeftTimes: proto.Int32(freeLeft), FreeMaxTimes: proto.Int32(rules.FreeCap), ResLeftTimes: proto.Int32(max(int32(0), rules.ResourceRefreshCap-resourceUsed)), ResMaxTimes: proto.Int32(rules.ResourceRefreshCap), NextUpdateTime: proto.Int64(next)}
 		case *pb.CSRefreshShopRefresh:
-			response = &pb.SCRefreshShopRefresh{ShopType: proto.Int32(3), ShopItemList: items, FreeLeftTimes: proto.Int32(state.FreeLeft), FreeMaxTimes: proto.Int32(rules.FreeCap), ResLeftTimes: proto.Int32(max(int32(0), rules.ResourceRefreshCap-state.ResourceUsed)), ResMaxTimes: proto.Int32(rules.ResourceRefreshCap), Cost: costs, NextUpdateTime: proto.Int64(next)}
+			response = &pb.SCRefreshShopRefresh{ShopType: proto.Int32(shopType), ShopItemList: items, FreeLeftTimes: proto.Int32(freeLeft), FreeMaxTimes: proto.Int32(rules.FreeCap), ResLeftTimes: proto.Int32(max(int32(0), rules.ResourceRefreshCap-resourceUsed)), ResMaxTimes: proto.Int32(rules.ResourceRefreshCap), Cost: costs, NextUpdateTime: proto.Int64(next)}
 		case *pb.CSRefreshShopBuy:
-			response = &pb.SCRefreshShopBuy{ShopType: proto.Int32(3), ShopItemList: items, Get: gain, Cost: costs, NextUpdateTime: proto.Int64(next)}
+			response = &pb.SCRefreshShopBuy{ShopType: proto.Int32(shopType), ShopItemList: items, Get: gain, Cost: costs, NextUpdateTime: proto.Int64(next)}
 		case *pb.CSActivityShopInfo:
 			discount := float64(1)
 			if state.DiscountBps > 0 {

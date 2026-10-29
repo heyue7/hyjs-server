@@ -155,15 +155,15 @@ func (s *GameService) p7ReRushSectionMutation(tx *gorm.DB, player *pb.Player, ga
 				return nil, err
 			}
 		}
-		three, err := p1RewardResources("point,300;item_005,6")
+		three, err := p1RewardResources(fmt.Sprintf("point,%d;item_005,6", 3*constUtil.Trial82SectionStarPoints))
 		if err != nil {
 			return nil, err
 		}
-		six, err := p1RewardResources("point,600;item_005,12")
+		six, err := p1RewardResources(fmt.Sprintf("point,%d;item_005,12", 6*constUtil.Trial82SectionStarPoints))
 		if err != nil {
 			return nil, err
 		}
-		nine, err := p1RewardResources("point,900;item_005,18")
+		nine, err := p1RewardResources(fmt.Sprintf("point,%d;item_005,18", 9*constUtil.Trial82SectionStarPoints))
 		if err != nil {
 			return nil, err
 		}
@@ -180,7 +180,7 @@ func (s *GameService) p7ReRushSectionMutation(tx *gorm.DB, player *pb.Player, ga
 		if !complete || row.Claimed {
 			return nil, errors.New("本段试炼未完成或奖励已领取")
 		}
-		gain, err := s.GrantFixedReward(player, game, fmt.Sprintf("point,%d;item_005,%d", stars*100, stars*2))
+		gain, err := s.GrantFixedReward(player, game, fmt.Sprintf("point,%d;item_005,%d", stars*constUtil.Trial82SectionStarPoints, stars*2))
 		if err != nil {
 			return nil, err
 		}
@@ -242,7 +242,7 @@ func (s *GameService) p7ReRushSweep(tx *gorm.DB, player *pb.Player, game *model.
 		if win.Star < 1 || three && win.Star != 3 {
 			break
 		}
-		gain, err := s.GrantFixedReward(player, game, fmt.Sprintf("coin,%d;point,%d", (2000+floor*500)*win.Star, (50+floor*10)*win.Star))
+		gain, err := s.GrantFixedReward(player, game, fmt.Sprintf("coin,%d;point,%d", (2000+floor*500)*win.Star, trial82FloorPoints(floor, win.Star)))
 		if err != nil {
 			return nil, err
 		}

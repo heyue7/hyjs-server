@@ -1,0 +1,44 @@
+{
+  "schema": "hyjs-trial-refresh82-overlay-v1",
+  "status": "STATIC_VERIFIED_NOT_PACKAGED",
+  "baseAPKSHA256": "25026a1f180d164ba2b191e4cc7e558e20f7a761b740fb7b28d6205d6756112a",
+  "inputManagedSHA256": "8b732cce869cad9a9a06c75d3ba4891b4084a3ac646848fc99a933148e300437",
+  "managedOnly": true,
+  "deviceTested": false,
+  "inheritedHelperPublicMethodsCompatible": true,
+  "payloadFiles": {
+    "assets/bin/Data/Managed/SoulFlowerGGOShop.dll": "tools/client_trial_refresh82/overlay-80/SoulFlowerGGOShop.dll",
+    "assets/bin/Data/Managed/Assembly-CSharp.dll": "tools/client_trial_refresh82/overlay-80/Assembly-CSharp.dll"
+  },
+  "replacementEntries": {
+    "assets/bin/Data/Managed/SoulFlowerGGOShop.dll": "2303449f69473f504a70fef4d988e72d35d3a856026b6133a33651f109fb7e50",
+    "assets/bin/Data/Managed/Assembly-CSharp.dll": "ae45481555ecf555b68ec455a7c3aab32ab546d195d5953d0b3cd47566e004bb"
+  },
+  "sourcePins": {
+    "tools/ggo_items/client/GGOShop.cs": "ce38980c87159ba9c67f8a1830b65637d22626b401b8e3876b664a2b395a2f0e",
+    "tools/ggo_items/client/GGOIconManifest.cs": "5113f55a16e1456a1f277a28f0e104012c809f1018a462199be0d487b7824a27",
+    "tools/ggo_items/client/PetIconManifest75.cs": "f5a59873fccb44053bfa66ffe0f5f29e491391bc10982f901c4afdef427a8d51",
+    "tools/ggo_items/client/TrialShopRefresh75.cs": "039364ce43ad5b16e0f136fe2cffbc36d4a6683f6a99fa4b4f5c494c1a4326cc",
+    "tools/ggo_items/client/PetPortraitAssets75.cs": "f0a84f28eb99ebf10d0c280db79f91b01a24a91d9b919259ec137a4ec7dfc0fd",
+    "tools/client_trial_refresh82/build.py": "4c2fe90f7c690de4f21c92f6c1be5a62251bf99a735c358876f53c8f285075f2",
+    "tools/client_trial_refresh82/Injector.cs": "6ebf15294fc6be351247954e75601cd7eb69f4a581d4997f1e2dd449f9229943",
+    "tools/client_trial_refresh82/Verify.cs": "e074ed19cbae229bab9aa07557cc7946683013ac9d4fc280e60642da5e140380",
+    "tools/ggo_items/assets/ggo_credit_hud-source.png": "d464894c4da73e1c593adf14efbe1a6f809f98b15ac5570aefeaf666bbe3b394"
+  },
+  "allowedChangedMethods": [
+    {
+      "method": "UI.TabPointShop::UpdateAll",
+      "beforeSHA256": "66ccaf9c3c3c9b39e467d103bfa09a97938e9d4ffa90687697cb1937919cdafa",
+      "afterSHA256": "26c6f692befd6b1e537f43f9f3f8dcd33382d04ce4647c7d4666e23b8118e19b",
+      "inheritedCILPreserved": true
+    },
+    {
+      "method": "UI.TabPointShop::UpdateProducts",
+      "beforeSHA256": "9f9e641aa3d92eadd218a6f01a860c8fa023e25171140533eb110fd173c157d4",
+      "afterSHA256": "b9a39040c792716d411c6aed6d593d6d2f33ab7e5e4516feec45519191c4f47f",
+      "inheritedCILPreserved": true
+    }
+  ],
+  "originalEngineMethodsExact": 547,
+  "allOtherOriginalBodiesByteExact": true
+}
