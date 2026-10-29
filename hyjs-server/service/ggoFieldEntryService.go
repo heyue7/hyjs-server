@@ -39,7 +39,7 @@ func ggoCurrentPresence(tx *gorm.DB, a *ggoFieldActor, session []byte) error {
 		}
 		return err
 	}
-	v, ok := p10ClientSinks.Load(p10ClientKey{a.Service.p10ClientOwner(), a.Row.Id})
+	v, ok := p10LiveClient(p10ClientKey{a.Service.p10ClientOwner(), a.Row.Id})
 	if !ok || presence.Scene != constUtil.GGOFieldScene || presence.Line < 1 || presence.SessionHash != p6Digest(session) || subtle.ConstantTimeCompare(v.(*p10ClientSink).session, session) != 1 {
 		return ggoFieldError(constUtil.GGOFieldInvalidLocation, "请连接当前游戏场景")
 	}

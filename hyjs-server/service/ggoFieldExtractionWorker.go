@@ -105,15 +105,19 @@ func (s *GameService) ggoRecoverExtractions(ctx context.Context, now int64) erro
 	return nil
 }
 
-// Called only by the socket instance that successfully removed its own sink.
-// A disconnect after ReadyAt may complete an otherwise valid countdown; an
-// earlier disconnect cancels it, even if the player reconnects immediately.
-func (s *GameService) ggoExtractionDisconnect(ctx context.Context, id int64, session []byte) (bool, error) {
-	authorized, err := AuthorizeAccount(ctx, id, session)
-	if err != nil {
+// The trusted socket's first disconnect decides its original countdown even
+// if cleanup is delayed until after the deadline or a login rotates.
+func (s *GameService) ggoExtractionDisconnect(ctx context.Context, id int64, session []byte, disconnectedAt int64) (bool, error) {
+	if disconnectedAt <= 0 {
+		return false, errors.New("断线时间无效")
+	}
+	var observed db.Profile
+	if err := db.GetIns().WithContext(ctx).First(&observed, id).Error; err != nil {
 		return false, err
 	}
-	ctx, err = s.BindLocalPlayContext(ctx, authorized)
+	// Revoked sessions may cancel previously accepted actions, never finish them.
+	authErr := authorizeProfileSession(ctx, &observed, session)
+	ctx, err := s.BindLocalPlayContext(ctx, &observed)
 	if err != nil {
 		return false, err
 	}
@@ -135,21 +139,20 @@ func (s *GameService) ggoExtractionDisconnect(ctx context.Context, id int64, ses
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&row, id).Error; err != nil {
 			return err
 		}
-		if subtle.ConstantTimeCompare(row.Session, session) != 1 {
-			return nil
-		}
 		player, game, err := decodeProfileForCalendarUpdate(tx, &row)
 		if err != nil {
 			return err
 		}
-		if game.GGOField == nil || game.GGOField.Extraction == nil {
+		if game.GGOField == nil || game.GGOField.Extraction == nil || game.GGOField.Extraction.AcceptedAt > disconnectedAt {
 			return nil
 		}
-		now := time.Now().UnixMilli()
-		if now < game.GGOField.Extraction.ReadyAt {
-			_, err = ggoExtractionCancelLocked(tx, id, game, "disconnected", now)
+		if subtle.ConstantTimeCompare(row.Session, session) != 1 || disconnectedAt < game.GGOField.Extraction.ReadyAt {
+			_, err = ggoExtractionCancelLocked(tx, id, game, "disconnected", disconnectedAt)
 		} else {
-			actor := &ggoFieldActor{Service: runtime, Row: &row, Player: player, Game: game, Now: now}
+			if authErr != nil {
+				return authErr
+			}
+			actor := &ggoFieldActor{Service: runtime, Row: &row, Player: player, Game: game, Now: disconnectedAt}
 			var result *model.GGOFieldExtractionStatusResponse
 			result, err = ggoExtractionFinishWithSessionLocked(tx, actor, session)
 			completed = err == nil && result.Status == "completed"

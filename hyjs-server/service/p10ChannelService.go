@@ -27,7 +27,7 @@ func (s *GameService) InitializeP10Channel(ctx context.Context) error {
 }
 
 func (s *GameService) p10ChannelOnline(tx *gorm.DB, id int64) bool {
-	value, ok := p10ClientSinks.Load(p10ClientKey{s.p10ClientOwner(), id})
+	value, ok := p10LiveClient(p10ClientKey{s.p10ClientOwner(), id})
 	if !ok {
 		return false
 	}
@@ -227,7 +227,7 @@ func (s *GameService) p10ChannelAt(ctx context.Context, id int64, b *pb.CSChatTc
 		// 只快照当前真实会话；发送后权限仍逐个校验，离线查询使用持久化原历史。
 		p10ClientSinks.Range(func(key, value any) bool {
 			k := key.(p10ClientKey)
-			if k.service == s.p10ClientOwner() && k.playerID != id {
+			if k.service == s.p10ClientOwner() && k.playerID != id && value.(*p10ClientSink).disconnectedAt.Load() == 0 {
 				recipients = append(recipients, k.playerID)
 			}
 			return true

@@ -1309,7 +1309,7 @@ func (s *GameService) p13UFFieldLeaveExpected(ctx context.Context, id int64, req
 }
 
 func (s *GameService) p13UFFieldLive(tx *gorm.DB, actor db.P13UnionFightFieldPlayer) (*pb.InstUFPlayer, bool) {
-	value, ok := p10ClientSinks.Load(p10ClientKey{s.p10ClientOwner(), actor.PlayerID})
+	value, ok := p10LiveClient(p10ClientKey{s.p10ClientOwner(), actor.PlayerID})
 	if !ok || actor.LeftAt != 0 || actor.SessionHash == "" {
 		return nil, false
 	}
@@ -1368,7 +1368,7 @@ func (s *GameService) p13UFFieldPeers(tx *gorm.DB, scope string, exclude int64) 
 	var frames []*pb.InstUFPlayer
 	now := p13UFNow(tx.Statement.Context)
 	for _, row := range rows {
-		value, ok := p10ClientSinks.Load(p10ClientKey{s.p10ClientOwner(), row.PlayerID})
+		value, ok := p10LiveClient(p10ClientKey{s.p10ClientOwner(), row.PlayerID})
 		if !ok || row.CurrentGuildID != row.GuildID || row.ActualScene != constUtil.P13UnionFightFieldTarget || row.SessionHash != p6Digest(row.ProfileSession) || !bytes.Equal(row.ProfileSession, value.(*p10ClientSink).session) {
 			continue
 		}
@@ -1418,7 +1418,7 @@ func (s *GameService) p13UFFieldBroadcastRecipients(tx *gorm.DB, scope string, e
 	}
 	recipients := []p13UFFieldRecipient{}
 	for _, row := range rows {
-		value, ok := p10ClientSinks.Load(p10ClientKey{s.p10ClientOwner(), row.PlayerID})
+		value, ok := p10LiveClient(p10ClientKey{s.p10ClientOwner(), row.PlayerID})
 		if !ok || row.CurrentGuildID != row.GuildID || row.ActualScene != constUtil.P13UnionFightFieldTarget || row.SessionHash != p6Digest(row.ProfileSession) {
 			continue
 		}
@@ -1465,7 +1465,7 @@ func (s *GameService) SyncP13UnionFightField(ctx context.Context, id int64, move
 	if game.Position.GetScene() != constUtil.P13UnionFightFieldTarget {
 		return false, nil
 	}
-	value, ok := p10ClientSinks.Load(p10ClientKey{s.p10ClientOwner(), id})
+	value, ok := p10LiveClient(p10ClientKey{s.p10ClientOwner(), id})
 	if !ok {
 		return true, nil
 	}
@@ -1592,18 +1592,28 @@ func (s *GameService) p13UFFieldCleanupClosedProfile(ctx context.Context, id int
 }
 
 // DisconnectP13UnionFightField 旧会话不能清除新连接的战场在线状态，持久HP/AP与位置继续保留。
-func (s *GameService) DisconnectP13UnionFightField(ctx context.Context, id int64, session []byte) bool {
+func (s *GameService) DisconnectP13UnionFightField(ctx context.Context, id int64, session []byte) (bool, error) {
+	if !gameSchemaHasTable(db.GetIns().WithContext(ctx), &db.P13UnionFightFieldPlayer{}) {
+		return false, nil
+	}
 	var actor db.P13UnionFightFieldPlayer
-	matched, closedExit := false, false
+	matched, closedExit, replaced := false, false, false
 	err := db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var gate db.P13GuildPolicy
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&gate, 1).Error; err != nil {
 			return err
 		}
 		if err := tx.First(&actor, "player_id=? AND left_at=0 AND session_hash=?", id, p6Digest(session)).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return nil
+			}
 			return err
 		}
 		matched = true
+		if _, ok := p10LiveClient(p10ClientKey{s.p10ClientOwner(), id}); ok {
+			replaced = true
+			return nil
+		}
 		closed, err := p13UFWorldClosed(tx, actor.MatchID)
 		if err != nil {
 			return err
@@ -1638,13 +1648,15 @@ func (s *GameService) DisconnectP13UnionFightField(ctx context.Context, id int64
 		game.Position = &pb.Position{PlayerId: proto.Int64(id), Scene: proto.String("town_main"), Current: &pb.PointNew{X: proto.Float32(0), Y: proto.Float32(0), Z: proto.Float32(0)}}
 		return saveProfile(tx, &profile, player, game)
 	})
-	if err != nil {
-		return matched
+	if err != nil || !matched {
+		return matched, err
 	}
-	if !closedExit {
-		_ = p13UFPublishBeforeAbort(ctx, actor.MatchID, func() { s.p13UFFieldBroadcast(ctx, actor.MatchID, id, &pb.SCUFPlayerDisappear{Guid: []int64{id}}) })
+	if !closedExit && !replaced {
+		if err := p13UFPublishBeforeAbort(ctx, actor.MatchID, func() { s.p13UFFieldBroadcast(ctx, actor.MatchID, id, &pb.SCUFPlayerDisappear{Guid: []int64{id}}) }); err != nil {
+			return true, err
+		}
 	}
-	return true
+	return true, nil
 }
 
 func (s *GameService) p13UFFieldHook(ctx context.Context, id int64, request *pb.CSUFOnHook, now time.Time) ([]proto.Message, error) {

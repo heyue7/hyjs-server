@@ -271,6 +271,9 @@ func clientUpdateBusinessSuite(t *testing.T, mysql bool) {
 	if err = CheckClientUpdateSession(ctx, profile); err != nil {
 		t.Fatal("fresh login cannot resume", err)
 	}
+	// 首次维护已关闭旧连接，重新登录后注册真实的新连接。
+	unregister := s.RegisterP10Client(ctx, profile.Id, profile.Session, func(proto.Message) error { pushes++; return nil }, func() { closed++ })
+	defer unregister()
 	// 手动维护向当前运行服务连接推送原错误提示。
 	nextID := draft("maintenance", 400, 400, 400, time.Now().UnixMilli()+100000, time.Now().UnixMilli()+200000)
 	action(nextID, "publish", "manual-maintenance-plan")

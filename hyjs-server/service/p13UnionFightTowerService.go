@@ -336,7 +336,7 @@ func (s *GameService) p13UFTowerPlayers(tx *gorm.DB, match *db.P13UnionFightMatc
 	for i := range actors {
 		actor := &actors[i]
 		row, ok := directory[actor.PlayerID]
-		sink, online := p10ClientSinks.Load(p10ClientKey{s.p10ClientOwner(), actor.PlayerID})
+		sink, online := p10LiveClient(p10ClientKey{s.p10ClientOwner(), actor.PlayerID})
 		expectedGuild := match.LeftGuildID
 		if actor.Camp == 1 {
 			expectedGuild = match.RightGuildID

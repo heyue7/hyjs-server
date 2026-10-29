@@ -7,9 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"sync"
-
-	"go.uber.org/zap"
-	"hyjs-server/elog"
 	"time"
 
 	"google.golang.org/protobuf/proto"
@@ -169,7 +166,7 @@ func (s *GameService) p10SceneLiveRows(tx *gorm.DB, rows []db.P10ScenePresence) 
 	var candidates []candidate
 	var ids []int64
 	for _, row := range rows {
-		value, ok := p10ClientSinks.Load(p10ClientKey{s.p10ClientOwner(), row.PlayerID})
+		value, ok := p10LiveClient(p10ClientKey{s.p10ClientOwner(), row.PlayerID})
 		offline := !ok && row.Scene == constUtil.GGOFieldScene && row.SessionHash == "" && row.OfflineUntil > time.Now().UnixMilli()
 		if !offline && (!ok || row.SessionHash == "") {
 			continue
@@ -311,7 +308,7 @@ func (s *GameService) SyncP10Scene(ctx context.Context, id int64, movement bool)
 	if err != nil || cfg == nil {
 		return err
 	}
-	value, ok := p10ClientSinks.Load(p10ClientKey{s.p10ClientOwner(), id})
+	value, ok := p10LiveClient(p10ClientKey{s.p10ClientOwner(), id})
 	if !ok {
 		return nil
 	}
@@ -487,49 +484,73 @@ func (s *GameService) SyncP10Scene(ctx context.Context, id int64, movement bool)
 	}
 	return nil
 }
-func (s *GameService) DisconnectP10Scene(ctx context.Context, id int64, session []byte) {
-	if s.DisconnectP13UnionFightField(ctx, id, session) {
-		return
+func (s *GameService) DisconnectP10Scene(ctx context.Context, id int64, session []byte) error {
+	return s.p10DisconnectScene(ctx, id, session, time.Now().UnixMilli())
+}
+
+func (s *GameService) p10DisconnectScene(ctx context.Context, id int64, session []byte, disconnectedAt int64) error {
+	if handled, err := s.DisconnectP13UnionFightField(ctx, id, session); handled || err != nil {
+		return err
 	}
-	if s.DisconnectP13GuildRoom(ctx, id, session) {
-		return
+	if handled, err := s.DisconnectP13GuildRoom(ctx, id, session); handled || err != nil {
+		return err
 	}
 	p10SceneMutation.Lock()
 	defer p10SceneMutation.Unlock()
+	// A replacement can only be installed after its predecessor's lifecycle
+	// cleanup. Direct callers must also leave any live replacement untouched.
+	if _, ok := p10LiveClient(p10ClientKey{s.p10ClientOwner(), id}); ok {
+		return nil
+	}
 	tx := db.GetIns().WithContext(ctx)
+	var probe int
+	if err := tx.Raw("SELECT 1").Scan(&probe).Error; err != nil {
+		return err
+	}
 	cfg, err := p10SceneConfig(tx)
 	if err != nil || cfg == nil {
-		return
+		return err
 	}
 	var row db.P10ScenePresence
-	if tx.Where("player_id=? AND session_hash=?", id, p6Digest(session)).First(&row).Error != nil {
-		return
+	if err := tx.Where("player_id=? AND session_hash=?", id, p6Digest(session)).First(&row).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil
+		}
+		return err
 	}
 	if row.Scene == constUtil.GGOFieldScene {
 		if err := s.ggoTradeCancelSession(ctx, id, session); err != nil {
-			elog.Warn("ggo trade disconnect invalidation failed", zap.Error(err))
+			return err
 		}
-		completed, err := s.ggoExtractionDisconnect(ctx, id, session)
+		completed, err := s.ggoExtractionDisconnect(ctx, id, session, disconnectedAt)
 		if err != nil {
-			elog.Warn("ggo extraction disconnect recovery failed", zap.Error(err))
+			return err
 		}
 		if completed {
 			result := tx.Model(&db.P10ScenePresence{}).Where("player_id=? AND session_hash=?", id, p6Digest(session)).Updates(map[string]any{"session_hash": "", "offline_until": 0, "offline_pk_used": false})
-			if result.Error == nil && result.RowsAffected == 1 {
+			if result.Error != nil {
+				return result.Error
+			}
+			if result.RowsAffected == 1 {
 				s.p10SceneBroadcast(ctx, row.Scene, row.Line, id, &pb.SCPlayerDisappear{PlayerId: []int64{id}})
 			}
-			return
+			return nil
 		}
 		until := time.Now().UnixMilli() + 60000
 		result := tx.Model(&db.P10ScenePresence{}).Where("player_id=? AND session_hash=?", id, p6Digest(session)).Updates(map[string]any{"session_hash": "", "offline_until": until, "offline_pk_used": false, "updated_at": time.Now().UnixMilli()})
-		if result.Error == nil && result.RowsAffected == 1 {
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected == 1 {
 			s.ggoScheduleOfflineExpiry(id, until)
 		}
-		return
+		return nil
 	}
-	if tx.Model(&db.P10ScenePresence{}).Where("player_id=? AND session_hash=?", id, p6Digest(session)).Update("session_hash", "").Error == nil {
-		s.p10SceneBroadcast(ctx, row.Scene, row.Line, id, &pb.SCPlayerDisappear{PlayerId: []int64{id}})
+	if err := tx.Model(&db.P10ScenePresence{}).Where("player_id=? AND session_hash=?", id, p6Digest(session)).Update("session_hash", "").Error; err != nil {
+		return err
 	}
+	s.p10SceneBroadcast(ctx, row.Scene, row.Line, id, &pb.SCPlayerDisappear{PlayerId: []int64{id}})
+	return nil
 }
 func (s *GameService) AfterP10SceneRequest(ctx context.Context, id int64, request proto.Message) {
 	switch request.(type) {

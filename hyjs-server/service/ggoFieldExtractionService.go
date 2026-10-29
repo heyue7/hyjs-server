@@ -162,6 +162,12 @@ func ggoInterruptExtractionLocked(tx *gorm.DB, id int64, g *model.GameState, now
 }
 
 func ggoExtractionLive(tx *gorm.DB, a *ggoFieldActor, x *model.GGOFieldExtraction, disconnectedSession []byte) (bool, error) {
+	if disconnectedSession == nil {
+		if value, ok := p10ClientSinks.Load(p10ClientKey{a.Service.p10ClientOwner(), a.Row.Id}); ok && value.(*p10ClientSink).disconnectedAt.Load() != 0 {
+			// The serialized disconnect owns the ReadyAt decision and receipt.
+			return false, errors.New("断线撤离清理尚未完成")
+		}
+	}
 	g := a.Game
 	if x == nil || g.Position == nil || g.Position.GetScene() != constUtil.GGOFieldScene || g.PositionLoading || g.Field == nil || g.Field.Side == nil || g.Field.Side.GetCurHp() <= 0 ||
 		g.Field.Fight != nil && !g.Field.Fight.Settled || g.Run != nil && !g.Run.Complete {
@@ -194,7 +200,11 @@ func ggoExtractionLive(tx *gorm.DB, a *ggoFieldActor, x *model.GGOFieldExtractio
 		if !ok {
 			return false, nil
 		}
-		activeSession = v.(*p10ClientSink).session
+		sink := v.(*p10ClientSink)
+		if sink.disconnectedAt.Load() != 0 {
+			return false, errors.New("断线撤离清理尚未完成")
+		}
+		activeSession = sink.session
 	}
 	if len(activeSession) != 16 || presence.Scene != constUtil.GGOFieldScene || int64(presence.Line) != x.Line || presence.SessionHash != p6Digest(activeSession) || subtle.ConstantTimeCompare(a.Row.Session, activeSession) != 1 {
 		return false, nil

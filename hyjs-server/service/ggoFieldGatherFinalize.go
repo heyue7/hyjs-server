@@ -219,7 +219,7 @@ func ggoGatherCanFinish(tx *gorm.DB, a *ggoFieldActor, attempt *db.P8GatherAttem
 		}
 		return false, err
 	}
-	value, ok := p10ClientSinks.Load(p10ClientKey{a.Service.p10ClientOwner(), a.Row.Id})
+	value, ok := p10LiveClient(p10ClientKey{a.Service.p10ClientOwner(), a.Row.Id})
 	if !ok {
 		return false, nil
 	}

@@ -25,7 +25,7 @@ func (s *GameService) AdminOnlinePlayers(ctx context.Context, principal *model.A
 	// 拷贝当前连接会话，后续查询与分页使用同一份快照。
 	p10ClientSinks.Range(func(key, value any) bool {
 		k := key.(p10ClientKey)
-		if k.service == owner {
+		if k.service == owner && value.(*p10ClientSink).disconnectedAt.Load() == 0 {
 			sessions[k.playerID] = append([]byte(nil), value.(*p10ClientSink).session...)
 		}
 		return true

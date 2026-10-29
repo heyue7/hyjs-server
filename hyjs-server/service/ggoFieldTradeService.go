@@ -115,7 +115,7 @@ func ggoTradeLive(tx *gorm.DB, pair *ggoTradePair) (bool, error) {
 		if actor.Game.GGOField == nil || actor.Game.Field == nil || actor.Game.Field.Side == nil || actor.Game.Position == nil || actor.Game.PositionLoading || actor.Game.Field.Side.GetCurHp() <= 0 || actor.Game.Field.Side.GetState() != constUtil.P8FieldIdle || actor.Game.Field.Fight != nil && !actor.Game.Field.Fight.Settled || actor.Game.Run != nil && !actor.Game.Run.Complete || actor.Game.GGOField.Extraction != nil || !ggoPointInsideSafe(actor.Game.Position.GetCurrent(), cfg.Runtime.SafeArea) {
 			return false, nil
 		}
-		value, ok := p10ClientSinks.Load(p10ClientKey{actor.Service.p10ClientOwner(), actor.Row.Id})
+		value, ok := p10LiveClient(p10ClientKey{actor.Service.p10ClientOwner(), actor.Row.Id})
 		if !ok {
 			return false, nil
 		}

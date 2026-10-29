@@ -96,7 +96,7 @@ func (s *GameService) ggoWithProfile(ctx context.Context, auth model.GGOFieldAut
 			if presence.Scene != constUtil.GGOFieldScene || presence.Line < 1 || presence.SessionHash != p6Digest(session) {
 				return ggoFieldError(constUtil.GGOFieldInvalidLocation, "分线或会话已变化")
 			}
-			sinkValue, ok := p10ClientSinks.Load(p10ClientKey{runtime.p10ClientOwner(), auth.PlayerID})
+			sinkValue, ok := p10LiveClient(p10ClientKey{runtime.p10ClientOwner(), auth.PlayerID})
 			if !ok || subtle.ConstantTimeCompare(sinkValue.(*p10ClientSink).session, session) != 1 {
 				return ggoFieldError(constUtil.GGOFieldInvalidLocation, "请连接当前游戏场景")
 			}

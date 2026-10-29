@@ -85,7 +85,7 @@ func (s *GameService) fieldBossSprouts73(tx *gorm.DB, id int64, scene string, ma
 	ids = nil
 	for _, profile := range profiles {
 		r := presence[profile.Id]
-		value, ok := p10ClientSinks.Load(p10ClientKey{s.p10ClientOwner(), profile.Id})
+		value, ok := p10LiveClient(p10ClientKey{s.p10ClientOwner(), profile.Id})
 		if !ok {
 			continue
 		}

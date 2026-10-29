@@ -658,9 +658,9 @@ func (s *GameService) p10VoicePush(ctx context.Context, asset *db.P10VoiceAsset,
 	if asset.ChatType == 3 {
 		recipients = append(recipients, asset.TargetID)
 	} else {
-		p10ClientSinks.Range(func(key, _ any) bool {
+		p10ClientSinks.Range(func(key, value any) bool {
 			who := key.(p10ClientKey)
-			if who.service == s.p10ClientOwner() && who.playerID != asset.OwnerID {
+			if who.service == s.p10ClientOwner() && who.playerID != asset.OwnerID && value.(*p10ClientSink).disconnectedAt.Load() == 0 {
 				recipients = append(recipients, who.playerID)
 			}
 			return true

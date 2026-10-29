@@ -146,7 +146,8 @@ func TestP13BroadcastPinnedSendFailureRetiresOnlyExpectedSink(t *testing.T) {
 	if calls != 1 {
 		t.Fatal("failed batch continued", calls)
 	}
-	if current, ok := p10ClientSinks.Load(key); ok && current == sink {
-		t.Fatal("failed pinned sink retained")
+	if _, ok := p10LiveClient(key); ok {
+		t.Fatal("failed pinned sink remained live")
 	}
+	p10WaitRetired(t, key, sink)
 }

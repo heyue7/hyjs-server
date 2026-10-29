@@ -157,7 +157,7 @@ func (s *GameService) TickP12FieldPVPPresentation(ctx context.Context, now time.
 		if side != nil {
 			sendCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 2*time.Second)
 			if returned {
-				_, online := p10ClientSinks.Load(p10ClientKey{s.p10ClientOwner(), candidate.PlayerID})
+				_, online := p10LiveClient(p10ClientKey{s.p10ClientOwner(), candidate.PlayerID})
 				if online {
 					_ = s.SyncP10Scene(sendCtx, candidate.PlayerID, false)
 				} else if oldScene != "" {

@@ -135,8 +135,8 @@ func (s *GameService) ggoStopNoticeTimers() {
 func (s *GameService) ggoBroadcastFieldChange(ctx context.Context, line int32) error {
 	base := s.p10ClientOwner()
 	var ids []int64
-	p10ClientSinks.Range(func(key, _ any) bool {
-		if client, ok := key.(p10ClientKey); ok && client.service == base {
+	p10ClientSinks.Range(func(key, value any) bool {
+		if client, ok := key.(p10ClientKey); ok && client.service == base && value.(*p10ClientSink).disconnectedAt.Load() == 0 {
 			ids = append(ids, client.playerID)
 		}
 		return true
@@ -187,7 +187,7 @@ func (s *GameService) ggoBroadcastFieldChange(ctx context.Context, line int32) e
 			}
 		}
 		for _, recipient := range recipients {
-			v, ok := p10ClientSinks.Load(p10ClientKey{s.p10ClientOwner(), recipient.PlayerID})
+			v, ok := p10LiveClient(p10ClientKey{s.p10ClientOwner(), recipient.PlayerID})
 			if !ok {
 				continue
 			}
@@ -226,15 +226,11 @@ func (s *GameService) ggoBroadcastFieldChange(ctx context.Context, line int32) e
 				}
 			}
 			key := p10ClientKey{s.p10ClientOwner(), recipient.PlayerID}
-			if current, ok := p10ClientSinks.Load(key); !ok || current != sink {
+			if current, ok := p10LiveClient(key); !ok || current != sink {
 				continue
 			}
-			if err := sink.send(&pb.SCFieldResourceInfo{}); err != nil && p10ClientSinks.CompareAndDelete(key, sink) {
-				go func(id int64, session []byte) {
-					cleanup, cancel := context.WithTimeout(context.WithoutCancel(ctx), constUtil.P10SceneCleanupTimeout)
-					defer cancel()
-					s.DisconnectP10Scene(cleanup, id, session)
-				}(recipient.PlayerID, append([]byte(nil), sink.session...))
+			if err := sink.send(&pb.SCFieldResourceInfo{}); err != nil {
+				s.p10RetireFailedPush(ctx, recipient.PlayerID, sink)
 			}
 		}
 	}

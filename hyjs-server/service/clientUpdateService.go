@@ -232,19 +232,23 @@ func (s *GameService) CheckClientReconnect(ctx context.Context, row *db.Profile)
 }
 
 // ClientUpdateConnected 仅更新当前会话的连接事实。
-func (s *GameService) ClientUpdateConnected(ctx context.Context, id int64, session []byte) {
+func (s *GameService) ClientUpdateConnected(ctx context.Context, id int64, session []byte) error {
 	if !clientUpdatesEnabled() {
-		return
+		return nil
 	}
-	_ = db.GetIns().WithContext(ctx).Model(&db.ClientUpdateSession{}).Where("player_id=? AND session_hash=?", id, clientUpdateSessionHash(session)).Updates(map[string]any{"connected": true, "disconnected_at": 0, "last_seen_at": time.Now().UnixMilli()}).Error
+	return db.GetIns().WithContext(ctx).Model(&db.ClientUpdateSession{}).Where("player_id=? AND session_hash=?", id, clientUpdateSessionHash(session)).Updates(map[string]any{"connected": true, "disconnected_at": 0, "last_seen_at": time.Now().UnixMilli()}).Error
 }
 
 // ClientUpdateDisconnected 保留首次断线时刻，旧连接无法覆盖新会话。
-func (s *GameService) ClientUpdateDisconnected(ctx context.Context, id int64, session []byte) {
+func (s *GameService) ClientUpdateDisconnected(ctx context.Context, id int64, session []byte) error {
+	return s.clientUpdateDisconnectedAt(ctx, id, session, time.Now().UnixMilli())
+}
+
+func (s *GameService) clientUpdateDisconnectedAt(ctx context.Context, id int64, session []byte, disconnectedAt int64) error {
 	if !clientUpdatesEnabled() {
-		return
+		return nil
 	}
-	_ = db.GetIns().WithContext(ctx).Model(&db.ClientUpdateSession{}).Where("player_id=? AND session_hash=? AND connected=?", id, clientUpdateSessionHash(session), true).Updates(map[string]any{"connected": false, "disconnected_at": time.Now().UnixMilli()}).Error
+	return db.GetIns().WithContext(ctx).Model(&db.ClientUpdateSession{}).Where("player_id=? AND session_hash=? AND connected=?", id, clientUpdateSessionHash(session), true).Updates(map[string]any{"connected": false, "disconnected_at": disconnectedAt}).Error
 }
 
 // ClientCheckVersionReply 保留原资源版本和禁用原下载器的字段。
@@ -272,7 +276,7 @@ func (s *GameService) clientUpdateStats(ctx context.Context, tx *gorm.DB, p db.C
 	ids := []int64{}
 	p10ClientSinks.Range(func(key, value any) bool {
 		k := key.(p10ClientKey)
-		if k.service == owner {
+		if k.service == owner && value.(*p10ClientSink).disconnectedAt.Load() == 0 {
 			sessions[k.playerID] = clientUpdateSessionHash(value.(*p10ClientSink).session)
 			ids = append(ids, k.playerID)
 		}
@@ -612,14 +616,12 @@ func (s *GameService) clientUpdateMaintenancePush() {
 	owner := s.p10ClientOwner()
 	messages := GameError(constUtil.ErrGameRequest, constUtil.ErrClientUpdateMaintenance.Error())
 	p10ClientSinks.Range(func(key, value any) bool {
-		if key.(p10ClientKey).service == owner {
+		if key.(p10ClientKey).service == owner && value.(*p10ClientSink).disconnectedAt.Load() == 0 {
 			sink := value.(*p10ClientSink)
 			for _, msg := range messages {
 				_ = sink.send(proto.Clone(msg))
 			}
-			if sink.close != nil {
-				sink.close()
-			}
+			s.p10RetireFailedPush(context.Background(), key.(p10ClientKey).playerID, sink)
 		}
 		return true
 	})

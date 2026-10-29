@@ -45,9 +45,9 @@ func (s *GameService) publishP12WorldBossKill(ctx context.Context, message *pb.S
 	if message == nil {
 		return
 	}
-	p10ClientSinks.Range(func(key, _ any) bool {
+	p10ClientSinks.Range(func(key, value any) bool {
 		client := key.(p10ClientKey)
-		if client.service == s.p10ClientOwner() {
+		if client.service == s.p10ClientOwner() && value.(*p10ClientSink).disconnectedAt.Load() == 0 {
 			s.publishP10Private(ctx, client.playerID, message)
 		}
 		return true

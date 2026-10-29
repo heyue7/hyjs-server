@@ -583,7 +583,7 @@ func (s *GameService) p13GuildPlayers(tx *gorm.DB, viewer int64, ids []int64, me
 			coin, badge = int32(member.TodayCoin), member.TodayBadge
 		}
 		lastLogin := member.LastLoginAt
-		if value, ok := p10ClientSinks.Load(p10ClientKey{s.p10ClientOwner(), id}); ok && subtle.ConstantTimeCompare(read.Profile.Session, value.(*p10ClientSink).session) == 1 {
+		if value, ok := p10LiveClient(p10ClientKey{s.p10ClientOwner(), id}); ok && subtle.ConstantTimeCompare(read.Profile.Session, value.(*p10ClientSink).session) == 1 {
 			lastLogin = 0
 		}
 		friend := int32(0)

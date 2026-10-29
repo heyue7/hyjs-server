@@ -140,7 +140,7 @@ func (s *GameService) SyncP13GuildRoom(ctx context.Context, id int64, movement b
 	p10SceneMutation.Lock()
 	defer p10SceneMutation.Unlock()
 	// 加锁后重新读取当前会话/位置，避免前面的轻量路由观察变成权限快照。
-	value, ok := p10ClientSinks.Load(p10ClientKey{s.p10ClientOwner(), id})
+	value, ok := p10LiveClient(p10ClientKey{s.p10ClientOwner(), id})
 	if !ok {
 		return game.Position.GetScene() == constUtil.P13GuildRoomTarget, nil
 	}
@@ -228,21 +228,31 @@ func (s *GameService) SyncP13GuildRoom(ctx context.Context, id int64, movement b
 	}
 	return true, nil
 }
-func (s *GameService) DisconnectP13GuildRoom(ctx context.Context, id int64, session []byte) bool {
+func (s *GameService) DisconnectP13GuildRoom(ctx context.Context, id int64, session []byte) (bool, error) {
 	tx := db.GetIns().WithContext(ctx)
 	if !gameSchemaHasTable(tx, &db.P10ScenePresence{}) {
-		return false
+		return false, nil
 	}
 	var row db.P10ScenePresence
-	if tx.First(&row, "player_id=? AND session_hash=?", id, p6Digest(session)).Error != nil || !strings.HasPrefix(row.Scene, constUtil.P13GuildRoomScopePrefix) {
-		return false
+	if err := tx.First(&row, "player_id=? AND session_hash=?", id, p6Digest(session)).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return false, nil
+		}
+		return false, err
+	}
+	if !strings.HasPrefix(row.Scene, constUtil.P13GuildRoomScopePrefix) {
+		return false, nil
 	}
 	p10SceneMutation.Lock()
 	defer p10SceneMutation.Unlock()
-	if tx.Model(&db.P10ScenePresence{}).Where("player_id=? AND session_hash=?", id, p6Digest(session)).Update("session_hash", "").Error == nil {
-		s.p10SceneBroadcast(ctx, row.Scene, row.Line, id, &pb.SCPlayerDisappear{PlayerId: []int64{id}})
+	if _, ok := p10LiveClient(p10ClientKey{s.p10ClientOwner(), id}); ok {
+		return true, nil
 	}
-	return true
+	if err := tx.Model(&db.P10ScenePresence{}).Where("player_id=? AND session_hash=?", id, p6Digest(session)).Update("session_hash", "").Error; err != nil {
+		return true, err
+	}
+	s.p10SceneBroadcast(ctx, row.Scene, row.Line, id, &pb.SCPlayerDisappear{PlayerId: []int64{id}})
+	return true, nil
 }
 func (s *GameService) AfterP13GuildRoomRevoke(ctx context.Context, ids []int64) {
 	tx := db.GetIns().WithContext(ctx)

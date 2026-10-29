@@ -133,20 +133,34 @@ func AuthorizeAccount(ctx context.Context, id int64, session []byte) (*db.Profil
 	if err := db.GetIns().WithContext(ctx).First(&row, id).Error; err != nil {
 		return nil, err
 	}
-	if len(session) != 16 || subtle.ConstantTimeCompare(row.Session, session) != 1 {
-		return nil, errors.New("本地会话无效，请重新登录")
-	}
-	if row.AccountID > 0 {
-		account, err := AccountForProfile(db.GetIns().WithContext(ctx), &row)
-		if err != nil || !account.Enabled || row.AccountAuthRevision != account.AuthRevision {
-			return nil, errors.New("账号登录已失效，请重新登录")
-		}
-	}
-	// 原协议和附加HTTP入口共享客户端运行资格。
-	if err := CheckClientUpdateSession(ctx, &row); err != nil {
+	if err := authorizeProfileSession(ctx, &row, session); err != nil {
 		return nil, err
 	}
 	return &row, nil
+}
+
+// authorizeP10Push reads only the identity columns required for a fresh push check.
+func authorizeP10Push(ctx context.Context, id int64, session []byte) error {
+	var row db.Profile
+	if err := db.GetIns().WithContext(ctx).Select("id", "session", "account_id", "account_auth_revision").First(&row, id).Error; err != nil {
+		return err
+	}
+	return authorizeProfileSession(ctx, &row, session)
+}
+
+// authorizeProfileSession keeps all authorization gates shared by full and push reads.
+func authorizeProfileSession(ctx context.Context, row *db.Profile, session []byte) error {
+	if len(session) != 16 || subtle.ConstantTimeCompare(row.Session, session) != 1 {
+		return errors.New("本地会话无效，请重新登录")
+	}
+	if row.AccountID > 0 {
+		account, err := AccountForProfile(db.GetIns().WithContext(ctx), row)
+		if err != nil || !account.Enabled || row.AccountAuthRevision != account.AuthRevision {
+			return errors.New("账号登录已失效，请重新登录")
+		}
+	}
+	// 原协议和附加HTTP入口共享客户端运行资格。
+	return CheckClientUpdateSession(ctx, row)
 }
 
 func decodeProfile(row *db.Profile) (*pb.Player, *model.GameState, error) {
