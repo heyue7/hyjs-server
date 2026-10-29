@@ -55,7 +55,7 @@ func TestP7ReRushCompleteCatalogueMatchesRecoveredReAnchors(t *testing.T) {
 		}
 		if row.Kind == constUtil.P7RushTrial {
 			preview := p7ReRushTaskProjection(row)
-			if preview.GetCoin() != (2000+row.Floor*500)*row.Star || preview.GetPoint() != (50+row.Floor*10)*row.Star {
+			if preview.GetCoin() != (2000+row.Floor*500)*row.Star || preview.GetPoint() != (10+row.Floor)*row.Star {
 				t.Fatal("original Ready reward projection", row.ID)
 			}
 		}
@@ -143,7 +143,7 @@ func TestP7ReRushMySQLFirstSectionOriginalEndRewardAdditionResetSweepCold(t *tes
 	var last *pb.CSRushFightEnd
 	for floor := int32(1); floor <= 3; floor++ {
 		tasks := call(&pb.CSRushCurrentInfo{}, 0)[0].(*pb.SCRushCurrentInfo).TaskInfoList
-		if len(tasks) != 3 || tasks[0].GetCoin() != (2000+floor*500) || tasks[0].GetPoint() != (50+floor*10) {
+		if len(tasks) != 3 || tasks[0].GetCoin() != (2000+floor*500) || tasks[0].GetPoint() != (10+floor) {
 			t.Fatal("actual Ready source", tasks)
 		}
 		start := call(&pb.CSRushFightStart{RushType: proto.Int32(1), TaskId: tasks[0].TaskId, Star: proto.Int32(1)}, 19400+int64(floor))[0].(*pb.SCRushFightStart)
@@ -178,7 +178,7 @@ func TestP7ReRushMySQLFirstSectionOriginalEndRewardAdditionResetSweepCold(t *tes
 		}
 	}
 	after, _ := f.profile(t)
-	if after.GetCoin()-before.GetCoin() != 9000 || after.GetPoint()-before.GetPoint() != 210 {
+	if after.GetCoin()-before.GetCoin() != 9000 || after.GetPoint()-before.GetPoint() != 36 {
 		t.Fatal("Re exact first three rewards", after.GetCoin()-before.GetCoin(), after.GetPoint()-before.GetPoint())
 	}
 	info := call(&pb.CSGetRushInfo{}, 0)[0].(*pb.SCGetRushInfo)
@@ -189,6 +189,10 @@ func TestP7ReRushMySQLFirstSectionOriginalEndRewardAdditionResetSweepCold(t *tes
 		t.Fatal("next section started before claiming and choosing")
 	}
 	claim := call(&pb.CSRushGetSectionReward{}, 19421)[0]
+	claimedPlayer, _ := f.profile(t)
+	if claimedPlayer.GetPoint()-after.GetPoint() != 30 {
+		t.Fatal("trial82 section point reward", claimedPlayer.GetPoint()-after.GetPoint())
+	}
 	options := call(&pb.CSRushGetSectionAddition{}, 0)[0].(*pb.SCRushGetSectionAddition)
 	if options.GetCostStar() != 3 || options.GetStarResult3() != "perhp,0.03" {
 		t.Fatal("Re original addition options", options)
@@ -230,7 +234,31 @@ func TestP7ReRushMySQLFirstSectionOriginalEndRewardAdditionResetSweepCold(t *tes
 	if len(sweep.SweepInfo) != 3 || sweep.SweepInfo[2].GetIsSectionEnd() != 1 || sweep.SweepInfo[2].GetSectionProp() != "" {
 		t.Fatal("original bounded sweep and section result", sweep)
 	}
+	pointGain := func(result *pb.ResultObject) int32 {
+		var amount int32
+		for _, item := range result.GetSimps() {
+			if item.GetId() == "point" {
+				amount += item.GetNum()
+			}
+		}
+		return amount
+	}
+	for index, info := range sweep.SweepInfo {
+		if pointGain(info.GetGain()) != int32(11+index) {
+			t.Fatal("trial82 per-floor sweep gain", info)
+		}
+		wantSection := int32(0)
+		if index == 2 {
+			wantSection = 30
+		}
+		if pointGain(info.GetSectionGain()) != wantSection {
+			t.Fatal("trial82 sweep section gain", info)
+		}
+	}
 	sweepPlayer, sweepGame := f.profile(t)
+	if sweepPlayer.GetPoint()-current.GetPoint() != 66 {
+		t.Fatal("trial82 sweep point reward", sweepPlayer.GetPoint()-current.GetPoint())
+	}
 	sweepState, err := p7State(db.GetIns(), f.id, time.Now())
 	if err != nil {
 		t.Fatal(err)

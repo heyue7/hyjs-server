@@ -74,7 +74,7 @@ func p7ReRushEnabled(tx *gorm.DB) (bool, error) {
 }
 
 func p7ReRushTaskProjection(stage db.P7RushStageRule) *pb.RushTaskInfo {
-	return &pb.RushTaskInfo{TaskId: proto.String(stage.TaskID), Star: proto.Int32(stage.Star), FightScore: proto.Float64(stage.RecommendedPower), IsPassed: proto.Bool(false), Coin: proto.Int32((2000 + stage.Floor*500) * stage.Star), Point: proto.Int32((50 + stage.Floor*10) * stage.Star)}
+	return &pb.RushTaskInfo{TaskId: proto.String(stage.TaskID), Star: proto.Int32(stage.Star), FightScore: proto.Float64(stage.RecommendedPower), IsPassed: proto.Bool(false), Coin: proto.Int32((2000 + stage.Floor*500) * stage.Star), Point: proto.Int32(trial82StagePoints(stage))}
 }
 
 func p7ReRushNavigation(floor int32) string {
@@ -159,7 +159,7 @@ func (s *GameService) p7ReRushEnemyConfigured(floor, star int32, eliteID string,
 }
 
 // p7ReRushCatalogue 批量生成102层三难度与原表全部精英，调用者负责事务发布。
-// 奖励保留 Re 的层数公式及单参 Amount 的原样返回行为，初始化不发奖。
+// 金币保留 Re 层数公式；攻略点采用试炼82预算，初始化不发奖。
 func (s *GameService) p7ReRushCatalogue(enabled bool) ([]db.P7RushStageRule, error) {
 	return s.p7ReRushCatalogueConfigured(enabled, defaultAdminTrialGeneration())
 }
@@ -179,7 +179,7 @@ func (s *GameService) p7ReRushCatalogueConfigured(enabled bool, cfg model.AdminT
 		prop := monster.Formation[0].Prop
 		power := math.RoundToEven((prop.GetHp()*.25 + prop.GetAtt()*6 + prop.GetPdef()*10 + prop.GetMdef()*10) * .1 * float64(min(cfg.MaxCount, cfg.InitialCount+(floor-1)/cfg.CountEveryFloors)))
 		// 当前轮 Floor 仅由实际结算/合法扫荡推进；保留既有来源玩家当前楼层。
-		row := db.P7RushStageRule{ID: fmt.Sprintf("re-rush:%d:%d", floor, star), Kind: constUtil.P7RushTrial, TaskID: fmt.Sprintf("local_rush_%d", floor), Floor: floor, Star: star, MinLevel: 22, Enabled: enabled, Scene: maps[((floor-1)/21)%5], MaxRound: 40, Enemies: enemy, Reward: fmt.Sprintf("coin,%d;point,%d", (2000+floor*500)*star, (50+floor*10)*star), RecommendedPower: power, Source: constUtil.P7ReRushSource}
+		row := db.P7RushStageRule{ID: fmt.Sprintf("re-rush:%d:%d", floor, star), Kind: constUtil.P7RushTrial, TaskID: fmt.Sprintf("local_rush_%d", floor), Floor: floor, Star: star, MinLevel: 22, Enabled: enabled, Scene: maps[((floor-1)/21)%5], MaxRound: 40, Enemies: enemy, Reward: fmt.Sprintf("coin,%d;point,%d", (2000+floor*500)*star, trial82FloorPoints(floor, star)), RecommendedPower: power, Source: constUtil.P7ReRushSource}
 		if eliteID != "" {
 			original := s.table("RushEliteBoss", "EliteTaskId", eliteID)
 			row.ID, row.Kind, row.TaskID, row.Star = "elite:"+eliteID, constUtil.P7RushElite, eliteID, 0

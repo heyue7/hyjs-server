@@ -866,15 +866,15 @@ func ValidateGameRequest(p *model.GamePacket) error {
 			return errors.New("Invalid shop catalogue")
 		}
 	case *pb.CSRefreshShopQuery:
-		if b.GetShopType() != 3 {
+		if b.GetShopType() != 3 && b.GetShopType() != 5 {
 			return errors.New("Invalid memory catalogue")
 		}
 	case *pb.CSRefreshShopRefresh:
-		if b.GetShopType() != 3 || p.Timestamp <= 0 {
+		if (b.GetShopType() != 3 && b.GetShopType() != 5) || p.Timestamp <= 0 {
 			return errors.New("Invalid memory refresh")
 		}
 	case *pb.CSRefreshShopBuy:
-		if b.GetShopType() != 3 || b.GetShopItemId() == "" || len(b.GetShopItemId()) > 256 || p.Timestamp <= 0 {
+		if (b.GetShopType() != 3 && b.GetShopType() != 5) || b.GetShopItemId() == "" || len(b.GetShopItemId()) > 256 || p.Timestamp <= 0 {
 			return errors.New("Invalid memory purchase")
 		}
 	case *pb.CSGetLoginReward:
