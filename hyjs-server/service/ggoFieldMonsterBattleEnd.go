@@ -234,7 +234,9 @@ func (s *GameService) ggoMonsterEndLocked(tx *gorm.DB, id int64, p *pb.Player, g
 		}
 		inputHash = p6Digest(raw)
 	}
-	if input.BattleType != 6 || input.Monster == nil || len(input.Monster.Formation) != 1 {
+	// Old in-flight battles contain one enemy; newer frozen starts may use the
+	// original multi-member formation. P6 admission validates every frozen actor.
+	if input.BattleType != 6 || input.Monster == nil || len(input.Monster.Formation) == 0 {
 		return nil, nil, false, errors.New("沙漠小怪冻结战斗无效")
 	}
 	if _, err = s.ValidateP6GenericMechanisms(tx.Statement.Context, input); err != nil {
@@ -243,6 +245,13 @@ func (s *GameService) ggoMonsterEndLocked(tx *gorm.DB, id int64, p *pb.Player, g
 	terminal, expected, err := s.ggoBattleTerminal(tx.Statement.Context, input, b.GetOptRecord(), b.GetResult(), b.GetBattlePlayer(), id, true)
 	if err != nil {
 		return nil, nil, false, err
+	}
+	// A verified record can only return the reported result. A discrepancy here
+	// therefore means the automatic fallback won after the client reported a
+	// defeat. The original serializer omits the default zero result on the wire.
+	// Preserve that loss; never accept a reported win as proof.
+	if expected == 1 && b.GetResult() == 0 {
+		expected = 0
 	}
 	if err = ggoMonsterApplyTerminal(input.Attacker, f.Side, terminal); err != nil {
 		return nil, nil, false, err
@@ -312,6 +321,9 @@ func (s *GameService) ggoMonsterEndLocked(tx *gorm.DB, id int64, p *pb.Player, g
 			receipt.DeliveryStatus = "pending_delivery"
 			receipt.TerminalRevision = g.GGOField.Revision
 			receipt.CreditBalance = ggoCreditBalance(g)
+			if e = s.ggoMonsterAwardPendingChips(p, g, &pending, receipt); e != nil {
+				return nil, nil, false, e
+			}
 			key := frozenFight.FightID
 			if e = ggoSaveReceipt(tx, id, ggoSystemReceiptID("monster-ready", key), constUtil.GGOFieldOpMonsterReady, p6Digest([]byte(key)), frozenFight.EconomyVersion, &key, [6]int64{}, 0, now, pending); e != nil {
 				return nil, nil, false, e
@@ -329,16 +341,21 @@ func (s *GameService) ggoMonsterEndLocked(tx *gorm.DB, id int64, p *pb.Player, g
 		}
 		monster.State = proto.Int32(1)
 		monster.CurHp = proto.Float64(1)
-		if f.Side.GetCurHp() <= 0 {
-			var lost [6]int64
-			lost, err = s.ggoPVEDeathLocked(tx, id, p, g, &frozenFight, now)
-			if err != nil {
-				return nil, nil, false, err
+		// A lost ordinary monster battle is a defeat even when the round limit
+		// or fallback leaves HP. Zero-HP terminal projection already counts it.
+		if f.Side.GetCurHp() > 0 {
+			if f.Side.GetKilleds() == math.MaxInt32 {
+				return nil, nil, false, errors.New("沙漠死亡次数溢出")
 			}
-			receipt.Lost = lost
-			receipt.TerminalRevision = g.GGOField.Revision
-			needRefresh = true
+			f.Side.Killeds = proto.Int32(f.Side.GetKilleds() + 1)
 		}
+		lost, err := s.ggoPVEDeathLocked(tx, id, p, g, &frozenFight, now)
+		if err != nil {
+			return nil, nil, false, err
+		}
+		receipt.Lost = lost
+		receipt.TerminalRevision = g.GGOField.Revision
+		needRefresh = true
 		gain = &pb.ResultObject{}
 	}
 	if receipt.CreditBalance < 0 {
@@ -351,10 +368,7 @@ func (s *GameService) ggoMonsterEndLocked(tx *gorm.DB, id int64, p *pb.Player, g
 		return nil, nil, false, err
 	}
 	key := frozenFight.FightID
-	delta := [6]int64{}
-	if receipt.DeliveryStatus == "delivered" {
-		delta = receipt.Chips
-	}
+	delta := receipt.Chips
 	side := g.Field.Side
 	result := &pb.SCSidePveFightEnd{Getn: gain, FightResult: proto.Int32(expected), Code: proto.Int32(1), Anger: side.Anger, State: side.State, Monster: monster}
 	for _, hp := range side.GetBattlePosHps() {

@@ -25,6 +25,8 @@ func defaultGGORuntime() *model.AdminFieldGGORuntime {
 			MaterialNumerator: 5, MaterialDenominator: 4,
 			Tiers: defaultGGOResourceTiers(),
 		},
+		// Per-member values match the original field groups at the same levels;
+		// each encounter uses four members at the original group positions.
 		MonsterTiers: []model.AdminFieldGGOMobTier{
 			{HeroID: "monster_026", Level: 35, Count: 10, HP: 28619, Attack: 5008, PhyDefend: 1431, MagicDefend: 1431, RespawnSeconds: 30, ChipTriggerBps: 2000, RewardNumerator: 1, RewardDenominator: 1},
 			{HeroID: "monster_032", Level: 45, Count: 8, HP: 48123, Attack: 8421, PhyDefend: 2406, MagicDefend: 2406, RespawnSeconds: 30, ChipTriggerBps: 3000, RewardNumerator: 3, RewardDenominator: 2},

@@ -28,6 +28,11 @@ namespace HYJS.DesertV4
         readonly Dictionary<string,UITexture> smallMarkers=new Dictionary<string,UITexture>();
         readonly Dictionary<string,UITexture> largeExits=new Dictionary<string,UITexture>();
         readonly Dictionary<AMMiniMapEntity,UISprite> largeResources=new Dictionary<AMMiniMapEntity,UISprite>();
+        sealed class BossMarker { public GameObject root; public UISprite icon; public UILabel label; }
+        BossMarker smallBoss,largeBoss;
+        AMMiniMap bossLeaseMap;
+        AMMiniMapEntity bossLeaseEntity;
+        string bossLeaseId;
         sealed class TeamLease { public AMMiniMap map; public AMMiniMapEntity entity; }
         readonly Dictionary<TeamMap86.Key,TeamLease> teamLeases=new Dictionary<TeamMap86.Key,TeamLease>();
         readonly Dictionary<TeamMap86.Key,UITexture> smallTeam=new Dictionary<TeamMap86.Key,UITexture>();
@@ -100,12 +105,13 @@ namespace HYJS.DesertV4
                 MiniMapComponent value=NativeInstance.GetValue(null) as MiniMapComponent;
                 MapViewer86 viewer=Ensure(value);
                 if (viewer!=null && Time.unscaledTime>=viewer.nextSmallRefresh)
-                { viewer.nextSmallRefresh=Time.unscaledTime+.25f; viewer.UpdateSmallMarkers(); viewer.UpdateSmallTeam(); }
+                { viewer.nextSmallRefresh=Time.unscaledTime+.25f; viewer.UpdateSmallBoss(); viewer.UpdateSmallMarkers(); viewer.UpdateSmallTeam(); }
             }
             catch (Exception error)
             {
                 if (instance!=null)
                 {
+                    instance.ClearSmallBoss();
                     instance.ClearSmallTeam();
                     if (!instance.reportedMiniFailure)
                     { instance.reportedMiniFailure=true; Debug.LogWarning("Desert map markers: "+error.GetType().Name+": "+error.Message); }
@@ -180,7 +186,81 @@ namespace HYJS.DesertV4
         static void RemoveTexture(UITexture widget)
         { if (widget!=null) { widget.gameObject.SetActive(false); Destroy(widget.gameObject); } }
         void ClearSmall()
-        { ClearSmallTeam(); foreach (UITexture item in smallMarkers.Values) RemoveTexture(item); smallMarkers.Clear(); }
+        { ClearSmallBoss(); ClearSmallTeam(); foreach (UITexture item in smallMarkers.Values) RemoveTexture(item); smallMarkers.Clear(); }
+
+        UIAtlas BossAtlas()
+        {
+            UISprite frame=Need(source.transform,"small/ForegroundPanel/foreground2/frame").GetComponent<UISprite>();
+            UIAtlas atlas=frame==null ? null : frame.atlas;
+            if (atlas==null || atlas.GetSprite("UI_ditu_boss")==null) throw new InvalidOperationException("native boss map sprite unavailable");
+            return atlas;
+        }
+        BossMarker NewBossMarker(Transform parent,int size,int depth)
+        {
+            GameObject root=new GameObject("DesertBoss"); root.layer=parent.gameObject.layer; Parent(root.transform,parent);
+            try
+            {
+                GameObject iconObject=new GameObject("Icon"); iconObject.layer=root.layer; Parent(iconObject.transform,root.transform);
+                UISprite icon=iconObject.AddComponent<UISprite>(); icon.atlas=BossAtlas(); icon.spriteName="UI_ditu_boss";
+                icon.pivot=UIWidget.Pivot.Center; icon.width=size; icon.height=size; icon.depth=depth;
+                GameObject prefab=Resources.Load("Pages/TownMapPage") as GameObject;
+                UILabel template=prefab==null ? null : Need(prefab.transform,"top").GetComponentInChildren<UILabel>();
+                if (template==null) throw new InvalidOperationException("native map label unavailable");
+                GameObject textObject=Clone(template.transform,root.transform,"BossState");
+                foreach (Transform child in textObject.transform) Destroy(child.gameObject);
+                UILabel label=textObject.GetComponent<UILabel>();
+                foreach (MonoBehaviour component in label.GetComponents<MonoBehaviour>())
+                    if (component!=null && component.GetType().Name=="TextKit") DestroyImmediate(component);
+                label.pivot=UIWidget.Pivot.Center; label.alignment=NGUIText.Alignment.Center;
+                label.width=84; label.height=18; label.fontSize=size>21 ? 14 : 12; label.maxLineCount=1;
+                label.overflowMethod=UILabel.Overflow.ShrinkContent; label.depth=depth+1; label.color=Color.white;
+                label.effectStyle=UILabel.Effect.Outline; label.effectColor=Color.black;
+                textObject.transform.localPosition=new Vector3(0,-size*.5f-8,0);
+                return new BossMarker { root=root,icon=icon,label=label };
+            }
+            catch (Exception) { root.SetActive(false); Destroy(root); throw; }
+        }
+        static void SetBossState(BossMarker marker,string state)
+        {
+            marker.icon.color=state=="active" ? Color.white : new Color(.58f,.58f,.58f,1f);
+            if (state=="active") marker.label.text="首领出现";
+            else if (state=="waiting") marker.label.text="待刷新";
+            else if (state=="defeated") marker.label.text="已击败";
+            else if (state=="expired") marker.label.text="已消失";
+            else marker.label.text="待确认";
+        }
+        static void RemoveBossMarker(BossMarker marker)
+        { if (marker!=null && marker.root!=null) { marker.root.SetActive(false); Destroy(marker.root); } }
+        void RestoreBossLease()
+        {
+            try
+            {
+                if (bossLeaseMap!=null && bossLeaseEntity!=null && bossLeaseMap.GetEntity(bossLeaseId)==bossLeaseEntity && !bossLeaseEntity.Show)
+                    bossLeaseEntity.Show=true;
+            }
+            catch (Exception) { } // the native map may already be tearing down
+            finally { bossLeaseMap=null; bossLeaseEntity=null; bossLeaseId=null; }
+        }
+        void ClearSmallBoss()
+        { RestoreBossLease(); RemoveBossMarker(smallBoss); smallBoss=null; }
+        void UpdateSmallBoss()
+        {
+            AMMiniMap map=Map(); string id,state; Vector3 position;
+            if (map==null || !map.Initialized || map.OffsetRoot==null || !FieldBoss.MapMarker(ownerRoom,out id,out position,out state))
+            { ClearSmallBoss(); return; }
+            if (smallBoss!=null && (smallBoss.root==null || smallBoss.root.transform.parent!=map.OffsetRoot)) ClearSmallBoss();
+            AMMiniMapEntity entity=map.GetEntity(id);
+            if (bossLeaseEntity!=null && (bossLeaseMap!=map || bossLeaseId!=id || bossLeaseEntity!=entity || entity.SpriteName!="UI_ditu_boss"))
+                RestoreBossLease();
+            if (entity!=null && entity.SpriteName=="UI_ditu_boss")
+            {
+                if (bossLeaseEntity==null && entity.Show) { bossLeaseMap=map; bossLeaseEntity=entity; bossLeaseId=id; }
+                if (bossLeaseEntity==entity) entity.Show=false;
+            }
+            if (smallBoss==null) smallBoss=NewBossMarker(map.OffsetRoot,21,24);
+            SetBossState(smallBoss,state);
+            float scale=SceneScale(); smallBoss.root.transform.localPosition=new Vector3(position.x*scale,position.z*scale,0);
+        }
 
         Texture2D TeamDot()
         {
@@ -401,6 +481,7 @@ namespace HYJS.DesertV4
             foreach (UITexture item in largeTeam.Values) RemoveTexture(item); largeTeam.Clear();
             foreach (UISprite item in largeResources.Values) if (item!=null) Destroy(item.gameObject);
             largeResources.Clear();
+            RemoveBossMarker(largeBoss); largeBoss=null;
             if (view!=null) { view.SetActive(false); Destroy(view); }
             view=null; mask=null; background=null; heading=null; closeButton=null; clipRoot=null; chromeRoot=null; mapRoot=null; panel=null; clip=null; chrome=null; mapImage=null; selfMarker=null;
             dragFinger=pinchA=pinchB=-1; mouseDragging=false;
@@ -449,6 +530,7 @@ namespace HYJS.DesertV4
             foreach (UITexture marker in largeExits.Values) if (marker!=null) marker.transform.localScale=markerScale;
             foreach (UISprite marker in largeResources.Values) if (marker!=null) marker.transform.localScale=markerScale;
             foreach (UITexture marker in largeTeam.Values) if (marker!=null) marker.transform.localScale=markerScale;
+            if (largeBoss!=null && largeBoss.root!=null) largeBoss.root.transform.localScale=markerScale;
         }
         Vector2 ScreenToView(Vector2 position)
         {
@@ -543,8 +625,19 @@ namespace HYJS.DesertV4
         }
         void UpdateLargeMarkers()
         {
-            AMMiniMap map=Map(); if (map==null) return;
+            AMMiniMap map=Map();
+            if (map==null) { RemoveBossMarker(largeBoss); largeBoss=null; return; }
             float scale=SceneScale(); Vector2 offset=SceneOffset();
+            string bossId,bossState; Vector3 bossPosition;
+            if (!FieldBoss.MapMarker(ownerRoom,out bossId,out bossPosition,out bossState))
+            { RemoveBossMarker(largeBoss); largeBoss=null; }
+            else
+            {
+                if (largeBoss==null || largeBoss.root==null) largeBoss=NewBossMarker(mapRoot,26,24);
+                SetBossState(largeBoss,bossState);
+                largeBoss.root.transform.localPosition=RelativePosition(new Vector2(bossPosition.x*scale,bossPosition.z*scale),offset,scale);
+                largeBoss.root.transform.localScale=Vector3.one/zoom;
+            }
 
             Dictionary<string,Vector3> exits=FieldRuntime.ExtractionMapPositions(); var oldExits=new List<string>();
             foreach (string id in largeExits.Keys) if (!exits.ContainsKey(id)) oldExits.Add(id);

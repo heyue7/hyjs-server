@@ -29,10 +29,22 @@ namespace HYJS.DesertV4
         FightEndRecord pending;
         string resumedFight="",resumedHash="";
         int resumedType;
+        static MonsterRewardView monsterRewardView;
+        static FieldWire.Session monsterRewardOwner;
         static bool SameActor(FieldWire.Session a,FieldWire.Session b)
         { return a!=null && b!=null && a.playerId==b.playerId && a.origin==b.origin; }
         static bool SameSession(FieldWire.Session a,FieldWire.Session b)
         { return SameActor(a,b) && a.sessionHex==b.sessionHex; }
+        public static ResultObject MonsterRewardDisplay(ResultObject original)
+        {
+            FieldWire.Session owner;
+            if (!Target() || monsterRewardView==null || !FieldWire.Current(out owner) || !SameActor(owner,monsterRewardOwner) ||
+                StaticData.curBattleData==null || (int)StaticData.curBattleData.battleType!=6) return original;
+            ResultObject projected=monsterRewardView.Project(StaticData.curBattleData.fightId,original);
+            if (System.Object.ReferenceEquals(projected,original)) return original;
+            try { TradePanel.RegisterIcons(); return projected; }
+            catch (Exception) { try { Notice("芯片已存入临时终端"); } catch (Exception) { } return original; }
+        }
         static bool Target() { return StaticData.fieldId=="field_003"; }
         static bool Hex(string value,int length)
         {
@@ -287,6 +299,14 @@ namespace HYJS.DesertV4
                         object native=PBConvert.toObject(NativeResponseOpcode(type),bytes);
                         if ((type==6 && !(native is SCSidePveFightEnd)) || (type==12 && !(native is SCSidePveBossFightEnd)))
                             throw new InvalidOperationException("Wrong native receipt type");
+                        if (type==6)
+                        {
+                            // The native response stays untouched for its later inventory update.
+                            // Receipt data is bound to this owner and fight for display only.
+                            monsterRewardView=null; monsterRewardOwner=null;
+                            try { monsterRewardView=MonsterRewardView.FromReceipt(expected.fightId,d); monsterRewardOwner=owner; }
+                            catch (Exception) { }
+                        }
                         if (CurrentBattleMatches(type,expected.fightId))
                         {
                             if (nativeOwner==null || (type==6 && !(nativeOwner is Battle.FieldPVEBattleOver)) ||

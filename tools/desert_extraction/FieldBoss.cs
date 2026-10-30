@@ -22,6 +22,7 @@ namespace HYJS.DesertV4
         }
         readonly RoomCharactorManager manager;
         readonly Action refresh;
+        static FieldBoss mapOwner;
         Event current;
         string shownWarning="";
         long receivedTicks,lastRefresh;
@@ -43,7 +44,27 @@ namespace HYJS.DesertV4
         void Remove(Event e)
         { if (e!=null && !String.IsNullOrEmpty(e.id) && manager.GetCharactor(e.id)!=null) manager.DestroyCharactor(e.id); }
         public void Clear()
-        { Remove(current); current=null; shownWarning=""; }
+        {
+            if (System.Object.ReferenceEquals(mapOwner,this)) mapOwner=null;
+            try { Remove(current); }
+            finally { current=null; shownWarning=""; }
+        }
+        // The map reads only a validated event belonging to the current room.
+        // Crossing a scheduled boundary needs a fresh server state; the local
+        // clock alone must never claim that a boss has appeared or survived.
+        public static bool MapMarker(RoomBase room,out string id,out Vector3 position,out string state)
+        {
+            id=null; position=Vector3.zero; state=null;
+            FieldBoss owner=mapOwner;
+            if (owner==null || owner.current==null || room==null || room!=RoomManager.currentRoom ||
+                room.charactorManager!=owner.manager || StaticData.fieldId!="field_003") return false;
+            Event e=owner.current;
+            long elapsed=(Stopwatch.GetTimestamp()-owner.receivedTicks)*1000/Stopwatch.Frequency;
+            long now=e.serverTime+Math.Max(0,elapsed);
+            id=e.id; position=e.position; state=e.state;
+            if ((state=="waiting" && now>=e.start) || (state=="active" && now>=e.end)) state="syncing";
+            return true;
+        }
         public bool CanInteract(string id,RoomCharactor actor)
         {
             return current!=null && current.state=="active" && current.hp>0 && current.id==id && actor!=null &&
@@ -84,7 +105,7 @@ namespace HYJS.DesertV4
                 ((RCAIFieldBoss)actor.ai).SetHp((float)side.curHp);
             }
             if (current==null || current.id!=e.id) shownWarning="";
-            current=e; receivedTicks=Stopwatch.GetTimestamp();
+            current=e; receivedTicks=Stopwatch.GetTimestamp(); mapOwner=this;
             Tick();
         }
         public void Tick()

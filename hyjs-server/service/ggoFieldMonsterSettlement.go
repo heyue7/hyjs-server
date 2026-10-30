@@ -130,6 +130,39 @@ func (s *GameService) ggoMonsterAward(p *pb.Player, g *model.GameState, pending 
 	return out, false, nil
 }
 
+// A full ordinary inventory must not hold back an independently deliverable
+// chip. The caller saves this receipt, the reduced pending award and the
+// profile in the same transaction, so retrying the ordinary claim cannot
+// grant the chip again. Older pending awards retain their frozen chips.
+func (s *GameService) ggoMonsterAwardPendingChips(p *pb.Player, g *model.GameState, pending *ggoPendingMonster, receipt *model.GGOFieldMonsterReceipt) error {
+	if pending == nil || receipt == nil || receipt.DeliveryStatus != "pending_delivery" || pending.FightID != receipt.FightID {
+		return errors.New("沙漠小怪待领回执无效")
+	}
+	if pending.Chips == ([6]int64{}) {
+		return nil
+	}
+	if receipt.Chips != ([6]int64{}) {
+		return errors.New("沙漠小怪芯片回执重复")
+	}
+	if g != nil && g.GGOField != nil && g.GGOField.Revision == math.MaxInt64 {
+		return nil
+	}
+	chipOnly := *pending
+	chipOnly.Reward = ""
+	delivered, full, err := s.ggoMonsterAward(p, g, &chipOnly)
+	if err != nil {
+		return err
+	}
+	if full {
+		return nil
+	}
+	receipt.Chips = delivered.Chips
+	receipt.TerminalRevision = delivered.TerminalRevision
+	receipt.CreditBalance = delivered.CreditBalance
+	pending.Chips = [6]int64{}
+	return nil
+}
+
 func (s *GameService) GGOFieldMonsterReceipt(ctx context.Context, req model.GGOFieldMonsterReceiptRequest, session []byte) (*model.GGOFieldMonsterReceipt, error) {
 	var out model.GGOFieldMonsterReceipt
 	err := s.ggoWithProfile(ctx, req.GGOFieldAuth, session, false, false, func(tx *gorm.DB, a *ggoFieldActor) error {

@@ -32,6 +32,8 @@ var beforeEncounter=Hook("BeforeEncounter",b,i4,str); var fightStart=Hook("Fight
 var patrol=Hook("MonsterPatrolTick",v,obj); var preserve=Hook("PreserveBattle",b);
 var tcpConnecting=Hook("TcpConnecting",v); var tcpLogin=Hook("TcpLoginResponse",v,obj);
 var endSend=Hook("FightEndSend",v,i4,obj,obj); var endResponse=Hook("FightEndResponse",b,i4,obj,obj);
+var resultObjectType=module.GetTypes().Single(t=>t.FullName=="ProtoBuf.Message.ResultObject");
+var monsterRewardDisplay=Hook("MonsterRewardDisplay",new ClassSig(resultObjectType),new ClassSig(resultObjectType));
 var legacyObserve=Hook("LegacyBossObserve",v,obj,obj); var legacyCompleted=Hook("LegacyBossCompleted",v,obj,obj);
 var transferSend=Hook("TransferSend",b,i4,obj); var transferResponse=Hook("TransferResponse",b,i4,obj,obj);
 var trackBase=Hook("TrackPositionBase",v,obj,obj);
@@ -250,6 +252,15 @@ foreach(var item in new[]{(Type:6,Class:"Battle.FieldPVEBattleOver",Reply:"Field
   if(observe.Length!=1 || complete.Length!=1) throw new InvalidOperationException("Original boss settlement bridge changed");
   observe[0].Operand=legacyObserve; complete[0].Operand=legacyCompleted;
  }
+}
+{
+ var m=Get("Battle.CopyBalance","Refresh");
+ var instructions=m.Body.Instructions;
+ var matches=instructions.Where((x,index)=>Match(x,"Battle.CopyBalance","GetResultItem") && index>0 &&
+     Match(instructions[index-1],"ProtoBuf.Message.SCSidePveFightEnd","get_getn")).ToArray();
+ if(matches.Length!=1 || matches[0].OpCode!=OpCodes.Call)
+  throw new InvalidOperationException("Original monster reward display changed");
+ instructions.Insert(instructions.IndexOf(matches[0]),Instruction.Create(OpCodes.Call,monsterRewardDisplay));
 }
 var options=new ModuleWriterOptions(module);
 options.MetadataOptions.Flags |= MetadataFlags.PreserveAll | MetadataFlags.KeepOldMaxStack;

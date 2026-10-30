@@ -124,6 +124,7 @@ namespace HYJS.DesertV4
         public static void TcpLoginResponse(object value) { PositionSync.LoginResponse(value); BattleRecovery.LoginResponse(value); PvpBridge.LoginResponse(value); }
         public static void FightEndSend(int opcode,object value,object over) { BattleRecovery.SendEnd(opcode,value,over); }
         public static bool FightEndResponse(int type,object over,object value) { return BattleRecovery.InterceptEnd(type,over,value); }
+        public static ResultObject MonsterRewardDisplay(ResultObject original) { return BattleRecovery.MonsterRewardDisplay(original); }
         public static void LegacyBossObserve(object over,object value)
         { if (!Target()) LocalFieldSettlement.Observe(over,value); }
         public static void LegacyBossCompleted(object over,object value)

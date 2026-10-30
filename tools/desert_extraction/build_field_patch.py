@@ -77,8 +77,8 @@ REPLACEMENTS={
  'Battle.FieldPVEBossBattleOver::AskFieldPVEFightResult':{'FightEndSend':'SendSocket','LegacyBossObserve':'Observe'},
  'Battle.FieldPVEBossBattleOver::FieldPVEBossFightResultHandler':{'LegacyBossCompleted':'Completed'},
 }
-EXTRAS={'BoxManager::CreateSocketReconnect','NetWork.Sockets.Event.EventManger::Tick','Room.RoomNetBase::SCCurrentPosition','Room.RoomNetField::SCCurrentPosition','Room.RoomField::OnLoadComplete','StaticData::InitPlayerData'} | set(REPLACEMENTS)
-SOURCES=('GatherAttempt.cs','NestedArrayJson.cs','FieldWire.cs','GatherJournalStore.cs','FieldResources.cs','GatherPreload.cs','NativeGatherUI.cs','GatherCoordinator.cs','ProtectionRelease.cs','FieldRuntime.cs','PendingRequest.cs','TerminalController.cs','FieldNpcs.cs','FieldMonsters.cs','FieldBoss.cs','PositionSync.cs','TravelController.cs','LeaveController.cs','TradeController.cs','TradePanel.cs','FightEndJournal.cs','BattleRecovery.cs','ColdBattleRecovery.cs','PvpBridge.cs','MapViewer86.cs','TeamMap86.cs')
+EXTRAS={'BoxManager::CreateSocketReconnect','NetWork.Sockets.Event.EventManger::Tick','Room.RoomNetBase::SCCurrentPosition','Room.RoomNetField::SCCurrentPosition','Room.RoomField::OnLoadComplete','StaticData::InitPlayerData','Battle.CopyBalance::Refresh'} | set(REPLACEMENTS)
+SOURCES=('GatherAttempt.cs','NestedArrayJson.cs','FieldWire.cs','GatherJournalStore.cs','FieldResources.cs','GatherPreload.cs','NativeGatherUI.cs','GatherCoordinator.cs','ProtectionRelease.cs','FieldRuntime.cs','PendingRequest.cs','TerminalController.cs','FieldNpcs.cs','FieldMonsters.cs','FieldBoss.cs','PositionSync.cs','TravelController.cs','LeaveController.cs','TradeController.cs','TradePanel.cs','FightEndJournal.cs','MonsterRewardView.cs','BattleRecovery.cs','ColdBattleRecovery.cs','PvpBridge.cs','MapViewer86.cs','TeamMap86.cs')
 MAP_ICON=HERE/'assets/evacuation-npc.png'
 
 def sha(raw): return hashlib.sha256(raw).hexdigest()
@@ -188,6 +188,14 @@ def verify(before,after):
             require(j>0 and name_for(right,y[j-1][1],old_names)=='ClearSocketBox' and y[j+1][0]=='brtrue','Wrong reconnect guard placement')
             target=y[j+1][1]; require(y[target]==('ldstr','UI/MessageBox/NetError'),'Wrong original reconnect view')
             remove.update((j,j+1))
+        if name=='Battle.CopyBalance::Refresh':
+            found=[j for j,q in enumerate(y) if hook_for(right,q)=='MonsterRewardDisplay']
+            require(len(found)==1,'Missing monster reward projection'); j=found[0]
+            require(j>0 and j+1<len(y) and name_for(right,y[j-1][1],old_names)=='get_getn' and
+                    name_for(right,y[j+1][1],old_names)=='GetResultItem' and y[j+1][0]=='call',
+                    'Monster reward projection is not on the original display-only path')
+            require(hook_owner(right,y[j])=='HYJS.DesertV4.FieldHooks','Wrong monster reward projection owner')
+            remove.add(j)
         if name=='NetWork.Sockets.Event.EventManger::Tick':
             found=[j for j,q in enumerate(y) if hook_for(right,q)=='DropPositionPacket']
             require(len(found)==1,'Missing position event epoch guard'); j=found[0]

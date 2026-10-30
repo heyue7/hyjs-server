@@ -95,7 +95,9 @@ func TestGGOBattleFallbackUsesFrozenResult(t *testing.T) {
 			end := ggoResume86EndRequest(t, fixture)
 			switch request := end.(type) {
 			case *pb.CSSidePveFightEnd:
-				request.OptRecord, request.Result, request.BattlePlayer = badRecord, proto.Int32(1-expected), nil
+				// A mismatched explicit monster loss has its own conservative
+				// settlement test; this case isolates invalid-record fallback.
+				request.OptRecord, request.Result, request.BattlePlayer = badRecord, proto.Int32(expected), nil
 			case *pb.CSSidePveBossFightEnd:
 				request.OptRecord, request.Result = nil, proto.Int32(1-expected)
 			}
@@ -176,7 +178,7 @@ func TestGGOBattleFallbackUsesFrozenResult(t *testing.T) {
 			}
 			changed := proto.Clone(end)
 			if request, ok := changed.(*pb.CSSidePveFightEnd); ok {
-				request.Result = proto.Int32(expected)
+				request.Result = proto.Int32(1 - expected)
 			} else {
 				changed.(*pb.CSSidePveBossFightEnd).Result = proto.Int32(expected)
 			}

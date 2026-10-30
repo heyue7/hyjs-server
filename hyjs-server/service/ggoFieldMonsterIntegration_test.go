@@ -58,7 +58,7 @@ func TestGGOMonsterNativeStartEndFrozenPolicy(t *testing.T) {
 		t.Fatal("native start", err)
 	}
 	start := startMessages[0].(*pb.SCSidePveFightStart)
-	if start.GetCode() != 1 || len(start.BattleMonsterList) != 1 || len(start.BattleMonsterList[0].Formation) != 1 {
+	if start.GetCode() != 1 || len(start.BattleMonsterList) != 1 || len(start.BattleMonsterList[0].Formation) != 4 {
 		t.Fatal("invalid native start")
 	}
 	_, game := f.profile(t)
@@ -68,6 +68,24 @@ func TestGGOMonsterNativeStartEndFrozenPolicy(t *testing.T) {
 	input, err := fieldBossFrozenInput(game.Field.Fight)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if !proto.Equal(start.BattleMonsterList[0], input.Monster) {
+		t.Fatal("native start and frozen monster formation differ")
+	}
+	// Published tuning affects future fights only, including after profile reload.
+	for i := range cfg.Runtime.MonsterTiers {
+		if cfg.Runtime.MonsterTiers[i].Level == node.Level && cfg.Runtime.MonsterTiers[i].HeroID == node.HeroID {
+			cfg.Runtime.MonsterTiers[i].HP++
+		}
+	}
+	_, reloaded := f.profile(t)
+	restored, err := fieldBossFrozenInput(reloaded.Field.Fight)
+	if err != nil || !proto.Equal(restored.Monster, input.Monster) {
+		t.Fatal("frozen monster formation changed after configuration edit", err)
+	}
+	retried, err := f.s.fieldFightStart(ctx, f.id, &pb.CSSidePveFightStart{MonsterId: proto.String(node.UUID)})
+	if err != nil || len(retried) != 1 || !proto.Equal(retried[0], start) {
+		t.Fatal("active battle start changed after configuration edit", err)
 	}
 	cfg.Rules.DeathLossPercent = ggoInt64(100)
 	beforeRaw, _ := json.Marshal(input)
