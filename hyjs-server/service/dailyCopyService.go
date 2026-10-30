@@ -595,6 +595,17 @@ func validateDailyCopyEnd(start *pb.SCDailyCopyFightStart, request *pb.CSDailyCo
 	return nil
 }
 
+// The same ownership, round and HP checks apply to settlement. Skills and
+// transforms are playback data and are independently checked when requested.
+func validateDailyCopySettlement(start *pb.SCDailyCopyFightStart, request *pb.CSDailyCopyFightEnd) error {
+	if request == nil || request.GetOptRecord() == nil {
+		return errors.New(constUtil.DailyCopyBattleError)
+	}
+	op := request.GetOptRecord()
+	core := &pb.CSDailyCopyFightEnd{ChapterId: request.ChapterId, FightId: request.FightId, IsWin: request.IsWin, OptRecord: &pb.BattleOperate{FinalRoundNum: op.FinalRoundNum, AttackerTotalLeftHp: op.AttackerTotalLeftHp, DefenderTotalLeftHp: op.DefenderTotalLeftHp}}
+	return validateDailyCopyEnd(start, core)
+}
+
 func (s *GameService) dailyCopyGain(player *pb.Player, game *model.GameState, reward string) (*pb.ResultObject, error) {
 	gain := &pb.ResultObject{}
 	if reward == "" {
@@ -652,12 +663,19 @@ func (s *GameService) dailyCopyEnd(tx *gorm.DB, player *pb.Player, game *model.G
 		return nil, false, err
 	}
 	if fight.Settled {
-		if !bytes.Equal(raw, fight.EndRequest) || len(fight.Response) == 0 {
+		if len(fight.Response) == 0 {
 			return nil, false, errors.New(constUtil.DailyCopyReplayError)
 		}
 		result := &pb.SCDailyCopyFightEnd{}
 		if err := proto.Unmarshal(fight.Response, result); err != nil {
 			return nil, false, err
+		}
+		if !bytes.Equal(raw, fight.EndRequest) {
+			start, startErr := decodeDailyCopyStart(&fight)
+			saved, savedErr := dailyCopyRecoverEndCore(fight.EndRequest)
+			if startErr != nil || savedErr != nil || validateDailyCopySettlement(start, saved) != nil || validateDailyCopySettlement(start, request) != nil || !dailyCopySameEndCore(saved, request) || result.GetIsWin() != saved.GetIsWin() {
+				return nil, false, errors.New(constUtil.DailyCopyReplayError)
+			}
 		}
 		if err := s.validateP5GrowthReceipt(game, result); err != nil {
 			return nil, false, err
@@ -668,7 +686,7 @@ func (s *GameService) dailyCopyEnd(tx *gorm.DB, player *pb.Player, game *model.G
 	if err != nil {
 		return nil, false, err
 	}
-	if err := validateDailyCopyEnd(start, request); err != nil {
+	if err := validateDailyCopySettlement(start, request); err != nil {
 		return nil, false, err
 	}
 	var state db.DailyCopyState

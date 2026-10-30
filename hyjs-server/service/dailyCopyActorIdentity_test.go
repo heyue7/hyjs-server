@@ -34,8 +34,8 @@ func TestDailyCopyOriginalCampUID(t *testing.T) {
 	for _, invalid := range []string{"1_" + actor.GetGuid(), "0_" + enemy.GetGuid(), "0_foreign-instance"} {
 		forged := proto.Clone(finish).(*pb.CSDailyCopyFightEnd)
 		forged.OptRecord.SkillOpts[0].ActorUid = proto.String(invalid)
-		if _, err := s.dailyCopyAt(ctx, id, forged, 101, now); err == nil {
-			t.Fatal("forged original camp/instance accepted", invalid)
+		if err := validateDailyCopyEnd(start, forged); err == nil {
+			t.Fatal("forged original camp/instance accepted for playback", invalid)
 		}
 	}
 	aliases := proto.Clone(finish).(*pb.CSDailyCopyFightEnd)
@@ -67,8 +67,8 @@ func TestDailyCopyOriginalCampUID(t *testing.T) {
 	if err != nil || !proto.Equal(settled[0], replay[0]) {
 		t.Fatal("original operations cold receipt changed", err)
 	}
-	if _, err := s.dailyCopyAt(ctx, id, historical, 104, now); err == nil {
-		t.Fatal("stored original operation bytes silently rewritten as a different receipt")
+	if recovered, err := s.dailyCopyAt(ctx, id, historical, 104, now); err != nil || !proto.Equal(settled[0], recovered[0]) {
+		t.Fatal("same result with different playback did not recover receipt", err)
 	}
 	var quota db.DailyCopyState
 	if err := db.GetIns().First(&quota, "player_id=? AND day=? AND type=?", id, dailyCopyDay(now), "PetEquip").Error; err != nil || quota.Used != 1 || quota.Limit != 3 {
