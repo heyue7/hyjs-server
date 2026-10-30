@@ -280,7 +280,7 @@ func (s *GameService) p7StagePrerequisite(tx *gorm.DB, id int64, stage db.P7Rush
 		}
 		end := &pb.CSRushFightEnd{}
 		result := &pb.SCRushFightEnd{}
-		if proto.Unmarshal(fight.EndRequest, end) != nil || proto.Unmarshal(fight.Result, result) != nil || end.GetFightId() != fight.ID || end.GetResult() != 1 || result.GetResult() != 1 || result.GetStar() != rule.Star {
+		if proto.Unmarshal(fight.EndRequest, end) != nil || proto.Unmarshal(fight.Result, result) != nil || end.GetFightId() != fight.ID || result.GetResult() != 1 || result.GetStar() != rule.Star {
 			continue
 		}
 		// 复用冻结来源校验，单独插入进度、战斗结果或诊断实例均不能满足此桥。
@@ -968,11 +968,18 @@ func (s *GameService) p7End(ctx context.Context, id int64, request *pb.CSRushFig
 					return err
 				}
 			}
-			_, scoped, err := p7ReadScopedRush(tx, &fight, request)
+			outcome, scoped, err := p7ReadScopedRush(tx, &fight, request)
 			if err != nil {
 				return err
 			}
 			if scoped {
+				actual := int32(0)
+				if outcome != nil && outcome.Winner == 0 {
+					actual = 1
+				}
+				if outcome == nil || !outcome.Authoritative || result.GetResult() != actual {
+					return errors.New("试炼结果与权威终局不一致")
+				}
 				if err = s.p7ValidateScopedAward(tx, id, g, result); err != nil {
 					return err
 				}
@@ -1004,7 +1011,7 @@ func (s *GameService) p7End(ctx context.Context, id int64, request *pb.CSRushFig
 		if json.Unmarshal(fight.Rule, &cfg) != nil {
 			return errors.New("试炼任务快照损坏")
 		}
-		if request.GetOptRecord() == nil {
+		if !scoped && request.GetOptRecord() == nil {
 			return errors.New("试炼结算缺少原操作记录")
 		}
 		outcome := scopedOutcome
@@ -1021,7 +1028,7 @@ func (s *GameService) p7End(ctx context.Context, id int64, request *pb.CSRushFig
 		if outcome.Winner == 0 {
 			won = 1
 		}
-		if request.GetResult() != won {
+		if !scoped && request.GetResult() != won {
 			return errors.New("客户端试炼结果与冻结计算不符")
 		}
 		state, err := p7State(tx, id, time.Now())

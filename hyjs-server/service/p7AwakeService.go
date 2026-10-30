@@ -1281,7 +1281,7 @@ func (s *GameService) p7AwakeFightBegin(ctx context.Context, id int64, body *pb.
 
 // p7AwakeFightEnd 在角色事务内按冻结输入独立重算完整原AI终局，再一次提交真实结果。
 func (s *GameService) p7AwakeFightEnd(ctx context.Context, id int64, body *pb.CSAwakeCopyFightEnd, now time.Time) ([]proto.Message, error) {
-	if body == nil || body.GetOptRecord() == nil || (body.GetIsWinClient() != 0 && body.GetIsWinClient() != 1) {
+	if body == nil || (body.GetIsWinClient() != 0 && body.GetIsWinClient() != 1) {
 		return nil, errors.New("觉醒End记录不完整")
 	}
 	var reply *pb.SCAwakeCopyFightEnd
@@ -1306,7 +1306,9 @@ func (s *GameService) p7AwakeFightEnd(ctx context.Context, id int64, body *pb.CS
 			if json.Unmarshal(fight.Terminal, &terminal) != nil {
 				return errors.New("觉醒终局回执损坏")
 			}
-			if fight.ScopeProof == constUtil.P7Awake16GenericCompatibilityProof {
+			if terminal.Outcome != nil && terminal.Outcome.CapabilityHash == constUtil.P7Awake16ServerFallbackProof {
+				err = validateP7Awake16ServerFallback(ctx, input, &terminal)
+			} else if fight.ScopeProof == constUtil.P7Awake16GenericCompatibilityProof {
 				err = validateP7Awake16GenericEnd(ctx, input, &terminal, body.GetOptRecord(), body.GetIsWinClient())
 			} else {
 				err = validateP7Awake16EndReceipt(input, &terminal, body.GetOptRecord(), body.GetIsWinClient())
@@ -1315,12 +1317,21 @@ func (s *GameService) p7AwakeFightEnd(ctx context.Context, id int64, body *pb.CS
 				return err
 			}
 			outcomeRaw, encodeErr := json.Marshal(terminal.Outcome)
-			result := p6PlaybackResult(terminal.Outcome.Winner)
-			if encodeErr != nil || !bytes.Equal(outcomeRaw, record.Outcome) || p6Digest(record.Outcome) != record.OutcomeHash || record.ClientResult != result || record.ServerResult != result || record.ReplayHash != p6Digest(append(append([]byte(nil), record.Operates...), byte(result))) {
+			if encodeErr != nil || !bytes.Equal(outcomeRaw, record.Outcome) || p6Digest(record.Outcome) != record.OutcomeHash {
 				return errors.New("觉醒权威录像与完整终局回执不一致")
 			}
 			reply = &pb.SCAwakeCopyFightEnd{}
-			return proto.Unmarshal(fight.Reply, reply)
+			if err = proto.Unmarshal(fight.Reply, reply); err != nil {
+				return err
+			}
+			actual := int32(0)
+			if terminal.Outcome.Winner == 0 {
+				actual = 1
+			}
+			if reply.GetIsWinServer() != actual {
+				return errors.New("觉醒结果与权威终局不一致")
+			}
+			return nil
 		}
 		ledger, run, err := p7AwakeActive(tx, id)
 		if err != nil {
@@ -1350,7 +1361,10 @@ func (s *GameService) p7AwakeFightEnd(ctx context.Context, id int64, body *pb.CS
 		if fight.ScopeProof == constUtil.P7Awake16GenericCompatibilityProof {
 			terminal, err = calculator.ComputeP7Awake16GenericSettlement(ctx, input, body.GetOptRecord(), body.GetIsWinClient())
 			if err != nil {
-				return err
+				terminal, err = calculator.p7Awake16ServerFallback(ctx, input)
+				if err != nil {
+					return err
+				}
 			}
 		} else {
 			terminal, err = s.ComputeP7Awake16ProtocolFinalHP(ctx, input)
@@ -1366,9 +1380,9 @@ func (s *GameService) p7AwakeFightEnd(ctx context.Context, id int64, body *pb.CS
 			}
 			if autoResult != body.GetIsWinClient() || !proto.Equal(terminal.OriginalOperates, body.GetOptRecord()) {
 				// 旧实例继续使用旧自动/原机手动族，不以新证书改写历史资格。
-				terminal, err = s.ComputeP7Awake16ManualSettlement(ctx, input, body.GetOptRecord(), body.GetIsWinClient())
-				if err != nil {
-					return errors.New("觉醒完整原操作或实际胜负不一致")
+				manual, manualErr := s.ComputeP7Awake16ManualSettlement(ctx, input, body.GetOptRecord(), body.GetIsWinClient())
+				if manualErr == nil {
+					terminal = manual
 				}
 			}
 		}

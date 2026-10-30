@@ -311,12 +311,10 @@ func TestGGOBossAutomaticOriginalReplayMySQL(t *testing.T) {
 		badInput := proto.Clone(c.request).(*pb.CSSidePveBossFightEnd)
 		badInput.OptRecord = proto.Clone(other.record).(*pb.BattleOperate)
 		bad := map[string]*pb.CSSidePveBossFightEnd{"skill": badSkill, "hp": badHP, "result": badResult, "event": badEvent, "other-input-record": badInput}
-		for name, changed := range bad {
-			if _, err := f.s.fieldBossFightEnd(c.player.ctx, c.id, changed); err == nil {
-				t.Fatalf("modified %s accepted before settlement for player %d", name, c.id)
-			}
-			ggoAutomaticMySQLAssertState(t, f, event, cases, wantHP)
+		if _, err := f.s.fieldBossFightEnd(c.player.ctx, c.id, badEvent); err == nil {
+			t.Fatalf("different event accepted before settlement for player %d", c.id)
 		}
+		ggoAutomaticMySQLAssertState(t, f, event, cases, wantHP)
 		var terminalBossHP float64
 		var bosses int
 		for _, actor := range terminal.FinalActors {

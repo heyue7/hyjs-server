@@ -198,8 +198,8 @@ func (s *GameService) ggoPVEDeathLocked(tx *gorm.DB, id int64, p *pb.Player, g *
 	return lost, nil
 }
 
-// ggoMonsterEndLocked replays the original recorded actions, then commits the
-// public node, profile and frozen reward receipt under one database transaction.
+// ggoMonsterEndLocked derives a server result, then commits the public node,
+// profile and frozen reward receipt under one database transaction.
 func (s *GameService) ggoMonsterEndLocked(tx *gorm.DB, id int64, p *pb.Player, g *model.GameState, b *pb.CSSidePveFightEnd) (*pb.SCSidePveFightEnd, *pb.PlayerSide, bool, error) {
 	if g.Field == nil || g.Field.Fight == nil || g.Field.Fight.Start == nil || g.Field.Fight.Start.GetFightId() != b.GetFightId() {
 		return nil, nil, false, errors.New("未知沙漠小怪战斗")
@@ -215,7 +215,7 @@ func (s *GameService) ggoMonsterEndLocked(tx *gorm.DB, id int64, p *pb.Player, g
 		}
 		return fight.Result, f.Side, false, nil
 	}
-	if g.GGOField == nil || g.GGOField.MonsterFight == nil || g.GGOField.MonsterFight.FightID != b.GetFightId() || b.GetOptRecord() == nil || b.GetResult() != 0 && b.GetResult() != 1 {
+	if g.GGOField == nil || g.GGOField.MonsterFight == nil || g.GGOField.MonsterFight.FightID != b.GetFightId() || b.GetResult() != 0 && b.GetResult() != 1 {
 		return nil, nil, false, errors.New("沙漠小怪结算参数无效")
 	}
 	frozenFight := *g.GGOField.MonsterFight
@@ -240,31 +240,8 @@ func (s *GameService) ggoMonsterEndLocked(tx *gorm.DB, id int64, p *pb.Player, g
 	if _, err = s.ValidateP6GenericMechanisms(tx.Statement.Context, input); err != nil {
 		return nil, nil, false, err
 	}
-	terminal, err := s.ComputeOriginalP6ProtocolFinalHP(tx.Statement.Context, input, b.GetOptRecord())
+	terminal, expected, err := s.ggoBattleTerminal(tx.Statement.Context, input, b.GetOptRecord(), b.GetResult(), b.GetBattlePlayer(), id, true)
 	if err != nil {
-		return nil, nil, false, err
-	}
-	if err = validateP6GenericMechanismTerminal(input, terminal); err != nil {
-		return nil, nil, false, err
-	}
-	// Playback processes one queued player action per tick; a rerecorded player
-	// clock can move by one frame. The original comparator still checks command
-	// identity and order, NPC clocks, transforms, final round and both HP totals.
-	// ggoMonsterEndHash binds the exact submitted bytes for every retry.
-	if !p6OriginalProtocolRecordEqual(b.GetOptRecord(), terminal.OriginalOperates) {
-		return nil, nil, false, errors.New(constUtil.P6ReplayConflict)
-	}
-	if terminal.Outcome.Winner != 0 && terminal.Outcome.Winner != 1 {
-		return nil, nil, false, errors.New("沙漠小怪战斗未产生胜败")
-	}
-	expected := int32(0)
-	if terminal.Outcome.Winner == 0 {
-		expected = 1
-	}
-	if b.GetResult() != expected {
-		return nil, nil, false, errors.New("沙漠小怪胜败与重放不一致")
-	}
-	if err = ggoMonsterReportedHP(id, b.GetBattlePlayer(), input, terminal); err != nil {
 		return nil, nil, false, err
 	}
 	if err = ggoMonsterApplyTerminal(input.Attacker, f.Side, terminal); err != nil {

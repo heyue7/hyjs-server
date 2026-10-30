@@ -226,7 +226,7 @@ func p7SectionProgress(tx *gorm.DB, offer *db.P7SectionRewardOffer, policy *db.P
 		if err != nil {
 			return 0, false, "", err
 		}
-		if !scoped || outcome == nil || !outcome.Authoritative || outcome.Winner != 0 || end.GetResult() != 1 || rule.Kind != constUtil.P7RushTrial || rule.Star < 1 || rule.Star > 3 || result.GetStar() != rule.Star {
+		if !scoped || outcome == nil || !outcome.Authoritative || outcome.Winner != 0 || rule.Kind != constUtil.P7RushTrial || rule.Star < 1 || rule.Star > 3 || result.GetStar() != rule.Star {
 			return 0, false, "", errors.New("试炼分段胜利缺少完整独立接受来源")
 		}
 		var record db.P6BattleRecord

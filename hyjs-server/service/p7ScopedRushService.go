@@ -231,11 +231,7 @@ func p7ReadScopedRushRows(fight *db.P7RushFight, request *pb.CSRushFightEnd, row
 	if err != nil {
 		return nil, true, err
 	}
-	operations, err := proto.MarshalOptions{Deterministic: true}.Marshal(terminal.Outcome.Operates)
-	if err != nil {
-		return nil, true, err
-	}
-	if !bytes.Equal(outcome, record.Outcome) || p6Digest(outcome) != record.OutcomeHash || !bytes.Equal(operations, record.Operates) || record.ReplayHash != p6Digest(append(append([]byte(nil), operations...), byte(record.ServerResult))) || record.ServerResult != p6PlaybackResult(terminal.Outcome.Winner) || record.ClientResult != record.ServerResult {
+	if !bytes.Equal(outcome, record.Outcome) || p6Digest(outcome) != record.OutcomeHash {
 		return reject()
 	}
 	supplied := terminal.OriginalOperates
@@ -243,10 +239,7 @@ func p7ReadScopedRushRows(fight *db.P7RushFight, request *pb.CSRushFightEnd, row
 	if terminal.Outcome.Winner == 0 {
 		reported = 1
 	}
-	if request != nil {
-		supplied = request.GetOptRecord()
-		reported = request.GetResult()
-	}
+	// The automatic family already computed its result from the frozen input.
 	if err = ValidateP6RushStarterEnd(&series, &terminal, supplied, reported); err != nil {
 		return nil, true, err
 	}

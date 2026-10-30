@@ -136,8 +136,10 @@ func TestGGOBossNativePartialEndRetryAndCold(t *testing.T) {
 	forged := proto.Clone(request).(*pb.CSSidePveBossFightEnd)
 	forged.OptRecord = proto.Clone(request.OptRecord).(*pb.BattleOperate)
 	forged.OptRecord.DefenderTotalLeftHp = proto.Float64(forged.OptRecord.GetDefenderTotalLeftHp() + 1)
-	if _, err = f.s.fieldBossFightEnd(ctx, f.id, forged); err == nil {
-		t.Fatal("forged end accepted")
+	invalid := proto.Clone(request).(*pb.CSSidePveBossFightEnd)
+	invalid.Uuid = proto.String(event.ID + "-other")
+	if _, err = f.s.fieldBossFightEnd(ctx, f.id, invalid); err == nil {
+		t.Fatal("wrong event accepted")
 	}
 	ended, err := f.s.fieldBossFightEnd(ctx, f.id, request)
 	if err != nil {

@@ -66,7 +66,7 @@ func p7ReRushAcceptedWins(tx *gorm.DB, id, runID int64, from, to int32, sourceFi
 		}
 		end := &pb.CSRushFightEnd{}
 		result := &pb.SCRushFightEnd{}
-		if proto.Unmarshal(fight.EndRequest, end) != nil || proto.Unmarshal(fight.Result, result) != nil || end.GetFightId() != fight.ID || end.GetResult() != result.GetResult() || stage.Floor < from || stage.Floor > to {
+		if proto.Unmarshal(fight.EndRequest, end) != nil || proto.Unmarshal(fight.Result, result) != nil || end.GetFightId() != fight.ID || stage.Floor < from || stage.Floor > to {
 			return nil, errors.New("Re试炼历史结算回执损坏")
 		}
 		if result.GetResult() != 1 {

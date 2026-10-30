@@ -165,7 +165,20 @@ func p7ReadManualRushRows(tx *gorm.DB, fight *db.P7RushFight, request *pb.CSRush
 		}
 		terminal, computeErr := family.ComputeEnd(tx.Statement.Context, &GameService{}, &series, request.GetOptRecord(), request.GetResult())
 		if computeErr != nil {
-			return nil, true, computeErr
+			// Admission saved a server-calculated preview bound to this frozen source.
+			var preview model.CombatFinalHPOutcome
+			if p6Digest(row.Preview) != row.PreviewHash || json.Unmarshal(row.Preview, &preview) != nil {
+				return nil, true, computeErr
+			}
+			if genericAdmission != nil {
+				err = genericAdmission.validatePreview(&series, &preview)
+			} else {
+				err = family.ValidatePreview(&series, &preview)
+			}
+			if err != nil {
+				return nil, true, computeErr
+			}
+			terminal = &preview
 		}
 		body, encodeErr := json.Marshal(terminal)
 		if encodeErr != nil {
@@ -221,7 +234,13 @@ func p7ReadManualRushRows(tx *gorm.DB, fight *db.P7RushFight, request *pb.CSRush
 		supplied = request.GetOptRecord()
 		reported = request.GetResult()
 	}
-	if genericAdmission != nil {
+	if row.TerminalHash == row.PreviewHash && bytes.Equal(row.Terminal, row.Preview) {
+		if genericAdmission != nil {
+			err = genericAdmission.validatePreview(&series, &terminal)
+		} else {
+			err = family.ValidatePreview(&series, &terminal)
+		}
+	} else if genericAdmission != nil {
 		err = genericAdmission.validateEnd(&series, &terminal, supplied, reported)
 	} else {
 		err = family.ValidateEnd(&series, &terminal, supplied, reported)
@@ -233,11 +252,7 @@ func p7ReadManualRushRows(tx *gorm.DB, fight *db.P7RushFight, request *pb.CSRush
 	if err != nil {
 		return nil, true, err
 	}
-	operations, err := proto.MarshalOptions{Deterministic: true}.Marshal(terminal.Outcome.Operates)
-	if err != nil {
-		return nil, true, err
-	}
-	if !bytes.Equal(outcome, record.Outcome) || p6Digest(outcome) != record.OutcomeHash || !bytes.Equal(operations, record.Operates) || record.ReplayHash != p6Digest(append(append([]byte(nil), operations...), byte(record.ServerResult))) || record.ServerResult != p6PlaybackResult(terminal.Outcome.Winner) || record.ClientResult != record.ServerResult {
+	if !bytes.Equal(outcome, record.Outcome) || p6Digest(outcome) != record.OutcomeHash {
 		return reject()
 	}
 	return terminal.Outcome, true, nil

@@ -951,7 +951,32 @@ func (s *GameService) fieldReward(id int64, player *pb.Player, g *model.GameStat
 	return gain, nil
 }
 
-// fieldFightEnd 校验客户端真实战斗快照；客户端技能引擎的权威重放仍待恢复。
+// validateOrdinaryFieldEnd keeps the original transport checks on non-GGO
+// battles after the shared entry lets GGO inspect its frozen battle first.
+func validateOrdinaryFieldEnd(b *pb.CSSidePveFightEnd) error {
+	if b.GetFightId() == "" || (b.GetResult() != 0 && b.GetResult() != 1) || b.GetBattlePlayer() == nil || b.GetBattlePlayer().GetInst() == nil || len(b.GetBattlePlayer().GetFormation()) == 0 || b.GetOptRecord() == nil {
+		return errors.New("Invalid field battle result")
+	}
+	record := b.GetOptRecord()
+	if record.GetFinalRoundNum() < 0 || record.GetFinalRoundNum() > 41 {
+		return errors.New("Missing field battle record")
+	}
+	values := []float64{record.GetAttackerTotalLeftHp(), record.GetDefenderTotalLeftHp(), b.GetBattlePlayer().GetInst().GetAnger()}
+	for _, hero := range b.GetBattlePlayer().GetFormation() {
+		if hero == nil || hero.GetGuid() == "" || hero.GetId() == "" || hero.Pose == nil || hero.GetInst() == nil {
+			return errors.New("Invalid field battle actor")
+		}
+		values = append(values, hero.GetInst().GetCurHp())
+	}
+	for _, value := range values {
+		if math.IsNaN(value) || math.IsInf(value, 0) || value < 0 {
+			return errors.New("Invalid field battle value")
+		}
+	}
+	return nil
+}
+
+// fieldFightEnd uses the selected field's settlement policy.
 func (s *GameService) fieldFightEnd(ctx context.Context, id int64, b *pb.CSSidePveFightEnd) ([]proto.Message, error) {
 	var (
 		result         *pb.SCSidePveFightEnd
@@ -976,6 +1001,9 @@ func (s *GameService) fieldFightEnd(ctx context.Context, id int64, b *pb.CSSideP
 		if g.Position.GetScene() == constUtil.GGOFieldScene && g.GGOField != nil && g.Field != nil && g.Field.Fight != nil && g.Field.Fight.BossStart == nil {
 			var err error
 			result, side, needGGORefresh, err = s.ggoMonsterEndLocked(tx, id, player, g, b)
+			return err
+		}
+		if err := validateOrdinaryFieldEnd(b); err != nil {
 			return err
 		}
 		if g.Field == nil {

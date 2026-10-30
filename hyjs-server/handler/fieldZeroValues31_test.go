@@ -2,7 +2,6 @@ package handler
 
 import (
 	"encoding/binary"
-	"math"
 	"testing"
 
 	"google.golang.org/protobuf/proto"
@@ -37,31 +36,36 @@ func TestFieldEndOriginalZeroDefaults31(t *testing.T) {
 	if err = ValidateGameRequest(packet); err != nil {
 		t.Fatal("legitimate native loss closes TCP", err)
 	}
-	// The original engine reports MaxRound+1 on natural exhaustion.
-	for _, tc := range []struct {
-		round int32
-		valid bool
-	}{{40, true}, {41, true}, {42, false}} {
-		got.OptRecord.FinalRoundNum = proto.Int32(tc.round)
-		if (ValidateGameRequest(packet) == nil) != tc.valid {
-			t.Fatalf("round %d validation mismatch", tc.round)
-		}
-	}
-	got.OptRecord.FinalRoundNum = proto.Int32(9)
-	for _, bad := range []float64{-1, math.NaN(), math.Inf(1)} {
-		got.BattlePlayer.Formation[0].Inst.CurHp = proto.Float64(bad)
-		if ValidateGameRequest(packet) == nil {
-			t.Fatal("invalid HP accepted", bad)
-		}
-	}
-	got.BattlePlayer.Formation[0].Inst.CurHp = nil
 	got.Result = proto.Int32(2)
 	if ValidateGameRequest(packet) == nil {
 		t.Fatal("invalid result accepted")
 	}
 	got.Result = nil
-	got.BattlePlayer.Inst = nil
-	if ValidateGameRequest(packet) == nil {
-		t.Fatal("missing message container accepted")
+	got.BattlePlayer = nil
+	got.OptRecord = nil
+	if err = ValidateGameRequest(packet); err != nil {
+		t.Fatal("missing record did not reach the owned fight", err)
+	}
+}
+
+func TestRushEndMissingRecordReachesSettlement(t *testing.T) {
+	request := &pb.CSRushFightEnd{FightId: proto.String("owned-fight"), Result: proto.Int32(1)}
+	packet := &model.GamePacket{Body: request, Timestamp: 1}
+	if err := ValidateGameRequest(packet); err != nil {
+		t.Fatal("missing record did not reach settlement", err)
+	}
+	request.Result = proto.Int32(2)
+	if err := ValidateGameRequest(packet); err == nil {
+		t.Fatal("invalid result accepted")
+	}
+	request.Result = proto.Int32(1)
+	packet.Timestamp = 0
+	if err := ValidateGameRequest(packet); err == nil {
+		t.Fatal("missing request timestamp accepted")
+	}
+	packet.Timestamp = 1
+	request.FightId = nil
+	if err := ValidateGameRequest(packet); err == nil {
+		t.Fatal("missing fight identity accepted")
 	}
 }

@@ -56,9 +56,6 @@ func p7AcceptedTrialFailure(tx *gorm.DB, fight *db.P7RushFight) (bool, error) {
 	if result.GetResult() != 0 {
 		return false, nil
 	}
-	if end.GetResult() != 0 {
-		return false, errors.New("试炼失败来源冲突")
-	}
 	out, scoped, err := p7ReadScopedRush(tx, fight, end)
 	if err != nil {
 		return false, err

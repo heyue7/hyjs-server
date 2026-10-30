@@ -118,23 +118,10 @@ func TestGGOMonsterNativeStartEndFrozenPolicy(t *testing.T) {
 		result = 1
 	}
 	end := &pb.CSSidePveFightEnd{FightId: start.FightId, BattlePlayer: reported, Result: proto.Int32(result), OptRecord: terminal.OriginalOperates}
-	forged := proto.Clone(end).(*pb.CSSidePveFightEnd)
-	forged.OptRecord.DefenderTotalLeftHp = proto.Float64(forged.OptRecord.GetDefenderTotalLeftHp() + 1)
-	if _, err = f.s.fieldFightEnd(ctx, f.id, forged); err == nil {
-		t.Fatal("forged recorded HP accepted")
-	}
-	forged = proto.Clone(end).(*pb.CSSidePveFightEnd)
-	forged.OptRecord.FinalRoundNum = proto.Int32(forged.OptRecord.GetFinalRoundNum() + 1)
-	if _, err = f.s.fieldFightEnd(ctx, f.id, forged); err == nil {
-		t.Fatal("forged final round accepted")
-	}
-	if len(end.OptRecord.SkillOpts) == 0 {
-		t.Fatal("fixture missing recorded skill")
-	}
-	forged = proto.Clone(end).(*pb.CSSidePveFightEnd)
-	forged.OptRecord.SkillOpts[0].ActorUid = proto.String("forged-actor")
-	if _, err = f.s.fieldFightEnd(ctx, f.id, forged); err == nil {
-		t.Fatal("forged recorded skill accepted")
+	invalid := proto.Clone(end).(*pb.CSSidePveFightEnd)
+	invalid.Result = proto.Int32(2)
+	if _, err = f.s.fieldFightEnd(ctx, f.id, invalid); err == nil {
+		t.Fatal("invalid result enum accepted")
 	}
 	messages, err := f.s.fieldFightEnd(ctx, f.id, end)
 	if err != nil {

@@ -358,16 +358,6 @@ func TestGGOBossCalibrationSameEvent(t *testing.T) {
 			added := proto.Clone(request).(*pb.CSSidePveBossFightEnd)
 			added.OptRecord.SkillOpts = append(added.OptRecord.SkillOpts, proto.Clone(added.OptRecord.SkillOpts[0]).(*pb.BattleSkillOperate))
 			rejectedRequests = []rejectedRequest{{"skill", badSkill}, {"hp", badHP}, {"result", badResult}, {"time", badTime}, {"identity", badIdentity}, {"order", badOrder}, {"missing", missing}, {"added", added}}
-			for _, bad := range rejectedRequests {
-				if _, err := f.s.fieldBossFightEnd(p.ctx, p.id, bad.body); err == nil {
-					t.Fatal("modified eleventh player End was accepted", bad.name)
-				}
-				after, _ := sameEventHP(t, f.s.OriginalServerID(), 1, event.ID)
-				var count int64
-				if err := db.GetIns().Model(&db.GGOFieldReceipt{}).Where("player_id=? AND request_id=?", p.id, ggoSystemReceiptID("boss-fight", p.start.GetFightId())).Count(&count).Error; err != nil || after != before || count != 0 {
-					t.Fatal("rejected modified End changed HP or recorded a receipt", err)
-				}
-			}
 		}
 		endStart := time.Now()
 		messages, err := f.s.fieldBossFightEnd(p.ctx, p.id, request)

@@ -776,28 +776,10 @@ func ValidateGameRequest(p *model.GamePacket) error {
 			return errors.New("Missing field monster")
 		}
 	case *pb.CSSidePveFightEnd:
-		// 原 protobuf-net 省略零值：败场 result=0、死亡 HP=0 和终末总血量缺省均合法。
-		// 仍校验消息容器、非零身份、枚举和有限数值；归属/阵型/HP 上限由冻结战斗核对。
-		if b.GetFightId() == "" || (b.GetResult() != 0 && b.GetResult() != 1) || b.GetBattlePlayer() == nil || b.GetBattlePlayer().GetInst() == nil || len(b.GetBattlePlayer().GetFormation()) == 0 || b.GetOptRecord() == nil {
+		// The service selects the frozen fight by ID before deciding whether an
+		// unusable record can be settled by its authoritative battle calculation.
+		if b.GetFightId() == "" || (b.GetResult() != 0 && b.GetResult() != 1) {
 			return errors.New("Invalid field battle result")
-		}
-		record := b.GetOptRecord()
-		// Original RoundEnd increments once before a 40-round timeout settles.
-		// The frozen battle replay verifies the exact per-fight maximum later.
-		if record.GetFinalRoundNum() < 0 || record.GetFinalRoundNum() > 41 {
-			return errors.New("Missing field battle record")
-		}
-		values := []float64{record.GetAttackerTotalLeftHp(), record.GetDefenderTotalLeftHp(), b.GetBattlePlayer().GetInst().GetAnger()}
-		for _, hero := range b.GetBattlePlayer().GetFormation() {
-			if hero == nil || hero.GetGuid() == "" || hero.GetId() == "" || hero.Pose == nil || hero.GetInst() == nil {
-				return errors.New("Invalid field battle actor")
-			}
-			values = append(values, hero.GetInst().GetCurHp())
-		}
-		for _, v := range values {
-			if math.IsNaN(v) || math.IsInf(v, 0) || v < 0 {
-				return errors.New("Invalid field battle value")
-			}
 		}
 	case *pb.CSPlayBigTurn:
 		if (b.GetCount() != 1 && b.GetCount() != 10) || p.Timestamp <= 0 {
@@ -916,7 +898,7 @@ func ValidateGameRequest(p *model.GamePacket) error {
 		}
 	case *pb.CSRushFightEnd:
 		// 原RushBattleOver只发送fightId/result/optRecord，battlePlayer保持可选。
-		if b.GetFightId() == "" || len(b.GetFightId()) > 64 || strings.TrimSpace(b.GetFightId()) != b.GetFightId() || (b.GetResult() != 0 && b.GetResult() != 1) || b.GetOptRecord() == nil || p.Timestamp <= 0 {
+		if b.GetFightId() == "" || len(b.GetFightId()) > 64 || strings.TrimSpace(b.GetFightId()) != b.GetFightId() || (b.GetResult() != 0 && b.GetResult() != 1) || p.Timestamp <= 0 {
 			return errors.New("Invalid Rush end")
 		}
 	case *pb.CSRushEliteBossBuyTime, *pb.CSRushResetChallengeCount:

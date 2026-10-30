@@ -1,7 +1,6 @@
 package service
 
 import (
-	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/json"
@@ -9,7 +8,6 @@ import (
 	"fmt"
 	"math"
 	"math/big"
-	"strings"
 	"time"
 
 	"go.uber.org/zap"
@@ -442,7 +440,7 @@ func (s *GameService) ggoBossFightEnd(ctx context.Context, id int64, request *pb
 		if frozen == nil || frozen.Boss == nil || fight.BossStart == nil || fight.BossStart.GetFightId() != request.GetFightId() || frozen.EventID != request.GetUuid() || fight.Settled {
 			return errors.New("首领战斗不匹配")
 		}
-		if request.GetOptRecord() == nil || request.GetResult() != 0 && request.GetResult() != 1 {
+		if request.GetResult() != 0 && request.GetResult() != 1 {
 			return errors.New("首领战斗结束参数无效")
 		}
 		input, err := fieldBossFrozenInput(fight)
@@ -455,50 +453,9 @@ func (s *GameService) ggoBossFightEnd(ctx context.Context, id int64, request *pb
 		if _, err = s.ValidateP6GenericMechanisms(tx.Statement.Context, input); err != nil {
 			return err
 		}
-		terminal, err := s.ComputeOriginalP6ProtocolFinalHP(tx.Statement.Context, input, request.GetOptRecord())
+		terminal, expected, err := s.ggoBattleTerminal(tx.Statement.Context, input, request.GetOptRecord(), request.GetResult(), nil, id, false)
 		if err != nil {
-			// The original automatic driver can emit several presses at the same
-			// instant, whereas PlaybackAI consumes at most one per tick. Preserve
-			// strict playback for ordinary records and accept this alternate path
-			// only when a fresh automatic calculation reproduces the entire record.
-			if contextErr := tx.Statement.Context.Err(); contextErr != nil {
-				return contextErr
-			}
-			if !strings.HasPrefix(err.Error(), constUtil.P6ReplayConflict+": 原录像终局或完整技能记录不符") &&
-				!strings.HasPrefix(err.Error(), "录像操作不符合原技能时序:") {
-				return err
-			}
-			originalErr := err
-			automatic, autoErr := s.ComputeOriginalP6ProtocolFinalHP(tx.Statement.Context, input, nil)
-			if contextErr := tx.Statement.Context.Err(); contextErr != nil {
-				return contextErr
-			}
-			if errors.Is(autoErr, context.Canceled) || errors.Is(autoErr, context.DeadlineExceeded) {
-				return autoErr
-			}
-			if autoErr != nil || automatic == nil || automatic.OriginalOperates == nil {
-				return originalErr
-			}
-			marshal := proto.MarshalOptions{Deterministic: true}
-			actualRecord, actualErr := marshal.Marshal(request.GetOptRecord())
-			expectedRecord, expectedErr := marshal.Marshal(automatic.OriginalOperates)
-			if actualErr != nil || expectedErr != nil || !bytes.Equal(actualRecord, expectedRecord) {
-				return originalErr
-			}
-			terminal = automatic
-		}
-		if err = validateP6GenericMechanismTerminal(input, terminal); err != nil {
 			return err
-		}
-		if terminal == nil || terminal.Outcome == nil || terminal.Outcome.Winner != 0 && terminal.Outcome.Winner != 1 {
-			return errors.New("首领原计算未产生有效胜败")
-		}
-		expected := int32(0)
-		if terminal.Outcome.Winner == 0 {
-			expected = 1
-		}
-		if request.GetResult() != expected {
-			return errors.New("首领结果与原计算不一致")
 		}
 		if err = ggoMonsterApplyTerminal(input.Attacker, g.Field.Side, terminal); err != nil {
 			return err
@@ -519,7 +476,7 @@ func (s *GameService) ggoBossFightEnd(ctx context.Context, id int64, request *pb
 				return err
 			}
 		}
-		result = &pb.SCSidePveBossFightEnd{Get: &pb.ResultObject{}, FightResult: proto.Int32(request.GetResult()), Code: proto.Int32(1), Anger: proto.Float64(side.GetAnger()), State: side.State, Monster: boss}
+		result = &pb.SCSidePveBossFightEnd{Get: &pb.ResultObject{}, FightResult: proto.Int32(expected), Code: proto.Int32(1), Anger: proto.Float64(side.GetAnger()), State: side.State, Monster: boss}
 		for _, part := range side.GetBattlePosHps() {
 			result.BattlePos = append(result.BattlePos, part.GetBattlePos())
 			result.Hps = append(result.Hps, part.GetHpPercent())
