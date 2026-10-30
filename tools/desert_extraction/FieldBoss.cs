@@ -20,10 +20,24 @@ namespace HYJS.DesertV4
             public float radius;
             public long hp,maxHp,start,end,warning,serverTime,nature;
         }
+        sealed class PositionConfirmation
+        {
+            public RoomBase room;
+            public RoomCharactor actor;
+            public FieldWire wire;
+            public FieldWire.Session owner;
+            public Action<bool,bool> completed;
+            public string eventId;
+            public Vector3 position;
+            public int epoch;
+            public long deadline,nextPoll,lease;
+            public bool inFlight;
+        }
         readonly RoomCharactorManager manager;
         readonly Action refresh;
         static FieldBoss mapOwner;
         Event current;
+        PositionConfirmation confirmation;
         string shownWarning="";
         long receivedTicks,lastRefresh;
         public FieldBoss(RoomCharactorManager source,Action requestRefresh)
@@ -46,6 +60,7 @@ namespace HYJS.DesertV4
         public void Clear()
         {
             if (System.Object.ReferenceEquals(mapOwner,this)) mapOwner=null;
+            if (confirmation!=null) FinishConfirmation(confirmation,false,false,false);
             try { Remove(current); }
             finally { current=null; shownWarning=""; }
         }
@@ -67,8 +82,127 @@ namespace HYJS.DesertV4
         }
         public bool CanInteract(string id,RoomCharactor actor)
         {
-            return current!=null && current.state=="active" && current.hp>0 && current.id==id && actor!=null &&
-                (actor.transform.position-current.position).sqrMagnitude<=current.radius*current.radius;
+            try
+            {
+                return current!=null && current.state=="active" && current.hp>0 && current.id==id && actor!=null &&
+                    (actor.transform.position-current.position).sqrMagnitude<=current.radius*current.radius;
+            }
+            catch (Exception) { return false; }
+        }
+        public bool Confirming { get { return confirmation!=null; } }
+        static bool SameSession(FieldWire.Session a,FieldWire.Session b)
+        { return a!=null && b!=null && a.playerId==b.playerId && a.sessionHex==b.sessionHex && a.origin==b.origin; }
+        static bool ValidPosition(Vector3 p)
+        {
+            return !Single.IsNaN(p.x) && !Single.IsNaN(p.y) && !Single.IsNaN(p.z) &&
+                !Single.IsInfinity(p.x) && !Single.IsInfinity(p.y) && !Single.IsInfinity(p.z) &&
+                Mathf.Abs(p.x)<=10000 && Mathf.Abs(p.y)<=10000 && Mathf.Abs(p.z)<=10000;
+        }
+        bool StillConfirming(PositionConfirmation p)
+        {
+            try
+            {
+                FieldWire.Session live;
+                return confirmation==p && Stopwatch.GetTimestamp()<p.deadline && p.room!=null && p.room==RoomManager.currentRoom && StaticData.fieldId=="field_003" &&
+                    p.room.charactorManager==manager && manager.GetSelfCharactor()==p.actor &&
+                    PositionSync.ConnectionEpoch==p.epoch && PositionSync.OwnsLock(p.lease) && FieldWire.Current(out live) && SameSession(live,p.owner) &&
+                    !TravelController.Pending && !LeaveController.Pending &&
+                    current!=null && current.id==p.eventId && current.state=="active" && current.hp>0 &&
+                    manager.GetCharactor(p.eventId)!=null && p.actor!=null &&
+                    (p.actor.transform.position-p.position).sqrMagnitude<=.0001f;
+            }
+            catch (Exception) { return false; }
+        }
+        // Mirror p8Near: the native PointNew coordinates are floats, while the
+        // server accumulates the squares as doubles. Keep its radius check.
+        bool ServerNear(Vector3 position)
+        {
+            double x=(double)(position.x-current.position.x), y=(double)(position.y-current.position.y), z=(double)(position.z-current.position.z);
+            return x*x+y*y+z*z<=(double)current.radius*current.radius;
+        }
+        void FinishConfirmation(PositionConfirmation p,bool accepted,bool cancelled,bool notify)
+        {
+            if (confirmation!=p) return;
+            confirmation=null;
+            bool released=PositionSync.ReleaseIfOwned(p.lease);
+            if (!released) accepted=false;
+            if (notify && p.completed!=null) p.completed(accepted,cancelled);
+        }
+        // Stop at the actual contact point, send the same original CSMove as
+        // the half-second native position sync, and read committed position.
+        // The read may race the asynchronous socket write; only a matching
+        // server result permits the caller to send the original boss Start.
+        public bool ConfirmPosition(RoomBase room,RoomCharactor actor,FieldWire wire,FieldWire.Session owner,Action<bool,bool> completed)
+        {
+            FieldWire.Session live; long lease=0;
+            try
+            {
+                if (confirmation!=null || room==null || room!=RoomManager.currentRoom || StaticData.fieldId!="field_003" || room.charactorManager!=manager ||
+                    actor==null || manager.GetSelfCharactor()!=actor || wire==null || completed==null ||
+                    TravelController.Pending || LeaveController.Pending ||
+                    !FieldWire.Current(out live) || !SameSession(owner,live) || current==null || !CanInteract(current.id,actor)) return false;
+            }
+            catch (Exception) { return false; }
+            Vector3 position;
+            try
+            {
+                if (!PositionSync.TryLock(actor,out lease)) return false;
+                position=actor.transform.position;
+                if (!ValidPosition(position) || !CanInteract(current.id,actor) || !ServerNear(position))
+                { PositionSync.ReleaseIfOwned(lease); return false; }
+            }
+            catch (Exception) { PositionSync.ReleaseIfOwned(lease); return false; }
+            PositionConfirmation p=new PositionConfirmation { room=room,actor=actor,wire=wire,owner=owner,completed=completed,
+                eventId=current.id,position=position,epoch=PositionSync.ConnectionEpoch,lease=lease,
+                deadline=Stopwatch.GetTimestamp()+5L*Stopwatch.Frequency };
+            confirmation=p;
+            try
+            {
+                var move=new CSMove { pointNew=new PointNew { x=position.x,y=position.y,z=position.z },
+                    currentTime=ServerTimerTool.CurrentUTCJavaTime() };
+                NetAPI.SendSocket(30026,move);
+                PollPosition(p);
+            }
+            catch (Exception) { FinishConfirmation(p,false,false,true); }
+            return true;
+        }
+        void PollPosition(PositionConfirmation p)
+        {
+            if (!StillConfirming(p) || p.inFlight) return;
+            p.inFlight=true;
+            try
+            {
+                p.wire.PositionStatus(p.owner,delegate(FieldWireResult result)
+                {
+                    if (confirmation!=p) return;
+                    p.inFlight=false;
+                    if (!StillConfirming(p)) { FinishConfirmation(p,false,false,true); return; }
+                    try
+                    {
+                        JsonData d=result==null ? null : result.data;
+                        if (result!=null && !result.uncertain && result.code==0 && d!=null &&
+                            (string)d["scene"]=="field_003" && d["loading"].IsBoolean && !(bool)d["loading"])
+                        {
+                            Vector3 observed=Vector(d["position"]);
+                            if (ValidPosition(observed) && (observed-p.position).sqrMagnitude<=.0001f && ServerNear(observed))
+                            { FinishConfirmation(p,true,false,true); return; }
+                        }
+                    }
+                    catch (Exception) { } // Retry a missing or malformed position within the bounded window.
+                    p.nextPoll=Stopwatch.GetTimestamp()+Math.Max(1L,Stopwatch.Frequency/4);
+                });
+            }
+            catch (Exception)
+            { p.inFlight=false; p.nextPoll=Stopwatch.GetTimestamp()+Math.Max(1L,Stopwatch.Frequency/4); }
+        }
+        void TickConfirmation(long tick)
+        {
+            PositionConfirmation p=confirmation;
+            if (p==null) return;
+            if (!StillConfirming(p)) { FinishConfirmation(p,false,false,true); return; }
+            if (Input.GetKeyDown(KeyCode.Escape)) { FinishConfirmation(p,false,true,true); return; }
+            if (tick>=p.deadline) { FinishConfirmation(p,false,false,true); return; }
+            if (!p.inFlight && tick>=p.nextPoll) PollPosition(p);
         }
         public void ApplySnapshot(JsonData snapshot)
         {
@@ -110,8 +244,9 @@ namespace HYJS.DesertV4
         }
         public void Tick()
         {
-            if (current==null) return;
             long tick=Stopwatch.GetTimestamp();
+            TickConfirmation(tick);
+            if (current==null) return;
             long elapsed=(tick-receivedTicks)*1000/Stopwatch.Frequency;
             long now=current.serverTime+Math.Max(0,elapsed);
             if ((current.state=="waiting" && now>=current.start) ||

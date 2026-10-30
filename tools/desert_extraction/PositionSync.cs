@@ -16,8 +16,13 @@ namespace HYJS.DesertV4
         static readonly object gate=new object();
         static readonly Dictionary<Packet,int> packetEpoch=new Dictionary<Packet,int>();
         static readonly Queue<long> sent=new Queue<long>();
+        // Only a body taken from the original socket event queue can satisfy a
+        // request. RoomNetBase.Tick also calls the position handler directly
+        // with a locally fabricated fallback after its scene-load timeout.
+        static object dispatchedBody;
+        static int dispatchedEpoch;
         static int epoch;
-        static long sequence,expected;
+        static long sequence,expected,lockGeneration;
         static FieldWire.Session owner;
         static bool overflow,confirmedBase,touchWasEnabled,authenticated;
         static volatile bool fieldActive,locked;
@@ -44,6 +49,7 @@ namespace HYJS.DesertV4
         public static void ConnectionStarting()
         {
             Interlocked.Increment(ref epoch);
+            lock(gate) { dispatchedBody=null; dispatchedEpoch=0; }
             sent.Clear(); sequence=expected=0; confirmedBase=false; overflow=false; authenticated=false; onResponse=null;
         }
         public static void LoginResponse(object value)
@@ -83,8 +89,23 @@ namespace HYJS.DesertV4
             Packet p=value as Packet;
             if (p==null || !(p.kBody is SCCurrentPosition)) return false;
             int generation; bool found;
-            lock(gate) { found=packetEpoch.TryGetValue(p,out generation); packetEpoch.Remove(p); }
+            lock(gate)
+            {
+                found=packetEpoch.TryGetValue(p,out generation); packetEpoch.Remove(p);
+                // EventManger invokes the handler synchronously with this same
+                // body. Unobserved or old-epoch packets never prove a reply.
+                dispatchedBody=found && generation==ConnectionEpoch ? p.kBody : null;
+                dispatchedEpoch=dispatchedBody==null ? 0 : generation;
+            }
             return fieldActive && (!found || generation!=ConnectionEpoch);
+        }
+        static bool TakeDispatched(object value)
+        {
+            lock(gate)
+            {
+                if (dispatchedBody==null || !System.Object.ReferenceEquals(value,dispatchedBody) || dispatchedEpoch!=ConnectionEpoch) return false;
+                dispatchedBody=null; dispatchedEpoch=0; return true;
+            }
         }
         // These hooks are observational in all scenes and never throw into the
         // original TCP methods; overflow leaves relocation unavailable.
@@ -106,6 +127,9 @@ namespace HYJS.DesertV4
         {
             try
             {
+                // The timeout fallback is a visual recovery, not a reply to
+                // 30024. Leave the real request queued for its eventual frame.
+                if (!TakeDispatched(value)) return;
                 if (!Current() || sent.Count==0) { confirmedBase=false; return; }
                 long actual=sent.Dequeue();
                 var rsp=value as SCCurrentPosition;
@@ -129,13 +153,31 @@ namespace HYJS.DesertV4
             if (!ChannelReady || actor==null || locked) return false;
             return LockAfterTeleport(actor);
         }
+        // Unity-thread owners may retain a lease across async callbacks. A
+        // callback for an older action must never release a newer action's lock.
+        public static bool TryLock(RoomCharactor actor,out long lease)
+        {
+            lease=0;
+            if (!TryLock(actor)) return false;
+            lease=lockGeneration; return true;
+        }
+        public static bool OwnsLock(long lease) { return lease>0 && locked && lease==lockGeneration; }
+        public static bool ReleaseIfOwned(long lease)
+        {
+            if (!OwnsLock(lease)) return false;
+            Release(); return true;
+        }
         public static bool LockAfterTeleport(RoomCharactor actor)
         {
             if (locked) return Current();
-            if (!Current() || actor==null) return false;
-            actor.StopMove(); locked=true;
-            touchWasEnabled=EasyTouchTool.Instance!=null && EasyTouchTool.Instance.Enable;
-            if (touchWasEnabled) EasyTouchTool.Instance.Hide();
+            if (!Current() || actor==null || lockGeneration==Int64.MaxValue) return false;
+            actor.StopMove(); lockGeneration++; locked=true;
+            try
+            {
+                touchWasEnabled=EasyTouchTool.Instance!=null && EasyTouchTool.Instance.Enable;
+                if (touchWasEnabled) EasyTouchTool.Instance.Hide();
+            }
+            catch (Exception) { Release(); return false; }
             return true;
         }
         public static void RequestCurrent(RoomNetBase net,Action<Vector3> callback)
@@ -163,8 +205,10 @@ namespace HYJS.DesertV4
         }
         public static void Release()
         {
-            if (touchWasEnabled && EasyTouchTool.Instance!=null) EasyTouchTool.Instance.ShowJoystick();
+            bool restoreTouch=touchWasEnabled;
             locked=false; touchWasEnabled=false; expected=0; onResponse=null;
+            try { if (restoreTouch && EasyTouchTool.Instance!=null) EasyTouchTool.Instance.ShowJoystick(); }
+            catch (Exception) { }
         }
     }
 }

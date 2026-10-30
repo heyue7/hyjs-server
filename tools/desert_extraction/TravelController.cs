@@ -123,6 +123,18 @@ namespace HYJS.DesertV4
         }
         bool Still(FieldWire.Session owner,string id)
         { return SameSession(session,owner) && pending!=null && pending.requestId==id; }
+        public static bool Pending
+        {
+            get
+            {
+                FieldWire.Session owner;
+                if (!FieldWire.Current(out owner)) return true;
+                if (instance!=null && SameActor(instance.session,owner) &&
+                    (instance.pending!=null || instance.busy || instance.awaitingOriginal || instance.saveFailed || instance.faulted)) return true;
+                try { return Load(owner)!=null; }
+                catch (Exception) { return true; }
+            }
+        }
         public static bool PendingExtraction
         {
             get { return instance!=null && instance.pending!=null && instance.pending.kind=="extraction"; }

@@ -213,6 +213,8 @@ namespace HYJS.DesertV4
         readonly DesertGuide guide=new DesertGuide();
         bool dirty, inFlight, snapshotReady, worldReady, askingProtection, awaitingEncounter, encounterTimedOut, safe;
         bool safeAreaKnown,lastLocalSafe;
+        bool dispatchingConfirmedBoss;
+        string confirmedBossId;
         bool teamHudChecked;
         double safeMinX,safeMaxX,safeMinZ,safeMaxZ;
         int sceneSerial, requestVersion;
@@ -376,6 +378,13 @@ namespace HYJS.DesertV4
             PlayerActionPanel86.CloseLocal();
             TeamMap86.ReleaseScene();
             MapViewer86.ReleaseScene();
+            // A scene/session transition cancels only this local pre-start;
+            // an already sent native battle keeps its existing recovery path.
+            if (boss!=null && boss.Confirming)
+            {
+                try { if (LoadingPanel.Instance!=null) LoadingPanel.Instance.HideLoading(); } catch (Exception) { }
+                try { boss.Clear(); } catch (Exception) { }
+            }
             if (!PositionSync.Locked) PositionSync.SetFieldActive(false);
             sceneSerial++; inFlight=false; dirty=true; nextSnapshot=0; snapshotReady=false; worldReady=false; safeAreaKnown=false;
             awaitingEncounter=false; encounterTimedOut=false; askingProtection=false; protectionDeadline=0;
@@ -569,6 +578,14 @@ namespace HYJS.DesertV4
         }
         public bool StartEncounter(int type,string uuid)
         {
+            // A confirmed boss continues through the original SendPveBoss
+            // method exactly once; its prefix returns here before any new gate.
+            if (type==12 && dispatchingConfirmedBoss)
+            {
+                bool admitted=awaitingEncounter && confirmedBossId==uuid;
+                dispatchingConfirmedBoss=false; confirmedBossId=null;
+                return admitted;
+            }
             if (!InteractionReady || !ColdBattleRecovery.AllowNewEncounter()) return false;
             if ((type!=6 && type!=12) || String.IsNullOrEmpty(uuid) || actor==null || !worldReady)
             { Notice("场景正在同步，请稍候"); RequestSnapshot(); return false; }
@@ -576,6 +593,7 @@ namespace HYJS.DesertV4
             if (LeaveController.Pending) { Notice("离图正在确认"); return false; }
             if (BattleRecovery.HasUnsettled()) { Notice("上次战斗结果尚待确认"); return false; }
             if (TravelController.InterruptExtraction()) { Notice("撤离正在中断，请再次触碰"); return false; }
+            if (type==12 && TravelController.Pending) { Notice("上次行程仍在确认"); return false; }
             if (type==12 && (boss==null || !boss.CanInteract(uuid,actor))) return false;
             if (awaitingEncounter) return false;
             if (Stopwatch.GetTimestamp()<protectionDeadline)
@@ -583,6 +601,50 @@ namespace HYJS.DesertV4
             if (LoadingPanel.Instance==null) { Notice("战斗画面正在准备"); return false; }
             awaitingEncounter=true; encounterTimedOut=false; encounterDeadline=Stopwatch.GetTimestamp()+15L*Stopwatch.Frequency;
             LoadingPanel.Instance.ShowLoadingPre();
+            if (type==12)
+            {
+                FieldBoss target=boss; RoomBase startRoom=room; FieldWire.Session startOwner=session;
+                int serial=sceneSerial,epoch=PositionSync.ConnectionEpoch;
+                bool started=target.ConfirmPosition(startRoom,actor,wire,startOwner,delegate(bool confirmed,bool cancelled)
+                {
+                    FieldWire.Session live;
+                    bool same=serial==sceneSerial && epoch==PositionSync.ConnectionEpoch && room==startRoom && room==RoomManager.currentRoom &&
+                        boss==target && Same(startOwner,session) && FieldWire.Current(out live) && Same(startOwner,live);
+                    if (!same)
+                    {
+                        if (serial==sceneSerial && awaitingEncounter)
+                        {
+                            awaitingEncounter=false; encounterTimedOut=false;
+                            if (LoadingPanel.Instance!=null) LoadingPanel.Instance.HideLoading();
+                        }
+                        return;
+                    }
+                    if (!confirmed || !target.CanInteract(uuid,actor))
+                    {
+                        if (cancelled)
+                        {
+                            awaitingEncounter=false; encounterTimedOut=false;
+                            if (LoadingPanel.Instance!=null) LoadingPanel.Instance.HideLoading();
+                            Notice("已取消战斗");
+                        }
+                        else EndEncounter(0);
+                        return;
+                    }
+                    try
+                    {
+                        RoomNetField net=startRoom.netManager as RoomNetField;
+                        MethodInfo send=typeof(RoomNetField).GetMethod("SendPveBoss",BindingFlags.Instance|BindingFlags.Public|BindingFlags.NonPublic);
+                        if (net==null || send==null || !awaitingEncounter) throw new InvalidOperationException("Original boss entry unavailable");
+                        confirmedBossId=uuid; dispatchingConfirmedBoss=true;
+                        send.Invoke(net,new object[]{uuid});
+                        if (dispatchingConfirmedBoss) throw new InvalidOperationException("Original boss entry hook unavailable");
+                    }
+                    catch (Exception) { EndEncounter(0); }
+                    finally { dispatchingConfirmedBoss=false; confirmedBossId=null; }
+                });
+                if (!started) EndEncounter(0);
+                return false;
+            }
             return true;
         }
         public static bool ResumeEncounter(int type,object native)
