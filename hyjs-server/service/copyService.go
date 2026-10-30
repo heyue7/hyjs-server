@@ -7,9 +7,11 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"gorm.io/gorm"
+	"hyjs-server/elog"
 	"hyjs-server/model"
 	pb "hyjs-server/model/protocol"
 	"math"
@@ -899,6 +901,32 @@ func copyCompletionStars(party *pb.BattlePlayer) int32 {
 	return max(int32(1), stars)
 }
 
+// The observational replay has no role in copy ownership, outcome, rewards or
+// continuity. A savepoint keeps a recording failure out of their transaction.
+func (s *GameService) copyFinishOptionalReplay(ctx context.Context, tx *gorm.DB, id int64, start *pb.SCCopyFightStart, end *pb.CSCopyFightEnd) error {
+	if end.GetOptRecord() == nil || start == nil || len(start.GetBattleMonsterList()) != 1 {
+		return nil
+	}
+	const savepoint = "copy_optional_replay"
+	if err := tx.Session(&gorm.Session{}).SavePoint(savepoint).Error; err != nil {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		elog.Warn("copy optional replay savepoint unavailable", zap.Error(err))
+		return nil
+	}
+	if err := s.FinishOriginalCopyReplay(ctx, tx.Session(&gorm.Session{}), id, start, end); err != nil {
+		if rollbackErr := tx.Session(&gorm.Session{}).RollbackTo(savepoint).Error; rollbackErr != nil {
+			return errors.Join(err, rollbackErr)
+		}
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		elog.Warn("copy optional replay unavailable", zap.Error(err))
+	}
+	return nil
+}
+
 func (s *GameService) copyFightEnd(ctx context.Context, id int64, b *pb.CSCopyFightEnd) ([]proto.Message, error) {
 	var (
 		result   *pb.SCCopyFightEnd
@@ -1059,7 +1087,7 @@ func (s *GameService) copyFightEnd(ctx context.Context, id int64, b *pb.CSCopyFi
 				run, fight, progress = g.Run, g.Run.Fight, g.Copy
 			}
 		}
-		if err := s.FinishOriginalCopyReplay(ctx, tx, id, fight.Start, b); err != nil {
+		if err := s.copyFinishOptionalReplay(ctx, tx, id, fight.Start, b); err != nil {
 			return err
 		}
 		run.Party = acceptedParty
