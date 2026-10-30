@@ -9,9 +9,18 @@ if (args.Length!=2) throw new ArgumentException("input and output managed assemb
 using var module=ModuleDefMD.Load(args[0]);
 var reference=new AssemblyRefUser(new AssemblyNameInfo("SoulFlowerDesertV4, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null"));
 var hooks=new TypeRefUser(module,"HYJS.DesertV4","FieldHooks",reference);
+var mapViewer=new TypeRefUser(module,"HYJS.DesertV4","MapViewer86",reference);
+var teamMap=new TypeRefUser(module,"HYJS.DesertV4","TeamMap86",reference);
 MemberRef Hook(string name,TypeSig ret,params TypeSig[] p) => new MemberRefUser(module,name,MethodSig.CreateStatic(ret,p),hooks);
 var b=module.CorLibTypes.Boolean; var v=module.CorLibTypes.Void; var i4=module.CorLibTypes.Int32;
 var str=module.CorLibTypes.String; var obj=module.CorLibTypes.Object;
+var openMap=new MemberRefUser(module,"Open",MethodSig.CreateStatic(b,obj),mapViewer);
+var teamObserve=new MemberRefUser(module,"Observe",MethodSig.CreateStatic(v,obj,obj),teamMap);
+var teamQueue=new MemberRefUser(module,"Queue",MethodSig.CreateStatic(v,obj),teamMap);
+var teamTickSent=new MemberRefUser(module,"TickSent",MethodSig.CreateStatic(v,obj),teamMap);
+var teamDispatch=new MemberRefUser(module,"InspectDispatch",MethodSig.CreateStatic(v,obj,obj),teamMap);
+var teamPositionObserve=new MemberRefUser(module,"ObservePosition",MethodSig.CreateStatic(v,obj,obj),teamMap);
+var teamScopeStarting=new MemberRefUser(module,"ScopeStarting",MethodSig.CreateStatic(v,i4),teamMap);
 var changed=Hook("ResourceChanged",b); var notification=Hook("ResourceNotification",b,obj); var check=Hook("ResourceCheck",b);
 var gather=Hook("Gather",b,str,str); var monsterChanged=Hook("MonsterChanged",b);
 var pvpResponse=Hook("PvpResponse",b,obj);
@@ -27,6 +36,8 @@ var legacyObserve=Hook("LegacyBossObserve",v,obj,obj); var legacyCompleted=Hook(
 var transferSend=Hook("TransferSend",b,i4,obj); var transferResponse=Hook("TransferResponse",b,i4,obj,obj);
 var trackBase=Hook("TrackPositionBase",v,obj,obj);
 var trackField=Hook("TrackPositionField",v,obj); var trackPacket=Hook("TrackPositionPacket",v,obj);
+var roomLoaded=Hook("RoomLoaded",v,obj); var fieldPositionReady=Hook("FieldPositionReady",v,obj,obj);
+var playerDataReady=Hook("PlayerDataReady",v,obj);
 var dropPacket=Hook("DropPositionPacket",b,obj); var dropSocket=Hook("DropOldSocket",b,obj,obj);
 var actorType=module.GetTypes().Single(t=>t.FullName=="Room.RoomCharactor");
 var blockMove=Hook("BlockMove",b,new ClassSig(actorType));
@@ -43,6 +54,25 @@ void GuardNoArg(MethodDef m,IMethod hook)
 { var first=m.Body.Instructions[0]; Head(m,Instruction.Create(OpCodes.Call,hook),Instruction.Create(OpCodes.Brfalse,first),Instruction.Create(OpCodes.Ret)); }
 bool Match(Instruction x,string type,string name)
 { return x.Operand is IMethod m && m.DeclaringType.FullName==type && m.Name==name; }
+bool Targets(Instruction x,Instruction target)
+{ return ReferenceEquals(x.Operand,target) || (x.Operand is System.Collections.Generic.IList<Instruction> targets && targets.Contains(target)); }
+
+{
+ var m=Get("StaticData","InitPlayerData");
+ var expected=new[]{"ProtoBuf.Message.SCPlayerLogin","ProtoBuf.Message.SCEquipmentTreasureList","ProtoBuf.Message.SCWarriorList",
+  "ProtoBuf.Message.SCItemList","ProtoBuf.Message.SCFragmentList","ProtoBuf.Message.SCFormationList",
+  "ProtoBuf.Message.SCChangeNameTimes","ProtoBuf.Message.SCGemAndCookingList","ProtoBuf.Message.SCPetList","ProtoBuf.Message.SCTitleList"};
+ if(!m.HasBody || !m.IsStatic || !m.IsPublic || m.MethodSig.HasThis || m.MethodSig.RetType.ElementType!=ElementType.Void ||
+    m.MethodSig.Params.Count!=expected.Length || !m.MethodSig.Params.Select(x=>x.FullName).SequenceEqual(expected))
+  throw new InvalidOperationException("Original login initialization signature changed");
+ var ret=m.Body.Instructions.Last();
+ if(ret.OpCode!=OpCodes.Ret || m.Body.Instructions.Count(x=>x.OpCode==OpCodes.Ret)!=1 ||
+    m.Body.Instructions.Any(x=>Targets(x,ret)) || m.Body.ExceptionHandlers.Count!=0)
+  throw new InvalidOperationException("Original login initialization tail changed");
+ int pos=m.Body.Instructions.Count-1;
+ m.Body.Instructions.Insert(pos++,Instruction.Create(OpCodes.Ldarg_0));
+ m.Body.Instructions.Insert(pos,Instruction.Create(OpCodes.Call,playerDataReady));
+}
 
 var field=module.GetTypes().Single(t=>t.FullName=="Room.RoomNetField");
 foreach(string name in new[]{"SCFieldResourceInfo","SCSideResourceCheck","SCFieldResourceStartGather","SCFieldGetResource","SendResourceCheck","SendGetFieldRes"})
@@ -64,6 +94,19 @@ foreach(string name in new[]{"SCFieldResourceInfo","SCSideResourceCheck","SCFiel
 }
 var onLoaded=Get("Room.RoomField","OnMainCharactorLoaded");
 Head(onLoaded,Instruction.Create(OpCodes.Call,changed),Instruction.Create(OpCodes.Pop));
+{
+ var m=Get("Room.RoomField","OnLoadComplete");
+ if(!m.HasBody || !m.MethodSig.HasThis || m.MethodSig.Params.Count!=0 || m.MethodSig.RetType.ElementType!=ElementType.Void)
+  throw new InvalidOperationException("Room load completion signature changed");
+ var ret=m.Body.Instructions.Last();
+ if(ret.OpCode!=OpCodes.Ret || m.Body.Instructions.Count(x=>x.OpCode==OpCodes.Ret)!=1 ||
+    m.Body.Instructions.Any(x=>Targets(x,ret)) || m.Body.ExceptionHandlers.Count!=0)
+  throw new InvalidOperationException("Unexpected room load completion tail");
+ int pos=m.Body.Instructions.Count-1;
+ m.Body.Instructions.Insert(pos++,Instruction.Create(OpCodes.Ldarg_0));
+ m.Body.Instructions.Insert(pos,Instruction.Create(OpCodes.Call,roomLoaded));
+ m.Body.MaxStack=(ushort)Math.Max(8,(int)m.Body.MaxStack);
+}
 foreach(string name in new[]{"SCSideMonster","SCSideBoss","SCSideWorldBoss","SCSideBossCountdown"})
  GuardNoArg(Get("Room.RoomNetField",name),monsterChanged);
 {
@@ -77,6 +120,31 @@ foreach(string name in new[]{"SCSideMonster","SCSideBoss","SCSideWorldBoss","SCS
 {
  var m=Get("Room.RCUINormalNPC","OpenPage"); var first=m.Body.Instructions[0];
  Head(m,Instruction.Create(OpCodes.Ldarg_0),Instruction.Create(OpCodes.Call,openNpc),Instruction.Create(OpCodes.Brfalse,first),Instruction.Create(OpCodes.Ret));
+}
+{
+ var m=Get("UI.MiniMapComponent","OnClick"); var first=m.Body.Instructions[0];
+ if(m.MethodSig.Params.Count!=0 || m.MethodSig.RetType.ElementType!=ElementType.Void) throw new InvalidOperationException("Mini map click signature changed");
+ Head(m,Instruction.Create(OpCodes.Ldarg_0),Instruction.Create(OpCodes.Call,openMap),Instruction.Create(OpCodes.Brfalse,first),Instruction.Create(OpCodes.Ret));
+}
+foreach(string name in new[]{"SCQueryTeam","SCQueryTeamTick","SCJoinTeam","SCExitTeam","SCTeamKick","SCDisbandTeam","SCTeamCreateAndInvite"})
+{
+ var m=Get("Room.RoomNetField",name);
+ if(!m.MethodSig.HasThis || m.MethodSig.Params.Count!=1 || m.MethodSig.Params[0].ElementType!=ElementType.Object || m.MethodSig.RetType.ElementType!=ElementType.Void)
+  throw new InvalidOperationException("Team response signature changed: "+name);
+ Head(m,Instruction.Create(OpCodes.Ldarg_0),Instruction.Create(OpCodes.Ldarg_1),Instruction.Create(OpCodes.Call,teamObserve));
+}
+foreach(string name in new[]{"SCPlayerAppear","SCMovePush","SCPlayerDisappear"})
+{
+ var m=Get("Room.RoomNetBase",name);
+ if(!m.MethodSig.HasThis || m.MethodSig.Params.Count!=1 || m.MethodSig.Params[0].ElementType!=ElementType.Object || m.MethodSig.RetType.ElementType!=ElementType.Void)
+  throw new InvalidOperationException("Position response signature changed: "+name);
+ Head(m,Instruction.Create(OpCodes.Ldarg_0),Instruction.Create(OpCodes.Ldarg_1),Instruction.Create(OpCodes.Call,teamPositionObserve));
+}
+{
+ var m=Get("Room.RoomNetField","SendCSQueryTeamTick");
+ if(!m.MethodSig.HasThis || m.MethodSig.Params.Count!=0 || m.MethodSig.RetType.ElementType!=ElementType.Void)
+  throw new InvalidOperationException("Team tick send signature changed");
+ Head(m,Instruction.Create(OpCodes.Ldarg_0),Instruction.Create(OpCodes.Call,teamTickSent));
 }
 foreach(var item in new[]{(Type:6,Send:"SendPve",Reply:"SCSidePveFightStart"),(Type:12,Send:"SendPveBoss",Reply:"SCSidePveBossFightStart")})
 {
@@ -106,8 +174,10 @@ foreach(string name in new[]{"Reconnect","SendSocketLogin","Disconnect"})
  Head(Get("NetAPI",name),Instruction.Create(OpCodes.Call,tcpConnecting));
 Head(Get("NetAPI","SCLoginTcpCallback"),Instruction.Create(OpCodes.Ldarg_0),Instruction.Create(OpCodes.Call,tcpLogin));
 {
- var m=Get("NetAPI","SendSocket"); var first=m.Body.Instructions[0];
- Head(m,Instruction.Create(OpCodes.Ldarg_0),Instruction.Create(OpCodes.Ldarg_1),Instruction.Create(OpCodes.Call,transferSend),Instruction.Create(OpCodes.Brfalse,first),Instruction.Create(OpCodes.Ret));
+ var m=Get("NetAPI","SendSocket");
+ var resume=Instruction.Create(OpCodes.Ldarg_0);
+ Head(m,Instruction.Create(OpCodes.Ldarg_0),Instruction.Create(OpCodes.Ldarg_1),Instruction.Create(OpCodes.Call,transferSend),Instruction.Create(OpCodes.Brfalse,resume),Instruction.Create(OpCodes.Ret),
+      resume,Instruction.Create(OpCodes.Call,teamScopeStarting));
 }
 foreach(var item in new[]{(Class:"ManagerController",Name:"SceneTransferCallback",Opcode:30033),(Class:"Room.RoomNetField",Name:"SCTransferLine",Opcode:30062)})
 {
@@ -116,6 +186,7 @@ foreach(var item in new[]{(Class:"ManagerController",Name:"SceneTransferCallback
       Instruction.Create(OpCodes.Call,transferResponse),Instruction.Create(OpCodes.Brfalse,first),Instruction.Create(OpCodes.Ret));
 }
 Head(Get("NetWork.Sockets.Event.EventManger","AddPacket"),Instruction.Create(OpCodes.Ldarg_1),Instruction.Create(OpCodes.Call,trackPacket));
+Head(Get("NetWork.Sockets.Event.EventManger","AddPacket"),Instruction.Create(OpCodes.Ldarg_1),Instruction.Create(OpCodes.Call,teamQueue));
 {
  var m=Get("NetWork.Layer.SocketTool","ReceiveHandler"); var first=m.Body.Instructions[0];
  Head(m,Instruction.Create(OpCodes.Ldarg_0),Instruction.Create(OpCodes.Ldarg_1),Instruction.Create(OpCodes.Call,dropSocket),
@@ -132,17 +203,29 @@ Head(Get("NetWork.Sockets.Event.EventManger","AddPacket"),Instruction.Create(OpC
  pos++;
  ins.Insert(pos++,Instruction.Create(OpCodes.Ldloc_0));
  ins.Insert(pos++,Instruction.Create(OpCodes.Call,dropPacket));
- ins.Insert(pos,Instruction.Create(OpCodes.Brtrue,condition));
+ ins.Insert(pos++,Instruction.Create(OpCodes.Brtrue,condition));
+ ins.Insert(pos++,Instruction.Create(OpCodes.Ldarg_0));
+ ins.Insert(pos++,Instruction.Create(OpCodes.Ldloc_0));
+ ins.Insert(pos,Instruction.Create(OpCodes.Call,teamDispatch));
  m.Body.MaxStack=(ushort)Math.Max(8,(int)m.Body.MaxStack);
 }
 foreach(var item in new[]{(Class:"Room.RoomNetBase",Hook:trackBase,WithThis:true),(Class:"Room.RoomNetField",Hook:trackField,WithThis:false)})
 {
  var m=Get(item.Class,"SCCurrentPosition"); var ret=m.Body.Instructions.Last();
  if(ret.OpCode!=OpCodes.Ret || m.Body.Instructions.Count(x=>x.OpCode==OpCodes.Ret)!=1 || m.Body.Instructions.Any(x=>ReferenceEquals(x.Operand,ret))) throw new InvalidOperationException("Unexpected position handler tail");
+ if(!item.WithThis && (!m.MethodSig.HasThis || m.MethodSig.Params.Count!=1 || m.MethodSig.Params[0].ElementType!=ElementType.Object ||
+    m.MethodSig.RetType.ElementType!=ElementType.Void || m.Body.ExceptionHandlers.Count!=0 || m.Body.Instructions.Any(x=>Targets(x,ret))))
+  throw new InvalidOperationException("Field position completion signature or tail changed");
  int pos=m.Body.Instructions.Count-1;
  if(item.WithThis) m.Body.Instructions.Insert(pos++,Instruction.Create(OpCodes.Ldarg_0));
  m.Body.Instructions.Insert(pos++,Instruction.Create(OpCodes.Ldarg_1));
- m.Body.Instructions.Insert(pos,Instruction.Create(OpCodes.Call,item.Hook));
+ m.Body.Instructions.Insert(pos++,Instruction.Create(OpCodes.Call,item.Hook));
+ if(!item.WithThis)
+ {
+  m.Body.Instructions.Insert(pos++,Instruction.Create(OpCodes.Ldarg_0));
+  m.Body.Instructions.Insert(pos++,Instruction.Create(OpCodes.Ldarg_1));
+  m.Body.Instructions.Insert(pos,Instruction.Create(OpCodes.Call,fieldPositionReady));
+ }
  m.Body.MaxStack=(ushort)Math.Max(8,(int)m.Body.MaxStack);
 }
 {

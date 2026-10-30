@@ -206,7 +206,7 @@ func (s *GameService) GGOFieldSnapshot(ctx context.Context, auth model.GGOFieldA
 			return errors.New("沙漠接应点与NPC位置不匹配")
 		}
 		out.SafeArea = cfg.Runtime.SafeArea
-		out.Boss, err = a.Service.ggoBossSnapshotLocked(tx, cfg, projectionNow)
+		out.Boss, err = a.Service.ggoBossSnapshotLocked(tx, cfg, projectionNow, int64(a.Presence.Line))
 		if err != nil {
 			return err
 		}

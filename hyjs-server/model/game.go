@@ -29,6 +29,8 @@ type GameState struct {
 	BagCapacityScale int32 `json:"bag_capacity_scale,omitempty"`
 	// WarriorBagCapacityScale reads the unreleased hero-only fivefold candidate without multiplying it again.
 	WarriorBagCapacityScale int32 `json:"warrior_bag_capacity_scale,omitempty"`
+	// WarriorBreachPity follows each owned GUID through ordinary breach growth.
+	WarriorBreachPity map[string]*WarriorBreachPity `json:"warrior_breach_pity,omitempty"`
 	// Guild prayer attributes are recaptured from the current transaction and never persisted.
 	GuildPrayerProjection *P5GuildPrayerProjection `json:"-"`
 	// Authenticated request projection; absolute field cooldowns keep wall time.
@@ -157,6 +159,8 @@ type EquipmentStarReceipt struct {
 	Response  *pb.SCEquipStar `json:"response"`
 }
 type FieldState struct {
+	// BossLine85 identifies the currently projected ordinary boss line.
+	BossLine85 int64 `json:"boss_line85,omitempty"`
 	// TownRecoveryAt records the real return time; HP is settled once on departure.
 	TownRecoveryAt int64 `json:"town_recovery_at,omitempty"`
 	// Marks the day namespace after one conservative legacy projection.
@@ -186,7 +190,9 @@ type FieldAreaState struct {
 	Fight     *FieldFight                   `json:"fight,omitempty"`
 }
 type FieldFight struct {
-	GGOBoss          *GGOFieldBossFight   `json:"ggo_boss,omitempty"`
+	GGOBoss *GGOFieldBossFight `json:"ggo_boss,omitempty"`
+	// BossLine85 freezes the accepted spawn line; legacy fights belong to line one.
+	BossLine85       int64                `json:"boss_line85,omitempty"`
 	BossDeathRules73 *AdminFieldBossGroup `json:"boss_death_rules73,omitempty"`
 	BossSprouts73    int64                `json:"boss_sprouts73,omitempty"`
 

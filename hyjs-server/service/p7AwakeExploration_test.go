@@ -183,8 +183,8 @@ func TestP7AwakeBoxProbabilitiesAreWeightedAndBounded(t *testing.T) {
 			t.Fatal("probability expression interpreted as direct reward", draw, result, err)
 		}
 	}
-	if _, err := f.s.p7AwakeRollBox("box17", func(int64) (int64, error) { t.Fatal("unsupported class grammar reached RNG"); return 0, nil }); err == nil {
-		t.Fatal("unknown class-select box grammar accepted")
+	if _, err := f.s.p7AwakeRollBox("box21", func(int64) (int64, error) { t.Fatal("unknown box reached RNG"); return 0, nil }); err == nil {
+		t.Fatal("unknown box accepted")
 	}
 	if _, err := f.s.p7AwakeRollBox("box1", func(int64) (int64, error) { return 1000, nil }); err == nil {
 		t.Fatal("RNG out of range")

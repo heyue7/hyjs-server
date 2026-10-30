@@ -5,9 +5,11 @@ import pb "hyjs-server/model/protocol"
 // GGOFieldBossFight keeps only the active battle's event and death policy.
 // The canonical combat input stays in FieldFight's existing compressed payload.
 type GGOFieldBossFight struct {
-	InputHash        string                 `json:"input_hash"`
-	Boss             *pb.SideBoss           `json:"boss"`
-	EventID          string                 `json:"event_id"`
+	InputHash string       `json:"input_hash"`
+	Boss      *pb.SideBoss `json:"boss"`
+	EventID   string       `json:"event_id"`
+	// Line freezes the server-selected spawn line; zero denotes an old fight on line one.
+	Line             int64                  `json:"line,omitempty"`
 	EndsAtMS         int64                  `json:"ends_at_ms"`
 	EconomyVersion   string                 `json:"economy_version"`
 	ExchangeValues   [6]int64               `json:"exchange_values"`

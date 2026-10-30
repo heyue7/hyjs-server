@@ -304,8 +304,8 @@ func TestWantedClock75RejectedMetadataKeepsFutureInstanceInert(t *testing.T) {
 	if err := db.GetIns().Model(&db.P12WantedInstance{}).Where("id=?", fight.InstanceID).Update("created_at", now.Add(time.Hour).UnixMilli()).Error; err != nil {
 		t.Fatal(err)
 	}
-	if err := recordP12WantedRejectedEnd(ctx, f.id, fight.ID, now, errors.New(constUtil.P12WantedInvalid)); err != nil {
-		t.Fatal(err)
+	if pending, err := recordP12WantedRejectedEnd(ctx, f.id, fight.ID, now, errors.New(constUtil.P12WantedInvalid)); err != nil || pending {
+		t.Fatal("future instance must remain inert", pending, err)
 	}
 	if got := wantedClock75Read(t, fight.ID); !reflect.DeepEqual(fight, got) {
 		t.Fatal("future instance rejection changed fight metadata")

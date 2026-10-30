@@ -200,6 +200,13 @@ namespace HYJS.DungeonContent
             if (chapter == null) return;
             var entry = AwakeField(room, "enterMsg") as SCEnterAwakeCopy;
             bool resume = awakeRoom == room && awakeChapter == id && awakeEntry == entry;
+            Awake85Transition(room, id, entry);
+            if (Awake85NightForest.Applies(awake85State, room, id, entry, (int)RoomManager.curSceneType))
+            {
+                if (chapter.sceneId != "map_nightforestfield_001")
+                    throw new InvalidOperationException("Awake85 night scene changed");
+                Awake85EnsureNightForest();
+            }
             if (!resume) { awakePrepared = false; awakeReplaced = false; }
             string scene = Scene(chapter.sceneId);
             if (scene != chapter.sceneId) { AwakeReplacedChapters[id] = scene; chapter.sceneId = scene; }
@@ -216,6 +223,11 @@ namespace HYJS.DungeonContent
         }
         public static void AwakePrepare(RoomChallenge room)
         {
+            if (Awake85Current(room))
+            {
+                if (!awakePrepared && !(bool)AwakeField(room, "sceneLoaded")) Awake85Prepare(room);
+                return;
+            }
             if (!AwakeCurrent(room) || awakePrepared || (bool)AwakeField(room, "sceneLoaded")) return;
             var chapter = DictAwakeCopyBlo.GetOne(awakeChapter);
             var entry = AwakeField(room, "enterMsg") as SCEnterAwakeCopy;
@@ -306,7 +318,7 @@ namespace HYJS.DungeonContent
         }
         public static void AwakeAlignPlayer(RoomChallenge room)
         {
-            if (!AwakeCurrent(room) || !awakePrepared || room.charactorManager == null) return;
+            if ((!AwakeCurrent(room) && !Awake85Current(room)) || !awakePrepared || room.charactorManager == null) return;
             var player = room.charactorManager.GetSelfCharactor();
             if (player == null) return;
             player.transform.position = awakeSpawn;
@@ -585,6 +597,136 @@ namespace HYJS.DungeonContent
         public static bool SkipArea(string area)
         {
             return Current() && prepared && area == "mission_" + activeMission;
+        }
+
+        // v85 layout is bound to a server-generated run and never changes an
+        // unmarked entry. The original helper's legacy awakening path remains.
+        private static Awake85State awake85State;
+
+        private static bool Awake85ExpectedNightCell(AssetCell cell)
+        {
+            return cell != null && Awake85NightForest.Matches(cell.path, cell.hashCode, cell.size);
+        }
+
+        private static void Awake85EnsureNightForest()
+        {
+            var manager = AssetBundleManager.Instance;
+            if (manager == null) throw new InvalidOperationException("Awake85 asset manager unavailable");
+            var fullField = typeof(AssetBundleManager).GetField("assetFileTool", AwakeFields);
+            var smallField = typeof(AssetBundleManager).GetField("smallAssetFileTool", AwakeFields);
+            var full = fullField == null ? null : fullField.GetValue(manager) as AssetFileTool;
+            var small = smallField == null ? null : smallField.GetValue(manager) as AssetFileTool;
+            if (full == null || small == null || full.assetCells == null || small.assetCells == null)
+                throw new InvalidOperationException("Awake85 asset manifests unavailable");
+            var parsed = AssetFileTool.LoadFromString(Awake85NightForest.ManifestText);
+            if (parsed == null) throw new InvalidOperationException("Awake85 night manifest parse failed");
+            Awake85NightForest.Register<AssetCell>(full.assetCells, small.assetCells, parsed.assetCells,
+                new Func<AssetCell, bool>(Awake85ExpectedNightCell));
+        }
+
+        private static void Awake85RestoreBorn(object owner, string value)
+        {
+            var chapter = owner as TableAwakeCopyChapter;
+            if (chapter == null) throw new InvalidOperationException("Awake85 chapter restore invalid");
+            chapter.bornPos = value;
+        }
+
+        private static void Awake85Transition(RoomChallenge room, string chapter, SCEnterAwakeCopy entry)
+        {
+            if (awake85State != null)
+            {
+                if (awake85State.Same(room, chapter, entry)) return;
+                awake85State.Leave(Awake85RestoreBorn);
+            }
+            if (entry == null) return;
+            string[] boxes = new string[entry.boxes.Count];
+            string[] monsters = new string[entry.monsters.Count];
+            for (int i = 0; i < boxes.Length; i++) boxes[i] = entry.boxes[i] == null ? null : entry.boxes[i].guid;
+            for (int i = 0; i < monsters.Length; i++) monsters[i] = entry.monsters[i] == null ? null : entry.monsters[i].guid;
+            string run = Awake85Contract.Identify(chapter, boxes, monsters);
+            if (run == null) return;
+            if (awake85State == null) awake85State = new Awake85State();
+            awake85State.Bind(room, chapter, entry, run);
+        }
+
+        private static bool Awake85Current(RoomChallenge room)
+        {
+            return (int)RoomManager.curSceneType == 10 && room != null && room == awakeRoom &&
+                awake85State != null && awake85State.Active(room, StaticData.challengeChapterId,
+                    AwakeField(room, "enterMsg"), (int)RoomManager.curSceneType);
+        }
+
+        private static void Awake85Prepare(RoomChallenge room)
+        {
+            var chapter = DictAwakeCopyBlo.GetOne(awakeChapter);
+            var entry = AwakeField(room, "enterMsg") as SCEnterAwakeCopy;
+            if (chapter == null || entry == null || awake85State == null)
+                throw new InvalidOperationException("Awake85 server entry unavailable");
+            string run = awake85State.Run;
+            string[] boxGuids = new string[entry.boxes.Count];
+            string[] monsterGuids = new string[entry.monsters.Count];
+            for (int i = 0; i < boxGuids.Length; i++) boxGuids[i] = entry.boxes[i] == null ? null : entry.boxes[i].guid;
+            for (int i = 0; i < monsterGuids.Length; i++) monsterGuids[i] = entry.monsters[i] == null ? null : entry.monsters[i].guid;
+            if (Awake85Contract.Identify(awakeChapter, boxGuids, monsterGuids) != run)
+                throw new InvalidOperationException("Awake85 entry source changed");
+
+            int cornerMask = 0;
+            int[] boxIndex = new int[4];
+            for (int i = 0; i < entry.boxes.Count; i++)
+            {
+                Vector3 original = AwakeVector(entry.boxes[i].pos);
+                if (Math.Abs(original.x) != 14.0f || original.y != 0.0f || Math.Abs(original.z) != 14.0f)
+                    throw new InvalidOperationException("Awake85 box template invalid");
+                int corner = (original.x > 0 ? 2 : 0) + (original.z > 0 ? 1 : 0);
+                if ((cornerMask & (1 << corner)) != 0) throw new InvalidOperationException("Awake85 box corner duplicated");
+                cornerMask |= 1 << corner;
+                boxIndex[Awake85Contract.BoxSlot(entry.boxes[i].guid, run)] = i;
+            }
+            if (cornerMask != 15) throw new InvalidOperationException("Awake85 box corners incomplete");
+            if (entry.monsters.Count == 1)
+            {
+                var monster = entry.monsters[0];
+                Vector3 original = AwakeVector(monster.pos);
+                if (original.x != 0.0f || original.y != 0.0f || original.z != 0.0f)
+                    throw new InvalidOperationException("Awake85 monster template invalid");
+                var outside = DictAwakeMonsterOutSideBlo.GetOne(monster.monId);
+                if (outside == null || outside.ViewR < 0 || outside.wanderR < 0 ||
+                    Double.IsNaN(outside.ViewR) || Double.IsInfinity(outside.ViewR) ||
+                    Double.IsNaN(outside.wanderR) || Double.IsInfinity(outside.wanderR) ||
+                    outside.ViewR + outside.wanderR > 9.0)
+                    throw new InvalidOperationException("Awake85 monster radius invalid");
+            }
+
+            List<Vector3> candidates = null;
+            int[] slots = null;
+            for (int count = 6; count <= 12 && slots == null; count += 2)
+            {
+                candidates = Layout(chapter.sceneId, count);
+                var x = new float[candidates.Count];
+                var z = new float[candidates.Count];
+                var paths = new bool[candidates.Count, candidates.Count];
+                var path = new NavMeshPath();
+                for (int i = 0; i < candidates.Count; i++)
+                {
+                    x[i] = candidates[i].x; z[i] = candidates[i].z;
+                    if (Single.IsNaN(candidates[i].y) || Single.IsInfinity(candidates[i].y))
+                        throw new InvalidOperationException("Awake85 candidate height invalid");
+                    for (int j = 0; j < candidates.Count; j++)
+                        paths[i, j] = i == j || (NavMesh.CalculatePath(candidates[i], candidates[j], -1, path) &&
+                            path.status == NavMeshPathStatus.PathComplete);
+                }
+                slots = Awake85Contract.Select(x, z, paths);
+            }
+            if (slots == null || candidates == null) throw new InvalidOperationException("Awake85 safe slots unavailable");
+            string[] positions = new string[6];
+            for (int i = 0; i < positions.Length; i++) positions[i] = AwakeText(candidates[slots[i]]);
+            // All checks finish before mutating the shared chapter or server entry.
+            awake85State.CaptureBorn(chapter, chapter.bornPos);
+            awakeSpawn = candidates[slots[0]];
+            chapter.bornPos = positions[0];
+            if (entry.monsters.Count == 1) entry.monsters[0].pos = positions[1];
+            for (int slot = 0; slot < boxIndex.Length; slot++) entry.boxes[boxIndex[slot]].pos = positions[slot + 2];
+            awakePrepared = true;
         }
     }
 }

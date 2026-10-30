@@ -17,13 +17,14 @@ import (
 	pb "hyjs-server/model/protocol"
 )
 
-// One small event remains in the existing realm boss row. Contribution and
-// award rows retain their own frozen policy after this live event is replaced.
+// Each line keeps its event in a separate boss row. Contribution and award
+// rows retain their frozen policy after the live event is replaced.
 type ggoBossClaimSessionKey struct{}
 
 type ggoBossEvent struct {
 	Source         string                       `json:"source"`
 	ID             string                       `json:"id"`
+	Line           int64                        `json:"line,omitempty"`
 	PointID        string                       `json:"pointId"`
 	Position       *model.AdminFieldGGOPosition `json:"position"`
 	Radius         float64                      `json:"radius"`
@@ -77,7 +78,7 @@ func ggoBossDecode(row *db.SharedFieldBoss55) (*ggoBossEvent, *pb.SideBoss, map[
 	var event ggoBossEvent
 	var boss pb.SideBoss
 	hp := map[string]float64{}
-	if json.Unmarshal(row.GGOEvent, &event) != nil || event.Source != constUtil.GGOFieldBossSource || event.ID != row.UUID || event.StartsAtMS >= event.EndsAtMS || event.Boss.HP < 1 || json.Unmarshal(row.Payload, &boss) != nil || boss.GetUuid() != event.ID || json.Unmarshal(row.HP, &hp) != nil {
+	if json.Unmarshal(row.GGOEvent, &event) != nil || event.Source != constUtil.GGOFieldBossSource || event.ID != row.UUID || row.Line < 1 || (event.Line != row.Line && !(event.Line == 0 && row.Line == constUtil.GGOFieldBossStorageLine)) || event.StartsAtMS >= event.EndsAtMS || event.Boss.HP < 1 || json.Unmarshal(row.Payload, &boss) != nil || boss.GetUuid() != event.ID || json.Unmarshal(row.HP, &hp) != nil {
 		return nil, nil, nil, errors.New("沙漠共享首领事件无效")
 	}
 	value, exists := hp[ggoBossGUID(event.ID)]
@@ -87,6 +88,10 @@ func ggoBossDecode(row *db.SharedFieldBoss55) (*ggoBossEvent, *pb.SideBoss, map[
 	return &event, &boss, hp, nil
 }
 func ggoBossGUID(eventID string) string { return "ggo-boss-" + eventID }
+
+func ggoBossEventID(serverID, line, start int64) string {
+	return "ggo-" + p6Digest([]byte(fmt.Sprintf("%d:%d:%d", serverID, line, start)))[:40]
+}
 
 func ggoBossNeedsEvent(row *db.SharedFieldBoss55, start, end, now int64) (bool, error) {
 	if row.UUID == "" {
@@ -103,16 +108,25 @@ func ggoBossNeedsEvent(row *db.SharedFieldBoss55, start, end, now int64) (bool, 
 	return event.StartsAtMS != start || event.EndsAtMS != end, nil
 }
 
-func (s *GameService) ggoBossCurrent(tx *gorm.DB, cfg *model.AdminFieldGGOConfiguration, now int64, write bool) (*db.SharedFieldBoss55, *ggoBossEvent, *pb.SideBoss, map[string]float64, error) {
+// The optional line keeps older internal callers on the legacy line; live
+// requests always pass their validated P10 presence line explicitly.
+func (s *GameService) ggoBossCurrent(tx *gorm.DB, cfg *model.AdminFieldGGOConfiguration, now int64, write bool, lines ...int64) (*db.SharedFieldBoss55, *ggoBossEvent, *pb.SideBoss, map[string]float64, error) {
 	if cfg == nil || cfg.Runtime == nil {
 		return nil, nil, nil, nil, errors.New("沙漠首领配置缺失")
+	}
+	line := constUtil.GGOFieldBossStorageLine
+	if len(lines) > 1 || len(lines) == 1 && (lines[0] < 1 || lines[0] > math.MaxInt32) {
+		return nil, nil, nil, nil, errors.New("沙漠首领线路无效")
+	}
+	if len(lines) == 1 {
+		line = lines[0]
 	}
 	start, end, err := ggoBossWindow(cfg.Runtime.Boss, now)
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
 	query := func(q *gorm.DB) *gorm.DB {
-		return sharedFieldBoss55Query(q, s.OriginalServerID(), constUtil.GGOFieldScene, constUtil.GGOFieldBossPosition)
+		return sharedFieldBoss55Query(q, s.OriginalServerID(), constUtil.GGOFieldScene, constUtil.GGOFieldBossPosition, line)
 	}
 	var row db.SharedFieldBoss55
 	err = query(tx).Take(&row).Error
@@ -129,7 +143,7 @@ func (s *GameService) ggoBossCurrent(tx *gorm.DB, cfg *model.AdminFieldGGOConfig
 	}
 	if write || needs {
 		if missing {
-			row = db.SharedFieldBoss55{ServerID: s.OriginalServerID(), Scene: constUtil.GGOFieldScene, PosID: constUtil.GGOFieldBossPosition, Payload: []byte("{}"), HP: []byte("{}")}
+			row = db.SharedFieldBoss55{ServerID: s.OriginalServerID(), Scene: constUtil.GGOFieldScene, Line: line, PosID: constUtil.GGOFieldBossPosition, Payload: []byte("{}"), HP: []byte("{}")}
 			if err = tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&row).Error; err != nil {
 				return nil, nil, nil, nil, err
 			}
@@ -162,8 +176,8 @@ func (s *GameService) ggoBossCurrent(tx *gorm.DB, cfg *model.AdminFieldGGOConfig
 			if e != nil {
 				return nil, nil, nil, nil, e
 			}
-			id := "ggo-" + p6Digest([]byte(fmt.Sprintf("%d:%d", s.OriginalServerID(), start)))[:40]
-			event := ggoBossEvent{Source: constUtil.GGOFieldBossSource, ID: id, PointID: point.ID, Position: point.Position, Radius: point.Radius, StartsAtMS: start, EndsAtMS: end, EconomyVersion: cfg.Runtime.EconomyVersion, ExchangeValues: values, Boss: cfg.Runtime.Boss}
+			id := ggoBossEventID(s.OriginalServerID(), line, start)
+			event := ggoBossEvent{Source: constUtil.GGOFieldBossSource, ID: id, Line: line, PointID: point.ID, Position: point.Position, Radius: point.Radius, StartsAtMS: start, EndsAtMS: end, EconomyVersion: cfg.Runtime.EconomyVersion, ExchangeValues: values, Boss: cfg.Runtime.Boss}
 			boss := &pb.SideBoss{Uuid: proto.String(id), BossId: proto.String(constUtil.GGOFieldBossID), BossPosId: proto.String(point.ID), HeroId: proto.String(event.Boss.HeroID), CurrentPoint: position, State: proto.Int32(1), CurHp: proto.Float64(1), Nature: proto.Int32(0)}
 			row.UUID = id
 			row.RespawnAt = 0
@@ -182,8 +196,8 @@ func (s *GameService) ggoBossCurrent(tx *gorm.DB, cfg *model.AdminFieldGGOConfig
 	return &row, event, boss, hp, err
 }
 
-func (s *GameService) ggoBossSnapshotLocked(tx *gorm.DB, cfg *model.AdminFieldGGOConfiguration, now int64) (*model.GGOFieldBossView, error) {
-	row, event, boss, hp, err := s.ggoBossCurrent(tx, cfg, now, false)
+func (s *GameService) ggoBossSnapshotLocked(tx *gorm.DB, cfg *model.AdminFieldGGOConfiguration, now, line int64) (*model.GGOFieldBossView, error) {
+	row, event, boss, hp, err := s.ggoBossCurrent(tx, cfg, now, false, line)
 	if err != nil {
 		return nil, err
 	}

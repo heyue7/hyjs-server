@@ -14,11 +14,13 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 	"hyjs-server/constUtil"
 	"hyjs-server/db"
+	"hyjs-server/elog"
 	"hyjs-server/model"
 	pb "hyjs-server/model/protocol"
 )
@@ -555,13 +557,21 @@ func (s *GameService) p12WantedStart(ctx context.Context, id int64, request *pb.
 			return errors.New(constUtil.P12WantedUnavailable)
 		}
 		var err error
+		if strings.HasPrefix(request.GetRebelId(), constUtil.P12WantedRecoveryPrefix) {
+			// This explicit identity never falls through to a paid new Start, even
+			// if another End has already committed the requested fight.
+			return s.p12WantedRecoverByFight(tx, id, request, game, now, &out)
+		}
 		// 原正时间戳绑定首次Start；结束后的网络重发也不创建新战斗或再次扣次数。
 		if stamp > 0 {
 			var prior db.P12WantedFight
-			found := tx.Where("player_id=? AND stamp=?", id, stamp).Order("created_at,id").First(&prior).Error
+			found := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("player_id=? AND stamp=?", id, stamp).Order("created_at,id").First(&prior).Error
 			if found == nil {
 				if prior.AbandonedAt > 0 || prior.InstanceID != request.GetRebelId() || prior.AttackType != int64(request.GetType()) || prior.StartHash != p6Digest(prior.StartProto) || proto.Unmarshal(prior.StartProto, &out) != nil {
 					return errors.New(constUtil.P12WantedInvalid)
+				}
+				if err = s.p12WantedReacquireRejected(tx, id, &prior, game, now); err != nil {
+					return err
 				}
 				return nil
 			}
@@ -579,6 +589,9 @@ func (s *GameService) p12WantedStart(ctx context.Context, id int64, request *pb.
 			if priorInstance.ExpiresAt > now.UnixMilli() && priorInstance.State == constUtil.P12WantedActive && priorInstance.CurrentHP > 0 {
 				if pending.InstanceID != request.GetRebelId() || pending.AttackType != int64(request.GetType()) || pending.StartHash != p6Digest(pending.StartProto) || proto.Unmarshal(pending.StartProto, &out) != nil {
 					return errors.New(constUtil.P12WantedInvalid)
+				}
+				if err = s.p12WantedReacquireRejected(tx, id, &pending, game, now); err != nil {
+					return err
 				}
 				return nil
 			}
@@ -673,8 +686,106 @@ func (s *GameService) p12WantedStart(ctx context.Context, id int64, request *pb.
 	return []proto.Message{&out}, nil
 }
 
+// Recover a named paid fight without allowing the original Start field to
+// create a new fight when a concurrent End has already committed it.
+func (s *GameService) p12WantedRecoverByFight(tx *gorm.DB, id int64, request *pb.CSRebelFightStart, game *model.GameState, now time.Time, out *pb.SCRebelFightStart) error {
+	fightID := strings.TrimPrefix(request.GetRebelId(), constUtil.P12WantedRecoveryPrefix)
+	parsed, err := uuid.Parse(fightID)
+	if err != nil || parsed.String() != fightID {
+		return errors.New(constUtil.P12WantedInvalid)
+	}
+	var fight db.P12WantedFight
+	if err = tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&fight, "id=? AND player_id=?", fightID, id).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return errors.New(constUtil.P12WantedUnavailable)
+		}
+		return err
+	}
+	if fight.AbandonedAt > 0 || fight.RejectedAt <= 0 || fight.RejectedReason != constUtil.P6ReplayConflict ||
+		fight.AttackType != int64(request.GetType()) || fight.Cost <= 0 ||
+		calendar75Adjusted(tx) && fight.CreatedAt > now.UnixMilli() ||
+		fight.InputHash != p6Digest([]byte(fight.InputJSON)) || fight.TerminalHash != p6Digest([]byte(fight.TerminalJSON)) ||
+		fight.StartHash != p6Digest(fight.StartProto) || proto.Unmarshal(fight.StartProto, out) != nil || out.GetFightId() != fight.ID {
+		return errors.New(constUtil.P12WantedInvalid)
+	}
+	var input model.FrozenBattleInput
+	var terminal model.CombatFinalHPOutcome
+	if json.Unmarshal([]byte(fight.InputJSON), &input) != nil || json.Unmarshal([]byte(fight.TerminalJSON), &terminal) != nil ||
+		ValidateP12WantedCertifiedReceipt(&input, &terminal) != nil {
+		return errors.New(constUtil.P12WantedInvalid)
+	}
+	identity := input.AppliedProperties["localWantedRule"]
+	if len(identity) != 3 || identity[1] != fight.InstanceID || identity[2] != strconv.FormatInt(fight.AttackType, 10) ||
+		input.Attacker.GetPlayerId() != id ||
+		input.AttackerDamageFactor == nil || out.GetDamageFactor() != *input.AttackerDamageFactor ||
+		out.GetRandSeed() != input.Seed || out.GetMaxround() != input.MaxRound ||
+		!proto.Equal(out.BattlePlayer, input.Attacker) || len(out.BattleMonsterList) != 1 || !proto.Equal(out.BattleMonsterList[0], input.Monster) {
+		return errors.New(constUtil.P12WantedInvalid)
+	}
+	var cost db.EventFact
+	if err = tx.Where("player_id=? AND source_key=? AND kind=?", id, "wanted:start:"+fight.ID, "spend:wantedAttTimes").First(&cost).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return errors.New(constUtil.P12WantedInvalid)
+		}
+		return err
+	}
+	if cost.Amount != fight.Cost {
+		return errors.New(constUtil.P12WantedInvalid)
+	}
+	if fight.Committed {
+		var receipt pb.SCRebelFightEnd
+		if len(fight.EndRequestHash) != 64 || len(fight.EndProto) == 0 || fight.EndHash != p6Digest(fight.EndProto) || proto.Unmarshal(fight.EndProto, &receipt) != nil ||
+			len(receipt.Cost) != 1 || receipt.Cost[0] == nil || receipt.Cost[0].GetId() != "wantedAttTimes" || int64(receipt.Cost[0].GetNum()) != fight.Cost ||
+			receipt.GetDamage() != fight.AppliedDamage || receipt.GetRecordAdd() != fight.Performance || int64(receipt.GetScoreAdd()) != fight.Score {
+			return errors.New(constUtil.P12WantedInvalid)
+		}
+		if fight.RecordedProof != "" {
+			var recorded pb.CSRebelFightEnd
+			if proto.Unmarshal(fight.RecordedEndRequest, &recorded) != nil || recorded.GetFightId() != fight.ID || p12WantedRecordedReceipt(&fight, &recorded) != nil {
+				return errors.New(constUtil.P12WantedInvalid)
+			}
+		} else if len(fight.RecordedEndRequest) != 0 || fight.RecordedTerminalJSON != "" || fight.RecordedTerminalHash != "" || fight.RecordedRecordHash != "" ||
+			p12WantedAutomaticCommittedReceipt(&fight, &terminal) != nil {
+			return errors.New(constUtil.P12WantedInvalid)
+		}
+		return errors.New(constUtil.P12WantedRecoveryCommitted)
+	}
+	return s.p12WantedReacquireRejected(tx, id, &fight, game, now)
+}
+
+// A rejected recording released its presentation lease, but retained the paid
+// Start. Reacquire the existing ownership checks before returning that Start;
+// neither cost nor the original rejection evidence is changed.
+func (s *GameService) p12WantedReacquireRejected(tx *gorm.DB, id int64, fight *db.P12WantedFight, game *model.GameState, now time.Time) error {
+	if fight.Committed || fight.RejectedAt <= 0 {
+		return nil
+	}
+	var instance db.P12WantedInstance
+	if err := tx.First(&instance, "id=?", fight.InstanceID).Error; err != nil {
+		return err
+	}
+	if instance.State != constUtil.P12WantedActive || instance.ExpiresAt <= now.UnixMilli() || instance.CurrentHP <= 0 {
+		return errors.New(constUtil.P12WantedUnavailable)
+	}
+	if fight.RecoveryLeaseActive {
+		return nil
+	}
+	if game.Run != nil && !game.Run.Complete || game.Field != nil && game.Field.Fight != nil && !game.Field.Fight.Settled {
+		return errors.New(constUtil.P12WantedUnavailable)
+	}
+	if err := s.ensureNoActiveDailyCopy(tx, id, now); err != nil {
+		return err
+	}
+	if err := tx.Model(fight).Update("recovery_lease_active", true).Error; err != nil {
+		return err
+	}
+	fight.RecoveryLeaseActive = true
+	return nil
+}
+
 func (s *GameService) p12WantedEnd(ctx context.Context, id int64, request *pb.CSRebelFightEnd, now time.Time) ([]proto.Message, error) {
 	var out pb.SCRebelFightEnd
+	var recordingRejected bool
 	err := s.p12WantedProfile(ctx, id, func(tx *gorm.DB, _ *db.Profile, player *pb.Player, game *model.GameState) error {
 		if request.GetFightId() == "" || request.OptRecord == nil || request.BattlePlayer != nil {
 			return errors.New(constUtil.P12WantedInvalid)
@@ -689,6 +800,17 @@ func (s *GameService) p12WantedEnd(ctx context.Context, id int64, request *pb.CS
 		}
 		if fight.Committed {
 			if fight.EndRequestHash != p6Digest(requestRaw) {
+				if fight.RecoveryLeaseActive {
+					// A valid concurrent End may finish after this paid recovery
+					// reacquired its lease. Verify the existing immutable receipt
+					// before reporting its committed status without a new award.
+					recoverRequest := &pb.CSRebelFightStart{RebelId: proto.String(constUtil.P12WantedRecoveryPrefix + fight.ID), Type: proto.Int32(int32(fight.AttackType))}
+					var originalStart pb.SCRebelFightStart
+					if checkErr := s.p12WantedRecoverByFight(tx, id, recoverRequest, game, now, &originalStart); checkErr != nil && checkErr.Error() == constUtil.P12WantedRecoveryCommitted {
+						elog.Warn("wanted recovered fight receipt conflict", zap.Error(errors.New(constUtil.P12WantedInvalid)))
+						return errors.New(constUtil.P12WantedRecoveryCommitted)
+					}
+				}
 				return errors.New(constUtil.P12WantedInvalid)
 			}
 			if fight.EndHash != p6Digest(fight.EndProto) || proto.Unmarshal(fight.EndProto, &out) != nil {
@@ -710,7 +832,11 @@ func (s *GameService) p12WantedEnd(ctx context.Context, id int64, request *pb.CS
 		if !proto.Equal(request.OptRecord, terminal.OriginalOperates) {
 			recorded, err := s.computeP12WantedRecorded(ctx, &input, request.OptRecord)
 			if err != nil {
-				return p12WantedRecordedReplayError(err)
+				// Only a rejected recording can be re-fought. Invalid snapshots,
+				// committed receipt conflicts and transient failures stay separate.
+				var mismatch *p12WantedRecordingMismatchError
+				recordingRejected = errors.As(err, &mismatch)
+				return err
 			}
 			if err := p12WantedStoreRecorded(&fight, request, recorded); err != nil {
 				return err
@@ -811,8 +937,12 @@ func (s *GameService) p12WantedEnd(ctx context.Context, id int64, request *pb.CS
 		return nil
 	})
 	if err != nil {
-		if metadataErr := recordP12WantedRejectedEnd(ctx, id, request.GetFightId(), now, err); metadataErr != nil {
+		pending, metadataErr := recordP12WantedRejectedEnd(ctx, id, request.GetFightId(), now, err)
+		if metadataErr != nil {
 			return nil, fmt.Errorf("%w: rejected battle recovery metadata: %v", err, metadataErr)
+		}
+		if recordingRejected && pending {
+			return nil, &P12WantedRetryableEndError{cause: err}
 		}
 		return nil, err
 	}

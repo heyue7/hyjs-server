@@ -155,6 +155,10 @@ func (s *GameService) Dispatch(ctx context.Context, request *model.GamePacket, p
 	}
 	if err != nil {
 		elog.Warn("game request failed", zap.String("message", name), zap.Error(err))
+		var wantedRetry *P12WantedRetryableEndError
+		if errors.As(err, &wantedRetry) {
+			return GameError(constUtil.P12WantedRetryableEndCode, err.Error())
+		}
 		return GameError(constUtil.ErrGameRequest, err.Error())
 	}
 	s.resumeRecruitGuide(ctx, result)
@@ -166,20 +170,51 @@ func (s *GameService) Dispatch(ctx context.Context, request *model.GamePacket, p
 		}
 	}
 	if !failed {
+		var lineRestored bool
 		// A committed war move already publishes its authoritative position to
 		// the same field. Do not repeat the full presence transaction before
 		// replying to this socket; the next queued gameplay request must proceed.
 		if !p13UFMovePublished(request, result) {
-			s.AfterP10SceneRequest(ctx, request.PlayerId, request.Body)
-		}
-		if current, ok := request.Body.(*pb.CSCurrentPosition); ok && current.GetShowArround() != 0 {
-			peers, snapshotErr := s.p10CurrentScenePeers(ctx, request.PlayerId)
-			if snapshotErr != nil {
-				return GameError(constUtil.ErrGameRequest, snapshotErr.Error())
+			if scene := fieldBossHandshakeScene85(request, result); scene != "" && s.SharedFieldBoss55Ready {
+				// The original handshake chooses its line only after the profile
+				// transaction. Its Boss messages must use that committed choice.
+				if syncErr := s.SyncP10Scene(ctx, request.PlayerId, false); syncErr != nil {
+					return GameError(constUtil.ErrGameRequest, syncErr.Error())
+				}
+				result, err = s.fieldBossAfterHandshake85(ctx, request, scene, result)
+				if err != nil {
+					return GameError(constUtil.ErrGameRequest, err.Error())
+				}
+			} else {
+				lineRestored = s.AfterP10SceneRequest(ctx, request.PlayerId, request.Body)
 			}
-			if len(peers) > 0 {
-				// Keep the rebuilt self frame ahead of peers on the same TCP write.
-				result = append(result, &pb.SCPlayerAppear{Player: peers})
+		}
+		if current, ok := request.Body.(*pb.CSCurrentPosition); ok {
+			// The original desert line callback explicitly sends a line even
+			// without showArround. A concurrent sync may already have consumed
+			// the pending marker, so use the self frame to retain reply ordering.
+			lineSnapshot := lineRestored
+			if !lineSnapshot && current.Line != nil {
+				for _, message := range result {
+					if self, ok := message.(*pb.SCCurrentPosition); ok && self.GetSelf().GetInfo().GetPlayerId() == request.PlayerId && self.GetSelf().GetPosition().GetScene() == constUtil.GGOFieldScene {
+						lineSnapshot = true
+						break
+					}
+				}
+			}
+			if current.GetShowArround() != 0 || lineSnapshot {
+				var expectedLine *int32
+				if current.GetShowArround() == 0 {
+					expectedLine = current.Line
+				}
+				peers, snapshotErr := s.p10CurrentScenePeers(ctx, request.PlayerId, expectedLine)
+				if snapshotErr != nil {
+					return GameError(constUtil.ErrGameRequest, snapshotErr.Error())
+				}
+				if len(peers) > 0 {
+					// Keep the rebuilt self frame ahead of peers on the same TCP write.
+					result = append(result, &pb.SCPlayerAppear{Player: peers})
+				}
 			}
 		}
 		s.afterRedPointRequest(ctx, request.PlayerId, request.Body, result)

@@ -205,9 +205,12 @@ func (s *GameService) GGOFieldPVPStatus(ctx context.Context, req model.GGOFieldP
 			return err
 		}
 		out.Status, out.FightID, out.WinnerID, out.NativeResponse = "settled", row.FightID, row.WinnerID, append([]byte(nil), row.Response...)
-		// Native presentation leases use the realm game clock; return a real
-		// server-clock deadline so a device does not inherit its day offset.
-		remaining := row.BusyUntil - LocalPlayNow(tx.Statement.Context).UnixMilli()
+		// Legacy receipt provenance is unknown; preserve its settled response
+		// without inventing a presentation deadline.
+		if row.ClockVersion != db.P12FieldPVPWallClock {
+			return nil
+		}
+		remaining := row.RealBusyUntil - out.ServerTimeMS
 		if remaining > 0 && remaining <= constUtil.P12FieldPVPBusyMS {
 			out.PresentationUntilMS = out.ServerTimeMS + remaining
 		}
@@ -218,7 +221,7 @@ func (s *GameService) GGOFieldPVPStatus(ctx context.Context, req model.GGOFieldP
 		if err := tx.First(&peerState, "player_id=?", opponent).Error; err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 			return err
 		}
-		if a.Game.Position == nil || a.Game.Position.GetScene() != constUtil.GGOFieldScene || a.Game.Field == nil || a.Game.Field.Side == nil || ownState.LastFightID != row.FightID || ownState.BusyUntil != row.BusyUntil || peerState.LastFightID != row.FightID || peerState.BusyUntil != row.BusyUntil || remaining <= 0 || remaining > constUtil.P12FieldPVPBusyMS {
+		if a.Game.Position == nil || a.Game.Position.GetScene() != constUtil.GGOFieldScene || a.Game.Field == nil || a.Game.Field.Side == nil || ownState.ClockVersion != db.P12FieldPVPWallClock || ownState.LastFightID != row.FightID || ownState.BusyUntil == 0 || ownState.RealBusyUntil != row.RealBusyUntil || peerState.ClockVersion != db.P12FieldPVPWallClock || peerState.LastFightID != row.FightID || peerState.BusyUntil == 0 || peerState.RealBusyUntil != row.RealBusyUntil || remaining <= 0 || remaining > constUtil.P12FieldPVPBusyMS {
 			return nil
 		}
 		var peerRow db.Profile
@@ -235,7 +238,7 @@ func (s *GameService) GGOFieldPVPStatus(ctx context.Context, req model.GGOFieldP
 		if peerGame.Position == nil || peerGame.Position.GetScene() != constUtil.GGOFieldScene || peerGame.Field == nil || peerGame.Field.Side == nil {
 			return nil
 		}
-		at := LocalPlayNow(tx.Statement.Context)
+		at := time.UnixMilli(out.ServerTimeMS)
 		ownSide, err := a.Service.ProjectP12FieldPVPSide(tx, a.Row.Id, a.Game.Field.Side, at)
 		if err != nil {
 			return err
@@ -245,7 +248,7 @@ func (s *GameService) GGOFieldPVPStatus(ctx context.Context, req model.GGOFieldP
 			return err
 		}
 		out.ServerTimeMS = time.Now().UnixMilli()
-		remaining = row.BusyUntil - LocalPlayNow(tx.Statement.Context).UnixMilli()
+		remaining = row.RealBusyUntil - out.ServerTimeMS
 		if remaining <= 0 || remaining > constUtil.P12FieldPVPBusyMS {
 			return nil
 		}

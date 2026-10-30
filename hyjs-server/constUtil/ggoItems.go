@@ -3,8 +3,8 @@ package constUtil
 const (
 	// AdminFieldGGOSchemaVersion 为当前沙漠后台配置结构版本。
 	AdminFieldGGOSchemaVersion int64 = 3
-	// GGOExtractionReady remains false until the complete V4 transactional chain is qualified.
-	GGOExtractionReady           = false
+	// GGOExtractionReady enables the desert extraction field for the release.
+	GGOExtractionReady           = true
 	GGOShopKey                   = "ggo"
 	GGOShopName                  = "信用商店"
 	GGOCurrencyID                = "item_9710"

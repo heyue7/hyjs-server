@@ -29,15 +29,18 @@ parser.add_argument('--apply-feedback79', action='store_true', help='Apply the r
 parser.add_argument('--apply-feedback80', action='store_true', help='Apply the reviewed feedback80 configuration under maintenance')
 parser.add_argument('--apply-feedback81', action='store_true', help='Apply the reviewed feedback81 configuration under maintenance')
 parser.add_argument('--apply-trial82', action='store_true', help='Apply the reviewed trial82 configuration under maintenance')
+parser.add_argument('--apply-feedback84', action='store_true', help='Apply the reviewed feedback84 configuration under maintenance')
+parser.add_argument('--apply-feedback85', action='store_true', help='Apply reviewed training and awakening configuration under maintenance')
 parser.add_argument('--apply-growth75', action='store_true', help='Apply audited 75 publication, calendar, economy and fresh activity CAS while keeping maintenance')
+parser.add_argument('--maintenance-redeploy', action='store_true', help='Redeploy a verified compatible candidate under maintenance without configuration publication')
 parser.add_argument('--expected-live-revision', help='Refuse activation if a different live release appeared')
 parser.add_argument('--restore-activity-calendar', help='Restore real game time and activity day one using this UUID under maintenance')
 args = parser.parse_args()
 if args.restore_activity_calendar:
     import uuid
     assert str(uuid.UUID(args.restore_activity_calendar)) == args.restore_activity_calendar
-    assert args.expected_live_revision and not any((args.provision, args.initial_dump, args.migrate_role_wallets, args.apply_growth74, args.apply_growth75, args.apply_activity77, args.apply_feedback78, args.apply_feedback79, args.apply_feedback80, args.apply_feedback81, args.apply_trial82)), 'Calendar restore requires a pinned standalone maintenance cutover'
-assert sum((args.apply_growth74, args.apply_growth75, args.apply_activity77, args.apply_feedback78, args.apply_feedback79, args.apply_feedback80, args.apply_feedback81, args.apply_trial82)) <= 1, 'Choose one explicit maintenance deployment version'
+    assert args.expected_live_revision and not any((args.provision, args.initial_dump, args.migrate_role_wallets, args.apply_growth74, args.apply_growth75, args.apply_activity77, args.apply_feedback78, args.apply_feedback79, args.apply_feedback80, args.apply_feedback81, args.apply_trial82, args.apply_feedback84, args.apply_feedback85)), 'Calendar restore requires a pinned standalone maintenance cutover'
+assert sum((args.apply_growth74, args.apply_growth75, args.apply_activity77, args.apply_feedback78, args.apply_feedback79, args.apply_feedback80, args.apply_feedback81, args.apply_trial82 or args.apply_feedback84 or args.apply_feedback85)) <= 1, 'Choose one explicit maintenance deployment version'
 if args.apply_activity77:
     assert args.expected_live_revision and not args.provision and not args.initial_dump and not args.migrate_role_wallets, 'Activity77 requires a pinned existing release and its own maintenance window'
 if args.apply_growth75:
@@ -54,9 +57,16 @@ if args.apply_feedback80:
 if args.apply_feedback81:
     assert args.expected_live_revision and re.fullmatch(r'[0-9a-f]{40,64}', args.expected_live_revision), 'Feedback81 requires an exact live revision'
     assert not any((args.provision, args.update_ingress, args.initial_dump, args.migrate_role_wallets, args.warm_rush_history_player)), 'Feedback81 requires a standalone maintenance cutover'
-if args.apply_trial82:
-    assert args.expected_live_revision and re.fullmatch(r'(?:[0-9a-f]{40}|[0-9a-f]{64})', args.expected_live_revision), 'Trial82 requires an exact live revision'
-    assert not any((args.provision, args.initial_dump, args.migrate_role_wallets, args.warm_rush_history_player)), 'Trial82 requires an existing standalone maintenance cutover'
+if args.apply_trial82 or args.apply_feedback84 or args.apply_feedback85:
+    assert args.expected_live_revision and re.fullmatch(r'(?:[0-9a-f]{40}|[0-9a-f]{64})', args.expected_live_revision), 'Trial82/feedback84 requires an exact live revision'
+    assert not any((args.provision, args.initial_dump, args.migrate_role_wallets, args.warm_rush_history_player)), 'Trial82/feedback84 requires an existing maintenance cutover'
+if args.maintenance_redeploy:
+    assert args.expected_live_revision and re.fullmatch(r'(?:[0-9a-f]{40}|[0-9a-f]{64})', args.expected_live_revision), 'Maintenance redeploy requires an exact live revision'
+    assert not any((args.provision, args.update_ingress, args.initial_dump, args.migrate_role_wallets,
+                    args.warm_rush_history_player, args.restore_activity_calendar, args.apply_growth74,
+                    args.apply_growth75, args.apply_activity77, args.apply_feedback78, args.apply_feedback79,
+                    args.apply_feedback80, args.apply_feedback81, args.apply_trial82, args.apply_feedback84,
+                    args.apply_feedback85)), 'Maintenance redeploy must not change configuration or ingress'
 settings = load(args.env_file)
 HOST = settings['HYJS_DEPLOY_SSH']
 REMOTE = settings['HYJS_DEPLOY_ROOT']
@@ -110,6 +120,7 @@ run('go', 'test', './middleware', '-run', '^TestCORSExactOriginsAndNativeCompati
 run('go', 'vet', './...', cwd=ROOT / 'hyjs-server')
 run('go', 'build', '-trimpath', '-buildvcs=false', '-o', str(app / 'hyjs-server'), '.', cwd=ROOT / 'hyjs-server', env=environment)
 run('go', 'build', '-trimpath', '-buildvcs=false', '-o', str(app / 'hyjs-backupseal'), './cmd/backupseal', cwd=ROOT / 'hyjs-server', env=environment)
+run('go', 'build', '-trimpath', '-buildvcs=false', '-o', str(app / 'hyjs-profile-storage86'), './cmd/profile-storage86', cwd=ROOT / 'hyjs-server', env=environment)
 # 覆盖发布只包含当前业务程序；历史版本需要时从Git重新构建。
 if args.migrate_role_wallets:
     assert args.expected_live_revision and not args.provision and not args.initial_dump, 'Wallet cutover requires an existing pinned release'
@@ -122,7 +133,7 @@ shutil.copytree(ROOT / 'analysis/tables', app / 'tables', ignore=shutil.ignore_p
 (app / 'config.test.yaml').write_text(render((ROOT / 'deploy/config.test.yaml').read_text(), settings))
 (stage / 'nginx.conf').write_text(render((ROOT / 'deploy/nginx.conf').read_text(), settings))
 (stage / 'deployment.env').write_text(''.join(key + '=' + settings[key] + '\n' for key in RUNTIME_KEYS))
-for name in ('Dockerfile', 'compose.yaml', 'activate.py', 'role_wallet_migration.py', 'growth75_activation.py', 'growth75_activity_patch.py', 'activity77_activation.py', 'feedback78_activation.py', 'feedback79_activation.py', 'feedback80_activation.py', 'feedback81_activation.py', 'trial82_activation.py', 'calendar_restore_activation.py'):
+for name in ('Dockerfile', 'compose.yaml', 'activate.py', 'ingress_activation.py', 'role_wallet_migration.py', 'growth75_activation.py', 'growth75_activity_patch.py', 'activity77_activation.py', 'feedback78_activation.py', 'feedback79_activation.py', 'feedback80_activation.py', 'feedback81_activation.py', 'trial82_activation.py', 'calendar_restore_activation.py'):
     shutil.copy2(ROOT / 'deploy' / name, stage / name)
 files = {str(p.relative_to(stage)): sha(p) for p in sorted(stage.rglob('*')) if p.is_file() and p.name != '.hyjs-stage'}
 manifest = {'revision': revision, 'architecture': 'linux/amd64', 'database': 'MySQL8.4', 'files': files,
@@ -141,6 +152,7 @@ root=Path(%r)
 assert (root/'.hyjs-owned').is_file()
 assert p.parent == root/'.incoming' and not p.is_symlink()
 if p.exists():
+    assert not any(p.glob('.ingress-recovery-*')), 'Retained ingress recovery evidence requires manual inspection before retry'
     manifest=p/'artifact.json'
     if manifest.exists(): assert json.loads(manifest.read_text())['revision'] == %r
     shutil.rmtree(p)
@@ -162,6 +174,8 @@ for player_id in args.warm_rush_history_player:
     command += ' --warm-rush-history-player ' + str(player_id)
 if args.expected_live_revision:
     command += ' --expected-live-revision ' + shlex.quote(args.expected_live_revision)
+if args.maintenance_redeploy:
+    command += ' --maintenance-redeploy'
 if args.apply_growth74:
     command += ' --apply-growth74'
 if args.apply_growth75:
@@ -178,6 +192,10 @@ if args.apply_feedback81:
     command += ' --apply-feedback81'
 if args.apply_trial82:
     command += ' --apply-trial82'
+if args.apply_feedback84:
+    command += ' --apply-feedback84'
+if args.apply_feedback85:
+    command += ' --apply-feedback85'
 if args.restore_activity_calendar:
     command += ' --restore-activity-calendar ' + shlex.quote(args.restore_activity_calendar)
 if args.migrate_role_wallets:

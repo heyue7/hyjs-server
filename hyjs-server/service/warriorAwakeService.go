@@ -135,6 +135,8 @@ func (s *GameService) warriorAwake(ctx context.Context, id int64, b *pb.CSWarrio
 		for _, candidate := range g.Warriors {
 			if !consumed[candidate.GetGuid()] {
 				remaining = append(remaining, candidate)
+			} else {
+				retireWarriorBreachPity(g, candidate.GetGuid())
 			}
 		}
 		g.Warriors = remaining

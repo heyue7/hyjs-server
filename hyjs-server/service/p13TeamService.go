@@ -3,6 +3,7 @@ package service
 import (
 	"bytes"
 	"context"
+	"crypto/subtle"
 	"errors"
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/proto"
@@ -57,58 +58,197 @@ func p13TeamInviteValid(tx *gorm.DB, team db.P13Team, target int64) (bool, error
 	}
 	return invite.AuthorityVersion == team.AuthorityVersion && invite.InviterID == team.LeaderID && sender.TeamID == team.ID && sender.Generation == invite.InviterGeneration && receiver.TeamID == "" && receiver.Generation == invite.TargetGeneration, nil
 }
-func (s *GameService) p13TeamPlayer(tx *gorm.DB, viewer, id int64) (*pb.TeamMember, error) {
-	info, err := s.p10Player(tx, id)
+
+type p13TeamProjectionProfile struct {
+	row    db.Profile
+	player *pb.Player
+	game   *model.GameState
+	member *pb.TeamMember
+}
+
+// p13TeamProjector lasts only for one transaction. Multiple recipient views
+// share profile decoding and member facts, while live sockets are rechecked.
+type p13TeamProjector struct {
+	s          *GameService
+	tx         *gorm.DB
+	hints      []int64
+	profiles   map[int64]*p13TeamProjectionProfile
+	guildNames map[int64]string
+	guildRead  map[int64]bool
+}
+
+func (p *p13TeamProjector) loadProfiles(ids []int64) error {
+	if p.profiles == nil {
+		p.profiles = map[int64]*p13TeamProjectionProfile{}
+	}
+	ids = append(append([]int64(nil), p.hints...), ids...)
+	p.hints = nil
+	var missing []int64
+	seen := map[int64]bool{}
+	for _, id := range ids {
+		if p.profiles[id] == nil && !seen[id] {
+			seen[id] = true
+			missing = append(missing, id)
+		}
+	}
+	// The team policy freezes a five-player capacity. Chunk even inconsistent
+	// historical rows so each indexed profile query has a bounded input.
+	for len(missing) > 0 {
+		n := min(len(missing), int(constUtil.P13TeamMaxSize))
+		batch := missing[:n]
+		var rows []db.Profile
+		if err := p.tx.Where("id IN ?", batch).Find(&rows).Error; err != nil {
+			return err
+		}
+		if len(rows) != len(batch) {
+			return gorm.ErrRecordNotFound
+		}
+		for _, row := range rows {
+			p.profiles[row.Id] = &p13TeamProjectionProfile{row: row}
+		}
+		missing = missing[n:]
+	}
+	return nil
+}
+
+func (p *p13TeamProjector) loadGuildNames(ids []int64) error {
+	if p.guildRead == nil {
+		p.guildRead = map[int64]bool{}
+		p.guildNames = map[int64]string{}
+	}
+	var missing []int64
+	seen := map[int64]bool{}
+	for _, id := range ids {
+		if !p.guildRead[id] && !seen[id] {
+			seen[id] = true
+			missing = append(missing, id)
+		}
+	}
+	if len(missing) == 0 {
+		return nil
+	}
+	if !gameSchemaHasTable(p.tx, &db.P13GuildMember{}) {
+		for _, id := range missing {
+			p.guildRead[id] = true
+		}
+		return nil
+	}
+	for len(missing) > 0 {
+		n := min(len(missing), int(constUtil.P13TeamMaxSize))
+		batch := missing[:n]
+		var members []db.P13GuildMember
+		if err := p.tx.Select("player_id", "guild_id").Where("player_id IN ?", batch).Find(&members).Error; err != nil {
+			return err
+		}
+		var guildMembers []int64
+		for _, member := range members {
+			if member.GuildID != "" {
+				guildMembers = append(guildMembers, member.PlayerID)
+			}
+		}
+		if len(guildMembers) > 0 {
+			var guilds []struct {
+				PlayerID int64
+				GuildID  *string
+				Name     *string
+			}
+			// Let the database apply its ID collation, as the original per-member
+			// lookup does; a missing guild must still fail the whole projection.
+			if err := p.tx.Table("p13_guild_members AS gm").Select("gm.player_id, g.id AS guild_id, g.name AS name").Joins("LEFT JOIN p13_guilds AS g ON g.id = gm.guild_id").Where("gm.player_id IN ?", guildMembers).Scan(&guilds).Error; err != nil {
+				return err
+			}
+			for _, guild := range guilds {
+				if guild.GuildID == nil || guild.Name == nil {
+					return gorm.ErrRecordNotFound
+				}
+				p.guildNames[guild.PlayerID] = *guild.Name
+			}
+			if len(guilds) != len(guildMembers) {
+				return gorm.ErrRecordNotFound
+			}
+		}
+		for _, id := range batch {
+			p.guildRead[id] = true
+		}
+		missing = missing[n:]
+	}
+	return nil
+}
+
+func (p *p13TeamProjector) profile(id int64) (*p13TeamProjectionProfile, error) {
+	row := p.profiles[id]
+	if row == nil {
+		return nil, gorm.ErrRecordNotFound
+	}
+	if row.player == nil {
+		player, game, err := decodeProfile(&row.row)
+		if err != nil {
+			return nil, err
+		}
+		row.player, row.game = player, game
+	}
+	return row, nil
+}
+
+func (p *p13TeamProjector) online(row *p13TeamProjectionProfile) bool {
+	value, ok := p10LiveClient(p10ClientKey{p.s.p10ClientOwner(), row.row.Id})
+	return ok && subtle.ConstantTimeCompare(row.row.Session, value.(*p10ClientSink).session) == 1
+}
+
+func (p *p13TeamProjector) player(viewer, id int64) (*pb.TeamMember, error) {
+	if err := p.loadProfiles([]int64{viewer, id}); err != nil {
+		return nil, err
+	}
+	if err := p.loadGuildNames([]int64{id}); err != nil {
+		return nil, err
+	}
+	row, err := p.profile(id)
 	if err != nil {
 		return nil, err
 	}
-	var row db.Profile
-	if err = tx.First(&row, id).Error; err != nil {
-		return nil, err
-	}
-	_, g, err := decodeProfile(&row)
+	own, err := p.profile(viewer)
 	if err != nil {
 		return nil, err
 	}
-	var viewerRow db.Profile
-	if err = tx.First(&viewerRow, viewer).Error; err != nil {
-		return nil, err
-	}
-	_, own, err := decodeProfile(&viewerRow)
-	if err != nil {
-		return nil, err
+	if row.member == nil {
+		if err = p.s.PrepareP5GuildPrayerProperties(p.tx.Statement.Context, p.tx, row.player, row.game, p13UFNow(p.tx.Statement.Context)); err != nil {
+			return nil, err
+		}
+		power, err := p.s.formationFightPower(row.player, row.game)
+		if err != nil {
+			return nil, err
+		}
+		heroID := ""
+		for _, warrior := range row.game.Warriors {
+			if warrior.GetGuid() == row.player.GetHeroWarId() {
+				heroID = warrior.GetId()
+				break
+			}
+		}
+		hp := float64(0)
+		if row.game.Field != nil && row.game.Field.Side != nil {
+			hp = row.game.Field.Side.GetCurHp()
+			if math.IsNaN(hp) || math.IsInf(hp, 0) || hp < 0 {
+				return nil, errors.New("队员实际血量无效")
+			}
+		}
+		row.member = &pb.TeamMember{PlayerId: proto.Int64(id), ServerId: proto.Int32(int32(p.s.OriginalServerID())), HeroId: proto.String(heroID), Level: row.player.Level, NickName: row.player.Name, UnionName: proto.String(p.guildNames[id]), FightPower: proto.Int32(power), CurHp: proto.Float64(hp)}
 	}
 	state := int32(0)
 	// 原TableText明确state=1表示同一场景；离线或不同实际位置使用0。
-	if s.p10ChannelOnline(tx, id) && s.p10ChannelOnline(tx, viewer) && p10SceneScope(g) != "" && p10SceneScope(g) == p10SceneScope(own) {
+	if p.online(row) && p.online(own) && p10SceneScope(row.game) != "" && p10SceneScope(row.game) == p10SceneScope(own.game) {
 		state = 1
 	}
-	hp := float64(0)
-	if g.Field != nil && g.Field.Side != nil {
-		hp = g.Field.Side.GetCurHp()
-		if math.IsNaN(hp) || math.IsInf(hp, 0) || hp < 0 {
-			return nil, errors.New("队员实际血量无效")
-		}
-	}
-	unionName := ""
-	guild, _, err := P13GuildScope(tx, id)
-	if err != nil {
-		return nil, err
-	}
-	if guild != "" {
-		var union db.P13Guild
-		if err = tx.First(&union, "id=?", guild).Error; err != nil {
-			return nil, err
-		}
-		unionName = union.Name
-	}
-	return &pb.TeamMember{PlayerId: info.PlayerId, ServerId: proto.Int32(int32(s.OriginalServerID())), HeroId: info.HeroWarId, Level: info.Level, NickName: info.PlayerName, UnionName: proto.String(unionName), FightPower: info.FightPower, State: proto.Int32(state), CurHp: proto.Float64(hp)}, nil
+	result := proto.Clone(row.member).(*pb.TeamMember)
+	result.State = proto.Int32(state)
+	return result, nil
 }
-func (s *GameService) p13TeamProjection(tx *gorm.DB, viewer int64, team db.P13Team) (*pb.Team, error) {
+
+func (p *p13TeamProjector) team(viewer int64, team db.P13Team) (*pb.Team, error) {
 	if team.ID == "" {
 		return &pb.Team{TeamId: proto.String(""), MaxSize: proto.Int32(constUtil.P13TeamMaxSize)}, nil
 	}
-	members, err := p13TeamMembers(tx, team.ID)
+	members, err := p13TeamMembers(p.tx, team.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -121,15 +261,30 @@ func (s *GameService) p13TeamProjection(tx *gorm.DB, viewer int64, team db.P13Te
 	if len(members) == 0 || members[0].PlayerID != team.LeaderID || len(members) > int(team.MaxSize) {
 		return nil, errors.New("真实队长或队伍人数事实无效")
 	}
+	ids := make([]int64, 0, len(members)+1)
+	ids = append(ids, viewer)
+	for _, member := range members {
+		ids = append(ids, member.PlayerID)
+	}
+	if err := p.loadProfiles(ids); err != nil {
+		return nil, err
+	}
+	if err := p.loadGuildNames(ids[1:]); err != nil {
+		return nil, err
+	}
 	result := &pb.Team{TeamId: proto.String(team.ID), MaxSize: proto.Int32(team.MaxSize)}
 	for _, m := range members {
-		info, err := s.p13TeamPlayer(tx, viewer, m.PlayerID)
+		info, err := p.player(viewer, m.PlayerID)
 		if err != nil {
 			return nil, err
 		}
 		result.MemberList = append(result.MemberList, info)
 	}
 	return result, nil
+}
+
+func (s *GameService) p13TeamProjection(tx *gorm.DB, viewer int64, team db.P13Team) (*pb.Team, error) {
+	return (&p13TeamProjector{s: s, tx: tx}).team(viewer, team)
 }
 func (s *GameService) p13TeamQuery(ctx context.Context, id int64, request proto.Message) ([]proto.Message, error) {
 	var response proto.Message
@@ -404,6 +559,9 @@ func (s *GameService) p13TeamAt(ctx context.Context, id int64, request proto.Mes
 				return errors.New("跨服组队尚未恢复")
 			}
 		}
+		// Views share a transaction-local snapshot; saving a profile below
+		// invalidates it because save hooks can update additional facts.
+		projection := &p13TeamProjector{s: s, tx: tx, hints: ids}
 		isCreate := false
 		isInvite := false
 		switch request.(type) {
@@ -476,7 +634,7 @@ func (s *GameService) p13TeamAt(ctx context.Context, id int64, request proto.Mes
 				if err = tx.Save(&invitation).Error; err != nil {
 					return err
 				}
-				view, err := s.p13TeamProjection(tx, target, team)
+				view, err := projection.team(target, team)
 				if err != nil {
 					return err
 				}
@@ -562,7 +720,7 @@ func (s *GameService) p13TeamAt(ctx context.Context, id int64, request proto.Mes
 				if targetID == team.LeaderID {
 					return errors.New("队长需先转让或解散")
 				}
-				removed, err = s.p13TeamPlayer(tx, id, targetID)
+				removed, err = projection.player(id, targetID)
 				if err != nil {
 					return err
 				}
@@ -622,11 +780,14 @@ func (s *GameService) p13TeamAt(ctx context.Context, id int64, request proto.Mes
 				if err = saveProfile(tx, &row.row, row.player, row.game); err != nil {
 					return err
 				}
+				delete(projection.profiles, target)
+				delete(projection.guildNames, target)
+				delete(projection.guildRead, target)
 			}
 		}
 		view := &pb.Team{TeamId: proto.String(team.ID), MaxSize: proto.Int32(team.MaxSize)}
 		if _, disband := request.(*pb.CSDisbandTeam); !disband {
-			view, err = s.p13TeamProjection(tx, id, team)
+			view, err = projection.team(id, team)
 			if err != nil {
 				return err
 			}
@@ -652,7 +813,7 @@ func (s *GameService) p13TeamAt(ctx context.Context, id int64, request proto.Mes
 				}
 				targetView := view
 				if _, disband := request.(*pb.CSDisbandTeam); !disband {
-					targetView, err = s.p13TeamProjection(tx, target, team)
+					targetView, err = projection.team(target, team)
 					if err != nil {
 						return err
 					}

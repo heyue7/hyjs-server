@@ -109,13 +109,34 @@ func adminMergeSavedJSON(saved string, before, after any) (string, error) {
 	return string(out), err
 }
 
+// Expand the stored roster before the identity-aware merge, preserving fields
+// the editor does not know. An unchanged game keeps its exact stored bytes.
+func adminMergeProfileGame86(saved string, before, after *model.GameState) (string, error) {
+	expanded, err := model.ExpandProfileGame86([]byte(saved))
+	if err != nil {
+		return "", err
+	}
+	merged, err := adminMergeSavedJSON(string(expanded), before, after)
+	if err != nil {
+		return "", err
+	}
+	if merged == string(expanded) {
+		return saved, nil
+	}
+	encoded, err := model.CompactProfileGame86([]byte(merged))
+	if err != nil {
+		return "", err
+	}
+	return string(encoded), nil
+}
+
 // adminSavePlayerChanges 在已持有角色行锁的运营事务中保存差量，避免触发游戏领奖和消费事件。
 func adminSavePlayerChanges(tx *gorm.DB, row *db.Profile, beforePlayer *pb.Player, beforeGame *model.GameState, player *pb.Player, game *model.GameState) error {
 	playerJSON, err := adminMergeSavedJSON(*row.Player, beforePlayer, player)
 	if err != nil {
 		return err
 	}
-	gameJSON, err := adminMergeSavedJSON(*row.Game, beforeGame, game)
+	gameJSON, err := adminMergeProfileGame86(*row.Game, beforeGame, game)
 	if err != nil {
 		return err
 	}

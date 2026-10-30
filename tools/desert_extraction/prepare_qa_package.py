@@ -74,7 +74,18 @@ def main():
                 value=right.net.user_strings.get(inst.operand.value&0xffffff).value
                 require(old_origin not in value,'Executable production origin remains in '+name)
     helper_audit={}
-    for key,raw in [('map',(source/'SoulFlowerDesert53.dll').read_bytes()),('v4',(source/'SoulFlowerDesertV4.dll').read_bytes()),('shop',shop_helper)]:
+    helpers = [('map',(source/'SoulFlowerDesert53.dll').read_bytes()),
+               ('v4',(source/'SoulFlowerDesertV4.dll').read_bytes()),('shop',shop_helper)]
+    # Audit every actual helper in the combined candidate, including additions.
+    for entry, relative in manifest['payloadFiles'].items():
+        if entry == ENTRY:
+            continue
+        path = (ROOT/relative).resolve()
+        require(path.is_relative_to(source) and path.is_file()
+                and sha(path.read_bytes()) == manifest['replacementEntries'].get(entry),
+                'QA helper payload differs: '+entry)
+        helpers.append((entry, path.read_bytes()))
+    for key,raw in helpers:
         pe=dnfile.dnPE(data=raw)
         for name,_,method in methods(pe):
             if not method.Rva:continue

@@ -22,11 +22,11 @@ import (
 // It never writes a profile or replays a historical reward or notice.
 func (s *GameService) InitializeSharedFieldBoss55(ctx context.Context) error {
 	tx := db.GetIns().WithContext(ctx)
-	if err := tx.AutoMigrate(&db.SharedFieldBoss55{}); err != nil {
+	if err := migrateSharedFieldBossLines85(tx); err != nil {
 		return err
 	}
 	var marker db.SharedFieldBoss55
-	err := tx.Where("server_id=? AND scene=? AND pos_id=?", s.OriginalServerID(), "", "").First(&marker).Error
+	err := tx.Where("server_id=? AND scene=? AND pos_id=?", s.OriginalServerID(), "", "").Where("line=?", 1).First(&marker).Error
 	if err == nil {
 		s.SharedFieldBoss55Ready = true
 		return nil
@@ -115,12 +115,16 @@ func (s *GameService) InitializeSharedFieldBoss55(ctx context.Context) error {
 	return err
 }
 
-func sharedFieldBoss55Query(tx *gorm.DB, sid int64, scene, pos string) *gorm.DB {
-	return tx.Where("server_id=? AND scene=? AND pos_id=?", sid, scene, pos)
+func sharedFieldBoss55Query(tx *gorm.DB, sid int64, scene, pos string, lines ...int64) *gorm.DB {
+	line := int64(1)
+	if len(lines) > 0 && lines[0] > 0 {
+		line = lines[0]
+	}
+	return tx.Where("server_id=? AND scene=? AND line=? AND pos_id=?", sid, scene, line, pos)
 }
-func (s *GameService) sharedFieldBoss55Locked(tx *gorm.DB, scene, pos string, now int64) (*db.SharedFieldBoss55, *pb.SideBoss, map[string]float64, error) {
+func (s *GameService) sharedFieldBoss55Locked(tx *gorm.DB, scene, pos string, line, now int64) (*db.SharedFieldBoss55, *pb.SideBoss, map[string]float64, error) {
 	var row db.SharedFieldBoss55
-	err := sharedFieldBoss55Query(tx.Clauses(clause.Locking{Strength: "UPDATE"}), s.OriginalServerID(), scene, pos).First(&row).Error
+	err := sharedFieldBoss55Query(tx.Clauses(clause.Locking{Strength: "UPDATE"}), s.OriginalServerID(), scene, pos, line).First(&row).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		b, e := s.fieldBossSpawn(pos)
 		if e != nil {
@@ -130,11 +134,11 @@ func (s *GameService) sharedFieldBoss55Locked(tx *gorm.DB, scene, pos string, no
 		if e != nil {
 			return nil, nil, nil, e
 		}
-		row = db.SharedFieldBoss55{ServerID: s.OriginalServerID(), Scene: scene, PosID: pos, UUID: b.GetUuid(), Payload: raw, HP: []byte("{}")}
+		row = db.SharedFieldBoss55{ServerID: s.OriginalServerID(), Scene: scene, Line: line, PosID: pos, UUID: b.GetUuid(), Payload: raw, HP: []byte("{}")}
 		if e := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&row).Error; e != nil {
 			return nil, nil, nil, e
 		}
-		if e := sharedFieldBoss55Query(tx.Clauses(clause.Locking{Strength: "UPDATE"}), s.OriginalServerID(), scene, pos).First(&row).Error; e != nil {
+		if e := sharedFieldBoss55Query(tx.Clauses(clause.Locking{Strength: "UPDATE"}), s.OriginalServerID(), scene, pos, line).First(&row).Error; e != nil {
 			return nil, nil, nil, e
 		}
 	} else if err != nil {
@@ -182,18 +186,23 @@ func saveSharedFieldBoss55(tx *gorm.DB, row *db.SharedFieldBoss55, boss *pb.Side
 
 // refreshSharedFieldBosses55 runs inside the caller's profile transaction.
 // Accepted fights retain their frozen personal projection until their receipt commits.
-func (s *GameService) refreshSharedFieldBosses55(tx *gorm.DB, g *model.GameState) error {
+func (s *GameService) refreshSharedFieldBosses55(tx *gorm.DB, id int64, g *model.GameState) error {
 	if !s.SharedFieldBoss55Ready || g.Field == nil {
 		return nil
 	}
 	f := g.Field
-	if f.Scene == constUtil.GGOFieldScene && g.GGOField != nil && s.GGOFieldEconomy != nil {
+	if f.Scene == constUtil.GGOFieldScene {
 		return nil
 	}
 	scene := s.fieldSceneRow(f.Scene)
 	if scene == nil || scene["adminOrdinaryBossEnabled"] == "false" {
 		return nil
 	}
+	line, err := s.fieldBossCurrentLine85(tx, id)
+	if err != nil {
+		return err
+	}
+	f.BossLine85 = line
 	if f.RespawnAt == nil {
 		f.RespawnAt = map[string]int64{}
 	}
@@ -214,7 +223,7 @@ func (s *GameService) refreshSharedFieldBosses55(tx *gorm.DB, g *model.GameState
 				continue
 			}
 		}
-		row, boss, hp, err := s.sharedFieldBoss55Locked(tx, f.Scene, pos, time.Now().UnixMilli())
+		row, boss, hp, err := s.sharedFieldBoss55Locked(tx, f.Scene, pos, line, time.Now().UnixMilli())
 		if err != nil {
 			return err
 		}
@@ -258,7 +267,7 @@ func (s *GameService) applySharedFieldBoss55(tx *gorm.DB, id int64, f *model.Fie
 		return false, false, nil
 	}
 	var row db.SharedFieldBoss55
-	err := sharedFieldBoss55Query(tx.Clauses(clause.Locking{Strength: "UPDATE"}), s.OriginalServerID(), f.Scene, boss.GetBossPosId()).First(&row).Error
+	err := sharedFieldBoss55Query(tx.Clauses(clause.Locking{Strength: "UPDATE"}), s.OriginalServerID(), f.Scene, boss.GetBossPosId(), f.Fight.BossLine85).First(&row).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return false, false, nil
 	}

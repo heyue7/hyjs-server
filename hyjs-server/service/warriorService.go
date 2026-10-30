@@ -329,6 +329,8 @@ func (s *GameService) warriorTalentApply(player *pb.Player, g *model.GameState, 
 	for _, w := range g.Warriors {
 		if !used[w.GetGuid()] {
 			remaining = append(remaining, w)
+		} else {
+			retireWarriorBreachPity(g, w.GetGuid())
 		}
 	}
 	g.Warriors = remaining
@@ -490,6 +492,8 @@ func (s *GameService) warriorStrengthenApply(player *pb.Player, g *model.GameSta
 	for _, w := range g.Warriors {
 		if !used[w.GetGuid()] {
 			remaining = append(remaining, w)
+		} else {
+			retireWarriorBreachPity(g, w.GetGuid())
 		}
 	}
 	g.Warriors = remaining

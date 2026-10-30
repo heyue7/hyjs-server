@@ -1,0 +1,7 @@
+{
+  "UI.UILuck::Init": "8f7c269a97c776a911b5be29aa6322168a07550b008863d9ee8ab82553d64167",
+  "UI.UILuck::SetInBattleHeroIcon": "e7c8ee0e3fd233b7d6afc57e1e1d3d530723b43086a3e3f7c87e00382d6a2419",
+  "UI.UILuck::UpdateCirclePanel": "3a635a938c699f444c0045133e8020b08047896b55a056d4a201e0f11a1b147e",
+  "UI.UILuckEvent::OpenHelpPage": "73ee573258d2a179e06437a69572b5ff63561637e0c0e8f5c0ee06da85ce0d20",
+  "<SetInBattleHeroIcon>c__AnonStorey1A3::<>m__20B": "1d96d83ea4654c92e2bb403bd8ba74f40bb2b9482a6f3c0c640e6a970258ce98"
+}

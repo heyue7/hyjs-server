@@ -29,12 +29,22 @@ func (s *GameService) ProjectP12FieldPVPSide(tx *gorm.DB, id int64, side *pb.Pla
 	if err != nil {
 		return nil, err
 	}
-	if state.BusyUntil <= now.UnixMilli() {
+	busy, _, err := p12FieldPVPDeadlines(&state)
+	if err != nil {
+		if state.ClockVersion == 0 && state.BusyUntil == 0 && err.Error() == constUtil.P12FieldPVPJailed {
+			return view, nil
+		}
+		return nil, err
+	}
+	if busy <= now.UnixMilli() {
 		return view, nil
 	}
 	var receipt db.P12FieldPVPReceipt
 	if err = tx.First(&receipt, "fight_id=?", state.LastFightID).Error; err != nil {
 		return nil, err
+	}
+	if receipt.ClockVersion != db.P12FieldPVPWallClock || receipt.RealBusyUntil != busy {
+		return nil, errors.New(constUtil.P12FieldPVPConflict)
 	}
 	_, replay, err := s.p12FieldPVPReadReceipt(tx, &receipt)
 	if err != nil {
@@ -78,7 +88,7 @@ func (s *GameService) RunP12FieldPVPPresentation(ctx context.Context) error {
 	ticker := time.NewTicker(constUtil.P12FieldPVPPresentationInterval)
 	defer ticker.Stop()
 	for {
-		if err := s.TickP12FieldPVPPresentation(ctx, LocalPlayNow(ctx)); err != nil && ctx.Err() == nil {
+		if err := s.TickP12FieldPVPPresentation(ctx, time.Now()); err != nil && ctx.Err() == nil {
 			return err
 		}
 		select {
@@ -93,7 +103,7 @@ func (s *GameService) RunP12FieldPVPPresentation(ctx context.Context) error {
 // Profile locks follow the same scene-mutex/profile/state ordering as accepting PK.
 func (s *GameService) TickP12FieldPVPPresentation(ctx context.Context, now time.Time) error {
 	var pending []db.P12FieldPVPState
-	if err := db.GetIns().WithContext(ctx).Where("busy_until>0 AND busy_until<=?", now.UnixMilli()).Order("player_id").Limit(constUtil.P12FieldPVPPresentationBatch).Find(&pending).Error; err != nil {
+	if err := db.GetIns().WithContext(ctx).Where("clock_version=? AND real_busy_until>0 AND real_busy_until<=?", db.P12FieldPVPWallClock, now.UnixMilli()).Order("player_id").Limit(constUtil.P12FieldPVPPresentationBatch).Find(&pending).Error; err != nil {
 		return err
 	}
 	for _, candidate := range pending {
@@ -112,7 +122,11 @@ func (s *GameService) TickP12FieldPVPPresentation(ctx context.Context, now time.
 			if err := tx.First(&state, "player_id=?", candidate.PlayerID).Error; err != nil {
 				return err
 			}
-			if state.BusyUntil <= 0 || state.BusyUntil > now.UnixMilli() {
+			busy, _, err := p12FieldPVPDeadlines(&state)
+			if err != nil {
+				return err
+			}
+			if busy <= 0 || busy > now.UnixMilli() {
 				return nil
 			}
 			var row db.Profile
@@ -148,7 +162,7 @@ func (s *GameService) TickP12FieldPVPPresentation(ctx context.Context, now time.
 					return e
 				}
 			}
-			return tx.Model(&state).Update("busy_until", 0).Error
+			return tx.Model(&state).Updates(map[string]any{"busy_until": 0, "real_busy_until": 0}).Error
 		})
 		p10SceneMutation.Unlock()
 		if err != nil {

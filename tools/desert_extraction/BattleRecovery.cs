@@ -27,6 +27,8 @@ namespace HYJS.DesertV4
         FieldWire.Session unrecordedSession;
         long nextQuery;
         FightEndRecord pending;
+        string resumedFight="",resumedHash="";
+        int resumedType;
         static bool SameActor(FieldWire.Session a,FieldWire.Session b)
         { return a!=null && b!=null && a.playerId==b.playerId && a.origin==b.origin; }
         static bool SameSession(FieldWire.Session a,FieldWire.Session b)
@@ -67,20 +69,34 @@ namespace HYJS.DesertV4
             FieldWire.Session now; if (!FieldWire.Current(out now)) return false;
             if (!SameSession(now,session))
             {
-                if (!SameActor(now,session)) { liveFightId=""; inputHash=""; liveType=0; nativeOwner=null; loginReady=false; }
+                if (!SameActor(now,session))
+                {
+                    liveFightId=""; inputHash=""; liveType=0; nativeOwner=null; loginReady=false;
+                    resumedFight=resumedHash=""; resumedType=0;
+                }
                 query=false; nextQuery=0; session=now;
                 try { pending=FightEndJournal.Load(now); }
                 catch (Exception) { pending=null; Warning("战斗记录需要恢复，请勿开始新战斗"); return false; }
             }
             return true;
         }
-        public static bool HasUnsettled()
+        public static bool HasEndJournal()
         {
             if (!Target()) return false;
             FieldWire.Session owner; if (!FieldWire.Current(out owner)) return true;
             if (singleton!=null && singleton.unrecordedMessage!=null && SameActor(singleton.unrecordedSession,owner)) return true;
             try { return FightEndJournal.Load(owner)!=null; }
             catch (Exception) { return true; }
+        }
+        public static bool HasUnsettled() { return HasEndJournal() || ColdBattleRecovery.Pending; }
+        public static bool LivePresent
+        { get { return singleton!=null && !String.IsNullOrEmpty(singleton.liveFightId) && CurrentBattleMatches(singleton.liveType,singleton.liveFightId); } }
+        public static void AdmitResume(int type,string fight,string hash)
+        {
+            if ((type!=6 && type!=12) || !Hex(fight,24) || !Hex(hash,64)) throw new InvalidOperationException("Invalid accepted fight");
+            BattleRecovery core=Require();
+            if (!core.AdoptSession() || core.pending!=null) throw new InvalidOperationException("Earlier original end pending");
+            core.resumedType=type; core.resumedFight=fight; core.resumedHash=hash;
         }
         public static bool PreserveBattle()
         {
@@ -131,7 +147,8 @@ namespace HYJS.DesertV4
             BattleRecovery core=Require(); if (!core.AdoptSession()) return;
             if (core.pending!=null && (core.pending.fightId!=id || TypeFromOpcode(core.pending.opcode)!=type))
             { core.Warning("上次战斗结果尚待确认"); return; }
-            core.liveFightId=id; core.liveType=type; core.inputHash=""; core.nativeOwner=null;
+            core.liveFightId=id; core.liveType=type;
+            core.inputHash=core.resumedType==type && core.resumedFight==id ? core.resumedHash : ""; core.nativeOwner=null;
             core.loginReady=true; core.query=false; core.nextQuery=0; core.ResetWarning();
         }
         public static void SendEnd(int opcode,object message,object over)
@@ -161,7 +178,8 @@ namespace HYJS.DesertV4
                 unrecordedFight!=liveFightId || TypeFromOpcode(unrecordedOpcode)!=liveType) return;
             try
             {
-                pending=FightEndJournal.Capture(session,unrecordedOpcode,unrecordedMessage,inputHash);
+                pending=FightEndJournal.Capture(session,unrecordedOpcode,unrecordedMessage,inputHash,
+                    resumedType==liveType && resumedFight==liveFightId && resumedHash==inputHash);
                 if (pending.fightId!=liveFightId) throw new InvalidOperationException("End fight ID differs");
                 nativeOwner=unrecordedOwner; unrecordedMessage=null; unrecordedOwner=null; unrecordedSession=null;
                 nextQuery=0; ResetWarning();
@@ -259,7 +277,9 @@ namespace HYJS.DesertV4
                         if (status=="active" || status=="unknown") { QueryActive(expected); return; }
                         if (status!="settled") { Warning("战斗结果待确认"); return; }
                         string hash=Optional(d,"inputHash"), endHash=Optional(d,"endRequestHash"), encoded=Optional(d,"nativeEnd");
-                        if (!Hex(hash,64) || endHash!=expected.payloadHash || String.IsNullOrEmpty(encoded))
+                        if (!Hex(hash,64) || Optional(d,"fightId")!=expected.fightId ||
+                            (!String.IsNullOrEmpty(expected.inputHash) && hash!=expected.inputHash) ||
+                            (!expected.resumeApproved && endHash!=expected.payloadHash) || !Hex(endHash,64) || String.IsNullOrEmpty(encoded))
                         { Warning("战斗回执不匹配，已暂停恢复"); return; }
                         pending=FightEndJournal.Bind(owner,expected,hash);
                         byte[] bytes=Convert.FromBase64String(encoded);
@@ -282,6 +302,7 @@ namespace HYJS.DesertV4
                         else Notice("上次战斗结果已确认");
                         FightEndJournal.Clear(owner,pending);
                         pending=null; nativeOwner=null; liveFightId=""; liveType=0; inputHash=""; ResetWarning();
+                        resumedFight=resumedHash=""; resumedType=0;
                         FieldRuntime.Require().RequestSnapshot();
                     }
                     catch (Exception) { Warning("战斗结果待确认"); }

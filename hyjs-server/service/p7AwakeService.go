@@ -32,26 +32,29 @@ type p7AwakeContent struct {
 }
 
 type p7AwakeFrozen struct {
-	BusinessDay       string              `json:"businessDay,omitempty"`
-	BusinessAt        int64               `json:"businessAt,omitempty"`
-	Rule              db.P7AwakeStageRule `json:"rule"`
-	Content           p7AwakeContent      `json:"content"`
-	Scene             string              `json:"scene"`
-	BattleMap         string              `json:"battleMap"`
-	BornPos           string              `json:"bornPos"`
-	BornAngle         int32               `json:"bornAngle"`
-	DurationMinutes   int32               `json:"durationMinutes"`
-	Revives           int32               `json:"revives"`
-	ReviveCost        int32               `json:"reviveCost"`
-	StaminaCost       int32               `json:"staminaCost"`
-	ActorHash         string              `json:"actorHash"`
-	GuildPrayerSource string              `json:"guildPrayerSource,omitempty"`
-	GuildTechSource   string              `json:"guildTechSource,omitempty"`
-	BoxLoot           map[string]string   `json:"boxLoot,omitempty"`
-	MonsterLoot       map[string]string   `json:"monsterLoot,omitempty"`
-	BattleSource      string              `json:"battleSource,omitempty"`
-	ScoreReward       string              `json:"scoreReward,omitempty"`
-	FrameHash         string              `json:"frameHash"`
+	MonsterSourceHashes85 map[string]string   `json:"monsterSourceHashes85,omitempty"`
+	RuleContent85         []byte              `json:"ruleContent85,omitempty"`
+	MonsterSources85      map[string][]byte   `json:"monsterSources85,omitempty"`
+	BusinessDay           string              `json:"businessDay,omitempty"`
+	BusinessAt            int64               `json:"businessAt,omitempty"`
+	Rule                  db.P7AwakeStageRule `json:"rule"`
+	Content               p7AwakeContent      `json:"content"`
+	Scene                 string              `json:"scene"`
+	BattleMap             string              `json:"battleMap"`
+	BornPos               string              `json:"bornPos"`
+	BornAngle             int32               `json:"bornAngle"`
+	DurationMinutes       int32               `json:"durationMinutes"`
+	Revives               int32               `json:"revives"`
+	ReviveCost            int32               `json:"reviveCost"`
+	StaminaCost           int32               `json:"staminaCost"`
+	ActorHash             string              `json:"actorHash"`
+	GuildPrayerSource     string              `json:"guildPrayerSource,omitempty"`
+	GuildTechSource       string              `json:"guildTechSource,omitempty"`
+	BoxLoot               map[string]string   `json:"boxLoot,omitempty"`
+	MonsterLoot           map[string]string   `json:"monsterLoot,omitempty"`
+	BattleSource          string              `json:"battleSource,omitempty"`
+	ScoreReward           string              `json:"scoreReward,omitempty"`
+	FrameHash             string              `json:"frameHash"`
 }
 
 func (s *GameService) LoadP7AwakeTables(root string) error {
@@ -85,7 +88,19 @@ func (s *GameService) InitializeP7Awake(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	return tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&local).Error
+	if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&local).Error; err != nil {
+		return err
+	}
+	for _, c := range awake85Chapters() {
+		rule, err := awake85Catalogue(c, false)
+		if err != nil {
+			return err
+		}
+		if err = tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&rule).Error; err != nil {
+			return err
+		}
+	}
+	return nil
 }
 func p7AwakeOpenDay(raw string, now time.Time) (bool, error) {
 	day := int(now.In(time.FixedZone("UTC+8", 8*3600)).Weekday())
@@ -156,7 +171,7 @@ func (s *GameService) p7AwakeCatalogue(ctx context.Context, id int64, now time.T
 			if e != nil {
 				return e
 			}
-			battlePreview = frozen.BattleSource == constUtil.P7AwakeBattleSource
+			battlePreview = p7AwakeBattleSourceKnown85(frozen.BattleSource)
 		}
 		chapters := append([]map[string]string(nil), s.Tables["AwakeCopyChapter"]...)
 		sort.Slice(chapters, func(i, j int) bool { return chapters[i]["chapterId"] < chapters[j]["chapterId"] })
@@ -189,7 +204,7 @@ func (s *GameService) p7AwakeCatalogue(ctx context.Context, id int64, now time.T
 			}
 			for _, rule := range rules {
 				// 原客户端会Int32.Parse(copyId)；兼容导入也必须保留原数字字符串。
-				if rule.ChapterID != row["chapterId"] || !rule.ContentRestored || (rule.Source == constUtil.P7AwakeExploreSource && !rule.Enabled && (run == nil || run.CopyID != rule.CopyID)) {
+				if rule.ChapterID != row["chapterId"] || !rule.ContentRestored || (p7AwakeExploreSourceKnown85(rule.Source) && !rule.Enabled && (run == nil || run.CopyID != rule.CopyID)) {
 					continue
 				}
 				if _, err = p7Integer(rule.CopyID, 1, math.MaxInt32); err != nil {
@@ -197,10 +212,13 @@ func (s *GameService) p7AwakeCatalogue(ctx context.Context, id int64, now time.T
 				}
 				task := &pb.AwakeCopyTask{CopyId: proto.String(rule.CopyID), FightPower: proto.Int64(rule.FightPower), IsRunning: proto.Int32(0)}
 				// 原BaoxiangClick按分号拆资源ID，不能发送数量串或缺省null。
-				if rule.Source == constUtil.P7AwakeExploreSource {
+				if p7AwakeExploreSourceKnown85(rule.Source) {
 					preview := constUtil.P7AwakeExplorePreview
 					if battlePreview {
 						preview += constUtil.P7AwakeBattlePreview
+					}
+					if c, ok := awake85Definition(rule.CopyID); ok {
+						preview = p7Awake85Preview(c)
 					}
 					task.DropReward = proto.String(preview)
 				}
@@ -278,7 +296,11 @@ func (s *GameService) p7AwakeFreeze(rule db.P7AwakeStageRule) (p7AwakeFrozen, er
 	if err != nil || !p7AwakePosition(row["bornPos"]) || row["sceneId"] == "" || row["BattleMap"] == "" {
 		return f, errors.New("原觉醒场景/安全点配置无效")
 	}
-	return p7AwakeFrozen{Rule: rule, Content: content, Scene: row["sceneId"], BattleMap: row["BattleMap"], BornPos: row["bornPos"], BornAngle: angle, DurationMinutes: duration, Revives: revives, ReviveCost: cost, StaminaCost: stamina}, nil
+	var ruleContent []byte
+	if rule.Source == constUtil.Awake85ExploreSource {
+		ruleContent = append([]byte(nil), rule.Content...)
+	}
+	return p7AwakeFrozen{Rule: rule, RuleContent85: ruleContent, Content: content, Scene: row["sceneId"], BattleMap: row["BattleMap"], BornPos: row["bornPos"], BornAngle: angle, DurationMinutes: duration, Revives: revives, ReviveCost: cost, StaminaCost: stamina}, nil
 }
 
 // PrepareP7AwakeDiagnostic 冻结受支持原帧；无公开路由，不消耗次数/材料/道具，不产生正式奖励。
@@ -389,14 +411,18 @@ type p7AwakeExplorationState struct {
 }
 
 // p7AwakeRollBox 使用具名本地的千分权重解释；原表达式不是直接资源串。
-// 仅接收 box1-4 的简单 item:quantity,weight 语法，职业选择标记保持关闭。
+// 保留原数量权重，并按原表后缀权重选择箱奖分支。
 func (s *GameService) p7AwakeRollBox(boxID string, draw func(int64) (int64, error)) (string, error) {
 	row := s.table("AwakeCopyBox", "BoxId", boxID)
-	if row == nil || (boxID != "box1" && boxID != "box2" && boxID != "box3" && boxID != "box4") {
+	if row == nil || !p7AwakeBoxKnown85(boxID) {
 		return "", errors.New("本地箱型的概率语法未恢复")
 	}
 	var rewards []string
 	for _, group := range strings.Split(row["dropAward"], "|") {
+		group, err := p7AwakeBoxGroup85(group, draw)
+		if err != nil {
+			return "", err
+		}
 		pair := strings.Split(group, ":")
 		if len(pair) != 2 || !strings.HasPrefix(pair[0], "item_") || s.table("Item", "itemId", pair[0]) == nil {
 			return "", errors.New("觉醒箱奖资源无效")
@@ -448,10 +474,10 @@ func (s *GameService) p7AwakeRollBox(boxID string, draw func(int64) (int64, erro
 
 func p7AwakeReadFrozen(run *db.P7AwakeRun) (*p7AwakeFrozen, error) {
 	var frozen p7AwakeFrozen
-	if run.Diagnostic || p6Digest(run.Freeze) != run.FreezeHash || json.Unmarshal(run.Freeze, &frozen) != nil || p6Digest(run.Actor) != frozen.ActorHash || p6Digest(run.EnterFrame) != frozen.FrameHash || run.EndAt-run.StartAt != int64(frozen.DurationMinutes)*60000 || frozen.Rule.Source != constUtil.P7AwakeExploreSource || frozen.Rule.CopyID != constUtil.P7AwakeExploreCopy || frozen.Content.Source != constUtil.P7AwakeExploreSource || len(frozen.BoxLoot) != len(frozen.Content.Boxes) {
+	if run.Diagnostic || p6Digest(run.Freeze) != run.FreezeHash || json.Unmarshal(run.Freeze, &frozen) != nil || p6Digest(run.Actor) != frozen.ActorHash || p6Digest(run.EnterFrame) != frozen.FrameHash || run.EndAt-run.StartAt != int64(frozen.DurationMinutes)*60000 || !p7AwakeFrozenSource85(run, &frozen) || len(frozen.BoxLoot) != len(frozen.Content.Boxes) {
 		return nil, errors.New("觉醒实际实例冻结来源无效")
 	}
-	if frozen.BattleSource != "" && (frozen.BattleSource != constUtil.P7AwakeBattleSource || frozen.ScoreReward != constUtil.P7AwakeScoreReward || len(frozen.MonsterLoot) != len(frozen.Content.Monsters)) {
+	if frozen.BattleSource != "" && (!p7AwakeBattleSourceKnown85(frozen.BattleSource) || frozen.ScoreReward != constUtil.P7AwakeScoreReward || len(frozen.MonsterLoot) != len(frozen.Content.Monsters)) {
 		return nil, errors.New("觉醒冻结战斗奖池来源无效")
 	}
 	if _, err := p7AwakeFrozenBusinessDay(run, &frozen); err != nil {
@@ -479,7 +505,7 @@ func p7AwakeReadProgress(ledger *db.P7AwakeExploration, frozen *p7AwakeFrozen) (
 				known = true
 			}
 		}
-		if !known || !dead || frozen.BattleSource != constUtil.P7AwakeBattleSource || state.LastFight == "" {
+		if !known || !dead || !p7AwakeBattleSourceKnown85(frozen.BattleSource) || state.LastFight == "" {
 			return nil, errors.New("觉醒击杀记录缺少真实战斗来源")
 		}
 		defeated++
@@ -651,7 +677,7 @@ func (s *GameService) p7AwakeSettle(tx *gorm.DB, p *pb.Player, g *model.GameStat
 	}
 	var scoreRewards []*pb.BaseResource
 	if state.Score == 100 {
-		if frozen.BattleSource != constUtil.P7AwakeBattleSource || frozen.ScoreReward != constUtil.P7AwakeScoreReward || len(state.Defeated) != 1 {
+		if !p7AwakeBattleSourceKnown85(frozen.BattleSource) || frozen.ScoreReward != constUtil.P7AwakeScoreReward || len(state.Defeated) != 1 {
 			return nil, errors.New("觉醒100分缺少真实完成来源")
 		}
 		day, eventAt, err := p7AwakeScoreClock(tx, run, frozen, now)
@@ -770,10 +796,10 @@ func (s *GameService) p7AwakeExplore(ctx context.Context, id int64, request prot
 			if err = tx.Where("id=?", constUtil.P7AwakeExplorePolicyID).First(&policy).Error; err != nil {
 				return err
 			}
-			if !policy.Enabled || policy.Source != constUtil.P7AwakeExploreSource || policy.MinLevel != 70 || p.GetLevel() < policy.MinLevel {
+			if !policy.Enabled || !p7AwakeExploreSourceKnown85(policy.Source) || policy.MinLevel != 70 || p.GetLevel() < policy.MinLevel {
 				return errors.New(constUtil.P7AwakeClosed)
 			}
-			expected, err := p7AwakeLocalCatalogue(true)
+			expected, err := p7AwakeExpectedCatalogue85(body.GetCopyId())
 			if err != nil {
 				return err
 			}
@@ -781,9 +807,7 @@ func (s *GameService) p7AwakeExplore(ctx context.Context, id int64, request prot
 			if err = tx.Where("copy_id=?", body.GetCopyId()).First(&rule).Error; err != nil {
 				return errors.New(constUtil.P7AwakeClosed)
 			}
-			a, _ := json.Marshal(rule)
-			b, _ := json.Marshal(expected)
-			if string(a) != string(b) {
+			if !p7AwakeRuleEqual85(rule, expected) {
 				return errors.New("本地觉醒目录尚未完整发布")
 			}
 			frozen, err := s.p7AwakeFreeze(rule)
@@ -828,6 +852,9 @@ func (s *GameService) p7AwakeExplore(ctx context.Context, id int64, request prot
 				return err
 			}
 			runID := "p7-awake-" + hex.EncodeToString(random[:])
+			if rule.Source == constUtil.Awake85ExploreSource {
+				runID = constUtil.Awake85RunPrefix + hex.EncodeToString(random[:])
+			}
 			for index, box := range frozen.Content.Boxes {
 				box.Guid = proto.String(fmt.Sprintf("%s:b%d", runID, index+1))
 			}
@@ -853,29 +880,47 @@ func (s *GameService) p7AwakeExplore(ctx context.Context, id int64, request prot
 				return e
 			}
 			if battlePolicy.Enabled {
-				if battlePolicy.Source != constUtil.P7AwakeBattleSource || battlePolicy.MinLevel != 70 {
+				if !p7AwakeBattleSourceKnown85(battlePolicy.Source) || battlePolicy.MinLevel != 70 {
 					return errors.New("本地觉醒战斗策略来源无效")
 				}
-				// 首次付次数前核对完整实际队伍；未覆盖阵容不能先付次数再发现战斗门禁。
-				if frozen.BattleMap != "map_forest_003" {
-					return errors.New("觉醒原战斗场景未覆盖")
+				if rule.Source == constUtil.Awake85ExploreSource {
+					if battlePolicy.Source != constUtil.Awake85BattleSource {
+						return errors.New("觉醒章节战斗未发布")
+					}
+					frozen.MonsterSources85 = map[string][]byte{}
+					frozen.MonsterSourceHashes85 = map[string]string{}
+					for _, mon := range frozen.Content.Monsters {
+						enemy, e := s.p7Awake85Enemy(mon.GetMonId())
+						if e != nil {
+							return e
+						}
+						raw, e := proto.MarshalOptions{Deterministic: true}.Marshal(enemy)
+						if e != nil {
+							return e
+						}
+						frozen.MonsterSources85[mon.GetGuid()] = raw
+						frozen.MonsterSourceHashes85[mon.GetGuid()] = p6Digest(raw)
+					}
+					frozen.BattleSource = constUtil.Awake85BattleSource
+				} else {
+					if frozen.BattleMap != "map_forest_003" {
+						return errors.New("觉醒原战斗场景未覆盖")
+					}
+					frozen.BattleSource = constUtil.P7AwakeBattleSource
 				}
-				enemyBytes, e := hex.DecodeString(constUtil.P7AwakeEnemyHex)
-				if e != nil || p6Digest(enemyBytes) != constUtil.P7AwakeEnemySHA {
-					return errors.New("觉醒原NPC来源无效")
+				for _, mon := range frozen.Content.Monsters {
+					enemy, e := p7AwakeFrozenEnemy85(&frozen, mon)
+					if e != nil {
+						return e
+					}
+					admission, e := s.FreezeBattleInput(model.FrozenBattleInput{Attacker: actor, Monster: enemy, Seed: 0, MaxRound: 40, BattleType: 16, AttackerDamageFactor: proto.Float64(1), DefenderDamageFactor: proto.Float64(1)})
+					if e != nil {
+						return e
+					}
+					if proof, e := s.p7AwakeBattleProof(ctx, admission); e != nil || len(proof) != 64 {
+						return fmt.Errorf("当前觉醒队伍原机制不可用: %w", e)
+					}
 				}
-				enemy := &pb.BattleMonster{}
-				if e = proto.Unmarshal(enemyBytes, enemy); e != nil {
-					return e
-				}
-				admission, e := s.FreezeBattleInput(model.FrozenBattleInput{Attacker: actor, Monster: enemy, Seed: 0, MaxRound: 40, BattleType: 16, AttackerDamageFactor: proto.Float64(1), DefenderDamageFactor: proto.Float64(1)})
-				if e != nil {
-					return e
-				}
-				if proof, e := s.p7AwakeBattleProof(ctx, admission); e != nil || len(proof) != 64 {
-					return fmt.Errorf("当前觉醒队伍原机制不可用: %w", e)
-				}
-				frozen.BattleSource = constUtil.P7AwakeBattleSource
 				frozen.ScoreReward = constUtil.P7AwakeScoreReward
 				frozen.MonsterLoot = map[string]string{}
 				for _, mon := range frozen.Content.Monsters {
@@ -885,7 +930,10 @@ func (s *GameService) p7AwakeExplore(ctx context.Context, id int64, request prot
 					}
 					frozen.MonsterLoot[mon.GetGuid()] = loot
 				}
+			} else if rule.Source == constUtil.Awake85ExploreSource {
+				return errors.New("觉醒章节战斗未开放")
 			}
+
 			run = &db.P7AwakeRun{ID: runID, PlayerID: id, CopyID: rule.CopyID, StartAt: now.UnixMilli(), EndAt: now.Add(time.Duration(frozen.DurationMinutes) * time.Minute).UnixMilli(), Actor: actorRaw}
 			state := &p7AwakeExplorationState{Opened: map[string]bool{}}
 			refresh, err := p7AwakeRefresh(run, &frozen, state)
@@ -1024,7 +1072,7 @@ func p7AwakeRequireIdle(tx *gorm.DB, id int64) error {
 
 // p7AwakeRollMonster 沿具名本地千分规则解释原mon030怪池，入场冻结所有结果。
 func (s *GameService) p7AwakeRollMonster(monID string) (string, error) {
-	if monID != "mon_030" {
+	if monID != "mon_030" && monID != "mon_024" && monID != "mon_010" && monID != "mon_016" && monID != "mon_006" {
 		return "", errors.New("本地觉醒怪池未恢复")
 	}
 	row := s.table("AwakeCopyMonsterOutside", "monId", monID)
@@ -1100,8 +1148,28 @@ func p7AwakeFightInput(tx *gorm.DB, fight *db.P7AwakeFight) (*model.FrozenBattle
 	if err != nil || fight.InputHash != record.InputHash || p6Digest(fight.Start) != fight.StartHash {
 		return nil, nil, errors.New("觉醒战斗冻结来源无效")
 	}
+	expectedRoom := "map_forest_003"
+	if strings.HasPrefix(fight.RunID, constUtil.Awake85RunPrefix) {
+		var run db.P7AwakeRun
+		if err := tx.Where("id=? AND player_id=?", fight.RunID, fight.PlayerID).First(&run).Error; err != nil {
+			return nil, nil, err
+		}
+		frozen, err := p7AwakeReadFrozen(&run)
+		if err != nil {
+			return nil, nil, err
+		}
+		node := p7AwakeFindMonster(frozen, fight.MonsterGUID)
+		if node == nil {
+			return nil, nil, errors.New("觉醒战斗节点来源无效")
+		}
+		enemy, err := p7AwakeFrozenEnemy85(frozen, node)
+		if err != nil || !proto.Equal(enemy, input.Monster) {
+			return nil, nil, errors.New("觉醒战斗敌方来源无效")
+		}
+		expectedRoom = frozen.BattleMap
+	}
 	start := &pb.SCAwakeCopyFightBegin{}
-	if proto.Unmarshal(fight.Start, start) != nil || start.GetFightId() != fight.ID || start.GetRandomSeed() != input.Seed || start.GetMaxRoundNum() != input.MaxRound || start.GetRoomId() != "map_forest_003" || !proto.Equal(start.BattlePlayer, input.Attacker) || !proto.Equal(start.BattleMonser, input.Monster) {
+	if proto.Unmarshal(fight.Start, start) != nil || start.GetFightId() != fight.ID || start.GetRandomSeed() != input.Seed || start.GetMaxRoundNum() != input.MaxRound || start.GetRoomId() != expectedRoom || !proto.Equal(start.BattlePlayer, input.Attacker) || !proto.Equal(start.BattleMonser, input.Monster) {
 		return nil, nil, errors.New("觉醒typed16与冻结输入不一致")
 	}
 	var proof string
@@ -1139,7 +1207,7 @@ func (s *GameService) p7AwakeFightBegin(ctx context.Context, id int64, body *pb.
 			return err
 		}
 		mon := p7AwakeFindMonster(frozen, body.GetMonGuid())
-		if mon == nil || frozen.BattleSource != constUtil.P7AwakeBattleSource || len(frozen.MonsterLoot) != 1 {
+		if mon == nil || !p7AwakeBattleSourceKnown85(frozen.BattleSource) || len(frozen.MonsterLoot) != 1 {
 			return errors.New("觉醒真实战斗策略或节点尚未开放")
 		}
 		if state.ActiveFight != "" {
@@ -1160,14 +1228,11 @@ func (s *GameService) p7AwakeFightBegin(ctx context.Context, id int64, body *pb.
 		if proto.Unmarshal(run.Actor, attacker) != nil {
 			return errors.New("觉醒冻结队伍无效")
 		}
-		enemyRaw, err := hex.DecodeString(constUtil.P7AwakeEnemyHex)
-		if err != nil || p6Digest(enemyRaw) != constUtil.P7AwakeEnemySHA {
-			return errors.New("原觉醒本地NPC来源无效")
-		}
-		enemy := &pb.BattleMonster{}
-		if err = proto.Unmarshal(enemyRaw, enemy); err != nil {
+		enemy, err := p7AwakeFrozenEnemy85(frozen, mon)
+		if err != nil {
 			return err
 		}
+
 		random, err := rand.Int(rand.Reader, big.NewInt(math.MaxInt32+1))
 		if err != nil {
 			return err
@@ -1272,12 +1337,18 @@ func (s *GameService) p7AwakeFightEnd(ctx context.Context, id int64, body *pb.CS
 		if err != nil {
 			return err
 		}
-		if state.ActiveFight != fight.ID || state.Defeated[fight.MonsterGUID] || frozen.BattleSource != constUtil.P7AwakeBattleSource {
+		if state.ActiveFight != fight.ID || state.Defeated[fight.MonsterGUID] || !p7AwakeBattleSourceKnown85(frozen.BattleSource) {
 			return errors.New("觉醒End跨实例或节点")
 		}
 		var terminal *model.CombatFinalHPOutcome
+		calculator := s
+		if strings.HasPrefix(run.ID, constUtil.Awake85RunPrefix) {
+			// p7AwakeFightInput has validated this persisted battle record and its
+			// configuration digest. Continue the accepted encounter from those tables.
+			calculator = &GameService{Tables: input.Tables}
+		}
 		if fight.ScopeProof == constUtil.P7Awake16GenericCompatibilityProof {
-			terminal, err = s.ComputeP7Awake16GenericSettlement(ctx, input, body.GetOptRecord(), body.GetIsWinClient())
+			terminal, err = calculator.ComputeP7Awake16GenericSettlement(ctx, input, body.GetOptRecord(), body.GetIsWinClient())
 			if err != nil {
 				return err
 			}

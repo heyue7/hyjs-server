@@ -413,4 +413,47 @@ func TestP8Life(t *testing.T) {
 			t.Fatal("outside accrual", g.Field.Side)
 		}
 	})
+	t.Run("same-clock-repeat-keeps-safe-boundary-and-skips-write", func(t *testing.T) {
+		id := fresh("same-clock86")
+		hp(id, 1)
+		now := time.Now()
+		updates := 0
+		callback := "test:p8-life-same-clock86"
+		if err := db.GetIns().Callback().Update().After("gorm:update").Register(callback, func(tx *gorm.DB) {
+			if tx.Statement.Table == "p8_life_states" {
+				updates++
+			}
+		}); err != nil {
+			t.Fatal(err)
+		}
+		defer db.GetIns().Callback().Update().Remove(callback)
+		if err := updateProfileWithTx(ctx, id, func(tx *gorm.DB, p *pb.Player, g *model.GameState) error {
+			g.Position.Current, _ = fieldPoint(s.table("Field", "FieldId", "field_001")["Resurrection"])
+			if _, err := s.RefreshP8Survival(tx, p, g, now); err != nil {
+				return err
+			}
+			before := updates
+			if _, err := s.RefreshP8Survival(tx, p, g, now); err != nil {
+				return err
+			}
+			if updates != before {
+				t.Fatal("unchanged same-clock survival wrote again")
+			}
+			g.Position.Current = &pb.PointNew{X: proto.Float32(1000), Y: proto.Float32(0), Z: proto.Float32(1000)}
+			if _, err := s.RefreshP8Survival(tx, p, g, now); err != nil {
+				return err
+			}
+			state, err := p8LifeState(tx, id)
+			if err != nil {
+				return err
+			}
+			if state.InSafe || updates != before+1 || state.SafeRecoveryAt != now.UnixMilli() {
+				t.Fatal("same-clock safe-zone exit was not persisted")
+			}
+			return nil
+		}); err != nil {
+			t.Fatal(err)
+		}
+	})
+
 }

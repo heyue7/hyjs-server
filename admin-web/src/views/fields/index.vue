@@ -619,7 +619,7 @@ onMounted(load);
               <NTag :type="row.available ? 'success' : 'warning'">
                 {{ row.available ? '资源齐备' : '暂未开放 · 场景缺失' }}
               </NTag>
-              <NTag v-if="row.scene === 'field_003' && templates.find(t => t.id === row.templateId)?.configuration.ggo" type="info">搜打撤 · 配置准备</NTag>
+              <NTag v-if="row.scene === 'field_003' && templates.find(t => t.id === row.templateId)?.configuration.ggo" type="info">搜打撤</NTag>
               <NTag v-if="row.templateChanged" type="warning">全局方案有更新</NTag>
             </div>
             <div class="flex flex-wrap items-center gap-3">
@@ -645,7 +645,7 @@ onMounted(load);
                 <NButton :disabled="readonly || !row.available" @click="saveChannels(channel)">保存分线</NButton>
               </div>
               <div class="flex flex-wrap gap-2"><NTag v-for="line in channel.lines" :key="line.line" :type="line.online >= channel.maxPlayers ? 'warning' : 'default'">{{ line.line }} 线 · {{ line.online }} 人</NTag></div>
-              <p class="ops-muted">采集与小怪为个人进度；世界首领按全服周期。</p>
+              <p class="ops-muted">{{ row.scene === 'field_003' ? '采集、小怪与沙漠 Boss 均按线路独立，同线玩家共享。' : '采集与小怪为个人进度；世界首领按全服周期。' }}</p>
             </div>
           </div>
         </div>

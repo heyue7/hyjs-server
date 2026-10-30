@@ -328,7 +328,7 @@ func (s *GameService) fieldTransfer(ctx context.Context, id int64, b *pb.CSTrans
 			if err := s.refreshField(id, g); err != nil {
 				return err
 			}
-			if err := s.refreshSharedFieldBosses55(tx, g); err != nil {
+			if err := s.refreshSharedFieldBosses55(tx, id, g); err != nil {
 				return err
 			}
 		}
@@ -392,7 +392,7 @@ func (s *GameService) fieldTransfer(ctx context.Context, id int64, b *pb.CSTrans
 			if err := s.refreshField(id, g); err != nil {
 				return err
 			}
-			if err := s.refreshSharedFieldBosses55(tx, g); err != nil {
+			if err := s.refreshSharedFieldBosses55(tx, id, g); err != nil {
 				return err
 			}
 		case constUtil.P13GuildRoomTarget:
@@ -517,7 +517,7 @@ func (s *GameService) fieldScene(ctx context.Context, id int64, login bool) ([]p
 			if err := s.refreshField(id, g); err != nil {
 				return err
 			}
-			if err := s.refreshSharedFieldBosses55(tx, g); err != nil {
+			if err := s.refreshSharedFieldBosses55(tx, id, g); err != nil {
 				return err
 			}
 			if g.Position.GetScene() == constUtil.GGOFieldScene && g.GGOField != nil {
@@ -540,13 +540,15 @@ func (s *GameService) fieldScene(ctx context.Context, id int64, login bool) ([]p
 			side = g.Field.Side
 		}
 		if s.P12FieldPVPReady {
-			if prison, ok := P12FieldPVPPrisonSide(player, g, time.Now()); ok {
+			wall := time.Now()
+			prison, ok, projectionErr := P12FieldPVPPrisonSide(tx, player, g, wall)
+			if projectionErr != nil {
+				return projectionErr
+			}
+			if ok {
 				side = prison
 			}
-		}
-		if s.P12FieldPVPReady {
-			var projectionErr error
-			side, projectionErr = s.ProjectP12FieldPVPSide(tx, id, side, LocalPlayNow(tx.Statement.Context))
+			side, projectionErr = s.ProjectP12FieldPVPSide(tx, id, side, wall)
 			if projectionErr != nil {
 				return projectionErr
 			}
@@ -680,7 +682,7 @@ func (s *GameService) fieldHeartbeat(ctx context.Context, id int64) ([]proto.Mes
 		if err := s.refreshField(id, g); err != nil {
 			return err
 		}
-		if err := s.refreshSharedFieldBosses55(tx, g); err != nil {
+		if err := s.refreshSharedFieldBosses55(tx, id, g); err != nil {
 			return err
 		}
 		if s.P8GatherReady {
@@ -708,7 +710,7 @@ func (s *GameService) fieldHeartbeat(ctx context.Context, id int64) ([]proto.Mes
 			for _, message := range messages {
 				if state, ok := message.(*pb.SCFieldPlayerState); ok {
 					for i, side := range state.Player {
-						view, err := s.ProjectP12FieldPVPSide(tx, side.GetPlayerId(), side, LocalPlayNow(tx.Statement.Context))
+						view, err := s.ProjectP12FieldPVPSide(tx, side.GetPlayerId(), side, time.Now())
 						if err != nil {
 							return err
 						}
@@ -982,7 +984,7 @@ func (s *GameService) fieldFightEnd(ctx context.Context, id int64, b *pb.CSSideP
 		if err := s.refreshField(id, g); err != nil {
 			return err
 		}
-		if err := s.refreshSharedFieldBosses55(tx, g); err != nil {
+		if err := s.refreshSharedFieldBosses55(tx, id, g); err != nil {
 			return err
 		}
 		if g.Field.Fight == nil || g.Field.Fight.Start.GetFightId() != b.GetFightId() {
@@ -1010,7 +1012,7 @@ func (s *GameService) fieldFightEnd(ctx context.Context, id int64, b *pb.CSSideP
 		if err := s.refreshField(id, g); err != nil {
 			return err
 		}
-		if err := s.refreshSharedFieldBosses55(tx, g); err != nil {
+		if err := s.refreshSharedFieldBosses55(tx, id, g); err != nil {
 			return err
 		}
 		monster := fieldFind(g, fight.MonsterUUID)
@@ -1129,6 +1131,8 @@ func (s *GameService) fieldFightEnd(ctx context.Context, id int64, b *pb.CSSideP
 func (s *GameService) fieldMove(ctx context.Context, id int64, b *pb.CSMove) error {
 	var tradePeer int64
 	err := updateProfileWithTx(ctx, id, func(tx *gorm.DB, p *pb.Player, g *model.GameState) error {
+		// Both sides of this one move use the same survival-clock instant.
+		now := time.Now()
 		if s.P12FieldPVPReady {
 			allowed, err := ShouldAllowP12PrisonTransfer(tx, id, g.Position.GetScene(), b.GetPointNew(), time.Now())
 			if err != nil {
@@ -1150,7 +1154,7 @@ func (s *GameService) fieldMove(ctx context.Context, id int64, b *pb.CSMove) err
 			return errors.New("死亡状态不能移动，请先复活")
 		}
 		if s.P8LifeReady {
-			if _, err := s.RefreshP8Survival(tx, p, g, time.Now()); err != nil {
+			if _, err := s.RefreshP8Survival(tx, p, g, now); err != nil {
 				return err
 			}
 		}
@@ -1182,7 +1186,7 @@ func (s *GameService) fieldMove(ctx context.Context, id int64, b *pb.CSMove) err
 		}
 		g.Position.Current = next
 		if s.P8LifeReady {
-			if _, err := s.RefreshP8Survival(tx, p, g, time.Now()); err != nil {
+			if _, err := s.RefreshP8Survival(tx, p, g, now); err != nil {
 				return err
 			}
 		}

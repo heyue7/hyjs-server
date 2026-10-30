@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/subtle"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"sync"
@@ -19,6 +20,20 @@ import (
 )
 
 var p10SceneMutation sync.Mutex
+var p10SceneBroadcastSlots = make(chan struct{}, constUtil.P10SceneBroadcastWorkers)
+
+type p10ScenePeer struct {
+	frame *pb.MovePlayer
+	sink  *p10ClientSink
+}
+
+func p10ScenePeerFrames(peers []p10ScenePeer) []*pb.MovePlayer {
+	var frames []*pb.MovePlayer
+	for _, peer := range peers {
+		frames = append(frames, peer.frame)
+	}
+	return frames
+}
 
 func (s *GameService) InitializeP10Scene(ctx context.Context) error {
 	tx := db.GetIns().WithContext(ctx)
@@ -103,16 +118,19 @@ func (s *GameService) p10SceneMovePlayer(p *pb.Player, g *model.GameState, proje
 		side = &pb.PlayerSide{PlayerId: p.PlayerId}
 	}
 	if s.P12FieldPVPReady {
-		if prison, ok := P12FieldPVPPrisonSide(p, g, time.Now()); ok {
-			side = prison
-		}
-	}
-	if s.P12FieldPVPReady {
 		tx := db.GetIns()
 		if len(projectionTx) == 1 {
 			tx = projectionTx[0]
 		}
-		side, err = s.ProjectP12FieldPVPSide(tx, p.GetPlayerId(), side, LocalPlayNow(tx.Statement.Context))
+		wall := time.Now()
+		prison, ok, err := P12FieldPVPPrisonSide(tx, p, g, wall)
+		if err != nil {
+			return nil, err
+		}
+		if ok {
+			side = prison
+		}
+		side, err = s.ProjectP12FieldPVPSide(tx, p.GetPlayerId(), side, wall)
 		if err != nil {
 			return nil, err
 		}
@@ -129,7 +147,7 @@ func (s *GameService) p10SceneMovePlayer(p *pb.Player, g *model.GameState, proje
 
 // p10CurrentScenePeers restores actors cleared by the client during room reload,
 // including stationary peers whose presence identity has not changed.
-func (s *GameService) p10CurrentScenePeers(ctx context.Context, id int64) ([]*pb.MovePlayer, error) {
+func (s *GameService) p10CurrentScenePeers(ctx context.Context, id int64, expectedLine *int32) ([]*pb.MovePlayer, error) {
 	p10SceneMutation.Lock()
 	defer p10SceneMutation.Unlock()
 	tx := db.GetIns().WithContext(ctx)
@@ -148,16 +166,81 @@ func (s *GameService) p10CurrentScenePeers(ctx context.Context, id int64) ([]*pb
 	if own.Scene != "town_main" && !constUtil.P8OriginalFieldScene(own.Scene) {
 		return nil, nil
 	}
+	if expectedLine != nil && own.Line != *expectedLine {
+		return nil, nil
+	}
 	if _, live := s.p10SceneLive(tx, own); !live {
 		return nil, nil
 	}
 	return s.p10ScenePeers(tx, own.Scene, own.Line, id)
 }
 
+// The directory checks the current scope without expanding every peer's cold
+// roster. A peer's own requests still decode and validate its complete profile.
+func p10SceneScopeProfile(profile *db.Profile) (*model.GameState, error) {
+	if profile.Player == nil || profile.Game == nil {
+		return nil, errors.New("请先创建角色")
+	}
+	var player pb.Player
+	if err := json.Unmarshal([]byte(*profile.Player), &player); err != nil {
+		return nil, err
+	}
+	var scope struct {
+		Position        *pb.Position `json:"position"`
+		PositionLoading bool         `json:"position_loading"`
+		GGOField        *struct{}    `json:"ggo_field"`
+		Run             *struct {
+			Complete bool `json:"complete"`
+		} `json:"run"`
+		Field *struct {
+			Fight *struct {
+				Settled bool `json:"settled"`
+			} `json:"fight"`
+		} `json:"field"`
+		Items                   []*pb.SimpleItem `json:"items"`
+		BagCapacityScale        int32            `json:"bag_capacity_scale"`
+		WarriorBagCapacityScale int32            `json:"warrior_bag_capacity_scale"`
+	}
+	if err := json.Unmarshal([]byte(*profile.Game), &scope); err != nil {
+		return nil, err
+	}
+	game := &model.GameState{
+		Position: scope.Position, PositionLoading: scope.PositionLoading,
+		Items: scope.Items, BagCapacityScale: scope.BagCapacityScale,
+		WarriorBagCapacityScale: scope.WarriorBagCapacityScale,
+	}
+	if scope.GGOField != nil {
+		game.GGOField = &model.GGOFieldState{}
+	}
+	if scope.Run != nil {
+		game.Run = &model.CopyRun{Complete: scope.Run.Complete}
+	}
+	if scope.Field != nil {
+		game.Field = &model.FieldState{}
+		if scope.Field.Fight != nil {
+			game.Field.Fight = &model.FieldFight{Settled: scope.Field.Fight.Settled}
+		}
+	}
+	if err := projectGGOCredit(profile, game); err != nil {
+		return nil, err
+	}
+	if err := prepareBagCapacity(&player, game); err != nil {
+		return nil, err
+	}
+	return game, nil
+}
+
 // p10SceneLiveRows reads each current profile and offline account by indexed ID
 // in bounded batches. The directory lives only for this call; each invocation
 // reads the current session, scene and account state again.
 func (s *GameService) p10SceneLiveRows(tx *gorm.DB, rows []db.P10ScenePresence) ([]*pb.MovePlayer, error) {
+	peers, err := s.p10SceneLiveEntries(tx, rows)
+	return p10ScenePeerFrames(peers), err
+}
+
+// Keep the sink selected with the directory row, so a later reconnect cannot
+// inherit a frame intended for a previous socket or an offline presence.
+func (s *GameService) p10SceneLiveEntries(tx *gorm.DB, rows []db.P10ScenePresence) ([]p10ScenePeer, error) {
 	type candidate struct {
 		row     db.P10ScenePresence
 		sink    *p10ClientSink
@@ -214,7 +297,7 @@ func (s *GameService) p10SceneLiveRows(tx *gorm.DB, rows []db.P10ScenePresence) 
 			accounts[account.ID] = account
 		}
 	}
-	var peers []*pb.MovePlayer
+	var peers []p10ScenePeer
 	for _, entry := range candidates {
 		row := entry.row
 		profile, exists := profiles[row.PlayerID]
@@ -233,7 +316,7 @@ func (s *GameService) p10SceneLiveRows(tx *gorm.DB, rows []db.P10ScenePresence) 
 				continue
 			}
 		}
-		_, game, err := decodeProfile(&profile)
+		game, err := p10SceneScopeProfile(&profile)
 		if err != nil {
 			continue
 		}
@@ -248,7 +331,7 @@ func (s *GameService) p10SceneLiveRows(tx *gorm.DB, rows []db.P10ScenePresence) 
 		if proto.Unmarshal(row.Frame, frame) != nil || frame.GetInfo().GetPlayerId() != row.PlayerID {
 			continue
 		}
-		peers = append(peers, frame)
+		peers = append(peers, p10ScenePeer{frame: frame, sink: entry.sink})
 	}
 	return peers, nil
 }
@@ -261,6 +344,11 @@ func (s *GameService) p10SceneLive(tx *gorm.DB, row db.P10ScenePresence) (*pb.Mo
 	return peers[0], true
 }
 func (s *GameService) p10ScenePeers(tx *gorm.DB, scene string, line int32, exclude int64) ([]*pb.MovePlayer, error) {
+	peers, err := s.p10ScenePeerEntries(tx, scene, line, exclude)
+	return p10ScenePeerFrames(peers), err
+}
+
+func (s *GameService) p10ScenePeerEntries(tx *gorm.DB, scene string, line int32, exclude int64) ([]p10ScenePeer, error) {
 	var rows []db.P10ScenePresence
 	base := func() *gorm.DB { return tx.Where("scene=? AND line=? AND player_id<>?", scene, line, exclude) }
 	if err := base().Where("session_hash<>?", "").Order("player_id").Find(&rows).Error; err != nil {
@@ -273,28 +361,72 @@ func (s *GameService) p10ScenePeers(tx *gorm.DB, scene string, line int32, exclu
 		}
 		rows = append(rows, offline...)
 	}
-	return s.p10SceneLiveRows(tx, rows)
+	return s.p10SceneLiveEntries(tx, rows)
 }
 
 func (s *GameService) p10SceneSend(ctx context.Context, id int64, message proto.Message) {
 	s.publishP10Private(ctx, id, message)
 }
 func (s *GameService) p10SceneBroadcast(ctx context.Context, scene string, line int32, exclude int64, message proto.Message) {
-	peers, err := s.p10ScenePeers(db.GetIns().WithContext(ctx), scene, line, exclude)
+	peers, err := s.p10ScenePeerEntries(db.GetIns().WithContext(ctx), scene, line, exclude)
 	if err != nil {
 		return
 	}
 	s.p10SceneSendPeers(ctx, peers, message)
 }
-func (s *GameService) p10SceneSendPeers(ctx context.Context, peers []*pb.MovePlayer, message proto.Message) {
-	for _, peer := range peers {
-		// Sending still rechecks the current account, session and client-update gate.
-		s.p10SceneSend(ctx, peer.GetInfo().GetPlayerId(), message)
+func (s *GameService) p10SceneSendPeers(ctx context.Context, peers []p10ScenePeer, message proto.Message) {
+	p10SceneForEachLivePeer(peers, func(peer p10ScenePeer) {
+		// Every send rechecks the pinned socket, account, session and client gate.
+		s.publishP10PrivateBatchPinned(ctx, peer.frame.GetInfo().GetPlayerId(), peer.sink, []proto.Message{message})
+	})
+}
+
+// Wait for this complete batch before the caller advances the scene mutation.
+// The shared slots also limit simultaneous broadcasts outside the scene lock.
+func p10SceneForEachLivePeer(peers []p10ScenePeer, send func(p10ScenePeer)) {
+	sendBounded := func(peer p10ScenePeer) {
+		p10SceneBroadcastSlots <- struct{}{}
+		defer func() { <-p10SceneBroadcastSlots }()
+		send(peer)
 	}
+	live := make([]p10ScenePeer, 0, len(peers))
+	for _, peer := range peers {
+		if peer.sink != nil {
+			live = append(live, peer)
+		}
+	}
+	if len(live) <= 1 {
+		for _, peer := range live {
+			sendBounded(peer)
+		}
+		return
+	}
+	jobs := make(chan p10ScenePeer)
+	var workers sync.WaitGroup
+	for i := 0; i < min(len(live), constUtil.P10SceneBroadcastWorkers); i++ {
+		workers.Add(1)
+		go func() {
+			defer workers.Done()
+			for peer := range jobs {
+				sendBounded(peer)
+			}
+		}()
+	}
+	for _, peer := range live {
+		jobs <- peer
+	}
+	close(jobs)
+	workers.Wait()
 }
 
 // SyncP10Scene 必须在公共位置事务提交后调用。它从当前真实TCP会话和profile恢复同屏，不造离线玩家。
 func (s *GameService) SyncP10Scene(ctx context.Context, id int64, movement bool) error {
+	return s.syncP10Scene(ctx, id, movement, nil)
+}
+
+// A CurrentPosition caller can request an ordered peer snapshot after a
+// committed desert line reload; other existing callers keep their behavior.
+func (s *GameService) syncP10Scene(ctx context.Context, id int64, movement bool, lineRestored *bool) error {
 	if handled, err := s.SyncP13UnionFightField(ctx, id, movement); handled || err != nil {
 		return err
 	}
@@ -329,6 +461,16 @@ func (s *GameService) SyncP10Scene(ctx context.Context, id int64, movement bool)
 	existed := err == nil
 	scope := p10SceneScope(g)
 	if scope == "" {
+		// A committed desert line change keeps its authenticated presence while
+		// the native position handshake is pending. The empty frame is not a
+		// visible actor, and retaining the session keeps disconnect cleanup bound
+		// to the socket even if a heartbeat arrives before CurrentPosition.
+		if existed && old.Scene == constUtil.GGOFieldScene && len(old.Frame) == 0 &&
+			old.SessionHash == p6Digest(sink.session) && g.PositionLoading &&
+			g.Position.GetScene() == constUtil.GGOFieldScene && g.GGOField != nil &&
+			(g.Run == nil || g.Run.Complete) && (g.Field == nil || g.Field.Fight == nil || g.Field.Fight.Settled) {
+			return nil
+		}
 		if old.SessionHash != "" {
 			if err = tx.Model(&db.P10ScenePresence{}).Where("player_id=?", id).Update("session_hash", "").Error; err != nil {
 				return err
@@ -346,12 +488,12 @@ func (s *GameService) SyncP10Scene(ctx context.Context, id int64, movement bool)
 	if line < 1 || line > cfg.LineCount {
 		line = 1
 	}
-	linePeers := make(map[int32][]*pb.MovePlayer)
-	loadLine := func(candidate int32) ([]*pb.MovePlayer, error) {
+	linePeers := make(map[int32][]p10ScenePeer)
+	loadLine := func(candidate int32) ([]p10ScenePeer, error) {
 		if peers, ok := linePeers[candidate]; ok {
 			return peers, nil
 		}
-		peers, err := s.p10ScenePeers(tx, scope, candidate, id)
+		peers, err := s.p10ScenePeerEntries(tx, scope, candidate, id)
 		if err == nil {
 			linePeers[candidate] = peers
 		}
@@ -418,7 +560,7 @@ func (s *GameService) SyncP10Scene(ctx context.Context, id int64, movement bool)
 	}
 	current := db.P10ScenePresence{PlayerID: id, Scene: scope, Line: line, SessionHash: p6Digest(sink.session), Frame: raw, UpdatedAt: time.Now().UnixMilli()}
 	changed := old.Scene != scope || old.Line != line || old.SessionHash != current.SessionHash
-	wrote := !existed
+	pendingLine := existed && old.Scene == constUtil.GGOFieldScene && old.Scene == scope && len(old.Frame) == 0
 	if !existed {
 		if err = tx.Save(&current).Error; err != nil {
 			return err
@@ -448,7 +590,6 @@ func (s *GameService) SyncP10Scene(ctx context.Context, id int64, movement bool)
 			updates["updated_at"] = current.UpdatedAt
 		}
 		if len(updates) > 0 {
-			wrote = true
 			result := tx.Model(&db.P10ScenePresence{}).Where("player_id=?", id).Updates(updates)
 			if result.Error != nil {
 				return result.Error
@@ -461,26 +602,24 @@ func (s *GameService) SyncP10Scene(ctx context.Context, id int64, movement bool)
 			}
 		}
 	}
-	if changed && old.SessionHash != "" {
+	if changed && !pendingLine && old.SessionHash != "" {
 		s.p10SceneBroadcast(ctx, old.Scene, old.Line, id, &pb.SCPlayerDisappear{PlayerId: []int64{id}})
 	}
-	broadcast := func(message proto.Message) {
-		if wrote {
-			// The frame write may have waited while another profile changed scope.
-			s.p10SceneBroadcast(ctx, scope, line, id, message)
-			return
+	if changed || pendingLine {
+		// Re-read the directory after the presence update before selecting recipients.
+		s.p10SceneBroadcast(ctx, scope, line, id, &pb.SCPlayerAppear{Player: []*pb.MovePlayer{frame}})
+		// An independently synchronized pending actor may still be waiting for
+		// its CurrentPosition response. Never push its peers ahead of that frame.
+		if pendingLine && lineRestored != nil {
+			*lineRestored = true
 		}
-		s.p10SceneSendPeers(ctx, peers, message)
-	}
-	if changed {
-		broadcast(&pb.SCPlayerAppear{Player: []*pb.MovePlayer{frame}})
-		if len(peers) > 0 {
-			s.p10SceneSend(ctx, id, &pb.SCPlayerAppear{Player: peers})
+		if len(peers) > 0 && !pendingLine {
+			s.p10SceneSend(ctx, id, &pb.SCPlayerAppear{Player: p10ScenePeerFrames(peers)})
 		}
 	} else if movement {
-		broadcast(&pb.SCMovePush{Position: []*pb.Position{frame.Position}})
+		s.p10SceneBroadcast(ctx, scope, line, id, &pb.SCMovePush{Position: []*pb.Position{frame.Position}})
 	} else if !bytes.Equal(old.Frame, current.Frame) {
-		broadcast(&pb.SCMovePlayerInfo{PlayerInfos: []*pb.MovePlayer{frame}})
+		s.p10SceneBroadcast(ctx, scope, line, id, &pb.SCMovePlayerInfo{PlayerInfos: []*pb.MovePlayer{frame}})
 	}
 	return nil
 }
@@ -552,13 +691,17 @@ func (s *GameService) p10DisconnectScene(ctx context.Context, id int64, session 
 	s.p10SceneBroadcast(ctx, row.Scene, row.Line, id, &pb.SCPlayerDisappear{PlayerId: []int64{id}})
 	return nil
 }
-func (s *GameService) AfterP10SceneRequest(ctx context.Context, id int64, request proto.Message) {
+func (s *GameService) AfterP10SceneRequest(ctx context.Context, id int64, request proto.Message) bool {
+	var lineRestored bool
 	switch request.(type) {
 	case *pb.CSMove:
 		_ = s.SyncP10Scene(ctx, id, true)
-	case *pb.CSCurrentPosition, *pb.CSLoginScene, *pb.CSTransferScene, *pb.CSCopyEnter, *pb.CSCopyLeave, *pb.CSSidePveFightStart, *pb.CSSidePveFightEnd, *pb.CSSidePveBossFightStart, *pb.CSSidePveBossFightEnd, *pb.CSPingTcp, *pb.CSFormationOn, *pb.CSFormationOff, *pb.CSFormationExChange:
+	case *pb.CSCurrentPosition:
+		_ = s.syncP10Scene(ctx, id, false, &lineRestored)
+	case *pb.CSLoginScene, *pb.CSTransferScene, *pb.CSCopyEnter, *pb.CSCopyLeave, *pb.CSSidePveFightStart, *pb.CSSidePveFightEnd, *pb.CSSidePveBossFightStart, *pb.CSSidePveBossFightEnd, *pb.CSPingTcp, *pb.CSFormationOn, *pb.CSFormationOff, *pb.CSFormationExChange:
 		_ = s.SyncP10Scene(ctx, id, false)
 	}
+	return lineRestored
 }
 func (s *GameService) DispatchP10Scene(ctx context.Context, id int64, request proto.Message, stamp int64) ([]proto.Message, bool, error) {
 	switch request.(type) {
@@ -704,6 +847,9 @@ func (s *GameService) DispatchP10Scene(ctx context.Context, id int64, request pr
 					return err
 				}
 				own = locked
+				// An empty, non-NULL frame persists the pending appearance across
+				// heartbeats and reconnects without discarding the socket identity.
+				own.Frame = []byte{}
 			}
 			if oldLine != b.GetLine() && game.GGOField != nil && game.Position.GetScene() != constUtil.GGOFieldScene {
 				if err = ggoPositionBump(game); err != nil {
@@ -748,7 +894,7 @@ func (s *GameService) DispatchP10Scene(ctx context.Context, id int64, request pr
 			if err != nil {
 				return nil, true, err
 			}
-			if len(peers) > 0 {
+			if len(peers) > 0 && len(own.Frame) > 0 {
 				s.p10SceneSend(ctx, id, &pb.SCPlayerAppear{Player: peers})
 			}
 		}

@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import type { FieldMapPoint, FieldPoint, FieldPresentation, FieldTemplate, FieldWeight } from '@/service/fields';
+import type { FieldGGOWorldPoint, FieldMapPoint, FieldPoint, FieldPresentation, FieldTemplate, FieldWeight } from '@/service/fields';
 
 const props = defineProps<{
   template?: FieldTemplate;
   presentation: Record<string, FieldPresentation>;
 }>();
 
-type Kind = 'fish' | 'mine' | 'monster' | 'boss' | 'worldBoss';
+type Kind = 'fish' | 'mine' | 'monster' | 'boss' | 'worldBoss' | 'exit';
 interface DisplayPoint {
   key: string;
   kind: Kind;
@@ -18,21 +18,32 @@ interface DisplayPoint {
   z: number;
 }
 
-const kinds: { key: Kind; label: string; glyph: string; candidateLabel: string }[] = [
+const allKinds: { key: Kind; label: string; glyph: string; candidateLabel: string }[] = [
   { key: 'fish', label: '钓鱼', glyph: '钓', candidateLabel: '候选鱼群' },
   { key: 'mine', label: '矿物', glyph: '矿', candidateLabel: '候选矿脉' },
   { key: 'monster', label: '小怪', glyph: '怪', candidateLabel: '候选小怪' },
   { key: 'boss', label: '普通首领出生点', glyph: '首', candidateLabel: '出生点候选首领' },
-  { key: 'worldBoss', label: '世界首领候选点', glyph: '世', candidateLabel: '候选出生位置' }
+  { key: 'worldBoss', label: '世界首领候选点', glyph: '世', candidateLabel: '候选出生位置' },
+  { key: 'exit', label: '撤离接应点', glyph: '撤', candidateLabel: '说明' }
 ];
-const kindMap = Object.fromEntries(kinds.map(kind => [kind.key, kind])) as Record<Kind, (typeof kinds)[number]>;
-const visibleKinds = ref<Kind[]>(kinds.map(kind => kind.key));
+const visibleKinds = ref<Kind[]>(allKinds.map(kind => kind.key));
 const activeKey = ref('');
 const zoom = ref(1);
 const zoomOptions = [1, 1.5, 2];
 
 const cfg = computed(() => props.template?.configuration);
 const scene = computed(() => cfg.value?.scene || '');
+const ggoRuntime = computed(() => (scene.value === 'field_003' ? cfg.value?.ggo?.runtime : undefined));
+const kinds = computed(() =>
+  ggoRuntime.value
+    ? allKinds.filter(kind => kind.key !== 'worldBoss').map(kind => ({
+        ...kind,
+        label: kind.key === 'boss' ? '公共 Boss' : kind.label,
+        candidateLabel: '说明'
+      }))
+    : allKinds.filter(kind => kind.key !== 'exit')
+);
+const kindMap = computed(() => Object.fromEntries(kinds.value.map(kind => [kind.key, kind])) as Record<Kind, (typeof allKinds)[number]>);
 const entry = computed(() => props.presentation[scene.value]);
 const map = computed(() => entry.value?.map);
 const mapIcon = computed(() => entry.value?.iconUrl || '');
@@ -115,18 +126,42 @@ function bossPoints(points: FieldMapPoint[] | undefined, kind: 'boss' | 'worldBo
   });
 }
 
-const allPoints = computed<DisplayPoint[]>(() => [
-  ...gatherPoints(cfg.value?.fishPoints, 'fish'),
-  ...gatherPoints(cfg.value?.minePoints, 'mine'),
-  ...monsterPoints(cfg.value?.monsterPoints),
-  ...bossPoints(map.value?.bossPoints, 'boss'),
-  ...bossPoints(map.value?.worldBossPoints, 'worldBoss')
-]);
+function ggoMapPosition(point: FieldGGOWorldPoint) {
+  const position = point.position;
+  if (typeof position?.x !== 'number' || !Number.isFinite(position.x)
+    || typeof position.z !== 'number' || !Number.isFinite(position.z)) return undefined;
+  return { x: position.x, z: position.z };
+}
+
+function ggoPoints(points: FieldGGOWorldPoint[]): DisplayPoint[] {
+  const descriptions: Record<FieldGGOWorldPoint['kind'], string> = {
+    fish: '公共鱼点', mine: '公共矿点', monster: '公共小怪', boss: '公共 Boss', exit: '撤离接应点'
+  };
+  return points.flatMap(point => {
+    const position = ggoMapPosition(point);
+    if (!position) return [];
+    const detail = point.kind === 'monster' ? `${point.level} 级${descriptions.monster}` : descriptions[point.kind];
+    return [{ key: `${point.kind}-${point.id}`, kind: point.kind, id: point.id, label: point.id, candidates: detail, ...position }];
+  });
+}
+
+const missingGgoPoints = computed(() => (ggoRuntime.value?.points ?? []).filter(point => !ggoMapPosition(point)).length);
+const allPoints = computed<DisplayPoint[]>(() =>
+  ggoRuntime.value
+    ? ggoPoints(ggoRuntime.value.points ?? [])
+    : [
+        ...gatherPoints(cfg.value?.fishPoints, 'fish'),
+        ...gatherPoints(cfg.value?.minePoints, 'mine'),
+        ...monsterPoints(cfg.value?.monsterPoints),
+        ...bossPoints(map.value?.bossPoints, 'boss'),
+        ...bossPoints(map.value?.worldBossPoints, 'worldBoss')
+      ]
+);
 const visiblePoints = computed(() => allPoints.value.filter(point => visibleKinds.value.includes(point.kind)));
 const activePoint = computed(() => allPoints.value.find(point => point.key === activeKey.value));
 const kindCounts = computed(() => {
   const counts = {} as Record<Kind, number>;
-  for (const kind of kinds) counts[kind.key] = allPoints.value.filter(point => point.kind === kind.key).length;
+  for (const kind of kinds.value) counts[kind.key] = allPoints.value.filter(point => point.kind === kind.key).length;
   return counts;
 });
 
@@ -153,7 +188,7 @@ function numberText(value: number) {
 }
 
 function pointAria(point: DisplayPoint) {
-  const meta = kindMap[point.kind];
+  const meta = kindMap.value[point.kind];
   return `${meta.label}，坐标 X ${numberText(point.x)}，Z ${numberText(point.z)}，${meta.candidateLabel}：${point.candidates}`;
 }
 
@@ -202,6 +237,7 @@ watch(
           </div>
         </div>
       </div>
+      <p v-if="missingGgoPoints" class="mb-2 text-sm text-gray-500">{{ missingGgoPoints }} 个配置点位缺少坐标，未显示。</p>
       <p v-if="!visiblePoints.length" class="mb-2 text-sm text-gray-500">没有符合当前分类的标记。</p>
       <div class="map-scroll" tabindex="0" aria-label="大地图，可滚动查看">
         <div
@@ -228,7 +264,7 @@ watch(
         </div>
       </div>
       <p class="mt-2 text-xs text-gray-500">
-        标记为候选位置，不显示实时刷新状态；同一周期仅出现一只世界首领。
+        {{ ggoRuntime ? '标记为方案配置点位，不显示实时对象或刷新状态。' : '标记为候选位置，不显示实时刷新状态；同一周期仅出现一只世界首领。' }}
       </p>
       <div class="map-detail" aria-live="polite">
         <template v-if="activePoint">
@@ -237,7 +273,7 @@ watch(
               {{ kindMap[activePoint.kind].glyph }}
             </span>
             <strong>{{ kindMap[activePoint.kind].label }}</strong>
-            <NTag size="small" type="warning">{{ activePoint.kind === 'boss' ? '出生点 · 非实时' : '候选点 · 非实时' }}</NTag>
+            <NTag size="small" type="warning">{{ ggoRuntime ? '配置点 · 非实时' : activePoint.kind === 'boss' ? '出生点 · 非实时' : '候选点 · 非实时' }}</NTag>
             <span class="text-sm text-gray-500">{{ activePoint.label }}</span>
           </div>
           <div class="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-sm">
@@ -249,7 +285,7 @@ watch(
             同一世界首领周期只会在其中一个候选点出现。
           </p>
         </template>
-        <p v-else class="text-sm text-gray-500">选择地图标记查看类别、坐标和候选资源。</p>
+        <p v-else class="text-sm text-gray-500">{{ ggoRuntime ? '选择地图标记查看类别、坐标和配置说明。' : '选择地图标记查看类别、坐标和候选资源。' }}</p>
       </div>
     </template>
   </div>
@@ -353,6 +389,9 @@ watch(
     0 0 0 2px var(--marker-bg),
     0 0 0 3px var(--marker-color);
 }
+.map-marker.kind-exit::before {
+  border-radius: 6px 6px 2px 2px;
+}
 .map-marker.kind-fish,
 .legend-item.kind-fish {
   --marker-color: #1d4ed8;
@@ -377,6 +416,11 @@ watch(
 .legend-item.kind-worldBoss {
   --marker-color: #7e22ce;
   --marker-bg: #f3e8ff;
+}
+.map-marker.kind-exit,
+.legend-item.kind-exit {
+  --marker-color: #0f766e;
+  --marker-bg: #ccfbf1;
 }
 .legend-item {
   display: inline-flex;
@@ -474,6 +518,11 @@ watch(
 .dark .legend-item.kind-worldBoss {
   --marker-color: #d8b4fe;
   --marker-bg: #581c87;
+}
+.dark .map-marker.kind-exit,
+.dark .legend-item.kind-exit {
+  --marker-color: #5eead4;
+  --marker-bg: #134e4a;
 }
 .dark .legend-item {
   border-color: #4b5563;

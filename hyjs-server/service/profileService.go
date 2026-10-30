@@ -324,12 +324,12 @@ func saveProfileAgainst(tx *gorm.DB, row *db.Profile, player *pb.Player, game *m
 	nowMS := time.Now().UnixMilli()
 	accountRoleChanged := row.Player == nil || row.Game == nil
 	if row.Player != nil && row.Game != nil {
-		before, _, err := decodeProfile(row)
-		if err != nil {
+		var before pb.Player
+		if err := json.Unmarshal([]byte(*row.Player), &before); err != nil {
 			return err
 		}
 		accountRoleChanged = before.GetName() != player.GetName() || before.GetLevel() != player.GetLevel()
-		if err = finalizeResourceRecovery(player, before.GetEnergy(), before.GetStamina(), nowMS); err != nil {
+		if err := finalizeResourceRecovery(player, before.GetEnergy(), before.GetStamina(), nowMS); err != nil {
 			return err
 		}
 	} else if _, err := settleResourceRecovery(player, nowMS); err != nil {
@@ -376,7 +376,7 @@ func saveProfileAgainst(tx *gorm.DB, row *db.Profile, player *pb.Player, game *m
 	if err != nil {
 		return err
 	}
-	g, err = json.Marshal(game)
+	g, err = model.MarshalProfileGame86(game)
 	if err != nil {
 		return err
 	}

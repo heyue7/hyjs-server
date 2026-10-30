@@ -78,25 +78,29 @@ MySQL 保持运行；核对旧表摘要、全部历史字段、迁移标记和�
 
 - 本批按用户决定保留现有HTTP，不启用HTTPS。后台Cookie保留HttpOnly/SameSite=Strict；如以后启用TLS，再显式配置HYJS_ADMIN_SECURE_COOKIES。不能把X-Forwarded-Proto当作任意客户端可信输入。
 - activate.py只把本部署Docker网桥的实际gateway加入HYJS_TRUSTED_PROXIES；Nginx覆盖传入的X-Forwarded-For，防止客户端伪造来源。不要设置任意来源可信。
-- 新部署前备份采用HYJSBK01格式AES-256-GCM，密钥保存在部署根的.backup-encryption.key（0600），备份在私有backups目录（0700）。密钥与备份分别保管，密钥不进入Git、日志、制品包或数据库。历史备份保留原权限，不自动清理业务历史。
-- 加密后先解密并核对摘要，再删除本次临时明文；失败保留私有.pending文件，部署中止。单快照上限256MiB，达到上限时采用另行审查的流式工具，禁止跳过备份。
+- 新部署前备份采用HYJSBK02分块格式AES-256-GCM，密钥保存在部署根的.backup-encryption.key（0600），备份在私有backups目录（0700）。密钥与备份分别保管，密钥不进入Git、日志、制品包或数据库。历史备份保留原权限，不自动清理业务历史。
+- 加密后先解密并核对摘要，再删除本次临时明文；失败保留私有.pending文件，部署中止。当前工具按4MiB分块认证，单快照上限8GiB；仍兼容历史HYJSBK01读取。达到上限或认证失败时中止，禁止跳过备份。
 - 手工恢复前先用hyjs-backupseal --decrypt --key-file 私有密钥路径 --input 选定.aesgcm --output 新的私有.sql.gz进行认证解密；该命令不执行数据库恢复。必须确认目标实例与所选备份后才导入。
 
-### 密码升级后的直接代码回退
+### 回退约束
 
-当前制品附带hyjs-server-auth-compatible-rollback及其JSON摘要：批45以6532c19已发布版本作为直接回退，保留野外首领压缩输入兼容，并补入公会自动报名开关的合并迁移和读写。已检查旧表升级、重复迁移、实际开关、首领冷恢复、幂等及新旧凭据登录。旧自动报名表移除后，仅使用这份兼容回退读取公会主表的新开关；早期不识别新开关或压缩首领输入的二进制不能用于直接回退。构建来源见build_storage_rollback.py。
+当前制品包含现行业务程序、备份认证工具和86存档维护工具，不附带旧版兼容回退程序。历史源码保存在Git；旧部署中的回退Compose覆盖示例已失效，不能套用于当前镜像。
 
-在专用部署根目录建立私有临时Compose覆盖文件（仅用于回退）：
+回退前保持维护停写，认证备份并保全新流水、回执及存档；优先修复当前兼容版本。86的角色库存压缩和多线首领状态必须分别核兼容：`hyjs-profile-storage86` 的有界展开只处理库存编码，不能证明95a7能够读取多线首领或安全直接回切。维护工具及限制见 `analysis/desert-final86/profile-rollback86.md`，执行时须独立确认应用已停止。
 
-```yaml
-services:
-  app:
-    entrypoint: ["/app/hyjs-server-auth-compatible-rollback"]
+### 维护期重部署兼容版本
+
+对已经存在的环境，可在核验候选程序兼容现有 schema、压缩存档、多线首领、在途战斗和账本，并完成隔离演练后，使用干净固定提交执行：
+
+```bash
+rtk proxy bash deploy_test.sh --revision <已验证的兼容候选提交> --expected-live-revision <完整当前提交> --maintenance-redeploy
 ```
 
-使用当前同一镜像、原compose.yaml、原.env及该覆盖文件，仅重建app服务；MySQL、账号、钱包、存档、回执及密码保持。本次回退保留原安全事件API及活动配置功能。下一次正常部署不使用此临时覆盖文件。
+该模式复用 82/84/85 的维护守卫：核当前部署记录、现有应用容器的版本标签、维护状态和既有数据库，停止应用，生成并认证本轮加密备份，校验备份身份和维护，再按原入口启动候选并核健康；健康后复查维护并记录 `maintenanceRedeployed`、候选摘要和私密 manifest。容器不存在或版本标签与记录不符时拒绝执行，需先核对中断现场。模式中不执行 82/84/85 或其他配置投放命令；禁止与任何投放、首次 provision/import、钱包迁移、指定玩家预热、日历恢复和 ingress 修改混用。维护不会自动解除。
 
-2026-10-23：按用户要求覆盖更新，仅部署当前业务程序；发布包不再附带旧版兼容回退程序，也不保留历史版本目录或旧镜像。旧版本源码保留在Git，需要时重新构建。
+调用前仍须独立确认所有应用实例、工作器和其他写入者均已停止，原事务已收口，维护期间阻止其他操作者解除维护，并核实认证备份的恢复可行性。脚本停止本 Compose 的 `app`，不发现或停止其他写入者，维护状态复查也无法排除两次检查之间被改动的情况。`--warm-rush-history-all` 仍会在备份后执行有界历史证明更新；候选启动的初始化、迁移和后台恢复任务也可能写入。健康启动后的新增流水、回执及存档须保留，不能自动用备份覆盖。
+
+维护断线可能触发撤离取消或完成、交易取消、采集资格变化；Boss 和觉醒探索仍按真实时间推进。须在隔离环境验证对应回执和资产，不把停服当成全部在途状态暂停。异常、中断或健康失败时守卫尝试停应用并保留证据，若停止失败须人工核实；SIGKILL、宿主机断电及部分写入已提交时，恢复前核对实际容器、镜像、维护状态、manifest 和数据库。此模式不保证旧程序兼容，不自动恢复旧数据库。`GGOExtractionReady=false` 仍会使已启用沙漠部署的野外快照失败；隔离演练须验证候选与当前发布配置的完整恢复链。
 
 ## 75版维护投放
 
@@ -108,18 +112,26 @@ services:
 
 本地脚本编排检查：`python3 -m unittest discover -s deploy -p test_growth75_activation.py`，不连接SSH、Docker或数据库。实际区服核账和原协议验收另行执行。
 
-## 试炼 82 维护投放
+## 试炼 82、夺宝 84 与养成 85 维护投放
 
 从已审核的干净提交执行现有部署入口，指定完整的当前线上提交：
 
 ```bash
-bash deploy_test.sh --revision <候选提交> --expected-live-revision <完整当前提交> --apply-trial82
-# 同批更新已审核的沙漠入口规则，仅针对已有本项目 ingress
-bash deploy_test.sh --revision <候选提交> --expected-live-revision <完整当前提交> --apply-trial82 --update-ingress
+rtk proxy bash deploy_test.sh --revision <候选提交> --expected-live-revision <完整当前提交> --apply-trial82
+# 仅投放夺宝扫荡开关
+rtk proxy bash deploy_test.sh --revision <候选提交> --expected-live-revision <完整当前提交> --apply-feedback84
+# 同一维护窗口顺序投放 82、84 与 85，并更新已审核的现有 ingress
+rtk proxy bash deploy_test.sh --revision <候选提交> --expected-live-revision <完整当前提交> --apply-trial82 --apply-feedback84 --apply-feedback85 --update-ingress
 ```
 
-`--apply-trial82` 仅允许已有环境，禁止与首次 `--provision`、初始导库、钱包迁移、显式 `--warm-rush-history-player`、日历恢复及其他投放参数混用。既有 `--warm-rush-history-all` 发布门禁仍会执行：候选程序不监听网络，按有界事务重验过期派生证明，不改资源、进度和回执。`--update-ingress` 可与本次投放同批使用；远端要求已有本项目站点配置及其启用链接，检查 Nginx 后只在配置变更时重载。该参数不执行首次基础设施或入口创建。
+`--apply-trial82`、`--apply-feedback84`、`--apply-feedback85` 可分别选择或共同选择，均只允许已有环境，禁止与首次 `--provision`、初始导库、钱包迁移、显式 `--warm-rush-history-player`、日历恢复及其他投放参数混用。必须指定完整且与远端部署记录一致的当前版本。既有 `--warm-rush-history-all` 发布门禁仍会执行：候选程序不监听网络，按有界事务重验过期派生证明，不改资源、进度和回执。`--update-ingress` 可与本次投放同批使用；远端要求已有本项目站点配置及其启用链接，检查 Nginx 后只在配置变更时重载。该参数不执行首次基础设施或入口创建。
 
-脚本先确认维护状态、建立私密试炼投放 manifest 并停应用，完成本轮加密备份和认证校验后执行候选程序的显式 `--apply-trial82`。manifest 保存候选程序与备份摘要、目标提交及阶段状态。备份校验、候选命令、启动、健康检查或中断失败时，守卫保持应用停止并记录失败；若停止命令失败会明确报错。保留备份和证据，核查后重试，不自动恢复数据库。成功记录部署前也会复核维护状态，正常启动不自动执行试炼投放；维护解除沿用现有流程。SIGHUP、SIGTERM 和键盘中断可触发进程内守卫；SIGKILL 或宿主机断电无法执行该守卫，恢复前需检查服务状态和私密 manifest。
+脚本先建立私密投放 manifest 并检查维护状态，停应用后完成一次加密备份和认证校验；同时选择时依次执行候选程序 `--apply-trial82`、`--apply-feedback84`、`--apply-feedback85`，每项完成后复核维护状态。命令分别校验既有管理员、时钟、维护及其配置约束，配置漂移会拒绝投放。manifest 保存候选程序与备份摘要、目标提交、实际请求的命令、逐命令结果和失败阶段；成功的部署记录分别写入 `trial82Applied`、`feedback84Applied`、`feedback85Applied`，指向同一份投放证明。
 
-本地编排检查：`python3 -m unittest discover -s deploy -p test_trial82_activation.py`。该检查使用本地夹具，不连接 SSH、Docker 或数据库；实际发布和区服验收另行完成。
+备份校验、候选命令、启动、健康检查或中断失败时，守卫保持应用停止并记录失败；若停止命令失败会明确报错。82 成功后 84 失败时保留 82 的已审计结果、备份和证据，核查后按各命令原有的幂等及漂移检查重试；脚本不自动恢复数据库或解除维护。成功记录部署前也会复核维护状态，正常启动不自动执行上述投放。SIGHUP、SIGTERM 和键盘中断可触发进程内守卫；SIGKILL 或宿主机断电无法执行该守卫，恢复前需检查服务状态和私密 manifest。
+
+本地编排检查：`rtk proxy env PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s deploy -p test_trial82_activation.py`。该检查使用本地夹具，不连接 SSH、Docker 或数据库；实际发布和区服验收另行完成。
+
+## 86 存档格式维护工具
+
+同提交制品附带 `hyjs-profile-storage86`，摘要纳入 `artifact.json`。默认只读预览；具体参数与停写、备份认证、维护、限批和中断续接要求见 `analysis/desert-final86/profile-rollback86.md` 与 CLI `--help`。该工具只把压缩 warriors 无损展开为旧 JSON 数组，不改变角色其余字段和业务历史。执行前必须实际停止应用、认证并固定最近备份、核目标数据库和数据库触发器；`--app-stopped` 仅记录操作者已完成前提，不检测进程。旧版对多线 Boss 和新业务状态的兼容仍需单独验证，不能展开存档后直接盲切 95a7fb6。

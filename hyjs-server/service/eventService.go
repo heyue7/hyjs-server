@@ -220,6 +220,15 @@ func (s *GameService) RecordP1Save(tx *gorm.DB, row *db.Profile, player *pb.Play
 	if row.Player == nil || row.Game == nil {
 		return nil
 	}
+	switch request.(type) {
+	case *pb.CSWarriorRecruit, *pb.CSShopBuy, *pb.CSWarriorRecruitGuide,
+		*pb.CSCopyFightEnd, *pb.CSCopySweep, *pb.CSEquipStrengthen,
+		*pb.CSEquipRefine, *pb.CSEquipStar, *pb.CSEquipForge,
+		*pb.CSWarriorTraining, *pb.CSWarriorStrengthen, *pb.CSWarriorBreached,
+		*pb.CSWarriorTalent, *pb.CSWarriorAwake, *pb.CSTreasureStrengthen, *pb.CSTreasureRefine:
+	default:
+		return nil
+	}
 	before, old, err := decodeProfile(row)
 	if err != nil {
 		return err

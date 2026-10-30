@@ -1,6 +1,7 @@
 package service
 
 import (
+	"encoding/json"
 	"fmt"
 	"google.golang.org/protobuf/proto"
 	"hyjs-server/constUtil"
@@ -89,6 +90,27 @@ func TestP11PlunderSweepActualIndependentChildrenEnergyStopAndCold(t *testing.T)
 			if variant.ppm == 0 && transfers != 0 || variant.ppm == 1000000 && transfers != 1 {
 				t.Fatal("actual local finite PPM", transfers)
 			}
+			if variant.name == "five-real-outcomes" {
+				// Construct the old auto=0 receipt format from the same real child
+				// facts to exercise its historical reader after the v2 change.
+				var row db.P11PlunderSweepReceipt
+				if err = db.GetIns().First(&row, "player_id=? AND stamp=?", f.id, 7101).Error; err != nil {
+					t.Fatal(err)
+				}
+				var legacy p11PlunderSweepPlan
+				if err = json.Unmarshal(row.Plan, &legacy); err != nil {
+					t.Fatal(err)
+				}
+				legacy.Source, legacy.SourceNote = constUtil.P11PlunderSweepSource, constUtil.P11PlunderSweepSourceNote
+				legacy.Request, legacy.MedicineItem, legacy.MedicineUnit, legacy.MedicineCount = nil, "", 0, 0
+				body, err := json.Marshal(legacy)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if err = db.GetIns().Model(&row).Updates(map[string]any{"source": legacy.Source, "plan": body, "source_hash": p6Digest(body)}).Error; err != nil {
+					t.Fatal(err)
+				}
+			}
 			if err = db.GetIns().Model(&db.P11PlunderFightPolicy{}).Where("id=1").Update("enabled", false).Error; err != nil {
 				t.Fatal(err)
 			}
@@ -114,7 +136,7 @@ func TestP11PlunderSweepActualIndependentChildrenEnergyStopAndCold(t *testing.T)
 	}
 }
 
-func TestP11PlunderSweepOriginalORGateAndAutoMedicineClosed(t *testing.T) {
+func TestP11PlunderSweepOriginalORGateAndAutoMedicineAvailable(t *testing.T) {
 	for _, vip := range []int32{0, 3} {
 		t.Run(fmt.Sprintf("vip%d", vip), func(t *testing.T) {
 			f, opponent, _, now := p11PlunderFightSetup(t)
@@ -135,11 +157,7 @@ func TestP11PlunderSweepOriginalORGateAndAutoMedicineClosed(t *testing.T) {
 			}
 			req := &pb.CSSweepTreasureFight{FragId: proto.String("frag_trea_001_1"), SweepNumber: proto.Int32(5), AutoAddEnergy: proto.Int32(1)}
 			before, _ := p10LuckyProfile(t, f.id)
-			if _, err := f.s.p11PlunderSweepAt(f.ctx, f.id, req, 7201, now); err == nil {
-				t.Fatal("automatic medicine must remain closed")
-			}
-			req.AutoAddEnergy = proto.Int32(0)
-			result, err := f.s.p11PlunderSweepAt(f.ctx, f.id, req, 7202, now)
+			result, err := f.s.p11PlunderSweepAt(f.ctx, f.id, req, 7201, now)
 			if vip == 0 {
 				if err == nil {
 					t.Fatal("neither original OR qualification met")

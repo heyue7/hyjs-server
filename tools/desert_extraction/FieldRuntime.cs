@@ -6,6 +6,7 @@ using System.Diagnostics;
 using LitJson;
 using ProtoBuf.Message;
 using Room;
+using UI;
 using UnityEngine;
 
 namespace HYJS.DesertV4
@@ -70,6 +71,21 @@ namespace HYJS.DesertV4
             if (!Target()) return false;
             return !FieldRuntime.Require().StartEncounter(type,uuid);
         }
+        public static void RoomLoaded(object value)
+        { try { FieldRuntime.NativeRoomLoaded(value as RoomBase); } catch (Exception) { } }
+        public static void FieldPositionReady(object net,object value)
+        { try { FieldRuntime.NativePositionReady(net,value as SCCurrentPosition); } catch (Exception) { } }
+        public static void PlayerDataReady(object original)
+        {
+            try
+            {
+                SCPlayerLogin login=original as SCPlayerLogin;
+                Player player=login==null ? null : login.player;
+                if (player!=null && StaticData.playerData!=null && StaticData.playerData.playerId==player.playerId)
+                    StaticData.playerData.teamId=player.teamId ?? "";
+            }
+            catch (Exception) { }
+        }
         public static void FightStartResponse(int type,object value)
         {
             if (!Target()) return;
@@ -79,7 +95,7 @@ namespace HYJS.DesertV4
             if (code==1) BattleRecovery.StartResponse(type,value);
         }
         public static bool PreserveBattle() { return BattleRecovery.PreserveBattle(); }
-        public static void TcpConnecting() { PositionSync.ConnectionStarting(); BattleRecovery.BeforeTcpLogin(); PvpBridge.ConnectionStarting(); }
+        public static void TcpConnecting() { PositionSync.ConnectionStarting(); TeamMap86.ConnectionStarting(); BattleRecovery.BeforeTcpLogin(); PvpBridge.ConnectionStarting(); }
         public static bool TransferSend(int opcode,object value)
         {
             if (PvpBridge.Capture(opcode,value)) return true;
@@ -119,6 +135,13 @@ namespace HYJS.DesertV4
     public sealed class FieldRuntime : MonoBehaviour, IGatherView, ITerminalView
     {
         static FieldRuntime singleton;
+        static RoomBase loadedRoom,positionRoom;
+        static object positionNet;
+        static FieldWire.Session loadedOwner,positionOwner;
+        static int loadedEpoch,positionEpoch;
+        static readonly FieldInfo LoadingInstance=typeof(LoadingPanel).GetField("instance",BindingFlags.Static|BindingFlags.NonPublic);
+        static readonly FieldInfo OpenBoxes=typeof(BoxManager).GetField("m_kOpenBox",BindingFlags.Static|BindingFlags.NonPublic);
+        static readonly FieldInfo NativeTeamInfo=typeof(UIFieldRunMap).GetField("teamInfo",BindingFlags.Instance|BindingFlags.Public|BindingFlags.NonPublic);
         RoomBase room;
         RoomCharactor actor;
         FieldWire wire;
@@ -133,6 +156,7 @@ namespace HYJS.DesertV4
         TerminalController terminal;
         bool dirty, inFlight, snapshotReady, worldReady, askingProtection, awaitingEncounter, encounterTimedOut, safe;
         bool safeAreaKnown,lastLocalSafe;
+        bool teamHudChecked;
         double safeMinX,safeMaxX,safeMinZ,safeMaxZ;
         int sceneSerial, requestVersion;
         long nextSnapshot, protectionDeadline, encounterDeadline;
@@ -152,15 +176,70 @@ namespace HYJS.DesertV4
         }
         public static bool PatrolMoving(RoomCharactor actor)
         { return singleton!=null && singleton.monsters!=null && singleton.monsters.IsPatrolling(actor); }
+        public static Dictionary<string,Vector3> ExtractionMapPositions()
+        {
+            if (singleton==null || !singleton.worldReady || singleton.npcs==null ||
+                StaticData.fieldId!="field_003" || singleton.room==null || singleton.room!=RoomManager.currentRoom)
+                return new Dictionary<string,Vector3>();
+            return singleton.npcs.ExtractionMapPositions();
+        }
         static bool Same(FieldWire.Session a,FieldWire.Session b)
         { return a!=null && b!=null && a.playerId==b.playerId && a.sessionHex==b.sessionHex && a.origin==b.origin; }
+        static bool SameActor(FieldWire.Session a,FieldWire.Session b)
+        { return a!=null && b!=null && a.playerId==b.playerId && a.origin==b.origin; }
+        public static void NativeRoomLoaded(RoomBase value)
+        {
+            FieldWire.Session current;
+            if (!(value is RoomField) || value!=RoomManager.currentRoom || StaticData.fieldId!="field_003" || !FieldWire.Current(out current)) return;
+            loadedRoom=value; loadedOwner=current; loadedEpoch=PositionSync.ConnectionEpoch;
+        }
+        public static void NativePositionReady(object net,SCCurrentPosition value)
+        {
+            RoomBase current=RoomManager.currentRoom; FieldWire.Session who;
+            if (!(current is RoomField) || StaticData.fieldId!="field_003" || !System.Object.ReferenceEquals(current.netManager,net) ||
+                !FieldWire.Current(out who) || value==null || value.self==null || value.self.info==null ||
+                value.self.info.playerId!=who.playerId || value.self.position==null || value.self.position.scene!="field_003" ||
+                value.self.position.current==null || current.charactorManager==null || current.charactorManager.GetSelfCharactor()==null || !PositionSync.ChannelReady) return;
+            positionRoom=current; positionNet=net; positionOwner=who; positionEpoch=PositionSync.ConnectionEpoch;
+        }
+        static bool Active(GameObject value) { return value!=null && value.activeInHierarchy; }
+        // Native completion callbacks are observations. Normal encounters also
+        // require an authenticated public snapshot; accepted-fight discovery
+        // must work while that snapshot is unavailable during a reserved fight.
+        public static bool InteractionReady
+        {
+            get
+            {
+                try
+                {
+                    FieldWire.Session who;
+                    if (singleton==null || singleton.room==null || singleton.room!=RoomManager.currentRoom || singleton.actor==null ||
+                        !FieldWire.Current(out who) || !Same(singleton.session,who) || loadedRoom!=singleton.room || positionRoom!=singleton.room ||
+                        !SameActor(loadedOwner,who) || !Same(positionOwner,who) ||
+                        positionEpoch!=PositionSync.ConnectionEpoch || !System.Object.ReferenceEquals(positionNet,singleton.room.netManager) || !PositionSync.ChannelReady) return false;
+                    UIFieldRunMap page=PageManager.instance==null ? null : PageManager.instance.currentPage as UIFieldRunMap;
+                    LoadingPanel loading=LoadingInstance==null ? null : LoadingInstance.GetValue(null) as LoadingPanel;
+                    if (page==null || !page.isOpen || !page.gameObject.activeInHierarchy || loading==null || loading.isLoading || loading.gameObject.activeInHierarchy ||
+                        Active(BoxManager.m_kBox) || Active(BoxManager.netMask) || Active(BoxManager.netBox) || Active(BoxManager.socketBox) ||
+                        MapViewer86.ViewOpen || PlayerActionPanel86.ViewOpen) return false;
+                    var boxes=OpenBoxes==null ? null : OpenBoxes.GetValue(null) as System.Collections.IEnumerable;
+                    int count=0;
+                    if (boxes!=null) foreach (object item in boxes) { if (++count>32 || Active(item as GameObject)) return false; }
+                    return true;
+                }
+                catch (Exception) { return false; }
+            }
+        }
+        public static int SceneVersion { get { return singleton==null ? -1 : singleton.sceneSerial; } }
         void Update()
         {
+            PlayerActionPanel86.TickInput();
             RoomBase current=StaticData.fieldId=="field_003" ? RoomManager.currentRoom : null;
             RoomCharactor self=null;
             try { if (current!=null && current.charactorManager!=null) self=current.charactorManager.GetSelfCharactor(); } catch (Exception) { }
             FieldWire.Session currentSession; FieldWire.Current(out currentSession);
-            if (room!=null && (current!=room || self!=actor || !Same(currentSession,session))) ReleaseScene();
+            if (room!=null && (current!=room || self!=actor || !Same(currentSession,session)))
+                ReleaseScene(current==room && SameActor(currentSession,session));
             if (current==null || self==null || currentSession==null) return;
             if (room==null)
             {
@@ -179,15 +258,19 @@ namespace HYJS.DesertV4
                     var nextGather=new GatherCoordinator(wire,currentSession,nextResources,self,nextPreload,nextNative,this);
                     room=current; actor=self; session=currentSession; resources=nextResources; preload=nextPreload;
                     protection=nextProtection; gather=nextGather; npcs=nextNpcs; monsters=nextMonsters; boss=nextBoss; terminal=nextTerminal;
-                    sceneSerial++; dirty=true; requestVersion++;
+                    sceneSerial++; dirty=true; requestVersion++; teamHudChecked=false;
+                    TeamMap86.BindScene(room);
                     PositionSync.SetFieldActive(true);
                     if (protection.Pending) protection.RetryPending();
                     BattleRecovery.SceneReady(); TravelController.SceneReady(); LeaveController.SceneReady(); TradeController.SceneReady(); PvpBridge.SceneReady();
+                    ColdBattleRecovery.SceneReady(room,sceneSerial);
                 }
                 catch (Exception) { return; } // actor assets/session may not yet be ready
             }
             try { PositionSync.Tick(); preload.Tick(); gather.Tick(); if (monsters!=null) monsters.Tick(); if (boss!=null) boss.Tick(); } catch (Exception) { Notice("采集状态需要确认，请重新进入"); ReleaseScene(); return; }
+            RefreshNativeTeamHud();
             RefreshTiredHud();
+            if (worldReady) MapViewer86.SyncMini();
             if (safeAreaKnown)
             {
                 bool local=InsideSafe(actor.transform.position,safeMinX,safeMaxX,safeMinZ,safeMaxZ);
@@ -201,8 +284,36 @@ namespace HYJS.DesertV4
             }
             if (dirty && !inFlight && Stopwatch.GetTimestamp()>=nextSnapshot) StartSnapshot();
         }
-        void ReleaseScene()
+        void RefreshNativeTeamHud()
         {
+            if (teamHudChecked || !InteractionReady || StaticData.playerData==null || String.IsNullOrEmpty(StaticData.playerData.teamId)) return;
+            try
+            {
+                UIFieldRunMap page=PageManager.instance.currentPage as UIFieldRunMap;
+                Component info=page==null || NativeTeamInfo==null ? null : NativeTeamInfo.GetValue(page) as Component;
+                if (info==null) return;
+                teamHudChecked=true;
+                // Early native team replies can fill the cache after ReRefresh
+                // hid this component. Restore its original Update/tick owner.
+                if (!info.gameObject.activeSelf) UIFieldRunMap.RefreshTeamInfo();
+            }
+            catch (Exception) { }
+        }
+        void ReleaseScene() { ReleaseScene(false); }
+        void ReleaseScene(bool sameNativeRoom)
+        {
+            ColdBattleRecovery.SceneExit(room);
+            // Native 30024 recreates the self actor even in an already loaded
+            // RoomField. Keep that room's resource-completion observation;
+            // position/session/connection proof is checked independently.
+            if (!sameNativeRoom)
+            {
+                if (loadedRoom==room) { loadedRoom=null; loadedOwner=null; }
+                if (positionRoom==room) { positionRoom=null; positionOwner=null; positionNet=null; }
+            }
+            PlayerActionPanel86.CloseLocal();
+            TeamMap86.ReleaseScene();
+            MapViewer86.ReleaseScene();
             if (!PositionSync.Locked) PositionSync.SetFieldActive(false);
             sceneSerial++; inFlight=false; dirty=true; nextSnapshot=0; snapshotReady=false; worldReady=false; safeAreaKnown=false;
             awaitingEncounter=false; encounterTimedOut=false; askingProtection=false; protectionDeadline=0;
@@ -338,7 +449,33 @@ namespace HYJS.DesertV4
             long id;
             if (player.owner==null || !Int64.TryParse(player.owner.name,out id) || id<=0 || session==null || id==session.playerId)
             { Notice("无法识别交易对象"); return true; }
-            TradeController.Invite(id); return true;
+            if (TradeController.BusyTrade || LeaveController.Pending || TravelController.PendingExtraction || BattleRecovery.HasUnsettled())
+            { Notice("请先完成当前行动"); return true; }
+            FieldWire.Session owner=session;
+            RoomBase ownerRoom=room;
+            RoomCharactor target=player.owner;
+            int server=player.serverID;
+            Func<bool> valid=delegate
+            {
+                FieldWire.Session current; FieldWire.Current(out current);
+                return this!=null && Same(owner,current) && Same(owner,session) && room==ownerRoom && RoomManager.currentRoom==ownerRoom &&
+                    player!=null && player.owner==target && target!=null && player.serverID==server &&
+                    ownerRoom!=null && ownerRoom.charactorManager!=null && ownerRoom.charactorManager.GetCharactor(id.ToString())==target &&
+                    SafeReady() && safe && !PvpBridge.HasPending() && !TradeController.BusyTrade && !LeaveController.Pending &&
+                    !TravelController.PendingExtraction && !BattleRecovery.HasUnsettled();
+            };
+            PlayerActionPanel86.Show(valid,delegate(bool team)
+            {
+                if (!valid()) { Notice("对象或场景已变化，请重新选择"); return; }
+                if (!team) TradeController.Invite(id);
+                else
+                {
+                    RoomNetField net=ownerRoom.netManager as RoomNetField;
+                    if (net==null) { Notice("队伍连接正在准备"); return; }
+                    net.SendCSTeamCreateAndInvite(id,server);
+                }
+            });
+            return true;
         }
         public void OpenNpc(RCUINormalNPC npc)
         {
@@ -369,6 +506,7 @@ namespace HYJS.DesertV4
         }
         public bool StartEncounter(int type,string uuid)
         {
+            if (!InteractionReady || !ColdBattleRecovery.AllowNewEncounter()) return false;
             if ((type!=6 && type!=12) || String.IsNullOrEmpty(uuid) || actor==null || !worldReady)
             { Notice("场景正在同步，请稍候"); RequestSnapshot(); return false; }
             if (PvpBridge.HasPending()) { Notice("上次挑战仍在确认"); return false; }
@@ -383,6 +521,30 @@ namespace HYJS.DesertV4
             awaitingEncounter=true; encounterTimedOut=false; encounterDeadline=Stopwatch.GetTimestamp()+15L*Stopwatch.Frequency;
             LoadingPanel.Instance.ShowLoadingPre();
             return true;
+        }
+        public static bool ResumeEncounter(int type,object native)
+        {
+            if (!InteractionReady || singleton==null || singleton.awaitingEncounter) return false;
+            MethodInfo method=typeof(RoomNetField).GetMethod(type==6 ? "SCSidePveFightStart" : "SCSidePveBossFightStart",BindingFlags.Instance|BindingFlags.Public|BindingFlags.NonPublic);
+            if (method==null || (type!=6 && type!=12)) return false;
+            singleton.awaitingEncounter=true; singleton.encounterTimedOut=false;
+            singleton.encounterDeadline=Stopwatch.GetTimestamp()+15L*Stopwatch.Frequency;
+            RoomBase original=singleton.room;
+            string fight=type==6 ? ((SCSidePveFightStart)native).fightId : ((SCSidePveBossFightStart)native).fightId;
+            LoadingPanel.Instance.ShowLoadingPre();
+            try { method.Invoke(original.netManager,new object[]{native}); return true; }
+            catch (Exception)
+            {
+                // Only undo our own pre-loader when the native handler has
+                // demonstrably not admitted this fight or changed its room.
+                bool admitted=StaticData.curBattleData!=null && StaticData.curBattleData.fightId==fight;
+                if (RoomManager.currentRoom==original && !admitted)
+                {
+                    singleton.awaitingEncounter=false; singleton.encounterTimedOut=false;
+                    LoadingPanel.Instance.HideLoading(); return false;
+                }
+                throw;
+            }
         }
         public void EndEncounter(int code)
         {
@@ -464,5 +626,126 @@ namespace HYJS.DesertV4
             }
             catch (Exception) { try { Notice("采集完成，奖励已到账"); } catch (Exception) { } }
         }
+    }
+
+    // Reuse the original two-button modal; clicking its mask only closes it.
+    public sealed class PlayerActionPanel86 : MonoBehaviour
+    {
+        static PlayerActionPanel86 instance;
+        public static bool ViewOpen { get { return instance!=null && !instance.closing; } }
+        static bool pendingInput;
+        static RoomBase pendingRoom;
+        static Page pendingPage;
+        static GameObject pendingBox;
+        Func<bool> valid;
+        Action<bool> selected;
+        RoomBase room;
+        Page page;
+        GameObject priorBox;
+        bool inputLease,closing;
+        float nextValidation;
+
+        static void Unlocalize(UILabel label)
+        {
+            foreach (MonoBehaviour component in label.GetComponents<MonoBehaviour>())
+                if (component!=null && component.GetType().Name=="TextKit") DestroyImmediate(component);
+        }
+        static void Caption(GameObject button,UILabel original,string text)
+        {
+            Transform art=button.transform.Find("Label");
+            if (art==null || art.GetComponent<UIWidget>()==null) throw new InvalidOperationException("native button caption unavailable");
+            GameObject clone=(GameObject)Instantiate(original.gameObject);
+            clone.name="PlayerActionText86"; clone.transform.parent=button.transform;
+            clone.transform.localPosition=art.localPosition; clone.transform.localRotation=Quaternion.identity; clone.transform.localScale=Vector3.one;
+            foreach (Transform child in clone.transform) Destroy(child.gameObject);
+            UILabel label=clone.GetComponent<UILabel>(); Unlocalize(label);
+            label.fontSize=20; label.width=160; label.depth=art.GetComponent<UIWidget>().depth+1;
+            label.alignment=NGUIText.Alignment.Center; label.overflowMethod=UILabel.Overflow.ShrinkContent;
+            label.color=Color.white; label.text=text; clone.SetActive(true); art.gameObject.SetActive(false);
+        }
+        public static void Show(Func<bool> valid,Action<bool> selected)
+        {
+            CloseLocal(); TickInput();
+            if (pendingInput || valid==null || !valid() || selected==null) return;
+            GameObject root=null;
+            try
+            {
+                GameObject prefab=Resources.Load("UI/MessageBox/MessageBoxWithConfirmAndCancelButton") as GameObject;
+                if (prefab==null || BoxManager.Anthor==null) throw new InvalidOperationException("native player interaction unavailable");
+                int topDepth=0,topOrder=0;
+                foreach (UnityEngine.Object value in FindObjectsOfType(typeof(UIPanel)))
+                { UIPanel panel=value as UIPanel; if (panel!=null && panel.gameObject.activeInHierarchy) { topDepth=Math.Max(topDepth,panel.depth); topOrder=Math.Max(topOrder,panel.sortingOrder); } }
+                root=(GameObject)Instantiate(prefab); root.name="DesertPlayerActions86";
+                root.transform.parent=BoxManager.Anthor; root.transform.localPosition=Vector3.zero;
+                root.transform.localRotation=Quaternion.identity; root.transform.localScale=Vector3.one;
+                MessageBoxWidth2BtnController native=root.GetComponent<MessageBoxWidth2BtnController>();
+                if (native==null || native.m_kMask==null || native.m_kLabel==null || native.titleLable==null || native.m_kOKBtn==null || native.m_kCancelBtn==null)
+                    throw new InvalidOperationException("native player interaction fields unavailable");
+                native.enabled=false;
+                foreach (UIButtonMessage item in root.GetComponentsInChildren<UIButtonMessage>(true)) DestroyImmediate(item);
+                foreach (UIEventListener item in root.GetComponentsInChildren<UIEventListener>(true)) DestroyImmediate(item);
+                foreach (UIEventTrigger item in root.GetComponentsInChildren<UIEventTrigger>(true)) DestroyImmediate(item);
+                foreach (UIButton item in root.GetComponentsInChildren<UIButton>(true)) item.onClick.Clear();
+                Unlocalize(native.titleLable); native.titleLable.text="玩家互动"; native.titleLable.gameObject.SetActive(true);
+                Unlocalize(native.m_kLabel); native.m_kLabel.text="请选择互动方式\n点击空白处关闭";
+                Caption(native.m_kOKBtn,native.m_kLabel,"芯片交易"); Caption(native.m_kCancelBtn,native.m_kLabel,"邀请组队");
+                PlayerActionPanel86 menu=root.AddComponent<PlayerActionPanel86>();
+                menu.valid=valid; menu.selected=selected; menu.room=RoomManager.currentRoom;
+                menu.page=PageManager.instance==null ? null:PageManager.instance.currentPage; menu.priorBox=BoxManager.m_kBox;
+                menu.inputLease=TouchKit.GetEnabled(); if (menu.inputLease) TouchKit.SetEnabled(false);
+                instance=menu;
+                UIEventListener.Get(native.m_kMask).onClick=delegate(GameObject ignored) { menu.Close(); };
+                UIEventListener.Get(native.m_kOKBtn).onClick=delegate(GameObject ignored) { menu.Choose(false); };
+                UIEventListener.Get(native.m_kCancelBtn).onClick=delegate(GameObject ignored) { menu.Choose(true); };
+                UIPanel[] panels=root.GetComponentsInChildren<UIPanel>(true);
+                int minDepth=Int32.MaxValue,minOrder=Int32.MaxValue;
+                foreach (UIPanel panel in panels) { minDepth=Math.Min(minDepth,panel.depth); minOrder=Math.Min(minOrder,panel.sortingOrder); }
+                foreach (UIPanel panel in panels) { panel.depth+=Math.Max(0,topDepth-minDepth+1); panel.sortingOrder+=Math.Max(0,topOrder-minOrder+1); }
+                root.SetActive(true);
+            }
+            catch (Exception error)
+            {
+                CloseLocal(); if (root!=null) Destroy(root);
+                UnityEngine.Debug.LogWarning("Player interaction: "+error.GetType().Name+": "+error.Message);
+                BoxManager.CreatePopupTextBox("互动窗口正在准备，请稍后重试",0f);
+            }
+        }
+        void Choose(bool team)
+        {
+            if (closing) return;
+            Action<bool> action=selected; bool current=valid!=null && valid();
+            Close(); if (current && action!=null) action(team);
+        }
+        public static void CloseLocal() { if (instance!=null) instance.Close(); }
+        void Close()
+        {
+            if (closing) return; closing=true;
+            if (instance==this) instance=null;
+            gameObject.SetActive(false);
+            RestoreInput(); Destroy(gameObject);
+        }
+        public static void TickInput()
+        {
+            if (!pendingInput) return;
+            if (RoomManager.currentRoom!=pendingRoom)
+            { pendingInput=false; pendingRoom=null; pendingPage=null; pendingBox=null; return; }
+            if (MapViewer86.ViewOpen || PageManager.instance==null || PageManager.instance.currentPage!=pendingPage || BoxManager.m_kBox!=pendingBox) return;
+            if (!TouchKit.GetEnabled()) TouchKit.SetEnabled(true);
+            pendingInput=false; pendingRoom=null; pendingPage=null; pendingBox=null;
+        }
+        void RestoreInput()
+        {
+            if (!inputLease) return;
+            pendingInput=true; pendingRoom=room; pendingPage=page; pendingBox=priorBox;
+            inputLease=false; TickInput();
+        }
+        void Update()
+        {
+            if (PageManager.instance==null || PageManager.instance.currentPage!=page || BoxManager.m_kBox!=priorBox || Input.GetKeyDown(KeyCode.Escape)) { Close(); return; }
+            if (Time.unscaledTime<nextValidation) return;
+            nextValidation=Time.unscaledTime+.25f;
+            if (valid==null || !valid()) Close();
+        }
+        void OnDestroy() { RestoreInput(); if (instance==this) instance=null; }
     }
 }

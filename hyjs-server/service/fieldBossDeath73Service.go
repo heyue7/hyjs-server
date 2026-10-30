@@ -390,7 +390,7 @@ func (s *GameService) CollectFieldBossPendingRewards(ctx context.Context, id int
 }
 
 // freezeFieldBossDeath73 binds one rule set to a shared generation before its first accepted fight.
-func (s *GameService) freezeFieldBossDeath73(tx *gorm.DB, scene string, boss *pb.SideBoss, leader map[string]string) (*model.AdminFieldBossGroup, error) {
+func (s *GameService) freezeFieldBossDeath73(tx *gorm.DB, scene string, line int64, boss *pb.SideBoss, leader map[string]string) (*model.AdminFieldBossGroup, error) {
 	if scene != "field_001" && scene != "field_002" {
 		return nil, nil
 	}
@@ -407,7 +407,7 @@ func (s *GameService) freezeFieldBossDeath73(tx *gorm.DB, scene string, boss *pb
 		return nil, nil
 	}
 	var shared db.SharedFieldBoss55
-	if err := sharedFieldBoss55Query(tx.Clauses(clause.Locking{Strength: "UPDATE"}), s.OriginalServerID(), scene, boss.GetBossPosId()).First(&shared).Error; err != nil {
+	if err := sharedFieldBoss55Query(tx.Clauses(clause.Locking{Strength: "UPDATE"}), s.OriginalServerID(), scene, boss.GetBossPosId(), line).First(&shared).Error; err != nil {
 		return nil, err
 	}
 	if shared.UUID != boss.GetUuid() {

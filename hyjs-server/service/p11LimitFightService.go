@@ -198,7 +198,7 @@ func (s *GameService) p11LimitFightAt(ctx context.Context, id int64, request *pb
 		}
 		if s.P12FieldPVPReady {
 			for _, pid := range []int64{id, request.GetPlayerId()} {
-				if err := P12FieldPVPRequireIdle(tx, pid, now); err != nil {
+				if err := P12FieldPVPRequireIdle(tx, pid, time.Now()); err != nil {
 					return err
 				}
 			}

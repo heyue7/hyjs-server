@@ -174,6 +174,12 @@ namespace HYJS.DesertV4
             if (type!=6 && type!=12) throw new ArgumentException("Unsupported fight type");
             Post(session,type==6 ? "/ggo-field/monster/active" : "/ggo-field/boss/active",Base(session),callback);
         }
+        public void ResumeFight(Session session,int type,string fight,string inputHash,Action<FieldWireResult> callback)
+        {
+            if ((type!=6 && type!=12) || String.IsNullOrEmpty(fight) || String.IsNullOrEmpty(inputHash)) throw new ArgumentException("Invalid accepted fight binding");
+            JsonData body=Base(session); body["battleType"]=type; body["expectedFightId"]=fight; body["expectedInputHash"]=inputHash;
+            Post(session,"/ggo-field/battle/resume",body,callback);
+        }
         public void FightReceipt(Session session,int type,string fightId,Action<FieldWireResult> callback)
         {
             if ((type!=6 && type!=12) || String.IsNullOrEmpty(fightId)) throw new ArgumentException("Invalid fight receipt request");

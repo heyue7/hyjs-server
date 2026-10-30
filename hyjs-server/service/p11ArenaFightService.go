@@ -86,7 +86,7 @@ func (s *GameService) p11ArenaScopedFightAt(ctx context.Context, id int64, reque
 		}
 		if s.P12FieldPVPReady {
 			for _, pid := range slices.Compact([]int64{id, lockTarget}) {
-				if err := P12FieldPVPRequireIdle(tx, pid, now); err != nil {
+				if err := P12FieldPVPRequireIdle(tx, pid, time.Now()); err != nil {
 					return err
 				}
 			}
@@ -114,7 +114,10 @@ func (s *GameService) p11ArenaScopedFightAt(ctx context.Context, id int64, reque
 		if !cfg.Enabled || !policy.Enabled || policy.Energy != constUtil.P11ArenaEnergy || policy.Source != constUtil.P11ArenaFightPolicySource {
 			return errors.New(constUtil.P11ArenaClosed)
 		}
-		if err = s.p11SyncArenaMembers(tx, cfg, now); err != nil {
+		// Matching already enrolled the participants and froze their ranks. Close
+		// the daily window before this mutation without rebuilding every profile.
+		dailyAdmission, err := s.PrepareP11ArenaDailyMutation(ctx, tx, now)
+		if err != nil {
 			return err
 		}
 		var ownerProfile, peerProfile db.Profile
@@ -165,6 +168,14 @@ func (s *GameService) p11ArenaScopedFightAt(ctx context.Context, id int64, reque
 			defMember = *projected
 		} else if err = tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&defMember, "player_id=? AND active=?", request.GetPlayerId(), true).Error; err != nil {
 			return err
+		}
+		if err = s.p11RefreshArenaParticipant(tx, &ownerProfile, &ownMember, now); err != nil {
+			return err
+		}
+		if !virtual {
+			if err = s.p11RefreshArenaParticipant(tx, &peerProfile, &defMember, now); err != nil {
+				return err
+			}
 		}
 		var match db.P11ArenaMatch
 		if err = tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("viewer_id=? AND opponent_id=? AND created_at<=? AND expires_at>?", id, request.GetPlayerId(), now.UnixMilli(), now.UnixMilli()).Order("created_at DESC, id DESC").First(&match).Error; err != nil {
@@ -226,7 +237,9 @@ func (s *GameService) p11ArenaScopedFightAt(ctx context.Context, id int64, reque
 		if !terminal.Outcome.Authoritative {
 			return errors.New(constUtil.P11ArenaClosed)
 		}
-		dailyAdmission, err := s.PrepareP11ArenaDailyMutation(ctx, tx, now)
+		// Computation may cross the daily cutoff. Recheck before changing ranks
+		// and record the admission time returned by this final preparation.
+		dailyAdmission, err = s.PrepareP11ArenaDailyMutation(ctx, tx, now)
 		if err != nil {
 			return err
 		}

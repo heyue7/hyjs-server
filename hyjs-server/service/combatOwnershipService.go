@@ -12,13 +12,18 @@ import (
 // ensureNoActiveDailyCopy 在角色行锁内拒绝与本日资源副本并行创建战斗。
 // 已有战斗回执应在调用之前返回；旧日快照保留结算能力，不占用新日挑战。
 func (s *GameService) ensureNoActiveDailyCopy(tx *gorm.DB, id int64, now time.Time) error {
+	return s.ensureNoActiveDailyCopyWithClocks(tx, id, time.Now(), now, LocalPlayAt(tx.Statement.Context, now))
+}
+
+// Calendar ownership remains with each gameplay mode; PVP's lease is physical.
+func (s *GameService) ensureNoActiveDailyCopyWithClocks(tx *gorm.DB, id int64, wall, wanted, daily time.Time) error {
 	if s.P12WantedReady {
-		if err := P12WantedRequireIdle(tx, id, now); err != nil {
+		if err := P12WantedRequireIdle(tx, id, wanted); err != nil {
 			return err
 		}
 	}
 	if s.P12FieldPVPReady {
-		if err := P12FieldPVPRequireIdle(tx, id, now); err != nil {
+		if err := P12FieldPVPRequireIdle(tx, id, wall); err != nil {
 			return err
 		}
 	}
@@ -36,7 +41,7 @@ func (s *GameService) ensureNoActiveDailyCopy(tx *gorm.DB, id int64, now time.Ti
 			return errors.New("当前世界首领战斗尚未结束")
 		}
 	}
-	if err := tx.Model(&db.DailyCopyFight{}).Where("player_id = ? AND day = ? AND settled = ?", id, dailyCopyDay(LocalPlayAt(tx.Statement.Context, now)), false).Count(&count).Error; err != nil {
+	if err := tx.Model(&db.DailyCopyFight{}).Where("player_id = ? AND day = ? AND settled = ?", id, dailyCopyDay(daily), false).Count(&count).Error; err != nil {
 		return err
 	}
 	if count > 0 {

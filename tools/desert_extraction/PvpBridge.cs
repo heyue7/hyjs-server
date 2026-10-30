@@ -236,6 +236,10 @@ namespace HYJS.DesertV4
                         JsonData d=result.data;
                         if (Integer(d["stamp"])!=record.stamp || Integer(d["opponentId"])!=record.opponentId || !Hex((string)d["requestHash"],64))
                             throw new InvalidOperationException("PK status identity changed");
+                        JsonData clock=d["serverTimeMs"];
+                        if (clock==null || !clock.IsInt && !clock.IsLong) throw new InvalidOperationException("Invalid PK server time");
+                        long serverTime=Integer(clock);
+                        if (serverTime<=0) throw new InvalidOperationException("Invalid PK server time");
                         string status=(string)d["status"];
                         if (status=="unknown")
                         {
@@ -257,20 +261,24 @@ namespace HYJS.DesertV4
                             (string)d["fightId"]!=response.fightId || Integer(d["winnerId"])!=response.winPlayerId || !d["presentationCurrent"].IsBoolean)
                             throw new InvalidOperationException("Invalid settled PK receipt");
                         bool current=(bool)d["presentationCurrent"];
-                        long serverTime=Integer(d["serverTimeMs"]),until=Integer(d["presentationUntilMs"]);
-                        if (serverTime<=0 || until<=0) throw new InvalidOperationException("Invalid PK presentation lease");
                         if (current)
                         {
-                            long elapsed=(Stopwatch.GetTimestamp()-sent)*1000/Stopwatch.Frequency;
-                            if (until-serverTime<=elapsed) { next=0; return; }
-                            if (!Target() || !(RoomManager.currentRoom is RoomField) || UI.PageManager.Instance==null ||
-                                !(UI.PageManager.Instance.currentPage is UI.UIFieldRunMap)) return;
-                            byte[] stateBytes=Convert.FromBase64String((string)d["nativeState"]);
+                            JsonData deadline=d["presentationUntilMs"],native=d["nativeState"];
+                            if (deadline==null || !deadline.IsInt && !deadline.IsLong || native==null || !native.IsString)
+                                throw new InvalidOperationException("Invalid PK presentation lease");
+                            long until=Integer(deadline);
+                            if (until<=0) throw new InvalidOperationException("Invalid PK presentation lease");
+                            byte[] stateBytes=Convert.FromBase64String((string)native);
+                            if (stateBytes.Length==0) throw new InvalidOperationException("Invalid native PK state");
                             var state=PBConvert.toObject(30042,stateBytes) as SCFieldPlayerState;
                             if (state==null || state.player==null || state.player.Count!=2) throw new InvalidOperationException("Invalid native PK state");
                             long a=state.player[0].playerId,b=state.player[1].playerId;
                             if (!((a==owner.playerId && b==record.opponentId) || (b==owner.playerId && a==record.opponentId)))
                                 throw new InvalidOperationException("Native PK participants differ");
+                            long elapsed=(Stopwatch.GetTimestamp()-sent)*1000/Stopwatch.Frequency;
+                            if (until-serverTime<=elapsed) { next=0; return; }
+                            if (!Target() || !(RoomManager.currentRoom is RoomField) || UI.PageManager.Instance==null ||
+                                !(UI.PageManager.Instance.currentPage is UI.UIFieldRunMap)) return;
                             ApplyState(state);
                         }
                         bool display=current && MarkShown(owner,response.fightId);

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -29,12 +28,8 @@ func (s *GameService) InitializeWarriorGrowth(ctx context.Context) error {
 	if err := tx.AutoMigrate(&db.WarriorGrowthRule{}, &db.WarriorGrowthReceipt{}); err != nil {
 		return err
 	}
-	rules := []db.WarriorGrowthRule{
-		{ID: "training_1", Enabled: true, Distribution: "[[-20,20],[10,40],[20,40]]", CriticalMultiplier: 1, Source: "本地服训练：上限基点-20/10/20，权重20/40/40；APK费用/上限/10级开放保留"},
-		{ID: "training_2", Enabled: true, Distribution: "[[-10,10],[20,40],[30,50]]", CriticalMultiplier: 1, Source: "本地服训练：上限基点-10/20/30，权重10/40/50；APK费用/上限/10级开放保留"},
-		{ID: "training_3", Enabled: true, Distribution: "[[20,40],[40,60]]", CriticalMultiplier: 1, Source: "本地服训练：上限基点20/40，权重40/60；APK费用/上限/10级开放保留"},
-		{ID: "breach", Enabled: true, Distribution: "[]", CriticalMultiplier: 2, Source: "本地服突破：APK经验权重/分段概率，暴击倍率2；满门槛升阶余量保留；跨日不清空经验；35级开放"},
-	}
+	rules := training85Defaults()
+	rules = append(rules, db.WarriorGrowthRule{ID: "breach", Enabled: true, Distribution: "[]", CriticalMultiplier: 2, Source: "本地服突破：APK经验权重/分段概率；概率累计保底，命中直接升一阶；普通经验余量保留，跨日不清空；35级开放"})
 	return tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&rules).Error
 }
 
@@ -171,7 +166,7 @@ func growthRule(tx *gorm.DB, key string) (*db.WarriorGrowthRule, error) {
 	if !rule.Enabled {
 		return nil, errors.New(constUtil.WarriorGrowthClosed)
 	}
-	if rule.Source == "" || rule.CriticalMultiplier < 1 || rule.CriticalMultiplier > 100 || rule.ResetSeconds < 0 || rule.ResetSeconds > 31536000 {
+	if rule.Source == "" || (key != "breach" && (rule.CriticalMultiplier < 1 || rule.CriticalMultiplier > 100 || rule.ResetSeconds < 0 || rule.ResetSeconds > 31536000)) {
 		return nil, errors.New(constUtil.WarriorGrowthConfig)
 	}
 	return &rule, nil
@@ -276,6 +271,12 @@ func (s *GameService) growthCost(player *pb.Player, g *model.GameState, value st
 
 // warriorTraining 扣费后持久化待确认增量，不把预览增量加入战斗属性。
 func (s *GameService) warriorTraining(ctx context.Context, id int64, b *pb.CSWarriorTraining, stamp int64) ([]proto.Message, error) {
+	return s.warriorTraining85WithDraw(ctx, id, b, stamp, training85CryptoDraw)
+}
+
+// The draw is supplied per request, so boundary tests exercise this same
+// transaction without mutating the process-wide cryptographic source.
+func (s *GameService) warriorTraining85WithDraw(ctx context.Context, id int64, b *pb.CSWarriorTraining, stamp int64, draw func(int64) (int64, error)) ([]proto.Message, error) {
 	result := &pb.SCWarriorTraining{}
 	return s.growthOperation(ctx, id, b.GetGuid(), "training", stamp, b, result, func(tx *gorm.DB, player *pb.Player, g *model.GameState, w *pb.Warrior) error {
 		if b.GetCostType() < 1 || b.GetCostType() > 3 || b.GetNumType() < 1 || b.GetNumType() > 3 {
@@ -291,18 +292,14 @@ func (s *GameService) warriorTraining(ctx context.Context, id int64, b *pb.CSWar
 		if err != nil {
 			return err
 		}
-		var options [][2]int64
-		if err = json.Unmarshal([]byte(rule.Distribution), &options); err != nil {
+		// 所有属性和批次共用已验证的权重，校验不消耗随机数。
+		distribution, err := training85ParseDistribution(rule.Distribution)
+		if err != nil {
 			return err
 		}
-		for _, p := range options {
-			if p[0] < -10000 || p[0] > 10000 {
-				return errors.New(constUtil.WarriorGrowthConfig)
-			}
-		}
-		// 在扣费前验证全部权重，防止无效 SQL 偶发成功。
-		if _, err = growthPick(options); err != nil {
-			return err
+		gradient := training85UsesGradient(b.GetCostType(), rule.Source)
+		if gradient && rule.Distribution != training85Rules()[b.GetCostType()-1].v3Distribution {
+			return errors.New(constUtil.WarriorGrowthConfig)
 		}
 		limits, err := s.trainingLimits(player, w)
 		if err != nil {
@@ -329,17 +326,18 @@ func (s *GameService) warriorTraining(ctx context.Context, id int64, b *pb.CSWar
 		}
 		for n := int32(0); n < count; n++ {
 			for i, limit := range limits {
-				bps, err := growthPick(options)
+				var change int64
+				if gradient {
+					change, err = training85GradientChange(values[i], limit, distribution.options[0][0], draw)
+				} else {
+					var bps int64
+					bps, err = distribution.pick(draw)
+					if err == nil {
+						change = training85LegacyChange(limit, bps)
+					}
+				}
 				if err != nil {
 					return err
-				}
-				change := int64(limit) * bps / 10000
-				if bps != 0 && change == 0 {
-					if bps > 0 {
-						change = 1
-					} else {
-						change = -1
-					}
 				}
 				values[i] = int32(max(int64(0), min(int64(limit), int64(values[i])+change)))
 			}
@@ -392,7 +390,7 @@ func (s *GameService) warriorTrainingReplace(ctx context.Context, id int64, b *p
 }
 
 // breachOptions 恢复 APK 每次经验值与权重；临界点选择暴击概率档位。
-func breachOptions(row map[string]string, exp int32) ([][2]int64, float64, error) {
+func breachOptions(row map[string]string, exp int32) ([][2]int64, int64, error) {
 	var options [][2]int64
 	for _, part := range strings.Split(row["ExpIncrease"], ";") {
 		pair := strings.Split(part, ",")
@@ -416,8 +414,8 @@ func breachOptions(row map[string]string, exp int32) ([][2]int64, float64, error
 			tier = i + 1
 		}
 	}
-	probability, err := strconv.ParseFloat(row[fmt.Sprintf("Criprobability%d", tier)], 64)
-	if err != nil || math.IsNaN(probability) || probability < 0 || probability > 100 {
+	probability, err := breachProbabilityUnits(row[fmt.Sprintf("Criprobability%d", tier)])
+	if err != nil {
 		return nil, 0, errors.New(constUtil.WarriorGrowthConfig)
 	}
 	return options, probability, nil
@@ -433,7 +431,7 @@ func (s *GameService) warriorBreached(ctx context.Context, id int64, b *pb.CSWar
 		if err := s.growthLevel(player, w, "HeroBreachedLevel"); err != nil {
 			return err
 		}
-		rule, err := growthRule(tx, "breach")
+		_, err := growthRule(tx, "breach")
 		if err != nil {
 			return err
 		}
@@ -446,18 +444,6 @@ func (s *GameService) warriorBreached(ctx context.Context, id int64, b *pb.CSWar
 			return errors.New(constUtil.WarriorGrowthInvalid)
 		}
 		now := time.Now()
-		if state.GetLastAddExpTime() != "" && rule.ResetSeconds > 0 {
-			last, err := strconv.ParseInt(state.GetLastAddExpTime(), 10, 64)
-			if err != nil {
-				return errors.New(constUtil.WarriorGrowthInvalid)
-			}
-			if now.Unix()-last >= rule.ResetSeconds {
-				state.Exp = proto.Int32(0)
-				if err := p5TrackBreachRefund(g, w.GetGuid(), nil, false, true); err != nil {
-					return err
-				}
-			}
-		}
 		count := int32(1)
 		if b.GetType() == 2 {
 			count = 10
@@ -484,12 +470,9 @@ func (s *GameService) warriorBreached(ctx context.Context, id int64, b *pb.CSWar
 			if err != nil {
 				return err
 			}
-			dice, err := rand.Int(rand.Reader, big.NewInt(1000000))
+			critical, err := advanceWarriorBreachPity(g, w.GetGuid(), probability, rand.Reader)
 			if err != nil {
 				return err
-			}
-			if float64(dice.Int64()) < probability*10000 {
-				gain *= rule.CriticalMultiplier
 			}
 			if gain > math.MaxInt32-int64(state.GetExp()) {
 				return errors.New(constUtil.WarriorGrowthInvalid)
@@ -506,6 +489,10 @@ func (s *GameService) warriorBreached(ctx context.Context, id int64, b *pb.CSWar
 			}
 			previousLevel := state.GetLevel()
 			exp := int64(state.GetExp()) + gain
+			if critical {
+				// 概率命中立即完成当前阶，普通经验只在未命中时使用。
+				exp = int64(threshold)
+			}
 			// 本地规则保留跨阶经验，最后一级停止增长；缺配置导致整个请求回滚。
 			for exp >= int64(threshold) {
 				exp -= int64(threshold)

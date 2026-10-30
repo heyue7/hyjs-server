@@ -14,6 +14,9 @@ services:
     command:
       # Bound retained binary logs on the shared 50 GiB production disk.
       - --binlog-expire-logs-seconds=86400
+      # Compress the complete durable row transaction at the lowest CPU effort.
+      - --binlog-transaction-compression=ON
+      - --binlog-transaction-compression-level-zstd=1
       - --innodb-buffer-pool-size=128M
       - --innodb-log-buffer-size=16M
       - --key-buffer-size=1M

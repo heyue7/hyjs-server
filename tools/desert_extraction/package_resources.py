@@ -11,6 +11,8 @@ BUNDLE_BYTES = 10846378
 CATALOG_ENTRY = 'assets/android/smallassetmanifest'
 LOGICAL = b'map/map_desertfield_001'
 BUNDLE_ENTRY = 'assets/android/hyjs/desert53/' + BUNDLE_SHA + '/map_desertfield_001'
+MAP_SCHEMA = 'hyjs-desert-v4-map-resource-overlay-v1'
+AWAKE_SCHEMA = 'hyjs-desert-v4-awake85-map-resource-overlay-v2'
 
 def sha(data):
     return hashlib.sha256(data).hexdigest()
@@ -32,6 +34,16 @@ def compose_catalog(before, bundle):
     row=LOGICAL+b'\t'+hashlib.md5(bundle).hexdigest().encode()+b'\t'+str(len(bundle)).encode()+b'\n'
     return before+(b'\n' if not before.endswith(b'\n') else b'')+row
 
+def compose_awake_catalog(before, bundle, night):
+    """Replay the desert row and the one audited night-forest row in order."""
+    from tools.client_awake85_layout.build import NIGHT_SHA, NIGHT_MD5, NIGHT_SIZE, small_overlay
+    require(len(night)==NIGHT_SIZE and sha(night)==NIGHT_SHA and hashlib.md5(night).hexdigest()==NIGHT_MD5,
+            'Night forest bundle identity differs')
+    mapped=compose_catalog(before,bundle)
+    final,added=small_overlay(mapped)
+    require(added, 'Expected one new night forest catalog row')
+    return final
+
 def apply_overlay(base, directory, payload, pins):
     """Validate all evidence before adding exactly one catalog and one map."""
     base,directory=Path(base).resolve(),Path(directory).resolve()
@@ -39,7 +51,8 @@ def apply_overlay(base, directory, payload, pins):
     require(sha_file(base)==BASE_SHA, 'Desert resource base differs')
     manifest=directory/'resource-manifest.json'
     report=json.loads(manifest.read_text())
-    require(report.get('schema')=='hyjs-desert-v4-map-resource-overlay-v1' and report.get('baseAPKSHA256')==BASE_SHA, 'Unqualified desert resource overlay')
+    schema=report.get('schema')
+    require(schema in (MAP_SCHEMA,AWAKE_SCHEMA) and report.get('baseAPKSHA256')==BASE_SHA, 'Unqualified desert resource overlay')
     require(report.get('bundleSHA256')==BUNDLE_SHA and report.get('bundleBytes')==BUNDLE_BYTES, 'Desert map pin differs')
     files=report.get('payloadFiles',{})
     require(set(files)=={CATALOG_ENTRY,BUNDLE_ENTRY} and set(report.get('replacementEntries',{}))==set(files), 'Desert resource scope differs')
@@ -55,9 +68,21 @@ def apply_overlay(base, directory, payload, pins):
         require(f not in pins or pins[f]==h, 'Conflicting desert source pin: '+relative); checked[f]=h
     with zipfile.ZipFile(base) as z:
         names=z.namelist(); require(len(names)==len(set(names)) and CATALOG_ENTRY in names and BUNDLE_ENTRY not in names, 'Desert base entry inventory differs')
-        old=z.read(CATALOG_ENTRY); expected=compose_catalog(old,local[BUNDLE_ENTRY])
+        old=z.read(CATALOG_ENTRY)
+        if schema==AWAKE_SCHEMA:
+            from tools.client_awake85_layout.build import NIGHT, NIGHT_SHA
+            require(names.count(NIGHT)==1 and report.get('nightBundleSHA256')==NIGHT_SHA,
+                    'Night forest resource proof differs')
+            expected=compose_awake_catalog(old,local[BUNDLE_ENTRY],z.read(NIGHT))
+        else:
+            expected=compose_catalog(old,local[BUNDLE_ENTRY])
         require(sha(old)==report['originalCatalogSHA256'] and sha(expected)==report['updatedCatalogSHA256'] and local[CATALOG_ENTRY]==expected, 'Desert catalog append differs')
     pins.update(checked); pins[manifest]=sha(manifest.read_bytes()); payload.update(local)
-    return {'schema':report['schema'],'bundleSHA256':BUNDLE_SHA,'bundleBytes':BUNDLE_BYTES,
+    result={'schema':schema,'bundleSHA256':BUNDLE_SHA,'bundleBytes':BUNDLE_BYTES,
             'originalCatalogSHA256':report['originalCatalogSHA256'],'updatedCatalogSHA256':report['updatedCatalogSHA256'],
-            'onlyExactAppendAndMapEntry':True,'sourcePinsVerified':True,'deviceExecuted':False}
+            'sourcePinsVerified':True,'deviceExecuted':False}
+    if schema==AWAKE_SCHEMA:
+        result.update(onlyDesertAndNightRowsAndMapEntry=True,nightBundleSHA256=report['nightBundleSHA256'])
+    else:
+        result['onlyExactAppendAndMapEntry']=True
+    return result

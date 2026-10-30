@@ -344,7 +344,11 @@ func (s *GameService) RefreshP8Survival(tx *gorm.DB, p *pb.Player, g *model.Game
 		if err != nil {
 			return nil, err
 		}
+		before := *state
 		state.InSafe, state.SafeRecoveryAt = false, now.UnixMilli()
+		if *state == before {
+			return nil, nil
+		}
 		return nil, tx.Save(state).Error
 	}
 	if !p8SideValid(g.Field.Side) {
@@ -354,6 +358,7 @@ func (s *GameService) RefreshP8Survival(tx *gorm.DB, p *pb.Player, g *model.Game
 	if err != nil {
 		return nil, err
 	}
+	before := *state
 	ms := now.UnixMilli()
 	safe, err := s.p8SafeZone(g)
 	if err != nil {
@@ -400,8 +405,12 @@ func (s *GameService) RefreshP8Survival(tx *gorm.DB, p *pb.Player, g *model.Game
 			changed = true
 		}
 	}
-	if err = tx.Save(state).Error; err != nil {
-		return nil, err
+	// The same movement may inspect both sides of a safe-zone boundary.
+	// Keep each inspection, but persist only an actual clock/state change.
+	if *state != before {
+		if err = tx.Save(state).Error; err != nil {
+			return nil, err
+		}
 	}
 	if changed {
 		return []proto.Message{&pb.SCFieldPlayerState{Player: []*pb.PlayerSide{g.Field.Side}}}, nil

@@ -9,6 +9,88 @@ from tools.awake_diff_rows.build import methods
 from tools.local_asset_ready.remove_gate import exact_body
 import dnfile
 
+SCHEMA86_QA="hyjs-desert-trial-feedback-fragment86-qa-managed-v1"
+SCHEMA86_FORMAL="hyjs-desert-trial-feedback-fragment86-formal-managed-v1"
+MANAGED86={"assets/bin/Data/Managed/"+name for name in ("Assembly-CSharp.dll","SoulFlowerDesert53.dll",
+ "SoulFlowerDesertV4.dll","SoulFlowerGGOShop.dll","HYJS.Feedback65.dll","HYJS.FragmentBoxes85.dll",
+ "HYJS.DungeonContent.dll","HYJS.WantedSkip87.dll")}
+
+def resolve_payload_file(overlay, file, schema):
+ path=(ROOT/file).resolve()
+ require(path.is_relative_to(ROOT),"Overlay file outside project")
+ if schema in (SCHEMA86_QA,SCHEMA86_FORMAL):
+  require(path.is_relative_to(Path(overlay).resolve()),"Combined 86 managed payload outside its overlay")
+ return path
+
+def validate_breach86_request(proof, directory, build_code, version_name, desert_directory, repair_pin, qa_origin, managed_directory):
+ """Constrain this additional resource to the reviewed combined-86 payload."""
+ schema=proof.get("schema")
+ if schema not in (SCHEMA86_QA,SCHEMA86_FORMAL):
+  require(directory is None,"Breach resource is reserved for combined 86")
+  return
+ require(directory is not None and desert_directory is not None and repair_pin,
+         "Combined 86 requires both resource overlays and manifest pin repair")
+ require(managed_directory is not None and Path(desert_directory).resolve()==Path(managed_directory).resolve(),
+         "Combined 86 resources must be in the managed overlay directory")
+ resources=json.loads((Path(desert_directory).resolve()/"resource-manifest.json").read_text())
+ require(resources.get("schema")=="hyjs-desert-v4-awake85-map-resource-overlay-v2"
+         and resources.get("baseAPKSHA256")==proof.get("baseAPKSHA256"),"Combined 86 resource manifest differs")
+ require((build_code,version_name)==(2026102904,"1.0.86"),"Combined 86 version differs")
+ require(proof.get("managedOnly") is True and not proof.get("diagnosticOnly"),"Combined 86 managed proof required")
+ if schema==SCHEMA86_QA:
+  require(proof.get("qaOnly") is True and proof.get("neverPromote") is True
+          and proof.get("qaOrigin")==qa_origin=="http://127.0.0.1:28979"
+          and proof.get("status")=="STATIC_VERIFIED_QA_NOT_RELEASED"
+          and proof.get("qaOriginProof",{}).get("onlyFourHTTPOriginLiteralsChanged") is True,
+          "Combined 86 QA isolation differs")
+  require(resources.get("releaseReady") is False and resources.get("qaOnly") is True
+          and resources.get("neverPromote") is True and resources.get("qaOrigin")==qa_origin
+          and not resources.get("diagnosticOnly"),"Combined 86 QA resource isolation differs")
+ else:
+  require(proof.get("qaOnly") is False and proof.get("neverPromote") is False
+          and not proof.get("qaOrigin") and qa_origin is None
+          and proof.get("status")=="READY_FOR_SIGNING_NOT_RELEASED"
+          and proof.get("qaOriginDifferedOnlyInFourVerifiedMethods") is True
+          and re.fullmatch(r"[0-9a-f]{64}",proof.get("qaAPKSHA256", "")),"Combined 86 formal input differs")
+  require(resources.get("releaseReady") is True
+          and all(k not in resources for k in ("qaOnly","neverPromote","qaOrigin"))
+          and not resources.get("diagnosticOnly"),
+          "Combined 86 formal resource is not release ready")
+  review=proof.get("acceptanceReview")
+  require(isinstance(review,str) and review in proof.get("sourcePins",{}),"Combined 86 reviewed evidence pin missing")
+ static_name=proof.get("combinedStaticProof")
+ require(isinstance(static_name,str) and static_name in proof.get("sourcePins",{}),"Combined 86 static proof pin missing")
+ static_file=(ROOT/static_name).resolve()
+ require(static_file.is_relative_to(ROOT) and static_file.is_file()
+         and common.digest(static_file)==proof["sourcePins"][static_name],"Combined 86 static proof differs")
+ static=json.loads(static_file.read_text())
+ require(static.get("schema")=="hyjs-desert-trial-feedback-fragment86-static-proof-v1"
+         and static.get("status")=="STATIC_PREVIEW_NOT_FOR_RELEASE"
+         and static.get("baseAPKSHA256")==proof.get("baseAPKSHA256")=="25026a1f180d164ba2b191e4cc7e558e20f7a761b740fb7b28d6205d6756112a"
+         and not any(static.get(k) for k in ("qaOnly","neverPromote","diagnosticOnly","qaOrigin")),
+         "QA output cannot be used as independent static proof")
+ link_name=proof.get("linkageProof")
+ require(isinstance(link_name,str) and link_name in proof.get("sourcePins",{}),"Combined 86 linkage proof pin missing")
+ link_file=(ROOT/link_name).resolve()
+ require(link_file==static_file.parent.parent/"linkage.json" and link_file.is_file()
+         and common.digest(link_file)==proof["sourcePins"][link_name],"Combined 86 linkage proof differs")
+ from tools.desert_extraction.build_combined86 import verify_linkage_report
+ require(verify_linkage_report(link_file,static_file.parent)==proof.get("linkageProofSummary"),
+         "Combined 86 linkage verification differs")
+ require(set(proof.get("payloadFiles",{}))==set(proof.get("replacementEntries",{}))==MANAGED86
+         and set(static.get("payloadSHA256",{}))==MANAGED86,"Combined 86 managed entry scope differs")
+ for name in MANAGED86:
+  static_payload=static_file.parent/Path(name).name
+  require(static_payload.is_file() and common.digest(static_payload)==static["payloadSHA256"][name],
+          "Independent static payload differs: "+name)
+  if schema==SCHEMA86_FORMAL or name!=common.DLL:
+   require(proof["replacementEntries"][name]==static["payloadSHA256"][name],"Combined 86 static payload not retained: "+name)
+ directory=Path(directory).resolve()
+ require(directory.is_relative_to(ROOT) and directory.is_dir(),"Breach overlay outside project")
+ require(common.digest(directory/"manifest.json")==proof.get("breach84OverlayManifestSHA256")
+         and common.digest(directory/"tabletext")==proof.get("breach84ResourceSHA256"),
+         "Combined 86 breach overlay differs from tested payload")
+
 def rebind_generated_manifest_pin(raw,new_sha,new_size):
  """Change the existing generated 64-byte hash payload without moving DEX data."""
  from tools.client_compat63 import dex_patch as dex
@@ -171,10 +253,11 @@ def verify_java_class_inventory(archive,payload):
  return {"DEXEntries":sorted(names),"classCount":len(headers),"noDuplicateClass":True,"noFinalSuperclass":True}
 
 def main():
- p=argparse.ArgumentParser(description=__doc__);p.add_argument("--base-apk",type=Path,required=True);p.add_argument("--overlay",type=Path,required=True);p.add_argument("--output",type=Path,required=True);p.add_argument("--record",type=Path,required=True);p.add_argument("--opening-font-overlay",type=Path);p.add_argument("--font-fallback-overlay",type=Path);p.add_argument("--dungeon-resource-overlay",type=Path);p.add_argument("--compat-overlay",type=Path,help="Reviewed formal62 startup/resource Pin compatibility overlay; composed after version patch");p.add_argument("--king-selector-description-overlay",type=Path,help="Pinned item_9761 description cells only");p.add_argument("--os-selector-description-overlay",type=Path,help="Pinned feedback78 item_9760 description cells only");p.add_argument("--repair-compat-manifest-pin",action="store_true");p.add_argument("--qa-wallet-origin");p.add_argument("--build-code",type=int);p.add_argument("--version-name");p.add_argument("--desert-resource-overlay",type=Path,help="Pinned v79 desert bundle plus single catalog entry");a=p.parse_args()
+ p=argparse.ArgumentParser(description=__doc__);p.add_argument("--base-apk",type=Path,required=True);p.add_argument("--overlay",type=Path,required=True);p.add_argument("--output",type=Path,required=True);p.add_argument("--record",type=Path,required=True);p.add_argument("--opening-font-overlay",type=Path);p.add_argument("--font-fallback-overlay",type=Path);p.add_argument("--dungeon-resource-overlay",type=Path);p.add_argument("--compat-overlay",type=Path,help="Reviewed formal62 startup/resource Pin compatibility overlay; composed after version patch");p.add_argument("--king-selector-description-overlay",type=Path,help="Pinned item_9761 description cells only");p.add_argument("--os-selector-description-overlay",type=Path,help="Pinned feedback78 item_9760 description cells only");p.add_argument("--repair-compat-manifest-pin",action="store_true");p.add_argument("--qa-wallet-origin");p.add_argument("--build-code",type=int);p.add_argument("--version-name");p.add_argument("--desert-resource-overlay",type=Path,help="Pinned v79 desert bundle plus single catalog entry");p.add_argument("--breach84-resource-overlay",type=Path,help="Exact reviewed combined-86 breach text overlay");a=p.parse_args()
  require((a.build_code is None)==(a.version_name is None),"Build code and version name must be supplied together")
  base,overlay,output,record=[x.resolve()for x in (a.base_apk,a.overlay,a.output,a.record)]
  proof=json.loads((overlay/"manifest.json").read_text());require(proof["inheritedJavaPublicProtectedABIExact"],"Qualified native ABI required")
+ validate_breach86_request(proof,a.breach84_resource_overlay,a.build_code,a.version_name,a.desert_resource_overlay,a.repair_compat_manifest_pin,a.qa_wallet_origin,overlay)
  require(not output.exists() and not record.exists(),"Fresh output required");require(common.digest(base)==proof["baseAPKSHA256"],"Base changed")
  pins={ROOT/n:h for n,h in proof["sourcePins"].items()}
  for f,h in pins.items():require(f.resolve().is_relative_to(ROOT)and common.digest(f)==h,"Source pin changed: "+str(f))
@@ -186,7 +269,12 @@ def main():
   require(proof.get("inheritedJavaByteExact") is True,"Managed-only overlay must retain all Java entries")
  for name,file in proof.get("payloadFiles",{}).items():
   require((name.startswith("assets/bin/Data/Managed/") and name.endswith(".dll")) or (proof.get("schema")=="brain-burst-account-overlay-v1" and name in {"assets/local-wallet/icon.png","assets/brain-burst/button-atlas.png"}),"Unexpected overlay entry")
-  f=ROOT/file;require(f.resolve().is_relative_to(ROOT),"Overlay file outside project");payload[name]=f.read_bytes()
+  f=resolve_payload_file(overlay,file,proof.get("schema"));payload[name]=f.read_bytes()
+ if proof.get("schema")==SCHEMA86_QA:
+  from tools.desert_extraction.prepare_release_package86 import verify_origin
+  static_file=(ROOT/proof["combinedStaticProof"]).resolve()
+  with zipfile.ZipFile(base) as archive:production_origin=json.loads(archive.read("assets/local-wallet.json"))["origin"].rstrip("/")
+  verify_origin((static_file.parent/"Assembly-CSharp.dll").read_bytes(),payload[common.DLL],production_origin)
  if a.build_code is not None:
   from tools.client_update.package import patch_manifest
   require(a.build_code>0 and bool(a.version_name.strip()),"Invalid Android release version")
@@ -250,6 +338,12 @@ def main():
   require(not any((a.opening_font_overlay,a.font_fallback_overlay,a.dungeon_resource_overlay,a.compat_overlay,a.king_selector_description_overlay,a.os_selector_description_overlay)),"Desert resources cannot overlap unrelated optional resource overlays")
   from tools.desert_extraction.package_resources import apply_overlay as apply_desert_overlay
   desert_report=apply_desert_overlay(base,a.desert_resource_overlay.resolve(),payload,pins)
+  if proof.get("schema") in (SCHEMA86_QA,SCHEMA86_FORMAL):
+   desert_report["resourceManifestSHA256"]=common.digest(a.desert_resource_overlay.resolve()/"resource-manifest.json")
+ breach_report=None
+ if a.breach84_resource_overlay:
+  from tools.client_breach84.build import apply_overlay as apply_breach_overlay
+  breach_report=apply_breach_overlay(base,a.breach84_resource_overlay.resolve(),payload,pins)
  compatibility_report=None
  if a.compat_overlay:compatibility_report=apply_compatibility_overlay(base,a.compat_overlay,payload,pins)
  os_selector_report=None
@@ -322,6 +416,7 @@ def main():
    require(common.digest(base)==proof["baseAPKSHA256"],"Base changed while packaging")
    result={"status":"PASS_SIGN_ALIGN_SCOPED_OVERLAY_NOT_INSTALLED","binarySHA256":common.digest(signed),"baseAPKSHA256":proof["baseAPKSHA256"],"replacementEntries":hashes,"openingFontChanges":font_changes,"fontFallbackProof":fallback_report,"dungeonResourceProof":dungeon_report,"compatibilityProof":compatibility_report,"manifestPinRepair":manifest_pin_repair,"javaClassInventory":java_inventory,"inheritedJavaByteExact":original_java_exact,"javaByteExact":java_byte_exact,"allOtherEntriesAndCompressedPayloadsExact":True,"managedAssemblyByteExact":common.DLL not in payload,"qaOnly":bool(a.qa_wallet_origin),"neverPromote":bool(a.qa_wallet_origin),"signatureVerified":True,"zipalignVerified":True,"originalEngineMethodsExact":547,"outputAPK":str(output.relative_to(ROOT))}
    if desert_report is not None:result["desertResourceProof"]=desert_report
+   if breach_report is not None:result["breach84ResourceProof"]=breach_report
    if os_selector_report is not None:result["osSelectorDescriptionProof"]=os_selector_report
    if king_selector_report is not None:result["kingSelectorDescriptionProof"]=king_selector_report
    # QA and diagnostic restrictions survive another scoped packaging layer.

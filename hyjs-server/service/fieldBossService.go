@@ -196,7 +196,7 @@ func (s *GameService) fieldBossCheck(ctx context.Context, id int64, b *pb.CSSide
 		if err := s.refreshField(id, g); err != nil {
 			return err
 		}
-		if err := s.refreshSharedFieldBosses55(tx, g); err != nil {
+		if err := s.refreshSharedFieldBosses55(tx, id, g); err != nil {
 			return err
 		}
 		boss := fieldBossFind(g.Field, b.GetUuid())
@@ -283,7 +283,7 @@ func (s *GameService) fieldBossFightStart(ctx context.Context, id int64, b *pb.C
 		if err := s.refreshField(id, g); err != nil {
 			return err
 		}
-		if err := s.refreshSharedFieldBosses55(tx, g); err != nil {
+		if err := s.refreshSharedFieldBosses55(tx, id, g); err != nil {
 			return err
 		}
 		f := g.Field
@@ -372,8 +372,8 @@ func (s *GameService) fieldBossFightStart(ctx context.Context, id int64, b *pb.C
 		if err != nil {
 			return err
 		}
-		f.Fight = &model.FieldFight{StartedAt: time.Now().UnixMilli(), BossUUID: boss.GetUuid(), BossLeaderGUID: leaderGUID, Start: compatStart, BossStart: result, BossInput: frozen, BossReward: reward, BossKill: kill, BossCooldownMS: hours * 3600 * 1000, BossRewardDailyLimit: &rewardLimit}
-		rules, err := s.freezeFieldBossDeath73(tx, f.Scene, boss, leader)
+		f.Fight = &model.FieldFight{BossLine85: f.BossLine85, StartedAt: time.Now().UnixMilli(), BossUUID: boss.GetUuid(), BossLeaderGUID: leaderGUID, Start: compatStart, BossStart: result, BossInput: frozen, BossReward: reward, BossKill: kill, BossCooldownMS: hours * 3600 * 1000, BossRewardDailyLimit: &rewardLimit}
+		rules, err := s.freezeFieldBossDeath73(tx, f.Scene, f.BossLine85, boss, leader)
 		if err != nil {
 			return err
 		}
@@ -410,7 +410,7 @@ func (s *GameService) fieldBossFightEnd(ctx context.Context, id int64, b *pb.CSS
 		if err := s.refreshField(id, g); err != nil {
 			return err
 		}
-		if err := s.refreshSharedFieldBosses55(tx, g); err != nil {
+		if err := s.refreshSharedFieldBosses55(tx, id, g); err != nil {
 			return err
 		}
 		f := g.Field

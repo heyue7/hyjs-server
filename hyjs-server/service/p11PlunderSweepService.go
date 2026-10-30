@@ -40,6 +40,10 @@ type p11PlunderSweepPlan struct {
 	OfferHash      string                 `json:"offerHash"`
 	Stop           string                 `json:"stop"`
 	Children       []p11PlunderSweepChild `json:"children"`
+	Request        []byte                 `json:"request,omitempty"`
+	MedicineItem   string                 `json:"medicineItem,omitempty"`
+	MedicineUnit   int32                  `json:"medicineUnit,omitempty"`
+	MedicineCount  int32                  `json:"medicineCount,omitempty"`
 }
 
 // InitializeP11PlunderSweep adds no reward, win, immunity or publication. The
@@ -54,15 +58,15 @@ func (s *GameService) InitializeP11PlunderSweep(ctx context.Context) error {
 	return db.GetIns().WithContext(ctx).AutoMigrate(&db.P11PlunderSweepReceipt{})
 }
 
-// p11PlunderSweepAt uses only already real matched profiles. Preparing a query
-// freezes qualification without granting resources; the later single transaction
-// locks every possible peer in ID order before policy and all child mutations.
+// p11PlunderSweepAt freezes a bounded real or source-bound virtual candidate
+// list. The later transaction locks every real participant in ID order before
+// policy, actual medicine consumption, and all child mutations.
 func (s *GameService) p11PlunderSweepAt(ctx context.Context, id int64, req *pb.CSSweepTreasureFight, stamp int64, now time.Time) ([]proto.Message, error) {
 	if stamp <= 0 || !s.p11PlunderFragment(req.GetFragId()) || (req.GetSweepNumber() != 1 && req.GetSweepNumber() != 5) {
 		return nil, errors.New(constUtil.P11PlunderFightRefresh)
 	}
-	if req.GetAutoAddEnergy() != 0 {
-		return nil, errors.New(constUtil.P11PlunderSweepUnavailable)
+	if req.GetAutoAddEnergy() < 0 || req.GetAutoAddEnergy() > 1 {
+		return nil, errors.New(constUtil.P11PlunderFightRefresh)
 	}
 	raw, err := proto.MarshalOptions{Deterministic: true}.Marshal(req)
 	if err != nil {
@@ -94,6 +98,9 @@ func (s *GameService) p11PlunderSweepAt(ctx context.Context, id int64, req *pb.C
 	seen := map[int64]bool{}
 	for _, entry := range listing[0].(*pb.SCTreasureBattleList).InfoList {
 		peer := entry.GetSimplePlayerInfo().GetPlayerId()
+		if (entry.GetIsRobot() == 1) != p11PlunderNPC84ID(peer) || entry.GetIsRobot() < 0 || entry.GetIsRobot() > 1 {
+			return nil, errors.New(constUtil.P11PlunderSweepConflict)
+		}
 		if peer > 0 && peer != id && !seen[peer] {
 			peers = append(peers, peer)
 			seen[peer] = true
@@ -108,7 +115,12 @@ func (s *GameService) p11PlunderSweepAt(ctx context.Context, id int64, req *pb.C
 			return err
 		}
 
-		ids := append([]int64{id}, peers...)
+		ids := []int64{id}
+		for _, peer := range peers {
+			if !p11PlunderNPC84ID(peer) {
+				ids = append(ids, peer)
+			}
+		}
 		slices.Sort(ids)
 		ids = slices.Compact(ids)
 		for _, profileID := range ids {
@@ -129,6 +141,9 @@ func (s *GameService) p11PlunderSweepAt(ctx context.Context, id int64, req *pb.C
 		var owner db.Profile
 		if e = tx.First(&owner, id).Error; e != nil {
 			return e
+		}
+		if AdminProfileServerID(owner) != s.OriginalServerID() {
+			return errors.New(constUtil.P11PlunderFightRefresh)
 		}
 		player, game, e := decodeProfileForCalendarUpdate(tx, &owner)
 		if e != nil {
@@ -163,7 +178,11 @@ func (s *GameService) p11PlunderSweepAt(ctx context.Context, id int64, req *pb.C
 		if !cfg.SweepEnabled {
 			return errors.New(constUtil.P11PlunderSweepUnavailable)
 		}
-		plan := p11PlunderSweepPlan{PlayerID: id, Stamp: stamp, RequestHash: p6Digest(raw), FragmentID: req.GetFragId(), RequestedCount: req.GetSweepNumber(), Source: constUtil.P11PlunderSweepSource, SourceNote: constUtil.P11PlunderSweepSourceNote, Peers: peers, OfferVersion: offer.Version, OfferHash: offer.SourceHash}
+		medicine := s.table("Item", "itemId", constUtil.P11PlunderSweep84Medicine)
+		if medicine == nil || medicine["category"] != "1" || medicine["energy"] != "10" {
+			return errors.New(constUtil.P11PlunderSweepConflict)
+		}
+		plan := p11PlunderSweepPlan{PlayerID: id, Stamp: stamp, RequestHash: p6Digest(raw), FragmentID: req.GetFragId(), RequestedCount: req.GetSweepNumber(), Source: constUtil.P11PlunderSweep84Source, SourceNote: constUtil.P11PlunderSweep84SourceNote, Peers: peers, OfferVersion: offer.Version, OfferHash: offer.SourceHash, Request: raw, MedicineItem: constUtil.P11PlunderSweep84Medicine, MedicineUnit: constUtil.P11PlunderSweep84Energy}
 		response = &pb.SCSweepTreasureFight{IsLevelUp: proto.Int32(0), Get: &pb.ResultObject{}}
 		initialLevel := player.GetLevel()
 		for step := int32(0); step < req.GetSweepNumber(); step++ {
@@ -182,12 +201,15 @@ func (s *GameService) p11PlunderSweepAt(ctx context.Context, id int64, req *pb.C
 				plan.Stop = "target-obtained"
 				break
 			}
-			if player.GetEnergy() < 2 {
-				plan.Stop = "energy-exhausted"
-				break
+			if player.GetEnergy() < 0 {
+				return errors.New(constUtil.P11PlunderSweepConflict)
 			}
 			var chosen int64
 			for _, peerID := range peers {
+				if p11PlunderNPC84ID(peerID) {
+					chosen = peerID
+					break
+				}
 				var peer db.Profile
 				if e = tx.First(&peer, peerID).Error; e != nil {
 					return e
@@ -209,7 +231,7 @@ func (s *GameService) p11PlunderSweepAt(ctx context.Context, id int64, req *pb.C
 					return e
 				}
 				difference := int64(player.GetLevel()) - int64(other.GetLevel())
-				if n > 0 && !protected && !blocked && other.GetLevel() >= ordinary && difference <= int64(cfg.LevelDifference) && -difference <= int64(cfg.LevelDifference) {
+				if n > 0 && !protected && !blocked && AdminProfileServerID(peer) == s.OriginalServerID() && other.GetPlayerId() == peer.Id && other.GetLevel() >= ordinary && difference <= int64(cfg.LevelDifference) && -difference <= int64(cfg.LevelDifference) {
 					chosen = peerID
 					break
 				}
@@ -217,6 +239,26 @@ func (s *GameService) p11PlunderSweepAt(ctx context.Context, id int64, req *pb.C
 			if chosen == 0 {
 				plan.Stop = "real-holders-exhausted"
 				break
+			}
+			if player.GetEnergy() < 2 {
+				count, e := p11PlunderFragmentCount(game, constUtil.P11PlunderSweep84Medicine)
+				if e != nil {
+					return e
+				}
+				if req.GetAutoAddEnergy() == 0 || count == 0 {
+					plan.Stop = "energy-exhausted"
+					break
+				}
+				if e = deductPoolCost(player, game, &pb.BaseResource{Id: proto.String(constUtil.P11PlunderSweep84Medicine), Num: proto.Int32(1)}); e != nil {
+					return e
+				}
+				if _, e = s.GrantFixedReward(player, game, "energy,10"); e != nil {
+					return e
+				}
+				if e = saveProfile(tx, &owner, player, game); e != nil {
+					return e
+				}
+				plan.MedicineCount++
 			}
 			match, e := s.p11PlunderSweepMatch(tx, id, chosen, req.GetFragId(), offer, cfg, now)
 			if e != nil {
@@ -239,6 +281,9 @@ func (s *GameService) p11PlunderSweepAt(ctx context.Context, id int64, req *pb.C
 			response.RewardList = append(response.RewardList, &pb.TreasureFightReward{Exp: proto.Int32(accepted.RewardExp), Coin: proto.Int32(accepted.RewardCoin), Reward: child.Reward, IsGetFrag: child.IsGetFrag})
 		}
 		if len(plan.Children) == 0 {
+			if plan.Stop == "energy-exhausted" {
+				return errors.New(constUtil.P11PlunderSweepEnergyShort)
+			}
 			return errors.New(constUtil.P11PlunderFightRefresh)
 		}
 		if plan.Stop == "" {
@@ -255,6 +300,10 @@ func (s *GameService) p11PlunderSweepAt(ctx context.Context, id int64, req *pb.C
 			response.IsLevelUp = proto.Int32(1)
 		}
 		response.Cost = []*pb.BaseResource{{Id: proto.String("energy"), Num: proto.Int32(int32(len(plan.Children)) * 2)}}
+		if plan.MedicineCount > 0 {
+			response.Cost = append(response.Cost, &pb.BaseResource{Id: proto.String(plan.MedicineItem), Num: proto.Int32(plan.MedicineCount)})
+			response.Get.Simps = append(response.Get.Simps, &pb.SimpleItem{Id: proto.String("energy"), Num: proto.Int32(plan.MedicineCount * plan.MedicineUnit)})
+		}
 		body, e := proto.MarshalOptions{Deterministic: true}.Marshal(response)
 		if e != nil {
 			return e
@@ -263,7 +312,7 @@ func (s *GameService) p11PlunderSweepAt(ctx context.Context, id int64, req *pb.C
 		if e != nil {
 			return e
 		}
-		return tx.Create(&db.P11PlunderSweepReceipt{PlayerID: id, Stamp: stamp, RequestHash: p6Digest(raw), FragmentID: req.GetFragId(), RequestedCount: req.GetSweepNumber(), AcceptedCount: int32(len(plan.Children)), Plan: planBody, SourceHash: p6Digest(planBody), Response: body, ResponseHash: p6Digest(body), Source: constUtil.P11PlunderSweepSource, CreatedAt: now.UnixMilli(), FinishedAt: now.UnixMilli()}).Error
+		return tx.Create(&db.P11PlunderSweepReceipt{PlayerID: id, Stamp: stamp, RequestHash: p6Digest(raw), FragmentID: req.GetFragId(), RequestedCount: req.GetSweepNumber(), AcceptedCount: int32(len(plan.Children)), Plan: planBody, SourceHash: p6Digest(planBody), Response: body, ResponseHash: p6Digest(body), Source: plan.Source, CreatedAt: now.UnixMilli(), FinishedAt: now.UnixMilli()}).Error
 	})
 	if err != nil {
 		return nil, err
@@ -295,12 +344,34 @@ func p11PlunderSweepChildStamp(tx *gorm.DB, id int64) (int64, error) {
 	return 0, errors.New(constUtil.P11PlunderSweepConflict)
 }
 
-// p11PlunderSweepMatch freezes the actual locked profiles again for each real
-// child. A level-up or earlier fragment transfer cannot reuse an old actor body.
+// p11PlunderSweepMatch freezes the current locked actor for each child and
+// either the locked real holder or the versioned virtual roster.
 func (s *GameService) p11PlunderSweepMatch(tx *gorm.DB, id, peerID int64, fragment string, offer *db.P11PlunderFightOffer, cfg *db.P11PlunderFightPolicy, now time.Time) (*db.P11PlunderFightMatch, error) {
 	var owner, peer db.Profile
 	if err := tx.First(&owner, id).Error; err != nil {
 		return nil, err
+	}
+	if p11PlunderNPC84ID(peerID) {
+		if !s.p11PlunderNPC84Allowed(fragment) {
+			return nil, errors.New(constUtil.P11PlunderFightRefresh)
+		}
+		if err := p11PlunderNPC84CheckIdentityDomain(tx); err != nil {
+			return nil, err
+		}
+		_, attacker, err := s.p11ArenaProjection(&owner, tx)
+		if err != nil {
+			return nil, err
+		}
+		candidate, err := s.p11PlunderNPC84Projection(int(peerID-constUtil.P11PlunderNPC84IDBase) - 1)
+		if err != nil {
+			return nil, err
+		}
+		configuration, err := s.p11ArenaConfigurationHash()
+		if err != nil {
+			return nil, err
+		}
+		match, _, err := s.p11PlunderNPC84Match(tx, id, fragment, attacker, candidate, offer, cfg, configuration, now)
+		return match, err
 	}
 	if err := tx.First(&peer, peerID).Error; err != nil {
 		return nil, err
@@ -313,6 +384,7 @@ func (s *GameService) p11PlunderSweepMatch(tx *gorm.DB, id, peerID int64, fragme
 	if err != nil {
 		return nil, err
 	}
+	peerInfo.ServerId = proto.Int32(int32(s.OriginalServerID()))
 	if err = SetP6FirstOrder(attacker, defender, false); err != nil {
 		return nil, err
 	}
@@ -349,12 +421,22 @@ func (s *GameService) p11PlunderSweepMatch(tx *gorm.DB, id, peerID int64, fragme
 // from actual accepted children. No opponent selection or combat runs on retry.
 func p11ReadPlunderSweepReceipt(tx *gorm.DB, row *db.P11PlunderSweepReceipt, requestHash string) (*pb.SCSweepTreasureFight, error) {
 	bad := errors.New(constUtil.P11PlunderSweepConflict)
-	if row == nil || row.Stamp <= 0 || row.RequestHash != requestHash || row.Source != constUtil.P11PlunderSweepSource || row.AcceptedCount < 1 || row.AcceptedCount > row.RequestedCount || row.RequestedCount != 1 && row.RequestedCount != 5 || p6Digest(row.Plan) != row.SourceHash || p6Digest(row.Response) != row.ResponseHash {
+	if row == nil || row.Stamp <= 0 || row.RequestHash != requestHash || (row.Source != constUtil.P11PlunderSweepSource && row.Source != constUtil.P11PlunderSweep84Source) || row.AcceptedCount < 1 || row.AcceptedCount > row.RequestedCount || row.RequestedCount != 1 && row.RequestedCount != 5 || p6Digest(row.Plan) != row.SourceHash || p6Digest(row.Response) != row.ResponseHash {
 		return nil, bad
 	}
 	var plan p11PlunderSweepPlan
-	if json.Unmarshal(row.Plan, &plan) != nil || plan.PlayerID != row.PlayerID || plan.Stamp != row.Stamp || plan.RequestHash != row.RequestHash || plan.FragmentID != row.FragmentID || plan.RequestedCount != row.RequestedCount || plan.Source != row.Source || plan.SourceNote != constUtil.P11PlunderSweepSourceNote || len(plan.Children) != int(row.AcceptedCount) || len(plan.Peers) < 1 || len(plan.Peers) > 3 {
+	if json.Unmarshal(row.Plan, &plan) != nil || plan.PlayerID != row.PlayerID || plan.Stamp != row.Stamp || plan.RequestHash != row.RequestHash || plan.FragmentID != row.FragmentID || plan.RequestedCount != row.RequestedCount || plan.Source != row.Source || len(plan.Children) != int(row.AcceptedCount) || len(plan.Peers) < 1 || len(plan.Peers) > 3 {
 		return nil, bad
+	}
+	if row.Source == constUtil.P11PlunderSweepSource {
+		if plan.SourceNote != constUtil.P11PlunderSweepSourceNote || len(plan.Request) != 0 || plan.MedicineItem != "" || plan.MedicineUnit != 0 || plan.MedicineCount != 0 {
+			return nil, bad
+		}
+	} else {
+		request := &pb.CSSweepTreasureFight{}
+		if plan.SourceNote != constUtil.P11PlunderSweep84SourceNote || p6Digest(plan.Request) != row.RequestHash || proto.Unmarshal(plan.Request, request) != nil || request.GetFragId() != row.FragmentID || request.GetSweepNumber() != row.RequestedCount || request.GetAutoAddEnergy() < 0 || request.GetAutoAddEnergy() > 1 || plan.MedicineItem != constUtil.P11PlunderSweep84Medicine || plan.MedicineUnit != constUtil.P11PlunderSweep84Energy || plan.MedicineCount < 0 || plan.MedicineCount > row.AcceptedCount || plan.MedicineCount > 0 && request.GetAutoAddEnergy() != 1 {
+			return nil, bad
+		}
 	}
 	expected := &pb.SCSweepTreasureFight{Get: &pb.ResultObject{}}
 	peers := map[int64]bool{}
@@ -390,6 +472,10 @@ func p11ReadPlunderSweepReceipt(tx *gorm.DB, row *db.P11PlunderSweepReceipt, req
 	}
 	expected.IsLevelUp = actual.IsLevelUp
 	expected.Cost = []*pb.BaseResource{{Id: proto.String("energy"), Num: proto.Int32(row.AcceptedCount * 2)}}
+	if plan.MedicineCount > 0 {
+		expected.Cost = append(expected.Cost, &pb.BaseResource{Id: proto.String(plan.MedicineItem), Num: proto.Int32(plan.MedicineCount)})
+		expected.Get.Simps = append(expected.Get.Simps, &pb.SimpleItem{Id: proto.String("energy"), Num: proto.Int32(plan.MedicineCount * plan.MedicineUnit)})
+	}
 	if !proto.Equal(expected, actual) {
 		return nil, bad
 	}

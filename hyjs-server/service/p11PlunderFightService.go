@@ -186,9 +186,9 @@ func p11PlunderMatchHash(match *db.P11PlunderFightMatch) string {
 	return p6Digest(raw)
 }
 
-// p11PlunderListAt publishes only real profiles holding this original fragment.
-// Peer snapshots use ordinary MVCC reads. The later fight acquires both profiles
-// in ID order and rechecks their actual inventory/protection/complete team bytes.
+// p11PlunderListAt first publishes real, eligible holders within the bounded
+// scan. A fully exhausted empty scan may use the separately versioned local NPC
+// roster. An incomplete scan never asserts that no real holder exists.
 func (s *GameService) p11PlunderListAt(ctx context.Context, id int64, fragment string, now time.Time) ([]proto.Message, error) {
 	if !s.p11PlunderFragment(fragment) {
 		return nil, errors.New(constUtil.P11PlunderFightRefresh)
@@ -202,6 +202,9 @@ func (s *GameService) p11PlunderListAt(ctx context.Context, id int64, fragment s
 		var owner db.Profile
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&owner, id).Error; err != nil {
 			return err
+		}
+		if AdminProfileServerID(owner) != s.OriginalServerID() {
+			return errors.New(constUtil.P11PlunderFightRefresh)
 		}
 		player, _, err := decodeProfile(&owner)
 		if err != nil {
@@ -218,7 +221,7 @@ func (s *GameService) p11PlunderListAt(ctx context.Context, id int64, fragment s
 		if err != nil {
 			return err
 		}
-		_, attacker, err := s.p11ArenaProjection(&owner, tx)
+		ownerInfo, attacker, err := s.p11ArenaProjection(&owner, tx)
 		if err != nil {
 			return err
 		}
@@ -228,9 +231,13 @@ func (s *GameService) p11PlunderListAt(ctx context.Context, id int64, fragment s
 		}
 		var cursor int64
 		var scanned int32
+		var unverified bool
+		peerQuery := func(q *gorm.DB, after int64) *gorm.DB {
+			return q.Where("id>? AND id<>? AND (server_id=? OR (?=1 AND server_id<=0)) AND player IS NOT NULL AND game IS NOT NULL", after, id, s.OriginalServerID(), s.OriginalServerID())
+		}
 		for scanned < cfg.ScanLimit && len(out.InfoList) < int(cfg.MatchCount) {
 			var peers []db.Profile
-			if err = tx.Where("id>? AND id<>?", cursor, id).Order("id").Limit(int(min(int32(64), cfg.ScanLimit-scanned))).Find(&peers).Error; err != nil {
+			if err = peerQuery(tx, cursor).Order("id").Limit(int(min(int32(64), cfg.ScanLimit-scanned))).Find(&peers).Error; err != nil {
 				return err
 			}
 			if len(peers) == 0 {
@@ -240,11 +247,19 @@ func (s *GameService) p11PlunderListAt(ctx context.Context, id int64, fragment s
 				cursor = peer.Id
 				scanned++
 				other, game, err := decodeProfile(&peer)
-				if err != nil || other.GetLevel() < minimum || int64(other.GetLevel())-int64(player.GetLevel()) > int64(cfg.LevelDifference) || int64(player.GetLevel())-int64(other.GetLevel()) > int64(cfg.LevelDifference) {
+				if err != nil || other.GetPlayerId() != peer.Id || AdminProfileServerID(peer) != s.OriginalServerID() {
+					unverified = true
+					continue
+				}
+				if other.GetLevel() < minimum || int64(other.GetLevel())-int64(player.GetLevel()) > int64(cfg.LevelDifference) || int64(player.GetLevel())-int64(other.GetLevel()) > int64(cfg.LevelDifference) {
 					continue
 				}
 				count, err := p11PlunderFragmentCount(game, fragment)
-				if err != nil || count < 1 {
+				if err != nil {
+					unverified = true
+					continue
+				}
+				if count < 1 {
 					continue
 				}
 				protected, err := P11PlunderProtected(tx, peer.Id, now)
@@ -260,8 +275,10 @@ func (s *GameService) p11PlunderListAt(ctx context.Context, id int64, fragment s
 				}
 				info, defender, err := s.p11ArenaProjection(&peer, tx)
 				if err != nil {
+					unverified = true
 					continue
 				}
+				info.ServerId = proto.Int32(int32(s.OriginalServerID()))
 				attack := proto.Clone(attacker).(*pb.BattlePlayer)
 				defenderFirst := attack.GetInst().GetFirstOrder() == 0 && defender.GetInst().GetFirstOrder() == 1
 				if err = SetP6FirstOrder(attack, defender, defenderFirst); err != nil {
@@ -300,6 +317,25 @@ func (s *GameService) p11PlunderListAt(ctx context.Context, id int64, fragment s
 				}
 			}
 		}
+		if len(out.InfoList) == 0 && !unverified && s.p11PlunderNPC84Allowed(fragment) {
+			var remaining int64
+			if err = peerQuery(tx.Model(&db.Profile{}), cursor).Select("id").Limit(1).Scan(&remaining).Error; err != nil {
+				return err
+			}
+			if remaining == 0 {
+				candidates, err := s.p11PlunderNPC84Candidates(tx, ownerInfo.GetFightPower())
+				if err != nil {
+					return err
+				}
+				for i := range candidates {
+					_, entry, err := s.p11PlunderNPC84Match(tx, id, fragment, attacker, &candidates[i], offer, cfg, config, now)
+					if err != nil {
+						return err
+					}
+					out.InfoList = append(out.InfoList, entry)
+				}
+			}
+		}
 		return nil
 	})
 	if err != nil {
@@ -308,9 +344,9 @@ func (s *GameService) p11PlunderListAt(ctx context.Context, id int64, fragment s
 	return []proto.Message{out}, nil
 }
 
-// p11PlunderFightAt holds both real profiles before policy/match locks. Every
-// mutation follows the independent type3 certificate; unsupported computation
-// rolls back its captured P6 record as well as all resource/cost/result writes.
+// p11PlunderFightAt locks the actual participants before policy/match locks.
+// The virtual roster has no profile row. Every mutation still follows the
+// independently certified type3 calculation and its frozen source.
 func (s *GameService) p11PlunderFightAt(ctx context.Context, id int64, request *pb.CSFightTreasureStartResult, stamp int64, now time.Time) ([]proto.Message, error) {
 	if stamp <= 0 || id == request.GetFightPlayerId() || !s.p11PlunderFragment(request.GetTargetFlagId()) {
 		return nil, errors.New(constUtil.P11PlunderFightRefresh)
@@ -342,7 +378,12 @@ func (s *GameService) p11PlunderFightTx(ctx context.Context, tx *gorm.DB, id int
 	var response *pb.SCFightTreasureStartResult
 	var accepted *db.P11PlunderFightSettlement
 	err := func() error {
-		if _, err := p10LockProfiles(tx, id, request.GetFightPlayerId()); err != nil {
+		npc := p11PlunderNPC84ID(request.GetFightPlayerId())
+		lockPeer := request.GetFightPlayerId()
+		if npc {
+			lockPeer = id
+		}
+		if _, err := p10LockProfiles(tx, id, lockPeer); err != nil {
 			return err
 		}
 		raw, err := proto.MarshalOptions{Deterministic: true}.Marshal(request)
@@ -361,16 +402,20 @@ func (s *GameService) p11PlunderFightTx(ctx context.Context, tx *gorm.DB, id int
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return err
 		}
+		participants := []int64{id}
+		if !npc {
+			participants = append(participants, request.GetFightPlayerId())
+		}
 		if s.P12WantedReady {
-			for _, pid := range []int64{id, request.GetFightPlayerId()} {
+			for _, pid := range participants {
 				if err := P12WantedRequireIdle(tx, pid, now); err != nil {
 					return err
 				}
 			}
 		}
 		if s.P12FieldPVPReady {
-			for _, pid := range []int64{id, request.GetFightPlayerId()} {
-				if err := P12FieldPVPRequireIdle(tx, pid, now); err != nil {
+			for _, pid := range participants {
+				if err := P12FieldPVPRequireIdle(tx, pid, time.Now()); err != nil {
 					return err
 				}
 			}
@@ -383,83 +428,97 @@ func (s *GameService) p11PlunderFightTx(ctx context.Context, tx *gorm.DB, id int
 		if err = tx.First(&owner, id).Error; err != nil {
 			return err
 		}
-		if err = tx.First(&peer, request.GetFightPlayerId()).Error; err != nil {
-			return err
+		if AdminProfileServerID(owner) != s.OriginalServerID() {
+			return errors.New(constUtil.P11PlunderFightRefresh)
 		}
 		player, game, err := decodeProfileForCalendarUpdate(tx, &owner)
 		if err != nil {
 			return err
 		}
-		other, otherGame, err := decodeProfileForCalendarUpdate(tx, &peer)
-		if err != nil {
-			return err
+		var other *pb.Player
+		var otherGame *model.GameState
+		if npc {
+			if !s.p11PlunderNPC84Allowed(request.GetTargetFlagId()) {
+				return errors.New(constUtil.P11PlunderFightRefresh)
+			}
+			if err = p11PlunderNPC84CheckIdentityDomain(tx); err != nil {
+				return err
+			}
+		} else {
+			if err = tx.First(&peer, request.GetFightPlayerId()).Error; err != nil {
+				return err
+			}
+			if AdminProfileServerID(peer) != s.OriginalServerID() {
+				return errors.New(constUtil.P11PlunderFightRefresh)
+			}
+			other, otherGame, err = decodeProfileForCalendarUpdate(tx, &peer)
+			if err != nil {
+				return err
+			}
 		}
 		minimum, err := s.p10Setting("RobTreasureLevel")
 		if err != nil {
 			return err
 		}
 		energy, err := s.p10Setting("TreaSweepCostEnergy")
-		if err != nil || energy != 2 || player.GetLevel() < minimum || other.GetLevel() < minimum || player.GetEnergy() < energy {
+		if err != nil || energy != 2 || player.GetLevel() < minimum || player.GetEnergy() < energy {
 			return errors.New(constUtil.P11PlunderFightRefresh)
 		}
-		protected, err := P11PlunderProtected(tx, peer.Id, now)
-		if err != nil {
-			return err
-		}
-		blocked, err := p10Blocked(tx, id, peer.Id)
-		if err != nil {
-			return err
-		}
-		holding, err := p11PlunderFragmentCount(otherGame, request.GetTargetFlagId())
-		if err != nil {
-			return err
-		}
-		if protected || blocked || holding < 1 {
-			return errors.New(constUtil.P11PlunderFightRefresh)
-		}
-		var match db.P11PlunderFightMatch
-		matchQuery := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("player_id=? AND opponent_id=? AND fragment_id=? AND created_at<=? AND expires_at>?", id, peer.Id, request.GetTargetFlagId(), now.UnixMilli(), now.UnixMilli())
-		if matchID != "" {
-			matchQuery = matchQuery.Where("id=?", matchID)
-		}
-		if err = matchQuery.Order("created_at DESC,id DESC").First(&match).Error; err != nil {
-			return errors.New(constUtil.P11PlunderFightRefresh)
+		if !npc {
+			difference := int64(player.GetLevel()) - int64(other.GetLevel())
+			if other.GetPlayerId() != peer.Id || other.GetLevel() < minimum || difference > int64(cfg.LevelDifference) || -difference > int64(cfg.LevelDifference) {
+				return errors.New(constUtil.P11PlunderFightRefresh)
+			}
+			protected, err := P11PlunderProtected(tx, peer.Id, now)
+			if err != nil {
+				return err
+			}
+			blocked, err := p10Blocked(tx, id, peer.Id)
+			if err != nil {
+				return err
+			}
+			holding, err := p11PlunderFragmentCount(otherGame, request.GetTargetFlagId())
+			if err != nil {
+				return err
+			}
+			if protected || blocked || holding < 1 {
+				return errors.New(constUtil.P11PlunderFightRefresh)
+			}
 		}
 		configuration, err := s.p11ArenaConfigurationHash()
 		if err != nil {
 			return err
 		}
-		if match.SourceHash != p11PlunderMatchHash(&match) || match.OfferVersion != offer.Version || match.OfferHash != offer.SourceHash || match.ConfigurationHash != configuration || match.CapabilityHash != P6CapabilityHash() {
-			return errors.New(constUtil.P11PlunderFightRefresh)
-		}
-		attacker, defender := &pb.BattlePlayer{}, &pb.BattlePlayer{}
-		if proto.Unmarshal(match.Attacker, attacker) != nil || proto.Unmarshal(match.Defender, defender) != nil || attacker.GetPlayerId() != id || defender.GetPlayerId() != peer.Id {
-			return errors.New(constUtil.P11PlunderFightConflict)
-		}
 		_, actualA, err := s.p11ArenaProjection(&owner, tx)
 		if err != nil {
 			return err
 		}
-		_, actualD, err := s.p11ArenaProjection(&peer, tx)
+		var actualD *pb.BattlePlayer
+		if npc {
+			candidate, e := s.p11PlunderNPC84Projection(int(request.GetFightPlayerId()-constUtil.P11PlunderNPC84IDBase) - 1)
+			if e != nil {
+				return e
+			}
+			actualD = candidate.Battle
+		} else {
+			_, actualD, err = s.p11ArenaProjection(&peer, tx)
+			if err != nil {
+				return err
+			}
+		}
+		match, attacker, defender, err := p11Plunder84ChooseMatch(tx, id, request.GetFightPlayerId(), request.GetTargetFlagId(), matchID, offer, configuration, actualA, actualD, now)
 		if err != nil {
 			return err
 		}
 		defenderFirst := attacker.GetInst().GetFirstOrder() == 0 && defender.GetInst().GetFirstOrder() == 1
-		if err = SetP6FirstOrder(actualA, actualD, defenderFirst); err != nil {
-			return err
-		}
-		if !proto.Equal(actualA, attacker) || !proto.Equal(actualD, defender) {
-			return errors.New(constUtil.P11PlunderFightRefresh)
-		}
-		var already int64
-		if err = tx.Model(&db.P11PlunderFightSettlement{}).Where("match_id=?", match.ID).Count(&already).Error; err != nil {
-			return err
-		}
-		if already != 0 {
-			return errors.New(constUtil.P11PlunderFightRefresh)
-		}
 		fightID := uuid.NewString()
 		input := model.FrozenBattleInput{Attacker: attacker, Defender: defender, BattleType: 3, MaxRound: 20, Seed: match.Seed, DefenderFirst: defenderFirst, AppliedProperties: map[string][]string{"source": {constUtil.P11PlunderFightSource}, "plunderTarget": {request.GetTargetFlagId()}, "plunderMatch": {match.ID, match.SourceHash}, "plunderOffer": {offer.Version, offer.SourceHash}, "plunderRequest": {p6Digest(raw)}}}
+		if npc {
+			input.AppliedProperties["plunderNPC"], err = p11PlunderNPC84Meta(match)
+			if err != nil {
+				return err
+			}
+		}
 		recordID, err := s.CaptureBattleReplay(ctx, tx, id, constUtil.P11PlunderFightSource, fightID, input)
 		if err != nil {
 			return err
@@ -518,16 +577,20 @@ func (s *GameService) p11PlunderFightTx(ctx context.Context, tx *gorm.DB, id int
 			draw = choice.Int64()
 			transferred = draw < cfg.DropPPM
 			if transferred {
-				if err = deductPoolCost(other, otherGame, &pb.BaseResource{Id: request.TargetFlagId, Num: proto.Int32(1)}); err != nil {
-					return err
+				if !npc {
+					if err = deductPoolCost(other, otherGame, &pb.BaseResource{Id: request.TargetFlagId, Num: proto.Int32(1)}); err != nil {
+						return err
+					}
 				}
 				fragment, err := s.GrantFixedReward(player, game, request.GetTargetFlagId()+",1")
 				if err != nil {
 					return err
 				}
 				proto.Merge(gain, fragment)
-				if err = saveProfile(tx, &peer, other, otherGame); err != nil {
-					return err
+				if !npc {
+					if err = saveProfile(tx, &peer, other, otherGame); err != nil {
+						return err
+					}
 				}
 			}
 		}
@@ -554,7 +617,7 @@ func (s *GameService) p11PlunderFightTx(ctx context.Context, tx *gorm.DB, id int
 		if err = p11StorePlunderP6(tx, &record, frozen, terminal, now); err != nil {
 			return err
 		}
-		row := db.P11PlunderFightSettlement{PlayerID: id, Stamp: stamp, OpponentID: peer.Id, FragmentID: request.GetTargetFlagId(), RequestHash: p6Digest(raw), FightID: fightID, MatchID: match.ID, MatchHash: match.SourceHash, P6RecordID: recordID, ScopeProof: terminal.Outcome.CapabilityHash, OfferHash: offer.SourceHash, AttackerWon: won, Draw: draw, DropPPM: cfg.DropPPM, FragmentTransferred: transferred, EnergySpent: energy, RewardCoin: coins, RewardExp: experience, Response: body, ResponseHash: p6Digest(body), Terminal: final, TerminalHash: p6Digest(final), CreatedAt: now.UnixMilli()}
+		row := db.P11PlunderFightSettlement{PlayerID: id, Stamp: stamp, OpponentID: request.GetFightPlayerId(), FragmentID: request.GetTargetFlagId(), RequestHash: p6Digest(raw), FightID: fightID, MatchID: match.ID, MatchHash: match.SourceHash, P6RecordID: recordID, ScopeProof: terminal.Outcome.CapabilityHash, OfferHash: offer.SourceHash, AttackerWon: won, Draw: draw, DropPPM: cfg.DropPPM, FragmentTransferred: transferred, EnergySpent: energy, RewardCoin: coins, RewardExp: experience, Response: body, ResponseHash: p6Digest(body), Terminal: final, TerminalHash: p6Digest(final), CreatedAt: now.UnixMilli()}
 		if err = tx.Create(&row).Error; err != nil {
 			return err
 		}
@@ -576,7 +639,11 @@ func (s *GameService) p11PlunderFightTx(ctx context.Context, tx *gorm.DB, id int
 				return err
 			}
 			if transferred {
-				return s.RecordP1Event(tx, id, "p11-plunder-fragment:"+fightID, "treasure_fragment_transferred", 1, now)
+				kind := "treasure_fragment_transferred"
+				if npc {
+					kind = constUtil.P11PlunderNPC84FragmentEvent
+				}
+				return s.RecordP1Event(tx, id, "p11-plunder-fragment:"+fightID, kind, 1, now)
 			}
 		}
 		return nil
@@ -682,6 +749,19 @@ func p11ReadPlunderReceipt(tx *gorm.DB, row *db.P11PlunderFightSettlement) (*pb.
 	meta := input.AppliedProperties
 	if !slices.Equal(meta["plunderTarget"], []string{row.FragmentID}) || !slices.Equal(meta["plunderMatch"], []string{match.ID, match.SourceHash}) || !slices.Equal(meta["plunderOffer"], []string{offer.Version, offer.SourceHash}) || !slices.Equal(meta["plunderRequest"], []string{row.RequestHash}) || row.RequestHash != p6Digest(request) {
 		return nil, bad
+	}
+	if len(meta["plunderNPC"]) != 0 {
+		want, e := p11PlunderNPC84Meta(&match)
+		if e != nil || !slices.Equal(meta["plunderNPC"], want) {
+			return nil, bad
+		}
+	} else if p11PlunderNPC84ID(row.OpponentID) {
+		// Keep historical real-player receipts readable even if an old
+		// deployment had a real ID in the newly reserved virtual range.
+		info := &pb.TreasureBattleInfo{}
+		if proto.Unmarshal(match.Info, info) != nil || info.GetIsRobot() != 0 {
+			return nil, bad
+		}
 	}
 	if record.PlayerID != row.PlayerID || record.Source != constUtil.P11PlunderFightSource || record.SourceFight != row.FightID || record.Status != constUtil.P6BattleComputed || !record.Authoritative || record.OutcomeHash != p6Digest(terminalBody) || p6Digest(record.Outcome) != record.OutcomeHash || p6Digest(operations) != p6Digest(record.Operates) || record.ReplayHash != p6Digest(append(append([]byte(nil), operations...), byte(record.ServerResult))) || record.ClientResult != record.ServerResult || record.ServerResult != p6PlaybackResult(final.Outcome.Winner) || final.CalculationSourceSHA256 != p6Digest(inputBody) || final.ConfigurationHash != record.ConfigurationHash || final.EngineVersion != record.EngineVersion || final.ClientVersion != record.ClientVersion || final.Outcome.CapabilityHash != row.ScopeProof || input.BattleType != 3 || input.MaxRound != 20 || input.Attacker.GetPlayerId() != row.PlayerID || input.Defender.GetPlayerId() != row.OpponentID {
 		return nil, bad

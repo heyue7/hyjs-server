@@ -98,11 +98,13 @@ def review_evidence(path, qa_sha):
             require(cited.stat().st_size > 0, 'Evidence file is empty: ' + name)
             add_pin(pins, cited, ref['sha256'])
     times = review.get('latencyMs')
-    require(isinstance(times, dict), 'First-frame timing measurements missing')
+    # Accepted V4 contract: gather action/countdown start; monster's original
+    # loading animation starts. Scene loading duration is excluded explicitly.
+    require(isinstance(times, dict), 'Action/loading-start timing measurements missing')
     for name in ('gather', 'monster'):
         value = times.get(name)
         require(type(value) in (int, float) and math.isfinite(value) and 0 <= value <= 1000,
-                name + ' touch-to-first-frame must be measured at <= 1000 ms')
+                name + ' action/loading-start must be measured at <= 1000 ms')
     add_pin(pins, path)
     return review, pins
 

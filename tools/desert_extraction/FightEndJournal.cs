@@ -12,6 +12,7 @@ namespace HYJS.DesertV4
     [Serializable] public sealed class FightEndRecord
     {
         public int version,opcode;
+        public bool resumeApproved;
         public long playerId;
         public string origin,fightId,inputHash,payloadBase64,payloadHash;
     }
@@ -59,6 +60,7 @@ namespace HYJS.DesertV4
             if (r==null || r.version!=1 || r.playerId!=owner.playerId || r.origin!=owner.origin ||
                 !LowerHex(r.fightId,24) || (r.opcode!=30049 && r.opcode!=30085) ||
                 (!String.IsNullOrEmpty(r.inputHash) && !LowerHex(r.inputHash,64)) ||
+                (r.resumeApproved && !LowerHex(r.inputHash,64)) ||
                 String.IsNullOrEmpty(r.payloadBase64)) throw new InvalidOperationException("Invalid pending fight record");
             Decode(r);
         }
@@ -75,6 +77,8 @@ namespace HYJS.DesertV4
             if (PlayerPrefs.GetString(key,"")!=raw) throw new InvalidOperationException("Fight record was not saved");
         }
         public static FightEndRecord Capture(FieldWire.Session owner,int opcode,object message,string inputHash)
+        { return Capture(owner,opcode,message,inputHash,false); }
+        public static FightEndRecord Capture(FieldWire.Session owner,int opcode,object message,string inputHash,bool resumeApproved)
         {
             string fight=MessageFightId(opcode,message);
             if (!LowerHex(fight,24) || (!String.IsNullOrEmpty(inputHash) && !LowerHex(inputHash,64)))
@@ -82,7 +86,7 @@ namespace HYJS.DesertV4
             byte[] payload=PBConvert.toBytes(opcode,message);
             if (payload==null || payload.Length==0 || payload.Length>MaxPayloadBytes) throw new InvalidOperationException("Original fight payload unavailable");
             var candidate=new FightEndRecord { version=1,opcode=opcode,playerId=owner.playerId,origin=owner.origin,
-                fightId=fight,inputHash=inputHash ?? "",payloadBase64=Convert.ToBase64String(payload),payloadHash=Digest(payload) };
+                fightId=fight,inputHash=inputHash ?? "",resumeApproved=resumeApproved,payloadBase64=Convert.ToBase64String(payload),payloadHash=Digest(payload) };
             FightEndRecord old=Load(owner);
             if (old!=null)
             {

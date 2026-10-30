@@ -37,6 +37,19 @@ namespace HYJS.DesertV4
         static bool Same(Point a,Point b)
         { return a.id==b.id && a.name==b.name && a.heroId==b.heroId && a.role==b.role && a.pointId==b.pointId && a.position==b.position && a.interactionPosition==b.interactionPosition && a.radius==b.radius; }
         public Point Find(RoomCharactor owner) { Point p; return owner!=null && owners.TryGetValue(owner,out p) ? p : null; }
+        // Roles come from the accepted snapshot; positions come from the actual
+        // spawned actors, using the same local coordinates as the native map.
+        public Dictionary<string,Vector3> ExtractionMapPositions()
+        {
+            var result=new Dictionary<string,Vector3>();
+            foreach (Point point in points.Values)
+            {
+                RoomCharactor actor;
+                if (point.role=="extraction" && actors.TryGetValue(point.id,out actor) && actor!=null)
+                    result.Add(point.id,actor.transform.localPosition);
+            }
+            return result;
+        }
         public void ApplySnapshot(JsonData snapshot)
         {
             JsonData area=snapshot["safeArea"];

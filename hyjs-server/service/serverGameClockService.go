@@ -392,7 +392,14 @@ func serverGameClockPendingBattles(tx *gorm.DB, real time.Time, offset int64) er
 	}
 	// PK is a real six-second lease, independent from the adjusted business calendar.
 	if gameSchemaHasTable(tx, &db.P12FieldPVPReceipt{}) {
-		if err := busy(tx.Model(&db.P12FieldPVPReceipt{}).Where("busy_until>?", real.UnixMilli())); err != nil {
+		if err := busy(tx.Model(&db.P12FieldPVPReceipt{}).Where("clock_version=? AND real_busy_until>?", db.P12FieldPVPWallClock, real.UnixMilli())); err != nil {
+			return err
+		}
+	}
+	// Old mutable markers carry no reliable clock provenance. Historical
+	// receipts alone do not block a change once their markers were cleared.
+	if gameSchemaHasTable(tx, &db.P12FieldPVPState{}) {
+		if err := busy(tx.Model(&db.P12FieldPVPState{}).Where("(clock_version=0 AND (busy_until<>0 OR jail_until<>0 OR real_busy_until<>0 OR real_jail_until<>0)) OR (clock_version=? AND (real_busy_until>? OR (busy_until=0 AND real_busy_until<>0) OR (busy_until<>0 AND real_busy_until=0) OR (jail_until=0 AND real_jail_until<>0) OR (jail_until<>0 AND real_jail_until=0))) OR clock_version NOT IN ?", db.P12FieldPVPWallClock, real.UnixMilli(), []int32{0, db.P12FieldPVPWallClock})); err != nil {
 			return err
 		}
 	}

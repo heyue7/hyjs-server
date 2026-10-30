@@ -56,3 +56,7 @@
 /skills/
 *.sql.gz
 *.bundle
+
+# Reproducible combined86 patch-chain outputs; retain source and target pins.
+/tools/client_wanted84/combined86-*/
+/tools/client_sweep84/combined86-*/

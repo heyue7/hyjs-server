@@ -1,6 +1,7 @@
 package service
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/json"
@@ -8,6 +9,7 @@ import (
 	"fmt"
 	"math"
 	"math/big"
+	"strings"
 	"time"
 
 	"go.uber.org/zap"
@@ -41,7 +43,7 @@ func (s *GameService) ggoBossCheck(ctx context.Context, id int64, request *pb.CS
 		if err = ggoCurrentPresence(tx, a, profile.Session); err != nil {
 			return err
 		}
-		row, event, boss, _, err := s.ggoBossCurrent(tx, s.GGOFieldConfig, a.Now, false)
+		row, event, boss, _, err := s.ggoBossCurrent(tx, s.GGOFieldConfig, a.Now, false, int64(a.Presence.Line))
 		if err != nil {
 			return err
 		}
@@ -144,7 +146,7 @@ func (s *GameService) ggoBossFightStart(ctx context.Context, id int64, request *
 		if err = ggoCurrentPresence(tx, a, profile.Session); err != nil {
 			return err
 		}
-		shared, event, boss, hp, err := s.ggoBossCurrent(tx, cfg, now, true)
+		shared, event, boss, hp, err := s.ggoBossCurrent(tx, cfg, now, true, int64(a.Presence.Line))
 		if err != nil {
 			return err
 		}
@@ -210,7 +212,7 @@ func (s *GameService) ggoBossFightStart(ctx context.Context, id int64, request *
 		if cfg.Rules.DeathLossPercent != nil {
 			deathLossPercent = *cfg.Rules.DeathLossPercent
 		}
-		field.Fight = &model.FieldFight{StartedAt: now, BossUUID: event.ID, BossLeaderGUID: ggoBossGUID(event.ID), Start: compat, BossStart: result, BossInput: input, BossRewardDailyLimit: &limit, GGOBoss: &model.GGOFieldBossFight{InputHash: p6Digest(raw), Boss: proto.Clone(boss).(*pb.SideBoss), EventID: event.ID, EndsAtMS: event.EndsAtMS, EconomyVersion: event.EconomyVersion, ExchangeValues: event.ExchangeValues, ProtectedChips: cfg.Runtime.ProtectedChips, DeathLossPercent: ggoInt64(deathLossPercent), SafeReturn: cfg.Runtime.SafeReturn, HealRatio: heal}}
+		field.Fight = &model.FieldFight{StartedAt: now, BossUUID: event.ID, BossLeaderGUID: ggoBossGUID(event.ID), Start: compat, BossStart: result, BossInput: input, BossRewardDailyLimit: &limit, GGOBoss: &model.GGOFieldBossFight{InputHash: p6Digest(raw), Boss: proto.Clone(boss).(*pb.SideBoss), EventID: event.ID, Line: int64(a.Presence.Line), EndsAtMS: event.EndsAtMS, EconomyVersion: event.EconomyVersion, ExchangeValues: event.ExchangeValues, ProtectedChips: cfg.Runtime.ProtectedChips, DeathLossPercent: ggoInt64(deathLossPercent), SafeReturn: cfg.Runtime.SafeReturn, HealRatio: heal}}
 		field.Side.State = proto.Int32(6)
 		projection := proto.Clone(boss).(*pb.SideBoss)
 		projection.State = proto.Int32(2)
@@ -321,8 +323,12 @@ func ggoBossRecordedEnd(tx *gorm.DB, id int64, request *pb.CSSidePveBossFightEnd
 func (s *GameService) ggoBossApplyDamageLocked(tx *gorm.DB, id int64, fight *model.FieldFight, input *model.FrozenBattleInput, terminal *model.CombatFinalHPOutcome, now int64) (*pb.SideBoss, float64, error) {
 	frozen := fight.GGOBoss
 	boss := proto.Clone(frozen.Boss).(*pb.SideBoss)
+	line, err := ggoBossFrozenLine(frozen)
+	if err != nil {
+		return nil, 0, err
+	}
 	var row db.SharedFieldBoss55
-	if err := sharedFieldBoss55Query(tx.Clauses(clause.Locking{Strength: "UPDATE"}), s.OriginalServerID(), constUtil.GGOFieldScene, constUtil.GGOFieldBossPosition).Take(&row).Error; err != nil {
+	if err := sharedFieldBoss55Query(tx.Clauses(clause.Locking{Strength: "UPDATE"}), s.OriginalServerID(), constUtil.GGOFieldScene, constUtil.GGOFieldBossPosition, line).Take(&row).Error; err != nil {
 		return nil, 0, err
 	}
 	// The live event can advance while an accepted original battle continues.
@@ -392,6 +398,16 @@ func (s *GameService) ggoBossApplyDamageLocked(tx *gorm.DB, id int64, fight *mod
 	return shared, damage, nil
 }
 
+func ggoBossFrozenLine(frozen *model.GGOFieldBossFight) (int64, error) {
+	if frozen.Line == 0 {
+		return constUtil.GGOFieldBossStorageLine, nil
+	}
+	if frozen.Line < 0 || frozen.Line > math.MaxInt32 {
+		return 0, errors.New("沙漠首领冻结线路无效")
+	}
+	return frozen.Line, nil
+}
+
 // Original 30085 finalizes one input and persists the exact 30086 before any
 // asynchronous recipient delivery. Every later replay is independent of FieldFight.
 func (s *GameService) ggoBossFightEnd(ctx context.Context, id int64, request *pb.CSSidePveBossFightEnd) ([]proto.Message, error) {
@@ -441,7 +457,35 @@ func (s *GameService) ggoBossFightEnd(ctx context.Context, id int64, request *pb
 		}
 		terminal, err := s.ComputeOriginalP6ProtocolFinalHP(tx.Statement.Context, input, request.GetOptRecord())
 		if err != nil {
-			return err
+			// The original automatic driver can emit several presses at the same
+			// instant, whereas PlaybackAI consumes at most one per tick. Preserve
+			// strict playback for ordinary records and accept this alternate path
+			// only when a fresh automatic calculation reproduces the entire record.
+			if contextErr := tx.Statement.Context.Err(); contextErr != nil {
+				return contextErr
+			}
+			if !strings.HasPrefix(err.Error(), constUtil.P6ReplayConflict+": 原录像终局或完整技能记录不符") &&
+				!strings.HasPrefix(err.Error(), "录像操作不符合原技能时序:") {
+				return err
+			}
+			originalErr := err
+			automatic, autoErr := s.ComputeOriginalP6ProtocolFinalHP(tx.Statement.Context, input, nil)
+			if contextErr := tx.Statement.Context.Err(); contextErr != nil {
+				return contextErr
+			}
+			if errors.Is(autoErr, context.Canceled) || errors.Is(autoErr, context.DeadlineExceeded) {
+				return autoErr
+			}
+			if autoErr != nil || automatic == nil || automatic.OriginalOperates == nil {
+				return originalErr
+			}
+			marshal := proto.MarshalOptions{Deterministic: true}
+			actualRecord, actualErr := marshal.Marshal(request.GetOptRecord())
+			expectedRecord, expectedErr := marshal.Marshal(automatic.OriginalOperates)
+			if actualErr != nil || expectedErr != nil || !bytes.Equal(actualRecord, expectedRecord) {
+				return originalErr
+			}
+			terminal = automatic
 		}
 		if err = validateP6GenericMechanismTerminal(input, terminal); err != nil {
 			return err
@@ -523,6 +567,8 @@ func (s *GameService) ggoBossFightEnd(ctx context.Context, id int64, request *pb
 		out = append(out, &pb.SCFieldPlayerState{Player: []*pb.PlayerSide{side}})
 	}
 	if changed {
+		// Payload-free hints also refresh a player who changed line mid-fight;
+		// each recipient reads its own authorized line when it resnapshots.
 		s.ggoNotifyFieldChange(ctx, 0)
 	}
 	// Award collection owns only this recipient profile and is retried by the

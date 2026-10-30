@@ -36,7 +36,7 @@ func TestField63SmallMonsterDoesNotReadSharedBoss(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := updateProfileWithTx(f.ctx, f.id, func(tx *gorm.DB, _ *pb.Player, g *model.GameState) error {
-		return f.s.refreshSharedFieldBosses55(tx, g)
+		return f.s.refreshSharedFieldBosses55(tx, f.id, g)
 	}); err != nil {
 		t.Fatal(err)
 	}

@@ -91,7 +91,7 @@ func (s *GameService) p12FieldPVPMapPolicy(tx *gorm.DB, scene string) (*db.P12Fi
 	}
 	return policy, nil
 }
-func p12FieldPVPState(tx *gorm.DB, p *pb.Player, g *model.GameState, now time.Time) (*db.P12FieldPVPState, error) {
+func p12FieldPVPLoadState(tx *gorm.DB, p *pb.Player, g *model.GameState) (*db.P12FieldPVPState, error) {
 	var row db.P12FieldPVPState
 	err := tx.First(&row, "player_id=?", p.GetPlayerId()).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -105,13 +105,49 @@ func p12FieldPVPState(tx *gorm.DB, p *pb.Player, g *model.GameState, now time.Ti
 	if row.Source != constUtil.P12FieldPVPSource || row.Kills < 0 || row.DailyKills < 0 || row.LootCoin < 0 || row.RedeemCount < 0 {
 		return nil, errors.New(constUtil.P12FieldPVPConflict)
 	}
+	return &row, nil
+}
+
+func p12FieldPVPState(tx *gorm.DB, p *pb.Player, g *model.GameState, now time.Time) (*db.P12FieldPVPState, error) {
+	row, err := p12FieldPVPLoadState(tx, p, g)
+	if err != nil {
+		return nil, err
+	}
 	day := now.In(time.FixedZone("Asia/Shanghai", 8*3600)).Format("2006-01-02")
 	if row.Day != day {
 		row.Day = day
 		row.DailyKills = 0
 		row.LootCoin = 0
 	}
-	return &row, nil
+	return row, nil
+}
+
+// Legacy deadlines were written in an unknown player's calendar. Keep the
+// markers intact and block their use until an evidenced migration resolves them.
+func p12FieldPVPDeadlines(row *db.P12FieldPVPState) (int64, int64, error) {
+	if row.BusyUntil < 0 || row.JailUntil < 0 || row.RealBusyUntil < 0 || row.RealJailUntil < 0 {
+		return 0, 0, errors.New(constUtil.P12FieldPVPConflict)
+	}
+	switch row.ClockVersion {
+	case 0:
+		if row.RealBusyUntil != 0 || row.RealJailUntil != 0 {
+			return 0, 0, errors.New(constUtil.P12FieldPVPConflict)
+		}
+		if row.JailUntil != 0 {
+			return 0, 0, errors.New(constUtil.P12FieldPVPJailed)
+		}
+		if row.BusyUntil != 0 {
+			return 0, 0, errors.New(constUtil.P12FieldPVPBusy)
+		}
+		return 0, 0, nil
+	case db.P12FieldPVPWallClock:
+		if (row.BusyUntil == 0) != (row.RealBusyUntil == 0) || (row.JailUntil == 0) != (row.RealJailUntil == 0) {
+			return 0, 0, errors.New(constUtil.P12FieldPVPConflict)
+		}
+		return row.RealBusyUntil, row.RealJailUntil, nil
+	default:
+		return 0, 0, errors.New(constUtil.P12FieldPVPConflict)
+	}
 }
 
 // P12FieldPVPRequireIdle runs under the caller's profile lock and covers other
@@ -126,10 +162,14 @@ func P12FieldPVPRequireIdle(tx *gorm.DB, id int64, now time.Time) error {
 	} else if err != nil {
 		return err
 	}
-	if row.JailUntil > now.UnixMilli() {
+	busy, jail, err := p12FieldPVPDeadlines(&row)
+	if err != nil {
+		return err
+	}
+	if jail > now.UnixMilli() {
 		return errors.New(constUtil.P12FieldPVPJailed)
 	}
-	if row.BusyUntil > now.UnixMilli() {
+	if busy > now.UnixMilli() {
 		return errors.New(constUtil.P12FieldPVPBusy)
 	}
 	return nil
@@ -154,11 +194,20 @@ func (s *GameService) SyncP12FieldPVPPenalty(tx *gorm.DB, p *pb.Player, g *model
 	if row.Source != constUtil.P12FieldPVPSource {
 		return errors.New(constUtil.P12FieldPVPConflict)
 	}
+	busy, jail, err := p12FieldPVPDeadlines(&row)
+	if err != nil {
+		// Preserve read access and immutable retry recovery. Action guards keep
+		// these unprovable legacy deadlines blocked without rewriting them.
+		if row.ClockVersion == 0 && (err.Error() == constUtil.P12FieldPVPBusy || err.Error() == constUtil.P12FieldPVPJailed) {
+			return nil
+		}
+		return err
+	}
 	if g.Field != nil && g.Field.Side != nil {
 		g.Field.Side.Kills = proto.Int32(row.Kills)
 	}
 	p.RedeemTime = proto.Int64(row.JailUntil)
-	if row.JailUntil > now.UnixMilli() && row.BusyUntil <= now.UnixMilli() && (g.Position.GetScene() != "town_main" || !p12FieldPVPPrisonPoint(g.Position.GetCurrent())) {
+	if jail > now.UnixMilli() && busy <= now.UnixMilli() && (g.Position.GetScene() != "town_main" || !p12FieldPVPPrisonPoint(g.Position.GetCurrent())) {
 		if g.Field == nil || g.Field.Side == nil {
 			return errors.New(constUtil.P12FieldPVPConflict)
 		}
@@ -177,7 +226,7 @@ func (s *GameService) SyncP12FieldPVPPenalty(tx *gorm.DB, p *pb.Player, g *model
 			return err
 		}
 	}
-	if row.JailUntil > 0 && now.UnixMilli() >= row.JailUntil {
+	if jail > 0 && now.UnixMilli() >= jail {
 		return s.p12FieldPVPRelease(tx, p, g, &row, now)
 	}
 	return nil
@@ -196,10 +245,14 @@ func ShouldAllowP12PrisonTransfer(tx *gorm.DB, id int64, scene string, point *pb
 	} else if err != nil {
 		return false, err
 	}
-	if row.JailUntil <= now.UnixMilli() {
+	busy, jail, err := p12FieldPVPDeadlines(&row)
+	if err != nil {
+		return false, err
+	}
+	if jail <= now.UnixMilli() {
 		return false, nil
 	}
-	if row.BusyUntil > now.UnixMilli() {
+	if busy > now.UnixMilli() {
 		return false, errors.New(constUtil.P12FieldPVPBusy)
 	}
 	return scene == "town_main" && p12FieldPVPPrisonPoint(point), nil
@@ -214,11 +267,27 @@ func ShouldAllowP12PrisonPosition(tx *gorm.DB, id int64, position *pb.Position, 
 // P12FieldPVPPrisonSide keeps the original jailFlag visible on Town self/peer
 // frames. Generic Town's default kills0 would clear RCAISelf.isPlayerNeedJail.
 // The caller has already synchronized the authoritative penalty on these objects.
-func P12FieldPVPPrisonSide(p *pb.Player, g *model.GameState, now time.Time) (*pb.PlayerSide, bool) {
-	if p == nil || g == nil || g.Position.GetScene() != "town_main" || p.GetRedeemTime() <= now.UnixMilli() || g.Field == nil || g.Field.Side == nil || g.Field.Side.GetKills() < 6 {
-		return nil, false
+func P12FieldPVPPrisonSide(tx *gorm.DB, p *pb.Player, g *model.GameState, now time.Time) (*pb.PlayerSide, bool, error) {
+	if p == nil || g == nil || g.Position.GetScene() != "town_main" || p.GetRedeemTime() == 0 || g.Field == nil || g.Field.Side == nil || g.Field.Side.GetKills() < 6 {
+		return nil, false, nil
 	}
-	return proto.Clone(g.Field.Side).(*pb.PlayerSide), true
+	var row db.P12FieldPVPState
+	if err := tx.First(&row, "player_id=?", p.GetPlayerId()).Error; err != nil {
+		return nil, false, err
+	}
+	_, jail, err := p12FieldPVPDeadlines(&row)
+	if err != nil {
+		if row.ClockVersion == 0 && row.BusyUntil == 0 && err.Error() == constUtil.P12FieldPVPJailed {
+			// Preserve the old prison flag while expiry is unknown. Movement
+			// and paid redemption remain guarded by the unconverted state.
+			return proto.Clone(g.Field.Side).(*pb.PlayerSide), true, nil
+		}
+		return nil, false, err
+	}
+	if jail <= now.UnixMilli() {
+		return nil, false, nil
+	}
+	return proto.Clone(g.Field.Side).(*pb.PlayerSide), true, nil
 }
 func p12FieldPVPPrisonPoint(p *pb.PointNew) bool {
 	return p != nil && combatFinite(float64(p.GetX())) && combatFinite(float64(p.GetY())) && combatFinite(float64(p.GetZ())) && math.Abs(float64(p.GetX())-constUtil.P12FieldPVPPrisonX) < .05 && math.Abs(float64(p.GetY())-constUtil.P12FieldPVPPrisonY) < .05 && math.Abs(float64(p.GetZ())-constUtil.P12FieldPVPPrisonZ) < .05
@@ -249,6 +318,7 @@ func (s *GameService) p12FieldPVPRelease(tx *gorm.DB, p *pb.Player, g *model.Gam
 	g.Field.Side.Kills = proto.Int32(0)
 	row.Kills = 0
 	row.JailUntil = 0
+	row.RealJailUntil = 0
 	p.RedeemTime = proto.Int64(0)
 	life, err := p8LifeState(tx, p.GetPlayerId())
 	if err != nil {
@@ -396,6 +466,10 @@ func p12FieldPVPApplyTerminal(party *pb.BattlePlayer, side *pb.PlayerSide, out *
 }
 
 func (s *GameService) p12FieldPVPQualify(tx *gorm.DB, p *pb.Player, g *model.GameState, now time.Time) (int32, error) {
+	return s.p12FieldPVPQualifyClocks(tx, p, g, now, LocalPlayAt(tx.Statement.Context, now))
+}
+
+func (s *GameService) p12FieldPVPQualifyClocks(tx *gorm.DB, p *pb.Player, g *model.GameState, now, gameNow time.Time) (int32, error) {
 	if g.Position.GetScene() == constUtil.GGOFieldScene && g.GGOField != nil {
 		if s.GGOFieldConfig == nil || s.GGOFieldConfig.Runtime == nil {
 			return 2002, nil
@@ -423,7 +497,7 @@ func (s *GameService) p12FieldPVPQualify(tx *gorm.DB, p *pb.Player, g *model.Gam
 	if g.Run != nil && !g.Run.Complete || g.Field.Fight != nil && !g.Field.Fight.Settled || g.Field.Side.GetState() != 0 || g.Field.Side.GetCurHp() <= 0 {
 		return 2002, nil
 	}
-	if err = s.ensureNoActiveDailyCopy(tx, p.GetPlayerId(), now); err != nil {
+	if err = s.ensureNoActiveDailyCopyWithClocks(tx, p.GetPlayerId(), now, gameNow, gameNow); err != nil {
 		return 2002, nil
 	}
 	inv, err := P8IsInvincible(tx, p.GetPlayerId(), now)
@@ -435,7 +509,43 @@ func (s *GameService) p12FieldPVPQualify(tx *gorm.DB, p *pb.Player, g *model.Gam
 	}
 	return 1, nil
 }
+
+// A defender never inherits the initiator's personal test calendar. The shared
+// server calendar takes precedence, matching BindLocalPlayContext.
+func (s *GameService) p12FieldPVPPeerContext(ctx context.Context, tx *gorm.DB, peer *db.Profile) (context.Context, error) {
+	if ServerGameClockContextBound(ctx) || s.ServerClockReady {
+		return ctx, nil
+	}
+	ctx = context.WithValue(ctx, constUtil.LocalPlayBoundKey, false)
+	if !s.LocalPlayToolsEnabled || !localWalletOwner(peer) {
+		return ctx, nil
+	}
+	enabled, err := localPlayPolicyEnabled(tx)
+	if err != nil || !enabled {
+		return ctx, err
+	}
+	var clock db.LocalPlayClockState
+	if err = tx.First(&clock, "player_id=?", peer.Id).Error; errors.Is(err, gorm.ErrRecordNotFound) {
+		clock = db.LocalPlayClockState{PlayerID: peer.Id}
+	} else if err != nil {
+		return ctx, err
+	}
+	if clock.OffsetDays < -3650 || clock.OffsetDays > 3650 || clock.Revision < 0 {
+		return ctx, errors.New(constUtil.LocalPlayInvalidMessage)
+	}
+	ctx = context.WithValue(ctx, constUtil.LocalPlayBoundKey, true)
+	ctx = context.WithValue(ctx, constUtil.LocalPlayOwnerKey, peer.Id)
+	return context.WithValue(ctx, constUtil.LocalPlayOffsetDaysKey, clock.OffsetDays), nil
+}
 func (s *GameService) p12FieldPVPFightAt(ctx context.Context, id int64, session []byte, b *pb.CSSidePvpFightResult, stamp int64, now time.Time) ([]proto.Message, error) {
+	return s.p12FieldPVPFightClocked(ctx, id, session, b, stamp, func() time.Time { return now })
+}
+
+// The physical presentation lease starts after combat computation. Tests can
+// supply an explicit clock without sleeping or altering calendar ownership.
+func (s *GameService) p12FieldPVPFightClocked(ctx context.Context, id int64, session []byte, b *pb.CSSidePvpFightResult, stamp int64, clock func() time.Time) ([]proto.Message, error) {
+	now := clock()
+	gameNow := LocalPlayAt(ctx, now)
 	if b == nil || id <= 0 || b.GetPlayerId() <= 0 || id == b.GetPlayerId() || stamp < 0 || b.GetFightType() < 0 || b.GetFightType() > 1 || b.GetServerId() != 0 && int64(b.GetServerId()) != s.OriginalServerID() {
 		return nil, errors.New("野外PK请求身份/类型无效")
 	}
@@ -517,12 +627,25 @@ func (s *GameService) p12FieldPVPFightAt(ctx context.Context, id int64, session 
 		if stamp > 0 {
 			q = q.Where("stamp=?", stamp)
 		} else {
-			q = q.Where("opponent_id=? AND busy_until>?", b.GetPlayerId(), now.UnixMilli())
+			q = q.Where("opponent_id=? AND clock_version=? AND real_busy_until>?", b.GetPlayerId(), db.P12FieldPVPWallClock, now.UnixMilli())
 		}
 		if !gameSchemaHasTable(tx, &db.P12FieldPVPReceipt{}) {
 			return errors.New(constUtil.P12FieldPVPClosed)
 		}
 		err = q.Order("created_at DESC").First(&previous).Error
+		if errors.Is(err, gorm.ErrRecordNotFound) && stamp == 0 {
+			// A legacy zero-stamp marker with unknown provenance remains locked.
+			// Recover only its own matching immutable receipt, without guessing
+			// whether that historical six-second deadline has elapsed.
+			var legacy db.P12FieldPVPState
+			stateErr := tx.First(&legacy, "player_id=?", id).Error
+			if stateErr != nil && !errors.Is(stateErr, gorm.ErrRecordNotFound) {
+				return stateErr
+			}
+			if stateErr == nil && legacy.ClockVersion == 0 && legacy.BusyUntil != 0 && legacy.LastFightID != "" {
+				err = tx.Where("fight_id=? AND player_id=? AND opponent_id=? AND clock_version=0", legacy.LastFightID, id, b.GetPlayerId()).First(&previous).Error
+			}
+		}
 		if err == nil {
 			if previous.OpponentID != b.GetPlayerId() || previous.RequestHash != requestHash {
 				return errors.New(constUtil.P12FieldPVPConflict)
@@ -533,6 +656,11 @@ func (s *GameService) p12FieldPVPFightAt(ctx context.Context, id int64, session 
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return err
 		}
+		peerCtx, err := s.p12FieldPVPPeerContext(ctx, tx, &peerRow)
+		if err != nil {
+			return err
+		}
+		peerGameNow := LocalPlayAt(peerCtx, now)
 		if g.Position.GetScene() == constUtil.GGOFieldScene && g.GGOField != nil {
 			if err = ggoCheckClientBuildLocked(tx, id, session, s.GGOFieldConfig); err != nil {
 				return err
@@ -573,18 +701,28 @@ func (s *GameService) p12FieldPVPFightAt(ctx context.Context, id int64, session 
 		}
 		states := make([]*db.P12FieldPVPState, 2)
 		for i, pair := range []struct {
-			p *pb.Player
-			g *model.GameState
-		}{{own, g}, {peer, pg}} {
-			states[i], err = p12FieldPVPState(tx, pair.p, pair.g, now)
+			p       *pb.Player
+			g       *model.GameState
+			ctx     context.Context
+			gameNow time.Time
+		}{{own, g, ctx, gameNow}, {peer, pg, peerCtx, peerGameNow}} {
+			if i == 0 {
+				states[i], err = p12FieldPVPState(tx, pair.p, pair.g, pair.gameNow)
+			} else {
+				states[i], err = p12FieldPVPLoadState(tx, pair.p, pair.g)
+			}
 			if err != nil {
 				return err
 			}
-			if states[i].BusyUntil > now.UnixMilli() || states[i].JailUntil > now.UnixMilli() {
+			busy, jail, e := p12FieldPVPDeadlines(states[i])
+			if e != nil || busy > now.UnixMilli() || jail > now.UnixMilli() {
+				if e != nil && e.Error() != constUtil.P12FieldPVPBusy && e.Error() != constUtil.P12FieldPVPJailed {
+					return e
+				}
 				response = &pb.SCSidePvpFightResult{Code: proto.Int32(2002)}
 				return nil
 			}
-			code, e := s.p12FieldPVPQualify(tx, pair.p, pair.g, now)
+			code, e := s.p12FieldPVPQualifyClocks(tx.WithContext(pair.ctx), pair.p, pair.g, now, pair.gameNow)
 			if e != nil {
 				return e
 			}
@@ -638,10 +776,12 @@ func (s *GameService) p12FieldPVPFightAt(ctx context.Context, id int64, session 
 			return errors.New("原每日击败上限已到")
 		}
 		for _, pair := range []struct {
-			p *pb.Player
-			g *model.GameState
-		}{{own, g}, {peer, pg}} {
-			if err = s.PrepareP5GuildPrayerProperties(ctx, tx, pair.p, pair.g, now); err != nil {
+			p       *pb.Player
+			g       *model.GameState
+			ctx     context.Context
+			gameNow time.Time
+		}{{own, g, ctx, gameNow}, {peer, pg, peerCtx, peerGameNow}} {
+			if err = s.PrepareP5GuildPrayerProperties(pair.ctx, tx, pair.p, pair.g, pair.gameNow); err != nil {
 				return err
 			}
 		}
@@ -692,7 +832,9 @@ func (s *GameService) p12FieldPVPFightAt(ctx context.Context, id int64, session 
 		if err = tx.First(&record, "id=?", recordID).Error; err != nil {
 			return err
 		}
-		if err = p12FieldPVPStoreRecord(tx, &record, terminal, now); err != nil {
+		acceptedAt := clock()
+		acceptedGameAt := LocalPlayAt(ctx, acceptedAt)
+		if err = p12FieldPVPStoreRecord(tx, &record, terminal, acceptedAt); err != nil {
 			return err
 		}
 		// Keep the original pre-fight side on the wire during the presentation lease.
@@ -738,18 +880,21 @@ func (s *GameService) p12FieldPVPFightAt(ctx context.Context, id int64, session 
 				winner, loser = pg, g
 				winnerID, loserID = peer.GetPlayerId(), id
 			}
-			if err = s.ggoSettlePVP(tx, winnerID, loserID, winner, loser, fightID, now.UnixMilli()); err != nil {
+			if err = s.ggoSettlePVP(tx, winnerID, loserID, winner, loser, fightID, acceptedAt.UnixMilli()); err != nil {
 				return err
 			}
 		}
 		// Red death applies to either participant, using the pre-reduction jail tier.
 		for i, pair := range []struct {
-			p *pb.Player
-			g *model.GameState
-		}{{own, g}, {peer, pg}} {
+			p       *pb.Player
+			g       *model.GameState
+			gameNow time.Time
+		}{{own, g, acceptedGameAt}, {peer, pg, LocalPlayAt(peerCtx, acceptedAt)}} {
 			st := states[i]
 			st.LastFightID = fightID
-			st.BusyUntil = now.UnixMilli() + constUtil.P12FieldPVPBusyMS
+			st.ClockVersion = db.P12FieldPVPWallClock
+			st.BusyUntil = pair.gameNow.UnixMilli() + constUtil.P12FieldPVPBusyMS
+			st.RealBusyUntil = acceptedAt.UnixMilli() + constUtil.P12FieldPVPBusyMS
 			if !desert && pair.g.Field.Side.GetCurHp() == 0 {
 				jailed, jailMS, e := s.p12FieldPVPKiller(st.Kills)
 				if e != nil {
@@ -759,6 +904,7 @@ func (s *GameService) p12FieldPVPFightAt(ctx context.Context, id int64, session 
 					if i == 1 && b.GetFightType() == 1 {
 						// Local judicial send preserves the pre-death jailFlag until release.
 						st.JailUntil = st.BusyUntil + max(jailMS, int64(st.Kills)*180000)
+						st.RealJailUntil = st.RealBusyUntil + max(jailMS, int64(st.Kills)*180000)
 						pair.p.RedeemTime = proto.Int64(st.JailUntil)
 					} else {
 						reduce, e := s.fieldConfigInt("ReduceKills")
@@ -776,9 +922,14 @@ func (s *GameService) p12FieldPVPFightAt(ctx context.Context, id int64, session 
 				if e != nil {
 					return e
 				}
-				life.DeathAt = now.UnixMilli()
-				life.SafeRecoveryAt = now.UnixMilli()
-				life.LastFightID = fightID
+				life.DeathAt = acceptedAt.UnixMilli()
+				life.SafeRecoveryAt = acceptedAt.UnixMilli()
+				// P8 uses this marker to consume the current settled PVE result.
+				// PK identity remains in the P12 state and immutable receipt; keep
+				// an older PVE result from resetting this new death's clock.
+				if fight := pair.g.Field.Fight; fight != nil && fight.Settled {
+					life.LastFightID = fight.Start.GetFightId()
+				}
 				if e = tx.Save(life).Error; e != nil {
 					return e
 				}
@@ -795,12 +946,12 @@ func (s *GameService) p12FieldPVPFightAt(ctx context.Context, id int64, session 
 			response.Result.Simps = []*pb.SimpleItem{{Id: proto.String("coin"), Num: proto.Int32(int32(loot))}}
 			response.Looted = resources
 		}
-		replay := &pb.SidePvpFightData{Id: proto.String(fightID), RandSeed: proto.Int64(frozen.Seed), AppVersion: proto.String(frozen.ClientVersion), ResVersion: proto.String(frozen.ClientVersion), Time: proto.Int64(now.UnixMilli()), MaxRoundCount: proto.Int32(40), AttPlayer: frozen.Attacker, DefPlayer: frozen.Defender, WinPlayerId: proto.Int64(win), AttGet: resources, DefLose: resources, AttFirstPlayerId: proto.Int64(id)}
+		replay := &pb.SidePvpFightData{Id: proto.String(fightID), RandSeed: proto.Int64(frozen.Seed), AppVersion: proto.String(frozen.ClientVersion), ResVersion: proto.String(frozen.ClientVersion), Time: proto.Int64(acceptedGameAt.UnixMilli()), MaxRoundCount: proto.Int32(40), AttPlayer: frozen.Attacker, DefPlayer: frozen.Defender, WinPlayerId: proto.Int64(win), AttGet: resources, DefLose: resources, AttFirstPlayerId: proto.Int64(id)}
 		winnerName := peer.GetName()
 		if win == id {
 			winnerName = own.GetName()
 		}
-		mv := &pb.SidePvpMV{FightId: proto.String(fightID), AttPlayerName: own.Name, DefPlayerName: peer.Name, AttHeroId: frozen.Attacker.Formation[0].Id, DefHeroId: frozen.Defender.Formation[0].Id, Time: proto.Int64(now.UnixMilli()), WinPlayerName: proto.String(winnerName), Resource: resources, AppVersion: replay.AppVersion, ResVersion: replay.ResVersion}
+		mv := &pb.SidePvpMV{FightId: proto.String(fightID), AttPlayerName: own.Name, DefPlayerName: peer.Name, AttHeroId: frozen.Attacker.Formation[0].Id, DefHeroId: frozen.Defender.Formation[0].Id, Time: proto.Int64(acceptedGameAt.UnixMilli()), WinPlayerName: proto.String(winnerName), Resource: resources, AppVersion: replay.AppVersion, ResVersion: replay.ResVersion}
 		body, err := proto.MarshalOptions{Deterministic: true}.Marshal(response)
 		if err != nil {
 			return err
@@ -817,7 +968,7 @@ func (s *GameService) p12FieldPVPFightAt(ctx context.Context, id int64, session 
 		if err != nil {
 			return err
 		}
-		receipt := db.P12FieldPVPReceipt{FightID: fightID, PlayerID: id, OpponentID: peer.GetPlayerId(), FightType: b.GetFightType(), RequestHash: requestHash, PolicyHash: policyHash, ScopeProof: terminal.Outcome.CapabilityHash, P6RecordID: recordID, WinnerID: win, LootCoin: loot, Response: body, ResponseHash: p6Digest(body), Terminal: term, TerminalHash: p6Digest(term), Replay: rraw, ReplayHash: p6Digest(rraw), MV: mraw, MVHash: p6Digest(mraw), CreatedAt: now.UnixMilli(), BusyUntil: now.UnixMilli() + constUtil.P12FieldPVPBusyMS}
+		receipt := db.P12FieldPVPReceipt{FightID: fightID, PlayerID: id, OpponentID: peer.GetPlayerId(), FightType: b.GetFightType(), RequestHash: requestHash, PolicyHash: policyHash, ScopeProof: terminal.Outcome.CapabilityHash, P6RecordID: recordID, WinnerID: win, LootCoin: loot, Response: body, ResponseHash: p6Digest(body), Terminal: term, TerminalHash: p6Digest(term), Replay: rraw, ReplayHash: p6Digest(rraw), MV: mraw, MVHash: p6Digest(mraw), CreatedAt: acceptedGameAt.UnixMilli(), BusyUntil: acceptedGameAt.UnixMilli() + constUtil.P12FieldPVPBusyMS, ClockVersion: db.P12FieldPVPWallClock, RealStartedAt: acceptedAt.UnixMilli(), RealBusyUntil: acceptedAt.UnixMilli() + constUtil.P12FieldPVPBusyMS}
 		if stamp > 0 {
 			receipt.Stamp = &stamp
 		}
@@ -930,6 +1081,13 @@ func (s *GameService) p12FieldPVPReadReceipt(tx *gorm.DB, row *db.P12FieldPVPRec
 		return nil, nil, errors.New(constUtil.P12FieldPVPConflict)
 	}
 	if row.PolicyHash != p6Digest([]byte(constUtil.P12FieldPVPSource)) || p6Digest(row.Response) != row.ResponseHash || p6Digest(row.Terminal) != row.TerminalHash || p6Digest(row.Replay) != row.ReplayHash || p6Digest(row.MV) != row.MVHash || row.BusyUntil != row.CreatedAt+constUtil.P12FieldPVPBusyMS {
+		return bad()
+	}
+	if row.ClockVersion == 0 {
+		if row.RealStartedAt != 0 || row.RealBusyUntil != 0 {
+			return bad()
+		}
+	} else if row.ClockVersion != db.P12FieldPVPWallClock || row.RealStartedAt <= 0 || row.RealStartedAt > math.MaxInt64-constUtil.P12FieldPVPBusyMS || row.RealBusyUntil != row.RealStartedAt+constUtil.P12FieldPVPBusyMS {
 		return bad()
 	}
 	var record db.P6BattleRecord
@@ -1061,22 +1219,26 @@ func (s *GameService) p12FieldPVPRedeemAt(ctx context.Context, id int64, session
 		if err = saveProfile(tx, row, p, g); err != nil {
 			return err
 		}
-		st, err := p12FieldPVPState(tx, p, g, now)
+		st, err := p12FieldPVPState(tx, p, g, LocalPlayAt(ctx, now))
 		if err != nil {
 			return err
 		}
-		if st.JailUntil == 0 {
+		busy, jail, err := p12FieldPVPDeadlines(st)
+		if err != nil {
+			return err
+		}
+		if jail == 0 {
 			out.RedeemTime = proto.Int64(0)
 			return nil
 		}
-		if st.JailUntil <= now.UnixMilli() {
+		if jail <= now.UnixMilli() {
 			if err = s.p12FieldPVPRelease(tx, p, g, st, now); err != nil {
 				return err
 			}
 			out.RedeemTime = proto.Int64(0)
 			return saveProfile(tx, row, p, g)
 		}
-		if st.BusyUntil > now.UnixMilli() {
+		if busy > now.UnixMilli() {
 			return errors.New(constUtil.P12FieldPVPBusy)
 		}
 		cost, err := s.p12FieldPVPRedeemCost(st)
@@ -1185,10 +1347,10 @@ func (s *GameService) p12FieldPVPMV(ctx context.Context, id int64, session []byt
 func (s *GameService) DispatchP12FieldPVP(ctx context.Context, id int64, session []byte, request proto.Message, stamp int64) ([]proto.Message, bool, error) {
 	switch b := request.(type) {
 	case *pb.CSSidePvpFightResult:
-		out, err := s.p12FieldPVPFightAt(ctx, id, session, b, stamp, LocalPlayNow(ctx))
+		out, err := s.p12FieldPVPFightClocked(ctx, id, session, b, stamp, time.Now)
 		return out, true, err
 	case *pb.CSPlayerRedeem:
-		out, err := s.p12FieldPVPRedeemAt(ctx, id, session, b, stamp, LocalPlayNow(ctx))
+		out, err := s.p12FieldPVPRedeemAt(ctx, id, session, b, stamp, time.Now())
 		return out, true, err
 	case *pb.CSSideGetPvpMVList, *pb.CSSideGetPvpMV:
 		out, err := s.p12FieldPVPMV(ctx, id, session, request)

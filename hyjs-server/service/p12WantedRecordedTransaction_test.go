@@ -81,8 +81,8 @@ func TestP12Wanted65ManualAutoEndColdConflict(t *testing.T) {
 	// Only a mismatch returned from the actual replay boundary may release the
 	// lease. Transport/DB failures and an untyped similar message must not.
 	for _, transient := range []error{context.DeadlineExceeded, errors.New("database connection lost"), errors.New(constUtil.P6ReplayConflict + ": 原录像终局或完整技能记录不符 round=untrusted")} {
-		if err = recordP12WantedRejectedEnd(f.ctx, f.id, fight.ID, now, transient); err != nil {
-			t.Fatal(err)
+		if pending, err := recordP12WantedRejectedEnd(f.ctx, f.id, fight.ID, now, transient); err != nil || pending {
+			t.Fatal("unclassified error must stay pending without recovery", pending, err)
 		}
 		var active db.P12WantedFight
 		if err = db.GetIns().First(&active, "id=?", fight.ID).Error; err != nil || active.RejectedAt != 0 || active.RejectedReason != "" {

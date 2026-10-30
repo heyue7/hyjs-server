@@ -20,8 +20,12 @@ CREATE TABLE IF NOT EXISTS p12_field_pvp_receipts (
  mv_hash VARCHAR(64) NOT NULL,
  created_at BIGINT NOT NULL,
  busy_until BIGINT NOT NULL,
+ clock_version INT NOT NULL DEFAULT 0,
+ real_started_at BIGINT NOT NULL DEFAULT 0,
+ real_busy_until BIGINT NOT NULL DEFAULT 0,
  UNIQUE KEY p12_pk_stamp(player_id,stamp),
  UNIQUE KEY idx_p12_field_pvp_receipts_p6_record_id(p6_record_id),
  KEY p12_pk_owner(player_id,created_at),
- KEY p12_pk_peer(opponent_id,created_at)
+ KEY p12_pk_peer(opponent_id,created_at),
+ KEY idx_p12_pk_real_busy(real_busy_until)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

@@ -44,6 +44,13 @@ func (s *GameService) computeFrozenBattleFinalHPRoundControlled(ctx context.Cont
 	return s.computeFrozenBattleFinalHPLiveControlled(ctx, input, supplied, originalRecordMode, formation, controls, false)
 }
 
+// A completed Wanted live-record calculation can carry its original mismatch
+// alongside the terminal. It is not an authoritative or accepted result.
+type p6CompletedRecordedMismatchError struct{ cause error }
+
+func (e *p6CompletedRecordedMismatchError) Error() string { return e.cause.Error() }
+func (e *p6CompletedRecordedMismatchError) Unwrap() error { return e.cause }
+
 func (s *GameService) computeFrozenBattleFinalHPLiveControlled(ctx context.Context, input *model.FrozenBattleInput, supplied *pb.BattleOperate, originalRecordMode bool, formation *pb.BattleTransOperate, controls []p6RoundAutoControl, liveRecorded bool) (*model.CombatFinalHPOutcome, error) {
 	if ctx == nil || input == nil {
 		return nil, errors.New(constUtil.CombatInvalid)
@@ -112,8 +119,13 @@ func (s *GameService) computeFrozenBattleFinalHPLiveControlled(ctx context.Conte
 		driverRecord = nil
 	}
 	result.Outcome, err = s.computeFrozenBattleRecordLiveControlled(ctx, frozen, driverRecord, nil, terminal, originalRecordMode, formation, controls, liveRecorded)
+	var completedMismatch error
 	if err != nil {
-		return nil, err
+		var mismatch *p6CompletedRecordedMismatchError
+		if !liveRecorded || input.BattleType != 8 || !errors.As(err, &mismatch) {
+			return nil, err
+		}
+		completedMismatch = err
 	}
 	if originalRecordMode {
 		// Project the actual completed command container before returning its
@@ -128,5 +140,5 @@ func (s *GameService) computeFrozenBattleFinalHPLiveControlled(ctx context.Conte
 			return nil, errors.New(constUtil.P6ReplayConflict)
 		}
 	}
-	return result, nil
+	return result, completedMismatch
 }

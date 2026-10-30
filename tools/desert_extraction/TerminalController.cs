@@ -86,10 +86,10 @@ namespace HYJS.DesertV4
             for (int i=0;i<6;i++)
             {
                 text.Append(Colors[i]).Append("色芯片 ").Append(chips[i]);
-                if (protectedChips[i]>0) text.Append("（保护 ").Append(protectedChips[i]).Append("）");
+                if (protectedChips[i]>0) text.Append("（死亡不掉落 ").Append(protectedChips[i]).Append("）");
                 text.Append("\n");
             }
-            text.Append("回收信用点 ").Append(credit).Append("\n确认结算携带芯片？");
+            text.Append("现有回收信用点 ").Append(credit).Append("\n确认结算携带芯片？");
             BoxManager.CreateMessageBoxWithCofirmAndCancelButton(text.ToString(),delegate(bool confirmed)
             {
                 if (!confirmed || !OwnerCurrent() || busy) return;
