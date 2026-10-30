@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, toRaw, watch } from 'vue';
 import { onBeforeRouteLeave, useRoute } from 'vue-router';
 import { ApiError, api, errorMessage, json } from '@/service/operations';
-import type { CombatMember, FieldChannel, FieldDeployment, FieldDeployments, FieldPresentation, FieldResource, FieldTemplate, FieldWorldBossStatus } from '@/service/fields';
+import type { CombatMember, FieldChannel, FieldDeployment, FieldDeployments, FieldGGOConfiguration, FieldPresentation, FieldResource, FieldTemplate, FieldWorldBossStatus } from '@/service/fields';
 import { useServerScopeStore } from '@/store/modules/server-scope';
 import { useOperations } from '@/composables/useOperations';
 import CombatEditor from './combat-editor.vue';
@@ -46,6 +46,9 @@ const conflict = ref(false);
 const search = ref('');
 const activeTab = ref('overview');
 const rewardLevel = ref(1);
+const ggoImportText = ref('');
+const ggoImportError = ref('');
+const ggoImportSuccess = ref('');
 const dirty = computed(() => Boolean(selected.value) && JSON.stringify(selected.value) !== original.value);
 const filtered = computed(() =>
   templates.value.filter(t => `${t.name} ${t.configuration.scene}`.includes(search.value))
@@ -86,6 +89,46 @@ function accept(row: FieldTemplate) {
   original.value = JSON.stringify(selected.value);
   conflict.value = false;
   rewardLevel.value = 1;
+  ggoImportText.value = '';
+  ggoImportError.value = '';
+  ggoImportSuccess.value = '';
+}
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+function isRecordArray(value: unknown): value is Record<string, unknown>[] {
+  return Array.isArray(value) && value.every(isRecord);
+}
+function isGgoImport(value: unknown): value is FieldGGOConfiguration {
+  if (!isRecord(value) || value.schemaVersion !== 3 || !isRecord(value.rules) || !isRecord(value.extraction)) return false;
+  if (![value.npcs, value.monsters, value.bosses, value.chips].every(isRecordArray) || !isRecord(value.runtime)) return false;
+  const runtime = value.runtime;
+  if (!isRecord(runtime.resource) || !isRecord(runtime.boss) || !isRecord(runtime.shop)) return false;
+  if (![runtime.points, runtime.entryPoints, runtime.monsterTiers, runtime.resource.tiers].every(isRecordArray)) return false;
+  if (!isRecordArray(runtime.resource.tiers) || !runtime.resource.tiers.every(tier => isRecordArray(tier.mineDrops) && isRecordArray(tier.fishDrops))) return false;
+  const boss = runtime.boss;
+  if (![boss.rankRewards, boss.tailRewards, boss.resourceDrops, boss.rankResourceDrops, boss.tailResourceDrops, boss.overclockRewards].every(isRecordArray)) return false;
+  return isRecordArray(boss.rankResourceDrops) && boss.rankResourceDrops.every(rank => isRecordArray(rank.drops)) &&
+    isRecordArray(boss.overclockRewards) && boss.overclockRewards.every(reward => isRecordArray(reward.quantities));
+}
+function importGgo() {
+  if (readonly.value || !selected.value || selected.value.configuration.scene !== 'field_003') return;
+  ggoImportError.value = '';
+  ggoImportSuccess.value = '';
+  let data: unknown;
+  try {
+    data = JSON.parse(ggoImportText.value);
+  } catch {
+    ggoImportError.value = 'JSON 格式有误，请检查后重新粘贴。';
+    return;
+  }
+  if (!isRecord(data) || data.scene !== 'field_003' || !isGgoImport(data.ggo)) {
+    ggoImportError.value = '请粘贴完整的沙漠地图配置，包含场景 field_003 和完整的搜打撤配置。';
+    return;
+  }
+  selected.value.configuration.ggo = data.ggo;
+  ggoImportText.value = '';
+  ggoImportSuccess.value = '已导入当前草稿，请保存修改并通过区服发布流程生效。';
 }
 function confirmAction(content: string): Promise<boolean> {
   return new Promise(resolve => {
@@ -380,6 +423,24 @@ onMounted(load);
               <p v-if="cfg.ggo?.runtime" class="ops-muted">沙漠公共资源数量与点位在“搜打撤配置”中设置。</p><p v-else class="ops-muted">矿物和鱼群从候选位置随机刷新，同一轮不会占用重复位置。</p>
             </NTabPane>
             <NTabPane v-if="cfg.scene === 'field_003'" name="ggo" tab="搜打撤配置">
+              <NCollapse class="mb-4">
+                <NCollapseItem title="导入搜打撤配置" name="ggo-import">
+                  <p class="mb-3 ops-muted">粘贴完整的沙漠地图 JSON，仅替换当前搜打撤草稿。导入后需另行保存和发布。</p>
+                  <NInput
+                    v-model:value="ggoImportText"
+                    type="textarea"
+                    :autosize="{ minRows: 6, maxRows: 12 }"
+                    :disabled="readonly"
+                    :input-props="{ 'aria-label': '沙漠地图配置 JSON' }"
+                    placeholder="在此粘贴完整配置 JSON"
+                  />
+                  <div class="mt-3">
+                    <NButton :disabled="readonly || !ggoImportText.trim()" @click="importGgo">导入到草稿</NButton>
+                  </div>
+                  <NAlert v-if="ggoImportError" type="error" class="mt-3">{{ ggoImportError }}</NAlert>
+                  <NAlert v-if="ggoImportSuccess" type="success" class="mt-3">{{ ggoImportSuccess }}</NAlert>
+                </NCollapseItem>
+              </NCollapse>
               <GgoConfigEditor v-if="cfg.ggo" v-model:value="cfg.ggo" :disabled="readonly" :resources="gatherResources" :boss-resources="bossResources" />
               <div v-if="cfg.ggo" class="ggo-save-bar">
                 <span class="ops-muted" role="status">{{ dirty ? '有未保存修改' : '当前方案已保存' }}</span>
