@@ -56,23 +56,33 @@ namespace HYJS.DesertV4
             if (instance==null || instance.room!=value) return;
             instance.generation++; instance.room=null; instance.pending=null; instance.busy=false;
         }
-        bool Current()
+        bool SameScene()
         {
             FieldWire.Session who;
             return room!=null && room==RoomManager.currentRoom && room is RoomField && StaticData.fieldId=="field_003" &&
-                scene==FieldRuntime.SceneVersion && epoch==PositionSync.ConnectionEpoch && FieldWire.Current(out who) && Same(owner,who);
+                scene==FieldRuntime.SceneVersion && FieldWire.Current(out who) && Same(owner,who);
+        }
+        bool Current() { return SameScene() && epoch==PositionSync.ConnectionEpoch; }
+        void RebindConnection()
+        {
+            if (!SameScene() || epoch==PositionSync.ConnectionEpoch) return;
+            // A reconnect can keep the same room and actor. Invalidate old
+            // callbacks and discover the new connection's authoritative state.
+            epoch=PositionSync.ConnectionEpoch; generation++; attempts=0;
+            busy=known=prompted=approved=delivered=warned=false;
+            pending=null; nextAttempt=0;
         }
         bool Still(int version)
         { return generation==version && Current(); }
         public static bool Pending
-        { get { return instance!=null && instance.Current() && (!instance.known || instance.pending!=null); } }
+        { get { return instance!=null && instance.SameScene() && (!instance.Current() || !instance.known || instance.pending!=null); } }
         public static bool AllowNewEncounter()
         { return instance!=null && instance.Current() && instance.known && instance.pending==null; }
         void Notice(string message)
         { if (!warned) { warned=true; BoxManager.CreatePopupTextBox(message,0f); } }
         void Failed()
         {
-            busy=false; known=false; nextAttempt=Time.realtimeSinceStartup+2f;
+            busy=false; known=false; nextAttempt=Time.realtimeSinceStartup+Math.Min(30,2+2*Math.Min(attempts,14));
             if (attempts>=3) Notice("上次战斗状态待确认，请重新连接后重试");
         }
         static Accepted ParseActive(int type,FieldWireResult result)
@@ -180,10 +190,15 @@ namespace HYJS.DesertV4
         }
         void Update()
         {
-            if (!Current() || delivered || BattleRecovery.HasEndJournal() || BattleRecovery.LivePresent || !FieldRuntime.InteractionReady) return;
+            // Fight discovery is a read-only authenticated query and must be
+            // able to finish while the position/UI readiness gate is blocked.
+            // Only prompting and resuming require the original UI to be ready.
+            RebindConnection();
+            if (!Current() || delivered || BattleRecovery.HasEndJournal() || BattleRecovery.LivePresent) return;
             if (busy || Time.realtimeSinceStartup<nextAttempt) return;
-            if (!known) { if (attempts<3) Discover(); return; }
+            if (!known) { Discover(); return; }
             if (pending==null) return;
+            if (!FieldRuntime.InteractionReady) return;
             if (approved) Resume();
             else if (!prompted) Prompt();
         }

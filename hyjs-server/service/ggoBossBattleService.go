@@ -55,39 +55,94 @@ func (s *GameService) ggoBossCheck(ctx context.Context, id int64, request *pb.CS
 	return []proto.Message{result}, err
 }
 
-// Only the desert event builds one enemy. Other ordinary boss formations keep
-// their original four-member contract and original wire messages.
+// The frozen event selects the legacy single encounter or the original
+// boss_003 formation, so retained old events keep their visible model.
 func (s *GameService) ggoBossMonster(event *ggoBossEvent, currentHP float64) (*pb.BattleMonster, error) {
-	base := s.fieldBossLeaderInScene(constUtil.GGOFieldBossID, constUtil.GGOFieldScene)
-	hero := s.table("Hero", "id", event.Boss.HeroID)
-	if base == nil || hero == nil || hero["resName"] == "" {
-		return nil, errors.New("沙漠首领原模型或技能缺失")
+	if event == nil || event.ID == "" || event.Boss.Level < 1 || event.Boss.HP < 1 || event.Boss.Attack < 1 || event.Boss.PhyDefend < 0 || event.Boss.MagicDefend < 0 {
+		return nil, errors.New("沙漠首领事件参数无效")
 	}
-	row := make(map[string]string, len(base))
-	for key, value := range base {
-		row[key] = value
-	}
-	row["HeroId"] = event.Boss.HeroID
-	row["Level"] = fmt.Sprint(event.Boss.Level)
-	row["Hp"] = fmt.Sprint(event.Boss.HP)
-	row["Attack"] = fmt.Sprint(event.Boss.Attack)
-	row["PhyDefend"] = fmt.Sprint(event.Boss.PhyDefend)
-	row["MagicDefend"] = fmt.Sprint(event.Boss.MagicDefend)
-	for _, key := range []string{"SkillId1", "SkillId2", "UltSkillId"} {
-		row[key] = hero[key]
-	}
-	for i := 0; i < 6; i++ {
-		delete(row, fmt.Sprintf("Talent%d", i))
-	}
-	actor, err := s.actor(row, ggoBossGUID(event.ID), 13, true)
-	if err != nil {
-		return nil, err
-	}
-	if !combatFinite(currentHP) || currentHP <= 0 || currentHP > actor.GetProp().GetHp() {
+	if !combatFinite(currentHP) || currentHP <= 0 || currentHP > float64(event.Boss.HP) {
 		return nil, errors.New("沙漠首领当前生命无效")
 	}
-	actor.Inst.CurHp = proto.Float64(currentHP)
-	return &pb.BattleMonster{MonsterId: proto.Int64(1), ServerId: proto.Int32(1), TaskId: proto.String(constUtil.GGOFieldBossID), GroupIndex: proto.Int32(1), Formation: []*pb.BattleHero{actor}, Inst: &pb.BattleMonsterInst{Anger: proto.Float64(0)}}, nil
+	if event.Boss.HeroID == "hero_017" {
+		base := s.fieldBossLeaderInScene(constUtil.GGOFieldBossID, constUtil.GGOFieldScene)
+		hero := s.table("Hero", "id", event.Boss.HeroID)
+		if base == nil || hero == nil || hero["resName"] == "" {
+			return nil, errors.New("沙漠首领原模型或技能缺失")
+		}
+		row := make(map[string]string, len(base))
+		for key, value := range base {
+			row[key] = value
+		}
+		row["HeroId"] = event.Boss.HeroID
+		row["Level"] = fmt.Sprint(event.Boss.Level)
+		row["Hp"] = fmt.Sprint(event.Boss.HP)
+		row["Attack"] = fmt.Sprint(event.Boss.Attack)
+		row["PhyDefend"] = fmt.Sprint(event.Boss.PhyDefend)
+		row["MagicDefend"] = fmt.Sprint(event.Boss.MagicDefend)
+		for _, key := range []string{"SkillId1", "SkillId2", "UltSkillId"} {
+			row[key] = hero[key]
+		}
+		for i := 0; i < 6; i++ {
+			delete(row, fmt.Sprintf("Talent%d", i))
+		}
+		actor, err := s.actor(row, ggoBossGUID(event.ID), 13, true)
+		if err != nil {
+			return nil, err
+		}
+		actor.Inst.CurHp = proto.Float64(currentHP)
+		return &pb.BattleMonster{MonsterId: proto.Int64(1), ServerId: proto.Int32(1), TaskId: proto.String(constUtil.GGOFieldBossID), GroupIndex: proto.Int32(1), Formation: []*pb.BattleHero{actor}, Inst: &pb.BattleMonsterInst{Anger: proto.Float64(0)}}, nil
+	}
+	if event.Boss.HeroID != "monster_047" {
+		return nil, errors.New("沙漠首领事件模型无效")
+	}
+	rows := s.fieldBossRows(constUtil.GGOFieldBossID)
+	if len(rows) != 4 {
+		return nil, errors.New("沙漠首领原阵容缺失")
+	}
+	monster := &pb.BattleMonster{MonsterId: proto.Int64(1), ServerId: proto.Int32(1), TaskId: proto.String(constUtil.GGOFieldBossID), GroupIndex: proto.Int32(1), Inst: &pb.BattleMonsterInst{Anger: proto.Float64(0)}}
+	seen := map[string]bool{}
+	for _, base := range rows {
+		location := base["Location"]
+		leader := location == "13"
+		if seen[location] || (location != "13" && location != "7" && location != "9" && location != "3") ||
+			(leader && (base["TeamLeader"] != "1" || base["HeroId"] != "monster_047")) ||
+			(!leader && (base["TeamLeader"] != "0" || base["HeroId"] != "monster_033")) {
+			return nil, errors.New("沙漠首领原阵容无效")
+		}
+		seen[location] = true
+		hero := s.table("Hero", "id", base["HeroId"])
+		if hero == nil || hero["resName"] == "" {
+			return nil, errors.New("沙漠首领原模型缺失")
+		}
+		row := make(map[string]string, len(base))
+		for key, value := range base {
+			row[key] = value
+		}
+		guid := fmt.Sprintf("%s-%s", ggoBossGUID(event.ID), location)
+		if leader {
+			guid = ggoBossGUID(event.ID)
+			row["Level"] = fmt.Sprint(event.Boss.Level)
+			row["Hp"] = fmt.Sprint(event.Boss.HP)
+			row["Attack"] = fmt.Sprint(event.Boss.Attack)
+			row["PhyDefend"] = fmt.Sprint(event.Boss.PhyDefend)
+			row["MagicDefend"] = fmt.Sprint(event.Boss.MagicDefend)
+		} else {
+			// Baseline used by the original-engine 15-party calibration; skill,
+			// talents and all other properties continue to come from boss_003.
+			row["Level"], row["Hp"], row["Attack"] = "60", "573045", "37500"
+			row["PhyDefend"], row["MagicDefend"] = "7000", "7000"
+		}
+		actor, err := s.actor(row, guid, int32(tableNumber(row, "Location")), true)
+		if err != nil {
+			return nil, err
+		}
+		if leader {
+			actor.Inst.CurHp = proto.Float64(currentHP)
+		}
+		monster.Formation = append(monster.Formation, actor)
+	}
+	return monster, nil
 }
 
 func (s *GameService) ggoBossFightStart(ctx context.Context, id int64, request *pb.CSSidePveBossFightStart) ([]proto.Message, error) {
@@ -318,8 +373,69 @@ func ggoBossRecordedEnd(tx *gorm.DB, id int64, request *pb.CSSidePveBossFightEnd
 	return result, true, nil
 }
 
+// ggoBossLeaderDamage validates every frozen enemy and its terminal HP, while
+// only the leader contributes to the line's shared event health.
+func ggoBossLeaderDamage(fight *model.FieldFight, input *model.FrozenBattleInput, terminal *model.CombatFinalHPOutcome) (float64, error) {
+	if fight == nil || fight.GGOBoss == nil || fight.GGOBoss.EventID == "" || input == nil || input.Monster == nil || terminal == nil {
+		return 0, errors.New("沙漠首领冻结战斗无效")
+	}
+	leaderGUID := ggoBossGUID(fight.GGOBoss.EventID)
+	if fight.BossLeaderGUID != "" && fight.BossLeaderGUID != leaderGUID {
+		return 0, errors.New("沙漠首领冻结标识无效")
+	}
+	formation := input.Monster.GetFormation()
+	if len(formation) != 1 && len(formation) != 4 {
+		return 0, errors.New("沙漠首领冻结阵容无效")
+	}
+	actors := make(map[string]*pb.BattleHero, len(formation))
+	for _, actor := range formation {
+		if actor == nil || actor.GetGuid() == "" || actor.Prop == nil || actor.Inst == nil || actors[actor.GetGuid()] != nil {
+			return 0, errors.New("沙漠首领冻结成员无效")
+		}
+		maxHP, currentHP := actor.Prop.GetHp(), actor.Inst.GetCurHp()
+		if !combatFinite(maxHP) || maxHP <= 0 || !combatFinite(currentHP) || currentHP < 0 || currentHP > maxHP {
+			return 0, errors.New("沙漠首领冻结血量无效")
+		}
+		actors[actor.GetGuid()] = actor
+	}
+	leader := actors[leaderGUID]
+	if leader == nil || leader.Inst.GetCurHp() <= 0 {
+		return 0, errors.New("沙漠首领冻结主怪无效")
+	}
+	seen := make(map[string]bool, len(actors))
+	var leaderFinal float64
+	for _, final := range terminal.FinalActors {
+		if final.Camp == 0 {
+			continue
+		}
+		if final.Camp != 1 {
+			return 0, errors.New("沙漠首领终局阵营无效")
+		}
+		actor := actors[final.GUID]
+		if actor == nil || seen[final.GUID] || !combatFinite(final.MaxHP) || final.MaxHP != actor.Prop.GetHp() ||
+			!combatFinite(final.CurrentHP) || final.CurrentHP < 0 || final.CurrentHP > final.MaxHP {
+			return 0, errors.New("沙漠首领终局敌方成员无效")
+		}
+		seen[final.GUID] = true
+		if final.GUID == leaderGUID {
+			leaderFinal = final.CurrentHP
+		}
+	}
+	if len(seen) != len(actors) {
+		return 0, errors.New("沙漠首领终局敌方成员缺失")
+	}
+	return math.Max(0, leader.Inst.GetCurHp()-leaderFinal), nil
+}
+
 func (s *GameService) ggoBossApplyDamageLocked(tx *gorm.DB, id int64, fight *model.FieldFight, input *model.FrozenBattleInput, terminal *model.CombatFinalHPOutcome, now int64) (*pb.SideBoss, float64, error) {
+	damage, err := ggoBossLeaderDamage(fight, input, terminal)
+	if err != nil {
+		return nil, 0, err
+	}
 	frozen := fight.GGOBoss
+	if frozen.Boss == nil {
+		return nil, 0, errors.New("沙漠首领冻结投影无效")
+	}
 	boss := proto.Clone(frozen.Boss).(*pb.SideBoss)
 	line, err := ggoBossFrozenLine(frozen)
 	if err != nil {
@@ -343,26 +459,7 @@ func (s *GameService) ggoBossApplyDamageLocked(tx *gorm.DB, id int64, fight *mod
 	if row.KillerID != 0 {
 		return shared, 0, nil
 	}
-	if len(input.Monster.GetFormation()) != 1 {
-		return nil, 0, errors.New("沙漠首领必须为单体")
-	}
-	actor := input.Monster.Formation[0]
-	var final *model.CombatFinalActorHP
-	for i := range terminal.FinalActors {
-		candidate := &terminal.FinalActors[i]
-		if candidate.Camp != 1 {
-			continue
-		}
-		if final != nil || candidate.GUID != actor.GetGuid() {
-			return nil, 0, errors.New("首领终局敌方成员无效")
-		}
-		final = candidate
-	}
-	if final == nil || !combatFinite(final.CurrentHP) || final.CurrentHP < 0 || final.MaxHP != actor.GetProp().GetHp() {
-		return nil, 0, errors.New("首领终局血量无效")
-	}
 	key := ggoBossGUID(event.ID)
-	damage := math.Max(0, actor.GetInst().GetCurHp()-final.CurrentHP)
 	damage = math.Min(hp[key], damage)
 	if !combatFinite(damage) {
 		return nil, 0, errors.New("首领有效伤害无效")
@@ -450,7 +547,7 @@ func (s *GameService) ggoBossFightEnd(ctx context.Context, id int64, request *pb
 		if err != nil {
 			return err
 		}
-		if input.BattleType != constUtil.FieldBossBattleType || len(input.Monster.GetFormation()) != 1 {
+		if input.BattleType != constUtil.FieldBossBattleType || (len(input.Monster.GetFormation()) != 1 && len(input.Monster.GetFormation()) != 4) {
 			return errors.New("沙漠首领冻结输入无效")
 		}
 		if _, err = s.ValidateP6GenericMechanisms(tx.Statement.Context, input); err != nil {

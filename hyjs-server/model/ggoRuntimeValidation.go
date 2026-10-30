@@ -78,7 +78,7 @@ func ValidAdminFieldGGORuntime(g *AdminFieldGGOConfiguration) bool {
 		return false
 	}
 	b := r.Boss
-	if b.HeroID != "hero_017" || b.Level < 1 || b.Level > 1000 || b.HP < 1 || b.HP > 2000000000 || b.Attack < 1 || b.Attack > 2000000000 ||
+	if (b.HeroID != "hero_017" && b.HeroID != "monster_047") || b.Level < 1 || b.Level > 1000 || b.HP < 1 || b.HP > 2000000000 || b.Attack < 1 || b.Attack > 2000000000 ||
 		b.PhyDefend < 0 || b.PhyDefend > 2000000000 || b.MagicDefend < 0 || b.MagicDefend > 2000000000 ||
 		b.ParticipationThresholdBps < 1 || b.ParticipationThresholdBps > 10000 || b.DailyLimit < 1 || b.DailyLimit > 100 ||
 		b.ActiveSeconds < 1 || b.ActiveSeconds > 86400 || b.PartyRounds < 1 || b.PartyRounds > 20 || b.WarningSeconds < 0 || b.WarningSeconds > 86400 ||

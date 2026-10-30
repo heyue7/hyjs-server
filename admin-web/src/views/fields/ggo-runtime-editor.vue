@@ -276,12 +276,12 @@ const npcRoles: Record<string, string> = { teleport: '随机传送', extraction:
       </section>
 
       <section class="runtime-section">
-        <h3>唯一公共 Boss</h3>
+        <h3>每线首领</h3>
         <div class="runtime-grid">
           <NFormItem label="Boss 模型">
             <NSelect
               v-model:value="runtime.boss.heroId"
-              :options="value.bosses.filter(enemy => enemy.heroId === 'hero_017').map(enemy => ({ label: enemy.name, value: enemy.heroId }))"
+              :options="[...value.bosses.filter(enemy => enemy.heroId === 'hero_017').map(enemy => ({ label: enemy.name, value: enemy.heroId })), { label: '双头怪', value: 'monster_047' }]"
             />
           </NFormItem>
           <NFormItem v-for="f in bossFields" :key="f.key" :label="f.label">

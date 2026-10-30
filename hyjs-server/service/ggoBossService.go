@@ -145,15 +145,21 @@ func (s *GameService) ggoBossCurrent(tx *gorm.DB, cfg *model.AdminFieldGGOConfig
 			return nil, nil, nil, nil, err
 		}
 	}
-	promote := false
+	promote, migrateFormation := false, false
 	if !missing && row.KillerID == 0 {
-		old, _, _, e := ggoBossDecode(&row)
+		old, _, hp, e := ggoBossDecode(&row)
 		if e != nil {
 			return nil, nil, nil, nil, e
 		}
 		promote = old.StartsAtMS > now || old.EndsAtMS != end
+		// Keep the same event and earned damage when the published RE boss
+		// replaces the earlier single-character model. Do not reduce a live
+		// boss to zero if damage already exceeds the new maximum.
+		damage := float64(old.Boss.HP) - hp[ggoBossGUID(old.ID)]
+		migrateFormation = old.Boss.HeroID == "hero_017" && cfg.Runtime.Boss.HeroID == "monster_047" &&
+			cfg.Runtime.Boss.HP > 0 && damage >= 0 && damage < float64(cfg.Runtime.Boss.HP)
 	}
-	if write || needs || promote {
+	if write || needs || promote || migrateFormation {
 		if missing {
 			row = db.SharedFieldBoss55{ServerID: s.OriginalServerID(), Scene: constUtil.GGOFieldScene, Line: line, PosID: constUtil.GGOFieldBossPosition, Payload: []byte("{}"), HP: []byte("{}")}
 			if err = tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&row).Error; err != nil {
@@ -205,20 +211,38 @@ func (s *GameService) ggoBossCurrent(tx *gorm.DB, cfg *model.AdminFieldGGOConfig
 		} else if row.KillerID == 0 {
 			// Promote the existing generation without discarding its health,
 			// contribution or frozen rewards when changing the availability rule.
-			event, _, _, e := ggoBossDecode(&row)
+			event, boss, hp, e := ggoBossDecode(&row)
 			if e != nil {
 				return nil, nil, nil, nil, e
 			}
+			changed := false
 			if event.StartsAtMS > now || event.EndsAtMS != end {
 				if event.StartsAtMS > now {
 					event.StartsAtMS = now
 				}
 				event.EndsAtMS = end
+				changed = true
+			}
+			damage := float64(event.Boss.HP) - hp[ggoBossGUID(event.ID)]
+			if event.Boss.HeroID == "hero_017" && cfg.Runtime.Boss.HeroID == "monster_047" &&
+				cfg.Runtime.Boss.HP > 0 && damage >= 0 && damage < float64(cfg.Runtime.Boss.HP) {
+				event.Boss.HeroID = cfg.Runtime.Boss.HeroID
+				event.Boss.Level = cfg.Runtime.Boss.Level
+				event.Boss.HP = cfg.Runtime.Boss.HP
+				event.Boss.Attack = cfg.Runtime.Boss.Attack
+				event.Boss.PhyDefend = cfg.Runtime.Boss.PhyDefend
+				event.Boss.MagicDefend = cfg.Runtime.Boss.MagicDefend
+				hp[ggoBossGUID(event.ID)] = float64(event.Boss.HP) - damage
+				boss.HeroId = proto.String(event.Boss.HeroID)
+				boss.CurHp = proto.Float64(hp[ggoBossGUID(event.ID)] / float64(event.Boss.HP))
+				changed = true
+			}
+			if changed {
 				row.GGOEvent, e = json.Marshal(event)
 				if e != nil {
 					return nil, nil, nil, nil, e
 				}
-				if e = query(tx.Model(&db.SharedFieldBoss55{})).Update("ggo_event", row.GGOEvent).Error; e != nil {
+				if e = saveSharedFieldBoss55(tx, &row, boss, hp); e != nil {
 					return nil, nil, nil, nil, e
 				}
 			}

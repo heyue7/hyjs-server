@@ -33,7 +33,7 @@ func defaultGGORuntime() *model.AdminFieldGGORuntime {
 			{HeroID: "monster_031", Level: 60, Count: 6, HP: 259024, Attack: 45329, PhyDefend: 7000, MagicDefend: 7000, RespawnSeconds: 30, ChipTriggerBps: 4500, RewardNumerator: 2, RewardDenominator: 1},
 		},
 		Boss: model.AdminFieldGGOBoss{
-			HeroID: "hero_017", Level: 60, HP: 134400000, Attack: 45000, PhyDefend: 7000, MagicDefend: 7000,
+			HeroID: "monster_047", Level: 60, HP: 43800000, Attack: 45000, PhyDefend: 7000, MagicDefend: 7000,
 			ParticipationThresholdBps: 300, DailyLimit: 3, ActiveSeconds: 1200, PartyRounds: 10, WarningSeconds: 180,
 			EveningStartHour: 18, DayIntervalMinutes: 60, EveningIntervalMinutes: 30,
 			ParticipationItemID: "item_9703", ParticipationAmount: 1, ThresholdAmount: 2,

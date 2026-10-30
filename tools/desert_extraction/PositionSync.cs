@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Reflection;
 using System.Threading;
 using NetWork.Packets;
@@ -16,6 +17,12 @@ namespace HYJS.DesertV4
         static readonly object gate=new object();
         static readonly Dictionary<Packet,int> packetEpoch=new Dictionary<Packet,int>();
         static readonly Queue<long> sent=new Queue<long>();
+        sealed class DeferredPosition
+        {
+            public int epoch;
+            public SCCurrentPosition frame;
+        }
+        static readonly Queue<DeferredPosition> deferred=new Queue<DeferredPosition>();
         // Only a body taken from the original socket event queue can satisfy a
         // request. RoomNetBase.Tick also calls the position handler directly
         // with a locally fabricated fallback after its scene-load timeout.
@@ -24,7 +31,8 @@ namespace HYJS.DesertV4
         static int epoch;
         static long sequence,expected,lockGeneration;
         static FieldWire.Session owner;
-        static bool overflow,confirmedBase,touchWasEnabled,authenticated;
+        static bool overflow,confirmedBase,touchWasEnabled,authenticated,unboundLogin;
+        static long nextBaseRetry;
         static volatile bool fieldActive,locked;
         static Action<Vector3> onResponse;
         static bool SameActor(FieldWire.Session a,FieldWire.Session b)
@@ -38,8 +46,14 @@ namespace HYJS.DesertV4
             if (!SameSession(owner,live))
             {
                 if (!SameActor(owner,live)) Release();
-                if (owner!=null) authenticated=false;
-                owner=live; sent.Clear(); sequence=expected=0; confirmedBase=false; overflow=false; onResponse=null;
+                if (owner!=null)
+                {
+                    authenticated=false; unboundLogin=false; sent.Clear(); deferred.Clear(); sequence=expected=0;
+                    confirmedBase=false; overflow=false; onResponse=null; nextBaseRetry=0;
+                }
+                // Keep sends observed on this connection before playerData
+                // became available. An established owner's change resets them.
+                owner=live;
             }
             return true;
         }
@@ -50,12 +64,14 @@ namespace HYJS.DesertV4
         {
             Interlocked.Increment(ref epoch);
             lock(gate) { dispatchedBody=null; dispatchedEpoch=0; }
-            sent.Clear(); sequence=expected=0; confirmedBase=false; overflow=false; authenticated=false; onResponse=null;
+            sent.Clear(); deferred.Clear(); sequence=expected=0; confirmedBase=false; overflow=false; authenticated=false; unboundLogin=false; onResponse=null; nextBaseRetry=0;
         }
         public static void LoginResponse(object value)
         {
             var response=value as SCSocketLogin;
-            if (response!=null && response.result==100 && Current()) authenticated=true;
+            if (response==null || response.result!=100) return;
+            if (Current()) { authenticated=true; unboundLogin=false; }
+            else unboundLogin=true;
         }
         // Called before SocketTool.ReceiveHandler on its network callback thread.
         // A late callback from an old socket may not enqueue into the new one.
@@ -99,11 +115,13 @@ namespace HYJS.DesertV4
             }
             return fieldActive && (!found || generation!=ConnectionEpoch);
         }
-        static bool TakeDispatched(object value)
+        static bool TakeDispatched(object value,out int dispatched)
         {
+            dispatched=0;
             lock(gate)
             {
                 if (dispatchedBody==null || !System.Object.ReferenceEquals(value,dispatchedBody) || dispatchedEpoch!=ConnectionEpoch) return false;
+                dispatched=dispatchedEpoch;
                 dispatchedBody=null; dispatchedEpoch=0; return true;
             }
         }
@@ -114,7 +132,10 @@ namespace HYJS.DesertV4
             if (opcode!=30024) return;
             try
             {
-                if (!Current()) return;
+                // A native request may precede playerData. Preserve its order
+                // under this connection epoch and bind its reply once the
+                // owner is known; ConnectionStarting always clears the queue.
+                Current();
                 if (sequence==Int64.MaxValue || sent.Count>=64) { overflow=true; return; }
                 sent.Enqueue(++sequence);
             }
@@ -129,20 +150,63 @@ namespace HYJS.DesertV4
             {
                 // The timeout fallback is a visual recovery, not a reply to
                 // 30024. Leave the real request queued for its eventual frame.
-                if (!TakeDispatched(value)) return;
-                if (!Current() || sent.Count==0) { confirmedBase=false; return; }
-                long actual=sent.Dequeue();
+                int dispatched;
+                if (!TakeDispatched(value,out dispatched) || dispatched!=ConnectionEpoch) return;
                 var rsp=value as SCCurrentPosition;
-                if (rsp==null || rsp.self==null || rsp.self.info==null || rsp.self.position==null || rsp.self.position.current==null ||
-                    rsp.self.info.playerId!=owner.playerId) { confirmedBase=false; return; }
-                confirmedBase=true;
-                if (expected==0 || actual!=expected) return;
-                PointNew p=rsp.self.position.current;
-                Vector3 position=new Vector3((float)p.x,(float)p.y,(float)p.z);
-                if (Single.IsNaN(position.x)||Single.IsNaN(position.y)||Single.IsNaN(position.z)||
-                    Single.IsInfinity(position.x)||Single.IsInfinity(position.y)||Single.IsInfinity(position.z)) { confirmedBase=false; return; }
+                bool current=Current();
+                if (dispatched!=ConnectionEpoch) return;
+                if (!current || deferred.Count>0)
+                {
+                    // Every saved response reserves one existing request.
+                    // No unsolicited or locally fabricated frame enters it.
+                    if (rsp==null || deferred.Count>=64 || deferred.Count>=sent.Count) { confirmedBase=false; return; }
+                    deferred.Enqueue(new DeferredPosition { epoch=dispatched,frame=rsp });
+                    return;
+                }
+                AcceptResponse(rsp);
+            }
+            catch (Exception) { confirmedBase=false; }
+        }
+        static bool AcceptResponse(SCCurrentPosition rsp)
+        {
+            if (sent.Count==0) { confirmedBase=false; return false; }
+            long actual=sent.Dequeue();
+            if (rsp==null || rsp.self==null || rsp.self.info==null || rsp.self.position==null || rsp.self.position.current==null ||
+                rsp.self.info.playerId!=owner.playerId) { confirmedBase=false; return false; }
+            PointNew p=rsp.self.position.current;
+            Vector3 position=new Vector3((float)p.x,(float)p.y,(float)p.z);
+            if (Single.IsNaN(position.x)||Single.IsNaN(position.y)||Single.IsNaN(position.z)||
+                Single.IsInfinity(position.x)||Single.IsInfinity(position.y)||Single.IsInfinity(position.z))
+            { confirmedBase=false; return false; }
+            if (unboundLogin) { authenticated=true; unboundLogin=false; }
+            confirmedBase=true;
+            if (expected!=0 && actual==expected)
+            {
                 expected=0; Action<Vector3> callback=onResponse; onResponse=null;
                 if (callback!=null) callback(position);
+            }
+            return true;
+        }
+        static void DrainDeferred()
+        {
+            try
+            {
+                if (deferred.Count==0) return;
+                RoomBase room=RoomManager.currentRoom;
+                if (room==null || room.netManager==null || room.charactorManager==null || room.charactorManager.GetSelfCharactor()==null) return;
+                SCCurrentPosition last=null;
+                while (deferred.Count>0)
+                {
+                    if (!Current() || deferred.Count==0 || room!=RoomManager.currentRoom) return;
+                    DeferredPosition value=deferred.Dequeue();
+                    if (value.epoch!=ConnectionEpoch) { deferred.Clear(); confirmedBase=false; return; }
+                    if (AcceptResponse(value.frame)) last=value.frame;
+                }
+                // The native handler ran before playerData was available, so its
+                // original readiness hook could not bind this real frame. Repeat
+                // only the readiness observation after ordered validation.
+                if (last!=null && fieldActive && room==RoomManager.currentRoom && ChannelReady)
+                    FieldRuntime.NativePositionReady(room.netManager,last);
             }
             catch (Exception) { confirmedBase=false; }
         }
@@ -189,7 +253,23 @@ namespace HYJS.DesertV4
         }
         public static void Tick()
         {
-            if (!locked || !Current()) return;
+            if (!Current()) return;
+            DrainDeferred();
+            if (!locked)
+            {
+                // Recover an unobserved or invalid initial frame by requesting
+                // a fresh native frame. Never replace an outstanding request or
+                // accept a local timeout fallback as an acknowledgement.
+                if (!confirmedBase && !overflow && (authenticated || unboundLogin) && sent.Count==0 &&
+                    NetAPI.SocketIsConnected() && Stopwatch.GetTimestamp()>=nextBaseRetry)
+                {
+                    nextBaseRetry=Stopwatch.GetTimestamp()+2L*Stopwatch.Frequency;
+                    RoomBase candidate=RoomManager.currentRoom;
+                    RoomNetField net=candidate==null ? null : candidate.netManager as RoomNetField;
+                    if (fieldActive && net!=null) try { net.SendCSCurrentPosition(null); } catch (Exception) { }
+                }
+                return;
+            }
             RoomBase room=RoomManager.currentRoom;
             if (room!=null && room.charactorManager!=null)
             {

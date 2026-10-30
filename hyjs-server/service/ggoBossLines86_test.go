@@ -165,7 +165,16 @@ func ggoBossLines86EndRequest(t *testing.T, f *p1Fixture, ctx context.Context, i
 		t.Fatal("native desert boss Start", id, err)
 	}
 	start := replies[0].(*pb.SCSidePveBossFightStart)
-	if len(start.BattleMonsterList) != 1 || len(start.BattleMonsterList[0].Formation) != 1 || start.BattleMonsterList[0].Formation[0].GetInst().GetCurHp() != float64(fullHP) {
+	if len(start.BattleMonsterList) != 1 {
+		t.Fatal("native Start must freeze the full boss", id)
+	}
+	var leader *pb.BattleHero
+	for _, actor := range start.BattleMonsterList[0].Formation {
+		if actor.GetGuid() == ggoBossGUID(eventID) {
+			leader = actor
+		}
+	}
+	if leader == nil || leader.GetInst().GetCurHp() != float64(fullHP) {
 		t.Fatal("native Start must freeze the full boss", id)
 	}
 	var profile db.Profile
@@ -191,8 +200,32 @@ func ggoBossLines86EndRequest(t *testing.T, f *p1Fixture, ctx context.Context, i
 	return &pb.CSSidePveBossFightEnd{FightId: start.FightId, Uuid: proto.String(eventID), Result: proto.Int32(result), OptRecord: terminal.OriginalOperates}
 }
 
+// These line-isolation cases use the previously released single-boss event;
+// its one-round fixture is too weak to reach the new formation's leader.
+func ggoBossLines86UseLegacyEvent(t *testing.T, f *p1Fixture, original *ggoBossEvent) {
+	t.Helper()
+	f.s.GGOFieldConfig.Runtime.Boss.HeroID = "hero_017"
+	if err := db.GetIns().Transaction(func(tx *gorm.DB) error {
+		row, event, boss, hp, err := f.s.ggoBossCurrent(tx, f.s.GGOFieldConfig, time.Now().UnixMilli(), true, 1)
+		if err != nil {
+			return err
+		}
+		event.Boss.HeroID = "hero_017"
+		original.Boss.HeroID = "hero_017"
+		boss.HeroId = proto.String("hero_017")
+		row.GGOEvent, err = json.Marshal(event)
+		if err != nil {
+			return err
+		}
+		return saveSharedFieldBoss55(tx, row, boss, hp)
+	}); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestGGOBossLines86IndependentSharedWithinLineAndColdReceipts(t *testing.T) {
 	f, firstCtx, _, firstEvent := ggoBossIntegrationFixture(t)
+	ggoBossLines86UseLegacyEvent(t, f, firstEvent)
 	peerID, peerCtx := ggoBossLines86Peer(t, f, firstCtx, firstEvent, 1)
 	otherID, otherCtx := ggoBossLines86Peer(t, f, firstCtx, firstEvent, 2)
 	var secondEvent *ggoBossEvent
@@ -376,6 +409,7 @@ func TestGGOBossLines86IndependentSharedWithinLineAndColdReceipts(t *testing.T) 
 // even when the reconnected player's new presence has moved to line two.
 func TestGGOBossLines86LegacyInFlightUsesLineOne(t *testing.T) {
 	f, ctx, _, current := ggoBossIntegrationFixture(t)
+	ggoBossLines86UseLegacyEvent(t, f, current)
 	legacy := *current
 	legacy.ID = "ggo-lines86-inflight-legacy"
 	legacy.Line = 0
@@ -517,7 +551,14 @@ func TestGGOBossLines86LastHitAndAwardsIndependent(t *testing.T) {
 		}
 		fight := &model.FieldFight{GGOBoss: &model.GGOFieldBossFight{Line: line, EventID: event.ID, EndsAtMS: event.EndsAtMS, Boss: &pb.SideBoss{Uuid: proto.String(event.ID)}}}
 		input := &model.FrozenBattleInput{Monster: monster}
-		terminal := &model.CombatFinalHPOutcome{FinalActors: []model.CombatFinalActorHP{{Camp: 1, GUID: ggoBossGUID(event.ID), CurrentHP: 0, MaxHP: float64(event.Boss.HP)}}}
+		terminal := &model.CombatFinalHPOutcome{}
+		for _, actor := range monster.Formation {
+			current := actor.GetInst().GetCurHp()
+			if actor.GetGuid() == ggoBossGUID(event.ID) {
+				current = 0
+			}
+			terminal.FinalActors = append(terminal.FinalActors, model.CombatFinalActorHP{Camp: 1, GUID: actor.GetGuid(), CurrentHP: current, MaxHP: actor.GetProp().GetHp()})
+		}
 		var damage float64
 		err = db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 			_, damage, err = f.s.ggoBossApplyDamageLocked(tx, id, fight, input, terminal, time.Now().UnixMilli())
@@ -667,7 +708,15 @@ func TestGGOBossLines86RefreshAndExpiredFight(t *testing.T) {
 	var damage float64
 	if err := db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		fight := &model.FieldFight{GGOBoss: &model.GGOFieldBossFight{Line: 1, EventID: old1.ID, EndsAtMS: old1.EndsAtMS, Boss: &pb.SideBoss{Uuid: proto.String(old1.ID)}}}
-		_, dealt, err := f.s.ggoBossApplyDamageLocked(tx, f.id, fight, nil, nil, nextNow)
+		monster, err := f.s.ggoBossMonster(old1, float64(old1.Boss.HP))
+		if err != nil {
+			return err
+		}
+		terminal := &model.CombatFinalHPOutcome{}
+		for _, actor := range monster.Formation {
+			terminal.FinalActors = append(terminal.FinalActors, model.CombatFinalActorHP{Camp: 1, GUID: actor.GetGuid(), CurrentHP: 0, MaxHP: actor.GetProp().GetHp()})
+		}
+		_, dealt, err := f.s.ggoBossApplyDamageLocked(tx, f.id, fight, &model.FrozenBattleInput{Monster: monster}, terminal, nextNow)
 		damage = dealt
 		return err
 	}); err != nil || damage != 0 {

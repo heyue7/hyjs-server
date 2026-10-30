@@ -38,7 +38,7 @@ namespace Room
         public RoomCharactor self;
         public RoomCharactor GetSelfCharactor() { return self; }
     }
-    public class RoomBase { public RoomCharactorManager charactorManager; }
+    public class RoomBase { public RoomCharactorManager charactorManager; public RoomNetBase netManager; }
     public static class RoomManager { public static RoomBase currentRoom; }
     public class RoomNetBase
     {
@@ -70,6 +70,14 @@ namespace HYJS.DesertV4
         public static Session session;
         public static bool Current(out Session result) { result=session; return result!=null; }
     }
+    public static class FieldRuntime
+    {
+        public static int readyCalls;
+        public static object readyNet;
+        public static SCCurrentPosition readyFrame;
+        public static void NativePositionReady(object net,SCCurrentPosition frame)
+        { readyCalls++; readyNet=net; readyFrame=frame; }
+    }
 }
 public static class PositionSyncChecks
 {
@@ -83,8 +91,9 @@ public static class PositionSyncChecks
         PositionSync.Release();
         FieldWire.session=new FieldWire.Session { playerId=42,sessionHex="session-1",origin="https://example.test" };
         NetAPI.connected=true; EasyTouchTool.Instance.Enable=true;
+        FieldRuntime.readyCalls=0; FieldRuntime.readyNet=null; FieldRuntime.readyFrame=null;
         actor=new RoomCharactor(); field=new RoomNetField();
-        RoomManager.currentRoom=new RoomBase { charactorManager=new RoomCharactorManager { self=actor } };
+        RoomManager.currentRoom=new RoomBase { charactorManager=new RoomCharactorManager { self=actor },netManager=field };
         PositionSync.SetFieldActive(true); PositionSync.ConnectionStarting();
         PositionSync.LoginResponse(new SCSocketLogin { result=100 });
     }
@@ -197,10 +206,150 @@ public static class PositionSyncChecks
         Check(!PositionSync.ReleaseIfOwned(newLease),"released lease could be reused");
         long failed=123; Check(!PositionSync.TryLock(null,out failed) && failed==0,"failed acquisition exposed a lease");
     }
+    static void LateOwnerKeepsTrackedBaseline()
+    {
+        Reset(); PositionSync.ConnectionStarting();
+        typeof(PositionSync).GetField("owner",System.Reflection.BindingFlags.Static|System.Reflection.BindingFlags.NonPublic).SetValue(null,null);
+        FieldWire.session=null;
+        PositionSync.LoginResponse(new SCSocketLogin { result=100 });
+        // The original request is sent before the player snapshot exists.
+        PositionSync.TrackSend(30024); PositionSync.TrackSend(30024);
+        FieldWire.session=new FieldWire.Session { playerId=42,sessionHex="session-1",origin="https://example.test" };
+        PositionSync.TrackFieldResponse(Position(42,4));
+        Check(!PositionSync.ChannelReady,"a fabricated fallback established a baseline");
+        Deliver(Queue(Position(42,7)));
+        Check(!PositionSync.ChannelReady,"one early response incorrectly satisfied two requests");
+        Deliver(Queue(Position(42,7)));
+        Check(PositionSync.ChannelReady,"a real initial frame failed to restore the tracked baseline");
+        Check(PositionSync.TryLock(actor),"the recovered baseline did not allow the requested action");
+        int callbacks=0;
+        PositionSync.RequestCurrent(field,delegate(Vector3 p) { callbacks++; });
+        PositionSync.TrackFieldResponse(Position(42,7));
+        Check(callbacks==0 && PositionSync.Locked,"a local fallback satisfied a locked relocation");
+        Deliver(Queue(Position(42,8)));
+        Check(callbacks==1 && PositionSync.Locked,"the numbered relocation did not await its real frame");
+        PositionSync.Release();
+    }
+    static void MissingBaselineRequestsFreshNativeFrame()
+    {
+        Reset();
+        Check(!PositionSync.ChannelReady,"reset started with a confirmed baseline");
+        PositionSync.Tick();
+        Check(!PositionSync.ChannelReady,"sending a request alone established a baseline");
+        PositionSync.TrackFieldResponse(Position(42,4));
+        Check(!PositionSync.ChannelReady,"the local fallback satisfied the retry");
+        Deliver(Queue(Position(42,9)));
+        Check(PositionSync.ChannelReady,"the real retry did not restore the channel");
+    }
+    static void InvalidUntrackedFrameCannotEstablishBaseline()
+    {
+        Reset(); Deliver(Queue(Position(99,1)));
+        Check(!PositionSync.ChannelReady,"another player's untracked frame established a baseline");
+        Deliver(Queue(Position(42,Single.NaN)));
+        Check(!PositionSync.ChannelReady,"nonfinite position established a baseline");
+        Deliver(Queue(Position(42,2)));
+        Check(!PositionSync.ChannelReady,"an unsolicited valid frame established a baseline");
+        PositionSync.ConnectionStarting(); PositionSync.LoginResponse(new SCSocketLogin { result=100 });
+        Packet stale=Queue(Position(42,3)); PositionSync.ConnectionStarting();
+        PositionSync.LoginResponse(new SCSocketLogin { result=100 });
+        Check(PositionSync.DropPacket(stale),"old epoch frame was not dropped");
+        PositionSync.TrackFieldResponse(stale.kBody);
+        Check(!PositionSync.ChannelReady,"old epoch established an untracked baseline");
+    }
+    static void DeliveredBeforeOwnerDrainsInOrder()
+    {
+        Reset(); PositionSync.ConnectionStarting();
+        typeof(PositionSync).GetField("owner",System.Reflection.BindingFlags.Static|System.Reflection.BindingFlags.NonPublic).SetValue(null,null);
+        FieldWire.session=null; PositionSync.LoginResponse(new SCSocketLogin { result=100 });
+        PositionSync.TrackSend(30024); PositionSync.TrackSend(30024);
+        SCCurrentPosition first=Position(42,10),second=Position(42,20);
+        PositionSync.TrackFieldResponse(Position(42,30)); // Unmarked fallback cannot be stored.
+        Deliver(Queue(first)); Deliver(Queue(second));
+        Check(!PositionSync.ChannelReady,"frames before owner enabled the channel");
+        RoomBase saved=RoomManager.currentRoom; RoomManager.currentRoom=null;
+        FieldWire.session=new FieldWire.Session { playerId=42,sessionHex="session-1",origin="https://example.test" };
+        PositionSync.Tick();
+        Check(!PositionSync.ChannelReady && FieldRuntime.readyCalls==0,"frames drained before the native room was ready");
+        RoomManager.currentRoom=saved; PositionSync.Tick();
+        Check(PositionSync.ChannelReady,"real frames were lost before the owner was ready");
+        Check(FieldRuntime.readyCalls==1 && FieldRuntime.readyNet==field && FieldRuntime.readyFrame==second,
+            "readiness did not use the last real frame in request order");
+    }
+    static void DeferredLockedReplyPreservesLease()
+    {
+        Reset(); PositionSync.TrackSend(30024); Deliver(Queue(Position(42,2)));
+        Check(PositionSync.TryLock(actor),"could not prepare locked relocation");
+        int callbacks=0; float observed=0;
+        PositionSync.RequestCurrent(field,delegate(Vector3 p) { callbacks++; observed=p.x; });
+        FieldWire.session=null; Deliver(Queue(Position(42,23)));
+        Check(callbacks==0 && PositionSync.Locked,"early frame bypassed owner validation");
+        FieldWire.session=new FieldWire.Session { playerId=42,sessionHex="session-1",origin="https://example.test" };
+        PositionSync.Tick();
+        Check(callbacks==1 && observed==23 && PositionSync.Locked,"deferred reply did not preserve the numbered relocation and lease");
+        PositionSync.Tick(); Check(callbacks==1,"deferred callback ran more than once");
+        PositionSync.Release();
+    }
+    static void DeferredThenLiveFramesStayOrdered()
+    {
+        Reset(); PositionSync.TrackSend(30024); PositionSync.TrackSend(30024);
+        FieldWire.session=null; Deliver(Queue(Position(42,11)));
+        FieldWire.session=new FieldWire.Session { playerId=42,sessionHex="session-1",origin="https://example.test" };
+        SCCurrentPosition later=Position(42,19); Deliver(Queue(later));
+        Check(!PositionSync.ChannelReady,"a later live reply overtook the deferred response");
+        PositionSync.Tick();
+        Check(PositionSync.ChannelReady && FieldRuntime.readyCalls==1 && FieldRuntime.readyFrame==later,
+            "deferred and live frames did not drain in original order");
+    }
+    static void DeferredRepliesDiscardedOnEpochOrOwnerChange()
+    {
+        Reset(); PositionSync.TrackSend(30024); FieldWire.session=null;
+        Packet old=Queue(Position(42,4)); Deliver(old);
+        PositionSync.ConnectionStarting();
+        FieldWire.session=new FieldWire.Session { playerId=42,sessionHex="session-1",origin="https://example.test" };
+        PositionSync.LoginResponse(new SCSocketLogin { result=100 }); PositionSync.Tick();
+        Check(!PositionSync.ChannelReady && FieldRuntime.readyCalls==0,"a buffered old connection established readiness");
+        Check(PositionSync.DropPacket(old),"a duplicate old frame was accepted after reconnect");
+        Deliver(Queue(Position(42,5))); Check(PositionSync.ChannelReady,"new connection could not establish a fresh baseline");
+        Reset(); PositionSync.TrackSend(30024); FieldWire.session=null; Deliver(Queue(Position(42,8)));
+        FieldWire.session=new FieldWire.Session { playerId=99,sessionHex="session-2",origin="https://example.test" };
+        PositionSync.Tick();
+        Check(!PositionSync.ChannelReady && FieldRuntime.readyCalls==0,"a prior role's buffered frame survived an owner change");
+    }
+    static void DeferredQueueIsBoundedByRequests()
+    {
+        Reset(); FieldWire.session=null;
+        for (int i=0;i<64;i++) PositionSync.TrackSend(30024);
+        for (int i=0;i<65;i++) Deliver(Queue(Position(42,i)));
+        var pending=(System.Collections.ICollection)typeof(PositionSync).GetField("deferred",System.Reflection.BindingFlags.Static|System.Reflection.BindingFlags.NonPublic).GetValue(null);
+        Check(pending.Count==64,"unsolicited frames exceeded the request-bounded queue");
+        FieldWire.session=new FieldWire.Session { playerId=42,sessionHex="session-1",origin="https://example.test" };
+        PositionSync.Tick();
+        Check(PositionSync.ChannelReady && FieldRuntime.readyCalls==1 && FieldRuntime.readyFrame.self.position.current.x==63,
+            "bounded real frames did not drain in order");
+    }
+    static void DeferredIdentityAndCallbackFailuresStayClosed()
+    {
+        Reset(); PositionSync.TrackSend(30024); FieldWire.session=null; Deliver(Queue(Position(99,2)));
+        FieldWire.session=new FieldWire.Session { playerId=42,sessionHex="session-1",origin="https://example.test" };
+        PositionSync.Tick();
+        Check(!PositionSync.ChannelReady && FieldRuntime.readyCalls==0,"deferred frame for another player was accepted");
+        Deliver(Queue(Position(42,3))); Check(PositionSync.ChannelReady,"valid retry did not recover after identity mismatch");
+        Reset(); PositionSync.TrackSend(30024); Deliver(Queue(Position(42,2)));
+        Check(PositionSync.TryLock(actor),"could not prepare callback failure test");
+        PositionSync.RequestCurrent(field,delegate(Vector3 p) { throw new Exception("fixture callback failure"); });
+        FieldWire.session=null; Deliver(Queue(Position(42,5)));
+        FieldWire.session=new FieldWire.Session { playerId=42,sessionHex="session-1",origin="https://example.test" };
+        PositionSync.Tick();
+        Check(!PositionSync.ChannelReady && PositionSync.Locked,"callback failure escaped or released a protected relocation");
+        PositionSync.Release();
+    }
     public static void Main()
     {
         OriginalFallbackThenLateReply(); NormalAndOverlappingPackets(); ReconnectRejectsOldPackets();
         IdentityAndTransportRemainRequired(); OriginalNonFieldExitHandshake(); OldLeaseCannotReleaseNewOwner();
+        LateOwnerKeepsTrackedBaseline(); MissingBaselineRequestsFreshNativeFrame(); InvalidUntrackedFrameCannotEstablishBaseline();
+        DeliveredBeforeOwnerDrainsInOrder(); DeferredLockedReplyPreservesLease(); DeferredThenLiveFramesStayOrdered();
+        DeferredRepliesDiscardedOnEpochOrOwnerChange(); DeferredQueueIsBoundedByRequests(); DeferredIdentityAndCallbackFailuresStayClosed();
         Console.WriteLine("PositionSync replay passed: "+checks+" assertions");
     }
 }
