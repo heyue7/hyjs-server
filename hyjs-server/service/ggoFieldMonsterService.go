@@ -113,37 +113,64 @@ func (s *GameService) ggoMonsterCheckLocked(tx *gorm.DB, id int64, g *model.Game
 	return result, nil
 }
 
-// ggoMonsterBattleFormation builds the four slots of the corresponding
-// original field group with the configured desert model and per-member stats.
-// The full formation is frozen at start so later configuration edits cannot
-// change an in-flight fight.
+// ggoMonsterBattleFormation uses original main-story encounter compositions,
+// while retaining the desert tier's per-member statistics. The resulting
+// formation is frozen at start for the lifetime of the accepted fight.
 func (s *GameService) ggoMonsterBattleFormation(node *ggoMonsterNode, tier *model.AdminFieldGGOMobTier) (*pb.BattleMonster, error) {
 	if node == nil || tier == nil || node.UUID == "" || node.MonID == "" || node.HeroID != tier.HeroID || node.Level != tier.Level || node.MonID != ggoMonsterGroup(node.HeroID) {
 		return nil, errors.New("沙漠小怪档位无效")
 	}
 	leader := s.fieldLeaderInScene(node.MonID, constUtil.GGOFieldScene)
-	hero := s.table("Hero", "id", node.HeroID)
-	if leader == nil || hero == nil || hero["resName"] == "" {
+	if leader == nil {
 		return nil, errors.New("沙漠小怪原模型或巡逻组缺失")
 	}
-	enemyRow := map[string]string{}
-	for key, value := range leader {
-		enemyRow[key] = value
+	// CopyEnemy tasks 123, 208 and 200 supply these positions and members. Keep
+	// the small catalogue here so starting a fight does not scan the full table.
+	type member struct {
+		hero string
+		pose int32
 	}
-	enemyRow["HeroId"], enemyRow["Level"], enemyRow["Attack"], enemyRow["Hp"], enemyRow["PhyDefend"], enemyRow["MagicDefend"] = node.HeroID, fmt.Sprint(tier.Level), fmt.Sprint(tier.Attack), fmt.Sprint(tier.HP), fmt.Sprint(tier.PhyDefend), fmt.Sprint(tier.MagicDefend)
-	for _, key := range []string{"SkillId1", "SkillId2", "UltSkillId"} {
-		enemyRow[key] = hero[key]
-	}
-	for i := 0; i < 6; i++ {
-		delete(enemyRow, fmt.Sprintf("Talent%d", i))
+	var members []member
+	switch node.HeroID {
+	case "monster_026":
+		members = []member{{"monster_026", 3}, {"monster_029", 7}, {"monster_029", 9}, {"monster_031", 13}}
+	case "monster_032":
+		members = []member{{"monster_032", 3}, {"monster_031", 7}, {"monster_031", 9}, {"monster_027", 13}}
+	case "monster_031":
+		members = []member{{"monster_031", 3}, {"monster_029", 9}, {"monster_029", 7}, {"monster_027", 13}}
 	}
 	monster := &pb.BattleMonster{MonsterId: proto.Int64(1), ServerId: proto.Int32(1), TaskId: proto.String(node.MonID), GroupIndex: proto.Int32(1), Inst: &pb.BattleMonsterInst{Anger: proto.Float64(0)}}
-	for _, pose := range []int32{3, 7, 9, 13} {
+	seen := map[int32]bool{}
+	models := map[string]bool{}
+	matchedModel := false
+	for _, m := range members {
+		pose, heroID := m.pose, m.hero
+		hero := s.table("Hero", "id", heroID)
+		if (pose != 3 && pose != 7 && pose != 9 && pose != 13) || seen[pose] || hero == nil || hero["resName"] == "" {
+			return nil, errors.New("沙漠小怪主线阵容无效")
+		}
+		seen[pose] = true
+		models[heroID] = true
+		matchedModel = matchedModel || heroID == node.HeroID
+		enemyRow := map[string]string{}
+		for key, value := range leader {
+			enemyRow[key] = value
+		}
+		enemyRow["HeroId"], enemyRow["Level"], enemyRow["Attack"], enemyRow["Hp"], enemyRow["PhyDefend"], enemyRow["MagicDefend"] = heroID, fmt.Sprint(tier.Level), fmt.Sprint(tier.Attack), fmt.Sprint(tier.HP), fmt.Sprint(tier.PhyDefend), fmt.Sprint(tier.MagicDefend)
+		for _, key := range []string{"SkillId1", "SkillId2", "UltSkillId"} {
+			enemyRow[key] = hero[key]
+		}
+		for i := 0; i < 6; i++ {
+			delete(enemyRow, fmt.Sprintf("Talent%d", i))
+		}
 		actor, err := s.actor(enemyRow, fmt.Sprintf("ggo-%s-%d", node.UUID, pose), pose, true)
 		if err != nil {
 			return nil, err
 		}
 		monster.Formation = append(monster.Formation, actor)
+	}
+	if len(monster.Formation) != 4 || len(models) < 2 || !matchedModel {
+		return nil, errors.New("沙漠小怪主线阵容缺失")
 	}
 	return monster, nil
 }
@@ -296,7 +323,11 @@ func (s *GameService) ggoMonsterStartLocked(tx *gorm.DB, id int64, player *pb.Pl
 	result := &pb.SCSidePveFightStart{FightId: proto.String(fightID), RandSeed: proto.Int64(frozen.Seed), BattlePlayer: frozen.Attacker, BattleMonsterList: []*pb.BattleMonster{frozen.Monster}, FightScene: proto.String(""), Code: proto.Int32(1), Maxround: proto.Int32(frozen.MaxRound)}
 	node.ReservedBy = id
 	node.FightID = fightID
-	if point.Patrol != nil {
+	path, err := ggoPatrolPath(point)
+	if err != nil {
+		return nil, err
+	}
+	if path != nil {
 		node.PatrolPausedAtMS = now
 	}
 	// Zero means the in-flight reservation has no wall-clock expiry. A late

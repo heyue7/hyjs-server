@@ -101,11 +101,15 @@ func ggoBossNeedsEvent(row *db.SharedFieldBoss55, start, end, now int64) (bool, 
 	if err != nil {
 		return false, err
 	}
-	// Mid-event publication cannot replace HP, model, rewards or the event ID.
-	if now >= event.StartsAtMS && now < event.EndsAtMS {
+	// An undefeated event keeps its health and frozen rewards until it is killed.
+	if row.KillerID == 0 {
 		return false, nil
 	}
-	return event.StartsAtMS != start || event.EndsAtMS != end, nil
+	due := row.RespawnAt
+	if due <= 0 {
+		due = event.EndsAtMS // compatibility with old rows
+	}
+	return now >= due, nil
 }
 
 // The optional line keeps older internal callers on the legacy line; live
@@ -121,15 +125,15 @@ func (s *GameService) ggoBossCurrent(tx *gorm.DB, cfg *model.AdminFieldGGOConfig
 	if len(lines) == 1 {
 		line = lines[0]
 	}
-	start, end, err := ggoBossWindow(cfg.Runtime.Boss, now)
-	if err != nil {
-		return nil, nil, nil, nil, err
+	start, end := now, constUtil.GGOFieldBossOpenUntilMS
+	if now <= 0 || now >= end {
+		return nil, nil, nil, nil, errors.New("沙漠首领时间无效")
 	}
 	query := func(q *gorm.DB) *gorm.DB {
 		return sharedFieldBoss55Query(q, s.OriginalServerID(), constUtil.GGOFieldScene, constUtil.GGOFieldBossPosition, line)
 	}
 	var row db.SharedFieldBoss55
-	err = query(tx).Take(&row).Error
+	err := query(tx).Take(&row).Error
 	missing := errors.Is(err, gorm.ErrRecordNotFound)
 	if err != nil && !missing {
 		return nil, nil, nil, nil, err
@@ -141,7 +145,15 @@ func (s *GameService) ggoBossCurrent(tx *gorm.DB, cfg *model.AdminFieldGGOConfig
 			return nil, nil, nil, nil, err
 		}
 	}
-	if write || needs {
+	promote := false
+	if !missing && row.KillerID == 0 {
+		old, _, _, e := ggoBossDecode(&row)
+		if e != nil {
+			return nil, nil, nil, nil, e
+		}
+		promote = old.StartsAtMS > now || old.EndsAtMS != end
+	}
+	if write || needs || promote {
 		if missing {
 			row = db.SharedFieldBoss55{ServerID: s.OriginalServerID(), Scene: constUtil.GGOFieldScene, Line: line, PosID: constUtil.GGOFieldBossPosition, Payload: []byte("{}"), HP: []byte("{}")}
 			if err = tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&row).Error; err != nil {
@@ -190,6 +202,26 @@ func (s *GameService) ggoBossCurrent(tx *gorm.DB, cfg *model.AdminFieldGGOConfig
 			if err = saveSharedFieldBoss55(tx, &row, boss, map[string]float64{ggoBossGUID(id): float64(event.Boss.HP)}); err != nil {
 				return nil, nil, nil, nil, err
 			}
+		} else if row.KillerID == 0 {
+			// Promote the existing generation without discarding its health,
+			// contribution or frozen rewards when changing the availability rule.
+			event, _, _, e := ggoBossDecode(&row)
+			if e != nil {
+				return nil, nil, nil, nil, e
+			}
+			if event.StartsAtMS > now || event.EndsAtMS != end {
+				if event.StartsAtMS > now {
+					event.StartsAtMS = now
+				}
+				event.EndsAtMS = end
+				row.GGOEvent, e = json.Marshal(event)
+				if e != nil {
+					return nil, nil, nil, nil, e
+				}
+				if e = query(tx.Model(&db.SharedFieldBoss55{})).Update("ggo_event", row.GGOEvent).Error; e != nil {
+					return nil, nil, nil, nil, e
+				}
+			}
 		}
 	}
 	event, boss, hp, err := ggoBossDecode(&row)
@@ -202,12 +234,18 @@ func (s *GameService) ggoBossSnapshotLocked(tx *gorm.DB, cfg *model.AdminFieldGG
 		return nil, err
 	}
 	state := "active"
-	if now < event.StartsAtMS {
+	starts, ends := event.StartsAtMS, event.EndsAtMS
+	if row.KillerID > 0 {
+		starts = row.RespawnAt
+		if starts <= 0 {
+			starts = event.EndsAtMS
+		}
+		ends = constUtil.GGOFieldBossOpenUntilMS
+		state = "waiting"
+	} else if now < event.StartsAtMS {
 		state = "waiting"
 	} else if now >= event.EndsAtMS {
 		state = "expired"
-	} else if row.KillerID > 0 {
-		state = "defeated"
 	}
-	return &model.GGOFieldBossView{Nature: int64(boss.GetNature()), Level: event.Boss.Level, WarningAtMS: event.StartsAtMS - event.Boss.WarningSeconds*1000, HeroID: event.Boss.HeroID, BossID: constUtil.GGOFieldBossID, Radius: event.Radius, PointID: event.PointID, EventID: event.ID, Position: event.Position, HP: int64(math.Ceil(hp[ggoBossGUID(event.ID)])), MaxHP: event.Boss.HP, StartsAtMS: event.StartsAtMS, EndsAtMS: event.EndsAtMS, State: state}, nil
+	return &model.GGOFieldBossView{Nature: int64(boss.GetNature()), Level: event.Boss.Level, WarningAtMS: starts - event.Boss.WarningSeconds*1000, HeroID: event.Boss.HeroID, BossID: constUtil.GGOFieldBossID, Radius: event.Radius, PointID: event.PointID, EventID: event.ID, Position: event.Position, HP: int64(math.Ceil(hp[ggoBossGUID(event.ID)])), MaxHP: event.Boss.HP, StartsAtMS: starts, EndsAtMS: ends, State: state}, nil
 }

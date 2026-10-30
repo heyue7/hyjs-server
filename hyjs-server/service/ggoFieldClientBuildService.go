@@ -9,6 +9,13 @@ import (
 	"hyjs-server/model"
 )
 
+// The paused, shared-clock patrol snapshot requires the corresponding client
+// interpolation and cannot be interpreted by older desert clients.
+func ggoClientBuildCompatible(configured, build int64) bool {
+	const patrolProtocolBuild int64 = 2026103102
+	return configured > 0 && build >= configured && build >= patrolProtocolBuild
+}
+
 // Caller holds this player's profile lock. The build is taken only from the
 // server's login binding for the same current 16-byte session, never the body.
 // A zero draft threshold fails closed; publication validates it separately.
@@ -24,7 +31,7 @@ func ggoCheckClientBuildLocked(tx *gorm.DB, id int64, session []byte, cfg *model
 	if err != nil {
 		return err
 	}
-	if binding.SessionHash != clientUpdateSessionHash(session) || binding.BuildCode < cfg.Runtime.MinClientBuild {
+	if binding.SessionHash != clientUpdateSessionHash(session) || !ggoClientBuildCompatible(cfg.Runtime.MinClientBuild, binding.BuildCode) {
 		return ggoFieldError(constUtil.GGOFieldClientUpdateRequired, constUtil.ClientUpdateDownloadText)
 	}
 	return nil

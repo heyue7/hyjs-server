@@ -22,6 +22,10 @@ func TestGGOPatrolSharedClockFreezeAndResume(t *testing.T) {
 	}
 	path := &model.AdminFieldGGOPoint{Position: point(0, 0), Patrol: &model.AdminFieldGGOPatrol{Waypoints: []*model.AdminFieldGGOPosition{point(0, 0), point(3, 0), point(3, 4)}, Speed: 1}}
 	node := &ggoMonsterNode{PatrolEpochMS: 1000}
+	effective, err := ggoPatrolPath(path)
+	if err != nil || len(effective.Waypoints) != 2 || *effective.Waypoints[1].X != 1 || effective.Speed != .8 {
+		t.Fatal("effective route is not confined to the configured first segment", effective, err)
+	}
 	check := func(now int64, wantX, wantZ float64) {
 		t.Helper()
 		p, err := ggoPatrolPosition(node, path, now)
@@ -30,22 +34,148 @@ func TestGGOPatrolSharedClockFreezeAndResume(t *testing.T) {
 		}
 	}
 	check(1000, 0, 0)
-	check(4000, 3, 0)
-	check(6000, 3, 2)
-	check(8000, 3, 4)
-	check(9000, 3, 3)
-	check(15000, 0, 0)
-	node.PatrolPausedAtMS = 6000
-	check(9000, 3, 2)
-	if err := ggoPatrolResume(node, 11000); err != nil {
+	check(13000, 0, 0)
+	check(13625, .5, 0)
+	check(14250, 1, 0)
+	check(26250, 1, 0)
+	check(26875, .5, 0)
+	check(27500, 0, 0)
+	// A second observer reading the same line receives the same position.
+	other := *node
+	for _, now := range []int64{13000, 13625, 14250, 26875} {
+		first, e1 := ggoPatrolPosition(node, path, now)
+		second, e2 := ggoPatrolPosition(&other, path, now)
+		if e1 != nil || e2 != nil || *first.X != *second.X || *first.Y != *second.Y || *first.Z != *second.Z {
+			t.Fatalf("line observers disagree at %d: %v %v", now, e1, e2)
+		}
+	}
+	node.PatrolPausedAtMS = 13625
+	check(20000, .5, 0)
+	if err := ggoPatrolResume(node, 25000); err != nil {
 		t.Fatal(err)
 	}
-	check(11000, 3, 2)
-	check(12000, 3, 3)
-	wire, err := ggoMonsterSide(node, path, 12000)
-	if err != nil || wire.GetCurrentPoint().GetX() != 3 || wire.GetCurrentPoint().GetZ() != 3 {
+	check(25000, .5, 0)
+	check(25625, 1, 0)
+	wire, err := ggoMonsterSide(node, path, 25625)
+	if err != nil || wire.GetCurrentPoint().GetX() != 1 || wire.GetCurrentPoint().GetZ() != 0 {
 		t.Fatalf("native battle check disagrees with snapshot: %v %v", wire, err)
 	}
+	stationary := &model.AdminFieldGGOPoint{Position: point(4, 5)}
+	for _, now := range []int64{1000, 13625, 1000000} {
+		p, err := ggoPatrolPosition(node, stationary, now)
+		if err != nil || *p.X != 4 || *p.Z != 5 {
+			t.Fatalf("unverified point moved at %d: %v %v", now, p, err)
+		}
+	}
+}
+
+func TestGGOPatrolBakedRoutesSharedClockAndPositionGuard(t *testing.T) {
+	point := &model.AdminFieldGGOPoint{ID: "M05", Position: &model.AdminFieldGGOPosition{}}
+	if _, err := ggoMonsterNavRoute(point); err != nil {
+		t.Fatal(err)
+	}
+	if len(ggoMonsterNavRoutes) != 20 {
+		t.Fatalf("expected 20 released NavMesh routes, got %d", len(ggoMonsterNavRoutes))
+	}
+	for id, waypoints := range ggoMonsterNavRoutes {
+		t.Run(id, func(t *testing.T) {
+			point := &model.AdminFieldGGOPoint{ID: id, Position: waypoints[0]}
+			path, err := ggoPatrolPath(point)
+			if err != nil || path == nil || len(path.Waypoints) < 2 {
+				t.Fatalf("verified route unavailable: %v", err)
+			}
+			node := &ggoMonsterNode{PatrolEpochMS: 1000}
+			start, err := ggoPatrolPosition(node, point, 13000)
+			if err != nil {
+				t.Fatal(err)
+			}
+			moving, err := ggoPatrolPosition(node, point, 13700)
+			if err != nil || distanceGGOPositions(start, moving) < .4 {
+				t.Fatalf("no short walk: %v", err)
+			}
+			for _, sample := range []struct {
+				now      int64
+				distance float64
+			}{{13000, 0}, {13312, .2496}, {13625, .5}, {14260, 1}, {20000, 1}, {26875, .5}, {27510, 0}} {
+				got, e := ggoPatrolPosition(node, point, sample.now)
+				want := interpolateGGORoute(path.Waypoints, sample.distance)
+				if e != nil || distanceGGOPositions(got, want) > 1e-7 {
+					t.Fatalf("incorrect route projection at %d: %v", sample.now, e)
+				}
+			}
+			other := *node
+			also, err := ggoPatrolPosition(&other, point, 13700)
+			if err != nil || distanceGGOPositions(moving, also) > 1e-9 {
+				t.Fatalf("same-line observers differ: %v", err)
+			}
+			node.PatrolPausedAtMS = 13700
+			frozen, err := ggoPatrolPosition(node, point, 19700)
+			if err != nil || distanceGGOPositions(moving, frozen) > 1e-9 {
+				t.Fatalf("fight did not freeze position: %v", err)
+			}
+			if err = ggoPatrolResume(node, 19700); err != nil {
+				t.Fatal(err)
+			}
+			resumed, err := ggoPatrolPosition(node, point, 19700)
+			if err != nil || distanceGGOPositions(moving, resumed) > 1e-9 {
+				t.Fatalf("release changed the frozen position: %v", err)
+			}
+			x := *point.Position.X + .01
+			changed := *point.Position
+			changed.X = &x
+			point.Position = &changed
+			if candidate, err := ggoPatrolPath(point); err != nil || candidate != nil {
+				t.Fatalf("route incorrectly applied to changed point: %v", err)
+			}
+		})
+	}
+}
+
+func TestGGOPatrolMigratesPreviouslyStaticFightAtAnchor(t *testing.T) {
+	if _, err := ggoMonsterNavRoute(&model.AdminFieldGGOPoint{ID: "M05", Position: &model.AdminFieldGGOPosition{}}); err != nil {
+		t.Fatal(err)
+	}
+	point := &model.AdminFieldGGOPoint{ID: "M05", Position: ggoMonsterNavRoutes["M05"][0]}
+	node := &ggoMonsterNode{ReservedBy: 7, PatrolEpochMS: 1000}
+	changed, err := ggoMigrateReservedMonsterPatrol(node, point, 13700)
+	if err != nil || !changed || node.PatrolEpochMS != 13700 || node.PatrolPausedAtMS != 13700 {
+		t.Fatalf("previously static fight was not frozen: %v", err)
+	}
+	frozen, err := ggoPatrolPosition(node, point, 20000)
+	if err != nil || distanceGGOPositions(frozen, point.Position) > 1e-9 {
+		t.Fatalf("old fight moved from its accepted anchor: %v", err)
+	}
+	if changed, err = ggoMigrateReservedMonsterPatrol(node, point, 21000); err != nil || changed {
+		t.Fatalf("paused clock migrated twice: %v", err)
+	}
+	if err = ggoPatrolResume(node, 22000); err != nil {
+		t.Fatal(err)
+	}
+	resumed, err := ggoPatrolPosition(node, point, 22000)
+	if err != nil || distanceGGOPositions(resumed, point.Position) > 1e-9 {
+		t.Fatalf("old fight did not resume at the anchor: %v", err)
+	}
+}
+
+func interpolateGGORoute(waypoints []*model.AdminFieldGGOPosition, distance float64) *model.AdminFieldGGOPosition {
+	for i := 1; i < len(waypoints); i++ {
+		a, b := waypoints[i-1], waypoints[i]
+		segment := distanceGGOPositions(a, b)
+		if distance <= segment || i == len(waypoints)-1 {
+			fraction := math.Max(0, math.Min(1, distance/segment))
+			x := *a.X + (*b.X-*a.X)*fraction
+			y := *a.Y + (*b.Y-*a.Y)*fraction
+			z := *a.Z + (*b.Z-*a.Z)*fraction
+			return &model.AdminFieldGGOPosition{X: &x, Y: &y, Z: &z}
+		}
+		distance -= segment
+	}
+	return waypoints[len(waypoints)-1]
+}
+
+func distanceGGOPositions(a, b *model.AdminFieldGGOPosition) float64 {
+	dx, dy, dz := *a.X-*b.X, *a.Y-*b.Y, *a.Z-*b.Z
+	return math.Sqrt(dx*dx + dy*dy + dz*dz)
 }
 
 func TestGGOLineDueRecoveryAndNotify(t *testing.T) {

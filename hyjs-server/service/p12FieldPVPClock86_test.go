@@ -419,7 +419,7 @@ func TestP12Clock86GGOStatusRealLeaseAndLegacyRecovery(t *testing.T) {
 				}); err != nil {
 					t.Fatal(err)
 				}
-				binding := db.ClientUpdateSession{PlayerID: id, SessionHash: clientUpdateSessionHash(sessions[id]), BuildCode: 1}
+				binding := db.ClientUpdateSession{PlayerID: id, SessionHash: clientUpdateSessionHash(sessions[id]), BuildCode: cfg.Runtime.MinClientBuild}
 				if err = database.Save(&binding).Error; err != nil {
 					t.Fatal(err)
 				}

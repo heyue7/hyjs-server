@@ -18,7 +18,7 @@ func TestGGOClientBuildRequiresCurrentSessionBinding(t *testing.T) {
 		t.Fatal(err)
 	}
 	cfg := ggoLineTestConfiguration(t)
-	cfg.Runtime.MinClientBuild = 140
+	cfg.Runtime.MinClientBuild = 2026102904
 	var row db.Profile
 	if err := db.GetIns().First(&row, f.id).Error; err != nil {
 		t.Fatal(err)
@@ -33,18 +33,21 @@ func TestGGOClientBuildRequiresCurrentSessionBinding(t *testing.T) {
 		}
 	}
 	assertUpdate(check(row.Session))
-	binding := db.ClientUpdateSession{PlayerID: f.id, SessionHash: clientUpdateSessionHash(row.Session), BuildCode: 139}
+	binding := db.ClientUpdateSession{PlayerID: f.id, SessionHash: clientUpdateSessionHash(row.Session), BuildCode: 2026103101}
 	if err := db.GetIns().Save(&binding).Error; err != nil {
 		t.Fatal(err)
 	}
 	assertUpdate(check(row.Session))
-	binding.BuildCode = 140
+	binding.BuildCode = 2026103102
 	if err := db.GetIns().Save(&binding).Error; err != nil {
 		t.Fatal(err)
 	}
 	if err := check(row.Session); err != nil {
 		t.Fatal(err)
 	}
+	cfg.Runtime.MinClientBuild = 2026103103
+	assertUpdate(check(row.Session))
+	cfg.Runtime.MinClientBuild = 2026102904
 	different := bytes.Repeat([]byte{42}, 16)
 	if bytes.Equal(different, row.Session) {
 		different[0]++

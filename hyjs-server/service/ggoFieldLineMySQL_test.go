@@ -19,7 +19,7 @@ func ggoLineTestConfiguration(t *testing.T) *model.AdminFieldGGOConfiguration {
 	t.Helper()
 	cfg := &model.AdminFieldGGOConfiguration{SchemaVersion: 3, Chips: defaultGGOChips(), Rules: defaultGGORules(), Runtime: defaultGGORuntime()}
 	cfg.Runtime.Enabled = true
-	cfg.Runtime.MinClientBuild = 1 // Isolated synthetic fixture, not a release build.
+	cfg.Runtime.MinClientBuild = 2026103102 // Match the current desert protocol in isolated fixtures.
 	position := func(x float64) *model.AdminFieldGGOPosition {
 		return &model.AdminFieldGGOPosition{X: ggoFloat64(x), Y: ggoFloat64(0), Z: ggoFloat64(8)}
 	}

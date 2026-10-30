@@ -28,7 +28,7 @@ func TestGGONativeTransferAdmissionAndPosition(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	f.config.Runtime.MinClientBuild = 140
+	f.config.Runtime.MinClientBuild = 2026102904
 	session := f.sessions[0]
 	packet := func(target string, token []byte) *model.GamePacket {
 		return &model.GamePacket{Opcode: 30032, PlayerId: id, ZoneId: int32(f.s.OriginalServerID()), Session: token, Body: &pb.CSTransferScene{Target: proto.String(target)}}
@@ -78,15 +78,15 @@ func TestGGONativeTransferAdmissionAndPosition(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	setBinding(139, clientUpdateSessionHash(session))
+	setBinding(2026103101, clientUpdateSessionHash(session))
 	rejected("field_003", session, constUtil.ClientUpdateDownloadText)
 	other := bytes.Repeat([]byte{42}, 16)
 	if bytes.Equal(other, session) {
 		other[0]++
 	}
-	setBinding(140, clientUpdateSessionHash(other))
+	setBinding(2026103102, clientUpdateSessionHash(other))
 	rejected("field_003", session, constUtil.ClientUpdateDownloadText)
-	setBinding(140, clientUpdateSessionHash(session))
+	setBinding(2026103102, clientUpdateSessionHash(session))
 	rejected("field_003", other, "本地会话无效，请重新登录")
 
 	out := f.s.Dispatch(f.ctx, packet("field_003", session), "127.0.0.1")

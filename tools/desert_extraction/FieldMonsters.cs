@@ -89,8 +89,11 @@ namespace HYJS.DesertV4
         {
             long at=p.pausedAtMs>0 ? p.pausedAtMs : nowMs;
             if (at<p.epochMs) at=p.epochMs;
-            double distance=((double)(at-p.epochMs)*p.speed/1000) % (2*p.length);
-            if (distance>p.length) distance=2*p.length-distance;
+            double travelMs=p.length/p.speed*1000, waitMs=12000;
+            double phase=(double)(at-p.epochMs)%(2*(waitMs+travelMs));
+            double progress=phase<waitMs ? 0 : phase<waitMs+travelMs ? (phase-waitMs)/travelMs :
+                phase<2*waitMs+travelMs ? 1 : 1-(phase-2*waitMs-travelMs)/travelMs;
+            double distance=progress*p.length;
             for (int i=1;i<p.waypoints.Length;i++)
             {
                 DPoint a=p.waypoints[i-1],b=p.waypoints[i]; double segment=Distance(a,b);
@@ -102,6 +105,13 @@ namespace HYJS.DesertV4
                 distance-=segment;
             }
             throw new InvalidOperationException("Invalid patrol projection");
+        }
+        static bool Moving(Patrol p,long nowMs)
+        {
+            if (p.pausedAtMs>0 || nowMs<p.epochMs) return false;
+            double travelMs=p.length/p.speed*1000, waitMs=12000;
+            double phase=(double)(nowMs-p.epochMs)%(2*(waitMs+travelMs));
+            return (phase>=waitMs && phase<waitMs+travelMs) || phase>=2*waitMs+travelMs;
         }
         static SideMonster Side(Point p,int state)
         {
@@ -180,9 +190,11 @@ namespace HYJS.DesertV4
         }
         public bool IsPatrolling(RoomCharactor actor)
         {
-            if (actor==null) return false;
+            if (actor==null || clockServerMs<=0) return false;
+            long elapsed=(long)((double)(Stopwatch.GetTimestamp()-clockTicks)*1000/Stopwatch.Frequency);
+            long now=clockServerMs+Math.Max(0,elapsed);
             foreach (Point p in points.Values)
-                if (p.patrol!=null && p.refreshAtMs==0 && p.patrol.pausedAtMs==0 && manager.GetCharactor(p.uuid)==actor) return true;
+                if (p.patrol!=null && p.refreshAtMs==0 && Moving(p.patrol,now) && manager.GetCharactor(p.uuid)==actor) return true;
             return false;
         }
         public void Clear()

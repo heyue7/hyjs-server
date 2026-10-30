@@ -554,6 +554,7 @@ func (s *GameService) p12FieldPVPFightClocked(ctx context.Context, id int64, ses
 	var sidePush *pb.SCFieldPlayerState
 	var presentationScene string
 	var presentationLine int32
+	changedChipTotal := false
 	// Presence writers use this mutex. Profiles then lock by ascending ID, before
 	// any consistent snapshot or domain row is read, including zero-stamp replay.
 	p10SceneMutation.Lock()
@@ -580,6 +581,14 @@ func (s *GameService) p12FieldPVPFightClocked(ctx context.Context, id int64, ses
 			return err
 		}
 		peer, pg, err := decodeProfileForCalendarUpdate(tx, &peerRow)
+		if err != nil {
+			return err
+		}
+		beforeOwnChips, err := ggoChipCount(g)
+		if err != nil {
+			return err
+		}
+		beforePeerChips, err := ggoChipCount(pg)
 		if err != nil {
 			return err
 		}
@@ -981,6 +990,17 @@ func (s *GameService) p12FieldPVPFightClocked(ctx context.Context, id int64, ses
 		if err = saveProfile(tx, &peerRow, peer, pg); err != nil {
 			return err
 		}
+		if desertRequest {
+			afterOwnChips, err := ggoChipCount(g)
+			if err != nil {
+				return err
+			}
+			afterPeerChips, err := ggoChipCount(pg)
+			if err != nil {
+				return err
+			}
+			changedChipTotal = beforeOwnChips != afterOwnChips || beforePeerChips != afterPeerChips
+		}
 		var presentationPresence db.P10ScenePresence
 		if e := tx.First(&presentationPresence, "player_id=?", id).Error; e == nil {
 			presentationScene = presentationPresence.Scene
@@ -994,6 +1014,9 @@ func (s *GameService) p12FieldPVPFightClocked(ctx context.Context, id int64, ses
 	p10SceneMutation.Unlock()
 	if err != nil {
 		return nil, err
+	}
+	if fresh && changedChipTotal && presentationScene == constUtil.GGOFieldScene && presentationLine > 0 {
+		s.ggoNotifyFieldChange(ctx, presentationLine)
 	}
 	// Send the original result to both actual participants after commit. Ordinary
 	// current SCPlayer follows old deltas, preventing retry balance duplication.

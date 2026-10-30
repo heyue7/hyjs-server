@@ -172,6 +172,24 @@ func ggoNextGeneration(state *ggoLineState) (int64, error) {
 	return value, nil
 }
 
+// An in-flight fight created before a previously static point gained its
+// verified route had no paused clock. Keep that accepted monster at its
+// original anchor until the fight releases it.
+func ggoMigrateReservedMonsterPatrol(node *ggoMonsterNode, point *model.AdminFieldGGOPoint, now int64) (bool, error) {
+	if node == nil || point == nil || node.ReservedBy == 0 || node.PatrolPausedAtMS != 0 || point.Patrol != nil {
+		return false, nil
+	}
+	path, err := ggoPatrolPath(point)
+	if err != nil || path == nil {
+		return false, err
+	}
+	if now <= 0 {
+		return false, errors.New("沙漠小怪巡逻时钟无效")
+	}
+	node.PatrolEpochMS, node.PatrolPausedAtMS = now, now
+	return true, nil
+}
+
 // The persisted deadline makes restart recovery an indexed bounded query.
 // Zero schedules one migration pass for snapshots written before this field.
 func ggoNextLineDue(state *ggoLineState) int64 {
@@ -346,6 +364,20 @@ func ggoLoadLine(tx *gorm.DB, serverID, line int64, cfg *model.AdminFieldGGOConf
 				n.PatrolPausedAtMS = now
 			}
 			updated = true
+		}
+		if n.ReservedBy > 0 && n.PatrolPausedAtMS == 0 {
+			var point *model.AdminFieldGGOPoint
+			for j := range cfg.Runtime.Points {
+				if cfg.Runtime.Points[j].ID == n.PointID {
+					point = &cfg.Runtime.Points[j]
+					break
+				}
+			}
+			migrated, e := ggoMigrateReservedMonsterPatrol(n, point, now)
+			if e != nil {
+				return nil, nil, false, e
+			}
+			updated = updated || migrated
 		}
 	}
 	if updated {

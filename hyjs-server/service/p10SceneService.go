@@ -476,8 +476,16 @@ func (s *GameService) syncP10Scene(ctx context.Context, id int64, movement bool,
 				return err
 			}
 			s.p10SceneBroadcast(ctx, old.Scene, old.Line, id, &pb.SCPlayerDisappear{PlayerId: []int64{id}})
+			if old.Scene == constUtil.GGOFieldScene {
+				s.ggoNotifyFieldChange(ctx, old.Line)
+			}
 		}
 		return nil
+	}
+	if scope == constUtil.GGOFieldScene {
+		if err = ggoEnsureChipProjection(tx, profile, g); err != nil {
+			return err
+		}
 	}
 	// Per-map capacity shares the original line protocol and preserves stable socket ownership.
 	cfg, err = s.adminFieldSceneConfig(tx, scope, cfg)
@@ -604,6 +612,9 @@ func (s *GameService) syncP10Scene(ctx context.Context, id int64, movement bool,
 	}
 	if changed && !pendingLine && old.SessionHash != "" {
 		s.p10SceneBroadcast(ctx, old.Scene, old.Line, id, &pb.SCPlayerDisappear{PlayerId: []int64{id}})
+		if old.Scene == constUtil.GGOFieldScene {
+			s.ggoNotifyFieldChange(ctx, old.Line)
+		}
 	}
 	if changed || pendingLine {
 		// Re-read the directory after the presence update before selecting recipients.
@@ -615,6 +626,9 @@ func (s *GameService) syncP10Scene(ctx context.Context, id int64, movement bool,
 		}
 		if len(peers) > 0 && !pendingLine {
 			s.p10SceneSend(ctx, id, &pb.SCPlayerAppear{Player: p10ScenePeerFrames(peers)})
+		}
+		if scope == constUtil.GGOFieldScene {
+			s.ggoNotifyFieldChange(ctx, line)
 		}
 	} else if movement {
 		s.p10SceneBroadcast(ctx, scope, line, id, &pb.SCMovePush{Position: []*pb.Position{frame.Position}})
@@ -672,6 +686,7 @@ func (s *GameService) p10DisconnectScene(ctx context.Context, id int64, session 
 			}
 			if result.RowsAffected == 1 {
 				s.p10SceneBroadcast(ctx, row.Scene, row.Line, id, &pb.SCPlayerDisappear{PlayerId: []int64{id}})
+				s.ggoNotifyFieldChange(ctx, row.Line)
 			}
 			return nil
 		}
@@ -875,6 +890,10 @@ func (s *GameService) DispatchP10Scene(ctx context.Context, id int64, request pr
 		}
 		if fresh {
 			s.p10SceneBroadcast(ctx, own.Scene, oldLine, id, &pb.SCPlayerDisappear{PlayerId: []int64{id}})
+			if own.Scene == constUtil.GGOFieldScene {
+				s.ggoNotifyFieldChange(ctx, oldLine)
+				s.ggoNotifyFieldChange(ctx, own.Line)
+			}
 			oldPeers, err := s.p10ScenePeers(tx, own.Scene, oldLine, id)
 			if err != nil {
 				return nil, true, err

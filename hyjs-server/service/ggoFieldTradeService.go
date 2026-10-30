@@ -69,7 +69,9 @@ func (s *GameService) ggoWithTradePair(ctx context.Context, auth model.GGOFieldA
 	ctx = context.WithValue(ctx, constUtil.GameServiceContextKey, runtime)
 	p10SceneMutation.Lock()
 	defer p10SceneMutation.Unlock()
-	return db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	changedLines := make(map[int32]bool)
+	var changedWithoutPresence []int64
+	err = db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := ServerGameClockGuardTransaction(tx); err != nil {
 			return err
 		}
@@ -93,8 +95,43 @@ func (s *GameService) ggoWithTradePair(ctx context.Context, auth model.GGOFieldA
 			}
 			actors[id] = &ggoFieldActor{Service: runtime, Row: row, Player: player, Game: game, Now: now}
 		}
-		return apply(tx, &ggoTradePair{Actors: [2]*ggoFieldActor{actors[initiator], actors[receiver]}, Now: now})
+		pair := &ggoTradePair{Actors: [2]*ggoFieldActor{actors[initiator], actors[receiver]}, Now: now}
+		var before [2]int64
+		for i, actor := range pair.Actors {
+			var err error
+			before[i], err = ggoChipCount(actor.Game)
+			if err != nil {
+				return err
+			}
+		}
+		if err := apply(tx, pair); err != nil {
+			return err
+		}
+		for i, actor := range pair.Actors {
+			after, err := ggoChipCount(actor.Game)
+			if err != nil {
+				return err
+			}
+			if before[i] == after {
+				continue
+			}
+			if actor.Presence.Scene == constUtil.GGOFieldScene && actor.Presence.Line > 0 {
+				changedLines[actor.Presence.Line] = true
+			} else {
+				changedWithoutPresence = append(changedWithoutPresence, actor.Row.Id)
+			}
+		}
+		return nil
 	})
+	if err == nil {
+		for line := range changedLines {
+			s.ggoNotifyFieldChange(ctx, line)
+		}
+		for _, id := range changedWithoutPresence {
+			s.ggoNotifyChipPlayerChange(ctx, id)
+		}
+	}
+	return err
 }
 
 func ggoTradeLinkMatches(link *model.GGOFieldTradeLink, state *ggoTradeState) bool {

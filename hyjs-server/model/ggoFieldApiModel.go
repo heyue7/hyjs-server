@@ -66,6 +66,12 @@ type GGOFieldTerminalView struct {
 	CreditBalance int64    `json:"creditBalance"`
 }
 
+// GGOFieldChipCountView is the public carried total for a visible player.
+type GGOFieldChipCountView struct {
+	PlayerID int64 `json:"playerId"`
+	Count    int64 `json:"count"`
+}
+
 type GGOFieldResourceView struct {
 	PointID       string                 `json:"pointId"`
 	Kind          string                 `json:"kind"`
@@ -142,6 +148,7 @@ type GGOFieldSnapshotResponse struct {
 	Fatigue           int64                    `json:"fatigue"`
 	Materials         []GGOFieldResourceAmount `json:"materials"`
 	Terminal          GGOFieldTerminalView     `json:"terminal"`
+	PlayerChipCounts  []GGOFieldChipCountView  `json:"playerChipCounts"`
 	NPCs              []GGOFieldNPCView        `json:"npcs"`
 	SafeArea          *AdminFieldGGOSafeArea   `json:"safeArea"`
 	Resources         []GGOFieldResourceView   `json:"resources"`

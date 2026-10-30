@@ -381,6 +381,19 @@ func saveProfileAgainst(tx *gorm.DB, row *db.Profile, player *pb.Player, game *m
 		return err
 	}
 	updates := map[string]any{}
+	// Keep the public desert total in the same transaction as the authoritative
+	// terminal. The six quality counts remain private to the profile owner.
+	if game.GGOField != nil && p10SceneScope(game) == constUtil.GGOFieldScene {
+		_, total, err := ggoProtectedChips(game.GGOField.Chips, 0)
+		if err != nil {
+			return err
+		}
+		if row.GGOChipTotal == nil || *row.GGOChipTotal != total {
+			updates["ggo_chip_total"] = total
+		}
+	} else if row.GGOChipTotal != nil {
+		updates["ggo_chip_total"] = nil
+	}
 	if !row.GGOCreditMigrated || row.GGOCredit != game.GGOCredit {
 		updates["ggo_credit"] = game.GGOCredit
 		updates["ggo_credit_migrated"] = true
@@ -425,7 +438,8 @@ func updateProfileForP7QueryWithTx(ctx context.Context, id int64, fn func(*gorm.
 }
 
 func updateProfileTransaction(ctx context.Context, id int64, prelockPeriods bool, fn func(*gorm.DB, *pb.Player, *model.GameState) error) error {
-	return db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	changedChipTotal := false
+	err := db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := ServerGameClockGuardTransaction(tx); err != nil {
 			return err
 		}
@@ -435,6 +449,10 @@ func updateProfileTransaction(ctx context.Context, id int64, prelockPeriods bool
 		}
 		persisted := row
 		player, game, err := decodeProfileForCalendarUpdate(tx, &row)
+		if err != nil {
+			return err
+		}
+		beforeChips, err := ggoChipCount(game)
 		if err != nil {
 			return err
 		}
@@ -459,8 +477,22 @@ func updateProfileTransaction(ctx context.Context, id int64, prelockPeriods bool
 		if err = fn(tx, player, game); err != nil {
 			return err
 		}
-		return saveProfileAgainst(tx, &row, player, game, &persisted)
+		if err = saveProfileAgainst(tx, &row, player, game, &persisted); err != nil {
+			return err
+		}
+		afterChips, err := ggoChipCount(game)
+		if err != nil {
+			return err
+		}
+		changedChipTotal = beforeChips != afterChips
+		return nil
 	}, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
+	if err == nil && changedChipTotal {
+		if svc, ok := ctx.Value(constUtil.GameServiceContextKey).(*GameService); ok {
+			svc.ggoNotifyChipPlayerChange(ctx, id)
+		}
+	}
+	return err
 }
 
 // CreatePlayer 幂等创建初始角色，已有角色不会被重新覆盖。

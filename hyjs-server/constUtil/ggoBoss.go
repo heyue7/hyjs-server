@@ -9,4 +9,7 @@ const (
 	GGOFieldBossSource               = "ggo-v4"
 	GGOFieldBossAwardOperation       = "boss-award"
 	GGOFieldBossLateOperation        = "boss-late-settle"
+	// A live boss stays available until defeated; its next spawn is one hour later.
+	GGOFieldBossRespawnMS   int64 = 60 * 60 * 1000
+	GGOFieldBossOpenUntilMS int64 = 253402300799000
 )

@@ -331,7 +331,7 @@ func (s *GameService) ggoBossApplyDamageLocked(tx *gorm.DB, id int64, fight *mod
 	}
 	// The live event can advance while an accepted original battle continues.
 	// Finishing that battle still resolves the player; it cannot damage a replacement.
-	if row.UUID != frozen.EventID || now >= frozen.EndsAtMS {
+	if row.UUID != frozen.EventID {
 		boss.State = proto.Int32(3)
 		boss.CurHp = proto.Float64(0)
 		return boss, 0, nil
@@ -384,7 +384,10 @@ func (s *GameService) ggoBossApplyDamageLocked(tx *gorm.DB, id int64, fight *mod
 	}
 	if hp[key] == 0 {
 		row.KillerID = id
-		row.RespawnAt = event.EndsAtMS
+		if now > math.MaxInt64-constUtil.GGOFieldBossRespawnMS {
+			return nil, 0, errors.New("沙漠首领刷新时间溢出")
+		}
+		row.RespawnAt = now + constUtil.GGOFieldBossRespawnMS
 		shared.State = proto.Int32(3)
 		if err = s.ggoBossFreezeAwardsLocked(tx, event, id); err != nil {
 			return nil, 0, err

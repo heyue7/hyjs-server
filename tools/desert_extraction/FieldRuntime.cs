@@ -95,13 +95,15 @@ namespace HYJS.DesertV4
             if (code==1) BattleRecovery.StartResponse(type,value);
         }
         public static bool PreserveBattle() { return BattleRecovery.PreserveBattle(); }
-        public static void TcpConnecting() { PositionSync.ConnectionStarting(); TeamMap86.ConnectionStarting(); BattleRecovery.BeforeTcpLogin(); PvpBridge.ConnectionStarting(); }
+        public static void TcpConnecting() { ChipNames.ReleaseScene(); PositionSync.ConnectionStarting(); TeamMap86.ConnectionStarting(); BattleRecovery.BeforeTcpLogin(); PvpBridge.ConnectionStarting(); }
         public static bool TransferSend(int opcode,object value)
         {
             if (PvpBridge.Capture(opcode,value)) return true;
             if (Target() && (opcode==30032 || opcode==30061) && PvpBridge.HasPending())
             { BoxManager.CreatePopupTextBox("上次挑战仍在确认",0f); return true; }
-            return LeaveController.Send(opcode,value);
+            bool intercepted=LeaveController.Send(opcode,value);
+            if (!intercepted && Target() && (opcode==30032 || opcode==30061)) ChipNames.ReleaseScene();
+            return intercepted;
         }
         public static bool PvpResponse(object value) { return PvpBridge.Intercept(value); }
         public static bool TransferResponse(int opcode,object owner,object value) { return LeaveController.Response(opcode,owner,value); }
@@ -131,6 +133,59 @@ namespace HYJS.DesertV4
         { if (!Target()) LocalFieldSettlement.Completed(over,value); }
     }
 
+    // Reuse the field's original explanation page and button for the desert.
+    // This state is only kept in memory for the current visit.
+    sealed class DesertGuide
+    {
+        const string Text = "【沙漠玩法】\n\n" +
+            "1. 在安全区找到诗乃，随机传送到沙漠。落地后30秒内不会被攻击；采集或战斗时可确认提前结束保护。\n\n" +
+            "2. 同一线路的玩家共享小怪、矿和鱼。击败小怪、采矿或钓鱼有机会获得芯片；采集还可获得材料，并消耗疲劳。\n\n" +
+            "3. 芯片暂存在临时终端。安全区里点击其他玩家，可以交易芯片。\n\n" +
+            "4. 战败时按携带芯片总数的一半向下取整扣除。品质最高的3枚不会丢失；其余芯片不够扣时，只扣其余的。\n\n" +
+            "5. 被其他玩家击败时，对方获得你丢失的芯片。战败后返回安全区，剩余芯片仍在终端里。\n\n" +
+            "6. 每条线路有一只首领，未被击败时可持续挑战；被击败后1小时刷新。\n\n" +
+            "7. 对首领造成伤害可获得参与奖励，伤害排名和最后一击还有额外奖励。野外首领奖励每天共可领取3次。\n\n" +
+            "8. 找到撤离点并等待10秒即可返回安全区；移动、受击或行动会打断撤离。\n\n" +
+            "9. 回到安全区找柯尔，把芯片兑换成信用点。确认返城或前往其他野外地图时，芯片也会自动结算。";
+
+        bool shown;
+        long playerId;
+        string origin;
+
+        public void Observe(string fieldId,FieldWire.Session owner,bool inTown)
+        {
+            if (fieldId!="field_003" || inTown) { shown=false; playerId=0; origin=null; return; }
+            if (owner==null) return;
+            if (playerId!=owner.playerId || origin!=owner.origin)
+            { shown=false; playerId=owner.playerId; origin=owner.origin; }
+        }
+
+        void Apply(DescriptionPage page)
+        {
+            if (page==null || page.text==null) return;
+            page.SetString(Text);
+            shown=true;
+            try { if (page.scroll!=null) page.scroll.ResetPosition(); } catch (Exception) { }
+        }
+
+        public void Tick(bool ready)
+        {
+            if (PageManager.instance==null) return;
+            DescriptionPage description=PageManager.instance.currentPage as DescriptionPage;
+            if (description!=null && description.text!=null)
+            {
+                string original=TableTextBlo.GetText("field_des");
+                if (original!=null && description.text.text==original.Replace("\\r","\r").Replace("\\n","\n")) Apply(description);
+                return;
+            }
+            if (shown || !ready) return;
+            UIFieldRunMap page=PageManager.instance.currentPage as UIFieldRunMap;
+            if (page==null || page.uiEvent==null) return;
+            page.uiEvent.Explain();
+            Apply(PageManager.instance.currentPage as DescriptionPage);
+        }
+    }
+
     // Scene binding for native resource, monster and NPC actors. Public
     // movement, travel and extraction remain separate integration gates.
     public sealed class FieldRuntime : MonoBehaviour, IGatherView, ITerminalView
@@ -155,6 +210,7 @@ namespace HYJS.DesertV4
         FieldMonsters monsters;
         FieldBoss boss;
         TerminalController terminal;
+        readonly DesertGuide guide=new DesertGuide();
         bool dirty, inFlight, snapshotReady, worldReady, askingProtection, awaitingEncounter, encounterTimedOut, safe;
         bool safeAreaKnown,lastLocalSafe;
         bool teamHudChecked;
@@ -239,6 +295,9 @@ namespace HYJS.DesertV4
             RoomCharactor self=null;
             try { if (current!=null && current.charactorManager!=null) self=current.charactorManager.GetSelfCharactor(); } catch (Exception) { }
             FieldWire.Session currentSession; FieldWire.Current(out currentSession);
+            // The native town transition clears UIFieldRunMap.fieldId, while
+            // StaticData.fieldId can retain the previous field until next entry.
+            guide.Observe(StaticData.fieldId,currentSession,RoomManager.currentRoom is RoomTown);
             if (room!=null && (current!=room || self!=actor || !Same(currentSession,session)))
                 ReleaseScene(current==room && SameActor(currentSession,session));
             if (current==null || self==null || currentSession==null) return;
@@ -268,6 +327,7 @@ namespace HYJS.DesertV4
                 }
                 catch (Exception) { return; } // actor assets/session may not yet be ready
             }
+            try { guide.Tick(InteractionReady); } catch (Exception) { }
             try { PositionSync.Tick(); preload.Tick(); gather.Tick(); if (monsters!=null) monsters.Tick(); if (boss!=null) boss.Tick(); } catch (Exception) { Notice("采集状态需要确认，请重新进入"); ReleaseScene(); return; }
             RefreshNativeTeamHud();
             RefreshTiredHud();
@@ -303,6 +363,7 @@ namespace HYJS.DesertV4
         void ReleaseScene() { ReleaseScene(false); }
         void ReleaseScene(bool sameNativeRoom)
         {
+            ChipNames.ReleaseScene();
             ColdBattleRecovery.SceneExit(room);
             // Native 30024 recreates the self actor even in an already loaded
             // RoomField. Keep that room's resource-completion observation;
@@ -407,6 +468,7 @@ namespace HYJS.DesertV4
                         boss.ApplySnapshot(result.data);
                         npcs.ApplySnapshot(result.data);
                         terminal.ApplySnapshot(result.data);
+                        ChipNames.ApplySnapshot(result.data);
                         protectionDeadline=Stopwatch.GetTimestamp()+remain*Stopwatch.Frequency/1000;
                         safe=nextSafe; safeMinX=minX; safeMaxX=maxX; safeMinZ=minZ; safeMaxZ=maxZ; safeAreaKnown=true;
                         lastLocalSafe=InsideSafe(actor.transform.position,minX,maxX,minZ,maxZ);

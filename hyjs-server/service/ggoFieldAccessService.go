@@ -67,7 +67,9 @@ func (s *GameService) ggoWithProfile(ctx context.Context, auth model.GGOFieldAut
 	runtime.GGOFieldEconomy = snapshot.ggoEconomy
 	runtime.GGOFieldRevision = snapshot.ggoRevision
 	ctx = context.WithValue(ctx, constUtil.GameServiceContextKey, runtime)
-	return db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	changedChips := false
+	var changedLine int32
+	err = db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := ServerGameClockGuardTransaction(tx); err != nil {
 			return err
 		}
@@ -79,6 +81,10 @@ func (s *GameService) ggoWithProfile(ctx context.Context, auth model.GGOFieldAut
 			return ggoFieldError(constUtil.GGOFieldInvalidLocation, "会话已失效")
 		}
 		player, game, err := decodeProfileForCalendarUpdate(tx, &row)
+		if err != nil {
+			return err
+		}
+		beforeChips, err := ggoChipCount(game)
 		if err != nil {
 			return err
 		}
@@ -101,8 +107,27 @@ func (s *GameService) ggoWithProfile(ctx context.Context, auth model.GGOFieldAut
 				return ggoFieldError(constUtil.GGOFieldInvalidLocation, "请连接当前游戏场景")
 			}
 		}
-		return apply(tx, &ggoFieldActor{Service: runtime, Row: &row, Player: player, Game: game, Presence: presence, Now: time.Now().UnixMilli()})
+		if err = apply(tx, &ggoFieldActor{Service: runtime, Row: &row, Player: player, Game: game, Presence: presence, Now: time.Now().UnixMilli()}); err != nil {
+			return err
+		}
+		afterChips, err := ggoChipCount(game)
+		if err != nil {
+			return err
+		}
+		changedChips = beforeChips != afterChips
+		if presence.Scene == constUtil.GGOFieldScene {
+			changedLine = presence.Line
+		}
+		return nil
 	})
+	if err == nil && changedChips {
+		if changedLine > 0 {
+			s.ggoNotifyFieldChange(ctx, changedLine)
+		} else {
+			s.ggoNotifyChipPlayerChange(ctx, auth.PlayerID)
+		}
+	}
+	return err
 }
 
 func ggoPointInsideSafe(p *pb.PointNew, area *model.AdminFieldGGOSafeArea) bool {
@@ -150,6 +175,9 @@ func (s *GameService) GGOFieldSnapshot(ctx context.Context, auth model.GGOFieldA
 	var out *model.GGOFieldSnapshotResponse
 	err = s.ggoWithActor(ctx, auth, session, func(tx *gorm.DB, a *ggoFieldActor) error {
 		cfg := a.Service.GGOFieldConfig
+		if err := ggoEnsureChipProjection(tx, a.Row, a.Game); err != nil {
+			return err
+		}
 		row, state, _, err := ggoLoadLine(tx, a.Service.OriginalServerID(), int64(a.Presence.Line), cfg, a.Service.GGOFieldRevision, a.Now)
 		if err != nil {
 			return err
@@ -160,6 +188,10 @@ func (s *GameService) GGOFieldSnapshot(ctx context.Context, auth model.GGOFieldA
 		out = &model.GGOFieldSnapshotResponse{ServerTimeMS: projectionNow, Scene: constUtil.GGOFieldScene, Line: int64(a.Presence.Line), EconomyVersion: cfg.Runtime.EconomyVersion, Revision: row.Revision, ResourceMineCount: cfg.Runtime.Resource.MineCount, ResourceFishCount: cfg.Runtime.Resource.FishCount,
 			Safe:      ggoPointInsideSafe(a.Game.Position.GetCurrent(), cfg.Runtime.SafeArea),
 			Resources: []model.GGOFieldResourceView{}, Monsters: []model.GGOFieldMonsterView{}, Exits: []model.GGOFieldExitView{}}
+		out.PlayerChipCounts, err = a.Service.ggoFieldChipCounts(tx, a)
+		if err != nil {
+			return err
+		}
 		if a.Game.GGOField != nil {
 			out.Terminal.Chips = a.Game.GGOField.Chips
 			out.Terminal.Revision = a.Game.GGOField.Revision
@@ -254,8 +286,12 @@ func (s *GameService) GGOFieldSnapshot(ctx context.Context, auth model.GGOFieldA
 				return err
 			}
 			var patrol *model.GGOFieldPatrolView
-			if p.Patrol != nil {
-				patrol = &model.GGOFieldPatrolView{Waypoints: p.Patrol.Waypoints, Speed: p.Patrol.Speed, EpochMS: n.PatrolEpochMS, PausedAtMS: n.PatrolPausedAtMS}
+			path, err := ggoPatrolPath(&p)
+			if err != nil {
+				return err
+			}
+			if path != nil {
+				patrol = &model.GGOFieldPatrolView{Waypoints: path.Waypoints, Speed: path.Speed, EpochMS: n.PatrolEpochMS, PausedAtMS: n.PatrolPausedAtMS}
 			}
 			out.Monsters = append(out.Monsters, model.GGOFieldMonsterView{UUID: n.UUID, MonID: n.MonID, PointID: n.PointID, Level: n.Level, HeroID: n.HeroID, Generation: n.Generation, Position: position, HPRatio: hp, Available: n.ReservedBy == 0 && n.RefreshAtMS == 0 && !ggoLegacyBlocked(state, n.PointID), RefreshAtMS: n.RefreshAtMS, Patrol: patrol})
 		}

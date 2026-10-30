@@ -203,8 +203,8 @@ func TestGGOBossLines86IndependentSharedWithinLineAndColdReceipts(t *testing.T) 
 	}); err != nil {
 		t.Fatal("create second line event", err)
 	}
-	if firstEvent.ID == secondEvent.ID || firstEvent.Line != 1 || secondEvent.Line != 2 || firstEvent.StartsAtMS != secondEvent.StartsAtMS {
-		t.Fatal("events must be distinct in the same scheduled window", firstEvent, secondEvent)
+	if firstEvent.ID == secondEvent.ID || firstEvent.Line != 1 || secondEvent.Line != 2 {
+		t.Fatal("events must be distinct and independent by line", firstEvent, secondEvent)
 	}
 	players := []struct {
 		id    int64
@@ -647,7 +647,11 @@ func TestGGOBossLines86RefreshAndExpiredFight(t *testing.T) {
 	if err := sharedFieldBoss55Query(db.GetIns(), f.s.OriginalServerID(), constUtil.GGOFieldScene, constUtil.GGOFieldBossPosition, 2).Take(&before2).Error; err != nil {
 		t.Fatal(err)
 	}
-	nextNow := old1.StartsAtMS + 3600000 + 1
+	nextNow := old1.StartsAtMS + constUtil.GGOFieldBossRespawnMS + 1
+	if err := sharedFieldBoss55Query(db.GetIns().Model(&db.SharedFieldBoss55{}), f.s.OriginalServerID(), constUtil.GGOFieldScene, constUtil.GGOFieldBossPosition, 1).
+		Updates(map[string]any{"killer_id": f.id, "respawn_at": nextNow}).Error; err != nil {
+		t.Fatal(err)
+	}
 	var next1 *ggoBossEvent
 	if err := db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		_, event, _, _, err := f.s.ggoBossCurrent(tx, f.s.GGOFieldConfig, nextNow, false, 1)
@@ -668,6 +672,10 @@ func TestGGOBossLines86RefreshAndExpiredFight(t *testing.T) {
 		return err
 	}); err != nil || damage != 0 {
 		t.Fatal("expired battle damaged replacement", damage, err)
+	}
+	if err := sharedFieldBoss55Query(db.GetIns().Model(&db.SharedFieldBoss55{}), f.s.OriginalServerID(), constUtil.GGOFieldScene, constUtil.GGOFieldBossPosition, 2).
+		Updates(map[string]any{"killer_id": f.id, "respawn_at": nextNow}).Error; err != nil {
+		t.Fatal(err)
 	}
 	var next2 *ggoBossEvent
 	if err := db.GetIns().Transaction(func(tx *gorm.DB) error {

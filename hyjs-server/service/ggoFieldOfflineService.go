@@ -37,6 +37,7 @@ func (s *GameService) ggoScheduleOfflineExpiry(id, until int64) {
 		p10SceneMutation.Unlock()
 		if eligible {
 			base.p10SceneBroadcast(ctx, row.Scene, row.Line, id, &pb.SCPlayerDisappear{PlayerId: []int64{id}})
+			base.ggoNotifyFieldChange(ctx, row.Line)
 		}
 	})
 	if old, ok := base.ggoOfflineTimers.Swap(id, task); ok {
