@@ -1,7 +1,7 @@
 import { api, json } from './operations';
 
 export type UpdateMode = 'notice' | 'next_login' | 'maintenance';
-export type UpdateAction = 'publish' | 'remind' | 'withdraw' | 'start_maintenance' | 'end_maintenance' | 'cancel_maintenance';
+export type UpdateAction = 'publish' | 'remind' | 'withdraw' | 'start_maintenance' | 'end_maintenance' | 'cancel_maintenance' | 'server_start';
 export interface ClientRelease {
   id: number; buildCode: number; versionName: string; title: string; content: string;
   mode: UpdateMode; minLoginBuild: number; minRunBuild: number;

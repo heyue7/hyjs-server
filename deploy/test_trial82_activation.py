@@ -202,7 +202,7 @@ class Trial82ActivationTests(unittest.TestCase):
         source = (HERE / 'activate.py').read_text()
         tree = ast.parse(source)
         node = next(n for n in tree.body if isinstance(n, ast.If)
-                    and ast.get_source_segment(source, n.test) == "(ROOT / 'migration.json').exists()"
+                    and ast.get_source_segment(source, n.test) == "args.with_backup and (ROOT / 'migration.json').exists()"
                     and 'verified_backup = backup_existing_database()' in ast.get_source_segment(source, n))
         block = compile(ast.Module(body=[node], type_ignores=[]), str(HERE / 'activate.py'), 'exec')
         (self.root / 'migration.json').write_text('{}')
@@ -210,7 +210,7 @@ class Trial82ActivationTests(unittest.TestCase):
         guard.record['requestedCommands'] = ['--apply-feedback84']
         def fail_backup():
             raise OSError('private backup failure')
-        namespace = {'ROOT': self.root, 'args': SimpleNamespace(apply_trial82=False, apply_feedback84=True, apply_feedback85=False, maintenance_redeploy=False),
+        namespace = {'ROOT': self.root, 'args': SimpleNamespace(with_backup=True, apply_trial82=False, apply_feedback84=True, apply_feedback85=False, maintenance_redeploy=False),
                      'trial82_guard': guard, 'backup_existing_database': fail_backup}
         with self.assertRaises(OSError):
             exec(block, namespace)
@@ -647,7 +647,7 @@ exec(tests.cutover_block(), namespace)
             ]
             for script, extra in (('deploy.py', ['--provision']), ('deploy.py', ['--initial-dump', '/tmp/not-a-dump']),
                                   ('activate.py', ['--initial-db']), ('activate.py', ['--initial-db', '--provision-ingress'])):
-                base = [sys.executable, str(HERE / script)]
+                base = [sys.executable, '-B', str(HERE / script), '--with-backup']
                 if script == 'activate.py':
                     base.append('/not/a/real/stage')
                 for options in common + [[*selection, *extra, '--expected-live-revision', live]]:
@@ -660,7 +660,7 @@ exec(tests.cutover_block(), namespace)
         for selection in (['--apply-trial82'], ['--apply-feedback84'], ['--apply-feedback85'], ['--apply-trial82', '--apply-feedback84', '--apply-feedback85']):
             result = subprocess.run([sys.executable, str(HERE / 'deploy.py'), '--check-config', '--env-file',
                                      str(HERE / '.env.example'), *selection, '--expected-live-revision',
-                                     self.live_revision, '--update-ingress'], capture_output=True, text=True)
+                                     self.live_revision, '--update-ingress', '--with-backup'], capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn('no external action performed', result.stdout)
         stage = self.root / 'owned' / '.incoming' / 'candidate'
@@ -668,7 +668,7 @@ exec(tests.cutover_block(), namespace)
         (stage.parent.parent / '.hyjs-owned').write_text('')
         (stage.parent.parent / 'deployed.json').write_text(json.dumps({'revision': 'd' * 40}))
         (stage / 'artifact.json').write_text('{}')
-        result = subprocess.run([sys.executable, str(HERE / 'activate.py'), str(stage), '--apply-trial82',
+        result = subprocess.run([sys.executable, '-B', str(HERE / 'activate.py'), str(stage), '--with-backup', '--apply-trial82',
                                  '--expected-live-revision', self.live_revision, '--provision-ingress'],
                                 capture_output=True, text=True)
         self.assertNotEqual(result.returncode, 0)
@@ -705,7 +705,7 @@ exec(tests.cutover_block(), namespace)
         end = next(i for i in range(start, len(tree.body)) if isinstance(tree.body[i], ast.Expr) and isinstance(tree.body[i].value, ast.Call) and isinstance(tree.body[i].value.func, ast.Name) and tree.body[i].value.func.id == 'print')
         block = compile(ast.Module(body=tree.body[start:end], type_ignores=[]), str(HERE / 'deploy.py'), 'exec')
         for trial_enabled, feedback_enabled, feedback85_enabled in ((False, False, False), (True, False, False), (False, True, False), (True, True, False), (False, False, True), (True, True, True)):
-            args = SimpleNamespace(warm_rush_history_player=[], expected_live_revision=self.live_revision,
+            args = SimpleNamespace(with_backup=True, warm_rush_history_player=[], expected_live_revision=self.live_revision,
                                    apply_growth74=False, apply_growth75=False, apply_activity77=False,
                                    apply_feedback78=False, apply_feedback79=False, apply_feedback80=False,
                                    apply_feedback81=False, apply_trial82=trial_enabled, apply_feedback84=feedback_enabled, apply_feedback85=feedback85_enabled, restore_activity_calendar=None,
@@ -713,6 +713,7 @@ exec(tests.cutover_block(), namespace)
             namespace = {'args': args, 'remote_stage': '/tmp/candidate', 'shlex': shlex}
             exec(block, namespace)
             argv = shlex.split(namespace['command'])
+            self.assertIn('--with-backup', argv)
             self.assertEqual('--apply-trial82' in argv, trial_enabled)
             self.assertEqual('--apply-feedback84' in argv, feedback_enabled)
             self.assertEqual('--apply-feedback85' in argv, feedback85_enabled)
@@ -790,7 +791,7 @@ exec(tests.cutover_block(), namespace)
                    [*selection, *pinned, '--restore-activity-calendar', '00000000-0000-0000-0000-000000000001']]
         for script, extras in (('deploy.py', [['--provision'], ['--update-ingress'], ['--initial-dump', '/tmp/unused']]),
                                ('activate.py', [['--initial-db'], ['--provision-ingress']])):
-            base = [sys.executable, str(HERE / script)] + (['/not/a/real/stage'] if script == 'activate.py' else [])
+            base = [sys.executable, '-B', str(HERE / script), '--with-backup'] + (['/not/a/real/stage'] if script == 'activate.py' else [])
             for options in common + [[*selection, *pinned, *extra] for extra in extras]:
                 with self.subTest(script=script, options=options):
                     result = subprocess.run(base + options, capture_output=True, text=True)
@@ -798,7 +799,7 @@ exec(tests.cutover_block(), namespace)
                     self.assertIn('AssertionError', result.stderr)
                     self.assertNotIn('FileNotFoundError', result.stderr)
         result = subprocess.run([sys.executable, str(HERE / 'deploy.py'), '--check-config', '--env-file',
-                                 str(HERE / '.env.example'), *selection, *pinned], capture_output=True, text=True)
+                                 str(HERE / '.env.example'), '--with-backup', *selection, *pinned], capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn('no external action performed', result.stdout)
 
@@ -811,7 +812,7 @@ exec(tests.cutover_block(), namespace)
                    and isinstance(tree.body[i].value, ast.Call) and isinstance(tree.body[i].value.func, ast.Name)
                    and tree.body[i].value.func.id == 'print')
         block = compile(ast.Module(body=tree.body[start:end], type_ignores=[]), str(HERE / 'deploy.py'), 'exec')
-        args = SimpleNamespace(warm_rush_history_player=[], expected_live_revision=self.live_revision,
+        args = SimpleNamespace(with_backup=True, warm_rush_history_player=[], expected_live_revision=self.live_revision,
                                apply_growth74=False, apply_growth75=False, apply_activity77=False,
                                apply_feedback78=False, apply_feedback79=False, apply_feedback80=False,
                                apply_feedback81=False, apply_trial82=False, apply_feedback84=False,
@@ -820,6 +821,7 @@ exec(tests.cutover_block(), namespace)
         namespace = {'args': args, 'remote_stage': '/tmp/candidate', 'shlex': shlex}
         exec(block, namespace)
         argv = shlex.split(namespace['command'])
+        self.assertEqual(argv.count('--with-backup'), 1)
         self.assertEqual(argv.count('--maintenance-redeploy'), 1)
         self.assertEqual(argv[argv.index('--expected-live-revision') + 1], self.live_revision)
         self.assertFalse(any(value.startswith('--apply-') for value in argv))
@@ -887,14 +889,14 @@ exec(tests.cutover_block(), namespace)
     def test_maintenance_redeploy_backup_failure_preserves_guard(self):
         source = (HERE / 'activate.py').read_text()
         node = next(n for n in ast.parse(source).body if isinstance(n, ast.If)
-                    and ast.get_source_segment(source, n.test) == "(ROOT / 'migration.json').exists()"
+                    and ast.get_source_segment(source, n.test) == "args.with_backup and (ROOT / 'migration.json').exists()"
                     and 'verified_backup = backup_existing_database()' in ast.get_source_segment(source, n))
         block = compile(ast.Module(body=[node], type_ignores=[]), str(HERE / 'activate.py'), 'exec')
         (self.root / 'migration.json').write_text('{}')
         guard = self.guard(mode='maintenance-redeploy')
         def fail_backup():
             raise OSError('private backup failure')
-        args = SimpleNamespace(apply_trial82=False, apply_feedback84=False, apply_feedback85=False, maintenance_redeploy=True)
+        args = SimpleNamespace(with_backup=True, apply_trial82=False, apply_feedback84=False, apply_feedback85=False, maintenance_redeploy=True)
         with self.assertRaises(OSError):
             exec(block, {'ROOT': self.root, 'args': args, 'trial82_guard': guard, 'backup_existing_database': fail_backup})
         guard.stop_if_unfinished()

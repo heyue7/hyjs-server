@@ -274,8 +274,16 @@ const historyColumns = computed<DataTableColumns<ClientRelease>>(() => [
 ]);
 const actionOpen = ref(false); const actionReason = ref(''); const actionError = ref(''); const confirmed = ref(false);
 const selected = ref<ClientRelease | null>(null); const action = ref<UpdateAction>('publish');
+const actionPolicyVersion = ref('');
 const currentRelease = computed(() => [...(overview.value?.items || []), ...history.value].find(item => item.id === overview.value?.policy.releaseId) || null);
 const currentPlanPhase = computed(() => maintenancePhase(overview.value?.policy.maintenanceStartAt || 0, maintenanceNow.value));
+const maintenanceEndAction = computed<UpdateAction | null>(() => {
+  const policy = overview.value?.policy;
+  if (!policy?.maintenance) return null;
+  if (policy.mode !== 'maintenance' || !policy.releaseId || currentRelease.value?.state === 'cancelled') return 'server_start';
+  if (currentRelease.value?.mode === 'maintenance' && (currentRelease.value.state === 'published' || currentRelease.value.state === 'withdrawn')) return 'end_maintenance';
+  return null;
+});
 let maintenanceTimer: number | undefined;
 function refreshMaintenanceClock() {
   const now = estimateServerTime();
@@ -301,7 +309,7 @@ watch(
   },
   { flush: 'sync' }
 );
-const actionNames: Record<UpdateAction, string> = { publish: '发布并提醒', remind: '再次提醒', withdraw: '撤回提醒', start_maintenance: '立即开始维护', end_maintenance: '结束维护', cancel_maintenance: '取消维护计划' };
+const actionNames: Record<UpdateAction, string> = { publish: '发布并提醒', remind: '再次提醒', withdraw: '撤回提醒', start_maintenance: '立即开始维护', end_maintenance: '结束维护', cancel_maintenance: '取消维护计划', server_start: '结束维护' };
 const actionVersionProblem = computed(() => {
   if (action.value === 'cancel_maintenance' && !pending.value && maintenancePhase(selected.value?.maintenanceStartAt || 0, maintenanceNow.value) !== 'future') return '无法确认维护尚未开始，请关闭窗口并刷新状态。';
   if (action.value !== 'publish' || !selected.value) return '';
@@ -314,20 +322,22 @@ const actionEffect = computed(() => {
   if (action.value === 'remind') return '向符合当前提醒条件的客户端发送新一批提醒，已看过上一批提醒的玩家也会再次收到。';
   if (action.value === 'start_maintenance') return '当前接入运行区服立即进入维护，在线玩家将退出，业务请求受到拦截。';
   if (action.value === 'cancel_maintenance') return '取消维护计划并关闭维护预告。已看过预告的玩家不会自动收到取消通知，已生效的版本门槛保持不变。';
+  if (action.value === 'server_start') return '当前接入运行区服恢复开放，已生效的登录和运行版本门槛继续保留。';
   if (action.value === 'end_maintenance') return row?.versionPolicy ? `当前接入运行区服恢复开放，低于 ${row.versionName} 或版本无法识别的客户端需要先更新；原有生效限制继续保留。预计结束时间不会自动开放。` : `当前接入运行区服恢复开放，并启用该记录的登录构建门槛 ${buildThreshold(row?.minLoginBuild || 0)}、运行构建门槛 ${buildThreshold(row?.minRunBuild || 0)}。预计结束时间不会自动开放。`;
   if (!row) return '';
   return row.versionPolicy ? modeEffect(row.mode, row.versionName, { start: row.maintenanceStartAt, end: row.maintenanceEndAt }) : legacyEffect(row);
 });
 function prepareAction(value: UpdateAction, row?: ClientRelease) {
-  if (!canPublish.value || blocked.value) return;
-  selected.value = row || currentRelease.value;
-  if (!selected.value) { error.value = '当前发布记录未载入，请刷新后重试'; return; }
-  if (selected.value.state === 'cancelled') { error.value = '维护计划已取消，请刷新查看当前状态'; return; }
+  if (!canPublish.value || blocked.value || !overview.value) return;
+  if ((value === 'server_start' || value === 'end_maintenance') && maintenanceEndAction.value !== value) { error.value = '维护状态或发布记录已变化，请刷新后重试'; return; }
+  selected.value = value === 'server_start' ? null : row || currentRelease.value;
+  if (value !== 'server_start' && !selected.value) { error.value = '当前发布记录未载入，请刷新后重试'; return; }
+  if (selected.value?.state === 'cancelled') { error.value = '维护计划已取消，请刷新查看当前状态'; return; }
   if (value === 'cancel_maintenance') {
     refreshMaintenanceClock();
     if (currentPlanPhase.value !== 'future') { error.value = '无法确认维护尚未开始，请刷新状态'; return; }
   }
-  action.value = value; actionReason.value = ''; actionError.value = ''; confirmed.value = false; actionOpen.value = true;
+  action.value = value; actionPolicyVersion.value = overview.value.version; actionReason.value = ''; actionError.value = ''; confirmed.value = false; actionOpen.value = true;
 }
 function handleActionFailure(e: unknown) {
   if (e instanceof ApiError && e.status === 409) {
@@ -338,15 +348,25 @@ function handleActionFailure(e: unknown) {
     if (e instanceof ApiError && e.status >= 400 && e.status < 500) pending.value = null;
   }
 }
+function createActionCommand(): ClientUpdateCommand | null {
+  const row = selected.value;
+  if (!overview.value || (!row && action.value !== 'server_start')) return null;
+  const reason = row
+    ? auditReason(`${actionNames[action.value]}（${modeName(row.mode)}）`, row.versionName, actionReason.value)
+    : auditReason('结束维护（恢复服务）', overview.value.policy.versionName, actionReason.value);
+  return { id: row?.id || 0, version: actionPolicyVersion.value, action: action.value, reason, requestId: createRequestId() };
+}
 async function execute() {
   if ((action.value === 'publish' || action.value === 'cancel_maintenance') && selected.value?.mode === 'maintenance' && !pending.value) refreshMaintenanceClock();
-  if (busy.value || !canPublish.value || !selected.value || !confirmed.value || actionVersionProblem.value) return;
+  if (busy.value || conflict.value || !canPublish.value || !confirmed.value || actionVersionProblem.value) return;
   const retrying = Boolean(pending.value);
-  pending.value ||= { id: selected.value.id, version: overview.value!.version, action: action.value, reason: auditReason(`${actionNames[action.value]}（${modeName(selected.value.mode)}）`, selected.value.versionName, actionReason.value), requestId: createRequestId() };
+  const command = pending.value || createActionCommand();
+  if (!command) return;
+  pending.value = command;
   busy.value = true; actionError.value = '';
   try {
     const startedAt = performance.now();
-    const result = await actClientUpdate(pending.value);
+    const result = await actClientUpdate(command);
     pending.value = null; actionOpen.value = false;
     if (retrying) {
       overview.value = result;
@@ -408,14 +428,17 @@ onBeforeUnmount(() => {
               <strong class="version-name">{{ overview.policy.versionName || '尚未发布更新' }}</strong>
               <p v-if="overview.policy.releaseId" class="ops-muted">{{ modeName(overview.policy.mode) }}</p>
             </div>
-            <NSpace v-if="canPublish && currentRelease && currentRelease.state !== 'cancelled'" class="policy-actions">
-              <NButton v-if="!overview.policy.maintenance" :disabled="blocked || (!!overview.policy.maintenanceStartAt && currentPlanPhase !== 'future')" @click="prepareAction('remind')">再次提醒</NButton>
-              <NButton v-if="!overview.policy.maintenance" :disabled="blocked || !overview.policy.noticeEnabled || (!!overview.policy.maintenanceStartAt && currentPlanPhase !== 'future')" @click="prepareAction('withdraw')">撤回提醒</NButton>
-              <NButton v-if="!overview.policy.maintenance && overview.policy.mode === 'maintenance' && overview.policy.maintenanceStartAt && currentPlanPhase === 'future'" type="warning" :disabled="blocked" @click="prepareAction('start_maintenance')">开始维护</NButton>
-              <NButton v-if="!overview.policy.maintenance && overview.policy.mode === 'maintenance' && overview.policy.maintenanceStartAt && currentPlanPhase === 'future'" :disabled="blocked" @click="prepareAction('cancel_maintenance')">取消维护计划</NButton>
-              <NButton v-if="overview.policy.maintenance" type="warning" :disabled="blocked" @click="prepareAction('end_maintenance')">结束维护</NButton>
+            <NSpace v-if="canPublish" class="policy-actions">
+              <template v-if="currentRelease && currentRelease.state !== 'cancelled' && !overview.policy.maintenance">
+                <NButton :disabled="blocked || (!!overview.policy.maintenanceStartAt && currentPlanPhase !== 'future')" @click="prepareAction('remind')">再次提醒</NButton>
+                <NButton :disabled="blocked || !overview.policy.noticeEnabled || (!!overview.policy.maintenanceStartAt && currentPlanPhase !== 'future')" @click="prepareAction('withdraw')">撤回提醒</NButton>
+                <NButton v-if="overview.policy.mode === 'maintenance' && overview.policy.maintenanceStartAt && currentPlanPhase === 'future'" type="warning" :disabled="blocked" @click="prepareAction('start_maintenance')">开始维护</NButton>
+                <NButton v-if="overview.policy.mode === 'maintenance' && overview.policy.maintenanceStartAt && currentPlanPhase === 'future'" :disabled="blocked" @click="prepareAction('cancel_maintenance')">取消维护计划</NButton>
+              </template>
+              <NButton v-if="maintenanceEndAction" type="warning" :disabled="blocked" @click="prepareAction(maintenanceEndAction)">结束维护</NButton>
             </NSpace>
           </div>
+          <p v-if="overview.policy.maintenance && !maintenanceEndAction" class="ops-muted maintenance-note">当前维护对应的发布记录未载入或状态不明确，请刷新后再结束维护。</p>
           <dl class="policy-summary">
             <div><dt>最低登录版本</dt><dd>{{ overview.policy.minLoginVersion || '未设置版本要求' }}</dd></div>
             <div><dt>最低运行版本</dt><dd>{{ overview.policy.minRunVersion || '未设置版本要求' }}</dd></div>
@@ -424,7 +447,7 @@ onBeforeUnmount(() => {
             <summary>查看仍生效的历史构建限制</summary>
             <p>最低登录构建：{{ buildThreshold(overview.policy.minLoginBuild) }}；最低运行构建：{{ buildThreshold(overview.policy.minRunBuild) }}。这些限制继续生效。</p>
           </details>
-          <p v-if="overview.policy.maintenanceStartAt" class="maintenance-note">维护时间（北京时间）：{{ formatTime(overview.policy.maintenanceStartAt) }} 开始，预计 {{ formatTime(overview.policy.maintenanceEndAt) }} 结束。结束维护后才会开放。<span v-if="!overview.policy.maintenance && currentPlanPhase !== 'future'"> 开始状态待确认，请刷新。</span></p>
+          <p v-if="overview.policy.mode === 'maintenance' && overview.policy.maintenanceStartAt && overview.policy.maintenanceEndAt" class="maintenance-note">维护时间（北京时间）：{{ formatTime(overview.policy.maintenanceStartAt) }} 开始，预计 {{ formatTime(overview.policy.maintenanceEndAt) }} 结束。结束维护后才会开放。<span v-if="!overview.policy.maintenance && currentPlanPhase !== 'future'"> 开始状态待确认，请刷新。</span></p>
           <p v-if="!canPublish" class="ops-muted permission-note">发布、提醒和维护操作需要管理员权限。</p>
         </section>
         <section class="update-panel delivery-panel" aria-labelledby="delivery-title">
@@ -511,7 +534,16 @@ onBeforeUnmount(() => {
     </NModal>
     <NModal :show="actionOpen" preset="card" :title="actionNames[action]" class="update-modal" :mask-closable="false" :closable="!busy && !pending" @update:show="!$event && closeAction()">
       <NAlert v-if="actionError" type="error" :title="actionError" class="mb-16px" />
-      <template v-if="selected"><div class="player-preview"><h3>{{ selected.title }}</h3><p class="player-content">{{ selected.content }}</p><p>请前往QQ群下载最新版</p></div><p>{{ selected.versionName }} · {{ modeName(selected.mode) }}</p><NAlert :type="action === 'start_maintenance' || action === 'end_maintenance' ? 'warning' : 'info'" :title="actionEffect" class="mb-16px" /><NAlert v-if="action === 'publish'" type="warning" :title="`请确认版本与实际安装包一致，且安装包已放到QQ群。系统不接收安装包，无法自动核验。${selected.mode !== 'notice' ? '强制更新会限制尚未取得新包的玩家登录。' : ''}`" class="mb-16px" /><NAlert v-if="actionVersionProblem" type="warning" :title="actionVersionProblem" class="mb-16px" /><NFormItem label="补充审计说明（可选）"><NInput v-model:value="actionReason" :input-props="{ 'aria-label': '补充审计说明' }" :disabled="busy || !!pending" :maxlength="150" placeholder="系统会记录操作和版本" /></NFormItem><NCheckbox v-model:checked="confirmed" :disabled="busy || !!pending">{{ action === 'publish' ? '已核对版本、玩家文案、QQ群安装包和操作后果' : '已核对上述版本、玩家文案和操作后果' }}</NCheckbox><p v-if="pending" class="ops-muted">结果尚未确认。重试沿用原请求，不会重复执行；请保留此窗口。</p></template>
+      <template v-if="selected">
+        <div class="player-preview"><h3>{{ selected.title }}</h3><p class="player-content">{{ selected.content }}</p><p>请前往QQ群下载最新版</p></div>
+        <p>{{ selected.versionName }} · {{ modeName(selected.mode) }}</p>
+      </template>
+      <NAlert :type="action === 'start_maintenance' || action === 'end_maintenance' || action === 'server_start' ? 'warning' : 'info'" :title="actionEffect" class="mb-16px" />
+      <NAlert v-if="action === 'publish' && selected" type="warning" :title="`请确认版本与实际安装包一致，且安装包已放到QQ群。系统不接收安装包，无法自动核验。${selected.mode !== 'notice' ? '强制更新会限制尚未取得新包的玩家登录。' : ''}`" class="mb-16px" />
+      <NAlert v-if="actionVersionProblem" type="warning" :title="actionVersionProblem" class="mb-16px" />
+      <NFormItem label="补充审计说明（可选）"><NInput v-model:value="actionReason" :input-props="{ 'aria-label': '补充审计说明' }" :disabled="busy || !!pending" :maxlength="150" placeholder="系统会记录操作和版本" /></NFormItem>
+      <NCheckbox v-model:checked="confirmed" :disabled="busy || !!pending">{{ action === 'publish' ? '已核对版本、玩家文案、QQ群安装包和操作后果' : action === 'server_start' ? '已核对恢复服务及现有版本限制' : '已核对上述版本、玩家文案和操作后果' }}</NCheckbox>
+      <p v-if="pending" class="ops-muted">结果尚未确认。重试沿用原请求，不会重复执行；请保留此窗口。</p>
       <template #footer><div class="modal-actions"><NButton :disabled="busy || !!pending" @click="closeAction">取消</NButton><NButton :type="action === 'start_maintenance' ? 'warning' : 'primary'" :loading="busy" :disabled="!confirmed || conflict || !canPublish || !!actionVersionProblem" @click="execute">{{ pending ? '重试原请求' : `确认${actionNames[action]}` }}</NButton></div></template>
     </NModal>
   </div>

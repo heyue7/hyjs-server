@@ -20,6 +20,7 @@ parser.add_argument('--update-ingress', action='store_true', help='Apply the rev
 parser.add_argument('--initial-dump', type=Path, help='One-time private SQL gzip; sibling initial-verification.json required')
 parser.add_argument('--env-file', type=Path, default=ROOT / 'deploy/.env', help='Ignored private deployment settings')
 parser.add_argument('--check-config', action='store_true', help='Validate and render templates without build, SSH or Docker')
+parser.add_argument('--with-backup', action='store_true', help='Create and authenticate a database backup before an existing deployment')
 parser.add_argument('--migrate-role-wallets', action='store_true', help='Quiesce legacy writers, back up and reconcile the one-time role-wallet cutover')
 parser.add_argument('--warm-rush-history-player', action='append', type=int, default=[], help='Prevalidate this existing owner with the exact candidate before application cutover')
 parser.add_argument('--apply-growth74', action='store_true', help='Apply reviewed growth configuration while game is in maintenance')
@@ -37,6 +38,12 @@ parser.add_argument('--expected-live-revision', help='Refuse activation if a dif
 parser.add_argument('--restore-activity-calendar', help='Restore real game time and activity day one using this UUID under maintenance')
 parser.add_argument('--calendar-formal-110', action='store_true', help='Use the reviewed offline empty-realm 1.1.0 calendar cutover')
 args = parser.parse_args()
+if not args.with_backup and any((args.migrate_role_wallets, args.restore_activity_calendar, args.calendar_formal_110,
+                                 args.apply_growth74, args.apply_growth75, args.apply_activity77,
+                                 args.apply_feedback78, args.apply_feedback79, args.apply_feedback80,
+                                 args.apply_feedback81, args.apply_trial82, args.apply_feedback84,
+                                 args.apply_feedback85, args.maintenance_redeploy)):
+    parser.error('This migration, publication or maintenance redeploy requires explicit --with-backup')
 if args.restore_activity_calendar:
     import uuid
     assert str(uuid.UUID(args.restore_activity_calendar)) == args.restore_activity_calendar
@@ -138,7 +145,7 @@ shutil.copytree(ROOT / 'analysis/tables', app / 'tables', ignore=shutil.ignore_p
 (app / 'config.test.yaml').write_text(render((ROOT / 'deploy/config.test.yaml').read_text(), settings))
 (stage / 'nginx.conf').write_text(render((ROOT / 'deploy/nginx.conf').read_text(), settings))
 (stage / 'deployment.env').write_text(''.join(key + '=' + settings[key] + '\n' for key in RUNTIME_KEYS))
-for name in ('Dockerfile', 'compose.yaml', 'activate.py', 'ingress_activation.py', 'role_wallet_migration.py', 'growth75_activation.py', 'growth75_activity_patch.py', 'activity77_activation.py', 'feedback78_activation.py', 'feedback79_activation.py', 'feedback80_activation.py', 'feedback81_activation.py', 'trial82_activation.py', 'calendar_restore_activation.py'):
+for name in ('Dockerfile', 'compose.yaml', 'activate.py', 'backup_pointer.py', 'ingress_activation.py', 'role_wallet_migration.py', 'growth75_activation.py', 'growth75_activity_patch.py', 'activity77_activation.py', 'feedback78_activation.py', 'feedback79_activation.py', 'feedback80_activation.py', 'feedback81_activation.py', 'trial82_activation.py', 'calendar_restore_activation.py'):
     shutil.copy2(ROOT / 'deploy' / name, stage / name)
 files = {str(p.relative_to(stage)): sha(p) for p in sorted(stage.rglob('*')) if p.is_file() and p.name != '.hyjs-stage'}
 manifest = {'revision': revision, 'architecture': 'linux/amd64', 'database': 'MySQL8.4', 'files': files,
@@ -174,6 +181,8 @@ if args.initial_dump:
     run('scp', '-q', str(verification), HOST + ':' + REMOTE + '/.incoming/initial-verification.json')
     remote('chmod 600 ' + shlex.quote(REMOTE + '/.incoming/initial.sql.gz') + ' ' + shlex.quote(REMOTE + '/.incoming/initial-verification.json'))
 command = 'sudo -n python3 ' + shlex.quote(remote_stage + '/activate.py') + ' ' + shlex.quote(remote_stage)
+if args.with_backup:
+    command += ' --with-backup'
 for player_id in args.warm_rush_history_player:
     assert player_id > 0
     command += ' --warm-rush-history-player ' + str(player_id)

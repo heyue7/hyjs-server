@@ -69,7 +69,7 @@ class Activity77ActivationTests(unittest.TestCase):
 
     def test_arguments_rejected_before_external_work(self):
         for script in ('deploy.py', 'activate.py'):
-            base = ['python3', str(HERE / script)]
+            base = ['python3', '-B', str(HERE / script), '--with-backup']
             if script == 'activate.py':
                 base.append('/not/a/real/stage')
             for options in (['--apply-activity77'],

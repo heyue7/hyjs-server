@@ -18,6 +18,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('stage')
 parser.add_argument('--initial-db', action='store_true')
 parser.add_argument('--provision-ingress', action='store_true')
+parser.add_argument('--with-backup', action='store_true', help='Create and authenticate a database backup before an existing deployment')
 parser.add_argument('--migrate-role-wallets', action='store_true')
 parser.add_argument('--expected-live-revision')
 parser.add_argument('--apply-growth74', action='store_true')
@@ -35,6 +36,12 @@ parser.add_argument('--restore-activity-calendar')
 parser.add_argument('--calendar-formal-110', action='store_true')
 parser.add_argument('--warm-rush-history-player', action='append', type=int, default=[])
 args = parser.parse_args()
+if not args.with_backup and any((args.migrate_role_wallets, args.restore_activity_calendar, args.calendar_formal_110,
+                                 args.apply_growth74, args.apply_growth75, args.apply_activity77,
+                                 args.apply_feedback78, args.apply_feedback79, args.apply_feedback80,
+                                 args.apply_feedback81, args.apply_trial82, args.apply_feedback84,
+                                 args.apply_feedback85, args.maintenance_redeploy)):
+    parser.error('This migration, publication or maintenance redeploy requires explicit --with-backup')
 if args.restore_activity_calendar:
     import uuid
     assert str(uuid.UUID(args.restore_activity_calendar)) == args.restore_activity_calendar
@@ -136,7 +143,7 @@ def backup_existing_database():
     run(str(stage / 'app/hyjs-backupseal'), '--input', str(encrypted), '--key-file', str(key_file), '--verify-sha256', sha(plain))
     plain.unlink()
     backup_record = {'file': encrypted.name, 'sha256': sha(encrypted), 'format': 'HYJSBK02-AES256GCM-CHUNKED', 'revisionBefore': args.expected_live_revision or 'preserved running image'}
-    (ROOT / 'backup-latest.json').write_text(json.dumps(backup_record, indent=2))
+    backup_pointer.write_backup_pointer(ROOT / 'backup-latest.json', backup_record)
     return backup_record
 
 
@@ -164,6 +171,8 @@ if getattr(args, 'calendar_formal_110', False):
 for name, digest in manifest['files'].items():
     path = stage / name
     assert path.resolve().is_relative_to(stage) and sha(path) == digest, name
+assert 'backup_pointer.py' in manifest['files'], 'Backup pointer helper missing from verified artifact'
+import backup_pointer
 if args.apply_trial82 or args.apply_feedback84 or args.apply_feedback85 or args.maintenance_redeploy:
     assert 'trial82_activation.py' in manifest['files'], 'Trial82/feedback84 activation missing from verified artifact'
     if args.provision_ingress:
@@ -176,7 +185,7 @@ if args.apply_trial82 or args.apply_feedback84 or args.apply_feedback85 or args.
         ingress_desired = ingress_activation.preflight(stage / 'nginx.conf', manifest['files']['nginx.conf'], run)
 if not args.provision_ingress:
     assert Path('/etc/nginx/sites-enabled/hyjs-test.conf').read_bytes() == (stage / 'nginx.conf').read_bytes(), 'Ingress differs; explicit provision-ingress required'
-if (ROOT / 'migration.json').exists():
+if args.with_backup and (ROOT / 'migration.json').exists():
     latest_backup = ROOT / 'backup-latest.json'
     previous_backup = (ROOT / 'backups' / json.loads(latest_backup.read_text())['file']
                        if latest_backup.exists() else ROOT / 'backups/initial-migration.sql.gz')
@@ -229,7 +238,7 @@ with os.fdopen(fd, 'w') as output:
     output.write('\n'.join(kept) + '\n' + ''.join(key + '=' + value + '\n' for key, value in runtime.items()))
 os.chmod(temporary_env, 0o600)
 os.replace(temporary_env, private_env)
-# Verify the encrypted snapshot before Compose can restart MySQL for new limits.
+# When requested, verify the encrypted snapshot before Compose can restart MySQL.
 wallet_baseline = None
 verified_backup = None
 if args.restore_activity_calendar:
@@ -295,7 +304,7 @@ if args.migrate_role_wallets:
     compose('stop', '-t', '30', 'app')
     wallet_baseline = role_wallet_migration.before(mysql)
     (ROOT / 'role-wallet-cutover-before.json').write_text(json.dumps(wallet_baseline, indent=2))
-if (ROOT / 'migration.json').exists():
+if args.with_backup and (ROOT / 'migration.json').exists():
     if getattr(args, 'calendar_formal_110', False):
         formal110_guard.checkpoint('backing-up')
     if args.apply_trial82 or args.apply_feedback84 or args.apply_feedback85 or args.maintenance_redeploy:

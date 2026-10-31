@@ -46,7 +46,7 @@ class Formal110ArgumentsTests(unittest.TestCase):
                            '--initial-db' if script == 'activate.py' else '--provision']):
                 with self.subTest(script=script, extra=extra):
                     result = subprocess.run([sys.executable, '-B', str(HERE / script), *prefix,
-                                             '--calendar-formal-110', *extra], capture_output=True, text=True)
+                                             '--with-backup', '--calendar-formal-110', *extra], capture_output=True, text=True)
                     self.assertNotEqual(result.returncode, 0)
                     self.assertNotIn('SSH', result.stderr)
                     self.assertNotIn('MySQL', result.stderr)

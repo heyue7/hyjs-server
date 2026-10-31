@@ -41,6 +41,8 @@ bash deploy_test.sh --revision master --provision --initial-dump /private/path/i
 bash deploy_test.sh --env-file /private/path/deployment.env --revision test
 ```
 
+常规发布默认不创建数据库备份，也不更新 `backup-latest.json`。需要备份时须由用户明确要求，并传入 `--with-backup`；原有项目备份按用户明确授权和归属核验后清理。涉及既有数据迁移、投放或维护期重部署的 `--migrate-role-wallets`、`--restore-activity-calendar`、`--calendar-formal-110`、各 `--apply-*` 及 `--maintenance-redeploy` 必须显式传 `--with-backup`，本机和远端均会在操作前检查。
+
 首次数据包同目录需有 `initial-verification.json`，包含快照 SHA、各表数量和
 完整 profile 校验摘要。仅允许对空项目数据库首次导入；重试相同快照不会重复导入。
 迁移脚本 `prepare_initial.py` 会停止已核实归属的本机写入进程；执行前先明确切换范围。
@@ -54,8 +56,8 @@ Nginx 管理入口为 `/admin/`，API ingress 仅开放客户端协议，保留�
 ## 回退与证据
 
 在干净 checkout 中检出已记录提交，用同一入口的 `--revision <commit>` 发布。
-数据库不会自动回退：保留首次快照及最近一次发布前快照，先检查 schema / 数据兼容性。
-代码历史由 Git 保存，远端仅保留一个应用制品目录。
+数据库不会自动回退；常规发布不创建发布前快照，回退前先检查现有备份及 schema / 数据兼容性。
+代码历史由 Git 保存，远端仅保留一个应用制品目录；成功发布后尝试清理无容器引用的前一应用镜像。
 
 本机发布记录在 `analysis/deploy-20261018/`，远端在项目目录的 `deployed.json`。
 这些记录含实际来源地址，应保持本机私有。脚本仅管理带归属标记的项目资源，
@@ -63,7 +65,7 @@ Nginx 管理入口为 `/admin/`，API ingress 仅开放客户端协议，保留�
 
 ## Brain Burst 2039 角色钱包切换
 
-首次切换使用 `--migrate-role-wallets --expected-live-revision <完整当前提交>`。
+首次切换使用 `--with-backup --migrate-role-wallets --expected-live-revision <完整当前提交>`。
 脚本先校验唯一旧角色和现网提交，在服务仍运行时构建镜像，随后停旧应用，
 固定旧账摘要并完成加密备份及解密验证，再启动新应用执行事务迁移。
 MySQL 保持运行；核对旧表摘要、全部历史字段、迁移标记和角色余额/revision后才记录发布成功。
@@ -78,7 +80,7 @@ MySQL 保持运行；核对旧表摘要、全部历史字段、迁移标记和�
 
 - 本批按用户决定保留现有HTTP，不启用HTTPS。后台Cookie保留HttpOnly/SameSite=Strict；如以后启用TLS，再显式配置HYJS_ADMIN_SECURE_COOKIES。不能把X-Forwarded-Proto当作任意客户端可信输入。
 - activate.py只把本部署Docker网桥的实际gateway加入HYJS_TRUSTED_PROXIES；Nginx覆盖传入的X-Forwarded-For，防止客户端伪造来源。不要设置任意来源可信。
-- 新部署前备份采用HYJSBK02分块格式AES-256-GCM，密钥保存在部署根的.backup-encryption.key（0600），备份在私有backups目录（0700）。密钥与备份分别保管，密钥不进入Git、日志、制品包或数据库。历史备份保留原权限，不自动清理业务历史。
+- 显式指定 `--with-backup` 时，部署前备份采用HYJSBK02分块格式AES-256-GCM，密钥保存在部署根的.backup-encryption.key（0600），备份在私有backups目录（0700）。密钥与备份分别保管，密钥不进入Git、日志、制品包或数据库。历史备份保留原权限，不自动清理业务历史。
 - 加密后先解密并核对摘要，再删除本次临时明文；失败保留私有.pending文件，部署中止。当前工具按4MiB分块认证，单快照上限8GiB；仍兼容历史HYJSBK01读取。达到上限或认证失败时中止，禁止跳过备份。
 - 手工恢复前先用hyjs-backupseal --decrypt --key-file 私有密钥路径 --input 选定.aesgcm --output 新的私有.sql.gz进行认证解密；该命令不执行数据库恢复。必须确认目标实例与所选备份后才导入。
 
@@ -93,7 +95,7 @@ MySQL 保持运行；核对旧表摘要、全部历史字段、迁移标记和�
 对已经存在的环境，可在核验候选程序兼容现有 schema、压缩存档、多线首领、在途战斗和账本，并完成隔离演练后，使用干净固定提交执行：
 
 ```bash
-rtk proxy bash deploy_test.sh --revision <已验证的兼容候选提交> --expected-live-revision <完整当前提交> --maintenance-redeploy
+rtk proxy bash deploy_test.sh --revision <已验证的兼容候选提交> --expected-live-revision <完整当前提交> --maintenance-redeploy --with-backup
 ```
 
 该模式复用 82/84/85 的维护守卫：核当前部署记录、现有应用容器的版本标签、维护状态和既有数据库，停止应用，生成并认证本轮加密备份，校验备份身份和维护，再按原入口启动候选并核健康；健康后复查维护并记录 `maintenanceRedeployed`、候选摘要和私密 manifest。容器不存在或版本标签与记录不符时拒绝执行，需先核对中断现场。模式中不执行 82/84/85 或其他配置投放命令；禁止与任何投放、首次 provision/import、钱包迁移、指定玩家预热、日历恢复和 ingress 修改混用。维护不会自动解除。
@@ -104,7 +106,7 @@ rtk proxy bash deploy_test.sh --revision <已验证的兼容候选提交> --expe
 
 ## 75版维护投放
 
-从审核通过的干净提交运行原 `deploy.py --revision <commit> --expected-live-revision <live-commit> --apply-growth75`，需要更新入口规则时另外明确传 `--update-ingress`。禁止与74投放、首次导库或角色钱包迁移混用。正常启动不执行75投放。
+从审核通过的干净提交运行原 `deploy.py --revision <commit> --expected-live-revision <live-commit> --apply-growth75 --with-backup`，需要更新入口规则时另外明确传 `--update-ingress`。禁止与74投放、首次导库或角色钱包迁移混用。正常启动不执行75投放。
 
 部署保留维护并停应用，生成并认证本轮加密数据库备份；候选程序 `--apply-growth75 --server-id 1` 先核对维护、audit321及完整820条V12排期，再依次恢复真实发布时间、修复日历锚点、应用经济目录、发布1.0.75/build2026102702兼容门槛。完成后仍处于维护。
 
@@ -117,11 +119,11 @@ rtk proxy bash deploy_test.sh --revision <已验证的兼容候选提交> --expe
 从已审核的干净提交执行现有部署入口，指定完整的当前线上提交：
 
 ```bash
-rtk proxy bash deploy_test.sh --revision <候选提交> --expected-live-revision <完整当前提交> --apply-trial82
+rtk proxy bash deploy_test.sh --revision <候选提交> --expected-live-revision <完整当前提交> --apply-trial82 --with-backup
 # 仅投放夺宝扫荡开关
-rtk proxy bash deploy_test.sh --revision <候选提交> --expected-live-revision <完整当前提交> --apply-feedback84
+rtk proxy bash deploy_test.sh --revision <候选提交> --expected-live-revision <完整当前提交> --apply-feedback84 --with-backup
 # 同一维护窗口顺序投放 82、84 与 85，并更新已审核的现有 ingress
-rtk proxy bash deploy_test.sh --revision <候选提交> --expected-live-revision <完整当前提交> --apply-trial82 --apply-feedback84 --apply-feedback85 --update-ingress
+rtk proxy bash deploy_test.sh --revision <候选提交> --expected-live-revision <完整当前提交> --apply-trial82 --apply-feedback84 --apply-feedback85 --update-ingress --with-backup
 ```
 
 `--apply-trial82`、`--apply-feedback84`、`--apply-feedback85` 可分别选择或共同选择，均只允许已有环境，禁止与首次 `--provision`、初始导库、钱包迁移、显式 `--warm-rush-history-player`、日历恢复及其他投放参数混用。必须指定完整且与远端部署记录一致的当前版本。既有 `--warm-rush-history-all` 发布门禁仍会执行：候选程序不监听网络，按有界事务重验过期派生证明，不改资源、进度和回执。`--update-ingress` 可与本次投放同批使用；远端要求已有本项目站点配置及其启用链接，检查 Nginx 后只在配置变更时重载。该参数不执行首次基础设施或入口创建。

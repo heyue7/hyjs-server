@@ -163,7 +163,7 @@ class Feedback81ActivationTests(unittest.TestCase):
         ]
         for script, extra in (('deploy.py', ['--provision']), ('deploy.py', ['--update-ingress']),
                               ('activate.py', ['--initial-db']), ('activate.py', ['--provision-ingress'])):
-            base = [sys.executable, str(HERE / script)]
+            base = [sys.executable, '-B', str(HERE / script), '--with-backup']
             if script == 'activate.py':
                 base.append('/not/a/real/stage')
             for options in common + [['--apply-feedback81', *extra, '--expected-live-revision', revision]]:
@@ -179,7 +179,7 @@ class Feedback81ActivationTests(unittest.TestCase):
         (root / '.hyjs-owned').write_text('')
         (root / 'deployed.json').write_text(json.dumps({'revision': 'a' * 40}))
         (stage / 'artifact.json').write_text('{}')
-        result = subprocess.run([sys.executable, str(HERE / 'activate.py'), str(stage), '--apply-feedback81', '--expected-live-revision', 'b' * 40], capture_output=True, text=True)
+        result = subprocess.run([sys.executable, '-B', str(HERE / 'activate.py'), str(stage), '--with-backup', '--apply-feedback81', '--expected-live-revision', 'b' * 40], capture_output=True, text=True)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn('Live revision changed', result.stderr)
         self.assertTrue((stage / 'artifact.json').is_file())
