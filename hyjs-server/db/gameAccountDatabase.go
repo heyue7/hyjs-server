@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"errors"
+	mysqlDriver "github.com/go-sql-driver/mysql"
 	"gorm.io/gorm"
 	"hyjs-server/config"
 	"regexp"
@@ -37,11 +38,23 @@ func InitializeGameAccountsSchema(ctx context.Context) error {
 		// The configured database must already exist and be granted to the application account; no CREATE DATABASE privileges are required.
 		statements := []string{
 			"CREATE TABLE IF NOT EXISTS " + AccountsTableName("game_account_sessions") + " (token_hash VARCHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL PRIMARY KEY, account_id BIGINT NOT NULL, auth_revision BIGINT NOT NULL, created_at BIGINT NOT NULL, expires_at BIGINT NOT NULL, KEY game_account_sessions_account (account_id), KEY game_account_sessions_expiry (expires_at)) ENGINE=InnoDB",
-			"CREATE TABLE IF NOT EXISTS " + AccountsTableName("game_accounts") + " (id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY, username VARBINARY(1024) NOT NULL, nickname VARCHAR(96) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_bin NOT NULL, password_salt LONGBLOB NOT NULL, password_hash LONGBLOB NOT NULL, enabled BOOLEAN NOT NULL, protected BOOLEAN NOT NULL, auth_revision BIGINT NOT NULL DEFAULT 0, revision BIGINT NOT NULL, created_at BIGINT NOT NULL, UNIQUE KEY game_accounts_username (username)) ENGINE=InnoDB",
+			"CREATE TABLE IF NOT EXISTS " + AccountsTableName("game_accounts") + " (id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY, username VARBINARY(1024) NOT NULL, nickname VARCHAR(96) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_bin NOT NULL, password_salt LONGBLOB NOT NULL, password_hash LONGBLOB NOT NULL, enabled BOOLEAN NOT NULL, protected BOOLEAN NOT NULL, beta_user BOOLEAN NOT NULL DEFAULT FALSE, auth_revision BIGINT NOT NULL DEFAULT 0, revision BIGINT NOT NULL, created_at BIGINT NOT NULL, UNIQUE KEY game_accounts_username (username)) ENGINE=InnoDB",
 			"CREATE TABLE IF NOT EXISTS " + AccountsTableName("game_account_roles") + " (account_id BIGINT NOT NULL, server_id BIGINT NOT NULL, player_id BIGINT NOT NULL, name VARCHAR(96) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_bin NOT NULL, level BIGINT NOT NULL, PRIMARY KEY (account_id, server_id)) ENGINE=InnoDB",
 		}
 		for _, statement := range statements {
 			if err := d.Exec(statement).Error; err != nil {
+				return err
+			}
+		}
+		// Existing account schemas receive only the new default-false flag.
+		var columns int64
+		if err := d.Raw("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=IF(?='',DATABASE(),?) AND TABLE_NAME='game_accounts' AND COLUMN_NAME='beta_user'", database, database).Scan(&columns).Error; err != nil {
+			return err
+		}
+		if columns == 0 {
+			err := d.Exec("ALTER TABLE " + AccountsTableName("game_accounts") + " ADD COLUMN beta_user BOOLEAN NOT NULL DEFAULT FALSE").Error
+			var mysqlErr *mysqlDriver.MySQLError
+			if err != nil && (!errors.As(err, &mysqlErr) || mysqlErr.Number != 1060) {
 				return err
 			}
 		}

@@ -551,8 +551,8 @@ func createPlayerLocked(tx *gorm.DB, id int64, name, heroId string) (*db.Profile
 		}
 		// Serialize first-character eligibility before any role-index or save writes.
 		// This keeps all realm creation paths in account -> role-index -> wallet lock order.
+		var account db.GameAccount
 		if row.AccountID > 0 {
-			var account db.GameAccount
 			if err := db.AccountsTable(tx, "game_accounts").Clauses(clause.Locking{Strength: "UPDATE"}).First(&account, row.AccountID).Error; err != nil {
 				return err
 			}
@@ -588,6 +588,11 @@ func createPlayerLocked(tx *gorm.DB, id int64, name, heroId string) (*db.Profile
 			}
 		}
 		game := &model.GameState{Warriors: []*pb.Warrior{w.(*pb.Warrior)}, Formation: []*pb.FormationItem{f.(*pb.FormationItem)}, Copy: copyInfo.(*pb.SCCopyPassedInfo), Position: pos.(*pb.Position)}
+		if account.BetaUser {
+			if err := grantBetaTitle(tx, game, realCreatedAt); err != nil {
+				return err
+			}
+		}
 		if err = prepareBagCapacity(p.(*pb.Player), game); err != nil {
 			return err
 		}

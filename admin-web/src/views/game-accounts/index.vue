@@ -55,13 +55,13 @@ const target = ref<GameAccount | null>(null);
 const saving = ref(false);
 const conflict = ref(false);
 const saveError = ref('');
-const draft = reactive({ username: '', nickname: '冒险者', password: '', confirmPassword: '', enabled: true, reason: '' });
+const draft = reactive({ username: '', nickname: '冒险者', password: '', confirmPassword: '', enabled: true, betaUser: false, reason: '' });
 const editorGuard = useDraftGuard({ active: () => Boolean(modal.value), value: () => draft, busy: () => saving.value, writable: () => canWrite.value, label: '账号修改', close: () => { modal.value = ''; draft.password = ''; draft.confirmPassword = ''; } });
 const title = computed(() => ({ create: '新建 Brain Burst 2039 账号', edit: '编辑 Brain Burst 2039 账号', password: '重置 Brain Burst 2039 密码' })[modal.value || 'edit']);
 function edit(kind: 'create' | 'edit' | 'password', row: GameAccount | null = null) {
   if (!canWrite.value || row?.protected || (kind === 'password' && !isAdmin.value)) return;
   target.value = row ? { ...row } : null;
-  Object.assign(draft, { username: row?.username || '', nickname: row?.nickname || '冒险者', password: '', confirmPassword: '', enabled: row?.enabled ?? true, reason: '' });
+  Object.assign(draft, { username: row?.username || '', nickname: row?.nickname || '冒险者', password: '', confirmPassword: '', enabled: row?.enabled ?? true, betaUser: row?.betaUser ?? false, reason: '' });
   saveError.value = '';
   conflict.value = false;
   editorGuard.capture();
@@ -87,9 +87,9 @@ async function save() {
   saving.value = true;
   try {
     const reason = draft.reason.trim();
-    if (modal.value === 'create') await createGameAccount({ username: draft.username, nickname: draft.nickname.trim(), password: draft.password, confirmPassword: draft.confirmPassword, reason });
+    if (modal.value === 'create') await createGameAccount({ username: draft.username, nickname: draft.nickname.trim(), password: draft.password, confirmPassword: draft.confirmPassword, betaUser: draft.betaUser, reason });
     else if (modal.value === 'password') await resetGameAccountPassword(target.value!.id, { password: draft.password, confirmPassword: draft.confirmPassword, version: target.value!.version, reason });
-    else await updateGameAccount(target.value!.id, { nickname: draft.nickname.trim(), enabled: draft.enabled, version: target.value!.version, reason });
+    else await updateGameAccount(target.value!.id, { nickname: draft.nickname.trim(), enabled: draft.enabled, betaUser: draft.betaUser, version: target.value!.version, reason });
     window.$message?.success(modal.value === 'password' ? '密码已重置' : modal.value === 'create' ? 'Brain Burst 2039 账号已创建' : '账号已保存');
     modal.value = '';
     editorGuard.clear();
@@ -129,6 +129,7 @@ function viewPlayers(row: GameAccount) { selected.value = row; playersOpen.value
 const columns: DataTableColumns<GameAccount> = [
   { title: '登录账号', key: 'username', minWidth: 190, render: row => h('div', [h('strong', row.username), row.protected ? h(NTag, { size: 'small', bordered: false, style: 'margin-left:8px' }, () => '受保护') : null]) },
   { title: '账号名称', key: 'nickname', minWidth: 140 },
+  { title: '封测用户', key: 'betaUser', width: 110, render: row => h(NTag, { size: 'small', bordered: false, type: row.betaUser ? 'success' : 'default' }, () => row.betaUser ? '是' : '否') },
   { title: '角色数量', key: 'players', width: 110, render: row => h(NButton, { text: true, type: 'primary', onClick: () => viewPlayers(row) }, () => `${row.players.length} 个角色`) },
   { title: '登录状态', key: 'enabled', width: 110, render: row => h(NTag, { size: 'small', bordered: false, type: row.enabled ? 'success' : 'default' }, () => row.enabled ? '允许登录' : '已停用') },
   { title: '注册时间', key: 'createdAt', minWidth: 180, render: row => formatTime(row.createdAt) },
@@ -159,7 +160,7 @@ onBeforeUnmount(() => { generation += 1; draft.password = ''; draft.confirmPassw
           <NButton v-if="canWrite" type="primary" @click="edit('create')">新建账号</NButton>
         </NSpace>
       </div>
-      <NDataTable :columns="columns" :data="rows" :loading="loading" :row-key="(row: GameAccount) => row.id" :row-class-name="rowClass" :bordered="false" :scroll-x="1100" />
+      <NDataTable :columns="columns" :data="rows" :loading="loading" :row-key="(row: GameAccount) => row.id" :row-class-name="rowClass" :bordered="false" :scroll-x="1220" />
       <div class="ops-pagination"><NPagination v-model:page="page" v-model:page-size="pageSize" :item-count="total" :page-sizes="[25, 50, 100]" show-size-picker @update:page="load" @update:page-size="search" /></div>
     </NCard>
     <NModal :show="Boolean(modal)" preset="card" :title="title" class="ops-modal account-editor" :mask-closable="!saving" :closable="!saving" @update:show="!$event && close()">
@@ -174,6 +175,7 @@ onBeforeUnmount(() => { generation += 1; draft.password = ''; draft.confirmPassw
           <NFormItem label="确认密码" required><NInput v-model:value="draft.confirmPassword" type="password" show-password-on="click" autocomplete="new-password" placeholder="再次输入密码" /></NFormItem>
         </template>
         <NFormItem v-if="modal === 'edit'" label="允许登录"><NSwitch v-model:value="draft.enabled" /><template #feedback>停用后，该账号下所有区服的角色将无法登录。</template></NFormItem>
+        <NFormItem v-if="modal !== 'password'" label="封测用户"><NSwitch v-model:value="draft.betaUser" /><template #feedback>开启后，新建角色会获得“封弊者”称号；已创建的角色保持原有状态。</template></NFormItem>
         <NFormItem label="操作原因" required><NInput v-model:value="draft.reason" type="textarea" :maxlength="300" :autosize="{ minRows: 2, maxRows: 4 }" placeholder="记录本次调整用途" /></NFormItem>
         <p v-if="modal === 'password'" class="ops-inline-note">新密码用于该账号下所有区服，不会显示历史密码。</p>
       </NForm>

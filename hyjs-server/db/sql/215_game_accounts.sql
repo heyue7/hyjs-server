@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS game_accounts (
  password_hash LONGBLOB NOT NULL,
  enabled BOOLEAN NOT NULL,
  protected BOOLEAN NOT NULL,
+ beta_user BOOLEAN NOT NULL DEFAULT FALSE,
  auth_revision BIGINT NOT NULL DEFAULT 0,
  revision BIGINT NOT NULL,
  created_at BIGINT NOT NULL,

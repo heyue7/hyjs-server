@@ -59,8 +59,11 @@ def validate_formal110_source_constants(path):
 
 
 def digest(path):
+    result = hashlib.sha256()
     with Path(path).open('rb') as stream:
-        return hashlib.file_digest(stream, 'sha256').hexdigest()
+        for chunk in iter(lambda: stream.read(1024 * 1024), b''):
+            result.update(chunk)
+    return result.hexdigest()
 
 
 def private_write(path, value):

@@ -9,6 +9,7 @@ type GameAccountDTO struct {
 	Username        string               `json:"username"`                  // Username is the case-sensitive login name.
 	Nickname        string               `json:"nickname"`                  // Nickname is separate from all realm character names.
 	Protected       bool                 `json:"protected"`                 // Protected identifies the inherited protected historical account.
+	BetaUser        bool                 `json:"betaUser"`                  // 封测用户的新角色自动获得封弊者称号。
 	Enabled         bool                 `json:"enabled"`                   // Enabled=false rejects authentication and existing sessions.
 	CreatedAt       int64                `json:"createdAt"`                 // CreatedAt is real Unix milliseconds.
 	Version         string               `json:"version"`                   // Version protects admin concurrent changes.
@@ -37,6 +38,7 @@ type AdminGameAccountCreateRequest struct {
 	Password        string `json:"password" binding:"required"`        // 新密码，至少6字符且最多72字节，绝不返回。
 	ConfirmPassword string `json:"confirmPassword" binding:"required"` // 与新密码完全相同的确认值。
 	Nickname        string `json:"nickname" binding:"required"`        // 全局账号昵称，1至24个可见字符，与角色名独立。
+	BetaUser        bool   `json:"betaUser"`                           // true将新账号加入封测用户名单。
 	Reason          string `json:"reason" binding:"required"`          // 本次后台操作的审计原因。
 }
 
@@ -44,6 +46,7 @@ type AdminGameAccountCreateRequest struct {
 type AdminGameAccountUpdateRequest struct {
 	Nickname string `json:"nickname" binding:"required"` // 全局账号昵称，1至24个可见字符，与角色名独立。
 	Enabled  bool   `json:"enabled"`                     // false停用登录和旧会话，true允许后续重新登录。
+	BetaUser *bool  `json:"betaUser"`                    // 可选；true允许新角色获得封测称号。
 	Version  string `json:"version" binding:"required"`  // 读取账号时的乐观并发版本。
 	Reason   string `json:"reason" binding:"required"`   // 本次后台操作的审计原因。
 }

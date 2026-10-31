@@ -266,7 +266,7 @@ func loginGlobalGameAccount(ctx context.Context, uid, password string) (*db.Prof
 }
 
 func gameAccountProjection(tx *gorm.DB, account db.GameAccount, terminal ...bool) (model.GameAccountDTO, error) {
-	out := model.GameAccountDTO{ID: account.ID, Username: account.Username, Nickname: account.Nickname, Enabled: account.Enabled, Protected: account.Protected, CreatedAt: account.CreatedAt, Version: adminVersion(account), Players: []model.GameAccountRoleDTO{}}
+	out := model.GameAccountDTO{ID: account.ID, Username: account.Username, Nickname: account.Nickname, Enabled: account.Enabled, Protected: account.Protected, BetaUser: account.BetaUser, CreatedAt: account.CreatedAt, Version: adminVersion(account), Players: []model.GameAccountRoleDTO{}}
 	var roles []db.GameAccountRole
 	if err := db.AccountsTable(tx, "game_account_roles").Where("account_id=?", account.ID).Order("server_id").Find(&roles).Error; err != nil {
 		return out, err
@@ -445,6 +445,7 @@ func AdminCreateGlobalGameAccount(ctx context.Context, actor *model.AdminPrincip
 	if err != nil {
 		return nil, err
 	}
+	account.BetaUser = req.BetaUser
 	var out model.GameAccountDTO
 	err = db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := adminOperationUser(tx, actor, true); err != nil {
@@ -490,6 +491,9 @@ func AdminUpdateGlobalGameAccount(ctx context.Context, actor *model.AdminPrincip
 			account.AuthRevision++
 		}
 		account.Nickname, account.Enabled = req.Nickname, req.Enabled
+		if req.BetaUser != nil {
+			account.BetaUser = *req.BetaUser
+		}
 		account.Revision++
 		if err := db.AccountsTable(tx, "game_accounts").Save(&account).Error; err != nil {
 			return err

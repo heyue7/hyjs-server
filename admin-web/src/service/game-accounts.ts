@@ -11,6 +11,7 @@ export interface GameAccount {
   username: string;
   nickname: string;
   protected: boolean;
+  betaUser: boolean;
   enabled: boolean;
   createdAt: number | string;
   version: string;
@@ -25,11 +26,13 @@ export const createGameAccount = (draft: {
   password: string;
   confirmPassword: string;
   nickname: string;
+  betaUser: boolean;
   reason: string;
 }) => api<GameAccount>('/game-accounts', json('POST', draft));
 export const updateGameAccount = (id: number, draft: {
   nickname: string;
   enabled: boolean;
+  betaUser: boolean;
   version: string;
   reason: string;
 }) => api<GameAccount>(`/game-accounts/${id}`, json('PUT', draft));

@@ -9,6 +9,7 @@ type GameAccount struct {
 	PasswordHash []byte `gorm:"type:longblob;not null" json:"-"`
 	Enabled      bool   `gorm:"not null" json:"enabled"`
 	Protected    bool   `gorm:"not null" json:"protected"`
+	BetaUser     bool   `gorm:"not null;default:false" json:"betaUser"`
 	AuthRevision int64  `gorm:"not null" json:"-"`
 	Revision     int64  `gorm:"not null" json:"-"`
 	CreatedAt    int64  `gorm:"not null;autoCreateTime:false" json:"createdAt"`

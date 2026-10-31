@@ -332,6 +332,33 @@ type p5TitleState struct {
 	Source   string `json:"source"`
 }
 
+// grantBetaTitle freezes the original title and any configured future-grant effects in the creation transaction.
+func grantBetaTitle(tx *gorm.DB, game *model.GameState, now time.Time) error {
+	owned := p5TitleState{Source: constUtil.GameAccountBetaTitleSource}
+	if gameSchemaHasTable(tx, &db.AdminTitleOverride{}) {
+		var override db.AdminTitleOverride
+		err := tx.First(&override, "id=?", constUtil.GameAccountBetaTitleID).Error
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+		if err == nil {
+			if override.EffectTime < 0 || override.EffectTime > 87600 {
+				return p5Error()
+			}
+			owned.Effects = override.Effects
+			if override.EffectTime > 0 {
+				owned.DeadTime = now.UnixMilli() + override.EffectTime*3600*1000
+			}
+		}
+	}
+	encoded, err := json.Marshal(owned)
+	if err != nil {
+		return err
+	}
+	p5SetKV(game, "p5.title:"+constUtil.GameAccountBetaTitleID, string(encoded))
+	return nil
+}
+
 func (s *GameService) p5TitleQualification(tx *gorm.DB, p *pb.Player, g *model.GameState, row map[string]string) (int32, int32, error) {
 	switch row["type"] {
 	case "1":
@@ -546,6 +573,9 @@ func (s *GameService) p5TitleListTx(tx *gorm.DB, p *pb.Player, g *model.GameStat
 			}
 		}
 		raw := p5KV(g, "p5.title:"+id)
+		if id == constUtil.GameAccountBetaTitleID && raw != "" {
+			current, total = 1, 1
+		}
 		var owned p5TitleState
 		if enabled && (row["type"] == "17" || row["type"] == "18") {
 			// A new delivered month may renew the same original generic title.
@@ -678,6 +708,9 @@ func (s *GameService) p5TitleBonus(g *model.GameState, values map[string]float64
 		}
 	}
 	if title.DeadTime > 0 && title.DeadTime <= now.UnixMilli() {
+		return nil
+	}
+	if strings.TrimSpace(title.Effects) == "" {
 		return nil
 	}
 	for _, entry := range strings.Split(title.Effects, ";") {

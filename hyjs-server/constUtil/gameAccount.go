@@ -11,6 +11,8 @@ const (
 	GameAccountRegisterWindowSeconds int64 = 60
 	GameAccountRegisterPerWindow           = 120
 	GameAccountRegisterMaxClients          = 10000
+	GameAccountBetaTitleID                 = "title_027"
+	GameAccountBetaTitleSource             = "封测用户名单；创建角色时赠送"
 )
 
 var (
