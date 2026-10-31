@@ -35,6 +35,7 @@ type ActivityCalendarRestoreManifest struct {
 type ActivityCalendarRestoreResult struct {
 	RequestID string                            `json:"requestId"`
 	Digest    string                            `json:"digest"`
+	Formal110 bool                              `json:"formal110,omitempty"`
 	OpeningAt int64                             `json:"openingAt"`
 	Clock     *model.ServerGameClockView        `json:"clock"`
 	Windows   int                               `json:"windows"`
@@ -51,6 +52,61 @@ type activityCalendarRestoreSnapshot struct {
 	anchors  []db.PlayerOpeningCalendar
 	profiles []db.Profile
 	opening  db.OpenServerActivityRule
+}
+
+// formal110EmptySnapshot contains counts only, never role or account payloads.
+// The caller must stop every application writer before running the CLI.
+type formal110EmptySnapshot struct {
+	Profiles           int64
+	RoleLinks          int64
+	Issued             int64
+	Anchors            int64
+	CommerceStates     int64
+	CommerceStocks     int64
+	CommerceReceipts   int64
+	ActivityOperations int64
+	ActivityBindings   int64
+	ActivityCycles     int64
+	RushStates         int64
+}
+
+func readFormal110EmptySnapshot(tx *gorm.DB) (formal110EmptySnapshot, error) {
+	var out formal110EmptySnapshot
+	if err := tx.Model(&db.Profile{}).Count(&out.Profiles).Error; err != nil {
+		return out, err
+	}
+	if err := db.AccountsTable(tx, "game_account_roles").Where("server_id IN ?", []int64{0, 1}).Count(&out.RoleLinks).Error; err != nil {
+		return out, err
+	}
+	if err := tx.Model(&db.AdminCharacterActivityInstance{}).Count(&out.Issued).Error; err != nil {
+		return out, err
+	}
+	if err := tx.Model(&db.PlayerOpeningCalendar{}).Count(&out.Anchors).Error; err != nil {
+		return out, err
+	}
+	// Trial82 quotes, lifetime purchases, daily quota, private activity scope,
+	// transaction receipts and star qualification are all role-derived state.
+	for _, table := range []struct {
+		model any
+		count *int64
+	}{
+		{&db.P4CommerceState{}, &out.CommerceStates},
+		{&db.P4CommerceStock{}, &out.CommerceStocks},
+		{&db.P4Receipt{}, &out.CommerceReceipts},
+		{&db.LocalPlayActivityOperation{}, &out.ActivityOperations},
+		{&db.LocalPlayActivityBinding{}, &out.ActivityBindings},
+		{&db.LocalPlayActivityCycle{}, &out.ActivityCycles},
+		{&db.P7RushState{}, &out.RushStates},
+	} {
+		if err := tx.Model(table.model).Count(table.count).Error; err != nil {
+			return out, err
+		}
+	}
+	return out, nil
+}
+
+func (v formal110EmptySnapshot) empty() bool {
+	return v.Profiles == 0 && v.RoleLinks == 0 && v.Issued == 0 && v.Anchors == 0 && v.CommerceStates == 0 && v.CommerceStocks == 0 && v.CommerceReceipts == 0 && v.ActivityOperations == 0 && v.ActivityBindings == 0 && v.ActivityCycles == 0 && v.RushStates == 0
 }
 
 // InitializeActivityCalendarRestoreSchema creates only the four new carry/archive
@@ -70,6 +126,24 @@ func (s *GameService) InitializeActivityCalendarRestoreSchema(ctx context.Contex
 // ApplyActivityCalendarRestoreCLI uses the same live administrator checks as the
 // authenticated entry. CLI execution has no player-facing or notification side effect.
 func (s *GameService) ApplyActivityCalendarRestoreCLI(ctx context.Context, req ActivityCalendarRestoreRequest) (*ActivityCalendarRestoreResult, error) {
+	return s.applyActivityCalendarRestoreCLI(ctx, req, false)
+}
+
+// ApplyFormal110ActivityCalendarRestoreCLI accepts only the explicit offline
+// candidate for this empty new realm. HTTP and ordinary CLI restore stay unchanged.
+func (s *GameService) ApplyFormal110ActivityCalendarRestoreCLI(ctx context.Context, req ActivityCalendarRestoreRequest) (*ActivityCalendarRestoreResult, error) {
+	return s.applyActivityCalendarRestoreCLI(ctx, req, true)
+}
+
+func (s *GameService) applyActivityCalendarRestoreCLI(ctx context.Context, req ActivityCalendarRestoreRequest, formal110 bool) (*ActivityCalendarRestoreResult, error) {
+	if formal110 {
+		if s == nil || req.RequestID == "" || len(req.RequestID) > 36 || len(req.ExpectedDigest) != 64 || req.RealMillis <= 0 {
+			return nil, constUtil.ErrAdminInput
+		}
+		if !formal110OpeningDate(s.OriginalServerID(), time.UnixMilli(req.RealMillis)) {
+			return nil, fmt.Errorf("formal110: requires server 1 and Beijing opening date 2026-11-01: %w", constUtil.ErrAdminConfigConflict)
+		}
+	}
 	var actor db.AdminUser
 	if err := db.GetIns().WithContext(ctx).Where("enabled=? AND role=?", true, constUtil.AdminRoleAdmin).Order("id").First(&actor).Error; err != nil {
 		return nil, err
@@ -81,14 +155,40 @@ func (s *GameService) ApplyActivityCalendarRestoreCLI(ctx context.Context, req A
 	if !serverGameClockValid(&clock) {
 		return nil, constUtil.ErrAdminConfiguration
 	}
+	principal := &model.AdminPrincipal{UserID: actor.ID, Username: actor.Username, Role: actor.Role}
+	if formal110 {
+		// A completed request has already changed its preimage. Route a replay to
+		// the transactional receipt check without creating or changing any schema.
+		var prior db.ServerGameClockOperation
+		err := db.GetIns().WithContext(ctx).Select("server_id", "request_id").First(&prior, "server_id=? AND request_id=?", clock.ServerID, req.RequestID).Error
+		if err == nil {
+			s.ServerClockReady = true
+			return s.adminRestoreActivityCalendar(ctx, principal, req, true)
+		}
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, err
+		}
+		if p1Day(time.Now()) != p1Day(time.UnixMilli(req.RealMillis)) {
+			return nil, constUtil.ErrAdminConfigConflict
+		}
+		// Validate the reviewed candidate before schema initialization; the apply
+		// transaction repeats the same complete check after initialization.
+		plan, err := s.previewActivityCalendarRestore(ctx, time.UnixMilli(req.RealMillis), true)
+		if err != nil {
+			return nil, err
+		}
+		if plan.Digest != req.ExpectedDigest || len(plan.Blockers) > 0 {
+			return nil, fmt.Errorf("restore preimage/blockers: %v: %w", plan.Blockers, constUtil.ErrAdminConfigConflict)
+		}
+	}
 	if err := s.InitializeActivityCalendarRestoreSchema(ctx); err != nil {
 		return nil, err
 	}
 	s.ServerClockReady = true
-	return s.AdminRestoreActivityCalendar(ctx, &model.AdminPrincipal{UserID: actor.ID, Username: actor.Username, Role: actor.Role}, req)
+	return s.adminRestoreActivityCalendar(ctx, principal, req, formal110)
 }
 
-func (s *GameService) readActivityCalendarRestore(tx *gorm.DB, real time.Time) (*activityCalendarRestoreSnapshot, error) {
+func (s *GameService) readActivityCalendarRestore(tx *gorm.DB, real time.Time, formal110 bool) (*activityCalendarRestoreSnapshot, error) {
 	x := &activityCalendarRestoreSnapshot{}
 	current := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Session(&gorm.Session{})
 	server := s.OriginalServerID()
@@ -138,7 +238,18 @@ func (s *GameService) readActivityCalendarRestore(tx *gorm.DB, real time.Time) (
 			return nil, err
 		}
 	}
-	x.plan = activityCalendarRestorePlan(x.realm, x.clock, x.revision, x.sources, x.issued, x.anchors, real)
+	x.plan = activityCalendarRestorePlanWithFormal110(x.realm, x.clock, x.revision, x.sources, x.issued, x.anchors, real, formal110)
+	var formalEmpty formal110EmptySnapshot
+	if formal110 {
+		var err error
+		formalEmpty, err = readFormal110EmptySnapshot(current)
+		if err != nil {
+			return nil, err
+		}
+		if !formalEmpty.empty() {
+			x.plan.Blockers = append(x.plan.Blockers, "formal110: roles or role-owned activity data exist")
+		}
+	}
 	if openingMissing {
 		x.plan.Blockers = append(x.plan.Blockers, "dependency schema missing: open_server_activity_rules")
 	}
@@ -195,13 +306,21 @@ func (s *GameService) readActivityCalendarRestore(tx *gorm.DB, real time.Time) (
 		sort.Strings(encoded)
 		x.plan.Manifest = append(x.plan.Manifest, ActivityCalendarRestoreManifest{statement.Schema.Table, len(rows), p6Digest(adminJSON(encoded))})
 	}
-	x.plan.Digest = p6Digest(adminJSON([]any{x.plan.Digest, x.plan.Manifest, x.opening}))
+	if formal110 {
+		x.plan.Digest = p6Digest(adminJSON([]any{x.plan.Digest, x.plan.Manifest, x.opening, formalEmpty, x.plan.Blockers}))
+	} else {
+		x.plan.Digest = p6Digest(adminJSON([]any{x.plan.Digest, x.plan.Manifest, x.opening}))
+	}
 	return x, nil
 }
 
 // AdminRestoreActivityCalendar commits every native consumer, carry, source,
 // anchor, timer and operation receipt in one caller-visible transaction.
 func (s *GameService) AdminRestoreActivityCalendar(ctx context.Context, p *model.AdminPrincipal, req ActivityCalendarRestoreRequest) (*ActivityCalendarRestoreResult, error) {
+	return s.adminRestoreActivityCalendar(ctx, p, req, false)
+}
+
+func (s *GameService) adminRestoreActivityCalendar(ctx context.Context, p *model.AdminPrincipal, req ActivityCalendarRestoreRequest, formal110 bool) (*ActivityCalendarRestoreResult, error) {
 	if s == nil || !s.ServerClockReady || p == nil || req.RequestID == "" || len(req.RequestID) > 36 || len(req.ExpectedDigest) != 64 || req.RealMillis <= 0 {
 		return nil, constUtil.ErrAdminInput
 	}
@@ -229,7 +348,7 @@ func (s *GameService) AdminRestoreActivityCalendar(ctx context.Context, p *model
 				return constUtil.ErrAdminConfigConflict
 			}
 			var old ActivityCalendarRestoreResult
-			if json.Unmarshal(prior.Response, &old) != nil || old.RequestID != req.RequestID || old.Digest != req.ExpectedDigest || old.Clock == nil {
+			if json.Unmarshal(prior.Response, &old) != nil || old.RequestID != req.RequestID || old.Digest != req.ExpectedDigest || old.Clock == nil || old.Formal110 != formal110 {
 				return constUtil.ErrAdminConfigConflict
 			}
 			result = &old
@@ -243,7 +362,7 @@ func (s *GameService) AdminRestoreActivityCalendar(ctx context.Context, p *model
 		if p1Day(real) != p1Day(previewReal) {
 			return constUtil.ErrAdminConfigConflict
 		}
-		x, err := s.readActivityCalendarRestore(tx, previewReal)
+		x, err := s.readActivityCalendarRestore(tx, previewReal, formal110)
 		if err != nil {
 			return err
 		}
@@ -293,7 +412,7 @@ func (s *GameService) AdminRestoreActivityCalendar(ctx context.Context, p *model
 					return constUtil.ErrAdminConfiguration
 				}
 			case "commerce", "shop-gate":
-				err = s.RestoreCommerceCalendarWindow(tx, key, CommerceCalendarWindow{before.StartAt, before.EndAt, before.ClaimEndAt}, CommerceCalendarWindow{after.StartAt, after.EndAt, after.ClaimEndAt})
+				err = s.restoreCommerceCalendarWindow(tx, key, CommerceCalendarWindow{before.StartAt, before.EndAt, before.ClaimEndAt}, CommerceCalendarWindow{after.StartAt, after.EndAt, after.ClaimEndAt}, formal110)
 			case "opening":
 				if w.Mode != "opening-14" || w.PlayerID <= 0 {
 					return constUtil.ErrAdminConfiguration
@@ -343,7 +462,7 @@ func (s *GameService) AdminRestoreActivityCalendar(ctx context.Context, p *model
 		if err := tx.Save(&clock).Error; err != nil {
 			return err
 		}
-		result = &ActivityCalendarRestoreResult{RequestID: req.RequestID, Digest: req.ExpectedDigest, OpeningAt: x.plan.OpeningAt, Clock: serverGameClockView(&clock, real), Windows: len(x.plan.Windows), Carries: count, Manifest: x.plan.Manifest}
+		result = &ActivityCalendarRestoreResult{RequestID: req.RequestID, Digest: req.ExpectedDigest, Formal110: formal110, OpeningAt: x.plan.OpeningAt, Clock: serverGameClockView(&clock, real), Windows: len(x.plan.Windows), Carries: count, Manifest: x.plan.Manifest}
 		raw, err := json.Marshal(result)
 		if err != nil {
 			return err

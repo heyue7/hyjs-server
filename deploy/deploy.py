@@ -35,6 +35,7 @@ parser.add_argument('--apply-growth75', action='store_true', help='Apply audited
 parser.add_argument('--maintenance-redeploy', action='store_true', help='Redeploy a verified compatible candidate under maintenance without configuration publication')
 parser.add_argument('--expected-live-revision', help='Refuse activation if a different live release appeared')
 parser.add_argument('--restore-activity-calendar', help='Restore real game time and activity day one using this UUID under maintenance')
+parser.add_argument('--calendar-formal-110', action='store_true', help='Use the reviewed offline empty-realm 1.1.0 calendar cutover')
 args = parser.parse_args()
 if args.restore_activity_calendar:
     import uuid
@@ -67,6 +68,10 @@ if args.maintenance_redeploy:
                     args.apply_growth75, args.apply_activity77, args.apply_feedback78, args.apply_feedback79,
                     args.apply_feedback80, args.apply_feedback81, args.apply_trial82, args.apply_feedback84,
                     args.apply_feedback85)), 'Maintenance redeploy must not change configuration or ingress'
+if args.calendar_formal_110:
+    import calendar_restore_activation
+    calendar_restore_activation.validate_formal110_arguments(args)
+    calendar_restore_activation.validate_formal110_source_constants(ROOT / 'hyjs-server/constUtil/payment.go')
 settings = load(args.env_file)
 HOST = settings['HYJS_DEPLOY_SSH']
 REMOTE = settings['HYJS_DEPLOY_ROOT']
@@ -198,6 +203,8 @@ if args.apply_feedback85:
     command += ' --apply-feedback85'
 if args.restore_activity_calendar:
     command += ' --restore-activity-calendar ' + shlex.quote(args.restore_activity_calendar)
+if getattr(args, 'calendar_formal_110', False):
+    command += ' --calendar-formal-110'
 if args.migrate_role_wallets:
     command += ' --migrate-role-wallets'
 if args.provision or args.update_ingress:
@@ -208,6 +215,14 @@ print('Activating verified artifacts and preserving persistent data', flush=True
 print(remote(command), flush=True)
 deployed = json.loads(remote('cat ' + shlex.quote(REMOTE + '/deployed.json')))
 assert deployed['revision'] == revision and deployed['files'] == manifest['files']
+if getattr(args, 'calendar_formal_110', False):
+    calendar = deployed.get('calendarRestore')
+    calendar_restore_activation.require(
+        isinstance(calendar, dict) and calendar.get('formal110') is True and
+        calendar.get('requestId') == args.restore_activity_calendar and
+        calendar.get('openingAt') == calendar_restore_activation.FORMAL110_OPENING_MILLIS and
+        isinstance(calendar.get('digest'), str) and re.fullmatch(r'[0-9a-f]{64}', calendar['digest']),
+        'Formal 110 deployed calendar identity or digest differs')
 (record_dir / 'deployed.json').write_text(json.dumps(deployed, indent=2))
 shutil.rmtree(stage)
 archive.unlink()

@@ -32,12 +32,21 @@ parser.add_argument('--apply-feedback85', action='store_true', help='Apply revie
 parser.add_argument('--apply-growth75', action='store_true')
 parser.add_argument('--maintenance-redeploy', action='store_true')
 parser.add_argument('--restore-activity-calendar')
+parser.add_argument('--calendar-formal-110', action='store_true')
 parser.add_argument('--warm-rush-history-player', action='append', type=int, default=[])
 args = parser.parse_args()
 if args.restore_activity_calendar:
     import uuid
     assert str(uuid.UUID(args.restore_activity_calendar)) == args.restore_activity_calendar
     assert args.expected_live_revision and not any((args.initial_db, args.migrate_role_wallets, args.apply_growth74, args.apply_growth75, args.apply_activity77, args.apply_feedback78, args.apply_feedback79, args.apply_feedback80, args.apply_feedback81, args.apply_trial82, args.apply_feedback84, args.apply_feedback85)), 'Calendar restore requires a standalone maintenance cutover'
+if args.calendar_formal_110:
+    if not args.restore_activity_calendar or not args.expected_live_revision or not re.fullmatch(r'(?:[0-9a-f]{40}|[0-9a-f]{64})', args.expected_live_revision):
+        raise ValueError('Formal 110 requires a calendar request and exact live revision')
+    if any((args.initial_db, args.provision_ingress, args.migrate_role_wallets, args.warm_rush_history_player,
+            args.apply_growth74, args.apply_growth75, args.apply_activity77, args.apply_feedback78,
+            args.apply_feedback79, args.apply_feedback80, args.apply_feedback81, args.apply_trial82,
+            args.apply_feedback84, args.apply_feedback85, args.maintenance_redeploy)):
+        raise ValueError('Formal 110 requires a standalone calendar cutover')
 assert sum((args.apply_growth74, args.apply_growth75, args.apply_activity77, args.apply_feedback78, args.apply_feedback79, args.apply_feedback80, args.apply_feedback81, args.apply_trial82 or args.apply_feedback84 or args.apply_feedback85)) <= 1, 'Choose one explicit maintenance deployment version'
 if args.apply_activity77:
     assert args.expected_live_revision and not args.initial_db and not args.migrate_role_wallets, 'Activity77 requires a pinned maintenance cutover'
@@ -131,6 +140,27 @@ def backup_existing_database():
     return backup_record
 
 
+if getattr(args, 'calendar_formal_110', False):
+    # Verify the guard module before importing it, then arm the guard before
+    # further artifact checks, image builds, backup, and the calendar operation.
+    guard_module = stage / 'calendar_restore_activation.py'
+    assert 'calendar_restore_activation.py' in manifest['files'] and sha(guard_module) == manifest['files']['calendar_restore_activation.py'], 'Formal 110 guard artifact differs'
+    import calendar_restore_activation
+    calendar_restore_activation.validate_formal110_arguments(args, remote=True)
+    assert (ROOT / 'migration.json').is_file() and not (ROOT / 'migration.json').is_symlink(), 'Formal 110 requires an existing initialized database'
+    live_revision = run('docker', 'inspect', '--format={{index .Config.Labels "org.opencontainers.image.revision"}}', 'hyjs-game').stdout.decode().strip()
+    assert live_revision == args.expected_live_revision, 'Formal 110 live container revision differs from deployment record'
+    formal110_guard = calendar_restore_activation.Formal110CutoverGuard(
+        compose, mysql, run, ROOT / 'backups', manifest['revision'], args.expected_live_revision,
+        args.restore_activity_calendar)
+    atexit.register(formal110_guard.stop_if_unfinished)
+    formal110_guard.install_signal_handlers()
+    formal110_guard.prepare()
+    formal110_guard.checkpoint('checking-maintenance-and-migration')
+    calendar_restore_activation.require_maintenance(mysql)
+    formal110_guard.checkpoint('checking-vip10-before-work')
+    calendar_restore_activation.require_vip10_approved(mysql)
+
 for name, digest in manifest['files'].items():
     path = stage / name
     assert path.resolve().is_relative_to(stage) and sha(path) == digest, name
@@ -174,6 +204,17 @@ for line in (stage / 'deployment.env').read_text().splitlines():
     runtime[key] = value
 private_env = ROOT / '.env'
 assert private_env.is_file() and not private_env.stat().st_mode & 0o077
+if getattr(args, 'calendar_formal_110', False):
+    formal110_guard.checkpoint('checking-existing-runtime')
+    current_runtime = {}
+    for line in private_env.read_text().splitlines():
+        key, separator, value = line.partition('=')
+        if separator and key in runtime:
+            assert key not in current_runtime, 'Formal 110 runtime key is duplicated'
+            current_runtime[key] = value
+    assert current_runtime == runtime, 'Formal 110 must preserve the existing runtime topology'
+    assert (ROOT / 'compose.yaml').is_file() and not (ROOT / 'compose.yaml').is_symlink() and \
+        (ROOT / 'compose.yaml').read_bytes() == (stage / 'compose.yaml').read_bytes(), 'Formal 110 must preserve existing Compose configuration'
 kept = [line for line in private_env.read_text().splitlines() if line.partition('=')[0] not in runtime]
 # Persist this application-only signing secret once; never emit or put it in the image.
 certificate_keys = [line.partition('=')[2] for line in kept if line.startswith('HYJS_RUSH_HISTORY_CERTIFICATE_KEY=')]
@@ -192,9 +233,17 @@ os.replace(temporary_env, private_env)
 wallet_baseline = None
 verified_backup = None
 if args.restore_activity_calendar:
-    compose('run', '--rm', '--no-deps', '-T', 'app', '--env', 'test', '--tables', '/app/tables', '--calendar-maintenance', 'begin', '--log-file', '/app/logs/calendar-maintenance.log')
-    assert mysql('SELECT maintenance FROM client_update_policy WHERE id=1;').strip() == '1'
-    compose('stop', '-t', '30', 'app')
+    if getattr(args, 'calendar_formal_110', False):
+        # This mode requires pre-existing maintenance and never toggles it.
+        formal110_guard.checkpoint('stopping-application')
+        calendar_restore_activation.require_maintenance(mysql)
+        compose('stop', '-t', '30', 'app')
+        formal110_guard.require_stopped()
+        calendar_restore_activation.require_maintenance(mysql)
+    else:
+        compose('run', '--rm', '--no-deps', '-T', 'app', '--env', 'test', '--tables', '/app/tables', '--calendar-maintenance', 'begin', '--log-file', '/app/logs/calendar-maintenance.log')
+        assert mysql('SELECT maintenance FROM client_update_policy WHERE id=1;').strip() == '1'
+        compose('stop', '-t', '30', 'app')
 if args.apply_growth74 or args.apply_growth75 or args.apply_activity77 or args.apply_feedback78 or args.apply_feedback79 or args.apply_feedback80 or args.apply_feedback81 or args.apply_trial82 or args.apply_feedback84 or args.apply_feedback85 or args.maintenance_redeploy:
     assert args.expected_live_revision and not args.initial_db
     if args.apply_trial82 or args.apply_feedback84 or args.apply_feedback85 or args.maintenance_redeploy:
@@ -247,10 +296,15 @@ if args.migrate_role_wallets:
     wallet_baseline = role_wallet_migration.before(mysql)
     (ROOT / 'role-wallet-cutover-before.json').write_text(json.dumps(wallet_baseline, indent=2))
 if (ROOT / 'migration.json').exists():
+    if getattr(args, 'calendar_formal_110', False):
+        formal110_guard.checkpoint('backing-up')
     if args.apply_trial82 or args.apply_feedback84 or args.apply_feedback85 or args.maintenance_redeploy:
         trial82_guard.record['state'] = 'backing-up'
         trial82_guard.checkpoint()
     verified_backup = backup_existing_database()
+    if getattr(args, 'calendar_formal_110', False):
+        formal110_guard.record['backupBefore'] = verified_backup
+        formal110_guard.checkpoint('backup-created')
     if args.apply_trial82 or args.apply_feedback84 or args.apply_feedback85 or args.maintenance_redeploy:
         trial82_guard.record['backupBefore'] = verified_backup
         trial82_guard.record['state'] = 'backup-created'
@@ -325,6 +379,8 @@ if args.maintenance_redeploy:
 
 # Derived certificates are prepared with the exact candidate before application startup.
 # This command opens no listener and cannot alter resources, progress or battle receipts.
+if getattr(args, 'calendar_formal_110', False):
+    formal110_guard.checkpoint('prewarming-rush-history')
 for player_id in args.warm_rush_history_player:
     assert player_id > 0
     compose('run', '--rm', '--no-deps', '-T', 'app', '--env', 'test', '--tables', '/app/tables',
@@ -421,15 +477,26 @@ if args.apply_trial82 or args.apply_feedback84 or args.apply_feedback85:
 if args.restore_activity_calendar:
     import calendar_restore_activation
     try:
-        manifest['calendarRestore'] = calendar_restore_activation.activate_calendar_restore(mysql, compose, ROOT / 'backups', manifest['revision'], verified_backup, args.restore_activity_calendar)
+        if getattr(args, 'calendar_formal_110', False):
+            manifest['calendarRestore'] = calendar_restore_activation.activate_calendar_restore(
+                mysql, compose, ROOT / 'backups', manifest['revision'], verified_backup, args.restore_activity_calendar,
+                formal110=True, expected_live_revision=args.expected_live_revision, guard=formal110_guard)
+        else:
+            manifest['calendarRestore'] = calendar_restore_activation.activate_calendar_restore(mysql, compose, ROOT / 'backups', manifest['revision'], verified_backup, args.restore_activity_calendar)
     except Exception as error:
+        if getattr(args, 'calendar_formal_110', False):
+            raise RuntimeError('Formal 110 cutover did not finish. The stop guard will attempt to stop the app and record the observed maintenance state; the calendar transaction may already have committed. Preserve the backup and evidence; do not auto-restore.') from None
         compose('stop', '-t', '30', 'app')
         raise RuntimeError('Calendar restore did not finish: ' + str(error) + '. Application remains stopped under maintenance; preserve the authenticated backup and calendar manifest, inspect the failure and retry the same request. Never auto-restore the database.') from None
 
+if getattr(args, 'calendar_formal_110', False):
+    formal110_guard.checkpoint('starting-application')
 if args.apply_trial82 or args.apply_feedback84 or args.apply_feedback85 or args.maintenance_redeploy:
     trial82_guard.record['state'] = 'starting-application'
     trial82_guard.checkpoint()
 compose('up', '-d', '--no-deps', '--force-recreate', 'app')
+if getattr(args, 'calendar_formal_110', False):
+    formal110_guard.checkpoint('checking-health')
 if args.apply_trial82 or args.apply_feedback84 or args.apply_feedback85 or args.maintenance_redeploy:
     trial82_guard.record['state'] = 'checking-health'
     trial82_guard.checkpoint()
@@ -445,6 +512,9 @@ else:
         compose('stop', '-t', '30', 'app')
     elif args.apply_trial82 or args.apply_feedback84 or args.apply_feedback85 or args.maintenance_redeploy:
         compose('stop', '-t', '30', 'app')
+    elif getattr(args, 'calendar_formal_110', False):
+        compose('stop', '-t', '30', 'app')
+        raise SystemExit('Formal 110 health check failed after a possible calendar commit; the stop guard will confirm the app state. Preserve the backup and evidence; do not auto-restore.')
     raise SystemExit('Application health failed; data and prior deployed.json preserved. Fix/retry this script, or deploy its recorded Git commit from a clean checkout; do not restore the database automatically.')
 
 if args.apply_activity77 or args.apply_feedback78 or args.apply_feedback79 or args.apply_feedback80 or args.apply_feedback81 or args.apply_trial82 or args.apply_feedback84 or args.apply_feedback85 or args.maintenance_redeploy:
@@ -457,6 +527,11 @@ if args.apply_activity77 or args.apply_feedback78 or args.apply_feedback79 or ar
         compose('stop', '-t', '30', 'app')
         raise
 
+if getattr(args, 'calendar_formal_110', False):
+    formal110_guard.checkpoint('checking-maintenance-and-vip10-after-health')
+    calendar_restore_activation.require_maintenance(mysql)
+    calendar_restore_activation.require_vip10_approved(mysql)
+
 if wallet_baseline is not None:
     try:
         reconciled = role_wallet_migration.after(mysql, wallet_baseline)
@@ -466,6 +541,8 @@ if wallet_baseline is not None:
         compose('stop', '-t', '30', 'app')
         raise SystemExit('Role wallet reconciliation failed. App stopped; preserve database, backup and evidence. Never start a legacy wallet binary against new role transactions.')
 
+if getattr(args, 'calendar_formal_110', False):
+    formal110_guard.checkpoint('validating-ingress')
 if args.apply_trial82 or args.apply_feedback84 or args.apply_feedback85 or args.maintenance_redeploy:
     trial82_guard.record['state'] = 'validating-ingress'
     trial82_guard.checkpoint()
@@ -492,6 +569,8 @@ else:
     assert Path('/etc/nginx/sites-enabled/hyjs-test.conf').read_bytes() == (stage / 'nginx.conf').read_bytes(), 'Ingress differs; explicit provision-ingress required'
 
 # One application artifact directory; no timestamped release copies.
+if getattr(args, 'calendar_formal_110', False):
+    formal110_guard.checkpoint('installing-artifacts')
 if args.apply_trial82 or args.apply_feedback84 or args.apply_feedback85 or args.maintenance_redeploy:
     trial82_guard.record['state'] = 'installing-artifacts'
     trial82_guard.checkpoint()
@@ -503,6 +582,10 @@ os.replace(stage / 'app', target)
 installed = run('docker', 'inspect', '--format={{index .Config.Labels "org.opencontainers.image.revision"}}', 'hyjs-game').stdout.decode().strip()
 assert installed == manifest['revision']
 manifest['deployedAt'] = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
+if getattr(args, 'calendar_formal_110', False):
+    formal110_guard.checkpoint('recording-deployment')
+    calendar_restore_activation.require_maintenance(mysql)
+    manifest['formal110Guard'] = {'privateManifest': str(formal110_guard.manifest)}
 if args.apply_trial82 or args.apply_feedback84 or args.apply_feedback85 or args.maintenance_redeploy:
     trial82_guard.record['state'] = 'recording-deployment'
     trial82_guard.checkpoint()
@@ -525,4 +608,10 @@ if args.apply_feedback81:
     feedback81_guard.complete = True
 if args.apply_trial82 or args.apply_feedback84 or args.apply_feedback85 or args.maintenance_redeploy:
     trial82_guard.complete = True
-print(json.dumps({'status': 'DEPLOYED', 'revision': installed, 'binarySHA256': manifest['files']['app/hyjs-server']}))
+if getattr(args, 'calendar_formal_110', False):
+    formal110_guard.checkpoint('deployed-maintenance')
+    formal110_guard.complete = True
+deployed_status = {'status': 'DEPLOYED', 'revision': installed, 'binarySHA256': manifest['files']['app/hyjs-server']}
+if getattr(args, 'calendar_formal_110', False):
+    deployed_status.update(formal110=True, calendarDigest=manifest['calendarRestore']['digest'])
+print(json.dumps(deployed_status))

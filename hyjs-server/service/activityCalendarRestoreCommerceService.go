@@ -64,12 +64,35 @@ func (s *GameService) commerceRestoreFixedRules(cfg db.P4CommerceRule, allowEdit
 	return nil
 }
 
+// This is the reviewed trial82 source configuration for the one-time formal110
+// empty-realm migration. The original rules and products are never rewritten.
+func (s *GameService) commerceRestoreFormal110TrialRules(cfg db.P4CommerceRule) error {
+	var rules p4CommerceRules
+	if cfg.Kind != "point" || cfg.ShopType != 5 || commerceRestoreDecode(cfg.Rules, &rules) != nil {
+		return constUtil.ErrAdminConfiguration
+	}
+	if !rules.LiveEditable || rules.TrialRefreshVersion != 1 || rules.MemoryPolicyVersion != 0 || rules.RankPublishedAt != 0 || len(rules.Discounts) != 0 || rules.RefreshEnabled == nil || !*rules.RefreshEnabled || rules.FreeSeconds != 7200 || rules.FreeCap != 10 || rules.ResourceRefreshCap != 15 || rules.RefreshItem != "item_013,1" || rules.RefreshCost != "diamond,20" || rules.Slots != constUtil.TrialRefresh82Slots || len(rules.Products) != 49 {
+		return fmt.Errorf("formal110 trial shop refresh configuration differs from reviewed source: %w", constUtil.ErrAdminConfiguration)
+	}
+	for _, product := range rules.Products {
+		if len(product.QuantityTiers) != 0 {
+			return fmt.Errorf("formal110 trial shop quantity tiers require review: %w", constUtil.ErrAdminConfiguration)
+		}
+	}
+	_, err := s.validateP4Commerce(cfg)
+	return err
+}
+
 // RestoreCommerceCalendarWindow runs inside the caller's clock/profile-locked
 // transaction. It preserves all progress/stock/quote bytes and changes only the
 // exact reviewed live and frozen boundaries. It never creates a quote or state.
 // Only reviewed scheduled point/guild shops and fixed activity catalogues are accepted.
 // Stable-ID live SKU hashes contain the rule ID/product, with no window component.
 func (s *GameService) RestoreCommerceCalendarWindow(tx *gorm.DB, ruleID string, old, next CommerceCalendarWindow) error {
+	return s.restoreCommerceCalendarWindow(tx, ruleID, old, next, false)
+}
+
+func (s *GameService) restoreCommerceCalendarWindow(tx *gorm.DB, ruleID string, old, next CommerceCalendarWindow, formal110 bool) error {
 	if tx == nil || tx.Statement == nil || ruleID == "" || old.StartAt <= 0 || old.EndAt <= old.StartAt || old.ClaimEndAt < old.EndAt || next.StartAt <= 0 || next.EndAt <= next.StartAt || next.ClaimEndAt < next.EndAt {
 		return constUtil.ErrAdminConfiguration
 	}
@@ -99,7 +122,35 @@ func (s *GameService) RestoreCommerceCalendarWindow(tx *gorm.DB, ruleID string, 
 	default:
 		return fmt.Errorf("unsupported commerce kind %q: %w", live.Kind, constUtil.ErrAdminConfiguration)
 	}
-	if err := s.commerceRestoreFixedRules(live, live.ShopType > 0); err != nil {
+	trial := false
+	if formal110 && live.Kind == "point" && live.ShopType == 5 {
+		var candidate p4CommerceRules
+		if err := commerceRestoreDecode(live.Rules, &candidate); err != nil {
+			return err
+		}
+		trial = trialRefresh82Enabled(live, candidate)
+	}
+	if trial {
+		// Recheck the whole role-derived state in the caller's transaction, even
+		// though the reviewed restore snapshot already verified the same preimage.
+		if s.OriginalServerID() != 1 {
+			return constUtil.ErrAdminConfigConflict
+		}
+		empty, err := readFormal110EmptySnapshot(tx.Clauses(clause.Locking{Strength: "UPDATE"}).Session(&gorm.Session{}))
+		if err != nil {
+			return err
+		}
+		if !empty.empty() {
+			return fmt.Errorf("formal110 trial shop has role-derived state: %w", constUtil.ErrAdminConfigConflict)
+		}
+	}
+	validateRules := func(cfg db.P4CommerceRule) error {
+		if trial {
+			return s.commerceRestoreFormal110TrialRules(cfg)
+		}
+		return s.commerceRestoreFixedRules(cfg, live.ShopType > 0)
+	}
+	if err := validateRules(live); err != nil {
 		return err
 	}
 	if live.ShopType > 0 {
@@ -107,7 +158,7 @@ func (s *GameService) RestoreCommerceCalendarWindow(tx *gorm.DB, ruleID string, 
 		if err != nil {
 			return err
 		}
-		if err := s.commerceRestoreFixedRules(source, true); err != nil {
+		if err := validateRules(source); err != nil {
 			return err
 		}
 	}
@@ -125,7 +176,7 @@ func (s *GameService) RestoreCommerceCalendarWindow(tx *gorm.DB, ruleID string, 
 		if frozen.ID != live.ID || frozen.ShopType != live.ShopType || frozen.Kind != live.Kind || commerceRestoreWindow(frozen) != old {
 			return constUtil.ErrAdminConfigConflict
 		}
-		if err := s.commerceRestoreFixedRules(frozen, live.ShopType > 0); err != nil {
+		if err := validateRules(frozen); err != nil {
 			return err
 		}
 		var fields map[string]json.RawMessage

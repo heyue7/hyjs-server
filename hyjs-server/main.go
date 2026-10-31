@@ -68,6 +68,7 @@ func run() error {
 		calendarDigest      = flag.String("calendar-digest", "", "expected complete activity restore candidate digest")
 		calendarReal        = flag.Int64("calendar-real-millis", 0, "frozen real timestamp of the calendar preview")
 		calendarMaintenance = flag.String("calendar-maintenance", "", "begin or end the calendar maintenance through the audited server action")
+		calendarFormal110   = flag.Bool("calendar-formal-110", false, "use the one-time offline empty-server-1 migration plan for 2026-11-01")
 		localWallet         = flag.Bool("enable-local-wallet", false, "enable local demo wallet payments in dev/test; no real charge")
 	)
 	flag.Parse()
@@ -79,6 +80,9 @@ func run() error {
 	}
 	if maintenanceCommands > 1 {
 		return errors.New("每次只执行一个维护命令")
+	}
+	if *calendarFormal110 && (!(*previewCalendar || *restoreCalendar != "") || *serverID != 1) {
+		return errors.New("formal110 仅允许显式指定 --server-id 1 的活动恢复预览或执行")
 	}
 	if (*applyGrowth && *applyGrowth75) || ((*applyGrowth || *applyGrowth75) && *warmRushPlayer != 0) || (*restoreVIP10 && (*applyGrowth || *applyGrowth75 || *warmRushPlayer != 0)) {
 		return errors.New("成长部署版本和试炼预热命令不能同时执行")
@@ -236,7 +240,12 @@ func run() error {
 			real = time.UnixMilli(*calendarReal)
 		}
 		if *previewCalendar {
-			plan, err := s.PreviewActivityCalendarRestore(ctx, real)
+			var plan *service.ActivityCalendarRestorePlan
+			if *calendarFormal110 {
+				plan, err = s.PreviewFormal110ActivityCalendarRestoreCLI(ctx, real)
+			} else {
+				plan, err = s.PreviewActivityCalendarRestore(ctx, real)
+			}
 			if err != nil {
 				return err
 			}
@@ -245,7 +254,13 @@ func run() error {
 		if *calendarReal <= 0 || *calendarDigest == "" {
 			return errors.New("活动恢复必须指定已预览时间和完整摘要")
 		}
-		result, err := s.ApplyActivityCalendarRestoreCLI(ctx, service.ActivityCalendarRestoreRequest{RequestID: *restoreCalendar, ExpectedDigest: *calendarDigest, RealMillis: *calendarReal})
+		req := service.ActivityCalendarRestoreRequest{RequestID: *restoreCalendar, ExpectedDigest: *calendarDigest, RealMillis: *calendarReal}
+		var result *service.ActivityCalendarRestoreResult
+		if *calendarFormal110 {
+			result, err = s.ApplyFormal110ActivityCalendarRestoreCLI(ctx, req)
+		} else {
+			result, err = s.ApplyActivityCalendarRestoreCLI(ctx, req)
+		}
 		if err != nil {
 			return err
 		}
