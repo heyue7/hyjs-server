@@ -221,7 +221,7 @@ func (s *GameService) RefreshOpenServerProgress(tx *gorm.DB, player *pb.Player, 
 	return s.refreshOpenServerProgressAt(tx, player, g, LocalPlayNow(tx.Statement.Context))
 }
 func (s *GameService) refreshOpenServerProgressAt(tx *gorm.DB, player *pb.Player, g *model.GameState, now time.Time) error {
-	cfg, e := loadPlayerOpenServerRule(tx, player.GetPlayerId())
+	cfg, anchor, e := loadPlayerOpenServerRuleWithAnchor(tx, player.GetPlayerId())
 	if e != nil {
 		return e
 	}
@@ -296,6 +296,11 @@ func (s *GameService) refreshOpenServerProgressAt(tx *gorm.DB, player *pb.Player
 			continue
 		}
 		current, e := s.openServerCurrent(player, g, cfg, t, values)
+		if t.TaskType == 1 && anchor != nil && cfg.UnlockStartAt > 0 && anchor.StartAt > cfg.UnlockStartAt && cfg.UnlockStartAt+int64(t.OpenDay-1)*86400000 < anchor.StartAt {
+			// Earlier realm tiers were open before this role existed. Qualify
+			// only those gifts using an actual login in this activity period.
+			current = openServerPeriodCounter(cfg, values, constUtil.OpenServerActivityCounterLogin, false)
+		}
 		if t.TaskType == 8 {
 			if !arenaRankRead {
 				bestArenaRank, _, e = P11ArenaVerifiedBestWonRank(tx, player.GetPlayerId())
@@ -338,22 +343,7 @@ func (s *GameService) openServerCurrent(player *pb.Player, g *model.GameState, c
 		}
 		// Second-week tasks and the day-seven character choice accept actual
 		// events throughout this period. Other first-week dates stay intact.
-		var current int64
-		for key, n := range values {
-			if !strings.HasPrefix(key, prefix) {
-				continue
-			}
-			at, err := time.ParseInLocation("2006-01-02", strings.TrimPrefix(key, prefix), time.FixedZone("UTC+8", 8*3600))
-			if err != nil || at.AddDate(0, 0, 1).UnixMilli() <= cfg.StartAt || at.UnixMilli() >= cfg.EndAt {
-				continue
-			}
-			if sum {
-				current = min(int64(math.MaxInt32), current+int64(n))
-			} else {
-				current = max(current, int64(n))
-			}
-		}
-		return int32(current)
+		return openServerPeriodCounter(cfg, values, prefix, sum)
 	}
 	switch t.TaskType {
 	case 2:
@@ -408,6 +398,27 @@ func (s *GameService) openServerCurrent(player *pb.Player, g *model.GameState, c
 	default:
 		return 0, nil
 	}
+}
+
+// openServerPeriodCounter reads recorded facts that overlap the accepted
+// participation window without creating or rewriting any dated event.
+func openServerPeriodCounter(cfg *db.OpenServerActivityRule, values map[string]int32, prefix string, sum bool) int32 {
+	var current int64
+	for key, n := range values {
+		if !strings.HasPrefix(key, prefix) {
+			continue
+		}
+		at, err := time.ParseInLocation("2006-01-02", strings.TrimPrefix(key, prefix), time.FixedZone("UTC+8", 8*3600))
+		if err != nil || at.AddDate(0, 0, 1).UnixMilli() <= cfg.StartAt || at.UnixMilli() >= cfg.EndAt {
+			continue
+		}
+		if sum {
+			current = min(int64(math.MaxInt32), current+int64(n))
+		} else {
+			current = max(current, int64(n))
+		}
+	}
+	return int32(current)
 }
 
 func (s *GameService) openServerFormationCurrent(g *model.GameState, kind int32) (int32, error) {

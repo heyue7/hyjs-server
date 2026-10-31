@@ -226,6 +226,12 @@ namespace HYJS.DesertV4
             lease=lockGeneration; return true;
         }
         public static bool OwnsLock(long lease) { return lease>0 && locked && lease==lockGeneration; }
+        public static bool LockAfterTeleport(RoomCharactor actor,out long lease)
+        {
+            lease=0;
+            if (locked || !LockAfterTeleport(actor)) return false;
+            lease=lockGeneration; return true;
+        }
         public static bool ReleaseIfOwned(long lease)
         {
             if (!OwnsLock(lease)) return false;

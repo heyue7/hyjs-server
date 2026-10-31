@@ -33,6 +33,7 @@ type ggoBossEvent struct {
 	EconomyVersion string                       `json:"economyVersion"`
 	ExchangeValues [6]int64                     `json:"exchangeValues"`
 	Boss           model.AdminFieldGGOBoss      `json:"boss"`
+	AttendantHP    map[string]float64           `json:"attendantHp,omitempty"`
 }
 
 type ggoBossAward struct {
@@ -82,10 +83,55 @@ func ggoBossDecode(row *db.SharedFieldBoss55) (*ggoBossEvent, *pb.SideBoss, map[
 		return nil, nil, nil, errors.New("沙漠共享首领事件无效")
 	}
 	value, exists := hp[ggoBossGUID(event.ID)]
-	if !exists || len(hp) != 1 || !combatFinite(value) || hp[ggoBossGUID(event.ID)] < 0 || hp[ggoBossGUID(event.ID)] > float64(event.Boss.HP) {
+	if !exists || len(hp) != 1 || !combatFinite(value) || value < 0 || value > float64(event.Boss.HP) {
 		return nil, nil, nil, errors.New("沙漠共享首领血量无效")
 	}
+	// The original HP column remains one-key for older servers. The optional
+	// event extension holds only the three original attendant positions.
+	if len(event.AttendantHP) != 0 {
+		if event.Boss.HeroID != "monster_047" || len(event.AttendantHP) != 3 {
+			return nil, nil, nil, errors.New("沙漠共享首领阵容血量无效")
+		}
+		for _, pose := range []string{"3", "7", "9"} {
+			value, ok := event.AttendantHP[pose]
+			if !ok || !combatFinite(value) || value < 0 || value > 573045 {
+				return nil, nil, nil, errors.New("沙漠共享首领随从血量无效")
+			}
+			hp[ggoBossGUID(event.ID)+"-"+pose] = value
+		}
+	}
 	return &event, &boss, hp, nil
+}
+
+// Persist the dynamic attendant state alongside the event snapshot while the
+// original shared-HP column remains readable by the previous server version.
+func saveGGOBossState(tx *gorm.DB, row *db.SharedFieldBoss55, event *ggoBossEvent, boss *pb.SideBoss, hp map[string]float64) error {
+	key := ggoBossGUID(event.ID)
+	leader, ok := hp[key]
+	if !ok || !combatFinite(leader) || leader < 0 || leader > float64(event.Boss.HP) {
+		return errors.New("沙漠共享首领血量无效")
+	}
+	if len(hp) == 1 {
+		event.AttendantHP = nil
+	} else {
+		if event.Boss.HeroID != "monster_047" || len(hp) != 4 {
+			return errors.New("沙漠共享首领阵容血量无效")
+		}
+		event.AttendantHP = make(map[string]float64, 3)
+		for _, pose := range []string{"3", "7", "9"} {
+			value, exists := hp[key+"-"+pose]
+			if !exists || !combatFinite(value) || value < 0 || value > 573045 {
+				return errors.New("沙漠共享首领随从血量无效")
+			}
+			event.AttendantHP[pose] = value
+		}
+	}
+	raw, err := json.Marshal(event)
+	if err != nil {
+		return err
+	}
+	row.GGOEvent = raw
+	return saveSharedFieldBoss55(tx, row, boss, map[string]float64{key: leader})
 }
 func ggoBossGUID(eventID string) string { return "ggo-boss-" + eventID }
 
@@ -201,11 +247,7 @@ func (s *GameService) ggoBossCurrent(tx *gorm.DB, cfg *model.AdminFieldGGOConfig
 			row.RespawnAt = 0
 			row.KillerID = 0
 			row.DeathRules73 = nil
-			row.GGOEvent, err = json.Marshal(event)
-			if err != nil {
-				return nil, nil, nil, nil, err
-			}
-			if err = saveSharedFieldBoss55(tx, &row, boss, map[string]float64{ggoBossGUID(id): float64(event.Boss.HP)}); err != nil {
+			if err = saveGGOBossState(tx, &row, &event, boss, map[string]float64{ggoBossGUID(id): float64(event.Boss.HP)}); err != nil {
 				return nil, nil, nil, nil, err
 			}
 		} else if row.KillerID == 0 {
@@ -238,11 +280,7 @@ func (s *GameService) ggoBossCurrent(tx *gorm.DB, cfg *model.AdminFieldGGOConfig
 				changed = true
 			}
 			if changed {
-				row.GGOEvent, e = json.Marshal(event)
-				if e != nil {
-					return nil, nil, nil, nil, e
-				}
-				if e = saveSharedFieldBoss55(tx, &row, boss, hp); e != nil {
+				if e = saveGGOBossState(tx, &row, event, boss, hp); e != nil {
 					return nil, nil, nil, nil, e
 				}
 			}

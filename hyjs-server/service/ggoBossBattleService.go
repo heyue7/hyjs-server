@@ -58,6 +58,10 @@ func (s *GameService) ggoBossCheck(ctx context.Context, id int64, request *pb.CS
 // The frozen event selects the legacy single encounter or the original
 // boss_003 formation, so retained old events keep their visible model.
 func (s *GameService) ggoBossMonster(event *ggoBossEvent, currentHP float64) (*pb.BattleMonster, error) {
+	return s.ggoBossMonsterWithHealth(event, currentHP, nil)
+}
+
+func (s *GameService) ggoBossMonsterWithHealth(event *ggoBossEvent, currentHP float64, sharedHP map[string]float64) (*pb.BattleMonster, error) {
 	if event == nil || event.ID == "" || event.Boss.Level < 1 || event.Boss.HP < 1 || event.Boss.Attack < 1 || event.Boss.PhyDefend < 0 || event.Boss.MagicDefend < 0 {
 		return nil, errors.New("沙漠首领事件参数无效")
 	}
@@ -139,6 +143,11 @@ func (s *GameService) ggoBossMonster(event *ggoBossEvent, currentHP float64) (*p
 		}
 		if leader {
 			actor.Inst.CurHp = proto.Float64(currentHP)
+		} else if saved, ok := sharedHP[guid]; ok {
+			if !combatFinite(saved) || saved < 0 || saved > actor.Prop.GetHp() {
+				return nil, errors.New("沙漠首领随从当前生命无效")
+			}
+			actor.Inst.CurHp = proto.Float64(saved)
 		}
 		monster.Formation = append(monster.Formation, actor)
 	}
@@ -216,7 +225,7 @@ func (s *GameService) ggoBossFightStart(ctx context.Context, id int64, request *
 		if held > 0 && (g.GGOField.EconomyVersion != event.EconomyVersion || g.GGOField.ExchangeValues != event.ExchangeValues) {
 			return errors.New("请先结算旧版本芯片")
 		}
-		monster, err := s.ggoBossMonster(event, hp[ggoBossGUID(event.ID)])
+		monster, err := s.ggoBossMonsterWithHealth(event, hp[ggoBossGUID(event.ID)], hp)
 		if err != nil {
 			return err
 		}
@@ -278,7 +287,9 @@ func (s *GameService) ggoBossFightStart(ctx context.Context, id int64, request *
 			if e != nil {
 				return e
 			}
-			rules, e := json.Marshal(event)
+			rulesEvent := *event
+			rulesEvent.AttendantHP = nil
+			rules, e := json.Marshal(rulesEvent)
 			if e != nil {
 				return e
 			}
@@ -323,7 +334,7 @@ func (s *GameService) GGOFieldBossReceipt(ctx context.Context, request model.GGO
 			if json.Unmarshal(row.Response, out) != nil || out.State != "settled" || out.FightID != request.FightID {
 				return errors.New("首领战斗回执损坏")
 			}
-			return nil
+			return s.ggoBossRewardStatusLocked(tx, a.Row.Id, out)
 		}
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return err
@@ -347,6 +358,18 @@ func ggoBossEndHash(request *pb.CSSidePveBossFightEnd) (string, error) {
 		return "", err
 	}
 	return p6Digest(raw), nil
+}
+
+// A reported loss with an actual, bounded terminal record and zero attacker
+// HP is a request to forfeit. Protobuf-net can omit the zero-valued fields.
+// This report is never used to calculate boss damage or award eligibility.
+func ggoBossRequestedForfeit(request *pb.CSSidePveBossFightEnd, maxRound int32) bool {
+	if request == nil || request.GetResult() != 0 || request.OptRecord == nil || maxRound < 1 {
+		return false
+	}
+	record := request.GetOptRecord()
+	round, hp := record.GetFinalRoundNum(), record.GetAttackerTotalLeftHp()
+	return round >= 1 && round <= maxRound+1 && combatFinite(hp) && hp == 0
 }
 
 func ggoBossRecordedEnd(tx *gorm.DB, id int64, request *pb.CSSidePveBossFightEnd) (*pb.SCSidePveBossFightEnd, bool, error) {
@@ -376,59 +399,65 @@ func ggoBossRecordedEnd(tx *gorm.DB, id int64, request *pb.CSSidePveBossFightEnd
 // ggoBossLeaderDamage validates every frozen enemy and its terminal HP, while
 // only the leader contributes to the line's shared event health.
 func ggoBossLeaderDamage(fight *model.FieldFight, input *model.FrozenBattleInput, terminal *model.CombatFinalHPOutcome) (float64, error) {
+	damage, err := ggoBossActorDamage(fight, input, terminal)
+	if err != nil {
+		return 0, err
+	}
+	return damage[ggoBossGUID(fight.GGOBoss.EventID)], nil
+}
+
+func ggoBossActorDamage(fight *model.FieldFight, input *model.FrozenBattleInput, terminal *model.CombatFinalHPOutcome) (map[string]float64, error) {
 	if fight == nil || fight.GGOBoss == nil || fight.GGOBoss.EventID == "" || input == nil || input.Monster == nil || terminal == nil {
-		return 0, errors.New("沙漠首领冻结战斗无效")
+		return nil, errors.New("沙漠首领冻结战斗无效")
 	}
 	leaderGUID := ggoBossGUID(fight.GGOBoss.EventID)
 	if fight.BossLeaderGUID != "" && fight.BossLeaderGUID != leaderGUID {
-		return 0, errors.New("沙漠首领冻结标识无效")
+		return nil, errors.New("沙漠首领冻结标识无效")
 	}
 	formation := input.Monster.GetFormation()
 	if len(formation) != 1 && len(formation) != 4 {
-		return 0, errors.New("沙漠首领冻结阵容无效")
+		return nil, errors.New("沙漠首领冻结阵容无效")
 	}
 	actors := make(map[string]*pb.BattleHero, len(formation))
 	for _, actor := range formation {
 		if actor == nil || actor.GetGuid() == "" || actor.Prop == nil || actor.Inst == nil || actors[actor.GetGuid()] != nil {
-			return 0, errors.New("沙漠首领冻结成员无效")
+			return nil, errors.New("沙漠首领冻结成员无效")
 		}
 		maxHP, currentHP := actor.Prop.GetHp(), actor.Inst.GetCurHp()
 		if !combatFinite(maxHP) || maxHP <= 0 || !combatFinite(currentHP) || currentHP < 0 || currentHP > maxHP {
-			return 0, errors.New("沙漠首领冻结血量无效")
+			return nil, errors.New("沙漠首领冻结血量无效")
 		}
 		actors[actor.GetGuid()] = actor
 	}
 	leader := actors[leaderGUID]
 	if leader == nil || leader.Inst.GetCurHp() <= 0 {
-		return 0, errors.New("沙漠首领冻结主怪无效")
+		return nil, errors.New("沙漠首领冻结主怪无效")
 	}
 	seen := make(map[string]bool, len(actors))
-	var leaderFinal float64
+	damage := make(map[string]float64, len(actors))
 	for _, final := range terminal.FinalActors {
 		if final.Camp == 0 {
 			continue
 		}
 		if final.Camp != 1 {
-			return 0, errors.New("沙漠首领终局阵营无效")
+			return nil, errors.New("沙漠首领终局阵营无效")
 		}
 		actor := actors[final.GUID]
 		if actor == nil || seen[final.GUID] || !combatFinite(final.MaxHP) || final.MaxHP != actor.Prop.GetHp() ||
 			!combatFinite(final.CurrentHP) || final.CurrentHP < 0 || final.CurrentHP > final.MaxHP {
-			return 0, errors.New("沙漠首领终局敌方成员无效")
+			return nil, errors.New("沙漠首领终局敌方成员无效")
 		}
 		seen[final.GUID] = true
-		if final.GUID == leaderGUID {
-			leaderFinal = final.CurrentHP
-		}
+		damage[final.GUID] = math.Max(0, actor.Inst.GetCurHp()-final.CurrentHP)
 	}
 	if len(seen) != len(actors) {
-		return 0, errors.New("沙漠首领终局敌方成员缺失")
+		return nil, errors.New("沙漠首领终局敌方成员缺失")
 	}
-	return math.Max(0, leader.Inst.GetCurHp()-leaderFinal), nil
+	return damage, nil
 }
 
 func (s *GameService) ggoBossApplyDamageLocked(tx *gorm.DB, id int64, fight *model.FieldFight, input *model.FrozenBattleInput, terminal *model.CombatFinalHPOutcome, now int64) (*pb.SideBoss, float64, error) {
-	damage, err := ggoBossLeaderDamage(fight, input, terminal)
+	actorDamage, err := ggoBossActorDamage(fight, input, terminal)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -460,26 +489,52 @@ func (s *GameService) ggoBossApplyDamageLocked(tx *gorm.DB, id int64, fight *mod
 		return shared, 0, nil
 	}
 	key := ggoBossGUID(event.ID)
-	damage = math.Min(hp[key], damage)
+	if event.Boss.HeroID == "monster_047" && len(hp) == 1 {
+		// Missing keys are an old event without stored attendant history.
+		for _, pose := range []string{"3", "7", "9"} {
+			hp[key+"-"+pose] = 573045
+		}
+	}
+	for guid := range actorDamage {
+		if _, ok := hp[guid]; !ok {
+			return nil, 0, errors.New("沙漠首领冻结成员与共享事件不匹配")
+		}
+	}
+	changed := false
+	var damage float64
+	for guid, dealt := range actorDamage {
+		applied := math.Min(hp[guid], dealt)
+		if !combatFinite(applied) {
+			return nil, 0, errors.New("首领有效伤害无效")
+		}
+		if applied > 0 {
+			hp[guid] -= applied
+			changed = true
+		}
+		if guid == key {
+			damage = applied
+		}
+	}
 	if !combatFinite(damage) {
 		return nil, 0, errors.New("首领有效伤害无效")
 	}
-	if damage <= 0 {
+	if !changed {
 		return shared, 0, nil
 	}
-	hp[key] = math.Max(0, hp[key]-damage)
 	shared.CurHp = proto.Float64(hp[key] / float64(event.Boss.HP))
-	var member db.FieldBossContribution73
-	if err = tx.Where("server_id=? AND spawn_uuid=? AND player_id=?", s.OriginalServerID(), event.ID, id).Take(&member).Error; err != nil {
-		return nil, 0, err
+	if damage > 0 {
+		var member db.FieldBossContribution73
+		if err = tx.Where("server_id=? AND spawn_uuid=? AND player_id=?", s.OriginalServerID(), event.ID, id).Take(&member).Error; err != nil {
+			return nil, 0, err
+		}
+		if member.Frozen || !combatFinite(member.Damage) || member.Damage < 0 || member.Damage > float64(event.Boss.HP)-damage {
+			return nil, 0, errors.New("首领贡献状态无效")
+		}
+		if err = tx.Model(&member).Update("damage", member.Damage+damage).Error; err != nil {
+			return nil, 0, err
+		}
 	}
-	if member.Frozen || !combatFinite(member.Damage) || member.Damage < 0 || member.Damage > float64(event.Boss.HP)-damage {
-		return nil, 0, errors.New("首领贡献状态无效")
-	}
-	if err = tx.Model(&member).Update("damage", member.Damage+damage).Error; err != nil {
-		return nil, 0, err
-	}
-	if hp[key] == 0 {
+	if hp[key] == 0 && damage > 0 {
 		row.KillerID = id
 		if now > math.MaxInt64-constUtil.GGOFieldBossRespawnMS {
 			return nil, 0, errors.New("沙漠首领刷新时间溢出")
@@ -490,7 +545,7 @@ func (s *GameService) ggoBossApplyDamageLocked(tx *gorm.DB, id int64, fight *mod
 			return nil, 0, err
 		}
 	}
-	if err = saveSharedFieldBoss55(tx, &row, shared, hp); err != nil {
+	if err = saveGGOBossState(tx, &row, event, shared, hp); err != nil {
 		return nil, 0, err
 	}
 	return shared, damage, nil
@@ -568,13 +623,19 @@ func (s *GameService) ggoBossFightEnd(ctx context.Context, id int64, request *pb
 		}
 		changed = damage > 0
 		var lost [6]int64
-		// Reaching the ten-own-turn limit with surviving heroes is a contribution,
-		// not a player death. Only an actually defeated party loses carried chips.
-		if side.GetCurHp() <= 0 {
+		// A surviving round-limit outcome keeps its contribution without death.
+		// A client-reported zero-HP loss can also request a self-funded forfeit,
+		// while damage and rewards remain derived from the server terminal.
+		forfeit := side.GetCurHp() > 0 && ggoBossRequestedForfeit(request, input.MaxRound)
+		defeated := side.GetCurHp() <= 0 || forfeit
+		if defeated {
 			lost, err = s.ggoPVEDeathLocked(tx, id, player, g, &model.GGOFieldMonsterFight{FightID: request.GetFightId(), EconomyVersion: frozen.EconomyVersion, ExchangeValues: frozen.ExchangeValues, ProtectedChips: frozen.ProtectedChips, DeathLossPercent: frozen.DeathLossPercent, SafeReturn: frozen.SafeReturn, HealRatio: frozen.HealRatio}, now)
 			if err != nil {
 				return err
 			}
+		}
+		if forfeit {
+			expected = 0
 		}
 		result = &pb.SCSidePveBossFightEnd{Get: &pb.ResultObject{}, FightResult: proto.Int32(expected), Code: proto.Int32(1), Anger: proto.Float64(side.GetAnger()), State: side.State, Monster: boss}
 		for _, part := range side.GetBattlePosHps() {
@@ -603,7 +664,16 @@ func (s *GameService) ggoBossFightEnd(ctx context.Context, id int64, request *pb
 		if g.GGOField != nil {
 			revision = g.GGOField.Revision
 		}
-		receipt := model.GGOFieldBossBattleReceipt{State: "settled", FightID: request.GetFightId(), EventID: frozen.EventID, InputHash: frozen.InputHash, EndRequestHash: hash, NativeEnd: native, Damage: damage, Lost: lost, TerminalRevision: revision}
+		receipt := model.GGOFieldBossBattleReceipt{State: "settled", FightID: request.GetFightId(), EventID: frozen.EventID, InputHash: frozen.InputHash, EndRequestHash: hash, NativeEnd: native, Damage: damage, Lost: lost, TerminalRevision: revision, Defeated: defeated, Forfeit: forfeit}
+		if defeated {
+			if g.Position == nil || g.Position.Current == nil || g.GGOField == nil || g.GGOField.PositionRevision < 1 {
+				return errors.New("沙漠死亡返回位置缺失")
+			}
+			point := g.Position.Current
+			x, y, z := float64(point.GetX()), float64(point.GetY()), float64(point.GetZ())
+			receipt.SafeReturn = &model.AdminFieldGGOPosition{X: &x, Y: &y, Z: &z}
+			receipt.PositionRevision = g.GGOField.PositionRevision
+		}
 		key := request.GetFightId()
 		if err = ggoSaveReceipt(tx, id, ggoSystemReceiptID("boss-fight", key), constUtil.GGOFieldBossFightOperation, hash, frozen.EconomyVersion, &key, [6]int64{}, 0, now, receipt); err != nil {
 			return err

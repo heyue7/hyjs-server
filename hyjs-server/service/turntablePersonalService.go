@@ -11,8 +11,27 @@ import (
 	"hyjs-server/constUtil"
 	"hyjs-server/db"
 	pb "hyjs-server/model/protocol"
+	"strings"
 	"time"
 )
+
+// growth74PersonalTurntableRewards projects the corrected single-gem award on
+// frozen personal pools without rewriting their inventory or historical receipts.
+func growth74PersonalTurntableRewards(cfg *db.GameplayPool, rewards []db.GameplayPoolReward) error {
+	if cfg == nil || cfg.Source != "成长投放V12 / 2026-10-26" || !strings.HasPrefix(cfg.ID, "admin_turntable_character_") {
+		return nil
+	}
+	for i := range rewards {
+		if rewards[i].ID != 1 || rewards[i].ResourceID != "MineItem_079" {
+			continue
+		}
+		if rewards[i].Stock != 4 {
+			return errors.New("成长投放个人转盘七彩宝石库存配置无效")
+		}
+		rewards[i].Amount = 1
+	}
+	return nil
+}
 
 func turntablePersonalOwner(tx *gorm.DB) int64 {
 	id, _ := tx.Statement.Context.Value(constUtil.PersonalTurntableOwnerKey).(int64)

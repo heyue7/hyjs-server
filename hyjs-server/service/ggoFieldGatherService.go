@@ -128,6 +128,20 @@ func ggoStartHash(req model.GGOFieldGatherStartRequest) string {
 	return p6Digest(raw)
 }
 
+func ggoGatherRequirementError(kind string, requiredLevel int64, level int32, requiredFatigue int64, fatigue int32) error {
+	if int64(level) < requiredLevel {
+		name := "冶炼"
+		if kind == "fish" {
+			name = "料理"
+		}
+		return ggoFieldError(constUtil.GGOFieldInsufficientLife, fmt.Sprintf("需要%s等级%d，当前等级%d", name, requiredLevel, level))
+	}
+	if int64(fatigue) < requiredFatigue {
+		return ggoFieldError(constUtil.GGOFieldInsufficientLife, fmt.Sprintf("疲劳不足，当前%d，需要%d", fatigue, requiredFatigue))
+	}
+	return nil
+}
+
 // GGOFieldGatherStart freezes the result, reserves one public point and records
 // its UUID under the same profile-then-line transaction.
 func (s *GameService) GGOFieldGatherStart(ctx context.Context, req model.GGOFieldGatherStartRequest, session []byte) (*model.GGOFieldGatherStartResponse, error) {
@@ -219,8 +233,8 @@ func (s *GameService) GGOFieldGatherStart(ctx context.Context, req model.GGOFiel
 		if err != nil {
 			return err
 		}
-		if int64(level) < node.Level || int64(a.Game.Field.Side.GetTiredness()) < cfg.Runtime.Resource.Fatigue {
-			return ggoFieldError(constUtil.GGOFieldInsufficientLife, "生活技能等级或疲劳不足")
+		if err := ggoGatherRequirementError(node.Kind, node.Level, level, cfg.Runtime.Resource.Fatigue, a.Game.Field.Side.GetTiredness()); err != nil {
+			return err
 		}
 		token, err := fieldToken()
 		if err != nil {

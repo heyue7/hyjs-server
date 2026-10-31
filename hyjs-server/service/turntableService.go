@@ -250,6 +250,9 @@ func (s *GameService) turntableConfigForPool(tx *gorm.DB, key string) (*db.Gamep
 	if err != nil {
 		return nil, nil, nil, err
 	}
+	if err = growth74PersonalTurntableRewards(cfg, rewards); err != nil {
+		return nil, nil, nil, err
+	}
 	if err = tx.Where("pool_id = ?", cfg.ID).First(&rules).Error; err != nil {
 		return nil, nil, nil, err
 	}

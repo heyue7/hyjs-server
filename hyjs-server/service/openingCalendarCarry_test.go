@@ -149,6 +149,9 @@ func TestOpeningCalendarCarryLoginOldOneAndRollback(t *testing.T) {
 	if values["login:2026-10-03"] != 0 || values["login:2026-10-05"] != 1 {
 		t.Fatal(values)
 	}
+	if got := openServerPeriodCounter(cfg, values, constUtil.OpenServerActivityCounterLogin, false); got != 1 {
+		t.Fatal("carried real login did not qualify period", got)
+	}
 	now := time.UnixMilli(after.StartAt + 1000)
 	rollback := errors.New("later failure")
 	err := db.GetIns().Transaction(func(tx *gorm.DB) error {

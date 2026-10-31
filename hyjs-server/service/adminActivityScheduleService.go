@@ -153,6 +153,14 @@ func (s *GameService) reconcileAdminActivityCatalogue(ctx context.Context, sourc
 // Reads preserve the stored template, issued snapshot and optimistic version.
 func adminActivityPresentationForm(form model.AdminActivityForm) model.AdminActivityForm {
 	form = adminActivityCanonicalForm(form)
+	if form.Mode == "turntable" && form.Source == "成长投放V12 / 2026-10-26" {
+		form.Prizes = append([]model.AdminActivityPrize(nil), form.Prizes...)
+		for i := range form.Prizes {
+			if form.Prizes[i].ID == 1 && form.Prizes[i].ResourceID == "MineItem_079" && form.Prizes[i].Stock == 4 {
+				form.Prizes[i].Amount = 1
+			}
+		}
+	}
 	if form.Mode == "fortune-cat" {
 		form.Milestones = append([]model.AdminActivityMilestone(nil), form.Milestones...)
 		for i, milestone := range form.Milestones {

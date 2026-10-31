@@ -152,9 +152,10 @@ func TestOpeningHalfMonthPeriodFactsPaymentsAndRepeat(t *testing.T) {
 			t.Fatal("period facts failed on a different date", id, got)
 		}
 	}
-	// A first-week login remains attached to its original date.
-	if got := query(21); got.GetState() == 1 {
-		t.Fatal("first-week date policy expanded unintentionally", got)
+	// Day two was unlocked before this late role was created. Its real
+	// period login qualifies the gift in this occurrence only.
+	if got := query(21); got.GetState() != 1 {
+		t.Fatal("late role's earlier gift ignored the actual period login", got)
 	}
 	claim := &pb.CSGetOpenServerReward{ItemId: proto.Int32(153)}
 	firstReceipt, err := f.s.openServerActivityAt(bound, f.id, claim, 97001, LocalPlayNow(bound))
@@ -185,6 +186,13 @@ func TestOpeningHalfMonthPeriodFactsPaymentsAndRepeat(t *testing.T) {
 	}
 	if got := query(139); got.GetCurrentNum() != 0 || got.GetState() != 0 {
 		t.Fatal("previous period event leaked", got)
+	}
+	if got := query(21); got.GetState() != 0 {
+		t.Fatal("previous period login qualified new period", got)
+	}
+	event(constUtil.OpenServerActivityCounterLogin, 1)
+	if got := query(21); got.GetState() != 1 {
+		t.Fatal("new period actual login ignored", got)
 	}
 	pay("djsy.wuyou.andp0030")
 	if got := query(153); got.GetState() != 1 {

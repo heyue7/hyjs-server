@@ -60,16 +60,15 @@ func TestGGOBossFormation87OriginalRoster(t *testing.T) {
 			t.Fatal("original attendant baseline", pose, actor)
 		}
 	}
-	// Another accepted encounter restores attendants to full health while the
-	// leader starts at the independently supplied shared health.
-	actors[7].Inst.CurHp = proto.Float64(0)
-	again, err := s.ggoBossMonster(event, 300)
+	// The next encounter retains the same slots and their shared event health.
+	again, err := s.ggoBossMonsterWithHealth(event, 300, map[string]float64{ggoBossGUID(event.ID) + "-7": 0, ggoBossGUID(event.ID) + "-9": 100, ggoBossGUID(event.ID) + "-3": 573045})
 	if err != nil {
 		t.Fatal(err)
 	}
+	want := map[int32]float64{13: 300, 7: 0, 9: 100, 3: 573045}
 	for _, actor := range again.Formation {
-		if actor.GetPose() == 13 && actor.GetInst().GetCurHp() != 300 || actor.GetPose() != 13 && actor.GetInst().GetCurHp() != 573045 {
-			t.Fatal("encounter health isolation", actor)
+		if actor.GetInst().GetCurHp() != want[actor.GetPose()] {
+			t.Fatal("shared encounter health", actor)
 		}
 	}
 }
@@ -298,8 +297,15 @@ func TestGGOBossFormation87NativeStartEndAndColdReceipt(t *testing.T) {
 	if err = sharedFieldBoss55Query(db.GetIns(), f.s.OriginalServerID(), constUtil.GGOFieldScene, constUtil.GGOFieldBossPosition, event.Line).Take(&after).Error; err != nil {
 		t.Fatal(err)
 	}
-	_, _, hp, err := ggoBossDecode(&after)
-	if err != nil || !bytes.Equal(before.GGOEvent, after.GGOEvent) || hp[ggoBossGUID(event.ID)] != float64(event.Boss.HP)-wantDamage {
+	beforeEvent, _, _, err := ggoBossDecode(&before)
+	if err != nil {
+		t.Fatal(err)
+	}
+	afterEvent, _, hp, err := ggoBossDecode(&after)
+	if err == nil {
+		beforeEvent.AttendantHP, afterEvent.AttendantHP = nil, nil
+	}
+	if err != nil || !reflect.DeepEqual(beforeEvent, afterEvent) || hp[ggoBossGUID(event.ID)] != float64(event.Boss.HP)-wantDamage {
 		t.Fatal("shared leader HP and frozen event", hp, wantDamage, err)
 	}
 	var member db.FieldBossContribution73
@@ -567,7 +573,7 @@ func TestGGOBossFormation87SharedLastHitRollbackAndLines(t *testing.T) {
 		}
 		terminal.FinalActors = append(terminal.FinalActors, model.CombatFinalActorHP{Camp: 1, GUID: actor.GetGuid(), CurrentHP: hp, MaxHP: actor.GetProp().GetHp()})
 	}
-	// Attendant damage does not change the shared HP or the contribution ledger.
+	// Attendant damage does not change leader HP or the contribution ledger.
 	if err = db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		_, damage, err := f.s.ggoBossApplyDamageLocked(tx, f.id, fight, input, terminal, time.Now().UnixMilli())
 		if err != nil || damage != 0 {

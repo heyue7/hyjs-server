@@ -40,13 +40,21 @@ type GGOFieldBossActiveResponse struct {
 
 // GGOFieldBossBattleReceipt preserves the exact native end reply and input binding.
 type GGOFieldBossBattleReceipt struct {
-	State            string   `json:"status"` // unknown, active or settled.
-	FightID          string   `json:"fightId"`
-	EventID          string   `json:"eventId,omitempty"`
-	InputHash        string   `json:"inputHash,omitempty"`
-	EndRequestHash   string   `json:"endRequestHash,omitempty"`
-	NativeEnd        []byte   `json:"nativeEnd,omitempty"` // Original 30086 Protobuf bytes, base64 in JSON.
-	Damage           float64  `json:"damage"`
-	Lost             [6]int64 `json:"lost"`
-	TerminalRevision int64    `json:"terminalRevision"`
+	State            string                   `json:"status"` // unknown, active or settled.
+	FightID          string                   `json:"fightId"`
+	EventID          string                   `json:"eventId,omitempty"`
+	InputHash        string                   `json:"inputHash,omitempty"`
+	EndRequestHash   string                   `json:"endRequestHash,omitempty"`
+	NativeEnd        []byte                   `json:"nativeEnd,omitempty"` // Original 30086 Protobuf bytes, base64 in JSON.
+	Damage           float64                  `json:"damage"`
+	Lost             [6]int64                 `json:"lost"`
+	TerminalRevision int64                    `json:"terminalRevision"`
+	Defeated         bool                     `json:"defeated"`
+	Forfeit          bool                     `json:"forfeit,omitempty"`
+	SafeReturn       *AdminFieldGGOPosition   `json:"safeReturn,omitempty"`
+	PositionRevision int64                    `json:"positionRevision,omitempty"`
+	RewardStatus     string                   `json:"rewardStatus,omitempty"`
+	RewardResources  []GGOFieldResourceAmount `json:"rewardResources,omitempty"`
+	RewardChips      *[6]int64                `json:"rewardChips,omitempty"`
+	RewardCredit     int64                    `json:"rewardCredit,omitempty"`
 }

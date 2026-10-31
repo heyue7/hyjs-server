@@ -53,7 +53,11 @@ func TestDailyCopyNativeDefaultZeroFieldsSettleAndReplay(t *testing.T) {
 				t.Fatal(err)
 			}
 			player, _, err := decodeProfile(&row)
-			if err != nil || player.GetCoin() != 0 || player.GetStamina() != 190 {
+			wantStamina := int32(200)
+			if win {
+				wantStamina = 190
+			}
+			if err != nil || player.GetCoin() != 0 || player.GetStamina() != wantStamina {
 				t.Fatal("settlement/replay changed wallet or recharged entry", player, err)
 			}
 		})

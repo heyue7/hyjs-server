@@ -98,6 +98,7 @@ namespace HYJS.DesertV4
         public static void TcpConnecting() { ChipNames.ReleaseScene(); PositionSync.ConnectionStarting(); TeamMap86.ConnectionStarting(); BattleRecovery.BeforeTcpLogin(); PvpBridge.ConnectionStarting(); }
         public static bool TransferSend(int opcode,object value)
         {
+            if (opcode==30026 && BattleRecovery.ReturningAfterDefeat) return true;
             if (PvpBridge.Capture(opcode,value)) return true;
             if (Target() && (opcode==30032 || opcode==30061) && PvpBridge.HasPending())
             { BoxManager.CreatePopupTextBox("上次挑战仍在确认",0f); return true; }
@@ -271,6 +272,7 @@ namespace HYJS.DesertV4
             {
                 try
                 {
+                    if (BattleRecovery.ReturningAfterDefeat) return false;
                     FieldWire.Session who;
                     if (singleton==null || singleton.room==null || singleton.room!=RoomManager.currentRoom || singleton.actor==null ||
                         !FieldWire.Current(out who) || !Same(singleton.session,who) || loadedRoom!=singleton.room || positionRoom!=singleton.room ||

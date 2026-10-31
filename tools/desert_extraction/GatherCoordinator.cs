@@ -79,7 +79,7 @@ namespace HYJS.DesertV4
                     try { GatherJournalStore.ClearFinished(session,attempt); attempt=null; }
                     catch (Exception) { view.Notice("采集记录清理失败，请稍候"); return; }
                     if (result.code==7204) view.AskToReleaseProtection();
-                    else view.Notice(Error(result.code));
+                    else view.Notice(Error(result.code,result.message));
                     view.RequestSnapshot(); return;
                 }
                 attempt.Cancel(); Save(); WaitForRetry(); view.Notice("采集结果确认中"); return;
@@ -223,12 +223,12 @@ namespace HYJS.DesertV4
             GatherJournalStore.ClearFinished(session,attempt); attempt=null; frameVerified=false;
             view.RequestSnapshot();
         }
-        static string Error(long code)
+        internal static string Error(long code,string message)
         {
             if (code==7201) return "沙漠采集暂未开放";
             if (code==7202) return "请靠近可采集位置";
             if (code==7203) return "资源正在被使用";
-            if (code==7205) return "技能或疲劳不足";
+            if (code==7205) return String.IsNullOrEmpty(message) ? "技能或疲劳不足" : message;
             if (code==7206) return "资源已刷新，请重新选择";
             return "采集未能开始，请稍后重试";
         }

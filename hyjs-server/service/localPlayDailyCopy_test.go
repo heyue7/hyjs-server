@@ -13,8 +13,8 @@ import (
 	pb "hyjs-server/model/protocol"
 )
 
-// 原资源副本16类/48档按个人星期与原日限投影。战斗使用有限协议
-// 败场合同，只验证日额、续接和所有权，不授胜利或资源、不扩P6证明。
+// 原资源副本16类/48档按个人星期与原日限投影。结算使用有限协议合同，
+// 验证胜负日额、续接和所有权，不扩展为权威战斗模拟证明。
 func TestLocalPlayDailyCopyWeekQuotaOwnershipAndCold(t *testing.T) {
 	f, id, owner := localClockFixture(t)
 	if err := f.s.InitializeDailyCopy(f.ctx); err != nil {
@@ -74,7 +74,9 @@ func TestLocalPlayDailyCopyWeekQuotaOwnershipAndCold(t *testing.T) {
 		}
 	}
 	first := start(ctx, "1", 310001)
-	lose(ctx, first, "1")
+	if _, err := f.s.dailyCopyAt(ctx, id, dailyCopyWin(first, "1"), 0, real); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := f.s.LocalPlayTimeChange(ctx, id, "nextDay", "daily-tuesday"); err != nil {
 		t.Fatal(err)
 	}
@@ -102,12 +104,16 @@ func TestLocalPlayDailyCopyWeekQuotaOwnershipAndCold(t *testing.T) {
 	}
 	lose(ctx, resumed, treasureChapter)
 	var states []db.DailyCopyState
-	if err := db.GetIns().Where("player_id=? AND used>0", id).Find(&states).Error; err != nil || len(states) != 2 {
-		t.Fatal("date-scoped consumed rows", err)
+	if err := db.GetIns().Where("player_id=?", id).Find(&states).Error; err != nil || len(states) != 2 {
+		t.Fatal("date-scoped quota rows", err)
 	}
 	for _, state := range states {
-		if state.Used != 1 || state.Limit != 1 {
-			t.Fatal("date revisit reset a consumed quota", state)
+		wantUsed := int32(0)
+		if state.Type == "HeroExp" {
+			wantUsed = 1
+		}
+		if state.Used != wantUsed || state.Limit != 1 {
+			t.Fatal("victory and loss quota differed", state)
 		}
 	}
 	if err := f.s.ensureNoActiveDailyCopy(db.GetIns().WithContext(ctx), id, real); err != nil {

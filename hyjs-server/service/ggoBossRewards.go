@@ -239,6 +239,104 @@ func (s *GameService) ggoBossFreezeAwardsLocked(tx *gorm.DB, event *ggoBossEvent
 	return nil
 }
 
+// Project the event's durable award state onto a fight receipt. The native
+// fight and death receipt stays immutable; later boss death/claim changes only
+// this read-time projection and never grants a reward.
+func (s *GameService) ggoBossRewardStatusLocked(tx *gorm.DB, playerID int64, out *model.GGOFieldBossBattleReceipt) error {
+	if out == nil || out.EventID == "" {
+		return errors.New("首领回执事件缺失")
+	}
+	out.RewardStatus, out.RewardResources, out.RewardChips, out.RewardCredit = "", nil, nil, 0
+	var member db.FieldBossContribution73
+	err := tx.Where("server_id=? AND spawn_uuid=? AND player_id=?", s.OriginalServerID(), out.EventID, playerID).Take(&member).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		out.RewardStatus = "no_contribution"
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if !combatFinite(member.Damage) || member.Damage < 0 {
+		return errors.New("首领贡献状态无效")
+	}
+	if member.Damage == 0 {
+		out.RewardStatus = "no_contribution"
+		return nil
+	}
+	if !member.Frozen {
+		out.RewardStatus = "pending_boss_defeat"
+		return nil
+	}
+	if !member.Claimed {
+		out.RewardStatus = "pending_delivery"
+		return nil
+	}
+	if member.Rank == 0 {
+		out.RewardStatus = "daily_limit"
+		return nil
+	}
+	if member.Rank < 0 {
+		return errors.New("首领奖励排名无效")
+	}
+	resources := map[string]int64{}
+	if err := ggoBossAddContent(resources, member.Reward); err != nil {
+		return err
+	}
+	keys := make([]string, 0, len(resources))
+	for key, amount := range resources {
+		if amount > 0 {
+			keys = append(keys, key)
+		}
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		out.RewardResources = append(out.RewardResources, model.GGOFieldResourceAmount{ID: key, Amount: resources[key]})
+	}
+	if !member.GGOChipsClaimed {
+		out.RewardStatus = "pending_chip_delivery"
+		return nil
+	}
+	var delivery db.GGOFieldReceipt
+	err = tx.Where("player_id=? AND operation=? AND business_key=?", playerID, constUtil.GGOFieldBossAwardOperation, out.EventID).Take(&delivery).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		// An award from a prior adventure may have been explicitly converted
+		// to credit; those chips were never added to the current terminal.
+		err = tx.Where("player_id=? AND operation=? AND business_key=?", playerID, constUtil.GGOFieldBossLateOperation, out.EventID).Take(&delivery).Error
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			out.RewardStatus = "pending_chip_delivery"
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		var late struct {
+			EventID     string `json:"eventId"`
+			CreditAdded int64  `json:"creditAdded"`
+		}
+		if json.Unmarshal(delivery.Response, &late) != nil || late.EventID != out.EventID || late.CreditAdded < 0 {
+			return errors.New("沙漠首领信用到账回执无效")
+		}
+		out.RewardCredit = late.CreditAdded
+		out.RewardStatus = "delivered"
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	var award ggoBossAward
+	if json.Unmarshal(delivery.Response, &award) != nil || award.EconomyVersion == "" {
+		return errors.New("沙漠首领芯片到账回执无效")
+	}
+	for _, amount := range award.Chips {
+		if amount < 0 {
+			return errors.New("沙漠首领芯片到账数量无效")
+		}
+	}
+	out.RewardChips = &award.Chips
+	out.RewardStatus = "delivered"
+	return nil
+}
+
 func ggoBossDeliverChipsLocked(tx *gorm.DB, id int64, g *model.GameState, row *db.FieldBossContribution73, eligible bool) error {
 	if len(row.GGOChips) == 0 || row.GGOChipsClaimed {
 		return nil

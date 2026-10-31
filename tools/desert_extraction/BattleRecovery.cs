@@ -4,6 +4,8 @@ using System.Diagnostics;
 using System.Reflection;
 using LitJson;
 using ProtoBuf.Message;
+using Room;
+using UI;
 using UnityEngine;
 
 namespace HYJS.DesertV4
@@ -31,6 +33,82 @@ namespace HYJS.DesertV4
         int resumedType;
         static MonsterRewardView monsterRewardView;
         static FieldWire.Session monsterRewardOwner;
+        FieldWire.Session returnOwner;
+        Vector3 returnPosition;
+        bool returnPending,returnRequest;
+        long returnLease,returnRetry;
+        long returnRevision;
+        int returnEpoch;
+        public static bool ReturningAfterDefeat { get { return singleton!=null && singleton.returnPending; } }
+        void ShowBossReceiptStatus(JsonData receipt)
+        {
+            string status=Optional(receipt,"rewardStatus"),text="";
+            if (status=="pending_boss_defeat") text="首领贡献已记录，击败首领后统一结算奖励";
+            else if (status=="delivered") text="首领奖励已到账";
+            else if (status=="daily_limit") text="今日首领奖励次数已用完";
+            else if (status=="pending_delivery") text="首领已被击败，奖励正在结算";
+            else if (status=="pending_chip_delivery") text="资源奖励已到账，芯片等待结算";
+            else if (status=="no_contribution") text="本场未造成有效伤害，未获得首领奖励";
+            if (text.Length>0) StartCoroutine(BossNotice(text,session));
+        }
+        IEnumerator BossNotice(string text,FieldWire.Session expected)
+        {
+            yield return new WaitForSeconds(1f);
+            FieldWire.Session live;
+            if (FieldWire.Current(out live) && SameSession(expected,live)) Notice(text);
+        }
+        void ArmDefeatReturn(FieldWire.Session owner,JsonData receipt)
+        {
+            if (Optional(receipt,"defeated")!="True" && Optional(receipt,"defeated")!="true") return;
+            JsonData p=receipt["safeReturn"];
+            returnPosition=new Vector3(Single.Parse(p["x"].ToString(),System.Globalization.CultureInfo.InvariantCulture),
+                Single.Parse(p["y"].ToString(),System.Globalization.CultureInfo.InvariantCulture),
+                Single.Parse(p["z"].ToString(),System.Globalization.CultureInfo.InvariantCulture));
+            returnOwner=owner; returnPending=true; returnRequest=false; returnRetry=0;
+            returnRevision=Int64.Parse(receipt["positionRevision"].ToString(),System.Globalization.CultureInfo.InvariantCulture);
+            UnityEngine.Debug.Log("HYJS boss defeat: waiting for safe-area position");
+        }
+        void TickDefeatReturn()
+        {
+            if (!returnPending) return;
+            if (returnEpoch!=PositionSync.ConnectionEpoch) { returnRequest=false; returnEpoch=PositionSync.ConnectionEpoch; }
+            FieldWire.Session who;
+            if (!FieldWire.Current(out who)) return;
+            if (!SameSession(who,returnOwner)) { PositionSync.ReleaseIfOwned(returnLease); returnPending=returnRequest=false; returnLease=0; return; }
+            RoomBase room=RoomManager.currentRoom;
+            if (!(room is RoomField) || PageManager.instance==null || !(PageManager.instance.currentPage is UIFieldRunMap) || room.charactorManager==null || returnRequest || Stopwatch.GetTimestamp()<returnRetry) return;
+            RoomCharactor actor=room.charactorManager.GetSelfCharactor();
+            if (actor==null || !(room.netManager is RoomNetField)) return;
+            if (!PositionSync.OwnsLock(returnLease) && !PositionSync.LockAfterTeleport(actor,out returnLease)) return;
+            returnRetry=Stopwatch.GetTimestamp()+2L*Stopwatch.Frequency;
+            try
+            {
+                returnRequest=true; FieldWire.Session expected=returnOwner; long lease=returnLease;
+                PositionSync.RequestCurrent(room.netManager,delegate(Vector3 observed)
+                {
+                    if (!returnPending || !SameSession(expected,returnOwner) || !PositionSync.OwnsLock(lease)) return;
+                    if ((observed-returnPosition).sqrMagnitude>.01f) { returnRequest=false; return; }
+                    wire.PositionStatus(expected,delegate(FieldWireResult result)
+                    {
+                        if (!returnPending || !SameSession(expected,returnOwner) || !PositionSync.OwnsLock(lease)) return;
+                        returnRequest=false;
+                        try
+                        {
+                            if (result==null || result.uncertain || result.code!=0 || result.data==null) return;
+                            JsonData d=result.data,p=d["position"];
+                            long version=Int64.Parse(d["positionRevision"].ToString()),confirmed=Int64.Parse(d["confirmedRevision"].ToString());
+                            Vector3 position=new Vector3(Single.Parse(p["x"].ToString(),System.Globalization.CultureInfo.InvariantCulture),Single.Parse(p["y"].ToString(),System.Globalization.CultureInfo.InvariantCulture),Single.Parse(p["z"].ToString(),System.Globalization.CultureInfo.InvariantCulture));
+                            if ((string)d["scene"]!="field_003" || (bool)d["loading"] || version<returnRevision || confirmed!=version || (position-returnPosition).sqrMagnitude>.01f) return;
+                            PositionSync.ReleaseIfOwned(lease); returnLease=0; returnPending=false;
+                            UnityEngine.Debug.Log("HYJS boss defeat: safe-area position confirmed");
+                            FieldRuntime.Require().RequestSnapshot();
+                        }
+                        catch (Exception) { }
+                    });
+                });
+            }
+            catch (Exception) { returnRequest=false; }
+        }
         static bool SameActor(FieldWire.Session a,FieldWire.Session b)
         { return a!=null && b!=null && a.playerId==b.playerId && a.origin==b.origin; }
         static bool SameSession(FieldWire.Session a,FieldWire.Session b)
@@ -214,6 +292,7 @@ namespace HYJS.DesertV4
         void Update()
         {
             if (!AdoptSession()) return;
+            TickDefeatReturn();
             if (unrecordedMessage!=null && Stopwatch.GetTimestamp()>=nextQuery) TryCapture();
             if (!NetAPI.SocketIsConnected()) loginReady=false;
             if (query || Stopwatch.GetTimestamp()<nextQuery || !loginReady || !NetAPI.SocketIsConnected()) return;
@@ -307,6 +386,7 @@ namespace HYJS.DesertV4
                             try { monsterRewardView=MonsterRewardView.FromReceipt(expected.fightId,d); monsterRewardOwner=owner; }
                             catch (Exception) { }
                         }
+                        if (type==12) ArmDefeatReturn(owner,d);
                         if (CurrentBattleMatches(type,expected.fightId))
                         {
                             if (nativeOwner==null || (type==6 && !(nativeOwner is Battle.FieldPVEBattleOver)) ||
@@ -323,6 +403,7 @@ namespace HYJS.DesertV4
                         FightEndJournal.Clear(owner,pending);
                         pending=null; nativeOwner=null; liveFightId=""; liveType=0; inputHash=""; ResetWarning();
                         resumedFight=resumedHash=""; resumedType=0;
+                        if (type==12) ShowBossReceiptStatus(d);
                         FieldRuntime.Require().RequestSnapshot();
                     }
                     catch (Exception) { Warning("战斗结果待确认"); }

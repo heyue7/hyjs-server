@@ -369,9 +369,12 @@ func (s *GameService) DispatchP7Awake(ctx context.Context, id int64, request pro
 	case *pb.CSAwakeCopyData:
 		reply, err := s.p7AwakeCatalogue(ctx, id, time.Now())
 		return reply, true, err
-	case *pb.CSEnterAwakeCopy, *pb.CSAwakeCopyOpenBox, *pb.CSAwakeCopySettle:
+	case *pb.CSEnterAwakeCopy, *pb.CSAwakeCopyOpenBox, *pb.CSAwakeCopySettle, *pb.CSAwakeUseItem:
 		if _, settle := request.(*pb.CSAwakeCopySettle); settle && stamp <= 0 {
 			return nil, true, errors.New("觉醒结算时间标识无效")
+		}
+		if _, use := request.(*pb.CSAwakeUseItem); use && stamp <= 0 {
+			return nil, true, errors.New("觉醒道具时间标识无效")
 		}
 		reply, err := s.p7AwakeExplore(ctx, id, request, time.Now(), stamp)
 		return reply, true, err
@@ -381,7 +384,7 @@ func (s *GameService) DispatchP7Awake(ctx context.Context, id int64, request pro
 	case *pb.CSAwakeCopyFightEnd:
 		reply, err := s.p7AwakeFightEnd(ctx, id, request.(*pb.CSAwakeCopyFightEnd), time.Now())
 		return reply, true, err
-	case *pb.CSAwakeUseItem, *pb.CSAwakeRevice, *pb.CSAwakeFightRecords, *pb.CSAwakeFightRecordReplay:
+	case *pb.CSAwakeRevice, *pb.CSAwakeFightRecords, *pb.CSAwakeFightRecordReplay:
 		// 改运营SQL也不能制造原节点/胜利/完成度；诊断函数从未注册为网络入口。
 		return nil, true, errors.New(constUtil.P7AwakeClosed)
 	}
@@ -401,13 +404,17 @@ func p7AwakeLocalCatalogue(enabled bool) (db.P7AwakeStageRule, error) {
 }
 
 type p7AwakeExplorationState struct {
-	Opened       map[string]bool    `json:"opened"`
-	Score        int32              `json:"score"`
-	Defeated     map[string]bool    `json:"defeated,omitempty"`
-	MonsterHP    map[string]float64 `json:"monsterHp,omitempty"`
-	ActiveFight  string             `json:"activeFight,omitempty"`
-	LastFight    string             `json:"lastFight,omitempty"`
-	CurrentActor []byte             `json:"currentActor,omitempty"`
+	Opened       map[string]bool      `json:"opened"`
+	Score        int32                `json:"score"`
+	Defeated     map[string]bool      `json:"defeated,omitempty"`
+	MonsterHP    map[string]float64   `json:"monsterHp,omitempty"`
+	ActiveFight  string               `json:"activeFight,omitempty"`
+	LastFight    string               `json:"lastFight,omitempty"`
+	CurrentActor []byte               `json:"currentActor,omitempty"`
+	Food         []p7AwakeFoodSlot    `json:"food,omitempty"`
+	FoodReadyAt  int64                `json:"foodReadyAt,omitempty"`
+	FoodReceipts []p7AwakeFoodReceipt `json:"foodReceipts,omitempty"`
+	FightPrior   map[string]string    `json:"fightPrior,omitempty"`
 }
 
 // p7AwakeRollBox 使用具名本地的千分权重解释；原表达式不是直接资源串。
@@ -490,6 +497,9 @@ func p7AwakeReadProgress(ledger *db.P7AwakeExploration, frozen *p7AwakeFrozen) (
 	if p6Digest(ledger.State) != ledger.StateHash || json.Unmarshal(ledger.State, &state) != nil || state.Opened == nil {
 		return nil, errors.New("觉醒探索账本损坏")
 	}
+	if err := p7AwakeValidateFood(&state); err != nil {
+		return nil, err
+	}
 	count := int32(0)
 	for guid, open := range state.Opened {
 		if _, ok := frozen.BoxLoot[guid]; !ok || !open {
@@ -521,7 +531,7 @@ func p7AwakeReadProgress(ledger *db.P7AwakeExploration, frozen *p7AwakeFrozen) (
 			return nil, errors.New("觉醒怪物血量来源无效")
 		}
 	}
-	if (state.LastFight == "") != (len(state.CurrentActor) == 0) {
+	if state.LastFight != "" && len(state.CurrentActor) == 0 || state.LastFight == "" && len(state.CurrentActor) > 0 && len(state.FoodReceipts) == 0 {
 		return nil, errors.New("觉醒战后队伍来源不完整")
 	}
 	if state.Score != count*5+defeated*80 || state.Score > 100 {
@@ -564,7 +574,7 @@ func p7AwakeRefresh(run *db.P7AwakeRun, frozen *p7AwakeFrozen, state *p7AwakeExp
 		return nil, errors.New("觉醒队伍总血量无效")
 	}
 	hpText := strconv.FormatFloat(current, 'f', -1, 64) + "/" + strconv.FormatFloat(maximum, 'f', -1, 64)
-	return &pb.AwakeCopyRefreshData{LeftReviveCount: proto.Int32(frozen.Revives), ReviveCost: proto.Int32(0), EndTime: proto.Int64(run.EndAt), HpPercent: proto.String(hpText), Score: proto.Int32(state.Score), Anger: proto.Float64(actor.GetInst().GetAnger())}, nil
+	return &pb.AwakeCopyRefreshData{LeftReviveCount: proto.Int32(frozen.Revives), ReviveCost: proto.Int32(0), EndTime: proto.Int64(run.EndAt), HpPercent: proto.String(hpText), Score: proto.Int32(state.Score), Anger: proto.Float64(actor.GetInst().GetAnger()), Items: p7AwakeFoodItems(state)}, nil
 }
 func p7AwakePending(frozen *p7AwakeFrozen, state *p7AwakeExplorationState) (string, []*pb.BaseResource, error) {
 	var tokens []string
@@ -731,6 +741,18 @@ func (s *GameService) p7AwakeExplore(ctx context.Context, id int64, request prot
 	}
 	var response proto.Message
 	err := updateProfileWithTx(ctx, id, func(tx *gorm.DB, p *pb.Player, g *model.GameState) error {
+		switch body := request.(type) {
+		case *pb.CSEnterAwakeCopy:
+			if len(body.GetItems()) > 0 {
+				if err := p7AwakeRequireFoodClient(tx, id); err != nil {
+					return err
+				}
+			}
+		case *pb.CSAwakeUseItem:
+			if err := p7AwakeRequireFoodClient(tx, id); err != nil {
+				return err
+			}
+		}
 		// 原Settle没有实例ID；已提交stamp先回放所属旧实例，再查询当前活动轮次。
 		if _, settle := request.(*pb.CSAwakeCopySettle); settle && stamp > 0 {
 			var saved db.P7AwakeExploration
@@ -756,10 +778,10 @@ func (s *GameService) p7AwakeExplore(ctx context.Context, id int64, request prot
 		}
 		switch body := request.(type) {
 		case *pb.CSEnterAwakeCopy:
-			if len(body.GetItems()) != 0 {
-				return errors.New("本地觉醒首实例尚未恢复携带料理，未扣道具")
-			}
 			if ledger != nil {
+				if stamp > 0 && ledger.EnterStamp > 0 && stamp < ledger.EnterStamp {
+					return errors.New("旧觉醒进入请求已过期")
+				}
 				if body.GetCopyId() != run.CopyID {
 					return errors.New("请先退出当前觉醒探索")
 				}
@@ -774,7 +796,24 @@ func (s *GameService) p7AwakeExplore(ctx context.Context, id int64, request prot
 				if err != nil {
 					return err
 				}
+				if stamp > 0 && stamp == ledger.EnterStamp && !p7AwakeFoodSelectionMatches(state.Food, body.GetItems()) {
+					return errors.New("觉醒进入请求与原携带道具不一致")
+				}
 				response, err = p7AwakeResume(run, frozen, state)
+				return err
+			}
+			if stamp > 0 {
+				var previous db.P7AwakeExploration
+				e := tx.Where("player_id=? AND enter_stamp=?", id, stamp).First(&previous).Error
+				if e == nil {
+					return errors.New("旧觉醒进入请求已结束")
+				}
+				if !errors.Is(e, gorm.ErrRecordNotFound) {
+					return e
+				}
+			}
+			food, err := s.p7AwakeFoodSelection(p, g, body.GetItems())
+			if err != nil {
 				return err
 			}
 			if g.Run != nil && !g.Run.Complete {
@@ -935,7 +974,7 @@ func (s *GameService) p7AwakeExplore(ctx context.Context, id int64, request prot
 			}
 
 			run = &db.P7AwakeRun{ID: runID, PlayerID: id, CopyID: rule.CopyID, StartAt: now.UnixMilli(), EndAt: now.Add(time.Duration(frozen.DurationMinutes) * time.Minute).UnixMilli(), Actor: actorRaw}
-			state := &p7AwakeExplorationState{Opened: map[string]bool{}}
+			state := &p7AwakeExplorationState{Opened: map[string]bool{}, Food: food}
 			refresh, err := p7AwakeRefresh(run, &frozen, state)
 			if err != nil {
 				return err
@@ -968,6 +1007,20 @@ func (s *GameService) p7AwakeExplore(ctx context.Context, id int64, request prot
 				return err
 			}
 			response = initial
+		case *pb.CSAwakeUseItem:
+			if ledger == nil {
+				return errors.New("没有进行中的觉醒探索")
+			}
+			frozen, err := p7AwakeReadFrozen(run)
+			if err != nil {
+				return err
+			}
+			state, err := p7AwakeReadProgress(ledger, frozen)
+			if err != nil {
+				return err
+			}
+			response, err = s.p7AwakeUseFood(tx, p, g, ledger, run, frozen, state, body.GetItemId(), stamp, now)
+			return err
 		case *pb.CSAwakeCopyOpenBox:
 			if ledger == nil {
 				return errors.New("没有进行中的觉醒探索")
@@ -1148,25 +1201,40 @@ func p7AwakeFightInput(tx *gorm.DB, fight *db.P7AwakeFight) (*model.FrozenBattle
 	if err != nil || fight.InputHash != record.InputHash || p6Digest(fight.Start) != fight.StartHash {
 		return nil, nil, errors.New("觉醒战斗冻结来源无效")
 	}
+	var run db.P7AwakeRun
+	if err := tx.Where("id=? AND player_id=?", fight.RunID, fight.PlayerID).First(&run).Error; err != nil {
+		return nil, nil, err
+	}
+	frozen, err := p7AwakeReadFrozen(&run)
+	if err != nil {
+		return nil, nil, err
+	}
+	var ledger db.P7AwakeExploration
+	if err = tx.Where("run_id=? AND player_id=?", run.ID, run.PlayerID).First(&ledger).Error; err != nil {
+		return nil, nil, err
+	}
+	state, err := p7AwakeReadProgress(&ledger, frozen)
+	if err != nil {
+		return nil, nil, err
+	}
+	node := p7AwakeFindMonster(frozen, fight.MonsterGUID)
+	if node == nil {
+		return nil, nil, errors.New("觉醒战斗节点来源无效")
+	}
 	expectedRoom := "map_forest_003"
 	if strings.HasPrefix(fight.RunID, constUtil.Awake85RunPrefix) {
-		var run db.P7AwakeRun
-		if err := tx.Where("id=? AND player_id=?", fight.RunID, fight.PlayerID).First(&run).Error; err != nil {
-			return nil, nil, err
+		expectedRoom = frozen.BattleMap
+	}
+	if prior := state.FightPrior[fight.ID]; prior != "" {
+		enemy, err := p7AwakeContinuedEnemy(tx, &run, prior, fight.MonsterGUID, fight.CreatedAt)
+		if err != nil || !proto.Equal(enemy, input.Monster) {
+			return nil, nil, errors.New("觉醒续战敌方来源无效")
 		}
-		frozen, err := p7AwakeReadFrozen(&run)
-		if err != nil {
-			return nil, nil, err
-		}
-		node := p7AwakeFindMonster(frozen, fight.MonsterGUID)
-		if node == nil {
-			return nil, nil, errors.New("觉醒战斗节点来源无效")
-		}
+	} else if strings.HasPrefix(fight.RunID, constUtil.Awake85RunPrefix) {
 		enemy, err := p7AwakeFrozenEnemy85(frozen, node)
 		if err != nil || !proto.Equal(enemy, input.Monster) {
 			return nil, nil, errors.New("觉醒战斗敌方来源无效")
 		}
-		expectedRoom = frozen.BattleMap
 	}
 	start := &pb.SCAwakeCopyFightBegin{}
 	if proto.Unmarshal(fight.Start, start) != nil || start.GetFightId() != fight.ID || start.GetRandomSeed() != input.Seed || start.GetMaxRoundNum() != input.MaxRound || start.GetRoomId() != expectedRoom || !proto.Equal(start.BattlePlayer, input.Attacker) || !proto.Equal(start.BattleMonser, input.Monster) {
@@ -1221,16 +1289,33 @@ func (s *GameService) p7AwakeFightBegin(ctx context.Context, id int64, body *pb.
 			reply = &pb.SCAwakeCopyFightBegin{}
 			return proto.Unmarshal(fight.Start, reply)
 		}
-		if state.Defeated[body.GetMonGuid()] || state.LastFight != "" {
-			return errors.New("本地首实例该怪已挑战，受伤续战和复活尚未恢复")
+		if state.Defeated[body.GetMonGuid()] {
+			return errors.New("该觉醒怪物已被击败")
 		}
 		attacker := &pb.BattlePlayer{}
-		if proto.Unmarshal(run.Actor, attacker) != nil {
+		actorRaw := run.Actor
+		if len(state.CurrentActor) != 0 {
+			actorRaw = state.CurrentActor
+		}
+		if proto.Unmarshal(actorRaw, attacker) != nil || len(attacker.Formation) == 0 {
 			return errors.New("觉醒冻结队伍无效")
+		}
+		var living bool
+		for _, hero := range attacker.Formation {
+			living = living || hero.GetInst().GetCurHp() > 0
+		}
+		if !living {
+			return errors.New("觉醒队伍已阵亡，请先复活")
 		}
 		enemy, err := p7AwakeFrozenEnemy85(frozen, mon)
 		if err != nil {
 			return err
+		}
+		if state.LastFight != "" {
+			enemy, err = p7AwakeContinuedEnemy(tx, run, state.LastFight, mon.GetGuid(), now.UnixMilli())
+			if err != nil {
+				return err
+			}
 		}
 
 		random, err := rand.Int(rand.Reader, big.NewInt(math.MaxInt32+1))
@@ -1269,6 +1354,12 @@ func (s *GameService) p7AwakeFightBegin(ctx context.Context, id int64, body *pb.
 		fight := &db.P7AwakeFight{ID: fightID, PlayerID: id, RunID: run.ID, MonsterGUID: mon.GetGuid(), Status: constUtil.P7AwakeFightPending, ReplayID: replayID, ScopeProof: proof, Start: raw, StartHash: p6Digest(raw), InputHash: record.InputHash, CreatedAt: now.UnixMilli()}
 		if err = tx.Create(fight).Error; err != nil {
 			return err
+		}
+		if state.LastFight != "" {
+			if state.FightPrior == nil {
+				state.FightPrior = map[string]string{}
+			}
+			state.FightPrior[fightID] = state.LastFight
 		}
 		state.ActiveFight = fightID
 		return p7AwakeSaveProgress(tx, ledger, state)

@@ -322,8 +322,8 @@ func (s *GameService) dailyCopyAt(ctx context.Context, id int64, request proto.M
 		return nil, err
 	}
 	if end, ok := response.(*pb.SCDailyCopyFightEnd); ok {
-		// Start已经扣费且SCPlayer提供权威余额；原结果页稍后会Delete(cost)。
-		// 只投影尚待客户端应用的成本，保留冻结回执的真实体力成本供重放校验。
+		// Start已经预扣体力且SCPlayer提供权威余额；原结果页稍后会Delete(cost)。
+		// 胜场回执保留真实成本，网络响应去除已反映在余额中的体力成本。
 		projected := proto.Clone(end).(*pb.SCDailyCopyFightEnd)
 		costs := projected.Cost
 		projected.Cost = nil
@@ -696,7 +696,7 @@ func (s *GameService) dailyCopyEnd(tx *gorm.DB, player *pb.Player, game *model.G
 	if state.Used < 1 || state.Limit < state.Used {
 		return nil, false, errors.New(constUtil.DailyCopyConfigError)
 	}
-	result := &pb.SCDailyCopyFightEnd{IsWin: proto.Int32(request.GetIsWin()), Get: &pb.ResultObject{}, Cost: []*pb.BaseResource{{Id: proto.String("stamina"), Num: proto.Int32(fight.Stamina)}}, LastTime: proto.Int32(state.Limit - state.Used), StarNum: proto.Int32(0)}
+	result := &pb.SCDailyCopyFightEnd{IsWin: proto.Int32(request.GetIsWin()), Get: &pb.ResultObject{}, StarNum: proto.Int32(0)}
 	if request.GetIsWin() == 1 {
 		gain, err := s.dailyCopyGain(player, game, fight.Reward)
 		if err != nil {
@@ -704,7 +704,26 @@ func (s *GameService) dailyCopyEnd(tx *gorm.DB, player *pb.Player, game *model.G
 		}
 		result.Get = gain
 		result.StarNum = proto.Int32(fight.WinStars)
+		result.Cost = []*pb.BaseResource{{Id: proto.String("stamina"), Num: proto.Int32(fight.Stamina)}}
+	} else {
+		// 返还原开战日的预扣额度；已结算回执会在上方直接重放，避免重复返还。
+		// 玩家可因道具等原因超过自然恢复上限，但退款必须完整落入协议数值范围。
+		if player.GetStamina() > math.MaxInt32-fight.Stamina {
+			return nil, false, errors.New("体力余额超出协议范围，请消耗后重试")
+		}
+		update := tx.Model(&db.DailyCopyState{}).
+			Where("player_id = ? AND day = ? AND type = ? AND used = ?", fight.PlayerID, fight.Day, fight.Type, state.Used).
+			Update("used", state.Used-1)
+		if update.Error != nil {
+			return nil, false, update.Error
+		}
+		if update.RowsAffected != 1 {
+			return nil, false, errors.New(constUtil.DailyCopyConfigError)
+		}
+		state.Used--
+		player.Stamina = proto.Int32(player.GetStamina() + fight.Stamina)
 	}
+	result.LastTime = proto.Int32(state.Limit - state.Used)
 	response, err := proto.Marshal(result)
 	if err != nil {
 		return nil, false, err

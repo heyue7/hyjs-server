@@ -56,6 +56,10 @@ func TestFeedback66DailyCopyPrepaidStaminaProjectionAndCold(t *testing.T) {
 					end.OptRecord.AttackerTotalLeftHp = proto.Float64(0)
 					end.OptRecord.DefenderTotalLeftHp = proto.Float64(1)
 				}
+				wantBalance, wantUsed := int32(190), int32(1)
+				if win == 0 {
+					wantBalance, wantUsed = 200, 0
+				}
 				settled, err := s.dailyCopyAt(ctx, id, end, 66003, now)
 				if err != nil {
 					t.Fatal(err)
@@ -77,7 +81,7 @@ func TestFeedback66DailyCopyPrepaidStaminaProjectionAndCold(t *testing.T) {
 							balance -= cost.GetNum()
 						}
 					}
-					if balance != 190 {
+					if balance != wantBalance {
 						t.Fatal("late native Delete(cost) charged prepaid stamina again", balance)
 					}
 					if delivered.GetIsWin() != win {
@@ -94,12 +98,14 @@ func TestFeedback66DailyCopyPrepaidStaminaProjectionAndCold(t *testing.T) {
 				if err := proto.Unmarshal(frozen, receipt); err != nil {
 					t.Fatal(err)
 				}
-				if len(receipt.GetCost()) != 1 || receipt.Cost[0].GetId() != "stamina" || receipt.Cost[0].GetNum() != 10 || row.Stamina != 10 {
-					t.Fatal("actual paid cost or frozen replay evidence lost", receipt)
+				if row.Stamina != 10 {
+					t.Fatal("frozen prepaid stamina lost", row.Stamina)
 				}
-				// This is the pre-fix native callback defect with the retained real receipt.
-				if snapshot(settled)-receipt.Cost[0].GetNum() != 180 {
-					t.Fatal("fixture does not expose duplicate local deduction")
+				if win == 1 && (len(receipt.GetCost()) != 1 || receipt.Cost[0].GetId() != "stamina" || receipt.Cost[0].GetNum() != 10) {
+					t.Fatal("winning receipt lost its actual cost", receipt)
+				}
+				if win == 0 && len(receipt.GetCost()) != 0 {
+					t.Fatal("losing receipt retained a refunded cost", receipt)
 				}
 				if !proto.Equal(receipt.GetGet(), projected.GetGet()) || receipt.GetStarNum() != projected.GetStarNum() || receipt.GetLastTime() != projected.GetLastTime() {
 					t.Fatal("projection changed reward or quota")
@@ -140,11 +146,11 @@ func TestFeedback66DailyCopyPrepaidStaminaProjectionAndCold(t *testing.T) {
 					t.Fatal(err)
 				}
 				player, _, err := decodeProfile(&profile)
-				if err != nil || player.GetStamina() != 190 {
+				if err != nil || player.GetStamina() != wantBalance {
 					t.Fatal("End or replay changed prepaid persisted stamina", err)
 				}
 				var quota db.DailyCopyState
-				if err := db.GetIns().First(&quota, "player_id=? AND type=?", id, typ).Error; err != nil || quota.Used != 1 {
+				if err := db.GetIns().First(&quota, "player_id=? AND type=?", id, typ).Error; err != nil || quota.Used != wantUsed {
 					t.Fatal("copy quota charged more than once", quota.Used, err)
 				}
 			})

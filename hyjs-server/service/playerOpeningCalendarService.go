@@ -45,34 +45,41 @@ func insertPlayerOpeningCalendar(tx *gorm.DB, id int64, gameAt, realAt time.Time
 // loadPlayerOpenServerRule projects the same original task windows onto this character's day one.
 // Old personal activity cycles retain their frozen windows and receipts.
 func loadPlayerOpenServerRule(tx *gorm.DB, id int64) (*db.OpenServerActivityRule, error) {
+	cfg, _, err := loadPlayerOpenServerRuleWithAnchor(tx, id)
+	return cfg, err
+}
+
+// The anchor identifies the role's game-calendar creation day even when a
+// scheduled activity starts later. Callers may use it without another query.
+func loadPlayerOpenServerRuleWithAnchor(tx *gorm.DB, id int64) (*db.OpenServerActivityRule, *db.PlayerOpeningCalendar, error) {
 	cfg, err := loadOpenServerRule(tx)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	cycle, err := localPlayOpenServerCycle(tx)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if cycle != nil || GameAccountProtectedProfile(tx, id) || !gameSchemaHasTable(tx, &db.PlayerOpeningCalendar{}) {
-		return cfg, nil
+		return cfg, nil, nil
 	}
 	var anchor db.PlayerOpeningCalendar
 	err = tx.First(&anchor, "player_id=?", id).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return cfg, nil
+		return cfg, nil, nil
 	}
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if anchor.Source != constUtil.PlayerOpeningCalendarSource || anchor.StartAt <= 0 {
-		return nil, constUtil.ErrAdminConfiguration
+		return nil, nil, constUtil.ErrAdminConfiguration
 	}
 	duration, grace := cfg.EndAt-cfg.StartAt, cfg.RewardEndAt-cfg.EndAt
 	cfg.StartAt = anchor.StartAt
 	cfg.EndAt = anchor.StartAt + duration
 	cfg.RewardEndAt = cfg.EndAt + grace
 	if err := AdminScheduledOpeningRule(tx, cfg, LocalPlayNow(tx.Statement.Context).UnixMilli(), id); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return cfg, nil
+	return cfg, &anchor, nil
 }
