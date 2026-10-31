@@ -213,7 +213,7 @@ if args.initial_dump:
     command += ' --initial-db'
 print('Activating verified artifacts and preserving persistent data', flush=True)
 print(remote(command), flush=True)
-deployed = json.loads(remote('cat ' + shlex.quote(REMOTE + '/deployed.json')))
+deployed = json.loads(remote('sudo -n cat ' + shlex.quote(REMOTE + '/deployed.json')))
 assert deployed['revision'] == revision and deployed['files'] == manifest['files']
 if getattr(args, 'calendar_formal_110', False):
     calendar = deployed.get('calendarRestore')
