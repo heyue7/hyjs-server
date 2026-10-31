@@ -90,7 +90,7 @@ class Formal110ArgumentsTests(unittest.TestCase):
     def test_vip10_predicate_is_readonly_and_bound_to_reviewed_go_constants(self):
         module.validate_formal110_source_constants(HERE.parent / 'hyjs-server/constUtil/payment.go')
         self.assertTrue(module.VIP10_CHECK_SQL.startswith('SELECT COUNT(*)'))
-        for fragment in ('enabled=1', 'min_v_ip=10', 'cost=1100', 'total_limit=0',
+        for fragment in ('enabled=1', 'min_v_ip=10', 'cost=2888', 'total_limit=0',
                          "BINARY cost_resource=BINARY 'diamond'", "BINARY reward=BINARY 'item_044,1'",
                          'BINARY source=BINARY', module.VIP10_SOURCE):
             self.assertIn(fragment, module.VIP10_CHECK_SQL)

@@ -11,14 +11,14 @@ import time
 import uuid
 
 VIP10_PRODUCT = 'p3vip10_growth_local'
-VIP10_SOURCE = '本地会员成长礼包；默认关闭；1100钻、每日一份为本地规则，原购买价格未恢复；原item_044→item_064宝石技能书，VIP10及真实确认测试订单资格'
+VIP10_SOURCE = '本地会员成长礼包；默认关闭；2888钻、每日一份为本地规则，原购买价格未恢复；原item_044→item_064宝石技能书，VIP10及真实确认测试订单资格'
 FORMAL110_OPENING_MILLIS = 1793462400000
 _REVISION = re.compile(r'(?:[0-9a-f]{40}|[0-9a-f]{64})')
 _SHA256 = re.compile(r'[0-9a-f]{64}')
 MAINTENANCE_SQL = 'SELECT maintenance FROM client_update_policy WHERE id=1;'
 VIP10_CHECK_SQL = (
     "SELECT COUNT(*) FROM p3_vip_shop_products WHERE BINARY id=BINARY '" + VIP10_PRODUCT +
-    "' AND enabled=1 AND min_v_ip=10 AND cost=1100 AND BINARY cost_resource=BINARY 'diamond'"
+    "' AND enabled=1 AND min_v_ip=10 AND cost=2888 AND BINARY cost_resource=BINARY 'diamond'"
     " AND total_limit=0 AND BINARY reward=BINARY 'item_044,1' AND BINARY source=BINARY '" + VIP10_SOURCE + "';"
 )
 
@@ -51,9 +51,11 @@ def validate_formal110_arguments(args, *, remote=False):
 def validate_formal110_source_constants(path):
     """Bind the SQL predicate to the reviewed Go release constants."""
     source = Path(path).read_text(encoding='utf-8')
-    for name, expected in (('P3VIP10GrowthProduct', VIP10_PRODUCT), ('P3VIP10GrowthSource', VIP10_SOURCE)):
-        matches = re.findall(r'^const\s+' + name + r'\s*=\s*"([^"\n]*)"\s*$', source, re.MULTILINE)
-        require(matches == [expected], 'Formal 110 VIP10 source constants differ from candidate')
+    matches = re.findall(r'^const\s+P3VIP10GrowthProduct\s*=\s*"([^"\n]*)"\s*$', source, re.MULTILINE)
+    require(matches == [VIP10_PRODUCT], 'Formal 110 VIP10 source constants differ from candidate')
+    reviewed = Path(path).with_name('feedback78.go').read_text(encoding='utf-8')
+    matches = re.findall(r'^\s*Feedback78VIPCurrentSource\s*=\s*"([^"\n]*)"\s*$', reviewed, re.MULTILINE)
+    require(matches == [VIP10_SOURCE], 'Formal 110 VIP10 source constants differ from candidate')
 
 
 def digest(path):
