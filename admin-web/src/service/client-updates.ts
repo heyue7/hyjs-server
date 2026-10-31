@@ -1,15 +1,17 @@
 import { api, json } from './operations';
 
 export type UpdateMode = 'notice' | 'next_login' | 'maintenance';
-export type UpdateAction = 'publish' | 'remind' | 'withdraw' | 'start_maintenance' | 'end_maintenance';
+export type UpdateAction = 'publish' | 'remind' | 'withdraw' | 'start_maintenance' | 'end_maintenance' | 'cancel_maintenance';
 export interface ClientRelease {
   id: number; buildCode: number; versionName: string; title: string; content: string;
   mode: UpdateMode; minLoginBuild: number; minRunBuild: number;
+  versionPolicy?: boolean;
   maintenanceStartAt: number; maintenanceEndAt: number;
-  state: 'draft' | 'published' | 'withdrawn'; publishedAt: number; updatedAt: number; publishedBy: string;
+  state: 'draft' | 'published' | 'withdrawn' | 'cancelled'; publishedAt: number; updatedAt: number; publishedBy: string;
 }
 export interface ClientPolicy {
   releaseId: number; latestBuild: number; minLoginBuild: number; minRunBuild: number;
+  versionPolicy?: boolean; minLoginVersion?: string; minRunVersion?: string;
   revision: number; noticeBatch: number; noticeEnabled: boolean; maintenance: boolean;
   maintenanceStartAt: number; maintenanceEndAt: number; versionName: string; title: string; content: string; mode: UpdateMode;
 }
@@ -20,10 +22,10 @@ export interface ClientUpdateOverview {
 }
 export interface ClientUpdateDraft {
   id: number; version: string; buildCode: number; versionName: string; title: string; content: string;
-  mode: UpdateMode; minLoginBuild: number; minRunBuild: number; maintenanceStartAt: number; maintenanceEndAt: number; reason: string;
+  versionPolicy: boolean; mode: UpdateMode; minLoginBuild: number; minRunBuild: number; maintenanceStartAt: number; maintenanceEndAt: number; reason: string;
 }
 export interface ClientUpdateCommand { id: number; version: string; requestId: string; action: UpdateAction; reason: string }
-export const getClientUpdates = () => api<ClientUpdateOverview>('/client-updates');
+export const getClientUpdates = () => api<ClientUpdateOverview>('/client-updates', { cache: 'no-store' });
 export const saveClientUpdate = (draft: ClientUpdateDraft) => api<ClientUpdateOverview>('/client-updates/draft', json('POST', draft));
 export const actClientUpdate = (command: ClientUpdateCommand) => api<ClientUpdateOverview>('/client-updates/action', json('POST', command));
 export const getClientUpdateHistory = (page = 1, pageSize = 20) => api<{ items: ClientRelease[]; total: number }>(`/client-updates/history?page=${page}&pageSize=${pageSize}`);

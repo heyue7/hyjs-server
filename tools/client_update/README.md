@@ -1,6 +1,8 @@
 # 客户端更新桥
 
-当前基线为 `build/hyjs-local.apk`。新进程生成独立 startup UUID，两处登录检查与登录界面版本标签的 appVersion 编码为 `hyjs/<buildCode>/<startupUUID>`，原 resVersion 保持不变。Java 端 `buildCode`/`versionName` 在运行时通过 `PackageManager` 读取已安装包的 versionCode/versionName，清单是唯一版本来源，不会与源码常量产生偏差。`--build-code` 和 `--version-name` 为必填构建输入，buildCode 必须大于基线清单值，并与打包写回清单的值一致。
+当前基线为 `build/hyjs-local.apk`。新进程生成独立 startup UUID，两处登录检查的 appVersion 编码为 `hyjs/<buildCode>/<startupUUID>/<major.minor.patch>`，原 resVersion 保持不变。登录界面版本标签展示清单中的版本名。Java 端通过 `PackageManager` 读取已安装包的 versionCode/versionName，清单是唯一版本来源。版本名必须是三段 0..999 的 ASCII 整数，不允许前导零、空白或其他字符。若无法读取或版本名不合规范，登录退回 `hyjs/<buildCode>/<startupUUID>`，status/ack 省略 `clientVersion`，服务端按未知版本处理；不会伪造 `0.0.0`。读取结果按进程固定，登录、status 和 ack 始终使用同一份身份；读取失败后需重启进程重新读取。
+
+`--build-code` 和 `--version-name` 为必填构建输入，buildCode 必须大于基线清单值，versionName 必须符合上述三段规则。当基包版本名也符合该规则时，新版本必须按三段数值严格递增，例如 `1.10.0 > 1.9.999`；基包版本名不符合规则时跳过版本名顺序检查。`package.py` 以构建证明中的两个值写回清单。版本比较类位于 `ClientUpdate.java` 内，该文件由现有 build.py 显式编译，D8 同时纳入其生成的全部类。
 
 ## 构建与合成
 
@@ -35,6 +37,8 @@ C# `Bridge.Version(GameConfig)` 适配原 instance getter 消耗的参数并调�
 
 界面沿原 SAO 灰白、青蓝、深灰文字，固定文案“请前往QQ群下载最新版”。没有群号、链接、复制、下载或跳转动作。远端标题/正文为普通不可点击文本。普通提醒按钮“知道了”，强制提示按钮“重新检查”。首次声明沿用同一浅蓝底板、字体和可滚动正文，左侧红色“退出”、右侧蓝色“了解”；正文高度按屏幕可用高度收缩，横屏和窄屏下两个按钮保持可见可点。
 
-登录页判定遍历原 `LoginUI` 组件及其 activeInHierarchy，不依赖绝对对象路径。普通提醒在本端 buildCode>=latestBuild 时直接忽略；维护阻断继续生效。弹窗展示远端标题/正文、当前/最新版本，以及提醒、下次登录更新、维护计划/预计结束的固定后果说明，时间明确为北京时间。
+登录页判定遍历原 `LoginUI` 组件及其 activeInHierarchy，不依赖绝对对象路径。服务端返回 `versionPolicy=true` 时，普通提醒按版本号逐段数值比较；本机版本较低且服务端 `noticeEnabled=true` 才显示。本机版本未知时由服务端的 `noticeEnabled` 决定，服务端最新版本无效时不显示普通更新提醒。维护预告面向所有版本，仍遵守 `noticeEnabled` 与批次去重；维护及其他阻断优先展示。`versionPolicy=false` 或缺失时沿用 buildCode 与 latestBuild 的原有比较，以支持分阶段部署。弹窗展示远端标题/正文、当前/最新版本，以及提醒、下次登录更新、维护计划/预计结束的固定后果说明，时间明确为北京时间。
 
-当前证据仅为针对当前基线的小型 Java/D8、C# 编译、四方法 IL 修改与 547 原引擎守卫。尚需主代理完成后端真实 status/ack 联调、首次声明/普通/重提醒、登录门槛、维护、战斗延后、恢复、窄屏及原机同状态界面验收。编译通过不代表原机可用。
+不生成 APK 的版本桥定向验证可运行 `rtk proxy <项目 Python> -B -m unittest tools.client_update.tests.test_client_version`；测试在临时目录编译原 Java 源码与独立 dex，模拟状态查询和回执，不访问外网。
+
+以往基线证据覆盖 C# 编译、四方法 IL 修改与 547 原引擎守卫。本次版本比较变更的定向测试覆盖 Java/D8、版本输入、真实基线清单的内存补丁及模拟 status/ack；尚需主代理完成后端真实 status/ack 联调、首次声明/普通/重提醒、登录门槛、维护、战斗延后、恢复、窄屏及原机同状态界面验收。编译通过不代表原机可用。

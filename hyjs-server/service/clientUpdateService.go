@@ -80,36 +80,47 @@ func clientUpdatePolicy(ctx context.Context) (db.ClientUpdatePolicy, error) {
 }
 
 func clientUpdateVersion(p db.ClientUpdatePolicy) string { return strconv.FormatInt(p.Revision, 10) }
-func parseClientUpdateVersion(v string) (int64, string) {
+func parseClientUpdateVersion(v string) (int64, string, string) {
 	parts := strings.Split(v, "/")
-	if len(parts) != 3 || parts[0] != "hyjs" {
-		return 0, ""
+	if (len(parts) != 3 && len(parts) != 4) || parts[0] != "hyjs" {
+		return 0, "", ""
 	}
 	n, err := strconv.ParseInt(parts[1], 10, 64)
 	if err != nil || n <= 0 || n > 2100000000 {
-		return 0, ""
+		return 0, "", ""
 	}
 	startup := strings.ToLower(strings.ReplaceAll(parts[2], "-", ""))
 	if len(startup) != 32 {
-		return 0, ""
+		return 0, "", ""
 	}
 	if _, err = hex.DecodeString(startup); err != nil {
-		return 0, ""
+		return 0, "", ""
 	}
-	return n, startup
+	version := ""
+	if len(parts) == 4 {
+		version = parts[3]
+		if !ClientUpdateVersionValid(version) {
+			return 0, "", ""
+		}
+	}
+	return n, startup, clientUpdateKnownVersion(n, version)
 }
 func clientUpdateSessionHash(session []byte) string {
 	sum := sha256.Sum256(session)
 	return hex.EncodeToString(sum[:])
 }
-func clientUpdateLoginError(p db.ClientUpdatePolicy, build int64) error {
+func clientUpdateLoginError(p db.ClientUpdatePolicy, build int64, version string) error {
 	if p.Maintenance || (p.MaintenanceStartAt > 0 && p.MaintenanceStartAt <= time.Now().UnixMilli()) {
 		return constUtil.ErrClientUpdateMaintenance
 	}
-	if build < p.MinLoginBuild {
+	if clientUpdateBelowLogin(p, build, version) {
 		return constUtil.ErrClientUpdateRequired
 	}
 	return nil
+}
+
+func clientUpdateBelowLogin(p db.ClientUpdatePolicy, build int64, version string) bool {
+	return build < p.MinLoginBuild || clientUpdateVersionBelow(clientUpdateKnownVersion(build, version), p.MinLoginVersion)
 }
 
 // CheckClientLogin 在原登录生成新会话之前执行版本与维护门槛。
@@ -121,8 +132,8 @@ func (s *GameService) CheckClientLogin(ctx context.Context, appVersion string) e
 	if err != nil {
 		return err
 	}
-	build, _ := parseClientUpdateVersion(appVersion)
-	return clientUpdateLoginError(p, build)
+	build, _, version := parseClientUpdateVersion(appVersion)
+	return clientUpdateLoginError(p, build, version)
 }
 
 // BindClientLogin 再次读取策略并原子保存服务端验证过的会话绑定。
@@ -133,13 +144,13 @@ func (s *GameService) BindClientLogin(ctx context.Context, row *db.Profile, appV
 	if _, err := clientUpdatePolicy(ctx); err != nil {
 		return err
 	}
-	build, startup := parseClientUpdateVersion(appVersion)
+	build, startup, version := parseClientUpdateVersion(appVersion)
 	return db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var p db.ClientUpdatePolicy
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&p, 1).Error; err != nil {
 			return err
 		}
-		if err := clientUpdateLoginError(p, build); err != nil {
+		if err := clientUpdateLoginError(p, build, version); err != nil {
 			return err
 		}
 		// 重新核对已落库会话，较早登录请求不能覆盖后一次登录的绑定。
@@ -151,7 +162,7 @@ func (s *GameService) BindClientLogin(ctx context.Context, row *db.Profile, appV
 			return constUtil.ErrClientUpdateRequired
 		}
 		now := time.Now().UnixMilli()
-		r := db.ClientUpdateSession{PlayerID: row.Id, SessionHash: clientUpdateSessionHash(row.Session), BuildCode: build, StartupID: startup, LoginAt: now, LastSeenAt: now, MaintenanceEpoch: p.MaintenanceEpoch}
+		r := db.ClientUpdateSession{PlayerID: row.Id, SessionHash: clientUpdateSessionHash(row.Session), BuildCode: build, ClientVersion: version, StartupID: startup, LoginAt: now, LastSeenAt: now, MaintenanceEpoch: p.MaintenanceEpoch}
 		return tx.Clauses(clause.OnConflict{Columns: []clause.Column{{Name: "player_id"}}, UpdateAll: true}).Create(&r).Error
 	})
 }
@@ -173,7 +184,7 @@ func clientUpdateRunError(p db.ClientUpdatePolicy, r db.ClientUpdateSession) err
 	if p.Maintenance || (p.MaintenanceStartAt > 0 && p.MaintenanceStartAt <= time.Now().UnixMilli()) {
 		return constUtil.ErrClientUpdateMaintenance
 	}
-	if r.MaintenanceEpoch < p.MaintenanceEpoch || r.BuildCode < p.MinRunBuild {
+	if r.MaintenanceEpoch < p.MaintenanceEpoch || r.BuildCode < p.MinRunBuild || clientUpdateVersionBelow(clientUpdateKnownVersion(r.BuildCode, r.ClientVersion), p.MinRunVersion) {
 		return constUtil.ErrClientUpdateRequired
 	}
 	return nil
@@ -204,7 +215,7 @@ func clientUpdateSessionError(p db.ClientUpdatePolicy, r db.ClientUpdateSession)
 	if err := clientUpdateRunError(p, r); err != nil {
 		return err
 	}
-	if r.BuildCode < p.MinLoginBuild && (r.PlayerID == 0 || r.LoginAt > p.LoginGateAt || (!r.Connected && (r.DisconnectedAt == 0 || r.DisconnectedAt < p.LoginGateAt || time.Now().UnixMilli()-r.DisconnectedAt > constUtil.ClientUpdateReconnectMS))) {
+	if clientUpdateBelowLogin(p, r.BuildCode, r.ClientVersion) && (r.PlayerID == 0 || r.LoginAt > p.LoginGateAt || (!r.Connected && (r.DisconnectedAt == 0 || r.DisconnectedAt < p.LoginGateAt || time.Now().UnixMilli()-r.DisconnectedAt > constUtil.ClientUpdateReconnectMS))) {
 		return constUtil.ErrClientUpdateRequired
 	}
 	return nil
@@ -234,7 +245,7 @@ func (s *GameService) CheckClientReconnect(ctx context.Context, row *db.Profile)
 	if err = clientUpdateRunError(p, r); err != nil {
 		return err
 	}
-	if r.BuildCode >= p.MinLoginBuild {
+	if !clientUpdateBelowLogin(p, r.BuildCode, r.ClientVersion) {
 		return nil
 	}
 	if r.PlayerID == 0 || r.LoginAt > p.LoginGateAt || (!r.Connected && (r.DisconnectedAt == 0 || r.DisconnectedAt < p.LoginGateAt || time.Now().UnixMilli()-r.DisconnectedAt > constUtil.ClientUpdateReconnectMS)) {
@@ -355,11 +366,19 @@ func (s *GameService) clientUpdateStats(ctx context.Context, tx *gorm.DB, p db.C
 				}
 			}
 			out.Online++
-			if r.BuildCode == 0 {
-				out.Unknown++
-			}
-			if r.BuildCode < p.LatestBuild {
-				out.Older++
+			if p.VersionPolicy {
+				version := clientUpdateKnownVersion(r.BuildCode, r.ClientVersion)
+				if version == "" {
+					out.Unknown++
+				} else if clientUpdateVersionBelow(version, p.VersionName) {
+					out.Older++
+				}
+			} else {
+				if r.BuildCode == 0 {
+					out.Unknown++
+				} else if r.BuildCode < p.LatestBuild {
+					out.Older++
+				}
 			}
 			prefix := strconv.FormatInt(r.PlayerID, 10) + ":" + r.StartupID + ":"
 			if receiptFlags[prefix+"shown"] {
@@ -410,6 +429,9 @@ func (s *GameService) AdminClientUpdates(ctx context.Context, actor *model.Admin
 
 // AdminClientUpdateDraft 保存草稿并推进全局乐观锁，不改变生效门槛。
 func (s *GameService) AdminClientUpdateDraft(ctx context.Context, actor *model.AdminPrincipal, req model.AdminClientUpdateDraftRequest) (*model.AdminClientUpdatesResponse, error) {
+	if req.VersionPolicy && !ClientUpdateVersionValid(req.VersionName) {
+		return nil, constUtil.ErrAdminInput
+	}
 	var out *model.AdminClientUpdatesResponse
 	err := db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := adminOperationUser(tx, actor, true); err != nil {
@@ -432,6 +454,7 @@ func (s *GameService) AdminClientUpdateDraft(ctx context.Context, actor *model.A
 			}
 		}
 		r.ID = req.ID
+		r.VersionPolicy = req.VersionPolicy
 		r.BuildCode = req.BuildCode
 		r.VersionName = req.VersionName
 		r.Title = req.Title
@@ -439,6 +462,10 @@ func (s *GameService) AdminClientUpdateDraft(ctx context.Context, actor *model.A
 		r.Mode = req.Mode
 		r.MinLoginBuild = req.MinLoginBuild
 		r.MinRunBuild = req.MinRunBuild
+		if req.VersionPolicy {
+			// 语义版本草稿不接受调用方覆盖既有构建号门槛。
+			r.BuildCode, r.MinLoginBuild, r.MinRunBuild = 0, 0, 0
+		}
 		r.MaintenanceStartAt = req.MaintenanceStartAt
 		r.MaintenanceEndAt = req.MaintenanceEndAt
 		r.State = "draft"
@@ -458,6 +485,45 @@ func (s *GameService) AdminClientUpdateDraft(ctx context.Context, actor *model.A
 		return err
 	})
 	return out, err
+}
+
+// 取消仅作用于尚未开始的当前计划，并保留所有既有准入事实。
+func clientUpdateCancelMaintenance(p *db.ClientUpdatePolicy, r *db.ClientUpdateRelease, now int64) error {
+	if p.ReleaseID != r.ID || p.Mode != constUtil.ClientUpdateModeMaintenance || r.Mode != constUtil.ClientUpdateModeMaintenance || (r.State != "published" && r.State != "withdrawn") || p.Maintenance || p.MaintenanceStartAt <= now {
+		return constUtil.ErrAdminConfigConflict
+	}
+	p.MaintenanceStartAt, p.MaintenanceEndAt = 0, 0
+	p.NoticeEnabled = false
+	r.State = "cancelled"
+	r.UpdatedAt = now
+	return nil
+}
+
+// 维护确实开始后才推进门槛，并在同一行锁内拒绝任何回退。
+func clientUpdateEndMaintenance(p *db.ClientUpdatePolicy, r *db.ClientUpdateRelease, now int64) error {
+	if p.ReleaseID != r.ID || p.Mode != constUtil.ClientUpdateModeMaintenance || r.Mode != constUtil.ClientUpdateModeMaintenance || (r.State != "published" && r.State != "withdrawn") || !p.Maintenance || p.VersionPolicy != r.VersionPolicy {
+		return constUtil.ErrAdminConfigConflict
+	}
+	if r.VersionPolicy {
+		if p.VersionName != r.VersionName || !ClientUpdateVersionValid(r.VersionName) || clientUpdateVersionBelow(r.VersionName, p.MinLoginVersion) || clientUpdateVersionBelow(r.VersionName, p.MinRunVersion) {
+			return constUtil.ErrAdminConfigConflict
+		}
+		if clientUpdateVersionBelow(p.MinLoginVersion, r.VersionName) {
+			p.LoginGateAt = now
+		}
+		p.MinLoginVersion, p.MinRunVersion = r.VersionName, r.VersionName
+	} else {
+		if r.MinLoginBuild < p.MinLoginBuild || r.MinRunBuild < p.MinRunBuild {
+			return constUtil.ErrAdminConfigConflict
+		}
+		if r.MinLoginBuild > p.MinLoginBuild {
+			p.LoginGateAt = now
+		}
+		p.MinLoginBuild, p.MinRunBuild = r.MinLoginBuild, r.MinRunBuild
+	}
+	p.Maintenance = false
+	p.MaintenanceStartAt, p.MaintenanceEndAt = 0, 0
+	return nil
 }
 
 // AdminClientUpdateAction 将策略、审计与幂等响应放入同一事务后再发送维护提示。
@@ -503,10 +569,34 @@ func (s *GameService) AdminClientUpdateAction(ctx context.Context, actor *model.
 		if req.Action == "server_stop" || req.Action == "server_start" {
 			stop := req.Action == "server_stop"
 			if stop != p.Maintenance || (!stop && p.MaintenanceStartAt != 0) {
+				now := time.Now().UnixMilli()
+				if !stop && p.Mode == constUtil.ClientUpdateModeMaintenance && p.ReleaseID > 0 {
+					var release db.ClientUpdateRelease
+					if err = tx.First(&release, p.ReleaseID).Error; err != nil {
+						return err
+					}
+					if !p.Maintenance {
+						if err = clientUpdateCancelMaintenance(&p, &release, now); err != nil {
+							return err
+						}
+						if err = tx.Save(&release).Error; err != nil {
+							return err
+						}
+						if err = adminAudit(tx, actor, "client_update.cancel_maintenance", strconv.FormatInt(release.ID, 10), req.Reason); err != nil {
+							return err
+						}
+					} else if release.State != "cancelled" {
+						if err = clientUpdateEndMaintenance(&p, &release, now); err != nil {
+							return err
+						}
+					}
+				} else if !stop && !p.Maintenance && p.MaintenanceStartAt != 0 {
+					return constUtil.ErrAdminConfigConflict
+				}
 				p.Maintenance = stop
 				p.MaintenanceStartAt, p.MaintenanceEndAt = 0, 0
 				if stop {
-					p.MaintenanceStartAt = time.Now().UnixMilli()
+					p.MaintenanceStartAt = now
 					p.MaintenanceEpoch++
 					notify = true
 				}
@@ -531,11 +621,28 @@ func (s *GameService) AdminClientUpdateAction(ctx context.Context, actor *model.
 		now := time.Now().UnixMilli()
 		switch req.Action {
 		case "publish":
-			if (r.Mode == constUtil.ClientUpdateModeNotice && (r.MinLoginBuild != p.MinLoginBuild || r.MinRunBuild != p.MinRunBuild)) || (r.Mode == constUtil.ClientUpdateModeNextLogin && (r.MinRunBuild != p.MinRunBuild || r.MinLoginBuild < 1)) {
-				return constUtil.ErrAdminInput
-			}
-			if r.State != "draft" || r.BuildCode < p.LatestBuild || r.MinLoginBuild < p.MinLoginBuild || r.MinRunBuild < p.MinRunBuild {
+			if r.State != "draft" {
 				return constUtil.ErrAdminConfigConflict
+			}
+			if r.VersionPolicy {
+				if !ClientUpdateVersionValid(r.VersionName) {
+					return constUtil.ErrAdminInput
+				}
+				if clientUpdateVersionBelow(r.VersionName, p.MinLoginVersion) || clientUpdateVersionBelow(r.VersionName, p.MinRunVersion) || (ClientUpdateVersionValid(p.VersionName) && clientUpdateVersionBelow(r.VersionName, p.VersionName)) {
+					return constUtil.ErrAdminConfigConflict
+				}
+				// 延续所有已生效的构建号门槛，以免切换策略时降低准入。
+				r.MinLoginBuild, r.MinRunBuild = p.MinLoginBuild, p.MinRunBuild
+			} else {
+				if p.VersionPolicy || p.MinLoginVersion != "" || p.MinRunVersion != "" {
+					return constUtil.ErrAdminConfigConflict
+				}
+				if (r.Mode == constUtil.ClientUpdateModeNotice && (r.MinLoginBuild != p.MinLoginBuild || r.MinRunBuild != p.MinRunBuild)) || (r.Mode == constUtil.ClientUpdateModeNextLogin && (r.MinRunBuild != p.MinRunBuild || r.MinLoginBuild < 1)) {
+					return constUtil.ErrAdminInput
+				}
+				if r.BuildCode < p.LatestBuild || r.MinLoginBuild < p.MinLoginBuild || r.MinRunBuild < p.MinRunBuild {
+					return constUtil.ErrAdminConfigConflict
+				}
 			}
 			if p.Maintenance || p.MaintenanceStartAt > 0 {
 				return constUtil.ErrAdminConfigConflict
@@ -544,7 +651,10 @@ func (s *GameService) AdminClientUpdateAction(ctx context.Context, actor *model.
 			r.PublishedAt = now
 			r.PublishedBy = actor.Username
 			p.ReleaseID = r.ID
-			p.LatestBuild = r.BuildCode
+			p.VersionPolicy = r.VersionPolicy
+			if !r.VersionPolicy {
+				p.LatestBuild = r.BuildCode
+			}
 			p.VersionName = r.VersionName
 			p.Title = r.Title
 			p.Content = r.Content
@@ -558,6 +668,11 @@ func (s *GameService) AdminClientUpdateAction(ctx context.Context, actor *model.
 					p.Maintenance = true
 					p.MaintenanceEpoch++
 					notify = true
+				}
+			} else if r.VersionPolicy {
+				if r.Mode == constUtil.ClientUpdateModeNextLogin && clientUpdateVersionBelow(p.MinLoginVersion, r.VersionName) {
+					p.LoginGateAt = now
+					p.MinLoginVersion = r.VersionName
 				}
 			} else {
 				if r.MinLoginBuild > p.MinLoginBuild {
@@ -580,7 +695,7 @@ func (s *GameService) AdminClientUpdateAction(ctx context.Context, actor *model.
 			p.NoticeEnabled = false
 			r.State = "withdrawn"
 		case "start_maintenance":
-			if p.ReleaseID != r.ID || p.Mode != constUtil.ClientUpdateModeMaintenance || p.Maintenance {
+			if p.ReleaseID != r.ID || p.Mode != constUtil.ClientUpdateModeMaintenance || r.Mode != constUtil.ClientUpdateModeMaintenance || (r.State != "published" && r.State != "withdrawn") || p.Maintenance || p.MaintenanceStartAt == 0 {
 				return constUtil.ErrAdminConfigConflict
 			}
 			p.Maintenance = true
@@ -588,17 +703,13 @@ func (s *GameService) AdminClientUpdateAction(ctx context.Context, actor *model.
 			p.MaintenanceEpoch++
 			notify = true
 		case "end_maintenance":
-			if p.ReleaseID != r.ID || (!p.Maintenance && p.MaintenanceStartAt == 0) {
-				return constUtil.ErrAdminConfigConflict
+			if err = clientUpdateEndMaintenance(&p, &r, now); err != nil {
+				return err
 			}
-			p.Maintenance = false
-			p.MaintenanceStartAt = 0
-			p.MaintenanceEndAt = 0
-			if r.MinLoginBuild > p.MinLoginBuild {
-				p.LoginGateAt = now
+		case "cancel_maintenance":
+			if err = clientUpdateCancelMaintenance(&p, &r, now); err != nil {
+				return err
 			}
-			p.MinLoginBuild = r.MinLoginBuild
-			p.MinRunBuild = r.MinRunBuild
 		default:
 			return constUtil.ErrAdminInput
 		}
@@ -659,7 +770,7 @@ func (s *GameService) AdminClientUpdateHistory(ctx context.Context, actor *model
 	return out, nil
 }
 
-func clientUpdateAuthenticate(ctx context.Context, build int64, startup string, id int64, sessionHex string) (*db.Profile, error) {
+func clientUpdateAuthenticate(ctx context.Context, build int64, version, startup string, id int64, sessionHex string) (*db.Profile, error) {
 	if id == 0 && sessionHex == "" {
 		return nil, nil
 	}
@@ -678,6 +789,9 @@ func clientUpdateAuthenticate(ctx context.Context, build int64, startup string, 
 	if bound.PlayerID == 0 || bound.BuildCode != build || bound.StartupID != startup {
 		return nil, constUtil.ErrClientUpdateIdentity
 	}
+	if clientUpdateKnownVersion(bound.BuildCode, bound.ClientVersion) != clientUpdateKnownVersion(build, version) {
+		return row, constUtil.ErrClientUpdateIdentity
+	}
 	return row, nil
 }
 
@@ -691,16 +805,30 @@ func (s *GameService) ClientUpdateStatus(ctx context.Context, req model.ClientUp
 	_ = json.Unmarshal(adminJSON(clientUpdatePolicyDTO(p)), out)
 	out.BatchID = p.NoticeBatch
 	out.PollSeconds = 60
-	// 达到当前发布版本时无需普通提醒，运行与登录资格继续独立校验。
-	out.NoticeEnabled = out.NoticeEnabled && req.BuildCode < p.LatestBuild
-	row, authErr := clientUpdateAuthenticate(ctx, req.BuildCode, req.StartupID, req.PlayerID, req.SessionHex)
+	// 维护预告覆盖所有客户端；普通更新按当前请求的实际版本计算。
+	if p.VersionPolicy {
+		maintenancePreview := p.Mode == constUtil.ClientUpdateModeMaintenance && !p.Maintenance && p.MaintenanceStartAt > time.Now().UnixMilli()
+		out.NoticeEnabled = out.NoticeEnabled && (maintenancePreview || clientUpdateVersionBelow(clientUpdateKnownVersion(req.BuildCode, req.ClientVersion), p.VersionName))
+		if req.ClientVersion == "" {
+			out.LatestBuild = 0
+			if out.NoticeEnabled {
+				out.LatestBuild = 2100000001
+			}
+		}
+	} else {
+		out.NoticeEnabled = out.NoticeEnabled && req.BuildCode < p.LatestBuild
+	}
+	row, authErr := clientUpdateAuthenticate(ctx, req.BuildCode, req.ClientVersion, req.StartupID, req.PlayerID, req.SessionHex)
 	if req.PlayerID > 0 || req.SessionHex != "" {
 		if authErr != nil {
+			if row != nil && errors.Is(authErr, constUtil.ErrClientUpdateIdentity) {
+				return nil, authErr
+			}
 			// 踢线、改密及绑定失效沿原登录流程处理；状态接口不授予业务访问。
 			// 当前身份不可用时按新登录资格检查，只有更新/维护门槛展示强制更新。
 			err = authErr
 			if !errors.Is(authErr, constUtil.ErrClientUpdateRequired) && !errors.Is(authErr, constUtil.ErrClientUpdateMaintenance) {
-				err = clientUpdateLoginError(p, req.BuildCode)
+				err = clientUpdateLoginError(p, req.BuildCode, req.ClientVersion)
 			}
 			if err != nil {
 				out.Blocked = true
@@ -714,7 +842,7 @@ func (s *GameService) ClientUpdateStatus(ctx context.Context, req model.ClientUp
 		}
 		err = clientUpdateRunError(p, r)
 	} else {
-		err = clientUpdateLoginError(p, req.BuildCode)
+		err = clientUpdateLoginError(p, req.BuildCode, req.ClientVersion)
 	}
 	if err != nil {
 		out.Blocked = true
@@ -732,7 +860,7 @@ func (s *GameService) ClientUpdateAck(ctx context.Context, req model.ClientUpdat
 	if req.BatchID != p.NoticeBatch || !p.NoticeEnabled {
 		return nil, constUtil.ErrAdminConfigConflict
 	}
-	row, err := clientUpdateAuthenticate(ctx, req.BuildCode, req.StartupID, req.PlayerID, req.SessionHex)
+	row, err := clientUpdateAuthenticate(ctx, req.BuildCode, req.ClientVersion, req.StartupID, req.PlayerID, req.SessionHex)
 	if err != nil {
 		return nil, err
 	}

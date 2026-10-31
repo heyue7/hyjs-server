@@ -5,6 +5,7 @@ type ClientUpdateSession struct {
 	PlayerID         int64  `gorm:"column:player_id;primaryKey;autoIncrement:false" json:"playerId"`
 	SessionHash      string `gorm:"column:session_hash;size:64" json:"sessionHash"`
 	BuildCode        int64  `gorm:"column:build_code;not null" json:"buildCode"`
+	ClientVersion    string `gorm:"column:client_version;size:11;not null;default:''" json:"clientVersion"`
 	StartupID        string `gorm:"column:startup_id;size:64" json:"startupId"`
 	LoginAt          int64  `gorm:"column:login_at;not null" json:"loginAt"`
 	LastSeenAt       int64  `gorm:"column:last_seen_at;not null" json:"lastSeenAt"`

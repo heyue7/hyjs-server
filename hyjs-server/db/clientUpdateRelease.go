@@ -4,6 +4,7 @@ package db
 type ClientUpdateRelease struct {
 	ID                 int64  `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
 	BuildCode          int64  `gorm:"column:build_code;not null" json:"buildCode"`
+	VersionPolicy      bool   `gorm:"column:version_policy;not null;default:false" json:"versionPolicy"`
 	VersionName        string `gorm:"column:version_name;size:80" json:"versionName"`
 	Title              string `gorm:"column:title;size:240" json:"title"`
 	Content            string `gorm:"column:content;type:text" json:"content"`

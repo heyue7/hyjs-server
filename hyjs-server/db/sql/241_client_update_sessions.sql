@@ -2,6 +2,7 @@ CREATE TABLE IF NOT EXISTS client_update_sessions (
   player_id BIGINT NOT NULL,
   session_hash VARCHAR(64),
   build_code BIGINT NOT NULL,
+  client_version VARCHAR(11) NOT NULL DEFAULT '',
   startup_id VARCHAR(64),
   login_at BIGINT NOT NULL,
   last_seen_at BIGINT NOT NULL,

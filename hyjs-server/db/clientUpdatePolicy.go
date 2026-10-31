@@ -7,6 +7,9 @@ type ClientUpdatePolicy struct {
 	LatestBuild        int64  `gorm:"column:latest_build;not null" json:"latestBuild"`
 	MinLoginBuild      int64  `gorm:"column:min_login_build;not null" json:"minLoginBuild"`
 	MinRunBuild        int64  `gorm:"column:min_run_build;not null" json:"minRunBuild"`
+	VersionPolicy      bool   `gorm:"column:version_policy;not null;default:false" json:"versionPolicy"`
+	MinLoginVersion    string `gorm:"column:min_login_version;size:11;not null;default:''" json:"minLoginVersion"`
+	MinRunVersion      string `gorm:"column:min_run_version;size:11;not null;default:''" json:"minRunVersion"`
 	Revision           int64  `gorm:"column:revision;not null" json:"revision"`
 	NoticeBatch        int64  `gorm:"column:notice_batch;not null" json:"noticeBatch"`
 	NoticeEnabled      bool   `gorm:"column:notice_enabled;not null" json:"noticeEnabled"`

@@ -149,10 +149,11 @@ type p10PushAuthorization struct {
 	AccountEnabled                                               bool
 	UpdatePlayerID, UpdateBuild, UpdateLoginAt, UpdateLastSeenAt int64
 	UpdateDisconnectedAt, UpdateEpoch                            int64
-	UpdateSessionHash                                            string
+	UpdateSessionHash, UpdateClientVersion                       string
 	UpdateConnected                                              bool
 	PolicyID, PolicyMinRun, PolicyMinLogin, PolicyLoginGateAt    int64
 	PolicyMaintenanceStartAt, PolicyMaintenanceEpoch             int64
+	PolicyMinLoginVersion, PolicyMinRunVersion                   string
 	PolicyMaintenance                                            bool
 }
 
@@ -163,11 +164,14 @@ func p10PushAuthorizationQuery(tx *gorm.DB, accountTable string, id int64) *gorm
 		COALESCE(a.id,0) AS account_row_id, COALESCE(a.enabled,0) AS account_enabled,
 		COALESCE(a.auth_revision,0) AS account_revision,
 		COALESCE(u.player_id,0) AS update_player_id, COALESCE(u.session_hash,'') AS update_session_hash,
-		COALESCE(u.build_code,0) AS update_build, COALESCE(u.login_at,0) AS update_login_at,
+		COALESCE(u.build_code,0) AS update_build, COALESCE(u.client_version,'') AS update_client_version,
+		COALESCE(u.login_at,0) AS update_login_at,
 		COALESCE(u.last_seen_at,0) AS update_last_seen_at, COALESCE(u.disconnected_at,0) AS update_disconnected_at,
 		COALESCE(u.maintenance_epoch,0) AS update_epoch, COALESCE(u.connected,0) AS update_connected,
 		COALESCE(c.id,0) AS policy_id, COALESCE(c.min_run_build,0) AS policy_min_run,
 		COALESCE(c.min_login_build,0) AS policy_min_login, COALESCE(c.login_gate_at,0) AS policy_login_gate_at,
+		COALESCE(c.min_login_version,'') AS policy_min_login_version,
+		COALESCE(c.min_run_version,'') AS policy_min_run_version,
 		COALESCE(c.maintenance,0) AS policy_maintenance, COALESCE(c.maintenance_start_at,0) AS policy_maintenance_start_at,
 		COALESCE(c.maintenance_epoch,0) AS policy_maintenance_epoch`).
 		Joins("LEFT JOIN "+account+" AS a ON a.id=p.account_id").
@@ -218,6 +222,7 @@ func authorizeP10Push(ctx context.Context, id int64, session []byte) error {
 		return gorm.ErrRecordNotFound
 	}
 	policy := db.ClientUpdatePolicy{ID: value.PolicyID, MinRunBuild: value.PolicyMinRun, MinLoginBuild: value.PolicyMinLogin,
+		MinRunVersion: value.PolicyMinRunVersion, MinLoginVersion: value.PolicyMinLoginVersion,
 		LoginGateAt: value.PolicyLoginGateAt, Maintenance: value.PolicyMaintenance,
 		MaintenanceStartAt: value.PolicyMaintenanceStartAt, MaintenanceEpoch: value.PolicyMaintenanceEpoch}
 	if !policy.Maintenance && policy.MaintenanceStartAt > 0 && policy.MaintenanceStartAt <= time.Now().UnixMilli() {
@@ -236,7 +241,8 @@ func authorizeP10Push(ctx context.Context, id int64, session []byte) error {
 	binding := db.ClientUpdateSession{}
 	if value.UpdateSessionHash == clientUpdateSessionHash(row.Session) {
 		binding = db.ClientUpdateSession{PlayerID: value.UpdatePlayerID, SessionHash: value.UpdateSessionHash, BuildCode: value.UpdateBuild,
-			LoginAt: value.UpdateLoginAt, LastSeenAt: value.UpdateLastSeenAt, DisconnectedAt: value.UpdateDisconnectedAt,
+			ClientVersion: value.UpdateClientVersion,
+			LoginAt:       value.UpdateLoginAt, LastSeenAt: value.UpdateLastSeenAt, DisconnectedAt: value.UpdateDisconnectedAt,
 			MaintenanceEpoch: value.UpdateEpoch, Connected: value.UpdateConnected}
 	}
 	if err := clientUpdateSessionError(policy, binding); err != nil {

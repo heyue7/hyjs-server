@@ -21,6 +21,16 @@ ALLOWED = {'Login.LoginCheckVersion::CheckVersion', 'Login.LoginUserLogin::UserL
            'UI.LoginNormalUI::Start', 'UI.LoginNormalUI::Show'}
 def sha(value): return hashlib.sha256(value).hexdigest()
 
+def valid_version_name(value):
+    """Accept only the canonical game version used by the server and bridge."""
+    return re.fullmatch(r'(?:0|[1-9][0-9]{0,2})\.(?:0|[1-9][0-9]{0,2})\.(?:0|[1-9][0-9]{0,2})', value) is not None
+
+def version_name_advances(value, base):
+    """Compare canonical versions numerically; legacy base names have no known order."""
+    if not valid_version_name(value): return False
+    if not valid_version_name(base): return True
+    return tuple(map(int, value.split('.'))) > tuple(map(int, base.split('.')))
+
 def manifest_versions(raw):
     """Read the base APK identity so the packaged manifest keeps increasing."""
     parts = chunks(raw)
@@ -67,11 +77,12 @@ def main():
     p.add_argument('--build-code',type=int,required=True);p.add_argument('--version-name',required=True)
     a=p.parse_args();out=a.output_directory.resolve();require(not out.exists(),'Fresh directory required')
     require(0<a.build_code<2147483648,'Android build code must fit signed int')
-    require(len(a.version_name.strip())>0,'Android version name required')
+    require(valid_version_name(a.version_name),'Android version name must have three canonical ASCII integer segments in 0..999')
     allowed=ALLOWED
     require(sha(a.base_apk.read_bytes())==a.base_sha256,'APK identity changed')
     with zipfile.ZipFile(a.base_apk) as base_zip: base_code,base_name=manifest_versions(base_zip.read('AndroidManifest.xml'))
     require(a.build_code>base_code,'Android build code must exceed the base manifest')
+    require(version_name_advances(a.version_name,base_name),'Android version name must exceed the base manifest version')
     out.mkdir(parents=True)
     runtime=ROOT/'.tools/native-batch';dotnet=runtime/'dotnet/dotnet';compiler=next((runtime/'dotnet/sdk').glob('*/Roslyn/bincore/csc.dll'))
     source=Path(__file__).resolve().parent;dnlib=runtime/'injector/bin/Debug/net8.0/dnlib.dll'

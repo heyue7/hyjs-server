@@ -2,6 +2,12 @@ package model
 
 // ClientUpdatePolicy 定义客户端更新接口数据。
 type ClientUpdatePolicy struct {
+	// VersionPolicy 为 true 时按三段数字版本计算提醒与门槛。
+	VersionPolicy bool `json:"versionPolicy"`
+	// MinLoginVersion 是新登录最低语义版本，空串表示无限制。
+	MinLoginVersion string `json:"minLoginVersion"`
+	// MinRunVersion 是当前会话最低语义版本，空串表示无限制。
+	MinRunVersion string `json:"minRunVersion"`
 	// ReleaseID 是当前策略所引用的发布记录ID。
 	ReleaseID int64 `json:"releaseId"`
 	// LatestBuild 是已发布的最新构建号。
@@ -34,6 +40,8 @@ type ClientUpdatePolicy struct {
 
 // ClientUpdateRelease 定义客户端更新接口数据。
 type ClientUpdateRelease struct {
+	// VersionPolicy 为 true 时按三段数字版本发布。
+	VersionPolicy bool `json:"versionPolicy"`
 	// ID 是草稿或发布记录ID，创建草稿传0。
 	ID int64 `json:"id"`
 	// BuildCode 是APK独立构建号，0表示无法识别。
@@ -54,7 +62,7 @@ type ClientUpdateRelease struct {
 	MaintenanceStartAt int64 `json:"maintenanceStartAt"`
 	// MaintenanceEndAt 是预计维护结束的毫秒时间，不会自动开服。
 	MaintenanceEndAt int64 `json:"maintenanceEndAt"`
-	// State 取 draft=草稿、published=已发布、withdrawn=已撤回。
+	// State 取 draft=草稿、published=已发布、withdrawn=提醒已撤回、cancelled=维护计划已取消。
 	State string `json:"state"`
 	// PublishedAt 是首次发布的毫秒时间。
 	PublishedAt int64 `json:"publishedAt"`
@@ -100,6 +108,8 @@ type AdminClientUpdatesResponse struct {
 
 // AdminClientUpdateDraftRequest 定义客户端更新接口数据。
 type AdminClientUpdateDraftRequest struct {
+	// VersionPolicy 为 true 时按三段数字版本发布。
+	VersionPolicy bool `json:"versionPolicy"`
 	// ID 是草稿或发布记录ID，创建草稿传0。
 	ID int64 `json:"id"`
 	// Version 是全局策略修订字符串，写入时用于乐观锁。
@@ -134,7 +144,7 @@ type AdminClientUpdateActionRequest struct {
 	Version string `json:"version" binding:"required"`
 	// RequestID 是本次操作的唯一幂等键。
 	RequestID string `json:"requestId" binding:"required"`
-	// Action 取 publish、remind、withdraw、start_maintenance、end_maintenance。
+	// Action 取 publish、remind、withdraw、start_maintenance、end_maintenance、cancel_maintenance、server_stop、server_start。
 	Action string `json:"action" binding:"required"`
 	// Reason 是管理员操作原因或客户端受限提示。
 	Reason string `json:"reason"`
@@ -150,6 +160,8 @@ type AdminClientUpdateHistoryResponse struct {
 
 // ClientUpdateStatusRequest 定义客户端更新接口数据。
 type ClientUpdateStatusRequest struct {
+	// ClientVersion 是客户端三段数字版本，旧客户端可省略。
+	ClientVersion string `json:"clientVersion"`
 	// BuildCode 是APK独立构建号，0表示无法识别。
 	BuildCode int64 `json:"buildCode"`
 	// StartupID 是当前客户端进程的32位小写十六进制启动标识。
@@ -162,6 +174,8 @@ type ClientUpdateStatusRequest struct {
 
 // ClientUpdateAckRequest 定义客户端更新接口数据。
 type ClientUpdateAckRequest struct {
+	// ClientVersion 是客户端三段数字版本，旧客户端可省略。
+	ClientVersion string `json:"clientVersion"`
 	// BuildCode 是APK独立构建号，0表示无法识别。
 	BuildCode int64 `json:"buildCode"`
 	// StartupID 是当前客户端进程的32位小写十六进制启动标识。
@@ -178,6 +192,12 @@ type ClientUpdateAckRequest struct {
 
 // ClientUpdateStatusResponse 定义客户端更新接口数据。
 type ClientUpdateStatusResponse struct {
+	// VersionPolicy 为 true 时按三段数字版本计算提醒与门槛。
+	VersionPolicy bool `json:"versionPolicy"`
+	// MinLoginVersion 是新登录最低语义版本，空串表示无限制。
+	MinLoginVersion string `json:"minLoginVersion"`
+	// MinRunVersion 是当前会话最低语义版本，空串表示无限制。
+	MinRunVersion string `json:"minRunVersion"`
 	// LatestBuild 是已发布的最新构建号。
 	LatestBuild int64 `json:"latestBuild"`
 	// MinLoginBuild 是新登录最低构建号，0表示无限制。

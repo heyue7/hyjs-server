@@ -2,10 +2,12 @@ package handler
 
 import (
 	"encoding/hex"
+	"errors"
 	"github.com/gin-gonic/gin"
 	"hyjs-server/constUtil"
 	"hyjs-server/model"
 	"hyjs-server/routes"
+	"hyjs-server/service"
 	"net/http"
 	"strings"
 )
@@ -60,7 +62,8 @@ func AdminClientUpdateDraftHandler(c *gin.Context) {
 	req.Title = strings.TrimSpace(req.Title)
 	req.Content = strings.TrimSpace(req.Content)
 	req.Reason = strings.TrimSpace(req.Reason)
-	if req.ID < 0 || req.BuildCode < 1 || req.BuildCode > 2100000000 || req.MinLoginBuild < 0 || req.MinRunBuild < 0 || req.MinRunBuild > req.MinLoginBuild || req.MinLoginBuild > req.BuildCode || req.Version == "" || len(req.Version) > 40 || req.VersionName == "" || len(req.VersionName) > 80 || req.Title == "" || len([]rune(req.Title)) > 80 || req.Content == "" || len(req.Content) > 16000 || req.Reason == "" || len(req.Reason) > 1000 || (req.Mode != "notice" && req.Mode != "next_login" && req.Mode != "maintenance") || req.MaintenanceStartAt < 0 || req.MaintenanceEndAt < 0 || (req.Mode == "maintenance" && (req.MaintenanceStartAt == 0 || req.MaintenanceEndAt <= req.MaintenanceStartAt)) || (req.Mode != "maintenance" && (req.MaintenanceStartAt != 0 || req.MaintenanceEndAt != 0)) {
+	invalidBuildPolicy := !req.VersionPolicy && (req.BuildCode < 1 || req.BuildCode > 2100000000 || req.MinLoginBuild < 0 || req.MinRunBuild < 0 || req.MinRunBuild > req.MinLoginBuild || req.MinLoginBuild > req.BuildCode)
+	if req.ID < 0 || invalidBuildPolicy || (req.VersionPolicy && !service.ClientUpdateVersionValid(req.VersionName)) || req.Version == "" || len(req.Version) > 40 || req.VersionName == "" || len(req.VersionName) > 80 || req.Title == "" || len([]rune(req.Title)) > 80 || req.Content == "" || len(req.Content) > 16000 || req.Reason == "" || len(req.Reason) > 1000 || (req.Mode != "notice" && req.Mode != "next_login" && req.Mode != "maintenance") || req.MaintenanceStartAt < 0 || req.MaintenanceEndAt < 0 || (req.Mode == "maintenance" && (req.MaintenanceStartAt == 0 || req.MaintenanceEndAt <= req.MaintenanceStartAt)) || (req.Mode != "maintenance" && (req.MaintenanceStartAt != 0 || req.MaintenanceEndAt != 0)) {
 		adminError(c, constUtil.ErrAdminInput)
 		return
 	}
@@ -74,7 +77,7 @@ func AdminClientUpdateDraftHandler(c *gin.Context) {
 
 // AdminClientUpdateActionHandler 幂等提交更新操作。
 // @Summary 执行更新操作
-// @Description 仅管理员可发布、提醒、撤回和切换维护。
+// @Description 仅管理员可发布、提醒、撤回、取消维护计划和切换维护。
 // @Tags Admin
 // @Accept json
 // @Produce json
@@ -88,7 +91,7 @@ func AdminClientUpdateActionHandler(c *gin.Context) {
 		return
 	}
 	req.Reason = strings.TrimSpace(req.Reason)
-	if (req.ID < 1 && req.Action != "server_stop" && req.Action != "server_start") || req.Version == "" || len(req.Version) > 40 || len(req.RequestID) < 16 || len(req.RequestID) > 80 || strings.ContainsAny(req.RequestID, " /\\\r\n\x00") || req.Reason == "" || len(req.Reason) > 1000 || (req.Action != "publish" && req.Action != "remind" && req.Action != "withdraw" && req.Action != "start_maintenance" && req.Action != "end_maintenance" && req.Action != "server_stop" && req.Action != "server_start") {
+	if (req.ID < 1 && req.Action != "server_stop" && req.Action != "server_start") || req.Version == "" || len(req.Version) > 40 || len(req.RequestID) < 16 || len(req.RequestID) > 80 || strings.ContainsAny(req.RequestID, " /\\\r\n\x00") || req.Reason == "" || len(req.Reason) > 1000 || (req.Action != "publish" && req.Action != "remind" && req.Action != "withdraw" && req.Action != "start_maintenance" && req.Action != "end_maintenance" && req.Action != "cancel_maintenance" && req.Action != "server_stop" && req.Action != "server_start") {
 		adminError(c, constUtil.ErrAdminInput)
 		return
 	}
@@ -142,12 +145,16 @@ func ClientUpdateStatusHandler(c *gin.Context) {
 	req.StartupID = strings.ToLower(strings.ReplaceAll(req.StartupID, "-", ""))
 	_, startupErr := hex.DecodeString(req.StartupID)
 	session, sessionErr := hex.DecodeString(req.SessionHex)
-	if req.BuildCode < 0 || len(req.StartupID) != 32 || startupErr != nil || req.PlayerID < 0 || ((req.PlayerID > 0 || req.SessionHex != "") && (req.PlayerID == 0 || sessionErr != nil || len(session) != 16)) {
+	if req.BuildCode < 0 || (req.ClientVersion != "" && !service.ClientUpdateVersionValid(req.ClientVersion)) || len(req.StartupID) != 32 || startupErr != nil || req.PlayerID < 0 || ((req.PlayerID > 0 || req.SessionHex != "") && (req.PlayerID == 0 || sessionErr != nil || len(session) != 16)) {
 		c.JSON(400, gin.H{"code": 400, "msg": "参数无效", "data": nil})
 		return
 	}
 	out, err := gameService.ClientUpdateStatus(c.Request.Context(), req)
 	if err != nil {
+		if errors.Is(err, constUtil.ErrClientUpdateIdentity) {
+			c.JSON(http.StatusConflict, gin.H{"code": 409, "msg": "客户端版本与会话不一致", "data": nil})
+			return
+		}
 		c.JSON(500, gin.H{"code": 500, "msg": "更新状态暂不可用", "data": nil})
 		return
 	}
@@ -172,7 +179,7 @@ func ClientUpdateAckHandler(c *gin.Context) {
 	req.StartupID = strings.ToLower(strings.ReplaceAll(req.StartupID, "-", ""))
 	_, startupErr := hex.DecodeString(req.StartupID)
 	session, sessionErr := hex.DecodeString(req.SessionHex)
-	if req.BuildCode < 0 || len(req.StartupID) != 32 || startupErr != nil || req.BatchID < 1 || req.PlayerID < 0 || (req.Kind != "shown" && req.Kind != "acknowledged") || ((req.PlayerID > 0 || req.SessionHex != "") && (req.PlayerID == 0 || sessionErr != nil || len(session) != 16)) {
+	if req.BuildCode < 0 || (req.ClientVersion != "" && !service.ClientUpdateVersionValid(req.ClientVersion)) || len(req.StartupID) != 32 || startupErr != nil || req.BatchID < 1 || req.PlayerID < 0 || (req.Kind != "shown" && req.Kind != "acknowledged") || ((req.PlayerID > 0 || req.SessionHex != "") && (req.PlayerID == 0 || sessionErr != nil || len(session) != 16)) {
 		c.JSON(400, gin.H{"code": 400, "msg": "参数无效", "data": nil})
 		return
 	}

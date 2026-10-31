@@ -1,6 +1,7 @@
 CREATE TABLE IF NOT EXISTS client_update_releases (
   id BIGINT NOT NULL AUTO_INCREMENT,
   build_code BIGINT NOT NULL,
+  version_policy BOOLEAN NOT NULL DEFAULT FALSE,
   version_name VARCHAR(80),
   title VARCHAR(240),
   content LONGTEXT,

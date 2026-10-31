@@ -32,29 +32,39 @@ public final class ClientUpdate {
     private static final String STARTUP = UUID.randomUUID().toString().replace("-", "");
     private static final Handler UI = new Handler(Looper.getMainLooper());
     private static final ExecutorService IO = Executors.newSingleThreadExecutor();
-    private static Activity activity;
+    private static volatile Activity activity;
     private static String origin;
     private static volatile JSONObject status;
     private static volatile Object statusAuth;
     private static volatile boolean blocked;
     private static volatile boolean active;
     private static volatile boolean accepted;
-    private static volatile long buildCode;
-    private static volatile String versionName = "";
+    private static volatile ClientVersion clientVersion;
     private static boolean busy;
     private static Dialog dialog;
     private static Dialog declaration;
     private static String displayedJson;
     private static final Runnable POLL = new Runnable(){public void run(){check();}};
-    public static String version(){if(buildCode==0 && activity!=null)readVersion(activity);return "hyjs/"+buildCode+"/"+STARTUP;}
-    public static String displayVersion(){if(versionName.length()==0 && activity!=null)readVersion(activity);return versionName;}
-    private static void readVersion(Activity a){
-        // Package manifest is the only version source; the packaged values cannot drift.
-        try {
-            PackageInfo info=a.getPackageManager().getPackageInfo(a.getPackageName(),0);
-            buildCode=Build.VERSION.SDK_INT>=28?info.getLongVersionCode():info.versionCode;
-            versionName=info.versionName==null?"":info.versionName.trim();
-        }catch(Exception ignored){buildCode=0;versionName="";}
+    public static String version(){return identity().appVersion(STARTUP);}
+    public static String displayVersion(){return identity().displayName;}
+    private static ClientVersion identity(){
+        ClientVersion result=clientVersion;
+        if(result!=null)return result;
+        synchronized(ClientUpdate.class){
+            if(clientVersion!=null)return clientVersion;
+            Activity a=activity;
+            // Unity may call the login bridge before ClientUpdateActivity.boot returns.
+            if(a==null)try{a=(Activity)Class.forName("com.unity3d.player.UnityPlayer").getField("currentActivity").get(null);}catch(Exception ignored){}
+            long build=0;String name="";
+            if(a!=null)try{
+                PackageInfo info=a.getPackageManager().getPackageInfo(a.getPackageName(),0);
+                build=Build.VERSION.SDK_INT>=28?info.getLongVersionCode():info.versionCode;
+                name=info.versionName;
+            }catch(Exception ignored){build=0;name="";}
+            // Freeze even an unknown identity: login, status and acknowledgements must agree.
+            clientVersion=new ClientVersion(build,name);
+            return clientVersion;
+        }
     }
     public static synchronized void boot(Activity a){activity=a;
         // Leaving one activity replaces its windows; drop stale handles before re-showing.
@@ -64,7 +74,7 @@ public final class ClientUpdate {
             InputStream in=a.getAssets().open("local-wallet.json"); origin=new JSONObject(read(in)).getString("origin").replaceAll("/+$", "");
             if(!origin.startsWith("https://") && !origin.startsWith("http://"))origin=null;
         }catch(Exception ignored){origin=null;}
-        readVersion(a);
+        identity();
         accepted=a.getSharedPreferences(PREFS,0).getBoolean(ACCEPTED,false);resume();}
     public static void resume(){active=true; UI.removeCallbacks(POLL); if(!accepted){declaration();return;} UI.post(POLL);}
     public static void pause(){active=false;UI.removeCallbacks(POLL);}
@@ -74,7 +84,9 @@ public final class ClientUpdate {
     private static Object credentials()throws Exception {Field f=Class.forName("com.hyjs.wallet.WalletActivity").getDeclaredField("credentials");f.setAccessible(true);return f.get(null);}
     private static Object field(Object o,String name)throws Exception {Field f=o.getClass().getDeclaredField(name);f.setAccessible(true);return f.get(o);}
     private static JSONObject payload(Object auth)throws Exception {
-        JSONObject p=new JSONObject().put("buildCode",buildCode).put("startupId",STARTUP);
+        ClientVersion version=identity();
+        JSONObject p=new JSONObject().put("buildCode",version.buildCode).put("startupId",STARTUP);
+        if(version.name.length()>0)p.put("clientVersion",version.name);
         long player=((Number)field(auth,"player")).longValue();String session=(String)field(auth,"session");
         if(player>0 && session.matches("[a-fA-F0-9]{32}"))p.put("playerId",player).put("sessionHex",session);return p;
     }
@@ -95,7 +107,9 @@ public final class ClientUpdate {
         final JSONObject s=new JSONObject(json);JSONObject latest=status;if(latest==null || !latest.toString().equals(json) || !active || activity==null || activity.isFinishing())return;
         final Object displayAuth=statusAuth;final boolean force=s.optBoolean("blocked",false);final String batch=s.optString("batchId", "");
         if(dialog!=null && dialog.isShowing())return;
-        if(!force && (buildCode>=s.optLong("latestBuild",0) || !s.optBoolean("noticeEnabled",false) || batch.length()==0 || activity.getSharedPreferences(PREFS,0).getBoolean("seen."+batch,false)))return;
+        boolean versionPolicy=s.optBoolean("versionPolicy",false);
+        boolean eligible=identity().noticeEligible(versionPolicy,maintenance(s,false),s.optLong("latestBuild",0),s.optString("versionName",""));
+        if(!force && (!eligible || !s.optBoolean("noticeEnabled",false) || batch.length()==0 || activity.getSharedPreferences(PREFS,0).getBoolean("seen."+batch,false)))return;
         dialog=new Dialog(activity);dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);dialog.setCancelable(!force);dialog.setCanceledOnTouchOutside(false);
         LinearLayout box=new LinearLayout(activity);box.setOrientation(LinearLayout.VERTICAL);box.setPadding(dp(28),dp(24),dp(28),dp(22));
         GradientDrawable bg=new GradientDrawable();bg.setColor(Color.rgb(245,249,250));bg.setStroke(dp(2),Color.rgb(124,174,187));bg.setCornerRadius(dp(3));box.setBackground(bg);
@@ -153,7 +167,8 @@ public final class ClientUpdate {
         String title=s.optString("title","").trim(),body=s.optString("content","").trim(),version=s.optString("versionName","").trim();
         if(title.length()>0)text.append(title).append("\n\n");
         if(version.length()>0)text.append("最新版本：").append(version).append("\n");
-        text.append("当前版本：").append(versionName.length()>0?versionName:"未知").append("\n\n");
+        String current=identity().displayName;
+        text.append("当前版本：").append(current.length()>0?current:"未知").append("\n\n");
         if(maintenance(s,force)){
             text.append(force?"服务器正在维护，暂时无法进入游戏。":"维护开始后将暂时无法进入游戏。").append("\n");
             long start=s.optLong("maintenanceStartAt",0),end=s.optLong("maintenanceEndAt",0);
@@ -166,4 +181,48 @@ public final class ClientUpdate {
         return text.toString().trim();
     }
     private static int dp(int n){return Math.round(n*activity.getResources().getDisplayMetrics().density);}
+}
+
+/** Package identity and version ordering; kept in this source so the APK build includes it. */
+final class ClientVersion {
+    final long buildCode;
+    final String name;
+    final String displayName;
+    private final int[] parts;
+
+    ClientVersion(long buildCode,String versionName){
+        this.buildCode=buildCode;
+        displayName=versionName==null?"":versionName.trim();
+        parts=parse(versionName);
+        name=parts==null?"":versionName;
+    }
+    String appVersion(String startup){return "hyjs/"+buildCode+"/"+startup+(name.length()>0?"/"+name:"");}
+    boolean noticeEligible(boolean versionPolicy,boolean maintenance,long latestBuild,String latestName){
+        if(!versionPolicy)return buildCode<latestBuild;
+        if(maintenance)return true;
+        // An unknown installed version relies on the server's noticeEnabled decision.
+        if(parts==null)return true;
+        int[] latest=parse(latestName);
+        if(latest==null)return false;
+        for(int i=0;i<3;i++)if(parts[i]!=latest[i])return parts[i]<latest[i];
+        return false;
+    }
+    private static int[] parse(String value){
+        if(value==null)return null;
+        String[] fields=value.split("\\.",-1);
+        if(fields.length!=3)return null;
+        int[] result=new int[3];
+        for(int i=0;i<3;i++){
+            String field=fields[i];
+            if(field.length()==0 || field.length()>3 || (field.length()>1 && field.charAt(0)=='0'))return null;
+            int n=0;
+            for(int j=0;j<field.length();j++){
+                char digit=field.charAt(j);
+                if(digit<'0' || digit>'9')return null;
+                n=n*10+(digit-'0');
+            }
+            result[i]=n;
+        }
+        return result;
+    }
 }
