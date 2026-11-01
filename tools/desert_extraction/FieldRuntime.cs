@@ -110,8 +110,9 @@ namespace HYJS.DesertV4
         public static bool TransferResponse(int opcode,object owner,object value) { return LeaveController.Response(opcode,owner,value); }
         public static void TrackPositionBase(object net,object value) { PositionSync.TrackBaseResponse(net,value); LeaveController.SceneReady(); }
         public static void TrackPositionField(object value) { PositionSync.TrackFieldResponse(value); LeaveController.SceneReady(); }
-        public static void TrackPositionPacket(object value) { PositionSync.TrackPacket(value); }
-        public static bool DropPositionPacket(object value) { return PositionSync.DropPacket(value); }
+        public static void TrackPositionPacket(object value) { PositionSync.TrackPacket(value); LeaveController.TrackPacket(value); }
+        public static bool DropPositionPacket(object value)
+        { bool position=PositionSync.DropPacket(value); return LeaveController.DropPacket(value) || position; }
         public static bool DropOldSocket(object tool,object value) { return PositionSync.DropOldSocket(tool,value as IAsyncResult); }
         public static bool BlockMove(RoomCharactor actor)
         {

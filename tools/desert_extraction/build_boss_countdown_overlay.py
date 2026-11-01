@@ -55,21 +55,150 @@ def source_list(raw):
                     isinstance(target, ast.Name) and target.id == 'SOURCES' for target in node.targets))
 
 
+class CliSignatures:
+    """Normalize build-local TypeDefOrRef tokens to named managed types."""
+
+    SIMPLE = {1: 'void', 2: 'bool', 3: 'char', 4: 'i1', 5: 'u1', 6: 'i2', 7: 'u2',
+              8: 'i4', 9: 'u4', 10: 'i8', 11: 'u8', 12: 'r4', 13: 'r8', 14: 'string',
+              22: 'typedbyref', 24: 'nativeint', 25: 'nativeuint', 28: 'object'}
+
+    def __init__(self, pe):
+        self.pe = pe
+        self.parents = {row.NestedClass.row_index: row.EnclosingClass.row_index
+                        for row in (pe.net.mdtables.NestedClass.rows if pe.net.mdtables.NestedClass else [])}
+
+    @staticmethod
+    def uint(raw, pos):
+        first = raw[pos]
+        if first < 0x80:
+            return first, pos + 1
+        if first < 0xc0:
+            return ((first & 0x3f) << 8) | raw[pos + 1], pos + 2
+        if first < 0xe0:
+            return ((first & 0x1f) << 24) | (raw[pos + 1] << 16) | (raw[pos + 2] << 8) | raw[pos + 3], pos + 4
+        raise ValueError('Invalid compressed signature integer')
+
+    def definition(self, rid):
+        row = self.pe.net.mdtables.TypeDef.rows[rid - 1]
+        if rid in self.parents:
+            return self.definition(self.parents[rid]) + '+' + str(row.TypeName)
+        return '.'.join(filter(None, [str(row.TypeNamespace), str(row.TypeName)]))
+
+    def reference(self, rid):
+        row = self.pe.net.mdtables.TypeRef.rows[rid - 1]
+        scope = row.ResolutionScope.row
+        if scope is not None and hasattr(scope, 'TypeName'):
+            return self.reference(row.ResolutionScope.row_index) + '+' + str(row.TypeName)
+        assembly = str(scope.Name) if scope is not None and hasattr(scope, 'Name') else ''
+        return '[' + assembly + ']' + '.'.join(filter(None, [str(row.TypeNamespace), str(row.TypeName)]))
+
+    def coded(self, value):
+        kind, rid = value & 3, value >> 2
+        if not rid:
+            raise ValueError('Null TypeDefOrRef in public ABI')
+        if kind == 0:
+            return 'def:' + self.definition(rid)
+        if kind == 1:
+            return 'ref:' + self.reference(rid)
+        if kind == 2:
+            raw = self.pe.net.mdtables.TypeSpec.rows[rid - 1].Signature.value
+            value, end = self.typ(raw, 0)
+            if end != len(raw):
+                raise ValueError('Trailing TypeSpec signature')
+            return 'spec:' + value
+        raise ValueError('Invalid TypeDefOrRef tag')
+
+    def typ(self, raw, pos):
+        kind = raw[pos]
+        pos += 1
+        if kind in self.SIMPLE:
+            return self.SIMPLE[kind], pos
+        if kind in (0x0f, 0x10, 0x1d, 0x45):
+            nested, pos = self.typ(raw, pos)
+            return {0x0f: 'ptr', 0x10: 'byref', 0x1d: 'array', 0x45: 'pinned'}[kind] + '(' + nested + ')', pos
+        if kind in (0x11, 0x12):
+            value, pos = self.uint(raw, pos)
+            return ('valuetype:' if kind == 0x11 else 'class:') + self.coded(value), pos
+        if kind in (0x13, 0x1e):
+            value, pos = self.uint(raw, pos)
+            return ('var:' if kind == 0x13 else 'mvar:') + str(value), pos
+        if kind in (0x1f, 0x20):
+            value, pos = self.uint(raw, pos)
+            nested, pos = self.typ(raw, pos)
+            return ('modreq:' if kind == 0x1f else 'modopt:') + self.coded(value) + '(' + nested + ')', pos
+        if kind == 0x15:
+            base, pos = self.typ(raw, pos)
+            count, pos = self.uint(raw, pos)
+            args = []
+            for _ in range(count):
+                item, pos = self.typ(raw, pos)
+                args.append(item)
+            return 'generic:' + base + '<' + ','.join(args) + '>', pos
+        if kind == 0x14:
+            nested, pos = self.typ(raw, pos)
+            rank, pos = self.uint(raw, pos)
+            sizes_count, pos = self.uint(raw, pos)
+            sizes = []
+            for _ in range(sizes_count):
+                value, pos = self.uint(raw, pos)
+                sizes.append(value)
+            bounds_count, pos = self.uint(raw, pos)
+            bounds = []
+            for _ in range(bounds_count):
+                value, pos = self.uint(raw, pos)
+                bounds.append(value)
+            return 'mdarray:%s:%s:%s:%s' % (nested, rank, sizes, bounds), pos
+        if kind == 0x1b:
+            nested, pos = self.method(raw, pos)
+            return 'fnptr:' + nested, pos
+        raise ValueError('Unsupported public ABI element 0x%02x' % kind)
+
+    def method(self, raw, pos=0):
+        flags = raw[pos]
+        pos += 1
+        generic = 0
+        if flags & 0x10:
+            generic, pos = self.uint(raw, pos)
+        count, pos = self.uint(raw, pos)
+        result, pos = self.typ(raw, pos)
+        params = []
+        while len([p for p in params if p != 'sentinel']) < count:
+            if raw[pos] == 0x41:
+                params.append('sentinel')
+                pos += 1
+            else:
+                value, pos = self.typ(raw, pos)
+                params.append(value)
+        return '%d/%d:%s(%s)' % (flags, generic, result, ','.join(params)), pos
+
+    def signature(self, raw, field=False):
+        if field:
+            if raw[0] != 0x06:
+                raise ValueError('Invalid field signature')
+            result, end = self.typ(raw, 1)
+        else:
+            result, end = self.method(raw)
+        if end != len(raw):
+            raise ValueError('Trailing public ABI signature')
+        return result
+
+
 def public_abi(pe):
     entries = Counter()
-    for owner in pe.net.mdtables.TypeDef.rows:
+    signatures = CliSignatures(pe)
+    for rid, owner in enumerate(pe.net.mdtables.TypeDef.rows, 1):
         if not (owner.Flags.tdPublic or owner.Flags.tdNestedPublic):
             continue
-        name = str(owner.TypeNamespace) + '.' + str(owner.TypeName)
+        name = signatures.definition(rid)
         entries[('type', name, owner.struct.Flags)] += 1
         for item in owner.MethodList:
             row = item.row
             if row.Flags.mdPublic:
-                entries[('method', name, str(row.Name), row.Signature.value.hex(), row.struct.Flags)] += 1
+                entries[('method', name, str(row.Name), signatures.signature(row.Signature.value), row.struct.Flags, row.struct.ImplFlags)] += 1
         for item in owner.FieldList:
             row = item.row
             if row.Flags.fdPublic:
-                entries[('field', name, str(row.Name), row.Signature.value.hex(), row.struct.Flags)] += 1
+                entries[('field', name, str(row.Name), signatures.signature(row.Signature.value, field=True), row.struct.Flags)] += 1
     return entries
 
 
@@ -112,7 +241,7 @@ def main():
         for name in sources:
             (old / name).write_bytes(baseline(name))
         changed = [name for name in sources if (old / name).read_bytes() != (HERE / name).read_bytes()]
-        if set(changed) != {'FieldBoss.cs', 'MapViewer86.cs'}:
+        if set(changed) != {'FieldBoss.cs', 'MapViewer86.cs', 'FieldRuntime.cs', 'PositionSync.cs', 'LeaveController.cs'}:
             raise ValueError('Unexpected production source changes: %s' % changed)
         (old / 'icon.png').write_bytes(baseline(ICON))
         if (HERE / ICON).read_bytes() != (old / 'icon.png').read_bytes():

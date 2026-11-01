@@ -9,7 +9,7 @@ using UnityEngine;
 
 namespace UnityEngine
 {
-    public struct Vector3
+    public partial struct Vector3
     {
         public float x,y,z;
         public Vector3(float a,float b,float c) { x=a; y=b; z=c; }
@@ -21,7 +21,7 @@ namespace ProtoBuf.Message
     public sealed class SCSocketLogin { public int result; }
     public sealed class PointNew { public float x,y,z; }
     public sealed class MovePlayerInfo { public long playerId; }
-    public sealed class Position { public PointNew current; }
+    public sealed class Position { public PointNew current; public string scene="field_003"; }
     public sealed class MovePlayer { public MovePlayerInfo info; public Position position; }
     public sealed class SCCurrentPosition { public MovePlayer self; }
 }
@@ -53,14 +53,14 @@ public sealed class EasyTouchTool
     public void Hide() { Enable=false; }
     public void ShowJoystick() { Enable=true; }
 }
-public static class NetAPI
+public static partial class NetAPI
 {
     public static bool connected=true;
     public static bool SocketIsConnected() { return connected; }
 }
 namespace HYJS.DesertV4
 {
-    public sealed class FieldWire
+    public sealed partial class FieldWire
     {
         public sealed class Session
         {
@@ -70,7 +70,7 @@ namespace HYJS.DesertV4
         public static Session session;
         public static bool Current(out Session result) { result=session; return result!=null; }
     }
-    public static class FieldRuntime
+    public static partial class FieldRuntime
     {
         public static int readyCalls;
         public static object readyNet;

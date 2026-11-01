@@ -33,8 +33,8 @@ namespace HYJS.DesertV4
         static FieldWire.Session owner;
         static bool overflow,confirmedBase,touchWasEnabled,authenticated,unboundLogin;
         static long nextBaseRetry;
-        static volatile bool fieldActive,locked;
-        static Action<Vector3> onResponse;
+        static volatile bool fieldActive,leaveActive,locked;
+        static Action<Vector3,string> onResponse;
         static bool SameActor(FieldWire.Session a,FieldWire.Session b)
         { return a!=null && b!=null && a.playerId==b.playerId && a.origin==b.origin; }
         static bool SameSession(FieldWire.Session a,FieldWire.Session b)
@@ -58,6 +58,9 @@ namespace HYJS.DesertV4
             return true;
         }
         public static void SetFieldActive(bool enabled) { fieldActive=enabled; }
+        // Leave recovery can outlive the desert room and still receive an old
+        // socket callback after a same-process reconnect in town.
+        internal static void SetLeaveActive(bool enabled) { leaveActive=enabled; }
         public static int ConnectionEpoch { get { return Thread.VolatileRead(ref epoch); } }
         public static bool Locked { get { return locked; } }
         public static void ConnectionStarting()
@@ -77,7 +80,7 @@ namespace HYJS.DesertV4
         // A late callback from an old socket may not enqueue into the new one.
         public static bool DropOldSocket(object tool,IAsyncResult asyncResult)
         {
-            if (!fieldActive) return false;
+            if (!fieldActive && !leaveActive) return false;
             try
             {
                 object helper=asyncResult==null ? null : asyncResult.AsyncState;
@@ -182,8 +185,8 @@ namespace HYJS.DesertV4
             confirmedBase=true;
             if (expected!=0 && actual==expected)
             {
-                expected=0; Action<Vector3> callback=onResponse; onResponse=null;
-                if (callback!=null) callback(position);
+                expected=0; Action<Vector3,string> callback=onResponse; onResponse=null;
+                if (callback!=null) callback(position,rsp.self.position.scene);
             }
             return true;
         }
@@ -252,30 +255,48 @@ namespace HYJS.DesertV4
         }
         public static void RequestCurrent(RoomNetBase net,Action<Vector3> callback)
         {
+            if (callback==null) throw new ArgumentNullException("callback");
+            RequestCurrentState(net,delegate(Vector3 position,string scene) { callback(position); });
+        }
+        // Recovery also needs the scene carried by this exact authenticated
+        // native frame; a cached fieldId can outlive the room that set it.
+        internal static void RequestCurrentState(RoomNetBase net,Action<Vector3,string> callback)
+        {
             if (!Current() || !locked || overflow || !authenticated || net==null || callback==null || expected!=0 || sent.Count!=0 || !NetAPI.SocketIsConnected())
                 throw new InvalidOperationException("Original position channel not ready");
-            expected=sequence+1; onResponse=callback; net.SendCSCurrentPosition(null);
-            if (sequence!=expected || sent.Count!=1) throw new InvalidOperationException("Original position request was not observed");
+            long request=sequence+1;
+            expected=request; onResponse=callback;
+            try
+            {
+                net.SendCSCurrentPosition(null);
+                if (sequence!=request || sent.Count!=1) throw new InvalidOperationException("Original position request was not observed");
+            }
+            catch (Exception)
+            {
+                if (expected==request) { expected=0; onResponse=null; }
+                throw;
+            }
         }
-        public static void Tick()
+        public static void Tick() { TickCore(false); }
+        // Pending leave recovery can run in a town after the desert runtime has
+        // stopped. It still needs one real 30024 baseline, with bounded retries.
+        internal static void TickRecovery() { TickCore(true); }
+        static void TickCore(bool recovery)
         {
             if (!Current()) return;
             DrainDeferred();
-            if (!locked)
+            if ((!locked || recovery) && !confirmedBase && !overflow && (authenticated || unboundLogin) && sent.Count==0 &&
+                NetAPI.SocketIsConnected() && Stopwatch.GetTimestamp()>=nextBaseRetry)
             {
                 // Recover an unobserved or invalid initial frame by requesting
                 // a fresh native frame. Never replace an outstanding request or
                 // accept a local timeout fallback as an acknowledgement.
-                if (!confirmedBase && !overflow && (authenticated || unboundLogin) && sent.Count==0 &&
-                    NetAPI.SocketIsConnected() && Stopwatch.GetTimestamp()>=nextBaseRetry)
-                {
-                    nextBaseRetry=Stopwatch.GetTimestamp()+2L*Stopwatch.Frequency;
-                    RoomBase candidate=RoomManager.currentRoom;
-                    RoomNetField net=candidate==null ? null : candidate.netManager as RoomNetField;
-                    if (fieldActive && net!=null) try { net.SendCSCurrentPosition(null); } catch (Exception) { }
-                }
-                return;
+                RoomBase candidate=RoomManager.currentRoom;
+                RoomNetBase net=candidate==null ? null : recovery ? candidate.netManager : candidate.netManager as RoomNetField;
+                if ((fieldActive || recovery) && net!=null)
+                { nextBaseRetry=Stopwatch.GetTimestamp()+2L*Stopwatch.Frequency; try { net.SendCSCurrentPosition(null); } catch (Exception) { } }
             }
+            if (!locked) return;
             RoomBase room=RoomManager.currentRoom;
             if (room!=null && room.charactorManager!=null)
             {
