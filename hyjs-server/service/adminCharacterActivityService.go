@@ -85,7 +85,7 @@ func (s *GameService) PrepareAdminCharacterActivitySchedules(ctx context.Context
 	if GameCalendarOwner(ctx) != playerID {
 		return constUtil.ErrAdminInput
 	}
-	return d.Transaction(func(tx *gorm.DB) error {
+	prepare := func(tx *gorm.DB) error {
 		if err := ServerGameClockGuardTransaction(tx); err != nil {
 			return err
 		}
@@ -172,6 +172,11 @@ func (s *GameService) PrepareAdminCharacterActivitySchedules(ctx context.Context
 			if form.Mode == "shop-window" {
 				key = "shop_schedule_" + form.Options.ShopKey + "_character_" + digest
 			}
+			// Issuing a consumer can create or modify P1 windows. Release every
+			// shared window lock before retrying the whole transaction exclusively.
+			if p1SharedRead(tx) {
+				return constUtil.ErrP1ExclusiveRetry
+			}
 			if err := s.adminPersistTypedActivity(tx, definition, key, form, true, false); err != nil {
 				return err
 			}
@@ -191,7 +196,13 @@ func (s *GameService) PrepareAdminCharacterActivitySchedules(ctx context.Context
 			}
 		}
 		return nil
-	})
+	}
+	shared := context.WithValue(ctx, constUtil.P1SharedReadContextKey{}, true)
+	err := d.WithContext(shared).Transaction(prepare)
+	if errors.Is(err, constUtil.ErrP1ExclusiveRetry) {
+		return d.Transaction(prepare)
+	}
+	return err
 }
 
 // adminCharacterActivityAccess retains historical receipts but prevents a role
