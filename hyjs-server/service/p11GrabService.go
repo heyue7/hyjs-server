@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -86,7 +87,7 @@ func (s *GameService) InitializeP11Grab(ctx context.Context) error {
 }
 func p11GrabConfig(tx *gorm.DB) (*db.P11GrabPolicy, []p11GrabReward, error) {
 	var cfg db.P11GrabPolicy
-	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&cfg, 1).Error; err != nil {
+	if err := tx.Clauses(clause.Locking{Strength: "SHARE"}).First(&cfg, 1).Error; err != nil {
 		return nil, nil, err
 	}
 	if cfg.Source == "" || cfg.MaxTimes != 3 || cfg.BuyMax != 3 || cfg.BuyPrice != 100 || cfg.Energy != 10 || cfg.MaxMillis != int64(3*time.Hour/time.Millisecond) || cfg.RewardsHash != p6Digest([]byte(cfg.RewardsJSON)) {
@@ -146,10 +147,22 @@ func p11GrabClose(tx *gorm.DB, slot *db.P11GrabSlot, at int64, reason string) er
 	return tx.Save(slot).Error
 }
 
-// p11GrabExpire以既有原3h截止关闭实际分段，重启/重复查询不追加占领时长。
-func p11GrabExpire(tx *gorm.DB, now time.Time) error {
+// Close only the caller's expired occupancy and the requested position. A
+// personal query never waits for an unrelated occupied position or battle.
+func p11GrabExpire(tx *gorm.DB, now time.Time, ownerID, position int64) error {
+	var mine []int64
+	if err := tx.Model(&db.P11GrabSlot{}).Where("owner_id=?", ownerID).Pluck("position", &mine).Error; err != nil {
+		return err
+	}
+	if position > 0 {
+		mine = append(mine, position)
+	}
+	if len(mine) == 0 {
+		return nil
+	}
 	var slots []db.P11GrabSlot
-	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("owner_id IS NOT NULL AND expires_at<=?", now.UnixMilli()).Order("position").Find(&slots).Error; err != nil {
+	query := tx.Where("position IN ? AND owner_id IS NOT NULL AND expires_at<=?", mine, now.UnixMilli())
+	if err := query.Clauses(clause.Locking{Strength: "UPDATE"}).Order("position").Find(&slots).Error; err != nil {
 		return err
 	}
 	for i := range slots {
@@ -258,7 +271,9 @@ func (s *GameService) p11GrabAt(ctx context.Context, id int64, request proto.Mes
 			if err := db.GetIns().WithContext(ctx).First(&observed, "position=?", grab.GetIndex()).Error; err != nil {
 				return nil, err
 			}
-			if observed.OwnerID != nil {
+			// Expired occupancy is a free-position admission. Its immutable
+			// segment is closed under this position's lock below.
+			if observed.OwnerID != nil && observed.ExpiresAt > now.UnixMilli() {
 				observedOwner = *observed.OwnerID
 			}
 		}
@@ -337,7 +352,11 @@ func (s *GameService) p11GrabAt(ctx context.Context, id int64, request proto.Mes
 		if err = s.PrepareP11GrabRandom(tx, now); err != nil {
 			return err
 		}
-		if err = p11GrabExpire(tx, now); err != nil {
+		var requestedPosition int64
+		if grab, ok := request.(*pb.CSGrab); ok {
+			requestedPosition = int64(grab.GetIndex())
+		}
+		if err = p11GrabExpire(tx, now, id, requestedPosition); err != nil {
 			return err
 		}
 		daily, err := p11GrabDaily(tx, id, now, cfg)
@@ -351,7 +370,7 @@ func (s *GameService) p11GrabAt(ctx context.Context, id int64, request proto.Mes
 		switch b := request.(type) {
 		case *pb.CSGetGrabData:
 			var slots []db.P11GrabSlot
-			if err = tx.Clauses(clause.Locking{Strength: "UPDATE"}).Order("position").Find(&slots).Error; err != nil {
+			if err = tx.Order("position").Find(&slots).Error; err != nil {
 				return err
 			}
 			if len(slots) != 18 {
@@ -359,6 +378,11 @@ func (s *GameService) p11GrabAt(ctx context.Context, id int64, request proto.Mes
 			}
 			out := &pb.SCGetGrabData{GrabTimes: proto.Int32(cfg.MaxTimes + daily.Bought - daily.Used), LastCount: proto.Int32(cfg.BuyMax - daily.Bought)}
 			for _, slot := range slots {
+				if slot.OwnerID != nil && slot.StartedAt > 0 && slot.ExpiresAt > slot.StartedAt && slot.SessionID != "" && slot.ExpiresAt <= now.UnixMilli() {
+					// The immutable session already caps elapsed time at expiry;
+					// display the free position without mutating another role.
+					slot.OwnerID = nil
+				}
 				frame, err := p11GrabFrame(tx, slot)
 				if err != nil {
 					return err
@@ -571,7 +595,7 @@ func (s *GameService) p11GrabAt(ctx context.Context, id int64, request proto.Mes
 			return tx.Create(&db.P11ArenaReceipt{PlayerID: id, Operation: operation, Stamp: stamp, RequestHash: p6Digest(raw), Response: blob, BatchID: daily.Day, CreatedAt: now.UnixMilli()}).Error
 		}
 		return nil
-	})
+	}, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
 	if err != nil {
 		return nil, err
 	}

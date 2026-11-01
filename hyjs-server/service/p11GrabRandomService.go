@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"crypto/rand"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -96,8 +97,20 @@ func (s *GameService) PrepareP11GrabRandom(tx *gorm.DB, now time.Time) error {
 
 func (s *GameService) p11GrabRandomOffer(tx *gorm.DB, now time.Time) (*db.P11GrabRandomOffer, error) {
 	month, _ := p11ArenaPrizeMonth(now)
+	var probe db.P11GrabRandomPolicy
+	if err := tx.Select("id", "enabled").First(&probe, 1).Error; err != nil {
+		return nil, err
+	}
+	var count int64
+	if err := tx.Model(&db.P11GrabRandomOffer{}).Where("month=?", month).Count(&count).Error; err != nil {
+		return nil, err
+	}
+	strength := "SHARE"
+	if count == 0 && probe.Enabled {
+		strength = "UPDATE"
+	}
 	var cfg db.P11GrabRandomPolicy
-	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&cfg, 1).Error; err != nil {
+	if err := tx.Clauses(clause.Locking{Strength: strength}).First(&cfg, 1).Error; err != nil {
 		return nil, err
 	}
 	var offer db.P11GrabRandomOffer
@@ -113,6 +126,9 @@ func (s *GameService) p11GrabRandomOffer(tx *gorm.DB, now time.Time) (*db.P11Gra
 	}
 	if !cfg.Enabled {
 		return nil, nil
+	}
+	if strength == "SHARE" {
+		return nil, constUtil.ErrConfigurationReadRetry
 	}
 	if _, err = s.p11GrabRandomPool(&cfg); err != nil {
 		return nil, err
@@ -363,7 +379,7 @@ func (s *GameService) p11GrabRandomAt(ctx context.Context, id int64, stamp int64
 		}
 		reply = out
 		return nil
-	})
+	}, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
 	if err != nil {
 		return nil, err
 	}

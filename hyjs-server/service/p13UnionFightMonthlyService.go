@@ -180,6 +180,47 @@ func p13UFMonthlyCutoffHash(row *db.P13UnionFightMonthlyCutoff) string {
 	return p6Digest(raw)
 }
 
+// Only publication or a missing due identity archive needs the shared writer.
+// Ordinary membership changes retain a shared lease and lock their own guild.
+func p13MonthlyIdentityNeedsWrite(tx *gorm.DB, now time.Time) (bool, error) {
+	if !gameSchemaHasTable(tx, &db.P13UnionFightMonthlyOffer{}) {
+		return false, nil
+	}
+	var policies []db.P13UnionFightMonthlyPolicy
+	if err := tx.Select("month").Where("enabled=?", true).Find(&policies).Error; err != nil {
+		return false, err
+	}
+	var offers []db.P13UnionFightMonthlyOffer
+	if err := tx.Select("month", "cutoff_at").Find(&offers).Error; err != nil {
+		return false, err
+	}
+	known := make(map[string]bool, len(offers))
+	var due []string
+	for _, offer := range offers {
+		known[offer.Month] = true
+		if offer.CutoffAt <= now.UnixMilli() {
+			due = append(due, offer.Month)
+		}
+	}
+	for _, policy := range policies {
+		start, _, err := p13UFMonth(policy.Month)
+		if err != nil {
+			return false, err
+		}
+		if now.Before(start) && !known[policy.Month] {
+			return true, nil
+		}
+	}
+	if len(due) == 0 {
+		return false, nil
+	}
+	var archived []string
+	if err := tx.Model(&db.P13UnionFightMonthlyCutoff{}).Where("month IN ?", due).Pluck("month", &archived).Error; err != nil {
+		return false, err
+	}
+	return len(archived) != len(due), nil
+}
+
 // P13MonthlyBeforeGuildMutation runs under the existing guild policy lock, before
 // any post-boundary membership, chairman, join or dissolution mutation. The same
 // hook at the worker boundary covers idle/offline accounts without moving cutoff.

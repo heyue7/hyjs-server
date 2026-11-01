@@ -385,7 +385,8 @@ func p13GuildRole(m *db.P13GuildMember, need int32) error {
 	return nil
 }
 
-// p13GuildMutate 先锁公共门禁，再锁角色；批准/转让/资源/原响应原子提交。
+// p13GuildMutate shares configuration, then locks the actual guild and ordered
+// participants. Only a new month identity archive needs the catalogue writer.
 func (s *GameService) p13GuildMutate(ctx context.Context, id int64, request, response proto.Message, stamp int64, now time.Time, economy bool, action func(*gorm.DB, *db.Profile, *pb.Player, *model.GameState) error) ([]proto.Message, error) {
 	if stamp <= 0 {
 		return nil, errors.New("公会变更缺少原请求时间戳")
@@ -403,140 +404,222 @@ func (s *GameService) p13GuildMutate(ctx context.Context, id int64, request, res
 	case *pb.CSUnionPray, *pb.CSGetUnionStamina, *pb.CSUnionOpenDonateBox:
 		personalAction = true
 	}
-	err = db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := ServerGameClockGuardTransaction(tx); err != nil {
-			return err
-		}
+	guildLocalAction := false
+	switch request.(type) {
+	case *pb.CSUnionDonate, *pb.CSUnionUpgrade, *pb.CSUnionOpenBuilder,
+		*pb.CSUnionHeroStatueUpgrade, *pb.CSUnionGuardTreeUpgrade,
+		*pb.CSUnionNoticeChange, *pb.CSUnionDeclarationChange, *pb.CSChangeUnionFlag:
+		guildLocalAction = true
+	}
+	calendarWriter := false
+	for attempt := 0; attempt < constUtil.GameLocalMutationMaxAttempts; attempt++ {
+		fresh, revokedIDs, resultPlayer = false, nil, nil
+		retryScope := false
+		err = db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+			if err := ServerGameClockGuardTransaction(tx); err != nil {
+				return err
+			}
 
-		var policy db.P13GuildPolicy
-		strength := "UPDATE"
-		if personalAction {
-			strength = "SHARE"
-		}
-		if err := tx.Clauses(clause.Locking{Strength: strength}).First(&policy, 1).Error; err != nil {
-			return err
-		}
-		if !personalAction {
-			// Membership and guild standings can advance their shared cutoffs.
-			// Personal claims and prayers do not change the guild standings.
-			if err := s.P13MonthlyBeforeGuildMutation(tx, now); err != nil {
+			var policy db.P13GuildPolicy
+			strength := "SHARE"
+			if calendarWriter {
+				strength = "UPDATE"
+			}
+			if err := tx.Clauses(clause.Locking{Strength: strength}).First(&policy, 1).Error; err != nil {
 				return err
 			}
-			giftMember, err := p13GuildMember(tx, id)
+			restore := func(row *db.Profile, receipt *db.P13GuildReceipt) error {
+				if !bytes.Equal(raw, receipt.Request) {
+					return errors.New("公会请求时间戳冲突")
+				}
+				p, g, err := decodeProfileForCalendarUpdate(tx, row)
+				if err != nil {
+					return err
+				}
+				if err = s.RefreshP5GuildPrayerPower(ctx, tx, p, g, now); err != nil {
+					return err
+				}
+				resultPlayer = proto.Clone(p).(*pb.Player)
+				return proto.Unmarshal(receipt.Response, response)
+			}
+			// A replay can outlive a dissolved guild and never repeats its mutation.
+			var prior db.P13GuildReceipt
+			priorErr := tx.First(&prior, "player_id=? AND operation=? AND stamp=?", id, op, stamp).Error
+			if priorErr == nil {
+				var owner db.Profile
+				if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&owner, id).Error; err != nil {
+					return err
+				}
+				return restore(&owner, &prior)
+			}
+			if !errors.Is(priorErr, gorm.ErrRecordNotFound) {
+				return priorErr
+			}
+			var observedMember *db.P13GuildMember
+			if !personalAction {
+				if !guildLocalAction {
+					needsWriter, err := p13MonthlyIdentityNeedsWrite(tx, now)
+					if err != nil {
+						return err
+					}
+					if needsWriter && !calendarWriter {
+						calendarWriter, retryScope = true, true
+						return constUtil.ErrConfigurationReadRetry
+					}
+					// Membership and guild identity changes advance their shared cutoff.
+					if err := s.P13MonthlyBeforeGuildMutation(tx, now); err != nil {
+						return err
+					}
+				}
+				giftMember, err := p13GuildMember(tx, id)
+				if err != nil {
+					return err
+				}
+				observedMember = giftMember
+				if giftMember.GuildID != "" {
+					var guild db.P13Guild
+					if err := tx.Select("id").Clauses(clause.Locking{Strength: "UPDATE"}).First(&guild, "id=?", giftMember.GuildID).Error; err != nil {
+						if errors.Is(err, gorm.ErrRecordNotFound) {
+							current, readErr := p13GuildMember(tx, id)
+							if readErr != nil {
+								return readErr
+							}
+							if current.GuildID != giftMember.GuildID || current.JoinedAt != giftMember.JoinedAt {
+								retryScope = true
+								return constUtil.ErrConfigurationReadRetry
+							}
+						}
+						return err
+					}
+				} else if apply, ok := request.(*pb.CSUnionApply); ok && apply.GetUnionId() != "" {
+					// Applications are personal; the selected guild only needs a
+					// deletion lease while its application row is created.
+					var guild db.P13Guild
+					if err := tx.Select("id").Clauses(clause.Locking{Strength: "SHARE"}).First(&guild, "id=?", apply.GetUnionId()).Error; err != nil {
+						return err
+					}
+				}
+				if _, err = s.P13GuildGiftBeforeMutation(tx, giftMember.GuildID, now); err != nil {
+					return err
+				}
+				if _, dissolve := request.(*pb.CSDissolveUnion); dissolve && giftMember.GuildID != "" {
+					if err = s.P13GuildGiftRetire(tx, giftMember.GuildID, now); err != nil {
+						return err
+					}
+				}
+			}
+			// 解散涉及全体成员位置，先按ID升序锁全员，避免与P10双角色业务逆序。
+			if _, dissolve := request.(*pb.CSDissolveUnion); dissolve {
+				member, err := p13GuildMember(tx, id)
+				if err != nil {
+					return err
+				}
+				var members []db.P13GuildMember
+				if member.GuildID != "" {
+					if err = tx.Where("guild_id=?", member.GuildID).Order("player_id").Find(&members).Error; err != nil {
+						return err
+					}
+				}
+				for _, m := range members {
+					var locked db.Profile
+					if err = tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&locked, m.PlayerID).Error; err != nil {
+						return err
+					}
+					revokedIDs = append(revokedIDs, m.PlayerID)
+				}
+			}
+			// 先锁较小目标角色，避免与好友等共享双角色行锁出现逆序。
+			target := int64(0)
+			switch b := request.(type) {
+			case *pb.CSUnionAgreeApply:
+				target = b.GetPlayerId()
+			case *pb.CSUnionRefuseApply:
+				target = b.GetPlayerId()
+			case *pb.CSPromotionViceChairman:
+				target = b.GetPlayerId()
+			case *pb.CSDismissViceChairman:
+				target = b.GetPlayerId()
+			case *pb.CSRemoveUnionPlayer:
+				target = b.GetPlayerId()
+			case *pb.CSTransferChairman:
+				target = b.GetPlayerId()
+			}
+			if target > 0 && target < id {
+				var first db.Profile
+				if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&first, target).Error; err != nil {
+					return err
+				}
+			}
+			var row db.Profile
+			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&row, id).Error; err != nil {
+				return err
+			}
+			if observedMember != nil {
+				current, err := p13GuildMember(tx, id)
+				if err != nil {
+					return err
+				}
+				if current.GuildID != observedMember.GuildID || current.Role != observedMember.Role || current.JoinedAt != observedMember.JoinedAt {
+					retryScope = true
+					return constUtil.ErrConfigurationReadRetry
+				}
+			}
+			var receipt db.P13GuildReceipt
+			err = tx.First(&receipt, "player_id=? AND operation=? AND stamp=?", id, op, stamp).Error
+			if err == nil {
+				return restore(&row, &receipt)
+			}
+			if !errors.Is(err, gorm.ErrRecordNotFound) {
+				return err
+			}
+			p, g, err := decodeProfileForCalendarUpdate(tx, &row)
 			if err != nil {
 				return err
 			}
-			if _, err = s.P13GuildGiftBeforeMutation(tx, giftMember.GuildID, now); err != nil {
+			if err = s.RefreshP5GuildPrayerPower(ctx, tx, p, g, now); err != nil {
 				return err
 			}
-			if _, dissolve := request.(*pb.CSDissolveUnion); dissolve && giftMember.GuildID != "" {
-				if err = s.P13GuildGiftRetire(tx, giftMember.GuildID, now); err != nil {
-					return err
-				}
+			if !policy.ManagementEnabled {
+				return errors.New(constUtil.P13GuildClosed)
 			}
-		}
-		// 解散涉及全体成员位置，先按ID升序锁全员，避免与P10双角色业务逆序。
-		if _, dissolve := request.(*pb.CSDissolveUnion); dissolve {
-			member, err := p13GuildMember(tx, id)
-			if err != nil {
+			if economy && !policy.EconomyEnabled {
+				return errors.New(constUtil.P13GuildEconomyClosed)
+			}
+			if err = action(tx, &row, p, g); err != nil {
 				return err
 			}
-			var members []db.P13GuildMember
-			if member.GuildID != "" {
-				if err = tx.Where("guild_id=?", member.GuildID).Order("player_id").Find(&members).Error; err != nil {
-					return err
-				}
-			}
-			for _, m := range members {
-				var locked db.Profile
-				if err = tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&locked, m.PlayerID).Error; err != nil {
-					return err
-				}
-				revokedIDs = append(revokedIDs, m.PlayerID)
-			}
-		}
-		// 先锁较小目标角色，避免与好友等共享双角色行锁出现逆序。
-		target := int64(0)
-		switch b := request.(type) {
-		case *pb.CSUnionAgreeApply:
-			target = b.GetPlayerId()
-		case *pb.CSUnionRefuseApply:
-			target = b.GetPlayerId()
-		case *pb.CSPromotionViceChairman:
-			target = b.GetPlayerId()
-		case *pb.CSDismissViceChairman:
-			target = b.GetPlayerId()
-		case *pb.CSRemoveUnionPlayer:
-			target = b.GetPlayerId()
-		case *pb.CSTransferChairman:
-			target = b.GetPlayerId()
-		}
-		if target > 0 && target < id {
-			var first db.Profile
-			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&first, target).Error; err != nil {
+			// Membership changes and the new prayer replace the current projection before saving.
+			if err = s.RefreshP5GuildPrayerPower(ctx, tx, p, g, now); err != nil {
 				return err
 			}
-		}
-		var row db.Profile
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&row, id).Error; err != nil {
-			return err
-		}
-		p, g, err := decodeProfileForCalendarUpdate(tx, &row)
-		if err != nil {
-			return err
-		}
-		if err = s.RefreshP5GuildPrayerPower(ctx, tx, p, g, now); err != nil {
-			return err
-		}
-		var receipt db.P13GuildReceipt
-		err = tx.First(&receipt, "player_id=? AND operation=? AND stamp=?", id, op, stamp).Error
-		if err == nil {
-			if !bytes.Equal(raw, receipt.Request) {
-				return errors.New("公会请求时间戳冲突")
+			if _, err = s.P13GuildRoomNormalize(tx, id, p, g); err != nil {
+				return err
+			}
+			// 最终保存当前内存快照前归一化战场位置，避免嵌套会员撤权保存的回城被旧g.Position覆盖。
+			if _, err = s.P13UnionFightFieldNormalize(tx, id, p, g, now); err != nil {
+				return err
+			}
+			switch b := request.(type) {
+			case *pb.CSQuitUnion:
+				revokedIDs = []int64{id}
+			case *pb.CSRemoveUnionPlayer:
+				revokedIDs = []int64{b.GetPlayerId()}
+			}
+			if err = saveProfile(tx, &row, p, g); err != nil {
+				return err
 			}
 			resultPlayer = proto.Clone(p).(*pb.Player)
-			return proto.Unmarshal(receipt.Response, response)
+			fresh = true
+			encoded, err := proto.Marshal(response)
+			if err != nil {
+				return err
+			}
+			return tx.Create(&db.P13GuildReceipt{PlayerID: id, Operation: op, Stamp: stamp, Request: raw, Response: encoded, CreatedAt: now.UnixMilli()}).Error
+		}, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
+		if !retryScope || ctx.Err() != nil {
+			break
 		}
-		if !errors.Is(err, gorm.ErrRecordNotFound) {
-			return err
-		}
-		if !policy.ManagementEnabled {
-			return errors.New(constUtil.P13GuildClosed)
-		}
-		if economy && !policy.EconomyEnabled {
-			return errors.New(constUtil.P13GuildEconomyClosed)
-		}
-		if err = action(tx, &row, p, g); err != nil {
-			return err
-		}
-		// Membership changes and the new prayer replace the current projection before saving.
-		if err = s.RefreshP5GuildPrayerPower(ctx, tx, p, g, now); err != nil {
-			return err
-		}
-		if _, err = s.P13GuildRoomNormalize(tx, id, p, g); err != nil {
-			return err
-		}
-		// 最终保存当前内存快照前归一化战场位置，避免嵌套会员撤权保存的回城被旧g.Position覆盖。
-		if _, err = s.P13UnionFightFieldNormalize(tx, id, p, g, now); err != nil {
-			return err
-		}
-		switch b := request.(type) {
-		case *pb.CSQuitUnion:
-			revokedIDs = []int64{id}
-		case *pb.CSRemoveUnionPlayer:
-			revokedIDs = []int64{b.GetPlayerId()}
-		}
-		if err = saveProfile(tx, &row, p, g); err != nil {
-			return err
-		}
-		resultPlayer = proto.Clone(p).(*pb.Player)
-		fresh = true
-		encoded, err := proto.Marshal(response)
-		if err != nil {
-			return err
-		}
-		return tx.Create(&db.P13GuildReceipt{PlayerID: id, Operation: op, Stamp: stamp, Request: raw, Response: encoded, CreatedAt: now.UnixMilli()}).Error
-	})
+	}
 	if err != nil {
 		return nil, err
 	}

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/subtle"
+	"database/sql"
 	"errors"
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/proto"
@@ -439,8 +440,27 @@ func p13TeamSetView(response proto.Message, team *pb.Team, actor int64, removed 
 	}
 }
 
-// p13TeamAt 管理事务锁住独立门禁，再按升序锁所有受影响真实角色；提交后按当前代数推送。
+// p13TeamAt retries a rolled-back attempt if its discovered membership changed.
 func (s *GameService) p13TeamAt(ctx context.Context, id int64, request proto.Message, stamp int64, now time.Time) ([]proto.Message, error) {
+	var err error
+	for attempt := 0; attempt < constUtil.GameLocalMutationMaxAttempts; attempt++ {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		var messages []proto.Message
+		messages, err = s.p13TeamAttempt(ctx, id, request, stamp, now)
+		if !errors.Is(err, constUtil.ErrConfigurationReadRetry) {
+			return messages, err
+		}
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	return nil, err
+}
+
+// p13TeamAttempt locks the selected team before its affected profiles.
+func (s *GameService) p13TeamAttempt(ctx context.Context, id int64, request proto.Message, stamp int64, now time.Time) ([]proto.Message, error) {
 	response := p13TeamResponse(request)
 	if response == nil {
 		return nil, errors.New("原队伍变更入口未恢复")
@@ -461,7 +481,7 @@ func (s *GameService) p13TeamAt(ctx context.Context, id int64, request proto.Mes
 		}
 
 		var cfg db.P13TeamPolicy
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&cfg, 1).Error; err != nil {
+		if err := tx.Clauses(clause.Locking{Strength: "SHARE"}).First(&cfg, 1).Error; err != nil {
 			return err
 		}
 		// 回执先于已删除队伍读取，解散/退出后重试仍只回放原响应。
@@ -499,7 +519,26 @@ func (s *GameService) p13TeamAt(ctx context.Context, id int64, request proto.Mes
 		var team db.P13Team
 		var members []db.P13TeamMember
 		if teamID != "" {
-			if err = tx.First(&team, "id=?", teamID).Error; err != nil {
+			if err = tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&team, "id=?", teamID).Error; err != nil {
+				if errors.Is(err, gorm.ErrRecordNotFound) {
+					current, readErr := p13TeamMember(tx, id)
+					if readErr != nil {
+						return readErr
+					}
+					if current.TeamID != own.TeamID || current.Generation != own.Generation {
+						return constUtil.ErrConfigurationReadRetry
+					}
+					if stamp > 0 {
+						var receipt db.P13TeamReceipt
+						receiptErr := tx.First(&receipt, "player_id=? AND operation=? AND stamp=?", id, op, stamp).Error
+						if receiptErr == nil {
+							return constUtil.ErrConfigurationReadRetry
+						}
+						if !errors.Is(receiptErr, gorm.ErrRecordNotFound) {
+							return receiptErr
+						}
+					}
+				}
 				return err
 			}
 			members, err = p13TeamMembers(tx, team.ID)
@@ -528,13 +567,41 @@ func (s *GameService) p13TeamAt(ctx context.Context, id int64, request proto.Mes
 			if err = tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&row, target).Error; err != nil {
 				return err
 			}
-			p, g, err := decodeProfileForCalendarUpdate(tx, &row)
+			profiles[target] = &p13TeamProfile{row: row}
+		}
+		actor := profiles[id]
+		currentOwn, err := p13TeamMember(tx, id)
+		if err != nil {
+			return err
+		}
+		if currentOwn.TeamID != own.TeamID || currentOwn.Generation != own.Generation {
+			return constUtil.ErrConfigurationReadRetry
+		}
+		own = currentOwn
+		if stamp > 0 {
+			var receipt db.P13TeamReceipt
+			err := tx.First(&receipt, "player_id=? AND operation=? AND stamp=?", id, op, stamp).Error
+			if err == nil {
+				if !bytes.Equal(raw, receipt.Request) {
+					return errors.New("队伍请求时间戳冲突")
+				}
+				player, _, err = decodeProfileForUpdate(&actor.row)
+				if err != nil {
+					return err
+				}
+				return proto.Unmarshal(receipt.Response, response)
+			}
+			if !errors.Is(err, gorm.ErrRecordNotFound) {
+				return err
+			}
+		}
+		for _, target := range ids {
+			profile := profiles[target]
+			profile.player, profile.game, err = decodeProfileForCalendarUpdate(tx, &profile.row)
 			if err != nil {
 				return err
 			}
-			profiles[target] = &p13TeamProfile{row: row, player: p, game: g}
 		}
-		actor := profiles[id]
 		player = actor.player
 		if !cfg.Enabled {
 			return errors.New(constUtil.P13TeamClosed)
@@ -834,7 +901,7 @@ func (s *GameService) p13TeamAt(ctx context.Context, id int64, request proto.Mes
 			return tx.Create(&db.P13TeamReceipt{PlayerID: id, Operation: op, Stamp: stamp, Request: raw, Response: encoded, CreatedAt: now.UnixMilli()}).Error
 		}
 		return nil
-	})
+	}, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
 	if err != nil {
 		return nil, err
 	}

@@ -163,8 +163,9 @@ func p7AuthorityAvailable(tx *gorm.DB) (bool, error) {
 	return cfg.AuthoritativeEnabled && cfg.NativeCapabilityHash == P6CapabilityHash() && cfg.ClientHash == constUtil.P6OriginalClientHash, nil
 }
 
+// p7Policy 持有共享政策租约至事务提交；角色行锁保护个人消耗，后台改价和停用仍需等待。
 func (s *GameService) p7Policy(tx *gorm.DB) (db.P7RushPolicy, error) {
-	return s.p7ReadPolicy(tx.Clauses(clause.Locking{Strength: "UPDATE"}))
+	return s.p7ReadPolicy(tx.Clauses(clause.Locking{Strength: "SHARE"}))
 }
 
 // p7ReadPolicy 供只读展示使用，避免全局运营行锁串行化所有玩家的查询。

@@ -50,8 +50,20 @@ func p11GrabFightRulesValid(rules *p11GrabFightRules) bool {
 // The frozen offer owns the original cost/session rules for its version.
 // Current Enabled controls new use; historical receipt reads never consult it.
 func (s *GameService) p11GrabFightOffer(tx *gorm.DB, grab *db.P11GrabPolicy, now time.Time) (*db.P11GrabFightOffer, *p11GrabFightRules, error) {
+	var probe db.P11GrabFightPolicy
+	if err := tx.Select("id", "enabled", "version").First(&probe, 1).Error; err != nil {
+		return nil, nil, err
+	}
+	var count int64
+	if err := tx.Model(&db.P11GrabFightOffer{}).Where("version=?", probe.Version).Count(&count).Error; err != nil {
+		return nil, nil, err
+	}
+	strength := "SHARE"
+	if count == 0 && probe.Enabled {
+		strength = "UPDATE"
+	}
 	var policy db.P11GrabFightPolicy
-	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&policy, 1).Error; err != nil {
+	if err := tx.Clauses(clause.Locking{Strength: strength}).First(&policy, 1).Error; err != nil {
 		return nil, nil, err
 	}
 	if !policy.Enabled {
@@ -60,6 +72,9 @@ func (s *GameService) p11GrabFightOffer(tx *gorm.DB, grab *db.P11GrabPolicy, now
 	var offer db.P11GrabFightOffer
 	err := tx.First(&offer, "version=?", policy.Version).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
+		if strength == "SHARE" {
+			return nil, nil, constUtil.ErrConfigurationReadRetry
+		}
 		rules := p11GrabFightRules{Policy: policy, Grab: *grab}
 		if !p11GrabFightRulesValid(&rules) || now.UnixMilli() < policy.StartsAt || now.UnixMilli() >= policy.EndsAt {
 			return nil, nil, errors.New(constUtil.P11GrabFightClosed)
