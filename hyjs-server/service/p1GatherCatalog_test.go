@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 	"hyjs-server/constUtil"
 	"hyjs-server/db"
 	"hyjs-server/model"
@@ -169,12 +170,26 @@ func testP1GatherCatalogPersonalPeriodFullRetry(t *testing.T, activityID, prefix
 		}
 	}
 	cycleID := "lp-00000000000000000000000001"
+	rollback := errors.New("rollback private clone fixture")
 	err := db.GetIns().WithContext(f.ctx).Transaction(func(tx *gorm.DB) error {
-		_, err := f.s.localPlayCreateScopedCycle(tx, playerID, def, &db.LocalPlayActivityCycle{ID: cycleID}, now)
-		return err
+		var owner db.Profile
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&owner, playerID).Error; err != nil {
+			return err
+		}
+		if _, err := f.s.localPlayCreateScopedCycle(tx, playerID, def, &db.LocalPlayActivityCycle{ID: cycleID}, now); err != nil {
+			return err
+		}
+		var period db.PeriodInstance
+		if err := tx.Where("id LIKE ? AND kind=?", "%"+cycleID+"%", kind).First(&period).Error; err != nil {
+			return err
+		}
+		if period.OwnerPlayerID != playerID || period.RealmID != f.s.OriginalServerID() {
+			return errors.New("private clone lost its owner scope")
+		}
+		return rollback
 	})
-	if !errors.Is(err, constUtil.ErrP1GatherCatalogWriteRetry) {
-		t.Fatalf("unguarded personal period clone was not rolled back: %v", err)
+	if !errors.Is(err, rollback) {
+		t.Fatalf("personal clone required a shared catalogue writer or failed its rollback: %v", err)
 	}
 	if p1Count(t, &db.PeriodInstance{}, "id LIKE ?", "%"+cycleID+"%") != 0 {
 		t.Fatal("failed personal clone left an instance behind")
@@ -182,7 +197,7 @@ func testP1GatherCatalogPersonalPeriodFullRetry(t *testing.T, activityID, prefix
 	const requestID = "cc000000-0000-4000-8000-000000000001"
 	first, err := f.s.LocalPlayActivitiesApply(f.ctx, playerID, "refresh", activityID, requestID)
 	if err != nil || len(first.Results) != 1 || first.Results[0].Status != "open" {
-		t.Fatalf("personal operation did not retry with the directory write guard: %+v %v", first, err)
+		t.Fatalf("personal owner operation failed: %+v %v", first, err)
 	}
 	replay, err := f.s.LocalPlayActivitiesApply(f.ctx, playerID, "refresh", activityID, requestID)
 	if err != nil || len(replay.Results) != 1 || replay.Results[0].Status != "open" {
@@ -193,7 +208,7 @@ func testP1GatherCatalogPersonalPeriodFullRetry(t *testing.T, activityID, prefix
 	if err := db.GetIns().Where("id LIKE ? AND kind=?", "%"+cycleID+"%", kind).First(&copied).Error; err != nil {
 		t.Fatal(err)
 	}
-	if len(copied.Frozen) != 0 || p1Count(t, &db.PeriodInstance{}, "id LIKE ? AND kind=?", "%"+cycleID+"%", kind) != 1 ||
+	if copied.OwnerPlayerID != playerID || copied.RealmID != f.s.OriginalServerID() || len(copied.Frozen) != 0 || p1Count(t, &db.PeriodInstance{}, "id LIKE ? AND kind=?", "%"+cycleID+"%", kind) != 1 ||
 		p1Count(t, &db.LocalPlayActivityOperation{}, "player_id=? AND request_id=?", playerID, requestID) != 1 {
 		t.Fatal("retry or replay duplicated the personal period or receipt")
 	}

@@ -92,7 +92,7 @@ func p1PeriodSnapshot(live db.PeriodInstance) (db.PeriodInstance, error) {
 
 // freezeP1Period 在第一次事实写入或截止结算时冻结整个实例，修改未来规则须创建新ID。
 func (s *GameService) freezeP1Period(tx *gorm.DB, live db.PeriodInstance, freeze bool) (db.PeriodInstance, error) {
-	if freeze && len(live.Frozen) == 0 && p1SharedRead(tx) {
+	if freeze && live.OwnerPlayerID == 0 && p1SharedRead(tx) {
 		return live, constUtil.ErrP1ExclusiveRetry
 	}
 	cfg, err := p1PeriodSnapshot(live)
@@ -100,7 +100,7 @@ func (s *GameService) freezeP1Period(tx *gorm.DB, live db.PeriodInstance, freeze
 		return cfg, err
 	}
 	if len(live.Frozen) == 0 && freeze {
-		if s.P1Ready && (cfg.Kind == constUtil.P8EventMineGather || cfg.Kind == constUtil.P8EventFishGather) {
+		if s.P1Ready && live.OwnerPlayerID == 0 && (cfg.Kind == constUtil.P8EventMineGather || cfg.Kind == constUtil.P8EventFishGather) {
 			if err := p1RequireGatherCatalog(tx, cfg.Kind, true); err != nil {
 				return cfg, err
 			}

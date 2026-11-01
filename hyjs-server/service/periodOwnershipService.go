@@ -95,15 +95,17 @@ func (s *GameService) p1EventPeriods(tx *gorm.DB, playerID int64, kind string) (
 			continue
 		}
 		if p1GatherSnapshotRC(tx) && p1GatherCatalogKind(kind) {
-			if len(candidate.Frozen) == 0 {
+			if len(candidate.Frozen) == 0 && candidate.OwnerPlayerID != playerID {
 				return nil, constUtil.ErrP1ExclusiveRetry
 			}
-			result = append(result, candidate)
-			continue
+			if len(candidate.Frozen) > 0 {
+				result = append(result, candidate)
+				continue
+			}
 		}
 		strength := "SHARE"
 		if len(candidate.Frozen) == 0 {
-			if p1SharedRead(tx) {
+			if p1SharedRead(tx) && candidate.OwnerPlayerID != playerID {
 				return nil, constUtil.ErrP1ExclusiveRetry
 			}
 			strength = "UPDATE"

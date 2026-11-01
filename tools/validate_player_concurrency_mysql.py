@@ -14,6 +14,9 @@ sys.path.insert(0, str(ROOT / 'tests'))
 from hyjs_managed_mysql import ManagedMySQL
 
 CASES = {
+    'TestPlayerConcurrencyMySQLPrivateFirstFreeze': 'p1',
+    'TestAdminCharacterScheduleSharedMySQL': 'p4',
+    'TestFeedback81MySQLConcurrentClaim': 'p4',
     'TestPlayerConcurrencyMySQLGuildLoginIsolation': 'p13',
     'TestCopyFormationContinuityMySQLInterleaving': 'p1',
     'TestRechargeDirectoryIndexMySQLBlockedCommitAndRollback': 'p1',

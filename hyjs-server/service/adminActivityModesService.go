@@ -663,6 +663,12 @@ func (s *GameService) AdminSaveTypedActivity(ctx context.Context, p *model.Admin
 }
 
 func (s *GameService) adminPersistTypedActivity(tx *gorm.DB, d adminActivityDefinition, key string, f model.AdminActivityForm, enabled, exists bool) error {
+	return s.adminPersistTypedActivityForOwner(tx, d, key, f, enabled, exists, 0)
+}
+
+// A newly issued personal consumer is protected by its owner's profile lock.
+// It is excluded from every other owner's catalogue before it becomes visible.
+func (s *GameService) adminPersistTypedActivityForOwner(tx *gorm.DB, d adminActivityDefinition, key string, f model.AdminActivityForm, enabled, exists bool, ownerID int64) error {
 	if d.domain == "period" && key == constUtil.RechargeTotalDirectoryID {
 		return constUtil.ErrAdminInput
 	}
@@ -774,8 +780,12 @@ func (s *GameService) adminPersistTypedActivity(tx *gorm.DB, d adminActivityDefi
 		}
 		return save(&cfg)
 	case "period":
-		if err := p1RequireGatherCatalog(tx, d.kind, true); err != nil {
-			return err
+		if ownerID == 0 {
+			if err := p1RequireGatherCatalog(tx, d.kind, true); err != nil {
+				return err
+			}
+		} else if ownerID < 1 || exists {
+			return constUtil.ErrAdminInput
 		}
 		if len(f.Milestones) > 31 || enabled && len(f.Milestones) == 0 {
 			return constUtil.ErrAdminInput
@@ -791,6 +801,9 @@ func (s *GameService) adminPersistTypedActivity(tx *gorm.DB, d adminActivityDefi
 			}
 		}
 		cfg := db.PeriodInstance{ID: key, Kind: d.kind, Mode: "cumulative", Enabled: enabled, Title: f.Name, Goal: goal, Rewards: rewards, StartAt: f.StartAt, EndAt: f.EndAt, RewardEndAt: f.ClaimEndAt, Source: f.Source}
+		if ownerID > 0 {
+			cfg.OwnerPlayerID, cfg.RealmID = ownerID, s.OriginalServerID()
+		}
 		if len(f.Milestones) > 1 {
 			tiers := []p1PeriodMilestone{}
 			for _, milestone := range f.Milestones {
@@ -830,6 +843,7 @@ func (s *GameService) adminPersistTypedActivity(tx *gorm.DB, d adminActivityDefi
 				return err
 			}
 			cfg.RewardSourceID = persisted.RewardSourceID
+			cfg.OwnerPlayerID, cfg.RealmID = persisted.OwnerPlayerID, persisted.RealmID
 			if gameSchemaHasTable(tx, &db.AdminCharacterActivityInstance{}) {
 				var issued int64
 				if err := tx.Model(&db.AdminCharacterActivityInstance{}).Where("consumer_key=?", key).Count(&issued).Error; err != nil {

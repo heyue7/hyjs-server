@@ -118,8 +118,8 @@ func TestAdminCharacterScheduleSharedSQLite(t *testing.T) {
 		t.Fatal(err)
 	}
 	modes, writes := probe.snapshot()
-	if !reflect.DeepEqual(modes, []bool{true, false}) || !reflect.DeepEqual(writes, []bool{true, false}) {
-		t.Fatalf("new consumer must roll back owner then retry exclusively: modes=%v owner writes=%v", modes, writes)
+	if !reflect.DeepEqual(modes, []bool{true}) || !reflect.DeepEqual(writes, []bool{true}) {
+		t.Fatalf("new personal consumer should use one owner transaction: modes=%v owner writes=%v", modes, writes)
 	}
 	issued := characterScheduleIssued(t, f.id, occurrence.ID)
 	if issued.Mode != "login-total" || p1Count(t, &db.PeriodInstance{}, "id=?", issued.ConsumerKey) != 1 ||
@@ -377,7 +377,7 @@ func TestAdminCharacterScheduleSharedMySQL(t *testing.T) {
 		}
 	}
 	issued := characterScheduleIssued(t, f.id, second.ID)
-	if sharedWrites < 1 || exclusiveWrites != 1 || p1Count(t, &db.AdminCharacterActivityInstance{}, "player_id=? AND occurrence_id=?", f.id, second.ID) != 1 ||
+	if sharedWrites != 1 || exclusiveWrites != 0 || p1Count(t, &db.AdminCharacterActivityInstance{}, "player_id=? AND occurrence_id=?", f.id, second.ID) != 1 ||
 		p1Count(t, &db.AdminActivityTemplateOwner{}, "server_id=? AND player_id=? AND template_id=?", f.s.OriginalServerID(), f.id, second.TemplateID) != 1 ||
 		p1Count(t, &db.PeriodInstance{}, "id=?", issued.ConsumerKey) != 1 {
 		t.Fatalf("new consumer retry was not atomic: shared owner writes=%d exclusive owner writes=%d", sharedWrites, exclusiveWrites)

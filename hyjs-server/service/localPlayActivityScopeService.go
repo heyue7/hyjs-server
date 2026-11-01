@@ -385,7 +385,7 @@ func (s *GameService) localPlayCreateScopedCycle(tx *gorm.DB, id int64, def loca
 			"LoginAward": {"totalLogin"}, "Congratulation": {"celebrationActivity"}, "Festival": {"totalLoginFestival"}, "Update": {"totalLoginUpdate"},
 		}[def.ID]
 		var originals []db.PeriodInstance
-		if err := source.Where("enabled=? AND id NOT LIKE ?", true, "%lp-%").Order("start_at DESC,id DESC").Find(&originals).Error; err != nil {
+		if err := source.Where("enabled=? AND owner_player_id=0 AND realm_id IN ? AND id NOT LIKE ?", true, []int64{0, s.OriginalServerID()}, "%lp-%").Order("start_at DESC,id DESC").Find(&originals).Error; err != nil {
 			return nil, err
 		}
 		seen := map[string]bool{}
@@ -430,9 +430,8 @@ func (s *GameService) localPlayCreateScopedCycle(tx *gorm.DB, id int64, def loca
 			if err := s.validateP1Period(cfg); err != nil {
 				return nil, err
 			}
-			if err := p1RequireGatherCatalog(tx, cfg.Kind, true); err != nil {
-				return nil, err
-			}
+			// The owner profile serializes this private clone. Other players'
+			// candidate queries exclude it, so no shared catalogue writer is needed.
 			if err := tx.Create(&cfg).Error; err != nil {
 				return nil, err
 			}

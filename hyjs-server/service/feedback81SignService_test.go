@@ -341,8 +341,8 @@ func TestFeedback81RejectsAndRollsBack(t *testing.T) {
 }
 
 func TestFeedback81MySQLConcurrentClaim(t *testing.T) {
-	if os.Getenv("HYJS_P1_MYSQL_DATABASE") == "" {
-		t.Skip("requires an isolated hyjs_test_p1_ MySQL database")
+	if os.Getenv("HYJS_P4_MYSQL_DATABASE") == "" {
+		t.Skip("requires an isolated hyjs_test_p4_ MySQL database used by reuseFixture")
 	}
 	f, actor := feedback81Fixture(t)
 	_, period, receipt := feedback81Issue(t, f, f.id, true, "pending")

@@ -96,17 +96,6 @@ func (s *GameService) PrepareAdminCharacterActivitySchedules(ctx context.Context
 		if AdminProfileServerID(profile) != s.OriginalServerID() || profile.Player == nil {
 			return constUtil.ErrAdminInput
 		}
-		if s.P1Ready {
-			guarded, err := p1AcquireGatherCatalog(tx)
-			if err != nil {
-				return err
-			}
-			tx = guarded
-		}
-		// Keep the established profile -> P1 windows -> activity source order.
-		if err := lockProfilePeriods(tx); err != nil {
-			return err
-		}
 		var anchor db.PlayerOpeningCalendar
 		err := tx.First(&anchor, "player_id=?", playerID).Error
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -177,18 +166,8 @@ func (s *GameService) PrepareAdminCharacterActivitySchedules(ctx context.Context
 			if form.Mode == "shop-window" {
 				key = "shop_schedule_" + form.Options.ShopKey + "_character_" + digest
 			}
-			// Issuing a consumer can create or modify P1 windows. Release every
-			// shared window lock before retrying the whole transaction exclusively.
-			if p1SharedRead(tx) {
-				return constUtil.ErrP1ExclusiveRetry
-			}
-			if err := s.adminPersistTypedActivity(tx, definition, key, form, true, false); err != nil {
+			if err := s.adminPersistTypedActivityForOwner(tx, definition, key, form, true, false, playerID); err != nil {
 				return err
-			}
-			if definition.domain == "period" {
-				if err := tx.Model(&db.PeriodInstance{}).Where("id=?", key).Updates(map[string]any{"owner_player_id": playerID, "realm_id": s.OriginalServerID()}).Error; err != nil {
-					return err
-				}
 			}
 			issued = db.AdminCharacterActivityInstance{PlayerID: playerID, OccurrenceID: schedule.ID, ServerID: s.OriginalServerID(), ConsumerID: definition.domain + ":" + key, ConsumerKey: key, Mode: schedule.Mode, StartAt: startAt, EndAt: endAt, ClaimEndAt: claimEndAt, SourceVersion: adminVersion(schedule), FormJSON: adminJSON(form)}
 			if form.Mode == "shop-window" && !adminOrdinarySchedulableShop(form.Options.ShopKey) {
@@ -208,14 +187,7 @@ func (s *GameService) PrepareAdminCharacterActivitySchedules(ctx context.Context
 		return nil
 	}
 	shared := context.WithValue(ctx, constUtil.P1SharedReadContextKey{}, true)
-	err := d.WithContext(shared).Transaction(prepare)
-	if errors.Is(err, constUtil.ErrP1ExclusiveRetry) {
-		err = d.Transaction(prepare)
-	}
-	if errors.Is(err, constUtil.ErrP1GatherCatalogWriteRetry) {
-		err = d.WithContext(p1GatherCatalogWriteContext(ctx)).Transaction(prepare)
-	}
-	return err
+	return d.WithContext(shared).Transaction(prepare)
 }
 
 // adminCharacterActivityAccess retains historical receipts but prevents a role

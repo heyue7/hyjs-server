@@ -115,6 +115,9 @@ func (s *GameService) recordP1Event(tx *gorm.DB, playerID int64, sourceKey, kind
 	if playerID <= 0 || !p1SourceValid(sourceKey) || !p1SourceValid(kind) || len(kind) > 64 || amount <= 0 || at.UnixMilli() <= 0 || at.After(LocalPlayNow(tx.Statement.Context).Add(time.Minute)) {
 		return errors.New("事件事实参数无效")
 	}
+	if p1SharedRead(tx) && !gather {
+		return constUtil.ErrP1ExclusiveRetry
+	}
 	var prior db.EventFact
 	err := tx.Where("player_id = ? AND source_key = ? AND kind = ?", playerID, sourceKey, kind).First(&prior).Error
 	if err == nil {
@@ -184,13 +187,12 @@ func (s *GameService) recordP1Event(tx *gorm.DB, playerID int64, sourceKey, kind
 			}
 		}
 		if p1SharedRead(tx) {
-			// First use must retry the entire transaction with an exclusive
-			// lock; a shared lock is never upgraded in place. Revalidate the
-			// immutable snapshot at the same point as the original freeze.
-			if len(live.Frozen) == 0 {
+			// A personal first use already owns its exact period UPDATE lock.
+			// A shared period's first use still retries its publication writer.
+			if len(live.Frozen) == 0 && live.OwnerPlayerID != playerID {
 				return constUtil.ErrP1ExclusiveRetry
 			}
-			cfg, err = s.freezeP1Period(tx, live, false)
+			cfg, err = s.freezeP1Period(tx, live, len(live.Frozen) == 0)
 			if err != nil {
 				return err
 			}

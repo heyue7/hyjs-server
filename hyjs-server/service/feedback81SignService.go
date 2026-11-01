@@ -53,6 +53,7 @@ func feedback81Form(raw []byte) ([]byte, bool, error) {
 // feedback81Period checks both historical source formats without changing their keys.
 func feedback81Period(cfg db.PeriodInstance, issued db.AdminCharacterActivityInstance) error {
 	if cfg.ID != issued.ConsumerKey || cfg.Title != constUtil.Feedback81Name || cfg.Source != constUtil.Feedback81Source ||
+		(cfg.OwnerPlayerID != 0 && cfg.OwnerPlayerID != issued.PlayerID) || (cfg.RealmID != 0 && cfg.RealmID != issued.ServerID) ||
 		cfg.Kind != constUtil.P1EventLoginDay || cfg.Mode != "cumulative" || cfg.Goal != 1 || cfg.RewardSourceID != "" ||
 		cfg.StartAt != issued.StartAt || cfg.EndAt != issued.EndAt || cfg.RewardEndAt != issued.ClaimEndAt ||
 		cfg.RankPlaces != 0 || cfg.RankRewards != "" {
@@ -79,6 +80,9 @@ func feedback81PeriodEquivalent(a, b db.PeriodInstance) bool {
 	normalize := func(v db.PeriodInstance) db.PeriodInstance {
 		v.Frozen = nil
 		v.Enabled = false
+		// Routing ownership lives on the row and is deliberately absent from
+		// historical JSON. feedback81Period validates it against the issuer.
+		v.OwnerPlayerID, v.RealmID = 0, 0
 		v.Rewards = constUtil.Feedback81OldReward
 		tiers := p1PeriodMilestones(v)
 		if len(tiers) > 0 {

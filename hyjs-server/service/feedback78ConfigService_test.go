@@ -136,6 +136,10 @@ func feedback78Setup(t *testing.T) *feedback78Fixture {
 			t.Fatal(err)
 		}
 	}
+	// Include database-generated read columns in the persisted baseline.
+	if err := db.GetIns().First(&profile, profile.Id).Error; err != nil {
+		t.Fatal(err)
+	}
 	f := &feedback78Fixture{s: &GameService{}, ctx: ctx, actor: &model.AdminPrincipal{UserID: user.ID, Username: user.Username, Role: user.Role}, profile: profile, vip: vip}
 	start := time.Now().UTC().Add(-time.Hour).UnixMilli()
 	week := int64(7 * 24 * time.Hour / time.Millisecond)
