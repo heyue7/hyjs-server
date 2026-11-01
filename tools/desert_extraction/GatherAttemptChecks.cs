@@ -65,6 +65,47 @@ public static class GatherAttemptChecks
         a=New(); Check(Accept(a,1200),"claim restart start"); a.Claim(); string claim=a.Journal.claimRequestId;
         a=GatherAttempt.Restore(a.Journal); Check(a.Journal.phase==GatherPhase.Claiming && a.Journal.claimRequestId==claim,"claim UUID survives restart");
         a.ClaimReceipt(claim,a.Journal.startRequestId,"frozen-token");
+
+        a=New(); Check(Accept(a,1200),"checked claim start"); a.Claim();
+        string checkedStart=a.Journal.startRequestId, checkedClaim=a.Journal.claimRequestId;
+        a.CheckClaimStatus();
+        Check(!Accept(a,1300) && a.Journal.phase==GatherPhase.CheckingClaim,"late start cannot replace checking");
+        a=GatherAttempt.Restore(a.Journal);
+        Check(a.Journal.phase==GatherPhase.CheckingClaim && a.Journal.claimRequestId==checkedClaim,"checking and claim UUID survive restart");
+        try { a.StatusCancellation(Guid.NewGuid().ToString("D"),"frozen-token"); throw new Exception("wrong status start accepted"); }
+        catch (InvalidOperationException) { }
+        try { a.StatusCancellation(checkedStart,"other-token"); throw new Exception("wrong status token accepted"); }
+        catch (InvalidOperationException) { }
+        try { a.StatusCancellation(checkedStart,""); throw new Exception("empty status token accepted"); }
+        catch (InvalidOperationException) { }
+        Check(a.Journal.phase==GatherPhase.CheckingClaim,"status mismatches stay blocked");
+        a.ResumeCheckedClaim(checkedStart,"frozen-token");
+        Check(a.Journal.phase==GatherPhase.Claiming && a.Journal.claimRequestId==checkedClaim,"pending retries original claim");
+        a.CheckClaimStatus();
+        Check(!a.MatchesClaimReceipt(Guid.NewGuid().ToString("D"),checkedStart,"frozen-token"),"checking rejects unrelated claim UUID");
+        Check(a.MatchesClaimReceipt(checkedClaim,checkedStart,"frozen-token"),"checking accepts original claim UUID");
+        Check(a.MatchesClaimReceipt(system,checkedStart,"frozen-token"),"checking accepts token system UUID");
+        a.StatusCancellation(checkedStart,"frozen-token");
+        Check(a.Journal.phase==GatherPhase.Finished,"matching cancellation finishes checking");
+
+        a=New(); Check(Accept(a,1200),"checked delivery start"); a.Claim(); a.CheckClaimStatus();
+        a.PendingDelivery(a.Journal.startRequestId,"frozen-token");
+        Check(a.Journal.phase==GatherPhase.PendingDelivery,"checking can recover pending delivery");
+        a=New(); Check(Accept(a,1200),"checked receipt start"); a.Claim(); a.CheckClaimStatus();
+        try { a.RecoveredReceipt(a.Journal.startRequestId,"frozen-token"); throw new Exception("checking recovery without claim UUID accepted"); }
+        catch (InvalidOperationException) { }
+        a.ClaimReceipt(a.Journal.claimRequestId,a.Journal.startRequestId,"frozen-token");
+        Check(a.Journal.phase==GatherPhase.Finished,"checking can recover receipt");
+        a=New(); Check(Accept(a,1200),"invalid checking journal start"); a.Claim(); a.CheckClaimStatus(); a.Journal.attemptToken="";
+        try { GatherAttempt.Restore(a.Journal); throw new Exception("checking journal without token accepted"); }
+        catch (ArgumentException) { }
+
+        a=New(); a.Expire(2000); a.CancelReceipt(a.Journal.cancelRequestId,a.Journal.startRequestId,"settled");
+        try { a.StatusCancellation(a.Journal.startRequestId,"recovered-token"); throw new Exception("unknown old token accepted"); }
+        catch (InvalidOperationException) { }
+        a.RecoveredReceipt(a.Journal.startRequestId,"recovered-token");
+        Check(a.Journal.phase==GatherPhase.Finished,"legacy recovery without saved token remains supported");
+
         a=New(); a.DefinitelyRejected(); Check(a.Journal.phase==GatherPhase.Finished,"definitive 7204 releases start");
         a=New(); a.Expire(2000); a.DefinitelyRejected(); Check(a.Journal.phase==GatherPhase.Cancelling,"late rejection cannot bypass cancellation");
         Console.WriteLine("GatherAttempt checks passed");

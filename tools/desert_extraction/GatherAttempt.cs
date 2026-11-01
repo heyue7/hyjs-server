@@ -7,7 +7,8 @@ namespace HYJS.DesertV4
     // Pure timing/receipt state. The caller persists Journal after every transition
     // before issuing the corresponding POST. Server acknowledgement is the only
     // way to release a node; timeout or process shutdown is never acknowledgement.
-    public enum GatherPhase { Starting, Active, Cancelling, Claiming, RecoverReceipt, Finished, PendingDelivery }
+    // Values are persisted by Unity. Append new phases without renumbering old journals.
+    public enum GatherPhase { Starting, Active, Cancelling, Claiming, RecoverReceipt, Finished, PendingDelivery, CheckingClaim }
     [Serializable]
     public sealed class GatherJournal
     {
@@ -40,7 +41,7 @@ namespace HYJS.DesertV4
                 !Enum.IsDefined(typeof(GatherPhase), journal.phase))
                 throw new ArgumentException("Invalid persisted gather journal");
             if (journal.phase == GatherPhase.Finished) throw new ArgumentException("Completed journal cannot be resumed");
-            if ((journal.phase == GatherPhase.Active || journal.phase == GatherPhase.Claiming || journal.phase == GatherPhase.PendingDelivery) && String.IsNullOrEmpty(journal.attemptToken))
+            if ((journal.phase == GatherPhase.Active || journal.phase == GatherPhase.Claiming || journal.phase == GatherPhase.PendingDelivery || journal.phase == GatherPhase.CheckingClaim) && String.IsNullOrEmpty(journal.attemptToken))
                 throw new ArgumentException("Missing attempt token");
             // No saved monotonic deadline survives a process restart. A previously
             // started but unclaimed action must be cancelled before new attempts.
@@ -67,7 +68,7 @@ namespace HYJS.DesertV4
             if (requestId != Journal.startRequestId || pointId != Journal.pointId || generation != Journal.generation ||
                 String.IsNullOrEmpty(token) || acceptedAtMs <= 0 || readyAtMs <= acceptedAtMs || fatigueCost < 0)
                 throw new ArgumentException("Start receipt does not match attempt");
-            if (Journal.phase == GatherPhase.Finished || Journal.phase == GatherPhase.Claiming) return false;
+            if (Journal.phase == GatherPhase.Finished || Journal.phase == GatherPhase.Claiming || Journal.phase == GatherPhase.CheckingClaim) return false;
             if (!String.IsNullOrEmpty(Journal.attemptToken) &&
                 (Journal.attemptToken != token || Journal.acceptedAtMs != acceptedAtMs || Journal.readyAtMs != readyAtMs || Journal.fatigueCost != fatigueCost))
                 throw new InvalidOperationException("Frozen start receipt changed");
@@ -93,6 +94,28 @@ namespace HYJS.DesertV4
             if (Journal.phase != GatherPhase.Active || String.IsNullOrEmpty(Journal.attemptToken)) throw new InvalidOperationException("No accepted active action");
             Journal.phase = GatherPhase.Claiming;
         }
+        public void CheckClaimStatus()
+        {
+            if (Journal.phase != GatherPhase.Claiming || String.IsNullOrEmpty(Journal.attemptToken)) throw new InvalidOperationException("No claim to check");
+            Journal.phase = GatherPhase.CheckingClaim;
+        }
+        void CheckKnownIdentity(string startRequestId, string attemptToken)
+        {
+            if (startRequestId != Journal.startRequestId || String.IsNullOrEmpty(Journal.attemptToken) || attemptToken != Journal.attemptToken)
+                throw new InvalidOperationException("Unexpected gather status identity");
+        }
+        public void ResumeCheckedClaim(string startRequestId, string attemptToken)
+        {
+            if (Journal.phase != GatherPhase.CheckingClaim) throw new InvalidOperationException("Claim is not being checked");
+            CheckKnownIdentity(startRequestId, attemptToken);
+            Journal.phase = GatherPhase.Claiming;
+        }
+        public void StatusCancellation(string startRequestId, string attemptToken)
+        {
+            if (Journal.phase != GatherPhase.CheckingClaim && Journal.phase != GatherPhase.RecoverReceipt) throw new InvalidOperationException("No status cancellation expected");
+            CheckKnownIdentity(startRequestId, attemptToken);
+            Journal.phase = GatherPhase.Finished;
+        }
         public void DefinitelyRejected()
         {
             if (Journal.phase == GatherPhase.Starting) Journal.phase = GatherPhase.Finished;
@@ -116,7 +139,7 @@ namespace HYJS.DesertV4
         }
         public void PendingDelivery(string startRequestId, string attemptToken)
         {
-            if ((Journal.phase != GatherPhase.Claiming && Journal.phase != GatherPhase.Cancelling && Journal.phase != GatherPhase.RecoverReceipt) ||
+            if ((Journal.phase != GatherPhase.Claiming && Journal.phase != GatherPhase.Cancelling && Journal.phase != GatherPhase.RecoverReceipt && Journal.phase != GatherPhase.CheckingClaim) ||
                 startRequestId != Journal.startRequestId || String.IsNullOrEmpty(attemptToken) ||
                 (!String.IsNullOrEmpty(Journal.attemptToken) && Journal.attemptToken != attemptToken))
                 throw new InvalidOperationException("Unexpected pending-delivery response");
@@ -142,7 +165,7 @@ namespace HYJS.DesertV4
         }
         public bool MatchesClaimReceipt(string requestId,string startRequestId,string attemptToken)
         {
-            if ((Journal.phase!=GatherPhase.Claiming && Journal.phase!=GatherPhase.RecoverReceipt) ||
+            if ((Journal.phase!=GatherPhase.Claiming && Journal.phase!=GatherPhase.RecoverReceipt && Journal.phase!=GatherPhase.CheckingClaim) ||
                 startRequestId!=Journal.startRequestId || String.IsNullOrEmpty(attemptToken) || attemptToken!=Journal.attemptToken)
                 return false;
             // The worker can settle first; accept only that token's exact system

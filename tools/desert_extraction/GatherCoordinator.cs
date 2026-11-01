@@ -119,7 +119,7 @@ namespace HYJS.DesertV4
             { try { Finished(); } catch (Exception) { WaitForRetry(); } return; }
             if (attempt.Journal.phase==GatherPhase.Cancelling && !cancelInFlight) SendCancel();
             else if (attempt.Journal.phase==GatherPhase.Claiming && !claimInFlight) SendClaim();
-            else if (attempt.Journal.phase==GatherPhase.RecoverReceipt && !statusInFlight) SendStatus();
+            else if ((attempt.Journal.phase==GatherPhase.RecoverReceipt || attempt.Journal.phase==GatherPhase.CheckingClaim) && !statusInFlight) SendStatus();
         }
         // Leaving, moving or damage interrupts the active action; retries reuse
         // the same cancellation UUID until the server's tombstone is confirmed.
@@ -183,6 +183,11 @@ namespace HYJS.DesertV4
                     try { attempt.PendingDelivery(id,attempt.Journal.attemptToken); Save(); view.Notice("背包已满，整理后重试领取"); view.RequestSnapshot(); } catch (Exception) { WaitForRetry(); }
                     return;
                 }
+                if (result.code==7206)
+                {
+                    try { attempt.CheckClaimStatus(); Save(); } catch (Exception) { WaitForRetry(); }
+                    return;
+                }
                 if (result.code!=0) return;
                 try
                 {
@@ -205,18 +210,32 @@ namespace HYJS.DesertV4
                 {
                     JsonData data=result.data;
                     if (Text(data["startRequestId"])!=id) return;
-                    if (Text(data["status"])=="pending_delivery")
-                    { attempt.PendingDelivery(id,Text(data["attemptToken"])); Save(); view.Notice("背包已满，整理后重试领取"); return; }
-                    if (Text(data["status"])!="settled") return;
-                    Recover(Text(data["attemptToken"]),data["claimReceipt"]);
+                    string status=Text(data["status"]), token=Text(data["attemptToken"]);
+                    if (attempt.Journal.phase==GatherPhase.CheckingClaim &&
+                        (String.IsNullOrEmpty(token) || token!=attempt.Journal.attemptToken)) return;
+                    if (status=="pending_delivery")
+                    { attempt.PendingDelivery(id,token); Save(); view.Notice("背包已满，整理后重试领取"); return; }
+                    if (status=="cancelled")
+                    { attempt.StatusCancellation(id,token); Finished(); view.Notice("采集已取消，请重新选择"); return; }
+                    if (status=="pending" && attempt.Journal.phase==GatherPhase.CheckingClaim)
+                    { attempt.ResumeCheckedClaim(id,token); Save(); return; }
+                    if (status!="settled") return;
+                    Recover(token,data["claimReceipt"]);
                 }
                 catch (Exception) { WaitForRetry(); }
             });
         }
         void Recover(string token,JsonData receipt)
         {
-            if (receipt==null || Text(receipt["startRequestId"])!=attempt.Journal.startRequestId || Text(receipt["attemptToken"])!=token) throw new InvalidOperationException("Recovered receipt mismatch");
-            view.ApplyOriginalReceipt(receipt); attempt.RecoveredReceipt(Text(receipt["startRequestId"]),token); Finished();
+            if ((attempt.Journal.phase!=GatherPhase.RecoverReceipt && attempt.Journal.phase!=GatherPhase.CheckingClaim) ||
+                String.IsNullOrEmpty(token) || (!String.IsNullOrEmpty(attempt.Journal.attemptToken) && token!=attempt.Journal.attemptToken) ||
+                receipt==null || Text(receipt["startRequestId"])!=attempt.Journal.startRequestId || Text(receipt["attemptToken"])!=token) throw new InvalidOperationException("Recovered receipt mismatch");
+            bool checking=attempt.Journal.phase==GatherPhase.CheckingClaim;
+            if (checking && !attempt.MatchesClaimReceipt(Text(receipt["requestId"]),Text(receipt["startRequestId"]),token)) throw new InvalidOperationException("Recovered claim request mismatch");
+            view.ApplyOriginalReceipt(receipt);
+            if (checking) attempt.ClaimReceipt(Text(receipt["requestId"]),Text(receipt["startRequestId"]),token);
+            else attempt.RecoveredReceipt(Text(receipt["startRequestId"]),token);
+            Finished();
         }
         void Finished()
         {
