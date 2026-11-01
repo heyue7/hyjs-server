@@ -50,7 +50,9 @@ func (s *GameService) ggoScheduleGather(ctx context.Context, id int64, token str
 }
 
 func (s *GameService) ggoFinishDue(ctx context.Context, id int64, token string) error {
-	ctx = p1GatherCatalogContext(context.WithValue(ctx, ggoGatherCurrentReadKey{}, true))
+	if s.P1Ready {
+		ctx = p1GatherCatalogContext(context.WithValue(ctx, ggoGatherCurrentReadKey{}, true))
+	}
 	snapshot, err := s.adminFieldRuntimeSnapshotForRequest(ctx, s.OriginalServerID())
 	if err != nil {
 		return err
@@ -70,11 +72,13 @@ func (s *GameService) ggoFinishDue(ctx context.Context, id int64, token string) 
 			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&row, id).Error; err != nil {
 				return err
 			}
-			guarded, err := p1AcquireGatherCatalog(tx)
-			if err != nil {
-				return err
+			if runtime.P1Ready {
+				guarded, guardErr := p1AcquireGatherCatalog(tx)
+				if guardErr != nil {
+					return guardErr
+				}
+				tx = guarded
 			}
-			tx = guarded
 			player, game, err := decodeProfileForCalendarUpdate(tx, &row)
 			if err != nil {
 				return err

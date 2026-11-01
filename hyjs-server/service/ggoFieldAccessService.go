@@ -97,11 +97,13 @@ func (s *GameService) ggoWithProfile(ctx context.Context, auth model.GGOFieldAut
 		}
 		// Marked gather transactions hold the stable activity catalog before
 		// calendar decoding or any profile/period hook can read activity rows.
-		guarded, guardErr := p1AcquireGatherCatalog(tx)
-		if guardErr != nil {
-			return guardErr
+		if runtime.P1Ready {
+			guarded, guardErr := p1AcquireGatherCatalog(tx)
+			if guardErr != nil {
+				return guardErr
+			}
+			tx = guarded
 		}
-		tx = guarded
 		player, game, err := decodeProfileForCalendarUpdate(tx, &row)
 		if err != nil {
 			return err
