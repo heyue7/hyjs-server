@@ -288,7 +288,7 @@ namespace HYJS.ActivitySafety
     // other activity or protocol field is changed by the directory layout.
     public sealed class RechargeDirectoryGrid : MonoBehaviour
     {
-        const float ExtraHeight = 152f;
+        const float ExtraHeight = 96f;
         SimpleGrid grid;
         float originalHeight;
         bool expanded;
@@ -333,7 +333,7 @@ namespace HYJS.ActivitySafety
 
     public sealed class RechargeDirectoryRow : MonoBehaviour
     {
-        const float ExtraHeight = 152f;
+        const float ExtraHeight = 96f;
         readonly List<Transform> moved = new List<Transform>();
         readonly List<Vector3> originalPositions = new List<Vector3>();
         UISprite background;
@@ -363,14 +363,13 @@ namespace HYJS.ActivitySafety
                 go.layer = row.gameObject.layer;
                 go.transform.parent = row.transform;
                 go.transform.localScale = Vector3.one;
-                go.transform.localPosition = new Vector3(-236f, 27f, 0f);
                 caption = go.AddComponent<UILabel>();
                 caption.bitmapFont = row.labTitle.bitmapFont;
                 caption.trueTypeFont = row.labTitle.trueTypeFont;
                 caption.fontStyle = row.labTitle.fontStyle;
-                caption.fontSize = 18;
+                caption.fontSize = 16;
                 caption.width = 472;
-                caption.height = 130;
+                caption.height = 80;
                 caption.pivot = UIWidget.Pivot.TopLeft;
                 caption.alignment = NGUIText.Alignment.Left;
                 caption.depth = Math.Max(row.labTitle.depth, row.leftLabel.depth) + 1;
@@ -378,6 +377,9 @@ namespace HYJS.ActivitySafety
                 caption.supportEncoding = false;
                 caption.maxLineCount = 6;
                 caption.overflowMethod = UILabel.Overflow.ShrinkContent;
+                // NGUI moves the transform when its pivot changes. Position
+                // the finished widget after its geometry has been configured.
+                go.transform.localPosition = new Vector3(-236f, 27f, 0f);
                 background.height = backgroundHeight + (int)ExtraHeight;
                 back.localPosition = new Vector3(backgroundPosition.x, backgroundPosition.y - ExtraHeight / 2f, backgroundPosition.z);
                 for (int i = 0; i < moved.Count; i++)

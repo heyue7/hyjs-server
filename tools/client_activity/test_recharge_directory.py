@@ -87,35 +87,50 @@ def inspect_prefab():
 
 def inspect_geometry(font_data):
     # Layout values also appear in the verbatim managed helper/model assertions.
-    font = ImageFont.truetype(io.BytesIO(font_data), 18)
     cmap = TTFont(io.BytesIO(font_data)).getBestCmap()
     sample = ['测' * 80, '活动截止 2026-11-04 00:00:00', '领奖截止 2026-11-05 23:59:59']
     assert all(ord(ch) in cmap for line in sample for ch in line)
-    lines = []
-    for part in sample:
-        line = ''
-        for ch in part:
-            if line and font.getlength(line + ch) > 472:
-                lines.append(line)
-                line = ''
-            line += ch
-        lines.append(line)
-    line_height = sum(font.getmetrics())
-    assert len(lines) == 6 and line_height * len(lines) <= 130
-    assert max(font.getlength(line) for line in lines) <= 472
-    # At row origin: title bottom=33; caption y=27..-103; the original
-    # reward clip's upper edge is 40 and shifts down by 152.
-    assert 27 < 33 and 27 - 130 > 40 - 152
+    selected = None
+    for font_size in range(16, 9, -1):
+        font = ImageFont.truetype(io.BytesIO(font_data), font_size)
+
+        def line_width(text):
+            left, _, right, _ = font.getbbox(text)
+            return max(font.getlength(text), right) - min(0, left)
+
+        wrapped = []
+        for part in sample:
+            part_lines = []
+            line = ''
+            for ch in part:
+                if line and line_width(line + ch) > 472:
+                    part_lines.append(line)
+                    line = ''
+                line += ch
+            part_lines.append(line)
+            assert ''.join(part_lines) == part
+            wrapped.extend(part_lines)
+        line_height = sum(font.getmetrics())
+        max_width = max(line_width(line) for line in wrapped)
+        if len(wrapped) <= 6 and line_height * len(wrapped) <= 80 and max_width <= 472:
+            selected = (font_size, wrapped, line_height, max_width)
+            break
+    assert selected is not None, 'full title and deadlines do not fit at font sizes 16 through 10'
+    font_size, lines, line_height, max_width = selected
+    # At row origin: title bottom=33; caption y=27..-53; the original
+    # reward clip's upper edge is 40 and shifts down by 96.
+    assert 27 < 33 and 27 - 80 > 40 - 96
     # Original background bottom is -74; next title reaches +73. The new
-    # 300-unit cell leaves a one-unit gap between consecutive rows.
-    assert -74 - 152 > 73 - 300
+    # 244-unit cell leaves a one-unit gap between consecutive rows.
+    assert -74 - 96 > 73 - 244
     content_top = 73
-    last_bottom = -300 - 74 - 152
+    last_bottom = -244 - 74 - 96
     assert content_top - last_bottom > 404
-    assert math.isclose((content_top - last_bottom) - 404, 195.0)
-    return {'sampleLines': len(lines), 'maxLineWidth': max(font.getlength(line) for line in lines),
-            'fontLineHeight': line_height, 'captionHeight': 130, 'rowSpacing': 300,
-            'viewportHeight': 404, 'twoRowScrollRangeModel': 195}
+    assert math.isclose((content_top - last_bottom) - 404, 83.0)
+    return {'sampleLines': len(lines), 'maxLineWidth': max_width, 'selectedFontSize': font_size,
+            'minimumTestedFontSize': 10, 'allSampleGlyphsPresent': True, 'fullSampleTextPreserved': True,
+            'fontLineHeight': line_height, 'captionHeight': 80, 'rowSpacing': 244,
+            'viewportHeight': 404, 'twoRowScrollRangeModel': 83}
 
 
 if __name__ == '__main__':

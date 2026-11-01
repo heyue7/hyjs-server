@@ -90,8 +90,21 @@ namespace UnityEngine
 
 public class UIWidget : UnityEngine.MonoBehaviour
 {
-    public enum Pivot { TopLeft }
-    public Pivot pivot;
+    public enum Pivot { Center, TopLeft }
+    Pivot currentPivot = Pivot.Center;
+    public Pivot pivot
+    {
+        get { return currentPivot; }
+        set
+        {
+            if (currentPivot == Pivot.Center && value == Pivot.TopLeft)
+            {
+                UnityEngine.Vector3 position = transform.localPosition;
+                transform.localPosition = new UnityEngine.Vector3(position.x - width / 2f, position.y + height / 2f, position.z);
+            }
+            currentPivot = value;
+        }
+    }
     public int width, height, depth;
     public UnityEngine.Color color;
 }
@@ -197,6 +210,13 @@ public static class RechargeDirectoryHarness
     }
     public static void Main()
     {
+        UIWidget pivotProbe = new UnityEngine.GameObject("pivot probe").AddComponent<UIWidget>();
+        pivotProbe.width = 472; pivotProbe.height = 80;
+        pivotProbe.transform.localPosition = new UnityEngine.Vector3(100, 200, 3);
+        Check(pivotProbe.pivot == UIWidget.Pivot.Center, "native pivot default changed");
+        pivotProbe.pivot = UIWidget.Pivot.TopLeft;
+        Check(pivotProbe.transform.localPosition.x == -136 && pivotProbe.transform.localPosition.y == 240 && pivotProbe.transform.localPosition.z == 3, "pivot did not move the widget");
+
         UnityEngine.GameObject view = new UnityEngine.GameObject("Scroll View");
         UIScrollView scroll = view.AddComponent<UIScrollView>();
         SimpleGrid grid = Child(view.transform, "simpleGrid", 0, 0).AddComponent<SimpleGrid>();
@@ -208,32 +228,32 @@ public static class RechargeDirectoryHarness
         Check(first.labTitle.text == "累计充值60元" && first.labLeftTimes.text == "30/60", "original amount display changed");
         Check(a.status == 0 && a.index == 80, "bridge changed the reward state or index");
         Check(!first.transform.Find("btnGet").gameObject.activeSelf && !first.transform.Find("getted").gameObject.activeSelf && first.transform.Find("notReached").gameObject.activeSelf, "unreached status changed");
-        Check(grid.cellHeight == 300, "expanded native row spacing is wrong");
+        Check(grid.cellHeight == 244, "expanded native row spacing is wrong");
         Check(first.transform.Find("titleBg").localPosition.y == 53, "native title moved");
-        Check(first.transform.Find("bg").GetComponent<UISprite>().height == 296 && first.transform.Find("bg").localPosition.y == -78, "background expansion is wrong");
-        Check(first.transform.Find("Scroll View").localPosition.y == -167 && first.transform.Find("btnGet").localPosition.y == -172, "reward or button position is wrong");
+        Check(first.transform.Find("bg").GetComponent<UISprite>().height == 240 && first.transform.Find("bg").localPosition.y == -50, "background expansion is wrong");
+        Check(first.transform.Find("Scroll View").localPosition.y == -111 && first.transform.Find("btnGet").localPosition.y == -116, "reward or button position is wrong");
         UILabel caption = first.transform.Find("HYJSRechargeDirectoryCaption").GetComponent<UILabel>();
         Check(caption.text == "测试充值\n活动截止 " + End + "\n领奖截止 " + Claim, "activity title or deadline changed");
-        Check(caption.trueTypeFont == first.labTitle.trueTypeFont && caption.fontStyle == 4 && caption.fontSize == 18, "original font was not reused");
-        Check(caption.width == 472 && caption.height == 130 && caption.maxLineCount == 6 && !caption.supportEncoding && caption.overflowMethod == UILabel.Overflow.ShrinkContent, "caption is not bounded");
-        Check(caption.transform.localPosition.x == -236 && caption.transform.localPosition.y == 27 && caption.gameObject.layer == 7, "caption placement changed");
+        Check(caption.trueTypeFont == first.labTitle.trueTypeFont && caption.fontStyle == 4 && caption.fontSize == 16, "original font was not reused");
+        Check(caption.width == 472 && caption.height == 80 && caption.maxLineCount == 6 && !caption.supportEncoding && caption.overflowMethod == UILabel.Overflow.ShrinkContent, "caption is not bounded");
+        Check(caption.pivot == UIWidget.Pivot.TopLeft && caption.transform.localPosition.x == -236 && caption.transform.localPosition.y == 27 && caption.transform.localPosition.z == 0 && caption.gameObject.layer == 7, "caption placement changed");
         HYJS.ActivitySafety.RechargeDisplay.Apply(first, a);
-        Check(first.transform.Find("btnGet").localPosition.y == -172 && first.transform.Find("bg").GetComponent<UISprite>().height == 296, "same row was expanded twice");
+        Check(first.transform.Find("btnGet").localPosition.y == -116 && first.transform.Find("bg").GetComponent<UISprite>().height == 240, "same row was expanded twice");
 
         UI.AcRechargeSingleItem second = Row(grid, Directory, UI.ActivityType.RechargeTotal);
         ProtoBuf.Message.ActivityItem b = Item(1, new string('测', 80));
         second.transform.Find("getted").gameObject.SetActive(false);
         second.transform.Find("notReached").gameObject.SetActive(false);
         HYJS.ActivitySafety.RechargeDisplay.Apply(second, b);
-        Check(b.status == 1 && b.index == 81 && second.transform.localPosition.y == -300, "second row identity or placement changed");
+        Check(b.status == 1 && b.index == 81 && second.transform.localPosition.y == -244, "second row identity or placement changed");
         Check(second.transform.Find("btnGet").gameObject.activeSelf && !second.transform.Find("getted").gameObject.activeSelf && !second.transform.Find("notReached").gameObject.activeSelf, "claimable status changed");
         Check(second.transform.Find("HYJSRechargeDirectoryCaption").GetComponent<UILabel>().text == new string('测', 80) + "\n活动截止 " + End + "\n领奖截止 " + Claim, "long title or deadline was lost");
         // Model the original UpdateActivityItems disabling scroll after adding two rows.
         scroll.enabled = false; second.transform.localPosition = new UnityEngine.Vector3(0, -148, 0);
         Late(grid);
         Check(scroll.enabled && scroll.invalidated == 1 && scroll.resets == 1, "two rows cannot scroll after native callback");
-        Check(second.transform.localPosition.y == -300, "final grid pass did not reposition the last row");
-        Check(27 - 130 > 40 - 152 && -74 - 152 > 73 - 300, "caption, reward area or adjacent row overlap");
+        Check(second.transform.localPosition.y == -244, "final grid pass did not reposition the last row");
+        Check(27 - 80 > 40 - 96 && -74 - 96 > 73 - 244, "caption, reward area or adjacent row overlap");
         Late(grid); Check(scroll.resets == 1, "idle frames repeatedly reset the scroll");
 
         UI.AcRechargeSingleItem third = Row(grid, Directory, UI.ActivityType.RechargeTotal);
@@ -241,10 +261,10 @@ public static class RechargeDirectoryHarness
         third.transform.Find("btnGet").gameObject.SetActive(false);
         third.transform.Find("notReached").gameObject.SetActive(false);
         HYJS.ActivitySafety.RechargeDisplay.Apply(third, c);
-        Check(c.status == 2 && third.transform.localPosition.y == -600 && third.transform.Find("HYJSRechargeDirectoryCaption") != null, "claimed row or noninteger amount was lost");
+        Check(c.status == 2 && third.transform.localPosition.y == -488 && third.transform.Find("HYJSRechargeDirectoryCaption") != null, "claimed row or noninteger amount was lost");
         Check(!third.transform.Find("btnGet").gameObject.activeSelf && third.transform.Find("getted").gameObject.activeSelf && !third.transform.Find("notReached").gameObject.activeSelf, "claimed status changed");
         Check(third.labTitle.text == null, "noninteger original title handling changed");
-        Late(grid); Check(third.transform.localPosition.y == -600 && scroll.resets == 2, "last of three rows was not revalidated");
+        Late(grid); Check(third.transform.localPosition.y == -488 && scroll.resets == 2, "last of three rows was not revalidated");
 
         string unusual = "标题 · 活动截止 假文字 · 活动截止 " + End + " · 领奖截止 " + Claim;
         Check(HYJS.ActivitySafety.RechargeDirectoryDisplay.Caption(unusual) == "标题 · 活动截止 假文字\n活动截止 " + End + "\n领奖截止 " + Claim, "a title containing the marker was changed");
