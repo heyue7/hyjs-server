@@ -153,11 +153,14 @@ namespace HYJS.ActivitySafety
             finally { switching = false; }
         }
     }
+    // RECHARGE_DISPLAY_TEST_BEGIN
     public static class RechargeDisplay
     {
         public static void Apply(AcRechargeSingleItem row, ActivityItem item)
         {
-            if (row == null || item == null || row.type != ActivityType.RechargeTotal) return;
+            if (row == null) return;
+            RechargeDirectoryDisplay.Apply(row, item);
+            if (item == null || row.type != ActivityType.RechargeTotal) return;
             decimal value;
             if (!Decimal.TryParse(item.value, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out value)) return;
             row.labTitle.text = String.Format(TableTextBlo.GetText("ChargeTotal_award_rmb_num"), (value / 100m).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture));
@@ -165,6 +168,7 @@ namespace HYJS.ActivitySafety
         }
     }
 
+    // RECHARGE_DISPLAY_TEST_END
     public sealed class BossMerged : MonoBehaviour
     {
         const BindingFlags F = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
@@ -279,4 +283,176 @@ namespace HYJS.ActivitySafety
         }
     }
 
+    // RECHARGE_DIRECTORY_TEST_BEGIN
+    // These components belong to the original recharge list and its rows. No
+    // other activity or protocol field is changed by the directory layout.
+    public sealed class RechargeDirectoryGrid : MonoBehaviour
+    {
+        const float ExtraHeight = 152f;
+        SimpleGrid grid;
+        float originalHeight;
+        bool expanded;
+        bool refreshPending;
+
+        public void Expand(SimpleGrid owner)
+        {
+            if (grid == null) { grid = owner; originalHeight = owner.cellHeight; }
+            if (grid != owner) return;
+            if (!expanded)
+            {
+                expanded = true;
+                grid.cellHeight = originalHeight + ExtraHeight;
+                grid.Reposition();
+            }
+            refreshPending = true;
+        }
+
+        public void Restore()
+        {
+            refreshPending = false;
+            if (!expanded || grid == null) return;
+            grid.cellHeight = originalHeight;
+            expanded = false;
+            grid.Reposition();
+        }
+
+        void LateUpdate()
+        {
+            if (!expanded || !refreshPending || grid == null) return;
+            refreshPending = false;
+            grid.Reposition();
+            UIScrollView scroll = grid.GetComponentInParent<UIScrollView>();
+            if (scroll == null) return;
+            // The native callback disables scrolling for fewer than three rows;
+            // expanded rows can exceed the original viewport even with two.
+            scroll.enabled = true;
+            scroll.InvalidateBounds();
+            scroll.ResetPosition();
+        }
+    }
+
+    public sealed class RechargeDirectoryRow : MonoBehaviour
+    {
+        const float ExtraHeight = 152f;
+        readonly List<Transform> moved = new List<Transform>();
+        readonly List<Vector3> originalPositions = new List<Vector3>();
+        UISprite background;
+        Vector3 backgroundPosition;
+        int backgroundHeight;
+        UILabel caption;
+
+        public bool Set(AcRechargeSingleItem row, string text)
+        {
+            if (caption == null)
+            {
+                Transform title = row.transform.Find("titleBg");
+                Transform back = row.transform.Find("bg");
+                if (title == null || back == null || row.labTitle == null || row.leftLabel == null ||
+                    row.labTitle.transform.parent != title) return false;
+                background = back.GetComponent<UISprite>();
+                if (background == null) return false;
+                backgroundPosition = back.localPosition;
+                backgroundHeight = background.height;
+                foreach (Transform child in row.transform)
+                {
+                    if (child == title || child == back) continue;
+                    moved.Add(child);
+                    originalPositions.Add(child.localPosition);
+                }
+                GameObject go = new GameObject("HYJSRechargeDirectoryCaption");
+                go.layer = row.gameObject.layer;
+                go.transform.parent = row.transform;
+                go.transform.localScale = Vector3.one;
+                go.transform.localPosition = new Vector3(-236f, 27f, 0f);
+                caption = go.AddComponent<UILabel>();
+                caption.bitmapFont = row.labTitle.bitmapFont;
+                caption.trueTypeFont = row.labTitle.trueTypeFont;
+                caption.fontStyle = row.labTitle.fontStyle;
+                caption.fontSize = 18;
+                caption.width = 472;
+                caption.height = 130;
+                caption.pivot = UIWidget.Pivot.TopLeft;
+                caption.alignment = NGUIText.Alignment.Left;
+                caption.depth = Math.Max(row.labTitle.depth, row.leftLabel.depth) + 1;
+                caption.color = row.leftLabel.color;
+                caption.supportEncoding = false;
+                caption.maxLineCount = 6;
+                caption.overflowMethod = UILabel.Overflow.ShrinkContent;
+                background.height = backgroundHeight + (int)ExtraHeight;
+                back.localPosition = new Vector3(backgroundPosition.x, backgroundPosition.y - ExtraHeight / 2f, backgroundPosition.z);
+                for (int i = 0; i < moved.Count; i++)
+                {
+                    Vector3 position = originalPositions[i];
+                    moved[i].localPosition = new Vector3(position.x, position.y - ExtraHeight, position.z);
+                }
+            }
+            caption.text = RechargeDirectoryDisplay.Caption(text);
+            return true;
+        }
+
+        public void Restore()
+        {
+            if (caption == null) return;
+            caption.gameObject.SetActive(false);
+            UnityEngine.Object.Destroy(caption.gameObject);
+            caption = null;
+            if (background != null)
+            {
+                background.height = backgroundHeight;
+                background.transform.localPosition = backgroundPosition;
+            }
+            for (int i = 0; i < moved.Count; i++)
+                if (moved[i] != null) moved[i].localPosition = originalPositions[i];
+            moved.Clear();
+            originalPositions.Clear();
+            background = null;
+        }
+    }
+
+    public static class RechargeDirectoryDisplay
+    {
+        const string DirectoryID = "rechargeTotal_p4_directory_8e1df9c1";
+        const string ItemMarker = "recharge-directory-v1";
+        const string EndMarker = " · 活动截止 ";
+        const string ClaimMarker = " · 领奖截止 ";
+        const BindingFlags Flags = BindingFlags.Instance | BindingFlags.NonPublic;
+        static readonly FieldInfo ActivityID = typeof(AcRechargeSingleItem).GetField("activityId", Flags);
+
+        public static string Caption(string text)
+        {
+            if (String.IsNullOrEmpty(text)) return "";
+            int claim = text.LastIndexOf(ClaimMarker, StringComparison.Ordinal);
+            int end = claim > 0 ? text.LastIndexOf(EndMarker, claim - 1, StringComparison.Ordinal) : -1;
+            if (end < 0) return text;
+            string title = text.Substring(0, end).Replace('\r', ' ').Replace('\n', ' ').Replace('\t', ' ');
+            return title + "\n" + text.Substring(end + 3, claim - end - 3) + "\n" + text.Substring(claim + 3);
+        }
+
+        public static void Apply(AcRechargeSingleItem row, ActivityItem item)
+        {
+            Transform parent = row.transform.parent;
+            SimpleGrid grid = parent == null ? null : parent.GetComponent<SimpleGrid>();
+            RechargeDirectoryGrid layout = grid == null ? null : grid.GetComponent<RechargeDirectoryGrid>();
+            RechargeDirectoryRow display = row.GetComponent<RechargeDirectoryRow>();
+            bool directory = row.type == ActivityType.RechargeTotal && ActivityID != null &&
+                String.Equals(ActivityID.GetValue(row) as string, DirectoryID, StringComparison.Ordinal);
+            if (!directory)
+            {
+                if (display != null) display.Restore();
+                if (layout != null) layout.Restore();
+                return;
+            }
+            if (item == null || item.param != ItemMarker || String.IsNullOrEmpty(item.message) || grid == null ||
+                (int)grid.arrangement != 1 || grid.maxPerLine != 1)
+            {
+                if (display != null) display.Restore();
+                return;
+            }
+            if (display == null) display = row.gameObject.AddComponent<RechargeDirectoryRow>();
+            if (!display.Set(row, item.message)) return;
+            if (layout == null) layout = grid.gameObject.AddComponent<RechargeDirectoryGrid>();
+            layout.Expand(grid);
+        }
+    }
+    // RECHARGE_DIRECTORY_TEST_END
 }

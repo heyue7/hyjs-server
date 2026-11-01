@@ -48,6 +48,22 @@ native crash or later template Update/Awake callback. Backend publication must
 still exclude unfinished/broken operational configurations. Static checks and
 compilation are not a phone pass; packaging and device checks belong to root.
 
+## Combined cumulative recharge
+
+Starting with the 1.1.6 client, the server may return one cumulative-recharge
+directory containing several independently earned activities. Its rows carry an
+explicit `recharge-directory-v1` marker and the original activity title and
+deadlines. The activity helper expands only these rows so that the original
+reward, progress and claim controls remain usable. Other activities and old
+unmarked recharge instances keep their existing layout. The server exposes the
+directory only to a matching current session with the required client version.
+
+`build_recharge_directory.py` reconstructs the shipped helper from the pinned
+1.1.5 APK before compiling its replacement. `test_recharge_directory.py` and
+the companion managed harness check the inherited ABI, model and original
+prefab/font boundaries. These checks do not replace a device pass through the
+activity page and its scrolling/claim controls.
+
 ## Guarded empty-state rendering and phone diagnosis
 
 The first phone batch showed the original activity background with no visible
