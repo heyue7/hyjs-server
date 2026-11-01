@@ -173,10 +173,14 @@ func (s *GameService) p7ReRushSectionMutation(tx *gorm.DB, player *pb.Player, ga
 		if !complete || !row.Claimed || row.Selected != "" {
 			return nil, errors.New("本段试炼未完成或加成已选择")
 		}
+		options, err := p7ReRushFreezeOptions(tx, state, row, true)
+		if err != nil {
+			return nil, err
+		}
 		if err = p7ReRushSaveAdditionOffer(tx, state, section); err != nil {
 			return nil, err
 		}
-		return &pb.SCRushGetSectionAddition{StarResult3: proto.String("perhp,0.03"), StarResult6: proto.String("peratt,0.06"), StarResult9: proto.String("perpdef,0.09"), CostStar: proto.Int32(stars), Prop: p7ReRushBonusProjection(bonus)}, nil
+		return &pb.SCRushGetSectionAddition{StarResult3: proto.String(options.Three), StarResult6: proto.String(options.Six), StarResult9: proto.String(options.Nine), CostStar: proto.Int32(stars), Prop: p7ReRushBonusProjection(bonus)}, nil
 	case *pb.CSRushGetSectionReward:
 		if !complete || row.Claimed {
 			return nil, errors.New("本段试炼未完成或奖励已领取")
@@ -194,8 +198,11 @@ func (s *GameService) p7ReRushSectionMutation(tx *gorm.DB, player *pb.Player, ga
 		if !complete || !row.Claimed || row.Selected != "" || req.GetStar() > stars {
 			return nil, errors.New("请先领取本段奖励，且不能重复选择加成")
 		}
-		options := map[int32]string{3: "perhp,0.03", 6: "peratt,0.06", 9: "perpdef,0.09"}
-		if options[req.GetStar()] == "" || options[req.GetStar()] != req.GetSelect() {
+		options, err := p7ReRushFreezeOptions(tx, state, row, false)
+		if err != nil {
+			return nil, err
+		}
+		if options.selected(req.GetStar()) == "" || options.selected(req.GetStar()) != req.GetSelect() {
 			return nil, errors.New("Re试炼加成选项与星数不匹配")
 		}
 		if err = p7ReRushSaveAdditionOffer(tx, state, section); err != nil {

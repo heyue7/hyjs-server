@@ -22,10 +22,28 @@ type p7ReRushWin struct {
 	Hash  string `json:"hash"`
 }
 
-// p7ReRushBonusProjection 将Re内部比例适配回原UI.Refresh读取的per字段。
-// 原界面读取perhp/peratt/perpdef/permdef；战斗展开继续使用内部比例。
+// p7ReRushBonusProjection 返回原客户端加成界面使用的十种比例。
 func p7ReRushBonusProjection(bonus *pb.BaseProp) *pb.BaseProp {
-	return &pb.BaseProp{Perhp: proto.Float64(bonus.GetHp()), Peratt: proto.Float64(bonus.GetAtt()), Perpdef: proto.Float64(bonus.GetPdef()), Permdef: proto.Float64(bonus.GetMdef())}
+	prop := &pb.BaseProp{Perhp: proto.Float64(bonus.GetHp()), Peratt: proto.Float64(bonus.GetAtt()), Perpdef: proto.Float64(bonus.GetPdef()), Permdef: proto.Float64(bonus.GetMdef())}
+	if bonus.GetHit() != 0 {
+		prop.Hit = proto.Float64(bonus.GetHit())
+	}
+	if bonus.GetDodge() != 0 {
+		prop.Dodge = proto.Float64(bonus.GetDodge())
+	}
+	if bonus.GetCri() != 0 {
+		prop.Cri = proto.Float64(bonus.GetCri())
+	}
+	if bonus.GetAntiCri() != 0 {
+		prop.AntiCri = proto.Float64(bonus.GetAntiCri())
+	}
+	if bonus.GetDamageAdd() != 0 {
+		prop.DamageAdd = proto.Float64(bonus.GetDamageAdd())
+	}
+	if bonus.GetDamageReduce() != 0 {
+		prop.DamageReduce = proto.Float64(bonus.GetDamageReduce())
+	}
+	return prop
 }
 
 // p7ReRushAcceptedWins 只接受实际结束且与原引擎权威记录一致的胜利。
@@ -206,23 +224,45 @@ func p7ReRushBonus(tx *gorm.DB, state *db.P7RushState) (*pb.BaseProp, error) {
 		if !complete || !section.Claimed || section.AcceptanceHash != hash || section.SpentStars > stars {
 			return nil, errors.New("Re试炼已选加成缺少真实分段来源")
 		}
-		switch section.Selected {
-		case "perhp,0.03":
-			if section.SpentStars != 3 {
-				return nil, errors.New("Re试炼生命加成星数冲突")
+		options := p7ReRushLegacyOptions()
+		if section.OptionsJSON != "" {
+			options, err = p7ReRushReadOptions(&section)
+			if err != nil {
+				return nil, err
 			}
-			prop.Hp = proto.Float64(prop.GetHp() + .03)
-		case "peratt,0.06":
-			if section.SpentStars != 6 {
-				return nil, errors.New("Re试炼攻击加成星数冲突")
+		}
+		if options.selected(section.SpentStars) == "" || options.selected(section.SpentStars) != section.Selected {
+			return nil, errors.New("Re试炼已选加成与冻结选项冲突")
+		}
+		key, err := p7ReRushAdditionKey(section.Selected, section.SpentStars)
+		if err != nil {
+			return nil, err
+		}
+		rate := float64(section.SpentStars) / 100
+		switch key {
+		case "perhp":
+			prop.Hp = proto.Float64(prop.GetHp() + rate)
+		case "peratt":
+			prop.Att = proto.Float64(prop.GetAtt() + rate)
+		case "perpdef":
+			prop.Pdef = proto.Float64(prop.GetPdef() + rate)
+			if options.Version == constUtil.P7ReRushLegacyAddition {
+				prop.Mdef = proto.Float64(prop.GetMdef() + rate)
 			}
-			prop.Att = proto.Float64(prop.GetAtt() + .06)
-		case "perpdef,0.09":
-			if section.SpentStars != 9 {
-				return nil, errors.New("Re试炼防御加成星数冲突")
-			}
-			prop.Pdef = proto.Float64(prop.GetPdef() + .09)
-			prop.Mdef = proto.Float64(prop.GetMdef() + .09)
+		case "permdef":
+			prop.Mdef = proto.Float64(prop.GetMdef() + rate)
+		case "hit":
+			prop.Hit = proto.Float64(prop.GetHit() + rate)
+		case "dodge":
+			prop.Dodge = proto.Float64(prop.GetDodge() + rate)
+		case "cri":
+			prop.Cri = proto.Float64(prop.GetCri() + rate)
+		case "antiCri":
+			prop.AntiCri = proto.Float64(prop.GetAntiCri() + rate)
+		case "damageAdd":
+			prop.DamageAdd = proto.Float64(prop.GetDamageAdd() + rate)
+		case "damageReduce":
+			prop.DamageReduce = proto.Float64(prop.GetDamageReduce() + rate)
 		default:
 			return nil, errors.New("Re试炼加成选项损坏")
 		}
@@ -245,6 +285,24 @@ func (s *GameService) p7ApplyReRushBonus(tx *gorm.DB, state *db.P7RushState, par
 		actor.Prop.Att = proto.Float64(math.RoundToEven(actor.Prop.GetAtt() * (1 + bonus.GetAtt())))
 		actor.Prop.Pdef = proto.Float64(math.RoundToEven(actor.Prop.GetPdef() * (1 + bonus.GetPdef())))
 		actor.Prop.Mdef = proto.Float64(math.RoundToEven(actor.Prop.GetMdef() * (1 + bonus.GetMdef())))
+		if bonus.GetHit() != 0 {
+			actor.Prop.Hit = proto.Float64(actor.Prop.GetHit() + 100*bonus.GetHit())
+		}
+		if bonus.GetDodge() != 0 {
+			actor.Prop.Dodge = proto.Float64(actor.Prop.GetDodge() + 100*bonus.GetDodge())
+		}
+		if bonus.GetCri() != 0 {
+			actor.Prop.Cri = proto.Float64(actor.Prop.GetCri() + 100*bonus.GetCri())
+		}
+		if bonus.GetAntiCri() != 0 {
+			actor.Prop.AntiCri = proto.Float64(actor.Prop.GetAntiCri() + 100*bonus.GetAntiCri())
+		}
+		if bonus.GetDamageAdd() != 0 {
+			actor.Prop.DamageAdd = proto.Float64(actor.Prop.GetDamageAdd() + 100*bonus.GetDamageAdd())
+		}
+		if bonus.GetDamageReduce() != 0 {
+			actor.Prop.DamageReduce = proto.Float64(actor.Prop.GetDamageReduce() + 100*bonus.GetDamageReduce())
+		}
 	}
 	return result, nil
 }

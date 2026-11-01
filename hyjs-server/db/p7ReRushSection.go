@@ -9,6 +9,7 @@ type P7ReRushSection struct {
 	Selected       string `gorm:"size:64;not null" json:"selected"`
 	SpentStars     int32  `gorm:"not null" json:"spentStars"`
 	AcceptanceHash string `gorm:"size:64;not null" json:"acceptanceHash"`
+	OptionsJSON    string `gorm:"type:varchar(512);not null;default:''" json:"optionsJson"`
 }
 
 func (P7ReRushSection) TableName() string { return "p7_re_rush_sections" }

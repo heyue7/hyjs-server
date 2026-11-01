@@ -2,6 +2,9 @@ package service
 
 import (
 	"fmt"
+	"math"
+	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -16,19 +19,27 @@ func TestP7ReRushDeferredAdditionQueueActualWins(t *testing.T) {
 	if err := f.s.PublishP7ReRush(f.ctx); err != nil {
 		t.Fatal(err)
 	}
+	var viewed *pb.SCRushGetSectionAddition
 	call := func(req proto.Message, stamp int64) proto.Message {
 		t.Helper()
 		out, handled, err := f.s.DispatchP7(f.ctx, f.id, req, stamp)
 		if err != nil || !handled {
 			t.Fatalf("%T: %v", req, err)
 		}
+		if options, ok := out[0].(*pb.SCRushGetSectionAddition); ok {
+			viewed = options
+		}
 		return out[0]
 	}
 	choose := func(star int32, stamp int64) proto.Message {
 		t.Helper()
-		option := map[int32]string{3: "perhp,0.03", 6: "peratt,0.06", 9: "perpdef,0.09"}
+		if viewed == nil {
+			t.Fatal("missing frozen options")
+		}
+		option := map[int32]string{3: viewed.GetStarResult3(), 6: viewed.GetStarResult6(), 9: viewed.GetStarResult9()}
 		return call(&pb.CSRushAddition{Star: proto.Int32(star), Select: proto.String(option[star])}, stamp)
 	}
+	var initialSelections []string
 	for floor := int32(1); floor <= 6; floor++ {
 		start := call(&pb.CSRushFightStart{RushType: proto.Int32(1), TaskId: proto.String(fmt.Sprintf("local_rush_%d", floor)), Star: proto.Int32(3)}, 71000+int64(floor)).(*pb.SCRushFightStart)
 		series, err := f.s.FreezeP6RushSeriesInput(start, true, false, nil, constUtil.P6OriginalClientHash)
@@ -50,6 +61,7 @@ func TestP7ReRushDeferredAdditionQueueActualWins(t *testing.T) {
 			}
 			call(&pb.CSRushGetSectionReward{}, 71100+int64(floor))
 			call(&pb.CSRushGetSectionAddition{}, 0)
+			initialSelections = append(initialSelections, viewed.GetStarResult3())
 			choose(3, 71200+int64(floor))
 		}
 	}
@@ -104,6 +116,7 @@ func TestP7ReRushDeferredAdditionQueueActualWins(t *testing.T) {
 		t.Fatal(err)
 	}
 	call(&pb.CSRushGetSectionAddition{}, 0)
+	firstChoice := viewed.GetStarResult6()
 	first := choose(6, 71400)
 	f.restart(t)
 	if !proto.Equal(first, choose(6, 71400)) {
@@ -123,13 +136,26 @@ func TestP7ReRushDeferredAdditionQueueActualWins(t *testing.T) {
 		t.Fatal(err)
 	}
 	call(&pb.CSRushGetSectionAddition{}, 0)
+	secondChoice := viewed.GetStarResult9()
 	choose(9, 71402)
 	bonus = call(&pb.CSRushAdditionView{}, 0).(*pb.SCRushAdditionView).Prop
-	if bonus.GetPerhp() != 0 || bonus.GetPeratt() != .06 || bonus.GetPerpdef() != .09 || bonus.GetPermdef() != .09 {
-		t.Fatal("selected bonuses not applied", bonus)
+	expected := map[string]float64{}
+	for _, selected := range []string{firstChoice, secondChoice} {
+		parts := strings.Split(selected, ",")
+		value, err := strconv.ParseFloat(parts[1], 64)
+		if err != nil {
+			t.Fatal(err)
+		}
+		expected[parts[0]] += value
+	}
+	actual := map[string]float64{"perhp": bonus.GetPerhp(), "peratt": bonus.GetPeratt(), "perpdef": bonus.GetPerpdef(), "permdef": bonus.GetPermdef(), "hit": bonus.GetHit(), "dodge": bonus.GetDodge(), "cri": bonus.GetCri(), "antiCri": bonus.GetAntiCri(), "damageAdd": bonus.GetDamageAdd(), "damageReduce": bonus.GetDamageReduce()}
+	for key, value := range actual {
+		if math.Abs(value-expected[key]) > 1e-9 {
+			t.Fatalf("selected bonus %s: got=%v want=%v", key, value, expected[key])
+		}
 	}
 	var old []db.P7ReRushSection
-	if err = db.GetIns().Where("player_id=? AND run_id=?", f.id, state.RunID-1).Find(&old).Error; err != nil || len(old) != 2 || old[0].Selected != "perhp,0.03" || old[1].Selected != "perhp,0.03" {
+	if err = db.GetIns().Where("player_id=? AND run_id=?", f.id, state.RunID-1).Order("section").Find(&old).Error; err != nil || len(old) != 2 || old[0].Selected != initialSelections[0] || old[1].Selected != initialSelections[1] {
 		t.Fatal("history rewritten", err)
 	}
 }

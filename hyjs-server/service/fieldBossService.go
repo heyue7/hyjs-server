@@ -451,14 +451,13 @@ func (s *GameService) fieldBossFightEnd(ctx context.Context, id int64, b *pb.CSS
 			return err
 		}
 		terminal, err := s.computeFrozenBattleFinalHPWithFieldBossMismatch(ctx, input, b.GetOptRecord(), true, nil, nil, false, true)
+		recordingMismatch := false
 		if err != nil {
 			var mismatch *p6CompletedRecordedMismatchError
-			if !errors.As(err, &mismatch) || terminal == nil || terminal.OriginalOperates == nil ||
-				b.GetOptRecord().GetFinalRoundNum() != terminal.OriginalOperates.GetFinalRoundNum() ||
-				b.GetOptRecord().GetAttackerTotalLeftHp() != terminal.OriginalOperates.GetAttackerTotalLeftHp() ||
-				b.GetOptRecord().GetDefenderTotalLeftHp() != terminal.OriginalOperates.GetDefenderTotalLeftHp() {
+			if !errors.As(err, &mismatch) || terminal == nil || terminal.OriginalOperates == nil {
 				return err
 			}
+			recordingMismatch = true
 		}
 		if err = validateP6GenericMechanismTerminal(input, terminal); err != nil {
 			return err
@@ -470,7 +469,7 @@ func (s *GameService) fieldBossFightEnd(ctx context.Context, id int64, b *pb.CSS
 		if terminal.Outcome.Winner == 0 {
 			expected = 1
 		}
-		if b.GetResult() != expected {
+		if !recordingMismatch && b.GetResult() != expected {
 			return errors.New("野外首领结算胜败与计算不一致")
 		}
 
@@ -596,7 +595,7 @@ func (s *GameService) fieldBossFightEnd(ctx context.Context, id int64, b *pb.CSS
 				return err
 			}
 		}
-		result = &pb.SCSidePveBossFightEnd{Get: gain, FightResult: proto.Int32(b.GetResult()), Code: proto.Int32(1), Anger: proto.Float64(anger), State: side.State, Monster: proto.Clone(boss).(*pb.SideBoss)}
+		result = &pb.SCSidePveBossFightEnd{Get: gain, FightResult: proto.Int32(expected), Code: proto.Int32(1), Anger: proto.Float64(anger), State: side.State, Monster: proto.Clone(boss).(*pb.SideBoss)}
 		for _, hp := range hps {
 			result.BattlePos = append(result.BattlePos, hp.GetBattlePos())
 			result.Hps = append(result.Hps, hp.GetHpPercent())

@@ -248,10 +248,16 @@ func (s *GameService) achievementReady(tx *gorm.DB, id int64, p *pb.Player, g *m
 func (s *GameService) periodReadyPoints(tx *gorm.DB, id int64, values map[string]bool) error {
 	now := LocalPlayNow(tx.Statement.Context).UnixMilli()
 	var rows []db.PeriodInstance
-	if err := tx.Where("enabled=?", true).Find(&rows).Error; err != nil {
+	// 冻结后的时间可能不同于实时列，必须保留全部带快照的窗口供下面核验。
+	if err := tx.Where("enabled=? AND ((start_at<=? AND reward_end_at>?) OR (frozen IS NOT NULL AND LENGTH(frozen)>0))", true, now, now).Find(&rows).Error; err != nil {
 		return err
 	}
 	for _, live := range rows {
+		// 红点只消费有效期内的原窗口，先判断冻结时间避免逐条查询已过期日程。
+		// 无法解析的快照仍走原校验链，保留其现有错误处理。
+		if snapshot, e := p1PeriodSnapshot(live); e == nil && (now < snapshot.StartAt || now >= snapshot.RewardEndAt) {
+			continue
+		}
 		allowed, e := localPlayActivityVisible(tx, live.ID)
 		if e != nil {
 			return e

@@ -123,8 +123,8 @@ func TestP7ReRushPowerSweepEligibilityReceiptsAndHistory(t *testing.T) {
 	if err != nil || !passed {
 		t.Fatalf("earned elite prerequisite: passed=%v err=%v", passed, err)
 	}
-	call(&pb.CSRushGetSectionAddition{}, 0)
-	call(&pb.CSRushAddition{Star: proto.Int32(9), Select: proto.String("perpdef,0.09")}, 119004)
+	options := call(&pb.CSRushGetSectionAddition{}, 0).(*pb.SCRushGetSectionAddition)
+	call(&pb.CSRushAddition{Star: proto.Int32(9), Select: options.StarResult9}, 119004)
 	call(&pb.CSRushResetChallengeCount{}, 119005)
 	state, err = p7State(db.GetIns(), f.id, time.Now())
 	if err != nil || state.Floor != 1 {
@@ -210,5 +210,42 @@ func TestP7ReRushPowerSweepCompletesMixedRealSection(t *testing.T) {
 	wins, err := p7ReRushRunWins(db.GetIns(), state, 1, 3)
 	if err != nil || len(wins) != 3 || wins[1].Star != 3 || wins[2].Star != 3 || wins[3].Star != 3 {
 		t.Fatalf("mixed source proof: %+v %v", wins, err)
+	}
+	if _, handled, err := f.s.DispatchP7(f.ctx, f.id, &pb.CSRushGetSectionAddition{}, 0); err != nil || !handled {
+		t.Fatal("open earned option", err)
+	}
+	// 隔离测试固定一个随机选项，验证次级属性进入真实下一层战斗及结算。
+	options := `{"version":"random-v1","three":"hit,0.03","six":"peratt,0.06","nine":"perhp,0.09"}`
+	if err = db.GetIns().Model(&section).Update("options_json", options).Error; err != nil {
+		t.Fatal(err)
+	}
+	if _, handled, err := f.s.DispatchP7(f.ctx, f.id, &pb.CSRushAddition{Star: proto.Int32(3), Select: proto.String("hit,0.03")}, 119104); err != nil || !handled {
+		t.Fatal("choose secondary option", err)
+	}
+	base, err := f.s.battlePlayer(player, game)
+	if err != nil {
+		t.Fatal(err)
+	}
+	start, err := f.s.p7Start(f.ctx, f.id, &pb.CSRushFightStart{RushType: proto.Int32(constUtil.P7RushTrial), TaskId: proto.String("local_rush_4"), Star: proto.Int32(3)}, 119105, false)
+	if err != nil || len(start.GetBattlePlayer().GetFormation()) == 0 {
+		t.Fatal("battle after secondary bonus", err)
+	}
+	if got, want := start.GetBattlePlayer().GetFormation()[0].GetProp().GetHit(), base.GetFormation()[0].GetProp().GetHit()+3; math.Abs(got-want) > 1e-9 {
+		t.Fatalf("battle hit got=%v want=%v", got, want)
+	}
+	series, err := f.s.FreezeP6RushSeriesInput(start, true, false, nil, constUtil.P6OriginalClientHash)
+	if err != nil {
+		t.Fatal(err)
+	}
+	input, err := p7GenericMechanismRushInputAt(series, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	terminal, err := f.s.ComputeOriginalP6ProtocolFinalHP(f.ctx, input, nil)
+	if err != nil || terminal.Outcome.Winner != 0 {
+		t.Fatal("actual boosted battle", err)
+	}
+	if _, err = f.s.p7End(f.ctx, f.id, &pb.CSRushFightEnd{FightId: start.FightId, Result: proto.Int32(1), OptRecord: terminal.OriginalOperates}); err != nil {
+		t.Fatal("actual boosted battle settlement", err)
 	}
 }

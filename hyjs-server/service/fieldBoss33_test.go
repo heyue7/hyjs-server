@@ -152,8 +152,8 @@ func TestFieldBoss33OriginalDataSpawnCheckColdAndOriginalReplay(t *testing.T) {
 	}
 	forged := proto.Clone(terminal.OriginalOperates).(*pb.BattleOperate)
 	forged.DefenderTotalLeftHp = proto.Float64(forged.GetDefenderTotalLeftHp() + 1)
-	if _, err = f.s.fieldBossFightEnd(f.ctx, f.id, &pb.CSSidePveBossFightEnd{FightId: start.FightId, Uuid: proto.String(bossUUID), OptRecord: forged}); err == nil {
-		t.Fatal("forged recorded terminal HP was accepted")
+	if _, err = f.s.ComputeOriginalP6ProtocolFinalHP(f.ctx, frozen, forged); err == nil {
+		t.Fatal("strict recording audit accepted changed terminal HP")
 	}
 	result := int32(0)
 	if terminal.Outcome.Winner == 0 {
@@ -270,13 +270,17 @@ func TestFieldBoss33RemnantVictoryRewardsOnceColdAndRespawn(t *testing.T) {
 		t.Fatal("actual engine must kill remnant", err)
 	}
 	incorrectRecord := fieldBoss33MismatchedNPCRecording(t, terminal.OriginalOperates)
+	incorrectRecord.DefenderTotalLeftHp = proto.Float64(incorrectRecord.GetDefenderTotalLeftHp() + 1)
 	if _, err = f.s.ComputeOriginalP6ProtocolFinalHP(f.ctx, input, incorrectRecord); err == nil || !strings.Contains(err.Error(), "原录像终局或完整技能记录不符") {
 		t.Fatal("strict recording audit must report the mismatch", err)
 	}
-	req := &pb.CSSidePveBossFightEnd{FightId: start.FightId, Uuid: proto.String(uuid), Result: proto.Int32(1), OptRecord: incorrectRecord}
+	req := &pb.CSSidePveBossFightEnd{FightId: start.FightId, Uuid: proto.String(uuid), Result: proto.Int32(0), OptRecord: incorrectRecord}
 	ended, err := f.s.fieldBossFightEnd(f.ctx, f.id, req)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if ended[0].(*pb.SCSidePveBossFightEnd).GetFightResult() != 1 {
+		t.Fatal("mismatched recording must use the server-calculated winner")
 	}
 	if notices != 1 || ended[2].(*pb.SCSideBossCountdown).GetTime() < 3598 {
 		t.Fatal("committed kill did not publish once with native refresh countdown")

@@ -193,6 +193,10 @@ func TestP7ReRushMySQLFirstSectionOriginalEndRewardAdditionResetSweepCold(t *tes
 	if claimedPlayer.GetPoint()-after.GetPoint() != 30 {
 		t.Fatal("trial82 section point reward", claimedPlayer.GetPoint()-after.GetPoint())
 	}
+	// 模拟升级前已经展示的固定选项，验证旧界面与旧加成继续有效。
+	if err := db.GetIns().Model(&db.P7RushState{}).Where("player_id=?", f.id).Update("addition_offer_section", 1).Error; err != nil {
+		t.Fatal(err)
+	}
 	options := call(&pb.CSRushGetSectionAddition{}, 0)[0].(*pb.SCRushGetSectionAddition)
 	if options.GetCostStar() != 3 || options.GetStarResult3() != "perhp,0.03" {
 		t.Fatal("Re original addition options", options)
