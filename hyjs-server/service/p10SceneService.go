@@ -32,30 +32,99 @@ type p10ScenePeer struct {
 // unchanged profile twice. This cache is scoped to one sync and its decoded
 // game is only inspected for routing before the separately authorized read.
 type p10SceneRouteSnapshot struct {
-	profile *db.Profile
-	game    *model.GameState
-	decode  func(*db.Profile) (*pb.Player, *model.GameState, error)
+	profile   *db.Profile
+	player    *pb.Player
+	game      *model.GameState
+	decode    func(*db.Profile) (*pb.Player, *model.GameState, error)
+	reads     int
+	pureRoute bool
+}
+
+// Copy the complete observed row, including all current pointer and byte-slice
+// fields. Later in-place edits must not make an old observation look current.
+func p10SceneProfileSnapshot(profile *db.Profile) *db.Profile {
+	if profile == nil {
+		return nil
+	}
+	copyBytes := func(value []byte) []byte {
+		if value == nil {
+			return nil
+		}
+		out := make([]byte, len(value))
+		copy(out, value)
+		return out
+	}
+	snapshot := *profile
+	snapshot.Session = copyBytes(profile.Session)
+	snapshot.PasswordSalt = copyBytes(profile.PasswordSalt)
+	snapshot.PasswordHash = copyBytes(profile.PasswordHash)
+	if profile.Player != nil {
+		value := *profile.Player
+		snapshot.Player = &value
+	}
+	if profile.Game != nil {
+		value := *profile.Game
+		snapshot.Game = &value
+	}
+	if profile.CreatedAt != nil {
+		value := *profile.CreatedAt
+		snapshot.CreatedAt = &value
+	}
+	if profile.GGOChipTotal != nil {
+		value := *profile.GGOChipTotal
+		snapshot.GGOChipTotal = &value
+	}
+	return &snapshot
 }
 
 func (snapshot *p10SceneRouteSnapshot) routeGame(profile *db.Profile) (*model.GameState, error) {
-	if snapshot != nil && snapshot.game != nil && reflect.DeepEqual(snapshot.profile, profile) {
+	same := false
+	if snapshot != nil {
+		same = snapshot.game != nil && reflect.DeepEqual(snapshot.profile, profile)
+		if snapshot.reads > 0 && !same {
+			snapshot.pureRoute = false
+		}
+		snapshot.reads++
+	}
+	if same {
 		return snapshot.game, nil
 	}
 	decode := decodeProfile
 	if snapshot != nil && snapshot.decode != nil {
 		decode = snapshot.decode
 	}
-	_, game, err := decode(profile)
+	player, game, err := decode(profile)
 	if snapshot != nil {
 		if err != nil {
 			snapshot.profile = nil
+			snapshot.player = nil
 			snapshot.game = nil
 		} else {
-			snapshot.profile = profile
+			snapshot.profile = p10SceneProfileSnapshot(profile)
+			snapshot.player = player
 			snapshot.game = game
 		}
 	}
 	return game, err
+}
+
+// authorizedProfile is called only after the live sink has been authorized.
+// It reuses the decoded objects only when both ordinary routes observed exactly
+// the same complete row and the separately authorized read still matches it.
+func (snapshot *p10SceneRouteSnapshot) authorizedProfile(profile *db.Profile) (*pb.Player, *model.GameState, error) {
+	if snapshot != nil {
+		reuse := snapshot.pureRoute && snapshot.reads == 2 && snapshot.player != nil && snapshot.game != nil && reflect.DeepEqual(snapshot.profile, profile)
+		// The caller can mutate the returned game; never reuse it a second time.
+		snapshot.pureRoute = false
+		if reuse {
+			return snapshot.player, snapshot.game, nil
+		}
+	}
+	decode := decodeProfile
+	if snapshot != nil && snapshot.decode != nil {
+		decode = snapshot.decode
+	}
+	return decode(profile)
 }
 
 func p10ScenePeerFrames(peers []p10ScenePeer) []*pb.MovePlayer {
@@ -458,7 +527,7 @@ func (s *GameService) SyncP10Scene(ctx context.Context, id int64, movement bool)
 // A CurrentPosition caller can request an ordered peer snapshot after a
 // committed desert line reload; other existing callers keep their behavior.
 func (s *GameService) syncP10Scene(ctx context.Context, id int64, movement bool, lineRestored *bool) error {
-	var route p10SceneRouteSnapshot
+	route := p10SceneRouteSnapshot{pureRoute: true}
 	if handled, err := s.syncP13UnionFightField(ctx, id, movement, &route); handled || err != nil {
 		return err
 	}
@@ -481,7 +550,7 @@ func (s *GameService) syncP10Scene(ctx context.Context, id int64, movement bool,
 	if err != nil {
 		return err
 	}
-	p, g, err := decodeProfile(profile)
+	p, g, err := route.authorizedProfile(profile)
 	if err != nil {
 		return err
 	}

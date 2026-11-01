@@ -141,6 +141,11 @@ func (s *GameService) syncP13GuildRoom(ctx context.Context, id int64, movement b
 	if game.Position.GetScene() != constUtil.P13GuildRoomTarget && !privateOld {
 		return false, nil
 	}
+	if route != nil {
+		// This branch can authorize, clear old presence and broadcast before
+		// returning to the ordinary scene. Require a fresh decode afterward.
+		route.pureRoute = false
+	}
 	p10SceneMutation.Lock()
 	defer p10SceneMutation.Unlock()
 	// 加锁后重新读取当前会话/位置，避免前面的轻量路由观察变成权限快照。

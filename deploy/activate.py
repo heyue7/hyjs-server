@@ -209,7 +209,9 @@ run('docker', 'build', '--build-arg', 'REVISION=' + manifest['revision'], '-t', 
 runtime = {}
 for line in (stage / 'deployment.env').read_text().splitlines():
     key, separator, value = line.partition('=')
-    assert separator and key in ('HYJS_PUBLIC_HOST', 'HYJS_HTTP_PORT', 'HYJS_ADMIN_PORT', 'HYJS_TCP_PORT', 'HYJS_UPSTREAM_PORT', 'HYJS_API_ORIGIN', 'HYJS_ADMIN_ORIGIN') and value
+    assert separator and key in ('HYJS_PUBLIC_HOST', 'HYJS_HTTP_PORT', 'HYJS_ADMIN_PORT', 'HYJS_TCP_PORT', 'HYJS_UPSTREAM_PORT', 'HYJS_API_ORIGIN', 'HYJS_ADMIN_ORIGIN', 'HYJS_COPY_SWEEP_P9_COMPLETE_SERVER') and value
+    if key == 'HYJS_COPY_SWEEP_P9_COMPLETE_SERVER':
+        assert value.isascii() and value.isdigit() and int(value) <= 2147483647 and str(int(value)) == value
     runtime[key] = value
 private_env = ROOT / '.env'
 assert private_env.is_file() and not private_env.stat().st_mode & 0o077

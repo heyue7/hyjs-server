@@ -79,6 +79,12 @@ type GameService struct {
 	P8LifeReady bool
 	// P9PetsReady 在原精灵表和实例事务表初始化后启用。
 	P9PetsReady bool
+	// CopySweepHistoryComplete is a trusted, immutable startup assertion that
+	// every historical successful sweep on this server has its P9 grant.
+	// It defaults to false and must never be set from a client request.
+	CopySweepHistoryComplete bool
+	// CopySweepWitnessReady is set only after the per-role witness table exists.
+	CopySweepWitnessReady bool
 	// P9IntimacyReady is immutable after explicit compatibility rules are initialized.
 	P9IntimacyReady bool
 	// P10VoiceReady 仅在语音事务表初始化后路由；本地音频政策仍默认关闭。

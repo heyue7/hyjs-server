@@ -2,7 +2,8 @@ package model
 
 import pb "hyjs-server/model/protocol"
 
-// CopySweepReceipt 持久化一次原始扫荡包，重试复用奖励增量且不重复扣费。
+// CopySweepReceipt 保存一次原始扫荡包和对应奖励增量。
+// GameState 的旧字段保留最大时间戳；独立 witness 保存最近一次。
 type CopySweepReceipt struct {
 	Timestamp int64           `json:"timestamp"`
 	Request   *pb.CSCopySweep `json:"request"`

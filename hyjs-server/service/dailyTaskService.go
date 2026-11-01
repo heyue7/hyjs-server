@@ -314,9 +314,11 @@ func (s *GameService) recordDailyTaskSaveAt(tx *gorm.DB, row *db.Profile, player
 	var count int32
 	switch b := request.(type) {
 	case *pb.CSCopySweep:
-		current := game.CopySweepReceipt
-		prior := before.CopySweepReceipt
-		if current != nil && current.Response != nil && (prior == nil || current.Timestamp > prior.Timestamp) {
+		committed, err := copySweepCommittedSince(&before, game)
+		if err != nil {
+			return err
+		}
+		if committed {
 			count = 1
 		}
 	case *pb.CSCopyFightEnd:

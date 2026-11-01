@@ -275,7 +275,11 @@ func (s *GameService) RecordP1Save(tx *gorm.DB, row *db.Profile, player *pb.Play
 			copyWin = 1
 		}
 	case *pb.CSCopySweep:
-		if game.CopySweepReceipt != nil && (old.CopySweepReceipt == nil || game.CopySweepReceipt.Timestamp > old.CopySweepReceipt.Timestamp) {
+		committed, err := copySweepCommittedSince(old, game)
+		if err != nil {
+			return err
+		}
+		if committed {
 			copyWin = 1
 		}
 	case *pb.CSEquipStrengthen:

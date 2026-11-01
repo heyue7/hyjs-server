@@ -101,6 +101,10 @@ func run() error {
 	if cfg.ServerID < 1 || cfg.ServerID > 2147483647 {
 		return errors.New("游戏区服编号必须为正int32部署配置")
 	}
+	sweepHistoryComplete, err := config.CopySweepHistoryComplete(cfg.ServerID)
+	if err != nil {
+		return err
+	}
 	if *bind != "" {
 		cfg.Bind = *bind
 	}
@@ -163,7 +167,7 @@ func run() error {
 		return err
 	}
 	defer sqlDB.Close()
-	s := &service.GameService{Host: cfg.AdvertiseHost, ServerID: cfg.ServerID, GGOIntegrationReady: *ggoIntegration}
+	s := &service.GameService{Host: cfg.AdvertiseHost, ServerID: cfg.ServerID, GGOIntegrationReady: *ggoIntegration, CopySweepHistoryComplete: sweepHistoryComplete}
 	if *applyFeedback78 || *applyFeedback79 || *applyFeedback80 || *applyFeedback81 || *applyTrial82 || *applyFeedback84 || *applyFeedback85 {
 		// 仅使用既有管理员及全服日历；业务事务内部复核维护、管理员和时钟。
 		if *applyFeedback79 || *applyFeedback80 || *applyFeedback81 || *applyTrial82 || *applyFeedback84 || *applyFeedback85 {
@@ -420,6 +424,9 @@ func run() error {
 	}
 	// 普通关卡掉落先保存具名兼容规则，战斗开始后按冻结配置结算。
 	if err = s.InitializeCopyDrops(ctx); err != nil {
+		return err
+	}
+	if err = s.InitializeCopySweepWitness(ctx); err != nil {
 		return err
 	}
 	// 公会与组队先完成原表加载和持久化初始化，再接受成员/资产变更。

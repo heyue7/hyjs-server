@@ -34,8 +34,13 @@ type GameState struct {
 	// Guild prayer attributes are recaptured from the current transaction and never persisted.
 	GuildPrayerProjection *P5GuildPrayerProjection `json:"-"`
 	// Authenticated request projection; absolute field cooldowns keep wall time.
-	FieldCalendarDay       string                            `json:"-"`
-	CopySweepReceipt       *CopySweepReceipt                 `json:"copy_sweep_receipt,omitempty"`
+	FieldCalendarDay string `json:"-"`
+	// CopySweepReceipt remains the greatest accepted timestamp for old binaries.
+	CopySweepReceipt *CopySweepReceipt `json:"copy_sweep_receipt,omitempty"`
+	// CopySweepWitnessInitialized protects witness rows during current-version saves.
+	CopySweepWitnessInitialized bool `json:"copy_sweep_witness_initialized,omitempty"`
+	// CopySweepCommitted only signals an actual settlement within this transaction.
+	CopySweepCommitted     bool                              `json:"-"`
 	SkillSpecialtyReceipts map[string]*SkillSpecialtyReceipt `json:"skill_specialty_receipts,omitempty"`
 	TreasureBoxReceipt     *TreasureBoxReceipt               `json:"treasure_box_receipt,omitempty"`
 	TreasureCombineReceipt *TreasureCombineReceipt           `json:"treasure_combine_receipt,omitempty"`

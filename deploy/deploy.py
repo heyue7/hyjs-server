@@ -10,7 +10,7 @@ import shutil
 import subprocess
 import tarfile
 import time
-from settings import load, render, RUNTIME_KEYS
+from settings import load, render, RUNTIME_KEYS, OPTIONAL_RUNTIME_KEYS
 
 ROOT = Path(__file__).resolve().parents[1]
 parser = argparse.ArgumentParser()
@@ -144,7 +144,7 @@ shutil.copytree(ROOT / 'admin-web/dist', app / 'admin-web')
 shutil.copytree(ROOT / 'analysis/tables', app / 'tables', ignore=shutil.ignore_patterns('*.json', '*.md', '*.png'))
 (app / 'config.test.yaml').write_text(render((ROOT / 'deploy/config.test.yaml').read_text(), settings))
 (stage / 'nginx.conf').write_text(render((ROOT / 'deploy/nginx.conf').read_text(), settings))
-(stage / 'deployment.env').write_text(''.join(key + '=' + settings[key] + '\n' for key in RUNTIME_KEYS))
+(stage / 'deployment.env').write_text(''.join(key + '=' + settings[key] + '\n' for key in RUNTIME_KEYS + OPTIONAL_RUNTIME_KEYS if key in settings))
 for name in ('Dockerfile', 'compose.yaml', 'activate.py', 'backup_pointer.py', 'ingress_activation.py', 'role_wallet_migration.py', 'growth75_activation.py', 'growth75_activity_patch.py', 'activity77_activation.py', 'feedback78_activation.py', 'feedback79_activation.py', 'feedback80_activation.py', 'feedback81_activation.py', 'trial82_activation.py', 'calendar_restore_activation.py'):
     shutil.copy2(ROOT / 'deploy' / name, stage / name)
 files = {str(p.relative_to(stage)): sha(p) for p in sorted(stage.rglob('*')) if p.is_file() and p.name != '.hyjs-stage'}

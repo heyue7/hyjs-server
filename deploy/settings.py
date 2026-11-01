@@ -9,6 +9,7 @@ KEYS = (
     'HYJS_UPSTREAM_PORT', 'HYJS_API_ORIGIN', 'HYJS_ADMIN_ORIGIN',
 )
 RUNTIME_KEYS = tuple(key for key in KEYS if not key.startswith('HYJS_DEPLOY_'))
+OPTIONAL_RUNTIME_KEYS = ('HYJS_COPY_SWEEP_P9_COMPLETE_SERVER',)
 
 def load(path):
     values = {}
@@ -17,12 +18,15 @@ def load(path):
         if not line or line.startswith('#'):
             continue
         key, separator, value = line.partition('=')
-        if not separator or key not in KEYS or key in values or not value or any(c.isspace() for c in value):
+        if not separator or key not in KEYS + OPTIONAL_RUNTIME_KEYS or key in values or not value or any(c.isspace() for c in value):
             raise ValueError('Invalid or duplicate deployment setting: ' + key)
         values[key] = value
     missing = set(KEYS) - values.keys()
     if missing:
         raise ValueError('Missing deployment keys: ' + ', '.join(sorted(missing)))
+    sweep_server = values.get('HYJS_COPY_SWEEP_P9_COMPLETE_SERVER')
+    if sweep_server is not None and (not sweep_server.isascii() or not sweep_server.isdigit() or int(sweep_server) > 2147483647 or str(int(sweep_server)) != sweep_server):
+        raise ValueError('Invalid HYJS_COPY_SWEEP_P9_COMPLETE_SERVER')
     if not re.fullmatch(r'[A-Za-z_][A-Za-z0-9_-]*@[A-Za-z0-9.-]+', values['HYJS_DEPLOY_SSH']):
         raise ValueError('Invalid HYJS_DEPLOY_SSH')
     if not re.fullmatch(r'[A-Za-z_][A-Za-z0-9_-]*', values['HYJS_DEPLOY_UPLOADER']):
