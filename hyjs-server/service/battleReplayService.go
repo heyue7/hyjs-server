@@ -208,8 +208,22 @@ func decodeP6Record(record *db.P6BattleRecord) (*model.FrozenBattleInput, error)
 	if err != nil || p6Digest(raw) != record.InputHash || json.Unmarshal(raw, &input) != nil || input.Attacker.GetPlayerId() != record.PlayerID || input.Seed != record.Seed || input.ConfigurationHash != record.ConfigurationHash || input.EngineVersion != record.EngineVersion || input.ClientVersion != record.ClientVersion {
 		return nil, errors.New(constUtil.P6ReplayConflict)
 	}
-	tables, err := json.Marshal(input.Tables)
-	if err != nil || p6Digest(tables) != input.ConfigurationHash || validateFrozenP6(&input) != nil {
+	// Captures already contain the canonical table bytes used for this hash.
+	// Hash those bytes directly instead of sorting and encoding the large map
+	// again. Historical noncanonical JSON keeps the original semantic verifier.
+	var envelope struct {
+		Tables json.RawMessage `json:"tables"`
+	}
+	if err = json.Unmarshal(raw, &envelope); err != nil {
+		return nil, errors.New(constUtil.P6ReplayConflict)
+	}
+	if p6Digest(envelope.Tables) != input.ConfigurationHash {
+		tables, err := json.Marshal(input.Tables)
+		if err != nil || p6Digest(tables) != input.ConfigurationHash {
+			return nil, errors.New(constUtil.P6ReplayConflict)
+		}
+	}
+	if validateFrozenP6(&input) != nil {
 		return nil, errors.New(constUtil.P6ReplayConflict)
 	}
 	return &input, nil

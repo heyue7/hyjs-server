@@ -14,6 +14,11 @@ sys.path.insert(0, str(ROOT / 'tests'))
 from hyjs_managed_mysql import ManagedMySQL
 
 CASES = {
+    'TestP11PlunderSweepActualIndependentChildrenEnergyStopAndCold/five-real-outcomes': 'p11',
+    'TestP11PlunderSweepActualIndependentChildrenEnergyStopAndCold/actual-energy-stop': 'p11',
+    'TestP11PlunderSweepActualIndependentChildrenEnergyStopAndCold/actual-fragment-stop': 'p11',
+    'TestP11ArenaScopedRealWinnerPaymentRanksConcurrentColdAndQualification': 'p11',
+    'TestP11ArenaDailyRealChallengerCutoffOfflineClaimAndColdOnce': 'p11',
     'TestPlayerConcurrencyMySQLP7PolicyIsolation': 'p7',
     'TestPlayerConcurrencyMySQLGuildEconomyIsolation': 'p13',
     'TestPlayerConcurrencyMySQLGuildMembershipIsolation': 'p13',
@@ -100,7 +105,7 @@ def main():
                     cwd=ROOT / 'hyjs-server/service', env=environment, text=True,
                     stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=330)
                 output = result.stdout.replace(connection.password, '[REDACTED]')
-                (args.output / (name + '.log')).write_text(output)
+                (args.output / (name.replace('/', '__') + '.log')).write_text(output)
                 passed = result.returncode == 0 and ('--- PASS: ' + name) in output and ('--- SKIP: ' + name) not in output
                 results.append({'case': name, 'passed': passed, 'exitCode': result.returncode,
                                 'seconds': round(time.monotonic() - began, 3)})
