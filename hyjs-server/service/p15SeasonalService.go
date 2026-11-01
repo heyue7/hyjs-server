@@ -192,96 +192,104 @@ func (s *GameService) p15SeasonalChildVisible(tx *gorm.DB, cfg db.P15SeasonalBun
 // p15SeasonalList freezes the exact native child directory and underlying rules together.
 func (s *GameService) p15SeasonalList(ctx context.Context, id int64, request *pb.CSActivityList, now time.Time) ([]proto.Message, error) {
 	out := &pb.SCActivityList{}
-	err := s.p3Profile(ctx, id, func(tx *gorm.DB, _ *db.Profile, _ *pb.Player, _ *model.GameState) error {
-		allowed, err := localPlayActivityAccess(tx, request.GetActivityId(), false)
-		if err != nil {
-			return err
-		}
-		if !allowed {
-			return errors.New(constUtil.P15SeasonalError)
-		}
-		if _, err := p1LockPeriods(tx); err != nil {
-			return err
-		}
-		var live db.P15SeasonalBundle
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&live, "id=?", request.GetActivityId()).Error; err != nil {
-			return errors.New(constUtil.P15SeasonalError)
-		}
-		if !live.Enabled {
-			return errors.New("季节活动已关闭")
-		}
-		cfg, children, err := p15SeasonalSnapshot(live)
-		if err != nil {
-			return err
-		}
-		if now.UnixMilli() < cfg.StartAt || now.UnixMilli() >= cfg.RewardEndAt {
-			return errors.New("季节活动未开放或领奖截止")
-		}
-		for i, child := range children {
-			available, err := s.p15SeasonalChildVisible(tx, cfg, child, now)
+	run := func(attemptCtx context.Context) error {
+		out = &pb.SCActivityList{}
+		return s.p3Profile(attemptCtx, id, func(tx *gorm.DB, _ *db.Profile, _ *pb.Player, _ *model.GameState) error {
+			allowed, err := localPlayActivityAccess(tx, request.GetActivityId(), false)
 			if err != nil {
 				return err
 			}
-			if !available {
-				continue
+			if !allowed {
+				return errors.New(constUtil.P15SeasonalError)
 			}
-			visible := false
-			if child.Domain == "period" {
-				var rule db.PeriodInstance
-				if err := tx.First(&rule, "id=?", child.ID).Error; err != nil {
+			if _, err := p1LockPeriods(tx); err != nil {
+				return err
+			}
+			var live db.P15SeasonalBundle
+			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&live, "id=?", request.GetActivityId()).Error; err != nil {
+				return errors.New(constUtil.P15SeasonalError)
+			}
+			if !live.Enabled {
+				return errors.New("季节活动已关闭")
+			}
+			cfg, children, err := p15SeasonalSnapshot(live)
+			if err != nil {
+				return err
+			}
+			if now.UnixMilli() < cfg.StartAt || now.UnixMilli() >= cfg.RewardEndAt {
+				return errors.New("季节活动未开放或领奖截止")
+			}
+			for i, child := range children {
+				available, err := s.p15SeasonalChildVisible(tx, cfg, child, now)
+				if err != nil {
 					return err
 				}
-				if rule.Enabled {
-					frozen, err := s.freezeP1Period(tx, rule, true)
-					if err != nil {
+				if !available {
+					continue
+				}
+				visible := false
+				if child.Domain == "period" {
+					var rule db.PeriodInstance
+					if err := tx.First(&rule, "id=?", child.ID).Error; err != nil {
 						return err
 					}
-					if frozen.StartAt != cfg.StartAt || frozen.EndAt != cfg.EndAt || frozen.RewardEndAt != cfg.RewardEndAt {
-						return errors.New(constUtil.P15SeasonalError)
-					}
-					visible = now.UnixMilli() < frozen.RewardEndAt
-				}
-			} else {
-				var rule db.P4CommerceRule
-				if err := tx.First(&rule, "id=?", child.ID).Error; err != nil {
-					return err
-				}
-				if rule.Enabled {
-					frozen, _, err := s.p4CommerceSnapshot(rule)
-					if err != nil {
-						return err
-					}
-					if frozen.StartAt != cfg.StartAt || frozen.EndAt != cfg.EndAt || frozen.ClaimEndAt > cfg.RewardEndAt {
-						return errors.New(constUtil.P15SeasonalError)
-					}
-					if len(rule.Frozen) == 0 {
-						raw, err := json.Marshal(frozen)
+					if rule.Enabled {
+						frozen, err := s.freezeP1Period(tx, rule, true)
 						if err != nil {
 							return err
 						}
-						if err := tx.Model(&rule).Update("frozen", raw).Error; err != nil {
+						if frozen.StartAt != cfg.StartAt || frozen.EndAt != cfg.EndAt || frozen.RewardEndAt != cfg.RewardEndAt {
+							return errors.New(constUtil.P15SeasonalError)
+						}
+						visible = now.UnixMilli() < frozen.RewardEndAt
+					}
+				} else {
+					var rule db.P4CommerceRule
+					if err := tx.First(&rule, "id=?", child.ID).Error; err != nil {
+						return err
+					}
+					if rule.Enabled {
+						frozen, _, err := s.p4CommerceSnapshot(rule)
+						if err != nil {
 							return err
 						}
+						if frozen.StartAt != cfg.StartAt || frozen.EndAt != cfg.EndAt || frozen.ClaimEndAt > cfg.RewardEndAt {
+							return errors.New(constUtil.P15SeasonalError)
+						}
+						if len(rule.Frozen) == 0 {
+							raw, err := json.Marshal(frozen)
+							if err != nil {
+								return err
+							}
+							if err := tx.Model(&rule).Update("frozen", raw).Error; err != nil {
+								return err
+							}
+						}
+						visible = now.UnixMilli() < frozen.EndAt
 					}
-					visible = now.UnixMilli() < frozen.EndAt
+				}
+				if visible {
+					out.ActivityList = append(out.ActivityList, &pb.ActivityTab{ActivityId: proto.String(child.ID), Name: proto.String(child.Title), Order: proto.Int32(int32(i + 1)), Status: proto.Int32(0), Param: proto.String(cfg.Source)})
 				}
 			}
-			if visible {
-				out.ActivityList = append(out.ActivityList, &pb.ActivityTab{ActivityId: proto.String(child.ID), Name: proto.String(child.Title), Order: proto.Int32(int32(i + 1)), Status: proto.Int32(0), Param: proto.String(cfg.Source)})
+			if len(live.Frozen) == 0 {
+				raw, err := json.Marshal(cfg)
+				if err != nil {
+					return err
+				}
+				if err := tx.Model(&live).Update("frozen", raw).Error; err != nil {
+					return err
+				}
 			}
-		}
-		if len(live.Frozen) == 0 {
-			raw, err := json.Marshal(cfg)
-			if err != nil {
-				return err
-			}
-			if err := tx.Model(&live).Update("frozen", raw).Error; err != nil {
-				return err
-			}
-		}
-		out.Information = proto.String(cfg.Title + "：完成活动任务后领取奖励，兑换商品按页面条件购买。")
-		return nil
-	})
+			out.Information = proto.String(cfg.Title + "：完成活动任务后领取奖励，兑换商品按页面条件购买。")
+			return nil
+		})
+	}
+	err := run(ctx)
+	if errors.Is(err, constUtil.ErrP1GatherCatalogWriteRetry) {
+		writeCtx := p1GatherCatalogWriteContext(context.WithValue(ctx, constUtil.P1SharedReadContextKey{}, false))
+		err = run(writeCtx)
+	}
 	return []proto.Message{out}, err
 }
 

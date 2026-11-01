@@ -261,6 +261,15 @@ func (s *GameService) AdminSaveActivityDefinition(ctx context.Context, p *model.
 		if err := adminOperationUser(tx, p, true); err != nil {
 			return err
 		}
+		if s.P1Ready {
+			// Definition validation uses a rolled-back real period insert, and
+			// a definition can change the kind of a future consumer.
+			guarded, err := p1AcquireGatherCatalogWriter(tx)
+			if err != nil {
+				return err
+			}
+			tx = guarded
+		}
 		// 排期保存先锁日历再锁模板，模板同步沿用同一锁序。
 		if req.Form.Mode == "fortune-cat" && id != "" {
 			if err := adminLockTreasureCalendars(tx); err != nil {

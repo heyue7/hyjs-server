@@ -18,6 +18,7 @@ type p1GatherCatalogIntent struct{ write bool }
 type p1GatherCatalogLease struct {
 	tx    *sql.Tx
 	write bool
+	rc    bool
 }
 
 // The marker is set outside the transaction; every retry must acquire a new
@@ -31,11 +32,11 @@ func p1GatherCatalogWriteContext(ctx context.Context) context.Context {
 }
 
 func p1GatherCatalogKinds() []string {
-	return []string{constUtil.P8EventFishGather, constUtil.P8EventMineGather}
+	return []string{constUtil.P8EventFishGather, constUtil.P8EventMineGather, constUtil.P4KindPower}
 }
 
 func p1GatherCatalogKind(kind string) bool {
-	return kind == constUtil.P8EventFishGather || kind == constUtil.P8EventMineGather
+	return kind == constUtil.P8EventFishGather || kind == constUtil.P8EventMineGather || kind == constUtil.P4KindPower
 }
 
 func p1InitializeGatherCatalog(tx *gorm.DB) error {
@@ -49,7 +50,7 @@ func p1InitializeGatherCatalog(tx *gorm.DB) error {
 	if err := tx.Model(&db.P1GatherCatalogGuard{}).Where("kind IN ?", p1GatherCatalogKinds()).Count(&count).Error; err != nil {
 		return err
 	}
-	if count != 2 {
+	if count != int64(len(p1GatherCatalogKinds())) {
 		return errors.New("gather activity catalogue guards are incomplete")
 	}
 	return nil
@@ -63,10 +64,42 @@ func p1AcquireGatherCatalog(tx *gorm.DB) (*gorm.DB, error) {
 	if !marked {
 		return tx, nil
 	}
-	return p1LockGatherCatalog(tx, intent.write)
+	// A gather retry without the shared marker can need first freeze. Acquire
+	// the directory write gates before any original exclusive period locks.
+	return p1LockGatherCatalog(tx, intent.write || !p1SharedRead(tx))
 }
 
-// Writers take both gates in the same order as readers before locking any
+// The transaction owner calls this only when it started this exact transaction
+// with READ COMMITTED on MySQL. SQLite retains its single-writer semantics.
+// An unmarked or original exclusive transaction never receives the capability.
+func p1EnableGatherSnapshotRC(tx *gorm.DB) (*gorm.DB, error) {
+	if tx == nil || tx.Statement == nil || tx.Statement.Context == nil {
+		return nil, errors.New("gather activity catalogue transaction is missing")
+	}
+	intent, marked := tx.Statement.Context.Value(p1GatherCatalogIntentKey{}).(p1GatherCatalogIntent)
+	if !marked || intent.write || !p1SharedRead(tx) {
+		return tx, nil
+	}
+	actual, ok := tx.Statement.ConnPool.(*sql.Tx)
+	lease, held := tx.Statement.Context.Value(p1GatherCatalogLeaseKey{}).(p1GatherCatalogLease)
+	if !ok || actual == nil || !held || lease.tx != actual || lease.write {
+		return nil, errors.New("gather activity catalogue read lease is missing")
+	}
+	lease.rc = true
+	return tx.WithContext(context.WithValue(tx.Statement.Context, p1GatherCatalogLeaseKey{}, lease)), nil
+}
+
+func p1GatherSnapshotRC(tx *gorm.DB) bool {
+	if tx == nil || tx.Statement == nil || tx.Statement.Context == nil || !p1SharedRead(tx) {
+		return false
+	}
+	intent, marked := tx.Statement.Context.Value(p1GatherCatalogIntentKey{}).(p1GatherCatalogIntent)
+	actual, ok := tx.Statement.ConnPool.(*sql.Tx)
+	lease, held := tx.Statement.Context.Value(p1GatherCatalogLeaseKey{}).(p1GatherCatalogLease)
+	return marked && !intent.write && ok && actual != nil && held && lease.tx == actual && !lease.write && lease.rc
+}
+
+// Writers take all gates in the same order as readers before locking any
 // period. This also covers changing an existing period's event kind.
 func p1AcquireGatherCatalogWriter(tx *gorm.DB) (*gorm.DB, error) {
 	return p1LockGatherCatalog(tx, true)

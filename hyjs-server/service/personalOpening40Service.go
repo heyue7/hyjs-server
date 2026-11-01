@@ -247,6 +247,13 @@ func (s *GameService) AdminSavePersonalOpening40(ctx context.Context, p *model.A
 		if err := adminOperationUser(tx, p, true); err != nil {
 			return err
 		}
+		if s.P1Ready {
+			guarded, err := p1AcquireGatherCatalogWriter(tx)
+			if err != nil {
+				return err
+			}
+			tx = guarded
+		}
 		if err := adminRequireActivityServer(tx, server); err != nil {
 			return err
 		}

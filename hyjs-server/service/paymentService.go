@@ -192,13 +192,20 @@ func (s *GameService) p3Profile(ctx context.Context, id int64, fn func(*gorm.DB,
 			if err != nil {
 				return err
 			}
+			// p3Profile always starts MySQL transactions at READ COMMITTED.
+			tx, err = p1EnableGatherSnapshotRC(tx)
+			if err != nil {
+				return err
+			}
 		}
 		p, g, err := decodeProfileForCalendarUpdate(tx, &row)
 		if err != nil {
 			return err
 		}
-		if err := lockProfilePeriods(tx); err != nil {
-			return err
+		if !p1GatherSnapshotRC(tx) {
+			if err := lockProfilePeriods(tx); err != nil {
+				return err
+			}
 		}
 		// p3Profile has an independent decode path. Persist only actual lazy penalty
 		// changes with a neutral request, then let the original callback own its work.

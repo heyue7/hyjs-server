@@ -31,7 +31,7 @@ func p1GatherSecondPlayer(t *testing.T, f *p1Fixture) int64 {
 }
 
 // InnoDB must allow another player's already-frozen projection to commit while
-// the first transaction holds its period shares and its uncommitted progress.
+// the first transaction holds directory shares and uncommitted progress.
 func TestP1GatherFrozenMySQLConcurrentIsolation(t *testing.T) {
 	if os.Getenv("HYJS_P1_MYSQL_DATABASE") == "" {
 		t.Skip("requires an isolated hyjs_test_p1_ MySQL database")
@@ -103,8 +103,12 @@ func TestP1GatherFrozenMySQLConcurrentIsolation(t *testing.T) {
 	exclusiveAcquired, exclusiveDone := make(chan struct{}), make(chan error, 1)
 	go func() {
 		exclusiveDone <- db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+			guarded, err := p1AcquireGatherCatalogWriter(tx)
+			if err != nil {
+				return err
+			}
 			var current db.PeriodInstance
-			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&current, "id=?", period.ID).Error; err != nil {
+			if err := guarded.Clauses(clause.Locking{Strength: "UPDATE"}).First(&current, "id=?", period.ID).Error; err != nil {
 				return err
 			}
 			close(exclusiveAcquired)
@@ -260,7 +264,13 @@ func TestP1GatherDisableMySQLWaitsForAdmittedFact(t *testing.T) {
 	started, disabled := make(chan struct{}), make(chan error, 1)
 	go func() {
 		close(started)
-		disabled <- db.GetIns().WithContext(ctx).Model(&db.PeriodInstance{}).Where("id=?", period.ID).Update("enabled", false).Error
+		disabled <- db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+			guarded, err := p1AcquireGatherCatalogWriter(tx)
+			if err != nil {
+				return err
+			}
+			return guarded.Model(&db.PeriodInstance{}).Where("id=?", period.ID).Update("enabled", false).Error
+		})
 	}()
 	<-started
 	select {

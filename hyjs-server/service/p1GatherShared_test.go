@@ -90,6 +90,11 @@ func p1GatherTestSharedProfile(s *GameService, ctx context.Context, id int64, fn
 func p1GatherFreeze(t *testing.T, f *p1Fixture, ids ...string) {
 	t.Helper()
 	if err := db.GetIns().WithContext(f.ctx).Transaction(func(tx *gorm.DB) error {
+		guarded, err := p1AcquireGatherCatalogWriter(tx)
+		if err != nil {
+			return err
+		}
+		tx = guarded
 		rows, err := p1LockPeriods(tx)
 		if err != nil {
 			return err

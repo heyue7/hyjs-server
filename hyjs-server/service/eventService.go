@@ -49,6 +49,21 @@ func p1LockPeriods(tx *gorm.DB) ([]db.PeriodInstance, error) {
 	return rows, err
 }
 
+// A READ COMMITTED gather holding all directory shares can read committed
+// period versions without waiting for an unrelated writer's P1 row locks.
+func p1ReadGatherPeriods(tx *gorm.DB) ([]db.PeriodInstance, error) {
+	if !p1GatherSnapshotRC(tx) {
+		return nil, errors.New("gather activity snapshot capability is missing")
+	}
+	var rows []db.PeriodInstance
+	if tx.Dialector.Name() == "mysql" {
+		err := tx.Raw("SELECT * FROM p1_period_instances FORCE INDEX (PRIMARY) ORDER BY id ASC").Scan(&rows).Error
+		return rows, err
+	}
+	err := tx.Order("id ASC").Find(&rows).Error
+	return rows, err
+}
+
 // 请求开始时只建立与完整读取相同的主键锁；实际事件发生时再加载规则正文。
 func p1LockPeriodIDs(tx *gorm.DB) error {
 	var rows []struct{ ID string }
@@ -67,9 +82,9 @@ func p1LockPeriodIDs(tx *gorm.DB) error {
 func lockProfilePeriods(tx *gorm.DB) error { return nil }
 
 // recordP1GatherEvent is limited to a trusted, just-consumed gather attempt.
-// Its caller has saved this attempt and acquired the period locks before any
-// resource lock. A shared transaction must be rolled back before an exclusive
-// retry, including its resource, profile and receipt changes.
+// Its caller holds the transaction-bound catalogue lease before resource
+// locks. A shared transaction must be rolled back before any exclusive retry,
+// including its resource, profile and receipt changes.
 func (s *GameService) recordP1GatherEvent(tx *gorm.DB, playerID int64, attempt *db.P8GatherAttempt, kind string, desert bool, at time.Time) error {
 	if attempt == nil || attempt.PlayerID != playerID || attempt.Active || len(attempt.Token) > 64 || !p1SourceValid(attempt.Token) ||
 		(kind != constUtil.P8EventMineGather && kind != constUtil.P8EventFishGather) {

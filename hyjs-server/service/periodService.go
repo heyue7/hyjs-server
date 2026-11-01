@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"math"
@@ -99,6 +100,11 @@ func (s *GameService) freezeP1Period(tx *gorm.DB, live db.PeriodInstance, freeze
 		return cfg, err
 	}
 	if len(live.Frozen) == 0 && freeze {
+		if s.P1Ready && (cfg.Kind == constUtil.P8EventMineGather || cfg.Kind == constUtil.P8EventFishGather) {
+			if err := p1RequireGatherCatalog(tx, cfg.Kind, true); err != nil {
+				return cfg, err
+			}
+		}
 		if err := s.validateP1Period(cfg); err != nil {
 			return cfg, err
 		}
@@ -567,71 +573,95 @@ func (s *GameService) SettleP1Periods(ctx context.Context) error {
 // settleP1Period rechecks all state under the original period lock; the
 // preceding scan is only a hint and never authorizes a reward or settlement.
 func (s *GameService) settleP1Period(ctx context.Context, id string) error {
-	return db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := ServerGameClockGuardTransaction(tx); err != nil {
-			return err
-		}
+	run := func(attemptCtx context.Context, opts ...*sql.TxOptions) error {
+		return db.GetIns().WithContext(attemptCtx).Transaction(func(tx *gorm.DB) error {
+			if err := ServerGameClockGuardTransaction(tx); err != nil {
+				return err
+			}
+			if s.P1Ready {
+				guarded, err := p1AcquireGatherCatalog(tx)
+				if err != nil {
+					return err
+				}
+				tx = guarded
+			}
 
-		var live db.PeriodInstance
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ?", id).First(&live).Error; err != nil {
-			return err
-		}
-		cfg, err := s.freezeP1Period(tx, live, false)
-		if err != nil {
-			return err
-		}
-		wall, err := localPlayCycleNow(tx, cfg.ID, time.Now())
-		if err != nil {
-			return err
-		}
-		now := wall.UnixMilli()
-		if now < cfg.EndAt {
-			return nil
-		}
-		var count int64
-		if err = tx.Model(&db.PeriodSettlement{}).Where("instance_id = ?", cfg.ID).Count(&count).Error; err != nil {
-			return err
-		}
-		if count > 0 {
-			return nil
-		}
-		var progress []db.PeriodProgress
-		if err = tx.Where("instance_id = ?", cfg.ID).Find(&progress).Error; err != nil {
-			return err
-		}
-		// 并列依旧使用稳定玩家ID顺序；当天指标只纳入截止所在最后一个北京时间日期。
-		cutoffDay := p1Day(time.UnixMilli(cfg.EndAt - 1))
-		ranks := []p1Rank{}
-		for _, row := range progress {
-			value := row.Value
-			if cfg.Mode == "daily" && row.LastDay != cutoffDay {
-				value = 0
+			var live db.PeriodInstance
+			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ?", id).First(&live).Error; err != nil {
+				return err
 			}
-			if value > 0 {
-				ranks = append(ranks, p1Rank{PlayerID: row.PlayerID, Value: value})
+			cfg, err := s.freezeP1Period(tx, live, false)
+			if err != nil {
+				return err
 			}
-		}
-		sort.Slice(ranks, func(i, j int) bool {
-			if ranks[i].Value == ranks[j].Value {
-				return ranks[i].PlayerID < ranks[j].PlayerID
+			wall, err := localPlayCycleNow(tx, cfg.ID, time.Now())
+			if err != nil {
+				return err
 			}
-			return ranks[i].Value > ranks[j].Value
-		})
-		for i := range ranks {
-			ranks[i].Rank = int32(i + 1)
-			if cfg.Enabled && cfg.RankPlaces > 0 && ranks[i].Rank <= cfg.RankPlaces {
-				if _, err = s.EnqueueRewardNotice(tx, ranks[i].PlayerID, "rank:"+cfg.ID, cfg.Title+"排行奖励", cfg.Source, cfg.RankRewards, cfg.RewardEndAt); err != nil {
+			now := wall.UnixMilli()
+			if now < cfg.EndAt {
+				return nil
+			}
+			if s.P1Ready && (cfg.Kind == constUtil.P8EventMineGather || cfg.Kind == constUtil.P8EventFishGather) {
+				// Roll back before taking a directory write lock: another player may
+				// already hold its share while recording an admitted fact.
+				if err := p1RequireGatherCatalog(tx, cfg.Kind, true); err != nil {
 					return err
 				}
 			}
-		}
-		// 停机跨越领取截止也保存过期投递与快照，恢复不延长窗口或额外补发。
-		snapshot, err := json.Marshal(p1Settlement{Rules: cfg, Ranks: ranks})
-		if err != nil {
-			return err
-		}
-		return tx.Create(&db.PeriodSettlement{InstanceID: cfg.ID, SettledAt: now, Snapshot: snapshot}).Error
-	})
+			var count int64
+			if err = tx.Model(&db.PeriodSettlement{}).Where("instance_id = ?", cfg.ID).Count(&count).Error; err != nil {
+				return err
+			}
+			if count > 0 {
+				return nil
+			}
+			var progress []db.PeriodProgress
+			if err = tx.Where("instance_id = ?", cfg.ID).Find(&progress).Error; err != nil {
+				return err
+			}
+			// 并列依旧使用稳定玩家ID顺序；当天指标只纳入截止所在最后一个北京时间日期。
+			cutoffDay := p1Day(time.UnixMilli(cfg.EndAt - 1))
+			ranks := []p1Rank{}
+			for _, row := range progress {
+				value := row.Value
+				if cfg.Mode == "daily" && row.LastDay != cutoffDay {
+					value = 0
+				}
+				if value > 0 {
+					ranks = append(ranks, p1Rank{PlayerID: row.PlayerID, Value: value})
+				}
+			}
+			sort.Slice(ranks, func(i, j int) bool {
+				if ranks[i].Value == ranks[j].Value {
+					return ranks[i].PlayerID < ranks[j].PlayerID
+				}
+				return ranks[i].Value > ranks[j].Value
+			})
+			for i := range ranks {
+				ranks[i].Rank = int32(i + 1)
+				if cfg.Enabled && cfg.RankPlaces > 0 && ranks[i].Rank <= cfg.RankPlaces {
+					if _, err = s.EnqueueRewardNotice(tx, ranks[i].PlayerID, "rank:"+cfg.ID, cfg.Title+"排行奖励", cfg.Source, cfg.RankRewards, cfg.RewardEndAt); err != nil {
+						return err
+					}
+				}
+			}
+			// 停机跨越领取截止也保存过期投递与快照，恢复不延长窗口或额外补发。
+			snapshot, err := json.Marshal(p1Settlement{Rules: cfg, Ranks: ranks})
+			if err != nil {
+				return err
+			}
+			return tx.Create(&db.PeriodSettlement{InstanceID: cfg.ID, SettledAt: now, Snapshot: snapshot}).Error
+		}, opts...)
+	}
+	err := run(ctx)
+	if errors.Is(err, constUtil.ErrP1GatherCatalogWriteRetry) {
+		writeCtx := p1GatherCatalogWriteContext(context.WithValue(ctx, constUtil.P1SharedReadContextKey{}, false))
+		// After waiting for admitted readers, use fresh statement snapshots when
+		// collecting every committed progress row and creating rank deliveries.
+		return run(writeCtx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
+	}
+	return err
 }
 
 // ServeP1Periods 启动时恢复截止结算，后台使用有界时钟并随服务上下文退出。

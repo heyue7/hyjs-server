@@ -17,12 +17,26 @@ func TestP1GatherCatalogTransactionProofAndUpgrade(t *testing.T) {
 	ctx := p1GatherContext(f)
 	var stale context.Context
 	rollback := errors.New("discard test transaction")
-	err := db.GetIns().WithContext(p1GatherCatalogContext(ctx)).Transaction(func(tx *gorm.DB) error {
+	shared := context.WithValue(p1GatherCatalogContext(ctx), constUtil.P1SharedReadContextKey{}, true)
+	err := db.GetIns().WithContext(shared).Transaction(func(tx *gorm.DB) error {
 		if err := p1RequireGatherCatalog(tx, constUtil.P8EventMineGather, false); err == nil {
 			t.Fatal("marker alone authorized a gather")
 		}
 		guarded, err := p1AcquireGatherCatalog(tx)
 		if err != nil {
+			return err
+		}
+		if p1GatherSnapshotRC(guarded) {
+			t.Fatal("directory lease alone enabled the READ COMMITTED capability")
+		}
+		if _, err := p1ReadGatherPeriods(guarded); err == nil {
+			t.Fatal("an unproven transaction read an unlocked gather snapshot")
+		}
+		guarded, err = p1EnableGatherSnapshotRC(guarded)
+		if err != nil || !p1GatherSnapshotRC(guarded) {
+			t.Fatalf("transaction capability missing: %v", err)
+		}
+		if _, err := p1ReadGatherPeriods(guarded); err != nil {
 			return err
 		}
 		for _, kind := range p1GatherCatalogKinds() {
@@ -43,6 +57,9 @@ func TestP1GatherCatalogTransactionProofAndUpgrade(t *testing.T) {
 		t.Fatalf("read lease transaction failed: %v", err)
 	}
 	err = db.GetIns().WithContext(stale).Transaction(func(tx *gorm.DB) error {
+		if p1GatherSnapshotRC(tx) {
+			t.Fatal("a prior transaction's READ COMMITTED capability was accepted")
+		}
 		if err := p1RequireGatherCatalog(tx, constUtil.P8EventMineGather, false); err == nil {
 			t.Fatal("a prior transaction's lease was accepted")
 		}
@@ -96,6 +113,7 @@ func TestP1GatherCatalogTypedChangeProtectsOldAndNewKind(t *testing.T) {
 	}{
 		{mine.ID, constUtil.P8EventMineGather, constUtil.P1EventLoginDay},
 		{other.ID, constUtil.P1EventLoginDay, constUtil.P8EventFishGather},
+		{other.ID, constUtil.P8EventFishGather, constUtil.P4KindPower},
 	} {
 		definition := adminActivityDefinition{mode: "isolated", domain: "period", kind: test.newKind}
 		persist := func(tx *gorm.DB) error {
@@ -127,17 +145,26 @@ func TestP1GatherCatalogTypedChangeProtectsOldAndNewKind(t *testing.T) {
 }
 
 func TestP1GatherCatalogPersonalPeriodFullRetry(t *testing.T) {
+	testP1GatherCatalogPersonalPeriodFullRetry(t, "MainCopy", "mainCopyWinTimes", constUtil.P8EventMineGather, "cumulative")
+}
+
+func TestP1GatherCatalogPersonalPowerFullRetry(t *testing.T) {
+	testP1GatherCatalogPersonalPeriodFullRetry(t, "OpenServerRace", "kaiFuJingSai", constUtil.P4KindPower, "single")
+}
+
+func testP1GatherCatalogPersonalPeriodFullRetry(t *testing.T, activityID, prefix, kind, mode string) {
+	t.Helper()
 	f, playerID := localPlayActivitiesFixture(t)
 	now := time.Now()
 	// The personal cycle copies the latest matching source, including a kind
 	// supplied through the generic period editor. Keep this source newest.
-	source := db.PeriodInstance{ID: "mainCopyWinTimes_catalog_guard", Kind: constUtil.P8EventMineGather, Mode: "cumulative", Enabled: true, Title: "采集目录复制测试", Goal: 1, Rewards: "coin,1", StartAt: now.AddDate(5, 0, 0).UnixMilli(), EndAt: now.AddDate(5, 0, 1).UnixMilli(), RewardEndAt: now.AddDate(5, 0, 2).UnixMilli(), Source: "隔离测试"}
+	source := db.PeriodInstance{ID: prefix + "_catalog_guard", Kind: kind, Mode: mode, Enabled: true, Title: "采集目录复制测试", Goal: 1, Rewards: "coin,1", StartAt: now.AddDate(5, 0, 0).UnixMilli(), EndAt: now.AddDate(5, 0, 1).UnixMilli(), RewardEndAt: now.AddDate(5, 0, 2).UnixMilli(), Source: "隔离测试"}
 	if err := db.GetIns().Create(&source).Error; err != nil {
 		t.Fatal(err)
 	}
 	var def localPlayActivityDefinition
 	for _, candidate := range localPlayActivityDefinitions {
-		if candidate.ID == "MainCopy" {
+		if candidate.ID == activityID {
 			def = candidate
 		}
 	}
@@ -147,26 +174,26 @@ func TestP1GatherCatalogPersonalPeriodFullRetry(t *testing.T) {
 		return err
 	})
 	if !errors.Is(err, constUtil.ErrP1GatherCatalogWriteRetry) {
-		t.Fatalf("unguarded personal mine clone was not rolled back: %v", err)
+		t.Fatalf("unguarded personal period clone was not rolled back: %v", err)
 	}
 	if p1Count(t, &db.PeriodInstance{}, "id LIKE ?", "%"+cycleID+"%") != 0 {
 		t.Fatal("failed personal clone left an instance behind")
 	}
 	const requestID = "cc000000-0000-4000-8000-000000000001"
-	first, err := f.s.LocalPlayActivitiesApply(f.ctx, playerID, "refresh", "MainCopy", requestID)
+	first, err := f.s.LocalPlayActivitiesApply(f.ctx, playerID, "refresh", activityID, requestID)
 	if err != nil || len(first.Results) != 1 || first.Results[0].Status != "open" {
 		t.Fatalf("personal operation did not retry with the directory write guard: %+v %v", first, err)
 	}
-	replay, err := f.s.LocalPlayActivitiesApply(f.ctx, playerID, "refresh", "MainCopy", requestID)
+	replay, err := f.s.LocalPlayActivitiesApply(f.ctx, playerID, "refresh", activityID, requestID)
 	if err != nil || len(replay.Results) != 1 || replay.Results[0].Status != "open" {
 		t.Fatalf("personal operation replay changed: %+v %v", replay, err)
 	}
-	cycleID = localPlayCycleID(t, f, playerID, "MainCopy")
+	cycleID = localPlayCycleID(t, f, playerID, activityID)
 	var copied db.PeriodInstance
-	if err := db.GetIns().Where("id LIKE ? AND kind=?", "%"+cycleID+"%", constUtil.P8EventMineGather).First(&copied).Error; err != nil {
+	if err := db.GetIns().Where("id LIKE ? AND kind=?", "%"+cycleID+"%", kind).First(&copied).Error; err != nil {
 		t.Fatal(err)
 	}
-	if len(copied.Frozen) != 0 || p1Count(t, &db.PeriodInstance{}, "id LIKE ? AND kind=?", "%"+cycleID+"%", constUtil.P8EventMineGather) != 1 ||
+	if len(copied.Frozen) != 0 || p1Count(t, &db.PeriodInstance{}, "id LIKE ? AND kind=?", "%"+cycleID+"%", kind) != 1 ||
 		p1Count(t, &db.LocalPlayActivityOperation{}, "player_id=? AND request_id=?", playerID, requestID) != 1 {
 		t.Fatal("retry or replay duplicated the personal period or receipt")
 	}

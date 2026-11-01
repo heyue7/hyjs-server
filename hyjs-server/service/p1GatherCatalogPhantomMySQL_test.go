@@ -19,9 +19,8 @@ import (
 	pb "hyjs-server/model/protocol"
 )
 
-// Stop after the actual full locking scan has returned its rows, while its
-// transaction still holds the scan locks. This isolates an insertion after
-// the scan from the earlier ID-only prelock.
+// Stop after the period scan returns, while the transaction still holds its
+// directory guard. Shared gathers use an ordinary READ COMMITTED snapshot.
 type p1GatherCatalogScanBarrier struct {
 	logger.Interface
 	armed   atomic.Bool
@@ -34,11 +33,9 @@ func (b *p1GatherCatalogScanBarrier) Trace(ctx context.Context, _ time.Time, sta
 	query, _ := statement()
 	query = strings.ToLower(query)
 	shared := ctx.Value(constUtil.P1SharedReadContextKey{}) == true
-	strength := "for update"
-	if b.shared {
-		strength = "for share"
-	}
-	if shared != b.shared || !strings.Contains(query, "select * from p1_period_instances") || !strings.Contains(query, strength) || !b.armed.CompareAndSwap(true, false) {
+	if shared != b.shared || !strings.Contains(query, "select * from p1_period_instances") ||
+		(b.shared && (strings.Contains(query, "for share") || strings.Contains(query, "for update"))) ||
+		(!b.shared && !strings.Contains(query, "for update")) || !b.armed.CompareAndSwap(true, false) {
 		return
 	}
 	close(b.scanned)
