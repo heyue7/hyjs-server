@@ -189,7 +189,8 @@ func TestP8MySQLCancelDoesNotWaitForOtherLine(t *testing.T) {
 	workers.Add(1)
 	go func() {
 		defer workers.Done()
-		cancelDone <- updateProfileWithTx(ctx, f.ids[0], func(tx *gorm.DB, _ *pb.Player, game *model.GameState) error {
+		moveCtx := context.WithValue(ctx, constUtil.GameRequestContextKey, &pb.CSMove{})
+		cancelDone <- updateFieldProfileWithTx(moveCtx, f.ids[0], func(tx *gorm.DB, _ *pb.Player, game *model.GameState) error {
 			return f.s.P8CancelGather(tx, f.ids[0], game)
 		})
 	}()
@@ -243,6 +244,10 @@ func TestP8MySQLStartAndAutomaticRelineSerializeOnProfile(t *testing.T) {
 			if err = db.GetIns().Model(&db.P10ScenePresence{}).Where("player_id=?", f.ids[1]).Update("frame", peerFrame).Error; err != nil {
 				t.Fatal(err)
 			}
+			peers, err := f.s.p10ScenePeers(db.GetIns(), "field_002", 1, f.ids[0])
+			if err != nil || len(peers) != 1 || peers[0].GetInfo().GetPlayerId() != f.ids[1] {
+				t.Fatalf("automatic-reline fixture lacks its full line: peers=%d err=%v", len(peers), err)
+			}
 			if err = p8CreateReservationGate(f.base, &p8ReservationGateMissing{serverID: f.s.OriginalServerID(), scene: "field_002", posID: f.pos[0]}); err != nil {
 				t.Fatal(err)
 			}
@@ -259,7 +264,7 @@ func TestP8MySQLStartAndAutomaticRelineSerializeOnProfile(t *testing.T) {
 				operation, _ := tx.Statement.Context.Value(p8AutoRelineProbeKey{}).(string)
 				table := "p8_resource_reservations"
 				if first == "reline" {
-					table = "p10_scene_presences"
+					table = "p10_scene_presence"
 				}
 				if operation != first || tx.Statement.Table != table || !heldOnce.CompareAndSwap(false, true) {
 					return
