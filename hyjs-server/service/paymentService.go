@@ -88,6 +88,9 @@ func (s *GameService) InitializePayments(ctx context.Context) error {
 	if err := d.AutoMigrate(&db.PaymentProduct{}, &db.PaymentOrder{}, &db.LocalPlayPaymentTime{}, &db.PaymentConfirmation{}, &db.MembershipClaim{}, &db.PaymentActivityRule{}, &db.PaymentActivityState{}, &db.PaymentGiftCode{}, &db.PaymentLuxuryOffer{}, &db.VIPShopProduct{}, &db.OpeningCalendarPaymentCarry{}); err != nil {
 		return err
 	}
+	if err := rechargeDirectoryCheckReserved(d); err != nil {
+		return err
+	}
 	return d.Transaction(func(tx *gorm.DB) error {
 		if err := ServerGameClockGuardTransaction(tx); err != nil {
 			return err

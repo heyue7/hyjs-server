@@ -947,6 +947,9 @@ func (s *GameService) adminNativeApplyFund(tx *gorm.DB, snap *adminNativeSnapsho
 }
 
 func (s *GameService) adminNativeApplyPayment(tx *gorm.DB, snap *adminNativeSnapshot, req model.AdminNativeActivitySaveRequest) error {
+	if snap.payment.ID == constUtil.RechargeTotalDirectoryID {
+		return constUtil.ErrAdminInput
+	}
 	form := req.Form
 	if form.StartAt <= 0 || form.EndAt <= form.StartAt || form.ClaimEndAt < form.EndAt || form.Threshold <= 0 || form.Threshold > math.MaxInt32 {
 		return constUtil.ErrAdminInput
@@ -1214,6 +1217,9 @@ func (s *GameService) adminNativeApplyFirstDouble(tx *gorm.DB, snap *adminNative
 }
 
 func (s *GameService) adminNativeApplyCelebration(tx *gorm.DB, snap *adminNativeSnapshot, req model.AdminNativeActivitySaveRequest) error {
+	if snap.period.ID == constUtil.RechargeTotalDirectoryID {
+		return constUtil.ErrAdminInput
+	}
 	form := req.Form
 	if form.StartAt <= 0 || form.EndAt <= form.StartAt || form.ClaimEndAt < form.EndAt || len(form.Milestones) < 1 || len(form.Milestones) > 31 {
 		return constUtil.ErrAdminInput
@@ -1339,6 +1345,9 @@ func (s *GameService) adminNativeApplyP15(tx *gorm.DB, snap *adminNativeSnapshot
 }
 
 func (s *GameService) adminNativeApplyFrozenState(tx *gorm.DB, snap *adminNativeSnapshot, enabled bool) error {
+	if snap.payment.ID == constUtil.RechargeTotalDirectoryID || snap.period.ID == constUtil.RechargeTotalDirectoryID {
+		return constUtil.ErrAdminInput
+	}
 	if enabled {
 		if err := s.adminNativeValidateEnable(tx, snap); err != nil {
 			return err

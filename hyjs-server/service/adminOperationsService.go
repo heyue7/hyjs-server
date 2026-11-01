@@ -258,7 +258,7 @@ func (s *GameService) AdminUpdateActivity(ctx context.Context, p *model.AdminPri
 			return err
 		}
 		domain, key, ok := strings.Cut(id, ":")
-		if !ok {
+		if !ok || (domain == "period" && key == constUtil.RechargeTotalDirectoryID) {
 			return constUtil.ErrAdminInput
 		}
 		if domain == "period" && s.P1Ready {

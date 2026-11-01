@@ -25,7 +25,7 @@ import (
 func (s *GameService) AdminCreateActivity(ctx context.Context, p *model.AdminPrincipal, req model.AdminActivityCreateRequest) (*model.AdminActivityDTO, error) {
 	domain, template, ok := strings.Cut(req.TemplateID, ":")
 	key := strings.TrimPrefix(req.NewID, domain+":")
-	if !ok || key == template || len(key) > 64 || !strings.HasPrefix(key, template+"_") || !regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.:-]*$`).MatchString(key) {
+	if !ok || key == constUtil.RechargeTotalDirectoryID || key == template || len(key) > 64 || !strings.HasPrefix(key, template+"_") || !regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.:-]*$`).MatchString(key) {
 		return nil, constUtil.ErrAdminInput
 	}
 	var saved model.AdminActivityDTO

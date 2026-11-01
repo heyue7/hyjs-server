@@ -663,6 +663,9 @@ func (s *GameService) AdminSaveTypedActivity(ctx context.Context, p *model.Admin
 }
 
 func (s *GameService) adminPersistTypedActivity(tx *gorm.DB, d adminActivityDefinition, key string, f model.AdminActivityForm, enabled, exists bool) error {
+	if d.domain == "period" && key == constUtil.RechargeTotalDirectoryID {
+		return constUtil.ErrAdminInput
+	}
 	if f.Mode == "king-recruit" {
 		return s.adminPersistKingRecruitActivity(tx, key, f, enabled, exists)
 	}

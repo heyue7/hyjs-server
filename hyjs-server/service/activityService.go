@@ -622,6 +622,10 @@ func (s *GameService) AvailableActivities(ctx context.Context, id int64) ([]*pb.
 	}
 	result = append(result, instances...)
 	result = append(result, payments...)
+	result, err = s.rechargeDirectoryTabs(db.GetIns().WithContext(ctx), id, now, result)
+	if err != nil {
+		return nil, err
+	}
 	welfare, err := s.P4ActivityTabs(ctx, LocalPlayNow(ctx))
 	if err != nil {
 		return nil, err

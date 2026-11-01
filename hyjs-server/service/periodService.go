@@ -41,7 +41,7 @@ func (s *GameService) seedP1Periods(ctx context.Context, now time.Time) error {
 }
 
 func (s *GameService) validateP1Period(cfg db.PeriodInstance) error {
-	if cfg.ID == "" || len(cfg.ID) > 64 || cfg.StartAt <= 0 || cfg.StartAt >= cfg.EndAt || cfg.EndAt > cfg.RewardEndAt || cfg.Goal <= 0 || cfg.Goal > math.MaxInt32 || cfg.Kind == "" || len(cfg.Kind) > 64 {
+	if cfg.ID == "" || cfg.ID == constUtil.RechargeTotalDirectoryID || len(cfg.ID) > 64 || cfg.StartAt <= 0 || cfg.StartAt >= cfg.EndAt || cfg.EndAt > cfg.RewardEndAt || cfg.Goal <= 0 || cfg.Goal > math.MaxInt32 || cfg.Kind == "" || len(cfg.Kind) > 64 {
 		return errors.New("活动实例规则无效")
 	}
 	if err := s.validateP1Milestones(cfg); err != nil {
@@ -205,7 +205,9 @@ func (s *GameService) P1Activity(ctx context.Context, id int64, request proto.Me
 	err := updateProfileWithTx(ctx, id, func(tx *gorm.DB, player *pb.Player, game *model.GameState) error {
 		var err error
 		now := LocalPlayNow(ctx).UnixMilli()
-		if key == constUtil.P1LoginDirectoryID {
+		if key == constUtil.RechargeTotalDirectoryID {
+			response, err = s.rechargeDirectoryApply(tx, id, player, game, request, now)
+		} else if key == constUtil.P1LoginDirectoryID {
 			response, err = s.p1LoginDirectoryApply(tx, id, player, game, request, now)
 		} else {
 			response, err = s.p1ActivityApply(tx, id, player, game, key, request, now)

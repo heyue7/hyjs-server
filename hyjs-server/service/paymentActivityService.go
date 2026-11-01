@@ -218,6 +218,21 @@ func (s *GameService) p3ActivityItems(tx *gorm.DB, p *pb.Player, state *db.Payme
 func (s *GameService) paymentActivity(ctx context.Context, id int64, request proto.Message, now time.Time) ([]proto.Message, error) {
 	var response proto.Message
 	err := s.p3Profile(ctx, id, func(tx *gorm.DB, row *db.Profile, p *pb.Player, g *model.GameState) error {
+		var err error
+		response, err = s.paymentActivityApply(tx, row, id, p, g, request, now, true)
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+	return []proto.Message{response}, nil
+}
+
+// paymentActivityApply shares the caller's transaction; the combined recharge
+// page lets its outer profile transaction save once after all child work.
+func (s *GameService) paymentActivityApply(tx *gorm.DB, row *db.Profile, id int64, p *pb.Player, g *model.GameState, request proto.Message, now time.Time, save bool) (proto.Message, error) {
+	var response proto.Message
+	err := func() error {
 		activity := ""
 		index := int32(1)
 		kind := int32(0)
@@ -307,8 +322,10 @@ func (s *GameService) paymentActivity(ctx context.Context, id int64, request pro
 		if err = tx.Save(state).Error; err != nil {
 			return err
 		}
-		if err = saveProfile(tx, row, p, g); err != nil {
-			return err
+		if save {
+			if err = saveProfile(tx, row, p, g); err != nil {
+				return err
+			}
 		}
 		items, value, err = s.p3ActivityItems(tx, p, state, r, now)
 		if err != nil {
@@ -327,11 +344,8 @@ func (s *GameService) paymentActivity(ctx context.Context, id int64, request pro
 			response = &pb.SCActivityReward{ActivityId: proto.String(activity), ItemList: items, Get: gain}
 		}
 		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-	return []proto.Message{response}, nil
+	}()
+	return response, err
 }
 
 // PaymentActivityTabs 交由共享活动列表聚合，不覆盖已恢复累计登录等活动。
