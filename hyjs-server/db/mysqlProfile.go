@@ -56,6 +56,9 @@ func OpenGameMySQL(ctx context.Context, cfg MySQLConfig, applySchema bool) (*gor
 	if err == nil && applySchema && !d.WithContext(ctx).Migrator().HasIndex(&Profile{}, "idx_profiles_server_id") {
 		err = d.WithContext(ctx).Migrator().CreateIndex(&Profile{}, "idx_profiles_server_id")
 	}
+	if err == nil && applySchema {
+		err = migrateProfileSceneScope(d.WithContext(ctx))
+	}
 	if err == nil {
 		err = validateMySQLProfiles(ctx, d)
 	}

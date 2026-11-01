@@ -204,7 +204,7 @@ func (s *GameService) GGOFieldGatherStart(ctx context.Context, req model.GGOFiel
 			if err = ggoLockPeriodsBeforeLine(tx, a.Service); err != nil {
 				return err
 			}
-			row, state, _, err := ggoLoadLine(tx, a.Service.OriginalServerID(), int64(a.Presence.Line), cfg, a.Service.GGOFieldRevision, a.Now)
+			row, state, _, err := ggoLoadLine(tx, a.Service.OriginalServerID(), int64(a.Presence.Line), cfg, a.Service.GGOFieldRevision, a.Now, req.PointID)
 			if err != nil {
 				return err
 			}

@@ -240,15 +240,9 @@ func ggoGatherCanFinish(tx *gorm.DB, a *ggoFieldActor, attempt *db.P8GatherAttem
 	return true, nil
 }
 
-// ggoLockPeriodsBeforeLine keeps the full activity lock range ahead of the line.
-// Rule bodies are loaded later only when an activity hook needs them; shared
-// transactions retain their existing exclusive-retry behavior.
-func ggoLockPeriodsBeforeLine(tx *gorm.DB, s *GameService) error {
-	if s == nil || !s.P1Ready {
-		return nil
-	}
-	return p1LockPeriodIDs(tx)
-}
+// Activity consumers acquire their selected instance at the actual event.
+// Gather catalogue leases are acquired before any resource mutation.
+func ggoLockPeriodsBeforeLine(tx *gorm.DB, s *GameService) error { return nil }
 
 // ggoEndAttempt consumes a reserved generation exactly once. If inventory cannot
 // accept its frozen materials, the durable ready receipt allows later delivery.
@@ -273,15 +267,11 @@ func ggoEndAttempt(tx *gorm.DB, a *ggoFieldActor, attempt *db.P8GatherAttempt, r
 	if err = ggoLockPeriodsBeforeLine(tx, a.Service); err != nil {
 		return nil, false, err
 	}
-	var row db.GGOFieldLine
-	if err = tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&row, "server_id=? AND line=?", a.Service.OriginalServerID(), frozen.Line).Error; err != nil {
+	row, state, err := ggoLoadReservedPoint(tx, a.Service.OriginalServerID(), frozen.Line, attempt.PosID)
+	if err != nil {
 		return nil, false, err
 	}
-	var state ggoLineState
-	if json.Unmarshal(row.Payload, &state) != nil {
-		return nil, false, errors.New("沙漠场景状态损坏")
-	}
-	node, detached, released, err := ggoResolveGatherReservation(&state, attempt, frozen)
+	node, detached, released, err := ggoResolveGatherReservation(state, attempt, frozen)
 	if err != nil || node != nil && node.Remaining < 1 {
 		return nil, false, ggoFieldError(constUtil.GGOFieldStaleGeneration, "采集资源代次已变化")
 	}
@@ -302,7 +292,7 @@ func ggoEndAttempt(tx *gorm.DB, a *ggoFieldActor, attempt *db.P8GatherAttempt, r
 	a.Game.Field.Side.Tiredness = proto.Int32(a.Game.Field.Side.GetTiredness() - frozen.Fatigue)
 	a.Game.Field.Side.State = proto.Int32(constUtil.P8FieldIdle)
 	if !detached || released {
-		if err = ggoLineSave(tx, &row, &state, a.Now); err != nil {
+		if err = ggoLineSave(tx, row, state, a.Now); err != nil {
 			return nil, false, err
 		}
 	}

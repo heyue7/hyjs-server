@@ -20,17 +20,19 @@ import (
 
 type ggoGatherReadFenceKey struct{}
 
-func TestGGOGatherIsolationIsScoped(t *testing.T) {
+func TestGGOTransactionIsolationIsScoped(t *testing.T) {
 	mysqlDB := &gorm.DB{Config: &gorm.Config{Dialector: mysql.New(mysql.Config{})}}
 	sqliteDB := &gorm.DB{Config: &gorm.Config{Dialector: sqlite.Open(":memory:")}}
 	ordinary := context.Background()
 	gather := context.WithValue(ordinary, ggoGatherCurrentReadKey{}, true)
-	if len(ggoGatherTransactionOptions(mysqlDB, ordinary)) != 0 || len(ggoGatherTransactionOptions(sqliteDB, gather)) != 0 {
-		t.Fatal("a non-gather or SQLite transaction changed isolation")
-	}
-	options := ggoGatherTransactionOptions(mysqlDB, gather)
-	if len(options) != 1 || options[0].Isolation != sql.LevelReadCommitted {
-		t.Fatalf("MySQL gather transaction isolation: %+v", options)
+	for name, ctx := range map[string]context.Context{"ordinary": ordinary, "gather": gather} {
+		options := ggoGatherTransactionOptions(mysqlDB, ctx)
+		if len(options) != 1 || options[0] == nil || options[0].Isolation != sql.LevelReadCommitted {
+			t.Fatalf("MySQL %s transaction isolation: %+v", name, options)
+		}
+		if options := ggoGatherTransactionOptions(sqliteDB, ctx); options != nil {
+			t.Fatalf("SQLite %s transaction changed isolation: %+v", name, options)
+		}
 	}
 }
 
@@ -51,7 +53,11 @@ func ggoGatherReadPeriod(t *testing.T, f *ggoPeriodLockFixture, end time.Time) d
 	period := p1Instance(t, nil, id, constUtil.P8EventMineGather, "cumulative", 100, end, 0)
 	database := db.GetIns()
 	if err := database.Transaction(func(tx *gorm.DB) error {
-		_, err := f.s.freezeP1Period(tx, period, true)
+		guarded, err := p1AcquireGatherCatalogWriter(tx)
+		if err != nil {
+			return err
+		}
+		_, err = f.s.freezeP1Period(guarded, period, true)
 		return err
 	}); err != nil {
 		t.Fatal(err)

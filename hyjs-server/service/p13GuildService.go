@@ -232,7 +232,7 @@ func (s *GameService) p13GuildLoginAt(ctx context.Context, id int64, now time.Ti
 		}
 
 		var policy db.P13GuildPolicy
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&policy, 1).Error; err != nil {
+		if err := tx.Clauses(clause.Locking{Strength: "SHARE"}).First(&policy, 1).Error; err != nil {
 			return err
 		}
 		m, err := p13GuildMember(tx, id)
@@ -241,6 +241,15 @@ func (s *GameService) p13GuildLoginAt(ctx context.Context, id int64, now time.Ti
 		}
 		if m.GuildID == "" {
 			return nil
+		}
+		// Login credit belongs to this guild and this member. Other guilds
+		// can credit their members while the management policy is shared.
+		var guildLock db.P13Guild
+		if err = tx.Select("id").Clauses(clause.Locking{Strength: "UPDATE"}).First(&guildLock, "id=?", m.GuildID).Error; err != nil {
+			return err
+		}
+		if err = tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(m, "player_id=?", id).Error; err != nil {
+			return err
 		}
 		if err = calendarGuildDay75(tx, m, now); err != nil {
 			return err
@@ -378,29 +387,41 @@ func (s *GameService) p13GuildMutate(ctx context.Context, id int64, request, res
 	var resultPlayer *pb.Player
 	fresh := false
 	var revokedIDs []int64
+	personalAction := false
+	switch request.(type) {
+	case *pb.CSUnionPray, *pb.CSGetUnionStamina, *pb.CSUnionOpenDonateBox:
+		personalAction = true
+	}
 	err = db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := ServerGameClockGuardTransaction(tx); err != nil {
 			return err
 		}
 
 		var policy db.P13GuildPolicy
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&policy, 1).Error; err != nil {
+		strength := "UPDATE"
+		if personalAction {
+			strength = "SHARE"
+		}
+		if err := tx.Clauses(clause.Locking{Strength: strength}).First(&policy, 1).Error; err != nil {
 			return err
 		}
-		// Freeze due month identities before any post-cutoff membership or role mutation.
-		if err := s.P13MonthlyBeforeGuildMutation(tx, now); err != nil {
-			return err
-		}
-		giftMember, err := p13GuildMember(tx, id)
-		if err != nil {
-			return err
-		}
-		if _, err = s.P13GuildGiftBeforeMutation(tx, giftMember.GuildID, now); err != nil {
-			return err
-		}
-		if _, dissolve := request.(*pb.CSDissolveUnion); dissolve && giftMember.GuildID != "" {
-			if err = s.P13GuildGiftRetire(tx, giftMember.GuildID, now); err != nil {
+		if !personalAction {
+			// Membership and guild standings can advance their shared cutoffs.
+			// Personal claims and prayers do not change the guild standings.
+			if err := s.P13MonthlyBeforeGuildMutation(tx, now); err != nil {
 				return err
+			}
+			giftMember, err := p13GuildMember(tx, id)
+			if err != nil {
+				return err
+			}
+			if _, err = s.P13GuildGiftBeforeMutation(tx, giftMember.GuildID, now); err != nil {
+				return err
+			}
+			if _, dissolve := request.(*pb.CSDissolveUnion); dissolve && giftMember.GuildID != "" {
+				if err = s.P13GuildGiftRetire(tx, giftMember.GuildID, now); err != nil {
+					return err
+				}
 			}
 		}
 		// 解散涉及全体成员位置，先按ID升序锁全员，避免与P10双角色业务逆序。
@@ -739,7 +760,7 @@ func (s *GameService) p13GuildQuery(ctx context.Context, id int64, request proto
 			return nil
 		case *pb.CSGetUnionInfo:
 			var giftGate db.P13GuildPolicy
-			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&giftGate, 1).Error; err != nil {
+			if err := tx.Clauses(clause.Locking{Strength: "SHARE"}).First(&giftGate, 1).Error; err != nil {
 				return err
 			}
 			member, err := p13GuildMember(tx, id)
@@ -1335,6 +1356,9 @@ func (s *GameService) p13GuildEconomy(ctx context.Context, id int64, request pro
 		}
 		if err = tx.Save(m).Error; err != nil {
 			return err
+		}
+		if _, personalStamina := request.(*pb.CSGetUnionStamina); personalStamina {
+			return nil
 		}
 		return tx.Save(guild).Error
 	})

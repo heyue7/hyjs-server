@@ -14,6 +14,15 @@ sys.path.insert(0, str(ROOT / 'tests'))
 from hyjs_managed_mysql import ManagedMySQL
 
 CASES = {
+    'TestPlayerConcurrencyMySQLPVPDoesNotBlockMovement': 'p12_pk',
+    'TestPlayerConcurrencyMySQLSceneProjectionMigration': 'p1',
+    'TestGGOPeriodPointRealMySQLCancelDoesNotBlockOtherClaim': 'p1',
+    'TestPlayerConcurrencyMySQLGGOPoints': 'p1',
+    'TestP1GatherRealTwoPlayersIgnoreOtherPeriodXMySQL': 'p4',
+    'TestP1GatherFrozenMySQLConcurrentIsolation': 'p1',
+    'TestP1GatherFirstFreezeMySQLConcurrentRetry': 'p1',
+    'TestP1GatherDisableMySQLWaitsForAdmittedFact': 'p1',
+    'TestP1GatherCutoffMySQLWaitsForAdmittedFact': 'p1',
     'TestPlayerConcurrencyMySQLActivityIsolation': 'p1',
     'TestPlayerConcurrencyMySQLSceneMovement': 'p10',
     'TestPlayerConcurrencyMySQLSlowSocket': 'p10',

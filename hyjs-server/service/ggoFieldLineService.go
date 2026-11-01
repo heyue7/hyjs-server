@@ -20,6 +20,8 @@ type ggoLineState struct {
 	Resources          []ggoResourceNode `json:"resources"`
 	Monsters           []ggoMonsterNode  `json:"monsters"`
 	LegacyBlocks       []ggoLegacyBlock  `json:"legacyBlocks,omitempty"`
+	pointRows          map[string]db.GGOFieldPoint
+	pointReadOnly      bool
 }
 
 // A published revision can replace visible nodes while earlier accepted
@@ -225,6 +227,9 @@ func ggoNextLineDue(state *ggoLineState) int64 {
 }
 
 func ggoLineSave(tx *gorm.DB, row *db.GGOFieldLine, state *ggoLineState, now int64) error {
+	if state.pointRows != nil {
+		return ggoSavePointState(tx, row, state, now)
+	}
 	if row.Revision < 0 || row.Revision == math.MaxInt64 {
 		return errors.New("沙漠场景版本无效")
 	}
@@ -241,7 +246,7 @@ func ggoLineSave(tx *gorm.DB, row *db.GGOFieldLine, state *ggoLineState, now int
 
 // ggoLoadLine obtains a single line row lock before changing a node, so a
 // resource reservation, generation change and reward commit share a transaction.
-func ggoLoadLine(tx *gorm.DB, serverID, line int64, cfg *model.AdminFieldGGOConfiguration, revision string, now int64) (*db.GGOFieldLine, *ggoLineState, bool, error) {
+func ggoLoadLegacyLine(tx *gorm.DB, serverID, line int64, cfg *model.AdminFieldGGOConfiguration, revision string, now int64) (*db.GGOFieldLine, *ggoLineState, bool, error) {
 	if serverID < 1 || line < 1 {
 		return nil, nil, false, errors.New("沙漠区服或分线无效")
 	}
@@ -434,7 +439,11 @@ func ggoLoadLine(tx *gorm.DB, serverID, line int64, cfg *model.AdminFieldGGOConf
 }
 
 func ggoValidateLineState(state *ggoLineState, cfg *model.AdminFieldGGOConfiguration) error {
-	if state == nil || cfg == nil || cfg.Runtime == nil || len(state.Resources) != int(cfg.Runtime.Resource.MineCount+cfg.Runtime.Resource.FishCount) {
+	return ggoValidatePointState(state, cfg, true)
+}
+
+func ggoValidatePointState(state *ggoLineState, cfg *model.AdminFieldGGOConfiguration, complete bool) error {
+	if state == nil || cfg == nil || cfg.Runtime == nil || complete && len(state.Resources) != int(cfg.Runtime.Resource.MineCount+cfg.Runtime.Resource.FishCount) {
 		return errors.New("沙漠资源状态数量无效")
 	}
 	points := map[string]model.AdminFieldGGOPoint{}
@@ -467,7 +476,7 @@ func ggoValidateLineState(state *ggoLineState, cfg *model.AdminFieldGGOConfigura
 	for _, tier := range cfg.Runtime.MonsterTiers {
 		total += tier.Count
 	}
-	if int64(len(state.Monsters)) != total {
+	if complete && int64(len(state.Monsters)) != total {
 		return errors.New("沙漠小怪状态数量无效")
 	}
 	for _, monster := range state.Monsters {

@@ -555,9 +555,9 @@ func (s *GameService) p12FieldPVPFightClocked(ctx context.Context, id int64, ses
 	var presentationScene string
 	var presentationLine int32
 	changedChipTotal := false
-	// Presence writers use this mutex. Profiles then lock by ascending ID, before
-	// any consistent snapshot or domain row is read, including zero-stamp replay.
-	p10SceneMutation.Lock()
+	// Only the two participants' ordered profile/presence rows serialize combat.
+	// The shared scene lease excludes transfers while unrelated players can move.
+	p10SceneMutation.RLock()
 	err := db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) (retErr error) {
 		if err := ServerGameClockGuardTransaction(tx); err != nil {
 			return err
@@ -1011,7 +1011,7 @@ func (s *GameService) p12FieldPVPFightClocked(ctx context.Context, id int64, ses
 		fresh = true
 		return nil
 	})
-	p10SceneMutation.Unlock()
+	p10SceneMutation.RUnlock()
 	if err != nil {
 		return nil, err
 	}

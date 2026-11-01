@@ -67,6 +67,10 @@ func p10SceneProfileSnapshot(profile *db.Profile) *db.Profile {
 		value := *profile.Game
 		snapshot.Game = &value
 	}
+	if profile.SceneScope != nil {
+		value := *profile.SceneScope
+		snapshot.SceneScope = &value
+	}
 	if profile.CreatedAt != nil {
 		value := *profile.CreatedAt
 		snapshot.CreatedAt = &value
@@ -375,7 +379,7 @@ func (s *GameService) p10SceneLiveEntries(tx *gorm.DB, rows []db.P10ScenePresenc
 	for start := 0; start < len(ids); start += batchSize {
 		end := min(start+batchSize, len(ids))
 		var batch []db.Profile
-		if err := tx.Select("id", "session", "account_id", "account_auth_revision", "player", "game", "ggo_credit", "ggo_credit_migrated").Where("id IN ?", ids[start:end]).Find(&batch).Error; err != nil {
+		if err := tx.Select("id", "session", "account_id", "account_auth_revision", "scene_scope").Where("id IN ?", ids[start:end]).Find(&batch).Error; err != nil {
 			return nil, err
 		}
 		for _, profile := range batch {
@@ -421,9 +425,12 @@ func (s *GameService) p10SceneLiveEntries(tx *gorm.DB, rows []db.P10ScenePresenc
 				continue
 			}
 		}
-		game, err := p10SceneScopeProfile(&profile)
-		if err != nil {
+		if profile.SceneScope == nil || *profile.SceneScope == "" {
 			continue
+		}
+		game := &model.GameState{Position: &pb.Position{Scene: proto.String(*profile.SceneScope)}}
+		if *profile.SceneScope == constUtil.GGOFieldScene {
+			game.GGOField = &model.GGOFieldState{}
 		}
 		if entry.offline && (game.GGOField == nil || game.Position.GetScene() != constUtil.GGOFieldScene || game.PositionLoading) {
 			continue
@@ -949,8 +956,13 @@ func (s *GameService) DispatchP10Scene(ctx context.Context, id int64, request pr
 	if err := s.SyncP10Scene(ctx, id, false); err != nil {
 		return nil, true, err
 	}
-	p10SceneMutation.Lock()
-	defer p10SceneMutation.Unlock()
+	if _, transition := request.(*pb.CSTransferLine); transition {
+		p10SceneMutation.Lock()
+		defer p10SceneMutation.Unlock()
+	} else {
+		p10SceneMutation.RLock()
+		defer p10SceneMutation.RUnlock()
+	}
 	tx := db.GetIns().WithContext(ctx)
 	cfg, err := s.P13GuildRoomSceneConfig(tx, id)
 	if err != nil {

@@ -113,7 +113,7 @@ func (s *GameService) TickP12FieldPVPPresentation(ctx context.Context, now time.
 		var line int32
 		var oldScene string
 		var oldLine int32
-		p10SceneMutation.Lock()
+		p10SceneMutation.RLock()
 		err := db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 			if _, err := p10LockProfiles(tx, candidate.PlayerID, candidate.PlayerID); err != nil {
 				return err
@@ -164,7 +164,7 @@ func (s *GameService) TickP12FieldPVPPresentation(ctx context.Context, now time.
 			}
 			return tx.Model(&state).Updates(map[string]any{"busy_until": 0, "real_busy_until": 0}).Error
 		})
-		p10SceneMutation.Unlock()
+		p10SceneMutation.RUnlock()
 		if err != nil {
 			return err
 		}

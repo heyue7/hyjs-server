@@ -249,7 +249,7 @@ func (s *GameService) periodReadyPoints(tx *gorm.DB, id int64, values map[string
 	now := LocalPlayNow(tx.Statement.Context).UnixMilli()
 	var rows []db.PeriodInstance
 	// 冻结后的时间可能不同于实时列，必须保留全部带快照的窗口供下面核验。
-	if err := tx.Where("enabled=? AND ((start_at<=? AND reward_end_at>?) OR (frozen IS NOT NULL AND LENGTH(frozen)>0))", true, now, now).Find(&rows).Error; err != nil {
+	if err := tx.Where("enabled=? AND owner_player_id IN ? AND realm_id IN ? AND ((start_at<=? AND reward_end_at>?) OR (frozen IS NOT NULL AND LENGTH(frozen)>0))", true, []int64{0, id}, []int64{0, s.OriginalServerID()}, now, now).Find(&rows).Error; err != nil {
 		return err
 	}
 	for _, live := range rows {

@@ -50,6 +50,7 @@ func run() error {
 		logFile             = flag.String("log-file", "", "isolated process log path; empty keeps configured path")
 		warmRushAll         = flag.Bool("warm-rush-history-all", false, "revalidate stale settled trial histories in bounded transactions, then exit")
 		warmRushPlayer      = flag.Int64("warm-rush-history-player", 0, "validate existing trial history and persist signed certificates, then exit")
+		restoreGGOLines     = flag.Bool("restore-ggo-line-payloads", false, "materialize current GGO points for an older binary while application writers are stopped, then exit")
 		testPayments        = flag.Bool("enable-test-payments", false, "enable loopback-only demo payment confirmation")
 		ggoIntegration      = flag.Bool("enable-ggo-integration", false, "enable GGO only in an isolated loopback MySQL test environment")
 		applyGrowth         = flag.Bool("apply-growth74", false, "apply the authorized growth configuration during maintenance, then exit")
@@ -73,7 +74,7 @@ func run() error {
 	)
 	flag.Parse()
 	maintenanceCommands := 0
-	for _, selected := range []bool{*applyGrowth, *applyGrowth75, *applyActivity77, *applyFeedback78, *applyFeedback79, *applyFeedback80, *applyFeedback81, *applyTrial82, *applyFeedback84, *applyFeedback85, *restoreVIP10, *warmRushAll, *warmRushPlayer != 0, *previewCalendar, *restoreCalendar != "", *calendarMaintenance != ""} {
+	for _, selected := range []bool{*applyGrowth, *applyGrowth75, *applyActivity77, *applyFeedback78, *applyFeedback79, *applyFeedback80, *applyFeedback81, *applyTrial82, *applyFeedback84, *applyFeedback85, *restoreVIP10, *warmRushAll, *warmRushPlayer != 0, *restoreGGOLines, *previewCalendar, *restoreCalendar != "", *calendarMaintenance != ""} {
 		if selected {
 			maintenanceCommands++
 		}
@@ -149,7 +150,7 @@ func run() error {
 	case "mysql":
 		mc := config.AppConfigIns.MysqlConfig
 		connect := db.InitGameMySQL
-		if *previewCalendar || *restoreCalendar != "" || *calendarMaintenance != "" || *restoreVIP10 || *applyFeedback78 || *applyFeedback79 || *applyFeedback80 || *applyFeedback81 || *applyTrial82 || *applyFeedback84 || *applyFeedback85 {
+		if *restoreGGOLines || *previewCalendar || *restoreCalendar != "" || *calendarMaintenance != "" || *restoreVIP10 || *applyFeedback78 || *applyFeedback79 || *applyFeedback80 || *applyFeedback81 || *applyTrial82 || *applyFeedback84 || *applyFeedback85 {
 			connect = db.InitExistingGameMySQL
 		}
 		if err := connect(ctx, db.MySQLConfig{Host: mc.Host, User: mc.User, Password: mc.Pass, Database: mc.DbName}); err != nil {
@@ -168,6 +169,14 @@ func run() error {
 	}
 	defer sqlDB.Close()
 	s := &service.GameService{Host: cfg.AdvertiseHost, ServerID: cfg.ServerID, GGOIntegrationReady: *ggoIntegration, CopySweepHistoryComplete: sweepHistoryComplete}
+	if *restoreGGOLines {
+		restored, err := service.RestoreGGOFieldLinePayloads(ctx, cfg.ServerID)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("restored GGO line payloads: %d\n", restored)
+		return nil
+	}
 	if *applyFeedback78 || *applyFeedback79 || *applyFeedback80 || *applyFeedback81 || *applyTrial82 || *applyFeedback84 || *applyFeedback85 {
 		// 仅使用既有管理员及全服日历；业务事务内部复核维护、管理员和时钟。
 		if *applyFeedback79 || *applyFeedback80 || *applyFeedback81 || *applyTrial82 || *applyFeedback84 || *applyFeedback85 {

@@ -88,7 +88,7 @@ func TestGGOMonsterTerminalUsesFinalPose(t *testing.T) {
 func TestGGOMonsterReservationSurvivesElapsedTime(t *testing.T) {
 	t.Setenv("HYJS_P1_MYSQL_DATABASE", "")
 	_ = p1Setup(t)
-	if err := db.GetIns().AutoMigrate(&db.GGOFieldLine{}); err != nil {
+	if err := db.GetIns().AutoMigrate(&db.GGOFieldLine{}, &db.GGOFieldPoint{}); err != nil {
 		t.Fatal(err)
 	}
 	cfg := ggoLineTestConfiguration(t)

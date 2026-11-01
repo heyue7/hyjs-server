@@ -1,7 +1,6 @@
 package service
 
 import (
-	"encoding/json"
 	"math"
 	"sync"
 	"sync/atomic"
@@ -208,11 +207,12 @@ func TestGGOLineDueRecoveryAndNotify(t *testing.T) {
 	t.Setenv("HYJS_P1_MYSQL_DATABASE", "")
 	f := ggoTradeSetup(t)
 	f.s.GGOIntegrationReady = true
-	if err := db.GetIns().AutoMigrate(&db.GGOFieldLine{}); err != nil {
+	if err := db.GetIns().AutoMigrate(&db.GGOFieldLine{}, &db.GGOFieldPoint{}); err != nil {
 		t.Fatal(err)
 	}
 	now := time.Now().UnixMilli()
 	var before int64
+	var pointID string
 	err := db.GetIns().Transaction(func(tx *gorm.DB) error {
 		row, state, _, err := ggoLoadLine(tx, f.s.OriginalServerID(), 1, f.config, "isolated-trade-config", now)
 		if err != nil {
@@ -221,11 +221,16 @@ func TestGGOLineDueRecoveryAndNotify(t *testing.T) {
 		n := &state.Resources[0]
 		n.Remaining, n.RefreshAtMS = 0, now+100
 		before = n.Generation
+		pointID = n.PointID
 		if err = ggoLineSave(tx, row, state, now); err != nil {
 			return err
 		}
-		if row.NextDueAt != now+100 {
-			t.Fatalf("wrong indexed deadline %d", row.NextDueAt)
+		var point db.GGOFieldPoint
+		if err := tx.First(&point, "server_id=? AND line=? AND point_id=?", f.s.OriginalServerID(), 1, pointID).Error; err != nil {
+			return err
+		}
+		if point.NextDueAt != now+100 {
+			t.Fatalf("wrong indexed deadline %d", point.NextDueAt)
 		}
 		return nil
 	})
@@ -235,16 +240,31 @@ func TestGGOLineDueRecoveryAndNotify(t *testing.T) {
 	if err = f.s.ggoRecoverLines(f.ctx, now+200); err != nil {
 		t.Fatal(err)
 	}
-	var line db.GGOFieldLine
-	if err = db.GetIns().First(&line, "server_id=? AND line=?", f.s.OriginalServerID(), 1).Error; err != nil {
+	var got *ggoLineState
+	var point db.GGOFieldPoint
+	err = db.GetIns().Transaction(func(tx *gorm.DB) error {
+		_, state, _, err := ggoReadLineSnapshot(tx, f.s.OriginalServerID(), 1, f.config, "isolated-trade-config", now+200)
+		if err != nil {
+			return err
+		}
+		got = state
+		return tx.First(&point, "server_id=? AND line=? AND point_id=?", f.s.OriginalServerID(), 1, pointID).Error
+	})
+	if err != nil {
 		t.Fatal(err)
 	}
-	var got ggoLineState
-	if err = json.Unmarshal(line.Payload, &got); err != nil {
-		t.Fatal(err)
+	var node *ggoResourceNode
+	for i := range got.Resources {
+		if got.Resources[i].PointID == pointID {
+			node = &got.Resources[i]
+			break
+		}
 	}
-	if got.Resources[0].Generation == before || got.Resources[0].Remaining != f.config.Runtime.Resource.Capacity || line.NextDueAt <= now+200 {
-		t.Fatal("depleted node not refreshed", got.Resources[0], line.NextDueAt)
+	if node == nil {
+		t.Fatalf("refreshed node %q missing", pointID)
+	}
+	if node.Generation == before || node.Remaining != f.config.Runtime.Resource.Capacity || point.NextDueAt <= now+200 {
+		t.Fatal("depleted node not refreshed", node, point.NextDueAt)
 	}
 	received := make(chan int64, 4)
 	for i, id := range f.ids {

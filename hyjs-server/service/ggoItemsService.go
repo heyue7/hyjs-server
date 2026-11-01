@@ -92,7 +92,10 @@ func (s *GameService) InitializeGGO(ctx context.Context) error {
 	if err := initializeGGOAccountWeekly(tx); err != nil {
 		return err
 	}
-	if err := tx.AutoMigrate(&db.GGOShopReceipt{}, &db.GGOFieldLine{}, &db.GGOFieldReceipt{}); err != nil {
+	if err := tx.AutoMigrate(&db.GGOShopReceipt{}, &db.GGOFieldLine{}, &db.GGOFieldPoint{}, &db.GGOFieldReceipt{}); err != nil {
+		return err
+	}
+	if err := migrateGGOFieldPoints(tx, s.OriginalServerID()); err != nil {
 		return err
 	}
 	var count int64

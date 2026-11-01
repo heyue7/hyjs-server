@@ -8,7 +8,6 @@ import (
 
 	"google.golang.org/protobuf/proto"
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 	"hyjs-server/constUtil"
 	"hyjs-server/db"
 	"hyjs-server/model"
@@ -47,15 +46,11 @@ func ggoCancelAttempt(tx *gorm.DB, s *GameService, id int64, g *model.GameState,
 	if err = ggoLockPeriodsBeforeLine(tx, s); err != nil {
 		return nil, err
 	}
-	var row db.GGOFieldLine
-	if err = tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&row, "server_id=? AND line=?", s.OriginalServerID(), frozen.Line).Error; err != nil {
+	row, state, err := ggoLoadReservedPoint(tx, s.OriginalServerID(), frozen.Line, attempt.PosID)
+	if err != nil {
 		return nil, err
 	}
-	var state ggoLineState
-	if json.Unmarshal(row.Payload, &state) != nil {
-		return nil, errors.New("沙漠场景状态损坏")
-	}
-	node, detached, released, err := ggoResolveGatherReservation(&state, attempt, frozen)
+	node, detached, released, err := ggoResolveGatherReservation(state, attempt, frozen)
 	if err != nil {
 		return nil, err
 	}
@@ -64,7 +59,7 @@ func ggoCancelAttempt(tx *gorm.DB, s *GameService, id int64, g *model.GameState,
 	}
 	attempt.Active = false
 	if !detached || released {
-		if err = ggoLineSave(tx, &row, &state, now); err != nil {
+		if err = ggoLineSave(tx, row, state, now); err != nil {
 			return nil, err
 		}
 	}

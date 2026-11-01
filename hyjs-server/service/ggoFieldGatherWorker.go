@@ -78,6 +78,12 @@ func (s *GameService) ggoFinishDue(ctx context.Context, id int64, token string) 
 					return guardErr
 				}
 				tx = guarded
+				if database.Dialector.Name() == "mysql" && attemptCtx.Value(ggoGatherCurrentReadKey{}) == true {
+					tx, guardErr = p1EnableGatherSnapshotRC(tx)
+					if guardErr != nil {
+						return guardErr
+					}
+				}
 			}
 			player, game, err := decodeProfileForCalendarUpdate(tx, &row)
 			if err != nil {

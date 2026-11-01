@@ -205,7 +205,7 @@ func (s *GameService) p13GuildPrayerInfo(ctx context.Context, id int64, now time
 		}
 
 		var gate db.P13GuildPolicy
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&gate, 1).Error; err != nil {
+		if err := tx.Clauses(clause.Locking{Strength: "SHARE"}).First(&gate, 1).Error; err != nil {
 			return err
 		}
 		if !gate.ManagementEnabled {
@@ -361,7 +361,7 @@ func (s *GameService) DispatchP13GuildPrayer(ctx context.Context, id int64, requ
 			owner := s.p10ClientOwner()
 			if owner.guildCoreSchemaReady.Load() || gameSchemaHasTable(tx, &db.P13GuildPolicy{}) {
 				var policy db.P13GuildPolicy
-				err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&policy, 1).Error
+				err := tx.Clauses(clause.Locking{Strength: "SHARE"}).First(&policy, 1).Error
 				if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 					return err
 				}

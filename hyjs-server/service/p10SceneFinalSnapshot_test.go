@@ -33,7 +33,7 @@ func p10FinalSnapshotFixture(t testing.TB, roster int) *db.Profile {
 	}
 	playerJSON, gameJSON := string(playerRaw), string(gameRaw)
 	created, chips := int64(123), int64(8)
-	return &db.Profile{Id: 1, Uid: "snapshot", ServerID: 1, Session: []byte("0123456789abcdef"), AccountID: 12, AccountAuthRevision: 2, Player: &playerJSON, Game: &gameJSON, CreatedAt: &created, GGOCredit: 4, GGOCreditMigrated: true, GGOChipTotal: &chips, PasswordSalt: []byte("salt"), PasswordHash: []byte("hash")}
+	return &db.Profile{Id: 1, Uid: "snapshot", ServerID: 1, Session: []byte("0123456789abcdef"), AccountID: 12, AccountAuthRevision: 2, Player: &playerJSON, Game: &gameJSON, SceneScope: proto.String("town_main"), CreatedAt: &created, GGOCredit: 4, GGOCreditMigrated: true, GGOChipTotal: &chips, PasswordSalt: []byte("salt"), PasswordHash: []byte("hash")}
 }
 
 func p10FinalSnapshotRoute(t testing.TB, profile *db.Profile, decodes *int) *p10SceneRouteSnapshot {
@@ -99,6 +99,7 @@ func TestP10SceneFinalSnapshotInvalidatesEveryProfileColumn(t *testing.T) {
 			*p.Player = `{"playerId":1,"level":7,"warriorBagSize":10,"equipBagSize":10,"petBagSize":10}`
 		},
 		"Game":                  func(p *db.Profile) { *p.Game = `{"position":{"scene":"field_001"},"warriors":[]}` },
+		"SceneScope":            func(p *db.Profile) { *p.SceneScope = "field_001" },
 		"CreatedAt":             func(p *db.Profile) { *p.CreatedAt++ },
 		"LastSproutLoginAt":     func(p *db.Profile) { p.LastSproutLoginAt++ },
 		"ReturnSproutStartedAt": func(p *db.Profile) { p.ReturnSproutStartedAt++ },
@@ -137,9 +138,10 @@ func TestP10SceneProfileSnapshotDetachesReferenceFields(t *testing.T) {
 	profile.PasswordHash[0] ^= 1
 	*profile.Player = "changed player"
 	*profile.Game = "changed game"
+	*profile.SceneScope = "field_001"
 	*profile.CreatedAt++
 	*profile.GGOChipTotal++
-	if reflect.DeepEqual(snapshot, profile) || string(snapshot.Session) != "0123456789abcdef" || string(snapshot.PasswordSalt) != "salt" || string(snapshot.PasswordHash) != "hash" || *snapshot.Player == *profile.Player || *snapshot.Game == *profile.Game || *snapshot.CreatedAt == *profile.CreatedAt || *snapshot.GGOChipTotal == *profile.GGOChipTotal {
+	if reflect.DeepEqual(snapshot, profile) || string(snapshot.Session) != "0123456789abcdef" || string(snapshot.PasswordSalt) != "salt" || string(snapshot.PasswordHash) != "hash" || *snapshot.Player == *profile.Player || *snapshot.Game == *profile.Game || *snapshot.SceneScope == *profile.SceneScope || *snapshot.CreatedAt == *profile.CreatedAt || *snapshot.GGOChipTotal == *profile.GGOChipTotal {
 		t.Fatal("snapshot aliased a reference field")
 	}
 	// Empty non-nil and nil slices remain distinguishable to DeepEqual.
@@ -148,7 +150,7 @@ func TestP10SceneProfileSnapshotDetachesReferenceFields(t *testing.T) {
 	if !reflect.DeepEqual(p10SceneProfileSnapshot(profile), profile) {
 		t.Fatal("snapshot changed nil or empty field semantics")
 	}
-	known := map[string]bool{"Session": true, "PasswordSalt": true, "PasswordHash": true, "Player": true, "Game": true, "CreatedAt": true, "GGOChipTotal": true}
+	known := map[string]bool{"Session": true, "PasswordSalt": true, "PasswordHash": true, "Player": true, "Game": true, "SceneScope": true, "CreatedAt": true, "GGOChipTotal": true}
 	profileType := reflect.TypeOf(db.Profile{})
 	for i := 0; i < profileType.NumField(); i++ {
 		field := profileType.Field(i)

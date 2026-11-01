@@ -202,12 +202,23 @@ func (s *GameService) p15SeasonalList(ctx context.Context, id int64, request *pb
 			if !allowed {
 				return errors.New(constUtil.P15SeasonalError)
 			}
-			if _, err := p1LockPeriods(tx); err != nil {
-				return err
+			lockStrength := func(frozen []byte) string {
+				if len(frozen) > 0 {
+					return "SHARE"
+				}
+				return "UPDATE"
 			}
-			var live db.P15SeasonalBundle
-			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&live, "id=?", request.GetActivityId()).Error; err != nil {
+			var bundleProbe db.P15SeasonalBundle
+			if err := tx.Select("id", "frozen").First(&bundleProbe, "id=?", request.GetActivityId()).Error; err != nil {
 				return errors.New(constUtil.P15SeasonalError)
+			}
+			bundleStrength := lockStrength(bundleProbe.Frozen)
+			var live db.P15SeasonalBundle
+			if err := tx.Clauses(clause.Locking{Strength: bundleStrength}).First(&live, "id=?", request.GetActivityId()).Error; err != nil {
+				return errors.New(constUtil.P15SeasonalError)
+			}
+			if bundleStrength == "SHARE" && len(live.Frozen) == 0 {
+				return constUtil.ErrConfigurationReadRetry
 			}
 			if !live.Enabled {
 				return errors.New("季节活动已关闭")
@@ -229,9 +240,17 @@ func (s *GameService) p15SeasonalList(ctx context.Context, id int64, request *pb
 				}
 				visible := false
 				if child.Domain == "period" {
-					var rule db.PeriodInstance
-					if err := tx.First(&rule, "id=?", child.ID).Error; err != nil {
+					var probe db.PeriodInstance
+					if err := tx.Select("id", "frozen").First(&probe, "id=?", child.ID).Error; err != nil {
 						return err
+					}
+					strength := lockStrength(probe.Frozen)
+					var rule db.PeriodInstance
+					if err := tx.Clauses(clause.Locking{Strength: strength}).First(&rule, "id=?", child.ID).Error; err != nil {
+						return err
+					}
+					if strength == "SHARE" && len(rule.Frozen) == 0 {
+						return constUtil.ErrConfigurationReadRetry
 					}
 					if rule.Enabled {
 						frozen, err := s.freezeP1Period(tx, rule, true)
@@ -244,9 +263,17 @@ func (s *GameService) p15SeasonalList(ctx context.Context, id int64, request *pb
 						visible = now.UnixMilli() < frozen.RewardEndAt
 					}
 				} else {
-					var rule db.P4CommerceRule
-					if err := tx.First(&rule, "id=?", child.ID).Error; err != nil {
+					var probe db.P4CommerceRule
+					if err := tx.Select("id", "frozen").First(&probe, "id=?", child.ID).Error; err != nil {
 						return err
+					}
+					strength := lockStrength(probe.Frozen)
+					var rule db.P4CommerceRule
+					if err := tx.Clauses(clause.Locking{Strength: strength}).First(&rule, "id=?", child.ID).Error; err != nil {
+						return err
+					}
+					if strength == "SHARE" && len(rule.Frozen) == 0 {
+						return constUtil.ErrConfigurationReadRetry
 					}
 					if rule.Enabled {
 						frozen, _, err := s.p4CommerceSnapshot(rule)
@@ -294,7 +321,6 @@ func (s *GameService) p15SeasonalList(ctx context.Context, id int64, request *pb
 }
 
 // p15SeasonalGuard applies parent shutdown and directory membership to direct child requests.
-// Period locks precede bundle/catalogue locks on list, reward and commerce paths.
 func (s *GameService) p15SeasonalGuard(tx *gorm.DB, key string, now time.Time) error {
 	if !isP15SeasonalChild(key) {
 		return nil
@@ -305,9 +331,6 @@ func (s *GameService) p15SeasonalGuard(tx *gorm.DB, key string, now time.Time) e
 	}
 	if !allowed {
 		return errors.New(constUtil.P15SeasonalError)
-	}
-	if _, err := p1LockPeriods(tx); err != nil {
-		return err
 	}
 	parts := strings.Split(key, "_")
 	if len(parts) != 4 || parts[1] != "p4" {

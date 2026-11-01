@@ -8,9 +8,7 @@ import (
 
 	"google.golang.org/protobuf/proto"
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 	"hyjs-server/constUtil"
-	"hyjs-server/db"
 	"hyjs-server/model"
 	pb "hyjs-server/model/protocol"
 )
@@ -257,15 +255,11 @@ func (s *GameService) ggoMonsterEndLocked(tx *gorm.DB, id int64, p *pb.Player, g
 		return nil, nil, false, err
 	}
 	now := time.Now().UnixMilli()
-	var line db.GGOFieldLine
-	if err = tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&line, "server_id=? AND line=?", s.OriginalServerID(), frozenFight.Line).Error; err != nil {
+	line, shared, err := ggoLoadReservedPoint(tx, s.OriginalServerID(), frozenFight.Line, frozenFight.PointID)
+	if err != nil {
 		return nil, nil, false, err
 	}
-	var shared ggoLineState
-	if json.Unmarshal(line.Payload, &shared) != nil {
-		return nil, nil, false, errors.New("沙漠场景状态损坏")
-	}
-	node, detached, err := ggoResolveMonsterReservation(&shared, &frozenFight, id, now)
+	node, detached, err := ggoResolveMonsterReservation(shared, &frozenFight, id, now)
 	if err != nil {
 		return nil, nil, false, ggoFieldError(constUtil.GGOFieldStaleGeneration, "沙漠小怪战斗占用已失效")
 	}
@@ -364,7 +358,7 @@ func (s *GameService) ggoMonsterEndLocked(tx *gorm.DB, id int64, p *pb.Player, g
 	if receipt.DeliveryStatus == "lost" {
 		receipt.TerminalRevision = g.GGOField.Revision
 	}
-	if err = ggoLineSave(tx, &line, &shared, now); err != nil {
+	if err = ggoLineSave(tx, line, shared, now); err != nil {
 		return nil, nil, false, err
 	}
 	key := frozenFight.FightID

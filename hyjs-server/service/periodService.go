@@ -132,7 +132,7 @@ func (s *GameService) P1ActivityTabs(ctx context.Context, id int64) ([]*pb.Activ
 		return nil, nil
 	}
 	var rows []db.PeriodInstance
-	if err := db.GetIns().WithContext(ctx).Where("enabled = ?", true).Order("id ASC").Find(&rows).Error; err != nil {
+	if err := db.GetIns().WithContext(ctx).Where("enabled = ? AND owner_player_id IN ? AND realm_id IN ?", true, []int64{0, id}, []int64{0, s.OriginalServerID()}).Order("id ASC").Find(&rows).Error; err != nil {
 		return nil, err
 	}
 	var tabs []*pb.ActivityTab
@@ -242,6 +242,9 @@ func (s *GameService) p1ActivityApply(tx *gorm.DB, id int64, player *pb.Player, 
 	var live db.PeriodInstance
 	if err := tx.Clauses(clause.Locking{Strength: strength}).First(&live, "id=?", key).Error; err != nil {
 		return nil, errors.New("活动实例不存在")
+	}
+	if live.OwnerPlayerID != 0 && live.OwnerPlayerID != id || live.RealmID != 0 && live.RealmID != s.OriginalServerID() {
+		return nil, errors.New("活动实例不属于当前角色")
 	}
 	if strength == "SHARE" && len(live.Frozen) == 0 {
 		return nil, constUtil.ErrConfigurationReadRetry
@@ -360,7 +363,7 @@ func (s *GameService) p1LoginDirectoryApply(tx *gorm.DB, id int64, player *pb.Pl
 		return result, nil
 	}
 	var rows []db.PeriodInstance
-	if err := tx.Where("enabled = ? AND id LIKE ?", true, "totalLogin_p1_%").Order("id ASC").Find(&rows).Error; err != nil {
+	if err := tx.Where("enabled = ? AND id LIKE ? AND owner_player_id IN ? AND realm_id IN ?", true, "totalLogin_p1_%", []int64{0, id}, []int64{0, s.OriginalServerID()}).Order("id ASC").Find(&rows).Error; err != nil {
 		return nil, err
 	}
 	result := &pb.SCActivityInfo{ActivityId: proto.String(constUtil.P1LoginDirectoryID), Param: proto.String("1"), Information: proto.String("各条奖励独立统计，领取期限见条目。")}

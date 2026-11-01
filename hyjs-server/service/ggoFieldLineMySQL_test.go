@@ -75,7 +75,7 @@ func TestGGOFieldLineMySQLConcurrentReservationAndBoundary(t *testing.T) {
 	}
 	pool.SetMaxOpenConns(6)
 	pool.SetMaxIdleConns(2)
-	if err = connection.AutoMigrate(&db.GGOFieldLine{}); err != nil {
+	if err = connection.AutoMigrate(&db.GGOFieldLine{}, &db.GGOFieldPoint{}); err != nil {
 		t.Fatal(err)
 	}
 	serverID := time.Now().UnixNano()

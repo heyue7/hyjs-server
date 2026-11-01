@@ -13,7 +13,6 @@ import (
 
 	"google.golang.org/protobuf/proto"
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 	"hyjs-server/constUtil"
 	"hyjs-server/db"
 	"hyjs-server/model"
@@ -62,7 +61,7 @@ func ggoMonsterSide(node *ggoMonsterNode, point *model.AdminFieldGGOPoint, now i
 
 // The caller already holds the profile row. Lock the current presence before
 // taking the shared line row, matching gather and PvP lock ordering.
-func (s *GameService) ggoMonsterLineLocked(tx *gorm.DB, id int64, g *model.GameState, now int64) (*db.GGOFieldLine, *ggoLineState, error) {
+func (s *GameService) ggoMonsterLineLocked(tx *gorm.DB, id int64, g *model.GameState, now int64, targetUUID ...string) (*db.GGOFieldLine, *ggoLineState, error) {
 	if s.GGOFieldConfig == nil || g.GGOField == nil {
 		return nil, nil, ggoFieldError(constUtil.GGOFieldUnavailable, "沙漠搜打撤暂未开放")
 	}
@@ -77,7 +76,19 @@ func (s *GameService) ggoMonsterLineLocked(tx *gorm.DB, id int64, g *model.GameS
 	if err := ggoCurrentPresence(tx, actor, profile.Session); err != nil {
 		return nil, nil, err
 	}
-	row, state, _, err := ggoLoadLine(tx, s.OriginalServerID(), int64(actor.Presence.Line), s.GGOFieldConfig, s.GGOFieldRevision, now)
+	var pointIDs []string
+	if len(targetUUID) > 0 {
+		var target db.GGOFieldPoint
+		if err := tx.Select("point_id").Where("server_id=? AND line=? AND monster_uuid=?", s.OriginalServerID(), actor.Presence.Line, targetUUID[0]).First(&target).Error; err != nil {
+			return nil, nil, ggoFieldError(constUtil.GGOFieldBusy, "小怪已刷新，请重试")
+		}
+		pointIDs = []string{target.PointID}
+	}
+	if len(pointIDs) == 0 {
+		row, state, _, err := ggoReadLineSnapshot(tx, s.OriginalServerID(), int64(actor.Presence.Line), s.GGOFieldConfig, s.GGOFieldRevision, now)
+		return row, state, err
+	}
+	row, state, _, err := ggoLoadLine(tx, s.OriginalServerID(), int64(actor.Presence.Line), s.GGOFieldConfig, s.GGOFieldRevision, now, pointIDs...)
 	return row, state, err
 }
 
@@ -217,6 +228,9 @@ func (s *GameService) ggoMonsterStartLocked(tx *gorm.DB, id int64, player *pb.Pl
 	if _, err := ggoNativeProfileSession(tx, id); err != nil {
 		return nil, err
 	}
+	if err := s.ggoLockExpiredAndTarget(tx, id, g, b.GetMonsterId(), time.Now().UnixMilli()); err != nil {
+		return nil, err
+	}
 	if _, err := s.ggoExpireMonsterFightLocked(tx, id, g, time.Now().UnixMilli()); err != nil {
 		return nil, err
 	}
@@ -250,7 +264,7 @@ func (s *GameService) ggoMonsterStartLocked(tx *gorm.DB, id int64, player *pb.Pl
 	if err := ggoInterruptExtractionLocked(tx, id, g, now); err != nil {
 		return nil, err
 	}
-	line, state, err := s.ggoMonsterLineLocked(tx, id, g, now)
+	line, state, err := s.ggoMonsterLineLocked(tx, id, g, now, b.GetMonsterId())
 	if err != nil {
 		return nil, err
 	}
@@ -444,13 +458,9 @@ func (s *GameService) ggoExpireMonsterFightLocked(tx *gorm.DB, id int64, g *mode
 	if err := ggoLockPeriodsBeforeLine(tx, s); err != nil {
 		return false, err
 	}
-	var line db.GGOFieldLine
-	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&line, "server_id=? AND line=?", s.OriginalServerID(), pending.Line).Error; err != nil {
+	line, shared, err := ggoLoadReservedPoint(tx, s.OriginalServerID(), pending.Line, pending.PointID)
+	if err != nil {
 		return false, err
-	}
-	var shared ggoLineState
-	if json.Unmarshal(line.Payload, &shared) != nil {
-		return false, errors.New("沙漠场景状态损坏")
 	}
 	released := false
 	for i := range shared.Monsters {
@@ -460,7 +470,7 @@ func (s *GameService) ggoExpireMonsterFightLocked(tx *gorm.DB, id int64, g *mode
 			if err != nil {
 				return false, err
 			}
-			node.Generation, err = ggoNextGeneration(&shared)
+			node.Generation, err = ggoNextGeneration(shared)
 			if err != nil {
 				return false, err
 			}
@@ -469,15 +479,15 @@ func (s *GameService) ggoExpireMonsterFightLocked(tx *gorm.DB, id int64, g *mode
 			node.FightID = ""
 			node.ReservedUntilMS = 0
 			node.PatrolEpochMS, node.PatrolPausedAtMS = now, 0
-			if err = ggoLineSave(tx, &line, &shared, now); err != nil {
+			if err = ggoLineSave(tx, line, shared, now); err != nil {
 				return false, err
 			}
 			released = true
 			break
 		}
 	}
-	if !released && ggoReleaseLegacyBlock(&shared, pending.PointID, "monster", id, pending.FightID, pending.Generation) {
-		if err := ggoLineSave(tx, &line, &shared, now); err != nil {
+	if !released && ggoReleaseLegacyBlock(shared, pending.PointID, "monster", id, pending.FightID, pending.Generation) {
+		if err := ggoLineSave(tx, line, shared, now); err != nil {
 			return false, err
 		}
 	}

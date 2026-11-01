@@ -118,8 +118,20 @@ func p11PlunderFightOfferRules(offer *db.P11PlunderFightOffer) (*db.P11PlunderFi
 // Its existing immutable version supplies all parameters; live field edits never
 // alter pending candidates or the chance already displayed by the original UI.
 func p11PlunderFightOffer(tx *gorm.DB, now time.Time) (*db.P11PlunderFightOffer, *db.P11PlunderFightPolicy, error) {
+	var probe db.P11PlunderFightPolicy
+	if err := tx.Select("id", "version").First(&probe, 1).Error; err != nil {
+		return nil, nil, err
+	}
+	var count int64
+	if err := tx.Model(&db.P11PlunderFightOffer{}).Where("version=?", probe.Version).Count(&count).Error; err != nil {
+		return nil, nil, err
+	}
+	strength := "UPDATE"
+	if count > 0 {
+		strength = "SHARE"
+	}
 	var live db.P11PlunderFightPolicy
-	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&live, 1).Error; err != nil {
+	if err := tx.Clauses(clause.Locking{Strength: strength}).First(&live, 1).Error; err != nil {
 		return nil, nil, err
 	}
 	if !live.Enabled {
@@ -128,6 +140,9 @@ func p11PlunderFightOffer(tx *gorm.DB, now time.Time) (*db.P11PlunderFightOffer,
 	var offer db.P11PlunderFightOffer
 	err := tx.First(&offer, "version=?", live.Version).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
+		if strength == "SHARE" {
+			return nil, nil, constUtil.ErrConfigurationReadRetry
+		}
 		if !p11PlunderCalendarOpen75(tx, &live, now) {
 			return nil, nil, errors.New(constUtil.P11PlunderFightUnavailable)
 		}

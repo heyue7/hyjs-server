@@ -28,6 +28,7 @@ type Profile struct {
 	Session               []byte  `gorm:"column:session;not null" json:"-"`
 	Player                *string `gorm:"column:player" json:"-"`
 	Game                  *string `gorm:"column:game" json:"-"`
+	SceneScope            *string `gorm:"column:scene_scope;->;-:migration" json:"-"`
 	CreatedAt             *int64  `gorm:"column:created_at;autoCreateTime:false" json:"created_at"`
 	LastSproutLoginAt     int64   `gorm:"column:last_sprout_login_at;not null;default:0" json:"-"`
 	ReturnSproutStartedAt int64   `gorm:"column:return_sprout_started_at;not null;default:0" json:"-"`
@@ -83,7 +84,7 @@ func InitGame(ctx context.Context, path string) error {
 				}
 			}
 		}
-		return nil
+		return migrateProfileSceneScope(tx)
 	}); err != nil {
 		sqlDB.Close()
 		return err

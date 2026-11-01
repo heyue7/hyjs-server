@@ -17,7 +17,7 @@ import (
 func TestGGOFieldGatherRequirementMessagesAndRollback(t *testing.T) {
 	t.Setenv("HYJS_P1_MYSQL_DATABASE", "")
 	f := ggoTradeSetup(t)
-	if err := db.GetIns().AutoMigrate(&db.GGOFieldLine{}, &db.GemCraftState{}, &db.CookingCraftState{}); err != nil {
+	if err := db.GetIns().AutoMigrate(&db.GGOFieldLine{}, &db.GGOFieldPoint{}, &db.GemCraftState{}, &db.CookingCraftState{}); err != nil {
 		t.Fatal(err)
 	}
 	f.s.GGOIntegrationReady = true

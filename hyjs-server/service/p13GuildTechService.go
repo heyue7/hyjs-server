@@ -321,7 +321,7 @@ func (s *GameService) p13GuildTechQuery(ctx context.Context, id int64, building 
 		}
 
 		var policy db.P13GuildPolicy
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&policy, 1).Error; err != nil {
+		if err := tx.Clauses(clause.Locking{Strength: "SHARE"}).First(&policy, 1).Error; err != nil {
 			return err
 		}
 		if !policy.ManagementEnabled {

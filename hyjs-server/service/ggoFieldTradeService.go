@@ -67,8 +67,8 @@ func (s *GameService) ggoWithTradePair(ctx context.Context, auth model.GGOFieldA
 	runtime := s.withRuntimeTables(snapshot.tables)
 	runtime.GGOFieldConfig, runtime.GGOFieldEconomy, runtime.GGOFieldRevision = snapshot.ggo, snapshot.ggoEconomy, snapshot.ggoRevision
 	ctx = context.WithValue(ctx, constUtil.GameServiceContextKey, runtime)
-	p10SceneMutation.Lock()
-	defer p10SceneMutation.Unlock()
+	p10SceneMutation.RLock()
+	defer p10SceneMutation.RUnlock()
 	changedLines := make(map[int32]bool)
 	var changedWithoutPresence []int64
 	err = db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {

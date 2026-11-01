@@ -28,27 +28,26 @@ func TestGGOGatherP1SharedSettlementAndFirstFreeze(t *testing.T) {
 				period := p1Instance(t, nil, "ggo-gather-shared-settlement", constUtil.P8EventMineGather, "cumulative", 100, end, 0)
 				if alreadyFrozen {
 					if err := db.GetIns().Transaction(func(tx *gorm.DB) error {
-						_, err := f.s.freezeP1Period(tx, period, true)
+						guarded, err := p1AcquireGatherCatalogWriter(tx)
+						if err != nil {
+							return err
+						}
+						_, err = f.s.freezeP1Period(guarded, period, true)
 						return err
 					}); err != nil {
 						t.Fatal(err)
 					}
 				}
-				var before db.GGOFieldLine
-				if err := db.GetIns().First(&before, "server_id=? AND line=?", f.s.OriginalServerID(), 1).Error; err != nil {
+				var before db.GGOFieldPoint
+				if err := db.GetIns().First(&before, "server_id=? AND line=? AND point_id=?", f.s.OriginalServerID(), 1, f.starts[0].PointID).Error; err != nil {
 					t.Fatal(err)
 				}
-				var beforeState ggoLineState
+				var beforeState ggoPointPayload
 				if err := json.Unmarshal(before.Payload, &beforeState); err != nil {
 					t.Fatal(err)
 				}
-				var beforeNode ggoResourceNode
-				for _, node := range beforeState.Resources {
-					if node.PointID == f.starts[0].PointID {
-						beforeNode = node
-					}
-				}
-				if beforeNode.ReservedBy != f.ids[0] || beforeNode.AttemptToken != f.starts[0].AttemptToken {
+				beforeNode := beforeState.Resource
+				if beforeNode == nil || beforeNode.PointID != f.starts[0].PointID || beforeNode.ReservedBy != f.ids[0] || beforeNode.AttemptToken != f.starts[0].AttemptToken {
 					t.Fatal("fixture lost the accepted reservation")
 				}
 				var modes []bool
@@ -86,12 +85,14 @@ func TestGGOGatherP1SharedSettlementAndFirstFreeze(t *testing.T) {
 				if !reflect.DeepEqual(modes, wantModes) {
 					t.Fatalf("settlement modes %v, want %v", modes, wantModes)
 				}
-				var after db.GGOFieldLine
+				var after db.GGOFieldPoint
 				var attempt db.P8GatherAttempt
 				var current db.PeriodInstance
 				var progress db.PeriodProgress
 				for _, query := range []func() error{
-					func() error { return database.First(&after, "server_id=? AND line=?", f.s.OriginalServerID(), 1).Error },
+					func() error {
+						return database.First(&after, "server_id=? AND line=? AND point_id=?", f.s.OriginalServerID(), 1, f.starts[0].PointID).Error
+					},
 					func() error { return database.First(&attempt, "player_id=?", f.ids[0]).Error },
 					func() error { return database.First(&current, "id=?", period.ID).Error },
 					func() error {
@@ -102,17 +103,12 @@ func TestGGOGatherP1SharedSettlementAndFirstFreeze(t *testing.T) {
 						t.Fatal(err)
 					}
 				}
-				var afterState ggoLineState
+				var afterState ggoPointPayload
 				if err := json.Unmarshal(after.Payload, &afterState); err != nil {
 					t.Fatal(err)
 				}
-				var afterNode ggoResourceNode
-				for _, node := range afterState.Resources {
-					if node.PointID == beforeNode.PointID {
-						afterNode = node
-					}
-				}
-				if attempt.Active || after.Revision != before.Revision+1 || afterNode.Remaining != beforeNode.Remaining-1 ||
+				afterNode := afterState.Resource
+				if afterNode == nil || afterNode.PointID != beforeNode.PointID || attempt.Active || after.Revision != before.Revision+1 || afterNode.Remaining != beforeNode.Remaining-1 ||
 					afterNode.ReservedBy != 0 || afterNode.AttemptToken != "" || len(current.Frozen) == 0 || progress.Value != 1 ||
 					p1Count(t, &db.EventFact{}, "player_id=? AND source_key=?", f.ids[0], "ggo:gather:"+attempt.Token) != 1 ||
 					p1Count(t, &db.GGOFieldReceipt{}, "player_id=? AND operation=? AND business_key=?", f.ids[0], constUtil.GGOFieldOpGatherClaim, attempt.Token) != 1 {

@@ -150,7 +150,7 @@ func TestGGOChipSnapshotAndActorCommitIntegration(t *testing.T) {
 	f := ggoTradeSetup(t)
 	f.s.GGOIntegrationReady = true
 	t.Cleanup(f.s.ggoStopNoticeTimers)
-	if err := db.GetIns().AutoMigrate(&db.GGOFieldLine{}, &db.SharedFieldBoss55{}); err != nil {
+	if err := db.GetIns().AutoMigrate(&db.GGOFieldLine{}, &db.GGOFieldPoint{}, &db.SharedFieldBoss55{}); err != nil {
 		t.Fatal(err)
 	}
 	received := make(chan int, 8)

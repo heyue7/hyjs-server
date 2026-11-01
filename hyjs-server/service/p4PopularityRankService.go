@@ -176,7 +176,7 @@ func (s *GameService) p4PopularityRankResolve(tx *gorm.DB, productID string, now
 	if managed && scheduled == "" {
 		return "", errors.New(constUtil.P4PopularityRankDenied)
 	}
-	query := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("kind=? AND enabled=?", constUtil.P4PopularityRankKind, true)
+	query := tx.Clauses(clause.Locking{Strength: "SHARE"}).Where("kind=? AND enabled=?", constUtil.P4PopularityRankKind, true)
 	if managed {
 		query = query.Where("id=?", scheduled)
 	} else {

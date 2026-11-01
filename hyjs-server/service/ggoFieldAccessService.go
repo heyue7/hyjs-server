@@ -29,12 +29,10 @@ type ggoFieldActor struct {
 
 type ggoGatherCurrentReadKey struct{}
 
-// Gather fact admission reads settlement and activity ownership after its P1
-// locks. MySQL RR could retain an earlier snapshot created before those locks.
-// Other GGO transactions keep their existing isolation and SQLite keeps its
-// single-writer behavior.
+// Current reads keep post-lock activity admission fresh and avoid unrelated
+// MySQL gap locks between point rows. SQLite retains its existing behavior.
 func ggoGatherTransactionOptions(database *gorm.DB, ctx context.Context) []*sql.TxOptions {
-	if database != nil && database.Dialector.Name() == "mysql" && ctx.Value(ggoGatherCurrentReadKey{}) == true {
+	if database != nil && database.Dialector.Name() == "mysql" {
 		return []*sql.TxOptions{{Isolation: sql.LevelReadCommitted}}
 	}
 	return nil
@@ -103,6 +101,12 @@ func (s *GameService) ggoWithProfile(ctx context.Context, auth model.GGOFieldAut
 				return guardErr
 			}
 			tx = guarded
+			if database.Dialector.Name() == "mysql" && ctx.Value(ggoGatherCurrentReadKey{}) == true {
+				tx, guardErr = p1EnableGatherSnapshotRC(tx)
+				if guardErr != nil {
+					return guardErr
+				}
+			}
 		}
 		player, game, err := decodeProfileForCalendarUpdate(tx, &row)
 		if err != nil {
@@ -202,7 +206,7 @@ func (s *GameService) GGOFieldSnapshot(ctx context.Context, auth model.GGOFieldA
 		if err := ggoEnsureChipProjection(tx, a.Row, a.Game); err != nil {
 			return err
 		}
-		row, state, _, err := ggoLoadLine(tx, a.Service.OriginalServerID(), int64(a.Presence.Line), cfg, a.Service.GGOFieldRevision, a.Now)
+		row, state, _, err := ggoReadLineSnapshot(tx, a.Service.OriginalServerID(), int64(a.Presence.Line), cfg, a.Service.GGOFieldRevision, a.Now)
 		if err != nil {
 			return err
 		}

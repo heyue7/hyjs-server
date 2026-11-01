@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -22,37 +23,40 @@ import (
 	pb "hyjs-server/model/protocol"
 )
 
+type ggoNoSQLTrace struct {
+	logger.Interface
+	statements []string
+}
+
+func (trace *ggoNoSQLTrace) Trace(_ context.Context, _ time.Time, statement func() (string, int64), _ error) {
+	query, _ := statement()
+	trace.statements = append(trace.statements, query)
+}
+
 // The query connector is also used by the shared-read tests; no server is
-// contacted while checking the generated MySQL lock strengths.
-func TestGGOPeriodBeforeLineLockModes(t *testing.T) {
+// contacted while checking that the old global prelock issues no SQL.
+func TestGGOPeriodBeforeLineNoGlobalPrelock(t *testing.T) {
 	connector := &p1SharedQueryConnector{}
 	connection := sql.OpenDB(connector)
 	t.Cleanup(func() { _ = connection.Close() })
+	trace := &ggoNoSQLTrace{Interface: logger.Default.LogMode(logger.Silent)}
 	database, err := gorm.Open(mysql.New(mysql.Config{Conn: connection, SkipInitializeWithVersion: true}), &gorm.Config{
-		DisableAutomaticPing: true, Logger: logger.Default.LogMode(logger.Silent),
+		DisableAutomaticPing: true, Logger: trace,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err = ggoLockPeriodsBeforeLine(database, &GameService{}); err != nil || len(connector.queries) != 0 {
-		t.Fatalf("an uninitialized P1 fixture should issue no activity query: %v %v", connector.queries, err)
+	if err = ggoLockPeriodsBeforeLine(database, &GameService{}); err != nil || len(connector.queries) != 0 || len(trace.statements) != 0 {
+		t.Fatalf("an uninitialized P1 fixture should issue no SQL: %v %v %v", connector.queries, trace.statements, err)
 	}
 	shared := database.WithContext(context.WithValue(context.Background(), constUtil.P1SharedReadContextKey{}, true))
 	for i := 0; i < 2; i++ {
-		if err = ggoLockPeriodsBeforeLine(shared, &GameService{P1Ready: true}); err != nil {
-			t.Fatal(err)
+		if err = ggoLockPeriodsBeforeLine(shared, &GameService{P1Ready: true}); err != nil || len(connector.queries) != 0 || len(trace.statements) != 0 {
+			t.Fatalf("shared activity prelock should issue no SQL: %v %v %v", connector.queries, trace.statements, err)
 		}
 	}
-	if err = ggoLockPeriodsBeforeLine(database, &GameService{P1Ready: true}); err != nil {
-		t.Fatal(err)
-	}
-	want := []string{
-		"SELECT id FROM p1_period_instances FORCE INDEX (PRIMARY) ORDER BY id ASC FOR SHARE",
-		"SELECT id FROM p1_period_instances FORCE INDEX (PRIMARY) ORDER BY id ASC FOR SHARE",
-		"SELECT id FROM p1_period_instances FORCE INDEX (PRIMARY) ORDER BY id ASC FOR UPDATE",
-	}
-	if !reflect.DeepEqual(connector.queries, want) {
-		t.Fatalf("activity prelock must retain the full primary-key range and mode: %v", connector.queries)
+	if err = ggoLockPeriodsBeforeLine(database, &GameService{P1Ready: true}); err != nil || len(connector.queries) != 0 || len(trace.statements) != 0 {
+		t.Fatalf("activity prelock should issue no SQL: %v %v %v", connector.queries, trace.statements, err)
 	}
 }
 
@@ -64,7 +68,7 @@ type ggoPeriodLockFixture struct {
 func ggoPeriodLockSetup(t *testing.T) *ggoPeriodLockFixture {
 	t.Helper()
 	f := &ggoPeriodLockFixture{ggoTradeTestFixture: ggoTradeSetup(t)}
-	if err := db.GetIns().AutoMigrate(&db.GGOFieldLine{}, &db.GemCraftState{}, &db.CookingCraftState{}); err != nil {
+	if err := db.GetIns().AutoMigrate(&db.GGOFieldLine{}, &db.GGOFieldPoint{}, &db.GemCraftState{}, &db.CookingCraftState{}); err != nil {
 		t.Fatal(err)
 	}
 	f.s.GGOIntegrationReady = true
@@ -161,11 +165,22 @@ func TestGGOPeriodLineGatherRollbackAndReplay(t *testing.T) {
 	database := db.GetIns()
 	var beforeProfile, afterProfile db.Profile
 	var beforeLine, afterLine db.GGOFieldLine
+	var beforePoint, afterPoint db.GGOFieldPoint
 	if err := database.First(&beforeProfile, f.ids[1]).Error; err != nil {
 		t.Fatal(err)
 	}
 	if err := database.First(&beforeLine, "server_id=? AND line=?", f.s.OriginalServerID(), 1).Error; err != nil {
 		t.Fatal(err)
+	}
+	if err := database.First(&beforePoint, "server_id=? AND line=? AND point_id=?", f.s.OriginalServerID(), 1, f.starts[1].PointID).Error; err != nil {
+		t.Fatal(err)
+	}
+	var beforeState ggoPointPayload
+	if err := json.Unmarshal(beforePoint.Payload, &beforeState); err != nil {
+		t.Fatal(err)
+	}
+	if beforeState.Resource == nil || beforeState.Resource.PointID != f.starts[1].PointID || beforeState.Resource.ReservedBy != f.ids[1] || beforeState.Resource.AttemptToken != f.starts[1].AttemptToken {
+		t.Fatal("claim fixture lost the accepted reservation")
 	}
 	forced := errors.New("injected claim receipt failure")
 	const callback = "test:ggo-period-receipt-failure"
@@ -188,24 +203,47 @@ func TestGGOPeriodLineGatherRollbackAndReplay(t *testing.T) {
 	if err := database.First(&afterLine, "server_id=? AND line=?", f.s.OriginalServerID(), 1).Error; err != nil {
 		t.Fatal(err)
 	}
+	if err := database.First(&afterPoint, "server_id=? AND line=? AND point_id=?", f.s.OriginalServerID(), 1, f.starts[1].PointID).Error; err != nil {
+		t.Fatal(err)
+	}
 	var attempt db.P8GatherAttempt
 	if err := database.First(&attempt, "player_id=?", f.ids[1]).Error; err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(beforeProfile, afterProfile) || !reflect.DeepEqual(beforeLine, afterLine) || !attempt.Active ||
+	if !reflect.DeepEqual(beforeProfile, afterProfile) || !reflect.DeepEqual(beforeLine, afterLine) || !reflect.DeepEqual(beforePoint, afterPoint) || !attempt.Active ||
 		p1Count(t, &db.EventFact{}, "player_id=? AND source_key=?", f.ids[1], "ggo:gather:"+claim.AttemptToken) != 0 ||
 		p1Count(t, &db.GGOFieldReceipt{}, "player_id=? AND request_id=?", f.ids[1], claim.RequestID) != 0 {
-		t.Fatal("failed receipt did not roll back profile, line, attempt, fact and receipt")
+		t.Fatal("failed receipt did not roll back profile, line, point, attempt, fact and receipt")
 	}
 	first, err := f.s.GGOFieldGatherClaim(f.ctx, claim, f.sessions[1])
 	if err != nil {
 		t.Fatalf("claim retry: %v", err)
+	}
+	var committedPoint db.GGOFieldPoint
+	if err := database.First(&committedPoint, "server_id=? AND line=? AND point_id=?", f.s.OriginalServerID(), 1, f.starts[1].PointID).Error; err != nil {
+		t.Fatal(err)
+	}
+	var committedState ggoPointPayload
+	if err := json.Unmarshal(committedPoint.Payload, &committedState); err != nil {
+		t.Fatal(err)
+	}
+	if committedState.Resource == nil || committedState.Resource.PointID != beforeState.Resource.PointID ||
+		committedPoint.Revision != beforePoint.Revision+1 || committedState.Resource.Remaining != beforeState.Resource.Remaining-1 ||
+		committedState.Resource.ReservedBy != 0 || committedState.Resource.AttemptToken != "" || committedState.Resource.ReadyAtMS != 0 {
+		t.Fatal("claim did not consume the selected point exactly once")
 	}
 	again, err := f.s.GGOFieldGatherClaim(f.ctx, claim, f.sessions[1])
 	if err != nil || !reflect.DeepEqual(first, again) ||
 		p1Count(t, &db.EventFact{}, "player_id=? AND source_key=?", f.ids[1], "ggo:gather:"+claim.AttemptToken) != 1 ||
 		p1Count(t, &db.GGOFieldReceipt{}, "player_id=? AND request_id=?", f.ids[1], claim.RequestID) != 1 {
 		t.Fatalf("claim replay did not retain one result and fact: %+v %+v %v", first, again, err)
+	}
+	var replayPoint db.GGOFieldPoint
+	if err := database.First(&replayPoint, "server_id=? AND line=? AND point_id=?", f.s.OriginalServerID(), 1, f.starts[1].PointID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(committedPoint, replayPoint) {
+		t.Fatal("claim replay changed the selected point")
 	}
 	cancel := f.cancelRequest(0)
 	one, err := f.s.GGOFieldGatherCancel(f.ctx, cancel, f.sessions[0])
@@ -219,10 +257,9 @@ func TestGGOPeriodLineGatherRollbackAndReplay(t *testing.T) {
 	}
 }
 
-// This test must use a separately coordinated local MySQL lease. A retains its
-// activity SHARE and line lock after cancellation; B takes activity SHARE first
-// and waits on that line until A commits, with neither transaction upgrading.
-func TestGGOPeriodLineRealMySQLSharedCancelAgainstClaim(t *testing.T) {
+// This test requires a separately coordinated local MySQL lease. A holds one
+// cancelled point while B claims a different point on the same line.
+func TestGGOPeriodPointRealMySQLCancelDoesNotBlockOtherClaim(t *testing.T) {
 	name := os.Getenv("HYJS_P1_MYSQL_DATABASE")
 	if name == "" {
 		t.Skip("requires a coordinated isolated hyjs_test_p1_ MySQL database")
@@ -232,6 +269,9 @@ func TestGGOPeriodLineRealMySQLSharedCancelAgainstClaim(t *testing.T) {
 	}
 	f := ggoPeriodLockSetup(t)
 	f.setDue(t, 1)
+	if f.starts[0].PointID == f.starts[1].PointID {
+		t.Fatal("fixture must reserve two different points")
+	}
 	database := db.GetIns()
 	pool, err := database.DB()
 	if err != nil {
@@ -240,128 +280,184 @@ func TestGGOPeriodLineRealMySQLSharedCancelAgainstClaim(t *testing.T) {
 	pool.SetMaxOpenConns(6)
 	pool.SetMaxIdleConns(6)
 
+	type cancelResult struct {
+		response *model.GGOFieldGatherCancelResponse
+		err      error
+	}
+	type claimResult struct {
+		response *model.GGOFieldGatherClaimResponse
+		err      error
+	}
 	ctx, cancel := context.WithTimeout(f.ctx, 12*time.Second)
-	defer cancel()
-	sharedReady, startCancel := make(chan struct{}), make(chan struct{})
-	lineHeld, releaseLine := make(chan struct{}), make(chan struct{})
-	sharedDone := make(chan error, 1)
-	claimReady := make(chan struct{})
-	claimDone := make(chan error, 1)
-	var signalOnce sync.Once
-	var exclusive bool
-	var traceMu sync.Mutex
-	const callback = "test:ggo-period-mysql-wait"
-	if err = database.Callback().Row().Before("gorm:row").Register(callback, func(tx *gorm.DB) {
-		if tx.Statement.Context.Value(ggoLockTestContextKey{}) == "claim" && strings.Contains(tx.Statement.SQL.String(), "p1_period_instances") {
-			if strings.Contains(tx.Statement.SQL.String(), "FOR SHARE") {
-				signalOnce.Do(func() { close(claimReady) })
-			}
-			if strings.Contains(tx.Statement.SQL.String(), "FOR UPDATE") {
-				traceMu.Lock()
-				exclusive = true
-				traceMu.Unlock()
+	pointHeld, releasePoint := make(chan struct{}), make(chan struct{})
+	cancelDone := make(chan cancelResult, 1)
+	claimDone := make(chan claimResult, 1)
+	var heldOnce, releaseOnce sync.Once
+	release := func() { releaseOnce.Do(func() { close(releasePoint) }) }
+	cancelReceived, claimStarted, claimReceived := false, false, false
+	defer func() {
+		release()
+		cancel()
+		if !cancelReceived {
+			select {
+			case <-cancelDone:
+			case <-time.After(5 * time.Second):
+				t.Error("cancellation goroutine did not exit")
 			}
 		}
-	}); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = database.Callback().Row().Remove(callback) })
+		if claimStarted && !claimReceived {
+			select {
+			case <-claimDone:
+			case <-time.After(5 * time.Second):
+				t.Error("claim goroutine did not exit")
+			}
+		}
+	}()
+
+	cancelRequest := f.cancelRequest(0)
+	claimRequest := f.claimRequest(1)
 	go func() {
 		move := context.WithValue(ctx, constUtil.GameRequestContextKey, &pb.CSMove{})
 		move = context.WithValue(move, constUtil.GameServiceContextKey, f.s)
+		var response *model.GGOFieldGatherCancelResponse
 		err := updateFieldProfileWithTx(move, f.ids[0], func(tx *gorm.DB, _ *pb.Player, game *model.GameState) error {
-			if !p1SharedRead(tx) {
-				return errors.New("movement did not hold shared activity locks")
-			}
-			close(sharedReady)
-			select {
-			case <-startCancel:
-			case <-ctx.Done():
-				return ctx.Err()
-			}
 			var attempt db.P8GatherAttempt
 			if err := tx.First(&attempt, "player_id=? AND token=? AND active=?", f.ids[0], f.starts[0].AttemptToken, true).Error; err != nil {
 				return err
 			}
-			req := f.cancelRequest(0)
-			_, err := ggoCancelAttempt(tx, f.s, f.ids[0], game, &attempt, req.RequestID, ggoCancelHash(req.StartRequestID, req.AttemptToken), time.Now().UnixMilli())
+			var err error
+			response, err = ggoCancelAttempt(tx, f.s, f.ids[0], game, &attempt, cancelRequest.RequestID, ggoCancelHash(cancelRequest.StartRequestID, cancelRequest.AttemptToken), time.Now().UnixMilli())
 			if err != nil {
 				return err
 			}
-			close(lineHeld)
+			heldOnce.Do(func() { close(pointHeld) })
 			select {
-			case <-releaseLine:
+			case <-releasePoint:
 				return nil
 			case <-ctx.Done():
 				return ctx.Err()
 			}
 		})
-		sharedDone <- err
+		cancelDone <- cancelResult{response: response, err: err}
 	}()
 	select {
-	case <-sharedReady:
-	case err := <-sharedDone:
-		t.Fatalf("shared movement failed before cancellation: %v", err)
+	case <-pointHeld:
+	case result := <-cancelDone:
+		cancelReceived = true
+		t.Fatalf("cancellation finished before holding its point: %v", result.err)
 	case <-ctx.Done():
-		t.Fatal("shared movement did not obtain activity locks")
+		t.Fatal("cancellation did not hold its point")
 	}
-	close(startCancel)
-	select {
-	case <-lineHeld:
-	case err := <-sharedDone:
-		t.Fatalf("cancellation failed before retaining the line: %v", err)
-	case <-ctx.Done():
-		t.Fatal("cancellation did not retain the line")
-	}
+
+	claimStarted = true
 	go func() {
-		claimCtx := context.WithValue(ctx, ggoLockTestContextKey{}, "claim")
-		_, err := f.s.GGOFieldGatherClaim(claimCtx, f.claimRequest(1), f.sessions[1])
-		claimDone <- err
+		response, err := f.s.GGOFieldGatherClaim(ctx, claimRequest, f.sessions[1])
+		claimDone <- claimResult{response: response, err: err}
 	}()
+	timer := time.NewTimer(2 * time.Second)
+	defer timer.Stop()
+	var firstClaim *model.GGOFieldGatherClaimResponse
 	select {
-	case <-claimReady:
-	case err := <-claimDone:
-		t.Fatalf("claim ended before attempting the activity lock: %v", err)
-	case <-ctx.Done():
-		t.Fatal("claim did not attempt its activity lock")
-	}
-	select {
-	case err := <-claimDone:
-		t.Fatalf("claim finished while the line was still held: %v", err)
-	case <-time.After(250 * time.Millisecond):
-	}
-	close(releaseLine)
-	select {
-	case err := <-sharedDone:
-		if err != nil {
-			t.Fatalf("shared cancellation could not complete ahead of claim: %v", err)
+	case result := <-claimDone:
+		claimReceived = true
+		if result.err != nil || result.response == nil {
+			t.Fatalf("other point claim failed while cancellation held its transaction: %v", result.err)
 		}
+		firstClaim = result.response
+	case <-timer.C:
+		t.Fatal("other point claim did not complete within 2 seconds")
+	case <-ctx.Done():
+		t.Fatal("context ended before other point claim completed")
+	}
+	select {
+	case result := <-cancelDone:
+		cancelReceived = true
+		t.Fatalf("cancellation finished before its point was released: %v", result.err)
+	default:
+	}
+
+	release()
+	var firstCancel *model.GGOFieldGatherCancelResponse
+	select {
+	case result := <-cancelDone:
+		cancelReceived = true
+		if result.err != nil || result.response == nil || result.response.Status != "cancelled" {
+			t.Fatalf("cancellation did not commit: %v", result.err)
+		}
+		firstCancel = result.response
 	case <-time.After(4 * time.Second):
-		t.Fatal("shared cancellation did not release the line")
-	}
-	select {
-	case err := <-claimDone:
-		if err != nil {
-			t.Fatalf("claim failed after cancellation released its locks: %v", err)
-		}
+		t.Fatal("cancellation did not complete after its point was released")
 	case <-ctx.Done():
-		t.Fatal("claim did not complete after line release")
+		t.Fatal("context ended before cancellation completed")
 	}
-	traceMu.Lock()
-	usedExclusive := exclusive
-	traceMu.Unlock()
-	if usedExclusive {
-		t.Fatal("claim unexpectedly retried with an exclusive activity lock")
+
+	type playerSnapshot struct {
+		profile db.Profile
+		attempt db.P8GatherAttempt
+		point   db.GGOFieldPoint
 	}
-	for i := range f.ids {
-		var attempt db.P8GatherAttempt
-		if err := database.First(&attempt, "player_id=?", f.ids[i]).Error; err != nil || attempt.Active {
-			t.Fatalf("player %d attempt did not commit exactly once: %+v %v", f.ids[i], attempt, err)
+	snapshot := func() [2]playerSnapshot {
+		t.Helper()
+		var result [2]playerSnapshot
+		for i := range f.ids {
+			if err := database.First(&result[i].profile, f.ids[i]).Error; err != nil {
+				t.Fatal(err)
+			}
+			if err := database.First(&result[i].attempt, "player_id=?", f.ids[i]).Error; err != nil {
+				t.Fatal(err)
+			}
+			if err := database.First(&result[i].point, "server_id=? AND line=? AND point_id=?", f.s.OriginalServerID(), 1, f.starts[i].PointID).Error; err != nil {
+				t.Fatal(err)
+			}
+		}
+		return result
+	}
+	beforeReplay := snapshot()
+	if beforeReplay[0].attempt.Active || beforeReplay[1].attempt.Active ||
+		p1Count(t, &db.GGOFieldReceipt{}, "player_id=? AND request_id=?", f.ids[0], cancelRequest.RequestID) != 1 ||
+		p1Count(t, &db.GGOFieldReceipt{}, "player_id=? AND request_id=?", f.ids[1], claimRequest.RequestID) != 1 ||
+		p1Count(t, &db.EventFact{}, "player_id=? AND source_key=?", f.ids[1], "ggo:gather:"+f.starts[1].AttemptToken) != 1 {
+		t.Fatal("concurrent cancellation or claim lost its exactly-once attempt, receipt or fact")
+	}
+
+	const callback = "test:ggo-point-replay-write"
+	const replayMarker = "point-isolation-replay"
+	var replayWrites []string
+	recordWrite := func(tx *gorm.DB) {
+		if tx.Statement.Context.Value(ggoLockTestContextKey{}) == replayMarker {
+			replayWrites = append(replayWrites, tx.Statement.Table)
 		}
 	}
-	if p1Count(t, &db.GGOFieldReceipt{}, "player_id=? AND request_id=?", f.ids[0], f.cancelRequest(0).RequestID) != 1 ||
-		p1Count(t, &db.GGOFieldReceipt{}, "player_id=? AND request_id=?", f.ids[1], f.claimRequest(1).RequestID) != 1 ||
+	if err := database.Callback().Create().Before("gorm:create").Register(callback, recordWrite); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = database.Callback().Create().Remove(callback) })
+	if err := database.Callback().Update().Before("gorm:update").Register(callback, recordWrite); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = database.Callback().Update().Remove(callback) })
+	if err := database.Callback().Delete().Before("gorm:delete").Register(callback, recordWrite); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = database.Callback().Delete().Remove(callback) })
+
+	replayCtx, replayCancel := context.WithTimeout(context.WithValue(f.ctx, ggoLockTestContextKey{}, replayMarker), 8*time.Second)
+	defer replayCancel()
+	cancelReplay, err := f.s.GGOFieldGatherCancel(replayCtx, cancelRequest, f.sessions[0])
+	if err != nil || !reflect.DeepEqual(firstCancel, cancelReplay) {
+		t.Fatalf("cancellation replay changed its result: %v", err)
+	}
+	claimReplay, err := f.s.GGOFieldGatherClaim(replayCtx, claimRequest, f.sessions[1])
+	if err != nil || !reflect.DeepEqual(firstClaim, claimReplay) {
+		t.Fatalf("claim replay changed its result: %v", err)
+	}
+	if len(replayWrites) != 0 {
+		t.Fatalf("replays attempted writes: %v", replayWrites)
+	}
+	if afterReplay := snapshot(); !reflect.DeepEqual(beforeReplay, afterReplay) ||
+		p1Count(t, &db.GGOFieldReceipt{}, "player_id=? AND request_id=?", f.ids[0], cancelRequest.RequestID) != 1 ||
+		p1Count(t, &db.GGOFieldReceipt{}, "player_id=? AND request_id=?", f.ids[1], claimRequest.RequestID) != 1 ||
 		p1Count(t, &db.EventFact{}, "player_id=? AND source_key=?", f.ids[1], "ggo:gather:"+f.starts[1].AttemptToken) != 1 {
-		t.Fatal("concurrent cancellation or claim lost its exactly-once receipt or fact")
+		t.Fatal("replay changed a profile, point, attempt, receipt or fact")
 	}
 }
