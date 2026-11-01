@@ -38,7 +38,7 @@ namespace HYJS.DesertV4
         static FieldBoss mapOwner;
         Event current;
         PositionConfirmation confirmation;
-        string shownWarning="";
+        int snapshotEpoch,requestedEpoch;
         long receivedTicks,lastRefresh;
         public FieldBoss(RoomCharactorManager source,Action requestRefresh)
         {
@@ -62,29 +62,55 @@ namespace HYJS.DesertV4
             if (System.Object.ReferenceEquals(mapOwner,this)) mapOwner=null;
             if (confirmation!=null) FinishConfirmation(confirmation,false,false,false);
             try { Remove(current); }
-            finally { current=null; shownWarning=""; }
+            finally { current=null; }
+        }
+        long ServerNow(long tick)
+        {
+            if (tick<=receivedTicks) return current.serverTime;
+            double elapsed=(tick-receivedTicks)*1000.0/Stopwatch.Frequency;
+            if (elapsed>=Int64.MaxValue-current.serverTime) return Int64.MaxValue;
+            return current.serverTime+(long)elapsed;
+        }
+        static string WaitingLabel(long remainingMs,bool killed)
+        {
+            // Round upward so a positive fraction never appears as 00:00.
+            long seconds=remainingMs/1000+(remainingMs%1000==0 ? 0 : 1);
+            long hours=seconds/3600, minutes=seconds/60%60, rest=seconds%60;
+            string time=hours>0 ? String.Format(CultureInfo.InvariantCulture,"{0}:{1:00}:{2:00}",hours,minutes,rest) :
+                String.Format(CultureInfo.InvariantCulture,"{0:00}:{1:00}",minutes,rest);
+            return (killed ? "复活 " : "刷新 ")+time;
         }
         // The map reads only a validated event belonging to the current room.
         // Crossing a scheduled boundary needs a fresh server state; the local
         // clock alone must never claim that a boss has appeared or survived.
         public static bool MapMarker(RoomBase room,out string id,out Vector3 position,out string state)
         {
-            id=null; position=Vector3.zero; state=null;
+            string label;
+            return MapMarkerLabel(room,out id,out position,out state,out label);
+        }
+        internal static bool MapMarkerLabel(RoomBase room,out string id,out Vector3 position,out string state,out string label)
+        {
+            id=null; position=Vector3.zero; state=null; label=null;
             FieldBoss owner=mapOwner;
             if (owner==null || owner.current==null || room==null || room!=RoomManager.currentRoom ||
                 room.charactorManager!=owner.manager || StaticData.fieldId!="field_003") return false;
             Event e=owner.current;
-            long elapsed=(Stopwatch.GetTimestamp()-owner.receivedTicks)*1000/Stopwatch.Frequency;
-            long now=e.serverTime+Math.Max(0,elapsed);
+            long now=owner.ServerNow(Stopwatch.GetTimestamp());
             id=e.id; position=e.position; state=e.state;
-            if ((state=="waiting" && now>=e.start) || (state=="active" && now>=e.end)) state="syncing";
+            if (owner.snapshotEpoch!=PositionSync.ConnectionEpoch || (state=="waiting" && now>=e.start) ||
+                (state=="active" && now>=e.end)) state="syncing";
+            if (state=="waiting") label=WaitingLabel(e.start-now,e.hp==0);
+            else if (state=="active") label="首领出现";
+            else if (state=="defeated") label="已击败";
+            else if (state=="expired") label="已消失";
+            else label="待确认";
             return true;
         }
         public bool CanInteract(string id,RoomCharactor actor)
         {
             try
             {
-                return current!=null && current.state=="active" && current.hp>0 && current.id==id && actor!=null &&
+                return current!=null && snapshotEpoch==PositionSync.ConnectionEpoch && current.state=="active" && current.hp>0 && current.id==id && actor!=null &&
                     (actor.transform.position-current.position).sqrMagnitude<=current.radius*current.radius;
             }
             catch (Exception) { return false; }
@@ -206,6 +232,11 @@ namespace HYJS.DesertV4
         }
         public void ApplySnapshot(JsonData snapshot)
         {
+            int epoch=PositionSync.ConnectionEpoch;
+            // An old in-flight response may arrive before the frame that sees
+            // a reconnect. Discard it and request a snapshot from the new epoch.
+            if (current!=null && snapshotEpoch!=epoch && requestedEpoch!=epoch)
+            { requestedEpoch=epoch; refresh(); return; }
             JsonData d=snapshot["boss"];
             if (d==null) { Clear(); return; }
             Event e=new Event();
@@ -238,8 +269,13 @@ namespace HYJS.DesertV4
                 }
                 ((RCAIFieldBoss)actor.ai).SetHp((float)side.curHp);
             }
-            if (current==null || current.id!=e.id) shownWarning="";
-            current=e; receivedTicks=Stopwatch.GetTimestamp(); mapOwner=this;
+            long received=Stopwatch.GetTimestamp();
+            // A repeated snapshot for the same deadline may use an older wall
+            // clock. Preserve elapsed monotonic time without carrying it into a
+            // new event or a newly established respawn deadline.
+            if (current!=null && current.id==e.id && current.state=="waiting" && e.state=="waiting" && current.start==e.start)
+                e.serverTime=Math.Max(e.serverTime,ServerNow(received));
+            current=e; receivedTicks=received; snapshotEpoch=epoch; requestedEpoch=epoch; mapOwner=this;
             Tick();
         }
         public void Tick()
@@ -247,19 +283,21 @@ namespace HYJS.DesertV4
             long tick=Stopwatch.GetTimestamp();
             TickConfirmation(tick);
             if (current==null) return;
-            long elapsed=(tick-receivedTicks)*1000/Stopwatch.Frequency;
-            long now=current.serverTime+Math.Max(0,elapsed);
+            int epoch=PositionSync.ConnectionEpoch;
+            if (snapshotEpoch!=epoch)
+            {
+                if (requestedEpoch!=epoch) { requestedEpoch=epoch; refresh(); }
+                return;
+            }
+            long now=ServerNow(tick);
             if ((current.state=="waiting" && now>=current.start) ||
                 (current.state=="active" && (now>=current.end || tick-lastRefresh>=5L*Stopwatch.Frequency)))
             {
                 if (tick-lastRefresh>=2L*Stopwatch.Frequency) { lastRefresh=tick; refresh(); }
             }
-            if (current.state!="waiting" || shownWarning==current.id || now<current.warning || now>=current.start) return;
-            // Nature is the server's native SideBoss value; the original map
-            // timer accepts seconds and updates its own NGUI countdown.
-            float seconds=(float)((current.start-now)/1000.0);
-            UI.UIFieldRunMap.RefreshBossTime((int)current.nature,seconds);
-            shownWarning=current.id;
+            // Map labels derive directly from this room's validated snapshot.
+            // The native nature timer is process-static and would leak a desert
+            // deadline into another field after a scene transition.
         }
     }
 }

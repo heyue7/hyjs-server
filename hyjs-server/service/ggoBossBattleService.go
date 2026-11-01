@@ -567,6 +567,7 @@ func (s *GameService) ggoBossFightEnd(ctx context.Context, id int64, request *pb
 	var result *pb.SCSidePveBossFightEnd
 	var side *pb.PlayerSide
 	var session []byte
+	var killNotice *pb.SCPublicMessage
 	replayed := false
 	changed := false
 	err := updateProfileWithTx(ctx, id, func(tx *gorm.DB, player *pb.Player, g *model.GameState) error {
@@ -622,6 +623,12 @@ func (s *GameService) ggoBossFightEnd(ctx context.Context, id int64, request *pb
 			return err
 		}
 		changed = damage > 0
+		// Under the shared event row lock, positive applied leader damage with
+		// zero remaining HP is exactly the first durable KillerID transition.
+		// The enclosing transaction still owns the receipt and profile writes.
+		if damage > 0 && boss.GetState() == 3 && boss.GetCurHp() == 0 {
+			killNotice = s.ggoBossKillNotice(player.GetName(), boss.GetHeroId())
+		}
 		var lost [6]int64
 		// A surviving round-limit outcome keeps its contribution without death.
 		// A client-reported zero-HP loss can also request a self-funded forfeit,
@@ -690,6 +697,10 @@ func (s *GameService) ggoBossFightEnd(ctx context.Context, id int64, request *pb
 	if replayed {
 		return out, nil
 	}
+	// Never replay after restart: a committed KillerID is the durable once
+	// marker. Like the existing field marquee, a process exit between commit
+	// and TCP send can omit this transient notice.
+	s.publishP12WorldBossKill(context.WithoutCancel(ctx), killNotice)
 	if side != nil {
 		out = append(out, &pb.SCFieldPlayerState{Player: []*pb.PlayerSide{side}})
 	}

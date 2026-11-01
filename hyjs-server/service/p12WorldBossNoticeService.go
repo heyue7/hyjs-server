@@ -21,6 +21,24 @@ func p12WorldBossKillNotice(playerName string) *pb.SCPublicMessage {
 	}}
 }
 
+// ggoBossKillNotice uses the same in-game marquee and localized hero name as
+// the existing field-boss kill notice, with a meaningful fallback for tables
+// that do not contain a translated name.
+func (s *GameService) ggoBossKillNotice(playerName, heroID string) *pb.SCPublicMessage {
+	name := "沙漠首领"
+	if s.AdminCatalogueData != nil {
+		hero := s.table("Hero", "id", heroID)
+		if localized := s.AdminCatalogueData.DisplayNames[hero["name"]]; localized != "" {
+			name = localized
+		}
+	}
+	return &pb.SCPublicMessage{Pubmsg: &pb.PublicMessage{
+		Type:       proto.Int32(constUtil.P12WorldBossKillNoticeType),
+		ScrollType: proto.Int32(constUtil.P12WorldBossKillNoticeScrollType),
+		Msg:        proto.String(fmt.Sprintf(constUtil.FieldBossKillNoticeFormat, p12NoticeName(playerName), p12NoticeName(name))),
+	}}
+}
+
 // p12NoticeName keeps authenticated display names from changing NGUI markup.
 func p12NoticeName(value string) string {
 	return strings.Map(func(r rune) rune {

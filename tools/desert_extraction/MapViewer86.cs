@@ -29,7 +29,7 @@ namespace HYJS.DesertV4
         readonly Dictionary<string,UITexture> largeExits=new Dictionary<string,UITexture>();
         readonly Dictionary<AMMiniMapEntity,UISprite> largeResources=new Dictionary<AMMiniMapEntity,UISprite>();
         sealed class BossMarker { public GameObject root; public UISprite icon; public UILabel label; }
-        BossMarker smallBoss,largeBoss;
+        BossMarker smallBoss,largeBoss,fixedBossTime;
         AMMiniMap bossLeaseMap;
         AMMiniMapEntity bossLeaseEntity;
         string bossLeaseId;
@@ -220,14 +220,10 @@ namespace HYJS.DesertV4
             }
             catch (Exception) { root.SetActive(false); Destroy(root); throw; }
         }
-        static void SetBossState(BossMarker marker,string state)
+        static void SetBossState(BossMarker marker,string state,string label)
         {
             marker.icon.color=state=="active" ? Color.white : new Color(.58f,.58f,.58f,1f);
-            if (state=="active") marker.label.text="首领出现";
-            else if (state=="waiting") marker.label.text="待刷新";
-            else if (state=="defeated") marker.label.text="已击败";
-            else if (state=="expired") marker.label.text="已消失";
-            else marker.label.text="待确认";
+            marker.label.text=label;
         }
         static void RemoveBossMarker(BossMarker marker)
         { if (marker!=null && marker.root!=null) { marker.root.SetActive(false); Destroy(marker.root); } }
@@ -242,11 +238,36 @@ namespace HYJS.DesertV4
             finally { bossLeaseMap=null; bossLeaseEntity=null; bossLeaseId=null; }
         }
         void ClearSmallBoss()
-        { RestoreBossLease(); RemoveBossMarker(smallBoss); smallBoss=null; }
+        {
+            RestoreBossLease(); RemoveBossMarker(smallBoss); smallBoss=null;
+            RemoveBossMarker(fixedBossTime); fixedBossTime=null;
+        }
+        void UpdateFixedBossTime(string state,string label)
+        {
+            if (state!="waiting" && state!="syncing")
+            { RemoveBossMarker(fixedBossTime); fixedBossTime=null; return; }
+            // The frame stays in the minimap foreground while OffsetRoot follows
+            // world coordinates. Place the label inside the frame's lower edge.
+            Transform transform=Need(source.transform,"small/ForegroundPanel/foreground2/frame");
+            UISprite frame=transform.GetComponent<UISprite>();
+            if (frame==null) throw new InvalidOperationException("native minimap frame unavailable");
+            if (fixedBossTime!=null && (fixedBossTime.root==null || fixedBossTime.root.transform.parent!=transform))
+            { RemoveBossMarker(fixedBossTime); fixedBossTime=null; }
+            if (fixedBossTime==null)
+            {
+                fixedBossTime=NewBossMarker(transform,21,frame.depth+1);
+                fixedBossTime.icon.gameObject.SetActive(false);
+                fixedBossTime.label.transform.localPosition=Vector3.zero;
+            }
+            Vector3[] corners=frame.localCorners;
+            fixedBossTime.root.transform.localPosition=new Vector3((corners[0].x+corners[2].x)*.5f,corners[0].y+11,0);
+            fixedBossTime.label.width=Math.Max(1,Math.Min(100,(int)Math.Abs(corners[2].x-corners[0].x)-8));
+            SetBossState(fixedBossTime,state,label);
+        }
         void UpdateSmallBoss()
         {
-            AMMiniMap map=Map(); string id,state; Vector3 position;
-            if (map==null || !map.Initialized || map.OffsetRoot==null || !FieldBoss.MapMarker(ownerRoom,out id,out position,out state))
+            AMMiniMap map=Map(); string id,state,label; Vector3 position;
+            if (map==null || !map.Initialized || map.OffsetRoot==null || !FieldBoss.MapMarkerLabel(ownerRoom,out id,out position,out state,out label))
             { ClearSmallBoss(); return; }
             if (smallBoss!=null && (smallBoss.root==null || smallBoss.root.transform.parent!=map.OffsetRoot)) ClearSmallBoss();
             AMMiniMapEntity entity=map.GetEntity(id);
@@ -258,7 +279,8 @@ namespace HYJS.DesertV4
                 if (bossLeaseEntity==entity) entity.Show=false;
             }
             if (smallBoss==null) smallBoss=NewBossMarker(map.OffsetRoot,21,24);
-            SetBossState(smallBoss,state);
+            SetBossState(smallBoss,state,label);
+            UpdateFixedBossTime(state,label);
             float scale=SceneScale(); smallBoss.root.transform.localPosition=new Vector3(position.x*scale,position.z*scale,0);
         }
 
@@ -628,13 +650,13 @@ namespace HYJS.DesertV4
             AMMiniMap map=Map();
             if (map==null) { RemoveBossMarker(largeBoss); largeBoss=null; return; }
             float scale=SceneScale(); Vector2 offset=SceneOffset();
-            string bossId,bossState; Vector3 bossPosition;
-            if (!FieldBoss.MapMarker(ownerRoom,out bossId,out bossPosition,out bossState))
+            string bossId,bossState,bossLabel; Vector3 bossPosition;
+            if (!FieldBoss.MapMarkerLabel(ownerRoom,out bossId,out bossPosition,out bossState,out bossLabel))
             { RemoveBossMarker(largeBoss); largeBoss=null; }
             else
             {
                 if (largeBoss==null || largeBoss.root==null) largeBoss=NewBossMarker(mapRoot,26,24);
-                SetBossState(largeBoss,bossState);
+                SetBossState(largeBoss,bossState,bossLabel);
                 largeBoss.root.transform.localPosition=RelativePosition(new Vector2(bossPosition.x*scale,bossPosition.z*scale),offset,scale);
                 largeBoss.root.transform.localScale=Vector3.one/zoom;
             }

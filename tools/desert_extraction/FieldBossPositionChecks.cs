@@ -73,7 +73,7 @@ namespace Room
         }
     }
 }
-namespace UI { public static class UIFieldRunMap { public static void RefreshBossTime(int nature,float seconds) { } } }
+namespace UI { public static class UIFieldRunMap { public static int timerCalls; public static void RefreshBossTime(int nature,float seconds) { timerCalls++; } } }
 public static class StaticData { public static string fieldId="field_003"; }
 public static class ServerTimerTool { public static long CurrentUTCJavaTime() { return 123456; } }
 public static class NetAPI
@@ -130,7 +130,7 @@ public static class FieldBossPositionChecks
         public readonly HYJS.DesertV4.FieldWire wire=new HYJS.DesertV4.FieldWire();
         public readonly HYJS.DesertV4.FieldWire.Session owner=new HYJS.DesertV4.FieldWire.Session { playerId=1,sessionHex="one",origin="test" };
         public readonly HYJS.DesertV4.FieldBoss boss;
-        public int completed,starts;
+        public int completed,starts,refreshes;
         public bool accepted,cancelled;
         public Fixture(float x)
         {
@@ -140,7 +140,7 @@ public static class FieldBossPositionChecks
             UnityEngine.Input.cancel=false;
             self.transform.position=new UnityEngine.Vector3(x,0,0); manager.self=self;
             room.charactorManager=manager; Room.RoomManager.currentRoom=room;
-            boss=new HYJS.DesertV4.FieldBoss(manager,delegate { });
+            boss=new HYJS.DesertV4.FieldBoss(manager,delegate { refreshes++; });
             boss.ApplySnapshot(Snapshot("ggo-line-one","active",100));
         }
         public bool Begin()
@@ -160,6 +160,65 @@ public static class FieldBossPositionChecks
             "\",\"pointId\":\"B1\",\"heroId\":\"hero_017\",\"bossId\":\"boss_003\",\"state\":\""+state+
             "\",\"position\":{\"x\":0,\"y\":0,\"z\":0},\"radius\":3,\"hp\":"+hp+
             ",\"maxHp\":100,\"startsAtMs\":100000,\"endsAtMs\":1000000,\"warningAtMs\":90000,\"level\":60,\"nature\":0}}");
+    }
+    static JsonData TimedSnapshot(string id,string state,int hp,long now,long start)
+    {
+        return JsonMapper.ToObject("{\"serverTimeMs\":"+now+",\"boss\":{\"eventId\":\""+id+
+            "\",\"pointId\":\"B1\",\"heroId\":\"hero_017\",\"bossId\":\"boss_003\",\"state\":\""+state+
+            "\",\"position\":{\"x\":0,\"y\":0,\"z\":0},\"radius\":3,\"hp\":"+hp+
+            ",\"maxHp\":100,\"startsAtMs\":"+start+",\"endsAtMs\":"+(start+7200000)+",\"warningAtMs\":"+(start-60000)+",\"level\":60,\"nature\":0}}");
+    }
+    static void SetReceived(HYJS.DesertV4.FieldBoss boss,long elapsedSeconds)
+    { typeof(HYJS.DesertV4.FieldBoss).GetField("receivedTicks",BindingFlags.Instance|BindingFlags.NonPublic).SetValue(boss,Stopwatch.GetTimestamp()-elapsedSeconds*Stopwatch.Frequency); }
+    static string Marker(Room.RoomBase room,out string state)
+    {
+        string id,label; UnityEngine.Vector3 position;
+        Check(HYJS.DesertV4.FieldBoss.MapMarkerLabel(room,out id,out position,out state,out label),"current room marker missing");
+        return label;
+    }
+    static void CountdownAndScope()
+    {
+        var f=new Fixture(2f); string state;
+        f.boss.ApplySnapshot(TimedSnapshot("one","waiting",0,200000,3800000));
+        Check(Marker(f.room,out state)=="复活 1:00:00" && state=="waiting","death deadline must show immediately before warning window");
+        SetReceived(f.boss,61);
+        Check(Marker(f.room,out state)=="复活 58:59","countdown must follow monotonic elapsed time");
+        f.boss.ApplySnapshot(TimedSnapshot("one","waiting",0,200000,3800000));
+        Check(Marker(f.room,out state)=="复活 58:59","older server clock must not increase the same deadline");
+        f.boss.ApplySnapshot(TimedSnapshot("two","waiting",0,200000,3800000));
+        Check(Marker(f.room,out state)=="复活 1:00:00","new event must reset its clock");
+        f.boss.ApplySnapshot(TimedSnapshot("two","waiting",100,200000,560000));
+        Check(Marker(f.room,out state)=="刷新 06:00","new deadline and scheduled spawn must replace old timer");
+        SetReceived(f.boss,360);
+        Check(Marker(f.room,out state)=="待确认" && state=="syncing","deadline must wait for server confirmation");
+        typeof(HYJS.DesertV4.FieldBoss).GetField("lastRefresh",BindingFlags.Instance|BindingFlags.NonPublic).SetValue(f.boss,0L);
+        int before=f.refreshes; f.boss.Tick(); f.boss.Tick();
+        Check(f.refreshes==before+1,"deadline refresh is bounded");
+        f.boss.ApplySnapshot(TimedSnapshot("two","waiting",100,200000,560000));
+        Check(Marker(f.room,out state)=="待确认","repeated old clock cannot revive an expired countdown");
+        f.boss.ApplySnapshot(TimedSnapshot("three","active",100,200000,100000));
+        Check(Marker(f.room,out state)=="首领出现" && state=="active","server-confirmed new event must replace waiting state");
+        string id,label; UnityEngine.Vector3 position;
+        Check(!HYJS.DesertV4.FieldBoss.MapMarkerLabel(new Room.RoomBase(),out id,out position,out state,out label),"other room must not inherit marker");
+        StaticData.fieldId="field_002";
+        Check(!HYJS.DesertV4.FieldBoss.MapMarkerLabel(f.room,out id,out position,out state,out label),"other map must not inherit marker");
+        StaticData.fieldId="field_003"; f.boss.Clear();
+        Check(!HYJS.DesertV4.FieldBoss.MapMarkerLabel(f.room,out id,out position,out state,out label),"scene exit must release marker");
+        Check(UI.UIFieldRunMap.timerCalls==0,"desert countdown must not write the process-static native field timer");
+        var reconnect=new Fixture(2f);
+        reconnect.boss.ApplySnapshot(TimedSnapshot("one","waiting",0,300000,3800000));
+        Check(Marker(reconnect.room,out state)=="复活 58:20","reconnect must use the fresh authoritative deadline");
+        HYJS.DesertV4.PositionSync.ConnectionEpoch++;
+        Check(Marker(reconnect.room,out state)=="待确认" && state=="syncing","a disconnected epoch must hide the old timer");
+        int refreshes=reconnect.refreshes;
+        reconnect.boss.ApplySnapshot(TimedSnapshot("one","waiting",0,300000,3800000));
+        Check(reconnect.refreshes==refreshes+1 && Marker(reconnect.room,out state)=="待确认","old in-flight reply must trigger a fresh snapshot");
+        reconnect.boss.ApplySnapshot(TimedSnapshot("one","waiting",0,400000,3800000));
+        Check(Marker(reconnect.room,out state)=="复活 56:40","new connection snapshot restores the timer");
+        string oldId,oldState; UnityEngine.Vector3 oldPosition;
+        Check(HYJS.DesertV4.FieldBoss.MapMarker(reconnect.room,out oldId,out oldPosition,out oldState) && oldId=="one" && oldState=="waiting",
+            "existing public marker ABI must remain usable");
+        reconnect.boss.Clear();
     }
     static HYJS.DesertV4.FieldWireResult Status(float x,string scene,bool loading)
     {
@@ -265,7 +324,7 @@ public static class FieldBossPositionChecks
     public static void Main()
     {
         System.Threading.Thread.CurrentThread.CurrentCulture=CultureInfo.InvariantCulture;
-        PositionBeforeStart(); RadiusAndStatusGates(); InvalidationAndCancellation(); LeaseAndFailures();
-        Console.WriteLine("PASS FieldBoss position confirmation: "+checks+" assertions");
+        PositionBeforeStart(); RadiusAndStatusGates(); InvalidationAndCancellation(); LeaseAndFailures(); CountdownAndScope();
+        Console.WriteLine("PASS FieldBoss position and countdown: "+checks+" assertions");
     }
 }
