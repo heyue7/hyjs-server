@@ -384,13 +384,39 @@ public static class LeaveRecoveryChecks
         var oldCallback=new SocketCallback { AsyncState=new SocketBox { socket=oldSocket } };
         var freshCallback=new SocketCallback { AsyncState=new SocketBox { socket=newSocket } };
         PositionSync.ConnectionStarting();
-        Check(PositionSync.DropOldSocket(tool,oldCallback),"old socket reached the new epoch while town leave was pending");
+        foreach (object body in new object[] { new SCTransferScene { result=1 },new SCTransferLine() })
+        {
+            bool dropped=PositionSync.DropOldSocket(tool,oldCallback);
+            if (!dropped) LeaveController.TrackPacket(new Packet { kBody=body });
+            Check(dropped,"old transfer socket reached the new epoch while town leave was pending");
+        }
         Check(!PositionSync.DropOldSocket(tool,freshCallback),"current socket was rejected during town leave recovery");
         Check(PositionSync.DropOldSocket(tool,null),"unknown socket callback passed during leave recovery");
         PositionSync.LoginResponse(new SCSocketLogin { result=100 });
         Tick(); ReplyStatus(Receipt(false,1331)); NativePosition("town_main",12,69); Tick(); NativePosition("town_main",12,69);
         ReplyPosition(PositionStatus("town_main",1357,1357,false,12));
         Check(!LeaveController.Pending && !PositionSync.DropOldSocket(tool,oldCallback),"ordinary town socket behavior was not restored after leave completion");
+    }
+    static void SupersededLineAndResponse()
+    {
+        Reset("position");
+        original.opcode=30061; original.mode="line"; original.targetScene=null; original.targetLine=2;
+        byte[] raw=PBConvert.toBytes(30061,new CSTransferLine { line=2 });
+        original.payload=Convert.ToBase64String(raw); original.hash=Hash(raw);
+        PlayerPrefs.SetString(key,JsonUtility.ToJson(original)); Set(Core(),"pending",original);
+        RoomManager.currentRoom=new RoomField { charactorManager=new RoomCharactorManager { self=actor },netManager=net };
+        StaticData.fieldId="field_003"; Tick();
+        JsonData receipt=new JsonData(); receipt["requestId"]=Request; receipt["status"]="completed"; receipt["mode"]="line";
+        receipt["targetLine"]=2; receipt["nativeRequestHash"]=original.hash; receipt["nativeResponse"]="";
+        receipt["positionRevision"]=1331; receipt["targetCurrent"]=false; ReplyStatus(receipt);
+        NativePosition("field_003",12,69); Tick(); NativePosition("field_003",12,69);
+        ReplyPosition(PositionStatus("field_003",1357,1357,false,12));
+        Check(!LeaveController.Pending && !PositionSync.Locked,"newer confirmed line position did not recover");
+
+        Reset("sent"); object callback=new RoomNetField(); bool dropped;
+        Ticket(true,30061,session,callback,Request);
+        Check(Incoming(30062,callback,new SCTransferLine(),out dropped) && !dropped,"own line reply was not intercepted");
+        Check(!Incoming(30062,callback,new SCTransferLine(),out dropped),"unrelated line reply was swallowed");
     }
     static void PrepareDesert()
     {
@@ -447,7 +473,7 @@ public static class LeaveRecoveryChecks
     {
         SupersededPosition(); InvalidProofsRetain(); SaveFailureAndOwnership(); ReconnectAndOldFrames(); OriginalReplyScope();
         MissingEarlierTicketAndLateStatus(); OrdinaryTransferAndLateOwnReply();
-        PreparedOutsideDesertDoesNotSend(); OldSocketBeforeEnqueue(); TravelPersistenceGate();
+        PreparedOutsideDesertDoesNotSend(); OldSocketBeforeEnqueue(); SupersededLineAndResponse(); TravelPersistenceGate();
         Console.WriteLine("PASS leave recovery: "+checks+" assertions");
     }
 }
