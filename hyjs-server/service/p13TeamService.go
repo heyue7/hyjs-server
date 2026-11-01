@@ -362,12 +362,14 @@ type p13TeamProfile struct {
 	changed bool
 }
 type p13TeamPush struct {
-	target     int64
-	teamID     string
-	generation int64
-	invitation bool
-	revision   int64
-	message    proto.Message
+	target            int64
+	teamID            string
+	generation        int64
+	invitation        bool
+	authorityVersion  int64
+	inviterGeneration int64
+	revision          int64
+	message           proto.Message
 }
 
 func p13TeamRequestInfo(request proto.Message) (string, []int64, []int32) {
@@ -627,18 +629,19 @@ func (s *GameService) p13TeamAt(ctx context.Context, id int64, request proto.Mes
 				if err != nil {
 					return err
 				}
-				if valid {
-					continue
+				if !valid {
+					invitation := db.P13TeamInvite{TeamID: team.ID, TargetID: target, InviterID: id, AuthorityVersion: team.AuthorityVersion, InviterGeneration: own.Generation, TargetGeneration: m.Generation, CreatedAt: now.UnixMilli()}
+					if err = tx.Save(&invitation).Error; err != nil {
+						return err
+					}
 				}
-				invitation := db.P13TeamInvite{TeamID: team.ID, TargetID: target, InviterID: id, AuthorityVersion: team.AuthorityVersion, InviterGeneration: own.Generation, TargetGeneration: m.Generation, CreatedAt: now.UnixMilli()}
-				if err = tx.Save(&invitation).Error; err != nil {
-					return err
-				}
+				// A new native request can repeat a declined or lost invitation.
+				// Positive-stamp receipt replays have already returned above.
 				view, err := projection.team(target, team)
 				if err != nil {
 					return err
 				}
-				pushes = append(pushes, p13TeamPush{target: target, teamID: team.ID, generation: m.Generation, invitation: true, message: &pb.SCTeamCreateAndInvite{Team: view, InvitePlayerId: proto.Int64(id)}})
+				pushes = append(pushes, p13TeamPush{target: target, teamID: team.ID, generation: m.Generation, invitation: true, authorityVersion: team.AuthorityVersion, inviterGeneration: own.Generation, message: &pb.SCTeamCreateAndInvite{Team: view, InvitePlayerId: proto.Int64(id)}})
 			}
 		} else {
 			switch b := request.(type) {
@@ -835,6 +838,11 @@ func (s *GameService) p13TeamAt(ctx context.Context, id int64, request proto.Mes
 	if err != nil {
 		return nil, err
 	}
+	s.p13TeamPublish(ctx, id, pushes)
+	return []proto.Message{response, &pb.SCPlayer{Player: player}}, nil
+}
+
+func (s *GameService) p13TeamPublish(ctx context.Context, id int64, pushes []p13TeamPush) {
 	// 提交后按当前会话和实际成员代数复核；换队/转让后的旧邀请和旧变更帧不推送。
 	tx := db.GetIns().WithContext(ctx)
 	for _, push := range pushes {
@@ -845,6 +853,13 @@ func (s *GameService) p13TeamAt(ctx context.Context, id int64, request proto.Mes
 		if push.invitation {
 			var team db.P13Team
 			if tx.First(&team, "id=?", push.teamID).Error != nil {
+				continue
+			}
+			if team.LeaderID != id || team.AuthorityVersion != push.authorityVersion {
+				continue
+			}
+			inviter, err := p13TeamMember(tx, id)
+			if err != nil || inviter.TeamID != team.ID || inviter.Generation != push.inviterGeneration {
 				continue
 			}
 			valid, err := p13TeamInviteValid(tx, team, push.target)
@@ -861,7 +876,6 @@ func (s *GameService) p13TeamAt(ctx context.Context, id int64, request proto.Mes
 		}
 		s.publishP10Private(ctx, push.target, push.message)
 	}
-	return []proto.Message{response, &pb.SCPlayer{Player: player}}, nil
 }
 func (s *GameService) DispatchP13Team(ctx context.Context, id int64, request proto.Message, stamp int64) ([]proto.Message, bool, error) {
 	switch request.(type) {

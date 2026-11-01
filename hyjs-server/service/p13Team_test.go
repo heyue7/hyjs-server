@@ -101,11 +101,24 @@ func TestP13TeamOriginalManagementInvitationsLeaderPermissionsExitAndRecovery(t 
 			t.Fatal("native invite target", i, len(invites), expected)
 		}
 	}
-	p13TeamCall(t, f, ids[0], request, 1, now)
-	p13TeamCall(t, f, ids[0], request, 0, now)
+	replayed := p13TeamCall(t, f, ids[0], request, 1, now)
+	if !proto.Equal(created, replayed) {
+		t.Fatal("positive-stamp invitation receipt changed")
+	}
 	for _, rec := range recs {
 		if len(p13TeamInvites(rec.drain())) != 0 {
-			t.Fatal("retry duplicate invitation")
+			t.Fatal("positive-stamp receipt repeated invitation")
+		}
+	}
+	// Original TCP has no request ID; a later request must redeliver invitations.
+	p13TeamCall(t, f, ids[0], request, 0, now)
+	for i, rec := range recs {
+		expected := 0
+		if i > 0 && i < 4 {
+			expected = 1
+		}
+		if invites := p13TeamInvites(rec.drain()); len(invites) != expected {
+			t.Fatal("native reinvitation target", i, len(invites), expected)
 		}
 	}
 	// 第二个被邀请者仍可在第一次加入后接受，邀请绑定队长和该目标成员代数。
