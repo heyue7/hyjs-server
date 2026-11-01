@@ -110,7 +110,7 @@ func (s *GameService) p7FreezeMazeTrader(tx *gorm.DB, fight *db.P7RushFight, now
 		return err
 	}
 	var policy db.P7MazeTraderPolicy
-	if err = tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&policy, constUtil.P7MazeTraderPolicyID).Error; err != nil {
+	if err = tx.Clauses(clause.Locking{Strength: "SHARE"}).First(&policy, constUtil.P7MazeTraderPolicyID).Error; err != nil {
 		return err
 	}
 	if !policy.Enabled {

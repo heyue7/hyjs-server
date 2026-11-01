@@ -60,6 +60,9 @@ func decodeProfileForUpdate(row *db.Profile) (*pb.Player, *model.GameState, erro
 	if err != nil {
 		return nil, nil, err
 	}
+	if row.Player != nil && row.Game != nil {
+		game.ProfileStorageBaseline = &model.ProfileStorageBaseline{Player: *row.Player, Game: *row.Game}
+	}
 	if _, err = settleResourceRecovery(player, time.Now().UnixMilli()); err != nil {
 		return nil, nil, err
 	}

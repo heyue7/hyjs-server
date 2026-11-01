@@ -21,7 +21,16 @@ type GamePacket struct {
 }
 
 // GameState 与已经产生的 SQLite 存档兼容，协议对象使用原始字段名。
+// ProfileStorageBaseline belongs to one decoded role transaction and is never
+// part of the persisted game payload or protocol.
+type ProfileStorageBaseline struct {
+	Player string
+	Game   string
+}
+
 type GameState struct {
+	ProfileStorageBaseline *ProfileStorageBaseline `json:"-"`
+
 	// GGOCredit is a transaction-local projection of profiles.ggo_credit, never a second wallet in the save JSON.
 	GGOCredit       int64 `json:"-"`
 	GGOCreditLoaded bool  `json:"-"`

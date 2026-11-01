@@ -1,0 +1,78 @@
+#!/usr/bin/env python3
+"""Run the fixed player-concurrency cases on managed, isolated InnoDB schemas."""
+import argparse
+import fcntl
+import json
+import os
+from pathlib import Path
+import subprocess
+import sys
+import time
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / 'tests'))
+from hyjs_managed_mysql import ManagedMySQL
+
+CASES = {
+    'TestPlayerConcurrencyMySQLActivityIsolation': 'p1',
+    'TestPlayerConcurrencyMySQLSceneMovement': 'p10',
+    'TestPlayerConcurrencyMySQLSlowSocket': 'p10',
+    'TestPlayerConcurrencyMySQLCommerceReaders': 'p4',
+    'TestPlayerConcurrencyUnchangedCustomSave': 'p1',
+    'TestP5GoldEggOriginalAll54AndOneUse': 'p1',
+    'TestP4CopyBenefitsRealDropAtomicReplayConcurrentRestart': 'p4',
+}
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--case', choices=CASES, action='append')
+    parser.add_argument('--output', required=True, type=Path)
+    args = parser.parse_args()
+    args.output.mkdir(parents=True, exist_ok=True)
+    binary = ROOT / 'build/player-concurrency-20261102/service.test'
+    lock = open('/tmp/hyjs-isolated-mysql.lock', 'a+')
+    started = time.monotonic()
+    while True:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            break
+        except BlockingIOError:
+            if time.monotonic() - started > 30:
+                raise RuntimeError('shared MySQL regression window is held by another session')
+            time.sleep(0.25)
+    results = []
+    pool = ManagedMySQL()
+    try:
+        for name in args.case or CASES:
+            prefix = CASES[name]
+            connection = pool.allocate(prefix + '_player_concurrency')
+            began = time.monotonic()
+            try:
+                environment = {key: value for key, value in os.environ.items()
+                               if not (key.startswith('HYJS_') and ('MYSQL' in key or 'DATABASE' in key))}
+                environment.update(connection.env())
+                for key in ['HOST', 'USER', 'PASSWORD', 'DATABASE']:
+                    environment['HYJS_' + prefix.upper() + '_MYSQL_' + key] = environment['HYJS_MYSQL_' + key]
+                result = subprocess.run(
+                    ['rtk', 'proxy', str(binary), '-test.run=^' + name + '$', '-test.v', '-test.timeout=5m'],
+                    cwd=ROOT / 'hyjs-server/service', env=environment, text=True,
+                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=330)
+                output = result.stdout.replace(connection.password, '[REDACTED]')
+                (args.output / (name + '.log')).write_text(output)
+                passed = result.returncode == 0 and ('--- PASS: ' + name) in output and ('--- SKIP: ' + name) not in output
+                results.append({'case': name, 'passed': passed, 'exitCode': result.returncode,
+                                'seconds': round(time.monotonic() - began, 3)})
+                print(json.dumps(results[-1]), flush=True)
+                if not passed:
+                    break
+            finally:
+                pool.release(connection.database)
+    finally:
+        pool.close()
+        fcntl.flock(lock, fcntl.LOCK_UN)
+        lock.close()
+    (args.output / 'summary.json').write_text(json.dumps(results, indent=2) + '\n')
+    return 0 if results and all(item['passed'] for item in results) else 1
+
+if __name__ == '__main__':
+    raise SystemExit(main())

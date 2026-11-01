@@ -88,9 +88,20 @@ func (s *GameService) p5GoldEggOptions(tx *gorm.DB) ([]p5GoldEggOption, error) {
 	if e := s.seedP5GoldEgg(tx); e != nil {
 		return nil, e
 	}
-	var cfg db.P5GoldEggRule
-	if e := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&cfg, "id=?", constUtil.P5GoldEggRuleID).Error; e != nil {
+	var probe db.P5GoldEggRule
+	if e := tx.Select("frozen").First(&probe, "id=?", constUtil.P5GoldEggRuleID).Error; e != nil {
 		return nil, e
+	}
+	strength := "UPDATE"
+	if len(probe.Frozen) > 0 {
+		strength = "SHARE"
+	}
+	var cfg db.P5GoldEggRule
+	if e := tx.Clauses(clause.Locking{Strength: strength}).First(&cfg, "id=?", constUtil.P5GoldEggRuleID).Error; e != nil {
+		return nil, e
+	}
+	if strength == "SHARE" && len(cfg.Frozen) == 0 {
+		return nil, constUtil.ErrConfigurationReadRetry
 	}
 	if !cfg.Enabled {
 		return nil, errors.New("失落金蛋暂未开放")
@@ -208,7 +219,7 @@ func (s *GameService) p5AppendGoldEggBinding(tx *gorm.DB, directory *db.P4Resour
 		}
 	}
 	var live db.P4CommerceRule
-	e := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&live, "id=?", key).Error
+	e := tx.Clauses(clause.Locking{Strength: p4ExchangeChildLock(tx)}).First(&live, "id=?", key).Error
 	if errors.Is(e, gorm.ErrRecordNotFound) {
 		return nil
 	}
@@ -221,6 +232,9 @@ func (s *GameService) p5AppendGoldEggBinding(tx *gorm.DB, directory *db.P4Resour
 	}
 	if cfg.Kind != "exchange" || len(rules.Products) != 1 || rules.Products[0].ID != "item_360" {
 		return errors.New("金蛋供给目录无效")
+	}
+	if err := p4RequireExchangeDirectoryWrite(tx); err != nil {
+		return err
 	}
 	if len(live.Frozen) == 0 {
 		raw, _ := json.Marshal(cfg)

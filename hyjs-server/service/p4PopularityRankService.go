@@ -18,6 +18,13 @@ import (
 // popularity SKU or their existing per-player state. Operators publish its
 // window and version before opening; the first list freezes all terms.
 func (s *GameService) seedP4PopularityRank(tx *gorm.DB, now time.Time) error {
+	var existing int64
+	if err := tx.Model(&db.P4CommerceRule{}).Where("id=?", constUtil.P4PopularityRankRulePrefix+"local-v1").Count(&existing).Error; err != nil {
+		return err
+	}
+	if existing > 0 {
+		return nil
+	}
 	product := p4BaseProduct("p4PopularityRank_local_v1_1", "item_001,1", "popularity,20", 1, 10)
 	product.MaxRank, product.DailyLimit, product.TotalLimit = 1000, 1, 1
 	rules := p4CommerceRules{Products: []p4Product{product}}

@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"crypto/rand"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -122,7 +123,18 @@ func (s *GameService) seedP4Memory(tx *gorm.DB, now time.Time) error {
 	return tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&cfg).Error
 }
 
+type p4CommerceSeedKey struct{}
+type p4CommerceSeed struct {
+	tx    *sql.Tx
+	month string
+}
+
 func (s *GameService) seedP4Commerce(tx *gorm.DB, now time.Time) error {
+	month := now.In(time.FixedZone("UTC+8", 8*3600)).Format("200601")
+	actual, transactional := tx.Statement.ConnPool.(*sql.Tx)
+	if prior, ok := tx.Statement.Context.Value(p4CommerceSeedKey{}).(p4CommerceSeed); ok && transactional && prior.tx == actual && prior.month == month {
+		return nil
+	}
 	local := now.In(time.FixedZone("UTC+8", 8*3600))
 	start := time.Date(local.Year(), local.Month(), 1, 0, 0, 0, 0, local.Location())
 	end := start.AddDate(0, 1, 0)
@@ -229,7 +241,15 @@ func (s *GameService) seedP4Commerce(tx *gorm.DB, now time.Time) error {
 	if err := s.seedP4PopularityRank(tx, now); err != nil {
 		return err
 	}
-	return s.seedP4GuildShop(tx, now)
+	if err := s.seedP4GuildShop(tx, now); err != nil {
+		return err
+	}
+	// Reuse preparation only inside this SQL transaction. A rollback or a new
+	// transaction never inherits an uncommitted catalogue.
+	if transactional {
+		tx.Statement.Context = context.WithValue(tx.Statement.Context, p4CommerceSeedKey{}, p4CommerceSeed{tx: actual, month: month})
+	}
+	return nil
 }
 
 func (s *GameService) p4ParseCost(content string) (*pb.BaseResource, error) {
@@ -473,7 +493,7 @@ func (s *GameService) loadP4CommerceForMemory(tx *gorm.DB, id int64, key string,
 		return q.Order("start_at DESC,id DESC")
 	}
 	strength := "UPDATE"
-	if memory && !forceExclusive {
+	if !forceExclusive {
 		strength = "SHARE"
 		var candidates []db.P4CommerceRule
 		if err := query().Select("rules", "frozen").Find(&candidates).Error; err != nil {
@@ -529,8 +549,11 @@ func (s *GameService) loadP4CommerceForMemory(tx *gorm.DB, id int64, key string,
 		}
 		if len(live.Frozen) == 0 && !rules.LiveEditable {
 			// 后台可能在无锁预读后更改规则；回滚共享锁事务后重新独占读取，避免锁升级死锁。
-			if memory && strength == "SHARE" {
-				return cfg, rules, nil, nil, retryFreeze
+			if strength == "SHARE" {
+				if retryFreeze != nil {
+					return cfg, rules, nil, nil, retryFreeze
+				}
+				return cfg, rules, nil, nil, constUtil.ErrConfigurationReadRetry
 			}
 			raw, _ := json.Marshal(cfg)
 			if err = tx.Model(&live).Update("frozen", raw).Error; err != nil {
@@ -781,7 +804,7 @@ func (s *GameService) p4Projection(tx *gorm.DB, p *pb.Player, cfg db.P4CommerceR
 			if cfg.Kind == "memory" {
 				stock = memoryStock[memorySource55(product)]
 			} else {
-				err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("rule_id = ? AND product_id = ?", cfg.ID, memorySource55(product)).First(&stock).Error
+				err := tx.Where("rule_id = ? AND product_id = ?", cfg.ID, memorySource55(product)).First(&stock).Error
 				if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 					return nil, nil, err
 				}

@@ -185,6 +185,11 @@ func (s *GameService) PrepareAdminCharacterActivitySchedules(ctx context.Context
 			if err := s.adminPersistTypedActivity(tx, definition, key, form, true, false); err != nil {
 				return err
 			}
+			if definition.domain == "period" {
+				if err := tx.Model(&db.PeriodInstance{}).Where("id=?", key).Updates(map[string]any{"owner_player_id": playerID, "realm_id": s.OriginalServerID()}).Error; err != nil {
+					return err
+				}
+			}
 			issued = db.AdminCharacterActivityInstance{PlayerID: playerID, OccurrenceID: schedule.ID, ServerID: s.OriginalServerID(), ConsumerID: definition.domain + ":" + key, ConsumerKey: key, Mode: schedule.Mode, StartAt: startAt, EndAt: endAt, ClaimEndAt: claimEndAt, SourceVersion: adminVersion(schedule), FormJSON: adminJSON(form)}
 			if form.Mode == "shop-window" && !adminOrdinarySchedulableShop(form.Options.ShopKey) {
 				issued.ConsumerID = "shop-gate:" + key

@@ -163,7 +163,7 @@ func (s *GameService) RecordP4Save(tx *gorm.DB, row *db.Profile, p *pb.Player, g
 
 func (s *GameService) recordP4PowerEntry(tx *gorm.DB, id int64, power int32, now time.Time) error {
 	// 与RecordP1Event保持相同锁顺序，跨角色同时进入新窗口时避免逆序锁等待。
-	instances, err := p1LockPeriods(tx)
+	instances, err := s.p1EventPeriods(tx, id, constUtil.P4KindPower)
 	if err != nil {
 		return err
 	}
@@ -220,9 +220,6 @@ func (s *GameService) RecordP4Login(ctx context.Context, id int64) error {
 			}
 			p, g, err := decodeProfileForCalendarUpdate(tx, &row)
 			if err != nil {
-				return err
-			}
-			if _, err := p1LockPeriods(tx); err != nil {
 				return err
 			}
 			return s.RecordP4Save(tx, &row, p, g)

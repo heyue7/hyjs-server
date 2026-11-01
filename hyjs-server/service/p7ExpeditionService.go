@@ -182,7 +182,7 @@ func (s *GameService) InitializeP7Expedition(ctx context.Context) error {
 
 func (s *GameService) p7ExpeditionPolicy(tx *gorm.DB, p *pb.Player, requireEnabled bool) (db.P7ExpeditionPolicy, error) {
 	var cfg db.P7ExpeditionPolicy
-	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&cfg, constUtil.P7ExpeditionPolicyID).Error; err != nil {
+	if err := tx.Clauses(clause.Locking{Strength: "SHARE"}).First(&cfg, constUtil.P7ExpeditionPolicyID).Error; err != nil {
 		return cfg, err
 	}
 	if !requireEnabled {

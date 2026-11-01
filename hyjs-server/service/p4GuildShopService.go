@@ -131,7 +131,7 @@ func (s *GameService) p4GuildShop(ctx context.Context, id int64, request proto.M
 			return errors.New(constUtil.P13GuildClosed)
 		}
 		var policy db.P13GuildPolicy
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&policy, 1).Error; err != nil {
+		if err := tx.Clauses(clause.Locking{Strength: "SHARE"}).First(&policy, 1).Error; err != nil {
 			return err
 		}
 		var profile db.Profile

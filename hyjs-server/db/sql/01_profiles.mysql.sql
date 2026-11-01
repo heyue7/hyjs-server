@@ -15,5 +15,6 @@ CREATE TABLE IF NOT EXISTS profiles (
   created_at BIGINT NULL,
   password_salt LONGBLOB NULL,
   password_hash LONGBLOB NULL,
-  UNIQUE KEY profiles_uid (uid)
+  UNIQUE KEY profiles_uid (uid),
+  KEY idx_profiles_server_id (server_id)
 ) ENGINE=InnoDB;

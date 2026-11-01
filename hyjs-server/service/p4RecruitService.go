@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
+	"hyjs-server/constUtil"
 	"hyjs-server/db"
 	"sort"
 	"time"
@@ -101,9 +102,23 @@ func (s *GameService) loadP4Rotation(tx *gorm.DB, kind int32, now time.Time) ([]
 	if err := s.seedP4Rotations(tx, now); err != nil {
 		return nil, 0, err
 	}
+	query := func() *gorm.DB {
+		return tx.Where("kind=? AND enabled=? AND start_at<=? AND end_at>?", kind, true, now.UnixMilli(), now.UnixMilli()).Order("start_at DESC,id DESC")
+	}
+	var probe []db.P4RecruitRotation
+	if err := query().Select("id", "frozen").Find(&probe).Error; err != nil {
+		return nil, 0, err
+	}
+	strength := "SHARE"
+	for _, candidate := range probe {
+		if len(candidate.Frozen) == 0 {
+			strength = "UPDATE"
+			break
+		}
+	}
 	var cfg db.P4RecruitRotation
 	var candidates []db.P4RecruitRotation
-	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("kind=? AND enabled=? AND start_at<=? AND end_at>?", kind, true, now.UnixMilli(), now.UnixMilli()).Order("start_at DESC,id DESC").Find(&candidates).Error; err != nil {
+	if err := query().Clauses(clause.Locking{Strength: strength}).Find(&candidates).Error; err != nil {
 		return nil, 0, err
 	}
 	for _, candidate := range candidates {
@@ -124,6 +139,9 @@ func (s *GameService) loadP4Rotation(tx *gorm.DB, kind int32, now time.Time) ([]
 		return nil, 0, err
 	}
 	if len(cfg.Frozen) == 0 {
+		if strength == "SHARE" {
+			return nil, 0, constUtil.ErrConfigurationReadRetry
+		}
 		if err := tx.Model(&cfg).Update("frozen", raw).Error; err != nil {
 			return nil, 0, err
 		}

@@ -180,10 +180,23 @@ func (s *GameService) loadReOperationsWelfareQuote(tx *gorm.DB, owner int64, key
 	if !allowed {
 		return nil, cfg, rules, nil, constUtil.ErrP4WelfareNotOpen
 	}
-	if err = tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&cfg, "id=? AND kind=? AND enabled=?", key, kind, true).Error; err != nil {
+	refresh = refresh && kind == constUtil.ReWelfareCatKind
+	strength := "SHARE"
+	if !refresh {
+		var probe db.P4WelfareRule
+		if err = tx.Select("id", "frozen").First(&probe, "id=?", key).Error; err != nil {
+			return nil, cfg, rules, nil, err
+		}
+		if len(probe.Frozen) == 0 {
+			strength = "UPDATE"
+		}
+	}
+	if err = tx.Clauses(clause.Locking{Strength: strength}).First(&cfg, "id=? AND kind=? AND enabled=?", key, kind, true).Error; err != nil {
 		return nil, cfg, rules, nil, err
 	}
-	refresh = refresh && kind == constUtil.ReWelfareCatKind
+	if !refresh && strength == "SHARE" && len(cfg.Frozen) == 0 {
+		return nil, cfg, rules, nil, constUtil.ErrConfigurationReadRetry
+	}
 	if len(cfg.Frozen) > 0 && !refresh {
 		if json.Unmarshal(cfg.Frozen, &cfg) != nil {
 			return nil, cfg, rules, nil, constUtil.ErrAdminConfiguration
@@ -505,7 +518,7 @@ func (s *GameService) reOperationsWelfareTabs(tx *gorm.DB, now time.Time) ([]*pb
 			continue
 		}
 		var cfg db.P4WelfareRule
-		if err = tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&cfg, "id=? AND kind=? AND enabled=?", key, spec.kind, true).Error; err != nil {
+		if err = tx.Clauses(clause.Locking{Strength: "SHARE"}).First(&cfg, "id=? AND kind=? AND enabled=?", key, spec.kind, true).Error; err != nil {
 			return nil, err
 		}
 		if len(cfg.Frozen) > 0 && spec.kind != constUtil.ReWelfareCatKind {

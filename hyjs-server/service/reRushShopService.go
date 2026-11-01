@@ -28,12 +28,22 @@ func reRushShopRules() p4CommerceRules {
 // bytes, player progress, stock and receipts stay in place. Operator edits win.
 func (s *GameService) seedReRushShop(tx *gorm.DB, now time.Time) error {
 	var source db.P4CommerceRule
-	err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("kind=? AND id NOT LIKE ?", "point", "shop_schedule_%").Order("start_at DESC,id DESC").First(&source).Error
+	err := tx.Where("kind=? AND id NOT LIKE ?", "point", "shop_schedule_%").Order("start_at DESC,id DESC").First(&source).Error
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		return err
 	}
 	if err == nil && strings.Contains(source.Source, constUtil.ReRushShopPolicy) {
 		return nil
+	}
+	if err == nil {
+		// A current catalogue is read-only on player requests. Only a legacy
+		// migration re-reads the exact row exclusively before inspecting edits.
+		if err = tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&source, "id=?", source.ID).Error; err != nil {
+			return err
+		}
+		if strings.Contains(source.Source, constUtil.ReRushShopPolicy) {
+			return nil
+		}
 	}
 	if gameSchemaHasTable(tx, &db.AdminAudit{}) {
 		var edits int64

@@ -424,6 +424,7 @@ func (s *GameService) localPlayCreateScopedCycle(tx *gorm.DB, id int64, def loca
 				cfg.Source += constUtil.P7AincradPersonalSource
 			}
 			cfg.ID = localPlayCloneKey(cfg.ID, cycle.ID, len(snapshot.Periods))
+			cfg.OwnerPlayerID, cfg.RealmID = id, s.OriginalServerID()
 			cfg.Frozen = nil
 			cfg.StartAt, cfg.EndAt, cfg.RewardEndAt = cycle.StartAt, cycle.EndAt, cycle.RewardEndAt
 			if err := s.validateP1Period(cfg); err != nil {

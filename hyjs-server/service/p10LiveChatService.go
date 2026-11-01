@@ -23,9 +23,18 @@ type p10ClientSink struct {
 	close          func()
 	tradeReady     atomic.Bool
 	disconnectedAt atomic.Int64
-	// 场景锁保护的短期公会展示缓存，随连接释放。
+	sceneMutation  sync.Mutex
+	pushQueue      chan p10PushBatch
+	pushDone       chan struct{}
+	pushStop       sync.Once
+	// 角色场景锁保护的短期公会展示缓存，随连接释放。
 	sceneGuildName  string
 	sceneGuildUntil time.Time
+}
+
+type p10PushBatch struct {
+	ctx      context.Context
+	messages []proto.Message
 }
 
 var p10ClientSinks sync.Map
@@ -34,6 +43,34 @@ var p10ClientSinks sync.Map
 // visible. Broadcasts can hold the scene lock, so they only mark/close a failed
 // sink and schedule retirement; they never wait for this mutex.
 var p10ClientLifecycle sync.Mutex
+
+type p10LifecycleEntry struct {
+	mutex sync.Mutex
+	users int
+}
+
+var p10ClientLifecycleEntries = make(map[p10ClientKey]*p10LifecycleEntry)
+
+func p10LockClientLifecycle(key p10ClientKey) func() {
+	p10ClientLifecycle.Lock()
+	entry := p10ClientLifecycleEntries[key]
+	if entry == nil {
+		entry = &p10LifecycleEntry{}
+		p10ClientLifecycleEntries[key] = entry
+	}
+	entry.users++
+	p10ClientLifecycle.Unlock()
+	entry.mutex.Lock()
+	return func() {
+		entry.mutex.Unlock()
+		p10ClientLifecycle.Lock()
+		entry.users--
+		if entry.users == 0 {
+			delete(p10ClientLifecycleEntries, key)
+		}
+		p10ClientLifecycle.Unlock()
+	}
+}
 
 func p10LiveClient(key p10ClientKey) (any, bool) {
 	value, ok := p10ClientSinks.Load(key)
@@ -44,8 +81,13 @@ func p10LiveClient(key p10ClientKey) (any, bool) {
 }
 
 func p10MarkDisconnected(sink *p10ClientSink, closeSocket bool) {
-	if sink.disconnectedAt.CompareAndSwap(0, time.Now().UnixMilli()) && closeSocket && sink.close != nil {
-		sink.close()
+	if sink.disconnectedAt.CompareAndSwap(0, time.Now().UnixMilli()) {
+		if sink.pushDone != nil {
+			sink.pushStop.Do(func() { close(sink.pushDone) })
+		}
+		if closeSocket && sink.close != nil {
+			sink.close()
+		}
 	}
 }
 
@@ -71,8 +113,8 @@ func (s *GameService) p10CleanupClient(ctx context.Context, key p10ClientKey, si
 func (s *GameService) p10RetireFailedPush(ctx context.Context, id int64, sink *p10ClientSink) {
 	p10MarkDisconnected(sink, true)
 	go func() {
-		p10ClientLifecycle.Lock()
-		defer p10ClientLifecycle.Unlock()
+		release := p10LockClientLifecycle(p10ClientKey{s.p10ClientOwner(), id})
+		defer release()
 		if err := s.p10CleanupClient(ctx, p10ClientKey{s.p10ClientOwner(), id}, sink); err != nil {
 			elog.Warn("p10 failed push cleanup failed", zap.Int64("player_id", id), zap.Error(err))
 		}
@@ -94,12 +136,18 @@ func (s *GameService) RegisterP10Client(ctx context.Context, id int64, session [
 	if len(closeConnection) > 0 {
 		sink.close = closeConnection[0]
 	}
-	p10ClientLifecycle.Lock()
+	// Socket consumers provide a close callback, allowing bounded asynchronous
+	// delivery and retirement on backpressure. Inline consumers stay synchronous.
+	if sink.close != nil {
+		sink.pushQueue = make(chan p10PushBatch, constUtil.P10PushQueueDepth)
+		sink.pushDone = make(chan struct{})
+	}
+	release := p10LockClientLifecycle(key)
 	if old, ok := p10ClientSinks.Load(key); ok {
 		previous := old.(*p10ClientSink)
 		p10MarkDisconnected(previous, true)
 		if err := s.p10CleanupClient(ctx, key, previous); err != nil {
-			p10ClientLifecycle.Unlock()
+			release()
 			elog.Warn("p10 old connection cleanup failed", zap.Int64("player_id", id), zap.Error(err))
 			if sink.close != nil {
 				sink.close()
@@ -108,7 +156,7 @@ func (s *GameService) RegisterP10Client(ctx context.Context, id int64, session [
 		}
 	}
 	if err := s.ClientUpdateConnected(ctx, id, session); err != nil {
-		p10ClientLifecycle.Unlock()
+		release()
 		elog.Warn("p10 connection status update failed", zap.Int64("player_id", id), zap.Error(err))
 		if sink.close != nil {
 			sink.close()
@@ -116,7 +164,10 @@ func (s *GameService) RegisterP10Client(ctx context.Context, id int64, session [
 		return func() {}
 	}
 	p10ClientSinks.Store(key, sink)
-	p10ClientLifecycle.Unlock()
+	release()
+	if sink.pushQueue != nil {
+		go s.p10DeliverQueuedPushes(id, sink)
+	}
 	// A newly connected socket cannot inherit an uncompleted trade from a
 	// disconnected/replaced socket, even if its account session is unchanged.
 	if s.ggoExtractionEnabled() {
@@ -133,8 +184,8 @@ func (s *GameService) RegisterP10Client(ctx context.Context, id int64, session [
 	}
 	return func() {
 		p10MarkDisconnected(sink, false)
-		p10ClientLifecycle.Lock()
-		defer p10ClientLifecycle.Unlock()
+		release := p10LockClientLifecycle(key)
+		defer release()
 		if err := s.p10CleanupClient(ctx, key, sink); err != nil {
 			elog.Warn("p10 connection cleanup failed", zap.Int64("player_id", id), zap.Error(err))
 		}
@@ -144,7 +195,7 @@ func (s *GameService) publishP10Private(ctx context.Context, id int64, message p
 	s.publishP10PrivateBatch(ctx, id, []proto.Message{message})
 }
 
-// publishP10PrivateBatch rechecks current authorization once before synchronous ordered frames.
+// Each connected socket owns its ordered queue; slow sockets cannot stall other players.
 func (s *GameService) publishP10PrivateBatch(ctx context.Context, id int64, messages []proto.Message) {
 	if len(messages) == 0 {
 		return
@@ -164,6 +215,41 @@ func (s *GameService) publishP10PrivateBatchPinned(ctx context.Context, id int64
 	if sink == nil || len(messages) == 0 {
 		return
 	}
+	key := p10ClientKey{s.p10ClientOwner(), id}
+	current, ok := p10LiveClient(key)
+	if !ok || current != sink {
+		return
+	}
+	if sink.pushQueue != nil {
+		batch := p10PushBatch{ctx: context.WithoutCancel(ctx), messages: make([]proto.Message, len(messages))}
+		for i, message := range messages {
+			batch.messages[i] = proto.Clone(message)
+		}
+		select {
+		case sink.pushQueue <- batch:
+		case <-sink.pushDone:
+		default:
+			s.p10RetireFailedPush(ctx, id, sink)
+		}
+		return
+	}
+	s.p10DeliverPrivateBatch(ctx, id, sink, messages)
+}
+
+func (s *GameService) p10DeliverQueuedPushes(id int64, sink *p10ClientSink) {
+	for {
+		select {
+		case <-sink.pushDone:
+			return
+		case batch := <-sink.pushQueue:
+			ctx, cancel := context.WithTimeout(batch.ctx, constUtil.P10SceneCleanupTimeout)
+			s.p10DeliverPrivateBatch(ctx, id, sink, batch.messages)
+			cancel()
+		}
+	}
+}
+
+func (s *GameService) p10DeliverPrivateBatch(ctx context.Context, id int64, sink *p10ClientSink, messages []proto.Message) {
 	key := p10ClientKey{s.p10ClientOwner(), id}
 	current, ok := p10LiveClient(key)
 	if !ok || current != sink {

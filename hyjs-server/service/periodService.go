@@ -91,7 +91,7 @@ func p1PeriodSnapshot(live db.PeriodInstance) (db.PeriodInstance, error) {
 
 // freezeP1Period 在第一次事实写入或截止结算时冻结整个实例，修改未来规则须创建新ID。
 func (s *GameService) freezeP1Period(tx *gorm.DB, live db.PeriodInstance, freeze bool) (db.PeriodInstance, error) {
-	if freeze && p1SharedRead(tx) {
+	if freeze && len(live.Frozen) == 0 && p1SharedRead(tx) {
 		return live, constUtil.ErrP1ExclusiveRetry
 	}
 	cfg, err := p1PeriodSnapshot(live)
@@ -225,9 +225,20 @@ func (s *GameService) p1ActivityApply(tx *gorm.DB, id int64, player *pb.Player, 
 	if err := s.p15SeasonalGuard(tx, key, LocalPlayNow(tx.Statement.Context)); err != nil {
 		return nil, err
 	}
-	var live db.PeriodInstance
-	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ?", key).First(&live).Error; err != nil {
+	var before db.PeriodInstance
+	if err := tx.Select("frozen").First(&before, "id=?", key).Error; err != nil {
 		return nil, errors.New("活动实例不存在")
+	}
+	strength := "SHARE"
+	if len(before.Frozen) == 0 {
+		strength = "UPDATE"
+	}
+	var live db.PeriodInstance
+	if err := tx.Clauses(clause.Locking{Strength: strength}).First(&live, "id=?", key).Error; err != nil {
+		return nil, errors.New("活动实例不存在")
+	}
+	if strength == "SHARE" && len(live.Frozen) == 0 {
+		return nil, constUtil.ErrConfigurationReadRetry
 	}
 	cfg, err := s.freezeP1Period(tx, live, false)
 	if err != nil {
@@ -236,7 +247,7 @@ func (s *GameService) p1ActivityApply(tx *gorm.DB, id int64, player *pb.Player, 
 	if !cfg.Enabled || now < cfg.StartAt || now >= cfg.RewardEndAt {
 		return nil, errors.New("活动未开放或领奖截止")
 	}
-	progress, frozen, err := s.p1Progress(tx, cfg, id)
+	progress, frozen, err := s.p1ProgressForUpdate(tx, cfg, id)
 	if err != nil {
 		return nil, err
 	}

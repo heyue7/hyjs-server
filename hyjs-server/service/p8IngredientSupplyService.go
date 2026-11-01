@@ -58,7 +58,7 @@ func (s *GameService) p8AppendIngredientBindings(tx *gorm.DB, directory *db.P4Re
 		}
 	}
 	var live db.P4CommerceRule
-	e := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&live, "id=?", key).Error
+	e := tx.Clauses(clause.Locking{Strength: p4ExchangeChildLock(tx)}).First(&live, "id=?", key).Error
 	if errors.Is(e, gorm.ErrRecordNotFound) {
 		return nil
 	}
@@ -74,6 +74,9 @@ func (s *GameService) p8AppendIngredientBindings(tx *gorm.DB, directory *db.P4Re
 	}
 	if cfg.Kind != "exchange" || len(rules.Products) != 10 || len(*bindings)+10 > 1000 {
 		return errors.New("高阶料理食材供应目录无效")
+	}
+	if err := p4RequireExchangeDirectoryWrite(tx); err != nil {
+		return err
 	}
 	if len(live.Frozen) == 0 {
 		raw, _ := json.Marshal(cfg)

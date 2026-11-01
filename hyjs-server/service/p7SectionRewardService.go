@@ -124,7 +124,7 @@ func (s *GameService) p7CaptureSectionOffer(tx *gorm.DB, fight *db.P7RushFight) 
 		return err
 	}
 	var policy db.P7SectionRewardPolicy
-	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&policy, constUtil.P7SectionRewardPolicyID).Error; err != nil {
+	if err := tx.Clauses(clause.Locking{Strength: "SHARE"}).First(&policy, constUtil.P7SectionRewardPolicyID).Error; err != nil {
 		return err
 	}
 	if !policy.Enabled {

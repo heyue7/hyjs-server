@@ -30,6 +30,82 @@ func p4ExchangeKey(now time.Time) string {
 	return constUtil.P4ResourceExchangePrefix + now.In(time.FixedZone("UTC+8", 8*3600)).Format("200601")
 }
 
+func p4ExchangeChildLock(tx *gorm.DB) string {
+	if read, _ := tx.Statement.Context.Value(constUtil.ExchangeDirectoryReadContextKey{}).(bool); read {
+		return "SHARE"
+	}
+	return "UPDATE"
+}
+
+func p4RequireExchangeDirectoryWrite(tx *gorm.DB) error {
+	if p4ExchangeChildLock(tx) == "SHARE" {
+		return constUtil.ErrExchangeDirectoryRetry
+	}
+	return nil
+}
+
+// Publication is uncommon. Discover missing eligible children without locking
+// the monthly directory; its existing mapping is rechecked under the chosen lock.
+func (s *GameService) p4ExchangeNeedsAppend(tx *gorm.DB, bindings []p4ExchangeBinding, now time.Time) (bool, error) {
+	month := now.In(time.FixedZone("UTC+8", 8*3600)).Format("200601")
+	prefixes := []string{constUtil.P5GoldEggSupplyPrefix, constUtil.P8IngredientSupplyPrefix, constUtil.P15RedOSSupplyPrefix, constUtil.P5CrystalSupplyPrefix, constUtil.P4LuckySupplyPrefix, constUtil.P5WorldSeedSupplyPrefix, constUtil.P5AwakeMaterialSupplyPrefix, constUtil.P5GrowthResourceSupplyPrefix, constUtil.P5AwakeElementSupplyPrefix, constUtil.P5GloryFragmentSupplyPrefix, constUtil.P9PetFoodSupplyPrefix}
+	bound := make(map[string]bool, len(bindings))
+	for _, binding := range bindings {
+		bound[binding.ChildID] = true
+	}
+	var missing []string
+	for _, prefix := range prefixes {
+		if key := prefix + month; !bound[key] {
+			missing = append(missing, key)
+		}
+	}
+	if len(missing) == 0 {
+		return false, nil
+	}
+	var rows []db.P4CommerceRule
+	if err := tx.Where("id IN ?", missing).Find(&rows).Error; err != nil {
+		return false, err
+	}
+	for _, live := range rows {
+		if strings.HasPrefix(live.ID, constUtil.P5GoldEggSupplyPrefix) {
+			return true, nil // The original gold-egg mapping is published even before its use switch opens.
+		}
+		if !live.Enabled {
+			continue
+		}
+		if strings.HasPrefix(live.ID, constUtil.P15RedOSSupplyPrefix) {
+			allowed, err := p15RedOSSupplyAllowed(tx)
+			if err != nil {
+				return false, err
+			}
+			if allowed {
+				return true, nil
+			}
+			continue
+		}
+		if strings.HasPrefix(live.ID, constUtil.P8IngredientSupplyPrefix) || strings.HasPrefix(live.ID, constUtil.P5CrystalSupplyPrefix) {
+			return true, nil
+		}
+		if strings.HasPrefix(live.ID, constUtil.P4LuckySupplyPrefix) {
+			ready, err := p4LuckySupplyReady(tx)
+			if err != nil {
+				return false, err
+			}
+			if !ready {
+				continue
+			}
+		}
+		cfg, _, err := s.p4CommerceSnapshot(live)
+		if err != nil {
+			return false, err
+		}
+		if now.UnixMilli() >= cfg.StartAt && now.UnixMilli() < cfg.EndAt {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 // p4ExchangeDirectory holds stable outer indices while every child owns its original quota.
 func (s *GameService) p4ExchangeDirectory(tx *gorm.DB, key string, now time.Time) (*db.P4ResourceExchangeDirectory, []p4ExchangeBinding, error) {
 	expected, err := localPlayExchangeKey(tx, now)
@@ -52,20 +128,47 @@ func (s *GameService) p4ExchangeDirectory(tx *gorm.DB, key string, now time.Time
 	local := now.In(time.FixedZone("UTC+8", 8*3600))
 	start := time.Date(local.Year(), local.Month(), 1, 0, 0, 0, 0, local.Location())
 	row := &db.P4ResourceExchangeDirectory{ID: key, Enabled: true, StartAt: start.UnixMilli(), EndAt: start.AddDate(0, 1, 0).UnixMilli(), Source: constUtil.P4ResourceExchangeSource, Bindings: []byte{}, InputHash: ""}
-	// Create the directory lock before child locks so concurrent first queries share one mapping.
-	if !private {
+	var observed db.P4ResourceExchangeDirectory
+	readErr := tx.First(&observed, "id=?", key).Error
+	if readErr != nil && !errors.Is(readErr, gorm.ErrRecordNotFound) {
+		return nil, nil, readErr
+	}
+	strength := "UPDATE"
+	force, _ := tx.Statement.Context.Value(constUtil.ExchangeDirectoryWriteContextKey{}).(bool)
+	if readErr == nil && len(observed.Bindings) > 0 && !force {
+		var existing []p4ExchangeBinding
+		if err := json.Unmarshal(observed.Bindings, &existing); err != nil {
+			return nil, nil, errors.New("资源兑换映射损坏")
+		}
+		needsAppend := false
+		if !private {
+			needsAppend, err = s.p4ExchangeNeedsAppend(tx, existing, now)
+			if err != nil {
+				return nil, nil, err
+			}
+		}
+		if !needsAppend {
+			strength = "SHARE"
+		}
+	}
+	// Only first creation and actual publication acquire the monthly writer.
+	if !private && errors.Is(readErr, gorm.ErrRecordNotFound) {
 		if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(row).Error; err != nil {
 			return nil, nil, err
 		}
 	}
-	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(row, "id=?", key).Error; err != nil {
+	if err := tx.Clauses(clause.Locking{Strength: strength}).First(row, "id=?", key).Error; err != nil {
 		return nil, nil, err
 	}
+	tx = tx.WithContext(context.WithValue(tx.Statement.Context, constUtil.ExchangeDirectoryReadContextKey{}, strength == "SHARE"))
 	if !row.Enabled || now.UnixMilli() < row.StartAt || now.UnixMilli() >= row.EndAt {
 		return nil, nil, errors.New("资源兑换实例未开放")
 	}
 	var bindings []p4ExchangeBinding
 	if len(row.Bindings) == 0 {
+		if err := p4RequireExchangeDirectoryWrite(tx); err != nil {
+			return nil, nil, err
+		}
 		if private {
 			return nil, nil, errors.New("私期资源兑换冻结目录缺失")
 		}

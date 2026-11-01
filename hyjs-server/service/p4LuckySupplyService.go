@@ -94,7 +94,7 @@ func (s *GameService) p4AppendLuckySupplyBinding(tx *gorm.DB, directory *db.P4Re
 		}
 	}
 	var live db.P4CommerceRule
-	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&live, "id=?", key).Error; err != nil {
+	if err := tx.Clauses(clause.Locking{Strength: p4ExchangeChildLock(tx)}).First(&live, "id=?", key).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil
 		}
@@ -116,6 +116,9 @@ func (s *GameService) p4AppendLuckySupplyBinding(tx *gorm.DB, directory *db.P4Re
 	}
 	if now.UnixMilli() < cfg.StartAt || now.UnixMilli() >= cfg.EndAt {
 		return nil
+	}
+	if err := p4RequireExchangeDirectoryWrite(tx); err != nil {
+		return err
 	}
 	if len(live.Frozen) == 0 {
 		raw, _ := json.Marshal(cfg)

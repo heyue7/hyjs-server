@@ -235,9 +235,20 @@ func (s *GameService) bindKingRecruitActivityRules(tx *gorm.DB, key string) erro
 			return nil
 		}
 	}
-	var snapshot db.KingRecruitActivitySnapshot
-	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&snapshot, "pool_id=?", key).Error; err != nil {
+	var snapshotProbe db.KingRecruitActivitySnapshot
+	if err := tx.Select("frozen").First(&snapshotProbe, "pool_id=?", key).Error; err != nil {
 		return err
+	}
+	strength := "UPDATE"
+	if snapshotProbe.Frozen {
+		strength = "SHARE"
+	}
+	var snapshot db.KingRecruitActivitySnapshot
+	if err := tx.Clauses(clause.Locking{Strength: strength}).First(&snapshot, "pool_id=?", key).Error; err != nil {
+		return err
+	}
+	if strength == "SHARE" && !snapshot.Frozen {
+		return constUtil.ErrConfigurationReadRetry
 	}
 	var source adminKingRecruitSource
 	if json.Unmarshal(snapshot.Payload, &source) != nil || source.Pool.ID != key {

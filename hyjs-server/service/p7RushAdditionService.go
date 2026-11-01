@@ -80,7 +80,7 @@ func (s *GameService) p7CaptureRushAdditionOffer(tx *gorm.DB, fight *db.P7RushFi
 		return err
 	}
 	var policy db.P7RushAdditionPolicy
-	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&policy, constUtil.P7RushAdditionPolicyID).Error; err != nil {
+	if err := tx.Clauses(clause.Locking{Strength: "SHARE"}).First(&policy, constUtil.P7RushAdditionPolicyID).Error; err != nil {
 		return err
 	}
 	if !policy.Enabled {

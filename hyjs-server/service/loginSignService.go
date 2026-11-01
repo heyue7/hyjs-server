@@ -226,7 +226,7 @@ func (s *GameService) loadP4Welfare(tx *gorm.DB, id int64, kind string, now time
 		// 原协议没有实例ID，先补领宽限期内已经达成的旧实例，再展示当前实例。
 		order = "start_at ASC, id ASC"
 	}
-	query := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("kind = ? AND enabled = ?", kind, true)
+	query := tx.Where("kind = ? AND enabled = ?", kind, true)
 	var pendingKeys []string
 	if scopedKey != "" {
 		pendingKeys = []string{scopedKey}
@@ -248,6 +248,20 @@ func (s *GameService) loadP4Welfare(tx *gorm.DB, id int64, kind string, now time
 		}
 		sort.SliceStable(configs, func(i, j int) bool { return rank[configs[i].ID] < rank[configs[j].ID] })
 	}
+	parseWelfare := func(live db.P4WelfareRule) (db.P4WelfareRule, p4WelfareRules, bool, error) {
+		cfg := live
+		if len(live.Frozen) > 0 {
+			if err := json.Unmarshal(live.Frozen, &cfg); err != nil {
+				return empty, zero, false, err
+			}
+		}
+		cfg.Enabled = live.Enabled
+		rules, err := s.validateP4Welfare(cfg)
+		if err != nil {
+			return empty, zero, false, err
+		}
+		return cfg, rules, now.UnixMilli() >= cfg.StartAt && now.UnixMilli() < cfg.ClaimEndAt, nil
+	}
 	for _, live := range configs {
 		retired, e := p4WelfareRetired(tx, live.ID)
 		if e != nil {
@@ -260,26 +274,42 @@ func (s *GameService) loadP4Welfare(tx *gorm.DB, id int64, kind string, now time
 		if !allowed && retired == nil {
 			continue
 		}
-		cfg := live
-		if len(live.Frozen) > 0 {
-			if err := json.Unmarshal(live.Frozen, &cfg); err != nil {
-				return nil, empty, zero, nil, err
-			}
-			cfg.Enabled = live.Enabled
-		}
-		rules, err := s.validateP4Welfare(cfg)
+		cfg, rules, inWindow, err := parseWelfare(live)
 		if err != nil {
 			return nil, empty, zero, nil, err
 		}
-		if now.UnixMilli() < cfg.StartAt || now.UnixMilli() >= cfg.ClaimEndAt {
+		if !inWindow {
 			continue
 		}
-		if len(live.Frozen) == 0 {
-			frozen, err := json.Marshal(cfg)
-			if err != nil {
-				return nil, empty, zero, nil, err
+		strength := "UPDATE"
+		if len(live.Frozen) > 0 {
+			strength = "SHARE"
+		}
+		var locked db.P4WelfareRule
+		if err := tx.Clauses(clause.Locking{Strength: strength}).First(&locked, "id=?", live.ID).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				continue
 			}
-			if err = tx.Model(&live).Update("frozen", frozen).Error; err != nil {
+			return nil, empty, zero, nil, err
+		}
+		live = locked
+		if strength == "SHARE" && len(live.Frozen) == 0 {
+			return nil, empty, zero, nil, constUtil.ErrConfigurationReadRetry
+		}
+		if !live.Enabled || live.Kind != kind {
+			continue
+		}
+		cfg, rules, inWindow, err = parseWelfare(live)
+		if err != nil {
+			return nil, empty, zero, nil, err
+		}
+		if !inWindow {
+			continue
+		}
+		var frozen []byte
+		if len(live.Frozen) == 0 {
+			frozen, err = json.Marshal(cfg)
+			if err != nil {
 				return nil, empty, zero, nil, err
 			}
 		}
@@ -315,9 +345,7 @@ func (s *GameService) loadP4Welfare(tx *gorm.DB, id int64, kind string, now time
 			}
 			// Only already earned frozen rights enter this old no-ID page.
 			// Pending selection never accepts another old exploration or login.
-			return row, cfg, rules, state, nil
-		}
-		if now.UnixMilli() >= cfg.EndAt {
+		} else if now.UnixMilli() >= cfg.EndAt {
 			switch kind {
 			case constUtil.P4WelfareLogin:
 				var days int64
@@ -339,6 +367,11 @@ func (s *GameService) loadP4Welfare(tx *gorm.DB, id int64, kind string, now time
 				if state.CatTotal < rules.TotalLimit || state.CatFinal {
 					continue
 				}
+			}
+		}
+		if len(live.Frozen) == 0 {
+			if err = tx.Model(&live).Update("frozen", frozen).Error; err != nil {
+				return nil, empty, zero, nil, err
 			}
 		}
 		return row, cfg, rules, state, nil

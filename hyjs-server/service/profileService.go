@@ -334,6 +334,11 @@ func saveProfileAgainst(tx *gorm.DB, row *db.Profile, player *pb.Player, game *m
 }
 
 func saveProfileAgainstWithCraftPower(tx *gorm.DB, row *db.Profile, player *pb.Player, game *model.GameState, persisted *db.Profile, forceCraftPower bool) error {
+	if persisted == nil && game.ProfileStorageBaseline != nil {
+		baseline := game.ProfileStorageBaseline
+		persisted = &db.Profile{Player: &baseline.Player, Game: &baseline.Game}
+	}
+
 	if !game.GGOCreditLoaded {
 		if err := projectGGOCredit(row, game); err != nil {
 			return err
@@ -438,6 +443,7 @@ func saveProfileAgainstWithCraftPower(tx *gorm.DB, row *db.Profile, player *pb.P
 			return err
 		}
 	}
+	game.ProfileStorageBaseline = &model.ProfileStorageBaseline{Player: string(p), Game: string(g)}
 	if accountRoleChanged && row.AccountID > 0 {
 		snapshot := *row
 		playerJSON, gameJSON := string(p), string(g)

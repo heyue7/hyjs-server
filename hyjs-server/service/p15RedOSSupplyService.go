@@ -53,7 +53,7 @@ func (s *GameService) p15AppendRedOSBindings(tx *gorm.DB, directory *db.P4Resour
 		}
 	}
 	var live db.P4CommerceRule
-	e := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&live, "id=?", key).Error
+	e := tx.Clauses(clause.Locking{Strength: p4ExchangeChildLock(tx)}).First(&live, "id=?", key).Error
 	if errors.Is(e, gorm.ErrRecordNotFound) {
 		return nil
 	}
@@ -69,6 +69,9 @@ func (s *GameService) p15AppendRedOSBindings(tx *gorm.DB, directory *db.P4Resour
 	}
 	if cfg.Kind != "exchange" || len(rules.Products) != 3 || len(*bindings)+3 > 1000 {
 		return errors.New("三红碎片供应目录无效")
+	}
+	if err := p4RequireExchangeDirectoryWrite(tx); err != nil {
+		return err
 	}
 	if len(live.Frozen) == 0 {
 		raw, _ := json.Marshal(cfg)

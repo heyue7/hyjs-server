@@ -8,5 +8,7 @@ CREATE TABLE IF NOT EXISTS turntable_records (
   amount INT NOT NULL,
   jackpot BOOLEAN NOT NULL,
   created_at_millis BIGINT NOT NULL,
-  KEY idx_turntable_records_pool(pool_id)
+  KEY idx_turntable_records_pool(pool_id),
+  KEY idx_turntable_record_owner(pool_id,player_id,id),
+  KEY idx_turntable_record_reward(pool_id,player_id,resource_id,jackpot)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

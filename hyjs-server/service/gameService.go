@@ -148,7 +148,12 @@ func (s *GameService) Dispatch(ctx context.Context, request *model.GamePacket, p
 		case *pb.CSCombine, *pb.CSItemUse:
 			localOnly = true
 		}
-		if !localOnly || !errors.As(err, &mysqlErr) || mysqlErr.Number != 1213 || attempt+1 == constUtil.GameLocalMutationMaxAttempts {
+		retryDirectory := errors.Is(err, constUtil.ErrExchangeDirectoryRetry)
+		if retryDirectory {
+			ctx = context.WithValue(ctx, constUtil.ExchangeDirectoryWriteContextKey{}, true)
+		}
+		retryConfiguration := retryDirectory || errors.Is(err, constUtil.ErrConfigurationReadRetry)
+		if (!retryConfiguration && (!localOnly || !errors.As(err, &mysqlErr) || mysqlErr.Number != 1213)) || attempt+1 == constUtil.GameLocalMutationMaxAttempts {
 			break
 		}
 		timer := time.NewTimer(constUtil.GameLocalMutationRetryDelay * time.Duration(attempt+1))

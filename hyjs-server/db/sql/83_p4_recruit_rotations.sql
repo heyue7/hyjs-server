@@ -1,2 +1,2 @@
 -- P4 本地兼容规则，实例冻结、交易与回执在同一事务。
-CREATE TABLE IF NOT EXISTS p4_recruit_rotations (id VARBINARY(64) NOT NULL,kind INT NOT NULL,enabled BOOLEAN NOT NULL,start_at BIGINT NOT NULL,end_at BIGINT NOT NULL,rewards LONGBLOB NOT NULL,frozen LONGBLOB,source TEXT NOT NULL,PRIMARY KEY(id),KEY(kind)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE TABLE IF NOT EXISTS p4_recruit_rotations (id VARBINARY(64) NOT NULL,kind INT NOT NULL,enabled BOOLEAN NOT NULL,start_at BIGINT NOT NULL,end_at BIGINT NOT NULL,rewards LONGBLOB NOT NULL,frozen LONGBLOB,source TEXT NOT NULL,PRIMARY KEY(id),KEY(kind),KEY idx_p4_recruit_kind_window(kind,enabled,start_at,id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

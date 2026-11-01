@@ -21,6 +21,9 @@ func (s *GameService) InitializeP1(ctx context.Context) error {
 	if err := db.GetIns().WithContext(ctx).AutoMigrate(&db.RewardDelivery{}, &db.MailMessage{}, &db.EventFact{}, &db.PeriodInstance{}, &db.PeriodProgress{}, &db.PeriodSettlement{}, &db.P1LoginDirectoryMember{}, &db.P1GatherCatalogGuard{}); err != nil {
 		return err
 	}
+	if err := s.backfillP1Owners(ctx); err != nil {
+		return err
+	}
 	if err := p1InitializeGatherCatalog(db.GetIns().WithContext(ctx)); err != nil {
 		return err
 	}
@@ -53,6 +56,7 @@ func (s *GameService) GrantFixedReward(player *pb.Player, game *model.GameState,
 		return nil, err
 	}
 	// Preserve only the transaction-local source across this internal JSON clone.
+	copyGame.ProfileStorageBaseline = game.ProfileStorageBaseline
 	copyGame.GuildPrayerProjection = game.GuildPrayerProjection.Clone()
 	copyGame.FieldCalendarDay = game.FieldCalendarDay
 	copyGame.GGOCredit, copyGame.GGOCreditLoaded = game.GGOCredit, game.GGOCreditLoaded

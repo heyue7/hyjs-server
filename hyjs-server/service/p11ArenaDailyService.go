@@ -267,19 +267,89 @@ func p11ArenaDailyAccepted(tx *gorm.DB, fact *db.P11ArenaDailyChallenge) (*db.P1
 	return &row, nil
 }
 
+// A challenge is recorded after authoritative calculation and prize validation
+// commit together. Counting that ledger needs its accepted identity and ranking
+// transition, without decoding every historical replay's complete tables again.
+func p11ArenaDailyValidateChallenges(tx *gorm.DB, start, end int64, eligible []int64) error {
+	if len(eligible) == 0 {
+		return nil
+	}
+	var lastAt, lastID int64
+	for {
+		var facts []db.P11ArenaDailyChallenge
+		query := tx.Where("accepted_at>=? AND accepted_at<? AND player_id IN ?", start, end, eligible)
+		if lastID > 0 {
+			query = query.Where("accepted_at>? OR (accepted_at=? AND id>?)", lastAt, lastAt, lastID)
+		}
+		if err := query.Order("accepted_at,id").Limit(256).Find(&facts).Error; err != nil {
+			return err
+		}
+		if len(facts) == 0 {
+			return nil
+		}
+		fightIDs := make([]string, 0, len(facts))
+		for _, fact := range facts {
+			fightIDs = append(fightIDs, fact.FightID)
+		}
+		var rows []db.P11ArenaFightSettlement
+		if err := tx.Select("player_id", "stamp", "opponent_id", "fight_id", "p6_record_id", "scope_proof", "policy_hash", "winner_id", "attacker_old_rank", "defender_old_rank", "attacker_new_rank", "defender_new_rank", "energy_spent", "response_hash", "terminal_hash").Where("fight_id IN ?", fightIDs).Find(&rows).Error; err != nil {
+			return err
+		}
+		settlements := make(map[string]db.P11ArenaFightSettlement, len(rows))
+		recordIDs := make([]string, 0, len(rows))
+		for _, row := range rows {
+			settlements[row.FightID] = row
+			recordIDs = append(recordIDs, row.P6RecordID)
+		}
+		var records []db.P6BattleRecord
+		if len(recordIDs) > 0 {
+			if err := tx.Select("id", "player_id", "source", "source_fight", "status", "client_result", "server_result", "authoritative").Where("id IN ?", recordIDs).Find(&records).Error; err != nil {
+				return err
+			}
+		}
+		sources := make(map[string]db.P6BattleRecord, len(records))
+		for _, record := range records {
+			sources[record.ID] = record
+		}
+		for _, fact := range facts {
+			row, exists := settlements[fact.FightID]
+			record, sourceExists := sources[row.P6RecordID]
+			winner := int32(0)
+			if row.WinnerID == row.OpponentID {
+				winner = 1
+			}
+			own, defender := row.AttackerOldRank, row.DefenderOldRank
+			if winner == 0 && own > defender {
+				own, defender = defender, own
+			}
+			if !exists || !sourceExists || fact.ID <= 0 || fact.SourceHash != p11ArenaDailyChallengeHash(fact) ||
+				fact.PlayerID != row.PlayerID || fact.OpponentID != row.OpponentID || fact.ResponseHash != row.ResponseHash || fact.TerminalHash != row.TerminalHash || fact.P6RecordID != row.P6RecordID || fact.ScopeProof != row.ScopeProof ||
+				row.PlayerID <= 0 || row.OpponentID <= 0 || row.PlayerID == row.OpponentID || row.EnergySpent != constUtil.P11ArenaEnergy || row.PolicyHash != p6Digest([]byte(constUtil.P11ArenaFightPolicySource)) ||
+				(row.WinnerID != row.PlayerID && row.WinnerID != row.OpponentID) || own <= 0 || defender <= 0 || own == defender || row.AttackerNewRank != own || row.DefenderNewRank != defender ||
+				record.PlayerID != row.PlayerID || record.Source != constUtil.P11ArenaFightSource || record.SourceFight != row.FightID || record.Status != constUtil.P6BattleComputed || !record.Authoritative || record.ServerResult != p6PlaybackResult(winner) || record.ClientResult != record.ServerResult {
+				return errors.New(constUtil.P11ArenaDailyConflict)
+			}
+		}
+		lastAt, lastID = facts[len(facts)-1].AcceptedAt, facts[len(facts)-1].ID
+	}
+}
+
 func (s *GameService) p11ArenaDailyClose(tx *gorm.DB, offer *db.P11ArenaDailyOffer, now time.Time) error {
 	rules, err := p11ArenaDailyOfferRules(offer)
 	if err != nil {
 		return err
 	}
 	snapshot := db.P11ArenaDailySnapshot{Day: offer.Day, StartAt: offer.StartAt, EndAt: offer.EndAt, OfferHash: offer.SourceHash, Status: constUtil.P11ArenaDailyComplete, RanksJSON: "[]", CapturedAt: now.UnixMilli()}
-	var facts []db.P11ArenaDailyChallenge
-	if err = tx.Where("accepted_at>=? AND accepted_at<?", max(offer.StartAt, offer.CapturedAt), offer.EndAt).Order("id").Find(&facts).Error; err != nil {
+	var totals []struct {
+		PlayerID int64
+		Total    int64
+	}
+	if err = tx.Model(&db.P11ArenaDailyChallenge{}).Select("player_id,COUNT(*) AS total").Where("accepted_at>=? AND accepted_at<?", max(offer.StartAt, offer.CapturedAt), offer.EndAt).Group("player_id").Scan(&totals).Error; err != nil {
 		return err
 	}
 	counts := map[int64]int64{}
-	for _, fact := range facts {
-		counts[fact.PlayerID]++
+	for _, total := range totals {
+		counts[total.PlayerID] = total.Total
 	}
 	var members []db.P11ArenaMember
 	membership := tx.Where("position>0 AND position<=1000")
@@ -303,20 +373,31 @@ func (s *GameService) p11ArenaDailyClose(tx *gorm.DB, offer *db.P11ArenaDailyOff
 	}
 	ranks := make([]p11ArenaDailyRank, 0)
 	pending := func(reason string) { snapshot.Status = constUtil.P11ArenaDailyPending; snapshot.Reason = reason }
+	var eligible []int64
 	for _, member := range members {
-		if counts[member.PlayerID] < rules.Policy.MinChallenges {
-			continue
+		if counts[member.PlayerID] >= rules.Policy.MinChallenges {
+			eligible = append(eligible, member.PlayerID)
 		}
-		for i := range facts {
-			if facts[i].PlayerID == member.PlayerID {
-				if _, err = checked(&facts[i]); err != nil {
-					pending("accepted-challenge-proof-missing")
-					break
-				}
-			}
+	}
+	if err = p11ArenaDailyValidateChallenges(tx, max(offer.StartAt, offer.CapturedAt), offer.EndAt, eligible); err != nil {
+		pending("accepted-challenge-proof-missing")
+	}
+	profileExists := make(map[int64]bool, len(eligible))
+	if len(eligible) > 0 {
+		var ids []int64
+		if err = tx.Model(&db.Profile{}).Where("id IN ?", eligible).Pluck("id", &ids).Error; err != nil {
+			return err
 		}
+		for _, id := range ids {
+			profileExists[id] = true
+		}
+	}
+	for _, member := range members {
 		if snapshot.Status == constUtil.P11ArenaDailyPending {
 			break
+		}
+		if counts[member.PlayerID] < rules.Policy.MinChallenges {
+			continue
 		}
 		var latest db.P11ArenaDailyChallenge
 		if err = tx.Where("accepted_at<? AND (player_id=? OR opponent_id=?)", offer.EndAt, member.PlayerID, member.PlayerID).Order("id DESC").First(&latest).Error; err != nil {
@@ -339,11 +420,7 @@ func (s *GameService) p11ArenaDailyClose(tx *gorm.DB, offer *db.P11ArenaDailyOff
 			pending("current-rank-not-supported-by-last-transition")
 			break
 		}
-		var n int64
-		if err = tx.Model(&db.Profile{}).Where("id=?", member.PlayerID).Count(&n).Error; err != nil {
-			return err
-		}
-		if n != 1 {
+		if !profileExists[member.PlayerID] {
 			pending("eligible-player-profile-missing")
 			break
 		}

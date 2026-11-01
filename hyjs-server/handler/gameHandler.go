@@ -1448,6 +1448,9 @@ func serveGameConnection(ctx context.Context, c net.Conn, s *service.GameService
 		}
 		writeLock.Lock()
 		defer writeLock.Unlock()
+		if err := c.SetWriteDeadline(time.Now().Add(constUtil.P10SocketWriteTimeout)); err != nil {
+			return err
+		}
 		n, err := c.Write(payload)
 		if err == nil && n != len(payload) {
 			return io.ErrShortWrite
@@ -1475,7 +1478,7 @@ func serveGameConnection(ctx context.Context, c net.Conn, s *service.GameService
 	}
 	peer, _, _ := net.SplitHostPort(c.RemoteAddr().String())
 	for {
-		c.SetDeadline(time.Now().Add(constUtil.PacketTimeout))
+		c.SetReadDeadline(time.Now().Add(constUtil.PacketTimeout))
 		prefix := make([]byte, 4)
 		if _, err := io.ReadFull(c, prefix); err != nil {
 			closed("read-prefix", err)

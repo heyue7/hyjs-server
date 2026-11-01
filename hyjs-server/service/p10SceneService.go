@@ -21,7 +21,7 @@ import (
 	pb "hyjs-server/model/protocol"
 )
 
-var p10SceneMutation sync.Mutex
+var p10SceneMutation sync.RWMutex
 var p10SceneBroadcastSlots = make(chan struct{}, constUtil.P10SceneBroadcastWorkers)
 
 type p10ScenePeer struct {
@@ -253,8 +253,8 @@ func (s *GameService) p10SceneMovePlayer(p *pb.Player, g *model.GameState, proje
 // p10CurrentScenePeers restores actors cleared by the client during room reload,
 // including stationary peers whose presence identity has not changed.
 func (s *GameService) p10CurrentScenePeers(ctx context.Context, id int64, expectedLine *int32) ([]*pb.MovePlayer, error) {
-	p10SceneMutation.Lock()
-	defer p10SceneMutation.Unlock()
+	p10SceneMutation.RLock()
+	defer p10SceneMutation.RUnlock()
 	tx := db.GetIns().WithContext(ctx)
 	cfg, err := p10SceneConfig(tx)
 	if err != nil || cfg == nil {
@@ -480,10 +480,12 @@ func (s *GameService) p10SceneBroadcast(ctx context.Context, scene string, line 
 	s.p10SceneSendPeers(ctx, peers, message)
 }
 func (s *GameService) p10SceneSendPeers(ctx context.Context, peers []p10ScenePeer, message proto.Message) {
-	p10SceneForEachLivePeer(peers, func(peer p10ScenePeer) {
-		// Every send rechecks the pinned socket, account, session and client gate.
-		s.publishP10PrivateBatchPinned(ctx, peer.frame.GetInfo().GetPlayerId(), peer.sink, []proto.Message{message})
-	})
+	for _, peer := range peers {
+		if peer.sink != nil {
+			// Authorization is rechecked by each socket's worker before delivery.
+			s.publishP10PrivateBatchPinned(ctx, peer.frame.GetInfo().GetPlayerId(), peer.sink, []proto.Message{message})
+		}
+	}
 }
 
 // Wait for this complete batch before the caller advances the scene mutation.
@@ -575,15 +577,37 @@ func (s *GameService) p10SceneCommitOrdinaryReline(tx *gorm.DB, observed *db.Pro
 // A CurrentPosition caller can request an ordered peer snapshot after a
 // committed desert line reload; other existing callers keep their behavior.
 func (s *GameService) syncP10Scene(ctx context.Context, id int64, movement bool, lineRestored *bool) error {
-	route := p10SceneRouteSnapshot{pureRoute: true}
-	if handled, err := s.syncP13UnionFightField(ctx, id, movement, &route); handled || err != nil {
-		return err
+	if value, ok := p10LiveClient(p10ClientKey{s.p10ClientOwner(), id}); ok {
+		sink := value.(*p10ClientSink)
+		sink.sceneMutation.Lock()
+		defer sink.sceneMutation.Unlock()
 	}
-	if handled, err := s.syncP13GuildRoom(ctx, id, movement, &route); handled || err != nil {
-		return err
+	for shared := true; ; shared = false {
+		route := p10SceneRouteSnapshot{pureRoute: true}
+		if handled, err := s.syncP13UnionFightField(ctx, id, movement, &route); handled || err != nil {
+			return err
+		}
+		if handled, err := s.syncP13GuildRoom(ctx, id, movement, &route); handled || err != nil {
+			return err
+		}
+		if shared {
+			p10SceneMutation.RLock()
+		} else {
+			p10SceneMutation.Lock()
+		}
+		err := s.syncP10OrdinaryScene(ctx, id, movement, lineRestored, &route, shared)
+		if shared {
+			p10SceneMutation.RUnlock()
+		} else {
+			p10SceneMutation.Unlock()
+		}
+		if !errors.Is(err, constUtil.ErrP10SceneMembershipRetry) || !shared {
+			return err
+		}
 	}
-	p10SceneMutation.Lock()
-	defer p10SceneMutation.Unlock()
+}
+
+func (s *GameService) syncP10OrdinaryScene(ctx context.Context, id int64, movement bool, lineRestored *bool, route *p10SceneRouteSnapshot, shared bool) error {
 	tx := db.GetIns().WithContext(ctx)
 	cfg, err := p10SceneConfig(tx)
 	if err != nil || cfg == nil {
@@ -609,6 +633,12 @@ func (s *GameService) syncP10Scene(ctx context.Context, id int64, movement bool,
 	}
 	existed := err == nil
 	scope := p10SceneScope(g)
+	if scope == "" && old.SessionHash == "" {
+		return nil
+	}
+	if shared && (!existed || scope == "" || old.Scene != scope || old.SessionHash != p6Digest(sink.session) || len(old.Frame) == 0 || old.OfflineUntil != 0) {
+		return constUtil.ErrP10SceneMembershipRetry
+	}
 	if scope == "" {
 		// A committed desert line change keeps its authenticated presence while
 		// the native position handshake is pending. The empty frame is not a
@@ -642,6 +672,9 @@ func (s *GameService) syncP10Scene(ctx context.Context, id int64, movement bool,
 		return err
 	}
 	line := old.Line
+	if shared && (line < 1 || line > cfg.LineCount) {
+		return constUtil.ErrP10SceneMembershipRetry
+	}
 	if line < 1 || line > cfg.LineCount {
 		line = 1
 	}
@@ -681,6 +714,9 @@ func (s *GameService) syncP10Scene(ctx context.Context, id int64, movement bool,
 		line, peers = bestLine, bestPeers
 	}
 	if len(peers) >= int(cfg.MaxPlayers) {
+		if shared {
+			return constUtil.ErrP10SceneMembershipRetry
+		}
 		if scope == constUtil.GGOFieldScene && old.Scene == scope {
 			return errors.New("原沙漠线路已满，请稍后重连")
 		}
@@ -793,9 +829,13 @@ func (s *GameService) syncP10Scene(ctx context.Context, id int64, movement bool,
 			s.ggoNotifyFieldChange(ctx, line)
 		}
 	} else if movement {
-		s.p10SceneBroadcast(ctx, scope, line, id, &pb.SCMovePush{Position: []*pb.Position{frame.Position}})
+		recipients, err := s.p10ScenePeerEntries(tx, scope, line, id)
+		if err != nil {
+			return err
+		}
+		s.p10SceneSendPeers(ctx, recipients, &pb.SCMovePush{Position: []*pb.Position{frame.Position}})
 		if oldInfoChanged {
-			s.p10SceneBroadcast(ctx, scope, line, id, &pb.SCMovePlayerInfo{PlayerInfos: []*pb.MovePlayer{frame}})
+			s.p10SceneSendPeers(ctx, recipients, &pb.SCMovePlayerInfo{PlayerInfos: []*pb.MovePlayer{frame}})
 		}
 	} else if !bytes.Equal(old.Frame, current.Frame) {
 		s.p10SceneBroadcast(ctx, scope, line, id, &pb.SCMovePlayerInfo{PlayerInfos: []*pb.MovePlayer{frame}})

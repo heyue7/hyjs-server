@@ -48,7 +48,7 @@ func (s *GameService) p5AppendCrystalBindings(tx *gorm.DB, directory *db.P4Resou
 		}
 	}
 	var live db.P4CommerceRule
-	e := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&live, "id=?", key).Error
+	e := tx.Clauses(clause.Locking{Strength: p4ExchangeChildLock(tx)}).First(&live, "id=?", key).Error
 	if errors.Is(e, gorm.ErrRecordNotFound) {
 		return nil
 	}
@@ -64,6 +64,9 @@ func (s *GameService) p5AppendCrystalBindings(tx *gorm.DB, directory *db.P4Resou
 	}
 	if cfg.Kind != "exchange" || len(rules.Products) != 4 || len(*bindings)+4 > 1000 {
 		return errors.New("灵魂水晶供应目录无效")
+	}
+	if err := p4RequireExchangeDirectoryWrite(tx); err != nil {
+		return err
 	}
 	if len(live.Frozen) == 0 {
 		raw, _ := json.Marshal(cfg)

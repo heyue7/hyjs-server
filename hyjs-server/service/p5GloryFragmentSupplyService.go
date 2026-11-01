@@ -119,7 +119,7 @@ func (s *GameService) p5AppendGloryFragmentBinding(tx *gorm.DB, directory *db.P4
 		}
 	}
 	var live db.P4CommerceRule
-	err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&live, "id=?", key).Error
+	err := tx.Clauses(clause.Locking{Strength: p4ExchangeChildLock(tx)}).First(&live, "id=?", key).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil
 	}
@@ -135,6 +135,9 @@ func (s *GameService) p5AppendGloryFragmentBinding(tx *gorm.DB, directory *db.P4
 	}
 	if now.UnixMilli() < cfg.StartAt || now.UnixMilli() >= cfg.EndAt {
 		return nil
+	}
+	if err := p4RequireExchangeDirectoryWrite(tx); err != nil {
+		return err
 	}
 	if len(live.Frozen) == 0 {
 		raw, e := json.Marshal(cfg)

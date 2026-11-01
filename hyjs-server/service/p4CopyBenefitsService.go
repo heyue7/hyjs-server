@@ -55,8 +55,24 @@ func (s *GameService) p4CopyBenefitRule(tx *gorm.DB, now time.Time, freeze bool)
 	if err := s.seedP4CopyWindow(tx, now); err != nil {
 		return nil, err
 	}
+	query := func() *gorm.DB {
+		return tx.Where("enabled=?", true).Order("id ASC")
+	}
+	var probe []db.P4CopyBenefitRule
+	if err := query().Select("id", "frozen").Find(&probe).Error; err != nil {
+		return nil, err
+	}
+	strength := "SHARE"
+	if freeze {
+		for _, candidate := range probe {
+			if len(candidate.Frozen) == 0 {
+				strength = "UPDATE"
+				break
+			}
+		}
+	}
 	var rows []db.P4CopyBenefitRule
-	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("enabled=?", true).Order("id ASC").Find(&rows).Error; err != nil {
+	if err := query().Clauses(clause.Locking{Strength: strength}).Find(&rows).Error; err != nil {
 		return nil, err
 	}
 	var selected *db.P4CopyBenefitRule
@@ -87,6 +103,9 @@ func (s *GameService) p4CopyBenefitRule(tx *gorm.DB, now time.Time, freeze bool)
 			return nil, errors.New("副本福利运营窗口重叠")
 		}
 		if freeze && len(live.Frozen) == 0 {
+			if strength == "SHARE" {
+				return nil, constUtil.ErrConfigurationReadRetry
+			}
 			raw, err := json.Marshal(cfg)
 			if err != nil {
 				return nil, err

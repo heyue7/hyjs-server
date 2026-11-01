@@ -62,13 +62,9 @@ func p1LockPeriodIDs(tx *gorm.DB) error {
 	return tx.Model(&db.PeriodInstance{}).Select("id").Clauses(clause.Locking{Strength: strength}).Order("id ASC").Find(&rows).Error
 }
 
-// lockProfilePeriods 在角色行锁之后、域动作之前固定公共窗口加锁顺序。
-func lockProfilePeriods(tx *gorm.DB) error {
-	if s, ok := tx.Statement.Context.Value(constUtil.GameServiceContextKey).(*GameService); ok && s.P1Ready {
-		return p1LockPeriodIDs(tx)
-	}
-	return nil
-}
+// A role transaction locks its own profile first. Activity participation later
+// locks only its selected instance and the player's progress row.
+func lockProfilePeriods(tx *gorm.DB) error { return nil }
 
 // recordP1GatherEvent is limited to a trusted, just-consumed gather attempt.
 // Its caller has saved this attempt and acquired the period locks before any
@@ -115,17 +111,11 @@ func (s *GameService) recordP1Event(tx *gorm.DB, playerID int64, sourceKey, kind
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return err
 	}
-	// Only this private gather entry may update per-player progress while the
-	// enclosing transaction holds shared period locks. All other new events
-	// retain the original rollback-and-exclusive-retry contract.
-	if p1SharedRead(tx) && !gather {
-		return constUtil.ErrP1ExclusiveRetry
-	}
 	fact := db.EventFact{PlayerID: playerID, SourceKey: sourceKey, Kind: kind, Amount: amount, OccurredAt: at.UnixMilli(), Day: p1Day(at)}
 	if err = tx.Create(&fact).Error; err != nil {
 		return err
 	}
-	configs, err := p1LockPeriods(tx)
+	configs, err := s.p1EventPeriods(tx, playerID, kind)
 	if err != nil {
 		return err
 	}
@@ -202,7 +192,7 @@ func (s *GameService) recordP1Event(tx *gorm.DB, playerID int64, sourceKey, kind
 		if settled > 0 {
 			continue
 		}
-		progress, frozen, err := s.p1Progress(tx, cfg, playerID)
+		progress, frozen, err := s.p1ProgressForUpdate(tx, cfg, playerID)
 		if err != nil {
 			return err
 		}
@@ -339,8 +329,11 @@ func (s *GameService) RecordP1Save(tx *gorm.DB, row *db.Profile, player *pb.Play
 	case *pb.CSEquipStrengthen:
 		paidNoReward = true
 		for _, a := range old.Equipment {
+			if a.GetGuid() != b.GetGuid() {
+				continue
+			}
 			for _, v := range game.Equipment {
-				if a.GetGuid() == b.GetGuid() && v.GetGuid() == a.GetGuid() {
+				if v.GetGuid() == a.GetGuid() {
 					strength = int64(max(0, v.GetLevel()-a.GetLevel()))
 				}
 			}
@@ -401,7 +394,7 @@ func (s *GameService) p1Progress(tx *gorm.DB, cfg db.PeriodInstance, id int64) (
 		row.Snapshot = blob
 		// Persist this one-time historical inheritance even when an info query has no new facts.
 		if cfg.RewardSourceID != "" {
-			if e = tx.Create(row).Error; e != nil {
+			if e = tx.Clauses(clause.OnConflict{DoNothing: true}).Create(row).Error; e != nil {
 				return nil, cfg, e
 			}
 		}
@@ -410,6 +403,32 @@ func (s *GameService) p1Progress(tx *gorm.DB, cfg db.PeriodInstance, id int64) (
 	if err != nil {
 		return nil, cfg, err
 	}
+	if err = json.Unmarshal(row.Snapshot, &frozen); err != nil {
+		return nil, cfg, err
+	}
+	if frozen.ID != cfg.ID || frozen.RewardSourceID != cfg.RewardSourceID || row.Value < 0 {
+		return nil, cfg, errors.New("活动冻结存档无效")
+	}
+	if err = s.validateP1Period(frozen); err != nil {
+		return nil, cfg, err
+	}
+	return row, frozen, nil
+}
+
+// p1ProgressForUpdate also supports offline writers that do not own a Profile
+// lock. Insert-or-read is restricted to one (instance, player) primary key.
+func (s *GameService) p1ProgressForUpdate(tx *gorm.DB, cfg db.PeriodInstance, id int64) (*db.PeriodProgress, db.PeriodInstance, error) {
+	row, _, err := s.p1Progress(tx, cfg, id)
+	if err != nil {
+		return nil, cfg, err
+	}
+	if err = tx.Clauses(clause.OnConflict{DoNothing: true}).Create(row).Error; err != nil {
+		return nil, cfg, err
+	}
+	if err = tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(row, "instance_id=? AND player_id=?", cfg.ID, id).Error; err != nil {
+		return nil, cfg, err
+	}
+	frozen := cfg
 	if err = json.Unmarshal(row.Snapshot, &frozen); err != nil {
 		return nil, cfg, err
 	}
@@ -465,7 +484,7 @@ func (s *GameService) RecordP1Cost(tx *gorm.DB, id int64, source string, costs [
 // The Profile lock serializes login and claims; the existing reward source keeps
 // reconnects and the two claim entrances on one persisted delivery.
 func (s *GameService) p1ReconcileLoginPeriods(tx *gorm.DB, id int64, now time.Time) error {
-	periods, err := p1LockPeriods(tx)
+	periods, err := s.p1EventPeriods(tx, id, constUtil.P1EventLoginDay)
 	if err != nil {
 		return err
 	}
@@ -508,7 +527,7 @@ func (s *GameService) p1ReconcileLoginPeriods(tx *gorm.DB, id int64, now time.Ti
 		if settled > 0 {
 			continue
 		}
-		progress, frozen, err := s.p1Progress(tx, cfg, id)
+		progress, frozen, err := s.p1ProgressForUpdate(tx, cfg, id)
 		if err != nil {
 			return err
 		}

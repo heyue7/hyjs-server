@@ -331,8 +331,11 @@ func (s *GameService) recordDailyTaskSaveAt(tx *gorm.DB, row *db.Profile, player
 		count = int32(max(0, len(game.Treasures)-len(before.Treasures)))
 	case *pb.CSEquipStrengthen:
 		for _, a := range before.Equipment {
+			if a.GetGuid() != b.GetGuid() {
+				continue
+			}
 			for _, v := range game.Equipment {
-				if a.GetGuid() == b.GetGuid() && v.GetGuid() == a.GetGuid() {
+				if v.GetGuid() == a.GetGuid() {
 					count = max(0, v.GetLevel()-a.GetLevel())
 				}
 			}
@@ -351,8 +354,11 @@ func (s *GameService) recordDailyTaskSaveAt(tx *gorm.DB, row *db.Profile, player
 		count = int32(min(actual, int64(math.MaxInt32)))
 	case *pb.CSEquipRefine:
 		for _, a := range before.Equipment {
+			if a.GetGuid() != b.GetGuid() {
+				continue
+			}
 			for _, v := range game.Equipment {
-				if a.GetGuid() == b.GetGuid() && v.GetGuid() == a.GetGuid() && (v.GetRefineLv() != a.GetRefineLv() || v.GetRefineExp() != a.GetRefineExp()) {
+				if v.GetGuid() == a.GetGuid() && (v.GetRefineLv() != a.GetRefineLv() || v.GetRefineExp() != a.GetRefineExp()) {
 					count = 1
 				}
 			}
@@ -360,8 +366,11 @@ func (s *GameService) recordDailyTaskSaveAt(tx *gorm.DB, row *db.Profile, player
 	case *pb.CSTreasureStrengthen:
 		// 吞噬可能只增加当前经验；按一次成功消耗操作计数。
 		for _, a := range before.Treasures {
+			if a.GetGuid() != b.GetTargetId() {
+				continue
+			}
 			for _, v := range game.Treasures {
-				if a.GetGuid() == b.GetTargetId() && v.GetGuid() == a.GetGuid() && (v.GetStrengthLevel() != a.GetStrengthLevel() || v.GetCurrentExp() != a.GetCurrentExp()) {
+				if v.GetGuid() == a.GetGuid() && (v.GetStrengthLevel() != a.GetStrengthLevel() || v.GetCurrentExp() != a.GetCurrentExp()) {
 					count = 1
 				}
 			}
