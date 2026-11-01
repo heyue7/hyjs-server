@@ -9,6 +9,7 @@ type gameTableLookup struct {
 type gameTableLookupTable struct {
 	rows    []map[string]string
 	columns map[string]map[string]map[string]string
+	groups  map[string]map[string][]map[string]string
 }
 
 // InitializeGameTableLookup runs after startup catalogue enrichment, before requests.
@@ -36,9 +37,36 @@ func (s *GameService) InitializeGameTableLookup() {
 			}
 			entry.columns[key] = column
 		}
+		if name == "TalentAdvenced" {
+			// Preserve source order and row identity for multiple nodes per hero.
+			// This catalogue, including its grouping key, is immutable after startup.
+			byHero := make(map[string][]map[string]string)
+			for _, row := range rows {
+				byHero[row["warId"]] = append(byHero[row["warId"]], row)
+			}
+			entry.groups = map[string]map[string][]map[string]string{"warId": byHero}
+		}
 		lookup.tables[name] = entry
 	}
 	s.tableLookup = lookup
+}
+
+// indexedTableGroup observes the same catalogue identity guard as indexedTable.
+// A replacement runtime table uses its original linear-scan path.
+func (s *GameService) indexedTableGroup(name, key, value string) ([]map[string]string, bool) {
+	if s.tableLookup == nil {
+		return nil, false
+	}
+	entry, found := s.tableLookup.tables[name]
+	rows := s.Tables[name]
+	if !found || len(rows) != len(entry.rows) || len(rows) > 0 && &rows[0] != &entry.rows[0] {
+		return nil, false
+	}
+	group, found := entry.groups[key]
+	if !found {
+		return nil, false
+	}
+	return group[value], true
 }
 
 func (s *GameService) indexedTable(name, key, value string) (map[string]string, bool) {

@@ -148,7 +148,11 @@ func (s *GameService) battleWarrior(player *pb.Player, warrior *pb.Warrior, game
 	if level < 1 {
 		level = 1
 	}
-	for _, node := range s.Tables["TalentAdvenced"] {
+	nodes, indexed := s.indexedTableGroup("TalentAdvenced", "warId", warrior.GetId())
+	if !indexed {
+		nodes = s.Tables["TalentAdvenced"]
+	}
+	for _, node := range nodes {
 		if node["warId"] != warrior.GetId() {
 			continue
 		}
@@ -376,7 +380,9 @@ func copyTalentProperty(values, percent map[string]float64, buff map[string]stri
 	}
 }
 
-func (s *GameService) battlePlayer(player *pb.Player, game *model.GameState) (*pb.BattlePlayer, error) {
+// battleFormationActors retains the original slot and inventory traversal order.
+// Both battle transport and the scalar power calculation use these same actors.
+func (s *GameService) battleFormationActors(player *pb.Player, game *model.GameState) ([]*pb.BattleHero, error) {
 	if err := s.PrepareFormation(game); err != nil {
 		return nil, err
 	}
@@ -397,6 +403,18 @@ func (s *GameService) battlePlayer(player *pb.Player, game *model.GameState) (*p
 			}
 		}
 	}
+	return actors, nil
+}
+
+func (s *GameService) battlePlayer(player *pb.Player, game *model.GameState) (*pb.BattlePlayer, error) {
+	actors, err := s.battleFormationActors(player, game)
+	if err != nil {
+		return nil, err
+	}
+	return s.battlePlayerFromActors(player, actors)
+}
+
+func (s *GameService) battlePlayerFromActors(player *pb.Player, actors []*pb.BattleHero) (*pb.BattlePlayer, error) {
 	msg, err := model.GameMessage("BattlePlayer", map[string]any{"playerId": player.GetPlayerId(), "serverId": s.OriginalServerID(), "level": player.GetLevel(), "nickName": player.GetName(), "formation": actors, "inst": map[string]any{"anger": 0}})
 	if err != nil {
 		return nil, err

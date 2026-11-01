@@ -853,11 +853,22 @@ func (s *GameService) AddFormationBonus(g *model.GameState, values, percent map[
 
 // formationFightPower 对齐 UIHeroFormation 的战斗力公式，并使用同一战斗属性来源。
 func (s *GameService) formationFightPower(player *pb.Player, g *model.GameState) (int32, error) {
-	party, err := s.battlePlayer(player, g)
+	actors, err := s.battleFormationActors(player, g)
 	if err != nil {
 		return 0, err
 	}
-	return s.formationFightPowerFromParty(party)
+	if s.OriginalServerID() > math.MaxInt32 {
+		// Preserve the original BattlePlayer int32 decoding error for an
+		// unrepresentable server ID, without rebuilding the actors.
+		party, err := s.battlePlayerFromActors(player, actors)
+		if err != nil {
+			return 0, err
+		}
+		return s.formationFightPowerFromParty(party)
+	}
+	// The power formula consumes only these actors. Battle transport keeps its
+	// existing GameMessage conversion in battlePlayer.
+	return s.formationFightPowerFromParty(&pb.BattlePlayer{Formation: actors})
 }
 
 // formationFightPowerFromParty reuses the current request's authoritative battle projection.
