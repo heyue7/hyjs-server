@@ -44,6 +44,13 @@ func (s *GameService) InitializePersonalOpening40(ctx context.Context) error {
 		if err := ServerGameClockGuardTransaction(tx); err != nil {
 			return err
 		}
+		if s.P1Ready {
+			guarded, err := p1AcquireGatherCatalogWriter(tx)
+			if err != nil {
+				return err
+			}
+			tx = guarded
+		}
 		server := s.OriginalServerID()
 		revision, err := adminActivityScheduleRevision(tx, server, true)
 		if err != nil {

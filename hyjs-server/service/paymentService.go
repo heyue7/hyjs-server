@@ -186,6 +186,13 @@ func (s *GameService) p3Profile(ctx context.Context, id int64, fn func(*gorm.DB,
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&row, id).Error; err != nil {
 			return err
 		}
+		if s.P1Ready {
+			var err error
+			tx, err = p1AcquireGatherCatalog(tx)
+			if err != nil {
+				return err
+			}
+		}
 		p, g, err := decodeProfileForCalendarUpdate(tx, &row)
 		if err != nil {
 			return err
@@ -200,7 +207,7 @@ func (s *GameService) p3Profile(ctx context.Context, id int64, fn func(*gorm.DB,
 			return err
 		}
 		if penaltyChanged {
-			recoveryCtx := context.WithValue(ctx, constUtil.GameRequestContextKey, struct{}{})
+			recoveryCtx := context.WithValue(tx.Statement.Context, constUtil.GameRequestContextKey, struct{}{})
 			if err = saveProfile(tx.WithContext(recoveryCtx), &row, p, g); err != nil {
 				return err
 			}

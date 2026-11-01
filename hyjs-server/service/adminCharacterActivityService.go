@@ -96,9 +96,14 @@ func (s *GameService) PrepareAdminCharacterActivitySchedules(ctx context.Context
 		if AdminProfileServerID(profile) != s.OriginalServerID() || profile.Player == nil {
 			return constUtil.ErrAdminInput
 		}
+		if s.P1Ready {
+			guarded, err := p1AcquireGatherCatalog(tx)
+			if err != nil {
+				return err
+			}
+			tx = guarded
+		}
 		// Keep the established profile -> P1 windows -> activity source order.
-		// MySQL's period range lock also serializes insertion of a new native
-		// cumulative consumer against a concurrent calendar publication.
 		if err := lockProfilePeriods(tx); err != nil {
 			return err
 		}
@@ -200,7 +205,10 @@ func (s *GameService) PrepareAdminCharacterActivitySchedules(ctx context.Context
 	shared := context.WithValue(ctx, constUtil.P1SharedReadContextKey{}, true)
 	err := d.WithContext(shared).Transaction(prepare)
 	if errors.Is(err, constUtil.ErrP1ExclusiveRetry) {
-		return d.Transaction(prepare)
+		err = d.Transaction(prepare)
+	}
+	if errors.Is(err, constUtil.ErrP1GatherCatalogWriteRetry) {
+		err = d.WithContext(p1GatherCatalogWriteContext(ctx)).Transaction(prepare)
 	}
 	return err
 }

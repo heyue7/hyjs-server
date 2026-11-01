@@ -48,7 +48,7 @@ func TestP1GatherFrozenMySQLConcurrentIsolation(t *testing.T) {
 	defer releaseHeld()
 	firstDone := make(chan error, 1)
 	go func() {
-		firstDone <- updateProfileWithSharedPeriods(ctx, f.id, func(tx *gorm.DB, _ *pb.Player, _ *model.GameState) error {
+		firstDone <- p1GatherTestSharedProfile(f.s, ctx, f.id, func(tx *gorm.DB, _ *pb.Player, _ *model.GameState) error {
 			if !p1SharedRead(tx) {
 				return errors.New("frozen first gather retried exclusively")
 			}
@@ -74,7 +74,7 @@ func TestP1GatherFrozenMySQLConcurrentIsolation(t *testing.T) {
 	}
 	secondDone := make(chan error, 1)
 	go func() {
-		secondDone <- updateProfileWithSharedPeriods(ctx, peer, func(tx *gorm.DB, _ *pb.Player, _ *model.GameState) error {
+		secondDone <- p1GatherTestSharedProfile(f.s, ctx, peer, func(tx *gorm.DB, _ *pb.Player, _ *model.GameState) error {
 			if !p1SharedRead(tx) {
 				return errors.New("frozen peer gather retried exclusively")
 			}
@@ -96,7 +96,7 @@ func TestP1GatherFrozenMySQLConcurrentIsolation(t *testing.T) {
 	// also wait until the already-admitted shared projection commits.
 	sameDone := make(chan error, 1)
 	go func() {
-		sameDone <- updateProfileWithSharedPeriods(ctx, f.id, func(tx *gorm.DB, _ *pb.Player, _ *model.GameState) error {
+		sameDone <- p1GatherTestSharedProfile(f.s, ctx, f.id, func(tx *gorm.DB, _ *pb.Player, _ *model.GameState) error {
 			return f.s.recordP1GatherEvent(tx, f.id, &db.P8GatherAttempt{PlayerID: f.id, Token: "concurrent-same"}, constUtil.P8EventMineGather, false, time.Now())
 		})
 	}()
@@ -171,7 +171,7 @@ func TestP1GatherFirstFreezeMySQLConcurrentRetry(t *testing.T) {
 		id := id
 		go func() {
 			var modes []bool
-			err := updateProfileWithSharedPeriods(ctx, id, func(tx *gorm.DB, _ *pb.Player, _ *model.GameState) error {
+			err := p1GatherTestSharedProfile(f.s, ctx, id, func(tx *gorm.DB, _ *pb.Player, _ *model.GameState) error {
 				shared := p1SharedRead(tx)
 				modes = append(modes, shared)
 				if shared {
@@ -237,7 +237,7 @@ func TestP1GatherDisableMySQLWaitsForAdmittedFact(t *testing.T) {
 	defer releaseHeld()
 	writeDone := make(chan error, 1)
 	go func() {
-		writeDone <- updateProfileWithSharedPeriods(ctx, f.id, func(tx *gorm.DB, _ *pb.Player, _ *model.GameState) error {
+		writeDone <- p1GatherTestSharedProfile(f.s, ctx, f.id, func(tx *gorm.DB, _ *pb.Player, _ *model.GameState) error {
 			if err := f.s.recordP1GatherEvent(tx, f.id, &db.P8GatherAttempt{PlayerID: f.id, Token: "disable-before"}, constUtil.P8EventMineGather, false, time.Now()); err != nil {
 				return err
 			}
@@ -279,7 +279,7 @@ func TestP1GatherDisableMySQLWaitsForAdmittedFact(t *testing.T) {
 			t.Fatal("disable transaction did not finish")
 		}
 	}
-	if err := updateProfileWithSharedPeriods(ctx, peer, func(tx *gorm.DB, _ *pb.Player, _ *model.GameState) error {
+	if err := p1GatherTestSharedProfile(f.s, ctx, peer, func(tx *gorm.DB, _ *pb.Player, _ *model.GameState) error {
 		return f.s.recordP1GatherEvent(tx, peer, &db.P8GatherAttempt{PlayerID: peer, Token: "disable-after"}, constUtil.P8EventMineGather, true, time.Now())
 	}); err != nil {
 		t.Fatal(err)
@@ -309,7 +309,7 @@ func TestP1GatherCutoffMySQLWaitsForAdmittedFact(t *testing.T) {
 	defer releaseHeld()
 	writeDone := make(chan error, 1)
 	go func() {
-		writeDone <- updateProfileWithSharedPeriods(ctx, f.id, func(tx *gorm.DB, _ *pb.Player, _ *model.GameState) error {
+		writeDone <- p1GatherTestSharedProfile(f.s, ctx, f.id, func(tx *gorm.DB, _ *pb.Player, _ *model.GameState) error {
 			if err := f.s.recordP1GatherEvent(tx, f.id, &db.P8GatherAttempt{PlayerID: f.id, Token: "cutoff-before"}, constUtil.P8EventMineGather, false, time.Now()); err != nil {
 				return err
 			}
@@ -332,7 +332,7 @@ func TestP1GatherCutoffMySQLWaitsForAdmittedFact(t *testing.T) {
 	case <-ctx.Done():
 		t.Fatal("gather did not reach the deadline test")
 	}
-	if err := updateProfileWithSharedPeriods(ctx, peer, func(tx *gorm.DB, _ *pb.Player, _ *model.GameState) error {
+	if err := p1GatherTestSharedProfile(f.s, ctx, peer, func(tx *gorm.DB, _ *pb.Player, _ *model.GameState) error {
 		return f.s.recordP1GatherEvent(tx, peer, &db.P8GatherAttempt{PlayerID: peer, Token: "cutoff-peer"}, constUtil.P8EventMineGather, true, time.Now())
 	}); err != nil || !time.Now().Before(deadline) {
 		t.Fatalf("peer fact was not committed before cutoff: %v", err)
@@ -380,7 +380,7 @@ func TestP1GatherCutoffMySQLWaitsForAdmittedFact(t *testing.T) {
 			t.Fatalf("player %d did not receive its stable rank attachment", id)
 		}
 	}
-	if err := updateProfileWithSharedPeriods(ctx, f.id, func(tx *gorm.DB, _ *pb.Player, _ *model.GameState) error {
+	if err := p1GatherTestSharedProfile(f.s, ctx, f.id, func(tx *gorm.DB, _ *pb.Player, _ *model.GameState) error {
 		return f.s.recordP1GatherEvent(tx, f.id, &db.P8GatherAttempt{PlayerID: f.id, Token: "cutoff-after"}, constUtil.P8EventMineGather, false, time.Now())
 	}); err != nil {
 		t.Fatal(err)

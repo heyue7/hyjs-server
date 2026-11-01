@@ -803,6 +803,13 @@ func (s *GameService) AdminSaveActivitySchedule(ctx context.Context, p *model.Ad
 		if err := adminOperationUser(tx, p, true); err != nil {
 			return err
 		}
+		if s.P1Ready {
+			guarded, err := p1AcquireGatherCatalogWriter(tx)
+			if err != nil {
+				return err
+			}
+			tx = guarded
+		}
 		// Creating the guard before locking serializes two first-time publishers on MySQL too.
 		guard := db.AdminActivityScheduleRevision{ServerID: serverID}
 		if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&guard).Error; err != nil {

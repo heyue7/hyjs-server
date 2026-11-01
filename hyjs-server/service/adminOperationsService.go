@@ -261,6 +261,13 @@ func (s *GameService) AdminUpdateActivity(ctx context.Context, p *model.AdminPri
 		if !ok {
 			return constUtil.ErrAdminInput
 		}
+		if domain == "period" && s.P1Ready {
+			guarded, err := p1AcquireGatherCatalogWriter(tx)
+			if err != nil {
+				return err
+			}
+			tx = guarded
+		}
 		switch domain {
 		case "pool":
 			var old db.GameplayPool

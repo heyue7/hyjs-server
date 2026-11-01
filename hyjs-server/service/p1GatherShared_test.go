@@ -66,6 +66,27 @@ func p1GatherContext(f *p1Fixture) context.Context {
 	return context.WithValue(ctx, constUtil.GameRequestContextKey, struct{}{})
 }
 
+// Exercise the actual p3 transaction boundary used by ordinary gathers. Each
+// retry acquires a lease in its own SQL transaction before profile recovery.
+func p1GatherTestExclusiveProfile(s *GameService, ctx context.Context, id int64, fn func(*gorm.DB, *pb.Player, *model.GameState) error) error {
+	ctx = p1GatherCatalogContext(ctx)
+	return s.p3Profile(ctx, id, func(tx *gorm.DB, row *db.Profile, player *pb.Player, game *model.GameState) error {
+		if err := fn(tx, player, game); err != nil {
+			return err
+		}
+		return saveProfile(tx, row, player, game)
+	})
+}
+
+func p1GatherTestSharedProfile(s *GameService, ctx context.Context, id int64, fn func(*gorm.DB, *pb.Player, *model.GameState) error) error {
+	shared := context.WithValue(ctx, constUtil.P1SharedReadContextKey{}, true)
+	err := p1GatherTestExclusiveProfile(s, shared, id, fn)
+	if errors.Is(err, constUtil.ErrP1ExclusiveRetry) {
+		return p1GatherTestExclusiveProfile(s, ctx, id, fn)
+	}
+	return err
+}
+
 func p1GatherFreeze(t *testing.T, f *p1Fixture, ids ...string) {
 	t.Helper()
 	if err := db.GetIns().WithContext(f.ctx).Transaction(func(tx *gorm.DB) error {
@@ -114,7 +135,7 @@ func TestP1GatherFrozenProgressAndReplay(t *testing.T) {
 		t.Helper()
 		var modes []bool
 		attempt := &db.P8GatherAttempt{PlayerID: f.id, Token: token}
-		err := updateProfileWithSharedPeriods(ctx, f.id, func(tx *gorm.DB, _ *pb.Player, _ *model.GameState) error {
+		err := p1GatherTestSharedProfile(f.s, ctx, f.id, func(tx *gorm.DB, _ *pb.Player, _ *model.GameState) error {
 			modes = append(modes, p1SharedRead(tx))
 			return f.s.recordP1GatherEvent(tx, f.id, attempt, kind, desert, time.Now())
 		})
@@ -165,7 +186,7 @@ func TestP1GatherFrozenProgressAndReplay(t *testing.T) {
 	// A later non-gather event rolls back the already-projected shared gather.
 	before, _ := f.profile(t)
 	var modes []bool
-	err = updateProfileWithSharedPeriods(ctx, f.id, func(tx *gorm.DB, player *pb.Player, _ *model.GameState) error {
+	err = p1GatherTestSharedProfile(f.s, ctx, f.id, func(tx *gorm.DB, player *pb.Player, _ *model.GameState) error {
 		modes = append(modes, p1SharedRead(tx))
 		player.Coin = proto.Int64(player.GetCoin() + 1)
 		attempt := &db.P8GatherAttempt{PlayerID: f.id, Token: "mine-three"}
@@ -197,7 +218,7 @@ func TestP1GatherFirstFreezeRollsBackBeforeRetry(t *testing.T) {
 	}
 	before, _ := f.profile(t)
 	var modes []bool
-	err := updateProfileWithSharedPeriods(p1GatherContext(f), f.id, func(tx *gorm.DB, player *pb.Player, _ *model.GameState) error {
+	err := p1GatherTestSharedProfile(f.s, p1GatherContext(f), f.id, func(tx *gorm.DB, player *pb.Player, _ *model.GameState) error {
 		modes = append(modes, p1SharedRead(tx))
 		var attempt db.P8GatherAttempt
 		if err := tx.First(&attempt, "player_id=? AND active=?", f.id, true).Error; err != nil {
@@ -238,7 +259,7 @@ func TestP1GatherHonorsEnabledFrozenAndExpiredWindows(t *testing.T) {
 	write := func(token string, at time.Time) []bool {
 		t.Helper()
 		var modes []bool
-		err := updateProfileWithSharedPeriods(ctx, f.id, func(tx *gorm.DB, _ *pb.Player, _ *model.GameState) error {
+		err := p1GatherTestSharedProfile(f.s, ctx, f.id, func(tx *gorm.DB, _ *pb.Player, _ *model.GameState) error {
 			modes = append(modes, p1SharedRead(tx))
 			return f.s.recordP1GatherEvent(tx, f.id, &db.P8GatherAttempt{PlayerID: f.id, Token: token}, constUtil.P8EventMineGather, false, at)
 		})
@@ -272,7 +293,7 @@ func TestP1GatherHonorsEnabledFrozenAndExpiredWindows(t *testing.T) {
 		t.Fatal(err)
 	}
 	peer := p1GatherSecondPlayer(t, f)
-	err := updateProfileWithSharedPeriods(ctx, peer, func(tx *gorm.DB, _ *pb.Player, _ *model.GameState) error {
+	err := p1GatherTestSharedProfile(f.s, ctx, peer, func(tx *gorm.DB, _ *pb.Player, _ *model.GameState) error {
 		return f.s.recordP1GatherEvent(tx, peer, &db.P8GatherAttempt{PlayerID: peer, Token: "window-peer"}, constUtil.P8EventMineGather, true, time.Now())
 	})
 	if err != nil {
@@ -290,7 +311,7 @@ func TestP1GatherHonorsEnabledFrozenAndExpiredWindows(t *testing.T) {
 	closed := p1Instance(t, f, "gather-window-closed", constUtil.P8EventFishGather, "cumulative", 1, time.Now().Add(-time.Hour), 0)
 	p1GatherFreeze(t, f, closed.ID)
 	oldTime := time.Now().Add(-2 * time.Hour)
-	if err = updateProfileWithSharedPeriods(ctx, f.id, func(tx *gorm.DB, _ *pb.Player, _ *model.GameState) error {
+	if err = p1GatherTestSharedProfile(f.s, ctx, f.id, func(tx *gorm.DB, _ *pb.Player, _ *model.GameState) error {
 		return f.s.recordP1GatherEvent(tx, f.id, &db.P8GatherAttempt{PlayerID: f.id, Token: "window-late"}, constUtil.P8EventFishGather, true, oldTime)
 	}); err != nil {
 		t.Fatal(err)
@@ -327,7 +348,7 @@ func TestP1GatherRejectsInvalidAttemptAndOtherSharedFacts(t *testing.T) {
 		t.Fatal("invalid attempts wrote event facts")
 	}
 	var modes []bool
-	err := updateProfileWithSharedPeriods(p1GatherContext(f), f.id, func(tx *gorm.DB, _ *pb.Player, _ *model.GameState) error {
+	err := p1GatherTestSharedProfile(f.s, p1GatherContext(f), f.id, func(tx *gorm.DB, _ *pb.Player, _ *model.GameState) error {
 		modes = append(modes, p1SharedRead(tx))
 		return f.s.RecordP1Event(tx, f.id, "untrusted-gather-source", constUtil.P8EventMineGather, 1, time.Now())
 	})

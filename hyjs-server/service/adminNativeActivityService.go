@@ -794,6 +794,13 @@ func (s *GameService) AdminSaveNativeActivity(ctx context.Context, p *model.Admi
 		if err := adminOperationUser(tx, p, true); err != nil {
 			return err
 		}
+		if s.P1Ready {
+			guarded, err := p1AcquireGatherCatalogWriter(tx)
+			if err != nil {
+				return err
+			}
+			tx = guarded
+		}
 		snap, err := s.adminNativeLoad(tx, id, true)
 		if err != nil {
 			return err

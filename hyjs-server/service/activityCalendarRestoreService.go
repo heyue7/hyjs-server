@@ -341,6 +341,13 @@ func (s *GameService) adminRestoreActivityCalendar(ctx context.Context, p *model
 		if actor.Role != constUtil.AdminRoleAdmin {
 			return constUtil.ErrAdminPermission
 		}
+		if s.P1Ready {
+			guarded, err := p1AcquireGatherCatalogWriter(tx)
+			if err != nil {
+				return err
+			}
+			tx = guarded
+		}
 		var prior db.ServerGameClockOperation
 		err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&prior, "server_id=? AND request_id=?", clock.ServerID, req.RequestID).Error
 		if err == nil {

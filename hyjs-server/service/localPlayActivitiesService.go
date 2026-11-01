@@ -147,115 +147,123 @@ func (s *GameService) LocalPlayActivitiesApply(ctx context.Context, id int64, ac
 		return nil, errLocalPlayActivitiesInvalid
 	}
 	var result *model.LocalPlayActivitiesView
-	err := s.p3Profile(ctx, id, func(tx *gorm.DB, row *db.Profile, _ *pb.Player, g *model.GameState) error {
-		if err := s.localPlayActivitiesAuthorize(ctx, row); err != nil {
-			return err
-		}
-		if g.Run != nil {
-			return errors.New("请先正常结束副本再刷新试玩活动")
-		}
-		if err := localPlayActivitiesPolicy(tx); err != nil {
-			return err
-		}
-		clock := db.LocalPlayClockState{PlayerID: id}
-		if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&clock).Error; err != nil {
-			return err
-		}
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&clock, "player_id=?", id).Error; err != nil {
-			return err
-		}
-		if clock.OffsetDays < -3650 || clock.OffsetDays > 3650 || clock.Revision < 0 {
-			return errLocalPlayActivitiesInvalid
-		}
-		ctx = context.WithValue(ctx, constUtil.LocalPlayOffsetDaysKey, clock.OffsetDays)
-		tx = tx.WithContext(context.WithValue(ctx, constUtil.LocalPlayOwnerKey, id))
-		var old db.LocalPlayActivityOperation
-		err := tx.First(&old, "player_id=? AND request_id=?", id, requestID).Error
-		if err == nil {
-			if old.Action != action || old.ActivityID != activityID {
-				return errors.New("试玩活动操作编号冲突")
+	run := func(runCtx context.Context) error {
+		return s.p3Profile(runCtx, id, func(tx *gorm.DB, row *db.Profile, _ *pb.Player, g *model.GameState) error {
+			if err := s.localPlayActivitiesAuthorize(runCtx, row); err != nil {
+				return err
 			}
-			result = &model.LocalPlayActivitiesView{}
-			if json.Unmarshal(old.Response, result) != nil || !result.TestOnly {
+			if g.Run != nil {
+				return errors.New("请先正常结束副本再刷新试玩活动")
+			}
+			if err := localPlayActivitiesPolicy(tx); err != nil {
+				return err
+			}
+			clock := db.LocalPlayClockState{PlayerID: id}
+			if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&clock).Error; err != nil {
+				return err
+			}
+			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&clock, "player_id=?", id).Error; err != nil {
+				return err
+			}
+			if clock.OffsetDays < -3650 || clock.OffsetDays > 3650 || clock.Revision < 0 {
 				return errLocalPlayActivitiesInvalid
 			}
-			return nil
-		}
-		if !errors.Is(err, gorm.ErrRecordNotFound) {
-			return err
-		}
-		now := LocalPlayNow(ctx)
-		outcomes := []model.LocalPlayActivityResult{}
-		for _, def := range localPlayActivityDefinitions {
-			if activityID != "all" && def.ID != activityID {
-				continue
-			}
-			if def.Kind == "" {
-				outcomes = append(outcomes, model.LocalPlayActivityResult{ID: def.ID, Status: "unsupported", Message: def.Description})
-				continue
-			}
-			if !localPlayActivitySourceReady(tx, def) {
-				outcomes = append(outcomes, model.LocalPlayActivityResult{ID: def.ID, Status: "closed", Message: "待后台配置并启用，本次未开放"})
-				continue
-			}
-			var binding db.LocalPlayActivityBinding
-			err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&binding, "player_id=? AND activity_id=?", id, def.ID).Error
-			if err == nil && action == "open" {
-				current, e := localPlayBoundCycle(tx, id, def.ID)
-				if e != nil {
-					return e
+			scope := context.WithValue(tx.Statement.Context, constUtil.LocalPlayOffsetDaysKey, clock.OffsetDays)
+			scope = context.WithValue(scope, constUtil.LocalPlayOwnerKey, id)
+			tx = tx.WithContext(scope)
+			var old db.LocalPlayActivityOperation
+			err := tx.First(&old, "player_id=? AND request_id=?", id, requestID).Error
+			if err == nil {
+				if old.Action != action || old.ActivityID != activityID {
+					return errors.New("试玩活动操作编号冲突")
 				}
-				if current != nil && now.UnixMilli() >= current.StartAt && now.UnixMilli() < current.RewardEndAt {
-					outcomes = append(outcomes, model.LocalPlayActivityResult{ID: def.ID, Status: "open", Message: "保留当前独立活动期"})
+				result = &model.LocalPlayActivitiesView{}
+				if json.Unmarshal(old.Response, result) != nil || !result.TestOnly {
+					return errLocalPlayActivitiesInvalid
+				}
+				return nil
+			}
+			if !errors.Is(err, gorm.ErrRecordNotFound) {
+				return err
+			}
+			now := LocalPlayNow(scope)
+			outcomes := []model.LocalPlayActivityResult{}
+			for _, def := range localPlayActivityDefinitions {
+				if activityID != "all" && def.ID != activityID {
 					continue
 				}
-			}
-			if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-				return err
-			}
-			if binding.Revision == math.MaxInt64 {
-				return errLocalPlayActivitiesInvalid
-			}
-			digest := sha256.Sum256([]byte(row.Uid + "/" + def.ID + "/" + requestID))
-			cycleID := "lp-" + hex.EncodeToString(digest[:13])
-			if err := tx.SavePoint("local_play_activity_create").Error; err != nil {
-				return err
-			}
-			cycle, err := s.localPlayCreateCycle(tx, id, def, cycleID, now)
-			if err != nil {
-				if errors.Is(err, gorm.ErrRecordNotFound) || errors.Is(err, errLocalPlayActivitySource) {
-					if e := tx.RollbackTo("local_play_activity_create").Error; e != nil {
-						return e
-					}
+				if def.Kind == "" {
+					outcomes = append(outcomes, model.LocalPlayActivityResult{ID: def.ID, Status: "unsupported", Message: def.Description})
+					continue
+				}
+				if !localPlayActivitySourceReady(tx, def) {
 					outcomes = append(outcomes, model.LocalPlayActivityResult{ID: def.ID, Status: "closed", Message: "待后台配置并启用，本次未开放"})
 					continue
 				}
+				var binding db.LocalPlayActivityBinding
+				err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&binding, "player_id=? AND activity_id=?", id, def.ID).Error
+				if err == nil && action == "open" {
+					current, e := localPlayBoundCycle(tx, id, def.ID)
+					if e != nil {
+						return e
+					}
+					if current != nil && now.UnixMilli() >= current.StartAt && now.UnixMilli() < current.RewardEndAt {
+						outcomes = append(outcomes, model.LocalPlayActivityResult{ID: def.ID, Status: "open", Message: "保留当前独立活动期"})
+						continue
+					}
+				}
+				if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+					return err
+				}
+				if binding.Revision == math.MaxInt64 {
+					return errLocalPlayActivitiesInvalid
+				}
+				digest := sha256.Sum256([]byte(row.Uid + "/" + def.ID + "/" + requestID))
+				cycleID := "lp-" + hex.EncodeToString(digest[:13])
+				if err := tx.SavePoint("local_play_activity_create").Error; err != nil {
+					return err
+				}
+				cycle, err := s.localPlayCreateCycle(tx, id, def, cycleID, now)
+				if err != nil {
+					if errors.Is(err, gorm.ErrRecordNotFound) || errors.Is(err, errLocalPlayActivitySource) {
+						if e := tx.RollbackTo("local_play_activity_create").Error; e != nil {
+							return e
+						}
+						outcomes = append(outcomes, model.LocalPlayActivityResult{ID: def.ID, Status: "closed", Message: "待后台配置并启用，本次未开放"})
+						continue
+					}
+					return err
+				}
+				if err := tx.Create(cycle).Error; err != nil {
+					return err
+				}
+				if err := s.localPlayRetireWelfare(tx, id, binding, cycle, now); err != nil {
+					return err
+				}
+				binding.PlayerID, binding.ActivityID, binding.CycleID = id, def.ID, cycleID
+				binding.Revision++
+				if err := tx.Save(&binding).Error; err != nil {
+					return err
+				}
+				outcomes = append(outcomes, model.LocalPlayActivityResult{ID: def.ID, Status: "open", Message: "已建立独立新期，旧领取和回执保留"})
+			}
+			result, err = localPlayActivityViews(tx, id, now)
+			if err != nil {
 				return err
 			}
-			if err := tx.Create(cycle).Error; err != nil {
+			result.Results = outcomes
+			raw, err := json.Marshal(result)
+			if err != nil {
 				return err
 			}
-			if err := s.localPlayRetireWelfare(tx, id, binding, cycle, now); err != nil {
-				return err
-			}
-			binding.PlayerID, binding.ActivityID, binding.CycleID = id, def.ID, cycleID
-			binding.Revision++
-			if err := tx.Save(&binding).Error; err != nil {
-				return err
-			}
-			outcomes = append(outcomes, model.LocalPlayActivityResult{ID: def.ID, Status: "open", Message: "已建立独立新期，旧领取和回执保留"})
-		}
-		result, err = localPlayActivityViews(tx, id, now)
-		if err != nil {
-			return err
-		}
-		result.Results = outcomes
-		raw, err := json.Marshal(result)
-		if err != nil {
-			return err
-		}
-		return tx.Create(&db.LocalPlayActivityOperation{PlayerID: id, RequestID: requestID, Action: action, ActivityID: activityID, Response: raw, CreatedAt: now.UnixMilli()}).Error
-	})
+			return tx.Create(&db.LocalPlayActivityOperation{PlayerID: id, RequestID: requestID, Action: action, ActivityID: activityID, Response: raw, CreatedAt: now.UnixMilli()}).Error
+		})
+	}
+	err := run(ctx)
+	if errors.Is(err, constUtil.ErrP1GatherCatalogWriteRetry) {
+		result = nil
+		err = run(p1GatherCatalogWriteContext(ctx))
+	}
 	return result, err
 }
 

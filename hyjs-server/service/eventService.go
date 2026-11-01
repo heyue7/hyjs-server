@@ -83,6 +83,14 @@ func (s *GameService) recordP1GatherEvent(tx *gorm.DB, playerID int64, attempt *
 	if desert {
 		prefix = "ggo:gather:"
 	}
+	// Legacy partial-service fixtures may accept the event without initializing
+	// P1. Preserve their original exclusive event path and its durable fact.
+	if !s.P1Ready {
+		return s.RecordP1Event(tx, playerID, prefix+attempt.Token, kind, 1, at)
+	}
+	if err := p1RequireGatherCatalog(tx, kind, false); err != nil {
+		return err
+	}
 	return s.recordP1Event(tx, playerID, prefix+attempt.Token, kind, 1, at, true)
 }
 

@@ -106,9 +106,9 @@ func testP1GatherCatalogPhantomMySQL(t *testing.T, shared bool) {
 			return f.s.recordP1GatherEvent(tx, f.id, &attempt, constUtil.P8EventMineGather, false, time.Now())
 		}
 		if shared {
-			gatherDone <- updateProfileWithSharedPeriods(ctx, f.id, apply)
+			gatherDone <- p1GatherTestSharedProfile(f.s, ctx, f.id, apply)
 		} else {
-			gatherDone <- updateProfileWithTx(ctx, f.id, apply)
+			gatherDone <- p1GatherTestExclusiveProfile(f.s, ctx, f.id, apply)
 		}
 	}()
 	select {
@@ -136,6 +136,11 @@ func testP1GatherCatalogPhantomMySQL(t *testing.T, shared bool) {
 		var visible int64
 		close(publisherStarted)
 		err := database.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+			var err error
+			tx, err = p1AcquireGatherCatalogWriter(tx)
+			if err != nil {
+				return err
+			}
 			if err := f.s.adminPersistTypedActivity(tx, definition, periodID, form, true, false); err != nil {
 				return err
 			}

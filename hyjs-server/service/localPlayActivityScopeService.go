@@ -429,6 +429,9 @@ func (s *GameService) localPlayCreateScopedCycle(tx *gorm.DB, id int64, def loca
 			if err := s.validateP1Period(cfg); err != nil {
 				return nil, err
 			}
+			if err := p1RequireGatherCatalog(tx, cfg.Kind, true); err != nil {
+				return nil, err
+			}
 			if err := tx.Create(&cfg).Error; err != nil {
 				return nil, err
 			}

@@ -37,6 +37,13 @@ func (s *GameService) AdminCreateActivity(ctx context.Context, p *model.AdminPri
 		if err := adminOperationUser(tx, p, true); err != nil {
 			return err
 		}
+		if domain == "period" && s.P1Ready {
+			guarded, err := p1AcquireGatherCatalogWriter(tx)
+			if err != nil {
+				return err
+			}
+			tx = guarded
+		}
 		// 所有新配置仅Create；同ID已存在时返回冲突，不能覆盖历史或并发创建结果。
 		absent := func(table any) error {
 			var count int64

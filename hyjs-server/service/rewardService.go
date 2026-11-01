@@ -18,7 +18,10 @@ import (
 
 // InitializeP1 创建独立公共能力表；既有玩法与存档结构保持原样。
 func (s *GameService) InitializeP1(ctx context.Context) error {
-	if err := db.GetIns().WithContext(ctx).AutoMigrate(&db.RewardDelivery{}, &db.MailMessage{}, &db.EventFact{}, &db.PeriodInstance{}, &db.PeriodProgress{}, &db.PeriodSettlement{}, &db.P1LoginDirectoryMember{}); err != nil {
+	if err := db.GetIns().WithContext(ctx).AutoMigrate(&db.RewardDelivery{}, &db.MailMessage{}, &db.EventFact{}, &db.PeriodInstance{}, &db.PeriodProgress{}, &db.PeriodSettlement{}, &db.P1LoginDirectoryMember{}, &db.P1GatherCatalogGuard{}); err != nil {
+		return err
+	}
+	if err := p1InitializeGatherCatalog(db.GetIns().WithContext(ctx)); err != nil {
 		return err
 	}
 	if err := s.seedP1Periods(ctx, time.Now()); err != nil {

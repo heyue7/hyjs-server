@@ -584,6 +584,13 @@ func (s *GameService) AdminSaveTypedActivity(ctx context.Context, p *model.Admin
 		if domain != definition.domain {
 			return constUtil.ErrAdminInput
 		}
+		if domain == "period" && s.P1Ready {
+			guarded, err := p1AcquireGatherCatalogWriter(tx)
+			if err != nil {
+				return err
+			}
+			tx = guarded
+		}
 		raw, frozen, lookup := adminActivityRaw(tx.Clauses(clause.Locking{Strength: "UPDATE"}), id)
 		exists := lookup == nil
 		if lookup != nil && !errors.Is(lookup, gorm.ErrRecordNotFound) {
@@ -764,6 +771,9 @@ func (s *GameService) adminPersistTypedActivity(tx *gorm.DB, d adminActivityDefi
 		}
 		return save(&cfg)
 	case "period":
+		if err := p1RequireGatherCatalog(tx, d.kind, true); err != nil {
+			return err
+		}
 		if len(f.Milestones) > 31 || enabled && len(f.Milestones) == 0 {
 			return constUtil.ErrAdminInput
 		}
@@ -811,6 +821,9 @@ func (s *GameService) adminPersistTypedActivity(tx *gorm.DB, d adminActivityDefi
 		if exists {
 			var persisted db.PeriodInstance
 			if err := tx.First(&persisted, "id=?", key).Error; err != nil {
+				return err
+			}
+			if err := p1RequireGatherCatalog(tx, persisted.Kind, true); err != nil {
 				return err
 			}
 			cfg.RewardSourceID = persisted.RewardSourceID
@@ -895,6 +908,13 @@ func (s *GameService) AdminTypedActivityState(ctx context.Context, p *model.Admi
 		if err := adminOperationUser(tx, p, true); err != nil {
 			return err
 		}
+		if strings.HasPrefix(id, "period:") && s.P1Ready {
+			guarded, err := p1AcquireGatherCatalogWriter(tx)
+			if err != nil {
+				return err
+			}
+			tx = guarded
+		}
 		raw, frozen, err := adminActivityRaw(tx.Clauses(clause.Locking{Strength: "UPDATE"}), id)
 		if err != nil {
 			return err
@@ -963,6 +983,13 @@ func (s *GameService) AdminDeleteTypedActivity(ctx context.Context, p *model.Adm
 
 		if err := adminOperationUser(tx, p, true); err != nil {
 			return err
+		}
+		if strings.HasPrefix(id, "period:") && s.P1Ready {
+			guarded, err := p1AcquireGatherCatalogWriter(tx)
+			if err != nil {
+				return err
+			}
+			tx = guarded
 		}
 		raw, frozen, err := adminActivityRaw(tx.Clauses(clause.Locking{Strength: "UPDATE"}), id)
 		if err != nil {

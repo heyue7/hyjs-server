@@ -58,6 +58,13 @@ func (s *GameService) InitializeReActivityCatalogue(ctx context.Context) error {
 		if err := ServerGameClockGuardTransaction(tx); err != nil {
 			return err
 		}
+		if s.P1Ready {
+			guarded, err := p1AcquireGatherCatalogWriter(tx)
+			if err != nil {
+				return err
+			}
+			tx = guarded
+		}
 		serverID := s.OriginalServerID()
 		revision, err := adminActivityScheduleRevision(tx, serverID, true)
 		if err != nil {
