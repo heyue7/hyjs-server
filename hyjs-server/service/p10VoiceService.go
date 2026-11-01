@@ -618,7 +618,7 @@ func (s *GameService) p10VoicePublish(ctx context.Context, id int64, session []b
 		if last.LastSendAt > 0 && now.UnixMilli()-last.LastSendAt < int64(interval)*1000 {
 			return errors.New("本地既有聊天发送间隔未到")
 		}
-		info, err := s.p10Player(tx, id)
+		info, err := s.p10ChatPlayer(tx, id)
 		if err != nil {
 			return err
 		}
@@ -764,6 +764,7 @@ func (s *GameService) p10VoiceHistory(ctx context.Context, id int64, session []b
 
 		// 所有相关角色按同一顺序先锁定，随后才形成InnoDB读取快照，防止退会/删除已提交后读旧会员。
 		owners := []int64{id}
+		var avatars []p10ChatAvatarRef
 		for _, row := range rows {
 			owners = append(owners, row.OwnerID)
 		}
@@ -806,10 +807,12 @@ func (s *GameService) p10VoiceHistory(ctx context.Context, id int64, session []b
 				return err
 			}
 			list = append(list, &pb.ChatInfo{ChatType: frame.ChatType, Content: frame.Content, Time: frame.Time, Play: frame.Play, IsAudio: frame.IsAudio, AudioDownloadUrl: frame.DownLoadUrl, AudioTime: frame.AudioTime})
+			avatars = append(avatars, p10ChatAvatarRef{senderID: row.OwnerID, info: frame.Play})
 			if len(list) >= 50 {
 				break
 			}
 		}
+		s.p10ApplyChatAvatars(tx, avatars)
 		return nil
 	})
 	return list, err

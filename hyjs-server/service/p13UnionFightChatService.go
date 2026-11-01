@@ -83,6 +83,7 @@ func (s *GameService) p13UFChatHistory(ctx context.Context, id int64, now time.T
 		if err = tx.Where("match_id=? AND guild_id=? AND kind=0", match.ID, actor.GuildID).Where("NOT EXISTS (SELECT 1 FROM p10_social_blacks b WHERE (b.owner_id=? AND b.target_id=p13_union_fight_chats.sender_id) OR (b.owner_id=p13_union_fight_chats.sender_id AND b.target_id=?))", id, id).Order("id DESC").Limit(int(limit)).Find(&rows).Error; err != nil {
 			return err
 		}
+		var avatars []p10ChatAvatarRef
 		for i := len(rows) - 1; i >= 0; i-- {
 			message, err := p13UFChatFrame(&rows[i])
 			if err != nil {
@@ -90,7 +91,9 @@ func (s *GameService) p13UFChatHistory(ctx context.Context, id int64, now time.T
 			}
 			frame := message.(*pb.SCChatTcp)
 			list = append(list, &pb.ChatInfo{ChatType: frame.ChatType, Content: frame.Content, Time: frame.Time, Play: frame.Play, IsAudio: proto.Int32(0)})
+			avatars = append(avatars, p10ChatAvatarRef{senderID: rows[i].SenderID, info: frame.Play})
 		}
+		s.p10ApplyChatAvatars(tx, avatars)
 		return nil
 	})
 	if err != nil {
@@ -252,7 +255,7 @@ func (s *GameService) p13UFChat(ctx context.Context, id int64, request proto.Mes
 			}
 			return errors.New("公会战交流发送间隔未到")
 		}
-		info, err := s.p10Player(tx, id)
+		info, err := s.p10ChatPlayer(tx, id)
 		if err != nil {
 			return err
 		}

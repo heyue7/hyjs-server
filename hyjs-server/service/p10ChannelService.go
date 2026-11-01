@@ -80,16 +80,19 @@ func (s *GameService) p10ChannelHistory(tx *gorm.DB, id int64, kind int32) ([]*p
 		return nil, err
 	}
 	list := []*pb.ChatInfo{}
+	var avatars []p10ChatAvatarRef
 	for _, row := range rows {
 		frame, err := p10ChannelFrame(row)
 		if err != nil {
 			return nil, err
 		}
 		list = append(list, &pb.ChatInfo{ChatType: frame.ChatType, Content: frame.Content, Time: frame.Time, Play: frame.Play, IsAudio: proto.Int32(0)})
+		avatars = append(avatars, p10ChatAvatarRef{senderID: row.SenderID, info: frame.Play})
 		if len(list) >= int(limit) {
 			break
 		}
 	}
+	s.p10ApplyChatAvatars(tx, avatars)
 	for i, j := 0, len(list)-1; i < j; i, j = i+1, j-1 {
 		list[i], list[j] = list[j], list[i]
 	}
@@ -202,7 +205,7 @@ func (s *GameService) p10ChannelAt(ctx context.Context, id int64, b *pb.CSChatTc
 			}
 			return errors.New("原聊天发送间隔未到")
 		}
-		info, err := s.p10Player(tx, id)
+		info, err := s.p10ChatPlayer(tx, id)
 		if err != nil {
 			return err
 		}

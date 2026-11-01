@@ -68,6 +68,15 @@ func p10Friends(tx *gorm.DB, a, b int64) (bool, error) {
 	return count > 0, err
 }
 func (s *GameService) p10Player(tx *gorm.DB, id int64) (*pb.SimplePlayerInfo, error) {
+	return s.p10PlayerProjection(tx, id, false)
+}
+
+// p10ChatPlayer 仅改变聊天帧头像，其他社交资料继续使用原成长角色投影。
+func (s *GameService) p10ChatPlayer(tx *gorm.DB, id int64) (*pb.SimplePlayerInfo, error) {
+	return s.p10PlayerProjection(tx, id, true)
+}
+
+func (s *GameService) p10PlayerProjection(tx *gorm.DB, id int64, chatAvatar bool) (*pb.SimplePlayerInfo, error) {
 	var row db.Profile
 	if err := tx.First(&row, id).Error; err != nil {
 		return nil, err
@@ -88,6 +97,11 @@ func (s *GameService) p10Player(tx *gorm.DB, id int64) (*pb.SimplePlayerInfo, er
 		if w.GetGuid() == p.GetHeroWarId() {
 			heroID = w.GetId()
 			break
+		}
+	}
+	if chatAvatar {
+		if avatar, ok := s.p10ChatAvatar(p, g); ok {
+			heroID = avatar
 		}
 	}
 	return &pb.SimplePlayerInfo{PlayerId: proto.Int64(id), ServerId: proto.Int32(int32(s.OriginalServerID())), Level: p.Level, PlayerName: p.Name, FightPower: proto.Int32(power), HeroWarId: proto.String(heroID)}, nil
@@ -491,7 +505,7 @@ func (s *GameService) p10Social(ctx context.Context, id int64, request proto.Mes
 				}
 				return errors.New("原聊天发送间隔未到")
 			}
-			info, err := s.p10Player(tx, id)
+			info, err := s.p10ChatPlayer(tx, id)
 			if err != nil {
 				return err
 			}
@@ -527,6 +541,7 @@ func (s *GameService) p10Social(ctx context.Context, id int64, request proto.Mes
 				return err
 			}
 			list := &pb.SCChatCache{}
+			var avatars []p10ChatAvatarRef
 			for i := len(rows) - 1; i >= 0; i-- {
 				row := rows[i]
 				target := row.ReceiverID
@@ -545,7 +560,9 @@ func (s *GameService) p10Social(ctx context.Context, id int64, request proto.Mes
 					return errors.New("私聊发送人快照损坏")
 				}
 				list.ChatList = append(list.ChatList, &pb.ChatInfo{ChatType: proto.Int32(row.ChatType), Content: proto.String(row.Content), Time: proto.Int64(row.CreatedAt), Play: info, ReceiverName: proto.String(row.ReceiverName), IsAudio: proto.Int32(0)})
+				avatars = append(avatars, p10ChatAvatarRef{senderID: row.SenderID, info: info})
 			}
+			s.p10ApplyChatAvatars(tx, avatars)
 			response = list
 		default:
 			return errors.New("社交请求尚未恢复")
