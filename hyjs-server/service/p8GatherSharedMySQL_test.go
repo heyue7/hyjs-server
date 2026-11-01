@@ -16,7 +16,7 @@ import (
 	pb "hyjs-server/model/protocol"
 )
 
-func TestP8SharedFactRequiresOrdinaryGatherContext(t *testing.T) {
+func TestP8SharedFactRequiresTrustedGatherEntry(t *testing.T) {
 	f := p1Setup(t)
 	ctx := context.WithValue(f.ctx, constUtil.GameServiceContextKey, f.s)
 	var modes []bool
@@ -214,9 +214,8 @@ func TestP8GatherSharedAndActivityRetryRealMySQL(t *testing.T) {
 		if trace.shared.Load() == 0 || trace.exclusive.Load() != 0 {
 			t.Fatalf("%s resource query or start used an exclusive period lock: shared=%d exclusive=%d", kind, trace.shared.Load(), trace.exclusive.Load())
 		}
-		// Claim records an activity fact. Until insertion races are protected
-		// without changing the transaction's read view, retain the original X lock.
-		finish()
+		// An unrelated held reader must not block a claim with no matching
+		// mutable activity. Keep that reader until the claim and replay return.
 		trace.shared.Store(0)
 		trace.exclusive.Store(0)
 		claim := &pb.CSFieldGetResource{}
@@ -253,9 +252,10 @@ func TestP8GatherSharedAndActivityRetryRealMySQL(t *testing.T) {
 		if n := p1Count(t, &db.EventFact{}, "player_id=? AND source_key=?", f.id, "p8:gather:"+attempt.Token); n != 1 {
 			t.Fatalf("%s event fact count=%d", kind, n)
 		}
-		if trace.exclusive.Load() == 0 {
-			t.Fatalf("%s claim did not retain the exclusive period lock", kind)
+		if trace.shared.Load() == 0 || trace.exclusive.Load() != 0 {
+			t.Fatalf("%s claim or replay did not retain shared period locks: shared=%d exclusive=%d", kind, trace.shared.Load(), trace.exclusive.Load())
 		}
+		finish()
 	}
 
 	// A currently open matching activity freezes its rule and credits once.
@@ -271,6 +271,10 @@ func TestP8GatherSharedAndActivityRetryRealMySQL(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := database.Model(&attempt).Update("ready_at", time.Now().UnixMilli()-1).Error; err != nil {
+		t.Fatal(err)
+	}
+	var beforeNode db.P8ResourceNode
+	if err := database.First(&beforeNode, "player_id=? AND scene=? AND pos_id=?", f.id, chosen.node.Scene, chosen.node.PosID).Error; err != nil {
 		t.Fatal(err)
 	}
 	_, before := f.profile(t)
@@ -294,6 +298,20 @@ func TestP8GatherSharedAndActivityRetryRealMySQL(t *testing.T) {
 		finish()
 		t.Fatalf("failed shared attempt changed reservation: %v", err)
 	}
+	var pendingNode db.P8ResourceNode
+	if err := database.First(&pendingNode, "player_id=? AND scene=? AND pos_id=?", f.id, chosen.node.Scene, chosen.node.PosID).Error; err != nil || pendingNode.Remaining != beforeNode.Remaining {
+		finish()
+		t.Fatalf("rolled-back shared claim consumed the node: %v", err)
+	}
+	if p1Count(t, &db.EventFact{}, "player_id=? AND source_key=?", f.id, "p8:gather:"+attempt.Token) != 0 || p1Count(t, &db.P8GatherReceipt{}, "player_id=? AND operation=? AND timestamp=?", f.id, constUtil.P8GatherClaimOperation, 20101) != 0 {
+		finish()
+		t.Fatal("rolled-back shared claim leaked a fact or receipt")
+	}
+	_, pendingGame := f.profile(t)
+	if pendingGame.Field.Side.GetTiredness() != before.Field.Side.GetTiredness() {
+		finish()
+		t.Fatal("rolled-back shared claim consumed fatigue")
+	}
 	finish()
 	r := <-result
 	if r.err != nil || r.messages[0].(*pb.SCFieldGetResource).GetCode() != constUtil.P8ResourceAvailable {
@@ -301,6 +319,9 @@ func TestP8GatherSharedAndActivityRetryRealMySQL(t *testing.T) {
 	}
 	if trace.exclusive.Load() == 0 {
 		t.Fatalf("missing exclusive activity lock: shared=%d exclusive=%d", trace.shared.Load(), trace.exclusive.Load())
+	}
+	if trace.shared.Load() == 0 {
+		t.Fatal("missing shared claim before the exclusive freeze retry")
 	}
 	_, after := f.profile(t)
 	progress := p1ProgressValue(t, f, period.ID)
