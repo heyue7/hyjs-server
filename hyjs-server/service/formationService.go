@@ -271,6 +271,7 @@ func (s *GameService) formationOn(ctx context.Context, id int64, b *pb.CSFormati
 			target = &pb.FormationItem{FormatPos: proto.Int32(b.GetFormatPos())}
 			g.Formation = append(g.Formation, target)
 		}
+		guard := copyContinuityGuardFormation(player, g)
 		things := []*pb.FormationThing{{Pos: proto.Int32(0), Id: proto.String(b.GetId()), Guid: proto.String(b.GetGuid())}}
 		for _, thing := range target.GetThings() {
 			if thing.GetPos() != 0 {
@@ -278,6 +279,9 @@ func (s *GameService) formationOn(ctx context.Context, id int64, b *pb.CSFormati
 			}
 		}
 		target.Things = things
+		if err := guard.check(g); err != nil {
+			return err
+		}
 		current, err := s.currentTacticalFormation(g)
 		if err != nil {
 			return err
@@ -317,6 +321,7 @@ func (s *GameService) formationOff(ctx context.Context, id int64, b *pb.CSFormat
 		if err := s.formationPosition(player, g, b.GetFormatPos()); err != nil {
 			return err
 		}
+		guard := copyContinuityGuardFormation(player, g)
 		for _, slot := range g.Formation {
 			if slot.GetFormatPos() != b.GetFormatPos() {
 				continue
@@ -348,6 +353,9 @@ func (s *GameService) formationOff(ctx context.Context, id int64, b *pb.CSFormat
 				}
 			}
 			slot.Things = nil
+		}
+		if err := guard.check(g); err != nil {
+			return err
 		}
 		if err := s.syncEquipmentOwners(g); err != nil {
 			return err

@@ -140,6 +140,7 @@ func (s *GameService) p5FormationOnNative(ctx context.Context, id int64, b *pb.C
 			target = &pb.FormationItem{FormatPos: proto.Int32(b.GetFormatPos())}
 			g.Formation = append(g.Formation, target)
 		}
+		guard := copyContinuityGuardFormation(p, g)
 		// 阵容装备归该阵容位，换英雄只替换pos=0，随后同步实际装备主人。
 		things := []*pb.FormationThing{{Pos: proto.Int32(0), Id: proto.String(b.GetId()), Guid: proto.String(b.GetGuid())}}
 		for _, thing := range target.GetThings() {
@@ -148,6 +149,9 @@ func (s *GameService) p5FormationOnNative(ctx context.Context, id int64, b *pb.C
 			}
 		}
 		target.Things = things
+		if err := guard.check(g); err != nil {
+			return err
+		}
 		current, err := s.currentTacticalFormation(g)
 		if err != nil {
 			return err
