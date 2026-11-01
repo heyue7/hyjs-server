@@ -13,6 +13,75 @@ import (
 	pb "hyjs-server/model/protocol"
 )
 
+func TestGGOMonsterNativeStartAcceptsRecentPatrolContact(t *testing.T) {
+	f, ctx, _, _ := ggoBossIntegrationFixture(t)
+	cfg := f.s.GGOFieldConfig
+	f.s.GGOFieldRevision = "monster-contact-fixture"
+	var selected *model.AdminFieldGGOPoint
+	for i := range cfg.Runtime.Points {
+		if cfg.Runtime.Points[i].Kind == "monster" && cfg.Runtime.Points[i].Patrol != nil {
+			selected = &cfg.Runtime.Points[i]
+			selected.Radius = .2
+			break
+		}
+	}
+	if selected == nil {
+		t.Fatal("missing patrol fixture")
+	}
+	var uuid string
+	err := db.GetIns().Transaction(func(tx *gorm.DB) error {
+		now := time.Now().UnixMilli()
+		row, state, _, err := ggoLoadLine(tx, f.s.OriginalServerID(), 1, cfg, f.s.GGOFieldRevision, now)
+		if err != nil {
+			return err
+		}
+		for i := range state.Monsters {
+			if state.Monsters[i].PointID == selected.ID {
+				state.Monsters[i].PatrolEpochMS = now - 14200
+				uuid = state.Monsters[i].UUID
+				break
+			}
+		}
+		if uuid == "" {
+			t.Fatal("missing shared patrol node")
+		}
+		return ggoLineSave(tx, row, state, now)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	contact, err := ggoWirePoint(selected.Position)
+	if err != nil {
+		t.Fatal(err)
+	}
+	setPosition := func(point *pb.PointNew) {
+		t.Helper()
+		if err := updateProfile(ctx, f.id, func(_ *pb.Player, game *model.GameState) error {
+			game.Position.Current = point
+			game.GGOField.ProtectionUntil = 0
+			return nil
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	far := proto.Clone(contact).(*pb.PointNew)
+	far.X = proto.Float32(contact.GetX() + 5)
+	setPosition(far)
+	request := &pb.CSSidePveFightStart{MonsterId: proto.String(uuid)}
+	if _, err = f.s.fieldFightStart(ctx, f.id, request); err == nil {
+		t.Fatal("distant actor started combat")
+	}
+	setPosition(contact)
+	started, err := f.s.fieldFightStart(ctx, f.id, request)
+	if err != nil || len(started) != 1 || started[0].(*pb.SCSidePveFightStart).GetCode() != 1 {
+		t.Fatal("recent actual contact did not start native combat", started, err)
+	}
+	retry, err := f.s.fieldFightStart(ctx, f.id, request)
+	if err != nil || len(retry) != 1 || !proto.Equal(started[0], retry[0]) {
+		t.Fatal("start retry changed fight", err)
+	}
+}
+
 // Uses the real native type-6 start, original engine result and end transaction.
 // Coordinates and actor progress are bounded fixtures, not device evidence.
 func TestGGOMonsterNativeStartEndFrozenPolicy(t *testing.T) {

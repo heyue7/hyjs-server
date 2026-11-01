@@ -69,6 +69,32 @@ func TestGGOPatrolSharedClockFreezeAndResume(t *testing.T) {
 	}
 }
 
+func TestGGOPatrolRecentContactKeepsBoundedReach(t *testing.T) {
+	position := func(x, z float64) *model.AdminFieldGGOPosition {
+		y := float64(0)
+		return &model.AdminFieldGGOPosition{X: &x, Y: &y, Z: &z}
+	}
+	point := &model.AdminFieldGGOPoint{Position: position(0, 0), Radius: .2, Patrol: &model.AdminFieldGGOPatrol{Waypoints: []*model.AdminFieldGGOPosition{position(0, 0), position(1, 0)}}}
+	node := &ggoMonsterNode{PatrolEpochMS: 1000}
+	contact := &pb.PointNew{X: proto.Float32(0), Y: proto.Float32(0), Z: proto.Float32(0)}
+	check := func(now int64, actor *pb.PointNew, want bool) {
+		t.Helper()
+		side, err := ggoMonsterSide(node, point, now)
+		if err != nil {
+			t.Fatal(err)
+		}
+		got, err := ggoMonsterRecentContact(actor, side, node, point, now)
+		if err != nil || got != want {
+			t.Fatalf("now=%d got=%v want=%v err=%v", now, got, want, err)
+		}
+	}
+	check(14000, contact, true)                            // recently walked from the contact point
+	check(18000, contact, false)                           // last contact is outside the three-second window
+	check(14000, &pb.PointNew{X: proto.Float32(4)}, false) // distant actor remains rejected
+	point.Patrol = nil
+	check(14000, &pb.PointNew{X: proto.Float32(.3)}, false) // stationary monster retains exact radius
+}
+
 func TestGGOPatrolBakedRoutesSharedClockAndPositionGuard(t *testing.T) {
 	point := &model.AdminFieldGGOPoint{ID: "M05", Position: &model.AdminFieldGGOPosition{}}
 	if _, err := ggoMonsterNavRoute(point); err != nil {

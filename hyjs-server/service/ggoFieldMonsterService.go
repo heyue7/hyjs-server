@@ -177,6 +177,38 @@ func (s *GameService) ggoMonsterBattleFormation(node *ggoMonsterNode, tier *mode
 
 // ggoMonsterStartLocked freezes a type-6 input and claims one shared
 // generation; the caller's profile transaction owns its receipt.
+// A collision happened before the start packet and any database lock wait.
+// Check only the monster's authoritative recent path, with the actual player
+// position and configured radius; stationary monsters receive no expansion.
+func ggoMonsterRecentContact(player *pb.PointNew, current *pb.SideMonster, node *ggoMonsterNode, point *model.AdminFieldGGOPoint, now int64) (bool, error) {
+	if p8Near(player, &p8GatherConfig{Point: current.GetCurrentPoint(), Radius: point.Radius}) {
+		return true, nil
+	}
+	// Every published patrol is confined to one metre. Reject distant actors
+	// before projecting historical positions inside the shared line lock.
+	if !p8Near(player, &p8GatherConfig{Point: current.GetCurrentPoint(), Radius: point.Radius + 1}) {
+		return false, nil
+	}
+	path, err := ggoPatrolPath(point)
+	if err != nil || path == nil {
+		return false, err
+	}
+	for age := int64(250); age <= 3000; age += 250 {
+		position, err := ggoPatrolPosition(node, point, now-age)
+		if err != nil {
+			return false, err
+		}
+		wire, err := ggoWirePoint(position)
+		if err != nil {
+			return false, err
+		}
+		if p8Near(player, &p8GatherConfig{Point: wire, Radius: point.Radius}) {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 func (s *GameService) ggoMonsterStartLocked(tx *gorm.DB, id int64, player *pb.Player, g *model.GameState, b *pb.CSSidePveFightStart) (*pb.SCSidePveFightStart, error) {
 	if g.Field == nil || g.Field.Side == nil || g.GGOField == nil {
 		return nil, ggoFieldError(constUtil.GGOFieldUnavailable, "沙漠搜打撤暂未开放")
@@ -248,7 +280,11 @@ func (s *GameService) ggoMonsterStartLocked(tx *gorm.DB, id int64, player *pb.Pl
 	if err != nil {
 		return nil, err
 	}
-	if !p8Near(g.Position.GetCurrent(), &p8GatherConfig{Point: side.CurrentPoint, Radius: point.Radius}) {
+	near, err := ggoMonsterRecentContact(g.Position.GetCurrent(), side, node, point, now)
+	if err != nil {
+		return nil, err
+	}
+	if !near {
 		return nil, ggoFieldError(constUtil.GGOFieldInvalidLocation, "请靠近小怪")
 	}
 	var tier *model.AdminFieldGGOMobTier
