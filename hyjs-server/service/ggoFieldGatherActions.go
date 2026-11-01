@@ -85,42 +85,65 @@ func ggoCancelAttempt(tx *gorm.DB, s *GameService, id int64, g *model.GameState,
 func (s *GameService) GGOFieldGatherClaim(ctx context.Context, req model.GGOFieldGatherClaimRequest, session []byte) (*model.GGOFieldGatherClaimResponse, error) {
 	var out model.GGOFieldGatherClaimResponse
 	full := false
-	err := s.ggoWithProfile(ctx, req.GGOFieldAuth, session, false, false, func(tx *gorm.DB, a *ggoFieldActor) error {
-		hash := ggoClaimHash(req.StartRequestID, req.AttemptToken)
-		if found, err := ggoReadReceipt(tx, a.Row.Id, req.RequestID, constUtil.GGOFieldOpGatherClaim, hash, &out); err != nil || found {
-			return err
-		}
-		started, status, err := ggoReadStart(tx, a.Row.Id, req.StartRequestID)
-		if err != nil {
-			return err
-		}
-		if status != "pending" || started == nil {
-			return ggoFieldError(constUtil.GGOFieldStaleGeneration, "采集请求不存在或已取消")
-		}
-		if started.AttemptToken != req.AttemptToken {
-			return ggoFieldError(constUtil.GGOFieldRequestConflict, "采集编号不匹配")
-		}
-		var existing model.GGOFieldGatherClaimResponse
-		if found, err := ggoFindBusinessReceipt(tx, a.Row.Id, constUtil.GGOFieldOpGatherClaim, req.AttemptToken, &existing); err != nil {
-			return err
-		} else if found {
-			out = existing
-			return ggoSaveReceipt(tx, a.Row.Id, req.RequestID, constUtil.GGOFieldOpGatherClaim, hash, "", nil, [6]int64{}, 0, a.Now, out)
-		}
-		var cancelled model.GGOFieldGatherCancelResponse
-		if found, err := ggoFindBusinessReceipt(tx, a.Row.Id, constUtil.GGOFieldOpGatherCancel, req.AttemptToken, &cancelled); err != nil {
-			return err
-		} else if found {
-			return ggoFieldError(constUtil.GGOFieldStaleGeneration, "采集已取消")
-		}
-		var pending ggoPendingGather
-		if found, err := ggoFindBusinessReceipt(tx, a.Row.Id, constUtil.GGOFieldOpGatherReady, req.AttemptToken, &pending); err != nil {
-			return err
-		} else if found {
-			if pending.StartRequestID != req.StartRequestID {
+	run := func(attemptCtx context.Context) error {
+		out = model.GGOFieldGatherClaimResponse{}
+		full = false
+		return s.ggoWithProfile(attemptCtx, req.GGOFieldAuth, session, false, false, func(tx *gorm.DB, a *ggoFieldActor) error {
+			hash := ggoClaimHash(req.StartRequestID, req.AttemptToken)
+			if found, err := ggoReadReceipt(tx, a.Row.Id, req.RequestID, constUtil.GGOFieldOpGatherClaim, hash, &out); err != nil || found {
+				return err
+			}
+			started, status, err := ggoReadStart(tx, a.Row.Id, req.StartRequestID)
+			if err != nil {
+				return err
+			}
+			if status != "pending" || started == nil {
+				return ggoFieldError(constUtil.GGOFieldStaleGeneration, "采集请求不存在或已取消")
+			}
+			if started.AttemptToken != req.AttemptToken {
 				return ggoFieldError(constUtil.GGOFieldRequestConflict, "采集编号不匹配")
 			}
-			result, isFull, err := ggoDeliverPending(tx, a, &pending, req.RequestID)
+			var existing model.GGOFieldGatherClaimResponse
+			if found, err := ggoFindBusinessReceipt(tx, a.Row.Id, constUtil.GGOFieldOpGatherClaim, req.AttemptToken, &existing); err != nil {
+				return err
+			} else if found {
+				out = existing
+				return ggoSaveReceipt(tx, a.Row.Id, req.RequestID, constUtil.GGOFieldOpGatherClaim, hash, "", nil, [6]int64{}, 0, a.Now, out)
+			}
+			var cancelled model.GGOFieldGatherCancelResponse
+			if found, err := ggoFindBusinessReceipt(tx, a.Row.Id, constUtil.GGOFieldOpGatherCancel, req.AttemptToken, &cancelled); err != nil {
+				return err
+			} else if found {
+				return ggoFieldError(constUtil.GGOFieldStaleGeneration, "采集已取消")
+			}
+			var pending ggoPendingGather
+			if found, err := ggoFindBusinessReceipt(tx, a.Row.Id, constUtil.GGOFieldOpGatherReady, req.AttemptToken, &pending); err != nil {
+				return err
+			} else if found {
+				if pending.StartRequestID != req.StartRequestID {
+					return ggoFieldError(constUtil.GGOFieldRequestConflict, "采集编号不匹配")
+				}
+				result, isFull, err := ggoDeliverPending(tx, a, &pending, req.RequestID)
+				if err != nil {
+					return err
+				}
+				full = isFull
+				if result != nil {
+					out = *result
+				}
+				return nil
+			}
+			var attempt db.P8GatherAttempt
+			if err = tx.First(&attempt, "player_id=? AND active=?", a.Row.Id, true).Error; err != nil {
+				if errors.Is(err, gorm.ErrRecordNotFound) {
+					return errors.New("采集回执与预约不一致")
+				}
+				return err
+			}
+			if attempt.Token != req.AttemptToken {
+				return ggoFieldError(constUtil.GGOFieldStaleGeneration, "采集已发生变化")
+			}
+			result, isFull, err := ggoEndAttempt(tx, a, &attempt, req.RequestID)
 			if err != nil {
 				return err
 			}
@@ -129,27 +152,15 @@ func (s *GameService) GGOFieldGatherClaim(ctx context.Context, req model.GGOFiel
 				out = *result
 			}
 			return nil
-		}
-		var attempt db.P8GatherAttempt
-		if err = tx.First(&attempt, "player_id=? AND active=?", a.Row.Id, true).Error; err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return errors.New("采集回执与预约不一致")
-			}
-			return err
-		}
-		if attempt.Token != req.AttemptToken {
-			return ggoFieldError(constUtil.GGOFieldStaleGeneration, "采集已发生变化")
-		}
-		result, isFull, err := ggoEndAttempt(tx, a, &attempt, req.RequestID)
-		if err != nil {
-			return err
-		}
-		full = isFull
-		if result != nil {
-			out = *result
-		}
-		return nil
-	})
+		})
+	}
+	shared := context.WithValue(ctx, constUtil.P1SharedReadContextKey{}, true)
+	err := run(shared)
+	if errors.Is(err, constUtil.ErrP1ExclusiveRetry) {
+		// The shared transaction has returned and rolled back. Clear the marker
+		// explicitly even if the caller's context was already marked shared.
+		err = run(context.WithValue(ctx, constUtil.P1SharedReadContextKey{}, false))
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -304,7 +315,7 @@ func (s *GameService) GGOFieldGatherCancel(ctx context.Context, req model.GGOFie
 	shared := context.WithValue(ctx, constUtil.P1SharedReadContextKey{}, true)
 	err := run(shared)
 	if errors.Is(err, constUtil.ErrP1ExclusiveRetry) {
-		err = run(ctx)
+		err = run(context.WithValue(ctx, constUtil.P1SharedReadContextKey{}, false))
 	}
 	if err != nil {
 		return nil, err

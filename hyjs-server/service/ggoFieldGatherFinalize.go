@@ -309,8 +309,8 @@ func ggoEndAttempt(tx *gorm.DB, a *ggoFieldActor, attempt *db.P8GatherAttempt, r
 	if err = tx.Save(attempt).Error; err != nil {
 		return nil, false, err
 	}
-	if err = a.Service.RecordP1Event(tx, a.Row.Id, "ggo:gather:"+attempt.Token,
-		map[bool]string{true: constUtil.P8EventFishGather, false: constUtil.P8EventMineGather}[frozen.Kind == "fish"], 1,
+	if err = a.Service.recordP1GatherEvent(tx, a.Row.Id, attempt,
+		map[bool]string{true: constUtil.P8EventFishGather, false: constUtil.P8EventMineGather}[frozen.Kind == "fish"], true,
 		LocalPlayAt(tx.Statement.Context, time.UnixMilli(a.Now))); err != nil {
 		return nil, false, err
 	}

@@ -59,52 +59,61 @@ func (s *GameService) ggoFinishDue(ctx context.Context, id int64, token string) 
 	runtime.GGOFieldEconomy = snapshot.ggoEconomy
 	runtime.GGOFieldRevision = snapshot.ggoRevision
 	ctx = context.WithValue(ctx, constUtil.GameServiceContextKey, runtime)
-	return db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := ServerGameClockGuardTransaction(tx); err != nil {
-			return err
-		}
-		var row db.Profile
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&row, id).Error; err != nil {
-			return err
-		}
-		player, game, err := decodeProfileForCalendarUpdate(tx, &row)
-		if err != nil {
-			return err
-		}
-		var attempt db.P8GatherAttempt
-		err = tx.First(&attempt, "player_id=? AND token=? AND active=?", id, token, true).Error
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil
-		}
-		if err != nil {
-			return err
-		}
-		now := time.Now().UnixMilli()
-		if now < attempt.ReadyAt {
-			return nil
-		}
-		if !strings.Contains(attempt.Snapshot, "ggoStartRequestId") {
-			return nil
-		}
-		frozen, err := ggoFrozenAttempt(&attempt)
-		if err != nil {
-			return err
-		}
-		actor := &ggoFieldActor{Service: runtime, Row: &row, Player: player, Game: game, Now: now}
-		canFinish, err := ggoGatherCanFinish(tx, actor, &attempt, frozen)
-		if err != nil {
-			return err
-		}
-		if !canFinish {
-			requestID := ggoSystemReceiptID("cancel", token)
-			if _, err = ggoCancelAttempt(tx, runtime, id, game, &attempt, requestID, ggoCancelHash(frozen.StartRequestID, ""), now); err != nil {
+	run := func(attemptCtx context.Context) error {
+		return db.GetIns().WithContext(attemptCtx).Transaction(func(tx *gorm.DB) error {
+			if err := ServerGameClockGuardTransaction(tx); err != nil {
 				return err
 			}
-			return saveProfile(tx, &row, player, game)
-		}
-		_, _, err = ggoEndAttempt(tx, actor, &attempt, ggoSystemReceiptID("claim", token))
-		return err
-	})
+			var row db.Profile
+			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&row, id).Error; err != nil {
+				return err
+			}
+			player, game, err := decodeProfileForCalendarUpdate(tx, &row)
+			if err != nil {
+				return err
+			}
+			var attempt db.P8GatherAttempt
+			err = tx.First(&attempt, "player_id=? AND token=? AND active=?", id, token, true).Error
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return nil
+			}
+			if err != nil {
+				return err
+			}
+			now := time.Now().UnixMilli()
+			if now < attempt.ReadyAt {
+				return nil
+			}
+			if !strings.Contains(attempt.Snapshot, "ggoStartRequestId") {
+				return nil
+			}
+			frozen, err := ggoFrozenAttempt(&attempt)
+			if err != nil {
+				return err
+			}
+			actor := &ggoFieldActor{Service: runtime, Row: &row, Player: player, Game: game, Now: now}
+			canFinish, err := ggoGatherCanFinish(tx, actor, &attempt, frozen)
+			if err != nil {
+				return err
+			}
+			if !canFinish {
+				requestID := ggoSystemReceiptID("cancel", token)
+				if _, err = ggoCancelAttempt(tx, runtime, id, game, &attempt, requestID, ggoCancelHash(frozen.StartRequestID, ""), now); err != nil {
+					return err
+				}
+				return saveProfile(tx, &row, player, game)
+			}
+			_, _, err = ggoEndAttempt(tx, actor, &attempt, ggoSystemReceiptID("claim", token))
+			return err
+		})
+	}
+	shared := context.WithValue(ctx, constUtil.P1SharedReadContextKey{}, true)
+	err = run(shared)
+	if errors.Is(err, constUtil.ErrP1ExclusiveRetry) {
+		// The attempted settlement and every associated write have rolled back.
+		err = run(context.WithValue(ctx, constUtil.P1SharedReadContextKey{}, false))
+	}
+	return err
 }
 
 // ServeGGOFieldGather recovers due rows through the indexed bounded query.

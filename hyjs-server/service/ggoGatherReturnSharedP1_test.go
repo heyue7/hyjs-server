@@ -145,8 +145,8 @@ func TestGGOGatherSharedStartCancelRealMySQL(t *testing.T) {
 	if err := database.First(&attempt, "player_id=?", f.ids[0]).Error; err != nil || attempt.Active || attempt.Token != response.AttemptToken {
 		t.Fatalf("cancelled attempt not persisted once: %+v, %v", attempt, err)
 	}
-	// A cancellation arriving after the deadline must roll back the shared
-	// attempt before its claim records a fact with the original exclusive lock.
+	// A cancellation arriving after the deadline settles through the same
+	// trusted gather fact path while another transaction holds activity SHARE.
 	request.RequestID = "00000000-0000-4000-8000-000000000733"
 	due, err := f.s.GGOFieldGatherStart(ctx, request, f.sessions[0])
 	if err != nil || due == nil {
@@ -165,22 +165,21 @@ func TestGGOGatherSharedStartCancelRealMySQL(t *testing.T) {
 		result, err := f.s.GGOFieldGatherCancel(ctx, late, f.sessions[0])
 		lateResult <- cancelResult{result, err}
 	}()
+	var result cancelResult
 	select {
-	case result := <-lateResult:
-		t.Fatalf("late cancel did not wait for exclusive retry: %+v, %v", result.response, result.err)
-	case <-time.After(250 * time.Millisecond):
+	case result = <-lateResult:
+	case <-time.After(4 * time.Second):
+		t.Fatal("late cancel waited behind an unrelated shared activity reader")
 	}
-	if count := p1Count(t, &db.EventFact{}, "player_id=? AND source_key=?", f.ids[0], "ggo:gather:"+due.AttemptToken); count != 0 {
-		t.Fatalf("uncommitted late claim leaked %d facts", count)
-	}
-	finish()
-	result := <-lateResult
 	if result.err != nil || result.response == nil || result.response.Status != "settled" || result.response.ClaimReceipt == nil {
 		t.Fatalf("late cancel did not recover the settled claim: %+v, %v", result.response, result.err)
 	}
 	lateReplay, err := f.s.GGOFieldGatherCancel(ctx, late, f.sessions[0])
 	if err != nil || !reflect.DeepEqual(result.response, lateReplay) || p1Count(t, &db.EventFact{}, "player_id=? AND source_key=?", f.ids[0], "ggo:gather:"+due.AttemptToken) != 1 {
 		t.Fatalf("late claim replay changed the receipt or fact: %+v, %v", lateReplay, err)
+	}
+	if trace.exclusive.Load() != 0 {
+		t.Fatalf("late cancel unexpectedly acquired an exclusive activity lock: %d", trace.exclusive.Load())
 	}
 }
 

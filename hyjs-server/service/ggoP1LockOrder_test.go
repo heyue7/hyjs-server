@@ -219,9 +219,9 @@ func TestGGOPeriodLineGatherRollbackAndReplay(t *testing.T) {
 	}
 }
 
-// This test must use a separately coordinated local MySQL lease. A holds the
-// activity SHARE lock and then cancels on the line. B concurrently claims on
-// that same line; it must wait for activity X before obtaining the line X lock.
+// This test must use a separately coordinated local MySQL lease. A retains its
+// activity SHARE and line lock after cancellation; B takes activity SHARE first
+// and waits on that line until A commits, with neither transaction upgrading.
 func TestGGOPeriodLineRealMySQLSharedCancelAgainstClaim(t *testing.T) {
 	name := os.Getenv("HYJS_P1_MYSQL_DATABASE")
 	if name == "" {
@@ -243,14 +243,24 @@ func TestGGOPeriodLineRealMySQLSharedCancelAgainstClaim(t *testing.T) {
 	ctx, cancel := context.WithTimeout(f.ctx, 12*time.Second)
 	defer cancel()
 	sharedReady, startCancel := make(chan struct{}), make(chan struct{})
+	lineHeld, releaseLine := make(chan struct{}), make(chan struct{})
 	sharedDone := make(chan error, 1)
 	claimReady := make(chan struct{})
 	claimDone := make(chan error, 1)
 	var signalOnce sync.Once
+	var exclusive bool
+	var traceMu sync.Mutex
 	const callback = "test:ggo-period-mysql-wait"
 	if err = database.Callback().Row().Before("gorm:row").Register(callback, func(tx *gorm.DB) {
-		if tx.Statement.Context.Value(ggoLockTestContextKey{}) == "claim" && strings.Contains(tx.Statement.SQL.String(), "p1_period_instances") && strings.Contains(tx.Statement.SQL.String(), "FOR UPDATE") {
-			signalOnce.Do(func() { close(claimReady) })
+		if tx.Statement.Context.Value(ggoLockTestContextKey{}) == "claim" && strings.Contains(tx.Statement.SQL.String(), "p1_period_instances") {
+			if strings.Contains(tx.Statement.SQL.String(), "FOR SHARE") {
+				signalOnce.Do(func() { close(claimReady) })
+			}
+			if strings.Contains(tx.Statement.SQL.String(), "FOR UPDATE") {
+				traceMu.Lock()
+				exclusive = true
+				traceMu.Unlock()
+			}
 		}
 	}); err != nil {
 		t.Fatal(err)
@@ -275,7 +285,16 @@ func TestGGOPeriodLineRealMySQLSharedCancelAgainstClaim(t *testing.T) {
 			}
 			req := f.cancelRequest(0)
 			_, err := ggoCancelAttempt(tx, f.s, f.ids[0], game, &attempt, req.RequestID, ggoCancelHash(req.StartRequestID, req.AttemptToken), time.Now().UnixMilli())
-			return err
+			if err != nil {
+				return err
+			}
+			close(lineHeld)
+			select {
+			case <-releaseLine:
+				return nil
+			case <-ctx.Done():
+				return ctx.Err()
+			}
 		})
 		sharedDone <- err
 	}()
@@ -285,6 +304,14 @@ func TestGGOPeriodLineRealMySQLSharedCancelAgainstClaim(t *testing.T) {
 		t.Fatalf("shared movement failed before cancellation: %v", err)
 	case <-ctx.Done():
 		t.Fatal("shared movement did not obtain activity locks")
+	}
+	close(startCancel)
+	select {
+	case <-lineHeld:
+	case err := <-sharedDone:
+		t.Fatalf("cancellation failed before retaining the line: %v", err)
+	case <-ctx.Done():
+		t.Fatal("cancellation did not retain the line")
 	}
 	go func() {
 		claimCtx := context.WithValue(ctx, ggoLockTestContextKey{}, "claim")
@@ -298,14 +325,19 @@ func TestGGOPeriodLineRealMySQLSharedCancelAgainstClaim(t *testing.T) {
 	case <-ctx.Done():
 		t.Fatal("claim did not attempt its activity lock")
 	}
-	close(startCancel)
+	select {
+	case err := <-claimDone:
+		t.Fatalf("claim finished while the line was still held: %v", err)
+	case <-time.After(250 * time.Millisecond):
+	}
+	close(releaseLine)
 	select {
 	case err := <-sharedDone:
 		if err != nil {
 			t.Fatalf("shared cancellation could not complete ahead of claim: %v", err)
 		}
 	case <-time.After(4 * time.Second):
-		t.Fatal("claim retained the line while waiting for the shared activity lock")
+		t.Fatal("shared cancellation did not release the line")
 	}
 	select {
 	case err := <-claimDone:
@@ -313,7 +345,13 @@ func TestGGOPeriodLineRealMySQLSharedCancelAgainstClaim(t *testing.T) {
 			t.Fatalf("claim failed after cancellation released its locks: %v", err)
 		}
 	case <-ctx.Done():
-		t.Fatal("claim did not complete after activity lock release")
+		t.Fatal("claim did not complete after line release")
+	}
+	traceMu.Lock()
+	usedExclusive := exclusive
+	traceMu.Unlock()
+	if usedExclusive {
+		t.Fatal("claim unexpectedly retried with an exclusive activity lock")
 	}
 	for i := range f.ids {
 		var attempt db.P8GatherAttempt

@@ -293,7 +293,7 @@ func (s *GameService) GGOFieldGatherStart(ctx context.Context, req model.GGOFiel
 	shared := context.WithValue(ctx, constUtil.P1SharedReadContextKey{}, true)
 	err := run(shared)
 	if errors.Is(err, constUtil.ErrP1ExclusiveRetry) {
-		err = run(ctx)
+		err = run(context.WithValue(ctx, constUtil.P1SharedReadContextKey{}, false))
 	}
 	if err == nil && accepted {
 		s.ggoScheduleGather(ctx, req.PlayerID, out.AttemptToken, out.ReadyAtMS)
