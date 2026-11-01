@@ -70,9 +70,29 @@ func lockProfilePeriods(tx *gorm.DB) error {
 	return nil
 }
 
+// recordP1GatherEvent is limited to a trusted, just-consumed gather attempt.
+// Its caller has saved this attempt and acquired the period locks before any
+// resource lock. A shared transaction must be rolled back before an exclusive
+// retry, including its resource, profile and receipt changes.
+func (s *GameService) recordP1GatherEvent(tx *gorm.DB, playerID int64, attempt *db.P8GatherAttempt, kind string, desert bool, at time.Time) error {
+	if attempt == nil || attempt.PlayerID != playerID || attempt.Active || len(attempt.Token) > 64 || !p1SourceValid(attempt.Token) ||
+		(kind != constUtil.P8EventMineGather && kind != constUtil.P8EventFishGather) {
+		return errors.New("采集事件事实参数无效")
+	}
+	prefix := "p8:gather:"
+	if desert {
+		prefix = "ggo:gather:"
+	}
+	return s.recordP1Event(tx, playerID, prefix+attempt.Token, kind, 1, at, true)
+}
+
 // RecordP1Event 与调用方业务同事务记录事实；来源重放不增加任何活动，同源篡改拒绝。
 // 调用方先锁Profile。活动行锁只保护周期截止；结算流程不回锁Profile，避免逆序死锁。
 func (s *GameService) RecordP1Event(tx *gorm.DB, playerID int64, sourceKey, kind string, amount int64, at time.Time) error {
+	return s.recordP1Event(tx, playerID, sourceKey, kind, amount, at, false)
+}
+
+func (s *GameService) recordP1Event(tx *gorm.DB, playerID int64, sourceKey, kind string, amount int64, at time.Time, gather bool) error {
 	if playerID <= 0 || !p1SourceValid(sourceKey) || !p1SourceValid(kind) || len(kind) > 64 || amount <= 0 || at.UnixMilli() <= 0 || at.After(LocalPlayNow(tx.Statement.Context).Add(time.Minute)) {
 		return errors.New("事件事实参数无效")
 	}
@@ -87,32 +107,11 @@ func (s *GameService) RecordP1Event(tx *gorm.DB, playerID int64, sourceKey, kind
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return err
 	}
-	// 采集事实只写角色自身账本时允许并行；当前窗口可能消费该事实时回滚并独占重试。
-	// 其他新事实继续沿用原独占顺序，避免扩大并发语义。
-	if p1SharedRead(tx) {
-		if (kind != constUtil.P8EventMineGather && kind != constUtil.P8EventFishGather) || tx.Statement.Context.Value(p8OrdinaryGatherFactContextKey{}) != true {
-			return constUtil.ErrP1ExclusiveRetry
-		}
-		configs, err := p1LockPeriods(tx)
-		if err != nil {
-			return err
-		}
-		acceptedAt := max(at.UnixMilli(), LocalPlayNow(tx.Statement.Context).UnixMilli())
-		periodScope, _ := tx.Statement.Context.Value(constUtil.PeriodEventScopeContextKey{}).(string)
-		for _, live := range configs {
-			if !live.Enabled || periodScope != "" && live.ID != periodScope {
-				continue
-			}
-			cfg, err := p1PeriodSnapshot(live)
-			if err != nil {
-				return err
-			}
-			if cfg.Kind == kind && at.UnixMilli() >= cfg.StartAt && at.UnixMilli() < cfg.EndAt && acceptedAt >= cfg.StartAt && acceptedAt < cfg.EndAt {
-				return constUtil.ErrP1ExclusiveRetry
-			}
-		}
-		fact := db.EventFact{PlayerID: playerID, SourceKey: sourceKey, Kind: kind, Amount: amount, OccurredAt: at.UnixMilli(), Day: p1Day(at)}
-		return tx.Create(&fact).Error
+	// Only this private gather entry may update per-player progress while the
+	// enclosing transaction holds shared period locks. All other new events
+	// retain the original rollback-and-exclusive-retry contract.
+	if p1SharedRead(tx) && !gather {
+		return constUtil.ErrP1ExclusiveRetry
 	}
 	fact := db.EventFact{PlayerID: playerID, SourceKey: sourceKey, Kind: kind, Amount: amount, OccurredAt: at.UnixMilli(), Day: p1Day(at)}
 	if err = tx.Create(&fact).Error; err != nil {
@@ -122,7 +121,7 @@ func (s *GameService) RecordP1Event(tx *gorm.DB, playerID int64, sourceKey, kind
 	if err != nil {
 		return err
 	}
-	// 以拿到窗口锁的实际提交时间判断截止，晚于截止提交的动作保留事实但不回写截止快照。
+	// 以取得窗口锁后读取的游戏时间判断截止；事务提交可以晚于此刻。
 	acceptedAt := max(at.UnixMilli(), LocalPlayNow(tx.Statement.Context).UnixMilli())
 	var paymentRealAt int64
 	if kind == "payment_amount" {
@@ -171,9 +170,22 @@ func (s *GameService) RecordP1Event(tx *gorm.DB, playerID int64, sourceKey, kind
 				continue
 			}
 		}
-		cfg, err = s.freezeP1Period(tx, live, true)
-		if err != nil {
-			return err
+		if p1SharedRead(tx) {
+			// First use must retry the entire transaction with an exclusive
+			// lock; a shared lock is never upgraded in place. Revalidate the
+			// immutable snapshot at the same point as the original freeze.
+			if len(live.Frozen) == 0 {
+				return constUtil.ErrP1ExclusiveRetry
+			}
+			cfg, err = s.freezeP1Period(tx, live, false)
+			if err != nil {
+				return err
+			}
+		} else {
+			cfg, err = s.freezeP1Period(tx, live, true)
+			if err != nil {
+				return err
+			}
 		}
 		var settled int64
 		if err = tx.Model(&db.PeriodSettlement{}).Where("instance_id = ?", cfg.ID).Count(&settled).Error; err != nil {
