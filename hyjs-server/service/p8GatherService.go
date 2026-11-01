@@ -634,7 +634,7 @@ func (s *GameService) p8GatherMutationProjected(ctx context.Context, id int64, o
 			return tx.Create(&db.P8GatherReceipt{PlayerID: id, Operation: op, Timestamp: stamp, Request: raw, Response: data}).Error
 		})
 	}
-	if op == constUtil.P8GatherStartOperation {
+	if op == constUtil.P8GatherStartOperation || op == constUtil.P8GatherClaimOperation {
 		shared := context.WithValue(ctx, constUtil.P1SharedReadContextKey{}, true)
 		err = run(shared)
 		if errors.Is(err, constUtil.ErrP1ExclusiveRetry) {
@@ -776,7 +776,7 @@ func (s *GameService) p8ClaimGather(ctx context.Context, id int64, b *pb.CSField
 		if cfg.Kind == "fish" {
 			kind = constUtil.P8EventFishGather
 		}
-		if err = s.RecordP1Event(tx, id, "p8:gather:"+attempt.Token, kind, 1, LocalPlayAt(tx.Statement.Context, time.UnixMilli(now))); err != nil {
+		if err = s.recordP1GatherEvent(tx, id, &attempt, kind, false, LocalPlayAt(tx.Statement.Context, time.UnixMilli(now))); err != nil {
 			return err
 		}
 		out.Code = proto.Int32(constUtil.P8ResourceAvailable)
