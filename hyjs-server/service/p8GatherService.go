@@ -17,6 +17,7 @@ import (
 
 	"google.golang.org/protobuf/proto"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 	"hyjs-server/constUtil"
 	"hyjs-server/db"
 	"hyjs-server/model"
@@ -39,7 +40,7 @@ type p8GatherConfig struct {
 
 // InitializeP8Gather 仅创建独立采集状态表，原角色/冶炼/料理数据继续各域管理。
 func (s *GameService) InitializeP8Gather(ctx context.Context) error {
-	return db.GetIns().WithContext(ctx).AutoMigrate(&db.P8ResourceNode{}, &db.P8GatherAttempt{}, &db.P8GatherReceipt{})
+	return db.GetIns().WithContext(ctx).AutoMigrate(&db.P8ResourceNode{}, &db.P8GatherAttempt{}, &db.P8GatherReceipt{}, &db.P8ResourceReservation{})
 }
 
 func (s *GameService) LoadP8Tables(root string) error {
@@ -336,15 +337,202 @@ func p8Near(point *pb.PointNew, cfg *p8GatherConfig) bool {
 	return distance <= cfg.Radius*cfg.Radius
 }
 
+// A missing point guard is created after rolling back the player transaction.
+// The guard is retained, so normal starts on different lines only share it.
+type p8ReservationGateMissing struct {
+	serverID int64
+	scene    string
+	posID    string
+}
+
+func (*p8ReservationGateMissing) Error() string { return "资源点占用门禁尚未建立" }
+
+func p8CreateReservationGate(ctx context.Context, missing *p8ReservationGateMissing) error {
+	gate := db.P8ResourceReservation{ServerID: missing.serverID, Scene: missing.scene, PosID: missing.posID}
+	return db.GetIns().WithContext(ctx).Clauses(clause.OnConflict{DoNothing: true}).Create(&gate).Error
+}
+
+// A missing, stale or unauthenticated presence is treated as an unknown line.
+// That scope conservatively conflicts with all lines of this one physical point.
+func (s *GameService) p8ReservationLine(tx *gorm.DB, row *db.Profile, game *model.GameState, scene string) (int32, error) {
+	if row == nil || game == nil || AdminProfileServerID(*row) != s.OriginalServerID() {
+		return 0, p8GatherError()
+	}
+	if session, ok := tx.Statement.Context.Value(ggoNativeSessionKey{}).([]byte); ok && !bytes.Equal(session, row.Session) {
+		return 0, errors.New("游戏会话已变化")
+	}
+	if p10SceneScope(game) != scene || len(row.Session) == 0 || !gameSchemaHasTable(tx, &db.P10ScenePresence{}) {
+		return 0, nil
+	}
+	policy, err := p10SceneConfig(tx)
+	if err != nil || policy == nil {
+		return 0, err
+	}
+	policy, err = s.adminFieldSceneConfig(tx, scene, policy)
+	if err != nil || policy == nil {
+		return 0, err
+	}
+	var presence db.P10ScenePresence
+	err = tx.Clauses(clause.Locking{Strength: "SHARE"}).First(&presence, "player_id=?", row.Id).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return 0, nil
+	}
+	if err != nil {
+		return 0, err
+	}
+	value, live := p10LiveClient(p10ClientKey{s.p10ClientOwner(), row.Id})
+	if !live || presence.Scene != scene || presence.Line < 1 || presence.Line > policy.LineCount ||
+		presence.SessionHash == "" || presence.SessionHash != p6Digest(row.Session) || !bytes.Equal(value.(*p10ClientSink).session, row.Session) {
+		return 0, nil
+	}
+	return presence.Line, nil
+}
+
+// Old accepted attempts have no trustworthy line. Until their original timer
+// and grace expire, other players avoid the same point on every line.
+func (s *GameService) p8LegacyReservationBusy(tx *gorm.DB, id int64, scene, pos string, now int64) (bool, error) {
+	var rows []struct {
+		PlayerID int64
+		ServerID *int64
+	}
+	err := tx.Table("p8_gather_attempts AS a").Select("a.player_id, p.server_id").
+		Joins("LEFT JOIN profiles AS p ON p.id=a.player_id").
+		Where("a.scene=? AND a.pos_id=? AND a.active=? AND a.ready_at>? AND a.reservation_version=? AND a.player_id<>?", scene, pos, true, now-constUtil.P8ResourceLeaseGraceMS, 0, id).
+		Scan(&rows).Error
+	if err != nil {
+		return false, err
+	}
+	for _, row := range rows {
+		if row.ServerID == nil || *row.ServerID == s.OriginalServerID() || *row.ServerID <= 0 && s.OriginalServerID() == constUtil.GameDefaultServerID {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+// Each known line holds the point guard shared and its own occupancy row
+// exclusively. Unknown presence holds the point guard exclusively and checks
+// every line. This never holds a process-wide scene mutex or another profile.
+func (s *GameService) p8ReservePoint(tx *gorm.DB, row *db.Profile, game *model.GameState, attempt *db.P8GatherAttempt, cfg *p8GatherConfig) (int64, error) {
+	line, err := s.p8ReservationLine(tx, row, game, attempt.Scene)
+	if err != nil {
+		return 0, err
+	}
+	serverID := s.OriginalServerID()
+	key := "server_id=? AND scene=? AND pos_id=?"
+	if attempt.ReservationVersion == constUtil.P8ReservationVersion && attempt.StartedAt > 0 && attempt.ReservationLine != line {
+		// A reconnect or stale directory must not silently move an accepted
+		// animation to another line while its earlier lease is still live.
+		var previous db.P8ResourceReservation
+		err := tx.Where(key+" AND line=?", serverID, attempt.Scene, attempt.PosID, attempt.ReservationLine).First(&previous).Error
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			return 0, err
+		}
+		if err == nil && previous.PlayerID == row.Id && previous.Token == attempt.Token && previous.OccupiedUntil > time.Now().UnixMilli() {
+			return 0, errors.New("当前采集线路已变化，请先结束采集")
+		}
+	}
+	strength := "SHARE"
+	if line == 0 {
+		strength = "UPDATE"
+	}
+	var gate db.P8ResourceReservation
+	err = tx.Clauses(clause.Locking{Strength: strength}).Where(key+" AND line=?", serverID, attempt.Scene, attempt.PosID, 0).First(&gate).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return 0, &p8ReservationGateMissing{serverID: serverID, scene: attempt.Scene, posID: attempt.PosID}
+	}
+	if err != nil {
+		return 0, err
+	}
+	now := time.Now().UnixMilli()
+	busy, err := s.p8LegacyReservationBusy(tx, row.Id, attempt.Scene, attempt.PosID, now)
+	if err != nil {
+		return 0, err
+	}
+	if busy || gate.OccupiedUntil > now && (gate.PlayerID != row.Id || gate.Token != attempt.Token) {
+		return 0, errors.New(constUtil.P8ResourceOccupied)
+	}
+	if line == 0 {
+		var others []db.P8ResourceReservation
+		if err := tx.Where(key+" AND line>? AND occupied_until>?", serverID, attempt.Scene, attempt.PosID, 0, now).Find(&others).Error; err != nil {
+			return 0, err
+		}
+		for _, other := range others {
+			if other.PlayerID != row.Id || other.Token != attempt.Token {
+				return 0, errors.New(constUtil.P8ResourceOccupied)
+			}
+		}
+	} else {
+		// First use of one line creates only that line's row. The point guard
+		// already exists and remains a shared lock for normal line traffic.
+		initial := db.P8ResourceReservation{ServerID: serverID, Scene: attempt.Scene, PosID: attempt.PosID, Line: line}
+		if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&initial).Error; err != nil {
+			return 0, err
+		}
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where(key+" AND line=?", serverID, attempt.Scene, attempt.PosID, line).First(&gate).Error; err != nil {
+			return 0, err
+		}
+	}
+	now = time.Now().UnixMilli()
+	if gate.OccupiedUntil > now {
+		if gate.PlayerID != row.Id || gate.Token != attempt.Token {
+			return 0, errors.New(constUtil.P8ResourceOccupied)
+		}
+		if attempt.StartedAt > 0 && attempt.ReadyAt <= now {
+			// A late replay opens another client animation even though the
+			// accepted reward was already ready. Keep it protected after claim.
+			until := max(gate.OccupiedUntil, now+cfg.GatherMS+constUtil.P8ResourceLeaseGraceMS)
+			if err := tx.Model(&db.P8ResourceReservation{}).Where(key+" AND line=?", serverID, attempt.Scene, attempt.PosID, line).
+				Updates(map[string]any{"occupied_until": until, "replay_guard": true}).Error; err != nil {
+				return 0, err
+			}
+		}
+		attempt.ReservationLine = line
+		return now, nil
+	}
+	until := now + cfg.GatherMS + constUtil.P8ResourceLeaseGraceMS
+	if attempt.ReadyAt > now {
+		until = attempt.ReadyAt + constUtil.P8ResourceLeaseGraceMS
+	}
+	replay := attempt.StartedAt > 0 && attempt.ReadyAt <= now
+	if err := tx.Model(&db.P8ResourceReservation{}).Where(key+" AND line=?", serverID, attempt.Scene, attempt.PosID, line).
+		Updates(map[string]any{"player_id": row.Id, "token": attempt.Token, "occupied_until": until, "replay_guard": replay}).Error; err != nil {
+		return 0, err
+	}
+	attempt.ReservationLine = line
+	return now, nil
+}
+
+// Replaying a start may reopen the original client's gathering animation.
+// A completed attempt therefore reacquires a point for one frozen animation;
+// its original ReadyAt and accepted reward remain unchanged.
+func (s *GameService) p8ReserveActiveStart(tx *gorm.DB, row *db.Profile, game *model.GameState, attempt *db.P8GatherAttempt) error {
+	if attempt.ReservationVersion != 0 && attempt.ReservationVersion != constUtil.P8ReservationVersion {
+		return p8GatherError()
+	}
+	if attempt.ReservationVersion == 0 && time.Now().UnixMilli() < attempt.ReadyAt {
+		return nil
+	}
+	cfg, err := p8DecodeConfig(attempt.Snapshot)
+	if err != nil {
+		return err
+	}
+	if _, err = s.p8ReservePoint(tx, row, game, attempt, cfg); err != nil {
+		return err
+	}
+	attempt.ReservationVersion = constUtil.P8ReservationVersion
+	return tx.Save(attempt).Error
+}
+
 // P8CancelGather 与移动/离场/开战共用原玩家事务；取消不扣疲劳也不生成奖励。
 func (s *GameService) P8CancelGather(tx *gorm.DB, id int64, g *model.GameState) error {
-	if g != nil && g.GGOField != nil {
-		var attempt db.P8GatherAttempt
-		err := tx.First(&attempt, "player_id=? AND active=?", id, true).Error
-		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-			return err
-		}
-		if err == nil && attempt.Scene == constUtil.GGOFieldScene && strings.Contains(attempt.Snapshot, "ggoStartRequestId") {
+	var attempt db.P8GatherAttempt
+	err := tx.First(&attempt, "player_id=? AND active=?", id, true).Error
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return err
+	}
+	if err == nil {
+		if g != nil && g.GGOField != nil && attempt.Scene == constUtil.GGOFieldScene && strings.Contains(attempt.Snapshot, "ggoStartRequestId") {
 			frozen, e := ggoFrozenAttempt(&attempt)
 			if e != nil {
 				return e
@@ -355,6 +543,16 @@ func (s *GameService) P8CancelGather(tx *gorm.DB, id int64, g *model.GameState) 
 			requestID := ggoSystemReceiptID("cancel", attempt.Token)
 			_, e = s.ggoCancelGatherFromAction(tx, id, g, &attempt, frozen, requestID)
 			return e
+		}
+		if attempt.ReservationVersion == constUtil.P8ReservationVersion {
+			// Token matching prevents an old cancellation from releasing a later owner.
+			if err := tx.Model(&db.P8ResourceReservation{}).
+				Where("server_id=? AND scene=? AND pos_id=? AND line=? AND player_id=? AND token=?", s.OriginalServerID(), attempt.Scene, attempt.PosID, attempt.ReservationLine, id, attempt.Token).
+				Updates(map[string]any{"player_id": 0, "token": "", "occupied_until": 0, "replay_guard": false}).Error; err != nil {
+				return err
+			}
+		} else if attempt.ReservationVersion != 0 {
+			return p8GatherError()
 		}
 	}
 	if err := tx.Model(&db.P8GatherAttempt{}).Where("player_id=? AND active=?", id, true).Update("active", false).Error; err != nil {
@@ -544,12 +742,12 @@ type p8GatherProjection struct {
 type p8OrdinaryGatherFactContextKey struct{}
 
 func (s *GameService) p8GatherMutation(ctx context.Context, id int64, op string, stamp int64, request, response proto.Message, apply func(*gorm.DB, *pb.Player, *model.GameState, int64) error) ([]proto.Message, error) {
-	return s.p8GatherMutationProjected(ctx, id, op, stamp, request, response, func(tx *gorm.DB, p *pb.Player, g *model.GameState, now int64, _ *p8GatherProjection) error {
+	return s.p8GatherMutationProjected(ctx, id, op, stamp, request, response, func(tx *gorm.DB, _ *db.Profile, p *pb.Player, g *model.GameState, now int64, _ *p8GatherProjection) error {
 		return apply(tx, p, g, now)
 	})
 }
 
-func (s *GameService) p8GatherMutationProjected(ctx context.Context, id int64, op string, stamp int64, request, response proto.Message, apply func(*gorm.DB, *pb.Player, *model.GameState, int64, *p8GatherProjection) error) ([]proto.Message, error) {
+func (s *GameService) p8GatherMutationProjected(ctx context.Context, id int64, op string, stamp int64, request, response proto.Message, apply func(*gorm.DB, *db.Profile, *pb.Player, *model.GameState, int64, *p8GatherProjection) error) ([]proto.Message, error) {
 	if stamp < 0 || stamp == 0 && op != constUtil.P8GatherStartOperation && op != constUtil.P8GatherClaimOperation {
 		return nil, p8GatherError()
 	}
@@ -582,10 +780,40 @@ func (s *GameService) p8GatherMutationProjected(ctx context.Context, id int64, o
 					if !bytes.Equal(receipt.Request, raw) {
 						return p8GatherError()
 					}
+					if err = proto.Unmarshal(receipt.Response, response); err != nil {
+						return err
+					}
+					if start, ok := response.(*pb.SCFieldResourceStartGather); ok && start.GetResult() == constUtil.P8ResourceAvailable {
+						original, ok := request.(*pb.CSFieldResourceStartGather)
+						if !ok {
+							return p8GatherError()
+						}
+						var active db.P8GatherAttempt
+						err = tx.First(&active, "player_id=? AND active=?", id, true).Error
+						if errors.Is(err, gorm.ErrRecordNotFound) {
+							return errors.New("本次采集已结束，请重新选择资源点")
+						}
+						if err != nil {
+							return err
+						}
+						if receipt.AttemptToken == "" || receipt.AttemptToken != active.Token {
+							return errors.New("本次采集状态已变化，请重新选择资源点")
+						}
+						cfg, err := p8DecodeConfig(active.Snapshot)
+						if err != nil {
+							return err
+						}
+						if active.PosID != original.GetPosId() || active.Scene != g.Position.GetScene() || !p8Near(g.Position.GetCurrent(), cfg) {
+							return errors.New("本次采集状态已变化，请重新选择资源点")
+						}
+						if err = s.p8ReserveActiveStart(tx, row, g, &active); err != nil {
+							return err
+						}
+					}
 					if g.Field != nil {
 						side = proto.Clone(g.Field.Side).(*pb.PlayerSide)
 					}
-					return proto.Unmarshal(receipt.Response, response)
+					return nil
 				}
 				if !errors.Is(err, gorm.ErrRecordNotFound) {
 					return err
@@ -612,7 +840,7 @@ func (s *GameService) p8GatherMutationProjected(ctx context.Context, id int64, o
 				return err
 			}
 			projection := &p8GatherProjection{}
-			if err = apply(tx, p, g, now, projection); err != nil {
+			if err = apply(tx, row, p, g, now, projection); err != nil {
 				return err
 			}
 			if err = saveProfile(tx, row, p, g); err != nil {
@@ -634,19 +862,47 @@ func (s *GameService) p8GatherMutationProjected(ctx context.Context, id int64, o
 			if err != nil {
 				return err
 			}
-			return tx.Create(&db.P8GatherReceipt{PlayerID: id, Operation: op, Timestamp: stamp, Request: raw, Response: data}).Error
+			receipt := db.P8GatherReceipt{PlayerID: id, Operation: op, Timestamp: stamp, Request: raw, Response: data}
+			if start, ok := response.(*pb.SCFieldResourceStartGather); ok && start.GetResult() == constUtil.P8ResourceAvailable {
+				var active db.P8GatherAttempt
+				if err = tx.First(&active, "player_id=? AND active=?", id, true).Error; err != nil {
+					return err
+				}
+				if active.Token == "" {
+					return p8GatherError()
+				}
+				receipt.AttemptToken = active.Token
+			}
+			return tx.Create(&receipt).Error
 		})
+	}
+	reset := func() {
+		proto.Reset(response)
+		side, info = nil, nil
+	}
+	runWithGate := func(attemptCtx context.Context) error {
+		err := run(attemptCtx)
+		var missing *p8ReservationGateMissing
+		if errors.As(err, &missing) {
+			// Creation commits separately after the failed player transaction.
+			// It cannot hold the point exclusively during the gameplay retry.
+			if err = p8CreateReservationGate(ctx, missing); err != nil {
+				return err
+			}
+			reset()
+			return run(attemptCtx)
+		}
+		return err
 	}
 	if op == constUtil.P8GatherStartOperation || op == constUtil.P8GatherClaimOperation {
 		shared := context.WithValue(ctx, constUtil.P1SharedReadContextKey{}, true)
-		err = run(shared)
+		err = runWithGate(shared)
 		if errors.Is(err, constUtil.ErrP1ExclusiveRetry) {
-			proto.Reset(response)
-			side, info = nil, nil
-			err = run(ctx)
+			reset()
+			err = runWithGate(ctx)
 		}
 	} else {
-		err = run(ctx)
+		err = runWithGate(ctx)
 	}
 	if err != nil {
 		return nil, err
@@ -663,7 +919,7 @@ func (s *GameService) p8GatherMutationProjected(ctx context.Context, id int64, o
 
 func (s *GameService) p8StartGather(ctx context.Context, id int64, b *pb.CSFieldResourceStartGather, stamp int64) ([]proto.Message, error) {
 	out := &pb.SCFieldResourceStartGather{}
-	return s.p8GatherMutationProjected(ctx, id, constUtil.P8GatherStartOperation, stamp, b, out, func(tx *gorm.DB, p *pb.Player, g *model.GameState, now int64, projection *p8GatherProjection) error {
+	return s.p8GatherMutationProjected(ctx, id, constUtil.P8GatherStartOperation, stamp, b, out, func(tx *gorm.DB, row *db.Profile, p *pb.Player, g *model.GameState, now int64, projection *p8GatherProjection) error {
 		nodes, _, err := s.p8Nodes(tx, id, g.Position.GetScene(), now)
 		if err != nil {
 			return err
@@ -709,6 +965,9 @@ func (s *GameService) p8StartGather(ctx context.Context, id int64, b *pb.CSField
 			if old.Scene != node.Scene || old.PosID != node.PosID || old.Generation != node.Generation {
 				return errors.New("当前已有采集，需要先取消")
 			}
+			if err = s.p8ReserveActiveStart(tx, row, g, &old); err != nil {
+				return err
+			}
 		} else {
 			token, err := fieldToken()
 			if err != nil {
@@ -718,7 +977,12 @@ func (s *GameService) p8StartGather(ctx context.Context, id int64, b *pb.CSField
 			if err != nil {
 				return err
 			}
-			old = db.P8GatherAttempt{PlayerID: id, Token: token, Scene: node.Scene, PosID: node.PosID, Generation: node.Generation, StartedAt: now, ReadyAt: now + cfg.GatherMS, Active: true, Snapshot: node.Snapshot, Rewards: rewards}
+			old = db.P8GatherAttempt{PlayerID: id, Token: token, Scene: node.Scene, PosID: node.PosID, Generation: node.Generation, Active: true, Snapshot: node.Snapshot, Rewards: rewards, ReservationVersion: constUtil.P8ReservationVersion}
+			started, err := s.p8ReservePoint(tx, row, g, &old, cfg)
+			if err != nil {
+				return err
+			}
+			old.StartedAt, old.ReadyAt = started, started+cfg.GatherMS
 			if err = tx.Save(&old).Error; err != nil {
 				return err
 			}
@@ -773,6 +1037,17 @@ func (s *GameService) p8ClaimGather(ctx context.Context, id int64, b *pb.CSField
 		attempt.Active = false
 		if err = tx.Save(&attempt).Error; err != nil {
 			return err
+		}
+		if attempt.ReservationVersion == constUtil.P8ReservationVersion {
+			// A repeated start after ReadyAt can still be animating. Keep that
+			// replay lease until its deadline even when the old claim is ready.
+			if err = tx.Model(&db.P8ResourceReservation{}).
+				Where("server_id=? AND scene=? AND pos_id=? AND line=? AND player_id=? AND token=? AND replay_guard=?", s.OriginalServerID(), attempt.Scene, attempt.PosID, attempt.ReservationLine, id, attempt.Token, false).
+				Updates(map[string]any{"player_id": 0, "token": "", "occupied_until": 0, "replay_guard": false}).Error; err != nil {
+				return err
+			}
+		} else if attempt.ReservationVersion != 0 {
+			return p8GatherError()
 		}
 		g.Field.Side.State = proto.Int32(constUtil.P8FieldIdle)
 		kind := constUtil.P8EventMineGather
@@ -847,8 +1122,8 @@ func (s *GameService) p8ResourceQuery(ctx context.Context, id int64, request pro
 	return []proto.Message{out}, err
 }
 
-// DispatchP8Gather handles the original six maps; multiplayer ownership remains
-// the explicit later domain rather than changing these isolated player nodes.
+// DispatchP8Gather keeps the original per-player nodes and serializes active
+// gathering by physical point and authenticated line.
 func (s *GameService) DispatchP8Gather(ctx context.Context, id int64, request proto.Message, stamp int64) ([]proto.Message, bool, error) {
 	var out []proto.Message
 	var err error

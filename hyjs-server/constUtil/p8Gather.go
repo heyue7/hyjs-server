@@ -5,6 +5,9 @@ const (
 	P8GatherClaimOperation = "gather-claim"
 	P8ResourceAvailable    = int32(1)
 	P8ResourceMissing      = int32(2003)
+	P8ResourceOccupied     = "资源点正在被其他玩家采集，请稍候"
+	P8ReservationVersion   = int32(1)
+	P8ResourceLeaseGraceMS = int64(60000)
 	P8FieldIdle            = int32(0)
 	P8FieldFishing         = int32(3)
 	P8FieldMining          = int32(4)

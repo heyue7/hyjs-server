@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/subtle"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -528,6 +529,49 @@ func (s *GameService) SyncP10Scene(ctx context.Context, id int64, movement bool)
 	return s.syncP10Scene(ctx, id, movement, nil)
 }
 
+// Ordinary automatic line changes must serialize with accepted P8 starts.
+// The ordinary no-line-change path retains its existing narrow update.
+func (s *GameService) p10SceneCommitOrdinaryReline(tx *gorm.DB, observed *db.Profile, old, current db.P10ScenePresence, sink *p10ClientSink, updates map[string]any) error {
+	return tx.Transaction(func(tx *gorm.DB) error {
+		var profile db.Profile
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&profile, current.PlayerID).Error; err != nil {
+			return err
+		}
+		live, ok := p10LiveClient(p10ClientKey{s.p10ClientOwner(), current.PlayerID})
+		if !ok || live != sink || subtle.ConstantTimeCompare(profile.Session, sink.session) != 1 ||
+			profile.Player == nil || profile.Game == nil || observed == nil || observed.Player == nil || observed.Game == nil ||
+			AdminProfileServerID(profile) != s.OriginalServerID() || AdminProfileServerID(*observed) != s.OriginalServerID() ||
+			*profile.Player != *observed.Player || *profile.Game != *observed.Game {
+			return errors.New("场景状态已变化，请重新同步")
+		}
+		var presence db.P10ScenePresence
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&presence, "player_id=?", current.PlayerID).Error; err != nil {
+			return err
+		}
+		if presence.Scene != old.Scene || presence.Line != old.Line || presence.SessionHash != old.SessionHash {
+			return errors.New("场景线路已变化，请重新同步")
+		}
+		if gameSchemaHasTable(tx, &db.P8GatherAttempt{}) {
+			var active db.P8GatherAttempt
+			err := tx.First(&active, "player_id=? AND active=?", current.PlayerID, true).Error
+			if err == nil {
+				return errors.New("请先结束当前采集再换线")
+			}
+			if !errors.Is(err, gorm.ErrRecordNotFound) {
+				return err
+			}
+		}
+		result := tx.Model(&db.P10ScenePresence{}).Where("player_id=?", current.PlayerID).Updates(updates)
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected != 1 {
+			return errors.New("场景线路已变化，请重新同步")
+		}
+		return nil
+	}, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
+}
+
 // A CurrentPosition caller can request an ordered peer snapshot after a
 // committed desert line reload; other existing callers keep their behavior.
 func (s *GameService) syncP10Scene(ctx context.Context, id int64, movement bool, lineRestored *bool) error {
@@ -710,14 +754,20 @@ func (s *GameService) syncP10Scene(ctx context.Context, id int64, movement bool,
 			updates["updated_at"] = current.UpdatedAt
 		}
 		if len(updates) > 0 {
-			result := tx.Model(&db.P10ScenePresence{}).Where("player_id=?", id).Updates(updates)
-			if result.Error != nil {
-				return result.Error
-			}
-			if result.RowsAffected == 0 {
-				// Match Save's existing-row fallback if the row disappeared concurrently.
-				if err = tx.Save(&current).Error; err != nil {
+			if constUtil.P8PackagedFieldScene(scope) && old.Scene == current.Scene && old.Line != current.Line {
+				if err = s.p10SceneCommitOrdinaryReline(tx, profile, old, current, sink, updates); err != nil {
 					return err
+				}
+			} else {
+				result := tx.Model(&db.P10ScenePresence{}).Where("player_id=?", id).Updates(updates)
+				if result.Error != nil {
+					return result.Error
+				}
+				if result.RowsAffected == 0 {
+					// Match Save's existing-row fallback if the row disappeared concurrently.
+					if err = tx.Save(&current).Error; err != nil {
+						return err
+					}
 				}
 			}
 		}
