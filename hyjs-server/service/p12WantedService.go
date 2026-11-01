@@ -705,7 +705,12 @@ func (s *GameService) p12WantedStart(ctx context.Context, id int64, request *pb.
 			return err
 		}
 		// 验证独立type8原自动驱动，客户端winner/血量/伤害不参与计算。
-		input.AppliedProperties["wantedSettlementIndices"] = []string{period["PerformanceIndex"], period["CoreIndex"], constUtil.P12WantedRewardRule}
+		pool, err := p12WantedScorePool(instance.Difficulty)
+		if err != nil {
+			return err
+		}
+		// 新战斗冻结难度和积分池；旧战斗的原除数快照仍独立结算。
+		input.AppliedProperties["wantedSettlementIndices"] = []string{period["PerformanceIndex"], strconv.FormatInt(pool, 10), constUtil.P12WantedScoreRuleV2, strconv.FormatInt(instance.Difficulty, 10)}
 		terminal, err := s.ComputeP12WantedProtocolFinalHP(ctx, input)
 		if err != nil {
 			return err
@@ -929,6 +934,7 @@ func (s *GameService) p12WantedEnd(ctx context.Context, id int64, request *pb.CS
 		if json.Unmarshal([]byte(instance.MonsterHPJSON), &hp) != nil {
 			return errors.New(constUtil.P12WantedInvalid)
 		}
+		beforeHP := hp
 		_, _, beforeRank, _, err := p12WantedDailyTotals(tx, s.OriginalServerID(), id, now)
 		if err != nil {
 			return err
@@ -950,16 +956,10 @@ func (s *GameService) p12WantedEnd(ctx context.Context, id int64, request *pb.CS
 		} else if now.UnixMilli() >= instance.ExpiresAt && instance.State == constUtil.P12WantedActive {
 			instance.State = constUtil.P12WantedExpired
 		}
-		indices := input.AppliedProperties["wantedSettlementIndices"]
-		if len(indices) != 3 || indices[2] != constUtil.P12WantedRewardRule {
-			return errors.New(constUtil.P12WantedInvalid)
+		performance, score, err := p12WantedSettlementValues(&input, &fight, &instance, beforeHP, hp, applied)
+		if err != nil {
+			return err
 		}
-		performanceDiv, e1 := strconv.ParseInt(indices[0], 10, 64)
-		scoreDiv, e2 := strconv.ParseInt(indices[1], 10, 64)
-		if e1 != nil || e2 != nil || performanceDiv <= 0 || scoreDiv <= 0 || applied < 0 || !combatFinite(applied) || applied > float64(math.MaxInt32)*float64(min(performanceDiv, scoreDiv)) {
-			return errors.New(constUtil.P12WantedInvalid)
-		}
-		performance, score := int64(math.Floor(applied/float64(performanceDiv))), int64(math.Floor(applied/float64(scoreDiv)))
 		gain := &pb.ResultObject{}
 		if score > 0 {
 			gain, err = s.GrantFixedReward(player, game, "score,"+strconv.FormatInt(score, 10))
@@ -1054,6 +1054,129 @@ func p12WantedApplyTerminalHP(input *model.FrozenBattleInput, terminal *model.Co
 		return invalid()
 	}
 	return next, applied, nil
+}
+
+func p12WantedScorePool(difficulty int64) (int64, error) {
+	switch difficulty {
+	case 1:
+		return constUtil.P12WantedScorePool1, nil
+	case 2:
+		return constUtil.P12WantedScorePool2, nil
+	case 3:
+		return constUtil.P12WantedScorePool3, nil
+	default:
+		return 0, errors.New(constUtil.P12WantedInvalid)
+	}
+}
+
+// 对 float64 的精确值做向上量化，避免浮点乘法先舍入到相邻整数。
+func p12WantedHPUnits(hp float64) (*big.Int, error) {
+	if !combatFinite(hp) || hp < 0 {
+		return nil, errors.New(constUtil.P12WantedInvalid)
+	}
+	value := new(big.Rat).SetFloat64(hp)
+	if value == nil {
+		return nil, errors.New(constUtil.P12WantedInvalid)
+	}
+	numerator := new(big.Int).Mul(value.Num(), big.NewInt(constUtil.P12WantedScoreHPScale))
+	var units, remainder big.Int
+	units.QuoRem(numerator, value.Denom(), &remainder)
+	if remainder.Sign() > 0 {
+		units.Add(&units, big.NewInt(1))
+	}
+	return &units, nil
+}
+
+// 相邻结算沿用同一部位的量化剩余HP，拆分攻击不会多创造伤害单位。
+func p12WantedShareScore(input *model.FrozenBattleInput, before, after map[string]float64, instanceMaxHP float64, pool int64) (int64, error) {
+	invalid := func() (int64, error) { return 0, errors.New(constUtil.P12WantedInvalid) }
+	if input == nil || input.Monster == nil || len(input.Monster.Formation) != 4 || len(before) != 4 || len(after) != 4 || !combatFinite(instanceMaxHP) || instanceMaxHP <= 0 || pool <= 0 || pool > math.MaxInt32 {
+		return invalid()
+	}
+	seen := map[string]bool{}
+	var maximum, damage big.Int
+	var maximumFloat float64
+	for _, actor := range input.Monster.Formation {
+		if actor == nil || actor.Prop == nil || !strings.HasPrefix(actor.GetGuid(), "wanted-") || !combatFinite(actor.Prop.GetHp()) || actor.Prop.GetHp() <= 0 {
+			return invalid()
+		}
+		key := "wanted_" + strings.TrimPrefix(actor.GetGuid(), "wanted-")
+		old, oldOK := before[key]
+		current, currentOK := after[key]
+		if seen[key] || !oldOK || !currentOK || !combatFinite(old) || !combatFinite(current) || old < 0 || current < 0 || current > old || old > actor.Prop.GetHp() {
+			return invalid()
+		}
+		seen[key] = true
+		maximumFloat += actor.Prop.GetHp()
+		maxUnits, err := p12WantedHPUnits(actor.Prop.GetHp())
+		if err != nil {
+			return invalid()
+		}
+		oldUnits, err := p12WantedHPUnits(old)
+		if err != nil {
+			return invalid()
+		}
+		currentUnits, err := p12WantedHPUnits(current)
+		if err != nil || currentUnits.Cmp(oldUnits) > 0 {
+			return invalid()
+		}
+		maximum.Add(&maximum, maxUnits)
+		damage.Add(&damage, new(big.Int).Sub(oldUnits, currentUnits))
+	}
+	if !combatFinite(maximumFloat) || maximumFloat != instanceMaxHP || maximum.Sign() <= 0 || damage.Sign() < 0 || damage.Cmp(&maximum) > 0 {
+		return invalid()
+	}
+	// 使用任意精度整数乘除，单场余数向下舍去，累计结果不超过池上限。
+	amount := new(big.Int).Mul(&damage, big.NewInt(pool))
+	amount.Quo(amount, &maximum)
+	if !amount.IsInt64() || amount.Int64() < 0 || amount.Int64() > pool {
+		return invalid()
+	}
+	return amount.Int64(), nil
+}
+
+// 已支付的v1保留原除数；v2只使用开战快照及此次实际扣除的共享HP。
+func p12WantedSettlementValues(input *model.FrozenBattleInput, fight *db.P12WantedFight, instance *db.P12WantedInstance, before, after map[string]float64, applied float64) (int64, int64, error) {
+	invalid := func() (int64, int64, error) { return 0, 0, errors.New(constUtil.P12WantedInvalid) }
+	if input == nil || fight == nil || instance == nil {
+		return invalid()
+	}
+	indices := input.AppliedProperties["wantedSettlementIndices"]
+	if len(indices) < 3 {
+		return invalid()
+	}
+	performanceDiv, e1 := strconv.ParseInt(indices[0], 10, 64)
+	value, e2 := strconv.ParseInt(indices[1], 10, 64)
+	if e1 != nil || e2 != nil || performanceDiv <= 0 || value <= 0 || applied < 0 || !combatFinite(applied) {
+		return invalid()
+	}
+	switch indices[2] {
+	case constUtil.P12WantedRewardRule:
+		if len(indices) != 3 || applied > float64(math.MaxInt32)*float64(min(performanceDiv, value)) {
+			return invalid()
+		}
+		return int64(math.Floor(applied / float64(performanceDiv))), int64(math.Floor(applied / float64(value))), nil
+	case constUtil.P12WantedScoreRuleV2:
+		if len(indices) != 4 || value > math.MaxInt32 || applied > float64(math.MaxInt32)*float64(performanceDiv) {
+			return invalid()
+		}
+		difficulty, err := strconv.ParseInt(indices[3], 10, 64)
+		identity := input.AppliedProperties["localWantedRule"]
+		if err != nil || difficulty != instance.Difficulty || len(identity) != 3 || identity[0] != constUtil.P12WantedLocalRule || identity[1] != instance.ID || identity[1] != fight.InstanceID || identity[2] != strconv.FormatInt(fight.AttackType, 10) || input.Attacker.GetPlayerId() != fight.PlayerID {
+			return invalid()
+		}
+		catalog := input.AppliedProperties[constUtil.P12WantedCatalogScope]
+		if len(catalog) == 0 && instance.WantedID != "1" || len(catalog) > 0 && (len(catalog) != 2 || catalog[1] != instance.WantedID) {
+			return invalid()
+		}
+		score, err := p12WantedShareScore(input, before, after, instance.MaxHP, value)
+		if err != nil {
+			return invalid()
+		}
+		return int64(math.Floor(applied / float64(performanceDiv))), score, nil
+	default:
+		return invalid()
+	}
 }
 
 type p12WantedStanding struct {
