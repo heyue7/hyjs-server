@@ -16,6 +16,9 @@ import (
 	pb "hyjs-server/model/protocol"
 )
 
+var errP6ReplayTiming = errors.New("录像操作不符合原技能时序")
+var errP6ReplayInvalid = errors.New(constUtil.CombatInvalid)
+
 // combatRoundSkill 保存每个技能自己的回合CD、等待/施法/尾段状态与稳定出手顺序。
 type combatRoundSkill struct {
 	actor          *combatRoundActor
@@ -1148,7 +1151,7 @@ func (e *combatRoundEngine) step() error {
 			// Native wire stores guid; EnginePlaybackAI reconstructs camp_guid.
 			actor := e.find(fmt.Sprintf("%d_%s", op.GetCamp(), op.GetActorUid()), op.GetCamp())
 			if actor == nil || op.GetCamp() != e.camp {
-				return fmt.Errorf("录像操作不符合原技能时序: op=%d round=%d time=%g actor=%s camp=%d/%d", e.suppliedIndex, e.round, e.time, op.GetActorUid(), op.GetCamp(), e.camp)
+				return fmt.Errorf("%w: op=%d round=%d time=%g actor=%s camp=%d/%d", errP6ReplayTiming, e.suppliedIndex, e.round, e.time, op.GetActorUid(), op.GetCamp(), e.camp)
 			}
 			skill := actor.skill(op.GetSkillIndex())
 			if !e.issue(skill) {
@@ -1156,7 +1159,7 @@ func (e *combatRoundEngine) step() error {
 				if skill := actor.skill(op.GetSkillIndex()); skill != nil {
 					skillState, cooldown = skill.state, skill.cooldown
 				}
-				return fmt.Errorf("录像操作不符合原技能时序: op=%d round=%d time=%g actor=%s hp=%g skill=%d state=%d cooldown=%d anger=%g need=%g pending=%t", e.suppliedIndex, e.round, e.time, op.GetActorUid(), actor.hp, op.GetSkillIndex(), skillState, cooldown, e.players[actor.camp].anger, e.number("UTIL_TRIGGER_ANGERCOUNT"), e.pendingUltimate != nil)
+				return fmt.Errorf("%w: op=%d round=%d time=%g actor=%s hp=%g skill=%d state=%d cooldown=%d anger=%g need=%g pending=%t", errP6ReplayTiming, e.suppliedIndex, e.round, e.time, op.GetActorUid(), actor.hp, op.GetSkillIndex(), skillState, cooldown, e.players[actor.camp].anger, e.number("UTIL_TRIGGER_ANGERCOUNT"), e.pendingUltimate != nil)
 			}
 			if e.usesCopyEnemyAI(e.camp) {
 				if skill.row["IsUltimate"] != "1" {
@@ -1448,10 +1451,10 @@ func (e *combatRoundEngine) validateOperates(operate *pb.BattleOperate) error {
 	lastRound, lastTime := int32(0), 0.0
 	for _, op := range operate.SkillOpts {
 		if op == nil || op.GetRoundNum() < 1 || op.GetRoundNum() > e.input.MaxRound || op.GetCamp() < 0 || op.GetCamp() > 1 || op.GetSkillIndex() < 0 || op.GetSkillIndex() > 3 || !combatFinite(op.GetRoundTime()) || op.GetRoundTime() < 0 || op.GetRoundTime() > constUtil.P6RoundTimeLimit {
-			return errors.New(constUtil.CombatInvalid)
+			return errP6ReplayInvalid
 		}
 		if op.GetRoundNum() < lastRound || op.GetRoundNum() == lastRound && op.GetRoundTime() < lastTime {
-			return errors.New(constUtil.CombatInvalid)
+			return errP6ReplayInvalid
 		}
 		lastRound, lastTime = op.GetRoundNum(), op.GetRoundTime()
 	}

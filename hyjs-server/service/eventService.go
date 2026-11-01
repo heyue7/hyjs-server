@@ -87,10 +87,32 @@ func (s *GameService) RecordP1Event(tx *gorm.DB, playerID int64, sourceKey, kind
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return err
 	}
-	// Existing facts are immutable: replays need no activity-window mutation.
-	// A new fact requires rolling back all shared locks before retrying exclusively.
+	// 采集事实只写角色自身账本时允许并行；当前窗口可能消费该事实时回滚并独占重试。
+	// 其他新事实继续沿用原独占顺序，避免扩大并发语义。
 	if p1SharedRead(tx) {
-		return constUtil.ErrP1ExclusiveRetry
+		if (kind != constUtil.P8EventMineGather && kind != constUtil.P8EventFishGather) || tx.Statement.Context.Value(p8OrdinaryGatherFactContextKey{}) != true {
+			return constUtil.ErrP1ExclusiveRetry
+		}
+		configs, err := p1LockPeriods(tx)
+		if err != nil {
+			return err
+		}
+		acceptedAt := max(at.UnixMilli(), LocalPlayNow(tx.Statement.Context).UnixMilli())
+		periodScope, _ := tx.Statement.Context.Value(constUtil.PeriodEventScopeContextKey{}).(string)
+		for _, live := range configs {
+			if !live.Enabled || periodScope != "" && live.ID != periodScope {
+				continue
+			}
+			cfg, err := p1PeriodSnapshot(live)
+			if err != nil {
+				return err
+			}
+			if cfg.Kind == kind && at.UnixMilli() >= cfg.StartAt && at.UnixMilli() < cfg.EndAt && acceptedAt >= cfg.StartAt && acceptedAt < cfg.EndAt {
+				return constUtil.ErrP1ExclusiveRetry
+			}
+		}
+		fact := db.EventFact{PlayerID: playerID, SourceKey: sourceKey, Kind: kind, Amount: amount, OccurredAt: at.UnixMilli(), Day: p1Day(at)}
+		return tx.Create(&fact).Error
 	}
 	fact := db.EventFact{PlayerID: playerID, SourceKey: sourceKey, Kind: kind, Amount: amount, OccurredAt: at.UnixMilli(), Day: p1Day(at)}
 	if err = tx.Create(&fact).Error; err != nil {

@@ -785,6 +785,7 @@ func (s *GameService) p12WantedReacquireRejected(tx *gorm.DB, id int64, fight *d
 
 func (s *GameService) p12WantedEnd(ctx context.Context, id int64, request *pb.CSRebelFightEnd, now time.Time) ([]proto.Message, error) {
 	var out pb.SCRebelFightEnd
+	prepared := s.p12WantedPrepareRecording(ctx, id, request)
 	err := s.p12WantedProfile(ctx, id, func(tx *gorm.DB, _ *db.Profile, player *pb.Player, game *model.GameState) error {
 		if request.GetFightId() == "" || request.OptRecord == nil || request.BattlePlayer != nil {
 			return errors.New(constUtil.P12WantedInvalid)
@@ -830,7 +831,13 @@ func (s *GameService) p12WantedEnd(ctx context.Context, id int64, request *pb.CS
 		}
 		fallback := false
 		if !proto.Equal(request.OptRecord, terminal.OriginalOperates) {
-			recorded, err := s.computeP12WantedRecorded(ctx, &input, request.OptRecord)
+			var recorded *model.CombatFinalHPOutcome
+			var err error
+			if prepared != nil && prepared.fightID == fight.ID && prepared.inputHash == fight.InputHash && prepared.terminalHash == fight.TerminalHash && prepared.startHash == fight.StartHash && prepared.requestHash == p6Digest(requestRaw) {
+				recorded, err = prepared.terminal, prepared.err
+			} else {
+				recorded, err = s.computeP12WantedRecorded(ctx, &input, request.OptRecord)
+			}
 			if err != nil {
 				if p12WantedCanFallbackRecording(err) {
 					if err = p12WantedStoreAutomaticFallback(&fight, request); err != nil {

@@ -540,6 +540,9 @@ type p8GatherProjection struct {
 	ready bool
 }
 
+// Only the ordinary per-player resource flow may use the shared fact path.
+type p8OrdinaryGatherFactContextKey struct{}
+
 func (s *GameService) p8GatherMutation(ctx context.Context, id int64, op string, stamp int64, request, response proto.Message, apply func(*gorm.DB, *pb.Player, *model.GameState, int64) error) ([]proto.Message, error) {
 	return s.p8GatherMutationProjected(ctx, id, op, stamp, request, response, func(tx *gorm.DB, p *pb.Player, g *model.GameState, now int64, _ *p8GatherProjection) error {
 		return apply(tx, p, g, now)
@@ -559,76 +562,90 @@ func (s *GameService) p8GatherMutationProjected(ctx context.Context, id int64, o
 	}
 	var side *pb.PlayerSide
 	var info *pb.SCFieldResourceInfo
-	err = s.p3Profile(ctx, id, func(tx *gorm.DB, row *db.Profile, p *pb.Player, g *model.GameState) error {
-		var err error
-		if s.P12FieldPVPReady {
-			if err = CheckP12FieldPVPAction(tx, id, time.Now()); err != nil {
+	run := func(attemptCtx context.Context) error {
+		return s.p3Profile(attemptCtx, id, func(tx *gorm.DB, row *db.Profile, p *pb.Player, g *model.GameState) error {
+			var err error
+			if s.P12FieldPVPReady {
+				if err = CheckP12FieldPVPAction(tx, id, time.Now()); err != nil {
+					return err
+				}
+			}
+			// 原TCP没有请求时间戳，当前attempt/node事务状态负责防止重复领取。
+			// 只给实际HTTP正时间戳保存回执，避免制造客户端不存在的请求键。
+			if stamp > 0 {
+				var receipt db.P8GatherReceipt
+				err = tx.First(&receipt, "player_id=? AND operation=? AND timestamp=?", id, op, stamp).Error
+				if err == nil {
+					if !bytes.Equal(receipt.Request, raw) {
+						return p8GatherError()
+					}
+					if g.Field != nil {
+						side = proto.Clone(g.Field.Side).(*pb.PlayerSide)
+					}
+					return proto.Unmarshal(receipt.Response, response)
+				}
+				if !errors.Is(err, gorm.ErrRecordNotFound) {
+					return err
+				}
+			}
+			now := time.Now().UnixMilli()
+			// A new deployment cannot revoke a previously accepted gather. Only the
+			// new-open gates are bypassed; the original claim still verifies scene,
+			// distance, remaining node, fatigue, death and mutually exclusive fights.
+			acceptedClaim := false
+			if op == constUtil.P8GatherClaimOperation {
+				var active db.P8GatherAttempt
+				e := tx.First(&active, "player_id=? AND active=?", id, true).Error
+				if e == nil {
+					acceptedClaim = active.Scene == g.Position.GetScene()
+				} else if !errors.Is(e, gorm.ErrRecordNotFound) {
+					return e
+				}
+			}
+			if s.GGOFieldConfig != nil && g.Position.GetScene() == constUtil.GGOFieldScene {
+				return errors.New("沙漠采集需要更新客户端")
+			}
+			if err = s.p8GatherOpen(id, p, g, acceptedClaim); err != nil {
 				return err
 			}
-		}
-		// 原TCP没有请求时间戳，当前attempt/node事务状态负责防止重复领取。
-		// 只给实际HTTP正时间戳保存回执，避免制造客户端不存在的请求键。
-		if stamp > 0 {
-			var receipt db.P8GatherReceipt
-			err = tx.First(&receipt, "player_id=? AND operation=? AND timestamp=?", id, op, stamp).Error
-			if err == nil {
-				if !bytes.Equal(receipt.Request, raw) {
-					return p8GatherError()
-				}
-				if g.Field != nil {
-					side = proto.Clone(g.Field.Side).(*pb.PlayerSide)
-				}
-				return proto.Unmarshal(receipt.Response, response)
-			}
-			if !errors.Is(err, gorm.ErrRecordNotFound) {
+			projection := &p8GatherProjection{}
+			if err = apply(tx, p, g, now, projection); err != nil {
 				return err
 			}
-		}
-		now := time.Now().UnixMilli()
-		// A new deployment cannot revoke a previously accepted gather. Only the
-		// new-open gates are bypassed; the original claim still verifies scene,
-		// distance, remaining node, fatigue, death and mutually exclusive fights.
-		acceptedClaim := false
-		if op == constUtil.P8GatherClaimOperation {
-			var active db.P8GatherAttempt
-			e := tx.First(&active, "player_id=? AND active=?", id, true).Error
-			if e == nil {
-				acceptedClaim = active.Scene == g.Position.GetScene()
-			} else if !errors.Is(e, gorm.ErrRecordNotFound) {
-				return e
+			if err = saveProfile(tx, row, p, g); err != nil {
+				return err
 			}
-		}
-		if s.GGOFieldConfig != nil && g.Position.GetScene() == constUtil.GGOFieldScene {
-			return errors.New("沙漠采集需要更新客户端")
-		}
-		if err = s.p8GatherOpen(id, p, g, acceptedClaim); err != nil {
-			return err
-		}
-		projection := &p8GatherProjection{}
-		if err = apply(tx, p, g, now, projection); err != nil {
-			return err
-		}
-		if err = saveProfile(tx, row, p, g); err != nil {
-			return err
-		}
-		nodes := projection.nodes
-		if !projection.ready {
-			nodes, _, err = s.p8Nodes(tx, id, g.Position.GetScene(), now)
+			nodes := projection.nodes
+			if !projection.ready {
+				nodes, _, err = s.p8Nodes(tx, id, g.Position.GetScene(), now)
+				if err != nil {
+					return err
+				}
+			}
+			info = p8ResourceInfo(nodes, now)
+			side = proto.Clone(g.Field.Side).(*pb.PlayerSide)
+			if stamp == 0 {
+				return nil
+			}
+			data, err := proto.Marshal(response)
 			if err != nil {
 				return err
 			}
+			return tx.Create(&db.P8GatherReceipt{PlayerID: id, Operation: op, Timestamp: stamp, Request: raw, Response: data}).Error
+		})
+	}
+	if op == constUtil.P8GatherStartOperation || op == constUtil.P8GatherClaimOperation {
+		shared := context.WithValue(ctx, constUtil.P1SharedReadContextKey{}, true)
+		shared = context.WithValue(shared, p8OrdinaryGatherFactContextKey{}, true)
+		err = run(shared)
+		if errors.Is(err, constUtil.ErrP1ExclusiveRetry) {
+			proto.Reset(response)
+			side, info = nil, nil
+			err = run(ctx)
 		}
-		info = p8ResourceInfo(nodes, now)
-		side = proto.Clone(g.Field.Side).(*pb.PlayerSide)
-		if stamp == 0 {
-			return nil
-		}
-		data, err := proto.Marshal(response)
-		if err != nil {
-			return err
-		}
-		return tx.Create(&db.P8GatherReceipt{PlayerID: id, Operation: op, Timestamp: stamp, Request: raw, Response: data}).Error
-	})
+	} else {
+		err = run(ctx)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -772,51 +789,58 @@ func (s *GameService) p8ClaimGather(ctx context.Context, id int64, b *pb.CSField
 
 func (s *GameService) p8ResourceQuery(ctx context.Context, id int64, request proto.Message) ([]proto.Message, error) {
 	var out proto.Message
-	err := s.p3Profile(ctx, id, func(tx *gorm.DB, row *db.Profile, p *pb.Player, g *model.GameState) error {
-		if err := s.p8GatherOpen(id, p, g); err != nil {
-			return err
-		}
-		nodes, _, err := s.p8Nodes(tx, id, g.Position.GetScene(), time.Now().UnixMilli())
-		if err != nil {
-			return err
-		}
-		var posID string
-		switch b := request.(type) {
-		case *pb.CSSideResourceCheck:
-			posID = b.GetPosId()
-		case *pb.CSGatherCost:
-			posID = b.GetPosId()
-		default:
-			return p8GatherError()
-		}
-		var node *db.P8ResourceNode
-		for i := range nodes {
-			if nodes[i].PosID == posID {
-				node = &nodes[i]
+	run := func(attemptCtx context.Context) error {
+		return s.p3Profile(attemptCtx, id, func(tx *gorm.DB, row *db.Profile, p *pb.Player, g *model.GameState) error {
+			if err := s.p8GatherOpen(id, p, g); err != nil {
+				return err
 			}
-		}
-		switch request.(type) {
-		case *pb.CSSideResourceCheck:
-			result := &pb.SCSideResourceCheck{PosId: proto.String(posID), Code: proto.Int32(constUtil.P8ResourceMissing)}
-			if node != nil {
-				result.ResourceId = proto.String(node.ResourceID)
-				if node.Remaining > 0 {
-					result.Code = proto.Int32(constUtil.P8ResourceAvailable)
-				}
-			}
-			out = result
-		case *pb.CSGatherCost:
-			if node == nil || node.Remaining == 0 {
-				return p8GatherError()
-			}
-			cfg, err := p8DecodeConfig(node.Snapshot)
+			nodes, _, err := s.p8Nodes(tx, id, g.Position.GetScene(), time.Now().UnixMilli())
 			if err != nil {
 				return err
 			}
-			out = &pb.SCGatherCost{Need: []*pb.BaseResource{{Id: proto.String("tiredness"), Num: proto.Int32(cfg.Fatigue)}}}
-		}
-		return saveProfile(tx, row, p, g)
-	})
+			var posID string
+			switch b := request.(type) {
+			case *pb.CSSideResourceCheck:
+				posID = b.GetPosId()
+			case *pb.CSGatherCost:
+				posID = b.GetPosId()
+			default:
+				return p8GatherError()
+			}
+			var node *db.P8ResourceNode
+			for i := range nodes {
+				if nodes[i].PosID == posID {
+					node = &nodes[i]
+				}
+			}
+			switch request.(type) {
+			case *pb.CSSideResourceCheck:
+				result := &pb.SCSideResourceCheck{PosId: proto.String(posID), Code: proto.Int32(constUtil.P8ResourceMissing)}
+				if node != nil {
+					result.ResourceId = proto.String(node.ResourceID)
+					if node.Remaining > 0 {
+						result.Code = proto.Int32(constUtil.P8ResourceAvailable)
+					}
+				}
+				out = result
+			case *pb.CSGatherCost:
+				if node == nil || node.Remaining == 0 {
+					return p8GatherError()
+				}
+				cfg, err := p8DecodeConfig(node.Snapshot)
+				if err != nil {
+					return err
+				}
+				out = &pb.SCGatherCost{Need: []*pb.BaseResource{{Id: proto.String("tiredness"), Num: proto.Int32(cfg.Fatigue)}}}
+			}
+			return saveProfile(tx, row, p, g)
+		})
+	}
+	err := run(context.WithValue(ctx, constUtil.P1SharedReadContextKey{}, true))
+	if errors.Is(err, constUtil.ErrP1ExclusiveRetry) {
+		out = nil
+		err = run(ctx)
+	}
 	return []proto.Message{out}, err
 }
 

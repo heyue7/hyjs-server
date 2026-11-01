@@ -20,7 +20,42 @@ func p12WantedCanFallbackRecording(err error) bool {
 		return false
 	}
 	var mismatch *p12WantedRecordingMismatchError
-	return errors.As(err, &mismatch) || err.Error() == constUtil.CombatUnsupported || err.Error() == constUtil.P6ReplayConflict || strings.HasPrefix(err.Error(), constUtil.P6ReplayConflict+":")
+	return errors.As(err, &mismatch) || errors.Is(err, errP6ReplayTiming) || errors.Is(err, errP6ReplayInvalid) || err.Error() == constUtil.CombatUnsupported || err.Error() == constUtil.P6ReplayConflict || strings.HasPrefix(err.Error(), constUtil.P6ReplayConflict+":")
+}
+
+type p12WantedPreparedRecording struct {
+	fightID, inputHash, terminalHash, startHash, requestHash string
+	terminal                                                 *model.CombatFinalHPOutcome
+	err                                                      error
+}
+
+// Replaying manual controls may take seconds. Compute against the frozen,
+// certified battle before taking activity locks; the transaction rechecks every
+// identity before using the prepared result.
+func (s *GameService) p12WantedPrepareRecording(ctx context.Context, id int64, request *pb.CSRebelFightEnd) *p12WantedPreparedRecording {
+	if request == nil || request.GetFightId() == "" || request.OptRecord == nil || request.BattlePlayer != nil || len(request.OptRecord.SkillOpts) > 16000 {
+		return nil
+	}
+	var fight db.P12WantedFight
+	if err := db.GetIns().WithContext(ctx).First(&fight, "id=? AND player_id=?", request.GetFightId(), id).Error; err != nil || fight.Committed || fight.AbandonedAt > 0 {
+		return nil
+	}
+	if fight.InputHash != p6Digest([]byte(fight.InputJSON)) || fight.TerminalHash != p6Digest([]byte(fight.TerminalJSON)) || fight.StartHash != p6Digest(fight.StartProto) {
+		return nil
+	}
+	var input model.FrozenBattleInput
+	var terminal model.CombatFinalHPOutcome
+	if json.Unmarshal([]byte(fight.InputJSON), &input) != nil || json.Unmarshal([]byte(fight.TerminalJSON), &terminal) != nil ||
+		ValidateP12WantedCertifiedReceipt(&input, &terminal) != nil || proto.Equal(request.OptRecord, terminal.OriginalOperates) {
+		return nil
+	}
+	raw, err := proto.MarshalOptions{Deterministic: true}.Marshal(request)
+	if err != nil {
+		return nil
+	}
+	recorded, err := s.computeP12WantedRecorded(ctx, &input, request.OptRecord)
+	return &p12WantedPreparedRecording{fightID: fight.ID, inputHash: fight.InputHash, terminalHash: fight.TerminalHash,
+		startHash: fight.StartHash, requestHash: p6Digest(raw), terminal: recorded, err: err}
 }
 
 func p12WantedStoreAutomaticFallback(fight *db.P12WantedFight, request *pb.CSRebelFightEnd) error {
