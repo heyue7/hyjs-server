@@ -82,6 +82,46 @@ type p4CommerceProgress struct {
 func p4BaseProduct(id, reward, cost string, index, level int32) p4Product {
 	return p4Product{ID: id, Index: index, Rewards: reward, Cost: cost, Priority: 1000 + index, DailyLimit: 20, Stock: -1, MinLevel: level, DiscountBps: 10000, Weight: 1}
 }
+
+func (s *GameService) p4DefaultMemoryRules() p4CommerceRules {
+	memory := p4CommerceRules{FreeCap: 10, FreeSeconds: 7200, ResourceRefreshCap: 15, RefreshItem: "item_013,1", RefreshCost: "diamond,20", Slots: 6}
+	for i, spec := range []struct{ reward, cost string }{{"frag_hero_001,1", "light,20"}, {"frag_hero_025,1", "light,20"}, {"item_005,5", "light,15"}, {"hero_exp_002,1", "light,30"}, {"item_006,1", "light,30"}, {"item_013,1", "light,10"}} {
+		p := p4BaseProduct(fmt.Sprintf("p4Memory_%d", i+1), spec.reward, spec.cost, int32(i+1), 16)
+		p.DailyLimit = 1
+		memory.Products = append(memory.Products, p)
+	}
+	return s.memoryCatalogue55(memory)
+}
+
+func p4CommerceSeedRule(kind, prefix string, shop int32, rules p4CommerceRules, start, end time.Time) (db.P4CommerceRule, error) {
+	raw, err := json.Marshal(rules)
+	if err != nil {
+		return db.P4CommerceRule{}, err
+	}
+	return db.P4CommerceRule{ID: prefix + start.Format("200601"), Kind: kind, ShopType: shop, Enabled: false, StartAt: start.UnixMilli(), EndAt: end.UnixMilli(), ClaimEndAt: end.UnixMilli(), Rules: raw, Source: "本地兼容服目录/限购/库存：原普通商品位价格档与圣坛2小时/10次免费/刷新券优先/20钻规则保留；声望、试炼、悬赏货币来源分别由P11/P7/P12联动，神装精华使用item_021，红武ID复用P2核实equip_037。折扣和新商品投放均为SQL本地配置。"}, nil
+}
+
+// 只补圣坛当前月的默认目录；其他目录由启动或各自入口补种。
+func (s *GameService) seedP4Memory(tx *gorm.DB, now time.Time) error {
+	local := now.In(time.FixedZone("UTC+8", 8*3600))
+	start := time.Date(local.Year(), local.Month(), 1, 0, 0, 0, 0, local.Location())
+	var exists int64
+	if err := tx.Model(&db.P4CommerceRule{}).Where("id=?", "p4:memory:"+start.Format("200601")).Count(&exists).Error; err != nil {
+		return err
+	}
+	if exists > 0 {
+		return nil
+	}
+	cfg, err := p4CommerceSeedRule("memory", "p4:memory:", 3, s.p4DefaultMemoryRules(), start, start.AddDate(0, 1, 0))
+	if err != nil {
+		return err
+	}
+	if _, err := s.validateP4Commerce(cfg); err != nil {
+		return err
+	}
+	return tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&cfg).Error
+}
+
 func (s *GameService) seedP4Commerce(tx *gorm.DB, now time.Time) error {
 	local := now.In(time.FixedZone("UTC+8", 8*3600))
 	start := time.Date(local.Year(), local.Month(), 1, 0, 0, 0, 0, local.Location())
@@ -101,13 +141,7 @@ func (s *GameService) seedP4Commerce(tx *gorm.DB, now time.Time) error {
 		product.TierID = true
 		ordinary.Products = append(ordinary.Products, product)
 	}
-	memory := p4CommerceRules{FreeCap: 10, FreeSeconds: 7200, ResourceRefreshCap: 15, RefreshItem: "item_013,1", RefreshCost: "diamond,20", Slots: 6}
-	for i, spec := range []struct{ reward, cost string }{{"frag_hero_001,1", "light,20"}, {"frag_hero_025,1", "light,20"}, {"item_005,5", "light,15"}, {"hero_exp_002,1", "light,30"}, {"item_006,1", "light,30"}, {"item_013,1", "light,10"}} {
-		p := p4BaseProduct(fmt.Sprintf("p4Memory_%d", i+1), spec.reward, spec.cost, int32(i+1), 16)
-		p.DailyLimit = 1
-		memory.Products = append(memory.Products, p)
-	}
-	memory = s.memoryCatalogue55(memory)
+	memory := s.p4DefaultMemoryRules()
 	popularity := p4CommerceRules{Products: []p4Product{p4BaseProduct("p4Popularity_1", "item_001,1", "popularity,20", 1, 10), p4BaseProduct("p4Popularity_2", "frag_hero_001,1", "popularity,100", 2, 10)}}
 	score := p4CommerceRules{Products: []p4Product{p4BaseProduct("p4Score_1", "item_005,5", "score,50", 1, 35), p4BaseProduct("p4Score_2", "item_004,1", "score,100", 2, 35)}}
 	half := p4CommerceRules{Products: []p4Product{p4BaseProduct("p4Half_1", "item_006,2", "diamond,40", 1, 1)}}
@@ -132,11 +166,10 @@ func (s *GameService) seedP4Commerce(tx *gorm.DB, now time.Time) error {
 		{"ordinary", 1, "p4:ordinary:", ordinary}, {"memory", 3, "p4:memory:", memory}, {"popularity", 4, "p4:popularity:", popularity}, {"score", 7, "p4:score:", score},
 		{"half", 0, "halfDiscountSale_p4_", half}, {"discount", 0, "discountSale_p4_", discount}, {"exchange", 0, "limitExchange_p4_", exchange}, {"sale", 0, "limitSale_p4_", sale}, {"mystic", 0, "mysticDiscount_p4_", mystic},
 	} {
-		raw, err := json.Marshal(spec.rules)
+		cfg, err := p4CommerceSeedRule(spec.kind, spec.prefix, spec.shop, spec.rules, start, end)
 		if err != nil {
 			return err
 		}
-		cfg := db.P4CommerceRule{ID: spec.prefix + start.Format("200601"), Kind: spec.kind, ShopType: spec.shop, Enabled: false, StartAt: start.UnixMilli(), EndAt: end.UnixMilli(), ClaimEndAt: end.UnixMilli(), Rules: raw, Source: "本地兼容服目录/限购/库存：原普通商品位价格档与圣坛2小时/10次免费/刷新券优先/20钻规则保留；声望、试炼、悬赏货币来源分别由P11/P7/P12联动，神装精华使用item_021，红武ID复用P2核实equip_037。折扣和新商品投放均为SQL本地配置。"}
 		var exists int64
 		if err = tx.Model(&db.P4CommerceRule{}).Where("id=?", cfg.ID).Count(&exists).Error; err != nil {
 			return err
@@ -362,9 +395,20 @@ func (s *GameService) p4TierCost(id string, ordinal, count int32) (*pb.BaseResou
 	return &pb.BaseResource{Id: proto.String(kind), Num: proto.Int32(int32(total))}, nil
 }
 func (s *GameService) loadP4Commerce(tx *gorm.DB, id int64, key string, shopType int32, now time.Time) (db.P4CommerceRule, p4CommerceRules, *db.P4CommerceState, *p4CommerceProgress, error) {
+	return s.loadP4CommerceForMemory(tx, id, key, shopType, now, false, false, nil)
+}
+
+// 圣坛已冻结或允许运营编辑的目录可共享读取；首次冻结仍需独占。
+func (s *GameService) loadP4CommerceForMemory(tx *gorm.DB, id int64, key string, shopType int32, now time.Time, memory, forceExclusive bool, retryFreeze error) (db.P4CommerceRule, p4CommerceRules, *db.P4CommerceState, *p4CommerceProgress, error) {
 	var cfg db.P4CommerceRule
 	var rules p4CommerceRules
-	if err := s.seedP4Commerce(tx, now); err != nil {
+	var err error
+	if memory {
+		err = s.seedP4Memory(tx, now)
+	} else {
+		err = s.seedP4Commerce(tx, now)
+	}
+	if err != nil {
 		return cfg, rules, nil, nil, err
 	}
 	if key == "" {
@@ -414,19 +458,38 @@ func (s *GameService) loadP4Commerce(tx *gorm.DB, id int64, key string, shopType
 			return cfg, rules, nil, nil, errors.New("烟花和福袋用途尚未开放")
 		}
 	}
-	query := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("enabled = ?", true)
-	if key != "" {
-		query = query.Where("id = ?", key)
-	} else {
-		query = query.Where("shop_type = ? AND id NOT LIKE ?", shopType, "shop_schedule_%")
-		// Rank-tab offers append independently; they never replace the original
-		// monthly ordinary catalogue or reset its existing per-player quota.
-		if shopType == 4 {
-			query = query.Where("kind <> ?", constUtil.P4PopularityRankKind)
+	query := func() *gorm.DB {
+		q := tx.Where("enabled = ?", true)
+		if key != "" {
+			q = q.Where("id = ?", key)
+		} else {
+			q = q.Where("shop_type = ? AND id NOT LIKE ?", shopType, "shop_schedule_%")
+			// Rank-tab offers append independently; they never replace the original
+			// monthly ordinary catalogue or reset its existing per-player quota.
+			if shopType == 4 {
+				q = q.Where("kind <> ?", constUtil.P4PopularityRankKind)
+			}
+		}
+		return q.Order("start_at DESC,id DESC")
+	}
+	strength := "UPDATE"
+	if memory && !forceExclusive {
+		strength = "SHARE"
+		var candidates []db.P4CommerceRule
+		if err := query().Select("rules", "frozen").Find(&candidates).Error; err != nil {
+			return cfg, rules, nil, nil, err
+		}
+		for _, candidate := range candidates {
+			var current p4CommerceRules
+			_ = json.Unmarshal(candidate.Rules, &current)
+			if len(candidate.Frozen) == 0 && !current.LiveEditable {
+				strength = "UPDATE"
+				break
+			}
 		}
 	}
 	var configs []db.P4CommerceRule
-	if err := query.Order("start_at DESC,id DESC").Find(&configs).Error; err != nil {
+	if err := query().Clauses(clause.Locking{Strength: strength}).Find(&configs).Error; err != nil {
 		return cfg, rules, nil, nil, err
 	}
 	for _, live := range configs {
@@ -465,6 +528,10 @@ func (s *GameService) loadP4Commerce(tx *gorm.DB, id int64, key string, shopType
 			continue
 		}
 		if len(live.Frozen) == 0 && !rules.LiveEditable {
+			// 后台可能在无锁预读后更改规则；回滚共享锁事务后重新独占读取，避免锁升级死锁。
+			if memory && strength == "SHARE" {
+				return cfg, rules, nil, nil, retryFreeze
+			}
 			raw, _ := json.Marshal(cfg)
 			if err = tx.Model(&live).Update("frozen", raw).Error; err != nil {
 				return cfg, rules, nil, nil, err
@@ -652,6 +719,28 @@ func (s *GameService) p4Projection(tx *gorm.DB, p *pb.Player, cfg db.P4CommerceR
 			return nil, nil, err
 		}
 	}
+	// 展示库存只读取同一快照；实际购买另锁定目标库存行并再次校验。
+	memoryStock := map[string]db.P4CommerceStock{}
+	if cfg.Kind == "memory" {
+		var ids []string
+		seen := map[string]bool{}
+		for _, product := range offers {
+			id := memorySource55(product)
+			if product.Stock >= 0 && !shopHasDirectStamina(product.Rewards) && p4Visible(cfg, state, product) && !seen[id] {
+				ids = append(ids, id)
+				seen[id] = true
+			}
+		}
+		if len(ids) > 0 {
+			var stocks []db.P4CommerceStock
+			if err := tx.Where("rule_id = ? AND product_id IN ?", cfg.ID, ids).Find(&stocks).Error; err != nil {
+				return nil, nil, err
+			}
+			for _, stock := range stocks {
+				memoryStock[stock.ProductID] = stock
+			}
+		}
+	}
 	for _, product := range offers {
 		if shopHasDirectStamina(product.Rewards) || !p4Visible(cfg, state, product) {
 			continue
@@ -689,9 +778,13 @@ func (s *GameService) p4Projection(tx *gorm.DB, p *pb.Player, cfg db.P4CommerceR
 		}
 		if product.Stock >= 0 {
 			var stock db.P4CommerceStock
-			err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("rule_id = ? AND product_id = ?", cfg.ID, memorySource55(product)).First(&stock).Error
-			if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-				return nil, nil, err
+			if cfg.Kind == "memory" {
+				stock = memoryStock[memorySource55(product)]
+			} else {
+				err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("rule_id = ? AND product_id = ?", cfg.ID, memorySource55(product)).First(&stock).Error
+				if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+					return nil, nil, err
+				}
 			}
 			if stock.Used < 0 || !rules.LiveEditable && stock.Used > product.Stock {
 				return nil, nil, errors.New("共享库存存档无效")
@@ -921,6 +1014,26 @@ func p4IsOrdinaryProduct(id string) bool {
 
 // p4Commerce 使用冻结目录、服务器总价和行锁库存交易；调用方报价只能确认已展示选项。
 func (s *GameService) p4Commerce(ctx context.Context, id int64, request proto.Message, stamp int64, now time.Time) ([]proto.Message, error) {
+	retryFreeze := errors.New("圣坛目录变更后重新取得冻结锁")
+	response, guidePlayer, err := s.p4CommerceAttempt(ctx, id, request, stamp, now, false, retryFreeze)
+	if errors.Is(err, retryFreeze) {
+		// 放弃旧事务及其所有副作用，重取最新目录并在独占锁内冻结。
+		response, guidePlayer, err = s.p4CommerceAttempt(ctx, id, request, stamp, now, true, retryFreeze)
+	}
+	if err != nil {
+		return nil, err
+	}
+	switch request.(type) {
+	case *pb.CSShopBuy, *pb.CSRefreshShopBuy, *pb.CSRefreshShopRefresh, *pb.CSGetActivityShopReward, *pb.CSBuyActivityShop:
+		return s.shopInventorySync(ctx, id, []proto.Message{response})
+	}
+	if guidePlayer != nil {
+		return []proto.Message{response, &pb.SCPlayer{Player: guidePlayer}}, nil
+	}
+	return []proto.Message{response}, nil
+}
+
+func (s *GameService) p4CommerceAttempt(ctx context.Context, id int64, request proto.Message, stamp int64, now time.Time, forceMemoryLock bool, retryFreeze error) (proto.Message, *pb.Player, error) {
 	var response proto.Message
 	var guidePlayer *pb.Player
 	err := db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
@@ -1066,7 +1179,7 @@ func (s *GameService) p4Commerce(ctx context.Context, id int64, request proto.Me
 		if err := s.p15SeasonalGuard(tx, key, now); err != nil {
 			return err
 		}
-		cfg, rules, row, state, err := s.loadP4Commerce(tx, id, key, shopType, now)
+		cfg, rules, row, state, err := s.loadP4CommerceForMemory(tx, id, key, shopType, now, shopType == 3 && key == "", forceMemoryLock, retryFreeze)
 		if errors.Is(err, constUtil.ErrP4CommerceNotOpen) && query && key == "" {
 			if _, ok := request.(*pb.CSShopProductList); ok {
 				var items []*pb.ShopItem
@@ -1233,6 +1346,12 @@ func (s *GameService) p4Commerce(ctx context.Context, id int64, request proto.Me
 			var stock db.P4CommerceStock
 			if selected.Stock >= 0 {
 				stock = db.P4CommerceStock{RuleID: cfg.ID, ProductID: memorySource55(*selected)}
+				if cfg.Kind == "memory" {
+					// 首购先争用唯一库存键，缺行与已有行均按同一顺序加锁。
+					if err = tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&stock).Error; err != nil {
+						return err
+					}
+				}
 				e := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("rule_id = ? AND product_id = ?", cfg.ID, memorySource55(*selected)).First(&stock).Error
 				if e != nil && !errors.Is(e, gorm.ErrRecordNotFound) {
 					return e
@@ -1345,17 +1464,7 @@ func (s *GameService) p4Commerce(ctx context.Context, id int64, request proto.Me
 		// 新商店自行记录准确消费/购买，原type1 hook不接管这些SKU；资源恢复和存档保存仍复用原逻辑。
 		return saveProfile(tx.WithContext(context.WithValue(tx.Statement.Context, constUtil.GameRequestContextKey, nil)), &profile, p, g)
 	})
-	if err != nil {
-		return nil, err
-	}
-	switch request.(type) {
-	case *pb.CSShopBuy, *pb.CSRefreshShopBuy, *pb.CSRefreshShopRefresh, *pb.CSGetActivityShopReward, *pb.CSBuyActivityShop:
-		return s.shopInventorySync(ctx, id, []proto.Message{response})
-	}
-	if guidePlayer != nil {
-		return []proto.Message{response, &pb.SCPlayer{Player: guidePlayer}}, nil
-	}
-	return []proto.Message{response}, nil
+	return response, guidePlayer, err
 }
 
 // shopHasDirectStamina 统一拒绝新购买直接发体力；已经确认的历史回执仍可原样重放。
