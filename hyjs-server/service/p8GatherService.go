@@ -553,6 +553,9 @@ func (s *GameService) p8GatherMutationProjected(ctx context.Context, id int64, o
 	if stamp < 0 || stamp == 0 && op != constUtil.P8GatherStartOperation && op != constUtil.P8GatherClaimOperation {
 		return nil, p8GatherError()
 	}
+	if op == constUtil.P8GatherStartOperation || op == constUtil.P8GatherClaimOperation {
+		ctx = p1GatherCatalogContext(ctx)
+	}
 	raw, err := proto.Marshal(request)
 	if err != nil {
 		return nil, err
@@ -787,6 +790,7 @@ func (s *GameService) p8ClaimGather(ctx context.Context, id int64, b *pb.CSField
 }
 
 func (s *GameService) p8ResourceQuery(ctx context.Context, id int64, request proto.Message) ([]proto.Message, error) {
+	ctx = p1GatherCatalogContext(ctx)
 	var out proto.Message
 	run := func(attemptCtx context.Context) error {
 		return s.p3Profile(attemptCtx, id, func(tx *gorm.DB, row *db.Profile, p *pb.Player, g *model.GameState) error {
