@@ -116,6 +116,10 @@ func (s *GameService) P13GuildRoomRevoke(tx *gorm.DB, id int64) error {
 
 // SyncP13GuildRoom 不依赖世界/野外分线开关，复用原同屏帧但按真实guildId建立专属实例。
 func (s *GameService) SyncP13GuildRoom(ctx context.Context, id int64, movement bool) (bool, error) {
+	return s.syncP13GuildRoom(ctx, id, movement, nil)
+}
+
+func (s *GameService) syncP13GuildRoom(ctx context.Context, id int64, movement bool, route *p10SceneRouteSnapshot) (bool, error) {
 	tx := db.GetIns().WithContext(ctx)
 	if !gameSchemaHasTable(tx, &db.P10ScenePresence{}) {
 		return false, nil
@@ -124,7 +128,7 @@ func (s *GameService) SyncP13GuildRoom(ctx context.Context, id int64, movement b
 	if tx.First(&initial, id).Error != nil || initial.Game == nil || initial.Player == nil {
 		return false, nil
 	}
-	_, game, err := decodeProfile(&initial)
+	game, err := route.routeGame(&initial)
 	if err != nil {
 		return false, err
 	}

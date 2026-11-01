@@ -382,7 +382,11 @@ func saveProfileAgainst(tx *gorm.DB, row *db.Profile, player *pb.Player, game *m
 	if err != nil {
 		return err
 	}
-	g, err = model.MarshalProfileGame86(game)
+	if persisted != nil && persisted.Game != nil {
+		g, err = model.MarshalProfileGame86Reusing(game, []byte(*persisted.Game))
+	} else {
+		g, err = model.MarshalProfileGame86(game)
+	}
 	if err != nil {
 		return err
 	}
@@ -434,6 +438,24 @@ func updateProfile(ctx context.Context, id int64, fn func(*pb.Player, *model.Gam
 // updateProfileWithTx 让相关奖励与限时效果沿用同一角色行锁和提交边界。
 func updateProfileWithTx(ctx context.Context, id int64, fn func(*gorm.DB, *pb.Player, *model.GameState) error) error {
 	return updateProfileTransaction(ctx, id, true, fn)
+}
+
+// updateFieldProfileWithTx lets ordinary movement and heartbeats share the
+// activity-window read locks. A transaction that needs to publish an activity
+// fact rolls back completely before retrying with the original exclusive locks.
+// Its two callers reset their response and notification state on each attempt.
+func updateFieldProfileWithTx(ctx context.Context, id int64, fn func(*gorm.DB, *pb.Player, *model.GameState) error) error {
+	switch ctx.Value(constUtil.GameRequestContextKey).(type) {
+	case *pb.CSMove, *pb.CSPingTcp:
+	default:
+		return updateProfileWithTx(ctx, id, fn)
+	}
+	shared := context.WithValue(ctx, constUtil.P1SharedReadContextKey{}, true)
+	err := updateProfileWithTx(shared, id, fn)
+	if errors.Is(err, constUtil.ErrP1ExclusiveRetry) {
+		return updateProfileWithTx(ctx, id, fn)
+	}
+	return err
 }
 
 // updateProfileForP7QueryWithTx 仅供不产生P1事实的试炼查询使用。

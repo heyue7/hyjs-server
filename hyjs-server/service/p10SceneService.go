@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
 	"sync"
 	"time"
 
@@ -25,6 +26,36 @@ var p10SceneBroadcastSlots = make(chan struct{}, constUtil.P10SceneBroadcastWork
 type p10ScenePeer struct {
 	frame *pb.MovePlayer
 	sink  *p10ClientSink
+}
+
+// A scene sync keeps both preflight database reads, but can avoid expanding an
+// unchanged profile twice. This cache is scoped to one sync and its decoded
+// game is only inspected for routing before the separately authorized read.
+type p10SceneRouteSnapshot struct {
+	profile *db.Profile
+	game    *model.GameState
+	decode  func(*db.Profile) (*pb.Player, *model.GameState, error)
+}
+
+func (snapshot *p10SceneRouteSnapshot) routeGame(profile *db.Profile) (*model.GameState, error) {
+	if snapshot != nil && snapshot.game != nil && reflect.DeepEqual(snapshot.profile, profile) {
+		return snapshot.game, nil
+	}
+	decode := decodeProfile
+	if snapshot != nil && snapshot.decode != nil {
+		decode = snapshot.decode
+	}
+	_, game, err := decode(profile)
+	if snapshot != nil {
+		if err != nil {
+			snapshot.profile = nil
+			snapshot.game = nil
+		} else {
+			snapshot.profile = profile
+			snapshot.game = game
+		}
+	}
+	return game, err
 }
 
 func p10ScenePeerFrames(peers []p10ScenePeer) []*pb.MovePlayer {
@@ -427,10 +458,11 @@ func (s *GameService) SyncP10Scene(ctx context.Context, id int64, movement bool)
 // A CurrentPosition caller can request an ordered peer snapshot after a
 // committed desert line reload; other existing callers keep their behavior.
 func (s *GameService) syncP10Scene(ctx context.Context, id int64, movement bool, lineRestored *bool) error {
-	if handled, err := s.SyncP13UnionFightField(ctx, id, movement); handled || err != nil {
+	var route p10SceneRouteSnapshot
+	if handled, err := s.syncP13UnionFightField(ctx, id, movement, &route); handled || err != nil {
 		return err
 	}
-	if handled, err := s.SyncP13GuildRoom(ctx, id, movement); handled || err != nil {
+	if handled, err := s.syncP13GuildRoom(ctx, id, movement, &route); handled || err != nil {
 		return err
 	}
 	p10SceneMutation.Lock()

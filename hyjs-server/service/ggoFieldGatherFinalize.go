@@ -240,6 +240,17 @@ func ggoGatherCanFinish(tx *gorm.DB, a *ggoFieldActor, attempt *db.P8GatherAttem
 	return true, nil
 }
 
+// ggoLockPeriodsBeforeLine keeps activity locks ahead of a line that a subsequent
+// profile save or activity fact may touch. Shared profile transactions keep their
+// existing shared mode and retry exclusively if they later need to record a fact.
+func ggoLockPeriodsBeforeLine(tx *gorm.DB, s *GameService) error {
+	if s == nil || !s.P1Ready {
+		return nil
+	}
+	_, err := p1LockPeriods(tx)
+	return err
+}
+
 // ggoEndAttempt consumes a reserved generation exactly once. If inventory cannot
 // accept its frozen materials, the durable ready receipt allows later delivery.
 func ggoEndAttempt(tx *gorm.DB, a *ggoFieldActor, attempt *db.P8GatherAttempt, requestID string) (*model.GGOFieldGatherClaimResponse, bool, error) {
@@ -259,6 +270,9 @@ func ggoEndAttempt(tx *gorm.DB, a *ggoFieldActor, attempt *db.P8GatherAttempt, r
 	}
 	if !canFinish {
 		return nil, false, ggoFieldError(constUtil.GGOFieldInvalidLocation, "采集中断或资格已变化")
+	}
+	if err = ggoLockPeriodsBeforeLine(tx, a.Service); err != nil {
+		return nil, false, err
 	}
 	var row db.GGOFieldLine
 	if err = tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&row, "server_id=? AND line=?", a.Service.OriginalServerID(), frozen.Line).Error; err != nil {

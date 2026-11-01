@@ -195,6 +195,9 @@ func (s *GameService) GGOFieldGatherStart(ctx context.Context, req model.GGOFiel
 		if total > 0 && (a.Game.GGOField.EconomyVersion != cfg.Runtime.EconomyVersion || a.Game.GGOField.ExchangeValues != values) {
 			return ggoFieldError(constUtil.GGOFieldEconomyConflict, "请先返回安全区结算旧版本芯片")
 		}
+		if err = ggoLockPeriodsBeforeLine(tx, a.Service); err != nil {
+			return err
+		}
 		row, state, _, err := ggoLoadLine(tx, a.Service.OriginalServerID(), int64(a.Presence.Line), cfg, a.Service.GGOFieldRevision, a.Now)
 		if err != nil {
 			return err

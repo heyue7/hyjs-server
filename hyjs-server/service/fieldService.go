@@ -671,7 +671,8 @@ func (s *GameService) fieldMonsterCheck(ctx context.Context, id int64, b *pb.CSS
 // fieldHeartbeat 借用原 TCP 心跳推送重生，玩家停留原地也会看到新怪物。
 func (s *GameService) fieldHeartbeat(ctx context.Context, id int64) ([]proto.Message, error) {
 	var messages []proto.Message
-	err := updateProfileWithTx(ctx, id, func(tx *gorm.DB, player *pb.Player, g *model.GameState) error {
+	err := updateFieldProfileWithTx(ctx, id, func(tx *gorm.DB, player *pb.Player, g *model.GameState) error {
+		messages = nil
 		if s.fieldSceneRow(g.Position.GetScene()) == nil || g.Field == nil {
 			return nil
 		}
@@ -1158,7 +1159,8 @@ func (s *GameService) fieldFightEnd(ctx context.Context, id int64, b *pb.CSSideP
 // fieldMove keeps movement, survival and gather updates in the original profile transaction.
 func (s *GameService) fieldMove(ctx context.Context, id int64, b *pb.CSMove) error {
 	var tradePeer int64
-	err := updateProfileWithTx(ctx, id, func(tx *gorm.DB, p *pb.Player, g *model.GameState) error {
+	err := updateFieldProfileWithTx(ctx, id, func(tx *gorm.DB, p *pb.Player, g *model.GameState) error {
+		tradePeer = 0
 		// Both sides of this one move use the same survival-clock instant.
 		now := time.Now()
 		if s.P12FieldPVPReady {

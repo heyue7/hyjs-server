@@ -44,6 +44,9 @@ func ggoCancelAttempt(tx *gorm.DB, s *GameService, id int64, g *model.GameState,
 	if err != nil {
 		return nil, err
 	}
+	if err = ggoLockPeriodsBeforeLine(tx, s); err != nil {
+		return nil, err
+	}
 	var row db.GGOFieldLine
 	if err = tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&row, "server_id=? AND line=?", s.OriginalServerID(), frozen.Line).Error; err != nil {
 		return nil, err

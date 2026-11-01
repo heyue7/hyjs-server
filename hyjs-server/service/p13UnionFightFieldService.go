@@ -1453,12 +1453,16 @@ func (s *GameService) p13UFFieldBroadcast(ctx context.Context, scope string, exc
 
 // SyncP13UnionFightField 只同步同MatchID的真实已认证TCP，公共世界开关不改变战场可见范围。
 func (s *GameService) SyncP13UnionFightField(ctx context.Context, id int64, movement bool) (bool, error) {
+	return s.syncP13UnionFightField(ctx, id, movement, nil)
+}
+
+func (s *GameService) syncP13UnionFightField(ctx context.Context, id int64, movement bool, route *p10SceneRouteSnapshot) (bool, error) {
 	var profile db.Profile
 	err := db.GetIns().WithContext(ctx).First(&profile, id).Error
 	if err != nil || profile.Game == nil {
 		return false, nil
 	}
-	_, game, err := decodeProfile(&profile)
+	game, err := route.routeGame(&profile)
 	if err != nil {
 		return false, err
 	}

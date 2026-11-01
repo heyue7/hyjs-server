@@ -50,6 +50,13 @@ func (s *GameService) seedP4Periods(tx *gorm.DB, now time.Time) error {
 	for _, id := range existing {
 		present[id] = true
 	}
+	if p1SharedRead(tx) {
+		for _, id := range ids {
+			if !present[id] {
+				return constUtil.ErrP1ExclusiveRetry
+			}
+		}
+	}
 	for _, v := range specs {
 		cfg := db.PeriodInstance{ID: v.prefix + "_p4_" + start.Format("200601"), Enabled: false, Title: v.title, Kind: v.kind, Mode: v.mode, Goal: v.goal, Rewards: v.reward, StartAt: start.UnixMilli(), EndAt: end.UnixMilli(), RewardEndAt: end.AddDate(0, 0, 7).UnixMilli(), RankPlaces: v.rank, RankRewards: "coin,10000;item_021,1", Source: "P4本地兼容服月实例：只累计成功招募/主线通关、已真实拥有的不同英雄类型和服务器阵容战力；战力取期内峰值，截止后前10名同档奖励通过P1邮件/领奖中心发放。重复回执、重复登录及客户端战力值不参与计数。"}
 		if v.prefix == "kaiGongActivity" {

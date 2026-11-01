@@ -44,6 +44,9 @@ func (s *GameService) seedP15Seasonal(tx *gorm.DB, now time.Time) error {
 	if existing == 2 {
 		return nil
 	}
+	if p1SharedRead(tx) {
+		return constUtil.ErrP1ExclusiveRetry
+	}
 	periods := []db.PeriodInstance{
 		{ID: "celebrationActivity_p4_" + suffix, Title: "庆典登录补给", Enabled: false, Kind: constUtil.P1EventLoginDay, Mode: "cumulative", Goal: 1, Rewards: "item_005,10;item_047,5", StartAt: start.UnixMilli(), EndAt: end.UnixMilli(), RewardEndAt: end.AddDate(0, 0, 7).UnixMilli(), Source: constUtil.P15SeasonalSource},
 		{ID: "totalLoginFestival_p4_festival_" + suffix, Title: "节日精灵补给", Enabled: false, Kind: constUtil.P1EventLoginDay, Mode: "cumulative", Goal: 1, Rewards: "item_124,15", StartAt: start.UnixMilli(), EndAt: end.UnixMilli(), RewardEndAt: end.AddDate(0, 0, 7).UnixMilli(), Source: constUtil.P15SeasonalSource},

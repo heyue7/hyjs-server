@@ -168,11 +168,50 @@ func CompactProfileGame86(raw []byte) ([]byte, error) {
 // JSON exports/clones and every original protocol object keep their old shape.
 // Identical state produces identical stored bytes on every save.
 func MarshalProfileGame86(game *GameState) ([]byte, error) {
-	type plainGameState GameState
 	roster, err := encodeWarriors86(game.Warriors)
 	if err != nil {
 		return nil, err
 	}
+	return marshalProfileWithRoster86(game, roster)
+}
+
+// MarshalProfileGame86Reusing keeps a verified compressed roster when the
+// transaction changed other fields only. A damaged previous roster is rejected
+// and changed rosters still pass through the ordinary bounded compressor.
+func MarshalProfileGame86Reusing(game *GameState, previous []byte) ([]byte, error) {
+	if !bytes.Contains(previous, []byte(constUtil.ProfileWarriorsCodec86)) {
+		return MarshalProfileGame86(game)
+	}
+	var stored struct {
+		Warriors json.RawMessage `json:"warriors"`
+	}
+	if err := json.Unmarshal(previous, &stored); err != nil {
+		return nil, err
+	}
+	roster := bytes.TrimSpace(stored.Warriors)
+	if len(roster) == 0 || roster[0] != '{' {
+		return MarshalProfileGame86(game)
+	}
+	plain, err := expandWarriorsJSON86(roster)
+	if err != nil {
+		return nil, err
+	}
+	current, err := json.Marshal(game.Warriors)
+	if err != nil {
+		return nil, err
+	}
+	if bytes.Equal(plain, current) {
+		return marshalProfileWithRoster86(game, roster)
+	}
+	roster, err = compressWarriorsJSON86(current)
+	if err != nil {
+		return nil, err
+	}
+	return marshalProfileWithRoster86(game, roster)
+}
+
+func marshalProfileWithRoster86(game *GameState, roster json.RawMessage) ([]byte, error) {
+	type plainGameState GameState
 	if len(roster) == 0 || roster[0] != '{' {
 		// Keep historical field order and bytes for rosters that need no codec.
 		return json.Marshal(game)

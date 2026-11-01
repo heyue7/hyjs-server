@@ -405,6 +405,9 @@ func (s *GameService) ggoExpireMonsterFightLocked(tx *gorm.DB, id int64, g *mode
 	if pending.ReservedUntilMS < 1 || now < pending.ReservedUntilMS {
 		return false, nil
 	}
+	if err := ggoLockPeriodsBeforeLine(tx, s); err != nil {
+		return false, err
+	}
 	var line db.GGOFieldLine
 	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&line, "server_id=? AND line=?", s.OriginalServerID(), pending.Line).Error; err != nil {
 		return false, err

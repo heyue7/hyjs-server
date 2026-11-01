@@ -28,16 +28,24 @@ func p1PositiveAmount(text string) (int64, error) {
 }
 func p1Day(at time.Time) string { return at.In(time.FixedZone("UTC+8", 8*3600)).Format("2006-01-02") }
 
+func p1SharedRead(tx *gorm.DB) bool {
+	return tx != nil && tx.Statement != nil && tx.Statement.Context != nil && tx.Statement.Context.Value(constUtil.P1SharedReadContextKey{}) == true
+}
+
 // p1LockPeriods 沿主键正序取得完整窗口锁，避免过滤扫描先锁不同记录。
 // 包含未启用实例，后续启用或同事务多种事实沿用已取得的锁顺序。
 func p1LockPeriods(tx *gorm.DB) ([]db.PeriodInstance, error) {
 	var rows []db.PeriodInstance
+	strength := "UPDATE"
+	if p1SharedRead(tx) {
+		strength = "SHARE"
+	}
 	if tx.Dialector.Name() == "mysql" {
 		// 无过滤且强制PRIMARY，优化器不能在其他扫描之后filesort；一条语句保留固定取锁顺序。
-		err := tx.Raw("SELECT * FROM p1_period_instances FORCE INDEX (PRIMARY) ORDER BY id ASC FOR UPDATE").Scan(&rows).Error
+		err := tx.Raw("SELECT * FROM p1_period_instances FORCE INDEX (PRIMARY) ORDER BY id ASC FOR " + strength).Scan(&rows).Error
 		return rows, err
 	}
-	err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Order("id ASC").Find(&rows).Error
+	err := tx.Clauses(clause.Locking{Strength: strength}).Order("id ASC").Find(&rows).Error
 	return rows, err
 }
 
@@ -66,6 +74,11 @@ func (s *GameService) RecordP1Event(tx *gorm.DB, playerID int64, sourceKey, kind
 	}
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return err
+	}
+	// Existing facts are immutable: replays need no activity-window mutation.
+	// A new fact requires rolling back all shared locks before retrying exclusively.
+	if p1SharedRead(tx) {
+		return constUtil.ErrP1ExclusiveRetry
 	}
 	fact := db.EventFact{PlayerID: playerID, SourceKey: sourceKey, Kind: kind, Amount: amount, OccurredAt: at.UnixMilli(), Day: p1Day(at)}
 	if err = tx.Create(&fact).Error; err != nil {
