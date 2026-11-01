@@ -1157,10 +1157,12 @@ func (s *GameService) fieldFightEnd(ctx context.Context, id int64, b *pb.CSSideP
 }
 
 // fieldMove keeps movement, survival and gather updates in the original profile transaction.
-func (s *GameService) fieldMove(ctx context.Context, id int64, b *pb.CSMove) error {
+func (s *GameService) fieldMove(ctx context.Context, id int64, b *pb.CSMove) ([]proto.Message, error) {
 	var tradePeer int64
+	var recovery []proto.Message
 	err := updateFieldProfileWithTx(ctx, id, func(tx *gorm.DB, p *pb.Player, g *model.GameState) error {
 		tradePeer = 0
+		recovery = nil
 		// Both sides of this one move use the same survival-clock instant.
 		now := time.Now()
 		if s.P12FieldPVPReady {
@@ -1184,9 +1186,11 @@ func (s *GameService) fieldMove(ctx context.Context, id int64, b *pb.CSMove) err
 			return errors.New("死亡状态不能移动，请先复活")
 		}
 		if s.P8LifeReady {
-			if _, err := s.RefreshP8Survival(tx, p, g, now); err != nil {
+			messages, err := s.RefreshP8Survival(tx, p, g, now)
+			if err != nil {
 				return err
 			}
+			recovery = append(recovery, messages...)
 		}
 		if g.GGOField != nil && g.GGOField.Extraction != nil {
 			current, next := g.Position.GetCurrent(), b.GetPointNew()
@@ -1216,14 +1220,19 @@ func (s *GameService) fieldMove(ctx context.Context, id int64, b *pb.CSMove) err
 		}
 		g.Position.Current = next
 		if s.P8LifeReady {
-			if _, err := s.RefreshP8Survival(tx, p, g, now); err != nil {
+			messages, err := s.RefreshP8Survival(tx, p, g, now)
+			if err != nil {
 				return err
 			}
+			recovery = append(recovery, messages...)
 		}
 		return nil
 	})
 	if err == nil && tradePeer > 0 {
 		ggoTradeNotify(s, ctx, tradePeer)
 	}
-	return err
+	if err != nil {
+		return nil, err
+	}
+	return recovery, nil
 }

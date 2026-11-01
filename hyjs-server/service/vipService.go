@@ -88,10 +88,6 @@ func (s *GameService) p3VIPShopList(tx *gorm.DB, p *pb.Player, now time.Time) ([
 	if err := tx.Where("enabled = ?", true).Order("id").Find(&products).Error; err != nil {
 		return nil, err
 	}
-	_, _, paid, err := PaymentTotals(tx, p.GetPlayerId(), 0, now.UnixMilli()+1)
-	if err != nil {
-		return nil, err
-	}
 	var lifetime []struct {
 		Kind  string
 		Count int64
@@ -137,17 +133,16 @@ func (s *GameService) p3VIPShopList(tx *gorm.DB, p *pb.Player, now time.Time) ([
 			totalLeft = max(int64(0), cfg.TotalLimit-totals["vip-shop:"+cfg.ID])
 			left = min(left, int32(totalLeft))
 		}
-		can := left
-		if paid == 0 || int64(p.GetVip()) < cfg.MinVIP {
-			can = 0
-		}
+		// The original VIP card treats canBuy=0 as "already purchased".
+		// Its button checks the VIP level; the purchase transaction below
+		// independently checks level, confirmed payment, stock and price.
 		// 原会员商品卡直接读取 Price[0] 和 Discount[0]，两者都返回当前报价。
 		// 当前目录无额外折扣；缺少 Discount 会使原 UI 在挂载商品前抛异常。
 		price, e := s.p4ParseCost(fmt.Sprintf("%s,%d", vipShopCostResource(cfg), cfg.Cost))
 		if e != nil {
 			return nil, e
 		}
-		items = append(items, &pb.ShopItem{Id: proto.String(vipShopSKU(cfg)), Item: reward, Price: []*pb.BaseResource{price}, Discount: []*pb.BaseResource{proto.Clone(price).(*pb.BaseResource)}, ExchangeList: []*pb.BaseResource{proto.Clone(price).(*pb.BaseResource)}, CanBuy: proto.Int32(can), DayLeftTimes: proto.Int32(left), DayTotalTimes: proto.Int32(1), TotalTimes: proto.Int32(int32(cfg.TotalLimit)), TotalLeftTimes: proto.Int32(int32(totalLeft)), Condition: &pb.ShopCondition{Type: proto.String("vip"), Value: proto.Int64(cfg.MinVIP)}})
+		items = append(items, &pb.ShopItem{Id: proto.String(vipShopSKU(cfg)), Item: reward, Price: []*pb.BaseResource{price}, Discount: []*pb.BaseResource{proto.Clone(price).(*pb.BaseResource)}, ExchangeList: []*pb.BaseResource{proto.Clone(price).(*pb.BaseResource)}, CanBuy: proto.Int32(left), DayLeftTimes: proto.Int32(left), DayTotalTimes: proto.Int32(1), TotalTimes: proto.Int32(int32(cfg.TotalLimit)), TotalLeftTimes: proto.Int32(int32(totalLeft)), Condition: &pb.ShopCondition{Type: proto.String("vip"), Value: proto.Int64(cfg.MinVIP)}})
 	}
 	return items, nil
 }

@@ -60,10 +60,11 @@ type GGOFieldLeaveStatusRequest struct {
 }
 
 type GGOFieldTerminalView struct {
-	Chips         [6]int64 `json:"chips"`
-	Protected     [6]int64 `json:"protected"`
-	Revision      int64    `json:"revision"`
-	CreditBalance int64    `json:"creditBalance"`
+	Chips          [6]int64 `json:"chips"`
+	Protected      [6]int64 `json:"protected"`
+	ExchangeValues [6]int64 `json:"exchangeValues"`
+	Revision       int64    `json:"revision"`
+	CreditBalance  int64    `json:"creditBalance"`
 }
 
 // GGOFieldChipCountView is the public carried total for a visible player.

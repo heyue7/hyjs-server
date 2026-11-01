@@ -175,6 +175,16 @@ func TestGGOChipSnapshotAndActorCommitIntegration(t *testing.T) {
 		}
 		return result
 	}
+	frozen := [6]int64{3, 9, 30, 90, 300, 900}
+	if err := updateProfile(f.ctx, f.ids[0], func(_ *pb.Player, game *model.GameState) error {
+		game.GGOField.ExchangeValues = frozen
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if terminal := snapshot().Terminal; terminal.ExchangeValues != frozen || terminal.Chips[0] != 10 {
+		t.Fatal("terminal snapshot did not expose carried chips' frozen prices", terminal)
+	}
 	before := []model.GGOFieldChipCountView{{PlayerID: f.ids[0], Count: 10}, {PlayerID: f.ids[1], Count: 6}}
 	if actual := snapshot().PlayerChipCounts; !reflect.DeepEqual(actual, before) {
 		t.Fatal("native scene snapshot did not include both projections", actual)

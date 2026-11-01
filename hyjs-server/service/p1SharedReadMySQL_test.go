@@ -198,7 +198,7 @@ func TestP1SharedReadRealMySQLMovementLoad(t *testing.T) {
 					started := time.Now()
 					var err error
 					if shared {
-						err = f.s.fieldMove(ctx, id, move)
+						_, err = f.s.fieldMove(ctx, id, move)
 					} else {
 						err = updateProfileWithTx(ctx, id, func(_ *gorm.DB, _ *pb.Player, game *model.GameState) error {
 							game.Position.Current = move.GetPointNew()

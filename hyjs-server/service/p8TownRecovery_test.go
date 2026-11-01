@@ -117,3 +117,76 @@ func TestP8Town77ClockAndDeath(t *testing.T) {
 		t.Fatal("backward clock accrued HP", err)
 	}
 }
+
+// Movement can be the request that advances the safe-zone clock. The same
+// authenticated response must carry that committed HP to the original client.
+func TestP8MoveReturnsCommittedSafeRecovery(t *testing.T) {
+	f := p1Setup(t)
+	f.s.P8LifeReady = true
+	for _, load := range []func(string) error{f.s.LoadP5Tables, f.s.LoadP8Tables} {
+		if err := load("../../analysis/tables"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, init := range []func() error{
+		func() error { return f.s.InitializeP5(f.ctx) },
+		func() error { return f.s.InitializeP8Gather(f.ctx) },
+		func() error { return f.s.InitializeP8Life(f.ctx) },
+	} {
+		if err := init(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := updateProfile(f.ctx, f.id, func(p *pb.Player, _ *model.GameState) error { p.Level = proto.Int32(30); return nil }); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.s.fieldTransfer(f.ctx, f.id, &pb.CSTransferScene{Target: proto.String("field_001")}); err != nil {
+		t.Fatal(err)
+	}
+	if err := updateProfileWithTx(f.ctx, f.id, func(tx *gorm.DB, p *pb.Player, g *model.GameState) error {
+		g.PositionLoading = false
+		g.Field.Side.CurHp = proto.Float64(.2)
+		g.Field.Side.BattlePosHps = nil
+		g.Field.Fight = nil
+		safe, err := f.s.p8SafeZone(g)
+		if err != nil || !safe {
+			t.Fatal("expected safe spawn", safe, err)
+		}
+		return tx.Model(&db.P8LifeState{}).Where("player_id=?", f.id).Updates(map[string]any{"in_safe": true, "safe_recovery_at": time.Now().Add(-15 * time.Second).UnixMilli()}).Error
+	}); err != nil {
+		t.Fatal(err)
+	}
+	var owner db.Profile
+	if err := db.GetIns().First(&owner, f.id).Error; err != nil {
+		t.Fatal(err)
+	}
+	_, before := f.profile(t)
+	move := &pb.CSMove{PointNew: proto.Clone(before.Position.Current).(*pb.PointNew)}
+	packet := &model.GamePacket{Opcode: 30026, PlayerId: f.id, ZoneId: 1, Session: owner.Session, Body: move}
+	result := f.s.Dispatch(f.ctx, packet, "127.0.0.1")
+	var healed *pb.PlayerSide
+	for _, message := range result {
+		if failure, ok := message.(*pb.ErrorMessage); ok {
+			t.Fatal(failure.GetMsg())
+		}
+		if state, ok := message.(*pb.SCFieldPlayerState); ok && len(state.GetPlayer()) == 1 {
+			healed = state.GetPlayer()[0]
+		}
+	}
+	_, saved := f.profile(t)
+	if healed == nil || math.Abs(healed.GetCurHp()-.3) > 1e-9 || math.Abs(saved.Field.Side.GetCurHp()-.3) > 1e-9 {
+		t.Fatal("committed safe recovery was not returned to the moving client", healed, saved.Field.Side.GetCurHp())
+	}
+	for _, message := range f.s.Dispatch(f.ctx, packet, "127.0.0.1") {
+		if _, ok := message.(*pb.SCFieldPlayerState); ok {
+			t.Fatal("same recovery interval emitted twice")
+		}
+		if failure, ok := message.(*pb.ErrorMessage); ok {
+			t.Fatal(failure.GetMsg())
+		}
+	}
+	_, repeated := f.profile(t)
+	if math.Abs(repeated.Field.Side.GetCurHp()-.3) > 1e-9 {
+		t.Fatal("repeated move granted recovery twice")
+	}
+}

@@ -414,7 +414,7 @@ func (s *GameService) dispatch(ctx context.Context, r *model.GamePacket, peer st
 			}
 		}
 		// The movement transaction already recovers resources under its role lock.
-		return nil, s.fieldMove(ctx, row.Id, b)
+		return s.fieldMove(ctx, row.Id, b)
 	case *pb.CSRefreshSideHp:
 		return s.formationSideHPRefresh(ctx, row.Id, b)
 	case *pb.CSGenerateName:

@@ -197,11 +197,19 @@ func (s *GameService) GGOFieldSnapshot(ctx context.Context, auth model.GGOFieldA
 			out.Terminal.Revision = a.Game.GGOField.Revision
 			out.ProtectionUntilMS = a.Game.GGOField.ProtectionUntil
 		}
-		protected, _, err := ggoProtectedChips(out.Terminal.Chips, cfg.Runtime.ProtectedChips)
+		protected, held, err := ggoProtectedChips(out.Terminal.Chips, cfg.Runtime.ProtectedChips)
 		if err != nil {
 			return err
 		}
 		out.Terminal.Protected = protected
+		if held > 0 {
+			// Settlement uses the values frozen when these chips were acquired.
+			out.Terminal.ExchangeValues = a.Game.GGOField.ExchangeValues
+		} else {
+			// No chips have a frozen price yet. A bad optional quote must not
+			// make the rest of the scene snapshot unavailable.
+			out.Terminal.ExchangeValues, _ = ggoChipValues(cfg)
+		}
 		out.Terminal.CreditBalance = ggoCreditBalance(a.Game)
 		if out.Terminal.CreditBalance < 0 {
 			return errors.New("信用余额无效")
