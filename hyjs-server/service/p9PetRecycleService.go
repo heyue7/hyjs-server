@@ -46,16 +46,16 @@ func (s *GameService) p9PetReset(ctx context.Context, id int64, b *pb.CSPetReset
 		donors := []*pb.Pet{}
 		err = tx.First(&investment, "guid=? AND player_id=?", pet.GetGuid(), id).Error
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			// 攻略亲密属于不可退款来源；其余成长无账本时不制造返还。
-			base := proto.Clone(pet).(*pb.Pet)
-			base.Eat = &pb.PetEat{Level: proto.Int32(0), Exp: proto.Int32(0)}
-			if !p9BasicDonor(base) || len(pet.GetRandPropList()) != 0 {
+			// 无来源证明的亲密度可能来自付费喂食，不推测其投入。
+			if !p9ResetPristine(pet) {
 				return errors.New(constUtil.P9PetResetInvestmentMissing)
 			}
 		} else if err != nil {
 			return err
 		} else if investment.Source == "" || json.Unmarshal(investment.Costs, &pool) != nil || pool == nil || json.Unmarshal(investment.Donors, &donors) != nil || donors == nil || len(donors) >= 100 {
 			return errors.New(constUtil.P9PetResetInvestmentInvalid)
+		} else if err := p9RequireInvestmentProof(tx, id, pet, &investment); err != nil {
+			return err
 		}
 		keys := make([]string, 0, len(pool))
 		for key, count := range pool {

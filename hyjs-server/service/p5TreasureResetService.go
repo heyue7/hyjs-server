@@ -21,6 +21,9 @@ func (s *GameService) p5TreasureReset(ctx context.Context, id int64, b *pb.CStre
 		if err != nil {
 			return err
 		}
+		if err := p5ResetBaselineValid(g, treasure, false); err != nil {
+			return err
+		}
 		costs, err := p3Resources(s.table("GameConfigure", "StaticName", "EquipmentRebuildCost")["NameValue"])
 		if err != nil || len(costs) != 1 || costs[0].GetId() != "diamond" {
 			return p5Error()

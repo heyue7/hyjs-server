@@ -253,7 +253,7 @@ func (s *GameService) p9PetEat(ctx context.Context, id int64, b *pb.CSPetEat, st
 		}
 		pet.Eat.Level = proto.Int32(level)
 		pet.Eat.Exp = proto.Int32(int32(total))
-		if err = p9SavePet(tx, id, g, pet); err != nil {
+		if err = p9SavePet(tx, id, g, pet, true); err != nil {
 			return err
 		}
 		if err = p9Invest(tx, id, pet.GetGuid(), costs, nil); err != nil {
@@ -284,7 +284,7 @@ func (s *GameService) p9PetHudongShow(ctx context.Context, id int64, b *pb.CSPet
 			} else if !proto.Equal(prior, pet) {
 				// MySQL reports zero affected rows for an unchanged projection.
 				// Persist only a real mood/window change; repeated Show remains a query.
-				if err := p9SavePet(tx, id, g, pet); err != nil {
+				if err := p9SavePet(tx, id, g, pet, true); err != nil {
 					return err
 				}
 			}

@@ -253,6 +253,61 @@ func (s *GameService) p5GrantTrackedRefund(p *pb.Player, g *model.GameState, ref
 	return result, nil
 }
 
+// A later tracked payment does not establish the costs of an already grown
+// baseline. Validate the original identity and initial state before resetting.
+func p5ResetBaselineValid(g *model.GameState, current proto.Message, main bool) error {
+	var guid string
+	switch value := current.(type) {
+	case *pb.Warrior:
+		guid = value.GetGuid()
+	case *pb.Equipment:
+		guid = value.GetGuid()
+	case *pb.Treasure:
+		guid = value.GetGuid()
+	default:
+		return p5Error()
+	}
+	if p5KV(g, "p5.invest:"+guid) == "" {
+		switch value := current.(type) {
+		case *pb.Warrior:
+			if p5WarriorResetPristine(value, main) {
+				return nil
+			}
+		case *pb.Equipment:
+			if p5EquipmentResetPristine(value) {
+				return nil
+			}
+		}
+		return p5Error()
+	}
+	state, err := p5InvestmentState(g, guid, current)
+	if err != nil {
+		return err
+	}
+	switch value := current.(type) {
+	case *pb.Warrior:
+		var baseline pb.Warrior
+		if json.Unmarshal(state.Baseline, &baseline) != nil || baseline.GetGuid() != guid || (!main && baseline.GetId() != value.GetId()) || !p5WarriorResetPristine(&baseline, main) {
+			return p5Error()
+		}
+	case *pb.Equipment:
+		var baseline pb.Equipment
+		if json.Unmarshal(state.Baseline, &baseline) != nil || baseline.GetGuid() != guid || baseline.GetEquipId() != value.GetEquipId() || !p5EquipmentResetPristine(&baseline) {
+			return p5Error()
+		}
+	case *pb.Treasure:
+		var baseline pb.Treasure
+		if json.Unmarshal(state.Baseline, &baseline) != nil || baseline.GetGuid() != guid || baseline.GetTreasureId() != value.GetTreasureId() || baseline.GetStrengthLevel() != 1 || baseline.GetRefineLevel() != 0 || baseline.GetCurrentExp() != 0 {
+			return p5Error()
+		}
+	}
+	return nil
+}
+
+func p5EquipmentResetPristine(e *pb.Equipment) bool {
+	return e.GetLevel() == 1 && e.GetRefineLv() == 0 && e.GetRefineExp() == 0 && e.GetStar() == 0 && e.GetStarExp() == 0 && e.GetForgeLevel() == 0
+}
+
 func (s *GameService) p5WarriorReset(ctx context.Context, id int64, b *pb.CSWarriorReset, stamp int64) ([]proto.Message, error) {
 	out := &pb.SCWarriorReset{}
 	return s.p5Mutation(ctx, id, "warrior-reset", stamp, b, out, func(tx *gorm.DB, p *pb.Player, g *model.GameState) error {
@@ -267,6 +322,9 @@ func (s *GameService) p5WarriorReset(ctx context.Context, id int64, b *pb.CSWarr
 				return p5Error()
 			}
 		} else if err := P5GuardInstance(p, g, b.GetGuid()); err != nil {
+			return err
+		}
+		if err := p5ResetBaselineValid(g, w, isMain); err != nil {
 			return err
 		}
 		costs, err := p3Resources(s.table("GameConfigure", "StaticName", "WarriorRebuildCost")["NameValue"])
@@ -293,8 +351,6 @@ func (s *GameService) p5WarriorReset(ctx context.Context, id int64, b *pb.CSWarr
 			if err != nil {
 				return err
 			}
-		} else if !p5WarriorResetPristine(w, isMain) {
-			return p5Error()
 		}
 		if isMain {
 			// 退还资源会克隆存档，重取主角后回传，保留阵容和穿戴引用。
@@ -334,6 +390,9 @@ func (s *GameService) p5EquipmentReset(ctx context.Context, id int64, b *pb.CSEq
 		if err != nil {
 			return err
 		}
+		if err := p5ResetBaselineValid(g, equip, false); err != nil {
+			return err
+		}
 		costs, err := p3Resources(s.table("GameConfigure", "StaticName", "EquipmentRebuildCost")["NameValue"])
 		if err != nil || len(costs) != 1 || costs[0].GetId() != "diamond" {
 			return p5Error()
@@ -355,8 +414,6 @@ func (s *GameService) p5EquipmentReset(ctx context.Context, id int64, b *pb.CSEq
 			if err != nil {
 				return err
 			}
-		} else if p5EquipmentProgressed(equip) {
-			return p5Error()
 		}
 		// Fixed refunds clone GameState; resolve the restored owned instance
 		// again before returning its current physical gem slots.

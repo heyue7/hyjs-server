@@ -50,9 +50,13 @@ func p9OwnedPet(tx *gorm.DB, id int64, guid string) (*pb.Pet, error) {
 	return pet, nil
 }
 
-func p9SavePet(tx *gorm.DB, id int64, g *model.GameState, pet *pb.Pet) error {
+func p9SavePet(tx *gorm.DB, id int64, g *model.GameState, pet *pb.Pet, verified ...bool) error {
 	data, err := proto.Marshal(pet)
 	if err != nil {
+		return err
+	}
+	trusted := len(verified) == 1 && verified[0]
+	if err = p9AdvanceInvestmentProof(tx, id, pet, data, trusted); err != nil {
 		return err
 	}
 	result := tx.Model(&db.P9PetInstance{}).Where("player_id=? AND guid=?", id, pet.GetGuid()).Update("data", data)
@@ -63,6 +67,119 @@ func p9SavePet(tx *gorm.DB, id int64, g *model.GameState, pet *pb.Pet) error {
 		return p5Error()
 	}
 	return p9ProjectPet(g, pet)
+}
+
+func p9ResetPristine(pet *pb.Pet) bool {
+	return p9BasicDonor(pet) && len(pet.GetRandPropList()) == 0
+}
+
+// A proof is established before a known paid or free growth operation while
+// the locked pet is pristine. Existing unmarked ledgers are never promoted.
+func p9PrepareInvestmentProof(tx *gorm.DB, id int64, guid string) error {
+	if !gameSchemaHasTable(tx, &db.P9PetInvestment{}) {
+		return nil
+	}
+	var investment db.P9PetInvestment
+	err := tx.First(&investment, "guid=?", guid).Error
+	if err == nil {
+		return nil
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return err
+	}
+	var owned db.P9PetInstance
+	if err := tx.First(&owned, "guid=? AND player_id=?", guid, id).Error; err != nil {
+		return err
+	}
+	before := &pb.Pet{}
+	if owned.Source == "" || proto.Unmarshal(owned.Data, before) != nil || before.GetGuid() != guid || before.GetId() != owned.PetID || before.GetEat() == nil || before.GetBreached() == nil {
+		return p5Error()
+	}
+	if !p9ResetPristine(before) {
+		return nil
+	}
+	investment = db.P9PetInvestment{
+		GUID:     guid,
+		PlayerID: id,
+		Costs:    []byte("{}"),
+		Donors:   []byte("[]"),
+		Source:   constUtil.P9PetSource + "；实际成长成本与原同ID基础实例捐献快照" + constUtil.P9PetInvestmentProofPrefix + p6Digest(owned.Data) + "]",
+	}
+	return tx.Create(&investment).Error
+}
+
+// Every verified save advances the fingerprint; an unexplained state change
+// permanently invalidates the proof without preventing further pet growth.
+func p9AdvanceInvestmentProof(tx *gorm.DB, id int64, pet *pb.Pet, data []byte, trusted bool) error {
+	if !gameSchemaHasTable(tx, &db.P9PetInvestment{}) {
+		return nil
+	}
+	var investment db.P9PetInvestment
+	err := tx.First(&investment, "guid=?", pet.GetGuid()).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if investment.PlayerID != id || investment.Source == "" {
+		return p5Error()
+	}
+	var owned db.P9PetInstance
+	if err := tx.First(&owned, "guid=? AND player_id=?", pet.GetGuid(), id).Error; err != nil {
+		return err
+	}
+	if owned.Source == "" || owned.PetID != pet.GetId() {
+		return p5Error()
+	}
+	proof, valid := p9InvestmentProof(investment.Source)
+	if trusted && valid && proof == p6Digest(owned.Data) {
+		next := strings.Replace(investment.Source, constUtil.P9PetInvestmentProofPrefix+proof+"]", constUtil.P9PetInvestmentProofPrefix+p6Digest(data)+"]", 1)
+		if next != investment.Source {
+			return tx.Model(&investment).Update("source", next).Error
+		}
+		return nil
+	}
+	// Once a marked chain no longer matches, never restore its proof merely
+	// because a later state happens to match the old bytes again.
+	if strings.Contains(investment.Source, constUtil.P9PetInvestmentProofPrefix) {
+		next := strings.ReplaceAll(investment.Source, constUtil.P9PetInvestmentProofPrefix, constUtil.P9PetInvestmentInvalidProof)
+		return tx.Model(&investment).Update("source", next).Error
+	}
+	return nil
+}
+
+func p9InvestmentProof(source string) (string, bool) {
+	prefix := constUtil.P9PetInvestmentProofPrefix
+	if strings.Count(source, prefix) != 1 {
+		return "", false
+	}
+	start := strings.Index(source, prefix) + len(prefix)
+	if len(source)-start < 65 || source[start+64] != ']' {
+		return "", false
+	}
+	proof := source[start : start+64]
+	for _, ch := range proof {
+		if (ch < '0' || ch > '9') && (ch < 'a' || ch > 'f') {
+			return "", false
+		}
+	}
+	return proof, true
+}
+
+func p9RequireInvestmentProof(tx *gorm.DB, id int64, pet *pb.Pet, investment *db.P9PetInvestment) error {
+	proof, ok := p9InvestmentProof(investment.Source)
+	if !ok {
+		return errors.New(constUtil.P9PetResetInvestmentMissing)
+	}
+	var owned db.P9PetInstance
+	if err := tx.Select("data").First(&owned, "guid=? AND player_id=?", pet.GetGuid(), id).Error; err != nil {
+		return err
+	}
+	if proof != p6Digest(owned.Data) {
+		return errors.New(constUtil.P9PetResetInvestmentInvalid)
+	}
+	return nil
 }
 
 func p9Invest(tx *gorm.DB, id int64, guid string, costs []*pb.BaseResource, donors []*pb.Pet) error {
@@ -329,7 +446,7 @@ func (s *GameService) p9PetLevelup(ctx context.Context, id int64, b *pb.CSPetLev
 		if terminal && pet.GetLevel() == cap {
 			pet.Exp = proto.Int64(0)
 		}
-		if err = p9SavePet(tx, id, g, pet); err != nil {
+		if err = p9SavePet(tx, id, g, pet, true); err != nil {
 			return err
 		}
 		if err = p9Invest(tx, id, pet.GetGuid(), costs, nil); err != nil {
@@ -415,7 +532,7 @@ func (s *GameService) p9PetBreach(ctx context.Context, id int64, b *pb.CSPetBrea
 			}
 		}
 		pet.Breached.Level = proto.Int32(pet.GetBreached().GetLevel() + 1)
-		if err = p9SavePet(tx, id, g, pet); err != nil {
+		if err = p9SavePet(tx, id, g, pet, true); err != nil {
 			return err
 		}
 		if err = p9Invest(tx, id, pet.GetGuid(), costs, donors); err != nil {
@@ -590,6 +707,30 @@ func (s *GameService) p9NextMutation(ctx context.Context, id int64, op string, s
 		}
 		if gameSchemaHasTable(tx, &db.DailyCopyFight{}) {
 			if err := s.ensureNoActiveDailyCopy(tx, id, time.Now()); err != nil {
+				return err
+			}
+		}
+		var guid string
+		switch entry := request.(type) {
+		case *pb.CSPetLevelup:
+			guid = entry.GetGuid()
+		case *pb.CSPetBreached:
+			guid = entry.GetGuid()
+		case *pb.CSPetEat:
+			guid = entry.GetGuid()
+		case *pb.CSPetHudong:
+			guid = entry.GetGuid()
+		case *pb.CSPetEquipStrengthOne:
+			guid = entry.GetPetGuid()
+		case *pb.CSPetEquipStrengthAll:
+			guid = entry.GetPetGuid()
+		case *pb.CSPetEquipAdvance:
+			guid = entry.GetPetGuid()
+		case *pb.CSPetEquipAwake:
+			guid = entry.GetPetGuid()
+		}
+		if guid != "" {
+			if err := p9PrepareInvestmentProof(tx, id, guid); err != nil {
 				return err
 			}
 		}

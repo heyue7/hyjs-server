@@ -7,4 +7,6 @@ const (
 	P9PetResetInvestmentMissing = "旧培养精灵缺实际投入账本，保留原实例与资源"
 	P9PetResetInvestmentInvalid = "精灵重置投入或捐献快照不完整，保留原实例与资源"
 	P9PetReceiptExpired         = "精灵实例已有后续变更，请刷新当前精灵；历史投入与回执保留"
+	P9PetInvestmentProofPrefix  = "[p9-investment-proof-v1:"
+	P9PetInvestmentInvalidProof = "[p9-investment-invalid-v1:"
 )

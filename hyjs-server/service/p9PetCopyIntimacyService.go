@@ -147,7 +147,10 @@ func (s *GameService) p9DrainDeferredIntimacy(tx *gorm.DB, id int64, g *model.Ga
 			if consumed.Deferred != 0 {
 				return nil
 			}
-			if err = p9SavePet(tx, id, g, grown); err != nil {
+			if err = p9PrepareInvestmentProof(tx, id, pet.GetGuid()); err != nil {
+				return err
+			}
+			if err = p9SavePet(tx, id, g, grown, true); err != nil {
 				return err
 			}
 			proto.Reset(pet)
@@ -217,7 +220,10 @@ func (s *GameService) ApplyP9CopyIntimacy(tx *gorm.DB, id int64, p *pb.Player, g
 				return nil, err
 			}
 			if fact.Applied > 0 {
-				if err = p9SavePet(tx, id, g, grown); err != nil {
+				if err = p9PrepareInvestmentProof(tx, id, pet.GetGuid()); err != nil {
+					return nil, err
+				}
+				if err = p9SavePet(tx, id, g, grown, true); err != nil {
 					return nil, err
 				}
 				infos = append(infos, &pb.PetAddIntimacy{Guid: grown.Guid, AddExp: proto.Int32(fact.Applied), CurExp: grown.GetEat().Exp, Pet: proto.Clone(grown).(*pb.Pet)})

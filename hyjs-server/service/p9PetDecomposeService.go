@@ -25,9 +25,7 @@ func (s *GameService) p9DecomposeRefund(tx *gorm.DB, id int64, pet *pb.Pet) (map
 	donors := []*pb.Pet{}
 	err := tx.First(&investment, "guid=? AND player_id=?", pet.GetGuid(), id).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		base := proto.Clone(pet).(*pb.Pet)
-		base.Eat = &pb.PetEat{Level: proto.Int32(0), Exp: proto.Int32(0)}
-		if !p9BasicDonor(base) || len(pet.GetRandPropList()) != 0 {
+		if !p9ResetPristine(pet) {
 			return nil, nil, errors.New(constUtil.P9PetResetInvestmentMissing)
 		}
 		return pool, donors, nil
@@ -37,6 +35,9 @@ func (s *GameService) p9DecomposeRefund(tx *gorm.DB, id int64, pet *pb.Pet) (map
 	}
 	if investment.Source == "" || json.Unmarshal(investment.Costs, &pool) != nil || pool == nil || json.Unmarshal(investment.Donors, &donors) != nil || donors == nil || len(donors) >= 100 {
 		return nil, nil, errors.New(constUtil.P9PetResetInvestmentInvalid)
+	}
+	if err := p9RequireInvestmentProof(tx, id, pet, &investment); err != nil {
+		return nil, nil, err
 	}
 	for key, n := range pool {
 		if key == "" || strings.ContainsAny(key, ",;\r\n") || strings.HasPrefix(key, "pet_") || n < 1 || n > math.MaxInt32 {

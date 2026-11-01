@@ -239,13 +239,6 @@ func (s *GameService) p9PetHudongAt(ctx context.Context, id int64, request *pb.C
 				gain *= cfg.Multiplier
 			}
 		}
-		// Only a verified untouched base creates a zero-cost investment ledger.
-		// Existing paid ledgers remain exact; unknown old growth keeps its protection.
-		if pet.GetEat().GetLevel() == 0 && pet.GetEat().GetExp() == 0 && len(pet.GetRandPropList()) == 0 && p9BasicDonor(pet) {
-			if err := p9Invest(tx, id, pet.GetGuid(), nil, nil); err != nil {
-				return err
-			}
-		}
 		applied, capped, err := s.p9HudongGain(tx, id, pet, gain)
 		if err != nil {
 			return err
@@ -266,7 +259,7 @@ func (s *GameService) p9PetHudongAt(ctx context.Context, id int64, request *pb.C
 		if err := tx.Save(state).Error; err != nil {
 			return err
 		}
-		if err := p9SavePet(tx, id, g, pet); err != nil {
+		if err := p9SavePet(tx, id, g, pet, true); err != nil {
 			return err
 		}
 		out.Pet = proto.Clone(pet).(*pb.Pet)

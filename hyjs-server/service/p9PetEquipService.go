@@ -119,7 +119,7 @@ func (s *GameService) p9EquipStrength(ctx context.Context, id int64, b *pb.CSPet
 			costs = append(costs, paid...)
 		}
 		equip.StrengthLevel = proto.Int32(equip.GetStrengthLevel() + steps)
-		if err = p9SavePet(tx, id, g, pet); err != nil {
+		if err = p9SavePet(tx, id, g, pet, true); err != nil {
 			return err
 		}
 		if err = p9Invest(tx, id, pet.GetGuid(), costs, nil); err != nil {
@@ -227,7 +227,7 @@ func (s *GameService) p9EquipStrengthAll(ctx context.Context, id int64, b *pb.CS
 		for _, key := range order {
 			out.Cost = append(out.Cost, &pb.BaseResource{Id: proto.String(key), Num: proto.Int32(int32(totals[key]))})
 		}
-		if err = p9SavePet(tx, id, g, pet); err != nil {
+		if err = p9SavePet(tx, id, g, pet, true); err != nil {
 			return err
 		}
 		if err = p9Invest(tx, id, pet.GetGuid(), out.Cost, nil); err != nil {
@@ -271,7 +271,7 @@ func (s *GameService) p9EquipAdvance(ctx context.Context, id int64, b *pb.CSPetE
 			return err
 		}
 		equip.AdvanceLevel = proto.Int32(equip.GetAdvanceLevel() + 1)
-		if err = p9SavePet(tx, id, g, pet); err != nil {
+		if err = p9SavePet(tx, id, g, pet, true); err != nil {
 			return err
 		}
 		if err = p9Invest(tx, id, pet.GetGuid(), costs, nil); err != nil {
@@ -332,7 +332,7 @@ func (s *GameService) p9EquipAwake(ctx context.Context, id int64, b *pb.CSPetEqu
 			}
 		}
 		equip.AwakeLevel = proto.Int32(equip.GetAwakeLevel() + 1)
-		if err = p9SavePet(tx, id, g, pet); err != nil {
+		if err = p9SavePet(tx, id, g, pet, true); err != nil {
 			return err
 		}
 		if err = p9Invest(tx, id, pet.GetGuid(), costs, donors); err != nil {
