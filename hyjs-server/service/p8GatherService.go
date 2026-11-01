@@ -899,7 +899,7 @@ func (s *GameService) p8GatherMutationProjected(ctx context.Context, id int64, o
 		err = runWithGate(shared)
 		if errors.Is(err, constUtil.ErrP1ExclusiveRetry) {
 			reset()
-			err = runWithGate(ctx)
+			err = runWithGate(context.WithValue(ctx, constUtil.P1SharedReadContextKey{}, false))
 		}
 	} else {
 		err = runWithGate(ctx)
@@ -1117,7 +1117,7 @@ func (s *GameService) p8ResourceQuery(ctx context.Context, id int64, request pro
 	err := run(context.WithValue(ctx, constUtil.P1SharedReadContextKey{}, true))
 	if errors.Is(err, constUtil.ErrP1ExclusiveRetry) {
 		out = nil
-		err = run(ctx)
+		err = run(context.WithValue(ctx, constUtil.P1SharedReadContextKey{}, false))
 	}
 	return []proto.Message{out}, err
 }

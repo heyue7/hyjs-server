@@ -284,7 +284,8 @@ func TestP8GatherSharedAndActivityRetryRealMySQL(t *testing.T) {
 	claim := &pb.CSFieldGetResource{}
 	result := make(chan callResult, 1)
 	go func() {
-		messages, err := f.s.p8ClaimGather(requestContext(claim), f.id, claim, 20101)
+		inheritedShared := context.WithValue(requestContext(claim), constUtil.P1SharedReadContextKey{}, true)
+		messages, err := f.s.p8ClaimGather(inheritedShared, f.id, claim, 20101)
 		result <- callResult{messages, err}
 	}()
 	select {
