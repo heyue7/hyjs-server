@@ -312,9 +312,28 @@ func saveProfile(tx *gorm.DB, row *db.Profile, player *pb.Player, game *model.Ga
 	return saveProfileAgainst(tx, row, player, game, nil)
 }
 
+// saveProfileWithCraftPower 在保存阶段一次读取当前公会源并计算装备变动后的战力。
+func saveProfileWithCraftPower(tx *gorm.DB, row *db.Profile, player *pb.Player, game *model.GameState, service *GameService) error {
+	if bound, ok := tx.Statement.Context.Value(constUtil.GameServiceContextKey).(*GameService); ok && bound == service {
+		return saveProfileAgainstWithCraftPower(tx, row, player, game, nil, true)
+	}
+	// 非协议调用可能没有绑定服务；保留原有显式投影及后续存档钩子行为。
+	if err := service.PrepareP5GuildPrayerProperties(tx.Statement.Context, tx, player, game, p13UFNow(tx.Statement.Context)); err != nil {
+		return err
+	}
+	if err := service.P8RefreshCraftPower(player, game); err != nil {
+		return err
+	}
+	return saveProfile(tx, row, player, game)
+}
+
 // saveProfileAgainst compares hot-path output with the actual persisted row,
 // before resource recovery rewrites the transaction's consumption baseline.
 func saveProfileAgainst(tx *gorm.DB, row *db.Profile, player *pb.Player, game *model.GameState, persisted *db.Profile) error {
+	return saveProfileAgainstWithCraftPower(tx, row, player, game, persisted, false)
+}
+
+func saveProfileAgainstWithCraftPower(tx *gorm.DB, row *db.Profile, player *pb.Player, game *model.GameState, persisted *db.Profile, forceCraftPower bool) error {
 	if !game.GGOCreditLoaded {
 		if err := projectGGOCredit(row, game); err != nil {
 			return err
@@ -343,7 +362,7 @@ func saveProfileAgainst(tx *gorm.DB, row *db.Profile, player *pb.Player, game *m
 	}
 	// 在成功业务事务内记录真实事件并冻结活动进度，失败随存档一起回滚。
 	if svc, ok := tx.Statement.Context.Value(constUtil.GameServiceContextKey).(*GameService); ok {
-		if err := svc.RefreshP5GuildPrayerPower(tx.Statement.Context, tx, player, game, p13UFNow(tx.Statement.Context)); err != nil {
+		if err := svc.refreshP5GuildPrayerPower(tx.Statement.Context, tx, player, game, p13UFNow(tx.Statement.Context), forceCraftPower); err != nil {
 			return err
 		}
 		if err := svc.GuardP7ExpeditionSave(tx, row.Id, game); err != nil {

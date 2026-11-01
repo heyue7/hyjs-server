@@ -54,12 +54,17 @@ func (s *GameService) PrepareP5GuildPrayerProperties(ctx context.Context, tx *go
 // actual pre-mutation tech source or historical prayer. Inactive default-off
 // players retain their cached state; membership changes remove active bonuses.
 func (s *GameService) RefreshP5GuildPrayerPower(ctx context.Context, tx *gorm.DB, player *pb.Player, game *model.GameState, now time.Time) error {
+	return s.refreshP5GuildPrayerPower(ctx, tx, player, game, now, false)
+}
+
+// force 用于已改变装备属性的调用，同一当前公会快照下必须重新计算战力。
+func (s *GameService) refreshP5GuildPrayerPower(ctx context.Context, tx *gorm.DB, player *pb.Player, game *model.GameState, now time.Time, force bool) error {
 	// Preserve the actual pre-mutation source only within this transaction.
 	previousTech := game != nil && game.GuildPrayerProjection != nil && game.GuildPrayerProjection.TechSourceHash != ""
 	if err := s.PrepareP5GuildPrayerProperties(ctx, tx, player, game, now); err != nil {
 		return err
 	}
-	if game.GuildPrayerProjection.SourceHash == "" && game.GuildPrayerProjection.TechSourceHash == "" && !previousTech {
+	if !force && game.GuildPrayerProjection.SourceHash == "" && game.GuildPrayerProjection.TechSourceHash == "" && !previousTech {
 		owner := s.p10ClientOwner()
 		if (!owner.guildCoreSchemaReady.Load() || !owner.guildPrayerSchemaReady.Load()) && !gameSchemaHasTable(tx, &db.P13GuildPrayerRoll{}) {
 			return nil

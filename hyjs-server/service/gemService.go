@@ -89,8 +89,11 @@ func (s *GameService) gemMutation(ctx context.Context, id int64, opcode int32, s
 		if err != nil {
 			return err
 		}
-		if err = s.PrepareP5GuildPrayerProperties(ctx, tx, player, game, p13UFNow(ctx)); err != nil {
-			return err
+		equipmentChange := opcode == constUtil.GemMountOpcode || opcode == constUtil.GemMountChangeOpcode || opcode == constUtil.GemUnmountOpcode
+		if !equipmentChange {
+			if err = s.PrepareP5GuildPrayerProperties(ctx, tx, player, game, p13UFNow(ctx)); err != nil {
+				return err
+			}
 		}
 		before, err := s.P8GemTransferSnapshot(game, request)
 		if err != nil {
@@ -102,12 +105,12 @@ func (s *GameService) gemMutation(ctx context.Context, id int64, opcode int32, s
 		if err = s.P8RecordGemTransfer(game, before); err != nil {
 			return err
 		}
-		if opcode == constUtil.GemMountOpcode || opcode == constUtil.GemMountChangeOpcode || opcode == constUtil.GemUnmountOpcode {
-			if err = s.P8RefreshCraftPower(player, game); err != nil {
-				return err
-			}
+		if equipmentChange {
+			err = saveProfileWithCraftPower(tx, &row, player, game, s)
+		} else {
+			err = saveProfile(tx, &row, player, game)
 		}
-		if err = saveProfile(tx, &row, player, game); err != nil {
+		if err != nil {
 			return err
 		}
 		if err = tx.Save(&state).Error; err != nil {
