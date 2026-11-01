@@ -469,6 +469,12 @@ func updateFieldProfileWithTx(ctx context.Context, id int64, fn func(*gorm.DB, *
 	default:
 		return updateProfileWithTx(ctx, id, fn)
 	}
+	return updateProfileWithSharedPeriods(ctx, id, fn)
+}
+
+// updateProfileWithSharedPeriods 仅供确认重试安全的完整事务使用。
+// 首次需要创建活动事实或冻结窗口时，先回滚全部事务，再按原独占顺序重试。
+func updateProfileWithSharedPeriods(ctx context.Context, id int64, fn func(*gorm.DB, *pb.Player, *model.GameState) error) error {
 	shared := context.WithValue(ctx, constUtil.P1SharedReadContextKey{}, true)
 	err := updateProfileWithTx(shared, id, fn)
 	if errors.Is(err, constUtil.ErrP1ExclusiveRetry) {

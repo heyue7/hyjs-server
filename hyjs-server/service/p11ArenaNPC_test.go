@@ -29,7 +29,7 @@ func TestP11ArenaVirtualCurveFifteenWinsAndBoundedRewards(t *testing.T) {
 	if len(ranks) != 15 || rank != 500 {
 		t.Fatal("fifteen-win boundary", ranks)
 	}
-	for current, expected := range map[int64]int64{501: 500, 500: 450, 101: 100, 100: 95, 11: 10, 10: 9, 2: 1, 1: 1} {
+	for current, expected := range map[int64]int64{501: 498, 500: 450, 101: 98, 100: 95, 11: 8, 10: 7, 4: 1, 3: 1, 2: 1, 1: 1} {
 		if got := p11ArenaBestTarget(current); got != expected {
 			t.Fatal(current, got, expected)
 		}

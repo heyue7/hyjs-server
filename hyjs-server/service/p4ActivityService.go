@@ -208,24 +208,31 @@ func (s *GameService) RecordP4Login(ctx context.Context, id int64) error {
 	if !s.P4Ready {
 		return nil
 	}
-	return db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := ServerGameClockGuardTransaction(tx); err != nil {
-			return err
-		}
+	run := func(attemptCtx context.Context) error {
+		return db.GetIns().WithContext(attemptCtx).Transaction(func(tx *gorm.DB) error {
+			if err := ServerGameClockGuardTransaction(tx); err != nil {
+				return err
+			}
 
-		var row db.Profile
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&row, id).Error; err != nil {
-			return err
-		}
-		p, g, err := decodeProfileForCalendarUpdate(tx, &row)
-		if err != nil {
-			return err
-		}
-		if _, err := p1LockPeriods(tx); err != nil {
-			return err
-		}
-		return s.RecordP4Save(tx, &row, p, g)
-	}, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
+			var row db.Profile
+			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&row, id).Error; err != nil {
+				return err
+			}
+			p, g, err := decodeProfileForCalendarUpdate(tx, &row)
+			if err != nil {
+				return err
+			}
+			if _, err := p1LockPeriods(tx); err != nil {
+				return err
+			}
+			return s.RecordP4Save(tx, &row, p, g)
+		}, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
+	}
+	err := run(context.WithValue(ctx, constUtil.P1SharedReadContextKey{}, true))
+	if errors.Is(err, constUtil.ErrP1ExclusiveRetry) {
+		return run(ctx)
+	}
+	return err
 }
 
 // P4ActivityTabs 只投放规则已落地的入口；原生同类型只展示一个P4实例，36登记独立保留。

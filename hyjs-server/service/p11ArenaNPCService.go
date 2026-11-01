@@ -102,18 +102,18 @@ func p11ArenaHasHistory(tx *gorm.DB, id int64) (bool, error) {
 // p11ArenaBestTarget publishes the fastest permitted jump. Candidate filling
 // never adds a higher target beyond this boundary merely to fill nine cards.
 func p11ArenaBestTarget(rank int64) int64 {
+	var best int64
 	switch {
 	case rank > 500:
-		return max(int64(500), rank*3/4)
+		best = max(int64(500), rank*3/4)
 	case rank > 100:
-		return max(int64(100), rank*9/10)
+		best = max(int64(100), rank*9/10)
 	case rank > 10:
-		return max(int64(10), rank*95/100)
-	case rank > 1:
-		return rank - 1
+		best = max(int64(10), rank*95/100)
 	default:
-		return 1
+		best = max(int64(1), rank-1)
 	}
+	return min(best, max(int64(1), rank-3))
 }
 
 // p11ArenaNPCState is a nonpersistent projection from original hero rows and
@@ -219,12 +219,21 @@ func (s *GameService) p11ArenaCandidates(tx *gorm.DB, cfg *db.P11ArenaPolicy, vi
 		return result, nil
 	}
 	best := p11ArenaBestTarget(member.Rank)
-	better := int(cfg.MatchCount) - 2
-	if better < 1 {
-		better = 1
+	// 留出前三个更高名次，剩余名额继续覆盖原有最快提升目标。
+	matchCount := max(3, int(cfg.MatchCount))
+	better := max(3, matchCount-2)
+	for distance := int64(1); distance <= 3 && len(result) < better; distance++ {
+		if err := add(member.Rank - distance); err != nil {
+			return nil, err
+		}
+	}
+	if len(result) < better {
+		if err := add(best); err != nil {
+			return nil, err
+		}
 	}
 	span := member.Rank - best
-	for i := 0; i < better && span > 0; i++ {
+	for i := 0; i < better && span > 0 && len(result) < better; i++ {
 		distance := int64(1)
 		if better > 1 {
 			distance += (span - 1) * int64(i) / int64(better-1)
@@ -233,18 +242,18 @@ func (s *GameService) p11ArenaCandidates(tx *gorm.DB, cfg *db.P11ArenaPolicy, vi
 			return nil, err
 		}
 	}
-	for rank := member.Rank + 1; rank < cfg.NextRank && rank <= member.Rank+2 && len(result) < int(cfg.MatchCount); rank++ {
+	for rank := member.Rank + 1; rank < cfg.NextRank && rank <= member.Rank+2 && len(result) < matchCount; rank++ {
 		if err := add(rank); err != nil {
 			return nil, err
 		}
 	}
-	for distance := int64(1); len(result) < int(cfg.MatchCount) && (member.Rank-distance >= best || member.Rank+distance < cfg.NextRank); distance++ {
+	for distance := int64(1); len(result) < matchCount && (member.Rank-distance >= best || member.Rank+distance < cfg.NextRank); distance++ {
 		if member.Rank-distance >= best {
 			if err := add(member.Rank - distance); err != nil {
 				return nil, err
 			}
 		}
-		if len(result) < int(cfg.MatchCount) {
+		if len(result) < matchCount {
 			if err := add(member.Rank + distance); err != nil {
 				return nil, err
 			}

@@ -219,7 +219,7 @@ func (s *GameService) RecordP1Login(ctx context.Context, id int64) error {
 		return nil
 	}
 	now := LocalPlayNow(ctx)
-	return updateProfileWithTx(ctx, id, func(tx *gorm.DB, _ *pb.Player, _ *model.GameState) error {
+	return updateProfileWithSharedPeriods(ctx, id, func(tx *gorm.DB, _ *pb.Player, _ *model.GameState) error {
 		if err := s.RecordP1Event(tx, id, "login:"+p1Day(now), constUtil.P1EventLoginDay, 1, now); err != nil {
 			return err
 		}
@@ -428,6 +428,14 @@ func (s *GameService) p1ReconcileLoginPeriods(tx *gorm.DB, id int64, now time.Ti
 		return err
 	}
 	for _, live := range periods {
+		// 已启用且已知不属于当前登录累计窗口的实例无需查询日程归属。
+		// 损坏快照仍沿用原校验链，冻结窗口以快照时间和类型为准。
+		if live.Enabled {
+			cfg, snapshotErr := p1PeriodSnapshot(live)
+			if snapshotErr == nil && (cfg.Kind != constUtil.P1EventLoginDay || cfg.Mode != "cumulative" || now.UnixMilli() < cfg.StartAt || now.UnixMilli() >= cfg.EndAt) {
+				continue
+			}
+		}
 		allowed, err := localPlayActivityVisible(tx, live.ID)
 		if err != nil {
 			return err
