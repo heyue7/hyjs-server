@@ -49,11 +49,23 @@ func p1LockPeriods(tx *gorm.DB) ([]db.PeriodInstance, error) {
 	return rows, err
 }
 
+// 请求开始时只建立与完整读取相同的主键锁；实际事件发生时再加载规则正文。
+func p1LockPeriodIDs(tx *gorm.DB) error {
+	var rows []struct{ ID string }
+	strength := "UPDATE"
+	if p1SharedRead(tx) {
+		strength = "SHARE"
+	}
+	if tx.Dialector.Name() == "mysql" {
+		return tx.Raw("SELECT id FROM p1_period_instances FORCE INDEX (PRIMARY) ORDER BY id ASC FOR " + strength).Scan(&rows).Error
+	}
+	return tx.Model(&db.PeriodInstance{}).Select("id").Clauses(clause.Locking{Strength: strength}).Order("id ASC").Find(&rows).Error
+}
+
 // lockProfilePeriods 在角色行锁之后、域动作之前固定公共窗口加锁顺序。
 func lockProfilePeriods(tx *gorm.DB) error {
 	if s, ok := tx.Statement.Context.Value(constUtil.GameServiceContextKey).(*GameService); ok && s.P1Ready {
-		_, err := p1LockPeriods(tx)
-		return err
+		return p1LockPeriodIDs(tx)
 	}
 	return nil
 }

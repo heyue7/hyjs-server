@@ -87,6 +87,13 @@ func TestP1SharedReadMySQLLockOrderAndMode(t *testing.T) {
 			if !strings.Contains(query, "FORCE INDEX (PRIMARY) ORDER BY id ASC "+tc.expected) {
 				t.Fatalf("incorrect activity lock or order: %s", query)
 			}
+			if err := p1LockPeriodIDs(database.WithContext(ctx)); err != nil {
+				t.Fatal(err)
+			}
+			narrow := connector.queries[before+1]
+			if narrow != "SELECT id FROM p1_period_instances FORCE INDEX (PRIMARY) ORDER BY id ASC "+tc.expected {
+				t.Fatalf("activity prelock lost its primary order, mode or narrow projection: %s", narrow)
+			}
 		})
 	}
 }
