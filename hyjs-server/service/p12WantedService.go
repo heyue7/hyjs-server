@@ -785,7 +785,6 @@ func (s *GameService) p12WantedReacquireRejected(tx *gorm.DB, id int64, fight *d
 
 func (s *GameService) p12WantedEnd(ctx context.Context, id int64, request *pb.CSRebelFightEnd, now time.Time) ([]proto.Message, error) {
 	var out pb.SCRebelFightEnd
-	var recordingRejected bool
 	err := s.p12WantedProfile(ctx, id, func(tx *gorm.DB, _ *db.Profile, player *pb.Player, game *model.GameState) error {
 		if request.GetFightId() == "" || request.OptRecord == nil || request.BattlePlayer != nil {
 			return errors.New(constUtil.P12WantedInvalid)
@@ -829,25 +828,30 @@ func (s *GameService) p12WantedEnd(ctx context.Context, id int64, request *pb.CS
 		if json.Unmarshal([]byte(fight.InputJSON), &input) != nil || json.Unmarshal([]byte(fight.TerminalJSON), &terminal) != nil || ValidateP12WantedCertifiedReceipt(&input, &terminal) != nil {
 			return errors.New(constUtil.P12WantedInvalid)
 		}
+		fallback := false
 		if !proto.Equal(request.OptRecord, terminal.OriginalOperates) {
 			recorded, err := s.computeP12WantedRecorded(ctx, &input, request.OptRecord)
 			if err != nil {
-				// Only a rejected recording can be re-fought. Invalid snapshots,
-				// committed receipt conflicts and transient failures stay separate.
-				var mismatch *p12WantedRecordingMismatchError
-				recordingRejected = errors.As(err, &mismatch)
-				return err
+				if p12WantedCanFallbackRecording(err) {
+					if err = p12WantedStoreAutomaticFallback(&fight, request); err != nil {
+						return err
+					}
+					fallback = true
+				} else {
+					return err
+				}
+			} else {
+				if err := p12WantedStoreRecorded(&fight, request, recorded); err != nil {
+					return err
+				}
+				terminal = *recorded
 			}
-			if err := p12WantedStoreRecorded(&fight, request, recorded); err != nil {
-				return err
-			}
-			terminal = *recorded
 		}
 		winner := int32(0)
 		if terminal.Outcome.Winner == 0 {
 			winner = 1
 		}
-		if request.GetResult() != winner {
+		if !fallback && request.GetResult() != winner {
 			return errors.New(constUtil.P12WantedInvalid)
 		}
 		var instance db.P12WantedInstance
@@ -937,12 +941,9 @@ func (s *GameService) p12WantedEnd(ctx context.Context, id int64, request *pb.CS
 		return nil
 	})
 	if err != nil {
-		pending, metadataErr := recordP12WantedRejectedEnd(ctx, id, request.GetFightId(), now, err)
+		_, metadataErr := recordP12WantedRejectedEnd(ctx, id, request.GetFightId(), now, err)
 		if metadataErr != nil {
 			return nil, fmt.Errorf("%w: rejected battle recovery metadata: %v", err, metadataErr)
-		}
-		if recordingRejected && pending {
-			return nil, &P12WantedRetryableEndError{cause: err}
 		}
 		return nil, err
 	}

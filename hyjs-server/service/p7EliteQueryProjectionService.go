@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"strings"
 	"time"
 
 	"google.golang.org/protobuf/proto"
@@ -305,15 +306,25 @@ func (q *p7EliteQueryProjection) runWinsBetween(from, floor int32) (map[int32]p7
 	if err != nil {
 		return nil, err
 	}
+	var relevant []db.P7ReRushSweep
 	for _, sweep := range q.sweeps {
-		if sweep.Floor < from || sweep.Floor > floor {
-			continue
+		if sweep.Floor >= from && sweep.Floor <= floor {
+			relevant = append(relevant, sweep)
 		}
-		history, e := q.acceptedWins(0, sweep.Floor, sweep.Floor, &sweep.SourceFight)
-		if e != nil {
-			return nil, e
+	}
+	powerWins, err := p7ReRushPowerWinsForSweeps(q.tx, q.state.PlayerID, relevant)
+	if err != nil {
+		return nil, err
+	}
+	for _, sweep := range relevant {
+		win := powerWins[p7ReRushSweepKey{sweep.RunID, sweep.Floor}]
+		if !strings.HasPrefix(sweep.SourceFight, constUtil.P7ReRushPowerSource) {
+			history, e := q.acceptedWins(0, sweep.Floor, sweep.Floor, &sweep.SourceFight)
+			if e != nil {
+				return nil, e
+			}
+			win = history[sweep.Floor]
 		}
-		win := history[sweep.Floor]
 		if win.Star != sweep.Star || win.Fight != sweep.SourceFight || win.Hash != sweep.SourceHash || wins[sweep.Floor].Star != 0 {
 			return nil, errors.New("Re试炼扫荡资格来源冲突")
 		}
@@ -378,6 +389,48 @@ func (q *p7EliteQueryProjection) prerequisite(s *GameService, stage db.P7RushSta
 			completed[fight.RunID] = map[int32]bool{}
 		}
 		completed[fight.RunID][rule.Floor] = true
+	}
+	for _, run := range completed {
+		if len(run) == int(floor) {
+			return true, nil
+		}
+	}
+	if stage.Source == constUtil.P7ReRushSource {
+		// 旧轮次可能由真实战斗和扫荡共同组成，按来源证明合并后保持整轮连续性。
+		var sweeps []db.P7ReRushSweep
+		if err := q.tx.Where("player_id=? AND floor BETWEEN ? AND ?", q.state.PlayerID, 1, floor).Find(&sweeps).Error; err != nil {
+			return false, err
+		}
+		powerWins, err := p7ReRushPowerWinsForSweeps(q.tx, q.state.PlayerID, sweeps)
+		if err != nil {
+			return false, err
+		}
+		accepted := map[string]p7ReRushWin{}
+		for _, sweep := range sweeps {
+			win := powerWins[p7ReRushSweepKey{sweep.RunID, sweep.Floor}]
+			if !strings.HasPrefix(sweep.SourceFight, constUtil.P7ReRushPowerSource) {
+				var found bool
+				win, found = accepted[sweep.SourceFight]
+				if !found {
+					history, err := q.acceptedWins(0, sweep.Floor, sweep.Floor, &sweep.SourceFight)
+					if err != nil {
+						return false, err
+					}
+					win = history[sweep.Floor]
+					accepted[sweep.SourceFight] = win
+				}
+			}
+			if sweep.RunID <= 0 || win.Floor != sweep.Floor || win.Star != sweep.Star || win.Fight != sweep.SourceFight || win.Hash != sweep.SourceHash {
+				return false, errors.New("Re试炼历史扫荡资格来源冲突")
+			}
+			if completed[sweep.RunID] == nil {
+				completed[sweep.RunID] = map[int32]bool{}
+			}
+			if completed[sweep.RunID][sweep.Floor] {
+				return false, errors.New("Re试炼同轮战斗与扫荡来源冲突")
+			}
+			completed[sweep.RunID][sweep.Floor] = true
+		}
 	}
 	for _, run := range completed {
 		if len(run) == int(floor) {

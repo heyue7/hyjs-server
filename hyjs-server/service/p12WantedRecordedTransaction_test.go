@@ -89,10 +89,9 @@ func TestP12Wanted65ManualAutoEndColdConflict(t *testing.T) {
 			t.Fatal("transient error released lease", err)
 		}
 	}
-	invalid := proto.Clone(end).(*pb.CSRebelFightEnd)
-	invalid.OptRecord.DefenderTotalLeftHp = proto.Float64(invalid.OptRecord.GetDefenderTotalLeftHp() + 1)
-	if _, err = f.s.p12WantedEnd(endCtx, f.id, invalid, now); err == nil {
-		t.Fatal("forged terminal accepted")
+	// 模拟升级前的拒绝记录，验证新版本仍能恢复原有付费战斗。
+	if pending, err := recordP12WantedRejectedEnd(f.ctx, f.id, fight.ID, now, errors.New(constUtil.P6ReplayConflict)); err != nil || !pending {
+		t.Fatal("legacy rejection fixture", err)
 	}
 	unchanged, _ := f.profile(t)
 	if !proto.Equal(spent, unchanged) {

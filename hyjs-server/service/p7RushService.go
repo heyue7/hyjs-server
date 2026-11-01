@@ -256,13 +256,11 @@ func (s *GameService) p7StagePrerequisite(tx *gorm.DB, id int64, stage db.P7Rush
 		return false, nil
 	}
 	if stage.Source == constUtil.P7ReRushSource {
-		wins, err := p7ReRushRunWins(tx, &state, 1, floor)
+		projection, err := p7NewEliteQueryProjection(tx, &state)
 		if err != nil {
 			return false, err
 		}
-		if len(wins) == int(floor) {
-			return true, nil
-		}
+		return projection.prerequisite(s, stage)
 	}
 	var fights []db.P7RushFight
 	if err = tx.Where("player_id=? AND kind=? AND status=? AND diagnostic=? AND run_id > 0", id, constUtil.P7RushTrial, constUtil.P7RushSettled, false).Find(&fights).Error; err != nil {

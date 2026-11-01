@@ -35,14 +35,10 @@ func TestP12Wanted84LateRejectedEndKeepsRecoveredLease(t *testing.T) {
 		t.Fatal("paid recovery did not return the original Start", err)
 	}
 
-	// Repeat the same failed End after reacquisition, modeling a late request.
-	bad := proto.Clone(end).(*pb.CSRebelFightEnd)
-	bad.OptRecord.DefenderTotalLeftHp = proto.Float64(bad.OptRecord.GetDefenderTotalLeftHp() + 1)
-	badCtx := context.WithValue(f.ctx, constUtil.GameRequestContextKey, bad)
-	_, err = f.s.p12WantedEnd(badCtx, f.id, bad, now.Add(time.Second))
-	var retry *P12WantedRetryableEndError
-	if !errors.As(err, &retry) {
-		t.Fatal("late rejected End lost its recoverable classification", err)
+	// 模拟旧请求迟到时的拒绝元数据，不覆盖已经重新取得的租约。
+	pending, err := recordP12WantedRejectedEnd(f.ctx, f.id, start.GetFightId(), now.Add(time.Second), errors.New(constUtil.P6ReplayConflict))
+	if err != nil || !pending {
+		t.Fatal("late legacy rejection metadata", err)
 	}
 	var afterLate db.P12WantedFight
 	if err = db.GetIns().First(&afterLate, "id=?", start.GetFightId()).Error; err != nil {

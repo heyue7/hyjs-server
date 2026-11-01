@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"strings"
 
 	"google.golang.org/protobuf/proto"
 	"gorm.io/gorm"
@@ -112,12 +113,19 @@ func p7ReRushRunWins(tx *gorm.DB, state *db.P7RushState, from, to int32) (map[in
 	if err = tx.Where("player_id=? AND run_id=? AND floor BETWEEN ? AND ?", state.PlayerID, state.RunID, from, to).Find(&sweeps).Error; err != nil {
 		return nil, err
 	}
+	powerWins, err := p7ReRushPowerWinsForSweeps(tx, state.PlayerID, sweeps)
+	if err != nil {
+		return nil, err
+	}
 	for _, sweep := range sweeps {
-		history, err := p7ReRushAcceptedWins(tx, state.PlayerID, 0, sweep.Floor, sweep.Floor, sweep.SourceFight)
-		if err != nil {
-			return nil, err
+		win := powerWins[p7ReRushSweepKey{sweep.RunID, sweep.Floor}]
+		if !strings.HasPrefix(sweep.SourceFight, constUtil.P7ReRushPowerSource) {
+			history, err := p7ReRushAcceptedWins(tx, state.PlayerID, 0, sweep.Floor, sweep.Floor, sweep.SourceFight)
+			if err != nil {
+				return nil, err
+			}
+			win = history[sweep.Floor]
 		}
-		win := history[sweep.Floor]
 		if win.Star != sweep.Star || win.Fight != sweep.SourceFight || win.Hash != sweep.SourceHash || wins[sweep.Floor].Star != 0 {
 			return nil, errors.New("Re试炼扫荡资格来源冲突")
 		}

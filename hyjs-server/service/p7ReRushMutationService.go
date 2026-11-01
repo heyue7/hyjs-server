@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"time"
 
 	"google.golang.org/protobuf/proto"
@@ -210,8 +211,8 @@ func (s *GameService) p7ReRushSectionMutation(tx *gorm.DB, player *pb.Player, ga
 	return nil, errors.New("Re试炼区段消息不匹配")
 }
 
-// p7ReRushSweep 复用历史真实最高难度资格；三连要求三星，至最高每次最多三层。
-// Re 的扫荡属于已经通关内容的领取入口，不调用固定胜者战斗或制造新的原引擎记录。
+// p7ReRushSweep 复用历史资格；一键三星也可按服务端阵容战力取得新层资格。
+// 每批最多三层，战力证明和奖励在同一事务提交，不制造战斗录像。
 func (s *GameService) p7ReRushSweep(tx *gorm.DB, player *pb.Player, game *model.GameState, state *db.P7RushState, three bool) (proto.Message, error) {
 	legacy, err := s.p7ReRushLegacyFirstSection(tx, state)
 	if err != nil {
@@ -235,12 +236,72 @@ func (s *GameService) p7ReRushSweep(tx *gorm.DB, player *pb.Player, game *model.
 	if err != nil {
 		return nil, err
 	}
+	powerHistory, err := p7ReRushHistoricalPowerWins(tx, state.PlayerID, state.Floor, min(state.Floor+2, constUtil.P7ReRushLastFloor))
+	if err != nil {
+		return nil, err
+	}
+	for floor, win := range powerHistory {
+		if wins[floor].Star < win.Star {
+			wins[floor] = win
+		}
+	}
+	var stages map[int32]db.P7RushStageRule
+	var power int32
+	var partyBytes []byte
 	result3, resultTop := &pb.SCRush3Hit{}, &pb.SCRushToTop{}
 	for i := 0; i < 3 && state.Floor <= constUtil.P7ReRushLastFloor; i++ {
 		floor := state.Floor
 		win := wins[floor]
+		if three && win.Star != 3 {
+			if stages == nil {
+				party, e := s.battlePlayer(player, game)
+				if e != nil {
+					return nil, e
+				}
+				if len(party.GetFormation()) == 0 {
+					break
+				}
+				power, e = s.formationFightPowerFromParty(party)
+				if e != nil {
+					return nil, e
+				}
+				partyBytes, e = proto.MarshalOptions{Deterministic: true}.Marshal(party)
+				if e != nil {
+					return nil, e
+				}
+				var ids []string
+				for candidate := floor; candidate <= min(floor+2, constUtil.P7ReRushLastFloor); candidate++ {
+					ids = append(ids, fmt.Sprintf("re-rush:%d:3", candidate))
+				}
+				var rows []db.P7RushStageRule
+				if e = tx.Where("id IN ?", ids).Find(&rows).Error; e != nil {
+					return nil, e
+				}
+				stages = make(map[int32]db.P7RushStageRule, len(rows))
+				for _, stage := range rows {
+					stages[stage.Floor] = stage
+				}
+			}
+			stage, found := stages[floor]
+			if !found || !stage.Enabled || stage.Kind != constUtil.P7RushTrial || stage.Source != constUtil.P7ReRushSource || stage.Floor != floor || stage.Star != 3 || player.GetLevel() < stage.MinLevel || math.IsNaN(stage.RecommendedPower) || math.IsInf(stage.RecommendedPower, 0) || stage.RecommendedPower <= 0 {
+				return nil, errors.New("试炼三星战力配置无效")
+			}
+			if _, e := s.validateP7Stage(stage); e != nil {
+				return nil, e
+			}
+			if float64(power) < stage.RecommendedPower {
+				break
+			}
+			win, err = p7ReRushCreatePowerProof(tx, state, stage, partyBytes, power)
+			if err != nil {
+				return nil, err
+			}
+		}
 		if win.Star < 1 || three && win.Star != 3 {
 			break
+		}
+		if state.TotalStars > math.MaxInt32-win.Star {
+			return nil, errors.New("试炼星数溢出")
 		}
 		gain, err := s.GrantFixedReward(player, game, fmt.Sprintf("coin,%d;point,%d", (2000+floor*500)*win.Star, trial82FloorPoints(floor, win.Star)))
 		if err != nil {
@@ -252,6 +313,7 @@ func (s *GameService) p7ReRushSweep(tx *gorm.DB, player *pb.Player, game *model.
 		state.Floor++
 		state.TotalStars += win.Star
 		state.RecordStars = max(state.RecordStars, state.TotalStars)
+		state.HighFloor = max(state.HighFloor, floor)
 		// 扫荡仍计入本轮真实获得的星数，事件来源独立于新的战斗结算。
 		source := fmt.Sprintf("re-rush-sweep:%d:%d", state.RunID, floor)
 		if err = s.RecordP1Event(tx, state.PlayerID, source, constUtil.P7RushStarEvent, int64(state.TotalStars), LocalPlayNow(tx.Statement.Context)); err != nil {

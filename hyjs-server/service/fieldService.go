@@ -558,6 +558,12 @@ func (s *GameService) fieldScene(ctx context.Context, id int64, login bool) ([]p
 			return err
 		}
 		self := &pb.MovePlayer{Position: g.Position, Info: &pb.MovePlayerInfo{ServerId: proto.Int32(int32(s.OriginalServerID())), PlayerId: proto.Int64(id), PlayerName: player.Name, Level: player.Level, WarId: proto.String(heroID), ServerName: proto.String("本地测试"), PlayerSide: side}}
+		guildName, err := s.p10SceneGuildName(tx, id)
+		if err != nil {
+			return err
+		}
+		self.Info.UnionName = proto.String(guildName)
+		self.Info.Title = proto.String(s.p10SceneTitle(g, p13UFNow(ctx)))
 		if s.P9PetsReady {
 			pet, err := s.P9FollowPetInfo(g)
 			if err != nil {

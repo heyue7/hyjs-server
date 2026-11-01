@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"strings"
 	"testing"
 	"time"
 
@@ -53,16 +52,12 @@ func TestP12Wanted84RejectedRecordingAndUnknownReceiptRecovery(t *testing.T) {
 		// The original client can omit a zero result; preserve that presence.
 		end.Result = nil
 	}
-	bad := proto.Clone(end).(*pb.CSRebelFightEnd)
-	bad.OptRecord.DefenderTotalLeftHp = proto.Float64(bad.OptRecord.GetDefenderTotalLeftHp() + 1)
-	endCtx := context.WithValue(f.ctx, constUtil.GameRequestContextKey, bad)
-	_, err = f.s.p12WantedEnd(endCtx, f.id, bad, now)
+	endCtx := context.WithValue(f.ctx, constUtil.GameRequestContextKey, end)
+	// 旧版本留下的拒绝记录仍可恢复；新录像冲突由服务端终局直接结算。
+	pendingBefore, err := recordP12WantedRejectedEnd(f.ctx, f.id, fight.ID, now, errors.New(constUtil.P6ReplayConflict))
 	var replay *P12WantedRetryableEndError
-	var mismatch *p6CompletedRecordedMismatchError
-	if !errors.As(err, &replay) || !errors.As(err, &mismatch) ||
-		!strings.HasPrefix(err.Error(), constUtil.P6ReplayConflict+": 原录像终局或完整技能记录不符") ||
-		replay.Error() != mismatch.Error() || errors.Unwrap(replay) == nil || errors.Unwrap(replay).Error() != replay.Error() {
-		t.Fatal("recording rejection lost its original error or pending classification", err)
+	if err != nil || !pendingBefore {
+		t.Fatal("legacy recording rejection fixture", err)
 	}
 	var rejected db.P12WantedFight
 	var sameInstance db.P12WantedInstance
@@ -145,10 +140,9 @@ func TestP12Wanted84RejectedRecordingAndUnknownReceiptRecovery(t *testing.T) {
 	if err = db.GetIns().Model(&db.P12WantedFight{}).Where("id=?", fight.ID).Update("input_hash", fight.InputHash).Error; err != nil {
 		t.Fatal(err)
 	}
-	_, err = f.s.p12WantedEnd(endCtx, f.id, bad, now)
-	replay = nil
-	if !errors.As(err, &replay) {
-		t.Fatal("restored original data did not retain a verifiable recording rejection", err)
+	pendingBefore, err = recordP12WantedRejectedEnd(f.ctx, f.id, fight.ID, now, errors.New(constUtil.P6ReplayConflict))
+	if err != nil || !pendingBefore {
+		t.Fatal("restored legacy rejection metadata", err)
 	}
 	if _, err = f.s.p12WantedStart(recoveryCtx, f.id, recovery, 984002, now); err != nil {
 		t.Fatal("second recording rejection did not reacquire its paid lease", err)

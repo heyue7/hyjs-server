@@ -40,6 +40,12 @@ func (s *GameService) P9OwnMovePlayerInfo(ctx context.Context, id int64) ([]prot
 			return err
 		}
 		info := &pb.MovePlayerInfo{ServerId: proto.Int32(1), PlayerId: proto.Int64(id), PlayerName: p.Name, Level: p.Level, WarId: proto.String(heroID), ServerName: proto.String("本地测试"), PetId: proto.String(pet.GetPetId())}
+		guildName, err := s.p10SceneGuildName(tx, id)
+		if err != nil {
+			return err
+		}
+		info.UnionName = proto.String(guildName)
+		info.Title = proto.String(s.p10SceneTitle(g, p13UFNow(ctx)))
 		if g.Field != nil {
 			info.PlayerSide = g.Field.Side
 		}

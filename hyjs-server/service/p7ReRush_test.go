@@ -226,9 +226,16 @@ func TestP7ReRushMySQLFirstSectionOriginalEndRewardAdditionResetSweepCold(t *tes
 	}
 	call(last, 0)
 	call(&pb.CSRushResetChallengeCount{}, 19423)
+	actualPower, err := f.s.formationFightPower(current, currentGame)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = db.GetIns().Model(&db.P7RushStageRule{}).Where("id=?", "re-rush:1:3").Update("recommended_power", float64(actualPower)+1).Error; err != nil {
+		t.Fatal(err)
+	}
 	invalidSweep := call(&pb.CSRush3Hit{}, 19424)[0].(*pb.SCRush3Hit)
 	if invalidSweep.GetIsValid() != 0 || len(invalidSweep.Gain) != 0 {
-		t.Fatal("one-star historic source allowed three-star sweep")
+		t.Fatal("one-star historic source and insufficient power allowed three-star sweep")
 	}
 	sweep := call(&pb.CSRushToTop{}, 19425)[0].(*pb.SCRushToTop)
 	if len(sweep.SweepInfo) != 3 || sweep.SweepInfo[2].GetIsSectionEnd() != 1 || sweep.SweepInfo[2].GetSectionProp() != "" {

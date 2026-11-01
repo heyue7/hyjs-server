@@ -20,7 +20,7 @@ import (
 // InitializeP7ReRush 创建独立来源和区段账本；实际目录切换由发布步骤显式调用。
 func (s *GameService) InitializeP7ReRush(ctx context.Context) error {
 	tx := db.GetIns().WithContext(ctx)
-	if err := tx.AutoMigrate(&db.P7ReRushPolicy{}, &db.P7ReRushSection{}, &db.P7ReRushSweep{}, &db.P7ReRushRun{}); err != nil {
+	if err := tx.AutoMigrate(&db.P7ReRushPolicy{}, &db.P7ReRushSection{}, &db.P7ReRushSweep{}, &db.P7ReRushPowerProof{}, &db.P7ReRushRun{}); err != nil {
 		return err
 	}
 	return tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&db.P7ReRushPolicy{ID: 1, Source: constUtil.P7ReRushSource}).Error

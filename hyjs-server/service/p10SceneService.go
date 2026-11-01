@@ -242,7 +242,11 @@ func (s *GameService) p10SceneMovePlayer(p *pb.Player, g *model.GameState, proje
 		// Keep the persisted scene and line scope canonical; only project the wire frame.
 		position.Scene = proto.String(constUtil.P10FieldPlayerScenePrefix + fieldScope)
 	}
-	return &pb.MovePlayer{Position: position, Info: &pb.MovePlayerInfo{ServerId: proto.Int32(int32(s.OriginalServerID())), PlayerId: p.PlayerId, PlayerName: p.Name, Level: p.Level, WarId: proto.String(heroID), EquipId: proto.String(weaponID), Power: proto.Int64(int64(power)), PlayerSide: side, ServerName: proto.String("本地测试"), AwakeStage: proto.Int32(awake), PetId: proto.String(pet.GetPetId())}}, nil
+	now := time.Now()
+	if len(projectionTx) == 1 {
+		now = p13UFNow(projectionTx[0].Statement.Context)
+	}
+	return &pb.MovePlayer{Position: position, Info: &pb.MovePlayerInfo{ServerId: proto.Int32(int32(s.OriginalServerID())), PlayerId: p.PlayerId, PlayerName: p.Name, Level: p.Level, WarId: proto.String(heroID), EquipId: proto.String(weaponID), Power: proto.Int64(int64(power)), PlayerSide: side, ServerName: proto.String("本地测试"), AwakeStage: proto.Int32(awake), PetId: proto.String(pet.GetPetId()), Title: proto.String(s.p10SceneTitle(g, now))}}, nil
 }
 
 // p10CurrentScenePeers restores actors cleared by the client during room reload,
@@ -663,6 +667,13 @@ func (s *GameService) syncP10Scene(ctx context.Context, id int64, movement bool,
 	if err != nil {
 		return err
 	}
+	name, err := s.p10SceneCachedGuildName(tx, sink, id, p10SceneGuildRefreshRequest(ctx.Value(constUtil.GameRequestContextKey)))
+	if err != nil {
+		return err
+	}
+	frame.Info.UnionName = proto.String(name)
+	var oldFrame pb.MovePlayer
+	oldInfoChanged := proto.Unmarshal(old.Frame, &oldFrame) != nil || !proto.Equal(oldFrame.Info, frame.Info)
 	raw, err := proto.Marshal(frame)
 	if err != nil {
 		return err
@@ -733,6 +744,9 @@ func (s *GameService) syncP10Scene(ctx context.Context, id int64, movement bool,
 		}
 	} else if movement {
 		s.p10SceneBroadcast(ctx, scope, line, id, &pb.SCMovePush{Position: []*pb.Position{frame.Position}})
+		if oldInfoChanged {
+			s.p10SceneBroadcast(ctx, scope, line, id, &pb.SCMovePlayerInfo{PlayerInfos: []*pb.MovePlayer{frame}})
+		}
 	} else if !bytes.Equal(old.Frame, current.Frame) {
 		s.p10SceneBroadcast(ctx, scope, line, id, &pb.SCMovePlayerInfo{PlayerInfos: []*pb.MovePlayer{frame}})
 	}
@@ -814,7 +828,7 @@ func (s *GameService) AfterP10SceneRequest(ctx context.Context, id int64, reques
 		_ = s.SyncP10Scene(ctx, id, true)
 	case *pb.CSCurrentPosition:
 		_ = s.syncP10Scene(ctx, id, false, &lineRestored)
-	case *pb.CSLoginScene, *pb.CSTransferScene, *pb.CSCopyEnter, *pb.CSCopyLeave, *pb.CSSidePveFightStart, *pb.CSSidePveFightEnd, *pb.CSSidePveBossFightStart, *pb.CSSidePveBossFightEnd, *pb.CSPingTcp, *pb.CSFormationOn, *pb.CSFormationOff, *pb.CSFormationExChange:
+	case *pb.CSLoginScene, *pb.CSTransferScene, *pb.CSCopyEnter, *pb.CSCopyLeave, *pb.CSSidePveFightStart, *pb.CSSidePveFightEnd, *pb.CSSidePveBossFightStart, *pb.CSSidePveBossFightEnd, *pb.CSPingTcp, *pb.CSFormationOn, *pb.CSFormationOff, *pb.CSFormationExChange, *pb.CSChangeTitle, *pb.CSUnionCreate, *pb.CSUnionApply, *pb.CSUnionAgreeApply, *pb.CSQuitUnion, *pb.CSDissolveUnion, *pb.CSRemoveUnionPlayer, *pb.CSGetUnionInfo:
 		_ = s.SyncP10Scene(ctx, id, false)
 	}
 	return lineRestored

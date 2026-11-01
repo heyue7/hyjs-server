@@ -213,6 +213,7 @@ func (s *GameService) syncP13GuildRoom(ctx context.Context, id int64, movement b
 	if err != nil {
 		return true, err
 	}
+	frame.Info.UnionName = proto.String(row.Name)
 	raw, err := proto.Marshal(frame)
 	if err != nil {
 		return true, err

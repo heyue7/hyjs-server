@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 
 	"google.golang.org/protobuf/proto"
 	"hyjs-server/constUtil"
@@ -12,6 +13,58 @@ import (
 	"hyjs-server/model"
 	pb "hyjs-server/model/protocol"
 )
+
+// 仅对录像不匹配或录像玩法未覆盖使用冻结终局，取消及基础设施故障继续返回错误。
+func p12WantedCanFallbackRecording(err error) bool {
+	if err == nil || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return false
+	}
+	var mismatch *p12WantedRecordingMismatchError
+	return errors.As(err, &mismatch) || err.Error() == constUtil.CombatUnsupported || err.Error() == constUtil.P6ReplayConflict || strings.HasPrefix(err.Error(), constUtil.P6ReplayConflict+":")
+}
+
+func p12WantedStoreAutomaticFallback(fight *db.P12WantedFight, request *pb.CSRebelFightEnd) error {
+	if fight == nil || request == nil || request.OptRecord == nil || len(request.OptRecord.SkillOpts) > 16000 || request.GetFightId() != fight.ID {
+		return errors.New(constUtil.P12WantedInvalid)
+	}
+	raw, err := proto.MarshalOptions{Deterministic: true}.Marshal(request)
+	if err != nil {
+		return err
+	}
+	record, err := proto.MarshalOptions{Deterministic: true}.Marshal(request.OptRecord)
+	if err != nil {
+		return err
+	}
+	fight.RecordedEndRequest = raw
+	fight.RecordedTerminalJSON = ""
+	fight.RecordedTerminalHash = fight.TerminalHash
+	fight.RecordedRecordHash = p6Digest(record)
+	fight.RecordedProof = constUtil.P12WantedAutomaticFallback
+	return nil
+}
+
+func p12WantedAutomaticFallbackReceipt(fight *db.P12WantedFight, request *pb.CSRebelFightEnd) error {
+	reject := func() error { return errors.New(constUtil.P6ReplayConflict) }
+	if fight == nil || request == nil || request.OptRecord == nil || request.GetFightId() != fight.ID || len(request.OptRecord.SkillOpts) > 16000 ||
+		fight.RecordedProof != constUtil.P12WantedAutomaticFallback || fight.RecordedTerminalJSON != "" || fight.RecordedTerminalHash != fight.TerminalHash ||
+		p6Digest([]byte(fight.InputJSON)) != fight.InputHash || p6Digest([]byte(fight.TerminalJSON)) != fight.TerminalHash || p6Digest(fight.StartProto) != fight.StartHash {
+		return reject()
+	}
+	raw, err := proto.MarshalOptions{Deterministic: true}.Marshal(request)
+	if err != nil || !bytes.Equal(raw, fight.RecordedEndRequest) || p6Digest(raw) != fight.EndRequestHash {
+		return reject()
+	}
+	record, err := proto.MarshalOptions{Deterministic: true}.Marshal(request.OptRecord)
+	if err != nil || p6Digest(record) != fight.RecordedRecordHash {
+		return reject()
+	}
+	var input model.FrozenBattleInput
+	var terminal model.CombatFinalHPOutcome
+	if json.Unmarshal([]byte(fight.InputJSON), &input) != nil || json.Unmarshal([]byte(fight.TerminalJSON), &terminal) != nil || ValidateP12WantedCertifiedReceipt(&input, &terminal) != nil {
+		return reject()
+	}
+	return nil
+}
 
 // computeP12WantedRecorded keeps submitted commands as calculation input. The
 // independent native recorded-driver proof is required before settlement opens.
@@ -166,6 +219,9 @@ func p12WantedStoreRecorded(fight *db.P12WantedFight, request *pb.CSRebelFightEn
 }
 
 func p12WantedRecordedReceipt(fight *db.P12WantedFight, request *pb.CSRebelFightEnd) error {
+	if fight.RecordedProof == constUtil.P12WantedAutomaticFallback {
+		return p12WantedAutomaticFallbackReceipt(fight, request)
+	}
 	if fight.RecordedProof == "" && len(fight.RecordedEndRequest) == 0 && fight.RecordedTerminalJSON == "" && fight.RecordedTerminalHash == "" && fight.RecordedRecordHash == "" {
 		// Legacy automatic rows have no recorded columns. Their exact frozen
 		// automatic record must still match, so losing all five recorded

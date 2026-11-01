@@ -23,6 +23,9 @@ type p10ClientSink struct {
 	close          func()
 	tradeReady     atomic.Bool
 	disconnectedAt atomic.Int64
+	// 场景锁保护的短期公会展示缓存，随连接释放。
+	sceneGuildName  string
+	sceneGuildUntil time.Time
 }
 
 var p10ClientSinks sync.Map

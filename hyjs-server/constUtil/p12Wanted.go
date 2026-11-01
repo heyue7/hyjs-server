@@ -6,6 +6,8 @@ const (
 	P12WantedRecordedCertified = true
 	P12WantedRecordedProof     = "420fe0def2b8e391d78a06781db2c18fdbb8abc859de2b731cbcc4360e60d97b"
 	P12WantedRecordedDriver    = "original-wanted8-round1-manual-then-live-auto-exact-record-v1"
+	// P12WantedAutomaticFallback 标记录像无法复核时采用冻结服务端终局的回执。
+	P12WantedAutomaticFallback = "wanted-server-terminal-fallback-v1"
 	P12WantedLocalRule         = "local-wanted-copy-success-original-odds-private-until-first-hit-v1"
 	P12WantedLocalSource       = "原Wanted完整表/原type8协议；本地仅副本完整胜利或单次扫荡抽取，原时段Odd；首批WantedID1、每发现者最多一个存活私有任务；原空bloodNumber/SkillCastChance按1/100序列化；分享限本人真实伤害后同服公开；不冒原服运营规则"
 	P12WantedUnavailable       = "当前悬赏不存在、已结束或尚无参与资格"

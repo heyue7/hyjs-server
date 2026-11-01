@@ -40,13 +40,10 @@ func p12Wanted84RejectedFight(t *testing.T, f *p1Fixture, id string, stamp int64
 		result = 1
 	}
 	end := &pb.CSRebelFightEnd{FightId: start.FightId, Result: proto.Int32(result), OptRecord: terminal.OriginalOperates}
-	bad := proto.Clone(end).(*pb.CSRebelFightEnd)
-	bad.OptRecord.DefenderTotalLeftHp = proto.Float64(bad.OptRecord.GetDefenderTotalLeftHp() + 1)
-	ctx := context.WithValue(f.ctx, constUtil.GameRequestContextKey, bad)
-	_, err = f.s.p12WantedEnd(ctx, f.id, bad, now)
-	var rejected *P12WantedRetryableEndError
-	if !errors.As(err, &rejected) {
-		t.Fatal("strict rejected recording fixture", err)
+	// 模拟升级前已经被拒绝的付费战斗，继续覆盖旧记录恢复。
+	pending, err := recordP12WantedRejectedEnd(f.ctx, f.id, fight.ID, now, errors.New(constUtil.P6ReplayConflict))
+	if err != nil || !pending {
+		t.Fatal("legacy rejected recording fixture", err)
 	}
 	recovery := &pb.CSRebelFightStart{RebelId: proto.String(constUtil.P12WantedRecoveryPrefix + fight.ID), Type: proto.Int32(1)}
 	return start, end, recovery
