@@ -456,6 +456,41 @@ func ggoBossActorDamage(fight *model.FieldFight, input *model.FrozenBattleInput,
 	return damage, nil
 }
 
+// The remaining shared HP and each contributor's damage are accumulated in
+// separate float64 operations. On an actual final hit, their exact binary sum
+// can exceed the original maximum by a few representable steps. Accept at
+// most two ULPs of that maximum and clamp only this terminal rounding residue.
+func ggoBossContributionTotal(prior, damage, maximum float64, finalHit bool) (float64, error) {
+	invalid := func() (float64, error) { return 0, errors.New("首领贡献状态无效") }
+	if !combatFinite(prior) || !combatFinite(damage) || !combatFinite(maximum) || prior < 0 || damage <= 0 || maximum <= 0 || prior > maximum || damage > maximum {
+		return invalid()
+	}
+	total := prior + damage
+	if !combatFinite(total) {
+		return invalid()
+	}
+	if prior <= maximum-damage && total <= maximum {
+		return total, nil
+	}
+	if !finalHit {
+		return invalid()
+	}
+	next := math.Nextafter(maximum, math.Inf(1))
+	if !combatFinite(next) {
+		return invalid()
+	}
+	// Compare the exact values represented by both operands. A rounded sum
+	// alone can conceal an actual overflow beyond the permitted two ULPs.
+	exact := new(big.Rat).Add(new(big.Rat).SetFloat64(prior), new(big.Rat).SetFloat64(damage))
+	maxExact := new(big.Rat).SetFloat64(maximum)
+	ulp := new(big.Rat).Sub(new(big.Rat).SetFloat64(next), maxExact)
+	upper := new(big.Rat).Add(maxExact, new(big.Rat).Mul(ulp, big.NewRat(2, 1)))
+	if exact.Cmp(upper) > 0 {
+		return invalid()
+	}
+	return min(total, maximum), nil
+}
+
 func (s *GameService) ggoBossApplyDamageLocked(tx *gorm.DB, id int64, fight *model.FieldFight, input *model.FrozenBattleInput, terminal *model.CombatFinalHPOutcome, now int64) (*pb.SideBoss, float64, error) {
 	actorDamage, err := ggoBossActorDamage(fight, input, terminal)
 	if err != nil {
@@ -527,10 +562,14 @@ func (s *GameService) ggoBossApplyDamageLocked(tx *gorm.DB, id int64, fight *mod
 		if err = tx.Where("server_id=? AND spawn_uuid=? AND player_id=?", s.OriginalServerID(), event.ID, id).Take(&member).Error; err != nil {
 			return nil, 0, err
 		}
-		if member.Frozen || !combatFinite(member.Damage) || member.Damage < 0 || member.Damage > float64(event.Boss.HP)-damage {
+		if member.Frozen {
 			return nil, 0, errors.New("首领贡献状态无效")
 		}
-		if err = tx.Model(&member).Update("damage", member.Damage+damage).Error; err != nil {
+		total, err := ggoBossContributionTotal(member.Damage, damage, float64(event.Boss.HP), hp[key] == 0)
+		if err != nil {
+			return nil, 0, err
+		}
+		if err = tx.Model(&member).Update("damage", total).Error; err != nil {
 			return nil, 0, err
 		}
 	}
