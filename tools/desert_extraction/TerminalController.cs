@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
@@ -22,9 +23,9 @@ namespace HYJS.DesertV4
         readonly FieldWire.Session session;
         readonly ITerminalView view;
         readonly PendingRequest pending;
-        readonly long[] chips=new long[6], protectedChips=new long[6];
+        readonly long[] chips=new long[6], protectedChips=new long[6], exchangeValues=new long[6];
         long terminalRevision=-1, credit;
-        bool safe, ready, busy, suspended;
+        bool safe, ready, busy, suspended, hasExchangeValues;
         static readonly string[] Colors={"白","绿","蓝","紫","橙","红"};
         public TerminalController(FieldWire transport,FieldWire.Session owner,ITerminalView sink)
         {
@@ -53,7 +54,20 @@ namespace HYJS.DesertV4
                 if (rev==terminalRevision && (next[i]!=chips[i] || guarded[i]!=protectedChips[i])) throw new InvalidOperationException("Changed terminal at same revision");
             }
             if (!snapshot["safe"].IsBoolean) throw new InvalidOperationException("Missing safe-zone state");
+            var prices=new long[6]; bool hasPrices=false;
+            // Older servers have no optional quote; settlement remains available.
+            try
+            {
+                if (((IDictionary)t).Contains("exchangeValues") && t["exchangeValues"]!=null && t["exchangeValues"].IsArray && t["exchangeValues"].Count==6)
+                {
+                    hasPrices=true;
+                    for (int i=0;i<6;i++) { prices[i]=Number(t["exchangeValues"][i]); if (prices[i]<1) hasPrices=false; }
+                }
+            }
+            catch (Exception) { hasPrices=false; }
             for (int i=0;i<6;i++) { chips[i]=next[i]; protectedChips[i]=guarded[i]; }
+            for (int i=0;i<6;i++) exchangeValues[i]=prices[i];
+            hasExchangeValues=hasPrices;
             terminalRevision=rev; credit=balance; safe=(bool)snapshot["safe"]; ready=true;
             SetCredit(balance);
         }
@@ -82,15 +96,8 @@ namespace HYJS.DesertV4
             }
             if (!ready) { view.Notice("终端正在同步，请稍候"); view.RequestSnapshot(); return; }
             if (!safe) { view.Notice("请回到安全区结算"); return; }
-            var text=new StringBuilder("临时终端\n");
-            for (int i=0;i<6;i++)
-            {
-                text.Append(Colors[i]).Append("色芯片 ").Append(chips[i]);
-                if (protectedChips[i]>0) text.Append("（死亡不掉落 ").Append(protectedChips[i]).Append("）");
-                text.Append("\n");
-            }
-            text.Append("现有回收信用点 ").Append(credit).Append("\n确认结算携带芯片？");
-            BoxManager.CreateMessageBoxWithCofirmAndCancelButton(text.ToString(),delegate(bool confirmed)
+            string text=TerminalCreditQuote.Build(chips,protectedChips,exchangeValues,hasExchangeValues,credit);
+            BoxManager.CreateMessageBoxWithCofirmAndCancelButton(text,delegate(bool confirmed)
             {
                 if (!confirmed || !OwnerCurrent() || busy) return;
                 try { pending.Start(); Send(); } catch (Exception) { view.Notice("结算记录保存失败，请重试"); }

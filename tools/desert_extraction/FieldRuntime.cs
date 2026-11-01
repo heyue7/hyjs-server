@@ -209,13 +209,14 @@ namespace HYJS.DesertV4
         ProtectionRelease protection;
         FieldNpcs npcs;
         FieldMonsters monsters;
+        FieldMonsterPosition monsterPosition;
         FieldBoss boss;
         TerminalController terminal;
         readonly DesertGuide guide=new DesertGuide();
         bool dirty, inFlight, snapshotReady, worldReady, askingProtection, awaitingEncounter, encounterTimedOut, safe;
         bool safeAreaKnown,lastLocalSafe;
-        bool dispatchingConfirmedBoss;
-        string confirmedBossId;
+        bool dispatchingConfirmedBoss,dispatchingConfirmedMonster;
+        string confirmedBossId,confirmedMonsterId;
         bool teamHudChecked;
         double safeMinX,safeMaxX,safeMinZ,safeMaxZ;
         int sceneSerial, requestVersion;
@@ -314,6 +315,7 @@ namespace HYJS.DesertV4
                     var nextResources=new FieldResources(current.charactorManager);
                     var nextNpcs=new FieldNpcs(current.charactorManager);
                     var nextMonsters=new FieldMonsters(net,current.charactorManager);
+                    var nextMonsterPosition=new FieldMonsterPosition(current.charactorManager,nextMonsters);
                     var nextBoss=new FieldBoss(current.charactorManager,RequestSnapshot);
                     var nextTerminal=new TerminalController(wire,currentSession,this);
                     var nextPreload=new GatherPreload(this,self);
@@ -321,7 +323,7 @@ namespace HYJS.DesertV4
                     var nextProtection=new ProtectionRelease(wire,currentSession,ProtectionNotice);
                     var nextGather=new GatherCoordinator(wire,currentSession,nextResources,self,nextPreload,nextNative,this);
                     room=current; actor=self; session=currentSession; resources=nextResources; preload=nextPreload;
-                    protection=nextProtection; gather=nextGather; npcs=nextNpcs; monsters=nextMonsters; boss=nextBoss; terminal=nextTerminal;
+                    protection=nextProtection; gather=nextGather; npcs=nextNpcs; monsters=nextMonsters; monsterPosition=nextMonsterPosition; boss=nextBoss; terminal=nextTerminal;
                     sceneSerial++; dirty=true; requestVersion++; teamHudChecked=false;
                     TeamMap86.BindScene(room);
                     PositionSync.SetFieldActive(true);
@@ -332,7 +334,7 @@ namespace HYJS.DesertV4
                 catch (Exception) { return; } // actor assets/session may not yet be ready
             }
             try { guide.Tick(InteractionReady); } catch (Exception) { }
-            try { PositionSync.Tick(); preload.Tick(); gather.Tick(); if (monsters!=null) monsters.Tick(); if (boss!=null) boss.Tick(); } catch (Exception) { Notice("采集状态需要确认，请重新进入"); ReleaseScene(); return; }
+            try { PositionSync.Tick(); preload.Tick(); gather.Tick(); if (monsters!=null) monsters.Tick(); if (monsterPosition!=null) monsterPosition.Tick(); if (boss!=null) boss.Tick(); } catch (Exception) { Notice("采集状态需要确认，请重新进入"); ReleaseScene(); return; }
             RefreshNativeTeamHud();
             RefreshTiredHud();
             if (worldReady) MapViewer86.SyncMini();
@@ -387,6 +389,11 @@ namespace HYJS.DesertV4
                 try { if (LoadingPanel.Instance!=null) LoadingPanel.Instance.HideLoading(); } catch (Exception) { }
                 try { boss.Clear(); } catch (Exception) { }
             }
+            if (monsterPosition!=null && monsterPosition.Confirming)
+            {
+                try { if (LoadingPanel.Instance!=null) LoadingPanel.Instance.HideLoading(); } catch (Exception) { }
+                try { monsterPosition.Clear(); } catch (Exception) { }
+            }
             if (!PositionSync.Locked) PositionSync.SetFieldActive(false);
             sceneSerial++; inFlight=false; dirty=true; nextSnapshot=0; snapshotReady=false; worldReady=false; safeAreaKnown=false;
             awaitingEncounter=false; encounterTimedOut=false; askingProtection=false; protectionDeadline=0;
@@ -401,7 +408,7 @@ namespace HYJS.DesertV4
             TradeController.SceneExit();
             if (preload!=null) try { preload.Dispose(); } catch (Exception) { }
             room=null; actor=null; session=null; resources=null; preload=null; gather=null; protection=null;
-            npcs=null; monsters=null; boss=null; terminal=null;
+            npcs=null; monsters=null; monsterPosition=null; boss=null; terminal=null;
         }
         void OnDestroy() { ReleaseScene(); if (singleton==this) singleton=null; }
         public void Trigger(string groupId,string posId)
@@ -580,6 +587,12 @@ namespace HYJS.DesertV4
         }
         public bool StartEncounter(int type,string uuid)
         {
+            if (type==6 && dispatchingConfirmedMonster)
+            {
+                bool admitted=awaitingEncounter && !encounterTimedOut && confirmedMonsterId==uuid;
+                dispatchingConfirmedMonster=false; confirmedMonsterId=null;
+                return admitted;
+            }
             // A confirmed boss continues through the original SendPveBoss
             // method exactly once; its prefix returns here before any new gate.
             if (type==12 && dispatchingConfirmedBoss)
@@ -647,7 +660,50 @@ namespace HYJS.DesertV4
                 if (!started) EndEncounter(0);
                 return false;
             }
-            return true;
+            FieldMonsterPosition position=monsterPosition; FieldMonsters targets=monsters;
+            RoomBase startMonsterRoom=room; FieldWire.Session startMonsterOwner=session;
+            int monsterSerial=sceneSerial,monsterEpoch=PositionSync.ConnectionEpoch;
+            if (position==null || targets==null || !targets.HasAvailable(uuid)) { EndEncounter(0); return false; }
+            bool syncing=position.Begin(startMonsterRoom,actor,wire,startMonsterOwner,uuid,delegate(bool confirmed,bool cancelled)
+            {
+                FieldWire.Session live;
+                bool same=monsterSerial==sceneSerial && monsterEpoch==PositionSync.ConnectionEpoch && room==startMonsterRoom &&
+                    room==RoomManager.currentRoom && monsterPosition==position && monsters==targets && Same(startMonsterOwner,session) &&
+                    FieldWire.Current(out live) && Same(startMonsterOwner,live);
+                if (!same)
+                {
+                    if (monsterSerial==sceneSerial && awaitingEncounter)
+                    {
+                        awaitingEncounter=false; encounterTimedOut=false;
+                        if (LoadingPanel.Instance!=null) LoadingPanel.Instance.HideLoading();
+                    }
+                    return;
+                }
+                if (!confirmed || !targets.HasAvailable(uuid) || !awaitingEncounter || encounterTimedOut)
+                {
+                    if (cancelled)
+                    {
+                        awaitingEncounter=false; encounterTimedOut=false;
+                        if (LoadingPanel.Instance!=null) LoadingPanel.Instance.HideLoading();
+                        Notice("已取消战斗");
+                    }
+                    else EndEncounter(0);
+                    return;
+                }
+                try
+                {
+                    RoomNetField net=startMonsterRoom.netManager as RoomNetField;
+                    MethodInfo send=typeof(RoomNetField).GetMethod("SendPve",BindingFlags.Instance|BindingFlags.Public|BindingFlags.NonPublic);
+                    if (net==null || send==null) throw new InvalidOperationException("Original monster entry unavailable");
+                    confirmedMonsterId=uuid; dispatchingConfirmedMonster=true;
+                    send.Invoke(net,new object[]{uuid});
+                    if (dispatchingConfirmedMonster) throw new InvalidOperationException("Original monster entry hook unavailable");
+                }
+                catch (Exception) { EndEncounter(0); }
+                finally { dispatchingConfirmedMonster=false; confirmedMonsterId=null; }
+            });
+            if (!syncing) EndEncounter(0);
+            return false;
         }
         public static bool ResumeEncounter(int type,object native)
         {

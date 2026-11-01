@@ -197,6 +197,13 @@ namespace HYJS.DesertV4
                 if (p.patrol!=null && p.refreshAtMs==0 && Moving(p.patrol,now) && manager.GetCharactor(p.uuid)==actor) return true;
             return false;
         }
+        internal bool HasAvailable(string uuid)
+        {
+            if (String.IsNullOrEmpty(uuid)) return false;
+            foreach (Point p in points.Values)
+                if (p.uuid==uuid && p.available && p.refreshAtMs==0 && manager.GetCharactor(uuid)!=null) return true;
+            return false;
+        }
         public void Clear()
         {
             if (points.Count>0)

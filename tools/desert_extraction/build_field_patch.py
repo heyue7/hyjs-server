@@ -78,7 +78,7 @@ REPLACEMENTS={
  'Battle.FieldPVEBossBattleOver::FieldPVEBossFightResultHandler':{'LegacyBossCompleted':'Completed'},
 }
 EXTRAS={'BoxManager::CreateSocketReconnect','NetWork.Sockets.Event.EventManger::Tick','Room.RoomNetBase::SCCurrentPosition','Room.RoomNetField::SCCurrentPosition','Room.RoomField::OnLoadComplete','StaticData::InitPlayerData','Battle.CopyBalance::Refresh'} | set(REPLACEMENTS)
-SOURCES=('GatherAttempt.cs','NestedArrayJson.cs','FieldWire.cs','GatherJournalStore.cs','FieldResources.cs','GatherPreload.cs','NativeGatherUI.cs','GatherCoordinator.cs','ProtectionRelease.cs','FieldRuntime.cs','PendingRequest.cs','TerminalController.cs','FieldNpcs.cs','FieldMonsters.cs','FieldBoss.cs','PositionSync.cs','TravelController.cs','LeaveController.cs','TradeController.cs','TradePanel.cs','FightEndJournal.cs','MonsterRewardView.cs','BattleRecovery.cs','ColdBattleRecovery.cs','PvpBridge.cs','MapViewer86.cs','TeamMap86.cs','ChipNames.cs')
+SOURCES=('GatherAttempt.cs','NestedArrayJson.cs','FieldWire.cs','GatherJournalStore.cs','FieldResources.cs','GatherPreload.cs','NativeGatherUI.cs','GatherCoordinator.cs','ProtectionRelease.cs','FieldRuntime.cs','PendingRequest.cs','TerminalController.cs','FieldNpcs.cs','FieldMonsters.cs','FieldBoss.cs','PositionSync.cs','TravelController.cs','LeaveController.cs','TradeController.cs','TradePanel.cs','FightEndJournal.cs','MonsterRewardView.cs','BattleRecovery.cs','ColdBattleRecovery.cs','PvpBridge.cs','MapViewer86.cs','TeamMap86.cs','ChipNames.cs','TerminalCreditQuote.cs','FieldMonsterPosition.cs','ExpeditionHeroList.cs')
 MAP_ICON=HERE/'assets/evacuation-npc.png'
 
 def sha(raw): return hashlib.sha256(raw).hexdigest()
