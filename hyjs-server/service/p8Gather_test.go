@@ -281,6 +281,11 @@ func TestP8Gather(t *testing.T) {
 				break
 			}
 		}
+		if err := updateProfileWithTx(ctx, id, func(tx *gorm.DB, _ *pb.Player, game *model.GameState) error {
+			return s.P8CancelGather(tx, id, game)
+		}); err != nil {
+			t.Fatal(err)
+		}
 	})
 	t.Run("cancel_frozen_reward_parallel_receipt_and_database_reopen", func(t *testing.T) {
 		id := fresh("resume", 18)
@@ -288,7 +293,7 @@ func TestP8Gather(t *testing.T) {
 		node := nodes(id)[0]
 		move(id, node)
 		request := &pb.CSFieldResourceStartGather{PosId: proto.String(node.PosID)}
-		first := call(id, request)
+		call(id, request)
 		startStamp := stamp
 		var pending db.P8GatherAttempt
 		db.GetIns().First(&pending, "player_id=?", id)
@@ -353,8 +358,8 @@ func TestP8Gather(t *testing.T) {
 			t.Fatal("parallel fatigue duplication")
 		}
 		replay, _, err := s.DispatchP8Gather(ctx, id, request, startStamp)
-		if err != nil || !proto.Equal(replay[0], first[0]) {
-			t.Fatal("historical start lost", err)
+		if err == nil || len(replay) != 0 {
+			t.Fatal("cancelled historical start reopened its old animation", err)
 		}
 	})
 	t.Run("overflow_failure_preserves_attempt_node_fatigue_and_retries", func(t *testing.T) {
