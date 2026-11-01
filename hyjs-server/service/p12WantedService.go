@@ -35,6 +35,11 @@ type p12WantedDefinition struct {
 	RewardSource       string                         `json:"rewardSource"`
 }
 
+// This error identifies damage confined to one frozen Wanted instance.
+type p12WantedInvalidInstanceError struct{}
+
+func (p12WantedInvalidInstanceError) Error() string { return constUtil.P12WantedInvalid }
+
 func (s *GameService) LoadP12WantedTables(root string) error {
 	for _, name := range []string{"WantedEnemy", "WantedLevel", "WantedTimeLimit", "WantedSpecialTime", "WantedDamageRank", "WantedPerformanceRank"} {
 		if err := s.loadP7Table(root, name); err != nil {
@@ -153,18 +158,21 @@ func (s *GameService) p12WantedMonster(def p12WantedDefinition, wantedID string,
 		group, e1 := strconv.Atoi(row["GroupIndex"])
 		pose, e2 := strconv.ParseInt(row["Location"], 10, 32)
 		if e1 != nil || e2 != nil || group < 1 || pose < 1 || pose > 15 || seen[row["WantedEnemyId"]] {
-			return nil, nil, 0, errors.New(constUtil.P12WantedInvalid)
+			return nil, nil, 0, p12WantedInvalidInstanceError{}
 		}
 		seen[row["WantedEnemyId"]] = true
 		actor, err := s.actor(row, "wanted-"+strings.TrimPrefix(row["WantedEnemyId"], "wanted_"), int32(pose), true)
-		if err != nil || actor.GetProp().GetHp() <= 0 {
-			return nil, nil, 0, errors.New(constUtil.P12WantedInvalid)
+		if err != nil {
+			return nil, nil, 0, err
+		}
+		if actor.GetProp().GetHp() <= 0 {
+			return nil, nil, 0, p12WantedInvalidInstanceError{}
 		}
 		hp := actor.GetProp().GetHp()
 		if current != nil {
 			value, ok := current[row["WantedEnemyId"]]
 			if !ok || !combatFinite(value) || value < 0 || value > hp {
-				return nil, nil, 0, errors.New(constUtil.P12WantedInvalid)
+				return nil, nil, 0, p12WantedInvalidInstanceError{}
 			}
 			actor.Inst.CurHp = proto.Float64(value)
 		}
@@ -173,7 +181,7 @@ func (s *GameService) p12WantedMonster(def p12WantedDefinition, wantedID string,
 		total += hp
 	}
 	if len(groups) == 0 || current != nil && len(current) != len(seen) {
-		return nil, nil, 0, errors.New(constUtil.P12WantedInvalid)
+		return nil, nil, 0, p12WantedInvalidInstanceError{}
 	}
 	keys := make([]int, 0, len(groups))
 	for group := range groups {
@@ -183,7 +191,7 @@ func (s *GameService) p12WantedMonster(def p12WantedDefinition, wantedID string,
 	waves := make([]*pb.BattleMonster, 0, len(keys))
 	for index, group := range keys {
 		if group != index+1 {
-			return nil, nil, 0, errors.New(constUtil.P12WantedInvalid)
+			return nil, nil, 0, p12WantedInvalidInstanceError{}
 		}
 		waves = append(waves, &pb.BattleMonster{Inst: &pb.BattleMonsterInst{Anger: proto.Float64(0)}, Formation: groups[group]})
 	}
@@ -216,25 +224,60 @@ func (s *GameService) p12WantedView(instance *db.P12WantedInstance) (*pb.RebelIn
 		def p12WantedDefinition
 		hp  map[string]float64
 	)
-	if instance.DefinitionHash != p6Digest([]byte(instance.DefinitionJSON)) || json.Unmarshal([]byte(instance.DefinitionJSON), &def) != nil || json.Unmarshal([]byte(instance.MonsterHPJSON), &hp) != nil {
-		return nil, errors.New(constUtil.P12WantedInvalid)
+	if instance.ID == "" || instance.ServerID <= 0 || instance.FinderID <= 0 || instance.DefinitionHash != p6Digest([]byte(instance.DefinitionJSON)) || json.Unmarshal([]byte(instance.DefinitionJSON), &def) != nil || json.Unmarshal([]byte(instance.MonsterHPJSON), &hp) != nil || hp == nil {
+		return nil, p12WantedInvalidInstanceError{}
+	}
+	task, _, err := p12WantedDefinitionRow(def, instance.WantedID)
+	if err != nil {
+		return nil, p12WantedInvalidInstanceError{}
+	}
+	level, levelErr := strconv.ParseInt(task["Level"], 10, 64)
+	difficulty, difficultyErr := strconv.ParseInt(task["Difficulty"], 10, 64)
+	if levelErr != nil || difficultyErr != nil || level <= 0 || difficulty <= 0 || level != instance.Level || difficulty != instance.Difficulty {
+		return nil, p12WantedInvalidInstanceError{}
 	}
 	_, monsters, total, err := s.p12WantedMonster(def, instance.WantedID, hp)
-	if err != nil || total != instance.MaxHP {
-		return nil, errors.New(constUtil.P12WantedInvalid)
+	if err != nil {
+		return nil, err
+	}
+	if total != instance.MaxHP {
+		return nil, p12WantedInvalidInstanceError{}
 	}
 	current := float64(0)
 	for _, monster := range monsters {
 		current += monster.GetHp()
 	}
-	if current != instance.CurrentHP {
-		return nil, errors.New(constUtil.P12WantedInvalid)
+	if current != instance.CurrentHP && !p12WantedLegacyMapTotalMatches(monsters, instance.CurrentHP) {
+		return nil, p12WantedInvalidInstanceError{}
 	}
 	state := int32(0)
 	if instance.SharedAt > 0 {
 		state = 1
 	}
 	return &pb.RebelInfo{Id: proto.String(instance.ID), Finder: proto.Int64(instance.FinderID), FinderName: proto.String(instance.FinderName), RunTime: proto.Int64(instance.ExpiresAt), Hp: proto.Float64(current), MaxHP: proto.Float64(total), Level: proto.Int32(int32(instance.Level)), WantedId: proto.String(instance.WantedID), Difficulty: proto.Int32(int32(instance.Difficulty)), State: proto.Int32(state), Monsters: monsters}, nil
+}
+
+// Older settlements summed a four-body Go map in an unspecified order. Accept
+// only totals exactly reproducible by one of those orders after the definition,
+// body identities and individual HP bounds have all passed validation.
+func p12WantedLegacyMapTotalMatches(monsters []*pb.RebelMonster, stored float64) bool {
+	if len(monsters) != 4 || !combatFinite(stored) || stored < 0 {
+		return false
+	}
+	var match func(float64, uint8) bool
+	match = func(total float64, used uint8) bool {
+		if used == 15 {
+			return total == stored
+		}
+		for i, monster := range monsters {
+			bit := uint8(1 << i)
+			if used&bit == 0 && match(total+monster.GetHp(), used|bit) {
+				return true
+			}
+		}
+		return false
+	}
+	return match(0, 0)
 }
 
 // DiscoverP12Wanted 由已成功提交的原副本/扫荡事务调用；失败和重发不得重新抽发现。
@@ -420,7 +463,14 @@ func (s *GameService) p12WantedList(ctx context.Context, id int64, now time.Time
 		for index := range instances {
 			view, e := s.p12WantedView(&instances[index])
 			if e != nil {
-				return e
+				var invalid p12WantedInvalidInstanceError
+				if !errors.As(e, &invalid) {
+					return e
+				}
+				// Only this instance failed its frozen-definition or HP checks.
+				// Keep it unavailable for writes without hiding other valid tasks.
+				elog.Warn("invalid wanted instance omitted from list", zap.String("instance_id", instances[index].ID), zap.Error(e))
+				continue
 			}
 			out.Rebels = append(out.Rebels, view)
 		}
@@ -448,6 +498,9 @@ func (s *GameService) p12WantedShare(ctx context.Context, id int64, request *pb.
 		}
 		if instance.FinderID != id || instance.ServerID != s.OriginalServerID() || instance.State != constUtil.P12WantedActive || instance.CreatedAt > now.UnixMilli() || instance.ExpiresAt <= now.UnixMilli() || instance.CurrentHP <= 0 || instance.CurrentHP >= instance.MaxHP {
 			return errors.New(constUtil.P12WantedUnavailable)
+		}
+		if _, err = s.p12WantedView(&instance); err != nil {
+			return err
 		}
 		if instance.SharedAt > 0 {
 			return nil
@@ -621,6 +674,9 @@ func (s *GameService) p12WantedStart(ctx context.Context, id int64, request *pb.
 		}
 		if instance.ServerID != s.OriginalServerID() || instance.FinderID != id && (instance.SharedAt == 0 || instance.SharedAt > now.UnixMilli()) || instance.State != constUtil.P12WantedActive || instance.CreatedAt > now.UnixMilli() || instance.ExpiresAt <= now.UnixMilli() || instance.CurrentHP <= 0 {
 			return errors.New(constUtil.P12WantedUnavailable)
+		}
+		if _, err = s.p12WantedView(&instance); err != nil {
+			return err
 		}
 		if err = p12WantedRecover(player, now); err != nil {
 			return err
@@ -865,7 +921,8 @@ func (s *GameService) p12WantedEnd(ctx context.Context, id int64, request *pb.CS
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&instance, "id=?", fight.InstanceID).Error; err != nil {
 			return err
 		}
-		if _, err = s.p12WantedView(&instance); err != nil {
+		view, err := s.p12WantedView(&instance)
+		if err != nil {
 			return err
 		}
 		var hp map[string]float64
@@ -883,8 +940,9 @@ func (s *GameService) p12WantedEnd(ctx context.Context, id int64, request *pb.CS
 				return err
 			}
 			instance.CurrentHP = 0
-			for _, value := range hp {
-				instance.CurrentHP += value
+			// Store the same frozen-definition order used by p12WantedView.
+			for _, monster := range view.Monsters {
+				instance.CurrentHP += hp[monster.GetWantedEnemyId()]
 			}
 			if instance.CurrentHP == 0 {
 				instance.State, instance.KilledAt, instance.KillerID = constUtil.P12WantedKilled, now.UnixMilli(), id

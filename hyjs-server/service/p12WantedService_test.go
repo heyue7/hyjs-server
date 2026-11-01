@@ -60,7 +60,7 @@ func TestP12WantedMonsterOriginalFourBodiesAndPersistentView(t *testing.T) {
 	}
 	rawHP, _ := json.Marshal(current)
 	rawDef, _ := json.Marshal(def)
-	instance := &db.P12WantedInstance{ID: "instance", FinderID: 7, WantedID: "1", Level: 1, Difficulty: 1, CurrentHP: maximum - 10, MaxHP: maximum, MonsterHPJSON: string(rawHP), DefinitionJSON: string(rawDef), DefinitionHash: p6Digest(rawDef), ExpiresAt: 1800000}
+	instance := &db.P12WantedInstance{ID: "instance", ServerID: 1, FinderID: 7, WantedID: "1", Level: 1, Difficulty: 1, CurrentHP: maximum - 10, MaxHP: maximum, MonsterHPJSON: string(rawHP), DefinitionJSON: string(rawDef), DefinitionHash: p6Digest(rawDef), ExpiresAt: 1800000}
 	view, err := s.p12WantedView(instance)
 	if err != nil || view.GetHp() != maximum-10 || view.GetMaxHP() != maximum || view.GetRunTime() != instance.ExpiresAt || view.GetState() != 0 || len(view.Monsters) != 4 {
 		t.Fatal("persistent original view", err)
