@@ -306,7 +306,16 @@ func (s *GameService) computeFrozenBattleRecordRoundControlled(ctx context.Conte
 }
 
 func (s *GameService) computeFrozenBattleRecordLiveControlled(ctx context.Context, input *model.FrozenBattleInput, supplied *pb.BattleOperate, observer, terminalObserver func(*combatRoundEngine), originalRecordMode bool, formation *pb.BattleTransOperate, controls []p6RoundAutoControl, liveRecorded bool) (*model.CombatOutcome, error) {
+	return s.computeFrozenBattleRecordWithFieldBossMismatch(ctx, input, supplied, observer, terminalObserver, originalRecordMode, formation, controls, liveRecorded, false)
+}
+
+// A field-boss settlement may inspect the independently calculated terminal
+// even if the complete supplied recording differs. Other callers stay strict.
+func (s *GameService) computeFrozenBattleRecordWithFieldBossMismatch(ctx context.Context, input *model.FrozenBattleInput, supplied *pb.BattleOperate, observer, terminalObserver func(*combatRoundEngine), originalRecordMode bool, formation *pb.BattleTransOperate, controls []p6RoundAutoControl, liveRecorded, allowFieldBossMismatch bool) (*model.CombatOutcome, error) {
 	if ctx == nil || input == nil {
+		return nil, errors.New(constUtil.CombatInvalid)
+	}
+	if allowFieldBossMismatch && (input.BattleType != constUtil.FieldBossBattleType || !originalRecordMode || supplied == nil || formation != nil || len(controls) != 0 || liveRecorded) {
 		return nil, errors.New(constUtil.CombatInvalid)
 	}
 	frozenInput, err := cloneP6CalculationInput(input)
@@ -562,11 +571,11 @@ func (s *GameService) computeFrozenBattleRecordLiveControlled(ctx context.Contex
 	var completedMismatch error
 	if !recordMatches {
 		mismatch := fmt.Errorf("%s: 原录像终局或完整技能记录不符 round=%d hp=%g/%g，计算 round=%d hp=%g/%g", constUtil.P6ReplayConflict, supplied.GetFinalRoundNum(), supplied.GetAttackerTotalLeftHp(), supplied.GetDefenderTotalLeftHp(), e.operate.GetFinalRoundNum(), e.operate.GetAttackerTotalLeftHp(), e.operate.GetDefenderTotalLeftHp())
-		if !liveRecorded || frozen.BattleType != 8 {
+		if !(liveRecorded && frozen.BattleType == 8) && !allowFieldBossMismatch {
 			return nil, mismatch
 		}
-		// Wanted must validate the independently computed terminal before it
-		// can classify this mismatch as a recoverable paid fight.
+		// The requesting settlement must validate the independent terminal
+		// before deciding whether this mismatch can be tolerated.
 		completedMismatch = &p6CompletedRecordedMismatchError{cause: mismatch}
 	}
 	if terminalObserver != nil {

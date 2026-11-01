@@ -27,6 +27,19 @@ func fieldBoss33State(t *testing.T, id int64) (*pb.Player, *model.GameState) {
 	return player, game
 }
 
+func fieldBoss33MismatchedNPCRecording(t *testing.T, original *pb.BattleOperate) *pb.BattleOperate {
+	t.Helper()
+	mismatched := proto.Clone(original).(*pb.BattleOperate)
+	if len(mismatched.SkillOpts) == 0 {
+		t.Fatal("fixture did not produce a recorded skill")
+	}
+	extra := proto.Clone(mismatched.SkillOpts[len(mismatched.SkillOpts)-1]).(*pb.BattleSkillOperate)
+	extra.Camp = proto.Int32(1)
+	extra.ActorUid = proto.String("unmatched-npc-record")
+	mismatched.SkillOpts = append(mismatched.SkillOpts, extra)
+	return mismatched
+}
+
 // TestFieldBoss33OriginalDataSpawnCheckColdAndOriginalReplay covers the two
 // original maps without substituting rewards, respawn or a fake winner.
 func TestFieldBoss33OriginalDataSpawnCheckColdAndOriginalReplay(t *testing.T) {
@@ -150,11 +163,17 @@ func TestFieldBoss33OriginalDataSpawnCheckColdAndOriginalReplay(t *testing.T) {
 	if _, err = f.s.fieldBossFightEnd(f.ctx, f.id, &pb.CSSidePveBossFightEnd{FightId: proto.String(start.GetFightId()), Uuid: proto.String(bossUUID), Result: proto.Int32(1 - result), OptRecord: terminal.OriginalOperates}); err == nil {
 		t.Fatal("forged boss winner was accepted")
 	}
-	ended, err := f.s.fieldBossFightEnd(f.ctx, f.id, &pb.CSSidePveBossFightEnd{FightId: proto.String(start.GetFightId()), Uuid: proto.String(bossUUID), Result: proto.Int32(result), OptRecord: terminal.OriginalOperates})
-	if err != nil {
-		t.Fatal("original field boss settlement failed", err)
+	// An extra NPC recording entry reproduces a completed playback mismatch
+	// without changing the independently simulated player commands or terminal.
+	mismatched := fieldBoss33MismatchedNPCRecording(t, terminal.OriginalOperates)
+	if _, err = f.s.ComputeOriginalP6ProtocolFinalHP(f.ctx, frozen, mismatched); err == nil || !strings.Contains(err.Error(), "原录像终局或完整技能记录不符") {
+		t.Fatal("strict recording audit must still reject the differing skill record", err)
 	}
-	if ended[0].(*pb.SCSidePveBossFightEnd).GetMonster() == nil {
+	ended, err := f.s.fieldBossFightEnd(f.ctx, f.id, &pb.CSSidePveBossFightEnd{FightId: proto.String(start.GetFightId()), Uuid: proto.String(bossUUID), Result: proto.Int32(result), OptRecord: mismatched})
+	if err != nil {
+		t.Fatal("field boss should settle its matching computed terminal despite a recording mismatch", err)
+	}
+	if ended[0].(*pb.SCSidePveBossFightEnd).GetMonster() == nil || ended[0].(*pb.SCSidePveBossFightEnd).GetFightResult() != result {
 		t.Fatal("field boss result has no state")
 	}
 	_, settled := fieldBoss33State(t, f.id)
@@ -250,7 +269,11 @@ func TestFieldBoss33RemnantVictoryRewardsOnceColdAndRespawn(t *testing.T) {
 	if err != nil || terminal.Outcome.Winner != 0 {
 		t.Fatal("actual engine must kill remnant", err)
 	}
-	req := &pb.CSSidePveBossFightEnd{FightId: start.FightId, Uuid: proto.String(uuid), Result: proto.Int32(1), OptRecord: terminal.OriginalOperates}
+	incorrectRecord := fieldBoss33MismatchedNPCRecording(t, terminal.OriginalOperates)
+	if _, err = f.s.ComputeOriginalP6ProtocolFinalHP(f.ctx, input, incorrectRecord); err == nil || !strings.Contains(err.Error(), "原录像终局或完整技能记录不符") {
+		t.Fatal("strict recording audit must report the mismatch", err)
+	}
+	req := &pb.CSSidePveBossFightEnd{FightId: start.FightId, Uuid: proto.String(uuid), Result: proto.Int32(1), OptRecord: incorrectRecord}
 	ended, err := f.s.fieldBossFightEnd(f.ctx, f.id, req)
 	if err != nil {
 		t.Fatal(err)

@@ -44,14 +44,18 @@ func (s *GameService) computeFrozenBattleFinalHPRoundControlled(ctx context.Cont
 	return s.computeFrozenBattleFinalHPLiveControlled(ctx, input, supplied, originalRecordMode, formation, controls, false)
 }
 
-// A completed Wanted live-record calculation can carry its original mismatch
-// alongside the terminal. It is not an authoritative or accepted result.
+// A completed calculation can carry its original mismatch alongside the
+// terminal. It is not an authoritative or accepted result by itself.
 type p6CompletedRecordedMismatchError struct{ cause error }
 
 func (e *p6CompletedRecordedMismatchError) Error() string { return e.cause.Error() }
 func (e *p6CompletedRecordedMismatchError) Unwrap() error { return e.cause }
 
 func (s *GameService) computeFrozenBattleFinalHPLiveControlled(ctx context.Context, input *model.FrozenBattleInput, supplied *pb.BattleOperate, originalRecordMode bool, formation *pb.BattleTransOperate, controls []p6RoundAutoControl, liveRecorded bool) (*model.CombatFinalHPOutcome, error) {
+	return s.computeFrozenBattleFinalHPWithFieldBossMismatch(ctx, input, supplied, originalRecordMode, formation, controls, liveRecorded, false)
+}
+
+func (s *GameService) computeFrozenBattleFinalHPWithFieldBossMismatch(ctx context.Context, input *model.FrozenBattleInput, supplied *pb.BattleOperate, originalRecordMode bool, formation *pb.BattleTransOperate, controls []p6RoundAutoControl, liveRecorded, allowFieldBossMismatch bool) (*model.CombatFinalHPOutcome, error) {
 	if ctx == nil || input == nil {
 		return nil, errors.New(constUtil.CombatInvalid)
 	}
@@ -118,11 +122,11 @@ func (s *GameService) computeFrozenBattleFinalHPLiveControlled(ctx context.Conte
 		// Keep the full expected record bound above; live AI does not consume it.
 		driverRecord = nil
 	}
-	result.Outcome, err = s.computeFrozenBattleRecordLiveControlled(ctx, frozen, driverRecord, nil, terminal, originalRecordMode, formation, controls, liveRecorded)
+	result.Outcome, err = s.computeFrozenBattleRecordWithFieldBossMismatch(ctx, frozen, driverRecord, nil, terminal, originalRecordMode, formation, controls, liveRecorded, allowFieldBossMismatch)
 	var completedMismatch error
 	if err != nil {
 		var mismatch *p6CompletedRecordedMismatchError
-		if !liveRecorded || input.BattleType != 8 || !errors.As(err, &mismatch) {
+		if !errors.As(err, &mismatch) || (!(liveRecorded && input.BattleType == 8) && !(allowFieldBossMismatch && input.BattleType == constUtil.FieldBossBattleType)) {
 			return nil, err
 		}
 		completedMismatch = err

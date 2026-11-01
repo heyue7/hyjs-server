@@ -392,7 +392,9 @@ func (s *GameService) fieldBossFightStart(ctx context.Context, id int64, b *pb.C
 	return []proto.Message{result}, err
 }
 
-// fieldBossFightEnd 只用原计算回放终局，客户端 result 仅作胜败映射校验。
+// fieldBossFightEnd uses the independently computed terminal and checks the
+// client's result mapping. A completed recording mismatch can settle only when
+// the terminal round and both HP totals still match exactly.
 func (s *GameService) fieldBossFightEnd(ctx context.Context, id int64, b *pb.CSSidePveBossFightEnd) ([]proto.Message, error) {
 	if strings.HasPrefix(b.GetUuid(), "ggo-") {
 		return s.ggoBossFightEnd(ctx, id, b)
@@ -445,15 +447,18 @@ func (s *GameService) fieldBossFightEnd(ctx context.Context, id int64, b *pb.CSS
 		if _, err := s.ValidateP6GenericMechanisms(ctx, input); err != nil {
 			return err
 		}
-		// Type12 records real player commands, just like the existing original
-		// PVE consumer. Playback executes one queued command per tick, so its
-		// rerecorded player clock can be one tick later. Keep the existing PVE
-		// source-record contract: command identity/order, automatic NPC clocks,
-		// final round and both HP totals are validated by the original driver.
-		// The exact supplied record is also bound into the calculation digest.
-		terminal, err := s.ComputeOriginalP6ProtocolFinalHP(ctx, input, b.GetOptRecord())
-		if err != nil {
+		if err := validateOriginalP6ProtocolInput(input, b.GetOptRecord()); err != nil {
 			return err
+		}
+		terminal, err := s.computeFrozenBattleFinalHPWithFieldBossMismatch(ctx, input, b.GetOptRecord(), true, nil, nil, false, true)
+		if err != nil {
+			var mismatch *p6CompletedRecordedMismatchError
+			if !errors.As(err, &mismatch) || terminal == nil || terminal.OriginalOperates == nil ||
+				b.GetOptRecord().GetFinalRoundNum() != terminal.OriginalOperates.GetFinalRoundNum() ||
+				b.GetOptRecord().GetAttackerTotalLeftHp() != terminal.OriginalOperates.GetAttackerTotalLeftHp() ||
+				b.GetOptRecord().GetDefenderTotalLeftHp() != terminal.OriginalOperates.GetDefenderTotalLeftHp() {
+				return err
+			}
 		}
 		if err = validateP6GenericMechanismTerminal(input, terminal); err != nil {
 			return err
