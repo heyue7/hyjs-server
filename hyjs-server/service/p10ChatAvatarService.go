@@ -1,6 +1,7 @@
 package service
 
 import (
+	"bytes"
 	"encoding/json"
 
 	"go.uber.org/zap"
@@ -51,14 +52,20 @@ func (s *GameService) p10ApplyChatAvatars(tx *gorm.DB, refs []p10ChatAvatarRef) 
 	if len(ids) == 0 {
 		return
 	}
-	var rows []db.Profile
-	if err := tx.Select("id", "player", "game").Where("id IN ?", ids).Find(&rows).Error; err != nil {
+	rows, err := tx.Model(&db.Profile{}).Select("id", "player", "game").Where("id IN ?", ids).Rows()
+	if err != nil {
 		// Avatar lookup is optional; keep the already authorized message snapshots.
 		elog.Warn("chat avatar history projection unavailable", zap.Error(err))
 		return
 	}
-	avatars := make(map[int64]string, len(rows))
-	for _, row := range rows {
+	defer rows.Close()
+	avatars := make(map[int64]string, len(ids))
+	for rows.Next() {
+		var row db.Profile
+		if err := tx.ScanRows(rows, &row); err != nil {
+			elog.Warn("chat avatar history projection unavailable", zap.Error(err))
+			return
+		}
 		if row.Player == nil || row.Game == nil {
 			continue
 		}
@@ -66,17 +73,35 @@ func (s *GameService) p10ApplyChatAvatars(tx *gorm.DB, refs []p10ChatAvatarRef) 
 			HeroWarID *string `json:"heroWarId"`
 		}
 		var game struct {
+			Warriors  json.RawMessage     `json:"warriors"`
+			Formation []*pb.FormationItem `json:"formation"`
+		}
+		if json.Unmarshal([]byte(*row.Player), &player) != nil || json.Unmarshal([]byte(*row.Game), &game) != nil || len(game.Warriors) == 0 {
+			continue
+		}
+		var roster struct {
 			Warriors []*struct {
 				ID   *string `json:"id"`
 				GUID *string `json:"guid"`
 			} `json:"warriors"`
-			Formation []*pb.FormationItem `json:"formation"`
 		}
-		if json.Unmarshal([]byte(*row.Player), &player) != nil || json.Unmarshal([]byte(*row.Game), &game) != nil {
+		rosterJSON := bytes.TrimSpace(game.Warriors)
+		if len(rosterJSON) > 0 && rosterJSON[0] == '{' {
+			// Reuse the bounded codec check on just the roster; the remaining
+			// game fields never enter expansion or a full game decode.
+			wrapped := make([]byte, 0, len(rosterJSON)+13)
+			wrapped = append(wrapped, `{"warriors":`...)
+			wrapped = append(wrapped, rosterJSON...)
+			wrapped = append(wrapped, '}')
+			expanded, err := model.ExpandProfileGame86(wrapped)
+			if err != nil || json.Unmarshal(expanded, &roster) != nil {
+				continue
+			}
+		} else if json.Unmarshal(rosterJSON, &roster.Warriors) != nil {
 			continue
 		}
 		projection := &model.GameState{Formation: game.Formation}
-		for _, warrior := range game.Warriors {
+		for _, warrior := range roster.Warriors {
 			if warrior != nil {
 				projection.Warriors = append(projection.Warriors, &pb.Warrior{Id: warrior.ID, Guid: warrior.GUID})
 			}
@@ -84,6 +109,14 @@ func (s *GameService) p10ApplyChatAvatars(tx *gorm.DB, refs []p10ChatAvatarRef) 
 		if avatar, ok := s.p10ChatAvatar(&pb.Player{HeroWarId: player.HeroWarID}, projection); ok {
 			avatars[row.Id] = avatar
 		}
+	}
+	if err := rows.Err(); err != nil {
+		elog.Warn("chat avatar history projection unavailable", zap.Error(err))
+		return
+	}
+	if err := rows.Close(); err != nil {
+		elog.Warn("chat avatar history projection unavailable", zap.Error(err))
+		return
 	}
 	for _, ref := range refs {
 		if ref.info != nil && ref.info.GetPlayerId() == ref.senderID {
