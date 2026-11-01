@@ -244,8 +244,8 @@ func ggoLineSave(tx *gorm.DB, row *db.GGOFieldLine, state *ggoLineState, now int
 	return tx.Model(&db.GGOFieldLine{}).Where("server_id=? AND line=?", row.ServerID, row.Line).Updates(map[string]any{"revision": row.Revision, "payload": row.Payload, "updated_at": row.UpdatedAt, "next_due_at": row.NextDueAt}).Error
 }
 
-// ggoLoadLine obtains a single line row lock before changing a node, so a
-// resource reservation, generation change and reward commit share a transaction.
+// The legacy line writer is used only for initial migration and publication.
+// Ordinary reservations and settlement use the selected point rows.
 func ggoLoadLegacyLine(tx *gorm.DB, serverID, line int64, cfg *model.AdminFieldGGOConfiguration, revision string, now int64) (*db.GGOFieldLine, *ggoLineState, bool, error) {
 	if serverID < 1 || line < 1 {
 		return nil, nil, false, errors.New("沙漠区服或分线无效")

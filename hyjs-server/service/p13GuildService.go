@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/subtle"
+	"database/sql"
 	"encoding/csv"
 	"errors"
 	"fmt"
@@ -216,6 +217,16 @@ func P13GuildChannelEnabled(tx *gorm.DB) (bool, error) {
 func (s *GameService) RecordP13GuildLogin(ctx context.Context, id int64) error {
 	return s.p13GuildLoginAt(ctx, id, LocalPlayNow(ctx))
 }
+
+// Guild reads following a per-guild lock must observe the previous owner's
+// commit rather than retain a snapshot from the initial membership lookup.
+func p13GuildCurrentReadOptions(database *gorm.DB) []*sql.TxOptions {
+	if database.Dialector.Name() == "mysql" {
+		return []*sql.TxOptions{{Isolation: sql.LevelReadCommitted}}
+	}
+	return nil
+}
+
 func (s *GameService) p13GuildLoginAt(ctx context.Context, id int64, now time.Time) error {
 	tables, err := AdminGuildRuntimeTables(ctx, s.Tables)
 	if err != nil {
@@ -260,7 +271,7 @@ func (s *GameService) p13GuildLoginAt(ctx context.Context, id int64, now time.Ti
 		m.LastLoginAt = now.UnixMilli()
 		if policy.ManagementEnabled && policy.EconomyEnabled && m.LastLoginDay != p13GuildDay(now) {
 			var guild db.P13Guild
-			if err = tx.First(&guild, "id=?", m.GuildID).Error; err != nil {
+			if err = tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&guild, "id=?", m.GuildID).Error; err != nil {
 				return err
 			}
 			active, err := s.p10Setting("UnionLoginActiveScore")
@@ -288,7 +299,7 @@ func (s *GameService) p13GuildLoginAt(ctx context.Context, id int64, now time.Ti
 			}
 		}
 		return tx.Save(m).Error
-	})
+	}, p13GuildCurrentReadOptions(db.GetIns())...)
 }
 
 func p13GuildDay(now time.Time) string {
@@ -903,7 +914,7 @@ func (s *GameService) p13GuildQuery(ctx context.Context, id int64, request proto
 		default:
 			return errors.New("公会查询入口未恢复")
 		}
-	})
+	}, p13GuildCurrentReadOptions(db.GetIns())...)
 	if err != nil {
 		return nil, err
 	}

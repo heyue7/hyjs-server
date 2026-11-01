@@ -81,7 +81,9 @@ func (s *GameService) rechargeDirectoryCandidates(tx *gorm.DB, playerID, now int
 	var result []rechargeDirectoryCandidate
 	if s.P1Ready {
 		var rows []db.PeriodInstance
-		if err := tx.Where("enabled = ? AND id LIKE ? ESCAPE '!'", true, "rechargeTotal!_%").Order("id ASC").Find(&rows).Error; err != nil {
+		if err := tx.Where("enabled = ? AND id LIKE ? ESCAPE '!'", true, "rechargeTotal!_%").
+			Where("owner_player_id IN ? AND realm_id IN ?", []int64{0, playerID}, []int64{0, s.OriginalServerID()}).
+			Order("id ASC").Find(&rows).Error; err != nil {
 			return nil, err
 		}
 		ids := make([]string, 0, len(rows))

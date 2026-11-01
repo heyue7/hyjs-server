@@ -321,7 +321,9 @@ if args.with_backup and (ROOT / 'migration.json').exists():
         trial82_guard.record['state'] = 'backup-created'
         trial82_guard.checkpoint()
 shutil.copy2(stage / 'compose.yaml', ROOT / 'compose.yaml')
-compose('up', '-d', 'mysql')
+# Application releases preserve the running database and its current limits.
+# Explicit database configuration maintenance is performed separately.
+compose('up', '-d', '--no-recreate', 'mysql')
 for _ in range(80):
     try:
         mysql('SELECT 1;')

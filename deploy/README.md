@@ -43,6 +43,8 @@ bash deploy_test.sh --env-file /private/path/deployment.env --revision test
 
 常规发布默认不创建数据库备份，也不更新 `backup-latest.json`。需要备份时须由用户明确要求，并传入 `--with-backup`；原有项目备份按用户明确授权和归属核验后清理。涉及既有数据迁移、投放或维护期重部署的 `--migrate-role-wallets`、`--restore-activity-calendar`、`--calendar-formal-110`、各 `--apply-*` 及 `--maintenance-redeploy` 必须显式传 `--with-backup`，本机和远端均会在操作前检查。
 
+应用发布通过 `--no-recreate` 保留已有 MySQL 容器及其运行参数；数据库容器配置变更单独维护。新环境仍可创建和启动缺失数据库。
+
 首次数据包同目录需有 `initial-verification.json`，包含快照 SHA、各表数量和
 完整 profile 校验摘要。仅允许对空项目数据库首次导入；重试相同快照不会重复导入。
 迁移脚本 `prepare_initial.py` 会停止已核实归属的本机写入进程；执行前先明确切换范围。

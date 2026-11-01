@@ -14,6 +14,11 @@ sys.path.insert(0, str(ROOT / 'tests'))
 from hyjs_managed_mysql import ManagedMySQL
 
 CASES = {
+    'TestPlayerConcurrencyMySQLGuildLoginIsolation': 'p13',
+    'TestCopyFormationContinuityMySQLInterleaving': 'p1',
+    'TestRechargeDirectoryIndexMySQLBlockedCommitAndRollback': 'p1',
+    'TestRechargeDirectoryMySQLConcurrentClaimsAndReplay': 'p4',
+    'TestRechargeDirectoryMySQLP3ObservationBlocksDisable': 'p1',
     'TestPlayerConcurrencyMySQLPVPDoesNotBlockMovement': 'p12_pk',
     'TestPlayerConcurrencyMySQLSceneProjectionMigration': 'p1',
     'TestGGOPeriodPointRealMySQLCancelDoesNotBlockOtherClaim': 'p1',
@@ -36,6 +41,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--case', choices=CASES, action='append')
     parser.add_argument('--output', required=True, type=Path)
+    parser.add_argument('--keep-going', action='store_true')
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=True)
     binary = ROOT / 'build/player-concurrency-20261102/service.test'
@@ -72,7 +78,7 @@ def main():
                 results.append({'case': name, 'passed': passed, 'exitCode': result.returncode,
                                 'seconds': round(time.monotonic() - began, 3)})
                 print(json.dumps(results[-1]), flush=True)
-                if not passed:
+                if not passed and not args.keep_going:
                     break
             finally:
                 pool.release(connection.database)
