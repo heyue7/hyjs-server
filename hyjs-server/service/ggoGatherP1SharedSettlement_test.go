@@ -141,3 +141,31 @@ func TestGGOGatherP1SharedSettlementAndFirstFreeze(t *testing.T) {
 		}
 	}
 }
+
+func TestGGOGatherWithoutP1ReadyKeepsOriginalFactPath(t *testing.T) {
+	t.Setenv("HYJS_P1_MYSQL_DATABASE", "")
+	f := ggoPeriodLockSetup(t)
+	f.setDue(t, 0)
+	// The legacy partial-service configuration may retain event tables without
+	// having installed the new activity catalog guard.
+	f.s.P1Ready = false
+	database := db.GetIns()
+	const callback = "test:ggo-no-uninitialized-p1-catalog"
+	if err := database.Callback().Query().Before("gorm:query").Register(callback, func(tx *gorm.DB) {
+		if tx.Statement.Table == "p1_gather_catalog_guards" {
+			tx.AddError(fmt.Errorf("uninitialized P1 catalog was queried"))
+		}
+	}); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = database.Callback().Query().Remove(callback) })
+	first, err := f.s.GGOFieldGatherClaim(f.ctx, f.claimRequest(0), f.sessions[0])
+	if err != nil || first == nil {
+		t.Fatalf("partial-service claim: %+v %v", first, err)
+	}
+	again, err := f.s.GGOFieldGatherClaim(f.ctx, f.claimRequest(0), f.sessions[0])
+	if err != nil || !reflect.DeepEqual(first, again) ||
+		p1Count(t, &db.EventFact{}, "player_id=? AND source_key=?", f.ids[0], "ggo:gather:"+f.starts[0].AttemptToken) != 1 {
+		t.Fatalf("partial-service claim lost its original fact or replay: %+v %v", again, err)
+	}
+}
