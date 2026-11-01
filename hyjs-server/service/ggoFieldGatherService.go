@@ -147,145 +147,154 @@ func ggoGatherRequirementError(kind string, requiredLevel int64, level int32, re
 func (s *GameService) GGOFieldGatherStart(ctx context.Context, req model.GGOFieldGatherStartRequest, session []byte) (*model.GGOFieldGatherStartResponse, error) {
 	var out model.GGOFieldGatherStartResponse
 	accepted := false
-	err := s.ggoWithActor(ctx, req.GGOFieldAuth, session, func(tx *gorm.DB, a *ggoFieldActor) error {
-		hash := ggoStartHash(req)
-		var previous db.GGOFieldReceipt
-		e := tx.First(&previous, "player_id=? AND request_id=?", a.Row.Id, req.RequestID).Error
-		if e == nil {
-			if previous.Operation == constUtil.GGOFieldOpGatherTombstone {
-				return ggoFieldError(constUtil.GGOFieldStaleGeneration, "采集请求已取消")
+	run := func(attemptCtx context.Context) error {
+		out = model.GGOFieldGatherStartResponse{}
+		accepted = false
+		return s.ggoWithActor(attemptCtx, req.GGOFieldAuth, session, func(tx *gorm.DB, a *ggoFieldActor) error {
+			hash := ggoStartHash(req)
+			var previous db.GGOFieldReceipt
+			e := tx.First(&previous, "player_id=? AND request_id=?", a.Row.Id, req.RequestID).Error
+			if e == nil {
+				if previous.Operation == constUtil.GGOFieldOpGatherTombstone {
+					return ggoFieldError(constUtil.GGOFieldStaleGeneration, "采集请求已取消")
+				}
+				if previous.Operation != constUtil.GGOFieldOpGatherStart || previous.RequestHash != hash {
+					return ggoFieldError(constUtil.GGOFieldRequestConflict, "请求编号已用于其他操作")
+				}
+				return json.Unmarshal(previous.Response, &out)
 			}
-			if previous.Operation != constUtil.GGOFieldOpGatherStart || previous.RequestHash != hash {
-				return ggoFieldError(constUtil.GGOFieldRequestConflict, "请求编号已用于其他操作")
+			if !errors.Is(e, gorm.ErrRecordNotFound) {
+				return e
 			}
-			return json.Unmarshal(previous.Response, &out)
-		}
-		if !errors.Is(e, gorm.ErrRecordNotFound) {
-			return e
-		}
-		if a.Game.GGOField == nil {
-			return ggoFieldError(constUtil.GGOFieldInvalidLocation, "请先从向导进入危险区")
-		}
-		if a.Game.GGOField.ProtectionUntil > a.Now {
-			return ggoFieldError(constUtil.GGOFieldProtectionConfirmation, "确认解除入场保护后请再次操作")
-		}
-		if err := P12FieldPVPRequireIdle(tx, a.Row.Id, time.UnixMilli(a.Now)); err != nil {
-			return ggoFieldError(constUtil.GGOFieldBusy, "当前角色正在战斗")
-		}
-		if a.Game.Field.Side.GetCurHp() <= 0 || a.Game.Run != nil && !a.Game.Run.Complete || a.Game.Field.Fight != nil && !a.Game.Field.Fight.Settled {
-			return ggoFieldError(constUtil.GGOFieldBusy, "倒下或战斗中无法采集")
-		}
-		var active db.P8GatherAttempt
-		e = tx.First(&active, "player_id=? AND active=?", a.Row.Id, true).Error
-		if e != nil && !errors.Is(e, gorm.ErrRecordNotFound) {
-			return e
-		}
-		if e == nil {
-			return ggoFieldError(constUtil.GGOFieldBusy, "已有采集尚未结束")
-		}
-		cfg := a.Service.GGOFieldConfig
-		values, err := ggoChipValues(cfg)
-		if err != nil {
-			return err
-		}
-		_, total, err := ggoProtectedChips(a.Game.GGOField.Chips, cfg.Runtime.ProtectedChips)
-		if err != nil {
-			return err
-		}
-		if total > 0 && (a.Game.GGOField.EconomyVersion != cfg.Runtime.EconomyVersion || a.Game.GGOField.ExchangeValues != values) {
-			return ggoFieldError(constUtil.GGOFieldEconomyConflict, "请先返回安全区结算旧版本芯片")
-		}
-		if err = ggoLockPeriodsBeforeLine(tx, a.Service); err != nil {
-			return err
-		}
-		row, state, _, err := ggoLoadLine(tx, a.Service.OriginalServerID(), int64(a.Presence.Line), cfg, a.Service.GGOFieldRevision, a.Now)
-		if err != nil {
-			return err
-		}
-		var node *ggoResourceNode
-		for i := range state.Resources {
-			if state.Resources[i].PointID == req.PointID {
-				node = &state.Resources[i]
-				break
+			if a.Game.GGOField == nil {
+				return ggoFieldError(constUtil.GGOFieldInvalidLocation, "请先从向导进入危险区")
 			}
-		}
-		if node == nil || node.Generation != req.Generation {
-			return ggoFieldError(constUtil.GGOFieldStaleGeneration, "资源已刷新")
-		}
-		if node.Remaining < 1 || node.ReservedBy != 0 || ggoLegacyBlocked(state, node.PointID) {
-			return ggoFieldError(constUtil.GGOFieldBusy, "资源点已耗尽或被占用")
-		}
-		var point *model.AdminFieldGGOPoint
-		for i := range cfg.Runtime.Points {
-			if cfg.Runtime.Points[i].ID == node.PointID {
-				point = &cfg.Runtime.Points[i]
-				break
+			if a.Game.GGOField.ProtectionUntil > a.Now {
+				return ggoFieldError(constUtil.GGOFieldProtectionConfirmation, "确认解除入场保护后请再次操作")
 			}
-		}
-		if point == nil {
-			return errors.New("沙漠资源点配置缺失")
-		}
-		frozen, err := ggoGatherConfig(a.Service, cfg, *node, *point, req.RequestID, int64(a.Presence.Line))
-		if err != nil {
-			return err
-		}
-		if !p8Near(a.Game.Position.GetCurrent(), &frozen.p8GatherConfig) {
-			return ggoFieldError(constUtil.GGOFieldInvalidLocation, "请靠近资源点")
-		}
-		level, err := a.Service.p8LifeLevel(tx, a.Row.Id, node.Kind)
-		if err != nil {
-			return err
-		}
-		if err := ggoGatherRequirementError(node.Kind, node.Level, level, cfg.Runtime.Resource.Fatigue, a.Game.Field.Side.GetTiredness()); err != nil {
-			return err
-		}
-		token, err := fieldToken()
-		if err != nil {
-			return err
-		}
-		rewards, err := a.Service.p8RollGather(&frozen.p8GatherConfig)
-		if err != nil {
-			return err
-		}
-		raw, err := json.Marshal(frozen)
-		if err != nil {
-			return err
-		}
-		if a.Now > math.MaxInt64-frozen.GatherMS {
-			return errors.New("采集时间溢出")
-		}
-		if err = ggoInterruptExtractionLocked(tx, a.Row.Id, a.Game, a.Now); err != nil {
-			return err
-		}
-		attempt := db.P8GatherAttempt{PlayerID: a.Row.Id, Token: token, Scene: constUtil.GGOFieldScene, PosID: node.PointID, Generation: node.Generation, StartedAt: a.Now, ReadyAt: a.Now + frozen.GatherMS, Active: true, Snapshot: string(raw), Rewards: rewards}
-		node.ReservedBy = a.Row.Id
-		node.AttemptToken = token
-		node.ReadyAtMS = attempt.ReadyAt
-		if err = ggoLineSave(tx, row, state, a.Now); err != nil {
-			return err
-		}
-		if err = tx.Save(&attempt).Error; err != nil {
-			return err
-		}
-		if total == 0 {
-			a.Game.GGOField.EconomyVersion = cfg.Runtime.EconomyVersion
-			a.Game.GGOField.ExchangeValues = values
-		}
-		if node.Kind == "fish" {
-			a.Game.Field.Side.State = proto.Int32(constUtil.P8FieldFishing)
-		} else {
-			a.Game.Field.Side.State = proto.Int32(constUtil.P8FieldMining)
-		}
-		if err = saveProfile(tx, a.Row, a.Player, a.Game); err != nil {
-			return err
-		}
-		out = model.GGOFieldGatherStartResponse{RequestID: req.RequestID, AttemptToken: token, PointID: node.PointID, Generation: node.Generation, AcceptedAtMS: a.Now, ReadyAtMS: attempt.ReadyAt, FatigueCost: int64(frozen.Fatigue)}
-		if err = ggoSaveReceipt(tx, a.Row.Id, req.RequestID, constUtil.GGOFieldOpGatherStart, hash, cfg.Runtime.EconomyVersion, nil, [6]int64{}, 0, a.Now, out); err != nil {
-			return err
-		}
-		accepted = true
-		return nil
-	})
+			if err := P12FieldPVPRequireIdle(tx, a.Row.Id, time.UnixMilli(a.Now)); err != nil {
+				return ggoFieldError(constUtil.GGOFieldBusy, "当前角色正在战斗")
+			}
+			if a.Game.Field.Side.GetCurHp() <= 0 || a.Game.Run != nil && !a.Game.Run.Complete || a.Game.Field.Fight != nil && !a.Game.Field.Fight.Settled {
+				return ggoFieldError(constUtil.GGOFieldBusy, "倒下或战斗中无法采集")
+			}
+			var active db.P8GatherAttempt
+			e = tx.First(&active, "player_id=? AND active=?", a.Row.Id, true).Error
+			if e != nil && !errors.Is(e, gorm.ErrRecordNotFound) {
+				return e
+			}
+			if e == nil {
+				return ggoFieldError(constUtil.GGOFieldBusy, "已有采集尚未结束")
+			}
+			cfg := a.Service.GGOFieldConfig
+			values, err := ggoChipValues(cfg)
+			if err != nil {
+				return err
+			}
+			_, total, err := ggoProtectedChips(a.Game.GGOField.Chips, cfg.Runtime.ProtectedChips)
+			if err != nil {
+				return err
+			}
+			if total > 0 && (a.Game.GGOField.EconomyVersion != cfg.Runtime.EconomyVersion || a.Game.GGOField.ExchangeValues != values) {
+				return ggoFieldError(constUtil.GGOFieldEconomyConflict, "请先返回安全区结算旧版本芯片")
+			}
+			if err = ggoLockPeriodsBeforeLine(tx, a.Service); err != nil {
+				return err
+			}
+			row, state, _, err := ggoLoadLine(tx, a.Service.OriginalServerID(), int64(a.Presence.Line), cfg, a.Service.GGOFieldRevision, a.Now)
+			if err != nil {
+				return err
+			}
+			var node *ggoResourceNode
+			for i := range state.Resources {
+				if state.Resources[i].PointID == req.PointID {
+					node = &state.Resources[i]
+					break
+				}
+			}
+			if node == nil || node.Generation != req.Generation {
+				return ggoFieldError(constUtil.GGOFieldStaleGeneration, "资源已刷新")
+			}
+			if node.Remaining < 1 || node.ReservedBy != 0 || ggoLegacyBlocked(state, node.PointID) {
+				return ggoFieldError(constUtil.GGOFieldBusy, "资源点已耗尽或被占用")
+			}
+			var point *model.AdminFieldGGOPoint
+			for i := range cfg.Runtime.Points {
+				if cfg.Runtime.Points[i].ID == node.PointID {
+					point = &cfg.Runtime.Points[i]
+					break
+				}
+			}
+			if point == nil {
+				return errors.New("沙漠资源点配置缺失")
+			}
+			frozen, err := ggoGatherConfig(a.Service, cfg, *node, *point, req.RequestID, int64(a.Presence.Line))
+			if err != nil {
+				return err
+			}
+			if !p8Near(a.Game.Position.GetCurrent(), &frozen.p8GatherConfig) {
+				return ggoFieldError(constUtil.GGOFieldInvalidLocation, "请靠近资源点")
+			}
+			level, err := a.Service.p8LifeLevel(tx, a.Row.Id, node.Kind)
+			if err != nil {
+				return err
+			}
+			if err := ggoGatherRequirementError(node.Kind, node.Level, level, cfg.Runtime.Resource.Fatigue, a.Game.Field.Side.GetTiredness()); err != nil {
+				return err
+			}
+			token, err := fieldToken()
+			if err != nil {
+				return err
+			}
+			rewards, err := a.Service.p8RollGather(&frozen.p8GatherConfig)
+			if err != nil {
+				return err
+			}
+			raw, err := json.Marshal(frozen)
+			if err != nil {
+				return err
+			}
+			if a.Now > math.MaxInt64-frozen.GatherMS {
+				return errors.New("采集时间溢出")
+			}
+			if err = ggoInterruptExtractionLocked(tx, a.Row.Id, a.Game, a.Now); err != nil {
+				return err
+			}
+			attempt := db.P8GatherAttempt{PlayerID: a.Row.Id, Token: token, Scene: constUtil.GGOFieldScene, PosID: node.PointID, Generation: node.Generation, StartedAt: a.Now, ReadyAt: a.Now + frozen.GatherMS, Active: true, Snapshot: string(raw), Rewards: rewards}
+			node.ReservedBy = a.Row.Id
+			node.AttemptToken = token
+			node.ReadyAtMS = attempt.ReadyAt
+			if err = ggoLineSave(tx, row, state, a.Now); err != nil {
+				return err
+			}
+			if err = tx.Save(&attempt).Error; err != nil {
+				return err
+			}
+			if total == 0 {
+				a.Game.GGOField.EconomyVersion = cfg.Runtime.EconomyVersion
+				a.Game.GGOField.ExchangeValues = values
+			}
+			if node.Kind == "fish" {
+				a.Game.Field.Side.State = proto.Int32(constUtil.P8FieldFishing)
+			} else {
+				a.Game.Field.Side.State = proto.Int32(constUtil.P8FieldMining)
+			}
+			if err = saveProfile(tx, a.Row, a.Player, a.Game); err != nil {
+				return err
+			}
+			out = model.GGOFieldGatherStartResponse{RequestID: req.RequestID, AttemptToken: token, PointID: node.PointID, Generation: node.Generation, AcceptedAtMS: a.Now, ReadyAtMS: attempt.ReadyAt, FatigueCost: int64(frozen.Fatigue)}
+			if err = ggoSaveReceipt(tx, a.Row.Id, req.RequestID, constUtil.GGOFieldOpGatherStart, hash, cfg.Runtime.EconomyVersion, nil, [6]int64{}, 0, a.Now, out); err != nil {
+				return err
+			}
+			accepted = true
+			return nil
+		})
+	}
+	shared := context.WithValue(ctx, constUtil.P1SharedReadContextKey{}, true)
+	err := run(shared)
+	if errors.Is(err, constUtil.ErrP1ExclusiveRetry) {
+		err = run(ctx)
+	}
 	if err == nil && accepted {
 		s.ggoScheduleGather(ctx, req.PlayerID, out.AttemptToken, out.ReadyAtMS)
 	}

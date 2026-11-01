@@ -68,7 +68,7 @@ func TestP8GatherSharedAndActivityRetryRealMySQL(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	// 现网同量级的其他活动必须不会让两种采集取独占锁。
+	// 现网同量级的其他活动不应让资源查询或开始采集取独占锁。
 	now := time.Now()
 	periods := make([]db.PeriodInstance, 700)
 	for i := range periods {
@@ -211,6 +211,14 @@ func TestP8GatherSharedAndActivityRetryRealMySQL(t *testing.T) {
 		if err := database.First(&resumed, "player_id=?", f.id).Error; err != nil || resumed.Token != attempt.Token || resumed.ReadyAt != attempt.ReadyAt || resumed.Rewards != attempt.Rewards {
 			t.Fatalf("%s repeat start changed the frozen attempt: %v", kind, err)
 		}
+		if trace.shared.Load() == 0 || trace.exclusive.Load() != 0 {
+			t.Fatalf("%s resource query or start used an exclusive period lock: shared=%d exclusive=%d", kind, trace.shared.Load(), trace.exclusive.Load())
+		}
+		// Claim records an activity fact. Until insertion races are protected
+		// without changing the transaction's read view, retain the original X lock.
+		finish()
+		trace.shared.Store(0)
+		trace.exclusive.Store(0)
 		claim := &pb.CSFieldGetResource{}
 		claimStamp := stamp + 1
 		if stamp == 0 {
@@ -245,14 +253,12 @@ func TestP8GatherSharedAndActivityRetryRealMySQL(t *testing.T) {
 		if n := p1Count(t, &db.EventFact{}, "player_id=? AND source_key=?", f.id, "p8:gather:"+attempt.Token); n != 1 {
 			t.Fatalf("%s event fact count=%d", kind, n)
 		}
-		if trace.shared.Load() == 0 || trace.exclusive.Load() != 0 {
-			t.Fatalf("%s used exclusive period lock: shared=%d exclusive=%d", kind, trace.shared.Load(), trace.exclusive.Load())
+		if trace.exclusive.Load() == 0 {
+			t.Fatalf("%s claim did not retain the exclusive period lock", kind)
 		}
-		finish()
 	}
 
-	// A currently open matching activity still forces a full rollback before the
-	// original exclusive path freezes its rule and credits the player once.
+	// A currently open matching activity freezes its rule and credits once.
 	period := p1Instance(t, f, "p8_shared_active_mine", constUtil.P8EventMineGather, "cumulative", 1, time.Now().Add(time.Hour), 0)
 	chosen := selected["mine"]
 	move(chosen)
@@ -280,7 +286,7 @@ func TestP8GatherSharedAndActivityRetryRealMySQL(t *testing.T) {
 	select {
 	case r := <-result:
 		finish()
-		t.Fatalf("active activity did not wait for exclusive retry: %v", r.err)
+		t.Fatalf("active activity did not wait for exclusive lock: %v", r.err)
 	case <-time.After(250 * time.Millisecond):
 	}
 	var pending db.P8GatherAttempt
@@ -293,8 +299,8 @@ func TestP8GatherSharedAndActivityRetryRealMySQL(t *testing.T) {
 	if r.err != nil || r.messages[0].(*pb.SCFieldGetResource).GetCode() != constUtil.P8ResourceAvailable {
 		t.Fatalf("exclusive retry failed: %v", r.err)
 	}
-	if trace.shared.Load() == 0 || trace.exclusive.Load() == 0 {
-		t.Fatalf("missing rollback and exclusive retry: shared=%d exclusive=%d", trace.shared.Load(), trace.exclusive.Load())
+	if trace.exclusive.Load() == 0 {
+		t.Fatalf("missing exclusive activity lock: shared=%d exclusive=%d", trace.shared.Load(), trace.exclusive.Load())
 	}
 	_, after := f.profile(t)
 	progress := p1ProgressValue(t, f, period.ID)

@@ -114,54 +114,65 @@ func (s *GameService) resourceProfile(ctx context.Context, id int64) (*pb.Player
 	}
 	// 恢复结算属于查询前置步骤，不沿用外层业务消息触发活动进度回调。
 	readCtx := context.WithValue(ctx, constUtil.GameRequestContextKey, struct{}{})
-	err := db.GetIns().WithContext(readCtx).Transaction(func(tx *gorm.DB) error {
-		if err := ServerGameClockGuardTransaction(tx); err != nil {
-			return err
-		}
+	run := func(attemptCtx context.Context) error {
+		// 独占重试必须返回重新读取的角色，不能泄漏已回滚尝试中的内存状态。
+		player, game = nil, nil
+		return db.GetIns().WithContext(attemptCtx).Transaction(func(tx *gorm.DB) error {
+			if err := ServerGameClockGuardTransaction(tx); err != nil {
+				return err
+			}
 
-		var row db.Profile
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&row, id).Error; err != nil {
-			return err
-		}
-		persisted := row
-		var err error
-		player, game, err = decodeProfile(&row)
-		if err != nil {
-			return err
-		}
-		clockChanged, err := ServerGameClockPrepareProfile(tx, &row, player)
-		if err != nil {
-			return err
-		}
-		fieldChanged := false
-		if ServerGameClockContextBound(readCtx) && row.Id == GameCalendarOwner(readCtx) {
-			game.FieldCalendarDay = LocalPlayNow(readCtx).In(time.FixedZone("Asia/Shanghai", 8*60*60)).Format("2006-01-02")
-			fieldChanged, err = prepareFieldCalendar75(tx, row.Id, game, game.FieldCalendarDay)
+			var row db.Profile
+			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&row, id).Error; err != nil {
+				return err
+			}
+			persisted := row
+			var err error
+			player, game, err = decodeProfile(&row)
 			if err != nil {
 				return err
 			}
-		}
-		penaltyChanged, err := s.syncP12FieldPVPPenaltyForRead(tx, player, game, time.Now())
-		if err != nil {
-			return err
-		}
-		storedPower := player.GetFightPower()
-		if err = s.RefreshP5GuildPrayerPower(readCtx, tx, player, game, p13UFNow(readCtx)); err != nil {
-			return err
-		}
-		powerChanged := false
-		if refreshPower {
-			if err = s.refreshP5GrowthFightPower(readCtx, tx, player, game); err != nil {
+			clockChanged, err := ServerGameClockPrepareProfile(tx, &row, player)
+			if err != nil {
 				return err
 			}
-			powerChanged = storedPower != player.GetFightPower()
-		}
-		changed, err := settleResourceRecovery(player, time.Now().UnixMilli())
-		if err != nil || !changed && !penaltyChanged && !clockChanged && !powerChanged && !fieldChanged {
-			return err
-		}
-		return saveProfileAgainst(tx, &row, player, game, &persisted)
-	})
+			fieldChanged := false
+			if ServerGameClockContextBound(attemptCtx) && row.Id == GameCalendarOwner(attemptCtx) {
+				game.FieldCalendarDay = LocalPlayNow(attemptCtx).In(time.FixedZone("Asia/Shanghai", 8*60*60)).Format("2006-01-02")
+				fieldChanged, err = prepareFieldCalendar75(tx, row.Id, game, game.FieldCalendarDay)
+				if err != nil {
+					return err
+				}
+			}
+			penaltyChanged, err := s.syncP12FieldPVPPenaltyForRead(tx, player, game, time.Now())
+			if err != nil {
+				return err
+			}
+			storedPower := player.GetFightPower()
+			if err = s.RefreshP5GuildPrayerPower(attemptCtx, tx, player, game, p13UFNow(attemptCtx)); err != nil {
+				return err
+			}
+			powerChanged := false
+			if refreshPower {
+				if err = s.refreshP5GrowthFightPower(attemptCtx, tx, player, game); err != nil {
+					return err
+				}
+				powerChanged = storedPower != player.GetFightPower()
+			}
+			changed, err := settleResourceRecovery(player, time.Now().UnixMilli())
+			if err != nil || !changed && !penaltyChanged && !clockChanged && !powerChanged && !fieldChanged {
+				return err
+			}
+			return saveProfileAgainst(tx, &row, player, game, &persisted)
+		})
+	}
+	// 无活动写入的恢复可以共享窗口锁；需要产生事实或补齐配置时，
+	// 必须先回滚整笔恢复，再沿原有独占窗口路径执行。
+	shared := context.WithValue(readCtx, constUtil.P1SharedReadContextKey{}, true)
+	err := run(shared)
+	if errors.Is(err, constUtil.ErrP1ExclusiveRetry) {
+		err = run(readCtx)
+	}
 	return player, game, err
 }
 

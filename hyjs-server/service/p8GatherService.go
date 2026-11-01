@@ -634,9 +634,8 @@ func (s *GameService) p8GatherMutationProjected(ctx context.Context, id int64, o
 			return tx.Create(&db.P8GatherReceipt{PlayerID: id, Operation: op, Timestamp: stamp, Request: raw, Response: data}).Error
 		})
 	}
-	if op == constUtil.P8GatherStartOperation || op == constUtil.P8GatherClaimOperation {
+	if op == constUtil.P8GatherStartOperation {
 		shared := context.WithValue(ctx, constUtil.P1SharedReadContextKey{}, true)
-		shared = context.WithValue(shared, p8OrdinaryGatherFactContextKey{}, true)
 		err = run(shared)
 		if errors.Is(err, constUtil.ErrP1ExclusiveRetry) {
 			proto.Reset(response)

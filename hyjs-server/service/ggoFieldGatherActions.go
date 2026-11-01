@@ -210,94 +210,102 @@ func (s *GameService) GGOFieldGatherStatus(ctx context.Context, req model.GGOFie
 
 func (s *GameService) GGOFieldGatherCancel(ctx context.Context, req model.GGOFieldGatherCancelRequest, session []byte) (*model.GGOFieldGatherCancelResponse, error) {
 	var out model.GGOFieldGatherCancelResponse
-	err := s.ggoWithProfile(ctx, req.GGOFieldAuth, session, false, false, func(tx *gorm.DB, a *ggoFieldActor) error {
-		hash := ggoCancelHash(req.StartRequestID, req.AttemptToken)
-		if found, err := ggoReadReceipt(tx, a.Row.Id, req.RequestID, constUtil.GGOFieldOpGatherCancel, hash, &out); err != nil || found {
-			return err
-		}
-		start, status, err := ggoReadStart(tx, a.Row.Id, req.StartRequestID)
-		if err != nil {
-			return err
-		}
-		if status == "unknown" {
-			tomb := model.GGOFieldGatherCancelResponse{RequestID: req.StartRequestID, StartRequestID: req.StartRequestID, Status: "cancelled"}
-			if err = ggoSaveReceipt(tx, a.Row.Id, req.StartRequestID, constUtil.GGOFieldOpGatherTombstone, "", "", nil, [6]int64{}, 0, a.Now, tomb); err != nil {
+	run := func(attemptCtx context.Context) error {
+		out = model.GGOFieldGatherCancelResponse{}
+		return s.ggoWithProfile(attemptCtx, req.GGOFieldAuth, session, false, false, func(tx *gorm.DB, a *ggoFieldActor) error {
+			hash := ggoCancelHash(req.StartRequestID, req.AttemptToken)
+			if found, err := ggoReadReceipt(tx, a.Row.Id, req.RequestID, constUtil.GGOFieldOpGatherCancel, hash, &out); err != nil || found {
 				return err
 			}
-			out = model.GGOFieldGatherCancelResponse{RequestID: req.RequestID, StartRequestID: req.StartRequestID, Status: "cancelled"}
-			return ggoSaveReceipt(tx, a.Row.Id, req.RequestID, constUtil.GGOFieldOpGatherCancel, hash, "", nil, [6]int64{}, 0, a.Now, out)
-		}
-		if status == "cancelled" {
-			out = model.GGOFieldGatherCancelResponse{RequestID: req.RequestID, StartRequestID: req.StartRequestID, Status: "already_cancelled"}
-			return ggoSaveReceipt(tx, a.Row.Id, req.RequestID, constUtil.GGOFieldOpGatherCancel, hash, "", nil, [6]int64{}, 0, a.Now, out)
-		}
-		if start == nil || req.AttemptToken != "" && req.AttemptToken != start.AttemptToken {
-			return ggoFieldError(constUtil.GGOFieldRequestConflict, "采集编号不匹配")
-		}
-		out = model.GGOFieldGatherCancelResponse{RequestID: req.RequestID, StartRequestID: req.StartRequestID, AttemptToken: start.AttemptToken}
-		var claim model.GGOFieldGatherClaimResponse
-		if found, err := ggoFindBusinessReceipt(tx, a.Row.Id, constUtil.GGOFieldOpGatherClaim, start.AttemptToken, &claim); err != nil {
-			return err
-		} else if found {
-			out.Status = "settled"
-			out.ClaimReceipt = &claim
-			return ggoSaveReceipt(tx, a.Row.Id, req.RequestID, constUtil.GGOFieldOpGatherCancel, hash, "", nil, [6]int64{}, 0, a.Now, out)
-		}
-		var pending ggoPendingGather
-		if found, err := ggoFindBusinessReceipt(tx, a.Row.Id, constUtil.GGOFieldOpGatherReady, start.AttemptToken, &pending); err != nil {
-			return err
-		} else if found {
-			out.Status = "pending_delivery"
-			return ggoSaveReceipt(tx, a.Row.Id, req.RequestID, constUtil.GGOFieldOpGatherCancel, hash, "", nil, [6]int64{}, 0, a.Now, out)
-		}
-		var previous model.GGOFieldGatherCancelResponse
-		if found, err := ggoFindBusinessReceipt(tx, a.Row.Id, constUtil.GGOFieldOpGatherCancel, start.AttemptToken, &previous); err != nil {
-			return err
-		} else if found {
-			out.Status = "already_cancelled"
-			return ggoSaveReceipt(tx, a.Row.Id, req.RequestID, constUtil.GGOFieldOpGatherCancel, hash, "", nil, [6]int64{}, 0, a.Now, out)
-		}
-		var attempt db.P8GatherAttempt
-		if err = tx.First(&attempt, "player_id=? AND token=? AND active=?", a.Row.Id, start.AttemptToken, true).Error; err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return errors.New("采集回执与预约不一致")
-			}
-			return err
-		}
-		frozen, err := ggoFrozenAttempt(&attempt)
-		if err != nil {
-			return err
-		}
-		canFinish := false
-		if a.Now >= attempt.ReadyAt {
-			canFinish, err = ggoGatherCanFinish(tx, a, &attempt, frozen)
+			start, status, err := ggoReadStart(tx, a.Row.Id, req.StartRequestID)
 			if err != nil {
 				return err
 			}
-		}
-		if canFinish {
-			result, full, err := ggoEndAttempt(tx, a, &attempt, ggoSystemReceiptID("claim", attempt.Token))
-			if err != nil {
-				return err
+			if status == "unknown" {
+				tomb := model.GGOFieldGatherCancelResponse{RequestID: req.StartRequestID, StartRequestID: req.StartRequestID, Status: "cancelled"}
+				if err = ggoSaveReceipt(tx, a.Row.Id, req.StartRequestID, constUtil.GGOFieldOpGatherTombstone, "", "", nil, [6]int64{}, 0, a.Now, tomb); err != nil {
+					return err
+				}
+				out = model.GGOFieldGatherCancelResponse{RequestID: req.RequestID, StartRequestID: req.StartRequestID, Status: "cancelled"}
+				return ggoSaveReceipt(tx, a.Row.Id, req.RequestID, constUtil.GGOFieldOpGatherCancel, hash, "", nil, [6]int64{}, 0, a.Now, out)
 			}
-			if full {
-				out.Status = "pending_delivery"
-			} else {
+			if status == "cancelled" {
+				out = model.GGOFieldGatherCancelResponse{RequestID: req.RequestID, StartRequestID: req.StartRequestID, Status: "already_cancelled"}
+				return ggoSaveReceipt(tx, a.Row.Id, req.RequestID, constUtil.GGOFieldOpGatherCancel, hash, "", nil, [6]int64{}, 0, a.Now, out)
+			}
+			if start == nil || req.AttemptToken != "" && req.AttemptToken != start.AttemptToken {
+				return ggoFieldError(constUtil.GGOFieldRequestConflict, "采集编号不匹配")
+			}
+			out = model.GGOFieldGatherCancelResponse{RequestID: req.RequestID, StartRequestID: req.StartRequestID, AttemptToken: start.AttemptToken}
+			var claim model.GGOFieldGatherClaimResponse
+			if found, err := ggoFindBusinessReceipt(tx, a.Row.Id, constUtil.GGOFieldOpGatherClaim, start.AttemptToken, &claim); err != nil {
+				return err
+			} else if found {
 				out.Status = "settled"
-				out.ClaimReceipt = result
+				out.ClaimReceipt = &claim
+				return ggoSaveReceipt(tx, a.Row.Id, req.RequestID, constUtil.GGOFieldOpGatherCancel, hash, "", nil, [6]int64{}, 0, a.Now, out)
 			}
-			return ggoSaveReceipt(tx, a.Row.Id, req.RequestID, constUtil.GGOFieldOpGatherCancel, hash, frozen.EconomyVersion, nil, [6]int64{}, 0, a.Now, out)
-		}
-		cancelled, err := ggoCancelAttempt(tx, a.Service, a.Row.Id, a.Game, &attempt, req.RequestID, hash, a.Now)
-		if err != nil {
-			return err
-		}
-		if err = saveProfile(tx, a.Row, a.Player, a.Game); err != nil {
-			return err
-		}
-		out = *cancelled
-		return nil
-	})
+			var pending ggoPendingGather
+			if found, err := ggoFindBusinessReceipt(tx, a.Row.Id, constUtil.GGOFieldOpGatherReady, start.AttemptToken, &pending); err != nil {
+				return err
+			} else if found {
+				out.Status = "pending_delivery"
+				return ggoSaveReceipt(tx, a.Row.Id, req.RequestID, constUtil.GGOFieldOpGatherCancel, hash, "", nil, [6]int64{}, 0, a.Now, out)
+			}
+			var previous model.GGOFieldGatherCancelResponse
+			if found, err := ggoFindBusinessReceipt(tx, a.Row.Id, constUtil.GGOFieldOpGatherCancel, start.AttemptToken, &previous); err != nil {
+				return err
+			} else if found {
+				out.Status = "already_cancelled"
+				return ggoSaveReceipt(tx, a.Row.Id, req.RequestID, constUtil.GGOFieldOpGatherCancel, hash, "", nil, [6]int64{}, 0, a.Now, out)
+			}
+			var attempt db.P8GatherAttempt
+			if err = tx.First(&attempt, "player_id=? AND token=? AND active=?", a.Row.Id, start.AttemptToken, true).Error; err != nil {
+				if errors.Is(err, gorm.ErrRecordNotFound) {
+					return errors.New("采集回执与预约不一致")
+				}
+				return err
+			}
+			frozen, err := ggoFrozenAttempt(&attempt)
+			if err != nil {
+				return err
+			}
+			canFinish := false
+			if a.Now >= attempt.ReadyAt {
+				canFinish, err = ggoGatherCanFinish(tx, a, &attempt, frozen)
+				if err != nil {
+					return err
+				}
+			}
+			if canFinish {
+				result, full, err := ggoEndAttempt(tx, a, &attempt, ggoSystemReceiptID("claim", attempt.Token))
+				if err != nil {
+					return err
+				}
+				if full {
+					out.Status = "pending_delivery"
+				} else {
+					out.Status = "settled"
+					out.ClaimReceipt = result
+				}
+				return ggoSaveReceipt(tx, a.Row.Id, req.RequestID, constUtil.GGOFieldOpGatherCancel, hash, frozen.EconomyVersion, nil, [6]int64{}, 0, a.Now, out)
+			}
+			cancelled, err := ggoCancelAttempt(tx, a.Service, a.Row.Id, a.Game, &attempt, req.RequestID, hash, a.Now)
+			if err != nil {
+				return err
+			}
+			if err = saveProfile(tx, a.Row, a.Player, a.Game); err != nil {
+				return err
+			}
+			out = *cancelled
+			return nil
+		})
+	}
+	shared := context.WithValue(ctx, constUtil.P1SharedReadContextKey{}, true)
+	err := run(shared)
+	if errors.Is(err, constUtil.ErrP1ExclusiveRetry) {
+		err = run(ctx)
+	}
 	if err != nil {
 		return nil, err
 	}

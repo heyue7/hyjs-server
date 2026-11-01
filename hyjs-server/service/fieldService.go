@@ -300,8 +300,18 @@ func (s *GameService) refreshField(id int64, g *model.GameState) error {
 func (s *GameService) fieldTransfer(ctx context.Context, id int64, b *pb.CSTransferScene) ([]proto.Message, error) {
 	var resolved *pb.PointNew
 	reply := &pb.SCTransferScene{Result: proto.Int32(1)}
-	err := updateProfileWithTx(ctx, id, func(tx *gorm.DB, player *pb.Player, g *model.GameState) error {
+	townReturn := b.GetTarget() == "town" || b.GetTarget() == "town_main"
+	scopedAttempt := true
+	transfer := func(tx *gorm.DB, player *pb.Player, g *model.GameState) error {
+		// A shared attempt may roll back after preparing a desert receipt. Rebuild
+		// captured outputs so only the committed transaction is returned.
+		resolved = nil
+		reply = &pb.SCTransferScene{Result: proto.Int32(1)}
 		previousScene := g.Position.GetScene()
+		if townReturn && scopedAttempt && p1SharedRead(tx) && previousScene != "field_001" && previousScene != "field_002" && previousScene != constUtil.GGOFieldScene {
+			scopedAttempt = false
+			return constUtil.ErrP1ExclusiveRetry
+		}
 		if previousScene == constUtil.GGOFieldScene && g.GGOField != nil {
 			if b.GetTarget() == constUtil.GGOFieldScene {
 				return ggoFieldError(constUtil.GGOFieldInvalidLocation, "请通过安全区向导出发")
@@ -454,7 +464,13 @@ func (s *GameService) fieldTransfer(ctx context.Context, id int64, b *pb.CSTrans
 			}
 		}
 		return nil
-	})
+	}
+	var err error
+	if townReturn {
+		err = updateProfileWithSharedPeriods(ctx, id, transfer)
+	} else {
+		err = updateProfileWithTx(ctx, id, transfer)
+	}
 	if err == nil {
 		// 仅记录成功转场的非敏感空间坐标，追踪原请求到最终入口的映射。
 		elog.Debug("scene transfer committed", zap.Int64("playerId", id), zap.String("scene", b.GetTarget()),
