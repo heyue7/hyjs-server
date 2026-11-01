@@ -46,9 +46,13 @@ func TestGGOPeriodBeforeLineLockModes(t *testing.T) {
 	if err = ggoLockPeriodsBeforeLine(database, &GameService{P1Ready: true}); err != nil {
 		t.Fatal(err)
 	}
-	if len(connector.queries) != 3 || !strings.HasSuffix(connector.queries[0], "FOR SHARE") ||
-		!strings.HasSuffix(connector.queries[1], "FOR SHARE") || !strings.HasSuffix(connector.queries[2], "FOR UPDATE") {
-		t.Fatalf("unexpected activity lock strengths: %v", connector.queries)
+	want := []string{
+		"SELECT id FROM p1_period_instances FORCE INDEX (PRIMARY) ORDER BY id ASC FOR SHARE",
+		"SELECT id FROM p1_period_instances FORCE INDEX (PRIMARY) ORDER BY id ASC FOR SHARE",
+		"SELECT id FROM p1_period_instances FORCE INDEX (PRIMARY) ORDER BY id ASC FOR UPDATE",
+	}
+	if !reflect.DeepEqual(connector.queries, want) {
+		t.Fatalf("activity prelock must retain the full primary-key range and mode: %v", connector.queries)
 	}
 }
 

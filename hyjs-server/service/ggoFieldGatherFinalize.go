@@ -240,15 +240,14 @@ func ggoGatherCanFinish(tx *gorm.DB, a *ggoFieldActor, attempt *db.P8GatherAttem
 	return true, nil
 }
 
-// ggoLockPeriodsBeforeLine keeps activity locks ahead of a line that a subsequent
-// profile save or activity fact may touch. Shared profile transactions keep their
-// existing shared mode and retry exclusively if they later need to record a fact.
+// ggoLockPeriodsBeforeLine keeps the full activity lock range ahead of the line.
+// Rule bodies are loaded later only when an activity hook needs them; shared
+// transactions retain their existing exclusive-retry behavior.
 func ggoLockPeriodsBeforeLine(tx *gorm.DB, s *GameService) error {
 	if s == nil || !s.P1Ready {
 		return nil
 	}
-	_, err := p1LockPeriods(tx)
-	return err
+	return p1LockPeriodIDs(tx)
 }
 
 // ggoEndAttempt consumes a reserved generation exactly once. If inventory cannot
