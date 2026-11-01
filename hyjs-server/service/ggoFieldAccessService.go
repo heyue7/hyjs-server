@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"crypto/subtle"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"math"
@@ -24,6 +25,19 @@ type ggoFieldActor struct {
 	Game     *model.GameState
 	Presence db.P10ScenePresence
 	Now      int64
+}
+
+type ggoGatherCurrentReadKey struct{}
+
+// Gather fact admission reads settlement and activity ownership after its P1
+// locks. MySQL RR could retain an earlier snapshot created before those locks.
+// Other GGO transactions keep their existing isolation and SQLite keeps its
+// single-writer behavior.
+func ggoGatherTransactionOptions(database *gorm.DB, ctx context.Context) []*sql.TxOptions {
+	if database != nil && database.Dialector.Name() == "mysql" && ctx.Value(ggoGatherCurrentReadKey{}) == true {
+		return []*sql.TxOptions{{Isolation: sql.LevelReadCommitted}}
+	}
+	return nil
 }
 
 func ggoFieldError(code int64, text string) error { return model.NewErrBizCodeMsg(code, text) }
@@ -69,7 +83,8 @@ func (s *GameService) ggoWithProfile(ctx context.Context, auth model.GGOFieldAut
 	ctx = context.WithValue(ctx, constUtil.GameServiceContextKey, runtime)
 	changedChips := false
 	var changedLine int32
-	err = db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	database := db.GetIns()
+	err = database.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := ServerGameClockGuardTransaction(tx); err != nil {
 			return err
 		}
@@ -80,6 +95,13 @@ func (s *GameService) ggoWithProfile(ctx context.Context, auth model.GGOFieldAut
 		if AdminProfileServerID(row) != s.OriginalServerID() || subtle.ConstantTimeCompare(row.Session, session) != 1 {
 			return ggoFieldError(constUtil.GGOFieldInvalidLocation, "会话已失效")
 		}
+		// Marked gather transactions hold the stable activity catalog before
+		// calendar decoding or any profile/period hook can read activity rows.
+		guarded, guardErr := p1AcquireGatherCatalog(tx)
+		if guardErr != nil {
+			return guardErr
+		}
+		tx = guarded
 		player, game, err := decodeProfileForCalendarUpdate(tx, &row)
 		if err != nil {
 			return err
@@ -119,7 +141,7 @@ func (s *GameService) ggoWithProfile(ctx context.Context, auth model.GGOFieldAut
 			changedLine = presence.Line
 		}
 		return nil
-	})
+	}, ggoGatherTransactionOptions(database, ctx)...)
 	if err == nil && changedChips {
 		if changedLine > 0 {
 			s.ggoNotifyFieldChange(ctx, changedLine)

@@ -50,6 +50,7 @@ func (s *GameService) ggoScheduleGather(ctx context.Context, id int64, token str
 }
 
 func (s *GameService) ggoFinishDue(ctx context.Context, id int64, token string) error {
+	ctx = p1GatherCatalogContext(context.WithValue(ctx, ggoGatherCurrentReadKey{}, true))
 	snapshot, err := s.adminFieldRuntimeSnapshotForRequest(ctx, s.OriginalServerID())
 	if err != nil {
 		return err
@@ -60,7 +61,8 @@ func (s *GameService) ggoFinishDue(ctx context.Context, id int64, token string) 
 	runtime.GGOFieldRevision = snapshot.ggoRevision
 	ctx = context.WithValue(ctx, constUtil.GameServiceContextKey, runtime)
 	run := func(attemptCtx context.Context) error {
-		return db.GetIns().WithContext(attemptCtx).Transaction(func(tx *gorm.DB) error {
+		database := db.GetIns()
+		return database.WithContext(attemptCtx).Transaction(func(tx *gorm.DB) error {
 			if err := ServerGameClockGuardTransaction(tx); err != nil {
 				return err
 			}
@@ -68,6 +70,11 @@ func (s *GameService) ggoFinishDue(ctx context.Context, id int64, token string) 
 			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&row, id).Error; err != nil {
 				return err
 			}
+			guarded, err := p1AcquireGatherCatalog(tx)
+			if err != nil {
+				return err
+			}
+			tx = guarded
 			player, game, err := decodeProfileForCalendarUpdate(tx, &row)
 			if err != nil {
 				return err
@@ -105,7 +112,7 @@ func (s *GameService) ggoFinishDue(ctx context.Context, id int64, token string) 
 			}
 			_, _, err = ggoEndAttempt(tx, actor, &attempt, ggoSystemReceiptID("claim", token))
 			return err
-		})
+		}, ggoGatherTransactionOptions(database, attemptCtx)...)
 	}
 	shared := context.WithValue(ctx, constUtil.P1SharedReadContextKey{}, true)
 	err = run(shared)

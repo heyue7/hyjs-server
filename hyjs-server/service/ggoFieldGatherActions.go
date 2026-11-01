@@ -83,6 +83,7 @@ func ggoCancelAttempt(tx *gorm.DB, s *GameService, id int64, g *model.GameState,
 }
 
 func (s *GameService) GGOFieldGatherClaim(ctx context.Context, req model.GGOFieldGatherClaimRequest, session []byte) (*model.GGOFieldGatherClaimResponse, error) {
+	ctx = p1GatherCatalogContext(context.WithValue(ctx, ggoGatherCurrentReadKey{}, true))
 	var out model.GGOFieldGatherClaimResponse
 	full := false
 	run := func(attemptCtx context.Context) error {
@@ -220,6 +221,7 @@ func (s *GameService) GGOFieldGatherStatus(ctx context.Context, req model.GGOFie
 }
 
 func (s *GameService) GGOFieldGatherCancel(ctx context.Context, req model.GGOFieldGatherCancelRequest, session []byte) (*model.GGOFieldGatherCancelResponse, error) {
+	ctx = p1GatherCatalogContext(context.WithValue(ctx, ggoGatherCurrentReadKey{}, true))
 	var out model.GGOFieldGatherCancelResponse
 	run := func(attemptCtx context.Context) error {
 		out = model.GGOFieldGatherCancelResponse{}

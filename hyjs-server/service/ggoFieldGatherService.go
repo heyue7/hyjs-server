@@ -145,6 +145,7 @@ func ggoGatherRequirementError(kind string, requiredLevel int64, level int32, re
 // GGOFieldGatherStart freezes the result, reserves one public point and records
 // its UUID under the same profile-then-line transaction.
 func (s *GameService) GGOFieldGatherStart(ctx context.Context, req model.GGOFieldGatherStartRequest, session []byte) (*model.GGOFieldGatherStartResponse, error) {
+	ctx = p1GatherCatalogContext(context.WithValue(ctx, ggoGatherCurrentReadKey{}, true))
 	var out model.GGOFieldGatherStartResponse
 	accepted := false
 	run := func(attemptCtx context.Context) error {
