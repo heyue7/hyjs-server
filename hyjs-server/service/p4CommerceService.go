@@ -858,7 +858,12 @@ func (s *GameService) p4Projection(tx *gorm.DB, p *pb.Player, cfg db.P4CommerceR
 			totalTimes = 1
 		}
 		shopItem := &pb.ShopItem{Id: proto.String(publicID), Item: rewards, Price: []*pb.BaseResource{price}, ExchangeList: []*pb.BaseResource{price}, Priority: proto.Int32(priority), CanBuy: proto.Int32(shopCanBuy), DayLeftTimes: proto.Int32(max(0, left)), DayTotalTimes: proto.Int32(dayTotal), TotalLeftTimes: proto.Int32(max(0, allLeft)), TotalTimes: proto.Int32(totalTimes), PerDiscount: proto.String(strconv.Itoa(int(bps / 100))), Condition: condition}
-		if err := s.p4BatchPurchasePrices(shopItem, product, state, min(bought+1, product.DailyLimit), max(0, left)); err != nil {
+		batchMaximum := max(int32(0), left)
+		if cfg.Kind == "score" {
+			// Keep the period quota intact while the existing bulk UI selects one per transaction.
+			batchMaximum = min(batchMaximum, 1)
+		}
+		if err := s.p4BatchPurchasePrices(shopItem, product, state, min(bought+1, product.DailyLimit), batchMaximum); err != nil {
 			return nil, nil, err
 		}
 		shop = append(shop, shopItem)
@@ -883,7 +888,7 @@ func (s *GameService) p4Projection(tx *gorm.DB, p *pb.Player, cfg db.P4CommerceR
 		}
 		// 原 ParseDiscount 读取整数百分比并除以10显示折数。
 		activityItem := &pb.ActivityShopItem{Index: proto.Int32(product.Index), GetResource: rewards, CostResource: []*pb.BaseResource{price}, Total: proto.Int32(product.DailyLimit), Left: proto.Int32(max(0, left)), Discount: proto.String(strconv.Itoa(int(bps / 100))), PickOneOrGetAll: proto.Int32(1), Status: proto.Int32(status), Name: proto.String(name)}
-		if err := s.p4BatchPurchasePrices(activityItem, product, state, min(bought+1, product.DailyLimit), max(0, left)); err != nil {
+		if err := s.p4BatchPurchasePrices(activityItem, product, state, min(bought+1, product.DailyLimit), batchMaximum); err != nil {
 			return nil, nil, err
 		}
 		activity = append(activity, activityItem)
@@ -1269,6 +1274,9 @@ func (s *GameService) p4CommerceAttempt(ctx context.Context, id int64, request p
 		} else if !query {
 			if count < 1 || count > 100 {
 				return errors.New("交易数量无效")
+			}
+			if cfg.Kind == "score" && count != 1 {
+				return errors.New("悬赏商店每次只能兑换一份")
 			}
 			var selected *p4Product
 			offers := memoryProducts55(cfg, rules, state)

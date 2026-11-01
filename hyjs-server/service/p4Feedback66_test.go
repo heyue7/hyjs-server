@@ -1,9 +1,11 @@
 package service
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
+	"google.golang.org/protobuf/encoding/protowire"
 	"google.golang.org/protobuf/proto"
 	"hyjs-server/db"
 	pb "hyjs-server/model/protocol"
@@ -78,10 +80,23 @@ func TestP4Feedback66ScoreProjectionUsesNativeStateAndRetainsQuota(t *testing.T)
 	}
 }
 
-func TestP4Feedback66ScoreOriginalBatchAndStampReplay(t *testing.T) {
+func TestP4Feedback66ScoreSinglePurchaseAndHistoricalBatchReplay(t *testing.T) {
 	f := p4Setup(t)
 	p4Fund(t, f)
-	if err := db.GetIns().Model(&db.P4CommerceRule{}).Where("kind=?", "score").Update("enabled", true).Error; err != nil {
+	var cfg db.P4CommerceRule
+	if err := db.GetIns().Where("kind=?", "score").First(&cfg).Error; err != nil {
+		t.Fatal(err)
+	}
+	var rules p4CommerceRules
+	if err := json.Unmarshal(cfg.Rules, &rules); err != nil {
+		t.Fatal(err)
+	}
+	for i := range rules.Products {
+		if rules.Products[i].ID == "p4Score_1" {
+			rules.Products[i].DailyLimit = 2
+		}
+	}
+	if err := db.GetIns().Model(&cfg).Updates(map[string]any{"enabled": true, "rules": adminJSON(rules)}).Error; err != nil {
 		t.Fatal(err)
 	}
 	now := time.Now()
@@ -90,15 +105,63 @@ func TestP4Feedback66ScoreOriginalBatchAndStampReplay(t *testing.T) {
 	if len(listed.ShopItemList) != 2 {
 		t.Fatal("score catalogue", listed)
 	}
-	for _, item := range listed.ShopItemList {
-		if item.GetCanBuy() != 1 || item.GetDayLeftTimes() != 20 {
-			t.Fatal("original visible buy button and batch quota", item)
+	item := p4PopularityFind(t, listed.ShopItemList, "p4Score_1")
+	if item.GetCanBuy() != 1 || item.GetDayLeftTimes() != 2 || item.GetDayTotalTimes() != 2 {
+		t.Fatal("native visible state or daily quota changed", item)
+	}
+	curve := func(item *pb.ShopItem) []int32 {
+		t.Helper()
+		var prices []int32
+		for raw := item.ProtoReflect().GetUnknown(); len(raw) > 0; {
+			field, kind, n := protowire.ConsumeTag(raw)
+			if n < 0 || field != 100 || kind != protowire.BytesType {
+				t.Fatal("malformed price extension")
+			}
+			payload, size := protowire.ConsumeBytes(raw[n:])
+			if size < 0 {
+				t.Fatal("malformed price")
+			}
+			var price pb.BaseResource
+			if err := proto.Unmarshal(payload, &price); err != nil {
+				t.Fatal(err)
+			}
+			prices = append(prices, price.GetNum())
+			raw = raw[n+size:]
 		}
+		return prices
+	}
+	if prices := curve(item); len(prices) != 1 || prices[0] != 50 {
+		t.Fatal("existing bulk selector must receive one exact price", prices)
+	}
+	ordinary := p4Trade(t, f, &pb.CSShopProductList{ShopType: proto.Int32(1)}, 0, now).(*pb.SCShopProductList)
+	if prices := curve(p4PopularityFind(t, ordinary.ShopItemList, "itemShopId_1")); len(prices) < 2 {
+		t.Fatal("other shop batch prices were limited", prices)
+	}
+	// This preexisting immutable receipt represents an already completed old batch.
+	legacy := &pb.CSShopBuy{ShopType: proto.Int32(7), ShopItemId: proto.String("p4Score_1"), BuyCount: proto.Int32(2)}
+	legacyReceipt := &pb.SCShopBuy{ShopType: proto.Int32(7), Cost: []*pb.BaseResource{{Id: proto.String("score"), Num: proto.Int32(100)}}, Get: &pb.ResultObject{Simps: []*pb.SimpleItem{{Id: proto.String("item_005"), Num: proto.Int32(10)}}}}
+	if err := p4SaveReceipt(db.GetIns(), f.id, "commerce:7", 66000, legacy, legacyReceipt); err != nil {
+		t.Fatal(err)
 	}
 	before, beforeGame := f.profile(t)
 	owned := simpleOwned(before, beforeGame, "item_005")
+	if replay := p4Trade(t, f, legacy, 66000, now); !proto.Equal(replay, legacyReceipt) {
+		t.Fatal("legacy batch receipt changed", replay)
+	}
+	conflict := proto.Clone(legacy).(*pb.CSShopBuy)
+	conflict.BuyCount = proto.Int32(1)
+	if _, err := f.s.p4Commerce(f.ctx, f.id, conflict, 66000, now); err == nil {
+		t.Fatal("changed historical request reused receipt")
+	}
+	if _, err := f.s.p4Commerce(f.ctx, f.id, legacy, 66001, now); err == nil {
+		t.Fatal("new batch purchase accepted")
+	}
+	unchanged, unchangedGame := f.profile(t)
+	if !proto.Equal(before, unchanged) || !p6CopySeriesJSONEqual(t, beforeGame, unchangedGame) {
+		t.Fatal("legacy replay or rejected batch changed assets")
+	}
 	bought := int32(0)
-	for index, count := range []int32{1, 18, 1} {
+	for index, count := range []int32{1, 1} {
 		request := &pb.CSShopBuy{ShopType: proto.Int32(7), ShopItemId: proto.String("p4Score_1"), BuyCount: proto.Int32(count)}
 		wire, err := proto.Marshal(request)
 		if err != nil {
@@ -108,11 +171,11 @@ func TestP4Feedback66ScoreOriginalBatchAndStampReplay(t *testing.T) {
 		if err = proto.Unmarshal(wire, decoded); err != nil {
 			t.Fatal(err)
 		}
-		stamp := int64(66001 + index)
+		stamp := int64(66002 + index)
 		result := p4Trade(t, f, decoded, stamp, now).(*pb.SCShopBuy)
 		bought += count
 		if len(result.GetCost()) != 1 || result.GetCost()[0].GetId() != "score" || result.GetCost()[0].GetNum() != count*50 || len(result.GetGet().GetSimps()) != 1 || result.GetGet().GetSimps()[0].GetId() != "item_005" || result.GetGet().GetSimps()[0].GetNum() != count*5 {
-			t.Fatal("original batch amount ignored", result)
+			t.Fatal("single purchase amount changed", result)
 		}
 		current, game := f.profile(t)
 		if current.GetScore() != before.GetScore()-bought*50 || simpleOwned(current, game, "item_005") != owned+int64(bought)*5 {
@@ -120,10 +183,10 @@ func TestP4Feedback66ScoreOriginalBatchAndStampReplay(t *testing.T) {
 		}
 		item := p4PopularityFind(t, result.ShopItemList, "p4Score_1")
 		wantCan := int32(1)
-		if bought == 20 {
+		if bought == 2 {
 			wantCan = 0
 		}
-		if item.GetCanBuy() != wantCan || item.GetDayLeftTimes() != 20-bought {
+		if item.GetCanBuy() != wantCan || item.GetDayLeftTimes() != 2-bought {
 			t.Fatal("post-buy native state and quota", item)
 		}
 		replay := p4Trade(t, f, decoded, stamp, now)
@@ -134,5 +197,9 @@ func TestP4Feedback66ScoreOriginalBatchAndStampReplay(t *testing.T) {
 	}
 	if _, err := f.s.p4Commerce(f.ctx, f.id, &pb.CSShopBuy{ShopType: proto.Int32(7), ShopItemId: proto.String("p4Score_1"), BuyCount: proto.Int32(1)}, 66004, now); err == nil {
 		t.Fatal("daily quota bypass")
+	}
+	f.restart(t)
+	if replay := p4Trade(t, f, legacy, 66000, now); !proto.Equal(replay, legacyReceipt) {
+		t.Fatal("cold historical receipt changed", replay)
 	}
 }

@@ -125,6 +125,34 @@ func TestActivity77ShopsApplyAndWeeklyPurchase(t *testing.T) {
 	if _, err := f.s.p4Commerce(f.ctx, f.id, buy, 77002, now); err == nil {
 		t.Fatal("weekly duplicate accepted")
 	}
+	peer, err := LoginAccount(f.ctx, fmt.Sprintf("weekly-peer-%d", now.UnixNano()), "isolated-password")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = CreatePlayer(f.ctx, peer.Id, "同账号周限购验证", "hero_043"); err != nil {
+		t.Fatal(err)
+	}
+	if err = db.GetIns().Model(&db.Profile{}).Where("id=?", peer.Id).Update("account_id", 77).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err = updateProfile(f.ctx, peer.Id, func(p *pb.Player, _ *model.GameState) error {
+		p.Level = proto.Int32(75)
+		p.Score = proto.Int32(100000)
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	peerList, err := f.s.p4Commerce(f.ctx, peer.Id, &pb.CSShopProductList{ShopType: proto.Int32(7)}, 0, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	peerItem := p4PopularityFind(t, peerList[0].(*pb.SCShopProductList).ShopItemList, target.GetId())
+	if peerItem.GetDayLeftTimes() != 0 {
+		t.Fatal("second character did not inherit account weekly limit", peerItem)
+	}
+	if _, err = f.s.p4Commerce(f.ctx, peer.Id, buy, 77001, now); err == nil {
+		t.Fatal("second character bypassed account weekly limit")
+	}
 	list = p4Trade(t, f, &pb.CSShopProductList{ShopType: proto.Int32(7)}, 0, now.Add(24*time.Hour)).(*pb.SCShopProductList)
 	for _, item := range list.ShopItemList {
 		if item.GetId() == target.GetId() && item.GetDayLeftTimes() != 0 {

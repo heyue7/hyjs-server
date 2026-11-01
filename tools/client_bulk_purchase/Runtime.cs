@@ -234,7 +234,7 @@ namespace HYJS.BulkPurchase
             var curve = Curve(item);
             if (curve != null && curve.Count > 0) cap = Math.Min(cap, curve.Count);
             else if (!String.IsNullOrEmpty(item.perDiscount) && item.perDiscount != "100") cap = Math.Min(cap, 1);
-            if (type == 2 || type == 3 || item.condition != null && item.condition.type == "rank") cap = Math.Min(cap, 1);
+            if (type == 2 || type == 3 || type == 7 || item.condition != null && item.condition.type == "rank") cap = Math.Min(cap, 1);
             return cap;
         }
         static QuantitySession State(BuyShopItem view) { return view.GetComponent<QuantitySession>(); }
