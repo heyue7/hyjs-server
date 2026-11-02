@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -238,7 +239,31 @@ func TestGGOBossFormation87LeaderDamageAndValidation(t *testing.T) {
 func TestGGOBossFormation87NativeStartEndAndColdReceipt(t *testing.T) {
 	t.Setenv("HYJS_P1_MYSQL_DATABASE", "")
 	t.Setenv("HYJS_GAME_ACCOUNTS_DATABASE", "")
+	ggoBossFormation87NativeStartEndAndColdReceipt(t, false)
+}
+
+func TestGGOBossRound2MySQLNativeStartEndAndColdReceipt(t *testing.T) {
+	ggoBossRound2MySQLGuard(t)
+	ggoBossFormation87NativeStartEndAndColdReceipt(t, true)
+}
+
+func ggoBossRound2MySQLGuard(t *testing.T) {
+	t.Helper()
+	name := os.Getenv("HYJS_P1_MYSQL_DATABASE")
+	if name == "" {
+		t.Skip("requires an isolated hyjs_test_p1_ MySQL database")
+	}
+	if !strings.HasPrefix(name, "hyjs_test_p1_") || len(name) == len("hyjs_test_p1_") || os.Getenv("HYJS_GAME_ACCOUNTS_DATABASE") != "" {
+		t.Fatal("requires an isolated game and accounts fixture")
+	}
+}
+
+func ggoBossFormation87NativeStartEndAndColdReceipt(t *testing.T, requireMySQL bool) {
+	t.Helper()
 	f, ctx, _, event := ggoBossIntegrationFixture(t)
+	if requireMySQL && db.GetIns().Dialector.Name() != "mysql" {
+		t.Fatal("requires a MySQL game connection")
+	}
 	var before db.SharedFieldBoss55
 	if err := sharedFieldBoss55Query(db.GetIns(), f.s.OriginalServerID(), constUtil.GGOFieldScene, constUtil.GGOFieldBossPosition, event.Line).Take(&before).Error; err != nil {
 		t.Fatal(err)
@@ -534,7 +559,20 @@ func TestGGOBossFormation87OldSingleFrozenEnd(t *testing.T) {
 func TestGGOBossFormation87SharedLastHitRollbackAndLines(t *testing.T) {
 	t.Setenv("HYJS_P1_MYSQL_DATABASE", "")
 	t.Setenv("HYJS_GAME_ACCOUNTS_DATABASE", "")
+	ggoBossFormation87SharedLastHitRollbackAndLines(t, false)
+}
+
+func TestGGOBossRound2MySQLSharedLastHitRollbackAndLines(t *testing.T) {
+	ggoBossRound2MySQLGuard(t)
+	ggoBossFormation87SharedLastHitRollbackAndLines(t, true)
+}
+
+func ggoBossFormation87SharedLastHitRollbackAndLines(t *testing.T, requireMySQL bool) {
+	t.Helper()
 	f, ctx, _, event := ggoBossIntegrationFixture(t)
+	if requireMySQL && db.GetIns().Dialector.Name() != "mysql" {
+		t.Fatal("requires a MySQL game connection")
+	}
 	var lineTwo db.SharedFieldBoss55
 	if err := db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		row, _, _, _, err := f.s.ggoBossCurrent(tx, f.s.GGOFieldConfig, time.Now().UnixMilli(), true, 2)

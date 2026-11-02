@@ -1,0 +1,3 @@
+=== RUN   TestP11ArenaConcurrencyRound2MySQLVirtualRankArbitration
+--- PASS: TestP11ArenaConcurrencyRound2MySQLVirtualRankArbitration (4.67s)
+PASS

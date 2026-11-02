@@ -1,0 +1,3 @@
+=== RUN   TestP1GatherCutoffMySQLWaitsForAdmittedFact
+--- PASS: TestP1GatherCutoffMySQLWaitsForAdmittedFact (4.76s)
+PASS

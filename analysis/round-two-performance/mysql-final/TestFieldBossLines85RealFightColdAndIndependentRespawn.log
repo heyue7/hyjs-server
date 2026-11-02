@@ -1,0 +1,7 @@
+=== RUN   TestFieldBossLines85RealFightColdAndIndependentRespawn
+=== RUN   TestFieldBossLines85RealFightColdAndIndependentRespawn/field_001
+=== RUN   TestFieldBossLines85RealFightColdAndIndependentRespawn/field_002
+--- PASS: TestFieldBossLines85RealFightColdAndIndependentRespawn (8.77s)
+    --- PASS: TestFieldBossLines85RealFightColdAndIndependentRespawn/field_001 (4.54s)
+    --- PASS: TestFieldBossLines85RealFightColdAndIndependentRespawn/field_002 (4.23s)
+PASS

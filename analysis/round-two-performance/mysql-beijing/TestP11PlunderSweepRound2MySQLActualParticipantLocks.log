@@ -1,0 +1,3 @@
+=== RUN   TestP11PlunderSweepRound2MySQLActualParticipantLocks
+--- PASS: TestP11PlunderSweepRound2MySQLActualParticipantLocks (3.56s)
+PASS

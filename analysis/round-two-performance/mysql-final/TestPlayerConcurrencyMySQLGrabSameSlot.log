@@ -1,0 +1,3 @@
+=== RUN   TestPlayerConcurrencyMySQLGrabSameSlot
+--- PASS: TestPlayerConcurrencyMySQLGrabSameSlot (2.01s)
+PASS

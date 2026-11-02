@@ -1,0 +1,4 @@
+=== RUN   TestP5GoldEggOriginalAll54AndOneUse
+    p5GoldEgg_test.go:105: 54 original awards/110150 frozen relative weights/single action/8once/cold/off/earned actual recharge source; original private param/rate/pity unknown
+--- PASS: TestP5GoldEggOriginalAll54AndOneUse (1.94s)
+PASS

@@ -1,0 +1,3 @@
+=== RUN   TestGGOBossRound2MySQLSharedLastHitRollbackAndLines
+--- PASS: TestGGOBossRound2MySQLSharedLastHitRollbackAndLines (1.90s)
+PASS

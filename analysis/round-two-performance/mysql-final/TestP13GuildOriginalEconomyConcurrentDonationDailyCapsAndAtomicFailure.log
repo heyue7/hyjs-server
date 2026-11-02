@@ -1,0 +1,3 @@
+=== RUN   TestP13GuildOriginalEconomyConcurrentDonationDailyCapsAndAtomicFailure
+--- PASS: TestP13GuildOriginalEconomyConcurrentDonationDailyCapsAndAtomicFailure (8.59s)
+PASS

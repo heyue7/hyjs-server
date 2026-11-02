@@ -1,0 +1,3 @@
+=== RUN   TestPlayerConcurrencyMySQLActivityIsolation
+--- PASS: TestPlayerConcurrencyMySQLActivityIsolation (0.60s)
+PASS

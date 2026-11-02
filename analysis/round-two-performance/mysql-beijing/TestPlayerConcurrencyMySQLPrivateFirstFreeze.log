@@ -1,0 +1,3 @@
+=== RUN   TestPlayerConcurrencyMySQLPrivateFirstFreeze
+--- PASS: TestPlayerConcurrencyMySQLPrivateFirstFreeze (0.63s)
+PASS

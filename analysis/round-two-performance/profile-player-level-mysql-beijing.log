@@ -1,0 +1,33 @@
+[managed isolated MySQL; TZ=Asia/Shanghai]
+=== RUN   TestProfilePlayerLevelMySQL
+=== RUN   TestProfilePlayerLevelMySQL/zero
+=== RUN   TestProfilePlayerLevelMySQL/seventy
+=== RUN   TestProfilePlayerLevelMySQL/maximum
+=== RUN   TestProfilePlayerLevelMySQL/sql-null
+=== RUN   TestProfilePlayerLevelMySQL/json-null
+=== RUN   TestProfilePlayerLevelMySQL/invalid-json
+=== RUN   TestProfilePlayerLevelMySQL/string
+=== RUN   TestProfilePlayerLevelMySQL/negative
+=== RUN   TestProfilePlayerLevelMySQL/out-of-range
+=== RUN   TestProfilePlayerLevelMySQL/large-integer
+=== RUN   TestProfilePlayerLevelMySQL/decimal
+=== RUN   TestProfilePlayerLevelMySQL/boolean
+=== RUN   TestProfilePlayerLevelMySQL/missing
+--- PASS: TestProfilePlayerLevelMySQL (4.35s)
+    --- PASS: TestProfilePlayerLevelMySQL/zero (0.03s)
+    --- PASS: TestProfilePlayerLevelMySQL/seventy (0.02s)
+    --- PASS: TestProfilePlayerLevelMySQL/maximum (0.02s)
+    --- PASS: TestProfilePlayerLevelMySQL/sql-null (0.16s)
+    --- PASS: TestProfilePlayerLevelMySQL/json-null (0.02s)
+    --- PASS: TestProfilePlayerLevelMySQL/invalid-json (0.25s)
+    --- PASS: TestProfilePlayerLevelMySQL/string (0.07s)
+    --- PASS: TestProfilePlayerLevelMySQL/negative (0.02s)
+    --- PASS: TestProfilePlayerLevelMySQL/out-of-range (0.05s)
+    --- PASS: TestProfilePlayerLevelMySQL/large-integer (0.07s)
+    --- PASS: TestProfilePlayerLevelMySQL/decimal (0.02s)
+    --- PASS: TestProfilePlayerLevelMySQL/boolean (0.03s)
+    --- PASS: TestProfilePlayerLevelMySQL/missing (0.01s)
+PASS
+ok  	hyjs-server/db	6.904s
+
+[runner exit=0 cleanup=ok elapsed=12.93s]

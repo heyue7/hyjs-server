@@ -138,7 +138,7 @@ func (s *GameService) p11ArenaNPCMember(rank int64) (*db.P11ArenaMember, error) 
 	if err != nil {
 		return nil, err
 	}
-	power, err := s.formationFightPower(player, game)
+	power, err := s.formationFightPowerFromParty(battle)
 	if err != nil {
 		return nil, err
 	}
@@ -154,8 +154,8 @@ func (s *GameService) p11ArenaNPCMember(rank int64) (*db.P11ArenaMember, error) 
 	return &db.P11ArenaMember{PlayerID: player.GetPlayerId(), Rank: rank, Active: true, Info: rawInfo, Battle: rawBattle, SnapshotHash: p6Digest(append(append([]byte(nil), rawInfo...), rawBattle...))}, nil
 }
 
-// p11ArenaNPCSlot checks the current rank owner under the arena-policy lock.
-// Inactive legacy members still reserve their historical position.
+// p11ArenaNPCSlot checks membership in the transaction's committed view.
+// Unique positions arbitrate mutations; inactive members keep their historical seat.
 func p11ArenaNPCSlot(tx *gorm.DB, cfg *db.P11ArenaPolicy, id int64) (int64, error) {
 	rank := id - constUtil.P11ArenaNPCIDBase
 	if !p11ArenaNPCID(id) || rank >= cfg.NextRank {
@@ -172,34 +172,105 @@ func p11ArenaNPCSlot(tx *gorm.DB, cfg *db.P11ArenaPolicy, id int64) (int64, erro
 }
 
 func (s *GameService) p11ArenaCandidates(tx *gorm.DB, cfg *db.P11ArenaPolicy, viewer int64, member db.P11ArenaMember, match bool) ([]db.P11ArenaMember, error) {
-	var all []db.P11ArenaMember
-	if err := tx.Order("position").Find(&all).Error; err != nil {
+	const batchSize int64 = 128
+	minimum, err := s.p10Setting("PVPLevel")
+	if err != nil {
 		return nil, err
 	}
-	occupied := map[int64]db.P11ArenaMember{}
-	for _, row := range all {
-		occupied[row.Rank] = row
+	occupied := make(map[int64]db.P11ArenaMember)
+	known := make(map[int64]bool)
+	blocked := make(map[int64]bool)
+	blackChecked := make(map[int64]bool)
+
+	// Missing positions remain virtual seats; inactive rows still occupy them.
+	loadRanks := func(ranks []int64) error {
+		var missing []int64
+		for _, rank := range ranks {
+			if rank < 1 || rank >= cfg.NextRank || known[rank] {
+				continue
+			}
+			known[rank] = true
+			missing = append(missing, rank)
+		}
+		if len(missing) == 0 {
+			return nil
+		}
+		var rows []db.P11ArenaMember
+		if err := tx.Table("p11_arena_members AS m").Select("m.player_id, m.position, CASE WHEN m.active=? AND p.server_id=? AND p.player_level>=? AND p.game IS NOT NULL THEN 1 ELSE 0 END AS active", true, s.OriginalServerID(), minimum).Joins("LEFT JOIN profiles AS p ON p.id=m.player_id").Where("m.position IN ?", missing).Scan(&rows).Error; err != nil {
+			return err
+		}
+		var players []int64
+		for _, row := range rows {
+			occupied[row.Rank] = row
+			if match && row.Active && row.PlayerID != viewer && !blackChecked[row.PlayerID] {
+				players = append(players, row.PlayerID)
+				blackChecked[row.PlayerID] = true
+			}
+		}
+		if len(players) == 0 {
+			return nil
+		}
+		var black []db.P10SocialBlack
+		if err := tx.Select("owner_id", "target_id").Where("(owner_id=? AND target_id IN ?) OR (target_id=? AND owner_id IN ?)", viewer, players, viewer, players).Find(&black).Error; err != nil {
+			return err
+		}
+		for _, row := range black {
+			if row.OwnerID == viewer {
+				blocked[row.TargetID] = true
+			} else if row.TargetID == viewer {
+				blocked[row.OwnerID] = true
+			}
+		}
+		return nil
 	}
+
+	var initial []int64
+	var best int64
+	var matchCount, better int
+	if match {
+		best = p11ArenaBestTarget(member.Rank)
+		matchCount = max(3, int(cfg.MatchCount))
+		better = max(3, matchCount-2)
+		for distance := int64(1); distance <= 3; distance++ {
+			initial = append(initial, member.Rank-distance)
+		}
+		initial = append(initial, best)
+		span := member.Rank - best
+		for i := 0; i < better && span > 0; i++ {
+			distance := int64(1)
+			if better > 1 {
+				distance += (span - 1) * int64(i) / int64(better-1)
+			}
+			initial = append(initial, member.Rank-distance)
+		}
+		for rank := member.Rank + 1; rank < cfg.NextRank && rank <= member.Rank+2; rank++ {
+			initial = append(initial, rank)
+		}
+	} else {
+		for rank := int64(1); rank < cfg.NextRank && rank <= int64(cfg.RankShow); rank++ {
+			initial = append(initial, rank)
+		}
+	}
+	if err := loadRanks(initial); err != nil {
+		return nil, err
+	}
+
 	var result []db.P11ArenaMember
-	used := map[int64]bool{}
+	used := make(map[int64]bool)
+	realRanks := make(map[int64]int64)
 	add := func(rank int64) error {
 		if rank < 1 || rank >= cfg.NextRank || used[rank] || match && rank == member.Rank {
 			return nil
 		}
+		if !known[rank] {
+			return errors.New(constUtil.P11ArenaFightRefreshRequired)
+		}
 		used[rank] = true
 		if row, found := occupied[rank]; found {
-			if !row.Active || match && row.PlayerID == viewer {
+			if !row.Active || match && (row.PlayerID == viewer || blocked[row.PlayerID]) {
 				return nil
 			}
-			if match {
-				blocked, err := p10Blocked(tx, viewer, row.PlayerID)
-				if err != nil {
-					return err
-				}
-				if blocked {
-					return nil
-				}
-			}
+			realRanks[rank] = row.PlayerID
 			result = append(result, row)
 			return nil
 		}
@@ -210,18 +281,57 @@ func (s *GameService) p11ArenaCandidates(tx *gorm.DB, cfg *db.P11ArenaPolicy, vi
 		result = append(result, *npc)
 		return nil
 	}
+	finish := func() ([]db.P11ArenaMember, error) {
+		var players []int64
+		for _, row := range result {
+			if id, ok := realRanks[row.Rank]; ok {
+				players = append(players, id)
+			}
+		}
+		if len(players) == 0 {
+			return result, nil
+		}
+		var rows []db.P11ArenaMember
+		if err := tx.Where("player_id IN ?", players).Find(&rows).Error; err != nil {
+			return nil, err
+		}
+		full := make(map[int64]db.P11ArenaMember, len(rows))
+		for _, row := range rows {
+			full[row.PlayerID] = row
+		}
+		for i := range result {
+			id, ok := realRanks[result[i].Rank]
+			if !ok {
+				continue
+			}
+			row, found := full[id]
+			if !found || row.PlayerID != id || row.Rank != result[i].Rank {
+				return nil, errors.New(constUtil.P11ArenaFightRefreshRequired)
+			}
+			result[i] = row
+		}
+		return result, nil
+	}
+
 	if !match {
 		for rank := int64(1); rank < cfg.NextRank && len(result) < int(cfg.RankShow); rank++ {
+			if !known[rank] {
+				var next []int64
+				for candidate := rank; candidate < cfg.NextRank && candidate < rank+batchSize; candidate++ {
+					next = append(next, candidate)
+				}
+				if err := loadRanks(next); err != nil {
+					return nil, err
+				}
+			}
 			if err := add(rank); err != nil {
 				return nil, err
 			}
 		}
-		return result, nil
+		return finish()
 	}
-	best := p11ArenaBestTarget(member.Rank)
-	// 留出前三个更高名次，剩余名额继续覆盖原有最快提升目标。
-	matchCount := max(3, int(cfg.MatchCount))
-	better := max(3, matchCount-2)
+
+	// Keep the original selection and fill order, then publish ranks sorted.
 	for distance := int64(1); distance <= 3 && len(result) < better; distance++ {
 		if err := add(member.Rank - distance); err != nil {
 			return nil, err
@@ -248,6 +358,18 @@ func (s *GameService) p11ArenaCandidates(tx *gorm.DB, cfg *db.P11ArenaPolicy, vi
 		}
 	}
 	for distance := int64(1); len(result) < matchCount && (member.Rank-distance >= best || member.Rank+distance < cfg.NextRank); distance++ {
+		if (distance-1)%batchSize == 0 {
+			var next []int64
+			for rank := max(best, int64(1), member.Rank-distance-batchSize+1); rank <= member.Rank-distance && rank < cfg.NextRank; rank++ {
+				next = append(next, rank)
+			}
+			for rank := max(best, int64(1), member.Rank+distance); rank < cfg.NextRank && rank < member.Rank+distance+batchSize; rank++ {
+				next = append(next, rank)
+			}
+			if err := loadRanks(next); err != nil {
+				return nil, err
+			}
+		}
 		if member.Rank-distance >= best {
 			if err := add(member.Rank - distance); err != nil {
 				return nil, err
@@ -260,13 +382,14 @@ func (s *GameService) p11ArenaCandidates(tx *gorm.DB, cfg *db.P11ArenaPolicy, vi
 		}
 	}
 	sort.Slice(result, func(i, j int) bool { return result[i].Rank < result[j].Rank })
-	return result, nil
+	return finish()
 }
 
 func (s *GameService) p11ArenaNPCPreview(ctx context.Context, id, npcID int64, now time.Time) (*pb.FormationSimpleInfo, []*pb.FormationItem, error) {
 	var info *pb.FormationSimpleInfo
 	var slots []*pb.FormationItem
-	err := db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	err := s.p11ArenaTransaction(ctx, now, func(tx *gorm.DB) error {
+		info, slots = nil, nil
 		if err := ServerGameClockGuardTransaction(tx); err != nil {
 			return err
 		}
@@ -275,9 +398,6 @@ func (s *GameService) p11ArenaNPCPreview(ctx context.Context, id, npcID int64, n
 		}
 		cfg, err := p11ArenaConfig(tx)
 		if err != nil {
-			return err
-		}
-		if err = s.p11SyncArenaMembers(tx, cfg, now); err != nil {
 			return err
 		}
 		rank, err := p11ArenaNPCSlot(tx, cfg, npcID)
@@ -292,7 +412,7 @@ func (s *GameService) p11ArenaNPCPreview(ctx context.Context, id, npcID int64, n
 		if err != nil {
 			return err
 		}
-		power, err := s.formationFightPower(player, game)
+		power, err := s.formationFightPowerFromParty(battle)
 		if err != nil {
 			return err
 		}

@@ -227,12 +227,31 @@ func marshalProfileWithRoster86(game *GameState, roster json.RawMessage) ([]byte
 // before any gameplay reader can use the roster.
 func (game *GameState) UnmarshalJSON(raw []byte) error {
 	type plainGameState GameState
-	if bytes.Contains(raw, []byte(constUtil.ProfileWarriorsCodec86)) {
-		plain, err := ExpandProfileGame86(raw)
-		if err != nil {
-			return err
-		}
-		raw = plain
+	if !bytes.Contains(raw, []byte(constUtil.ProfileWarriorsCodec86)) {
+		return json.Unmarshal(raw, (*plainGameState)(game))
 	}
-	return json.Unmarshal(raw, (*plainGameState)(game))
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &fields); err != nil {
+		return err
+	}
+	roster, ok := fields["warriors"]
+	if !ok {
+		return json.Unmarshal(raw, (*plainGameState)(game))
+	}
+	plain, err := expandWarriorsJSON86(roster)
+	if err != nil {
+		return err
+	}
+	if bytes.Equal(bytes.TrimSpace(roster), plain) {
+		return json.Unmarshal(raw, (*plainGameState)(game))
+	}
+	delete(fields, "warriors")
+	otherFields, err := json.Marshal(fields)
+	if err != nil {
+		return err
+	}
+	if err := json.Unmarshal(otherFields, (*plainGameState)(game)); err != nil {
+		return err
+	}
+	return json.Unmarshal(plain, &game.Warriors)
 }

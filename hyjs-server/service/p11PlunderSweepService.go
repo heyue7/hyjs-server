@@ -27,6 +27,14 @@ type p11PlunderSweepChild struct {
 	TerminalHash string `json:"terminalHash"`
 }
 
+type errP11PlunderSweepParticipant struct {
+	PlayerID int64
+}
+
+func (*errP11PlunderSweepParticipant) Error() string {
+	return "plunder sweep participant lock required"
+}
+
 type p11PlunderSweepPlan struct {
 	PlayerID       int64                  `json:"playerId"`
 	Stamp          int64                  `json:"stamp"`
@@ -59,9 +67,10 @@ func (s *GameService) InitializeP11PlunderSweep(ctx context.Context) error {
 }
 
 // p11PlunderSweepAt freezes a bounded real or source-bound virtual candidate
-// list. The later transaction locks every real participant in ID order before
-// policy, actual medicine consumption, and all child mutations.
+// list. Each complete attempt locks the actual participants discovered so far
+// in ID order before policy, medicine consumption, and all child mutations.
 func (s *GameService) p11PlunderSweepAt(ctx context.Context, id int64, req *pb.CSSweepTreasureFight, stamp int64, now time.Time) ([]proto.Message, error) {
+	ctx = withP6InputReuseScope(ctx)
 	if stamp <= 0 || !s.p11PlunderFragment(req.GetFragId()) || (req.GetSweepNumber() != 1 && req.GetSweepNumber() != 5) {
 		return nil, errors.New(constUtil.P11PlunderFightRefresh)
 	}
@@ -110,210 +119,222 @@ func (s *GameService) p11PlunderSweepAt(ctx context.Context, id int64, req *pb.C
 		return nil, errors.New(constUtil.P11PlunderFightRefresh)
 	}
 	var response *pb.SCSweepTreasureFight
-	err = db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := ServerGameClockGuardTransaction(tx); err != nil {
-			return err
-		}
-
-		ids := []int64{id}
-		for _, peer := range peers {
-			if !p11PlunderNPC84ID(peer) {
-				ids = append(ids, peer)
+	lockIDs := []int64{id}
+	for attempt := 0; attempt < len(peers)+1; attempt++ {
+		response = nil
+		slices.Sort(lockIDs)
+		lockIDs = slices.Compact(lockIDs)
+		err = db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+			if err := ServerGameClockGuardTransaction(tx); err != nil {
+				return err
 			}
-		}
-		slices.Sort(ids)
-		ids = slices.Compact(ids)
-		for _, profileID := range ids {
-			var locked db.Profile
-			if e := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&locked, profileID).Error; e != nil {
+
+			for _, profileID := range lockIDs {
+				var locked db.Profile
+				if e := tx.Select("id").Clauses(clause.Locking{Strength: "UPDATE"}).First(&locked, profileID).Error; e != nil {
+					return e
+				}
+			}
+			var old db.P11PlunderSweepReceipt
+			e := tx.First(&old, "player_id=? AND stamp=?", id, stamp).Error
+			if e == nil {
+				response, e = p11ReadPlunderSweepReceipt(tx, &old, p6Digest(raw))
 				return e
 			}
-		}
-		var old db.P11PlunderSweepReceipt
-		e := tx.First(&old, "player_id=? AND stamp=?", id, stamp).Error
-		if e == nil {
-			response, e = p11ReadPlunderSweepReceipt(tx, &old, p6Digest(raw))
-			return e
-		}
-		if !errors.Is(e, gorm.ErrRecordNotFound) {
-			return e
-		}
-		var owner db.Profile
-		if e = tx.First(&owner, id).Error; e != nil {
-			return e
-		}
-		if AdminProfileServerID(owner) != s.OriginalServerID() {
-			return errors.New(constUtil.P11PlunderFightRefresh)
-		}
-		player, game, e := decodeProfileForCalendarUpdate(tx, &owner)
-		if e != nil {
-			return e
-		}
-		ordinary, e := s.p10Setting("TreaSweepLevel")
-		if e != nil {
-			return e
-		}
-		minLevel, e := s.p10Setting("Plunder5MinLevel")
-		if e != nil {
-			return e
-		}
-		minVIP, e := s.p10Setting("Plunder5VipMinLevel")
-		if e != nil {
-			return e
-		}
-		if player.GetLevel() < ordinary || req.GetSweepNumber() == 5 && (player.GetLevel() < minLevel && player.GetVip() < minVIP) {
-			return errors.New(constUtil.P11PlunderFightRefresh)
-		}
-		held, e := p11PlunderFragmentCount(game, req.GetFragId())
-		if e != nil {
-			return e
-		}
-		if held > 0 {
-			return errors.New(constUtil.P11PlunderFightRefresh)
-		}
-		offer, cfg, e := p11PlunderFightOffer(tx, now)
-		if e != nil {
-			return e
-		}
-		if !cfg.SweepEnabled {
-			return errors.New(constUtil.P11PlunderSweepUnavailable)
-		}
-		medicine := s.table("Item", "itemId", constUtil.P11PlunderSweep84Medicine)
-		if medicine == nil || medicine["category"] != "1" || medicine["energy"] != "10" {
-			return errors.New(constUtil.P11PlunderSweepConflict)
-		}
-		plan := p11PlunderSweepPlan{PlayerID: id, Stamp: stamp, RequestHash: p6Digest(raw), FragmentID: req.GetFragId(), RequestedCount: req.GetSweepNumber(), Source: constUtil.P11PlunderSweep84Source, SourceNote: constUtil.P11PlunderSweep84SourceNote, Peers: peers, OfferVersion: offer.Version, OfferHash: offer.SourceHash, Request: raw, MedicineItem: constUtil.P11PlunderSweep84Medicine, MedicineUnit: constUtil.P11PlunderSweep84Energy}
-		response = &pb.SCSweepTreasureFight{IsLevelUp: proto.Int32(0), Get: &pb.ResultObject{}}
-		initialLevel := player.GetLevel()
-		for step := int32(0); step < req.GetSweepNumber(); step++ {
+			if !errors.Is(e, gorm.ErrRecordNotFound) {
+				return e
+			}
+			var owner db.Profile
 			if e = tx.First(&owner, id).Error; e != nil {
 				return e
 			}
-			player, game, e = decodeProfileForCalendarUpdate(tx, &owner)
+			if AdminProfileServerID(owner) != s.OriginalServerID() {
+				return errors.New(constUtil.P11PlunderFightRefresh)
+			}
+			player, game, e := decodeProfileForCalendarUpdate(tx, &owner)
 			if e != nil {
 				return e
 			}
-			held, e = p11PlunderFragmentCount(game, req.GetFragId())
+			ordinary, e := s.p10Setting("TreaSweepLevel")
+			if e != nil {
+				return e
+			}
+			minLevel, e := s.p10Setting("Plunder5MinLevel")
+			if e != nil {
+				return e
+			}
+			minVIP, e := s.p10Setting("Plunder5VipMinLevel")
+			if e != nil {
+				return e
+			}
+			if player.GetLevel() < ordinary || req.GetSweepNumber() == 5 && (player.GetLevel() < minLevel && player.GetVip() < minVIP) {
+				return errors.New(constUtil.P11PlunderFightRefresh)
+			}
+			held, e := p11PlunderFragmentCount(game, req.GetFragId())
 			if e != nil {
 				return e
 			}
 			if held > 0 {
-				plan.Stop = "target-obtained"
-				break
+				return errors.New(constUtil.P11PlunderFightRefresh)
 			}
-			if player.GetEnergy() < 0 {
+			offer, cfg, e := p11PlunderFightOffer(tx, now)
+			if e != nil {
+				return e
+			}
+			if !cfg.SweepEnabled {
+				return errors.New(constUtil.P11PlunderSweepUnavailable)
+			}
+			medicine := s.table("Item", "itemId", constUtil.P11PlunderSweep84Medicine)
+			if medicine == nil || medicine["category"] != "1" || medicine["energy"] != "10" {
 				return errors.New(constUtil.P11PlunderSweepConflict)
 			}
-			var chosen int64
-			for _, peerID := range peers {
-				if p11PlunderNPC84ID(peerID) {
-					chosen = peerID
+			plan := p11PlunderSweepPlan{PlayerID: id, Stamp: stamp, RequestHash: p6Digest(raw), FragmentID: req.GetFragId(), RequestedCount: req.GetSweepNumber(), Source: constUtil.P11PlunderSweep84Source, SourceNote: constUtil.P11PlunderSweep84SourceNote, Peers: peers, OfferVersion: offer.Version, OfferHash: offer.SourceHash, Request: raw, MedicineItem: constUtil.P11PlunderSweep84Medicine, MedicineUnit: constUtil.P11PlunderSweep84Energy}
+			response = &pb.SCSweepTreasureFight{IsLevelUp: proto.Int32(0), Get: &pb.ResultObject{}}
+			initialLevel := player.GetLevel()
+			for step := int32(0); step < req.GetSweepNumber(); step++ {
+				if e = tx.First(&owner, id).Error; e != nil {
+					return e
+				}
+				player, game, e = decodeProfileForCalendarUpdate(tx, &owner)
+				if e != nil {
+					return e
+				}
+				held, e = p11PlunderFragmentCount(game, req.GetFragId())
+				if e != nil {
+					return e
+				}
+				if held > 0 {
+					plan.Stop = "target-obtained"
 					break
 				}
-				var peer db.Profile
-				if e = tx.First(&peer, peerID).Error; e != nil {
-					return e
+				if player.GetEnergy() < 0 {
+					return errors.New(constUtil.P11PlunderSweepConflict)
 				}
-				other, otherGame, e := decodeProfileForCalendarUpdate(tx, &peer)
-				if e != nil {
-					return e
+				var chosen int64
+				for _, peerID := range peers {
+					if p11PlunderNPC84ID(peerID) {
+						chosen = peerID
+						break
+					}
+					var peer db.Profile
+					if e = tx.First(&peer, peerID).Error; e != nil {
+						return e
+					}
+					other, otherGame, e := decodeProfileForCalendarUpdate(tx, &peer)
+					if e != nil {
+						return e
+					}
+					n, e := p11PlunderFragmentCount(otherGame, req.GetFragId())
+					if e != nil {
+						return e
+					}
+					protected, e := P11PlunderProtected(tx, peerID, now)
+					if e != nil {
+						return e
+					}
+					blocked, e := p10Blocked(tx, id, peerID)
+					if e != nil {
+						return e
+					}
+					difference := int64(player.GetLevel()) - int64(other.GetLevel())
+					if n > 0 && !protected && !blocked && AdminProfileServerID(peer) == s.OriginalServerID() && other.GetPlayerId() == peer.Id && other.GetLevel() >= ordinary && difference <= int64(cfg.LevelDifference) && -difference <= int64(cfg.LevelDifference) {
+						chosen = peerID
+						break
+					}
 				}
-				n, e := p11PlunderFragmentCount(otherGame, req.GetFragId())
-				if e != nil {
-					return e
-				}
-				protected, e := P11PlunderProtected(tx, peerID, now)
-				if e != nil {
-					return e
-				}
-				blocked, e := p10Blocked(tx, id, peerID)
-				if e != nil {
-					return e
-				}
-				difference := int64(player.GetLevel()) - int64(other.GetLevel())
-				if n > 0 && !protected && !blocked && AdminProfileServerID(peer) == s.OriginalServerID() && other.GetPlayerId() == peer.Id && other.GetLevel() >= ordinary && difference <= int64(cfg.LevelDifference) && -difference <= int64(cfg.LevelDifference) {
-					chosen = peerID
+				if chosen == 0 {
+					plan.Stop = "real-holders-exhausted"
 					break
 				}
-			}
-			if chosen == 0 {
-				plan.Stop = "real-holders-exhausted"
-				break
-			}
-			if player.GetEnergy() < 2 {
-				count, e := p11PlunderFragmentCount(game, constUtil.P11PlunderSweep84Medicine)
+				if !p11PlunderNPC84ID(chosen) && !slices.Contains(lockIDs, chosen) {
+					return &errP11PlunderSweepParticipant{PlayerID: chosen}
+				}
+				if player.GetEnergy() < 2 {
+					count, e := p11PlunderFragmentCount(game, constUtil.P11PlunderSweep84Medicine)
+					if e != nil {
+						return e
+					}
+					if req.GetAutoAddEnergy() == 0 || count == 0 {
+						plan.Stop = "energy-exhausted"
+						break
+					}
+					if e = deductPoolCost(player, game, &pb.BaseResource{Id: proto.String(constUtil.P11PlunderSweep84Medicine), Num: proto.Int32(1)}); e != nil {
+						return e
+					}
+					if _, e = s.GrantFixedReward(player, game, "energy,10"); e != nil {
+						return e
+					}
+					if e = saveProfile(tx, &owner, player, game); e != nil {
+						return e
+					}
+					plan.MedicineCount++
+				}
+				match, e := s.p11PlunderSweepMatch(tx, id, chosen, req.GetFragId(), offer, cfg, now)
 				if e != nil {
 					return e
 				}
-				if req.GetAutoAddEnergy() == 0 || count == 0 {
-					plan.Stop = "energy-exhausted"
-					break
-				}
-				if e = deductPoolCost(player, game, &pb.BaseResource{Id: proto.String(constUtil.P11PlunderSweep84Medicine), Num: proto.Int32(1)}); e != nil {
+				childStamp, e := p11PlunderSweepChildStamp(tx, id)
+				if e != nil {
 					return e
 				}
-				if _, e = s.GrantFixedReward(player, game, "energy,10"); e != nil {
+				child, e := s.p11PlunderFightTx(ctx, tx, id, &pb.CSFightTreasureStartResult{FightPlayerId: proto.Int64(chosen), TargetFlagId: req.FragId}, childStamp, now, match.ID)
+				if e != nil {
 					return e
 				}
-				if e = saveProfile(tx, &owner, player, game); e != nil {
+				var accepted db.P11PlunderFightSettlement
+				if e = tx.First(&accepted, "player_id=? AND stamp=?", id, childStamp).Error; e != nil {
 					return e
 				}
-				plan.MedicineCount++
+				plan.Children = append(plan.Children, p11PlunderSweepChild{Stamp: childStamp, FightID: accepted.FightID, MatchID: accepted.MatchID, RecordID: accepted.P6RecordID, ResponseHash: accepted.ResponseHash, TerminalHash: accepted.TerminalHash})
+				p1AppendGain(response.Get, child.GetGet())
+				response.RewardList = append(response.RewardList, &pb.TreasureFightReward{Exp: proto.Int32(accepted.RewardExp), Coin: proto.Int32(accepted.RewardCoin), Reward: child.Reward, IsGetFrag: child.IsGetFrag})
 			}
-			match, e := s.p11PlunderSweepMatch(tx, id, chosen, req.GetFragId(), offer, cfg, now)
+			if len(plan.Children) == 0 {
+				if plan.Stop == "energy-exhausted" {
+					return errors.New(constUtil.P11PlunderSweepEnergyShort)
+				}
+				return errors.New(constUtil.P11PlunderFightRefresh)
+			}
+			if plan.Stop == "" {
+				plan.Stop = "requested-count"
+			}
+			if e = tx.First(&owner, id).Error; e != nil {
+				return e
+			}
+			current, _, e := decodeProfileForCalendarUpdate(tx, &owner)
 			if e != nil {
 				return e
 			}
-			childStamp, e := p11PlunderSweepChildStamp(tx, id)
+			if current.GetLevel() != initialLevel {
+				response.IsLevelUp = proto.Int32(1)
+			}
+			response.Cost = []*pb.BaseResource{{Id: proto.String("energy"), Num: proto.Int32(int32(len(plan.Children)) * 2)}}
+			if plan.MedicineCount > 0 {
+				response.Cost = append(response.Cost, &pb.BaseResource{Id: proto.String(plan.MedicineItem), Num: proto.Int32(plan.MedicineCount)})
+				response.Get.Simps = append(response.Get.Simps, &pb.SimpleItem{Id: proto.String("energy"), Num: proto.Int32(plan.MedicineCount * plan.MedicineUnit)})
+			}
+			body, e := proto.MarshalOptions{Deterministic: true}.Marshal(response)
 			if e != nil {
 				return e
 			}
-			child, e := s.p11PlunderFightTx(ctx, tx, id, &pb.CSFightTreasureStartResult{FightPlayerId: proto.Int64(chosen), TargetFlagId: req.FragId}, childStamp, now, match.ID)
+			planBody, e := json.Marshal(plan)
 			if e != nil {
 				return e
 			}
-			var accepted db.P11PlunderFightSettlement
-			if e = tx.First(&accepted, "player_id=? AND stamp=?", id, childStamp).Error; e != nil {
-				return e
-			}
-			plan.Children = append(plan.Children, p11PlunderSweepChild{Stamp: childStamp, FightID: accepted.FightID, MatchID: accepted.MatchID, RecordID: accepted.P6RecordID, ResponseHash: accepted.ResponseHash, TerminalHash: accepted.TerminalHash})
-			p1AppendGain(response.Get, child.GetGet())
-			response.RewardList = append(response.RewardList, &pb.TreasureFightReward{Exp: proto.Int32(accepted.RewardExp), Coin: proto.Int32(accepted.RewardCoin), Reward: child.Reward, IsGetFrag: child.IsGetFrag})
+			return tx.Create(&db.P11PlunderSweepReceipt{PlayerID: id, Stamp: stamp, RequestHash: p6Digest(raw), FragmentID: req.GetFragId(), RequestedCount: req.GetSweepNumber(), AcceptedCount: int32(len(plan.Children)), Plan: planBody, SourceHash: p6Digest(planBody), Response: body, ResponseHash: p6Digest(body), Source: plan.Source, CreatedAt: now.UnixMilli(), FinishedAt: now.UnixMilli()}).Error
+		})
+		if err == nil {
+			break
 		}
-		if len(plan.Children) == 0 {
-			if plan.Stop == "energy-exhausted" {
-				return errors.New(constUtil.P11PlunderSweepEnergyShort)
-			}
-			return errors.New(constUtil.P11PlunderFightRefresh)
+		var participant *errP11PlunderSweepParticipant
+		if !errors.As(err, &participant) {
+			return nil, err
 		}
-		if plan.Stop == "" {
-			plan.Stop = "requested-count"
+		if attempt+1 == len(peers)+1 {
+			return nil, errors.New(constUtil.P11PlunderFightRefresh)
 		}
-		if e = tx.First(&owner, id).Error; e != nil {
-			return e
-		}
-		current, _, e := decodeProfileForCalendarUpdate(tx, &owner)
-		if e != nil {
-			return e
-		}
-		if current.GetLevel() != initialLevel {
-			response.IsLevelUp = proto.Int32(1)
-		}
-		response.Cost = []*pb.BaseResource{{Id: proto.String("energy"), Num: proto.Int32(int32(len(plan.Children)) * 2)}}
-		if plan.MedicineCount > 0 {
-			response.Cost = append(response.Cost, &pb.BaseResource{Id: proto.String(plan.MedicineItem), Num: proto.Int32(plan.MedicineCount)})
-			response.Get.Simps = append(response.Get.Simps, &pb.SimpleItem{Id: proto.String("energy"), Num: proto.Int32(plan.MedicineCount * plan.MedicineUnit)})
-		}
-		body, e := proto.MarshalOptions{Deterministic: true}.Marshal(response)
-		if e != nil {
-			return e
-		}
-		planBody, e := json.Marshal(plan)
-		if e != nil {
-			return e
-		}
-		return tx.Create(&db.P11PlunderSweepReceipt{PlayerID: id, Stamp: stamp, RequestHash: p6Digest(raw), FragmentID: req.GetFragId(), RequestedCount: req.GetSweepNumber(), AcceptedCount: int32(len(plan.Children)), Plan: planBody, SourceHash: p6Digest(planBody), Response: body, ResponseHash: p6Digest(body), Source: plan.Source, CreatedAt: now.UnixMilli(), FinishedAt: now.UnixMilli()}).Error
-	})
+		lockIDs = append(lockIDs, participant.PlayerID)
+	}
 	if err != nil {
 		return nil, err
 	}

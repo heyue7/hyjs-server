@@ -1,0 +1,3 @@
+=== RUN   TestGGOPeriodPointRealMySQLCancelDoesNotBlockOtherClaim
+--- PASS: TestGGOPeriodPointRealMySQLCancelDoesNotBlockOtherClaim (0.70s)
+PASS

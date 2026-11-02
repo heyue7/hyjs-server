@@ -1,0 +1,5 @@
+=== RUN   TestP11ArenaConcurrencyRound2MySQLVirtualRankArbitration
+[mysql] 2026/11/02 17:54:18 packets.go:58 read tcp 127.0.0.1:49232->127.0.0.1:3306: i/o timeout
+    p11ArenaConcurrencyRound2_test.go:726: other NPC fight failed while rank 93 was held: id=3 err=invalid connection
+--- FAIL: TestP11ArenaConcurrencyRound2MySQLVirtualRankArbitration (33.68s)
+FAIL

@@ -1,0 +1,14 @@
+[
+  {
+    "case": "TestP11ArenaConcurrencyRound2MySQLIndependentAfterFirstReceipt",
+    "passed": true,
+    "exitCode": 0,
+    "seconds": 5.094
+  },
+  {
+    "case": "TestP11ArenaConcurrencyRound2MySQLVirtualRankArbitration",
+    "passed": true,
+    "exitCode": 0,
+    "seconds": 5.064
+  }
+]

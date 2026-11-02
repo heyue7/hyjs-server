@@ -1,0 +1,3 @@
+=== RUN   TestPlayerConcurrencyMySQLPVPDoesNotBlockMovement
+--- PASS: TestPlayerConcurrencyMySQLPVPDoesNotBlockMovement (2.50s)
+PASS

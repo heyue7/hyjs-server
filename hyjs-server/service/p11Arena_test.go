@@ -69,7 +69,7 @@ func p11ArenaSetup(t *testing.T) (*p1Fixture, int64, int64) {
 	if err := f.s.InitializeP11Arena(f.ctx); err != nil {
 		t.Fatal(err)
 	}
-	for _, table := range []any{&db.P11ArenaPolicy{}, &db.P11ArenaMember{}, &db.P11ArenaMatch{}, &db.P11ArenaReceipt{}, &db.P11FriendDuel{}, &db.P11FriendFightSettlement{}, &db.P11ArenaFightSettlement{}, &db.P11ArenaFightPolicy{}, &db.P11LimitPolicy{}, &db.P11LimitPeriod{}, &db.P11LimitMember{}, &db.P11LimitDaily{}, &db.P11LimitRewardClaim{}, &db.P11PlunderPolicy{}, &db.P11PlunderState{}, &db.P11GrabPolicy{}, &db.P11GrabSlot{}, &db.P11GrabSession{}, &db.P11GrabDaily{}, &db.P11GrabRewardClaim{}} {
+	for _, table := range []any{&db.P11ArenaPolicy{}, &db.P11ArenaRankAllocator{}, &db.P11ArenaMember{}, &db.P11ArenaMatch{}, &db.P11ArenaReceipt{}, &db.P11FriendDuel{}, &db.P11FriendFightSettlement{}, &db.P11ArenaFightSettlement{}, &db.P11ArenaFightPolicy{}, &db.P11LimitPolicy{}, &db.P11LimitPeriod{}, &db.P11LimitMember{}, &db.P11LimitDaily{}, &db.P11LimitRewardClaim{}, &db.P11PlunderPolicy{}, &db.P11PlunderState{}, &db.P11GrabPolicy{}, &db.P11GrabSlot{}, &db.P11GrabSession{}, &db.P11GrabDaily{}, &db.P11GrabRewardClaim{}} {
 		if err := db.GetIns().Where("1=1").Delete(table).Error; err != nil {
 			t.Fatal(err)
 		}

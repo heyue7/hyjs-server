@@ -1,0 +1,3 @@
+=== RUN   TestP1GatherFrozenMySQLConcurrentIsolation
+--- PASS: TestP1GatherFrozenMySQLConcurrentIsolation (0.87s)
+PASS

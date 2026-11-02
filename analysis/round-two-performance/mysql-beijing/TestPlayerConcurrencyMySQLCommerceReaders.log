@@ -1,0 +1,3 @@
+=== RUN   TestPlayerConcurrencyMySQLCommerceReaders
+--- PASS: TestPlayerConcurrencyMySQLCommerceReaders (1.12s)
+PASS

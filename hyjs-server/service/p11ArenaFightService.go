@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"time"
 
+	mysqlDriver "github.com/go-sql-driver/mysql"
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/proto"
 	"gorm.io/gorm"
@@ -34,14 +35,16 @@ func (s *GameService) InitializeP11ArenaFight(ctx context.Context) error {
 
 // p11ArenaScopedFightAt completes original modern23101 in one transaction.
 // Profiles use the same ordered locks as friend/social operations; the shared
-// arena policy serializes membership/rank transitions after those profile locks.
+// stable arena policies are shared; rank mutations lock their actual participants.
 func (s *GameService) p11ArenaScopedFightAt(ctx context.Context, id int64, request *pb.CSPvpFightResult, stamp int64, now time.Time) ([]proto.Message, error) {
+	ctx = withP6InputReuseScope(ctx)
 	if stamp <= 0 {
 		return nil, errors.New(constUtil.P11ArenaFightStampRequired)
 	}
 	var response *pb.SCPvpFightResult
 	var historical *db.P11ArenaFightSettlement
-	err := db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	err := s.p11ArenaTransaction(ctx, now, func(tx *gorm.DB) error {
+		response, historical = nil, nil
 		if err := ServerGameClockGuardTransaction(tx); err != nil {
 			return err
 		}
@@ -51,7 +54,7 @@ func (s *GameService) p11ArenaScopedFightAt(ctx context.Context, id int64, reque
 		if virtual {
 			lockTarget = id
 		}
-		if _, err := p10LockProfiles(tx, id, lockTarget); err != nil {
+		if err := p10LockProfileIDs(tx, id, lockTarget); err != nil {
 			return err
 		}
 		if id == request.GetPlayerId() {
@@ -63,7 +66,9 @@ func (s *GameService) p11ArenaScopedFightAt(ctx context.Context, id int64, reque
 		}
 		requestHash := p6Digest(requestRaw)
 		var previous db.P11ArenaFightSettlement
-		err = tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&previous, "player_id=? AND stamp=?", id, stamp).Error
+		// The owning profile X lock already serializes this player's stamps.
+		// Locking a missing receipt here would gap-lock other players' inserts.
+		err = tx.First(&previous, "player_id=? AND stamp=?", id, stamp).Error
 		if err == nil {
 			if previous.OpponentID != request.GetPlayerId() || previous.RequestHash != requestHash {
 				return errors.New(constUtil.P11ArenaFightReceiptConflict)
@@ -108,7 +113,7 @@ func (s *GameService) p11ArenaScopedFightAt(ctx context.Context, id int64, reque
 			return err
 		}
 		var policy db.P11ArenaFightPolicy
-		if err = tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&policy, constUtil.P11ArenaFightPolicyID).Error; err != nil {
+		if err = tx.Clauses(clause.Locking{Strength: "SHARE"}).First(&policy, constUtil.P11ArenaFightPolicyID).Error; err != nil {
 			return err
 		}
 		if !cfg.Enabled || !policy.Enabled || policy.Energy != constUtil.P11ArenaEnergy || policy.Source != constUtil.P11ArenaFightPolicySource {
@@ -178,7 +183,7 @@ func (s *GameService) p11ArenaScopedFightAt(ctx context.Context, id int64, reque
 			}
 		}
 		var match db.P11ArenaMatch
-		if err = tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("viewer_id=? AND opponent_id=? AND created_at<=? AND expires_at>?", id, request.GetPlayerId(), now.UnixMilli(), now.UnixMilli()).Order("created_at DESC, id DESC").First(&match).Error; err != nil {
+		if err = tx.Where("viewer_id=? AND opponent_id=? AND created_at<=? AND expires_at>?", id, request.GetPlayerId(), now.UnixMilli(), now.UnixMilli()).Order("created_at DESC, id DESC").First(&match).Error; err != nil {
 			return errors.New(constUtil.P11ArenaFightRefreshRequired)
 		}
 		configHash, err := s.p11ArenaConfigurationHash()
@@ -217,7 +222,7 @@ func (s *GameService) p11ArenaScopedFightAt(ctx context.Context, id int64, reque
 		if err = tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&record, "id=?", recordID).Error; err != nil {
 			return err
 		}
-		frozen, err := decodeP6Record(&record)
+		frozen, err := decodeP6RecordScoped(tx.Statement.Context, &record)
 		if err != nil {
 			return err
 		}
@@ -249,7 +254,7 @@ func (s *GameService) p11ArenaScopedFightAt(ctx context.Context, id int64, reque
 			newOwn, newDef = oldDef, oldOwn
 		}
 		// Unique positive positions exchange through an uncommitted negative slot.
-		// Other arena writers hold the same policy lock and cannot observe a half swap.
+		// Participant locks and the unique position index keep concurrent swaps atomic.
 		if newOwn != oldOwn {
 			moved := tx.Model(&db.P11ArenaMember{}).Where("player_id=? AND position=?", id, oldOwn).Update("position", -oldOwn)
 			if moved.Error != nil {
@@ -264,6 +269,10 @@ func (s *GameService) p11ArenaScopedFightAt(ctx context.Context, id int64, reque
 				}
 			}
 			if err = tx.Model(&ownMember).Update("position", newOwn).Error; err != nil {
+				var duplicate *mysqlDriver.MySQLError
+				if virtual && (errors.Is(err, gorm.ErrDuplicatedKey) || errors.As(err, &duplicate) && duplicate.Number == 1062) {
+					return errors.New(constUtil.P11ArenaFightRefreshRequired)
+				}
 				return err
 			}
 		}
@@ -332,7 +341,7 @@ func (s *GameService) p11ArenaScopedFightAt(ctx context.Context, id int64, reque
 }
 
 func p11StoreArenaFightP6(tx *gorm.DB, record *db.P6BattleRecord, outcome *model.CombatOutcome, now time.Time) error {
-	input, err := decodeP6Record(record)
+	input, err := decodeP6RecordScoped(tx.Statement.Context, record)
 	if err != nil {
 		return err
 	}
@@ -371,7 +380,7 @@ func p11ReadArenaFightReceipt(tx *gorm.DB, row *db.P11ArenaFightSettlement) (*pb
 	if err := tx.First(&record, "id=?", row.P6RecordID).Error; err != nil {
 		return nil, err
 	}
-	input, err := decodeP6Record(&record)
+	input, err := decodeP6RecordScoped(tx.Statement.Context, &record)
 	if err != nil {
 		return nil, err
 	}

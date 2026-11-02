@@ -1,0 +1,13 @@
+=== RUN   TestFieldBossLines86HandshakeFirstReply
+=== RUN   TestFieldBossLines86HandshakeFirstReply/field_001
+    fieldBossHandshake86_test.go:147: reply: presence line=2 persisted boss line=2 final line generation exists=true
+    fieldBossHandshake86_test.go:147: reply: presence line=1 persisted boss line=1 final line generation exists=true
+    fieldBossHandshake86_test.go:147: reply: presence line=1 persisted boss line=1 final line generation exists=true
+=== RUN   TestFieldBossLines86HandshakeFirstReply/field_002
+    fieldBossHandshake86_test.go:147: reply: presence line=2 persisted boss line=2 final line generation exists=true
+    fieldBossHandshake86_test.go:147: reply: presence line=1 persisted boss line=1 final line generation exists=true
+    fieldBossHandshake86_test.go:147: reply: presence line=1 persisted boss line=1 final line generation exists=true
+--- PASS: TestFieldBossLines86HandshakeFirstReply (5.04s)
+    --- PASS: TestFieldBossLines86HandshakeFirstReply/field_001 (2.54s)
+    --- PASS: TestFieldBossLines86HandshakeFirstReply/field_002 (2.51s)
+PASS

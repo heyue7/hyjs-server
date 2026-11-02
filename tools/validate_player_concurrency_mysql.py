@@ -14,6 +14,20 @@ sys.path.insert(0, str(ROOT / 'tests'))
 from hyjs_managed_mysql import ManagedMySQL
 
 CASES = {
+    'TestP11ArenaRealRegistryUniqueRanksMatchSnapshotsAndNoResources': 'p11',
+    'TestP11ArenaConcurrentRealRegistrationReceiptAndRestart': 'p11',
+    'TestP11ArenaConcurrencyRound2MySQLIndependentAfterFirstReceipt': 'p11',
+    'TestP11ArenaVirtualUntouchedLegacySeatMigratesOnlyOnce': 'p11',
+    'TestGGOBossRound2MySQLNativeStartEndAndColdReceipt': 'p1',
+    'TestGGOBossRound2MySQLSharedLastHitRollbackAndLines': 'p1',
+    'TestP10LuckyDropRound2MySQLCapacityAndIsolation': 'p10',
+    'TestFieldBossLines85RealFightColdAndIndependentRespawn': 'p1',
+    'TestFieldBossLines86HandshakeFirstReply': 'p1',
+    'TestP11ArenaVirtualLegacyPositionsAndLazyTopRank': 'p11',
+    'TestP11ArenaVirtualOriginalGuideFightSlotConflictAndColdReceipt': 'p11',
+    'TestP11ArenaConcurrencyRound2MySQLStablePolicyReaders': 'p11',
+    'TestP11ArenaConcurrencyRound2MySQLVirtualRankArbitration': 'p11',
+    'TestP11PlunderSweepRound2MySQLActualParticipantLocks': 'p11',
     'TestP11PlunderSweepActualIndependentChildrenEnergyStopAndCold/five-real-outcomes': 'p11',
     'TestP11PlunderSweepActualIndependentChildrenEnergyStopAndCold/actual-energy-stop': 'p11',
     'TestP11PlunderSweepActualIndependentChildrenEnergyStopAndCold/actual-fragment-stop': 'p11',
@@ -63,6 +77,9 @@ CASES = {
     'TestPlayerConcurrencyMySQLActivityIsolation': 'p1',
     'TestPlayerConcurrencyMySQLSceneMovement': 'p10',
     'TestPlayerConcurrencyMySQLSlowSocket': 'p10',
+    'TestSharedFieldBoss55ReadsRound2MySQLStableProjection': 'p1',
+    'TestSharedFieldBoss55ReadsRound2MySQLCreateExpireCorrupt': 'p1',
+    'TestSharedFieldBoss55ReadsRound2MySQLExpiredRechecksLockedRow': 'p1',
     'TestPlayerConcurrencyMySQLCommerceReaders': 'p4',
     'TestPlayerConcurrencyUnchangedCustomSave': 'p1',
     'TestP5GoldEggOriginalAll54AndOneUse': 'p1',
@@ -73,10 +90,12 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--case', choices=CASES, action='append')
     parser.add_argument('--output', required=True, type=Path)
+    parser.add_argument('--binary', type=Path,
+                        default=ROOT / 'build/player-concurrency-20261102/service.test')
     parser.add_argument('--keep-going', action='store_true')
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=True)
-    binary = ROOT / 'build/player-concurrency-20261102/service.test'
+    binary = args.binary.expanduser().resolve()
     lock = open('/tmp/hyjs-isolated-mysql.lock', 'a+')
     started = time.monotonic()
     while True:
@@ -97,6 +116,7 @@ def main():
             try:
                 environment = {key: value for key, value in os.environ.items()
                                if not (key.startswith('HYJS_') and ('MYSQL' in key or 'DATABASE' in key))}
+                environment["TZ"] = "Asia/Shanghai"
                 environment.update(connection.env())
                 for key in ['HOST', 'USER', 'PASSWORD', 'DATABASE']:
                     environment['HYJS_' + prefix.upper() + '_MYSQL_' + key] = environment['HYJS_MYSQL_' + key]

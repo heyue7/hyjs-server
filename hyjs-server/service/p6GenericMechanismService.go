@@ -224,6 +224,10 @@ func (s *GameService) ComputeP6GenericMechanismBattle(ctx context.Context, input
 	if err != nil {
 		return nil, nil, err
 	}
+	return s.computeP6GenericMechanismBattleValidated(ctx, input, supplied, qualification)
+}
+
+func (s *GameService) computeP6GenericMechanismBattleValidated(ctx context.Context, input *model.FrozenBattleInput, supplied *pb.BattleOperate, qualification *model.P6MechanismQualification) (*model.CombatFinalHPOutcome, *model.P6MechanismQualification, error) {
 	result, err := s.ComputeOriginalP6ProtocolFinalHP(ctx, input, supplied)
 	if err != nil {
 		return nil, qualification, err

@@ -291,7 +291,7 @@ func (s *GameService) ApplyP11ArenaFightPrize(ctx context.Context, tx *gorm.DB, 
 	var policy db.P11ArenaPrizePolicy
 	if row.WinnerID == row.PlayerID {
 		response.BoxList = []*pb.BaseResource{{Id: proto.String("coin"), Num: proto.Int32(0)}, {Id: proto.String("coin"), Num: proto.Int32(0)}, {Id: proto.String("coin"), Num: proto.Int32(0)}}
-		if err = tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&policy, constUtil.P11ArenaPrizePolicyID).Error; err != nil {
+		if err = tx.Clauses(clause.Locking{Strength: "SHARE"}).First(&policy, constUtil.P11ArenaPrizePolicyID).Error; err != nil {
 			return err
 		}
 		award.Status = constUtil.P11ArenaPrizeDisabled
@@ -312,7 +312,12 @@ func (s *GameService) ApplyP11ArenaFightPrize(ctx context.Context, tx *gorm.DB, 
 					if _, _, e = p11ArenaPrizeOfferRules(&offer); e != nil {
 						return e
 					}
-					if err = tx.Create(&offer).Error; err != nil {
+					if err = tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&offer).Error; err != nil {
+						return err
+					}
+					// Concurrent first winners share stable rules; the month
+					// key elects one publisher without a global writer gate.
+					if err = tx.Clauses(clause.Locking{Strength: "SHARE"}).First(&offer, "month=?", month).Error; err != nil {
 						return err
 					}
 				}

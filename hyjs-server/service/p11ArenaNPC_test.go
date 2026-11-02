@@ -72,10 +72,15 @@ func TestP11ArenaVirtualLegacyPositionsAndLazyTopRank(t *testing.T) {
 			t.Fatal("legacy rank reordered", member, err)
 		}
 	}
+	var allocator db.P11ArenaRankAllocator
+	db.GetIns().First(&allocator, "policy_id=?", 1)
+	if allocator.NextRank != 32771 {
+		t.Fatal("virtual slot count lost", allocator.NextRank)
+	}
 	var cfg db.P11ArenaPolicy
 	db.GetIns().First(&cfg, 1)
-	if cfg.NextRank != 32771 {
-		t.Fatal("virtual slot count lost", cfg.NextRank)
+	if cfg.NextRank != 4 {
+		t.Fatal("ordinary listing rewrote the retired allocation field", cfg.NextRank)
 	}
 	if !p11ArenaNPCID(listing.GetRankList()[3].GetInfo().GetPlayerId()) {
 		t.Fatal("top empty slot missing NPC")
@@ -269,6 +274,10 @@ func TestP11ArenaVirtualUntouchedLegacySeatMigratesOnlyOnce(t *testing.T) {
 	if err := db.GetIns().Model(&db.P11ArenaMember{}).Where("player_id=?", peer).Updates(map[string]any{"position": int64(2), "rank_reward_best": int64(0), "best_won_rank": int64(2)}).Error; err != nil {
 		t.Fatal(err)
 	}
+	// Legacy migration now runs before serving requests, rather than in queries.
+	if err := f.s.InitializeP11Arena(f.ctx); err != nil {
+		t.Fatal("startup legacy migration", err)
+	}
 	query, err := f.s.p11ArenaQuery(f.ctx, f.id, &pb.CSPvpFindMatch{}, 992002, now)
 	if err != nil {
 		t.Fatal(err)
@@ -286,6 +295,9 @@ func TestP11ArenaVirtualUntouchedLegacySeatMigratesOnlyOnce(t *testing.T) {
 	}
 	if err = db.GetIns().First(&witnessed, "player_id=?", peer).Error; err != nil || witnessed.Rank != 2 || witnessed.BestWonRank != 2 {
 		t.Fatal("witnessed legacy rank moved", witnessed, err)
+	}
+	if err := f.s.InitializeP11Arena(f.ctx); err != nil {
+		t.Fatal("repeated startup legacy migration", err)
 	}
 	if _, err = f.s.p11ArenaQuery(f.ctx, f.id, &pb.CSPvpFindMatch{}, 992003, now); err != nil {
 		t.Fatal(err)

@@ -1,0 +1,3 @@
+=== RUN   TestP10LuckyDropRound2MySQLCapacityAndIsolation
+--- PASS: TestP10LuckyDropRound2MySQLCapacityAndIsolation (1.81s)
+PASS

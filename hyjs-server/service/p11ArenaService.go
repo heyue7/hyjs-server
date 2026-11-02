@@ -23,7 +23,7 @@ import (
 // InitializeP11Arena 保留实际成员，虚拟占位仅按需投影，不创建账号或成员行。
 func (s *GameService) InitializeP11Arena(ctx context.Context) error {
 	tx := db.GetIns().WithContext(ctx)
-	if err := tx.AutoMigrate(&db.P11ArenaPolicy{}, &db.P11ArenaMember{}, &db.P11ArenaMatch{}, &db.P11ArenaReceipt{}, &db.P11FriendDuel{}, &db.P11FriendFightSettlement{}); err != nil {
+	if err := tx.AutoMigrate(&db.P11ArenaPolicy{}, &db.P11ArenaRankAllocator{}, &db.P11ArenaMember{}, &db.P11ArenaMatch{}, &db.P11ArenaReceipt{}, &db.P11FriendDuel{}, &db.P11FriendFightSettlement{}); err != nil {
 		return err
 	}
 	low, err := s.p10Setting("PVPPushLowNum")
@@ -47,16 +47,27 @@ func (s *GameService) InitializeP11Arena(ctx context.Context) error {
 	if err := s.InitializeP11Plunder(ctx); err != nil {
 		return err
 	}
-	return s.InitializeP11Grab(ctx)
+	if err := s.InitializeP11Grab(ctx); err != nil {
+		return err
+	}
+	return s.initializeP11ArenaRanks(ctx)
 }
 func p11ArenaConfig(tx *gorm.DB) (*db.P11ArenaPolicy, error) {
 	var cfg db.P11ArenaPolicy
-	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&cfg, constUtil.P11ArenaPolicyID).Error; err != nil {
+	if err := tx.Clauses(clause.Locking{Strength: "SHARE"}).First(&cfg, constUtil.P11ArenaPolicyID).Error; err != nil {
 		return nil, err
 	}
 	if cfg.Source == "" || cfg.NextRank < 1 || cfg.MatchCount < 1 || cfg.MatchCount > 20 || cfg.RankShow < 1 || cfg.RankShow > 500 || cfg.MatchMillis < 1000 || cfg.MatchMillis > 3600000 {
 		return nil, errors.New("竞技真实名册运营值无效")
 	}
+	var allocator db.P11ArenaRankAllocator
+	if err := tx.First(&allocator, "policy_id=?", cfg.ID).Error; err != nil {
+		return nil, err
+	}
+	if allocator.NextRank < 1 || allocator.NextRank > constUtil.P11ArenaNPCMaxRank {
+		return nil, errors.New("竞技名次分配器无效")
+	}
+	cfg.NextRank = allocator.NextRank
 	return &cfg, nil
 }
 func (s *GameService) p11ArenaProjection(row *db.Profile, projectionTx ...*gorm.DB) (*pb.SimplePlayerInfo, *pb.BattlePlayer, error) {
@@ -80,7 +91,7 @@ func (s *GameService) p11ArenaProjection(row *db.Profile, projectionTx ...*gorm.
 	if len(battle.GetFormation()) == 0 {
 		return nil, nil, errors.New("竞技需实际队伍")
 	}
-	power, err := s.formationFightPower(p, g)
+	power, err := s.formationFightPowerFromParty(battle)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -88,15 +99,16 @@ func (s *GameService) p11ArenaProjection(row *db.Profile, projectionTx ...*gorm.
 	if err != nil {
 		return nil, nil, err
 	}
-	return &pb.SimplePlayerInfo{PlayerId: proto.Int64(row.Id), ServerId: proto.Int32(1), PlayerName: p.Name, Level: p.Level, HeroWarId: proto.String(hero), FightPower: proto.Int32(power)}, battle, nil
+	return &pb.SimplePlayerInfo{PlayerId: proto.Int64(row.Id), ServerId: proto.Int32(int32(AdminProfileServerID(*row))), PlayerName: p.Name, Level: p.Level, HeroWarId: proto.String(hero), FightPower: proto.Int32(power)}, battle, nil
 }
 
-// p11SyncArenaMembers 从实际Profile同一行快照生成名册，失败候选停用且不影响其他真实角色。
+// p11SyncArenaMembers is an explicit startup/maintenance rebuild. Ordinary
+// queries refresh only their owner and the selected combat participants.
 func (s *GameService) p11SyncArenaMembers(tx *gorm.DB, cfg *db.P11ArenaPolicy, now time.Time) error {
 	if err := p11ArenaReserveVirtualSlots(tx, cfg); err != nil {
 		return err
 	}
-	if _, err := s.PrepareP11ArenaDailyMutation(tx.Statement.Context, tx, now); err != nil {
+	if _, err := s.prepareP11ArenaDailyMaintenance(tx.Statement.Context, tx, now); err != nil {
 		return err
 	}
 	minLevel, err := s.p10Setting("PVPLevel")
@@ -104,48 +116,50 @@ func (s *GameService) p11SyncArenaMembers(tx *gorm.DB, cfg *db.P11ArenaPolicy, n
 		return err
 	}
 	var profiles []db.Profile
-	if err = tx.Where("player IS NOT NULL AND game IS NOT NULL").Order("id").Find(&profiles).Error; err != nil {
+	valid := map[int64]bool{}
+	if err = tx.Where("server_id=? AND player IS NOT NULL AND game IS NOT NULL", s.OriginalServerID()).Order("id").FindInBatches(&profiles, 64, func(_ *gorm.DB, _ int) error {
+		for _, profile := range profiles {
+			info, battle, err := s.p11ArenaProjection(&profile, tx)
+			if err != nil || info.GetLevel() < minLevel {
+				continue
+			}
+			valid[profile.Id] = true
+			rawInfo, err := proto.Marshal(info)
+			if err != nil {
+				return err
+			}
+			rawBattle, err := proto.Marshal(battle)
+			if err != nil {
+				return err
+			}
+			hash := p6Digest(append(append([]byte(nil), rawInfo...), rawBattle...))
+			var member db.P11ArenaMember
+			err = tx.First(&member, "player_id=?", profile.Id).Error
+			if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+				return err
+			}
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				if cfg.NextRank == math.MaxInt64 {
+					return errors.New("竞技名次编号溢出")
+				}
+				member = db.P11ArenaMember{PlayerID: profile.Id, Rank: cfg.NextRank, RankRewardBest: min(cfg.NextRank, constUtil.P11ArenaVirtualSlots+1), CreatedAt: now.UnixMilli()}
+				cfg.NextRank++
+			}
+			member.Active = true
+			member.Info = rawInfo
+			member.Battle = rawBattle
+			member.SnapshotHash = hash
+			member.UpdatedAt = now.UnixMilli()
+			if err = tx.Save(&member).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	}).Error; err != nil {
 		return err
 	}
-	valid := map[int64]bool{}
-	for _, profile := range profiles {
-		info, battle, err := s.p11ArenaProjection(&profile, tx)
-		if err != nil || info.GetLevel() < minLevel {
-			continue
-		}
-		valid[profile.Id] = true
-		rawInfo, err := proto.Marshal(info)
-		if err != nil {
-			return err
-		}
-		rawBattle, err := proto.Marshal(battle)
-		if err != nil {
-			return err
-		}
-		hash := p6Digest(append(append([]byte(nil), rawInfo...), rawBattle...))
-		var member db.P11ArenaMember
-		err = tx.First(&member, "player_id=?", profile.Id).Error
-		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-			return err
-		}
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			if cfg.NextRank == math.MaxInt64 {
-				return errors.New("竞技名次编号溢出")
-			}
-			member = db.P11ArenaMember{PlayerID: profile.Id, Rank: cfg.NextRank, RankRewardBest: min(cfg.NextRank, constUtil.P11ArenaVirtualSlots+1), CreatedAt: now.UnixMilli()}
-			cfg.NextRank++
-		}
-		member.Active = true
-		member.Info = rawInfo
-		member.Battle = rawBattle
-		member.SnapshotHash = hash
-		member.UpdatedAt = now.UnixMilli()
-		if err = tx.Save(&member).Error; err != nil {
-			return err
-		}
-	}
 	var members []db.P11ArenaMember
-	if err = tx.Find(&members).Error; err != nil {
+	if err = tx.Select("player_id", "active").Find(&members).Error; err != nil {
 		return err
 	}
 	for _, member := range members {
@@ -155,7 +169,11 @@ func (s *GameService) p11SyncArenaMembers(tx *gorm.DB, cfg *db.P11ArenaPolicy, n
 			}
 		}
 	}
-	return tx.Save(cfg).Error
+	if err := tx.Save(cfg).Error; err != nil {
+		return err
+	}
+	allocator := db.P11ArenaRankAllocator{PolicyID: cfg.ID, NextRank: cfg.NextRank}
+	return tx.Clauses(clause.OnConflict{Columns: []clause.Column{{Name: "policy_id"}}, DoUpdates: clause.AssignmentColumns([]string{"next_rank"})}).Create(&allocator).Error
 }
 func p11ArenaMemberInfo(member db.P11ArenaMember) (*pb.PvpRankPlayerInfo, error) {
 	info := &pb.SimplePlayerInfo{}
@@ -197,11 +215,22 @@ func (s *GameService) p11ArenaQuery(ctx context.Context, id int64, request proto
 	} else {
 		reply = &pb.SCPvpRank{}
 	}
-	err := db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	if err := s.p11PrepareArenaMembership(ctx, id, now); err != nil {
+		return nil, err
+	}
+	err := s.p11ArenaTransaction(ctx, now, func(tx *gorm.DB) error {
+		if match {
+			reply = &pb.SCPvpFindMatch{}
+		} else {
+			reply = &pb.SCPvpRank{}
+		}
 		if err := ServerGameClockGuardTransaction(tx); err != nil {
 			return err
 		}
 
+		if err := p10LockProfileIDs(tx, id, id); err != nil {
+			return err
+		}
 		cfg, err := p11ArenaConfig(tx)
 		if err != nil {
 			return err
@@ -223,9 +252,6 @@ func (s *GameService) p11ArenaQuery(ctx context.Context, id int64, request proto
 				return err
 			}
 		}
-		if err = s.p11SyncArenaMembers(tx, cfg, now); err != nil {
-			return err
-		}
 		var own db.Profile
 		if err = tx.First(&own, id).Error; err != nil {
 			return err
@@ -233,7 +259,7 @@ func (s *GameService) p11ArenaQuery(ctx context.Context, id int64, request proto
 		if err = p11ArenaGuideQueryProfile(ctx, &own); err != nil {
 			return err
 		}
-		info, _, err := s.p11ArenaProjection(&own, tx)
+		info, ownBattle, err := s.p11ArenaProjection(&own, tx)
 		if err != nil {
 			return err
 		}
@@ -244,7 +270,20 @@ func (s *GameService) p11ArenaQuery(ctx context.Context, id int64, request proto
 			return enrollmentErr
 		}
 		enrolled := enrollmentErr == nil
+		minimum, err := s.p10Setting("PVPLevel")
+		if err != nil {
+			return err
+		}
+		if enrolled && info.GetLevel() < minimum {
+			if err := tx.Model(&member).Update("active", false).Error; err != nil {
+				return err
+			}
+			enrolled = false
+		}
 		if enrolled {
+			if err := p11SetArenaProjection(tx, &member, info, ownBattle, now); err != nil {
+				return err
+			}
 			mine, err = p11ArenaMemberInfo(member)
 			if err != nil {
 				return err
@@ -254,6 +293,11 @@ func (s *GameService) p11ArenaQuery(ctx context.Context, id int64, request proto
 		if !match || enrolled {
 			selected, err = s.p11ArenaCandidates(tx, cfg, id, member, match)
 			if err != nil {
+				return err
+			}
+		}
+		if match {
+			if err := s.p11RefreshSelectedArenaSnapshots(tx, selected); err != nil {
 				return err
 			}
 		}

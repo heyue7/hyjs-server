@@ -1,0 +1,18 @@
+goos: darwin
+goarch: arm64
+pkg: hyjs-server/model
+cpu: Apple M1 Pro
+BenchmarkProfileStorageRound2/decode/old-8         	    1461	    396933 ns/op	   4.53 MB/s	  260619 B/op	    2501 allocs/op
+BenchmarkProfileStorageRound2/decode/old-8         	    1513	    398749 ns/op	   4.51 MB/s	  262406 B/op	    2501 allocs/op
+BenchmarkProfileStorageRound2/decode/old-8         	    1500	    415829 ns/op	   4.33 MB/s	  262630 B/op	    2501 allocs/op
+BenchmarkProfileStorageRound2/decode/new-8         	    1695	    352224 ns/op	   5.11 MB/s	  219581 B/op	    2497 allocs/op
+BenchmarkProfileStorageRound2/decode/new-8         	    1729	    352406 ns/op	   5.10 MB/s	  219611 B/op	    2498 allocs/op
+BenchmarkProfileStorageRound2/decode/new-8         	    1702	    356630 ns/op	   5.04 MB/s	  219682 B/op	    2498 allocs/op
+BenchmarkProfileStorageRound2/decode-and-position-save/old-8         	     943	    633777 ns/op	   2.84 MB/s	  399054 B/op	    2562 allocs/op
+BenchmarkProfileStorageRound2/decode-and-position-save/old-8         	     949	    643949 ns/op	   2.79 MB/s	  399941 B/op	    2562 allocs/op
+BenchmarkProfileStorageRound2/decode-and-position-save/old-8         	     925	    735613 ns/op	   2.45 MB/s	  403090 B/op	    2563 allocs/op
+BenchmarkProfileStorageRound2/decode-and-position-save/new-8         	    1002	    600212 ns/op	   3.00 MB/s	  374786 B/op	    2561 allocs/op
+BenchmarkProfileStorageRound2/decode-and-position-save/new-8         	    1003	    599389 ns/op	   3.00 MB/s	  373441 B/op	    2560 allocs/op
+BenchmarkProfileStorageRound2/decode-and-position-save/new-8         	    1010	    602316 ns/op	   2.99 MB/s	  371735 B/op	    2560 allocs/op
+PASS
+ok  	hyjs-server/model	8.785s

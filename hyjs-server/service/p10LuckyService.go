@@ -182,12 +182,31 @@ func (s *GameService) p10LuckyList(tx *gorm.DB, id int64, now time.Time) (*pb.SC
 	if err = tx.Where("scene=? AND line=? AND claimed_at=0 AND expires_at>?", own.Scene, own.Line, now.UnixMilli()).Order("created_at,guid").Limit(1000).Find(&rows).Error; err != nil {
 		return nil, err
 	}
+	var owners []int64
+	seen := make(map[int64]bool, len(rows))
 	for _, row := range rows {
-		blocked, err := p10Blocked(tx, id, row.OwnerID)
-		if err != nil {
+		if !seen[row.OwnerID] {
+			seen[row.OwnerID] = true
+			owners = append(owners, row.OwnerID)
+		}
+	}
+	blocked := make(map[int64]bool)
+	if len(owners) > 0 {
+		var relations []db.P10SocialBlack
+		if err = tx.Select("owner_id", "target_id").Where("(owner_id=? AND target_id IN ?) OR (target_id=? AND owner_id IN ?)", id, owners, id, owners).Find(&relations).Error; err != nil {
 			return nil, err
 		}
-		if blocked {
+		for _, relation := range relations {
+			if relation.OwnerID == id {
+				blocked[relation.TargetID] = true
+			}
+			if relation.TargetID == id {
+				blocked[relation.OwnerID] = true
+			}
+		}
+	}
+	for _, row := range rows {
+		if blocked[row.OwnerID] {
 			continue
 		}
 		frame := &pb.LuckyBag{}
@@ -201,12 +220,28 @@ func (s *GameService) p10LuckyList(tx *gorm.DB, id int64, now time.Time) (*pb.SC
 
 // p10LuckyAt 持有实际角色和对象行锁，扣袋、冻结对象或抢取资源、次数、回执在同一InnoDB事务提交。
 func (s *GameService) p10LuckyAt(ctx context.Context, id int64, request proto.Message, stamp int64, now time.Time) ([]proto.Message, error) {
-	p10SceneMutation.Lock()
-	defer p10SceneMutation.Unlock()
+	p10SceneMutation.RLock()
+	defer p10SceneMutation.RUnlock()
 	if _, ok := request.(*pb.CSCurrentLuckyBagsInfo); ok {
 		out, err := s.p10LuckyList(db.GetIns().WithContext(ctx), id, now)
 		return []proto.Message{out}, err
 	}
+	var dropKey p10LuckyDropKey
+	var unlockDrop func()
+	if _, ok := request.(*pb.CSThrowLuckyBags); ok {
+		preflight, _, err := s.p10LuckyScope(db.GetIns().WithContext(ctx), id)
+		if err == nil && preflight != nil {
+			if database, err := db.GetIns().DB(); err == nil {
+				dropKey = p10LuckyDropKey{database: database, scene: preflight.Scene, line: preflight.Line}
+				unlockDrop = p10LuckyDropLock(dropKey)
+			}
+		}
+	}
+	defer func() {
+		if unlockDrop != nil {
+			unlockDrop()
+		}
+	}()
 	var response proto.Message
 	domain := ""
 	switch request.(type) {
@@ -413,6 +448,10 @@ func (s *GameService) p10LuckyAt(ctx context.Context, id int64, request proto.Me
 					return errors.New("福袋投放超出原3米范围")
 				}
 			}
+			database, poolErr := tx.DB()
+			if poolErr != nil || unlockDrop == nil || dropKey != (p10LuckyDropKey{database: database, scene: scope.Scene, line: scope.Line}) {
+				return errors.New("场景线路已变化，请重新同步")
+			}
 			var active int64
 			if err = tx.Model(&db.P10LuckyObject{}).Where("scene=? AND line=? AND claimed_at=0 AND expires_at>?", scope.Scene, scope.Line, now.UnixMilli()).Count(&active).Error; err != nil {
 				return err
@@ -531,6 +570,10 @@ func (s *GameService) p10LuckyAt(ctx context.Context, id int64, request proto.Me
 		}
 		return nil
 	})
+	if unlockDrop != nil {
+		unlockDrop()
+		unlockDrop = nil
+	}
 	if err != nil {
 		return nil, err
 	}

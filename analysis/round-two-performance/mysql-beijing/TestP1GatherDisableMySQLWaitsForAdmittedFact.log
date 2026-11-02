@@ -1,0 +1,3 @@
+=== RUN   TestP1GatherDisableMySQLWaitsForAdmittedFact
+--- PASS: TestP1GatherDisableMySQLWaitsForAdmittedFact (0.79s)
+PASS

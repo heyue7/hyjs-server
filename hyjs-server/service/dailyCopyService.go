@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -271,8 +272,37 @@ func (s *GameService) dailyCopy(ctx context.Context, id int64, request proto.Mes
 	return s.dailyCopyAt(ctx, id, request, stamp, time.Now())
 }
 
-// dailyCopyAt 用角色行锁串行化体力、次数和战斗回执，所有写入同一事务提交。
+// dailyCopyAt uses read-only state projection and serializes battle writes under the player lock.
 func (s *GameService) dailyCopyAt(ctx context.Context, id int64, request proto.Message, stamp int64, now time.Time) ([]proto.Message, error) {
+	if _, ok := request.(*pb.CSDailyCopyState); ok {
+		var state *pb.SCDailyCopyState
+		err := db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+			if err := ServerGameClockGuardTransaction(tx); err != nil {
+				return err
+			}
+			var profile db.Profile
+			if err := tx.Select("id", "player").First(&profile, id).Error; err != nil {
+				return err
+			}
+			if profile.Player == nil {
+				return errors.New("请先创建角色")
+			}
+			var player pb.Player
+			if err := json.Unmarshal([]byte(*profile.Player), &player); err != nil {
+				return err
+			}
+			if player.GetPlayerId() != profile.Id {
+				return errors.New("角色存档身份不匹配")
+			}
+			var err error
+			state, err = s.dailyCopyInfo(tx, &player, now)
+			return err
+		})
+		if err != nil {
+			return nil, err
+		}
+		return []proto.Message{state}, nil
+	}
 	var response proto.Message
 	var updated *pb.Player
 	var currentState *pb.SCDailyCopyState
@@ -293,8 +323,6 @@ func (s *GameService) dailyCopyAt(ctx context.Context, id int64, request proto.M
 			return err
 		}
 		switch b := request.(type) {
-		case *pb.CSDailyCopyState:
-			response, err = s.dailyCopyInfo(tx, player, now)
 		case *pb.CSDailyCopyFightStart:
 			var changed bool
 			response, changed, err = s.dailyCopyStart(tx, player, game, b, stamp, now)
@@ -351,10 +379,19 @@ func (s *GameService) dailyCopyInfo(tx *gorm.DB, player *pb.Player, now time.Tim
 	if err != nil {
 		return nil, err
 	}
+	day := dailyCopyDay(now)
 	var active db.DailyCopyFight
-	activeErr := tx.Where("player_id = ? AND day = ? AND settled = ?", player.GetPlayerId(), dailyCopyDay(now), false).First(&active).Error
+	activeErr := tx.Select("type", "chapter_id").Where("player_id = ? AND day = ? AND settled = ?", player.GetPlayerId(), day, false).First(&active).Error
 	if activeErr != nil && !errors.Is(activeErr, gorm.ErrRecordNotFound) {
 		return nil, activeErr
+	}
+	var states []db.DailyCopyState
+	if err := tx.Where("player_id = ? AND day = ?", player.GetPlayerId(), day).Find(&states).Error; err != nil {
+		return nil, err
+	}
+	byType := make(map[string]db.DailyCopyState, len(states))
+	for _, state := range states {
+		byType[state.Type] = state
 	}
 	result := &pb.SCDailyCopyState{}
 	for _, rule := range s.Tables["DailyCopy"] {
@@ -362,9 +399,12 @@ func (s *GameService) dailyCopyInfo(tx *gorm.DB, player *pb.Player, now time.Tim
 		if err != nil {
 			return nil, err
 		}
-		state, err := loadDailyCopyState(tx, player.GetPlayerId(), rule["Type"], dailyCopyDay(now), limit)
-		if err != nil {
-			return nil, err
+		state, found := byType[rule["Type"]]
+		if !found {
+			state = db.DailyCopyState{PlayerID: player.GetPlayerId(), Type: rule["Type"], Day: day, Limit: limit}
+		}
+		if state.Limit < 1 || state.Used < 0 || state.Used > state.Limit {
+			return nil, errors.New(constUtil.DailyCopyConfigError)
 		}
 		item := &pb.DailyCopyStateType{Type: proto.String(rule["Type"]), IsOpen: proto.Int32(0), LastTime: proto.Int32(state.Limit - state.Used)}
 		if policy.Enabled && open {

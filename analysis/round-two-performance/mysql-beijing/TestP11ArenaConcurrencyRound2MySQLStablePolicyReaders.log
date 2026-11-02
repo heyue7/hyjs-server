@@ -1,0 +1,3 @@
+=== RUN   TestP11ArenaConcurrencyRound2MySQLStablePolicyReaders
+--- PASS: TestP11ArenaConcurrencyRound2MySQLStablePolicyReaders (1.90s)
+PASS

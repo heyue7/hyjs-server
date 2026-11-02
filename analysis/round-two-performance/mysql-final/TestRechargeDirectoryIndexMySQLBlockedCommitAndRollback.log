@@ -1,0 +1,3 @@
+=== RUN   TestRechargeDirectoryIndexMySQLBlockedCommitAndRollback
+--- PASS: TestRechargeDirectoryIndexMySQLBlockedCommitAndRollback (0.75s)
+PASS

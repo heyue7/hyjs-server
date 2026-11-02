@@ -9,6 +9,12 @@ CREATE TABLE IF NOT EXISTS profiles (
  uid VARBINARY(1024) NOT NULL,
   session LONGBLOB NOT NULL,
   player LONGTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_bin NULL,
+ player_level BIGINT GENERATED ALWAYS AS (CASE
+ WHEN player IS NULL OR JSON_VALID(player)=0 THEN NULL
+ WHEN JSON_TYPE(JSON_EXTRACT(player,'$.level'))='INTEGER' THEN CASE
+   WHEN CAST(JSON_UNQUOTE(JSON_EXTRACT(player,'$.level')) AS DECIMAL(65,0)) BETWEEN 0 AND 2147483647 THEN CAST(JSON_UNQUOTE(JSON_EXTRACT(player,'$.level')) AS SIGNED)
+   ELSE NULL END
+ ELSE NULL END) STORED,
   game LONGTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_bin NULL,
  scene_scope VARCHAR(64) GENERATED ALWAYS AS (CASE
  WHEN game IS NULL OR player IS NULL OR JSON_VALID(game)=0 OR JSON_VALID(player)=0 OR ggo_credit<0 THEN NULL
@@ -25,5 +31,6 @@ CREATE TABLE IF NOT EXISTS profiles (
   password_salt LONGBLOB NULL,
   password_hash LONGBLOB NULL,
   UNIQUE KEY profiles_uid (uid),
-  KEY idx_profiles_server_id (server_id)
+  KEY idx_profiles_server_id (server_id),
+  KEY idx_profiles_server_level (server_id, player_level, id)
 ) ENGINE=InnoDB;

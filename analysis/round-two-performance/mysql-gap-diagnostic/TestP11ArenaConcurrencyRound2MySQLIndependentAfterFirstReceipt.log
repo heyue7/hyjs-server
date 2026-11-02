@@ -1,0 +1,5 @@
+=== RUN   TestP11ArenaConcurrencyRound2MySQLIndependentAfterFirstReceipt
+[mysql] 2026/11/02 18:08:08 packets.go:58 read tcp 127.0.0.1:52053->127.0.0.1:3306: i/o timeout
+    p11ArenaConcurrencyRound2_test.go:894: other NPC fight failed while rank 90 was held: id=3 err=invalid connection; stages: 2=update p11_arena_members; 3=create p11_arena_fight_settlements
+--- FAIL: TestP11ArenaConcurrencyRound2MySQLIndependentAfterFirstReceipt (39.57s)
+FAIL

@@ -1,0 +1,4 @@
+=== RUN   TestGGOBossSharedLastHitRollbackAndRewards
+    ggoBossIntegration_test.go:230: 沙漠首领终局敌方成员缺失
+--- FAIL: TestGGOBossSharedLastHitRollbackAndRewards (2.05s)
+FAIL

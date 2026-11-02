@@ -140,6 +140,18 @@ func AuthorizeAccount(ctx context.Context, id int64, session []byte) (*db.Profil
 	return &row, nil
 }
 
+// authorizeAccountIdentity reads only the fields needed for a one-way movement acknowledgement.
+func authorizeAccountIdentity(ctx context.Context, id int64, session []byte) (*db.Profile, error) {
+	var row db.Profile
+	if err := db.GetIns().WithContext(ctx).Select("id", "server_id", "session", "account_id", "account_auth_revision").First(&row, id).Error; err != nil {
+		return nil, err
+	}
+	if err := authorizeProfileSession(ctx, &row, session); err != nil {
+		return nil, err
+	}
+	return &row, nil
+}
+
 // p10PushAuthorization reads only the identity, policy and bound-session data
 // required for this one send. No game save or credential columns are loaded.
 type p10PushAuthorization struct {

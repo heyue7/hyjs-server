@@ -71,6 +71,10 @@ func p10SceneProfileSnapshot(profile *db.Profile) *db.Profile {
 		value := *profile.SceneScope
 		snapshot.SceneScope = &value
 	}
+	if profile.PlayerLevel != nil {
+		value := *profile.PlayerLevel
+		snapshot.PlayerLevel = &value
+	}
 	if profile.CreatedAt != nil {
 		value := *profile.CreatedAt
 		snapshot.CreatedAt = &value

@@ -1,0 +1,5 @@
+=== RUN   TestP1GatherRealTwoPlayersIgnoreOtherPeriodXMySQL
+    p1GatherRealP8NoPeriodLockMySQL_test.go:246: player=1 point=mine_pos_10 start=147.022041ms claim=86.035875ms
+    p1GatherRealP8NoPeriodLockMySQL_test.go:246: player=2 point=mine_pos_12 start=147.053834ms claim=86.087625ms
+--- PASS: TestP1GatherRealTwoPlayersIgnoreOtherPeriodXMySQL (2.29s)
+PASS

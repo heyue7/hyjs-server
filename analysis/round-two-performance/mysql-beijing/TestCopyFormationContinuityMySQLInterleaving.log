@@ -1,0 +1,4 @@
+=== RUN   TestCopyFormationContinuityMySQLInterleaving
+    copyFormationContinuityMySQL_test.go:354: both lock orders completed for one isolated player; first reward hero_exp_006 retained exactly once
+--- PASS: TestCopyFormationContinuityMySQLInterleaving (1.57s)
+PASS

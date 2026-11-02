@@ -1,0 +1,4 @@
+=== RUN   TestP11ArenaVirtualOriginalGuideFightSlotConflictAndColdReceipt
+    p11ArenaNPC_test.go:258: {"P6":true,"energy":98,"guide":13,"rank":24576,"rankDiamond":8192,"winner":1}
+--- PASS: TestP11ArenaVirtualOriginalGuideFightSlotConflictAndColdReceipt (4.62s)
+PASS

@@ -363,6 +363,7 @@ func (s *GameService) p11PlunderListAt(ctx context.Context, id int64, fragment s
 // The virtual roster has no profile row. Every mutation still follows the
 // independently certified type3 calculation and its frozen source.
 func (s *GameService) p11PlunderFightAt(ctx context.Context, id int64, request *pb.CSFightTreasureStartResult, stamp int64, now time.Time) ([]proto.Message, error) {
+	ctx = withP6InputReuseScope(ctx)
 	if stamp <= 0 || id == request.GetFightPlayerId() || !s.p11PlunderFragment(request.GetTargetFlagId()) {
 		return nil, errors.New(constUtil.P11PlunderFightRefresh)
 	}
@@ -398,7 +399,7 @@ func (s *GameService) p11PlunderFightTx(ctx context.Context, tx *gorm.DB, id int
 		if npc {
 			lockPeer = id
 		}
-		if _, err := p10LockProfiles(tx, id, lockPeer); err != nil {
+		if err := p10LockProfileIDs(tx, id, lockPeer); err != nil {
 			return err
 		}
 		raw, err := proto.MarshalOptions{Deterministic: true}.Marshal(request)
@@ -542,7 +543,7 @@ func (s *GameService) p11PlunderFightTx(ctx context.Context, tx *gorm.DB, id int
 		if err = tx.First(&record, "id=?", recordID).Error; err != nil {
 			return err
 		}
-		frozen, err := decodeP6Record(&record)
+		frozen, err := decodeP6RecordScoped(tx.Statement.Context, &record)
 		if err != nil {
 			return err
 		}
@@ -722,7 +723,7 @@ func p11ReadPlunderReceipt(tx *gorm.DB, row *db.P11PlunderFightSettlement) (*pb.
 	if err = tx.First(&record, "id=?", row.P6RecordID).Error; err != nil {
 		return nil, err
 	}
-	input, err := decodeP6Record(&record)
+	input, err := decodeP6RecordScoped(tx.Statement.Context, &record)
 	if err != nil {
 		return nil, err
 	}

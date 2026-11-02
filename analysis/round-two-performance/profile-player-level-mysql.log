@@ -1,0 +1,39 @@
+
+[runner error: Restricted MySQL test-create failed for hyjs_test_p1_round_two_generated_bc3ec3a169 (exit 1)]
+
+[runner exit=None cleanup=ok elapsed=0.26s]
+[read-only manager status exit=1: cannot connect to Docker daemon at unix:///Users/lirui/.docker/run/docker.sock]
+
+[second attempt: managed isolated MySQL]
+=== RUN   TestProfilePlayerLevelMySQL
+=== RUN   TestProfilePlayerLevelMySQL/zero
+=== RUN   TestProfilePlayerLevelMySQL/seventy
+=== RUN   TestProfilePlayerLevelMySQL/maximum
+=== RUN   TestProfilePlayerLevelMySQL/sql-null
+=== RUN   TestProfilePlayerLevelMySQL/json-null
+=== RUN   TestProfilePlayerLevelMySQL/invalid-json
+=== RUN   TestProfilePlayerLevelMySQL/string
+=== RUN   TestProfilePlayerLevelMySQL/negative
+=== RUN   TestProfilePlayerLevelMySQL/out-of-range
+=== RUN   TestProfilePlayerLevelMySQL/large-integer
+=== RUN   TestProfilePlayerLevelMySQL/decimal
+=== RUN   TestProfilePlayerLevelMySQL/boolean
+=== RUN   TestProfilePlayerLevelMySQL/missing
+--- PASS: TestProfilePlayerLevelMySQL (0.67s)
+    --- PASS: TestProfilePlayerLevelMySQL/zero (0.01s)
+    --- PASS: TestProfilePlayerLevelMySQL/seventy (0.00s)
+    --- PASS: TestProfilePlayerLevelMySQL/maximum (0.00s)
+    --- PASS: TestProfilePlayerLevelMySQL/sql-null (0.00s)
+    --- PASS: TestProfilePlayerLevelMySQL/json-null (0.00s)
+    --- PASS: TestProfilePlayerLevelMySQL/invalid-json (0.00s)
+    --- PASS: TestProfilePlayerLevelMySQL/string (0.00s)
+    --- PASS: TestProfilePlayerLevelMySQL/negative (0.00s)
+    --- PASS: TestProfilePlayerLevelMySQL/out-of-range (0.00s)
+    --- PASS: TestProfilePlayerLevelMySQL/large-integer (0.00s)
+    --- PASS: TestProfilePlayerLevelMySQL/decimal (0.00s)
+    --- PASS: TestProfilePlayerLevelMySQL/boolean (0.00s)
+    --- PASS: TestProfilePlayerLevelMySQL/missing (0.00s)
+PASS
+ok  	hyjs-server/db	2.640s
+
+[second runner exit=0 cleanup=ok elapsed=6.28s]

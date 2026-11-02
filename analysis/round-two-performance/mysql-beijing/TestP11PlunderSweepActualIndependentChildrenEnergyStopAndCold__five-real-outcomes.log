@@ -1,0 +1,5 @@
+=== RUN   TestP11PlunderSweepActualIndependentChildrenEnergyStopAndCold
+=== RUN   TestP11PlunderSweepActualIndependentChildrenEnergyStopAndCold/five-real-outcomes
+--- PASS: TestP11PlunderSweepActualIndependentChildrenEnergyStopAndCold (7.00s)
+    --- PASS: TestP11PlunderSweepActualIndependentChildrenEnergyStopAndCold/five-real-outcomes (6.99s)
+PASS

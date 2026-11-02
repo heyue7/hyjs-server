@@ -27,6 +27,7 @@ type Profile struct {
 	Uid                   string  `gorm:"column:uid;not null;uniqueIndex" json:"uid"`
 	Session               []byte  `gorm:"column:session;not null" json:"-"`
 	Player                *string `gorm:"column:player" json:"-"`
+	PlayerLevel           *int64  `gorm:"column:player_level;->;-:migration" json:"-"`
 	Game                  *string `gorm:"column:game" json:"-"`
 	SceneScope            *string `gorm:"column:scene_scope;->;-:migration" json:"-"`
 	CreatedAt             *int64  `gorm:"column:created_at;autoCreateTime:false" json:"created_at"`
@@ -54,7 +55,11 @@ func InitGame(ctx context.Context, path string) error {
 	sqlDB.SetMaxOpenConns(1)
 	// SQLite 的表重建会丢失历史递增序号；按 Python Store 的方式只补齐缺失列。
 	if err = d.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := tx.Exec(profileSchema).Error; err != nil {
+		schema, err := sqliteProfileTableSchema()
+		if err != nil {
+			return err
+		}
+		if err := tx.Exec(schema).Error; err != nil {
 			return err
 		}
 		var columns []struct{ Name string }
@@ -84,7 +89,10 @@ func InitGame(ctx context.Context, path string) error {
 				}
 			}
 		}
-		return migrateProfileSceneScope(tx)
+		if err := migrateProfileSceneScope(tx); err != nil {
+			return err
+		}
+		return migrateProfilePlayerLevel(tx)
 	}); err != nil {
 		sqlDB.Close()
 		return err

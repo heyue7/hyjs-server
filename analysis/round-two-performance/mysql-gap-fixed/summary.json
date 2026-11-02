@@ -1,0 +1,44 @@
+[
+  {
+    "case": "TestP11ArenaConcurrencyRound2MySQLIndependentAfterFirstReceipt",
+    "passed": true,
+    "exitCode": 0,
+    "seconds": 7.161
+  },
+  {
+    "case": "TestP11ArenaConcurrencyRound2MySQLVirtualRankArbitration",
+    "passed": true,
+    "exitCode": 0,
+    "seconds": 4.014
+  },
+  {
+    "case": "TestP11ArenaScopedRealWinnerPaymentRanksConcurrentColdAndQualification",
+    "passed": true,
+    "exitCode": 0,
+    "seconds": 7.032
+  },
+  {
+    "case": "TestP11ArenaDailyRealChallengerCutoffOfflineClaimAndColdOnce",
+    "passed": true,
+    "exitCode": 0,
+    "seconds": 3.334
+  },
+  {
+    "case": "TestP11ArenaConcurrentRealRegistrationReceiptAndRestart",
+    "passed": true,
+    "exitCode": 0,
+    "seconds": 4.549
+  },
+  {
+    "case": "TestP11ArenaRealRegistryUniqueRanksMatchSnapshotsAndNoResources",
+    "passed": true,
+    "exitCode": 0,
+    "seconds": 2.386
+  },
+  {
+    "case": "TestP11ArenaConcurrencyRound2MySQLStablePolicyReaders",
+    "passed": true,
+    "exitCode": 0,
+    "seconds": 3.281
+  }
+]

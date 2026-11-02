@@ -1,0 +1,38 @@
+[
+  {
+    "case": "TestP11ArenaConcurrencyRound2MySQLStablePolicyReaders",
+    "passed": true,
+    "exitCode": 0,
+    "seconds": 2.416
+  },
+  {
+    "case": "TestP11ArenaConcurrencyRound2MySQLVirtualRankArbitration",
+    "passed": true,
+    "exitCode": 0,
+    "seconds": 4.977
+  },
+  {
+    "case": "TestP11PlunderSweepRound2MySQLActualParticipantLocks",
+    "passed": true,
+    "exitCode": 0,
+    "seconds": 3.869
+  },
+  {
+    "case": "TestSharedFieldBoss55ReadsRound2MySQLStableProjection",
+    "passed": true,
+    "exitCode": 0,
+    "seconds": 0.476
+  },
+  {
+    "case": "TestSharedFieldBoss55ReadsRound2MySQLCreateExpireCorrupt",
+    "passed": true,
+    "exitCode": 0,
+    "seconds": 0.557
+  },
+  {
+    "case": "TestSharedFieldBoss55ReadsRound2MySQLExpiredRechecksLockedRow",
+    "passed": true,
+    "exitCode": 0,
+    "seconds": 0.526
+  }
+]

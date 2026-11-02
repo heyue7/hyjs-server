@@ -1,0 +1,53 @@
+=== RUN   TestProfileStorage86RoundTripLegacyExportAndJSONPaths
+    profileStorage86_test.go:66: roster representative game bytes 23439 -> 1799
+--- PASS: TestProfileStorage86RoundTripLegacyExportAndJSONPaths (0.01s)
+=== RUN   TestProfileStorage86RawUnknownFieldsAndRollback
+--- PASS: TestProfileStorage86RawUnknownFieldsAndRollback (0.00s)
+=== RUN   TestProfileStorage86CorruptionAndBoundsRejected
+=== RUN   TestProfileStorage86CorruptionAndBoundsRejected/digest
+=== RUN   TestProfileStorage86CorruptionAndBoundsRejected/length
+=== RUN   TestProfileStorage86CorruptionAndBoundsRejected/oversized
+=== RUN   TestProfileStorage86CorruptionAndBoundsRejected/codec
+=== RUN   TestProfileStorage86CorruptionAndBoundsRejected/truncated
+=== RUN   TestProfileStorage86CorruptionAndBoundsRejected/trailing
+--- PASS: TestProfileStorage86CorruptionAndBoundsRejected (0.00s)
+    --- PASS: TestProfileStorage86CorruptionAndBoundsRejected/digest (0.00s)
+    --- PASS: TestProfileStorage86CorruptionAndBoundsRejected/length (0.00s)
+    --- PASS: TestProfileStorage86CorruptionAndBoundsRejected/oversized (0.00s)
+    --- PASS: TestProfileStorage86CorruptionAndBoundsRejected/codec (0.00s)
+    --- PASS: TestProfileStorage86CorruptionAndBoundsRejected/truncated (0.00s)
+    --- PASS: TestProfileStorage86CorruptionAndBoundsRejected/trailing (0.00s)
+=== RUN   TestProfileStorage86OriginalPartialAndNullDecode
+--- PASS: TestProfileStorage86OriginalPartialAndNullDecode (0.00s)
+=== RUN   TestProfileStorage86ReusePreservesAndValidatesRoster
+--- PASS: TestProfileStorage86ReusePreservesAndValidatesRoster (0.00s)
+=== RUN   TestProfileStorageRound2DecodeCompatibility
+=== RUN   TestProfileStorageRound2DecodeCompatibility/legacy-partial
+=== RUN   TestProfileStorageRound2DecodeCompatibility/compressed-partial
+=== RUN   TestProfileStorageRound2DecodeCompatibility/compressed-complete
+=== RUN   TestProfileStorageRound2DecodeCompatibility/missing-with-codec-elsewhere
+=== RUN   TestProfileStorageRound2DecodeCompatibility/null-with-codec-elsewhere
+=== RUN   TestProfileStorageRound2DecodeCompatibility/empty-with-codec-elsewhere
+=== RUN   TestProfileStorageRound2DecodeCompatibility/whole-null
+--- PASS: TestProfileStorageRound2DecodeCompatibility (0.00s)
+    --- PASS: TestProfileStorageRound2DecodeCompatibility/legacy-partial (0.00s)
+    --- PASS: TestProfileStorageRound2DecodeCompatibility/compressed-partial (0.00s)
+    --- PASS: TestProfileStorageRound2DecodeCompatibility/compressed-complete (0.00s)
+    --- PASS: TestProfileStorageRound2DecodeCompatibility/missing-with-codec-elsewhere (0.00s)
+    --- PASS: TestProfileStorageRound2DecodeCompatibility/null-with-codec-elsewhere (0.00s)
+    --- PASS: TestProfileStorageRound2DecodeCompatibility/empty-with-codec-elsewhere (0.00s)
+    --- PASS: TestProfileStorageRound2DecodeCompatibility/whole-null (0.00s)
+=== RUN   TestProfileStorageRound2CompressedNonCanonicalCompatibility
+=== RUN   TestProfileStorageRound2CompressedNonCanonicalCompatibility/duplicate-non-roster-key
+=== RUN   TestProfileStorageRound2CompressedNonCanonicalCompatibility/uppercase-only-compressed-roster
+=== RUN   TestProfileStorageRound2CompressedNonCanonicalCompatibility/uppercase-and-lowercase-roster
+=== RUN   TestProfileStorageRound2CompressedNonCanonicalCompatibility/damaged-roster-before-outer-mutation
+--- PASS: TestProfileStorageRound2CompressedNonCanonicalCompatibility (0.00s)
+    --- PASS: TestProfileStorageRound2CompressedNonCanonicalCompatibility/duplicate-non-roster-key (0.00s)
+    --- PASS: TestProfileStorageRound2CompressedNonCanonicalCompatibility/uppercase-only-compressed-roster (0.00s)
+    --- PASS: TestProfileStorageRound2CompressedNonCanonicalCompatibility/uppercase-and-lowercase-roster (0.00s)
+    --- PASS: TestProfileStorageRound2CompressedNonCanonicalCompatibility/damaged-roster-before-outer-mutation (0.00s)
+=== RUN   TestProfileStorageRound2IndependentChangesAndPreviousValidation
+--- PASS: TestProfileStorageRound2IndependentChangesAndPreviousValidation (0.01s)
+PASS
+ok  	hyjs-server/model	1.628s

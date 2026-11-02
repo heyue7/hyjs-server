@@ -1,0 +1,3 @@
+=== RUN   TestP4CopyBenefitsRealDropAtomicReplayConcurrentRestart
+--- PASS: TestP4CopyBenefitsRealDropAtomicReplayConcurrentRestart (1.06s)
+PASS

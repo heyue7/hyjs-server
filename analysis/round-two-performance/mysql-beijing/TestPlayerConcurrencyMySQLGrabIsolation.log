@@ -1,0 +1,3 @@
+=== RUN   TestPlayerConcurrencyMySQLGrabIsolation
+--- PASS: TestPlayerConcurrencyMySQLGrabIsolation (2.13s)
+PASS

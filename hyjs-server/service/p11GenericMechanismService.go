@@ -54,7 +54,8 @@ func (s *GameService) ComputeP11GenericMechanismSettlement(ctx context.Context, 
 	if err != nil {
 		return nil, err
 	}
-	if _, err = s.ValidateP6GenericMechanisms(ctx, input); err != nil {
+	qualification, err := s.ValidateP6GenericMechanisms(ctx, input)
+	if err != nil {
 		return nil, err
 	}
 	var out *model.CombatFinalHPOutcome
@@ -64,7 +65,7 @@ func (s *GameService) ComputeP11GenericMechanismSettlement(ctx context.Context, 
 	case 20:
 		out, err = s.ComputeOriginalP6LimitProtocolFinalHP(ctx, input)
 	default:
-		out, _, err = s.ComputeP6GenericMechanismBattle(ctx, input, nil)
+		out, _, err = s.computeP6GenericMechanismBattleValidated(ctx, input, nil, qualification)
 	}
 	if err != nil {
 		return nil, err

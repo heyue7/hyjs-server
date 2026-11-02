@@ -1,0 +1,14 @@
+[
+  {
+    "case": "TestGGOBossRound2MySQLNativeStartEndAndColdReceipt",
+    "passed": true,
+    "exitCode": 0,
+    "seconds": 6.724
+  },
+  {
+    "case": "TestGGOBossRound2MySQLSharedLastHitRollbackAndLines",
+    "passed": true,
+    "exitCode": 0,
+    "seconds": 1.925
+  }
+]

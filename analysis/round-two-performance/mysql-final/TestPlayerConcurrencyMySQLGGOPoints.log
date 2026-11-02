@@ -1,0 +1,3 @@
+=== RUN   TestPlayerConcurrencyMySQLGGOPoints
+--- PASS: TestPlayerConcurrencyMySQLGGOPoints (1.08s)
+PASS

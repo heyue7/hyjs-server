@@ -1,0 +1,3 @@
+=== RUN   TestPlayerConcurrencyMySQLGrabFrozenOffers
+--- PASS: TestPlayerConcurrencyMySQLGrabFrozenOffers (2.02s)
+PASS

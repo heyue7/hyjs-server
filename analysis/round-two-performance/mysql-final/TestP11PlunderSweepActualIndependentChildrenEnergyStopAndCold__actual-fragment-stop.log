@@ -1,0 +1,5 @@
+=== RUN   TestP11PlunderSweepActualIndependentChildrenEnergyStopAndCold
+=== RUN   TestP11PlunderSweepActualIndependentChildrenEnergyStopAndCold/actual-fragment-stop
+--- PASS: TestP11PlunderSweepActualIndependentChildrenEnergyStopAndCold (3.44s)
+    --- PASS: TestP11PlunderSweepActualIndependentChildrenEnergyStopAndCold/actual-fragment-stop (3.44s)
+PASS

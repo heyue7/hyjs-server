@@ -1,0 +1,3 @@
+=== RUN   TestPlayerConcurrencyMySQLGuildLoginIsolation
+--- PASS: TestPlayerConcurrencyMySQLGuildLoginIsolation (4.64s)
+PASS

@@ -1,0 +1,3 @@
+=== RUN   TestPlayerConcurrencyMySQLGuildMonthlyIdentityBoundary
+--- PASS: TestPlayerConcurrencyMySQLGuildMonthlyIdentityBoundary (3.67s)
+PASS

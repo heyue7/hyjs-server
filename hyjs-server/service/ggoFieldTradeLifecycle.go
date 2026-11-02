@@ -96,7 +96,7 @@ func (s *GameService) ggoRecoverTrades(ctx context.Context, now int64) error {
 			elog.Warn("ggo trade recovery found an invalid quote")
 			continue
 		}
-		p10SceneMutation.Lock()
+		p10SceneMutation.RLock()
 		changed := false
 		err := db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 			ids := []int64{initial.InitiatorID, initial.ReceiverID}
@@ -137,7 +137,7 @@ func (s *GameService) ggoRecoverTrades(ctx context.Context, now int64) error {
 			changed = true
 			return nil
 		})
-		p10SceneMutation.Unlock()
+		p10SceneMutation.RUnlock()
 		if err != nil {
 			elog.Warn("ggo trade expiry failed", zap.Error(err))
 			continue

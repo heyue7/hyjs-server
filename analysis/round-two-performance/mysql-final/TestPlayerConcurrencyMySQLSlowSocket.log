@@ -1,0 +1,3 @@
+=== RUN   TestPlayerConcurrencyMySQLSlowSocket
+--- PASS: TestPlayerConcurrencyMySQLSlowSocket (0.93s)
+PASS

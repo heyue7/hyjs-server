@@ -9,6 +9,10 @@ CREATE TABLE IF NOT EXISTS profiles (
  uid TEXT NOT NULL UNIQUE,
  session BLOB NOT NULL,
  player TEXT,
+ player_level INTEGER GENERATED ALWAYS AS (CASE
+ WHEN player IS NULL OR json_valid(player)=0 THEN NULL
+ WHEN json_type(player,'$.level')='integer' AND json_extract(player,'$.level') BETWEEN 0 AND 2147483647 THEN json_extract(player,'$.level')
+ ELSE NULL END) VIRTUAL,
  game TEXT,
  scene_scope VARCHAR(64) GENERATED ALWAYS AS (CASE
  WHEN game IS NULL OR player IS NULL OR json_valid(game)=0 OR json_valid(player)=0 OR ggo_credit<0 THEN NULL
@@ -25,3 +29,4 @@ CREATE TABLE IF NOT EXISTS profiles (
  password_salt BLOB,
  password_hash BLOB
 );
+CREATE INDEX IF NOT EXISTS idx_profiles_server_level ON profiles (server_id, player_level, id);

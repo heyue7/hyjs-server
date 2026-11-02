@@ -1,0 +1,3 @@
+=== RUN   TestP13GuildGiftMonthlyLegacyDisabledRollbackAndCorruption
+--- PASS: TestP13GuildGiftMonthlyLegacyDisabledRollbackAndCorruption (4.30s)
+PASS

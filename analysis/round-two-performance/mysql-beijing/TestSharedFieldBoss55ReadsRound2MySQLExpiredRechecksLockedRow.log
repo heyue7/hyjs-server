@@ -1,0 +1,3 @@
+=== RUN   TestSharedFieldBoss55ReadsRound2MySQLExpiredRechecksLockedRow
+--- PASS: TestSharedFieldBoss55ReadsRound2MySQLExpiredRechecksLockedRow (0.45s)
+PASS

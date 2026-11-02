@@ -1,0 +1,23 @@
+=== RUN   TestPlayerConcurrencyMySQLSceneProjectionMigration
+=== RUN   TestPlayerConcurrencyMySQLSceneProjectionMigration/town-loading
+=== RUN   TestPlayerConcurrencyMySQLSceneProjectionMigration/field
+=== RUN   TestPlayerConcurrencyMySQLSceneProjectionMigration/field-loading
+=== RUN   TestPlayerConcurrencyMySQLSceneProjectionMigration/ggo-missing-state
+=== RUN   TestPlayerConcurrencyMySQLSceneProjectionMigration/ggo
+=== RUN   TestPlayerConcurrencyMySQLSceneProjectionMigration/town-incomplete-run
+=== RUN   TestPlayerConcurrencyMySQLSceneProjectionMigration/town-complete-run
+=== RUN   TestPlayerConcurrencyMySQLSceneProjectionMigration/field-unsettled-fight
+=== RUN   TestPlayerConcurrencyMySQLSceneProjectionMigration/field-settled-fight
+=== RUN   TestPlayerConcurrencyMySQLSceneProjectionMigration/town-union
+--- PASS: TestPlayerConcurrencyMySQLSceneProjectionMigration (0.40s)
+    --- PASS: TestPlayerConcurrencyMySQLSceneProjectionMigration/town-loading (0.00s)
+    --- PASS: TestPlayerConcurrencyMySQLSceneProjectionMigration/field (0.00s)
+    --- PASS: TestPlayerConcurrencyMySQLSceneProjectionMigration/field-loading (0.00s)
+    --- PASS: TestPlayerConcurrencyMySQLSceneProjectionMigration/ggo-missing-state (0.00s)
+    --- PASS: TestPlayerConcurrencyMySQLSceneProjectionMigration/ggo (0.00s)
+    --- PASS: TestPlayerConcurrencyMySQLSceneProjectionMigration/town-incomplete-run (0.00s)
+    --- PASS: TestPlayerConcurrencyMySQLSceneProjectionMigration/town-complete-run (0.00s)
+    --- PASS: TestPlayerConcurrencyMySQLSceneProjectionMigration/field-unsettled-fight (0.00s)
+    --- PASS: TestPlayerConcurrencyMySQLSceneProjectionMigration/field-settled-fight (0.00s)
+    --- PASS: TestPlayerConcurrencyMySQLSceneProjectionMigration/town-union (0.00s)
+PASS

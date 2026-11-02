@@ -1,0 +1,3 @@
+=== RUN   TestP11ArenaVirtualUntouchedLegacySeatMigratesOnlyOnce
+--- PASS: TestP11ArenaVirtualUntouchedLegacySeatMigratesOnlyOnce (3.64s)
+PASS

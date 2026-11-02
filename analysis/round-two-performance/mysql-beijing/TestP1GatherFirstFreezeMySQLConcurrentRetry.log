@@ -1,0 +1,3 @@
+=== RUN   TestP1GatherFirstFreezeMySQLConcurrentRetry
+--- PASS: TestP1GatherFirstFreezeMySQLConcurrentRetry (0.47s)
+PASS

@@ -161,10 +161,64 @@ func p11ArenaDailyReward(rank int64) string {
 	return ""
 }
 
-// PrepareP11ArenaDailyMutation runs while the caller holds the existing arena
-// policy row lock, before roster or rank changes. A second call after computation
-// provides the actual admission time even when a request crossed the cutoff.
+// PrepareP11ArenaDailyMutation checks the frozen window while retaining a
+// shared policy lock. Maintenance happens only after the caller rolls back.
 func (s *GameService) PrepareP11ArenaDailyMutation(ctx context.Context, tx *gorm.DB, requested time.Time) (time.Time, error) {
+	now := p11ArenaDailyNow(ctx, requested)
+	tx = tx.WithContext(ctx)
+	if !gameSchemaHasTable(tx, &db.P11ArenaDailyPolicy{}) {
+		return now, nil
+	}
+	var policy db.P11ArenaDailyPolicy
+	if err := tx.Clauses(clause.Locking{Strength: "SHARE"}).First(&policy, 1).Error; err != nil {
+		return now, err
+	}
+	var due db.P11ArenaDailyOffer
+	closed := tx.Model(&db.P11ArenaDailySnapshot{}).Select("day")
+	result := tx.Select("day").Where("end_at<=? AND day NOT IN (?)", now.UnixMilli(), closed).Limit(1).Find(&due)
+	if result.Error != nil {
+		return now, result.Error
+	}
+	if result.RowsAffected > 0 {
+		return now, errP11ArenaDailyMaintenance
+	}
+	if !policy.Enabled {
+		return now, nil
+	}
+	if !p11ArenaDailyPolicyValid(&policy) {
+		return now, errors.New(constUtil.P11ArenaDailyConfigError)
+	}
+	// Preserve the original bounded local view when a game day is revisited.
+	if policy.Permanent && calendar75Adjusted(tx) && policy.PublishedAt > now.UnixMilli() && policy.PublishedAt <= calendar75SourceHorizon(tx, now).UnixMilli() {
+		start, _ := p11ArenaDailyWindow(now, policy.CutoffSecond)
+		policy.PublishedAt, policy.StartAt = now.UnixMilli(), start.UnixMilli()
+	}
+	start, end := p11ArenaDailyWindow(now, policy.CutoffSecond)
+	if start.UnixMilli() < policy.StartAt || (!policy.Permanent && end.UnixMilli() > policy.EndAt) || now.UnixMilli() < policy.PublishedAt {
+		return now, nil
+	}
+	var prior db.P11ArenaDailyOffer
+	err := tx.First(&prior, "day=?", start.Format("20060102")).Error
+	if err == nil {
+		_, err = p11ArenaDailyOfferRules(&prior)
+		return now, err
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return now, err
+	}
+	var overlapping int64
+	if err := tx.Model(&db.P11ArenaDailyOffer{}).Where("start_at<? AND end_at>?", end.UnixMilli(), start.UnixMilli()).Count(&overlapping).Error; err != nil {
+		return now, err
+	}
+	if overlapping > 0 {
+		return now, nil
+	}
+	return now, errP11ArenaDailyMaintenance
+}
+
+// prepareP11ArenaDailyMaintenance runs under the exclusive arena policy lock
+// held by TickP11ArenaDaily and performs the original window maintenance.
+func (s *GameService) prepareP11ArenaDailyMaintenance(ctx context.Context, tx *gorm.DB, requested time.Time) (time.Time, error) {
 	now := p11ArenaDailyNow(ctx, requested)
 	tx = tx.WithContext(ctx)
 	if !gameSchemaHasTable(tx, &db.P11ArenaDailyPolicy{}) {
@@ -465,6 +519,20 @@ func (s *GameService) TickP11ArenaDaily(ctx context.Context, now time.Time) erro
 	if bound {
 		now = LocalPlayNow(ctx)
 	}
+	err = db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := ServerGameClockGuardTransaction(tx); err != nil {
+			return err
+		}
+		var arena db.P11ArenaPolicy
+		if err := tx.Select("id").Clauses(clause.Locking{Strength: "SHARE"}).First(&arena, 1).Error; err != nil {
+			return err
+		}
+		_, err := s.PrepareP11ArenaDailyMutation(ctx, tx, now)
+		return err
+	})
+	if !errors.Is(err, errP11ArenaDailyMaintenance) {
+		return err
+	}
 	return db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := ServerGameClockGuardTransaction(tx); err != nil {
 			return err
@@ -474,7 +542,7 @@ func (s *GameService) TickP11ArenaDaily(ctx context.Context, now time.Time) erro
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&arena, 1).Error; err != nil {
 			return err
 		}
-		_, err := s.PrepareP11ArenaDailyMutation(ctx, tx, now)
+		_, err := s.prepareP11ArenaDailyMaintenance(ctx, tx, now)
 		return err
 	})
 }
@@ -484,11 +552,33 @@ func (s *GameService) ServeP11ArenaDaily(ctx context.Context) error {
 	}
 	ticker := time.NewTicker(constUtil.P11ArenaDailyWorkerInterval)
 	defer ticker.Stop()
+	var membershipCursor int64
 	for {
 		select {
 		case <-ctx.Done():
 			return nil
 		case now := <-ticker.C:
+			enrollmentCtx, bound, err := s.bindServerGameClockWorker75(ctx)
+			if err != nil {
+				return err
+			}
+			enrollmentNow := LocalPlayAt(enrollmentCtx, now)
+			if bound {
+				enrollmentNow = LocalPlayNow(enrollmentCtx)
+			}
+			ids, err := s.p11ArenaNewMemberPage(enrollmentCtx, membershipCursor)
+			if err != nil {
+				return err
+			}
+			for _, id := range ids {
+				if err := s.p11EnrollArenaMember(enrollmentCtx, id, enrollmentNow); err != nil {
+					return err
+				}
+				membershipCursor = id
+			}
+			if len(ids) < 64 {
+				membershipCursor = 0
+			}
 			if err := s.TickP11ArenaDaily(ctx, LocalPlayAt(ctx, now)); err != nil {
 				if ctx.Err() != nil {
 					return nil

@@ -1,0 +1,7 @@
+=== RUN   TestP11ArenaScopedRealWinnerPaymentRanksConcurrentColdAndQualification
+=== RUN   TestP11ArenaScopedRealWinnerPaymentRanksConcurrentColdAndQualification/strongAttacker-true
+=== RUN   TestP11ArenaScopedRealWinnerPaymentRanksConcurrentColdAndQualification/strongAttacker-false
+--- PASS: TestP11ArenaScopedRealWinnerPaymentRanksConcurrentColdAndQualification (7.32s)
+    --- PASS: TestP11ArenaScopedRealWinnerPaymentRanksConcurrentColdAndQualification/strongAttacker-true (3.58s)
+    --- PASS: TestP11ArenaScopedRealWinnerPaymentRanksConcurrentColdAndQualification/strongAttacker-false (3.74s)
+PASS

@@ -1,0 +1,11 @@
+=== RUN   TestSharedFieldBoss55ReadsRound2MySQLCreateExpireCorrupt
+=== RUN   TestSharedFieldBoss55ReadsRound2MySQLCreateExpireCorrupt/payload
+=== RUN   TestSharedFieldBoss55ReadsRound2MySQLCreateExpireCorrupt/hp
+=== RUN   TestSharedFieldBoss55ReadsRound2MySQLCreateExpireCorrupt/expired-payload
+=== RUN   TestSharedFieldBoss55ReadsRound2MySQLCreateExpireCorrupt/expired-hp
+--- PASS: TestSharedFieldBoss55ReadsRound2MySQLCreateExpireCorrupt (0.50s)
+    --- PASS: TestSharedFieldBoss55ReadsRound2MySQLCreateExpireCorrupt/payload (0.00s)
+    --- PASS: TestSharedFieldBoss55ReadsRound2MySQLCreateExpireCorrupt/hp (0.00s)
+    --- PASS: TestSharedFieldBoss55ReadsRound2MySQLCreateExpireCorrupt/expired-payload (0.00s)
+    --- PASS: TestSharedFieldBoss55ReadsRound2MySQLCreateExpireCorrupt/expired-hp (0.10s)
+PASS

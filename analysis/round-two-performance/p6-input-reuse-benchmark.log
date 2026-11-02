@@ -1,0 +1,9 @@
+goos: darwin
+goarch: arm64
+pkg: hyjs-server/service
+cpu: Apple M1 Pro
+BenchmarkP6InputReuseFiveReads/original_decoder-2         	       1	 329371125 ns/op	   3.33 MB/s	207994128 B/op	  943942 allocs/op
+BenchmarkP6InputReuseFiveReads/original_decoder-2         	       1	 325869584 ns/op	   3.37 MB/s	207992480 B/op	  943912 allocs/op
+BenchmarkP6InputReuseFiveReads/request_scope-2            	       5	  69007600 ns/op	  15.90 MB/s	41818713 B/op	  188781 allocs/op
+BenchmarkP6InputReuseFiveReads/request_scope-2            	       2	 257067625 ns/op	   4.27 MB/s	41819408 B/op	  188785 allocs/op
+PASS

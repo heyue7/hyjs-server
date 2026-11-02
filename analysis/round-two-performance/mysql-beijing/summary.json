@@ -1,0 +1,404 @@
+[
+  {
+    "case": "TestP11ArenaVirtualUntouchedLegacySeatMigratesOnlyOnce",
+    "passed": true,
+    "exitCode": 0,
+    "seconds": 3.428
+  },
+  {
+    "case": "TestGGOBossRound2MySQLNativeStartEndAndColdReceipt",
+    "passed": true,
+    "exitCode": 0,
+    "seconds": 2.783
+  },
+  {
+    "case": "TestGGOBossRound2MySQLSharedLastHitRollbackAndLines",
+    "passed": true,
+    "exitCode": 0,
+    "seconds": 1.823
+  },
+  {
+    "case": "TestP10LuckyDropRound2MySQLCapacityAndIsolation",
+    "passed": true,
+    "exitCode": 0,
+    "seconds": 1.553
+  },
+  {
+    "case": "TestFieldBossLines85RealFightColdAndIndependentRespawn",
+    "passed": true,
+    "exitCode": 0,
+    "seconds": 7.566
+  },
+  {
+    "case": "TestFieldBossLines86HandshakeFirstReply",
+    "passed": true,
+    "exitCode": 0,
+    "seconds": 5.066
+  },
+  {
+    "case": "TestP11ArenaVirtualLegacyPositionsAndLazyTopRank",
+    "passed": true,
+    "exitCode": 0,
+    "seconds": 1.963
+  },
+  {
+    "case": "TestP11ArenaVirtualOriginalGuideFightSlotConflictAndColdReceipt",
+    "passed": true,
+    "exitCode": 0,
+    "seconds": 3.134
+  },
+  {
+    "case": "TestP11ArenaConcurrencyRound2MySQLStablePolicyReaders",
+    "passed": true,
+    "exitCode": 0,
+    "seconds": 1.924
+  },
+  {
+    "case": "TestP11ArenaConcurrencyRound2MySQLVirtualRankArbitration",
+    "passed": false,
+    "exitCode": 1,
+    "seconds": 33.758
+  },
+  {
+    "case": "TestP11PlunderSweepRound2MySQLActualParticipantLocks",
+    "passed": true,
+    "exitCode": 0,
+    "seconds": 3.585
+  },
+  {
+    "case": "TestP11PlunderSweepActualIndependentChildrenEnergyStopAndCold/five-real-outcomes",
+    "passed": true,
+    "exitCode": 0,
+    "seconds": 7.024
+  },
+  {
+    "case": "TestP11PlunderSweepActualIndependentChildrenEnergyStopAndCold/actual-energy-stop",
+    "passed": true,
+    "exitCode": 0,
+    "seconds": 3.082
+  },
+  {
+    "case": "TestP11PlunderSweepActualIndependentChildrenEnergyStopAndCold/actual-fragment-stop",
+    "passed": true,
+    "exitCode": 0,
+    "seconds": 2.945
+  },
+  {
+    "case": "TestP11ArenaScopedRealWinnerPaymentRanksConcurrentColdAndQualification",
+    "passed": true,
+    "exitCode": 0,
+    "seconds": 6.433
+  },
+  {
+    "case": "TestP11ArenaDailyRealChallengerCutoffOfflineClaimAndColdOnce",
+    "passed": true,
+    "exitCode": 0,
+    "seconds": 2.907
+  },
+  {
+    "case": "TestPlayerConcurrencyMySQLP7PolicyIsolation",
+    "passed": true,
+    "exitCode": 0,
+    "seconds": 1.265
+  },
+  {
+    "case": "TestPlayerConcurrencyMySQLGuildEconomyIsolation",
+    "passed": true,
+    "exitCode": 0,
+    "seconds": 3.833
+  },
+  {
+    "case": "TestPlayerConcurrencyMySQLGuildMembershipIsolation",
+    "passed": true,
+    "exitCode": 0,
+    "seconds": 4.05
+  },
+  {
+    "case": "TestPlayerConcurrencyMySQLGuildMonthlyIdentityBoundary",
+    "passed": true,
+    "exitCode": 0,
+    "seconds": 3.701
+  },
+  {
+    "case": "TestP13GuildOriginalManagementPermissionsCooldownAndRestart",
+    "passed": true,
+    "exitCode": 0,
+    "seconds": 5.367
+  },
+  {
+    "case": "TestP13GuildConcurrentApprovalTransferUniqueMembershipAndReceipts",
+    "passed": true,
+    "exitCode": 0,
+    "seconds": 3.762
+  },
+  {
+    "case": "TestP13MonthlyPublishedBoundaryAndNoRetro",
+    "passed": true,
+    "exitCode": 0,
+    "seconds": 3.876
+  },
+  {
+    "case": "TestP13GuildGiftMonthlyLegacyDisabledRollbackAndCorruption",
+    "passed": true,
+    "exitCode": 0,
+    "seconds": 4.328
+  },
+  {
+    "case": "TestP13GuildOriginalEconomyConcurrentDonationDailyCapsAndAtomicFailure",
+    "passed": true,
+    "exitCode": 0,
+    "seconds": 13.244
+  },
+  {
+    "case": "TestP13GuildOriginalWeightedNameNoticeDeclarationBudgets",
+    "passed": true,
+    "exitCode": 0,
+    "seconds": 0.101
+  },
+  {
+    "case": "TestP13GuildTechRealFundsOriginalUpgradeOnceFrozenColdAndMembership",
+    "passed": true,
+    "exitCode": 0,
+    "seconds": 16.697
+  },
+  {
+    "case": "TestPlayerConcurrencyMySQLTeamIsolation",
+    "passed": true,
+    "exitCode": 0,
+    "seconds": 11.413
+  },
+  {
+    "case": "TestPlayerConcurrencyMySQLGrabIsolation",
+    "passed": true,
+    "exitCode": 0,
+    "seconds": 2.16
+  },
+  {
+    "case": "TestPlayerConcurrencyMySQLGrabSameSlot",
+    "passed": true,
+    "exitCode": 0,
+    "seconds": 1.867
+  },
+  {
+    "case": "TestPlayerConcurrencyMySQLGrabFrozenOffers",
+    "passed": true,
+    "exitCode": 0,
+    "seconds": 2.055
+  },
+  {
+    "case": "TestP11GrabOriginalEmptySlotAtomicOccupationBuyGiveupAndFullTimeRewards",
+    "passed": true,
+    "exitCode": 0,
+    "seconds": 2.632
+  },
+  {
+    "case": "TestP11GrabRandomActualSegmentsOriginalRewardUseDayCapCold",
+    "passed": true,
+    "exitCode": 0,
+    "seconds": 3.067
+  },
+  {
+    "case": "TestP11GrabRandomPrepublicationAndRealNoOccupation",
+    "passed": true,
+    "exitCode": 0,
+    "seconds": 2.131
+  },
+  {
+    "case": "TestP11GrabFightRealOwnerIndependentGateCostAndColdReceipt",
+    "passed": true,
+    "exitCode": 0,
+    "seconds": 5.934
+  },
+  {
+    "case": "TestP11GrabFightRulesNeverBorrowModeOrUnpublishedPolicy",
+    "passed": true,
+    "exitCode": 0,
+    "seconds": 0.025
+  },
+  {
+    "case": "TestP7OriginalEliteDirectoryVIPBudgetsQueriesAndDayReset",
+    "passed": true,
+    "exitCode": 0,
+    "seconds": 1.19
+  },
+  {
+    "case": "TestP13TeamOriginalManagementInvitationsLeaderPermissionsExitAndRecovery",
+    "passed": true,
+    "exitCode": 0,
+    "seconds": 5.659
+  },
+  {
+    "case": "TestP13TeamConcurrentAcceptUniqueMembershipExactReceiptAndAtomicInviteFailure",
+    "passed": true,
+    "exitCode": 0,
+    "seconds": 4.13
+  },
+  {
+    "case": "TestP13TeamFrozenFiveMemberCapacityConcurrentLastSlotAndLeaveRevokesOldInvite",
+    "passed": true,
+    "exitCode": 0,
+    "seconds": 4.601
+  },
+  {
+    "case": "TestPlayerConcurrencyMySQLPrivateFirstFreeze",
+    "passed": true,
+    "exitCode": 0,
+    "seconds": 0.66
+  },
+  {
+    "case": "TestAdminCharacterScheduleSharedMySQL",
+    "passed": true,
+    "exitCode": 0,
+    "seconds": 2.608
+  },
+  {
+    "case": "TestFeedback81MySQLConcurrentClaim",
+    "passed": true,
+    "exitCode": 0,
+    "seconds": 2.883
+  },
+  {
+    "case": "TestPlayerConcurrencyMySQLGuildLoginIsolation",
+    "passed": true,
+    "exitCode": 0,
+    "seconds": 4.675
+  },
+  {
+    "case": "TestCopyFormationContinuityMySQLInterleaving",
+    "passed": true,
+    "exitCode": 0,
+    "seconds": 1.595
+  },
+  {
+    "case": "TestRechargeDirectoryIndexMySQLBlockedCommitAndRollback",
+    "passed": true,
+    "exitCode": 0,
+    "seconds": 0.784
+  },
+  {
+    "case": "TestRechargeDirectoryMySQLConcurrentClaimsAndReplay",
+    "passed": true,
+    "exitCode": 0,
+    "seconds": 3.482
+  },
+  {
+    "case": "TestRechargeDirectoryMySQLP3ObservationBlocksDisable",
+    "passed": true,
+    "exitCode": 0,
+    "seconds": 0.871
+  },
+  {
+    "case": "TestPlayerConcurrencyMySQLPVPDoesNotBlockMovement",
+    "passed": true,
+    "exitCode": 0,
+    "seconds": 2.527
+  },
+  {
+    "case": "TestPlayerConcurrencyMySQLSceneProjectionMigration",
+    "passed": true,
+    "exitCode": 0,
+    "seconds": 0.427
+  },
+  {
+    "case": "TestGGOPeriodPointRealMySQLCancelDoesNotBlockOtherClaim",
+    "passed": true,
+    "exitCode": 0,
+    "seconds": 0.728
+  },
+  {
+    "case": "TestPlayerConcurrencyMySQLGGOPoints",
+    "passed": true,
+    "exitCode": 0,
+    "seconds": 0.854
+  },
+  {
+    "case": "TestP1GatherRealTwoPlayersIgnoreOtherPeriodXMySQL",
+    "passed": true,
+    "exitCode": 0,
+    "seconds": 1.76
+  },
+  {
+    "case": "TestP1GatherFrozenMySQLConcurrentIsolation",
+    "passed": true,
+    "exitCode": 0,
+    "seconds": 0.903
+  },
+  {
+    "case": "TestP1GatherFirstFreezeMySQLConcurrentRetry",
+    "passed": true,
+    "exitCode": 0,
+    "seconds": 0.496
+  },
+  {
+    "case": "TestP1GatherDisableMySQLWaitsForAdmittedFact",
+    "passed": true,
+    "exitCode": 0,
+    "seconds": 0.829
+  },
+  {
+    "case": "TestP1GatherCutoffMySQLWaitsForAdmittedFact",
+    "passed": true,
+    "exitCode": 0,
+    "seconds": 4.798
+  },
+  {
+    "case": "TestPlayerConcurrencyMySQLActivityIsolation",
+    "passed": true,
+    "exitCode": 0,
+    "seconds": 0.627
+  },
+  {
+    "case": "TestPlayerConcurrencyMySQLSceneMovement",
+    "passed": true,
+    "exitCode": 0,
+    "seconds": 0.914
+  },
+  {
+    "case": "TestPlayerConcurrencyMySQLSlowSocket",
+    "passed": true,
+    "exitCode": 0,
+    "seconds": 0.897
+  },
+  {
+    "case": "TestSharedFieldBoss55ReadsRound2MySQLStableProjection",
+    "passed": true,
+    "exitCode": 0,
+    "seconds": 0.446
+  },
+  {
+    "case": "TestSharedFieldBoss55ReadsRound2MySQLCreateExpireCorrupt",
+    "passed": true,
+    "exitCode": 0,
+    "seconds": 0.385
+  },
+  {
+    "case": "TestSharedFieldBoss55ReadsRound2MySQLExpiredRechecksLockedRow",
+    "passed": true,
+    "exitCode": 0,
+    "seconds": 0.483
+  },
+  {
+    "case": "TestPlayerConcurrencyMySQLCommerceReaders",
+    "passed": true,
+    "exitCode": 0,
+    "seconds": 1.146
+  },
+  {
+    "case": "TestPlayerConcurrencyUnchangedCustomSave",
+    "passed": true,
+    "exitCode": 0,
+    "seconds": 0.337
+  },
+  {
+    "case": "TestP5GoldEggOriginalAll54AndOneUse",
+    "passed": true,
+    "exitCode": 0,
+    "seconds": 1.972
+  },
+  {
+    "case": "TestP4CopyBenefitsRealDropAtomicReplayConcurrentRestart",
+    "passed": true,
+    "exitCode": 0,
+    "seconds": 1.083
+  }
+]

@@ -1,0 +1,8 @@
+[
+  {
+    "case": "TestP11ArenaConcurrencyRound2MySQLIndependentAfterFirstReceipt",
+    "passed": false,
+    "exitCode": 1,
+    "seconds": 42.974
+  }
+]

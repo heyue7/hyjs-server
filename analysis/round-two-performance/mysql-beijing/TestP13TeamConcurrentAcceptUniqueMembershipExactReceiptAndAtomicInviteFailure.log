@@ -1,0 +1,3 @@
+=== RUN   TestP13TeamConcurrentAcceptUniqueMembershipExactReceiptAndAtomicInviteFailure
+--- PASS: TestP13TeamConcurrentAcceptUniqueMembershipExactReceiptAndAtomicInviteFailure (4.09s)
+PASS

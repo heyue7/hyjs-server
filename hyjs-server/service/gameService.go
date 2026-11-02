@@ -356,7 +356,15 @@ func (s *GameService) dispatch(ctx context.Context, r *model.GamePacket, peer st
 	case *pb.CSRefreshGatewayIPAndPort:
 		session = b.GetSessionKey()
 	}
-	row, err := AuthorizeAccount(ctx, r.PlayerId, session)
+	var (
+		row *db.Profile
+		err error
+	)
+	if _, ok := r.Body.(*pb.CSMoveConfirm); ok {
+		row, err = authorizeAccountIdentity(ctx, r.PlayerId, session)
+	} else {
+		row, err = AuthorizeAccount(ctx, r.PlayerId, session)
+	}
 	if err != nil {
 		return GameError(constUtil.ErrGameSession, "本地会话无效，请重新登录"), nil
 	}

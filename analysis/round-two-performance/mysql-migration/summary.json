@@ -1,0 +1,8 @@
+[
+  {
+    "case": "TestP11ArenaVirtualUntouchedLegacySeatMigratesOnlyOnce",
+    "passed": true,
+    "exitCode": 0,
+    "seconds": 6.838
+  }
+]

@@ -39,7 +39,7 @@ func p11ArenaRankRewardFacts(tx *gorm.DB, row *db.P11ArenaFightSettlement) (befo
 		return
 	}
 	var input *model.FrozenBattleInput
-	input, err = decodeP6Record(&record)
+	input, err = decodeP6RecordScoped(tx.Statement.Context, &record)
 	if err != nil {
 		return
 	}

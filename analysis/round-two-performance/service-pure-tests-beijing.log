@@ -1,0 +1,49 @@
+=== RUN   TestAckIdentityRound2SQLite
+=== RUN   TestAckIdentityRound2SQLite/valid_acknowledgement_reads_only_identity
+=== RUN   TestAckIdentityRound2SQLite/expired_session
+=== RUN   TestAckIdentityRound2SQLite/disabled_account
+=== RUN   TestAckIdentityRound2SQLite/revoked_account_revision
+=== RUN   TestAckIdentityRound2SQLite/client_update_gate
+=== RUN   TestAckIdentityRound2SQLite/wrong_request_zone
+=== RUN   TestAckIdentityRound2SQLite/wrong_profile_zone
+--- PASS: TestAckIdentityRound2SQLite (0.23s)
+    --- PASS: TestAckIdentityRound2SQLite/valid_acknowledgement_reads_only_identity (0.05s)
+    --- PASS: TestAckIdentityRound2SQLite/expired_session (0.05s)
+    --- PASS: TestAckIdentityRound2SQLite/disabled_account (0.02s)
+    --- PASS: TestAckIdentityRound2SQLite/revoked_account_revision (0.03s)
+    --- PASS: TestAckIdentityRound2SQLite/client_update_gate (0.02s)
+    --- PASS: TestAckIdentityRound2SQLite/wrong_request_zone (0.02s)
+    --- PASS: TestAckIdentityRound2SQLite/wrong_profile_zone (0.05s)
+=== RUN   TestDailyCopyStateRound2SQLite
+=== RUN   TestDailyCopyStateRound2SQLite/missing_player
+=== RUN   TestDailyCopyStateRound2SQLite/invalid_JSON
+=== RUN   TestDailyCopyStateRound2SQLite/different_player_ID
+--- PASS: TestDailyCopyStateRound2SQLite (0.32s)
+    --- PASS: TestDailyCopyStateRound2SQLite/missing_player (0.00s)
+    --- PASS: TestDailyCopyStateRound2SQLite/invalid_JSON (0.00s)
+    --- PASS: TestDailyCopyStateRound2SQLite/different_player_ID (0.00s)
+=== RUN   TestP6InputReuseScope
+=== RUN   TestP6InputReuseScope/scope_and_public_decoder_isolation
+=== RUN   TestP6InputReuseScope/ID
+=== RUN   TestP6InputReuseScope/PlayerID
+=== RUN   TestP6InputReuseScope/Seed
+=== RUN   TestP6InputReuseScope/InputHash
+=== RUN   TestP6InputReuseScope/ConfigurationHash
+=== RUN   TestP6InputReuseScope/EngineVersion
+=== RUN   TestP6InputReuseScope/ClientVersion
+=== RUN   TestP6InputReuseScope/stored_input_bytes
+=== RUN   TestP6InputReuseScope/stored_bytes_copied_and_failed_reads_not_cached
+=== RUN   TestP6InputReuseScope/only_last_input_retained
+--- PASS: TestP6InputReuseScope (2.59s)
+    --- PASS: TestP6InputReuseScope/scope_and_public_decoder_isolation (0.46s)
+    --- PASS: TestP6InputReuseScope/ID (0.25s)
+    --- PASS: TestP6InputReuseScope/PlayerID (0.17s)
+    --- PASS: TestP6InputReuseScope/Seed (0.21s)
+    --- PASS: TestP6InputReuseScope/InputHash (0.07s)
+    --- PASS: TestP6InputReuseScope/ConfigurationHash (0.16s)
+    --- PASS: TestP6InputReuseScope/EngineVersion (0.16s)
+    --- PASS: TestP6InputReuseScope/ClientVersion (0.16s)
+    --- PASS: TestP6InputReuseScope/stored_input_bytes (0.22s)
+    --- PASS: TestP6InputReuseScope/stored_bytes_copied_and_failed_reads_not_cached (0.20s)
+    --- PASS: TestP6InputReuseScope/only_last_input_retained (0.21s)
+PASS

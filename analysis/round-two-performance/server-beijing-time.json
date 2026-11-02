@@ -1,0 +1,10 @@
+{
+  "server_epoch_seconds": 1793613185,
+  "server_beijing_time": "2026-11-02T17:53:05+08:00",
+  "reference_timezone": "Asia/Shanghai",
+  "round_trip_seconds": 0.327,
+  "server_minus_local_midpoint_seconds": -0.678,
+  "test_timezone": "Asia/Shanghai",
+  "database_storage_contract": "UTC/epoch contract unchanged; no database-global timezone mutation",
+  "application_timezone_env": null
+}

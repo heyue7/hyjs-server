@@ -1,0 +1,4 @@
+CREATE TABLE IF NOT EXISTS p11_arena_rank_allocators (
+  policy_id BIGINT NOT NULL PRIMARY KEY,
+  next_rank BIGINT NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;

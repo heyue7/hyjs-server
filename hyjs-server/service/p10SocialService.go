@@ -106,6 +106,24 @@ func (s *GameService) p10PlayerProjection(tx *gorm.DB, id int64, chatAvatar bool
 	}
 	return &pb.SimplePlayerInfo{PlayerId: proto.Int64(id), ServerId: proto.Int32(int32(s.OriginalServerID())), Level: p.Level, PlayerName: p.Name, FightPower: proto.Int32(power), HeroWarId: proto.String(heroID)}, nil
 }
+
+// p10LockProfileIDs keeps the existing role order without decoding inventories
+// when the caller will load its business objects under these locks itself.
+func p10LockProfileIDs(tx *gorm.DB, a, b int64) error {
+	lo, hi := p10Pair(a, b)
+	ids := []int64{lo}
+	if hi != lo {
+		ids = append(ids, hi)
+	}
+	for _, id := range ids {
+		var row db.Profile
+		if err := tx.Select("id").Clauses(clause.Locking{Strength: "UPDATE"}).First(&row, id).Error; err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func p10LockProfiles(tx *gorm.DB, a, b int64) (map[int64]*pb.Player, error) {
 	lo, hi := p10Pair(a, b)
 	ids := []int64{lo}

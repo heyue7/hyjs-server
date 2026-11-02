@@ -253,6 +253,13 @@ func (s *GameService) ggoBossFightStart(ctx context.Context, id int64, request *
 		if err != nil {
 			return err
 		}
+		// This exact encoding also supplies the accepted input hash. Store it
+		// once, so profile compaction does not marshal the whole input again.
+		stored, err := encodeP6StoredInput(raw)
+		if err != nil {
+			return err
+		}
+		inputHash := p6Digest(raw)
 		token, err := fieldToken()
 		if err != nil {
 			return err
@@ -274,7 +281,7 @@ func (s *GameService) ggoBossFightStart(ctx context.Context, id int64, request *
 		if cfg.Rules.DeathLossPercent != nil {
 			deathLossPercent = *cfg.Rules.DeathLossPercent
 		}
-		field.Fight = &model.FieldFight{StartedAt: now, BossUUID: event.ID, BossLeaderGUID: ggoBossGUID(event.ID), Start: compat, BossStart: result, BossInput: input, BossRewardDailyLimit: &limit, GGOBoss: &model.GGOFieldBossFight{InputHash: p6Digest(raw), Boss: proto.Clone(boss).(*pb.SideBoss), EventID: event.ID, Line: int64(a.Presence.Line), EndsAtMS: event.EndsAtMS, EconomyVersion: event.EconomyVersion, ExchangeValues: event.ExchangeValues, ProtectedChips: cfg.Runtime.ProtectedChips, DeathLossPercent: ggoInt64(deathLossPercent), SafeReturn: cfg.Runtime.SafeReturn, HealRatio: heal}}
+		field.Fight = &model.FieldFight{StartedAt: now, BossUUID: event.ID, BossLeaderGUID: ggoBossGUID(event.ID), Start: compat, BossStart: result, BossInputStored: stored, BossInputHash: inputHash, BossRewardDailyLimit: &limit, GGOBoss: &model.GGOFieldBossFight{InputHash: inputHash, Boss: proto.Clone(boss).(*pb.SideBoss), EventID: event.ID, Line: int64(a.Presence.Line), EndsAtMS: event.EndsAtMS, EconomyVersion: event.EconomyVersion, ExchangeValues: event.ExchangeValues, ProtectedChips: cfg.Runtime.ProtectedChips, DeathLossPercent: ggoInt64(deathLossPercent), SafeReturn: cfg.Runtime.SafeReturn, HealRatio: heal}}
 		field.Side.State = proto.Int32(6)
 		projection := proto.Clone(boss).(*pb.SideBoss)
 		projection.State = proto.Int32(2)

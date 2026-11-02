@@ -1,0 +1,3 @@
+=== RUN   TestP11ArenaConcurrencyRound2MySQLIndependentAfterFirstReceipt
+--- PASS: TestP11ArenaConcurrencyRound2MySQLIndependentAfterFirstReceipt (4.99s)
+PASS

@@ -1,0 +1,9 @@
+=== RUN   TestPlayerConcurrencyMySQLTeamIsolation
+=== RUN   TestPlayerConcurrencyMySQLTeamIsolation/different-teams
+=== RUN   TestPlayerConcurrencyMySQLTeamIsolation/last-slot
+=== RUN   TestPlayerConcurrencyMySQLTeamIsolation/same-stamp-replay
+--- PASS: TestPlayerConcurrencyMySQLTeamIsolation (11.38s)
+    --- PASS: TestPlayerConcurrencyMySQLTeamIsolation/different-teams (3.81s)
+    --- PASS: TestPlayerConcurrencyMySQLTeamIsolation/last-slot (3.67s)
+    --- PASS: TestPlayerConcurrencyMySQLTeamIsolation/same-stamp-replay (3.91s)
+PASS

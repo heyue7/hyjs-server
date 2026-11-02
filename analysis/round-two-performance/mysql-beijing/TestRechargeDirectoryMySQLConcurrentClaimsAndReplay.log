@@ -1,0 +1,3 @@
+=== RUN   TestRechargeDirectoryMySQLConcurrentClaimsAndReplay
+--- PASS: TestRechargeDirectoryMySQLConcurrentClaimsAndReplay (3.45s)
+PASS

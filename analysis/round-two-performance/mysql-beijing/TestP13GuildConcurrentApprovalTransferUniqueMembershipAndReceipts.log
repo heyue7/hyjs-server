@@ -1,0 +1,3 @@
+=== RUN   TestP13GuildConcurrentApprovalTransferUniqueMembershipAndReceipts
+--- PASS: TestP13GuildConcurrentApprovalTransferUniqueMembershipAndReceipts (3.73s)
+PASS

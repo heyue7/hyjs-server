@@ -1,0 +1,3 @@
+=== RUN   TestP11GrabFightRulesNeverBorrowModeOrUnpublishedPolicy
+--- PASS: TestP11GrabFightRulesNeverBorrowModeOrUnpublishedPolicy (0.00s)
+PASS

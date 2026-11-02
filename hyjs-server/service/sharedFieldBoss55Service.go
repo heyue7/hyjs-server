@@ -122,6 +122,32 @@ func sharedFieldBoss55Query(tx *gorm.DB, sid int64, scene, pos string, lines ...
 	}
 	return tx.Where("server_id=? AND scene=? AND line=? AND pos_id=?", sid, scene, line, pos)
 }
+
+// Stable projections read the committed generation without taking its write lock.
+// Creation and respawn must re-read under the original lock before writing.
+func (s *GameService) sharedFieldBoss55Read(tx *gorm.DB, scene, pos string, line, now int64) (*db.SharedFieldBoss55, *pb.SideBoss, map[string]float64, error) {
+	var row db.SharedFieldBoss55
+	err := sharedFieldBoss55Query(tx, s.OriginalServerID(), scene, pos, line).First(&row).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return s.sharedFieldBoss55Locked(tx, scene, pos, line, now)
+	}
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	if row.RespawnAt > 0 && row.RespawnAt <= now {
+		return s.sharedFieldBoss55Locked(tx, scene, pos, line, now)
+	}
+	var boss pb.SideBoss
+	hp := map[string]float64{}
+	if err := json.Unmarshal(row.Payload, &boss); err != nil {
+		return nil, nil, nil, err
+	}
+	if err := json.Unmarshal(row.HP, &hp); err != nil {
+		return nil, nil, nil, err
+	}
+	return &row, &boss, hp, nil
+}
+
 func (s *GameService) sharedFieldBoss55Locked(tx *gorm.DB, scene, pos string, line, now int64) (*db.SharedFieldBoss55, *pb.SideBoss, map[string]float64, error) {
 	var row db.SharedFieldBoss55
 	err := sharedFieldBoss55Query(tx.Clauses(clause.Locking{Strength: "UPDATE"}), s.OriginalServerID(), scene, pos, line).First(&row).Error
@@ -223,7 +249,7 @@ func (s *GameService) refreshSharedFieldBosses55(tx *gorm.DB, id int64, g *model
 				continue
 			}
 		}
-		row, boss, hp, err := s.sharedFieldBoss55Locked(tx, f.Scene, pos, line, time.Now().UnixMilli())
+		row, boss, hp, err := s.sharedFieldBoss55Read(tx, f.Scene, pos, line, time.Now().UnixMilli())
 		if err != nil {
 			return err
 		}
