@@ -1104,7 +1104,7 @@ func (s *GameService) copyFightEnd(ctx context.Context, id int64, b *pb.CSCopyFi
 				}
 				run, fight, progress = g.Run, g.Run.Fight, g.Copy
 			}
-			if err := s.triggerLuxuryDragonLocked(tx, id, LocalPlayAt(ctx, benefitAt)); err != nil {
+			if err := s.triggerLuxuryDragonLocked(tx, id, g, LocalPlayAt(ctx, benefitAt)); err != nil {
 				return err
 			}
 		}

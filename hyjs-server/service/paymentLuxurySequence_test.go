@@ -30,6 +30,7 @@ func TestP3LuxuryOriginalChapterSequenceAndPaidCold(t *testing.T) {
 		}); err != nil {
 			t.Fatal(err)
 		}
+		luxuryTestStart(t, f.ctx, f.s, id, now)
 		before, game := f.profile(t)
 		out, err := f.s.paymentOffer(f.ctx, id, request, now)
 		if err != nil || out[0].(*pb.SCOpenLuxuryEquipment).GetOpenOrNot() != 0 {

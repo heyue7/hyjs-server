@@ -10,6 +10,7 @@ import (
 	"gorm.io/gorm/clause"
 	"hyjs-server/constUtil"
 	"hyjs-server/db"
+	"hyjs-server/model"
 )
 
 const luxuryDragonOfferID int64 = 2
@@ -31,17 +32,46 @@ func (s *GameService) luxuryDragonDefinition(id int64, now time.Time) (db.Paymen
 	money, moneyErr := strconv.ParseInt(config["money"], 10, 64)
 	hours, hoursErr := strconv.ParseInt(config["limitHours"], 10, 64)
 	start := now.UnixMilli()
-	if moneyErr != nil || hoursErr != nil || money != 288 || hours != 12 || config["prize"] == "" || start <= 0 || start > math.MaxInt64-hours*3600*1000 {
+	if moneyErr != nil || hoursErr != nil || money != 288 || hours != 12 || config["chapter"] != "6" || config["stage"] != "1" || config["prize"] == "" || start <= 0 || start > math.MaxInt64-hours*3600*1000 {
 		return db.PaymentLuxuryOffer{}, errors.New(constUtil.P3PaymentConfigError)
 	}
 	return db.PaymentLuxuryOffer{PlayerID: id, OfferID: luxuryDragonOfferID, StartAt: start, EndAt: start + hours*3600*1000, Cents: money * 100, Reward: config["prize"]}, nil
 }
 
+// The original UI numbers stages within each chapter by numeric mission ID.
+// For chapter 6 stage 1, find the lowest ID in the original mission table.
+func (s *GameService) luxuryDragonGatePassed(g *model.GameState) (bool, error) {
+	if g == nil || g.Copy == nil {
+		return false, nil
+	}
+	var first int64
+	for _, row := range s.Tables["CopyMission"] {
+		if row["ChapterId"] != "6" {
+			continue
+		}
+		id, err := strconv.ParseInt(row["MissionId"], 10, 64)
+		if err != nil || id < 1 {
+			return false, errors.New(constUtil.P3PaymentConfigError)
+		}
+		if first == 0 || id < first {
+			first = id
+		}
+	}
+	if first == 0 {
+		return false, errors.New(constUtil.P3PaymentConfigError)
+	}
+	return copyMissionPassed(g, "6", strconv.FormatInt(first, 10)), nil
+}
+
 // triggerLuxuryDragonLocked is called only after a successful story completion
 // or sweep, with the player's profile already locked in the same transaction.
-func (s *GameService) triggerLuxuryDragonLocked(tx *gorm.DB, id int64, now time.Time) error {
+func (s *GameService) triggerLuxuryDragonLocked(tx *gorm.DB, id int64, game *model.GameState, now time.Time) error {
 	if !s.LuxuryDragonReady {
 		return nil
+	}
+	passed, err := s.luxuryDragonGatePassed(game)
+	if err != nil || !passed {
+		return err
 	}
 	next, err := s.luxuryDragonDefinition(id, now)
 	if err != nil {

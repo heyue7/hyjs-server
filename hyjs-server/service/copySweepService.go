@@ -492,7 +492,7 @@ func (s *GameService) copySweepAt(ctx context.Context, id int64, request *pb.CSC
 				response.WantedLevel = proto.Int32(found.GetLevel())
 			}
 		}
-		if err := s.triggerLuxuryDragonLocked(tx, id, LocalPlayAt(ctx, now)); err != nil {
+		if err := s.triggerLuxuryDragonLocked(tx, id, game, LocalPlayAt(ctx, now)); err != nil {
 			return err
 		}
 		receipt := &model.CopySweepReceipt{Timestamp: stamp, Request: proto.Clone(request).(*pb.CSCopySweep), Response: proto.Clone(response).(*pb.SCCopySweep)}

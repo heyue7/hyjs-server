@@ -18,8 +18,23 @@ import (
 // story and sweep entry points are exercised independently below.
 func luxuryTestStart(t *testing.T, ctx context.Context, s *GameService, id int64, now time.Time) {
 	t.Helper()
-	if err := updateProfileWithTx(ctx, id, func(tx *gorm.DB, _ *pb.Player, _ *model.GameState) error {
-		return s.triggerLuxuryDragonLocked(tx, id, now)
+	if err := updateProfileWithTx(ctx, id, func(tx *gorm.DB, _ *pb.Player, g *model.GameState) error {
+		return s.triggerLuxuryDragonLocked(tx, id, g, now)
+	}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func luxuryTestUnlock(t *testing.T, ctx context.Context, s *GameService, id int64) {
+	t.Helper()
+	if err := updateProfile(ctx, id, func(_ *pb.Player, g *model.GameState) error {
+		s.refreshCopyProgress(g)
+		for _, info := range g.Copy.PassedCopyInfo {
+			if info.GetChapterId() == "6" && info.GetMissionId() == "30" {
+				info.Star = proto.Int32(1)
+			}
+		}
+		return nil
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -74,8 +89,64 @@ func TestLuxuryDragonStorySweepCyclesAndPaidClaim(t *testing.T) {
 			t.Fatal(e)
 		}
 		count := p1Count(t, &db.PaymentLuxuryOffer{}, "player_id=?", id)
+		if count != 0 || i == len(tasks)-1 && result[0].(*pb.SCCopyFightEnd).GetIsCopyComplete() != 1 {
+			t.Fatal("pre-6-1 story incorrectly opened an offer", i, count)
+		}
+	}
+	if _, err = f.s.copyFightEnd(f.ctx, id, final); err != nil {
+		t.Fatal("pre-gate story receipt replay", err)
+	}
+	if err = updateProfile(f.ctx, id, func(p *pb.Player, g *model.GameState) error {
+		p.Level, p.Stamina = proto.Int32(14), proto.Int32(1000)
+		for _, info := range g.Copy.PassedCopyInfo {
+			if info.GetChapterId() == "1" && info.GetMissionId() == "1" {
+				info.Star = proto.Int32(5)
+			}
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	sweep := &pb.CSCopySweep{ChapterId: proto.String("1"), MissionId: proto.String("1")}
+	if _, err = f.s.copySweepAt(f.ctx, id, sweep, 100, time.Now()); err != nil {
+		t.Fatal("pre-gate successful sweep", err)
+	}
+	if count := p1Count(t, &db.PaymentLuxuryOffer{}, "player_id=?", id); count != 0 {
+		t.Fatal("pre-6-1 sweep opened an offer", count)
+	}
+	// The isolated fixture supplies the immediately preceding chapter's
+	// completion; the 6-1 mission itself runs through the actual entry/settle path.
+	if err = updateProfile(f.ctx, id, func(_ *pb.Player, g *model.GameState) error {
+		for _, info := range g.Copy.PassedCopyInfo {
+			if info.GetChapterId() == "5" && info.GetMissionId() == "29" {
+				info.Star = proto.Int32(5)
+			}
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = f.s.copyEnter(f.ctx, id, &pb.CSCopyEnter{ChapterId: proto.String("6"), MissionId: proto.String("30")}); err != nil {
+		t.Fatal("enter original chapter 6 stage 1", err)
+	}
+	tasks = f.s.tasks("30")
+	if len(tasks) == 0 {
+		t.Fatal("6-1 has no tasks")
+	}
+	for i, task := range tasks {
+		messages, e := f.s.copyFightStart(f.ctx, id, &pb.CSCopyFightStart{ChapterId: proto.String("6"), MissionId: proto.String("30"), TaskId: proto.String(task["TaskId"])})
+		if e != nil {
+			t.Fatal("start 6-1 encounter", e)
+		}
+		start := messages[0].(*pb.SCCopyFightStart)
+		final = &pb.CSCopyFightEnd{FightId: start.FightId, Result: proto.Int32(1), BattlePlayer: start.BattlePlayer}
+		result, e := f.s.copyFightEnd(f.ctx, id, final)
+		if e != nil {
+			t.Fatal("settle 6-1 encounter", e)
+		}
+		count := p1Count(t, &db.PaymentLuxuryOffer{}, "player_id=?", id)
 		if i < len(tasks)-1 && count != 0 || i == len(tasks)-1 && (count != 1 || result[0].(*pb.SCCopyFightEnd).GetIsCopyComplete() != 1) {
-			t.Fatal("story offer was not bound to whole-mission completion", i, count)
+			t.Fatal("6-1 offer was not bound to complete mission", i, count)
 		}
 	}
 	var first db.PaymentLuxuryOffer
@@ -115,7 +186,6 @@ func TestLuxuryDragonStorySweepCyclesAndPaidClaim(t *testing.T) {
 	if _, err = f.s.generatePayment(f.ctx, id, p3DemoProviderRequest(t, "djsy.wuyou.andp0030"), 30001, time.UnixMilli(first.StartAt).Add(time.Minute)); err != nil {
 		t.Fatal("partial real order", err)
 	}
-	sweep := &pb.CSCopySweep{ChapterId: proto.String("1"), MissionId: proto.String("1")}
 	if _, err = f.s.copySweepAt(f.ctx, id, sweep, 111, time.UnixMilli(first.EndAt-1)); err != nil {
 		t.Fatal("in-window sweep", err)
 	}
@@ -181,9 +251,10 @@ func TestLuxuryDragonStorySweepCyclesAndPaidClaim(t *testing.T) {
 
 func TestLuxuryDragonTriggerRollsBackWithStory(t *testing.T) {
 	f, id := p3DemoProviderFixture(t)
+	luxuryTestUnlock(t, f.ctx, f.s, id)
 	forced := errors.New("isolated rollback")
-	err := updateProfileWithTx(f.ctx, id, func(tx *gorm.DB, _ *pb.Player, _ *model.GameState) error {
-		if e := f.s.triggerLuxuryDragonLocked(tx, id, time.Now()); e != nil {
+	err := updateProfileWithTx(f.ctx, id, func(tx *gorm.DB, _ *pb.Player, g *model.GameState) error {
+		if e := f.s.triggerLuxuryDragonLocked(tx, id, g, time.Now()); e != nil {
 			return e
 		}
 		return forced
@@ -198,6 +269,7 @@ func TestLuxuryDragonConcurrentRenewalMySQL(t *testing.T) {
 	if db.GetIns().Dialector.Name() != "mysql" {
 		t.Skip("requires isolated InnoDB")
 	}
+	luxuryTestUnlock(t, f.ctx, f.s, id)
 	old := time.Now().Add(-25 * time.Hour).Truncate(time.Millisecond)
 	luxuryTestStart(t, f.ctx, f.s, id, old)
 	at := old.Add(13 * time.Hour)
@@ -209,8 +281,8 @@ func TestLuxuryDragonConcurrentRenewalMySQL(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			<-start
-			errs <- updateProfileWithTx(f.ctx, id, func(tx *gorm.DB, _ *pb.Player, _ *model.GameState) error {
-				return f.s.triggerLuxuryDragonLocked(tx, id, at)
+			errs <- updateProfileWithTx(f.ctx, id, func(tx *gorm.DB, _ *pb.Player, g *model.GameState) error {
+				return f.s.triggerLuxuryDragonLocked(tx, id, g, at)
 			})
 		}()
 	}
