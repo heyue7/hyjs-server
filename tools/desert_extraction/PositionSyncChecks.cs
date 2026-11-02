@@ -56,7 +56,10 @@ public sealed class EasyTouchTool
 public static partial class NetAPI
 {
     public static bool connected=true;
+    public static int reconnects;
+    public static bool reconnectThrows;
     public static bool SocketIsConnected() { return connected; }
+    public static void Reconnect() { reconnects++; if (reconnectThrows) throw new InvalidOperationException("isolated reconnect failure"); }
 }
 namespace HYJS.DesertV4
 {
@@ -90,7 +93,7 @@ public static class PositionSyncChecks
     {
         PositionSync.Release();
         FieldWire.session=new FieldWire.Session { playerId=42,sessionHex="session-1",origin="https://example.test" };
-        NetAPI.connected=true; EasyTouchTool.Instance.Enable=true;
+        NetAPI.connected=true; NetAPI.reconnects=0; NetAPI.reconnectThrows=false; EasyTouchTool.Instance.Enable=true;
         FieldRuntime.readyCalls=0; FieldRuntime.readyNet=null; FieldRuntime.readyFrame=null;
         actor=new RoomCharactor(); field=new RoomNetField();
         RoomManager.currentRoom=new RoomBase { charactorManager=new RoomCharactorManager { self=actor },netManager=field };
@@ -343,6 +346,98 @@ public static class PositionSyncChecks
         Check(!PositionSync.ChannelReady && PositionSync.Locked,"callback failure escaped or released a protected relocation");
         PositionSync.Release();
     }
+    static void OutstandingAge(long seconds)
+    {
+        typeof(PositionSync).GetField("firstOutstandingAt",System.Reflection.BindingFlags.Static|System.Reflection.BindingFlags.NonPublic)
+            .SetValue(null,System.Diagnostics.Stopwatch.GetTimestamp()-seconds*System.Diagnostics.Stopwatch.Frequency);
+    }
+    static int PendingSends()
+    {
+        return ((System.Collections.ICollection)typeof(PositionSync).GetField("sent",System.Reflection.BindingFlags.Static|System.Reflection.BindingFlags.NonPublic).GetValue(null)).Count;
+    }
+    static void LostPositionReconnectKeepsOwnerLease()
+    {
+        Reset(); PositionSync.TrackSend(30024); Deliver(Queue(Position(42,3)));
+        long lease; Check(PositionSync.TryLock(actor,out lease),"could not acquire recovery owner lease");
+        int callbacks=0; float x=0;
+        PositionSync.RequestCurrentState(field,delegate(Vector3 p,string scene) { callbacks++; x=p.x; });
+        Packet stale=Queue(Position(42,31));
+        OutstandingAge(14); PositionSync.Tick();
+        Check(NetAPI.reconnects==0 && PendingSends()==1,"outstanding frame reconnected before its deadline");
+        OutstandingAge(16); NetAPI.connected=false; PositionSync.Tick();
+        Check(NetAPI.reconnects==0 && PendingSends()==1,"disconnected socket was reconnected again");
+        NetAPI.connected=true; PositionSync.Tick(); PositionSync.Tick();
+        Check(NetAPI.reconnects==1 && PendingSends()==1 && callbacks==0,"timeout did not retain exactly one original request");
+        Check(PositionSync.OwnsLock(lease) && !EasyTouchTool.Instance.Enable,"timeout released the original owner lease");
+        PositionSync.TrackFieldResponse(Position(42,32));
+        Check(callbacks==0 && PendingSends()==1 && PositionSync.OwnsLock(lease),"a fallback impersonated the missing real response");
+        PositionSync.ConnectionStarting();
+        FieldWire.session=new FieldWire.Session { playerId=42,sessionHex="session-reconnected",origin="https://example.test" };
+        PositionSync.LoginResponse(new SCSocketLogin { result=100 });
+        Check(PositionSync.DropPacket(stale),"old position packet survived the new connection epoch");
+        PositionSync.TrackFieldResponse(stale.kBody);
+        Check(callbacks==0 && PositionSync.OwnsLock(lease),"old epoch completed or released the owner");
+        PositionSync.TickRecovery(); Deliver(Queue(Position(42,40)));
+        Check(PositionSync.ChannelReady && PositionSync.OwnsLock(lease),"new connection did not establish an authentic baseline");
+        PositionSync.RequestCurrentState(field,delegate(Vector3 p,string scene) { callbacks++; x=p.x; });
+        Deliver(Queue(Position(42,41)));
+        Check(callbacks==1 && x==41 && PositionSync.OwnsLock(lease),"new authentic position did not complete the original owner");
+        Check(PositionSync.ReleaseIfOwned(lease) && EasyTouchTool.Instance.Enable,"owner could not release after real recovery");
+    }
+    static void OutstandingQueueWindowAndSingleReconnect()
+    {
+        Reset(); PositionSync.TrackSend(30024); PositionSync.TrackSend(30024); OutstandingAge(16);
+        Deliver(Queue(Position(42,5))); PositionSync.Tick();
+        Check(NetAPI.reconnects==0 && PendingSends()==1,"next outstanding frame did not receive a fresh window");
+        OutstandingAge(16); NetAPI.reconnectThrows=true; PositionSync.Tick(); PositionSync.Tick();
+        Check(NetAPI.reconnects==1 && PendingSends()==1,"throwing reconnect was repeated or removed an outstanding frame");
+        Deliver(Queue(Position(42,6))); Check(PositionSync.ChannelReady,"actual response did not drain the original queue");
+        PositionSync.TrackSend(30024); OutstandingAge(16); PositionSync.Tick();
+        Check(NetAPI.reconnects==1 && PendingSends()==1,"same epoch repeated a reconnect after a later send");
+        PositionSync.ConnectionStarting(); PositionSync.LoginResponse(new SCSocketLogin { result=100 });
+        NetAPI.reconnectThrows=false; PositionSync.TrackSend(30024); OutstandingAge(16); PositionSync.Tick();
+        Check(NetAPI.reconnects==2,"a new connection epoch did not rearm the timeout");
+        PositionSync.ConnectionStarting(); PositionSync.LoginResponse(new SCSocketLogin { result=100 });
+        PositionSync.TrackSend(30024); Deliver(Queue(Position(42,7))); OutstandingAge(16); PositionSync.Tick();
+        Check(NetAPI.reconnects==2 && PendingSends()==0,"an empty queue requested reconnect");
+    }
+    static void TownLeaveTimeoutRequestsReconnect()
+    {
+        Reset(); PositionSync.SetFieldActive(false); PositionSync.SetLeaveActive(true);
+        RoomNetBase town=new RoomNetBase(); RoomManager.currentRoom.netManager=town;
+        PositionSync.TrackSend(30024); Packet stale=Queue(Position(42,11)); OutstandingAge(16);
+        PositionSync.TickRecovery(); PositionSync.TickRecovery();
+        Check(NetAPI.reconnects==1 && PendingSends()==1,"town leave did not bound its outstanding request");
+        PositionSync.ConnectionStarting(); PositionSync.LoginResponse(new SCSocketLogin { result=100 });
+        Check(!PositionSync.DropPacket(stale),"town old frame changed native dispatch behavior");
+        PositionSync.TrackBaseResponse(town,stale.kBody);
+        Check(!PositionSync.ChannelReady,"old town frame established a new connection baseline");
+        PositionSync.TickRecovery(); Packet fresh=Queue(Position(42,12));
+        Check(!PositionSync.DropPacket(fresh),"fresh town frame was dropped"); PositionSync.TrackBaseResponse(town,fresh.kBody);
+        Check(PositionSync.ChannelReady,"fresh town frame did not establish the baseline");
+        PositionSync.SetLeaveActive(false);
+    }
+    static void SessionResetClearsOutstandingWatchdog()
+    {
+        Reset(); PositionSync.TrackSend(30024); OutstandingAge(16); PositionSync.Tick();
+        Check(NetAPI.reconnects==1 && PendingSends()==1,"session test did not establish an outstanding reconnect");
+        FieldWire.session=new FieldWire.Session { playerId=42,sessionHex="session-2",origin="https://example.test" };
+        Check(!PositionSync.ChannelReady && PendingSends()==0,"new session retained an old request");
+        var flags=System.Reflection.BindingFlags.Static|System.Reflection.BindingFlags.NonPublic;
+        Check((long)typeof(PositionSync).GetField("firstOutstandingAt",flags).GetValue(null)==0 &&
+            !(bool)typeof(PositionSync).GetField("reconnectRequested",flags).GetValue(null),"session reset retained its watchdog state");
+    }
+    static void ReconnectClearsBoundedPacketTracking()
+    {
+        Reset(); Packet stale=null;
+        for (int i=0;i<512;i++) stale=Queue(Position(42,i));
+        PositionSync.ConnectionStarting(); PositionSync.LoginResponse(new SCSocketLogin { result=100 });
+        PositionSync.TrackSend(30024); Packet fresh=Queue(Position(42,600));
+        Check(PositionSync.DropPacket(stale),"old tracked packet survived the new connection epoch");
+        Check(!PositionSync.DropPacket(fresh),"old epoch packet tracking exhausted the new epoch");
+        PositionSync.TrackFieldResponse(fresh.kBody);
+        Check(PositionSync.ChannelReady,"new real frame did not establish readiness after tracking reset");
+    }
     public static void Main()
     {
         OriginalFallbackThenLateReply(); NormalAndOverlappingPackets(); ReconnectRejectsOldPackets();
@@ -350,6 +445,8 @@ public static class PositionSyncChecks
         LateOwnerKeepsTrackedBaseline(); MissingBaselineRequestsFreshNativeFrame(); InvalidUntrackedFrameCannotEstablishBaseline();
         DeliveredBeforeOwnerDrainsInOrder(); DeferredLockedReplyPreservesLease(); DeferredThenLiveFramesStayOrdered();
         DeferredRepliesDiscardedOnEpochOrOwnerChange(); DeferredQueueIsBoundedByRequests(); DeferredIdentityAndCallbackFailuresStayClosed();
+        LostPositionReconnectKeepsOwnerLease(); OutstandingQueueWindowAndSingleReconnect(); TownLeaveTimeoutRequestsReconnect(); SessionResetClearsOutstandingWatchdog();
+        ReconnectClearsBoundedPacketTracking();
         Console.WriteLine("PositionSync replay passed: "+checks+" assertions");
     }
 }

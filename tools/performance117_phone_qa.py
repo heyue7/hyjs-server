@@ -22,7 +22,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'tests'))
 from hyjs_managed_mysql import ManagedMySQL, SERVICES
 
-BUILD = ROOT / 'build/round-two-performance-final/server-oom-final'
+BUILD = ROOT / 'build/round-two-performance-final/arena-copy-qualification'
 FIXTURE_BINARY = BUILD / 'service.test'
 SERVER_BINARY = BUILD / 'hyjs-server'
 PRIVATE_ROOT = ROOT / '.local-env/performance117-ui'

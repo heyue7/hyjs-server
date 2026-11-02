@@ -1,0 +1,40 @@
+{
+  "status": "PASS_SIGN_ALIGN_SCOPED_OVERLAY_NOT_INSTALLED",
+  "binarySHA256": "191fe4826ad162d508b2d3fc8e0f8e6b6c5372815ad9f82cb21e7160bea17aa3",
+  "baseAPKSHA256": "cac89c00b7ad79e0a098a3108229cee94fd693bbf155fc64076c83ae25c36a47",
+  "replacementEntries": {
+    "assets/bin/Data/Managed/Assembly-CSharp.dll": "0e0fb0e88cc295877b5c4c74e3bfe3280e12bf0b7aa10e6521a69ad998fdbde1",
+    "assets/bin/Data/Managed/SoulFlowerDesertV4.dll": "ccdfab94f784ab9bb636dbfa7b924441c1e58ca90aaefb73834f6054a1ad3fba",
+    "assets/bin/Data/Managed/HYJS.LuxuryDragon.dll": "6d6655a38954d77b7aa9fdae39906c76848bce1c727abf47314ccc3f4e7e00f7",
+    "AndroidManifest.xml": "459a8cf97177b2e502e35f33f5d06fe72f6673e2e8f1932c13275033e2973b70"
+  },
+  "openingFontChanges": [],
+  "fontFallbackProof": null,
+  "dungeonResourceProof": null,
+  "compatibilityProof": null,
+  "manifestPinRepair": null,
+  "javaClassInventory": {
+    "DEXEntries": [
+      "classes.dex",
+      "classes2.dex",
+      "classes3.dex",
+      "classes4.dex",
+      "classes5.dex"
+    ],
+    "classCount": 4619,
+    "noDuplicateClass": true,
+    "noFinalSuperclass": true
+  },
+  "inheritedJavaByteExact": true,
+  "javaByteExact": true,
+  "allOtherEntriesAndCompressedPayloadsExact": true,
+  "managedAssemblyByteExact": false,
+  "qaOnly": false,
+  "neverPromote": false,
+  "signatureVerified": true,
+  "zipalignVerified": true,
+  "originalEngineMethodsExact": 547,
+  "outputAPK": "build/round-two-performance-final/\u9ed1\u8863\u5251\u58eb\u7075\u9b42\u4e4b\u82b1v1.1.7-\u5e76\u53d1\u4e0e\u73a9\u6cd5\u6062\u590d\u4f18\u5316.apk",
+  "buildCode": 2026110301,
+  "versionName": "1.1.7"
+}

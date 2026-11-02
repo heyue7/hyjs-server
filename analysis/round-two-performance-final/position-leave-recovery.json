@@ -1,0 +1,52 @@
+{
+  "status": "PASS",
+  "scope": "local C# model against actual sources; no device, server or DB",
+  "runtime": "/Users/lirui/LR/hyjs/.tools/native-batch",
+  "sharedPositionStubRunners": [
+    "run_position_sync_checks.py",
+    "run_leave_recovery_checks.py"
+  ],
+  "sourceSHA256": {
+    "LeaveController.cs": "31e3c8a512ed172826477eadb49aa662d26a3eefb55b99c4d7c8c047543a96a3",
+    "LeaveRecoveryChecks.cs": "4f576566900b9f13c1ee0bd9438849d3785131803cd32df9ac92de8a67f3adce",
+    "PositionSync.cs": "9d447f66f97675d78880536f8bcd307ef9ffc68c08cf4baa540f87388db67779",
+    "PositionSyncChecks.cs": "2bf73d4a70512e080da23d3b6df02b0a58a7e74bedce09d921b793b43c150b51"
+  },
+  "diffCheckExitCode": 0,
+  "checks": [
+    {
+      "name": "position",
+      "command": [
+        "rtk",
+        "proxy",
+        "/Users/lirui/LR/hyjs/.analysis-venv/bin/python",
+        "/Users/lirui/.codex/worktrees/hyjs-player-concurrency-20261102/hyjs/tools/desert_extraction/run_position_sync_checks.py",
+        "--runtime",
+        "/Users/lirui/LR/hyjs/.tools/native-batch"
+      ],
+      "exitCode": 0,
+      "assertions": 202,
+      "stdout": "PositionSync replay passed: 202 assertions\n",
+      "stderr": "",
+      "seconds": 0.78
+    },
+    {
+      "name": "leave",
+      "command": [
+        "rtk",
+        "proxy",
+        "/Users/lirui/LR/hyjs/.analysis-venv/bin/python",
+        "/Users/lirui/.codex/worktrees/hyjs-player-concurrency-20261102/hyjs/tools/desert_extraction/run_leave_recovery_checks.py",
+        "--runtime",
+        "/Users/lirui/LR/hyjs/.tools/native-batch",
+        "--apk",
+        "/Users/lirui/LR/hyjs/deliveries/client-update-1.1.2/黑衣剑士灵魂之花v1.1.2-修复候选.apk"
+      ],
+      "exitCode": 0,
+      "assertions": 442,
+      "stdout": "PASS leave recovery: 442 assertions\nTemporary leave model outputs cleaned\n",
+      "stderr": "",
+      "seconds": 1.25
+    }
+  ]
+}

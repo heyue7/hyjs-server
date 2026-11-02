@@ -31,8 +31,8 @@ namespace HYJS.DesertV4
         static int epoch;
         static long sequence,expected,lockGeneration;
         static FieldWire.Session owner;
-        static bool overflow,confirmedBase,touchWasEnabled,authenticated,unboundLogin;
-        static long nextBaseRetry;
+        static bool overflow,confirmedBase,touchWasEnabled,authenticated,unboundLogin,reconnectRequested;
+        static long nextBaseRetry,firstOutstandingAt;
         static volatile bool fieldActive,leaveActive,locked;
         static Action<Vector3,string> onResponse;
         static bool SameActor(FieldWire.Session a,FieldWire.Session b)
@@ -49,7 +49,7 @@ namespace HYJS.DesertV4
                 if (owner!=null)
                 {
                     authenticated=false; unboundLogin=false; sent.Clear(); deferred.Clear(); sequence=expected=0;
-                    confirmedBase=false; overflow=false; onResponse=null; nextBaseRetry=0;
+                    confirmedBase=false; overflow=false; onResponse=null; nextBaseRetry=firstOutstandingAt=0; reconnectRequested=false;
                 }
                 // Keep sends observed on this connection before playerData
                 // became available. An established owner's change resets them.
@@ -66,8 +66,8 @@ namespace HYJS.DesertV4
         public static void ConnectionStarting()
         {
             Interlocked.Increment(ref epoch);
-            lock(gate) { dispatchedBody=null; dispatchedEpoch=0; }
-            sent.Clear(); deferred.Clear(); sequence=expected=0; confirmedBase=false; overflow=false; authenticated=false; unboundLogin=false; onResponse=null; nextBaseRetry=0;
+            lock(gate) { packetEpoch.Clear(); dispatchedBody=null; dispatchedEpoch=0; }
+            sent.Clear(); deferred.Clear(); sequence=expected=0; confirmedBase=false; overflow=false; authenticated=false; unboundLogin=false; onResponse=null; nextBaseRetry=firstOutstandingAt=0; reconnectRequested=false;
         }
         public static void LoginResponse(object value)
         {
@@ -140,6 +140,7 @@ namespace HYJS.DesertV4
                 // owner is known; ConnectionStarting always clears the queue.
                 Current();
                 if (sequence==Int64.MaxValue || sent.Count>=64) { overflow=true; return; }
+                if (sent.Count==0) firstOutstandingAt=Stopwatch.GetTimestamp();
                 sent.Enqueue(++sequence);
             }
             catch (Exception) { overflow=true; }
@@ -174,6 +175,7 @@ namespace HYJS.DesertV4
         {
             if (sent.Count==0) { confirmedBase=false; return false; }
             long actual=sent.Dequeue();
+            firstOutstandingAt=sent.Count==0 ? 0 : Stopwatch.GetTimestamp();
             if (rsp==null || rsp.self==null || rsp.self.info==null || rsp.self.position==null || rsp.self.position.current==null ||
                 rsp.self.info.playerId!=owner.playerId) { confirmedBase=false; return false; }
             PointNew p=rsp.self.position.current;
@@ -285,6 +287,15 @@ namespace HYJS.DesertV4
         {
             if (!Current()) return;
             DrainDeferred();
+            if ((fieldActive || leaveActive || locked) && sent.Count>0 && firstOutstandingAt>0 &&
+                !reconnectRequested && NetAPI.SocketIsConnected() &&
+                Stopwatch.GetTimestamp()-firstOutstandingAt>=15L*Stopwatch.Frequency)
+            {
+                // 30024 has no request ID; keep its queue and lease intact
+                // until the original reconnect creates a fresh connection epoch.
+                reconnectRequested=true;
+                try { NetAPI.Reconnect(); } catch (Exception) { }
+            }
             if ((!locked || recovery) && !confirmedBase && !overflow && (authenticated || unboundLogin) && sent.Count==0 &&
                 NetAPI.SocketIsConnected() && Stopwatch.GetTimestamp()>=nextBaseRetry)
             {

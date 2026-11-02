@@ -4,6 +4,8 @@
 
 - [第二轮性能优化方案](round-two-performance-plan.md)
 - [第二轮首批实现、验证与回退](round-two-first-batch.md)
+- [第二轮收尾实现与实测](round-two-final-batch.md)
+- [性能收尾及遗留修复交付](20261103-performance-takeover.md)
 - [第一轮并发优化](20261102-player-concurrency.md)
 - [存储与玩法性能调研](storage-and-gameplay-performance-research.md)
 - [运行与验收合同](runtime-contracts.md)：涉及生命周期、生产操作或验收口径时读取。

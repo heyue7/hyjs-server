@@ -346,8 +346,7 @@ namespace HYJS.DesertV4
             { generation++; busy=awaitingPosition=receiptVerified=false; syncRoom=null; syncNet=null; next=0; }
             if (busy || awaitingPosition || Stopwatch.GetTimestamp()<next) return;
             if (callbackFault) { Warn("请重新登录以恢复离图"); return; }
-            if (pending.phase=="prepare" && StaticData.fieldId=="field_003" && RoomManager.currentRoom is RoomField) Prepare();
-            else if (!receiptVerified) Status(); else Synchronize();
+            if (!receiptVerified) Status(); else Synchronize();
         }
         void Later() { busy=false; next=Stopwatch.GetTimestamp()+Stopwatch.Frequency; }
         void Finish(string text)
@@ -406,7 +405,15 @@ namespace HYJS.DesertV4
                             (pending.mode=="line" && Integer(d["targetLine"])!=pending.targetLine)) throw new InvalidOperationException("Leave intent identity mismatch");
                         Finish("离图确认已失效，请重试"); return;
                     }
-                    if (status=="prepared" || status=="unknown") return;
+                    if (status=="prepared" || status=="unknown")
+                    {
+                        if (pending.phase!="prepare" || StaticData.fieldId!="field_003" || !(RoomManager.currentRoom is RoomField)) return;
+                        if (status=="prepared" && ((string)d["mode"]!=pending.mode ||
+                            (pending.mode=="scene" && (string)d["targetScene"]!=pending.targetScene) ||
+                            (pending.mode=="line" && Integer(d["targetLine"])!=pending.targetLine) || Integer(d["expiresAtMs"])<=0))
+                            throw new InvalidOperationException("Prepared leave identity mismatch");
+                        Prepare(); return;
+                    }
                     Message(pending);
                     if (status!="completed" || !d["targetCurrent"].IsBoolean || (string)d["mode"]!=pending.mode ||
                         (pending.mode=="scene" && (string)d["targetScene"]!=pending.targetScene) ||

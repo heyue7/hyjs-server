@@ -1,0 +1,53 @@
+{
+  "test": "TestCopyRunRecoveryTransactionsMySQL",
+  "sourceDigestScope": "sorted repository-relative hyjs-server non-test Go and SQL path + NUL + content + NUL",
+  "sourceBefore": {
+    "sha256": "5a59d1249b4cac5a4267be54e0a3b9be8093b68cbf573c052f7701317c999b35",
+    "fileCount": 2334
+  },
+  "binarySHA256": "230bb1a4a2bd4435a6fad47fe5131ebf68f9bb19cdabd9d823049dcd525a3527",
+  "testSourceSHA256": "cce9ec1aa7b0cbf2cbdf3d7ae2b901b803417a3d56de2b2a9abb3082187b6026",
+  "fixtureRoot": "/Users/lirui/LR/hyjs/analysis",
+  "timezone": "Asia/Shanghai",
+  "leaseSeconds": 600,
+  "leaseAcquired": true,
+  "leaseReleased": true,
+  "cleanup": true,
+  "status": "PASS",
+  "database": "hyjs_test_p1_copyrecovery_1ab3de3630",
+  "testStarted": true,
+  "command": "rtk proxy <verified service.test> -test.run=^TestCopyRunRecoveryTransactionsMySQL$ -test.v -test.count=1 -test.timeout=8m",
+  "exitCode": 0,
+  "timedOut": false,
+  "testSeconds": 1.774,
+  "log": "analysis/round-two-performance-final/copy-run-mysql/TestCopyRunRecoveryTransactionsMySQL.log",
+  "passLine": true,
+  "skipObserved": false,
+  "databaseEngine": "InnoDB",
+  "sourceAfter": {
+    "sha256": "5a59d1249b4cac5a4267be54e0a3b9be8093b68cbf573c052f7701317c999b35",
+    "fileCount": 2334
+  },
+  "sourceUnchanged": true,
+  "binaryUnchanged": true,
+  "elapsedSeconds": 3.461,
+  "passed": true,
+  "handlerModelBuild": {
+    "command": "rtk proxy env TZ=Asia/Shanghai GOMAXPROCS=2 GOMEMLIMIT=768MiB GOTOOLCHAIN=go1.27.2 go build ./handler ./model",
+    "exitCode": 0,
+    "timedOut": false,
+    "seconds": 28.978,
+    "log": "analysis/round-two-performance-final/copy-run-mysql/handler-model-build.log",
+    "sourceAfter": {
+      "sha256": "5a59d1249b4cac5a4267be54e0a3b9be8093b68cbf573c052f7701317c999b35",
+      "fileCount": 2334
+    },
+    "sourceUnchanged": true
+  },
+  "cleanupVerification": {
+    "allocationFilesAbsent": true,
+    "leaseFreeAtVerification": true,
+    "testProcessRunning": false,
+    "managerContract": "test-drop removes the isolated database and its last owned user before allocation metadata"
+  }
+}

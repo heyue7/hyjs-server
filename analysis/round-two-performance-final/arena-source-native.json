@@ -1,0 +1,232 @@
+{
+  "status": "PASS",
+  "scope": "local-1.1.6-original-managed-host",
+  "apkAssemblySHA256": "a39330e3504f8a6bb31756580dc8b13dd4f05090672111ba074c88eb75789e91",
+  "apkFirstPassSHA256": "e732d075c1f52133f665e835ac623e32be89ec9aa2e22ca11925014dfdff95b8",
+  "localUnityAdapterSHA256": "1c527c926adc21709576597ea94e9b16eeb4355597820effe6c954eea8d678cc",
+  "hostSHA256": "54112f9cf299e36fc01a1b6aa02328e65a23d6900eaa2caa3a7bcc9a35415563",
+  "callerSHA256": "8fd6a7d61dc001fd78a8ec903e84204c30b34f04213dbd351a7f4dafadf0b02c",
+  "historicalFirstTraceSHA256Matched": true,
+  "cases": [
+    {
+      "fightId": "4d230968-246e-46f5-8d79-2f3327e08a45",
+      "frozenInputSHA256": "4f3e1ecf8861d863dd63845fd2d2619c987905a18d73eaed9796bc0c0c324fd9",
+      "originalResponseSHA256": "7c3725aeed364c8387f4f0ade956916aba28466dbfca9ca861b8e2d3e73cd2ad",
+      "wireSHA256": "daca3f584835b03f63fe54e1c71cb8863d165414e519d628d091068b064d3e76",
+      "typedStartSHA256": "2aa9f767da821311ae67cd10c5653a93334ee3ed07391d0bbf1a57a8307a875e",
+      "traceSHA256": "1e49fdb2009736d24099b068bfdcda6c0aca2d91e56ac0e7bd8c32f696a04e22",
+      "traceRows": 973,
+      "hostLogSHA256": "e87f74771625d48e9ec2d1d36f3cd4e8ce4598588c0997aedfc31811657884f9",
+      "attackerWon": true,
+      "round": 15,
+      "frozenTablesMatchOriginalRows": true,
+      "originalTablePins": {
+        "BootHero": {
+          "rows": 5,
+          "sha256": "7ec6a65dad92bdd1d48832f5b2e7922a022c4704c6a23396f06361780d50ba97"
+        },
+        "Buff": {
+          "rows": 884,
+          "sha256": "68475f7c731e3ce19680f33720a4728a984727a96ea7e8bf4ba2c7aced0e0197"
+        },
+        "CopyEnemy": {
+          "rows": 2168,
+          "sha256": "acf67a9c670df87da6547688635d428f866b97d2ce5671fce861517bd61fdfe6"
+        },
+        "GameConfigure": {
+          "rows": 491,
+          "sha256": "f359612c3523918327f7256026ee861923468c2282f88504dac2c426bcd82206"
+        },
+        "Hero": {
+          "rows": 167,
+          "sha256": "7fe0a5dd0eab9bb291a9ce4561e0c45772c8f1edab8201a5c03fb37e1177526d"
+        },
+        "HeroAwakenAdd": {
+          "rows": 36,
+          "sha256": "531c23382f8971eb3803207e0662cfda6adc4b10e94ea9188c787f518dd18a34"
+        },
+        "RecruitShowHero": {
+          "rows": 21,
+          "sha256": "a06f6937bd9167a7daaed839f1420e96733ca4115f28f5a634dceb17808f5c2f"
+        },
+        "Skill": {
+          "rows": 508,
+          "sha256": "17ea58b52a45bcdbeb7c0f7b1e22d697dbcf00d7a970bb3c016835e33fbe44e1"
+        },
+        "SkillCast": {
+          "rows": 2470,
+          "sha256": "c17f0179803225860c25aefc2693f19c917cacc8b144fe0a509aaf014d6b5f2a"
+        },
+        "Talent": {
+          "rows": 780,
+          "sha256": "196959cefe4751a2a678d6e97b009ea59e8f2b9168c7bc9291b89f9472a95ab5"
+        }
+      }
+    },
+    {
+      "fightId": "d48fa9ec-d2bd-44cc-a3b3-8dda681451de",
+      "frozenInputSHA256": "ca396f819d47757fedd56a99e5412ee5c950e5bf598a10279138cbbe5a570a18",
+      "originalResponseSHA256": "ea52d738d53cc90496796e8e80628c876d44ed37fdf542d5e665c0a9613b8bbc",
+      "wireSHA256": "f4fb71f26a1934642d3c638f76b11fd4abc635dbd1efae58dc3a150ff0ec6f52",
+      "typedStartSHA256": "1088dc776f4ae35b176fc90c2188e3eba37a98744c9cb2f10e1a3acc6d05e94c",
+      "traceSHA256": "f6f3ff9e818e2c52ebb8440e5d2f98fb6bb97c9013cdf09e0bba6475ef2bc5bf",
+      "traceRows": 629,
+      "hostLogSHA256": "e87f74771625d48e9ec2d1d36f3cd4e8ce4598588c0997aedfc31811657884f9",
+      "attackerWon": false,
+      "round": 10,
+      "frozenTablesMatchOriginalRows": true,
+      "originalTablePins": {
+        "BootHero": {
+          "rows": 5,
+          "sha256": "7ec6a65dad92bdd1d48832f5b2e7922a022c4704c6a23396f06361780d50ba97"
+        },
+        "Buff": {
+          "rows": 884,
+          "sha256": "68475f7c731e3ce19680f33720a4728a984727a96ea7e8bf4ba2c7aced0e0197"
+        },
+        "CopyEnemy": {
+          "rows": 2168,
+          "sha256": "acf67a9c670df87da6547688635d428f866b97d2ce5671fce861517bd61fdfe6"
+        },
+        "GameConfigure": {
+          "rows": 491,
+          "sha256": "f359612c3523918327f7256026ee861923468c2282f88504dac2c426bcd82206"
+        },
+        "Hero": {
+          "rows": 167,
+          "sha256": "7fe0a5dd0eab9bb291a9ce4561e0c45772c8f1edab8201a5c03fb37e1177526d"
+        },
+        "HeroAwakenAdd": {
+          "rows": 36,
+          "sha256": "531c23382f8971eb3803207e0662cfda6adc4b10e94ea9188c787f518dd18a34"
+        },
+        "RecruitShowHero": {
+          "rows": 21,
+          "sha256": "a06f6937bd9167a7daaed839f1420e96733ca4115f28f5a634dceb17808f5c2f"
+        },
+        "Skill": {
+          "rows": 508,
+          "sha256": "17ea58b52a45bcdbeb7c0f7b1e22d697dbcf00d7a970bb3c016835e33fbe44e1"
+        },
+        "SkillCast": {
+          "rows": 2470,
+          "sha256": "c17f0179803225860c25aefc2693f19c917cacc8b144fe0a509aaf014d6b5f2a"
+        },
+        "Talent": {
+          "rows": 780,
+          "sha256": "196959cefe4751a2a678d6e97b009ea59e8f2b9168c7bc9291b89f9472a95ab5"
+        }
+      }
+    },
+    {
+      "fightId": "19c10bec-7929-42fc-8ce9-0aece4625f90",
+      "frozenInputSHA256": "872fb309c8a5632f6dececc1c250e17545ff9de82934e32acde30806ea4a885f",
+      "originalResponseSHA256": "144058050ae3d0d37b948c13dae05ba626d9ad03ace389f12f903cfec526080d",
+      "wireSHA256": "36839c7deef8d11f624dbb0a071e105f497e193cab6913f761409ae08e6c5a6f",
+      "typedStartSHA256": "25ee174c7b01cc058cf1cb71d5a1e2a88db2dfed5124e368051e9f75aa1676de",
+      "traceSHA256": "2d5d67f754ea1f74bb60cbedf3ea9e55812be516f68ad75b00e6606f527241f3",
+      "traceRows": 689,
+      "hostLogSHA256": "e87f74771625d48e9ec2d1d36f3cd4e8ce4598588c0997aedfc31811657884f9",
+      "attackerWon": false,
+      "round": 10,
+      "frozenTablesMatchOriginalRows": true,
+      "originalTablePins": {
+        "BootHero": {
+          "rows": 5,
+          "sha256": "7ec6a65dad92bdd1d48832f5b2e7922a022c4704c6a23396f06361780d50ba97"
+        },
+        "Buff": {
+          "rows": 884,
+          "sha256": "68475f7c731e3ce19680f33720a4728a984727a96ea7e8bf4ba2c7aced0e0197"
+        },
+        "CopyEnemy": {
+          "rows": 2168,
+          "sha256": "acf67a9c670df87da6547688635d428f866b97d2ce5671fce861517bd61fdfe6"
+        },
+        "GameConfigure": {
+          "rows": 491,
+          "sha256": "f359612c3523918327f7256026ee861923468c2282f88504dac2c426bcd82206"
+        },
+        "Hero": {
+          "rows": 167,
+          "sha256": "7fe0a5dd0eab9bb291a9ce4561e0c45772c8f1edab8201a5c03fb37e1177526d"
+        },
+        "HeroAwakenAdd": {
+          "rows": 36,
+          "sha256": "531c23382f8971eb3803207e0662cfda6adc4b10e94ea9188c787f518dd18a34"
+        },
+        "RecruitShowHero": {
+          "rows": 21,
+          "sha256": "a06f6937bd9167a7daaed839f1420e96733ca4115f28f5a634dceb17808f5c2f"
+        },
+        "Skill": {
+          "rows": 508,
+          "sha256": "17ea58b52a45bcdbeb7c0f7b1e22d697dbcf00d7a970bb3c016835e33fbe44e1"
+        },
+        "SkillCast": {
+          "rows": 2470,
+          "sha256": "c17f0179803225860c25aefc2693f19c917cacc8b144fe0a509aaf014d6b5f2a"
+        },
+        "Talent": {
+          "rows": 780,
+          "sha256": "196959cefe4751a2a678d6e97b009ea59e8f2b9168c7bc9291b89f9472a95ab5"
+        }
+      }
+    },
+    {
+      "fightId": "af336865-d08f-4bcd-83ce-b9cc9c9f8ad9",
+      "frozenInputSHA256": "1a25ea55e7a28e39cfd983ff1ae29cd3b5228cd40725a80461b07db71d222335",
+      "originalResponseSHA256": "1b8fa373a649baf413adb2912c1f02da888d4d9c0d14466022d0921e59df3849",
+      "wireSHA256": "db05bea1a20ebd269f06aebe558e6c4e0f95b3115d6025b95d13e635d0b32fc8",
+      "typedStartSHA256": "e1380ebb56f648185870cbd07f220f572f3be7d4d6cb43b25e6d6f84a3f1ff07",
+      "traceSHA256": "c890a74f6310822828c5c1ff39687d9ad85f5737908c6b92005e396b3e7cfa2d",
+      "traceRows": 655,
+      "hostLogSHA256": "e87f74771625d48e9ec2d1d36f3cd4e8ce4598588c0997aedfc31811657884f9",
+      "attackerWon": false,
+      "round": 10,
+      "frozenTablesMatchOriginalRows": true,
+      "originalTablePins": {
+        "BootHero": {
+          "rows": 5,
+          "sha256": "7ec6a65dad92bdd1d48832f5b2e7922a022c4704c6a23396f06361780d50ba97"
+        },
+        "Buff": {
+          "rows": 884,
+          "sha256": "68475f7c731e3ce19680f33720a4728a984727a96ea7e8bf4ba2c7aced0e0197"
+        },
+        "CopyEnemy": {
+          "rows": 2168,
+          "sha256": "acf67a9c670df87da6547688635d428f866b97d2ce5671fce861517bd61fdfe6"
+        },
+        "GameConfigure": {
+          "rows": 491,
+          "sha256": "f359612c3523918327f7256026ee861923468c2282f88504dac2c426bcd82206"
+        },
+        "Hero": {
+          "rows": 167,
+          "sha256": "7fe0a5dd0eab9bb291a9ce4561e0c45772c8f1edab8201a5c03fb37e1177526d"
+        },
+        "HeroAwakenAdd": {
+          "rows": 36,
+          "sha256": "531c23382f8971eb3803207e0662cfda6adc4b10e94ea9188c787f518dd18a34"
+        },
+        "RecruitShowHero": {
+          "rows": 21,
+          "sha256": "a06f6937bd9167a7daaed839f1420e96733ca4115f28f5a634dceb17808f5c2f"
+        },
+        "Skill": {
+          "rows": 508,
+          "sha256": "17ea58b52a45bcdbeb7c0f7b1e22d697dbcf00d7a970bb3c016835e33fbe44e1"
+        },
+        "SkillCast": {
+          "rows": 2470,
+          "sha256": "c17f0179803225860c25aefc2693f19c917cacc8b144fe0a509aaf014d6b5f2a"
+        },
+        "Talent": {
+          "rows": 780,
+          "sha256": "196959cefe4751a2a678d6e97b009ea59e8f2b9168c7bc9291b89f9472a95ab5"
+        }
+      }
+    }
+  ]
+}

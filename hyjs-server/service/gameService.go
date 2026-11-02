@@ -954,13 +954,7 @@ func (s *GameService) dispatch(ctx context.Context, r *model.GamePacket, peer st
 		return s.copyFightEnd(ctx, row.Id, b)
 	case *pb.CSCopyLeave:
 		if err = updateProfileWithTx(ctx, row.Id, func(tx *gorm.DB, _ *pb.Player, g *model.GameState) error {
-			if g.Run != nil && g.Run.Fight != nil && !g.Run.Fight.Settled {
-				if err := s.CancelOriginalCopyReplay(ctx, tx, row.Id, g.Run.Fight.Start); err != nil {
-					return err
-				}
-			}
-			g.Run = nil
-			return nil
+			return s.copyLeaveLocked(ctx, tx, row.Id, g)
 		}); err != nil {
 			return nil, err
 		}

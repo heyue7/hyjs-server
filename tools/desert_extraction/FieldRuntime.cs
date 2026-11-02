@@ -107,6 +107,7 @@ namespace HYJS.DesertV4
             if (PvpBridge.Capture(opcode,value)) return true;
             if (Target() && (opcode==30032 || opcode==30061) && PvpBridge.HasPending())
             { BoxManager.CreatePopupTextBox("上次挑战仍在确认",0f); return true; }
+            if (CopyExitRecovery.Send(opcode,value)) return true;
             bool intercepted=LeaveController.Send(opcode,value);
             if (!intercepted && Target() && (opcode==30032 || opcode==30061)) ChipNames.ReleaseScene();
             return intercepted;

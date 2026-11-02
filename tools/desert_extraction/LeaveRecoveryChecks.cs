@@ -120,8 +120,9 @@ namespace HYJS.DesertV4
     {
         public static readonly Queue<Action<FieldWireResult>> statuses=new Queue<Action<FieldWireResult>>();
         public static readonly Queue<Action<FieldWireResult>> positions=new Queue<Action<FieldWireResult>>();
+        public static readonly Queue<Action<FieldWireResult>> prepareReplies=new Queue<Action<FieldWireResult>>();
         public static int prepares;
-        public void LeavePrepare(Session owner,string id,string mode,string scene,int line,Action<FieldWireResult> action) { prepares++; }
+        public void LeavePrepare(Session owner,string id,string mode,string scene,int line,Action<FieldWireResult> action) { prepares++; prepareReplies.Enqueue(action); }
         public void LeaveStatus(Session owner,string id,Action<FieldWireResult> action) { statuses.Enqueue(action); }
         public void PositionStatus(Session owner,Action<FieldWireResult> action) { positions.Enqueue(action); }
         public void Entry(Session owner,string id,Action<FieldWireResult> action) { }
@@ -169,9 +170,9 @@ public static class LeaveRecoveryChecks
         PositionSync.Release(); PositionSync.SetFieldActive(false); PositionSync.ConnectionStarting();
         typeof(LeaveController).GetField("instance",Private).SetValue(null,null);
         typeof(TravelController).GetField("instance",Private).SetValue(null,null);
-        FieldWire.statuses.Clear(); FieldWire.positions.Clear(); FieldWire.prepares=0;
+        FieldWire.statuses.Clear(); FieldWire.positions.Clear(); FieldWire.prepareReplies.Clear(); FieldWire.prepares=0;
         PlayerPrefs.items.Clear(); PlayerPrefs.failDelete=false; BoxManager.notices.Clear(); BoxManager.confirmation=null;
-        ManagerController.Instance.calls=0; ManagerController.Instance.fail=false; NetAPI.connected=true; NetAPI.nativeTransfers=0;
+        ManagerController.Instance.calls=0; ManagerController.Instance.fail=false; NetAPI.connected=true; NetAPI.nativeTransfers=0; NetAPI.reconnects=0; NetAPI.reconnectThrows=false;
         session=new FieldWire.Session { playerId=69,sessionHex="session-a",origin="https://example.test" }; FieldWire.session=session;
         actor=new RoomCharactor(); net=new ObservedNet(); town=new RoomTown { charactorManager=new RoomCharactorManager { self=actor },netManager=net };
         RoomManager.currentRoom=town; StaticData.fieldId="field_001"; EasyTouchTool.Instance.Enable=true;
@@ -376,6 +377,140 @@ public static class LeaveRecoveryChecks
         Check(FieldWire.prepares==0 && NetAPI.nativeTransfers==0 && LeaveController.Pending,
             "an old prepare in town resent a desert transition");
     }
+    static void FieldPending(string phase)
+    {
+        Reset(phase);
+        RoomManager.currentRoom=new RoomField { charactorManager=new RoomCharactorManager { self=actor },netManager=net };
+        StaticData.fieldId="field_003"; net.SendCSCurrentPosition(null); NativePosition("field_003",12,69);
+        Check(PositionSync.ChannelReady,"field recovery baseline unavailable");
+    }
+    static long LockPending()
+    {
+        long lease; Check(PositionSync.TryLock(actor,out lease),"field recovery lease unavailable");
+        Set(Core(),"positionLease",lease); return lease;
+    }
+    static JsonData Lifecycle(string status)
+    {
+        JsonData d=new JsonData(); d["requestId"]=Request; d["status"]=status;
+        if (status!="unknown")
+        {
+            d["mode"]=original.mode;
+            if (original.mode=="scene") d["targetScene"]=original.targetScene;
+            else d["targetLine"]=original.targetLine;
+            if (status=="prepared") d["expiresAtMs"]=1;
+        }
+        return d;
+    }
+    static void ReplyPrepare(JsonData data)
+    {
+        Check(FieldWire.prepareReplies.Count==1,"one original prepare callback expected");
+        FieldWire.prepareReplies.Dequeue()(new FieldWireResult { data=data });
+    }
+    static void ExpiredPrepareFinishesOwnedLease()
+    {
+        foreach (string status in new string[] { "expired","superseded" })
+        {
+            FieldPending("prepare"); long lease=LockPending(); Tick();
+            Check(FieldWire.statuses.Count==1 && FieldWire.prepares==0,"prepare did not check its actual lifecycle first");
+            ReplyStatus(Lifecycle(status));
+            Check(!LeaveController.Pending && !PlayerPrefs.items.ContainsKey(key),status+" prepare remained durable");
+            Check(!PositionSync.OwnsLock(lease) && !PositionSync.Locked && EasyTouchTool.Instance.Enable,status+" prepare retained the joystick");
+            Check(FieldWire.prepares==0 && NetAPI.nativeTransfers==0,status+" prepare resent a native transfer");
+        }
+    }
+    static void UnknownAndPreparedStartOnlyAfterStatus()
+    {
+        foreach (string status in new string[] { "unknown","prepared" })
+        {
+            FieldPending("prepare"); long lease=LockPending(); Tick();
+            Check(FieldWire.statuses.Count==1 && FieldWire.prepares==0,"prepare skipped the lifecycle read");
+            ReplyStatus(Lifecycle(status));
+            Check(FieldWire.prepares==1 && FieldWire.prepareReplies.Count==1 && NetAPI.nativeTransfers==0,status+" did not invoke the original prepare once");
+            ReplyPrepare(Lifecycle("prepared"));
+            Check(NetAPI.nativeTransfers==1 && ((LeaveRecord)Get(Core(),"pending")).phase=="sent" && PositionSync.OwnsLock(lease),
+                status+" did not persist the sent phase before its original transfer");
+            Now(); Tick(); ReplyStatus(Lifecycle(status));
+            Check(FieldWire.prepares==1 && NetAPI.nativeTransfers==1 && PositionSync.OwnsLock(lease),"sent phase repeated the native transfer");
+        }
+    }
+    static void InvalidLifecycleKeepsOriginalOwner()
+    {
+        foreach (string name in new string[] { "request","mode","target","expiry" })
+        {
+            FieldPending("prepare"); long lease=LockPending(); Tick(); JsonData d=Lifecycle("prepared");
+            if (name=="request") d["requestId"]="other";
+            if (name=="mode") d["mode"]="line";
+            if (name=="target") d["targetScene"]="field_002";
+            if (name=="expiry") d["expiresAtMs"]=0;
+            ReplyStatus(d);
+            Check(LeaveController.Pending && PlayerPrefs.items.ContainsKey(key) && PositionSync.OwnsLock(lease),"invalid prepared "+name+" cleared the owner");
+            Check(FieldWire.prepares==0 && NetAPI.nativeTransfers==0,"invalid prepared "+name+" started a transfer");
+        }
+        foreach (string status in new string[] { "expired","superseded" })
+        foreach (string name in new string[] { "request","mode","target" })
+        {
+            FieldPending("prepare"); long lease=LockPending(); Tick(); JsonData d=Lifecycle(status);
+            if (name=="request") d["requestId"]="other";
+            if (name=="mode") d["mode"]="line";
+            if (name=="target") d["targetScene"]="field_002";
+            ReplyStatus(d);
+            Check(LeaveController.Pending && PlayerPrefs.items.ContainsKey(key) && PositionSync.OwnsLock(lease),"wrong "+status+" "+name+" cleared the owner");
+        }
+        FieldPending("prepare"); long lineLease=LockPending();
+        original.opcode=30061; original.mode="line"; original.targetScene=null; original.targetLine=2;
+        byte[] raw=PBConvert.toBytes(30061,new CSTransferLine { line=2 });
+        original.payload=Convert.ToBase64String(raw); original.hash=Hash(raw);
+        PlayerPrefs.SetString(key,JsonUtility.ToJson(original)); Set(Core(),"pending",original);
+        Tick(); JsonData wrongLine=Lifecycle("prepared"); wrongLine["targetLine"]=3; ReplyStatus(wrongLine);
+        Check(FieldWire.prepares==0 && PositionSync.OwnsLock(lineLease),"wrong prepared line was accepted");
+        Now(); Tick(); ReplyStatus(Lifecycle("prepared"));
+        Check(FieldWire.prepares==1 && PositionSync.OwnsLock(lineLease),"matching prepared line did not enter original prepare");
+    }
+    static void ExpiredCannotReleaseAnotherOwner()
+    {
+        FieldPending("prepare"); long other;
+        Check(PositionSync.TryLock(actor,out other),"other owner lease unavailable"); Tick();
+        ReplyStatus(Lifecycle("expired"));
+        Check(!LeaveController.Pending && PositionSync.OwnsLock(other) && !EasyTouchTool.Instance.Enable,
+            "expired leave released another owner's lock");
+        Check(PositionSync.ReleaseIfOwned(other) && EasyTouchTool.Instance.Enable,"other owner could not release its own lease");
+    }
+    static void PendingSentAndErrorsNeverResend()
+    {
+        foreach (string phase in new string[] { "sent","position" })
+        foreach (string status in new string[] { "unknown","prepared" })
+        {
+            FieldPending(phase); long lease=LockPending(); Tick(); ReplyStatus(Lifecycle(status));
+            Check(FieldWire.prepares==0 && NetAPI.nativeTransfers==0 && LeaveController.Pending && PositionSync.OwnsLock(lease),
+                phase+" "+status+" repeated the transition or released its lease");
+        }
+        foreach (bool uncertain in new bool[] { true,false })
+        {
+            FieldPending("prepare"); long lease=LockPending(); Tick();
+            Check(FieldWire.statuses.Count==1,"status read missing for an HTTP error");
+            FieldWire.statuses.Dequeue()(new FieldWireResult { uncertain=uncertain,code=uncertain ? 0 : 503 });
+            Check(LeaveController.Pending && PlayerPrefs.items.ContainsKey(key) && PositionSync.OwnsLock(lease) && FieldWire.prepares==0,
+                "HTTP uncertainty or error cleared the pending prepare");
+        }
+        foreach (long code in new long[] { 0,7002,7207 })
+        {
+            FieldPending("prepare"); long lease=LockPending(); Tick(); ReplyStatus(Lifecycle("unknown"));
+            Check(FieldWire.prepareReplies.Count==1,"original prepare callback missing for HTTP error");
+            FieldWire.prepareReplies.Dequeue()(new FieldWireResult { uncertain=code==0,code=code });
+            Check(LeaveController.Pending && PlayerPrefs.items.ContainsKey(key) && PositionSync.OwnsLock(lease) && NetAPI.nativeTransfers==0,
+                "uncertain or retryable prepare response cleared the pending intent");
+            Now(); Tick();
+            Check(FieldWire.statuses.Count==1 && FieldWire.prepares==1,"prepare error bypassed the next lifecycle read");
+        }
+        FieldPending("prepare"); long ownLease=LockPending(); Tick(); ReplyStatus(Lifecycle("unknown"));
+        Check(FieldWire.prepareReplies.Count==1,"original prepare callback missing for explicit rejection");
+        FieldWire.prepareReplies.Dequeue()(new FieldWireResult { code=7202 });
+        Check(!LeaveController.Pending && !PlayerPrefs.items.ContainsKey(key) && !PositionSync.OwnsLock(ownLease),
+            "explicit prepare rejection retained its own intent or lease");
+        Check(!PositionSync.Locked && EasyTouchTool.Instance.Enable && NetAPI.nativeTransfers==0,
+            "explicit prepare rejection failed to restore the joystick or sent a transfer");
+        Check(BoxManager.notices.Contains("当前无法离图，请回到安全区重试"),"explicit rejection did not preserve the original notice");
+    }
     static void OldSocketBeforeEnqueue()
     {
         Reset("position");
@@ -473,7 +608,9 @@ public static class LeaveRecoveryChecks
     {
         SupersededPosition(); InvalidProofsRetain(); SaveFailureAndOwnership(); ReconnectAndOldFrames(); OriginalReplyScope();
         MissingEarlierTicketAndLateStatus(); OrdinaryTransferAndLateOwnReply();
-        PreparedOutsideDesertDoesNotSend(); OldSocketBeforeEnqueue(); SupersededLineAndResponse(); TravelPersistenceGate();
+        PreparedOutsideDesertDoesNotSend(); ExpiredPrepareFinishesOwnedLease(); UnknownAndPreparedStartOnlyAfterStatus();
+        InvalidLifecycleKeepsOriginalOwner(); ExpiredCannotReleaseAnotherOwner(); PendingSentAndErrorsNeverResend();
+        OldSocketBeforeEnqueue(); SupersededLineAndResponse(); TravelPersistenceGate();
         Console.WriteLine("PASS leave recovery: "+checks+" assertions");
     }
 }

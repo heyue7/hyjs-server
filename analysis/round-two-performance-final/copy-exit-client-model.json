@@ -1,0 +1,13 @@
+{
+  "sourceSHA256": {
+    "tools/desert_extraction/CopyExitRecovery.cs": "e5364c11e82d4a16dd748e660ea98024277c8156b562a1295a85359bcd0635e7",
+    "tools/desert_extraction/FieldRuntime.cs": "3c9e0e47236ccde0c4da60944e8277f9842dabc4be6b0edb92007aaa8c891a6b",
+    "tools/desert_extraction/FieldWire.cs": "5961ce64a771aa8fd99252493255680e0c20e72160f5236610e97fb6df3e7c67",
+    "tools/desert_extraction/PositionSync.cs": "9d447f66f97675d78880536f8bcd307ef9ffc68c08cf4baa540f87388db67779",
+    "tools/desert_extraction/LeaveController.cs": "31e3c8a512ed172826477eadb49aa662d26a3eefb55b99c4d7c8c047543a96a3"
+  },
+  "actualSourceAssertions": 70,
+  "nativeTransportAndUIDoubles": true,
+  "deviceVerified": false,
+  "knownFixtureCorrection": "Test session replacement now models immutable production FieldWire.Session values."
+}

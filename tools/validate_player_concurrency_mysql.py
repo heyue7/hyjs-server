@@ -14,6 +14,13 @@ sys.path.insert(0, str(ROOT / 'tests'))
 from hyjs_managed_mysql import ManagedMySQL
 
 CASES = {
+    'TestCopyRunRecoveryTransactionsMySQL': 'p1',
+    'TestLuxuryDragonStorySweepCyclesAndPaidClaim': 'p1',
+    'TestLuxuryDragonTriggerRollsBackWithStory': 'p1',
+    'TestLuxuryDragonConcurrentRenewalMySQL': 'p1',
+    'TestP3LuxuryOriginalChapterSequenceAndPaidCold': 'p1',
+    'TestLocalPlayPaymentOfferAsOfConfirmedTime': 'p1',
+    'TestP3PaymentDomain/luxury_offer_query_and_paid_window': 'p3',
     'TestSceneRound2MySQLIndependentRoomsAndMovement': 'p10',
     'TestSceneRound2MySQLLastRoomSlot': 'p10',
     'TestSceneRound2MySQLReverseTransfers': 'p10',

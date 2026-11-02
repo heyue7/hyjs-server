@@ -9,7 +9,8 @@ func (e *combatRoundEngine) originalReboundEffect(source, target *combatRoundAct
 	target.hpLossAccumulator = 0
 	target.hpChangeInRound = 0
 	target.current, target.waiting = nil, nil
-	target.movedTarget, target.movedRule, target.waitUntil = "", -1, 0
+	target.resetCastPosition()
+	target.waitUntil = 0
 	target.speState, target.speUntil = 1, 0
 	for _, skill := range target.skills {
 		skill.state, skill.stage, skill.releaseIndex = 0, 0, 0

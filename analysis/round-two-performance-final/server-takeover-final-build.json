@@ -1,0 +1,92 @@
+{
+  "worktree": "/Users/lirui/.codex/worktrees/hyjs-player-concurrency-20261102/hyjs",
+  "createdAtUTC": "2026-11-02T18:28:26.912863+00:00",
+  "sourceDigest": {
+    "scheme": "sha256 sorted repository-relative UTF-8 path + NUL + file content + NUL",
+    "scope": "hyjs-server/**/*.go excluding *_test.go and hyjs-server/**/*.sql",
+    "fileCount": 2334,
+    "before": "5a59d1249b4cac5a4267be54e0a3b9be8093b68cbf573c052f7701317c999b35",
+    "afterBuildAndVet": "5a59d1249b4cac5a4267be54e0a3b9be8093b68cbf573c052f7701317c999b35",
+    "afterMySQL": "5a59d1249b4cac5a4267be54e0a3b9be8093b68cbf573c052f7701317c999b35",
+    "stable": true
+  },
+  "serviceTestBinary": {
+    "path": "build/round-two-performance-final/arena-copy-qualification/service.test",
+    "sha256": "230bb1a4a2bd4435a6fad47fe5131ebf68f9bb19cdabd9d823049dcd525a3527",
+    "bytes": 93193554,
+    "sha256BeforeMySQL": "230bb1a4a2bd4435a6fad47fe5131ebf68f9bb19cdabd9d823049dcd525a3527",
+    "sha256AfterMySQL": "230bb1a4a2bd4435a6fad47fe5131ebf68f9bb19cdabd9d823049dcd525a3527",
+    "stable": true
+  },
+  "expectedMySQLCases": 83,
+  "managedTestConnectionFileCountBefore": 4,
+  "steps": [
+    {
+      "name": "server_build",
+      "command": "rtk proxy env TZ=Asia/Shanghai GOMAXPROCS=2 GOMEMLIMIT=768MiB go build -o ../build/round-two-performance-final/arena-copy-qualification/hyjs-server .",
+      "cwd": "hyjs-server",
+      "log": "analysis/round-two-performance-final/server-takeover-final-build.log",
+      "startedAtUTC": "2026-11-02T18:28:33.444817+00:00",
+      "exitCode": 0,
+      "finishedAtUTC": "2026-11-02T18:28:41.613723+00:00"
+    },
+    {
+      "name": "server_build_exact_environment",
+      "command": "rtk proxy env TZ=Asia/Shanghai HYJS_TEST_FIXTURE_ROOT=/Users/lirui/LR/hyjs/analysis GOMAXPROCS=2 GOMEMLIMIT=768MiB go build -o ../build/round-two-performance-final/arena-copy-qualification/hyjs-server .",
+      "cwd": "hyjs-server",
+      "log": "analysis/round-two-performance-final/server-takeover-final-build-exact-env.log",
+      "startedAtUTC": "2026-11-02T18:28:59.960263+00:00",
+      "exitCode": 0,
+      "finishedAtUTC": "2026-11-02T18:29:03.219408+00:00"
+    },
+    {
+      "name": "go_vet",
+      "command": "rtk proxy env TZ=Asia/Shanghai HYJS_TEST_FIXTURE_ROOT=/Users/lirui/LR/hyjs/analysis GOMAXPROCS=2 GOMEMLIMIT=768MiB go vet ./...",
+      "cwd": "hyjs-server",
+      "log": "analysis/round-two-performance-final/server-takeover-final-vet.log",
+      "startedAtUTC": "2026-11-02T18:29:08.736835+00:00",
+      "exitCode": 0,
+      "finishedAtUTC": "2026-11-02T18:29:19.349934+00:00"
+    },
+    {
+      "name": "mysql_83",
+      "command": "rtk proxy env TZ=Asia/Shanghai HYJS_TEST_FIXTURE_ROOT=/Users/lirui/LR/hyjs/analysis GOMAXPROCS=2 GOMEMLIMIT=768MiB python3 tools/validate_player_concurrency_mysql.py --binary build/round-two-performance-final/arena-copy-qualification/service.test --output analysis/round-two-performance-final/mysql-takeover-final --keep-going",
+      "cwd": ".",
+      "log": "analysis/round-two-performance-final/server-takeover-final-mysql.log",
+      "startedAtUTC": "2026-11-02T18:29:50.896068+00:00",
+      "exitCode": 0,
+      "finishedAtUTC": "2026-11-02T18:35:04.653242+00:00"
+    }
+  ],
+  "serverBinary": {
+    "path": "build/round-two-performance-final/arena-copy-qualification/hyjs-server",
+    "sha256": "ab56364c675fb51df82024832dfa03326e3d4ef07ddeee10212d059ecda63138",
+    "bytes": 67915570,
+    "sha256AfterMySQL": "ab56364c675fb51df82024832dfa03326e3d4ef07ddeee10212d059ecda63138",
+    "stable": true
+  },
+  "readyForMySQL": true,
+  "mysqlVerification": {
+    "expected": 83,
+    "completed": 83,
+    "passed": 83,
+    "failed": 0,
+    "passMarkersVerified": 83,
+    "skippedCaseLogs": 0,
+    "missingCaseLogs": 0,
+    "logCount": 83,
+    "exactCaseSet": true,
+    "summaryPath": "analysis/round-two-performance-final/mysql-takeover-final/summary.json"
+  },
+  "resourceCleanup": {
+    "managedConnectionFilesBefore": 4,
+    "managedConnectionFilesAfter": 4,
+    "addedConnectionFiles": 0,
+    "removedBaselineConnectionFiles": 0,
+    "connectionFilesRestoredToBaseline": true,
+    "testPoolsReleasedByManager": true,
+    "mysqlRegressionLockAvailableAfter": true
+  },
+  "completedAtUTC": "2026-11-02T18:35:33.310404+00:00",
+  "passed": true
+}

@@ -72,8 +72,9 @@ type combatRoundActor struct {
 	skills              []*combatRoundSkill
 	current             *combatRoundSkill
 	waiting             []*combatRoundSkill
-	movedTarget         string
+	movedTarget         *combatRoundActor
 	movedRule           int32
+	castPositionOwner   *combatRoundActor
 	waitUntil           float64
 	hp                  float64
 	base                map[string]float64
@@ -96,6 +97,22 @@ type combatRoundActor struct {
 	reboundUsed         bool
 	rebounded           bool
 }
+
+// The owner's position is its mutable MainPosition; the temporary position
+// keeps a reference to that home-position owner across movement and formation.
+func (a *combatRoundActor) castPosition() *combatRoundActor {
+	if a.castPositionOwner != nil {
+		return a.castPositionOwner
+	}
+	return a
+}
+
+func (a *combatRoundActor) resetCastPosition() {
+	a.movedTarget = nil
+	a.movedRule = -1
+	a.castPositionOwner = nil
+}
+
 type combatRoundPlayer struct {
 	actors     []*combatRoundActor
 	deadActors []*combatRoundActor
@@ -889,8 +906,7 @@ func (e *combatRoundEngine) beginRound() error {
 			a.waiting = nil
 			a.hpLossAccumulator = 0
 			a.hpChangeInRound = 0
-			a.movedTarget = ""
-			a.movedRule = -1
+			a.resetCastPosition()
 			a.waitUntil = 0
 			a.speState = 1
 			a.speUntil = 0
@@ -1075,11 +1091,17 @@ func (e *combatRoundEngine) beginSkill(skill *combatRoundSkill) {
 	move := 0.0
 	rule := int32(tableNumber(skill.row, "SkillCastPointSelectRule"))
 	if skill.row["IsUltimate"] == "1" {
+		a.resetCastPosition()
 		move = e.number("ultMoveToSkillTime")
-	} else if rule != 4 && (a.movedTarget != skill.target.uid || a.movedRule != rule) {
-		move = e.number("moveToSkillTime")
-		if a.heroClass == 1 {
-			move = e.number("monsterMoveSkillTime")
+	} else if rule != 4 {
+		position := skill.target.castPosition()
+		if a.movedTarget == nil || a.movedRule != rule || a.movedTarget.camp != position.camp || a.movedTarget.position() != position.position() {
+			move = e.number("moveToSkillTime")
+			if a.heroClass == 1 {
+				move = e.number("monsterMoveSkillTime")
+			}
+			a.movedTarget = position
+			a.movedRule = rule
 		}
 	}
 	skill.begin = e.time + move
@@ -1095,15 +1117,6 @@ func (e *combatRoundEngine) beginSkill(skill *combatRoundSkill) {
 	// FActor.SkillBegin changes Wait to Skilling. A preceding skill's wait
 	// deadline cannot reset position during this newly active skill.
 	a.waitUntil = 0
-	if skill.row["IsUltimate"] == "1" {
-		// FSkill.Do resets the actor's position for an ultimate. Its target is
-		// never cached as the location of a completed normal-skill movement.
-		a.movedTarget = ""
-		a.movedRule = -1
-	} else {
-		a.movedTarget = skill.target.uid
-		a.movedRule = rule
-	}
 }
 
 func (e *combatRoundEngine) step() error {
@@ -1260,8 +1273,7 @@ func (e *combatRoundEngine) step() error {
 				}
 			}
 			if a.waitUntil > 0 && e.time >= a.waitUntil {
-				a.movedTarget = ""
-				a.movedRule = -1
+				a.resetCastPosition()
 				a.waitUntil = 0
 				if a.state < 3 {
 					a.state = 0
@@ -1289,6 +1301,9 @@ func (e *combatRoundEngine) step() error {
 				// FSkill.UpdateSkillBegin emits the original callback on its first
 				// Update, before the separately timed movement/release offset.
 				skill.beginNotified = true
+				if a.movedTarget != nil {
+					a.castPositionOwner = a.movedTarget
+				}
 				e.trace("skill_begin", a, skill.target, skill.id, "", skill.move)
 			}
 			if skill.stage == 0 && e.time >= skill.begin {
@@ -1366,14 +1381,13 @@ func (e *combatRoundEngine) finishOriginalSkillActorState(a *combatRoundActor) {
 			break
 		}
 	}
-	if needsAnother && a.movedTarget != "" && a.movedRule != 4 {
+	if needsAnother && a.movedTarget != nil && a.movedRule != 4 {
 		a.state = 2
 		a.waitUntil = e.time + e.number("ContinueAttackWaitTimeout")
 		return
 	}
 	a.state = 0
-	a.movedTarget = ""
-	a.movedRule = -1
+	a.resetCastPosition()
 	a.waitUntil = 0
 }
 

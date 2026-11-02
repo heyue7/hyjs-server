@@ -607,8 +607,12 @@ func (s *GameService) copyEnter(ctx context.Context, id int64, b *pb.CSCopyEnter
 			if cost < 0 || player.GetStamina() < cost {
 				return errors.New("体力不足")
 			}
+			runID := make([]byte, 16)
+			if _, err := rand.Read(runID); err != nil {
+				return err
+			}
 			player.Stamina = proto.Int32(player.GetStamina() - cost)
-			g.Run = &model.CopyRun{Chapter: b.GetChapterId(), Mission: b.GetMissionId(), Passed: []string{}}
+			g.Run = &model.CopyRun{RunID: hex.EncodeToString(runID), Chapter: b.GetChapterId(), Mission: b.GetMissionId(), Passed: []string{}}
 		}
 		var jobs []*pb.CopyJobInfo
 		for _, row := range s.tasks(b.GetMissionId()) {

@@ -55,6 +55,13 @@ namespace HYJS.DesertV4
         }
         public void Snapshot(Session session, Action<FieldWireResult> callback)
         { Post(session, "/ggo-field/snapshot", Base(session), callback); }
+        public void CopyRunStatus(Session session, Action<FieldWireResult> callback)
+        { Post(session, "/copy/run/status", Base(session), callback); }
+        public void CopyRunLeave(Session session,string token,Action<FieldWireResult> callback)
+        {
+            JsonData body=Base(session); body["runToken"]=token;
+            Post(session,"/copy/run/leave",body,callback);
+        }
         public void StartGather(Session session, GatherJournal j, Action<FieldWireResult> callback)
         {
             if (j == null || j.phase != GatherPhase.Starting || j.generation < 1 || String.IsNullOrEmpty(j.pointId)) throw new ArgumentException("Invalid start");

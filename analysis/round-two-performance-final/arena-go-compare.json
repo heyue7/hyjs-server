@@ -1,0 +1,410 @@
+{
+  "scope": "Four original arena inputs; terminal winner and round comparison plus earliest sampled state and skill-press diagnostics. State snapshots may occur at different points within a logical tick; candidate mismatches are not proof of exact state divergence. Full timeline parity was not established. Normalized cast exports compare complete collected sequences; simultaneous casts are sorted by skill and cast and times compare within 1e-8.",
+  "nativeEvidenceSHA256": "04edf0ae68872fc08c8c68e3eaed91b20e5963dff68ee2e578677e8766217aec",
+  "sourceDigestScope": "sorted hyjs-server non-test .go and .sql paths and bytes, each separated by NUL",
+  "sourceFiles": 2334,
+  "sourceDigestBefore": "5a59d1249b4cac5a4267be54e0a3b9be8093b68cbf573c052f7701317c999b35",
+  "sourceDigestAfter": "5a59d1249b4cac5a4267be54e0a3b9be8093b68cbf573c052f7701317c999b35",
+  "sourceStable": true,
+  "testSourceSHA256": "a04771310b8a33a2f239ed2990f87e2894a77d5e498d725f826efd8342991f4f",
+  "testBinary": "build/round-two-performance-final/arena-copy-qualification/service.test",
+  "testBinarySHA256": "230bb1a4a2bd4435a6fad47fe5131ebf68f9bb19cdabd9d823049dcd525a3527",
+  "testName": "TestP6ArenaTakeoverActual",
+  "testExplicitlyEnabled": true,
+  "testExitCode": 0,
+  "testCasesExecuted": 4,
+  "testCasesSkipped": 0,
+  "allTerminalResultsMatch": true,
+  "allInputsUnchanged": true,
+  "allNativeTraceDigestsMatch": true,
+  "privateArtifactsRoot": ".local-env/arena-takeover-go-cast-position-20261102-r1",
+  "privateDirectory0700Files0600": true,
+  "publicIncludesActorProfiles": false,
+  "cases": [
+    {
+      "case": 1,
+      "fightId": "4d230968-246e-46f5-8d79-2f3327e08a45",
+      "inputSHA256": "4f3e1ecf8861d863dd63845fd2d2619c987905a18d73eaed9796bc0c0c324fd9",
+      "inputFileSHAAfterMatches": true,
+      "nativeTraceSHA256Matches": true,
+      "inputSemanticallyUnchanged": true,
+      "nativeAttackerWon": true,
+      "nativeRound": 15,
+      "goWinner": 0,
+      "goRound": 15,
+      "terminalMatches": true,
+      "ticksTotal": 2354,
+      "ticksTruncated": false,
+      "eventsTotal": 3237,
+      "eventsTruncated": false,
+      "nativeSkillPressCount": 60,
+      "goSkillPressCount": 60,
+      "firstSkillPressMismatch": {
+        "ordinal": 54,
+        "native": {
+          "round": 11,
+          "time": 1.8,
+          "camp": 0,
+          "skillIndex": 2
+        },
+        "go": {
+          "round": 11,
+          "time": 1.4,
+          "camp": 0,
+          "skillIndex": 2
+        },
+        "sameActor": true
+      },
+      "sampledStateClocksCompared": 127,
+      "firstSampleStateMismatchCandidate": {
+        "round": 6,
+        "time": 3.3,
+        "field": "actor_hp",
+        "camp": 1,
+        "actorIndexZeroBased": 0
+      },
+      "normalizedCastComparison": {
+        "timeTolerance": 1e-08,
+        "ordering": "round, time, skill, cast; casts at the same time sorted by skill and cast",
+        "nativeCastExports": 209,
+        "goCastExports": 209,
+        "allMatch": true,
+        "firstMismatch": null
+      },
+      "firstRoundSelectedComparison": {
+        "native": [
+          {
+            "round": 1,
+            "time": 9.0,
+            "skill": "079_2",
+            "cast": "2302"
+          },
+          {
+            "round": 1,
+            "time": 9.2,
+            "skill": "062_1",
+            "cast": "1425"
+          }
+        ],
+        "go": [
+          {
+            "round": 1,
+            "time": 9.0,
+            "skill": "079_2",
+            "cast": "2302"
+          },
+          {
+            "round": 1,
+            "time": 9.2,
+            "skill": "062_1",
+            "cast": "1425"
+          }
+        ],
+        "orderAndTimesMatch": true,
+        "hero062_1425DodgeAndTargetMatch": true,
+        "nativeDodge": true,
+        "goDodge": true,
+        "nativeAngerExports": 0,
+        "goAngerExports": 0,
+        "angerValuesAndTargetsMatchWithinTolerance": true
+      }
+    },
+    {
+      "case": 2,
+      "fightId": "d48fa9ec-d2bd-44cc-a3b3-8dda681451de",
+      "inputSHA256": "ca396f819d47757fedd56a99e5412ee5c950e5bf598a10279138cbbe5a570a18",
+      "inputFileSHAAfterMatches": true,
+      "nativeTraceSHA256Matches": true,
+      "inputSemanticallyUnchanged": true,
+      "nativeAttackerWon": false,
+      "nativeRound": 10,
+      "goWinner": 1,
+      "goRound": 10,
+      "terminalMatches": true,
+      "ticksTotal": 1394,
+      "ticksTruncated": false,
+      "eventsTotal": 2393,
+      "eventsTruncated": false,
+      "nativeSkillPressCount": 39,
+      "goSkillPressCount": 44,
+      "firstSkillPressMismatch": {
+        "ordinal": 22,
+        "native": {
+          "round": 5,
+          "time": 0,
+          "camp": 0,
+          "skillIndex": 1
+        },
+        "go": {
+          "round": 5,
+          "time": 0,
+          "camp": 0,
+          "skillIndex": 0
+        },
+        "sameActor": true
+      },
+      "sampledStateClocksCompared": 74,
+      "firstSampleStateMismatchCandidate": {
+        "round": 4,
+        "time": 3.3,
+        "field": "actor_hp",
+        "camp": 1,
+        "actorIndexZeroBased": 0
+      },
+      "normalizedCastComparison": {
+        "timeTolerance": 1e-08,
+        "ordering": "round, time, skill, cast; casts at the same time sorted by skill and cast",
+        "nativeCastExports": 135,
+        "goCastExports": 158,
+        "allMatch": false,
+        "firstMismatch": {
+          "ordinal": 77,
+          "native": {
+            "round": 5,
+            "time": 1.2,
+            "skill": "002_2",
+            "cast": "213"
+          },
+          "go": {
+            "round": 5,
+            "time": 0.9,
+            "skill": "002_1",
+            "cast": "210"
+          }
+        }
+      },
+      "firstRoundSelectedComparison": {
+        "native": [
+          {
+            "round": 1,
+            "time": 9.0,
+            "skill": "079_2",
+            "cast": "2302"
+          },
+          {
+            "round": 1,
+            "time": 9.2,
+            "skill": "062_1",
+            "cast": "1425"
+          }
+        ],
+        "go": [
+          {
+            "round": 1,
+            "time": 9.0,
+            "skill": "079_2",
+            "cast": "2302"
+          },
+          {
+            "round": 1,
+            "time": 9.2,
+            "skill": "062_1",
+            "cast": "1425"
+          }
+        ],
+        "orderAndTimesMatch": true,
+        "hero062_1425DodgeAndTargetMatch": true,
+        "nativeDodge": false,
+        "goDodge": false,
+        "nativeAngerExports": 2,
+        "goAngerExports": 2,
+        "angerValuesAndTargetsMatchWithinTolerance": true
+      }
+    },
+    {
+      "case": 3,
+      "fightId": "19c10bec-7929-42fc-8ce9-0aece4625f90",
+      "inputSHA256": "872fb309c8a5632f6dececc1c250e17545ff9de82934e32acde30806ea4a885f",
+      "inputFileSHAAfterMatches": true,
+      "nativeTraceSHA256Matches": true,
+      "inputSemanticallyUnchanged": true,
+      "nativeAttackerWon": false,
+      "nativeRound": 10,
+      "goWinner": 1,
+      "goRound": 10,
+      "terminalMatches": true,
+      "ticksTotal": 1392,
+      "ticksTruncated": false,
+      "eventsTotal": 2461,
+      "eventsTruncated": false,
+      "nativeSkillPressCount": 43,
+      "goSkillPressCount": 43,
+      "firstSkillPressMismatch": {
+        "ordinal": 35,
+        "native": {
+          "round": 7,
+          "time": 0,
+          "camp": 0,
+          "skillIndex": 1
+        },
+        "go": {
+          "round": 7,
+          "time": 0,
+          "camp": 0,
+          "skillIndex": 0
+        },
+        "sameActor": true
+      },
+      "sampledStateClocksCompared": 122,
+      "firstSampleStateMismatchCandidate": {
+        "round": 6,
+        "time": 12.4,
+        "field": "actor_hp",
+        "camp": 1,
+        "actorIndexZeroBased": 0
+      },
+      "normalizedCastComparison": {
+        "timeTolerance": 1e-08,
+        "ordering": "round, time, skill, cast; casts at the same time sorted by skill and cast",
+        "nativeCastExports": 149,
+        "goCastExports": 151,
+        "allMatch": false,
+        "firstMismatch": {
+          "ordinal": 124,
+          "native": {
+            "round": 7,
+            "time": 0.9,
+            "skill": "001_2",
+            "cast": "4"
+          },
+          "go": {
+            "round": 7,
+            "time": 1.0,
+            "skill": "001_1",
+            "cast": "1"
+          }
+        }
+      },
+      "firstRoundSelectedComparison": {
+        "native": [
+          {
+            "round": 1,
+            "time": 9.2,
+            "skill": "062_1",
+            "cast": "1425"
+          },
+          {
+            "round": 1,
+            "time": 9.5,
+            "skill": "079_2",
+            "cast": "2302"
+          }
+        ],
+        "go": [
+          {
+            "round": 1,
+            "time": 9.2,
+            "skill": "062_1",
+            "cast": "1425"
+          },
+          {
+            "round": 1,
+            "time": 9.5,
+            "skill": "079_2",
+            "cast": "2302"
+          }
+        ],
+        "orderAndTimesMatch": true,
+        "hero062_1425DodgeAndTargetMatch": true,
+        "nativeDodge": true,
+        "goDodge": true,
+        "nativeAngerExports": 0,
+        "goAngerExports": 0,
+        "angerValuesAndTargetsMatchWithinTolerance": true
+      }
+    },
+    {
+      "case": 4,
+      "fightId": "af336865-d08f-4bcd-83ce-b9cc9c9f8ad9",
+      "inputSHA256": "1a25ea55e7a28e39cfd983ff1ae29cd3b5228cd40725a80461b07db71d222335",
+      "inputFileSHAAfterMatches": true,
+      "nativeTraceSHA256Matches": true,
+      "inputSemanticallyUnchanged": true,
+      "nativeAttackerWon": false,
+      "nativeRound": 10,
+      "goWinner": 1,
+      "goRound": 10,
+      "terminalMatches": true,
+      "ticksTotal": 1316,
+      "ticksTruncated": false,
+      "eventsTotal": 2176,
+      "eventsTruncated": false,
+      "nativeSkillPressCount": 41,
+      "goSkillPressCount": 41,
+      "firstSkillPressMismatch": null,
+      "sampledStateClocksCompared": 143,
+      "firstSampleStateMismatchCandidate": null,
+      "normalizedCastComparison": {
+        "timeTolerance": 1e-08,
+        "ordering": "round, time, skill, cast; casts at the same time sorted by skill and cast",
+        "nativeCastExports": 142,
+        "goCastExports": 142,
+        "allMatch": true,
+        "firstMismatch": null
+      },
+      "firstRoundSelectedComparison": {
+        "native": [
+          {
+            "round": 1,
+            "time": 9.0,
+            "skill": "079_2",
+            "cast": "2302"
+          },
+          {
+            "round": 1,
+            "time": 9.2,
+            "skill": "062_1",
+            "cast": "1425"
+          }
+        ],
+        "go": [
+          {
+            "round": 1,
+            "time": 9.0,
+            "skill": "079_2",
+            "cast": "2302"
+          },
+          {
+            "round": 1,
+            "time": 9.2,
+            "skill": "062_1",
+            "cast": "1425"
+          }
+        ],
+        "orderAndTimesMatch": true,
+        "hero062_1425DodgeAndTargetMatch": true,
+        "nativeDodge": true,
+        "goDodge": true,
+        "nativeAngerExports": 0,
+        "goAngerExports": 0,
+        "angerValuesAndTargetsMatchWithinTolerance": true
+      }
+    }
+  ],
+  "disabledEnvCheck": {
+    "executed": true,
+    "parentTestSkipped": true,
+    "exitCode": 0
+  },
+  "allSelectedFirstRoundComparisonsMatch": true,
+  "allNormalizedCastSequencesMatch": false,
+  "sourceDigestAfterFinalComparison": "5a59d1249b4cac5a4267be54e0a3b9be8093b68cbf573c052f7701317c999b35",
+  "buildCommand": "TZ=Asia/Shanghai GOMAXPROCS=2 GOMEMLIMIT=768MiB go test -c -o ../build/round-two-performance-final/arena-copy-qualification/service.test ./service",
+  "runArguments": [
+    "-test.run",
+    "^TestP6ArenaTakeoverActual$",
+    "-test.v",
+    "-test.count=1",
+    "-test.timeout=4m"
+  ],
+  "runEnvironment": {
+    "TZ": "Asia/Shanghai",
+    "GOMAXPROCS": "2",
+    "GOMEMLIMIT": "768MiB",
+    "HYJS_P6_ARENA_TAKEOVER_TEST": "1",
+    "HYJS_P6_ARENA_TAKEOVER_ROOT": ".local-env/arena-takeover",
+    "HYJS_P6_ARENA_TAKEOVER_NATIVE": "analysis/round-two-performance-final/arena-source-native.json",
+    "HYJS_P6_ARENA_TAKEOVER_OUTPUT": ".local-env/arena-takeover-go-cast-position-20261102-r1",
+    "HYJS_TEST_FIXTURE_ROOT": "/Users/lirui/LR/hyjs/analysis"
+  }
+}

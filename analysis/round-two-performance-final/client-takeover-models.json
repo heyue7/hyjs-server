@@ -1,0 +1,341 @@
+{
+  "status": "PASS",
+  "scope": "actual C# source models with isolated stubs; not Unity or device validation",
+  "runtime": "/Users/lirui/LR/hyjs/.tools/native-batch",
+  "deviceExecuted": false,
+  "databaseAccess": false,
+  "goExecuted": false,
+  "apkPackaging": false,
+  "models": {
+    "encounter": {
+      "runner": "tools/desert_extraction/run_encounter_start_checks.py",
+      "status": "PASS",
+      "assertions": 139,
+      "cases": {
+        "timeout_sends_only_ping": 17,
+        "late_start_and_wrong_echo": 20,
+        "matching_echo_allows_discovery": 22,
+        "normal_bindings_and_duplicate": 34,
+        "old_epoch_is_dropped": 3,
+        "exited_scene_is_dropped": 3,
+        "resume_admits_one_object_once": 4,
+        "three_pings_then_bounded_reconnect": 14,
+        "connection_fence_blocks_cold_discovery": 22
+      },
+      "sourceSHA256": {
+        "tools/desert_extraction/EncounterStartRecovery.cs": "6af88ac6a821b9fa2707f3a680b6e82b6dee32eb694af17ae9383be6ee5dcba0",
+        "tools/desert_extraction/ColdBattleRecovery.cs": "6374b0b26603623b8f77b0ff015d5e2119c992e191c3f00091ec83b800fe2717",
+        "tools/desert_extraction/EncounterStartRecoveryChecks.cs": "f28815fe5df7279a294673b27bc6ea928c0ec59dc91f25075833a5c7da9f29bc",
+        "tools/desert_extraction/run_encounter_start_checks.py": "84b8fb4afce4a2816215e261098517f37996c8189918586d8d5576704d616f8e"
+      },
+      "compilerLog": "",
+      "modelLog": "CASE\ttimeout_sends_only_ping\t17\nCASE\tlate_start_and_wrong_echo\t20\nCASE\tmatching_echo_allows_discovery\t22\nCASE\tnormal_bindings_and_duplicate\t34\nCASE\told_epoch_is_dropped\t3\nCASE\texited_scene_is_dropped\t3\nCASE\tresume_admits_one_object_once\t4\nCASE\tthree_pings_then_bounded_reconnect\t14\nCASE\tconnection_fence_blocks_cold_discovery\t22\nPASS\t139",
+      "detailEvidence": "analysis/round-two-performance-final/client-start-model.json"
+    },
+    "cold": {
+      "runner": "tools/desert_extraction/run_cold_battle_recovery_checks.py",
+      "status": "PASS",
+      "assertions": 62,
+      "sourceCases": [
+        "ReadWithoutPositionReadiness",
+        "ActiveFightStillBlocks",
+        "FailedReadsKeepRetrying",
+        "ReconnectInvalidatesOldCallbacks",
+        "JournalRemainsASeparateGuard"
+      ],
+      "sourceSHA256": {
+        "tools/desert_extraction/EncounterStartRecovery.cs": "6af88ac6a821b9fa2707f3a680b6e82b6dee32eb694af17ae9383be6ee5dcba0",
+        "tools/desert_extraction/ColdBattleRecovery.cs": "6374b0b26603623b8f77b0ff015d5e2119c992e191c3f00091ec83b800fe2717",
+        "tools/desert_extraction/ColdBattleRecoveryChecks.cs": "e548741da8d1dba3891d71e19f79f9a7a1ed6a8ee358b681fe9c3424deceec9b",
+        "tools/desert_extraction/run_cold_battle_recovery_checks.py": "b4cc706ed427ef05df03964b9dd9f84941df4d28f03432d25bc09bb4448022f0"
+      },
+      "modelLog": "ColdBattleRecovery replay passed: 62 assertions"
+    },
+    "awake": {
+      "runner": "tools/desert_extraction/run_awake_start_checks.py",
+      "status": "PASS",
+      "assertions": 286,
+      "cases": {
+        "http_wrapper_and_missing_owner": 8,
+        "duplicate_start_blocked": 8,
+        "timeout_and_late_callback": 20,
+        "callback_deadline_without_iterator": 11,
+        "failure_paths": 62,
+        "successful_native_and_iterator_once": 11,
+        "successful_reply_external_scope_change": 36,
+        "iterator_resource_failure": 20,
+        "playback_without_http": 8,
+        "stale_scopes_cannot_clear_new_request": 102
+      },
+      "sourceSHA256": {
+        "tools/desert_extraction/AwakeStartRecovery.cs": "24bde37fda3b65a2936bdf64299dee171efc370abead6ffedd847a607cfd2448",
+        "tools/desert_extraction/AwakeStartRecoveryChecks.cs": "e8e76a16676199fefdad3f5ffcbede5cc0094d0c0816f1c929c14817dcb66c6c",
+        "tools/desert_extraction/run_awake_start_checks.py": "2597eb0aae7834961b6ebd9f0fe63ea6bcdfcca3402849b11eeb53f25c6d5097"
+      },
+      "compilerLog": "",
+      "modelLog": "CASE\thttp_wrapper_and_missing_owner\t8\nCASE\tduplicate_start_blocked\t8\nCASE\ttimeout_and_late_callback\t20\nCASE\tcallback_deadline_without_iterator\t11\nCASE\tfailure_paths\t62\nCASE\tsuccessful_native_and_iterator_once\t11\nCASE\tsuccessful_reply_external_scope_change\t36\nCASE\titerator_resource_failure\t20\nCASE\tplayback_without_http\t8\nCASE\tstale_scopes_cannot_clear_new_request\t102\nPASS\t286",
+      "detailEvidence": "analysis/round-two-performance-final/client-awake-model.json"
+    },
+    "receipt": {
+      "runner": "tools/desert_extraction/run_battle_receipt_checks.py",
+      "status": "PASS",
+      "assertions": 239,
+      "cases": {
+        "boss_disabled_engine_receipt": {
+          "status": "PASS",
+          "detail": "12"
+        },
+        "monster_disabled_engine_receipt": {
+          "status": "PASS",
+          "detail": "12"
+        },
+        "boss_running_engine_receipt": {
+          "status": "PASS",
+          "detail": "12"
+        },
+        "monster_running_engine_receipt": {
+          "status": "PASS",
+          "detail": "12"
+        },
+        "boss_changed_room_disabled": {
+          "status": "PASS",
+          "detail": "7"
+        },
+        "boss_changed_battle_disabled": {
+          "status": "PASS",
+          "detail": "7"
+        },
+        "boss_changed_type_disabled": {
+          "status": "PASS",
+          "detail": "7"
+        },
+        "boss_changed_fight_disabled": {
+          "status": "PASS",
+          "detail": "7"
+        },
+        "monster_changed_room_disabled": {
+          "status": "PASS",
+          "detail": "7"
+        },
+        "monster_changed_battle_disabled": {
+          "status": "PASS",
+          "detail": "7"
+        },
+        "monster_changed_type_disabled": {
+          "status": "PASS",
+          "detail": "7"
+        },
+        "monster_changed_fight_disabled": {
+          "status": "PASS",
+          "detail": "7"
+        },
+        "boss_changed_room_running": {
+          "status": "PASS",
+          "detail": "9"
+        },
+        "boss_changed_battle_running": {
+          "status": "PASS",
+          "detail": "9"
+        },
+        "boss_changed_type_running": {
+          "status": "PASS",
+          "detail": "7"
+        },
+        "boss_changed_fight_running": {
+          "status": "PASS",
+          "detail": "7"
+        },
+        "monster_changed_room_running": {
+          "status": "PASS",
+          "detail": "9"
+        },
+        "monster_changed_battle_running": {
+          "status": "PASS",
+          "detail": "9"
+        },
+        "monster_changed_type_running": {
+          "status": "PASS",
+          "detail": "7"
+        },
+        "monster_changed_fight_running": {
+          "status": "PASS",
+          "detail": "7"
+        },
+        "boss_bad_hashes_disabled": {
+          "status": "PASS",
+          "detail": "16"
+        },
+        "monster_bad_hashes_disabled": {
+          "status": "PASS",
+          "detail": "16"
+        },
+        "boss_bad_hashes_running": {
+          "status": "PASS",
+          "detail": "16"
+        },
+        "monster_bad_hashes_running": {
+          "status": "PASS",
+          "detail": "16"
+        },
+        "session_change_invalidates_callback": {
+          "status": "PASS",
+          "detail": "7"
+        }
+      },
+      "sourceSHA256": {
+        "tools/desert_extraction/BattleRecovery.cs": "3366b0ce318b3ed729c55ebfa711593533b4f8b88d41c40a20c188a6e58ce21c",
+        "tools/desert_extraction/FightEndJournal.cs": "77ebc48cdc17d479b21f4741f5d73ce07530d21013c9a219aafb4fe5a67030a2",
+        "tools/desert_extraction/BattleReceiptRecoveryChecks.cs": "bfbc87829a1b07127375161c6ef0f54761f71c4a23e91157c7fa3bcfd556790c",
+        "tools/desert_extraction/run_battle_receipt_checks.py": "dce982d0a750ae65e6b8567d099595fd552330df4e4cf840d17af92c095d335c"
+      },
+      "modelLog": "CASE\tboss_disabled_engine_receipt\tPASS\t12\nCASE\tmonster_disabled_engine_receipt\tPASS\t12\nCASE\tboss_running_engine_receipt\tPASS\t12\nCASE\tmonster_running_engine_receipt\tPASS\t12\nCASE\tboss_changed_room_disabled\tPASS\t7\nCASE\tboss_changed_battle_disabled\tPASS\t7\nCASE\tboss_changed_type_disabled\tPASS\t7\nCASE\tboss_changed_fight_disabled\tPASS\t7\nCASE\tmonster_changed_room_disabled\tPASS\t7\nCASE\tmonster_changed_battle_disabled\tPASS\t7\nCASE\tmonster_changed_type_disabled\tPASS\t7\nCASE\tmonster_changed_fight_disabled\tPASS\t7\nCASE\tboss_changed_room_running\tPASS\t9\nCASE\tboss_changed_battle_running\tPASS\t9\nCASE\tboss_changed_type_running\tPASS\t7\nCASE\tboss_changed_fight_running\tPASS\t7\nCASE\tmonster_changed_room_running\tPASS\t9\nCASE\tmonster_changed_battle_running\tPASS\t9\nCASE\tmonster_changed_type_running\tPASS\t7\nCASE\tmonster_changed_fight_running\tPASS\t7\nCASE\tboss_bad_hashes_disabled\tPASS\t16\nCASE\tmonster_bad_hashes_disabled\tPASS\t16\nCASE\tboss_bad_hashes_running\tPASS\t16\nCASE\tmonster_bad_hashes_running\tPASS\t16\nCASE\tsession_change_invalidates_callback\tPASS\t7\nTOTAL\t239\t0",
+      "baselineStatus": "FAIL",
+      "baselineAssertions": 225,
+      "baselineFailures": 6,
+      "baselineCases": {
+        "boss_disabled_engine_receipt": {
+          "status": "FAIL",
+          "detail": "disabled-engine original result handler not called exactly once"
+        },
+        "monster_disabled_engine_receipt": {
+          "status": "FAIL",
+          "detail": "disabled-engine original result handler not called exactly once"
+        },
+        "boss_running_engine_receipt": {
+          "status": "PASS",
+          "detail": "12"
+        },
+        "monster_running_engine_receipt": {
+          "status": "PASS",
+          "detail": "12"
+        },
+        "boss_changed_room_disabled": {
+          "status": "PASS",
+          "detail": "7"
+        },
+        "boss_changed_battle_disabled": {
+          "status": "PASS",
+          "detail": "7"
+        },
+        "boss_changed_type_disabled": {
+          "status": "PASS",
+          "detail": "7"
+        },
+        "boss_changed_fight_disabled": {
+          "status": "PASS",
+          "detail": "7"
+        },
+        "monster_changed_room_disabled": {
+          "status": "PASS",
+          "detail": "7"
+        },
+        "monster_changed_battle_disabled": {
+          "status": "PASS",
+          "detail": "7"
+        },
+        "monster_changed_type_disabled": {
+          "status": "PASS",
+          "detail": "7"
+        },
+        "monster_changed_fight_disabled": {
+          "status": "PASS",
+          "detail": "7"
+        },
+        "boss_changed_room_running": {
+          "status": "FAIL",
+          "detail": "changed identity delivered receipt to old native owner"
+        },
+        "boss_changed_battle_running": {
+          "status": "FAIL",
+          "detail": "changed identity delivered receipt to old native owner"
+        },
+        "boss_changed_type_running": {
+          "status": "PASS",
+          "detail": "7"
+        },
+        "boss_changed_fight_running": {
+          "status": "PASS",
+          "detail": "7"
+        },
+        "monster_changed_room_running": {
+          "status": "FAIL",
+          "detail": "changed identity delivered receipt to old native owner"
+        },
+        "monster_changed_battle_running": {
+          "status": "FAIL",
+          "detail": "changed identity delivered receipt to old native owner"
+        },
+        "monster_changed_type_running": {
+          "status": "PASS",
+          "detail": "7"
+        },
+        "monster_changed_fight_running": {
+          "status": "PASS",
+          "detail": "7"
+        },
+        "boss_bad_hashes_disabled": {
+          "status": "PASS",
+          "detail": "16"
+        },
+        "monster_bad_hashes_disabled": {
+          "status": "PASS",
+          "detail": "16"
+        },
+        "boss_bad_hashes_running": {
+          "status": "PASS",
+          "detail": "16"
+        },
+        "monster_bad_hashes_running": {
+          "status": "PASS",
+          "detail": "16"
+        },
+        "session_change_invalidates_callback": {
+          "status": "PASS",
+          "detail": "7"
+        }
+      },
+      "baselineLog": "CASE\tboss_disabled_engine_receipt\tFAIL\tdisabled-engine original result handler not called exactly once\nCASE\tmonster_disabled_engine_receipt\tFAIL\tdisabled-engine original result handler not called exactly once\nCASE\tboss_running_engine_receipt\tPASS\t12\nCASE\tmonster_running_engine_receipt\tPASS\t12\nCASE\tboss_changed_room_disabled\tPASS\t7\nCASE\tboss_changed_battle_disabled\tPASS\t7\nCASE\tboss_changed_type_disabled\tPASS\t7\nCASE\tboss_changed_fight_disabled\tPASS\t7\nCASE\tmonster_changed_room_disabled\tPASS\t7\nCASE\tmonster_changed_battle_disabled\tPASS\t7\nCASE\tmonster_changed_type_disabled\tPASS\t7\nCASE\tmonster_changed_fight_disabled\tPASS\t7\nCASE\tboss_changed_room_running\tFAIL\tchanged identity delivered receipt to old native owner\nCASE\tboss_changed_battle_running\tFAIL\tchanged identity delivered receipt to old native owner\nCASE\tboss_changed_type_running\tPASS\t7\nCASE\tboss_changed_fight_running\tPASS\t7\nCASE\tmonster_changed_room_running\tFAIL\tchanged identity delivered receipt to old native owner\nCASE\tmonster_changed_battle_running\tFAIL\tchanged identity delivered receipt to old native owner\nCASE\tmonster_changed_type_running\tPASS\t7\nCASE\tmonster_changed_fight_running\tPASS\t7\nCASE\tboss_bad_hashes_disabled\tPASS\t16\nCASE\tmonster_bad_hashes_disabled\tPASS\t16\nCASE\tboss_bad_hashes_running\tPASS\t16\nCASE\tmonster_bad_hashes_running\tPASS\t16\nCASE\tsession_change_invalidates_callback\tPASS\t7\nTOTAL\t225\t6",
+      "baselineSourceSHA256": "0854d295db18589b1b362a0a9b69cef00bfd19f555585959a13f18b51633dd47",
+      "detailEvidence": "analysis/round-two-performance-final/client-receipt-model.json"
+    },
+    "luxury": {
+      "runner": "tools/client_luxury_repeat/verify_logic.py",
+      "status": "PASS",
+      "assertions": 24,
+      "sourceCases": [
+        "Test.Main"
+      ],
+      "assertionFailureLabels": [
+        "sent while away from story",
+        "busy transport recorded request",
+        "busy retry did not query",
+        "duplicate in-flight request",
+        "first active offer did not open",
+        "original page arguments changed",
+        "activity entry absent",
+        "same window reopened",
+        "new round did not open",
+        "expired unpaid offer shown",
+        "earned expired offer unavailable",
+        "missing offer shown",
+        "claimed offer shown",
+        "timed out request did not retry",
+        "stale timed out response shown",
+        "retry response lost",
+        "old session response shown",
+        "popup interrupted another page",
+        "return to story did not retry",
+        "network failure did not retry",
+        "network recovery lost popup",
+        "other player response shown",
+        "other server response shown",
+        "new player/server offer missing"
+      ],
+      "sourceSHA256": {
+        "tools/client_luxury_repeat/Runtime.cs": "29f5a221ee453ca5308f5547904d94c4c4339698b8ce68a30fb55a861c70c849",
+        "tools/client_luxury_repeat/verify_logic.py": "f8a5fb2afae2dd74a9d9f90f9dbe2387d30ade34d65e963d64a9b61db8f945be"
+      },
+      "modelLog": "PASS 24 actual-source assertions (minimal doubles; not Unity/device)"
+    }
+  }
+}

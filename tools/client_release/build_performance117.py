@@ -13,6 +13,7 @@ sys.path.insert(0,str(ROOT))
 from tools.desert_extraction.rebuild_clientfix import sources,verify_main as unused
 from tools.awake_diff_rows.build import methods,operand,symbol
 from tools.local_asset_ready.remove_gate import exact_body,require
+from tools.client_luxury_repeat.build import verify as verify_luxury, TARGETS as LUXURY_TARGETS
 from dncil.cil.body.reader import read_method_body_from_bytes
 import dnfile
 
@@ -84,7 +85,7 @@ def main():
     require(file_sha(base)==BASE,'1.1.6 APK differs')
     here=ROOT/'tools/desert_extraction'
     names=sources(blob(Path('tools/desert_extraction/build_field_patch.py')).decode())
-    changed_sources={'FieldRuntime.cs','ColdBattleRecovery.cs','BattleRecovery.cs'}
+    changed_sources={'FieldRuntime.cs','ColdBattleRecovery.cs','BattleRecovery.cs','FieldWire.cs','PositionSync.cs','LeaveController.cs'}
     for name in names:
         if name not in changed_sources: require((here/name).read_bytes()==blob(Path('tools/desert_extraction')/name),'Unscoped helper source change: '+name)
     out.mkdir(parents=True)
@@ -104,19 +105,36 @@ def main():
         shipped=baseline/'SoulFlowerDesertV4.dll'
         compile_helper(shipped,[baseline/name for name in names])
         require(shipped.read_bytes()==old_helper,'Source does not reproduce shipped helper')
-        compile_helper(out/'SoulFlowerDesertV4.dll',[here/name for name in names]+[here/'EncounterStartRecovery.cs',here/'AwakeStartRecovery.cs'])
+        extra_sources=[here/'EncounterStartRecovery.cs',here/'AwakeStartRecovery.cs',here/'CopyExitRecovery.cs']
+        compile_helper(out/'SoulFlowerDesertV4.dll',[here/name for name in names]+extra_sources)
         folder=work/'injector'; folder.mkdir()
         (folder/'Program.cs').write_bytes(Path(__file__).with_name('InjectorEncounter117.cs').read_bytes())
         (folder/'Patch.csproj').write_text('<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable></PropertyGroup><ItemGroup><Reference Include="dnlib"><HintPath>'+str(dnlib)+'</HintPath></Reference></ItemGroup></Project>')
         run([dotnet,'build',folder/'Patch.csproj','--nologo','--verbosity','quiet','-p:NuGetAudit=false'])
-        run([dotnet,folder/'bin/Debug/net8.0/Patch.dll',work/'Assembly-CSharp.dll',out/'Assembly-CSharp.dll'])
-        checks=verify_main(old_main,(out/'Assembly-CSharp.dll').read_bytes())
+        performance_main=work/'performance-main.dll'
+        run([dotnet,folder/'bin/Debug/net8.0/Patch.dll',work/'Assembly-CSharp.dll',performance_main])
+        checks=verify_main(old_main,performance_main.read_bytes())
+        luxury=ROOT/'tools/client_luxury_repeat'
+        luxury_helper=out/'HYJS.LuxuryDragon.dll'
+        run([dotnet,csc,'/nologo','/target:library','/nostdlib+','/langversion:3','/deterministic+',
+             '/codepage:65001','/out:'+str(luxury_helper),*references,luxury/'Runtime.cs'])
+        # Each stage proves unrelated bodies exact relative to the previous
+        # verified stage. The two reviewed target sets are disjoint.
+        require(not (TARGETS & set(LUXURY_TARGETS)), 'Overlapping composite hooks')
+        (folder/'Program.cs').write_bytes((luxury/'Injector.cs').read_bytes())
+        run([dotnet,'build',folder/'Patch.csproj','--nologo','--verbosity','quiet','-p:NuGetAudit=false'])
+        run([dotnet,folder/'bin/Debug/net8.0/Patch.dll',performance_main,luxury_helper,out/'Assembly-CSharp.dll'])
+        luxury_checks=verify_luxury(performance_main.read_bytes(),(out/'Assembly-CSharp.dll').read_bytes())
+        checks={'performance':checks,'luxury':luxury_checks,'originalEngineMethodsExact':547,
+                'changedMethods':sorted(TARGETS|set(LUXURY_TARGETS)),
+                'unchangedOriginalBodies':checks['unchangedOriginalBodies']-len(LUXURY_TARGETS)}
         dex=sha(archive.read('classes2.dex'))
-    source_paths=[Path(__file__).resolve(),Path(__file__).with_name('InjectorEncounter117.cs'),here/'build_field_patch.py',here/'EncounterStartRecovery.cs',here/'AwakeStartRecovery.cs',here/'assets/evacuation-npc.png',*[here/name for name in names]]
-    payload={MAIN:str((out/'Assembly-CSharp.dll').relative_to(ROOT)),HELPER:str((out/'SoulFlowerDesertV4.dll').relative_to(ROOT))}
-    proof={'schema':'hyjs-performance117-managed-v1','baseAPKSHA256':BASE,'inputManagedSHA256':sha(old_main),'inputDexSHA256':dex,'managedOnly':True,
+    source_paths=[Path(__file__).resolve(),Path(__file__).with_name('InjectorEncounter117.cs'),here/'build_field_patch.py',*extra_sources,here/'assets/evacuation-npc.png',*[here/name for name in names],luxury/'Runtime.cs',luxury/'Injector.cs',luxury/'build.py']
+    payload={MAIN:str((out/'Assembly-CSharp.dll').relative_to(ROOT)),HELPER:str((out/'SoulFlowerDesertV4.dll').relative_to(ROOT)),
+             'assets/bin/Data/Managed/HYJS.LuxuryDragon.dll':str(luxury_helper.relative_to(ROOT))}
+    proof={'schema':'hyjs-performance117-managed-v2','baseAPKSHA256':BASE,'inputManagedSHA256':sha(old_main),'inputDexSHA256':dex,'managedOnly':True,
         'inheritedJavaByteExact':True,'inheritedJavaPublicProtectedABIExact':True,'managedAssemblyByteExact':False,
-        'allowedChangedMethods':sorted(TARGETS),'payloadFiles':payload,'replacementEntries':{k:file_sha(ROOT/v) for k,v in payload.items()},
+        'allowedChangedMethods':sorted(TARGETS|set(LUXURY_TARGETS)),'payloadFiles':payload,'replacementEntries':{k:file_sha(ROOT/v) for k,v in payload.items()},
         'sourcePins':{str(f.relative_to(ROOT)):file_sha(f) for f in source_paths},'baselineReproducedByteForByte':True,'shippedHelperSHA256':sha(old_helper),'checks':checks,'deviceVerified':False}
     (out/'manifest.json').write_text(json.dumps(proof,ensure_ascii=False,indent=2)+'\n')
     print(json.dumps({'status':'STATIC_VERIFIED_NOT_INSTALLED','checks':checks,'output':str(out)}))
