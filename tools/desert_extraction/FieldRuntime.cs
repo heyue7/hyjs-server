@@ -94,8 +94,13 @@ namespace HYJS.DesertV4
             FieldRuntime.Require().EndEncounter(code);
             if (code==1) BattleRecovery.StartResponse(type,value);
         }
+        public static bool DropFightStartResponse(int type,object net,object value)
+        {
+            if (EncounterStartRecovery.DropStart(type,net,value)) return true;
+            FightStartResponse(type,value); return false;
+        }
         public static bool PreserveBattle() { return BattleRecovery.PreserveBattle(); }
-        public static void TcpConnecting() { ChipNames.ReleaseScene(); PositionSync.ConnectionStarting(); TeamMap86.ConnectionStarting(); BattleRecovery.BeforeTcpLogin(); PvpBridge.ConnectionStarting(); }
+        public static void TcpConnecting() { ChipNames.ReleaseScene(); PositionSync.ConnectionStarting(); EncounterStartRecovery.ConnectionStarting(); TeamMap86.ConnectionStarting(); BattleRecovery.BeforeTcpLogin(); PvpBridge.ConnectionStarting(); }
         public static bool TransferSend(int opcode,object value)
         {
             if (opcode==30026 && BattleRecovery.ReturningAfterDefeat) return true;
@@ -110,9 +115,9 @@ namespace HYJS.DesertV4
         public static bool TransferResponse(int opcode,object owner,object value) { return LeaveController.Response(opcode,owner,value); }
         public static void TrackPositionBase(object net,object value) { PositionSync.TrackBaseResponse(net,value); LeaveController.SceneReady(); }
         public static void TrackPositionField(object value) { PositionSync.TrackFieldResponse(value); LeaveController.SceneReady(); }
-        public static void TrackPositionPacket(object value) { PositionSync.TrackPacket(value); LeaveController.TrackPacket(value); }
+        public static void TrackPositionPacket(object value) { PositionSync.TrackPacket(value); LeaveController.TrackPacket(value); EncounterStartRecovery.TrackPacket(value); }
         public static bool DropPositionPacket(object value)
-        { bool position=PositionSync.DropPacket(value); return LeaveController.DropPacket(value) || position; }
+        { bool encounter=EncounterStartRecovery.DropPacket(value); bool position=PositionSync.DropPacket(value); return LeaveController.DropPacket(value) || position || encounter; }
         public static bool DropOldSocket(object tool,object value) { return PositionSync.DropOldSocket(tool,value as IAsyncResult); }
         public static bool BlockMove(RoomCharactor actor)
         {
@@ -348,8 +353,14 @@ namespace HYJS.DesertV4
             {
                 encounterTimedOut=true;
                 if (LoadingPanel.Instance!=null) LoadingPanel.Instance.HideLoading();
-                Notice("战斗响应尚待确认，请检查连接");
+                if (EncounterStartRecovery.Pending)
+                {
+                    Notice("正在确认本场战斗");
+                    EncounterStartRecovery.Timeout();
+                }
+                else EndEncounter(0);
             }
+            EncounterStartRecovery.Tick();
             if (dirty && !inFlight && Stopwatch.GetTimestamp()>=nextSnapshot) StartSnapshot();
         }
         void RefreshNativeTeamHud()
@@ -370,6 +381,7 @@ namespace HYJS.DesertV4
         void ReleaseScene() { ReleaseScene(false); }
         void ReleaseScene(bool sameNativeRoom)
         {
+            if (EncounterStartRecovery.Pending) EncounterStartRecovery.Timeout();
             ChipNames.ReleaseScene();
             ColdBattleRecovery.SceneExit(room);
             // Native 30024 recreates the self actor even in an already loaded
@@ -592,14 +604,16 @@ namespace HYJS.DesertV4
             {
                 bool admitted=awaitingEncounter && !encounterTimedOut && confirmedMonsterId==uuid;
                 dispatchingConfirmedMonster=false; confirmedMonsterId=null;
+                if (admitted) EncounterStartRecovery.Sent(type,room,sceneSerial,session);
                 return admitted;
             }
             // A confirmed boss continues through the original SendPveBoss
             // method exactly once; its prefix returns here before any new gate.
             if (type==12 && dispatchingConfirmedBoss)
             {
-                bool admitted=awaitingEncounter && confirmedBossId==uuid;
+                bool admitted=awaitingEncounter && !encounterTimedOut && confirmedBossId==uuid;
                 dispatchingConfirmedBoss=false; confirmedBossId=null;
+                if (admitted) EncounterStartRecovery.Sent(type,room,sceneSerial,session);
                 return admitted;
             }
             if (!InteractionReady || !ColdBattleRecovery.AllowNewEncounter()) return false;
@@ -635,7 +649,7 @@ namespace HYJS.DesertV4
                         }
                         return;
                     }
-                    if (!confirmed || !target.CanInteract(uuid,actor))
+                    if (!confirmed || !target.CanInteract(uuid,actor) || !awaitingEncounter || encounterTimedOut)
                     {
                         if (cancelled)
                         {
@@ -650,12 +664,12 @@ namespace HYJS.DesertV4
                     {
                         RoomNetField net=startRoom.netManager as RoomNetField;
                         MethodInfo send=typeof(RoomNetField).GetMethod("SendPveBoss",BindingFlags.Instance|BindingFlags.Public|BindingFlags.NonPublic);
-                        if (net==null || send==null || !awaitingEncounter) throw new InvalidOperationException("Original boss entry unavailable");
+                        if (net==null || send==null || !awaitingEncounter || encounterTimedOut) throw new InvalidOperationException("Original boss entry unavailable");
                         confirmedBossId=uuid; dispatchingConfirmedBoss=true;
                         send.Invoke(net,new object[]{uuid});
                         if (dispatchingConfirmedBoss) throw new InvalidOperationException("Original boss entry hook unavailable");
                     }
-                    catch (Exception) { EndEncounter(0); }
+                    catch (Exception) { if (EncounterStartRecovery.Pending) EncounterStartRecovery.Timeout(); else EndEncounter(0); }
                     finally { dispatchingConfirmedBoss=false; confirmedBossId=null; }
                 });
                 if (!started) EndEncounter(0);
@@ -700,7 +714,7 @@ namespace HYJS.DesertV4
                     send.Invoke(net,new object[]{uuid});
                     if (dispatchingConfirmedMonster) throw new InvalidOperationException("Original monster entry hook unavailable");
                 }
-                catch (Exception) { EndEncounter(0); }
+                catch (Exception) { if (EncounterStartRecovery.Pending) EncounterStartRecovery.Timeout(); else EndEncounter(0); }
                 finally { dispatchingConfirmedMonster=false; confirmedMonsterId=null; }
             });
             if (!syncing) EndEncounter(0);
@@ -716,6 +730,7 @@ namespace HYJS.DesertV4
             RoomBase original=singleton.room;
             string fight=type==6 ? ((SCSidePveFightStart)native).fightId : ((SCSidePveBossFightStart)native).fightId;
             LoadingPanel.Instance.ShowLoadingPre();
+            EncounterStartRecovery.AdmitResume(native);
             try { method.Invoke(original.netManager,new object[]{native}); return true; }
             catch (Exception)
             {
@@ -729,6 +744,13 @@ namespace HYJS.DesertV4
                 }
                 throw;
             }
+            finally { EncounterStartRecovery.AdmitResume(null); }
+        }
+        internal static void ClearEncounterWait()
+        {
+            if (singleton==null || !singleton.awaitingEncounter) return;
+            singleton.awaitingEncounter=false; singleton.encounterTimedOut=false;
+            if (LoadingPanel.Instance!=null) LoadingPanel.Instance.HideLoading();
         }
         public void EndEncounter(int code)
         {

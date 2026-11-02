@@ -21,6 +21,7 @@ type p10ClientSink struct {
 	session        []byte
 	send           func(proto.Message) error
 	close          func()
+	drain          func()
 	tradeReady     atomic.Bool
 	disconnectedAt atomic.Int64
 	sceneMutation  sync.Mutex
@@ -136,6 +137,9 @@ func (s *GameService) RegisterP10Client(ctx context.Context, id int64, session [
 	if len(closeConnection) > 0 {
 		sink.close = closeConnection[0]
 	}
+	if len(closeConnection) > 1 {
+		sink.drain = closeConnection[1]
+	}
 	// Socket consumers provide a close callback, allowing bounded asynchronous
 	// delivery and retirement on backpressure. Inline consumers stay synchronous.
 	if sink.close != nil {
@@ -146,6 +150,11 @@ func (s *GameService) RegisterP10Client(ctx context.Context, id int64, session [
 	if old, ok := p10ClientSinks.Load(key); ok {
 		previous := old.(*p10ClientSink)
 		p10MarkDisconnected(previous, true)
+		// The replacement must not overtake a request already executing on the
+		// retired socket. Only this player's previous connection is drained.
+		if previous.drain != nil {
+			previous.drain()
+		}
 		if err := s.p10CleanupClient(ctx, key, previous); err != nil {
 			release()
 			elog.Warn("p10 old connection cleanup failed", zap.Int64("player_id", id), zap.Error(err))

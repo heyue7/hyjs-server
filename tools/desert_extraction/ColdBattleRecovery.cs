@@ -50,6 +50,7 @@ namespace HYJS.DesertV4
             core.room=value; core.owner=who; core.scene=version; core.epoch=PositionSync.ConnectionEpoch;
             core.generation++; core.attempts=0; core.busy=core.known=core.prompted=core.approved=core.delivered=core.warned=false;
             core.pending=null; core.nextAttempt=0;
+            EncounterStartRecovery.FenceConnection(value,version,who);
         }
         public static void SceneExit(RoomBase value)
         {
@@ -71,13 +72,25 @@ namespace HYJS.DesertV4
             epoch=PositionSync.ConnectionEpoch; generation++; attempts=0;
             busy=known=prompted=approved=delivered=warned=false;
             pending=null; nextAttempt=0;
+            EncounterStartRecovery.FenceConnection(room,scene,owner);
         }
         bool Still(int version)
         { return generation==version && Current(); }
         public static bool Pending
         { get { return instance!=null && instance.SameScene() && (!instance.Current() || !instance.known || instance.pending!=null); } }
         public static bool AllowNewEncounter()
-        { return instance!=null && instance.Current() && instance.known && instance.pending==null; }
+        { return instance!=null && instance.Current() && instance.known && instance.pending==null && !EncounterStartRecovery.Pending; }
+        public static void SuspendForStart()
+        {
+            if (instance==null) return;
+            instance.generation++; instance.busy=false; instance.known=false;
+            instance.pending=null; instance.prompted=instance.approved=instance.delivered=false;
+        }
+        public static void RefreshAfterStart()
+        {
+            if (instance==null) return;
+            SuspendForStart(); instance.attempts=0; instance.warned=false; instance.nextAttempt=0;
+        }
         void Notice(string message)
         { if (!warned) { warned=true; BoxManager.CreatePopupTextBox(message,0f); } }
         void Failed()
@@ -194,6 +207,7 @@ namespace HYJS.DesertV4
             // able to finish while the position/UI readiness gate is blocked.
             // Only prompting and resuming require the original UI to be ready.
             RebindConnection();
+            if (EncounterStartRecovery.WaitingForFence) return;
             if (!Current() || delivered || BattleRecovery.HasEndJournal() || BattleRecovery.LivePresent) return;
             if (busy || Time.realtimeSinceStartup<nextAttempt) return;
             if (!known) { Discover(); return; }

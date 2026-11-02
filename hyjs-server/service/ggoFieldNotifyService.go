@@ -44,6 +44,9 @@ func (s *GameService) ggoNotifyFieldChange(ctx context.Context, line int32) {
 	if s == nil || !s.ggoExtractionEnabled() || line < 0 {
 		return
 	}
+	if p10SceneDeferNotice(ctx, func(ctx context.Context) { s.ggoNotifyFieldChange(ctx, line) }) {
+		return
+	}
 	base := s.p10ClientOwner()
 	for !base.ggoNoticeStopped.Load() {
 		candidate := &ggoNoticeTimer{}

@@ -112,42 +112,48 @@ func (s *GameService) AdminFieldChannels(ctx context.Context, actor *model.Admin
 
 // AdminSaveFieldChannels serializes capacity changes with original line transfer and refuses to evict live players.
 func (s *GameService) AdminSaveFieldChannels(ctx context.Context, actor *model.AdminPrincipal, req model.AdminFieldChannelSaveRequest) (*model.AdminFieldChannelsResponse, error) {
-	p10SceneMutation.Lock()
-	defer p10SceneMutation.Unlock()
-	err := db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := adminOperationUser(tx, actor, true); err != nil {
-			return err
-		}
-		var server db.AdminGameServer
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&server, req.ServerID).Error; err != nil {
-			return err
-		}
-		var row db.AdminFieldChannel
-		err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&row, "server_id=? AND scene=?", req.ServerID, req.Scene).Error
-		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-			return err
-		}
-		if err == nil && adminVersion(row) != req.Version || errors.Is(err, gorm.ErrRecordNotFound) && req.Version != "" {
-			return constUtil.ErrAdminConfigConflict
-		}
-		if req.ServerID == s.OriginalServerID() {
-			for line := int32(1); line <= 32; line++ {
-				peers, err := s.p10ScenePeers(tx, req.Scene, line, 0)
-				if err != nil {
-					return err
-				}
-				if int64(line) > req.LineCount && len(peers) > 0 || int64(len(peers)) > req.MaxPlayers {
-					return errors.New("目标线路仍有在线玩家，请先等待玩家离线，或提高线路数量和人数上限")
+	rooms := make([]p10SceneRoom, 0, 32)
+	for line := int32(1); line <= 32; line++ {
+		rooms = append(rooms, p10SceneRoom{scene: req.Scene, line: line})
+	}
+	err := func() error {
+		unlockRooms := p10SceneRoomsLock(rooms...)
+		defer unlockRooms()
+		return db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+			if err := adminOperationUser(tx, actor, true); err != nil {
+				return err
+			}
+			var server db.AdminGameServer
+			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&server, req.ServerID).Error; err != nil {
+				return err
+			}
+			var row db.AdminFieldChannel
+			err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&row, "server_id=? AND scene=?", req.ServerID, req.Scene).Error
+			if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+				return err
+			}
+			if err == nil && adminVersion(row) != req.Version || errors.Is(err, gorm.ErrRecordNotFound) && req.Version != "" {
+				return constUtil.ErrAdminConfigConflict
+			}
+			if req.ServerID == s.OriginalServerID() {
+				for line := int32(1); line <= 32; line++ {
+					peers, err := s.p10ScenePeers(tx, req.Scene, line, 0)
+					if err != nil {
+						return err
+					}
+					if int64(line) > req.LineCount && len(peers) > 0 || int64(len(peers)) > req.MaxPlayers {
+						return errors.New("目标线路仍有在线玩家，请先等待玩家离线，或提高线路数量和人数上限")
+					}
 				}
 			}
-		}
-		row.ServerID, row.Scene, row.LineCount, row.MaxPlayers = req.ServerID, req.Scene, req.LineCount, req.MaxPlayers
-		row.Revision++
-		if err := tx.Save(&row).Error; err != nil {
-			return err
-		}
-		return adminAudit(tx, actor, "field.channels.save", fmt.Sprintf("server=%d scene=%s", req.ServerID, req.Scene), fmt.Sprintf("lines=%d capacity=%d", req.LineCount, req.MaxPlayers))
-	})
+			row.ServerID, row.Scene, row.LineCount, row.MaxPlayers = req.ServerID, req.Scene, req.LineCount, req.MaxPlayers
+			row.Revision++
+			if err := tx.Save(&row).Error; err != nil {
+				return err
+			}
+			return adminAudit(tx, actor, "field.channels.save", fmt.Sprintf("server=%d scene=%s", req.ServerID, req.Scene), fmt.Sprintf("lines=%d capacity=%d", req.LineCount, req.MaxPlayers))
+		})
+	}()
 	if err != nil {
 		return nil, err
 	}

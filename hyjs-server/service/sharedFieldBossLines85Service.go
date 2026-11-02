@@ -194,8 +194,8 @@ func (s *GameService) fieldBossAfterHandshake85(ctx context.Context, request *mo
 	if fieldConfig == nil || fieldConfig["adminOrdinaryBossEnabled"] == "false" {
 		return messages, nil
 	}
-	p10SceneMutation.Lock()
-	defer p10SceneMutation.Unlock()
+	unlockScene := p10ScenePlayersRead(request.PlayerId)
+	defer unlockScene()
 	var projection []proto.Message
 	err = db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := ServerGameClockGuardTransaction(tx); err != nil {

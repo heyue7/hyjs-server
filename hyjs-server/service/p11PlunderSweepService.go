@@ -135,6 +135,7 @@ func (s *GameService) p11PlunderSweepAt(ctx context.Context, id int64, req *pb.C
 					return e
 				}
 			}
+			actors := newP11PlunderSweepActors(tx, lockIDs)
 			var old db.P11PlunderSweepReceipt
 			e := tx.First(&old, "player_id=? AND stamp=?", id, stamp).Error
 			if e == nil {
@@ -144,17 +145,11 @@ func (s *GameService) p11PlunderSweepAt(ctx context.Context, id int64, req *pb.C
 			if !errors.Is(e, gorm.ErrRecordNotFound) {
 				return e
 			}
-			var owner db.Profile
-			if e = tx.First(&owner, id).Error; e != nil {
-				return e
-			}
-			if AdminProfileServerID(owner) != s.OriginalServerID() {
-				return errors.New(constUtil.P11PlunderFightRefresh)
-			}
-			player, game, e := decodeProfileForCalendarUpdate(tx, &owner)
+			owner, e := actors.loadForServer(id, s.OriginalServerID(), true)
 			if e != nil {
 				return e
 			}
+			player, game := owner.player, owner.game
 			ordinary, e := s.p10Setting("TreaSweepLevel")
 			if e != nil {
 				return e
@@ -192,13 +187,11 @@ func (s *GameService) p11PlunderSweepAt(ctx context.Context, id int64, req *pb.C
 			response = &pb.SCSweepTreasureFight{IsLevelUp: proto.Int32(0), Get: &pb.ResultObject{}}
 			initialLevel := player.GetLevel()
 			for step := int32(0); step < req.GetSweepNumber(); step++ {
-				if e = tx.First(&owner, id).Error; e != nil {
-					return e
-				}
-				player, game, e = decodeProfileForCalendarUpdate(tx, &owner)
+				owner, e = actors.load(id)
 				if e != nil {
 					return e
 				}
+				player, game = owner.player, owner.game
 				held, e = p11PlunderFragmentCount(game, req.GetFragId())
 				if e != nil {
 					return e
@@ -216,15 +209,11 @@ func (s *GameService) p11PlunderSweepAt(ctx context.Context, id int64, req *pb.C
 						chosen = peerID
 						break
 					}
-					var peer db.Profile
-					if e = tx.First(&peer, peerID).Error; e != nil {
-						return e
-					}
-					other, otherGame, e := decodeProfileForCalendarUpdate(tx, &peer)
+					peer, e := actors.candidate(peerID)
 					if e != nil {
 						return e
 					}
-					n, e := p11PlunderFragmentCount(otherGame, req.GetFragId())
+					n, e := p11PlunderFragmentCount(peer.game, req.GetFragId())
 					if e != nil {
 						return e
 					}
@@ -236,8 +225,8 @@ func (s *GameService) p11PlunderSweepAt(ctx context.Context, id int64, req *pb.C
 					if e != nil {
 						return e
 					}
-					difference := int64(player.GetLevel()) - int64(other.GetLevel())
-					if n > 0 && !protected && !blocked && AdminProfileServerID(peer) == s.OriginalServerID() && other.GetPlayerId() == peer.Id && other.GetLevel() >= ordinary && difference <= int64(cfg.LevelDifference) && -difference <= int64(cfg.LevelDifference) {
+					difference := int64(player.GetLevel()) - int64(peer.player.GetLevel())
+					if n > 0 && !protected && !blocked && AdminProfileServerID(peer.row) == s.OriginalServerID() && peer.player.GetPlayerId() == peer.row.Id && peer.player.GetLevel() >= ordinary && difference <= int64(cfg.LevelDifference) && -difference <= int64(cfg.LevelDifference) {
 						chosen = peerID
 						break
 					}
@@ -264,12 +253,12 @@ func (s *GameService) p11PlunderSweepAt(ctx context.Context, id int64, req *pb.C
 					if _, e = s.GrantFixedReward(player, game, "energy,10"); e != nil {
 						return e
 					}
-					if e = saveProfile(tx, &owner, player, game); e != nil {
+					if e = actors.save(owner); e != nil {
 						return e
 					}
 					plan.MedicineCount++
 				}
-				match, e := s.p11PlunderSweepMatch(tx, id, chosen, req.GetFragId(), offer, cfg, now)
+				match, e := s.p11PlunderSweepMatchActors(tx, id, chosen, req.GetFragId(), offer, cfg, now, actors)
 				if e != nil {
 					return e
 				}
@@ -277,7 +266,7 @@ func (s *GameService) p11PlunderSweepAt(ctx context.Context, id int64, req *pb.C
 				if e != nil {
 					return e
 				}
-				child, e := s.p11PlunderFightTx(ctx, tx, id, &pb.CSFightTreasureStartResult{FightPlayerId: proto.Int64(chosen), TargetFlagId: req.FragId}, childStamp, now, match.ID)
+				child, e := s.p11PlunderFightActorsTx(ctx, tx, id, &pb.CSFightTreasureStartResult{FightPlayerId: proto.Int64(chosen), TargetFlagId: req.FragId}, childStamp, now, match.ID, actors)
 				if e != nil {
 					return e
 				}
@@ -298,14 +287,11 @@ func (s *GameService) p11PlunderSweepAt(ctx context.Context, id int64, req *pb.C
 			if plan.Stop == "" {
 				plan.Stop = "requested-count"
 			}
-			if e = tx.First(&owner, id).Error; e != nil {
-				return e
-			}
-			current, _, e := decodeProfileForCalendarUpdate(tx, &owner)
+			owner, e = actors.load(id)
 			if e != nil {
 				return e
 			}
-			if current.GetLevel() != initialLevel {
+			if owner.player.GetLevel() != initialLevel {
 				response.IsLevelUp = proto.Int32(1)
 			}
 			response.Cost = []*pb.BaseResource{{Id: proto.String("energy"), Num: proto.Int32(int32(len(plan.Children)) * 2)}}
@@ -368,9 +354,23 @@ func p11PlunderSweepChildStamp(tx *gorm.DB, id int64) (int64, error) {
 // p11PlunderSweepMatch freezes the current locked actor for each child and
 // either the locked real holder or the versioned virtual roster.
 func (s *GameService) p11PlunderSweepMatch(tx *gorm.DB, id, peerID int64, fragment string, offer *db.P11PlunderFightOffer, cfg *db.P11PlunderFightPolicy, now time.Time) (*db.P11PlunderFightMatch, error) {
+	return s.p11PlunderSweepMatchActors(tx, id, peerID, fragment, offer, cfg, now, nil)
+}
+
+func (s *GameService) p11PlunderSweepMatchActors(tx *gorm.DB, id, peerID int64, fragment string, offer *db.P11PlunderFightOffer, cfg *db.P11PlunderFightPolicy, now time.Time, actors *p11PlunderSweepActors) (*db.P11PlunderFightMatch, error) {
 	var owner, peer db.Profile
-	if err := tx.First(&owner, id).Error; err != nil {
+	if actors == nil {
+		if err := tx.First(&owner, id).Error; err != nil {
+			return nil, err
+		}
+	} else if err := actors.require(tx, id); err != nil {
 		return nil, err
+	}
+	project := func(row *db.Profile, id int64) (*pb.SimplePlayerInfo, *pb.BattlePlayer, error) {
+		if actors != nil {
+			return actors.projection(s, id)
+		}
+		return s.p11ArenaProjection(row, tx)
 	}
 	if p11PlunderNPC84ID(peerID) {
 		if !s.p11PlunderNPC84Allowed(fragment) {
@@ -379,7 +379,7 @@ func (s *GameService) p11PlunderSweepMatch(tx *gorm.DB, id, peerID int64, fragme
 		if err := p11PlunderNPC84CheckIdentityDomain(tx); err != nil {
 			return nil, err
 		}
-		_, attacker, err := s.p11ArenaProjection(&owner, tx)
+		_, attacker, err := project(&owner, id)
 		if err != nil {
 			return nil, err
 		}
@@ -394,14 +394,18 @@ func (s *GameService) p11PlunderSweepMatch(tx *gorm.DB, id, peerID int64, fragme
 		match, _, err := s.p11PlunderNPC84Match(tx, id, fragment, attacker, candidate, offer, cfg, configuration, now)
 		return match, err
 	}
-	if err := tx.First(&peer, peerID).Error; err != nil {
+	if actors == nil {
+		if err := tx.First(&peer, peerID).Error; err != nil {
+			return nil, err
+		}
+	} else if err := actors.require(tx, peerID); err != nil {
 		return nil, err
 	}
-	_, attacker, err := s.p11ArenaProjection(&owner, tx)
+	_, attacker, err := project(&owner, id)
 	if err != nil {
 		return nil, err
 	}
-	peerInfo, defender, err := s.p11ArenaProjection(&peer, tx)
+	peerInfo, defender, err := project(&peer, peerID)
 	if err != nil {
 		return nil, err
 	}

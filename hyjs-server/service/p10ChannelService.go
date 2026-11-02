@@ -104,8 +104,8 @@ func (s *GameService) p10ChannelAt(ctx context.Context, id int64, b *pb.CSChatTc
 	if err := validateChatContent(b.GetContent()); err != nil {
 		return nil, err
 	}
-	p10SceneMutation.RLock()
-	defer p10SceneMutation.RUnlock()
+	unlockScene := p10ScenePlayersRead(id)
+	defer unlockScene()
 	var reply pb.SCChatTcp
 	var recipients []int64
 	var scene string
@@ -274,8 +274,8 @@ func (s *GameService) DispatchP10Channel(ctx context.Context, id int64, request 
 		if b.GetChatType() != 0 && b.GetChatType() != constUtil.P10WorldChatType && b.GetChatType() != constUtil.P10FieldChatType && b.GetChatType() != constUtil.P13GuildChatType {
 			return nil, false, nil
 		}
-		p10SceneMutation.RLock()
-		defer p10SceneMutation.RUnlock()
+		unlockScene := p10ScenePlayersRead(id)
+		defer unlockScene()
 		if b.GetChatType() == 0 {
 			result, _, err := s.p10Social(ctx, id, b, stamp, time.Now())
 			if err != nil {
@@ -302,8 +302,8 @@ func (s *GameService) DispatchP10Channel(ctx context.Context, id int64, request 
 		list, err := s.p10ChannelHistory(db.GetIns().WithContext(ctx), id, b.GetChatType())
 		return []proto.Message{&pb.SCChatCache{ChatList: list}}, true, err
 	case *pb.CSSceneChatCache:
-		p10SceneMutation.RLock()
-		defer p10SceneMutation.RUnlock()
+		unlockScene := p10ScenePlayersRead(id)
+		defer unlockScene()
 		list, err := s.p10ChannelHistory(db.GetIns().WithContext(ctx), id, constUtil.P10FieldChatType)
 		return []proto.Message{&pb.SCSceneChatCache{ChatList: list}}, true, err
 	}

@@ -574,8 +574,8 @@ func (s *GameService) p8OwnHp(ctx context.Context, id int64, b *pb.CSGetHp) ([]p
 // p8VisibleHp 复用真实同屏资格，只读取当前存档，不用缓存角色帧替代已保存血量。
 func (s *GameService) p8VisibleHp(ctx context.Context, id, targetID int64) ([]proto.Message, error) {
 	// 换线、消失与查询在同一场景窗口内完成，避免读取一半更新的分线状态。
-	p10SceneMutation.RLock()
-	defer p10SceneMutation.RUnlock()
+	unlockScene := p10ScenePlayersRead(id, targetID)
+	defer unlockScene()
 	var hp float64
 	err := db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := ServerGameClockGuardTransaction(tx); err != nil {

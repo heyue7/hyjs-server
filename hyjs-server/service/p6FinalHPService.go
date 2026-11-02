@@ -59,7 +59,7 @@ func (s *GameService) computeFrozenBattleFinalHPWithFieldBossMismatch(ctx contex
 	if ctx == nil || input == nil {
 		return nil, errors.New(constUtil.CombatInvalid)
 	}
-	frozen, err := cloneP6CalculationInput(input)
+	frozen, err := cloneP6CalculationMetadata(input)
 	if err != nil {
 		return nil, err
 	}

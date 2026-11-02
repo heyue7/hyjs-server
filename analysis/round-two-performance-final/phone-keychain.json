@@ -1,0 +1,15 @@
+{
+  "schema": "hyjs-performance117-phone-keychain-v1",
+  "timezone": "Asia/Shanghai",
+  "normalBossResultAndNativeReturn": true,
+  "delayedStartMilliseconds": 18003,
+  "sameFightResumedWithoutStartRetry": true,
+  "secretRealmEntryDeviceVerified": false,
+  "candidateQAOnly": true,
+  "evidence": [
+    "analysis/round-two-performance-final/phone-town-arrived.png",
+    "analysis/round-two-performance-final/phone-result-after-native-click.png",
+    "analysis/round-two-performance-final/phone-tcp-delayed-trace.jsonl",
+    "analysis/round-two-performance-final/phone-trace-state.log"
+  ]
+}

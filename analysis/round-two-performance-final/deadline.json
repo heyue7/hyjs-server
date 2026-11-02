@@ -1,0 +1,10 @@
+{
+  "serverReferenceTime": "2026-11-03T00:54:19+08:00",
+  "timeZone": "Asia/Shanghai",
+  "deadline": "2026-11-03T08:54:19+08:00",
+  "scope": "performance then takeover bugs from two referenced chats; deploy and deliver APK; cleanup",
+  "doNotWakeThreads": [
+    "01a19cae-5c4b-78a0-b31c-c95ca82db67c",
+    "01a19a38-5d7d-72d1-88f3-1c4d768b480d"
+  ]
+}

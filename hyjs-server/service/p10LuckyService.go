@@ -220,8 +220,8 @@ func (s *GameService) p10LuckyList(tx *gorm.DB, id int64, now time.Time) (*pb.SC
 
 // p10LuckyAt 持有实际角色和对象行锁，扣袋、冻结对象或抢取资源、次数、回执在同一InnoDB事务提交。
 func (s *GameService) p10LuckyAt(ctx context.Context, id int64, request proto.Message, stamp int64, now time.Time) ([]proto.Message, error) {
-	p10SceneMutation.RLock()
-	defer p10SceneMutation.RUnlock()
+	unlockScene := p10ScenePlayersRead(id)
+	defer unlockScene()
 	if _, ok := request.(*pb.CSCurrentLuckyBagsInfo); ok {
 		out, err := s.p10LuckyList(db.GetIns().WithContext(ctx), id, now)
 		return []proto.Message{out}, err

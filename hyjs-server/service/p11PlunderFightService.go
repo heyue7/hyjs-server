@@ -391,6 +391,10 @@ func (s *GameService) p11PlunderFightAt(ctx context.Context, id int64, request *
 // with the new batch caller. The caller owns ordered real profile locks and the
 // transaction; every failure rolls back all captures, resources and facts.
 func (s *GameService) p11PlunderFightTx(ctx context.Context, tx *gorm.DB, id int64, request *pb.CSFightTreasureStartResult, stamp int64, now time.Time, matchID string) (*pb.SCFightTreasureStartResult, error) {
+	return s.p11PlunderFightActorsTx(ctx, tx, id, request, stamp, now, matchID, nil)
+}
+
+func (s *GameService) p11PlunderFightActorsTx(ctx context.Context, tx *gorm.DB, id int64, request *pb.CSFightTreasureStartResult, stamp int64, now time.Time, matchID string, actors *p11PlunderSweepActors) (*pb.SCFightTreasureStartResult, error) {
 	var response *pb.SCFightTreasureStartResult
 	var accepted *db.P11PlunderFightSettlement
 	err := func() error {
@@ -399,7 +403,11 @@ func (s *GameService) p11PlunderFightTx(ctx context.Context, tx *gorm.DB, id int
 		if npc {
 			lockPeer = id
 		}
-		if err := p10LockProfileIDs(tx, id, lockPeer); err != nil {
+		if actors == nil {
+			if err := p10LockProfileIDs(tx, id, lockPeer); err != nil {
+				return err
+			}
+		} else if err := actors.require(tx, id, lockPeer); err != nil {
 			return err
 		}
 		raw, err := proto.MarshalOptions{Deterministic: true}.Marshal(request)
@@ -440,14 +448,25 @@ func (s *GameService) p11PlunderFightTx(ctx context.Context, tx *gorm.DB, id int
 		if err != nil {
 			return err
 		}
-		var owner, peer db.Profile
-		if err = tx.First(&owner, id).Error; err != nil {
-			return err
+		var ownerRow, peerRow db.Profile
+		owner, peer := &ownerRow, &peerRow
+		var ownerActor, peerActor *p11PlunderSweepActor
+		var player *pb.Player
+		var game *model.GameState
+		if actors == nil {
+			if err = tx.First(owner, id).Error; err != nil {
+				return err
+			}
+			if AdminProfileServerID(*owner) != s.OriginalServerID() {
+				return errors.New(constUtil.P11PlunderFightRefresh)
+			}
+			player, game, err = decodeProfileForCalendarUpdate(tx, owner)
+		} else {
+			ownerActor, err = actors.loadForServer(id, s.OriginalServerID(), true)
+			if err == nil {
+				owner, player, game = &ownerActor.row, ownerActor.player, ownerActor.game
+			}
 		}
-		if AdminProfileServerID(owner) != s.OriginalServerID() {
-			return errors.New(constUtil.P11PlunderFightRefresh)
-		}
-		player, game, err := decodeProfileForCalendarUpdate(tx, &owner)
 		if err != nil {
 			return err
 		}
@@ -461,13 +480,20 @@ func (s *GameService) p11PlunderFightTx(ctx context.Context, tx *gorm.DB, id int
 				return err
 			}
 		} else {
-			if err = tx.First(&peer, request.GetFightPlayerId()).Error; err != nil {
-				return err
+			if actors == nil {
+				if err = tx.First(peer, request.GetFightPlayerId()).Error; err != nil {
+					return err
+				}
+				if AdminProfileServerID(*peer) != s.OriginalServerID() {
+					return errors.New(constUtil.P11PlunderFightRefresh)
+				}
+				other, otherGame, err = decodeProfileForCalendarUpdate(tx, peer)
+			} else {
+				peerActor, err = actors.loadForServer(request.GetFightPlayerId(), s.OriginalServerID(), true)
+				if err == nil {
+					peer, other, otherGame = &peerActor.row, peerActor.player, peerActor.game
+				}
 			}
-			if AdminProfileServerID(peer) != s.OriginalServerID() {
-				return errors.New(constUtil.P11PlunderFightRefresh)
-			}
-			other, otherGame, err = decodeProfileForCalendarUpdate(tx, &peer)
 			if err != nil {
 				return err
 			}
@@ -505,7 +531,12 @@ func (s *GameService) p11PlunderFightTx(ctx context.Context, tx *gorm.DB, id int
 		if err != nil {
 			return err
 		}
-		_, actualA, err := s.p11ArenaProjection(&owner, tx)
+		var actualA *pb.BattlePlayer
+		if actors == nil {
+			_, actualA, err = s.p11ArenaProjection(owner, tx)
+		} else {
+			_, actualA, err = actors.projection(s, id)
+		}
 		if err != nil {
 			return err
 		}
@@ -517,7 +548,11 @@ func (s *GameService) p11PlunderFightTx(ctx context.Context, tx *gorm.DB, id int
 			}
 			actualD = candidate.Battle
 		} else {
-			_, actualD, err = s.p11ArenaProjection(&peer, tx)
+			if actors == nil {
+				_, actualD, err = s.p11ArenaProjection(peer, tx)
+			} else {
+				_, actualD, err = actors.projection(s, peer.Id)
+			}
 			if err != nil {
 				return err
 			}
@@ -604,13 +639,23 @@ func (s *GameService) p11PlunderFightTx(ctx context.Context, tx *gorm.DB, id int
 				}
 				proto.Merge(gain, fragment)
 				if !npc {
-					if err = saveProfile(tx, &peer, other, otherGame); err != nil {
+					if actors == nil {
+						err = saveProfile(tx, peer, other, otherGame)
+					} else {
+						err = actors.save(peerActor)
+					}
+					if err != nil {
 						return err
 					}
 				}
 			}
 		}
-		if err = saveProfile(tx, &owner, player, game); err != nil {
+		if actors == nil {
+			err = saveProfile(tx, owner, player, game)
+		} else {
+			err = actors.save(ownerActor)
+		}
+		if err != nil {
 			return err
 		}
 		winner, fragmentFlag := int32(0), int32(0)

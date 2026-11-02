@@ -116,6 +116,9 @@ func (s *GameService) P13GuildRoomRevoke(tx *gorm.DB, id int64) error {
 
 // SyncP13GuildRoom 不依赖世界/野外分线开关，复用原同屏帧但按真实guildId建立专属实例。
 func (s *GameService) SyncP13GuildRoom(ctx context.Context, id int64, movement bool) (bool, error) {
+	ctx, notices := p10SceneNoticeContext(ctx)
+	unlockPlayer := p10ScenePlayersLock(id)
+	defer p10SceneFinishNotices(ctx, notices, unlockPlayer)
 	return s.syncP13GuildRoom(ctx, id, movement, nil)
 }
 
@@ -146,8 +149,24 @@ func (s *GameService) syncP13GuildRoom(ctx context.Context, id int64, movement b
 		// returning to the ordinary scene. Require a fresh decode afterward.
 		route.pureRoute = false
 	}
-	p10SceneMutation.Lock()
-	defer p10SceneMutation.Unlock()
+	probe, ok := p10LiveClient(p10ClientKey{s.p10ClientOwner(), id})
+	if !ok {
+		return game.Position.GetScene() == constUtil.P13GuildRoomTarget, nil
+	}
+	var probeScope string
+	var probeErr error
+	if game.Position.GetScene() == constUtil.P13GuildRoomTarget {
+		probeScope, probeErr = s.P13GuildRoomPresenceScope(tx, id, game)
+	}
+	observedOld := old
+	stable := probeErr == nil && probeScope != "" && old.Scene == probeScope && old.Line == 1 &&
+		old.SessionHash == p6Digest(probe.(*p10ClientSink).session) && len(old.Frame) > 0 && old.OfflineUntil == 0
+	var rooms []p10SceneRoom
+	if !stable {
+		rooms = []p10SceneRoom{{scene: old.Scene, line: old.Line}, {scene: probeScope, line: 1}}
+	}
+	unlockRooms := p10SceneRoomsLock(rooms...)
+	defer unlockRooms()
 	// 加锁后重新读取当前会话/位置，避免前面的轻量路由观察变成权限快照。
 	value, ok := p10LiveClient(p10ClientKey{s.p10ClientOwner(), id})
 	if !ok {
@@ -170,6 +189,12 @@ func (s *GameService) syncP13GuildRoom(ctx context.Context, id int64, movement b
 	scope, err := s.P13GuildRoomPresenceScope(tx, id, g)
 	if err != nil {
 		return true, err
+	}
+	if old.Scene != observedOld.Scene || old.Line != observedOld.Line ||
+		stable && (old.SessionHash != p6Digest(sink.session) || len(old.Frame) == 0 || old.OfflineUntil != 0 || scope != probeScope) ||
+		g.Position.GetScene() == constUtil.P13GuildRoomTarget &&
+			(game.Position.GetScene() != constUtil.P13GuildRoomTarget || probeErr != nil || scope != probeScope) {
+		return true, errors.New("公会场景状态已变化，请重新同步")
 	}
 	if g.Position.GetScene() != constUtil.P13GuildRoomTarget || scope == "" {
 		if privateOld && old.SessionHash != "" {
@@ -239,6 +264,13 @@ func (s *GameService) syncP13GuildRoom(ctx context.Context, id int64, movement b
 	return true, nil
 }
 func (s *GameService) DisconnectP13GuildRoom(ctx context.Context, id int64, session []byte) (bool, error) {
+	ctx, notices := p10SceneNoticeContext(ctx)
+	unlockPlayer := p10ScenePlayersLock(id)
+	defer p10SceneFinishNotices(ctx, notices, unlockPlayer)
+	return s.disconnectP13GuildRoom(ctx, id, session)
+}
+
+func (s *GameService) disconnectP13GuildRoom(ctx context.Context, id int64, session []byte) (bool, error) {
 	tx := db.GetIns().WithContext(ctx)
 	if !gameSchemaHasTable(tx, &db.P10ScenePresence{}) {
 		return false, nil
@@ -253,10 +285,20 @@ func (s *GameService) DisconnectP13GuildRoom(ctx context.Context, id int64, sess
 	if !strings.HasPrefix(row.Scene, constUtil.P13GuildRoomScopePrefix) {
 		return false, nil
 	}
-	p10SceneMutation.Lock()
-	defer p10SceneMutation.Unlock()
+	unlockRoom := p10SceneRoomsLock(p10SceneRoom{scene: row.Scene, line: row.Line})
+	defer unlockRoom()
 	if _, ok := p10LiveClient(p10ClientKey{s.p10ClientOwner(), id}); ok {
 		return true, nil
+	}
+	var current db.P10ScenePresence
+	if err := tx.First(&current, "player_id=? AND session_hash=?", id, p6Digest(session)).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return true, nil
+		}
+		return true, err
+	}
+	if current.Scene != row.Scene || current.Line != row.Line {
+		return true, errors.New("公会场景状态已变化，请重新同步")
 	}
 	if err := tx.Model(&db.P10ScenePresence{}).Where("player_id=? AND session_hash=?", id, p6Digest(session)).Update("session_hash", "").Error; err != nil {
 		return true, err

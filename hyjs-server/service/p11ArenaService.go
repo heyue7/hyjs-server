@@ -75,6 +75,10 @@ func (s *GameService) p11ArenaProjection(row *db.Profile, projectionTx ...*gorm.
 	if err != nil {
 		return nil, nil, err
 	}
+	return s.p11ArenaProjectionState(row, p, g, projectionTx...)
+}
+
+func (s *GameService) p11ArenaProjectionState(row *db.Profile, p *pb.Player, g *model.GameState, projectionTx ...*gorm.DB) (*pb.SimplePlayerInfo, *pb.BattlePlayer, error) {
 	if p.GetPlayerId() != row.Id {
 		return nil, nil, errors.New("竞技角色归属存档无效")
 	}

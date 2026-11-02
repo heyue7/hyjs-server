@@ -22,6 +22,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 	"unicode"
 	"unicode/utf16"
@@ -1441,6 +1442,8 @@ func serveGameConnection(ctx context.Context, c net.Conn, s *service.GameService
 		session  []byte
 	)
 	var writeLock sync.Mutex
+	var dispatchLock sync.Mutex
+	var retired atomic.Bool
 	writeMessages := func(messages []proto.Message) error {
 		payload, err := model.EncodeGameResponses(messages)
 		if err != nil {
@@ -1509,7 +1512,13 @@ func serveGameConnection(ctx context.Context, c net.Conn, s *service.GameService
 		if p.PlayerId == playerId {
 			p.Session = session
 		}
+		dispatchLock.Lock()
+		if retired.Load() {
+			dispatchLock.Unlock()
+			return
+		}
 		messages := s.Dispatch(ctx, p, peer)
+		dispatchLock.Unlock()
 		registerClient := false
 		if b, ok := p.Body.(*pb.CSSocketLogin); ok && len(messages) > 0 {
 			if reply, ok := messages[0].(*pb.SCSocketLogin); ok && reply.GetResult() == 100 {
@@ -1527,7 +1536,13 @@ func serveGameConnection(ctx context.Context, c net.Conn, s *service.GameService
 		}
 		// 原登录响应先完整写入，再允许私聊推送进入同一连接。
 		if registerClient {
-			unregister = s.RegisterP10Client(ctx, playerId, session, func(message proto.Message) error { return writeMessages([]proto.Message{message}) }, func() { _ = c.Close() })
+			unregister = s.RegisterP10Client(ctx, playerId, session, func(message proto.Message) error { return writeMessages([]proto.Message{message}) }, func() {
+				retired.Store(true)
+				_ = c.Close()
+			}, func() {
+				dispatchLock.Lock()
+				dispatchLock.Unlock()
+			})
 		}
 	}
 }

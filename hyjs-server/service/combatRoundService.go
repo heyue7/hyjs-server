@@ -166,9 +166,9 @@ type combatRoundEngine struct {
 	effectDepth                    int
 }
 
-// Each calculation already owns a deeply cloned frozen table collection. Index
-// original rows lazily within that calculation and preserve the first duplicate,
-// including a nil first row for the empty key, exactly like GameService.table.
+// Each calculation indexes immutable frozen table rows independently and
+// preserves the first duplicate, including a nil first row for the empty key,
+// exactly like GameService.table.
 func (e *combatRoundEngine) table(name, key, value string) map[string]string {
 	if e.tableIndexes == nil {
 		e.tableIndexes = map[combatRoundTableIndexKey]combatRoundTableIndex{}
@@ -321,7 +321,7 @@ func (s *GameService) computeFrozenBattleRecordWithFieldBossMismatch(ctx context
 	if allowFieldBossMismatch && (input.BattleType != constUtil.FieldBossBattleType || !originalRecordMode || supplied == nil || formation != nil || len(controls) != 0 || liveRecorded) {
 		return nil, errors.New(constUtil.CombatInvalid)
 	}
-	frozenInput, err := cloneP6CalculationInput(input)
+	frozenInput, err := cloneP6CalculationMetadata(input)
 	if err != nil {
 		return nil, err
 	}
@@ -599,10 +599,9 @@ func (s *GameService) computeFrozenBattleRecordWithFieldBossMismatch(ctx context
 	return output, completedMismatch
 }
 
-// cloneP6CalculationInput isolates every mutable input before simulation. Table
-// strings are immutable; cloning their maps avoids encoding and parsing the
-// entire original table collection for every automatic fight and replay.
-func cloneP6CalculationInput(input *model.FrozenBattleInput) (*model.FrozenBattleInput, error) {
+// cloneP6CalculationMetadata isolates per-calculation actors and metadata while
+// sharing only the frozen, read-only table collection.
+func cloneP6CalculationMetadata(input *model.FrozenBattleInput) (*model.FrozenBattleInput, error) {
 	if input == nil {
 		return nil, errors.New(constUtil.CombatInvalid)
 	}
@@ -658,6 +657,15 @@ func cloneP6CalculationInput(input *model.FrozenBattleInput) (*model.FrozenBattl
 	if _, err := json.Marshal(metadata); err != nil {
 		return nil, err
 	}
+	return &frozen, nil
+}
+
+// cloneP6CalculationInput retains full isolation for callers that edit tables.
+func cloneP6CalculationInput(input *model.FrozenBattleInput) (*model.FrozenBattleInput, error) {
+	frozen, err := cloneP6CalculationMetadata(input)
+	if err != nil {
+		return nil, err
+	}
 	if input.Tables != nil {
 		frozen.Tables = make(map[string][]map[string]string, len(input.Tables))
 		for name, rows := range input.Tables {
@@ -678,7 +686,7 @@ func cloneP6CalculationInput(input *model.FrozenBattleInput) (*model.FrozenBattl
 			frozen.Tables[name] = clonedRows
 		}
 	}
-	return &frozen, nil
+	return frozen, nil
 }
 
 // FrozenP6DamageFactor reads a camp's original multiplier. Old records omitted

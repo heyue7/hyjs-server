@@ -533,8 +533,12 @@ func (s *GameService) p10VoicePublish(ctx context.Context, id int64, session []b
 	if err := validateChatContent(body.GetContent()); err != nil {
 		return nil, err
 	}
-	p10SceneMutation.RLock()
-	defer p10SceneMutation.RUnlock()
+	var targetID int64
+	if body.GetChatType() == 3 {
+		targetID = body.GetPlayerId()
+	}
+	unlockScene := p10ScenePlayersRead(id, targetID)
+	defer unlockScene()
 	var frame *pb.SCChatTcp
 	var asset db.P10VoiceAsset
 	fresh := false

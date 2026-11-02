@@ -146,13 +146,23 @@ namespace HYJS.DesertV4
         }
         void OnDestroy() { if (singleton==this) singleton=null; }
         static void Notice(string message) { BoxManager.CreatePopupTextBox(message,0f); }
-        void Warning(string message) { if (!holdWarning) { holdWarning=true; Notice(message); } }
+        void Warning(string message) { if (!holdWarning) { holdWarning=true; UnityEngine.Debug.LogWarning("HYJS battle recovery: "+message); Notice(message); } }
         void ResetWarning() { holdWarning=false; }
         static bool CurrentBattleMatches(int type,string fightId)
         {
             return Target() && StaticData.curBattleData!=null && (int)StaticData.curBattleData.battleType==type &&
                 StaticData.curBattleData.fightId==fightId && Battle.BattleManager.Instance!=null &&
                 Battle.BattleManager.Instance.enabled && Battle.BattleManager.Instance.battleEngine!=null;
+        }
+        object nativeBattle;
+        RoomBase nativeRoom;
+        bool CurrentEndPresentation(int type,string fightId)
+        {
+            // The original result phase can disable/clear the running engine.
+            // Its exact registered result owner still needs the verified End.
+            return Target() && nativeOwner!=null && nativeBattle!=null && nativeRoom!=null &&
+                nativeRoom==RoomManager.currentRoom && System.Object.ReferenceEquals(nativeBattle,StaticData.curBattleData) &&
+                StaticData.curBattleData!=null && (int)StaticData.curBattleData.battleType==type && StaticData.curBattleData.fightId==fightId;
         }
         bool AdoptSession()
         {
@@ -161,7 +171,7 @@ namespace HYJS.DesertV4
             {
                 if (!SameActor(now,session))
                 {
-                    liveFightId=""; inputHash=""; liveType=0; nativeOwner=null; loginReady=false;
+                    liveFightId=""; inputHash=""; liveType=0; nativeOwner=null; nativeBattle=null; nativeRoom=null; loginReady=false;
                     resumedFight=resumedHash=""; resumedType=0;
                 }
                 query=false; nextQuery=0; session=now;
@@ -239,6 +249,7 @@ namespace HYJS.DesertV4
             { core.Warning("上次战斗结果尚待确认"); return; }
             core.liveFightId=id; core.liveType=type;
             core.inputHash=core.resumedType==type && core.resumedFight==id ? core.resumedHash : ""; core.nativeOwner=null;
+            core.nativeBattle=null; core.nativeRoom=null;
             core.loginReady=true; core.query=false; core.nextQuery=0; core.ResetWarning();
         }
         public static void SendEnd(int opcode,object message,object over)
@@ -272,6 +283,7 @@ namespace HYJS.DesertV4
                     resumedType==liveType && resumedFight==liveFightId && resumedHash==inputHash);
                 if (pending.fightId!=liveFightId) throw new InvalidOperationException("End fight ID differs");
                 nativeOwner=unrecordedOwner; unrecordedMessage=null; unrecordedOwner=null; unrecordedSession=null;
+                nativeBattle=StaticData.curBattleData; nativeRoom=RoomManager.currentRoom;
                 nextQuery=0; ResetWarning();
             }
             catch (Exception) { Warning("战斗结果保存失败，请保持当前界面并重试"); nextQuery=Stopwatch.GetTimestamp()+2L*Stopwatch.Frequency; }
@@ -282,7 +294,7 @@ namespace HYJS.DesertV4
             BattleRecovery core=singleton;
             if (core.delivering) return false;
             if (core.liveType!=type || String.IsNullOrEmpty(core.liveFightId)) return false;
-            if (core.pending==null || core.pending.fightId!=core.liveFightId || !CurrentBattleMatches(type,core.liveFightId))
+            if (core.pending==null || core.pending.fightId!=core.liveFightId || (!CurrentBattleMatches(type,core.liveFightId) && !core.CurrentEndPresentation(type,core.liveFightId)))
             { core.Warning("战斗结果待服务器确认"); return true; }
             core.nativeOwner=owner; core.nextQuery=0;
             // The native response has no fightId. Use the authoritative receipt
@@ -387,7 +399,7 @@ namespace HYJS.DesertV4
                             catch (Exception) { }
                         }
                         if (type==12) ArmDefeatReturn(owner,d);
-                        if (CurrentBattleMatches(type,expected.fightId))
+                        if (CurrentEndPresentation(type,expected.fightId))
                         {
                             if (nativeOwner==null || (type==6 && !(nativeOwner is Battle.FieldPVEBattleOver)) ||
                                 (type==12 && !(nativeOwner is Battle.FieldPVEBossBattleOver)))
@@ -399,14 +411,16 @@ namespace HYJS.DesertV4
                             try { method.Invoke(nativeOwner,new object[]{native}); }
                             finally { delivering=false; }
                         }
+                        else if (CurrentBattleMatches(type,expected.fightId))
+                        { Warning("战斗界面仍在恢复，请稍候"); return; }
                         else Notice("上次战斗结果已确认");
                         FightEndJournal.Clear(owner,pending);
-                        pending=null; nativeOwner=null; liveFightId=""; liveType=0; inputHash=""; ResetWarning();
+                        pending=null; nativeOwner=null; nativeBattle=null; nativeRoom=null; liveFightId=""; liveType=0; inputHash=""; ResetWarning();
                         resumedFight=resumedHash=""; resumedType=0;
                         if (type==12) ShowBossReceiptStatus(d);
                         FieldRuntime.Require().RequestSnapshot();
                     }
-                    catch (Exception) { Warning("战斗结果待确认"); }
+                    catch (Exception error) { if (!holdWarning) UnityEngine.Debug.LogWarning("HYJS receipt recovery: "+error.GetType().Name); Warning("战斗结果待确认"); }
                 });
             }
             catch (Exception) { Later(); }

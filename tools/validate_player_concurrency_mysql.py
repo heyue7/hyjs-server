@@ -14,6 +14,12 @@ sys.path.insert(0, str(ROOT / 'tests'))
 from hyjs_managed_mysql import ManagedMySQL
 
 CASES = {
+    'TestSceneRound2MySQLIndependentRoomsAndMovement': 'p10',
+    'TestSceneRound2MySQLLastRoomSlot': 'p10',
+    'TestSceneRound2MySQLReverseTransfers': 'p10',
+    'TestSceneRound2MySQLOldDisconnectKeepsReplacement': 'p10',
+    'TestConnectionDrainRound2MySQLReplacementBarrier': 'p10',
+    'TestP11PlunderSweepReuseRound2MySQLFiveRealChildren': 'p11',
     'TestP11ArenaRealRegistryUniqueRanksMatchSnapshotsAndNoResources': 'p11',
     'TestP11ArenaConcurrentRealRegistrationReceiptAndRestart': 'p11',
     'TestP11ArenaConcurrencyRound2MySQLIndependentAfterFirstReceipt': 'p11',

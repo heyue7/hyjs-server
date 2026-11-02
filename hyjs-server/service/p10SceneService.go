@@ -21,7 +21,6 @@ import (
 	pb "hyjs-server/model/protocol"
 )
 
-var p10SceneMutation sync.RWMutex
 var p10SceneBroadcastSlots = make(chan struct{}, constUtil.P10SceneBroadcastWorkers)
 
 type p10ScenePeer struct {
@@ -261,8 +260,8 @@ func (s *GameService) p10SceneMovePlayer(p *pb.Player, g *model.GameState, proje
 // p10CurrentScenePeers restores actors cleared by the client during room reload,
 // including stationary peers whose presence identity has not changed.
 func (s *GameService) p10CurrentScenePeers(ctx context.Context, id int64, expectedLine *int32) ([]*pb.MovePlayer, error) {
-	p10SceneMutation.RLock()
-	defer p10SceneMutation.RUnlock()
+	unlockScene := p10ScenePlayersRead(id)
+	defer unlockScene()
 	tx := db.GetIns().WithContext(ctx)
 	cfg, err := p10SceneConfig(tx)
 	if err != nil || cfg == nil {
@@ -481,6 +480,13 @@ func (s *GameService) p10ScenePeerEntries(tx *gorm.DB, scene string, line int32,
 }
 
 func (s *GameService) p10SceneSend(ctx context.Context, id int64, message proto.Message) {
+	if value, ok := p10LiveClient(p10ClientKey{s.p10ClientOwner(), id}); ok {
+		if s.p10SceneDeferPinned(ctx, id, value.(*p10ClientSink), message) {
+			return
+		}
+	} else if _, buffering := ctx.Value(p10SceneNoticeKey{}).(*p10SceneNotices); buffering {
+		return
+	}
 	s.publishP10Private(ctx, id, message)
 }
 func (s *GameService) p10SceneBroadcast(ctx context.Context, scene string, line int32, exclude int64, message proto.Message) {
@@ -493,8 +499,12 @@ func (s *GameService) p10SceneBroadcast(ctx context.Context, scene string, line 
 func (s *GameService) p10SceneSendPeers(ctx context.Context, peers []p10ScenePeer, message proto.Message) {
 	for _, peer := range peers {
 		if peer.sink != nil {
+			id := peer.frame.GetInfo().GetPlayerId()
+			if s.p10SceneDeferPinned(ctx, id, peer.sink, message) {
+				continue
+			}
 			// Authorization is rechecked by each socket's worker before delivery.
-			s.publishP10PrivateBatchPinned(ctx, peer.frame.GetInfo().GetPlayerId(), peer.sink, []proto.Message{message})
+			s.publishP10PrivateBatchPinned(ctx, id, peer.sink, []proto.Message{message})
 		}
 	}
 }
@@ -593,32 +603,39 @@ func (s *GameService) syncP10Scene(ctx context.Context, id int64, movement bool,
 		sink.sceneMutation.Lock()
 		defer sink.sceneMutation.Unlock()
 	}
-	for shared := true; ; shared = false {
-		route := p10SceneRouteSnapshot{pureRoute: true}
-		if handled, err := s.syncP13UnionFightField(ctx, id, movement, &route); handled || err != nil {
-			return err
-		}
-		if handled, err := s.syncP13GuildRoom(ctx, id, movement, &route); handled || err != nil {
-			return err
-		}
-		if shared {
-			p10SceneMutation.RLock()
-		} else {
-			p10SceneMutation.Lock()
-		}
-		err := s.syncP10OrdinaryScene(ctx, id, movement, lineRestored, &route, shared)
-		if shared {
-			p10SceneMutation.RUnlock()
-		} else {
-			p10SceneMutation.Unlock()
-		}
-		if !errors.Is(err, constUtil.ErrP10SceneMembershipRetry) || !shared {
-			return err
-		}
+	ctx, notices := p10SceneNoticeContext(ctx)
+	unlockPlayer := p10ScenePlayersLock(id)
+	defer p10SceneFinishNotices(ctx, notices, unlockPlayer)
+	route := p10SceneRouteSnapshot{pureRoute: true}
+	if handled, err := s.syncP13UnionFightField(ctx, id, movement, &route); handled || err != nil {
+		return err
 	}
+	if handled, err := s.syncP13GuildRoom(ctx, id, movement, &route); handled || err != nil {
+		return err
+	}
+	var rooms []p10SceneRoom
+	for attempt := 0; attempt < 34; attempt++ {
+		mark := len(notices.pending)
+		var restored bool
+		err := func() error {
+			unlockRooms := p10SceneRoomsLock(rooms...)
+			defer unlockRooms()
+			return s.syncP10OrdinaryScene(ctx, id, movement, &restored, &route, rooms)
+		}()
+		var retry *p10SceneMembershipRetry
+		if !errors.As(err, &retry) {
+			if lineRestored != nil && restored {
+				*lineRestored = true
+			}
+			return err
+		}
+		notices.pending = notices.pending[:mark]
+		rooms = retry.rooms
+	}
+	return errors.New("场景线路变化过快，请重新同步")
 }
 
-func (s *GameService) syncP10OrdinaryScene(ctx context.Context, id int64, movement bool, lineRestored *bool, route *p10SceneRouteSnapshot, shared bool) error {
+func (s *GameService) syncP10OrdinaryScene(ctx context.Context, id int64, movement bool, lineRestored *bool, route *p10SceneRouteSnapshot, held []p10SceneRoom) error {
 	tx := db.GetIns().WithContext(ctx)
 	cfg, err := p10SceneConfig(tx)
 	if err != nil || cfg == nil {
@@ -647,9 +664,6 @@ func (s *GameService) syncP10OrdinaryScene(ctx context.Context, id int64, moveme
 	if scope == "" && old.SessionHash == "" {
 		return nil
 	}
-	if shared && (!existed || scope == "" || old.Scene != scope || old.SessionHash != p6Digest(sink.session) || len(old.Frame) == 0 || old.OfflineUntil != 0) {
-		return constUtil.ErrP10SceneMembershipRetry
-	}
 	if scope == "" {
 		// A committed desert line change keeps its authenticated presence while
 		// the native position handshake is pending. The empty frame is not a
@@ -662,6 +676,9 @@ func (s *GameService) syncP10OrdinaryScene(ctx context.Context, id int64, moveme
 			return nil
 		}
 		if old.SessionHash != "" {
+			if err := p10SceneRequireRooms(held, p10SceneRoom{scene: old.Scene, line: old.Line}); err != nil {
+				return err
+			}
 			if err = tx.Model(&db.P10ScenePresence{}).Where("player_id=?", id).Update("session_hash", "").Error; err != nil {
 				return err
 			}
@@ -672,20 +689,12 @@ func (s *GameService) syncP10OrdinaryScene(ctx context.Context, id int64, moveme
 		}
 		return nil
 	}
-	if scope == constUtil.GGOFieldScene {
-		if err = ggoEnsureChipProjection(tx, profile, g); err != nil {
-			return err
-		}
-	}
 	// Per-map capacity shares the original line protocol and preserves stable socket ownership.
 	cfg, err = s.adminFieldSceneConfig(tx, scope, cfg)
 	if err != nil {
 		return err
 	}
 	line := old.Line
-	if shared && (line < 1 || line > cfg.LineCount) {
-		return constUtil.ErrP10SceneMembershipRetry
-	}
 	if line < 1 || line > cfg.LineCount {
 		line = 1
 	}
@@ -725,9 +734,6 @@ func (s *GameService) syncP10OrdinaryScene(ctx context.Context, id int64, moveme
 		line, peers = bestLine, bestPeers
 	}
 	if len(peers) >= int(cfg.MaxPlayers) {
-		if shared {
-			return constUtil.ErrP10SceneMembershipRetry
-		}
 		if scope == constUtil.GGOFieldScene && old.Scene == scope {
 			return errors.New("原沙漠线路已满，请稍后重连")
 		}
@@ -746,12 +752,28 @@ func (s *GameService) syncP10OrdinaryScene(ctx context.Context, id int64, moveme
 		}
 		if !found {
 			if old.SessionHash != "" && old.Scene != scope {
+				if err := p10SceneRequireRooms(held, p10SceneRoom{scene: old.Scene, line: old.Line}); err != nil {
+					return err
+				}
 				if err = tx.Model(&db.P10ScenePresence{}).Where("player_id=?", id).Update("session_hash", "").Error; err != nil {
 					return err
 				}
 				s.p10SceneBroadcast(ctx, old.Scene, old.Line, id, &pb.SCPlayerDisappear{PlayerId: []int64{id}})
 			}
 			return errors.New("所有有限分线已满")
+		}
+	}
+	membershipChange := !existed || old.Scene != scope || old.Line != line || old.SessionHash != p6Digest(sink.session) || len(old.Frame) == 0 || old.OfflineUntil != 0
+	if membershipChange {
+		if err := p10SceneRequireRooms(held, p10SceneRoom{scene: old.Scene, line: old.Line}, p10SceneRoom{scene: scope, line: line}); err != nil {
+			return err
+		}
+	} else if len(held) != 0 {
+		return &p10SceneMembershipRetry{}
+	}
+	if scope == constUtil.GGOFieldScene {
+		if err = ggoEnsureChipProjection(tx, profile, g); err != nil {
+			return err
 		}
 	}
 	frame, err := s.p10SceneMovePlayer(p, g, tx)
@@ -858,14 +880,15 @@ func (s *GameService) DisconnectP10Scene(ctx context.Context, id int64, session 
 }
 
 func (s *GameService) p10DisconnectScene(ctx context.Context, id int64, session []byte, disconnectedAt int64) error {
+	ctx, notices := p10SceneNoticeContext(ctx)
+	unlockPlayer := p10ScenePlayersLock(id)
+	defer p10SceneFinishNotices(ctx, notices, unlockPlayer)
 	if handled, err := s.DisconnectP13UnionFightField(ctx, id, session); handled || err != nil {
 		return err
 	}
-	if handled, err := s.DisconnectP13GuildRoom(ctx, id, session); handled || err != nil {
+	if handled, err := s.disconnectP13GuildRoom(ctx, id, session); handled || err != nil {
 		return err
 	}
-	p10SceneMutation.Lock()
-	defer p10SceneMutation.Unlock()
 	// A replacement can only be installed after its predecessor's lifecycle
 	// cleanup. Direct callers must also leave any live replacement untouched.
 	if _, ok := p10LiveClient(p10ClientKey{s.p10ClientOwner(), id}); ok {
@@ -887,6 +910,22 @@ func (s *GameService) p10DisconnectScene(ctx context.Context, id int64, session 
 		}
 		return err
 	}
+	unlockRoom := p10SceneRoomsLock(p10SceneRoom{scene: row.Scene, line: row.Line})
+	defer unlockRoom()
+	var current db.P10ScenePresence
+	if err := tx.Where("player_id=? AND session_hash=?", id, p6Digest(session)).First(&current).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil
+		}
+		return err
+	}
+	if current.Scene != row.Scene || current.Line != row.Line {
+		return errors.New("场景线路已变化，请重新同步")
+	}
+	if _, ok := p10LiveClient(p10ClientKey{s.p10ClientOwner(), id}); ok {
+		return nil
+	}
+	row = current
 	if row.Scene == constUtil.GGOFieldScene {
 		if err := s.ggoTradeCancelSession(ctx, id, session); err != nil {
 			return err
@@ -960,12 +999,13 @@ func (s *GameService) DispatchP10Scene(ctx context.Context, id int64, request pr
 	if err := s.SyncP10Scene(ctx, id, false); err != nil {
 		return nil, true, err
 	}
+	ctx, notices := p10SceneNoticeContext(ctx)
 	if _, transition := request.(*pb.CSTransferLine); transition {
-		p10SceneMutation.Lock()
-		defer p10SceneMutation.Unlock()
+		unlockPlayer := p10ScenePlayersLock(id)
+		defer p10SceneFinishNotices(ctx, notices, unlockPlayer)
 	} else {
-		p10SceneMutation.RLock()
-		defer p10SceneMutation.RUnlock()
+		unlockPlayer := p10ScenePlayersRead(id)
+		defer p10SceneFinishNotices(ctx, notices, unlockPlayer)
 	}
 	tx := db.GetIns().WithContext(ctx)
 	cfg, err := s.P13GuildRoomSceneConfig(tx, id)
@@ -1011,6 +1051,33 @@ func (s *GameService) DispatchP10Scene(ctx context.Context, id int64, request pr
 		if b.GetLine() < 1 || b.GetLine() > cfg.LineCount || stamp < 0 {
 			return nil, true, errors.New("有限线路不存在")
 		}
+		unlockRooms := p10SceneRoomsLock(p10SceneRoom{scene: own.Scene, line: own.Line}, p10SceneRoom{scene: own.Scene, line: b.GetLine()})
+		defer unlockRooms()
+		var confirmed db.P10ScenePresence
+		if err := tx.First(&confirmed, "player_id=?", id).Error; err != nil {
+			return nil, true, err
+		}
+		if confirmed.Scene != own.Scene || confirmed.Line != own.Line || confirmed.SessionHash != own.SessionHash {
+			return nil, true, errors.New("场景会话已变化")
+		}
+		own = confirmed
+		cfg, err = s.P13GuildRoomSceneConfig(tx, id)
+		if err != nil || cfg == nil {
+			if err == nil {
+				err = errors.New(constUtil.P10SceneClosed)
+			}
+			return nil, true, err
+		}
+		cfg, err = s.adminFieldSceneConfig(tx, own.Scene, cfg)
+		if err != nil {
+			return nil, true, err
+		}
+		if b.GetLine() > cfg.LineCount {
+			return nil, true, errors.New("有限线路不存在")
+		}
+		if _, ok := s.p10SceneLive(tx, own); !ok {
+			return nil, true, errors.New("当前角色不在有限公共场景")
+		}
 		var reply pb.SCTransferLine
 		fresh := false
 		oldLine := own.Line
@@ -1023,6 +1090,14 @@ func (s *GameService) DispatchP10Scene(ctx context.Context, id int64, request pr
 			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&row, id).Error; err != nil {
 				return err
 			}
+			var locked db.P10ScenePresence
+			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&locked, "player_id=?", id).Error; err != nil {
+				return err
+			}
+			if locked.Scene != own.Scene || locked.Line != oldLine || locked.SessionHash != own.SessionHash || locked.SessionHash != p6Digest(row.Session) {
+				return errors.New("场景会话已变化")
+			}
+			own = locked
 			// Original success clears actors before requesting CurrentPosition. Do not tear down an accepted action.
 			player, game, decodeErr := decodeProfile(&row)
 			if decodeErr != nil {
@@ -1068,13 +1143,6 @@ func (s *GameService) DispatchP10Scene(ctx context.Context, id int64, request pr
 				return errors.New("目标分线已满")
 			}
 			if oldLine != b.GetLine() && game.Position.GetScene() == constUtil.GGOFieldScene && game.GGOField != nil {
-				var locked db.P10ScenePresence
-				if err = tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&locked, "player_id=?", id).Error; err != nil {
-					return err
-				}
-				if locked.Scene != own.Scene || locked.Line != oldLine || locked.SessionHash != p6Digest(row.Session) {
-					return errors.New("场景会话已变化")
-				}
 				if err = ggoCommitLeave(tx, s, id, game, "line", "", b.GetLine(), time.Now().UnixMilli(), b, &reply); err != nil {
 					return err
 				}

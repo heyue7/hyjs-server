@@ -43,8 +43,8 @@ func ggoTradeIDsValid(actor, initiator, receiver int64) bool {
 	return initiator > 0 && receiver > 0 && initiator != receiver && (actor == initiator || actor == receiver)
 }
 
-// ggoWithTradePair uses the same global scene mutex and ascending player lock
-// order as native PvP. No request ever locks its own player before the peer.
+// ggoWithTradePair keeps both scene leases in ascending player order, matching
+// the profile locks used by native PvP.
 func (s *GameService) ggoWithTradePair(ctx context.Context, auth model.GGOFieldAuth, session []byte, initiator, receiver int64, apply func(*gorm.DB, *ggoTradePair) error) error {
 	if !ggoTradeIDsValid(auth.PlayerID, initiator, receiver) || len(session) != 16 {
 		return model.NewErrParamsError()
@@ -67,8 +67,8 @@ func (s *GameService) ggoWithTradePair(ctx context.Context, auth model.GGOFieldA
 	runtime := s.withRuntimeTables(snapshot.tables)
 	runtime.GGOFieldConfig, runtime.GGOFieldEconomy, runtime.GGOFieldRevision = snapshot.ggo, snapshot.ggoEconomy, snapshot.ggoRevision
 	ctx = context.WithValue(ctx, constUtil.GameServiceContextKey, runtime)
-	p10SceneMutation.RLock()
-	defer p10SceneMutation.RUnlock()
+	unlockScene := p10ScenePlayersRead(initiator, receiver)
+	defer unlockScene()
 	changedLines := make(map[int32]bool)
 	var changedWithoutPresence []int64
 	err = db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {

@@ -556,8 +556,8 @@ func (s *GameService) p12FieldPVPFightClocked(ctx context.Context, id int64, ses
 	var presentationLine int32
 	changedChipTotal := false
 	// Only the two participants' ordered profile/presence rows serialize combat.
-	// The shared scene lease excludes transfers while unrelated players can move.
-	p10SceneMutation.RLock()
+	// The participant leases exclude their transfers while unrelated players move.
+	unlockScene := p10ScenePlayersRead(id, b.GetPlayerId())
 	err := db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) (retErr error) {
 		if err := ServerGameClockGuardTransaction(tx); err != nil {
 			return err
@@ -1011,7 +1011,7 @@ func (s *GameService) p12FieldPVPFightClocked(ctx context.Context, id int64, ses
 		fresh = true
 		return nil
 	})
-	p10SceneMutation.RUnlock()
+	unlockScene()
 	if err != nil {
 		return nil, err
 	}

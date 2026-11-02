@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -32,6 +33,91 @@ func TestGGOIsolatedQAFixture(t *testing.T) {
 	if output != "/private/tmp/hyjs-desert-v4-qa/fixture.json" || os.Getenv("HYJS_MYSQL_DATABASE") != "hyjs_test_p1_desert_v4_qa_28b" || os.Getenv("HYJS_MYSQL_HOST") != "127.0.0.1:3306" || os.Getenv("HYJS_GAME_ACCOUNTS_DATABASE") != "" {
 		t.Fatal("fixture requires the designated isolated database and private path")
 	}
+	ggoIsolatedQAFixture(t, output, "hyjs_test_p1_desert_v4_qa_28b", nil, "")
+}
+
+func TestGGOIsolatedPerformance117PhoneFixture(t *testing.T) {
+	output := os.Getenv("HYJS_DESERT_QA_FIXTURE")
+	if output == "" {
+		t.Skip("isolated desert phone fixture not requested")
+	}
+	database := os.Getenv("HYJS_MYSQL_DATABASE")
+	const databasePrefix = "hyjs_test_p1_performance117_phone_"
+	if os.Getenv("HYJS_MYSQL_HOST") != "127.0.0.1:3306" || !strings.HasPrefix(database, databasePrefix) || len(database) == len(databasePrefix) || os.Getenv("HYJS_GAME_ACCOUNTS_DATABASE") != "" {
+		t.Fatal("phone fixture requires its isolated database")
+	}
+	root, err := filepath.Abs("../../.local-env/performance117-ui")
+	if err != nil || !filepath.IsAbs(output) || filepath.Clean(output) != output {
+		t.Fatal("phone fixture requires an absolute private output path")
+	}
+	inside, err := filepath.Rel(root, output)
+	if err != nil || filepath.IsAbs(inside) || inside == "." || inside == ".." || strings.HasPrefix(inside, ".."+string(filepath.Separator)) {
+		t.Fatal("phone fixture output must be inside its private directory")
+	}
+	localEnv, err := os.Lstat(filepath.Dir(root))
+	if err != nil || !localEnv.IsDir() || localEnv.Mode()&os.ModeSymlink != 0 {
+		t.Fatal("phone fixture local environment must be an existing directory")
+	}
+	info, err := os.Lstat(root)
+	if err != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+		t.Fatal("phone fixture private root must be an existing directory")
+	}
+	resolvedRoot, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		t.Fatal("phone fixture private root cannot be resolved")
+	}
+	resolvedParent, err := filepath.EvalSymlinks(filepath.Dir(output))
+	if err != nil {
+		t.Fatal("phone fixture parent must exist")
+	}
+	relative, err := filepath.Rel(resolvedRoot, resolvedParent)
+	if err != nil || filepath.IsAbs(relative) || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+		t.Fatal("phone fixture output escapes its private directory")
+	}
+	configuration := os.Getenv("HYJS_PERFORMANCE117_FIELD_CONFIG_FILE")
+	if configuration == "" {
+		configuration = filepath.Join(root, "published-field-configuration-live.json")
+	}
+	if !filepath.IsAbs(configuration) || filepath.Clean(configuration) != configuration {
+		t.Fatal("phone field configuration must use an absolute private path")
+	}
+	relative, err = filepath.Rel(root, configuration)
+	if err != nil || filepath.IsAbs(relative) || relative == "." || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+		t.Fatal("phone field configuration must be inside its private directory")
+	}
+	sourceInfo, err := os.Lstat(configuration)
+	if err != nil || !sourceInfo.Mode().IsRegular() || sourceInfo.Mode().Perm() != 0600 {
+		t.Fatal("phone field configuration must be an existing private file")
+	}
+	resolvedSource, err := filepath.EvalSymlinks(configuration)
+	if err != nil {
+		t.Fatal("phone field configuration cannot be resolved")
+	}
+	relative, err = filepath.Rel(resolvedRoot, resolvedSource)
+	if err != nil || filepath.IsAbs(relative) || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+		t.Fatal("phone field configuration escapes its private directory")
+	}
+	raw, err := os.ReadFile(configuration)
+	if err != nil {
+		t.Fatal("cannot read phone field configuration")
+	}
+	var published model.AdminFieldConfiguration
+	if json.Unmarshal(raw, &published) != nil || published.Scene != constUtil.GGOFieldScene || published.GGO == nil || published.GGO.Runtime == nil || !published.GGO.Runtime.Enabled || !model.ValidAdminFieldGGORuntime(published.GGO) {
+		t.Fatal("published phone field configuration is not enabled and valid")
+	}
+	if len(published.GGO.Runtime.Points) == 0 || len(published.GGO.Runtime.EntryPoints) == 0 {
+		t.Fatal("published phone field configuration has no points or entries")
+	}
+	digest := sha256.Sum256(raw)
+	published.GGO.Runtime.MinClientBuild = 2026110202
+	if !model.ValidAdminFieldGGORuntime(published.GGO) {
+		t.Fatal("phone field configuration is invalid after setting its client build")
+	}
+	ggoIsolatedQAFixture(t, output, database, published.GGO, hex.EncodeToString(digest[:]))
+}
+
+func ggoIsolatedQAFixture(t *testing.T, output, expectedDatabase string, publishedGGO *model.AdminFieldGGOConfiguration, sourceHash string) {
+	t.Helper()
 	if _, err := os.Lstat(output); !errors.Is(err, os.ErrNotExist) {
 		t.Fatal("fixture output already exists")
 	}
@@ -44,7 +130,7 @@ func TestGGOIsolatedQAFixture(t *testing.T) {
 	}
 	ctx := context.Background()
 	mc := config.AppConfigIns.MysqlConfig
-	if mc.Host != "127.0.0.1:3306" || mc.DbName != "hyjs_test_p1_desert_v4_qa_28b" || config.AppConfigIns.Game.AccountsDatabase != "" {
+	if mc.Host != "127.0.0.1:3306" || mc.DbName != expectedDatabase || config.AppConfigIns.Game.AccountsDatabase != "" {
 		t.Fatal("database config mismatch")
 	}
 	if err := db.InitExistingGameMySQL(ctx, db.MySQLConfig{Host: mc.Host, User: mc.User, Password: mc.Pass, Database: mc.DbName}); err != nil {
@@ -104,15 +190,23 @@ func TestGGOIsolatedQAFixture(t *testing.T) {
 	if err = db.GetIns().Where("username=? AND role=? AND enabled=?", admin.Username, constUtil.AdminRoleAdmin, true).First(&adminRow).Error; err != nil {
 		t.Fatal(err)
 	}
+	fixtureRoot := "../../analysis"
+	if configured := os.Getenv("HYJS_TEST_FIXTURE_ROOT"); configured != "" {
+		if !filepath.IsAbs(configured) {
+			t.Fatal("HYJS_TEST_FIXTURE_ROOT must be an absolute analysis directory")
+		}
+		fixtureRoot = filepath.Clean(configured)
+	}
+	tables := filepath.Join(fixtureRoot, "tables")
 	s := &GameService{ServerID: 1, GGOIntegrationReady: true}
-	if err = s.LoadTables("../../analysis/tables"); err != nil {
+	if err = s.LoadTables(tables); err != nil {
 		t.Fatal(err)
 	}
 	s.InstallGrowth74Resources()
 	if err = s.InstallGGOItems(); err != nil {
 		t.Fatal(err)
 	}
-	if err = s.LoadAdminCatalogue("../../analysis/tables", "../../admin-web/public/media/content-manifest.json"); err != nil {
+	if err = s.LoadAdminCatalogue(tables, "../../admin-web/public/media/content-manifest.json"); err != nil {
 		t.Fatal(err)
 	}
 	if err = s.InitializeServerGameClock(ctx); err != nil {
@@ -123,76 +217,88 @@ func TestGGOIsolatedQAFixture(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var input struct {
-		EligibleForRelease bool `json:"eligibleForRelease"`
-		Points             []struct {
-			ID       string                       `json:"id"`
-			Kind     string                       `json:"kind"`
-			Position *model.AdminFieldGGOPosition `json:"modelPosition"`
-			Stand    *model.AdminFieldGGOPosition `json:"standPosition"`
-		} `json:"points"`
-	}
-	raw, err := os.ReadFile("../../analysis/desert-extraction-v4-unity/point-selection-r5.json")
-	if err != nil || json.Unmarshal(raw, &input) != nil || input.EligibleForRelease || len(input.Points) != 59 {
-		t.Fatal("QA point input invalid")
-	}
-	ggo := defaultGGOFieldConfiguration()
-	ggo.Runtime.Enabled, ggo.Runtime.MinClientBuild = true, 2026102803
-	var safe *model.AdminFieldGGOPosition
-	var exits []*model.AdminFieldGGOPosition
-	monsterIndex := 0
-	for _, item := range input.Points {
-		if item.Position == nil || item.Position.X == nil || item.Position.Y == nil || item.Position.Z == nil {
-			t.Fatal("missing QA position")
+	var (
+		ggo  *model.AdminFieldGGOConfiguration
+		safe *model.AdminFieldGGOPosition
+		raw  []byte
+	)
+	if publishedGGO != nil {
+		ggo = publishedGGO
+		safe = ggo.Runtime.SafeReturn
+		if safe == nil || safe.X == nil || safe.Y == nil || safe.Z == nil {
+			t.Fatal("published phone field safe return is missing")
 		}
-		if item.Kind == "safe" {
-			safe = item.Position
-			continue
+	} else {
+		var input struct {
+			EligibleForRelease bool `json:"eligibleForRelease"`
+			Points             []struct {
+				ID       string                       `json:"id"`
+				Kind     string                       `json:"kind"`
+				Position *model.AdminFieldGGOPosition `json:"modelPosition"`
+				Stand    *model.AdminFieldGGOPosition `json:"standPosition"`
+			} `json:"points"`
 		}
-		kind := item.Kind
-		if kind == "mob" {
-			kind = "monster"
+		raw, err = os.ReadFile(filepath.Join(fixtureRoot, "desert-extraction-v4-unity", "point-selection-r5.json"))
+		if err != nil || json.Unmarshal(raw, &input) != nil || input.EligibleForRelease || len(input.Points) != 59 {
+			t.Fatal("QA point input invalid")
 		}
-		point := model.AdminFieldGGOPoint{ID: item.ID, Kind: kind, Position: item.Position, StandPosition: item.Stand, Radius: 3}
-		if kind == "monster" {
-			monsterIndex++
-			switch {
-			case monsterIndex <= 10:
-				point.Level = 35
-			case monsterIndex <= 18:
-				point.Level = 45
-			default:
-				point.Level = 60
+		ggo = defaultGGOFieldConfiguration()
+		ggo.Runtime.Enabled, ggo.Runtime.MinClientBuild = true, 2026102803
+		var exits []*model.AdminFieldGGOPosition
+		monsterIndex := 0
+		for _, item := range input.Points {
+			if item.Position == nil || item.Position.X == nil || item.Position.Y == nil || item.Position.Z == nil {
+				t.Fatal("missing QA position")
 			}
-			if monsterIndex <= 4 {
-				end := &model.AdminFieldGGOPosition{X: ggoFloat64(*item.Position.X), Y: ggoFloat64(*item.Position.Y), Z: ggoFloat64(*item.Position.Z + .1)}
-				point.Patrol = &model.AdminFieldGGOPatrol{Waypoints: []*model.AdminFieldGGOPosition{item.Position, end}, Speed: 3.2}
+			if item.Kind == "safe" {
+				safe = item.Position
+				continue
 			}
-			if monsterIndex == 12 {
-				ggo.Runtime.EntryPoints = []*model.AdminFieldGGOPosition{item.Position}
+			kind := item.Kind
+			if kind == "mob" {
+				kind = "monster"
 			}
+			point := model.AdminFieldGGOPoint{ID: item.ID, Kind: kind, Position: item.Position, StandPosition: item.Stand, Radius: 3}
+			if kind == "monster" {
+				monsterIndex++
+				switch {
+				case monsterIndex <= 10:
+					point.Level = 35
+				case monsterIndex <= 18:
+					point.Level = 45
+				default:
+					point.Level = 60
+				}
+				if monsterIndex <= 4 {
+					end := &model.AdminFieldGGOPosition{X: ggoFloat64(*item.Position.X), Y: ggoFloat64(*item.Position.Y), Z: ggoFloat64(*item.Position.Z + .1)}
+					point.Patrol = &model.AdminFieldGGOPatrol{Waypoints: []*model.AdminFieldGGOPosition{item.Position, end}, Speed: 3.2}
+				}
+				if monsterIndex == 12 {
+					ggo.Runtime.EntryPoints = []*model.AdminFieldGGOPosition{item.Position}
+				}
+			}
+			if kind == "exit" {
+				exits = append(exits, item.Position)
+			}
+			ggo.Runtime.Points = append(ggo.Runtime.Points, point)
 		}
-		if kind == "exit" {
-			exits = append(exits, item.Position)
+		if safe == nil || len(exits) != 3 || monsterIndex != 24 {
+			t.Fatal("QA map candidate incomplete")
 		}
-		ggo.Runtime.Points = append(ggo.Runtime.Points, point)
-	}
-	if safe == nil || len(exits) != 3 || monsterIndex != 24 {
-		t.Fatal("QA map candidate incomplete")
-	}
-	ggo.Runtime.SafeArea = &model.AdminFieldGGOSafeArea{MinX: *safe.X - 4, MaxX: *safe.X + 4, MinZ: *safe.Z - 4, MaxZ: *safe.Z + 4}
-	ggo.Runtime.SafeReturn = safe
-	exitIndex := 0
-	for i := range ggo.NPCs {
-		npc := &ggo.NPCs[i]
-		switch npc.Role {
-		case "teleport":
-			npc.Position = &model.AdminFieldGGOPosition{X: ggoFloat64(*safe.X - 1), Y: ggoFloat64(*safe.Y), Z: ggoFloat64(*safe.Z)}
-		case "settlement":
-			npc.Position = &model.AdminFieldGGOPosition{X: ggoFloat64(*safe.X + 1), Y: ggoFloat64(*safe.Y), Z: ggoFloat64(*safe.Z)}
-		case "extraction":
-			npc.Position = exits[exitIndex]
-			exitIndex++
+		ggo.Runtime.SafeArea = &model.AdminFieldGGOSafeArea{MinX: *safe.X - 4, MaxX: *safe.X + 4, MinZ: *safe.Z - 4, MaxZ: *safe.Z + 4}
+		ggo.Runtime.SafeReturn = safe
+		exitIndex := 0
+		for i := range ggo.NPCs {
+			npc := &ggo.NPCs[i]
+			switch npc.Role {
+			case "teleport":
+				npc.Position = &model.AdminFieldGGOPosition{X: ggoFloat64(*safe.X - 1), Y: ggoFloat64(*safe.Y), Z: ggoFloat64(*safe.Z)}
+			case "settlement":
+				npc.Position = &model.AdminFieldGGOPosition{X: ggoFloat64(*safe.X + 1), Y: ggoFloat64(*safe.Y), Z: ggoFloat64(*safe.Z)}
+			case "extraction":
+				npc.Position = exits[exitIndex]
+				exitIndex++
+			}
 		}
 	}
 	if !model.ValidAdminFieldGGORuntime(ggo) || !s.AdminGGOFieldBossResourceCatalogValid(ggo.Runtime.Boss) {
@@ -320,5 +426,13 @@ func TestGGOIsolatedQAFixture(t *testing.T) {
 	if len(players) != 2 || players[0].PlayerID == players[1].PlayerID || strings.TrimSpace(players[0].SessionHex) == "" {
 		t.Fatal("QA identities invalid")
 	}
-	writePrivate(output, map[string]any{"http": "http://127.0.0.1:18861", "tcpHost": "127.0.0.1", "tcpPort": 18862, "schema": mc.DbName, "players": players, "fixture": "r5 candidate and short synthetic patrol paths; QA only, not eligible for release"})
+	fixture := "r5 candidate and short synthetic patrol paths; QA only, not eligible for release"
+	if publishedGGO != nil {
+		fixture = "published GGO configuration, isolated synthetic accounts; QA only"
+	}
+	result := map[string]any{"http": "http://127.0.0.1:18861", "tcpHost": "127.0.0.1", "tcpPort": 18862, "schema": mc.DbName, "players": players, "fixture": fixture}
+	if publishedGGO != nil {
+		result["sourceHash"] = sourceHash
+	}
+	writePrivate(output, result)
 }

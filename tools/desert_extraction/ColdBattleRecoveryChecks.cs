@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using HYJS.DesertV4;
 using LitJson;
+using NetWork.Packets;
 using Room;
 
 namespace UnityEngine
@@ -30,12 +31,18 @@ namespace LitJson
 }
 namespace Room
 {
-    public class RoomBase { }
+    public class RoomBase { public object netManager=new object(); }
     public sealed class RoomField : RoomBase { }
     public static class RoomManager { public static RoomBase currentRoom; }
 }
+namespace NetWork.Packets
+{
+    public sealed class Packet { public object kBody; }
+}
 namespace ProtoBuf.Message
 {
+    public sealed class CSPingTcp { public long clientTime; }
+    public sealed class SCPingTcp { public long clientTime; }
     public sealed class SCSidePveFightEnd { public int code; }
     public sealed class SCSidePveBossFightEnd { public int code; }
     public sealed class SCSidePveFightStart { public int code; public string fightId; }
@@ -48,6 +55,14 @@ public static class StaticData
     public static BattleData curBattleData;
 }
 public static class PBConvert { public static object toObject(int opcode,byte[] bytes) { return null; } }
+public static class NetAPI
+{
+    public sealed class Send { public int opcode; public object body; }
+    public static readonly List<Send> sends=new List<Send>();
+    public static bool SocketIsConnected() { return true; }
+    public static void SendSocket(int opcode,object body) { sends.Add(new Send { opcode=opcode,body=body }); }
+    public static void Reconnect() { throw new Exception("Unexpected reconnect"); }
+}
 public static class BoxManager
 {
     public static int prompts,warnings;
@@ -79,6 +94,7 @@ namespace HYJS.DesertV4
     {
         public static bool InteractionReady;
         public static int SceneVersion;
+        public static void ClearEncounterWait() { }
         public static FieldRuntime Require() { return new FieldRuntime(); }
         public void RequestSnapshot() { }
         public static bool ResumeEncounter(int type,object native) { return false; }
@@ -91,13 +107,27 @@ public static class ColdBattleRecoveryChecks
     static readonly MethodInfo Update=typeof(ColdBattleRecovery).GetMethod("Update",BindingFlags.Instance|BindingFlags.NonPublic);
     static void Check(bool value,string message) { checks++; if (!value) throw new Exception(message); }
     static void Tick() { Update.Invoke(Instance.GetValue(null),null); }
+    static void EchoFence(int index)
+    {
+        Check(EncounterStartRecovery.WaitingForFence,"connection did not wait for an echo");
+        Check(index<NetAPI.sends.Count && NetAPI.sends[index].opcode==30020,"connection did not send its native ping");
+        ProtoBuf.Message.CSPingTcp ping=NetAPI.sends[index].body as ProtoBuf.Message.CSPingTcp;
+        Check(ping!=null,"connection fence body was not CSPingTcp");
+        Packet packet=new Packet { kBody=new ProtoBuf.Message.SCPingTcp { clientTime=ping.clientTime } };
+        EncounterStartRecovery.TrackPacket(packet);
+        Check(!EncounterStartRecovery.DropPacket(packet),"matching native ping echo was dropped");
+        Check(!EncounterStartRecovery.WaitingForFence,"matching native ping echo did not release fence");
+    }
     static void Reset()
     {
         FieldWire.calls.Clear(); FieldWire.current=new FieldWire.Session { playerId=42,sessionHex="session",origin="origin" };
         RoomManager.currentRoom=new RoomField(); StaticData.fieldId="field_003"; StaticData.curBattleData=null;
-        PositionSync.ConnectionEpoch++; FieldRuntime.SceneVersion++; FieldRuntime.InteractionReady=false;
+        PositionSync.ConnectionEpoch++; EncounterStartRecovery.ConnectionStarting(); NetAPI.sends.Clear();
+        FieldRuntime.SceneVersion++; FieldRuntime.InteractionReady=false;
         BattleRecovery.journal=BattleRecovery.live=false; UnityEngine.Time.realtimeSinceStartup=0; BoxManager.prompts=BoxManager.warnings=0;
         ColdBattleRecovery.SceneReady(RoomManager.currentRoom,FieldRuntime.SceneVersion);
+        Tick(); Check(FieldWire.calls.Count==0,"scene discovery started before its connection echo");
+        EchoFence(0);
     }
     static FieldWireResult Inactive()
     {
@@ -142,10 +172,15 @@ public static class ColdBattleRecoveryChecks
     }
     static void ReconnectInvalidatesOldCallbacks()
     {
-        Reset(); Tick(); PositionSync.ConnectionEpoch++;
+        Reset(); Tick(); int nextPing=NetAPI.sends.Count;
+        PositionSync.ConnectionEpoch++; EncounterStartRecovery.ConnectionStarting();
         Check(ColdBattleRecovery.Pending,"reconnect allowed exit before a new discovery");
-        Tick(); Check(FieldWire.calls.Count==2,"same-room reconnect did not restart discovery");
-        Reply(0,Inactive()); Check(FieldWire.calls.Count==2,"old connection callback advanced discovery");
+        Tick(); Check(NetAPI.sends.Count==nextPing+1,"same-room reconnect did not send a new fence");
+        Check(FieldWire.calls.Count==1,"same-room reconnect discovered before its echo");
+        Reply(0,Inactive()); Check(FieldWire.calls.Count==1,"old connection callback advanced discovery");
+        EchoFence(nextPing); Tick();
+        Check(FieldWire.calls.Count==2,"same-room reconnect did not restart discovery");
+        Reply(0,Inactive()); Check(FieldWire.calls.Count==2,"old connection callback advanced discovery after reconnect");
         Reply(1,Inactive()); Reply(2,Inactive());
         Check(!ColdBattleRecovery.Pending,"new connection did not finish discovery");
     }

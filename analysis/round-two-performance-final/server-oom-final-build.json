@@ -1,0 +1,118 @@
+{
+  "worktree": "/Users/lirui/.codex/worktrees/hyjs-player-concurrency-20261102/hyjs",
+  "recorded_at": "2026-11-02T08:58:31.886230-08:00",
+  "source_digest_before": {
+    "algorithm": "sha256",
+    "encoding": "sorted repository-relative UTF-8 path + NUL + file content + NUL",
+    "scope": "hyjs-server/**/*.go excluding *_test.go; hyjs-server/**/*.sql",
+    "file_count": 2328,
+    "sha256": "fa868ab396582ed74d9041a5b1175ea1e4b9f333d6336665bb01848778692034"
+  },
+  "steps": [
+    {
+      "name": "server_build",
+      "command": "rtk proxy env TZ=Asia/Shanghai GOMAXPROCS=2 GOMEMLIMIT=768MiB go build -o ../build/round-two-performance-final/server-oom-final/hyjs-server .",
+      "working_directory": "/Users/lirui/.codex/worktrees/hyjs-player-concurrency-20261102/hyjs/hyjs-server",
+      "started_at": "2026-11-02T08:58:42.330286-08:00",
+      "log": "analysis/round-two-performance-final/server-oom-final-build.log",
+      "exit_code": 0,
+      "finished_at": "2026-11-02T08:59:23.848155-08:00"
+    },
+    {
+      "name": "test_binary_build",
+      "command": "rtk proxy env TZ=Asia/Shanghai GOMAXPROCS=2 GOMEMLIMIT=768MiB go test -c -o ../build/round-two-performance-final/server-oom-final/service.test ./service",
+      "working_directory": "/Users/lirui/.codex/worktrees/hyjs-player-concurrency-20261102/hyjs/hyjs-server",
+      "started_at": "2026-11-02T08:59:31.351387-08:00",
+      "log": "analysis/round-two-performance-final/server-oom-final-test-build.log",
+      "exit_code": 0,
+      "finished_at": "2026-11-02T08:59:42.056810-08:00"
+    },
+    {
+      "name": "go_vet",
+      "command": "rtk proxy env TZ=Asia/Shanghai GOMAXPROCS=2 GOMEMLIMIT=768MiB go vet ./...",
+      "working_directory": "/Users/lirui/.codex/worktrees/hyjs-player-concurrency-20261102/hyjs/hyjs-server",
+      "started_at": "2026-11-02T08:59:48.020648-08:00",
+      "log": "analysis/round-two-performance-final/server-oom-final-vet.log",
+      "exit_code": 0,
+      "finished_at": "2026-11-02T09:00:00.218888-08:00"
+    },
+    {
+      "name": "mysql_76",
+      "command": "rtk proxy env TZ=Asia/Shanghai HYJS_TEST_FIXTURE_ROOT=/Users/lirui/LR/hyjs/analysis GOMAXPROCS=2 GOMEMLIMIT=768MiB python3 tools/validate_player_concurrency_mysql.py --binary build/round-two-performance-final/server-oom-final/service.test --output analysis/round-two-performance-final/mysql-oom-final --keep-going",
+      "working_directory": "/Users/lirui/.codex/worktrees/hyjs-player-concurrency-20261102/hyjs",
+      "started_at": "2026-11-02T09:00:30.375550-08:00",
+      "log": "analysis/round-two-performance-final/server-oom-final-mysql.log",
+      "exit_code": 0,
+      "finished_at": "2026-11-02T09:06:12.693060-08:00",
+      "completed": 76,
+      "failed": 0,
+      "summary": "analysis/round-two-performance-final/mysql-oom-final/summary.json"
+    }
+  ],
+  "binaries": {
+    "hyjs-server": {
+      "path": "build/round-two-performance-final/server-oom-final/hyjs-server",
+      "bytes": 67897682,
+      "sha256": "c2aa3701fe1ac3d31ce874722c07d80149b4198cb47b06be327ea222d16c0ecf"
+    },
+    "service.test": {
+      "path": "build/round-two-performance-final/server-oom-final/service.test",
+      "bytes": 93050658,
+      "sha256": "6b15a4059d84c1ee374393473c488a354f7a08e265a20548059572cce8ea7944"
+    }
+  },
+  "test_connection_files_before": [
+    "hyjs_test_p1_activity77_phone_82_8f627cd721.env",
+    "hyjs_test_p1_activity77_phone_82_8f627cd721.json",
+    "hyjs_test_p1_desert_v4_qa_28b.env",
+    "hyjs_test_p1_desert_v4_qa_28b.json"
+  ],
+  "mysql_regression_lock_before": "free",
+  "source_digest_after_build": {
+    "algorithm": "sha256",
+    "file_count": 2328,
+    "sha256": "fa868ab396582ed74d9041a5b1175ea1e4b9f333d6336665bb01848778692034",
+    "checked_at": "2026-11-02T09:00:10.297760-08:00"
+  },
+  "regression_case_count": 76,
+  "ready_for_mysql_regression": true,
+  "source_digest_after_regression": {
+    "algorithm": "sha256",
+    "file_count": 2328,
+    "sha256": "fa868ab396582ed74d9041a5b1175ea1e4b9f333d6336665bb01848778692034",
+    "checked_at": "2026-11-02T09:06:47.295032-08:00"
+  },
+  "mysql_regression_verification": {
+    "case_count": 76,
+    "passed_count": 76,
+    "failed_count": 0,
+    "exact_case_set": true,
+    "case_log_count": 76,
+    "cleanup": {
+      "checked_at": "2026-11-02T09:06:47.736025-08:00",
+      "test_connection_files_after": [
+        "hyjs_test_p1_activity77_phone_82_8f627cd721.env",
+        "hyjs_test_p1_activity77_phone_82_8f627cd721.json",
+        "hyjs_test_p1_desert_v4_qa_28b.env",
+        "hyjs_test_p1_desert_v4_qa_28b.json"
+      ],
+      "new_connection_files": [],
+      "missing_prior_connection_files": [],
+      "regression_lock_free": true,
+      "test_binary_processes": [],
+      "mysql_healthy": true,
+      "manager_release_evidence": "Each per-case test-drop and final pool.close returned successfully; manager removes last owned temporary account after schema/grant removal before deleting allocation metadata."
+    }
+  },
+  "binary_hash_verification": {
+    "hyjs-server": {
+      "sha256": "c2aa3701fe1ac3d31ce874722c07d80149b4198cb47b06be327ea222d16c0ecf",
+      "matches_build": true
+    },
+    "service.test": {
+      "sha256": "6b15a4059d84c1ee374393473c488a354f7a08e265a20548059572cce8ea7944",
+      "matches_build": true
+    }
+  },
+  "final_verified": true
+}

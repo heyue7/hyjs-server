@@ -30,11 +30,11 @@ func (s *GameService) ggoScheduleOfflineExpiry(id, until int64) {
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
-		p10SceneMutation.Lock()
+		unlockScene := p10ScenePlayersLock(id)
 		var row db.P10ScenePresence
 		err := db.GetIns().WithContext(ctx).First(&row, "player_id=?", id).Error
 		eligible := err == nil && row.Scene == constUtil.GGOFieldScene && row.SessionHash == "" && row.OfflineUntil == until && until <= time.Now().UnixMilli()
-		p10SceneMutation.Unlock()
+		unlockScene()
 		if eligible {
 			base.p10SceneBroadcast(ctx, row.Scene, row.Line, id, &pb.SCPlayerDisappear{PlayerId: []int64{id}})
 			base.ggoNotifyFieldChange(ctx, row.Line)
