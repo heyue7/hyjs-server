@@ -100,8 +100,10 @@ type GameService struct {
 	// P3AutoConfirmDemoPayments is immutable startup configuration for the local
 	// demo provider. Ordinary clients cannot opt themselves into confirmation.
 	P3AutoConfirmDemoPayments bool
-	P3LocalWalletEnabled      bool
-	LocalPlayToolsEnabled     bool
+	// LuxuryDragonReady is set after the offer and cycle-history tables exist.
+	LuxuryDragonReady     bool
+	P3LocalWalletEnabled  bool
+	LocalPlayToolsEnabled bool
 }
 
 func gameReply(name string, fields any) ([]proto.Message, error) {

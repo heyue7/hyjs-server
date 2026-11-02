@@ -11,8 +11,8 @@ import (
 	pb "hyjs-server/model/protocol"
 )
 
-// TestP3LuxuryOriginalChapterSequenceAndPaidCold 从原6-1真实ID30核原礼包合同。
-// 历史通关是有限前提；原钱包订单、四件原奖励与冷恢复均走业务。
+// Verify the legacy open query cannot create an offer from historical progress;
+// original wallet payments, four equipment rewards and cold recovery remain intact.
 func TestP3LuxuryOriginalChapterSequenceAndPaidCold(t *testing.T) {
 	f, id := p3DemoProviderFixture(t)
 	f.id = id
@@ -31,8 +31,9 @@ func TestP3LuxuryOriginalChapterSequenceAndPaidCold(t *testing.T) {
 			t.Fatal(err)
 		}
 		before, game := f.profile(t)
-		if _, err := f.s.paymentOffer(f.ctx, id, request, now); err == nil {
-			t.Fatal("wrong chapter/global ID or zero stars opened original offer", info)
+		out, err := f.s.paymentOffer(f.ctx, id, request, now)
+		if err != nil || out[0].(*pb.SCOpenLuxuryEquipment).GetOpenOrNot() != 0 {
+			t.Fatal("historical progress created an offer", info, err)
 		}
 		after, afterGame := f.profile(t)
 		var offers int64
@@ -46,9 +47,10 @@ func TestP3LuxuryOriginalChapterSequenceAndPaidCold(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := f.s.paymentOffer(f.ctx, id, request, now); err != nil {
-		t.Fatal("actual original sixth chapter first mission30", err)
+	if out, err := f.s.paymentOffer(f.ctx, id, request, now); err != nil || out[0].(*pb.SCOpenLuxuryEquipment).GetOpenOrNot() != 0 {
+		t.Fatal("legacy query created a window from historical completion", err)
 	}
+	luxuryTestStart(t, f.ctx, f.s, id, now)
 	var offer db.PaymentLuxuryOffer
 	if err := db.GetIns().First(&offer, "player_id=?", id).Error; err != nil || offer.OfferID != 2 || offer.Cents != 28800 || offer.EndAt-offer.StartAt != 12*3600*1000 {
 		t.Fatal("original price/window changed", err)

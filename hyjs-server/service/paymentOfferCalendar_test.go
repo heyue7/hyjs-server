@@ -40,9 +40,7 @@ func TestLocalPlayPaymentOfferAsOfConfirmedTime(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := f.s.paymentOffer(ctx, id, &pb.CSOpenLuxuryEquipment{Chapter: proto.Int32(6), Mission: proto.Int32(1)}, paidAt.Add(-time.Hour)); err != nil {
-		t.Fatal("original qualified offer", err)
-	}
+	luxuryTestStart(t, ctx, f.s, id, paidAt.Add(-time.Hour))
 	out, err := f.s.generatePayment(ctx, id, p3DemoProviderRequest(t, "djsy.wuyou.andp0288"), 19001, paidAt)
 	if err != nil {
 		t.Fatal("original funded payment", err)
@@ -56,9 +54,13 @@ func TestLocalPlayPaymentOfferAsOfConfirmedTime(t *testing.T) {
 		at   time.Time
 		want int32
 	}{{paidAt.Add(-time.Millisecond), 0}, {paidAt, 1}, {paidAt.Add(time.Hour), 1}} {
+		signWant := tc.want
+		if tc.at.Format("2006-01-02") != paidAt.Format("2006-01-02") {
+			signWant = 0
+		}
 		status, e := f.s.luxurySignStatus(db.GetIns().WithContext(ctx), id, tc.at)
-		if e != nil || status != tc.want {
-			t.Fatal("original paid-day qualification at", tc.at, status, tc.want, e)
+		if e != nil || status != signWant {
+			t.Fatal("original paid-day qualification at", tc.at, status, signWant, e)
 		}
 		info, e := f.s.paymentOffer(ctx, id, &pb.CSLuxuryEquipmentInfo{}, tc.at)
 		if e != nil || info[0].(*pb.SCLuxuryEquipmentInfo).GetRewardState() != tc.want {
@@ -69,7 +71,7 @@ func TestLocalPlayPaymentOfferAsOfConfirmedTime(t *testing.T) {
 	if err = db.GetIns().Where("player_id=?", id).First(&offer).Error; err != nil {
 		t.Fatal(err)
 	}
-	for _, at := range []time.Time{time.UnixMilli(offer.StartAt - 1), time.UnixMilli(offer.EndAt)} {
+	for _, at := range []time.Time{time.UnixMilli(offer.StartAt - 1)} {
 		info, e := f.s.paymentOffer(ctx, id, &pb.CSLuxuryEquipmentInfo{}, at)
 		if e != nil || info[0].(*pb.SCLuxuryEquipmentInfo).GetId() != 0 || info[0].(*pb.SCLuxuryEquipmentInfo).GetEndTime() != at.UnixMilli() {
 			t.Fatal("offer advertised outside its frozen window", e)
@@ -82,13 +84,18 @@ func TestLocalPlayPaymentOfferAsOfConfirmedTime(t *testing.T) {
 			t.Fatal("outside-window offer reopened", e)
 		}
 	}
+	expired := time.UnixMilli(offer.EndAt)
+	info, err := f.s.paymentOffer(ctx, id, &pb.CSLuxuryEquipmentInfo{}, expired)
+	if err != nil || info[0].(*pb.SCLuxuryEquipmentInfo).GetRewardState() != 1 {
+		t.Fatal("earned unclaimed reward lost after expiration", err)
+	}
 	if _, err = f.s.paymentOffer(ctx, id, &pb.CSLuxuryEquipmentReward{}, paidAt.Add(-time.Millisecond)); err == nil {
 		t.Fatal("future payment granted an early suit")
 	}
 	if _, err = f.s.paymentOffer(ctx, id, &pb.CSLuxuryEquipmentReward{}, paidAt); err != nil {
 		t.Fatal("actual confirmed-time suit claim", err)
 	}
-	info, err := f.s.paymentOffer(ctx, id, &pb.CSLuxuryEquipmentInfo{}, paidAt)
+	info, err = f.s.paymentOffer(ctx, id, &pb.CSLuxuryEquipmentInfo{}, paidAt)
 	if err != nil || info[0].(*pb.SCLuxuryEquipmentInfo).GetRewardState() != 2 {
 		t.Fatal("claimed offer status lost", err)
 	}

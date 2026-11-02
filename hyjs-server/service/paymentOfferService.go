@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"math"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -18,7 +17,7 @@ import (
 	pb "hyjs-server/model/protocol"
 )
 
-// paymentOffer 原6-1神装触发需要真实过关；原20资质套装与红箱测试商品独立。
+// paymentOffer 读取和领取主线或扫荡触发的巨龙套活动。
 // 礼包码仅哈希保存，单角色及共享次数和发奖同一事务；外部激活服务不模拟成功。
 func (s *GameService) paymentOffer(ctx context.Context, id int64, request proto.Message, now time.Time) ([]proto.Message, error) {
 	var response proto.Message
@@ -61,58 +60,39 @@ func (s *GameService) paymentOffer(ctx context.Context, id int64, request proto.
 			}
 			response = &pb.SCConvertGiftCode{Get: gain}
 		case *pb.CSOpenLuxuryEquipment:
-			var config map[string]string
-			for _, r := range s.Tables["LuxuryEquip"] {
-				if r["chapter"] == strconv.Itoa(int(b.GetChapter())) && r["stage"] == strconv.Itoa(int(b.GetMission())) {
-					config = r
-				}
-			}
-			if config == nil {
+			// The legacy request is a query. Only a committed story completion or
+			// sweep may create a new window.
+			if b.GetChapter() != 6 || b.GetMission() != 1 {
 				response = &pb.SCOpenLuxuryEquipment{OpenOrNot: proto.Int32(0)}
 				return nil
 			}
-			// 原请求的mission是章节内从1起的序号；存档使用全局MissionId。
-			// 沿原UIChapterData的数字排序映射，不能将6-1错误匹配为chapter6/MissionId1。
-			missionID, err := s.luxuryOfferMission(config["chapter"], b.GetMission())
-			if err != nil {
-				return err
+			var offer db.PaymentLuxuryOffer
+			found := tx.Where("player_id=? AND offer_id=?", id, luxuryDragonOfferID).Take(&offer).Error
+			if errors.Is(found, gorm.ErrRecordNotFound) {
+				response = &pb.SCOpenLuxuryEquipment{OpenOrNot: proto.Int32(0)}
+				return nil
 			}
-			passed := false
-			for _, info := range g.Copy.GetPassedCopyInfo() {
-				passed = passed || (info.GetChapterId() == config["chapter"] && info.GetMissionId() == missionID && info.GetStar() > 0)
-			}
-			if !passed {
-				return errors.New(constUtil.P3PaymentUnavailable)
-			}
-			offerID, e := strconv.ParseInt(config["id"], 10, 64)
-			if e != nil {
-				return e
-			}
-			money, e := strconv.ParseInt(config["money"], 10, 64)
-			if e != nil {
-				return e
-			}
-			hours, e := strconv.ParseInt(config["limitHours"], 10, 64)
-			if e != nil || hours < 1 || hours > 720 || money < 1 || money > 100000 {
-				return errors.New(constUtil.P3PaymentConfigError)
-			}
-			offer := db.PaymentLuxuryOffer{PlayerID: id, OfferID: offerID, StartAt: now.UnixMilli(), EndAt: now.UnixMilli() + hours*3600*1000, Cents: money * 100, Reward: config["prize"]}
-			if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&offer).Error; err != nil {
-				return err
-			}
-			// An existing offer keeps its original window and claim, including when
-			// the game calendar moves backwards. Never advertise it outside that window.
-			if err := tx.First(&offer, "player_id = ? AND offer_id = ?", id, offerID).Error; err != nil {
-				return err
+			if found != nil {
+				return found
 			}
 			open := int32(0)
 			if !offer.Claimed && now.UnixMilli() >= offer.StartAt && now.UnixMilli() < offer.EndAt {
-				open = 1
+				end := offer.EndAt
+				if GameCalendarContextBound(ctx) && now.UnixMilli() < end {
+					end = now.UnixMilli() + 1
+				}
+				paid, _, _, err := PaymentTotals(tx, id, offer.StartAt, end)
+				if err != nil {
+					return err
+				}
+				if paid < offer.Cents {
+					open = 1
+				}
 			}
 			response = &pb.SCOpenLuxuryEquipment{OpenOrNot: proto.Int32(open)}
 		case *pb.CSLuxuryEquipmentInfo, *pb.CSLuxuryEquipmentReward:
 			var offer db.PaymentLuxuryOffer
-			found := tx.Where("player_id = ?", id).Order("start_at DESC").First(&offer).Error
+			found := tx.Where("player_id = ? AND offer_id = ?", id, luxuryDragonOfferID).Take(&offer).Error
 			if errors.Is(found, gorm.ErrRecordNotFound) {
 				if _, ok := request.(*pb.CSLuxuryEquipmentReward); ok {
 					return errors.New(constUtil.P3PaymentUnavailable)
@@ -123,7 +103,7 @@ func (s *GameService) paymentOffer(ctx context.Context, id int64, request proto.
 			if found != nil {
 				return found
 			}
-			if now.UnixMilli() < offer.StartAt || now.UnixMilli() >= offer.EndAt {
+			if now.UnixMilli() < offer.StartAt {
 				if _, ok := request.(*pb.CSLuxuryEquipmentReward); ok {
 					return errors.New(constUtil.P3PaymentUnavailable)
 				}
@@ -146,8 +126,17 @@ func (s *GameService) paymentOffer(ctx context.Context, id int64, request proto.
 			if offer.Claimed {
 				status = 2
 			}
+			// Expiration ends earning, while an already earned unclaimed suit
+			// remains claimable without opening or extending another window.
+			if now.UnixMilli() >= offer.EndAt && status != 1 {
+				if _, ok := request.(*pb.CSLuxuryEquipmentReward); ok {
+					return errors.New(constUtil.P3PaymentUnavailable)
+				}
+				response = &pb.SCLuxuryEquipmentInfo{Id: proto.Int32(0), CurrentTime: proto.Int64(now.UnixMilli()), EndTime: proto.Int64(now.UnixMilli()), RewardState: proto.Int32(0)}
+				return nil
+			}
 			if _, ok := request.(*pb.CSLuxuryEquipmentReward); ok {
-				if now.UnixMilli() < offer.StartAt || now.UnixMilli() >= offer.EndAt || status != 1 {
+				if status != 1 {
 					return errors.New(constUtil.P3PaymentUnavailable)
 				}
 				gain, err := s.GrantFixedReward(p, g, offer.Reward)
@@ -174,27 +163,6 @@ func (s *GameService) paymentOffer(ctx context.Context, id int64, request proto.
 		return nil, err
 	}
 	return []proto.Message{response}, nil
-}
-
-// luxuryOfferMission 复用原UI按关卡数字ID排序后赋level_seq的章节内序号。
-// 返回真实原表ID，礼包报价、触发窗口及已创建实例保持原有合同。
-func (s *GameService) luxuryOfferMission(chapter string, stage int32) (string, error) {
-	var missions []int
-	for _, row := range s.Tables["CopyMission"] {
-		if row["ChapterId"] != chapter {
-			continue
-		}
-		id, err := strconv.Atoi(row["MissionId"])
-		if err != nil || id < 1 {
-			return "", errors.New(constUtil.P3PaymentConfigError)
-		}
-		missions = append(missions, id)
-	}
-	if stage < 1 || int(stage) > len(missions) {
-		return "", errors.New(constUtil.P3PaymentConfigError)
-	}
-	sort.Ints(missions)
-	return strconv.Itoa(missions[stage-1]), nil
 }
 
 // luxurySignReward 读取后台配置；缺少原奖励时保持关闭，不补设钻石奖励。

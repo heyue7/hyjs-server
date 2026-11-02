@@ -85,13 +85,13 @@ func (s *GameService) InitializePayments(ctx context.Context) error {
 	if len(s.Tables["Payment"]) == 0 || len(s.Tables["VipPerks"]) == 0 {
 		return errors.New(constUtil.P3PaymentConfigError)
 	}
-	if err := d.AutoMigrate(&db.PaymentProduct{}, &db.PaymentOrder{}, &db.LocalPlayPaymentTime{}, &db.PaymentConfirmation{}, &db.MembershipClaim{}, &db.PaymentActivityRule{}, &db.PaymentActivityState{}, &db.PaymentGiftCode{}, &db.PaymentLuxuryOffer{}, &db.VIPShopProduct{}, &db.OpeningCalendarPaymentCarry{}); err != nil {
+	if err := d.AutoMigrate(&db.PaymentProduct{}, &db.PaymentOrder{}, &db.LocalPlayPaymentTime{}, &db.PaymentConfirmation{}, &db.MembershipClaim{}, &db.PaymentActivityRule{}, &db.PaymentActivityState{}, &db.PaymentGiftCode{}, &db.PaymentLuxuryOffer{}, &db.PaymentLuxuryRound{}, &db.VIPShopProduct{}, &db.OpeningCalendarPaymentCarry{}); err != nil {
 		return err
 	}
 	if err := rechargeDirectoryCheckReserved(d); err != nil {
 		return err
 	}
-	return d.Transaction(func(tx *gorm.DB) error {
+	err := d.Transaction(func(tx *gorm.DB) error {
 		if err := ServerGameClockGuardTransaction(tx); err != nil {
 			return err
 		}
@@ -170,6 +170,10 @@ func (s *GameService) InitializePayments(ctx context.Context) error {
 		// 停止自动投放自建红箱礼包码；既有领取记录保留。
 		return nil
 	})
+	if err == nil {
+		s.LuxuryDragonReady = true
+	}
+	return err
 }
 
 func validateP3Product(p *db.PaymentProduct) error {

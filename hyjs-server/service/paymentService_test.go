@@ -449,10 +449,10 @@ func TestP3PaymentDomain(t *testing.T) {
 			t.Fatal("paid red equipment not created")
 		}
 	})
-	t.Run("luxury_offer_requires_actual_chapter_and_window", func(t *testing.T) {
+	t.Run("luxury_offer_query_and_paid_window", func(t *testing.T) {
 		id := fresh("luxury-offer")
 		req := &pb.CSOpenLuxuryEquipment{Chapter: proto.Int32(6), Mission: proto.Int32(1)}
-		if _, _, e := s.HandlePayment(ctx, id, req, 1); e == nil {
+		if result := call(id, req)[0].(*pb.SCOpenLuxuryEquipment); result.GetOpenOrNot() != 0 {
 			t.Fatal("unpassed chapter opened")
 		}
 		// 仅隔离fixture模拟未来章节已完成，不能算手机原6-1已打通。
@@ -462,7 +462,10 @@ func TestP3PaymentDomain(t *testing.T) {
 		}); e != nil {
 			t.Fatal(e)
 		}
-		call(id, req)
+		if result := call(id, req)[0].(*pb.SCOpenLuxuryEquipment); result.GetOpenOrNot() != 0 {
+			t.Fatal("historical completion created a window")
+		}
+		luxuryTestStart(t, ctx, s, id, time.Now())
 		info := call(id, &pb.CSLuxuryEquipmentInfo{})[0].(*pb.SCLuxuryEquipmentInfo)
 		if info.GetId() != 2 || info.GetEndTime()-info.GetCurrentTime() > 12*3600*1000 {
 			t.Fatal("original offer time")
