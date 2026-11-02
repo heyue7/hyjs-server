@@ -1,0 +1,27 @@
+{
+  "status": "PASS",
+  "errors": {},
+  "serverTimeBeijing": "2026-11-03T02:45:09+0800",
+  "hyjsGame": {
+    "StartedAt": "2026-11-02T15:31:55.831553209Z",
+    "RestartCount": 11,
+    "OOMKilled": false,
+    "Memory": 1073741824,
+    "NanoCpus": 0
+  },
+  "stats": {
+    "hyjs-game": {
+      "CPU": "13.21%",
+      "Memory": "153.7MiB / 1GiB"
+    },
+    "hyjs-mysql": {
+      "CPU": "16.60%",
+      "Memory": "1.329GiB / 2GiB"
+    }
+  },
+  "deployed": {
+    "revision": "3fb495f43063933d127577c4a14a772b8c30ceca",
+    "binarySHA": "ee5bc1202fcfffe33f2ee5773952287209cb6c99e9c1bca1969c6de82df12411"
+  },
+  "commandSeconds": 2.773
+}

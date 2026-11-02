@@ -1,0 +1,36 @@
+{
+  "timezone": "Asia/Shanghai",
+  "formalAPK_SHA256": "191fe4826ad162d508b2d3fc8e0f8e6b6c5372815ad9f82cb21e7160bea17aa3",
+  "controlledQA_SHA256": "e2d98ddd17fb369b36df2ec4d13260bca1bf9c33b8d1806b73a78ae25911fe6f",
+  "installedQA_SHA256Verified": true,
+  "serverBinary_SHA256": "ab56364c675fb51df82024832dfa03326e3d4ef07ddeee10212d059ecda63138",
+  "engineMethods547Exact": true,
+  "copyExplicitExitPrompt": true,
+  "copyRunRemovedAndP6Cancelled": true,
+  "copyExitAssetsUnchangedExceptNaturalStamina": true,
+  "subsequentActualField001Loaded": true,
+  "luxuryOriginalPageActiveWindow": true,
+  "luxurySameWindowReentryNoRepeatedPopup": true,
+  "secretDirectoryLoaded": true,
+  "secretActualBattleSceneLoaded": true,
+  "limits": [
+    "Synthetic isolated account; no production rewards, payments or battle results were submitted.",
+    "Secret entry screenshot is usability evidence, not a P95 or complete-load timing measurement.",
+    "Earlier normal native result and delayed Start recovery evidence remains separately bound to the performance source."
+  ],
+  "evidence": [
+    "phone-copy-town-gate.png",
+    "phone-copy-exit-field-loaded.png",
+    "phone-luxury-copy-entry.png",
+    "phone-luxury-same-window-dedup.png",
+    "phone-secret-directory.png",
+    "phone-secret-key-entry.png",
+    "phone-secret-native-result.png"
+  ],
+  "secretOriginalDefeatResultClicked": true,
+  "secretNativeResultReturnVerified": false,
+  "secretResultObservation": "Native defeat banner shown; result click occurred after the owned QA runtime reached its 3600-second TTL and stopped. Entry was verified; completed return after this click is not claimed.",
+  "qaRuntimeTTLExpired": true,
+  "qaRuntimeOwnedServerStopped": true,
+  "qaRuntimeAllocationsReleased": true
+}

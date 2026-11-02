@@ -1,0 +1,69 @@
+{
+  "scope": "isolated synthetic player 2, explicitly authorized phone fixture",
+  "schema": "hyjs_test_p1_performance117_phone_b9e5279d7b",
+  "playerId": 2,
+  "status": "READY",
+  "stage": "complete",
+  "productionAccess": false,
+  "phoneOperated": false,
+  "priorPreflight": "phone-copy-luxury-preflight-1.json",
+  "serverSHA256": "ab56364c675fb51df82024832dfa03326e3d4ef07ddeee10212d059ecda63138",
+  "runnerPid": 53357,
+  "listenerPid": 53358,
+  "fixtureRoleMatch": true,
+  "fixtureUsernameSHA256": "780f62e72501e247124b4ba8e869054327c2344e3144e778c1b649487ee7b24d",
+  "beforeGameSHA256": "4612bbdda7523b7953d52adc3c41c158c4291eb0e40a8ff96df72f3954b3f435",
+  "positionGameSHA256": "fd60efbc858f36f80ad292a6c91ad4e1551e3cb55e372b4da1414e51e1844662",
+  "position": "town_main",
+  "lastStamp": 1793645078297,
+  "frames": [
+    {
+      "request": "CSCopyPassedInfo",
+      "response": "SCCopyPassedInfo",
+      "responseSHA256": "6268739edc65d143e9327795c5e93bce89c069af315723ac7ba1624b3d07507d"
+    },
+    {
+      "request": "CSCopySweep",
+      "response": "SCCopySweep",
+      "responseSHA256": "319642982e4e347268e4f3cf1d63a1c8b81040dc8d512c10aa353dce99c7e3de"
+    },
+    {
+      "request": "CSLuxuryEquipmentInfo",
+      "response": "SCLuxuryEquipmentInfo",
+      "responseSHA256": "8cbb173036ae45f4f542a68201b6a16dde9545b8972338f3383e17ac1a52a63e"
+    },
+    {
+      "request": "CSCopyEnter",
+      "response": "SCCopyEnter",
+      "responseSHA256": "f2419e22235da132eff84481fc0ddd5a98677711021cd3d40f3815d0769caf3f"
+    },
+    {
+      "request": "CSCopyFightStart",
+      "response": "SCCopyFightStart",
+      "responseSHA256": "7c4b816d96ec2631ea9a7537cc8342b4d353c229715765c0cf7f4666ffdbc4de"
+    }
+  ],
+  "copyDirectoryCount": 161,
+  "targetStarsBefore": {
+    "1/1": 0,
+    "6/30": 0
+  },
+  "qualificationGameSHA256": "a9d0ed4f54f2dee0b5cc52d931d575fa30d58b5405cc2b091bba964c7d46c123",
+  "qualificationTargets": [
+    "1/1",
+    "6/30"
+  ],
+  "offer": {
+    "id": 2,
+    "active": true,
+    "rewardState": 0,
+    "endTime": 1793688277686
+  },
+  "taskId": "1",
+  "fightId": "cfd2a4ed546bfbbb158b1a83",
+  "p6Status": "captured",
+  "p6ExpiresAt": 1793645978680,
+  "pendingRun": true,
+  "finalPosition": "town_main",
+  "afterGameSHA256": "a005ef83cba3a10c6d42529dcb9a1b22764d6bae7bfe2aa1ffbb7b87f550184e"
+}

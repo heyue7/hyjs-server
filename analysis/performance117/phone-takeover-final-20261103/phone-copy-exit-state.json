@@ -1,0 +1,184 @@
+{
+  "stage": "after",
+  "schema": "hyjs_test_p1_performance117_phone_b9e5279d7b",
+  "playerId": 2,
+  "before": {
+    "stage": "before",
+    "schema": "hyjs_test_p1_performance117_phone_b9e5279d7b",
+    "playerId": 2,
+    "playerSHA256": "cff1356d7a3469d81643c897a24712ce6c675474705698b081ff8a2864aca652",
+    "gameWithoutRunNormalizedSHA256": "e75021dbee13938dc8b24eece390266f70dc458f525520cebaed2b8157b66bd1",
+    "gameNormalization": "parse stored game JSON, delete top-level run, Python json.dumps(sort_keys=True, ensure_ascii=False, separators=(comma,colon), allow_nan=False), UTF-8",
+    "runToken": "d0f720b14b3aad0f0b1182c0839b0794f599d86737ad4207d01f17d2b0b9c19f",
+    "runTokenBasis": "SHA-256 of the exact stored Go-serialized Run object; run field order verified",
+    "runJSONMatchesPythonCompact": true,
+    "fightId": "cfd2a4ed546bfbbb158b1a83",
+    "p6Status": "captured",
+    "p6ExpiresAt": 1793645978680,
+    "p6TimeExpired": false,
+    "capturedAtUnixMs": 1793645531558,
+    "databaseWrites": false,
+    "protocolCalls": false,
+    "phoneOperated": false
+  },
+  "after": {
+    "capturedAtUnixMs": 1793645769953,
+    "runRemoved": true,
+    "p6Status": "cancelled",
+    "p6ExpiresAt": 1793645978680,
+    "p6Terminal": true,
+    "playerSHA256": "dfdc3984138d9f9ff3ccf4c901382900a1e56d1bdb6ae83ed57b0b4d8fdea01d",
+    "playerAssetChanges": [
+      {
+        "field": "stamina",
+        "before": 80,
+        "after": 81,
+        "delta": 1
+      }
+    ],
+    "playerTimeFieldsChanged": [
+      "staminaLastRefreshTime"
+    ],
+    "otherPlayerFieldsChanged": [],
+    "gameWithoutRunNormalizedSHA256": "b8fba75db80a2f42bd7633029a4346e4701d6a0053e3e156a4ea738b6b41f3f1",
+    "gameWithoutRunUnchanged": false,
+    "otherGameTopLevelFieldsChanged": [
+      "field",
+      "ggo_field",
+      "position"
+    ],
+    "assetCanonicalScheme": "sha256 UTF-8 compact sorted-key JSON of {present,value}; compressed warriors verified and expanded",
+    "gameAssetChecks": {
+      "items": {
+        "beforeSHA256": "f3825110f1ee94db1f747299a0af90d397a77e4c1f1aeea5da7ef136265361fd",
+        "afterSHA256": "f3825110f1ee94db1f747299a0af90d397a77e4c1f1aeea5da7ef136265361fd",
+        "unchanged": true
+      },
+      "equipment": {
+        "beforeSHA256": "f35a0cf0ef896a2236d8419cac8a2d85bfb33d12859af555f9cf7825dc785109",
+        "afterSHA256": "f35a0cf0ef896a2236d8419cac8a2d85bfb33d12859af555f9cf7825dc785109",
+        "unchanged": true
+      },
+      "treasures": {
+        "beforeSHA256": "f35a0cf0ef896a2236d8419cac8a2d85bfb33d12859af555f9cf7825dc785109",
+        "afterSHA256": "f35a0cf0ef896a2236d8419cac8a2d85bfb33d12859af555f9cf7825dc785109",
+        "unchanged": true
+      },
+      "gems": {
+        "beforeSHA256": "f35a0cf0ef896a2236d8419cac8a2d85bfb33d12859af555f9cf7825dc785109",
+        "afterSHA256": "f35a0cf0ef896a2236d8419cac8a2d85bfb33d12859af555f9cf7825dc785109",
+        "unchanged": true
+      },
+      "cooking": {
+        "beforeSHA256": "f35a0cf0ef896a2236d8419cac8a2d85bfb33d12859af555f9cf7825dc785109",
+        "afterSHA256": "f35a0cf0ef896a2236d8419cac8a2d85bfb33d12859af555f9cf7825dc785109",
+        "unchanged": true
+      },
+      "warriors": {
+        "beforeSHA256": "604bc00408933f493a7e9816611263f0b092f3bed01f4e41295b5b1add8855c7",
+        "afterSHA256": "604bc00408933f493a7e9816611263f0b092f3bed01f4e41295b5b1add8855c7",
+        "unchanged": true
+      },
+      "formation": {
+        "beforeSHA256": "ec8cdfc5f95483e6e13556a9ed7808c30323d96dab7cf3a445ce070768c70fbc",
+        "afterSHA256": "ec8cdfc5f95483e6e13556a9ed7808c30323d96dab7cf3a445ce070768c70fbc",
+        "unchanged": true
+      },
+      "tactical_formations": {
+        "beforeSHA256": "d52cdf146349ecf90e187f987113a53ffb7db46b9d264143faab3d3575f08d19",
+        "afterSHA256": "d52cdf146349ecf90e187f987113a53ffb7db46b9d264143faab3d3575f08d19",
+        "unchanged": true
+      },
+      "tactical_skill_id": {
+        "beforeSHA256": "eb7598e6488f478e1802669ee4291e81fb1ef8ed7dff5e85ca14ab53b414f815",
+        "afterSHA256": "eb7598e6488f478e1802669ee4291e81fb1ef8ed7dff5e85ca14ab53b414f815",
+        "unchanged": true
+      },
+      "ggo_field.chips": {
+        "beforeSHA256": "f870f45feacc39bad3c505e29f26f50952969236d4b7b966f93445199afaa84b",
+        "afterSHA256": "f870f45feacc39bad3c505e29f26f50952969236d4b7b966f93445199afaa84b",
+        "unchanged": true
+      },
+      "ggo_field.material_remainder": {
+        "beforeSHA256": "f35a0cf0ef896a2236d8419cac8a2d85bfb33d12859af555f9cf7825dc785109",
+        "afterSHA256": "f35a0cf0ef896a2236d8419cac8a2d85bfb33d12859af555f9cf7825dc785109",
+        "unchanged": true
+      },
+      "ggo_field.monster_remainder": {
+        "beforeSHA256": "f35a0cf0ef896a2236d8419cac8a2d85bfb33d12859af555f9cf7825dc785109",
+        "afterSHA256": "f35a0cf0ef896a2236d8419cac8a2d85bfb33d12859af555f9cf7825dc785109",
+        "unchanged": true
+      }
+    },
+    "allListedGameAssetsUnchanged": true,
+    "positionBefore": {
+      "playerId": 2,
+      "current": {
+        "x": 41.11,
+        "y": -2.25,
+        "z": -42.33
+      },
+      "scene": "town_main"
+    },
+    "positionAfter": {
+      "playerId": 2,
+      "current": {
+        "x": 41.11,
+        "y": -2.2494645,
+        "z": -42.33
+      },
+      "scene": "town_main"
+    },
+    "positionLoading": false,
+    "sceneScope": "town_main",
+    "presence": {
+      "exists": true,
+      "scene": "town_main",
+      "line": 1,
+      "updatedAt": 1793645597341,
+      "offlineUntil": 0,
+      "sessionCurrent": true
+    },
+    "transferObservation": "no_committed_scene_change_observed_send_or_rejection_unknown",
+    "httpPathStatusEvidence": [
+      {
+        "path": "/copy/run/status",
+        "statuses": []
+      },
+      {
+        "path": "/copy/run/leave",
+        "statuses": []
+      }
+    ],
+    "httpStatusMeansBusinessSuccess": false,
+    "ggoCreditBeforeAvailable": false,
+    "databaseWrites": false,
+    "protocolCalls": false,
+    "phoneOperated": false,
+    "positionAndTimeChanges": {
+      "positionY": {
+        "before": -2.25,
+        "after": -2.2494645
+      },
+      "positionRevision": {
+        "before": 3,
+        "after": 5
+      },
+      "staminaLastRefreshTime": {
+        "before": 1793645077762,
+        "after": 1793645437762,
+        "deltaMs": 360000
+      },
+      "staminaRecoveryIntervalMsFromSource": 360000,
+      "fieldRespawnAt": {
+        "beforePresent": true,
+        "afterPresent": true,
+        "afterEntryCount": 0
+      }
+    },
+    "httpBusinessEvidence": {
+      "status": "prompt displayed after a successful client status response according to CopyExitRecovery.Status; no server access-log path/status found",
+      "leave": "Run removal and P6 cancellation are committed; HTTP response delivery/business body was not logged"
+    }
+  }
+}
