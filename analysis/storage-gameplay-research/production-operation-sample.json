@@ -1,0 +1,117 @@
+{
+  "sampledAtUTC": "2026-11-02T05:41:09.316307+00:00",
+  "containers": {
+    "hyjs-game": {
+      "status": "running",
+      "restarts": 0,
+      "startedAt": "2026-11-01T21:01:40.602798733Z",
+      "revision": "3fb495f43063933d127577c4a14a772b8c30ceca"
+    },
+    "hyjs-mysql": {
+      "status": "running",
+      "restarts": 5,
+      "startedAt": "2026-11-01T16:07:31.445747242Z",
+      "revision": null
+    }
+  },
+  "stats": [
+    "hyjs-game CPU=56.97% MEM=209.9MiB / 1GiB",
+    "hyjs-mysql CPU=14.92% MEM=1.288GiB / 2GiB"
+  ],
+  "boundedLogReadBytes": 175794,
+  "observedTimestampRange": [
+    "2026-11-02T03:05:38.869000+00:00",
+    "2026-11-02T05:40:55.242000+00:00"
+  ],
+  "targetOperations": {
+    "CSPvpFindMatch": {
+      "count": 26,
+      "maxMs": 2410,
+      "lastUTC": "2026-11-02T05:37:32.589000+00:00"
+    },
+    "CSTreasureBattleList": {
+      "count": 6,
+      "maxMs": 733,
+      "lastUTC": "2026-11-02T05:35:23.513000+00:00"
+    },
+    "CSSidePveBossFightStart": {
+      "count": 11,
+      "maxMs": 2705,
+      "lastUTC": "2026-11-02T05:06:52.454000+00:00"
+    },
+    "CSSidePveBossFightEnd": {
+      "count": 15,
+      "maxMs": 5405,
+      "lastUTC": "2026-11-02T05:11:51.753000+00:00"
+    },
+    "CSTreasureStrengthen": {
+      "count": 15,
+      "maxMs": 3075,
+      "lastUTC": "2026-11-02T05:34:21.870000+00:00"
+    },
+    "CSFightTreasureStartResult": {
+      "count": 2,
+      "maxMs": 5113,
+      "lastUTC": "2026-11-02T03:36:29.285000+00:00"
+    },
+    "CSTransferScene": {
+      "count": 4,
+      "maxMs": 409,
+      "lastUTC": "2026-11-02T04:55:15.581000+00:00"
+    },
+    "CSSidePveFightEnd": {
+      "count": 1,
+      "maxMs": 2208,
+      "lastUTC": "2026-11-02T03:32:16.227000+00:00"
+    },
+    "CSSweepTreasureFight": {
+      "count": 15,
+      "maxMs": 16552,
+      "lastUTC": "2026-11-02T05:15:12.570000+00:00"
+    },
+    "CSSideBossCheck": {
+      "count": 4,
+      "maxMs": 603,
+      "lastUTC": "2026-11-02T05:07:20.422000+00:00"
+    },
+    "CSPvpFightResult": {
+      "count": 21,
+      "maxMs": 8135,
+      "lastUTC": "2026-11-02T05:37:24.855000+00:00"
+    },
+    "CSPvpRank": {
+      "count": 1,
+      "maxMs": 1403,
+      "lastUTC": "2026-11-02T03:48:36.400000+00:00"
+    },
+    "CSFieldResourceStartGather": {
+      "count": 35,
+      "maxMs": 746,
+      "lastUTC": "2026-11-02T04:21:58.511000+00:00"
+    },
+    "CSTreasureRefine": {
+      "count": 5,
+      "maxMs": 1076,
+      "lastUTC": "2026-11-02T04:17:06.500000+00:00"
+    },
+    "CSFieldGetResource": {
+      "count": 1,
+      "maxMs": 215,
+      "lastUTC": "2026-11-02T04:20:05.832000+00:00"
+    },
+    "CSSidePveFightStart": {
+      "count": 1,
+      "maxMs": 1357,
+      "lastUTC": "2026-11-02T04:51:39.690000+00:00"
+    },
+    "CSEquipmentTreasureList": {
+      "count": 1,
+      "maxMs": 240,
+      "lastUTC": "2026-11-02T05:07:29.959000+00:00"
+    }
+  },
+  "errorMessages": {
+    "hyjs-server/handler.SproutStatusHandler error.": 67,
+    "hyjs-server/handler.GameGuideSkipHandler error.": 2
+  }
+}

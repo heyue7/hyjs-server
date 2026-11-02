@@ -1,0 +1,31 @@
+{
+  "recordedAtUTC": "2026-11-02T06:01:23.937023+00:00",
+  "sourceCommit": "f906b82a133bea8dc2f6ac9c37238b93fbb0bf79",
+  "productionRevision": "3fb495f43063933d127577c4a14a772b8c30ceca",
+  "mode": "read-only investigation; documentation and evidence files only",
+  "productionTables": 535,
+  "candidateFields": 2241,
+  "knownAggregateFields": 347,
+  "knownAggregateTables": 220,
+  "providerDetails": "Pending user clarification; no storage endpoint, keys or bucket tested.",
+  "samplingLimits": [
+    "Only information_schema metadata, counts and bounded length samples; no private payload content exported.",
+    "Initial JSON root-key aggregate reached its 3000ms bound. Wanted 4-row length sample reached its 1000ms bound. Both stopped by MySQL and not retried.",
+    "Slow-log records cover only requests at or above 200ms; no full latency percentiles or load-normalized capacity claim."
+  ],
+  "resourcesCreated": {
+    "localServiceInstances": 0,
+    "mysqlSchemas": 0,
+    "redisKeys": 0,
+    "appProcesses": 0,
+    "deviceSessions": 0,
+    "productionWrites": 0,
+    "deployment": false
+  },
+  "documentationLinkChecks": {
+    "absoluteLinks": 96,
+    "broken": []
+  },
+  "evidenceBytes": 1397872,
+  "localFreeBytesAtEnd": 20504322048
+}

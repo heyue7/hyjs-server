@@ -1,0 +1,91 @@
+{
+  "scope": "Original extracted TSVs parsed with English header rows[1] and data rows[5:] as LoadTables; Python compact JSON sizes are estimates before runtime normalizers, not deployed ConfigurationHash.",
+  "tables": [
+    {
+      "table": "Hero",
+      "rows": 167,
+      "fileBytes": 40218,
+      "sha256": "7fe0a5dd0eab9bb291a9ce4561e0c45772c8f1edab8201a5c03fb37e1177526d",
+      "approxJSONBytes": 133770
+    },
+    {
+      "table": "Skill",
+      "rows": 508,
+      "fileBytes": 91536,
+      "sha256": "17ea58b52a45bcdbeb7c0f7b1e22d697dbcf00d7a970bb3c016835e33fbe44e1",
+      "approxJSONBytes": 263099
+    },
+    {
+      "table": "SkillCast",
+      "rows": 2470,
+      "fileBytes": 206961,
+      "sha256": "c17f0179803225860c25aefc2693f19c917cacc8b144fe0a509aaf014d6b5f2a",
+      "approxJSONBytes": 1970780
+    },
+    {
+      "table": "Buff",
+      "rows": 884,
+      "fileBytes": 70586,
+      "sha256": "68475f7c731e3ce19680f33720a4728a984727a96ea7e8bf4ba2c7aced0e0197",
+      "approxJSONBytes": 428918
+    },
+    {
+      "table": "Talent",
+      "rows": 780,
+      "fileBytes": 75210,
+      "sha256": "196959cefe4751a2a678d6e97b009ea59e8f2b9168c7bc9291b89f9472a95ab5",
+      "approxJSONBytes": 490940
+    },
+    {
+      "table": "GameConfigure",
+      "rows": 491,
+      "fileBytes": 32615,
+      "sha256": "f359612c3523918327f7256026ee861923468c2282f88504dac2c426bcd82206",
+      "approxJSONBytes": 62381
+    },
+    {
+      "table": "CopyEnemy",
+      "rows": 2168,
+      "fileBytes": 233382,
+      "sha256": "acf67a9c670df87da6547688635d428f866b97d2ce5671fce861517bd61fdfe6",
+      "approxJSONBytes": 1008367
+    },
+    {
+      "table": "BuffInfExtend",
+      "rows": 0,
+      "fileBytes": 356,
+      "sha256": "2e74cf1543f77d19ccb4cf60b063093cb73e12f6d75ce04142a6abc3802221c9",
+      "approxJSONBytes": 2
+    },
+    {
+      "table": "HeroAwakenAdd",
+      "rows": 36,
+      "fileBytes": 1968,
+      "sha256": "531c23382f8971eb3803207e0662cfda6adc4b10e94ea9188c787f518dd18a34",
+      "approxJSONBytes": 4444
+    },
+    {
+      "table": "BootHero",
+      "rows": 5,
+      "fileBytes": 1367,
+      "sha256": "7ec6a65dad92bdd1d48832f5b2e7922a022c4704c6a23396f06361780d50ba97",
+      "approxJSONBytes": 1934
+    },
+    {
+      "table": "RecruitShowHero",
+      "rows": 21,
+      "fileBytes": 3051,
+      "sha256": "a06f6937bd9167a7daaed839f1420e96733ca4115f28f5a634dceb17808f5c2f",
+      "approxJSONBytes": 8658
+    },
+    {
+      "table": "WantedEnemy",
+      "rows": 1388,
+      "fileBytes": 167870,
+      "sha256": "d9c0e2b3dadc5abd7dbab9457c497b0261c491b4e010f496f08eb9b66fe1a4ad",
+      "approxJSONBytes": 689912
+    }
+  ],
+  "base11TablesApproxJSONBytes": 4373418,
+  "wanted12TablesApproxJSONBytes": 5063345
+}

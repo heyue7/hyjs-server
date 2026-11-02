@@ -1,0 +1,25 @@
+{
+  "sampledAtUTC": "2026-11-02T05:54:17.674304+00:00",
+  "scope": "Exact counts plus small primary-key ordered payload-length samples; no payload content transferred, samples not population means. Each SELECT capped at 1000ms.",
+  "exitCode": 1,
+  "rows": [
+    [
+      "P6_ROWS",
+      "9021"
+    ],
+    [
+      "WANTED_ROWS",
+      "358"
+    ],
+    [
+      "P6_PK_SAMPLE",
+      "8",
+      "220121.6250",
+      "220431",
+      "617.1250",
+      "137261.0000",
+      "8"
+    ]
+  ],
+  "error": "ERROR 3024 (HY000) at line 4: Query execution was interrupted, maximum statement execution time exceeded\n"
+}

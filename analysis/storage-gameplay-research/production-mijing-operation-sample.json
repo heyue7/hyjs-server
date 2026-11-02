@@ -1,0 +1,11 @@
+{
+  "sampledAtUTC": "2026-11-02T05:55:13.552411+00:00",
+  "boundedLogReadBytes": 188573,
+  "targetOperations": {
+    "CSCurrentPosition": {
+      "count": 10,
+      "maxMs": 634
+    }
+  },
+  "errors": {}
+}
