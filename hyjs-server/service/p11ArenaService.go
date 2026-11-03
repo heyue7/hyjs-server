@@ -300,10 +300,11 @@ func (s *GameService) p11ArenaQuery(ctx context.Context, id int64, request proto
 				return err
 			}
 		}
-		if match {
-			if err := s.p11RefreshSelectedArenaSnapshots(tx, selected); err != nil {
-				return err
-			}
+		// Display current public attributes even if the selected player has not
+		// reopened the arena. Only this request's copies change; accepted battle
+		// and historical membership snapshots remain immutable.
+		if err := s.p11RefreshSelectedArenaSnapshots(tx, selected); err != nil {
+			return err
 		}
 		list := []*pb.PvpRankPlayerInfo{}
 		batch := uuid.NewString()

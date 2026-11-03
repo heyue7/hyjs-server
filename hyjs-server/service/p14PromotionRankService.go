@@ -657,9 +657,6 @@ func p14PromotionRankSort(rows []p14PromotionRankProjection) {
 // version. Missing remote facts produce a pending error, never a local-only
 // global rank. Even a complete list does not create final32 qualification.
 func (s *GameService) p14PromotionRankReadAt(ctx context.Context, request *pb.CSKFRankInfo, now time.Time) ([]proto.Message, error) {
-	if err := s.QueueP14PromotionRanks(ctx, now); err != nil {
-		return nil, err
-	}
 	var response *pb.SCKFRankInfo
 	err := db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := ServerGameClockGuardTransaction(tx); err != nil {

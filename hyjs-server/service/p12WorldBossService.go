@@ -75,6 +75,10 @@ func p12WorldBossConfig(tx *gorm.DB) (*db.P12WorldBossPolicy, *p12WorldBossDefin
 	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&cfg, 1).Error; err != nil {
 		return nil, nil, err
 	}
+	return p12WorldBossValidateConfig(tx, &cfg)
+}
+
+func p12WorldBossValidateConfig(tx *gorm.DB, cfg *db.P12WorldBossPolicy) (*db.P12WorldBossPolicy, *p12WorldBossDefinition, error) {
 	if cfg.Source == "" || cfg.Level < 1 || cfg.Level > 50 || cfg.PositionID < 1 || cfg.DefinitionHash != p6Digest([]byte(cfg.DefinitionJSON)) {
 		return nil, nil, errors.New("世界首领完整运营快照无效")
 	}
@@ -83,11 +87,11 @@ func p12WorldBossConfig(tx *gorm.DB) (*db.P12WorldBossPolicy, *p12WorldBossDefin
 		return nil, nil, err
 	}
 	if s, ok := tx.Statement.Context.Value(constUtil.GameServiceContextKey).(*GameService); ok {
-		if err := s.adminFieldBossConfiguration(&cfg, &def); err != nil {
+		if err := s.adminFieldBossConfiguration(cfg, &def); err != nil {
 			return nil, nil, err
 		}
 	}
-	return &cfg, &def, nil
+	return cfg, &def, nil
 }
 
 // p12WorldBossWindow使用原两个刷新时刻/60分钟，边界为开始包含、结束不包含；返回当前或最近未来原窗口。
@@ -264,7 +268,9 @@ func p12WorldBossCycle(tx *gorm.DB, cfg *db.P12WorldBossPolicy, def *p12WorldBos
 }
 func (s *GameService) p12WorldBossAt(ctx context.Context, id int64, request proto.Message, now time.Time) ([]proto.Message, error) {
 	switch request.(type) {
-	case *pb.CSWorldBossInfo, *pb.CSWorldBossRank, *pb.CSWorldBossReward:
+	case *pb.CSWorldBossRank:
+		return s.p12WorldBossRankRead(ctx, id, now)
+	case *pb.CSWorldBossInfo, *pb.CSWorldBossReward:
 	default:
 		return nil, errors.New(constUtil.P12WorldBossClosed)
 	}
@@ -340,19 +346,6 @@ func (s *GameService) p12WorldBossAt(ctx context.Context, id int64, request prot
 				}
 			}
 			reply = &pb.SCWorldBossInfo{WorldBossShowInfo: out}
-		case *pb.CSWorldBossRank:
-			if s.P12WorldBossBattleReady {
-				var battlePolicy db.P12WorldBossBattlePolicy
-				if err := tx.First(&battlePolicy, 1).Error; err != nil {
-					return err
-				}
-				if battlePolicy.Enabled && cycle.State == constUtil.P12WorldBossActive {
-					reply, err = p12WorldBossBattleRank(tx, cycle.ID, id)
-					return err
-				}
-			}
-			// 本批没有权威攻击入口；未发生伤害的真实定义保持满条，列表/最后一击/个人排名均为空。
-			reply = &pb.SCWorldBossRank{BossHpPercent: proto.Float64(1), State: proto.Int32(state)}
 		case *pb.CSWorldBossReward:
 			reply, err = p12WorldBossRewardPreview(*frozen, cycle.Level)
 			if err != nil {

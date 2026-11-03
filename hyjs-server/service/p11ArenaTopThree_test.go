@@ -92,6 +92,10 @@ func TestP11ArenaFightThirdHigherRankSettlesOnce(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	// These are separate requests around a committed rank change. Keep their
+	// authority times ordered instead of choosing between random UUIDs tied
+	// at an artificial identical created_at.
+	now = now.Add(time.Millisecond)
 	offer := p11ArenaQuery(t, f, f.id, &pb.CSPvpFindMatch{}, 10101, now).(*pb.SCPvpFindMatch)
 	found := false
 	for _, target := range offer.GetRankList() {

@@ -714,9 +714,6 @@ func (s *GameService) P13UnionFightMonthlyRank(ctx context.Context, _ int64, b *
 	if b.GetRankType() != 2 || b.GetSubType() != 0 {
 		return nil, errors.New("原公会战月榜类型无效")
 	}
-	if err := s.TickP13UnionFightMonthly(ctx, now); err != nil {
-		return nil, err
-	}
 	out := &pb.SCUFRankInfo{RankType: b.RankType, SubType: b.SubType, RankIno: &pb.RankInfo{Type: proto.Int32(2)}}
 	err := db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := ServerGameClockGuardTransaction(tx); err != nil {
@@ -724,7 +721,7 @@ func (s *GameService) P13UnionFightMonthlyRank(ctx context.Context, _ int64, b *
 		}
 
 		var gate db.P13GuildPolicy
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&gate, 1).Error; err != nil {
+		if err := tx.First(&gate, 1).Error; err != nil {
 			return err
 		}
 		var offer db.P13UnionFightMonthlyOffer

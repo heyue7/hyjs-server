@@ -2,6 +2,7 @@
 
 本页只做导航。按当前任务读取对应计划；业务要求、版本和证据留在计划正文，不加载无关历史。
 
+- [排行榜读取与刷新修复](20261103-leaderboard-refresh.md)
 - [第二轮性能优化方案](round-two-performance-plan.md)
 - [第二轮首批实现、验证与回退](round-two-first-batch.md)
 - [第二轮收尾实现与实测](round-two-final-batch.md)

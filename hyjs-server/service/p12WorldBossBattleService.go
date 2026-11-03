@@ -1105,10 +1105,7 @@ func p12WorldBossBattleRank(tx *gorm.DB, instanceID string, id int64) (*pb.SCWor
 	if err != nil {
 		return nil, err
 	}
-	var rows []struct {
-		PlayerID int64
-		Damage   int64
-	}
+	var rows []p12WorldBossRankRow
 	// 当前读绕过MySQL RR旧快照；复合索引使此锁只涉及该实例已提交回执。
 	var receipts []db.P12WorldBossBattleReceipt
 	if err = tx.Clauses(clause.Locking{Strength: "UPDATE"}).Select("player_id,applied_damage").Where("instance_id=? AND committed=?", instanceID, true).Find(&receipts).Error; err != nil {
@@ -1121,10 +1118,7 @@ func p12WorldBossBattleRank(tx *gorm.DB, instanceID string, id int64) (*pb.SCWor
 		}
 	}
 	for playerID, damage := range totals {
-		rows = append(rows, struct {
-			PlayerID int64
-			Damage   int64
-		}{playerID, damage})
+		rows = append(rows, p12WorldBossRankRow{PlayerID: playerID, Damage: damage})
 	}
 	sort.Slice(rows, func(i, j int) bool {
 		if rows[i].Damage != rows[j].Damage {
@@ -1132,28 +1126,5 @@ func p12WorldBossBattleRank(tx *gorm.DB, instanceID string, id int64) (*pb.SCWor
 		}
 		return rows[i].PlayerID < rows[j].PlayerID
 	})
-	state := int32(1)
-	if instance.CurrentHP == 0 {
-		state = 2
-	}
-	out := &pb.SCWorldBossRank{BossHpPercent: proto.Float64(float64(instance.CurrentHP) / float64(instance.TotalHP)), State: proto.Int32(state)}
-	for index, row := range rows {
-		var profile db.Profile
-		if err = tx.First(&profile, row.PlayerID).Error; err != nil {
-			return nil, err
-		}
-		player, _, err := decodeProfile(&profile)
-		if err != nil {
-			return nil, err
-		}
-		info := &pb.WorldBossDamageInfo{Damage: proto.Float64(float64(row.Damage)), PlayerName: proto.String(player.GetName()), Rank: proto.Int32(int32(index + 1))}
-		out.DamageInfos = append(out.DamageInfos, info)
-		if row.PlayerID == id {
-			out.MyDamageInfo = info
-		}
-		if row.PlayerID == instance.KillerID {
-			out.LastDamageInfo = info
-		}
-	}
-	return out, nil
+	return p12WorldBossRankProjection(tx, &instance, rows, id)
 }

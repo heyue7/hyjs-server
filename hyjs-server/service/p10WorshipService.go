@@ -37,61 +37,84 @@ func p10WorshipActionHash(row *db.P10WorshipAction) string {
 	return p6Digest(raw)
 }
 
-// p10WorshipRanks 从本服已创建真实角色计算原战力与等级榜，空账号不生成占位玩家。
-func (s *GameService) p10WorshipRanks(tx *gorm.DB, kind int32) ([]*pb.SimplePlayerInfo, error) {
-	var rows []db.Profile
-	if err := tx.Order("id").Find(&rows).Error; err != nil {
-		return nil, err
-	}
+// p10WorshipRankLists reads each role and its current attribute sources once.
+// Only public top-three projections escape this read transaction.
+func (s *GameService) p10WorshipRankLists(tx *gorm.DB, serverID int64, now time.Time) (*p10FamousRankLists, error) {
 	var ranked []*pb.SimplePlayerInfo
-	for _, row := range rows {
-		if row.Player == nil && row.Game == nil {
-			continue
+	var lastID int64
+	for {
+		var ids []int64
+		if err := tx.Model(&db.Profile{}).Where("server_id=? AND id>? AND player IS NOT NULL AND game IS NOT NULL", serverID, lastID).Order("id").Limit(constUtil.PlayerRank48ReadPageSize).Pluck("id", &ids).Error; err != nil {
+			return nil, err
 		}
-		p, g, err := decodeProfile(&row)
+		if len(ids) == 0 {
+			break
+		}
+		reads, err := s.p13GuildReadPlayers(tx, ids, now)
 		if err != nil {
 			return nil, err
 		}
-		if p.GetName() == "" || p.GetHeroWarId() == "" || len(g.Warriors) == 0 {
-			continue
-		}
-		info, err := s.p10Player(tx, row.Id)
-		if err != nil {
-			return nil, err
-		}
-		// 名人榜模型跟随当前队伍的第一位角色，读取阵容顺序而不依赖账号主角。
-		var first *pb.FormationItem
-		for _, slot := range g.Formation {
-			hero := formationHero(slot)
-			if hero != nil && hero.GetId() != "" && hero.GetGuid() != "" && (first == nil || slot.GetFormatPos() < first.GetFormatPos()) {
-				first = slot
+		for _, id := range ids {
+			read := reads[id]
+			p, g := read.Player, read.Game
+			if p.GetName() == "" || p.GetHeroWarId() == "" || len(g.Warriors) == 0 {
+				continue
 			}
-		}
-		if first != nil {
-			hero, err := p5Warrior(g, formationHero(first).GetGuid())
-			if err != nil {
-				return nil, err
+			heroID := ""
+			for _, w := range g.Warriors {
+				if w.GetGuid() == p.GetHeroWarId() {
+					heroID = w.GetId()
+					break
+				}
 			}
-			weapon, err := s.battleWeaponID(g, first)
-			if err != nil {
-				return nil, err
+			info := &pb.SimplePlayerInfo{PlayerId: proto.Int64(id), ServerId: proto.Int32(int32(serverID)), Level: p.Level, PlayerName: p.Name, FightPower: proto.Int32(read.Power), HeroWarId: proto.String(heroID)}
+			var first *pb.FormationItem
+			for _, slot := range g.Formation {
+				hero := formationHero(slot)
+				if hero != nil && hero.GetId() != "" && hero.GetGuid() != "" && (first == nil || slot.GetFormatPos() < first.GetFormatPos()) {
+					first = slot
+				}
 			}
-			info.HeroWarId = hero.Id
-			info.WeaponId = proto.String(weapon)
+			if first != nil {
+				hero, err := p5Warrior(g, formationHero(first).GetGuid())
+				if err != nil {
+					return nil, err
+				}
+				weapon, err := s.battleWeaponID(g, first)
+				if err != nil {
+					return nil, err
+				}
+				info.HeroWarId = hero.Id
+				info.WeaponId = proto.String(weapon)
+			}
+			ranked = append(ranked, info)
 		}
-		ranked = append(ranked, info)
+		lastID = ids[len(ids)-1]
+		if len(ids) < constUtil.PlayerRank48ReadPageSize {
+			break
+		}
 	}
-	sort.Slice(ranked, func(i, j int) bool {
-		left, right := ranked[i].GetFightPower(), ranked[j].GetFightPower()
-		if kind == 1 {
-			left, right = ranked[i].GetLevel(), ranked[j].GetLevel()
+	lists := &p10FamousRankLists{}
+	for kind := 0; kind < 2; kind++ {
+		list := append([]*pb.SimplePlayerInfo(nil), ranked...)
+		sort.Slice(list, func(i, j int) bool {
+			left, right := list[i].GetFightPower(), list[j].GetFightPower()
+			if kind == 1 {
+				left, right = list[i].GetLevel(), list[j].GetLevel()
+			}
+			if left != right {
+				return left > right
+			}
+			return list[i].GetPlayerId() < list[j].GetPlayerId()
+		})
+		list = list[:min(len(list), constUtil.P10WorshipTopCount)]
+		if kind == 0 {
+			lists.Power = list
+		} else {
+			lists.Level = list
 		}
-		if left != right {
-			return left > right
-		}
-		return ranked[i].GetPlayerId() < ranked[j].GetPlayerId()
-	})
-	return ranked[:min(len(ranked), constUtil.P10WorshipTopCount)], nil
+	}
+	return lists, nil
 }
 
 // p10WorshipQuote 首次实际膜拜才冻结当天原报价；后续不因配置漂移重新定奖励。
@@ -151,6 +174,9 @@ func p10WorshipActions(tx *gorm.DB, daily *db.P10WorshipDaily) ([]int64, error) 
 
 // p10Worship 同一已锁观察者串行化每日3次/两个榜单/唯一目标与金币/P1事实/原回执。
 func (s *GameService) p10Worship(ctx context.Context, id int64, request proto.Message, stamp int64, now time.Time) ([]proto.Message, error) {
+	if rank, ok := request.(*pb.CSFamous); ok {
+		return s.p10FamousRead(ctx, id, rank.GetType(), now)
+	}
 	var response proto.Message
 	var player *pb.Player
 	err := db.GetIns().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
@@ -193,15 +219,6 @@ func (s *GameService) p10Worship(ctx context.Context, id int64, request proto.Me
 		}
 		left := int32(daily.Limit - int64(len(ids)))
 		switch b := request.(type) {
-		case *pb.CSFamous:
-			ranks, err := s.p10WorshipRanks(tx, b.GetType())
-			if err != nil {
-				return err
-			}
-			if !policy.Enabled {
-				left = 0
-			}
-			response = &pb.SCFamous{LeftAddGood: proto.Int32(left), GoodList: ids, PlayerList: ranks}
 		case *pb.CSGood:
 			if !policy.Enabled {
 				return errors.New(constUtil.P10WorshipClosed)
@@ -217,10 +234,14 @@ func (s *GameService) p10Worship(ctx context.Context, id int64, request proto.Me
 			var target *pb.SimplePlayerInfo
 			var rankType int32
 			var position int64
+			lists, err := s.p10WorshipRankLists(tx, AdminProfileServerID(profile), now)
+			if err != nil {
+				return err
+			}
 			for _, kind := range []int32{0, 1} {
-				ranks, err := s.p10WorshipRanks(tx, kind)
-				if err != nil {
-					return err
+				ranks := lists.Power
+				if kind == 1 {
+					ranks = lists.Level
 				}
 				for i, info := range ranks {
 					if info.GetPlayerId() == b.GetPlayerId() {

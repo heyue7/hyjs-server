@@ -26,9 +26,10 @@ type GameService struct {
 	// GGOIntegrationReady is set once by the isolated loopback test process.
 	GGOIntegrationReady bool
 	// RuntimeBase preserves live socket ownership across request-local table overlays.
-	RuntimeBase  *GameService
-	tableLookup  *gameTableLookup
-	gameSchema64 atomic.Pointer[gameSchema64Snapshot]
+	RuntimeBase     *GameService
+	famousRankCache p10FamousRankCache
+	tableLookup     *gameTableLookup
+	gameSchema64    atomic.Pointer[gameSchema64Snapshot]
 	// ServerID 由启动配置注入；同一数据库中的本地ID归属该区服。
 	ServerID int64
 	Host     string
