@@ -132,6 +132,9 @@ func TestGGOBossNativePartialEndRetryAndCold(t *testing.T) {
 	if terminal.Outcome.Winner == 0 {
 		result = 1
 	}
+	if result != 0 || terminal.OriginalOperates.GetAttackerTotalLeftHp() <= 0 {
+		t.Fatal("fixture must end as a surviving partial loss", terminal.Outcome, terminal.OriginalOperates)
+	}
 	request := &pb.CSSidePveBossFightEnd{FightId: start.FightId, Uuid: proto.String(event.ID), Result: proto.Int32(result), OptRecord: terminal.OriginalOperates}
 	forged := proto.Clone(request).(*pb.CSSidePveBossFightEnd)
 	forged.OptRecord = proto.Clone(request.OptRecord).(*pb.BattleOperate)
@@ -156,8 +159,8 @@ func TestGGOBossNativePartialEndRetryAndCold(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !g.Field.Fight.Settled || g.GGOField.Chips != ([6]int64{10, 0, 0, 1}) || g.Field.Side.GetCurHp() <= 0 {
-		t.Fatal("surviving partial battle changed carried chips")
+	if !g.Field.Fight.Settled || g.GGOField.Chips != ([6]int64{5, 0, 0, 1}) || g.Field.Side.GetCurHp() <= 0 || !g.PositionLoading {
+		t.Fatal("surviving partial loss did not apply death return", g.GGOField.Chips)
 	}
 	var shared db.SharedFieldBoss55
 	if err = sharedFieldBoss55Query(db.GetIns(), f.s.OriginalServerID(), constUtil.GGOFieldScene, constUtil.GGOFieldBossPosition).First(&shared).Error; err != nil {

@@ -523,6 +523,7 @@ func (s *GameService) treasureProperties(t *pb.Treasure, values, percent map[str
 }
 func (s *GameService) treasureFormationProperties(g *model.GameState, slot *pb.FormationItem, values, percent map[string]float64) error {
 	seen := map[int32]bool{}
+	strengthMinimum, refineMinimum := int32(math.MaxInt32), int32(math.MaxInt32)
 	guids := map[string]bool{}
 	for _, candidate := range g.Formation {
 		for _, thing := range candidate.GetThings() {
@@ -547,9 +548,29 @@ func (s *GameService) treasureFormationProperties(g *model.GameState, slot *pb.F
 			return errors.New("饰品挂载类型无效")
 		}
 		seen[thing.GetPos()] = true
+		strengthMinimum = min(strengthMinimum, t.GetStrengthLevel())
+		refineMinimum = min(refineMinimum, t.GetRefineLevel())
 		if err = s.treasureProperties(t, values, percent); err != nil {
 			return err
 		}
+	}
+	// Both treasure slots are required; each master contributes its highest reached tier.
+	if len(seen) == 2 {
+		var strengthMaster, refineMaster map[string]string
+		for _, row := range s.Tables["StrengthenMaster"] {
+			switch row["type"] {
+			case "3":
+				if tableNumber(row, "strengthenLevel") <= float64(strengthMinimum) && (strengthMaster == nil || tableNumber(row, "level") > tableNumber(strengthMaster, "level")) {
+					strengthMaster = row
+				}
+			case "4":
+				if tableNumber(row, "strengthenLevel") <= float64(refineMinimum) && (refineMaster == nil || tableNumber(row, "level") > tableNumber(refineMaster, "level")) {
+					refineMaster = row
+				}
+			}
+		}
+		equipmentAddProperty(values, strengthMaster)
+		equipmentAddProperty(values, refineMaster)
 	}
 	return nil
 }

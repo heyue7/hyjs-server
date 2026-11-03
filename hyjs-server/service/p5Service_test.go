@@ -494,7 +494,7 @@ func TestP5Domain(t *testing.T) {
 		}
 		p, g := state(id)
 		values := map[string]float64{}
-		if err := s.p5TitleBonus(g, values); err != nil || values["hp"] != 50 {
+		if err := s.p5TitleBonus(g, values, "hero_043"); err != nil || values["hp"] != 50 {
 			t.Fatal("title native property", err, values)
 		}
 		if err := updateProfile(ctx, id, func(_ *pb.Player, g *model.GameState) error {
@@ -510,7 +510,7 @@ func TestP5Domain(t *testing.T) {
 		call(id, &pb.CSTitleList{})
 		p, g = state(id)
 		values = map[string]float64{}
-		if err := s.p5TitleBonus(g, values); err != nil || values["hp"] != 0 || p5KV(g, "p5.current-title") != "" {
+		if err := s.p5TitleBonus(g, values, "hero_043"); err != nil || values["hp"] != 0 || p5KV(g, "p5.current-title") != "" {
 			t.Fatal("expired title active", err, values)
 		}
 	})

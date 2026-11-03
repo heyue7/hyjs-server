@@ -676,11 +676,11 @@ func (s *GameService) ggoBossFightEnd(ctx context.Context, id int64, request *pb
 			killNotice = s.ggoBossKillNotice(player.GetName(), boss.GetHeroId())
 		}
 		var lost [6]int64
-		// A surviving round-limit outcome keeps its contribution without death.
-		// A client-reported zero-HP loss can also request a self-funded forfeit,
-		// while damage and rewards remain derived from the server terminal.
+		// Every server-confirmed loss, including a surviving round-limit outcome,
+		// applies the death return. A client-reported zero-HP loss can also
+		// request a self-funded forfeit; damage remains server-derived.
 		forfeit := side.GetCurHp() > 0 && ggoBossRequestedForfeit(request, input.MaxRound)
-		defeated := side.GetCurHp() <= 0 || forfeit
+		defeated := expected == 0 || side.GetCurHp() <= 0 || forfeit
 		if defeated {
 			lost, err = s.ggoPVEDeathLocked(tx, id, player, g, &model.GGOFieldMonsterFight{FightID: request.GetFightId(), EconomyVersion: frozen.EconomyVersion, ExchangeValues: frozen.ExchangeValues, ProtectedChips: frozen.ProtectedChips, DeathLossPercent: frozen.DeathLossPercent, SafeReturn: frozen.SafeReturn, HealRatio: frozen.HealRatio}, now)
 			if err != nil {

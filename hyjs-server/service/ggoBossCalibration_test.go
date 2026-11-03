@@ -38,7 +38,7 @@ func desertBossCalibrationTeam(t *testing.T, s *GameService, ids []string) (*pb.
 		t.Fatal(err)
 	}
 	player := &pb.Player{PlayerId: proto.Int64(2), Name: proto.String("沙漠数值隔离夹具"), Level: proto.Int32(100)}
-	build := func(progress int32) (*model.GameState, int32) {
+	build := func(progress int32, lowerMembers int) (*model.GameState, int32) {
 		g := &model.GameState{}
 		formation, e := s.newTacticalFormation("2", 1)
 		if e != nil {
@@ -47,6 +47,10 @@ func desertBossCalibrationTeam(t *testing.T, s *GameService, ids []string) (*pb.
 		g.TacticalFormations = []*pb.TaticalFormation{formation}
 		g.TacticalSkillId = s.tacticalSkill("2", 1)["id"]
 		for i, id := range ids {
+			memberProgress := progress
+			if i < lowerMembers && memberProgress > 0 {
+				memberProgress--
+			}
 			found := false
 			for _, row := range source.Paths {
 				if row.HeroID != id {
@@ -54,9 +58,9 @@ func desertBossCalibrationTeam(t *testing.T, s *GameService, ids []string) (*pb.
 				}
 				found = true
 				w := proto.Clone(row.Warrior).(*pb.Warrior)
-				w.Breached.Level = proto.Int32(1 + 24*progress/10000)
+				w.Breached.Level = proto.Int32(1 + 24*memberProgress/10000)
 				for _, v := range w.SkillRefine {
-					v.Level = proto.Int32(1 + 99*progress/10000)
+					v.Level = proto.Int32(1 + 99*memberProgress/10000)
 					row, e := s.specialtyTable("SkillSpecialty", "level", v.GetType(), v.GetLevel())
 					if e != nil {
 						t.Fatal(e)
@@ -70,16 +74,16 @@ func desertBossCalibrationTeam(t *testing.T, s *GameService, ids []string) (*pb.
 				g.Warriors = append(g.Warriors, w)
 				for _, original := range row.Equipment {
 					v := proto.Clone(original).(*pb.Equipment)
-					v.Level = proto.Int32(1 + 259*progress/10000)
-					v.RefineLv = proto.Int32(80 * progress / 10000)
-					v.Star = proto.Int32(5 * progress / 10000)
-					v.ForgeLevel = proto.Int32(15 * progress / 10000)
+					v.Level = proto.Int32(1 + 259*memberProgress/10000)
+					v.RefineLv = proto.Int32(80 * memberProgress / 10000)
+					v.Star = proto.Int32(5 * memberProgress / 10000)
+					v.ForgeLevel = proto.Int32(15 * memberProgress / 10000)
 					g.Equipment = append(g.Equipment, v)
 				}
 				for _, original := range row.Treasures {
 					v := proto.Clone(original).(*pb.Treasure)
-					v.StrengthLevel = proto.Int32(1 + 99*progress/10000)
-					v.RefineLevel = proto.Int32(30 * progress / 10000)
+					v.StrengthLevel = proto.Int32(1 + 99*memberProgress/10000)
+					v.RefineLevel = proto.Int32(30 * memberProgress / 10000)
 					g.Treasures = append(g.Treasures, v)
 				}
 				f := proto.Clone(row.Formation).(*pb.FormationItem)
@@ -100,18 +104,27 @@ func desertBossCalibrationTeam(t *testing.T, s *GameService, ids []string) (*pb.
 	low, high := int32(0), int32(10000)
 	for low < high {
 		mid := (low + high) / 2
-		_, power := build(mid)
+		_, power := build(mid, 0)
 		if power < 500000 {
 			low = mid + 1
 		} else {
 			high = mid
 		}
 	}
-	g, power := build(low)
+	g, power := build(low, 0)
 	if low > 0 {
-		prior, previous := build(low - 1)
+		prior, previous := build(low-1, 0)
 		if math.Abs(float64(previous)-500000) < math.Abs(float64(power)-500000) {
 			g, power = prior, previous
+		}
+	}
+	if math.Abs(float64(power)-500000) > 10000 && low > 0 {
+		// Individual members may be on either side of the same real progression step.
+		for lowerMembers := 1; lowerMembers < len(ids); lowerMembers++ {
+			candidate, candidatePower := build(low, lowerMembers)
+			if math.Abs(float64(candidatePower)-500000) < math.Abs(float64(power)-500000) {
+				g, power = candidate, candidatePower
+			}
 		}
 	}
 	if math.Abs(float64(power)-500000) > 10000 {

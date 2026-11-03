@@ -128,13 +128,13 @@ func TestAdminContentFrozenClaims(t *testing.T) {
 	timed, _ := json.Marshal(p5TitleState{Effects: "att,2", DeadTime: time.Now().Add(time.Hour).UnixMilli(), Source: "isolated timed title fixture"})
 	p5SetKV(clockGame, "p5.title:"+target.ID, string(timed))
 	baseValues := map[string]float64{}
-	if err = f.s.p5TitleBonus(clockGame, baseValues); err != nil || baseValues["att"] != 2 {
+	if err = f.s.p5TitleBonus(clockGame, baseValues, "hero_043"); err != nil || baseValues["att"] != 2 {
 		t.Fatal("active timed title", err)
 	}
 	f.s.ServerClockReady = true
 	f.s.ServerClockState.Store(&model.ServerGameClockView{OffsetDays: 1})
 	expiredValues := map[string]float64{}
-	if err = f.s.p5TitleBonus(clockGame, expiredValues); err != nil || expiredValues["att"] != 0 {
+	if err = f.s.p5TitleBonus(clockGame, expiredValues, "hero_043"); err != nil || expiredValues["att"] != 0 {
 		t.Fatal("server date did not expire real title effect", err)
 	}
 	f.s.ServerClockReady = false

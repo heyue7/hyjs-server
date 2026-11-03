@@ -49,6 +49,34 @@ func TestTableLookup62CatalogueAndOverlay(t *testing.T) {
 	}
 }
 
+func TestTableLookup62TitleIDAndOverlay(t *testing.T) {
+	s := &GameService{Tables: map[string][]map[string]string{
+		"Title": {{"titleId": "same", "value": "first"}, {"titleId": "same", "value": "second"}},
+		"Other": {{"titleId": "same", "value": "other"}},
+	}}
+	s.InitializeGameTableLookup()
+	if row, indexed := s.indexedTable("Title", "titleId", "same"); !indexed || row["value"] != "first" {
+		t.Fatalf("title index did not retain first row: %v, indexed=%v", row, indexed)
+	}
+	if row, indexed := s.indexedTable("Title", "titleId", "missing"); !indexed || row != nil {
+		t.Fatalf("title index missing-key result: %v, indexed=%v", row, indexed)
+	}
+	if _, indexed := s.indexedTable("Other", "titleId", "same"); indexed {
+		t.Fatal("titleId index added outside Title catalogue")
+	}
+	overlay := map[string][]map[string]string{
+		"Title": {{"titleId": "same", "value": "overlay"}, {"titleId": "same", "value": "later overlay"}},
+		"Other": s.Tables["Other"],
+	}
+	view := s.withRuntimeTables(overlay)
+	if _, indexed := view.indexedTable("Title", "titleId", "same"); indexed {
+		t.Fatal("replacement title table retained stale index")
+	}
+	if view.table("Title", "titleId", "same")["value"] != "overlay" || s.table("Title", "titleId", "same")["value"] != "first" {
+		t.Fatal("title overlay did not retain isolated first-row lookup")
+	}
+}
+
 func BenchmarkTableLookup62(b *testing.B) {
 	rows := make([]map[string]string, 6000)
 	for i := range rows {

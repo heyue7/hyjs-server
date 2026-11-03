@@ -18,7 +18,11 @@ func (s *GameService) InitializeGameTableLookup() {
 	lookup := &gameTableLookup{tables: make(map[string]gameTableLookupTable, len(s.Tables))}
 	for name, rows := range s.Tables {
 		entry := gameTableLookupTable{rows: rows, columns: make(map[string]map[string]map[string]string, 2)}
-		for _, key := range []string{"id", "StaticName"} {
+		keys := []string{"id", "StaticName"}
+		if name == "Title" {
+			keys = append(keys, "titleId")
+		}
+		for _, key := range keys {
 			present := false
 			for _, row := range rows {
 				if _, present = row[key]; present {

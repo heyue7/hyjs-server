@@ -274,7 +274,7 @@ func (s *GameService) AddP5StaticBonus(p *pb.Player, g *model.GameState, w *pb.W
 			}
 		}
 	}
-	return s.p5TitleBonus(g, values)
+	return s.p5TitleBonus(g, values, w.GetId())
 }
 
 func p5SeedID(row map[string]string) int32 {

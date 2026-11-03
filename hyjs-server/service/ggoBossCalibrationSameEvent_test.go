@@ -380,23 +380,65 @@ func TestGGOBossCalibrationSameEvent(t *testing.T) {
 			t.Fatalf("receipt damage differs from independent original automatic terminal player=%d got=%.12f want=%.12f", p.id, settled.Damage, wantDamage)
 		}
 		native := messages[0].(*pb.SCSidePveBossFightEnd)
-		if native.GetAnger() != terminal.Outcome.Attacker.GetInst().GetAnger() || len(native.GetBattlePos()) != len(native.GetHps()) {
-			t.Fatal("native returned anger or actor HP shape differs from original terminal", p.id)
+		if native.GetFightResult() != result || len(native.GetBattlePos()) != len(native.GetHps()) {
+			t.Fatal("native returned result or actor HP shape differs", p.id)
 		}
 		hps := map[int32]float64{}
 		for j, pos := range native.GetBattlePos() {
+			if _, exists := hps[pos]; exists {
+				t.Fatal("native returned duplicate actor position", p.id, pos)
+			}
 			hps[pos] = native.GetHps()[j]
 		}
+		var attackerHP float64
 		for _, actor := range terminal.FinalActors {
-			if actor.Camp != 0 {
-				continue
+			if actor.Camp == 0 {
+				attackerHP += actor.CurrentHP
 			}
-			pos := actor.Pose
-			if actor.RuntimePose != 0 {
-				pos = actor.RuntimePose
+		}
+		wantDefeated := result == 0 || attackerHP <= 0
+		if settled.Defeated != wantDefeated || settled.Forfeit {
+			t.Fatal("native outcome and death receipt differ", p.id, result, attackerHP, settled.Defeated, settled.Forfeit)
+		}
+		if settled.Defeated {
+			var profile db.Profile
+			if err := db.GetIns().First(&profile, p.id).Error; err != nil {
+				t.Fatal("load death recovery", p.id, err)
 			}
-			if got, ok := hps[pos]; !ok || got != actor.CurrentHP/actor.MaxHP {
-				t.Fatal("native returned actor HP differs from original terminal", p.id, pos)
+			_, game, err := decodeProfile(&profile)
+			if err != nil || game.Field == nil || game.Field.Fight == nil || game.Field.Fight.GGOBoss == nil || game.GGOField == nil {
+				t.Fatal("load frozen death recovery", p.id, err)
+			}
+			frozen := game.Field.Fight.GGOBoss
+			point, err := ggoWirePoint(frozen.SafeReturn)
+			if err != nil || settled.SafeReturn == nil || settled.SafeReturn.X == nil || settled.SafeReturn.Y == nil || settled.SafeReturn.Z == nil ||
+				*settled.SafeReturn.X != float64(point.GetX()) || *settled.SafeReturn.Y != float64(point.GetY()) || *settled.SafeReturn.Z != float64(point.GetZ()) ||
+				!game.PositionLoading || !proto.Equal(game.Position.GetCurrent(), point) || settled.PositionRevision < 1 || settled.PositionRevision != game.GGOField.PositionRevision {
+				t.Fatal("death recovery position or receipt differs", p.id, err)
+			}
+			if native.GetAnger() != 0 || native.GetState() != constUtil.P8FieldIdle || frozen.HealRatio <= 0 || frozen.HealRatio > 1 || len(hps) != len(p.input.Attacker.GetFormation()) {
+				t.Fatal("death recovery anger, state or formation differs", p.id)
+			}
+			for _, hero := range p.input.Attacker.GetFormation() {
+				if got, ok := hps[hero.GetPose()]; !ok || got != frozen.HealRatio {
+					t.Fatal("native returned actor HP differs from frozen death recovery", p.id, hero.GetPose())
+				}
+			}
+		} else {
+			if native.GetAnger() != terminal.Outcome.Attacker.GetInst().GetAnger() || settled.SafeReturn != nil || settled.PositionRevision != 0 {
+				t.Fatal("successful outcome has unexpected anger or death return", p.id)
+			}
+			for _, actor := range terminal.FinalActors {
+				if actor.Camp != 0 {
+					continue
+				}
+				pos := actor.Pose
+				if actor.RuntimePose != 0 {
+					pos = actor.RuntimePose
+				}
+				if got, ok := hps[pos]; !ok || got != actor.CurrentHP/actor.MaxHP {
+					t.Fatal("native returned actor HP differs from original terminal", p.id, pos)
+				}
 			}
 		}
 		replay, err := f.s.fieldBossFightEnd(p.ctx, p.id, request)

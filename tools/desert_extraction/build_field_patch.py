@@ -78,7 +78,7 @@ REPLACEMENTS={
  'Battle.FieldPVEBossBattleOver::FieldPVEBossFightResultHandler':{'LegacyBossCompleted':'Completed'},
 }
 EXTRAS={'BoxManager::CreateSocketReconnect','NetWork.Sockets.Event.EventManger::Tick','Room.RoomNetBase::SCCurrentPosition','Room.RoomNetField::SCCurrentPosition','Room.RoomField::OnLoadComplete','StaticData::InitPlayerData','Battle.CopyBalance::Refresh'} | set(REPLACEMENTS)
-SOURCES=('GatherAttempt.cs','NestedArrayJson.cs','FieldWire.cs','GatherJournalStore.cs','FieldResources.cs','GatherPreload.cs','NativeGatherUI.cs','GatherCoordinator.cs','ProtectionRelease.cs','FieldRuntime.cs','PendingRequest.cs','TerminalController.cs','FieldNpcs.cs','FieldMonsters.cs','FieldBoss.cs','PositionSync.cs','TravelController.cs','LeaveController.cs','TradeController.cs','TradePanel.cs','FightEndJournal.cs','MonsterRewardView.cs','BattleRecovery.cs','ColdBattleRecovery.cs','PvpBridge.cs','MapViewer86.cs','TeamMap86.cs','ChipNames.cs','TerminalCreditQuote.cs','FieldMonsterPosition.cs','ExpeditionHeroList.cs')
+SOURCES=('GatherAttempt.cs','NestedArrayJson.cs','FieldWire.cs','GatherJournalStore.cs','FieldResources.cs','GatherPreload.cs','NativeGatherUI.cs','GatherCoordinator.cs','ProtectionRelease.cs','FieldRuntime.cs','PendingRequest.cs','TerminalController.cs','FieldNpcs.cs','FieldMonsters.cs','FieldBoss.cs','PositionSync.cs','TravelController.cs','LeaveController.cs','TradeController.cs','TradePanel.cs','FightEndJournal.cs','MonsterRewardView.cs','BossRewardView.cs','BattleRecovery.cs','ColdBattleRecovery.cs','PvpBridge.cs','MapViewer86.cs','TeamMap86.cs','ChipNames.cs','TerminalCreditQuote.cs','FieldMonsterPosition.cs','ExpeditionHeroList.cs')
 MAP_ICON=HERE/'assets/evacuation-npc.png'
 
 def sha(raw): return hashlib.sha256(raw).hexdigest()
@@ -93,6 +93,17 @@ def name_for(pe,token,old_methods):
     if table==6: return old_methods.get(index+1,'').split('::')[-1]
     if table==10:
         try: return str(pe.net.mdtables.MemberRef.rows[index].Name)
+        except Exception: return ''
+    return ''
+def qualified_name_for(pe,token,old_methods):
+    if not isinstance(token,int): return ''
+    table=token>>24; index=(token&0xffffff)-1
+    if table==6: return old_methods.get(index+1,'')
+    if table==10:
+        try:
+            ref=pe.net.mdtables.MemberRef.rows[index]; cls=ref.Class.row
+            ns=str(getattr(cls,'TypeNamespace','')); typ=str(getattr(cls,'TypeName',''))
+            return (ns+'.' if ns else '')+typ+'::'+str(ref.Name)
         except Exception: return ''
     return ''
 def hook_for(pe,item):
@@ -161,6 +172,8 @@ def verify(before,after):
             unchanged+=1; engine+=name.startswith('Battle.Engine'); continue
         require(raw_a!=raw_b,'Expected hook not written: '+name)
         ob,x=decoded(left,a); nb,y=decoded(right,b)
+        if name!='Battle.CopyBalance::Refresh':
+            require(all(hook_for(right,q)!='MonsterRewardDisplay' for q in y),'Unexpected reward projection: '+name)
         remove=set(); prefix=HEADS.get(name)
         if prefix:
             hook,ops=prefix; require([q[0] for q in y[:len(ops)]]==ops,'Incorrect hook prefix: '+name)
@@ -190,12 +203,21 @@ def verify(before,after):
             remove.update((j,j+1))
         if name=='Battle.CopyBalance::Refresh':
             found=[j for j,q in enumerate(y) if hook_for(right,q)=='MonsterRewardDisplay']
-            require(len(found)==1,'Missing monster reward projection'); j=found[0]
-            require(j>0 and j+1<len(y) and name_for(right,y[j-1][1],old_names)=='get_getn' and
-                    name_for(right,y[j+1][1],old_names)=='GetResultItem' and y[j+1][0]=='call',
-                    'Monster reward projection is not on the original display-only path')
-            require(hook_owner(right,y[j])=='HYJS.DesertV4.FieldHooks','Wrong monster reward projection owner')
-            remove.add(j)
+            require(len(found)==2,'Expected one monster and one boss reward projection')
+            getters=[]
+            for j in found:
+                require(j>0 and j+1<len(y) and qualified_name_for(right,y[j+1][1],old_names)=='Battle.CopyBalance::GetResultItem' and
+                        y[j-1][0]=='callvirt' and y[j+1][0]=='call','Reward projection is not on the original display-only path')
+                getters.append(qualified_name_for(right,y[j-1][1],old_names))
+                require(hook_owner(right,y[j])=='HYJS.DesertV4.FieldHooks','Wrong reward projection owner')
+                remove.add(j)
+            require(sorted(getters)==['ProtoBuf.Message.SCSidePveBossFightEnd::get_get',
+                                      'ProtoBuf.Message.SCSidePveFightEnd::get_getn'],'Wrong reward projection getters')
+            for k,q in enumerate(x):
+                if qualified_name_for(left,q[1],old_names)!='Battle.CopyBalance::GetResultItem' or k==0: continue
+                if qualified_name_for(left,x[k-1][1],old_names) not in getters: continue
+                require(all(not (branch(op) and value==k) and not (op=='switch' and k in value)
+                            for op,value in x),'Original branch can skip reward projection')
         if name=='NetWork.Sockets.Event.EventManger::Tick':
             found=[j for j,q in enumerate(y) if hook_for(right,q)=='DropPositionPacket']
             require(len(found)==1,'Missing position event epoch guard'); j=found[0]

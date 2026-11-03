@@ -183,7 +183,23 @@ namespace HYJS.DesertV4
         public static MonsterRewardView FromReceipt(string fight,JsonData data) { return new MonsterRewardView(); }
         public ResultObject Project(string fight,ResultObject original) { return original; }
     }
-    public static class TradePanel { public static void RegisterIcons() { } }
+    public sealed class BossRewardView
+    {
+        public static int reads,projects;
+        public static bool fail;
+        readonly string fight;
+        BossRewardView(string id) { fight=id; }
+        public static BossRewardView FromReceipt(string fight,JsonData data)
+        {
+            reads++;
+            if (fail || (string)data["fightId"]!=fight) throw new InvalidOperationException("invalid projection");
+            return new BossRewardView(fight);
+        }
+        public ResultObject Project(string current,ResultObject original)
+        { projects++; return current==fight ? new ResultObject() : original; }
+        public bool Matches(string current) { return current==fight; }
+    }
+    public static class TradePanel { public static int calls; public static void RegisterIcons() { calls++; } }
 }
 
 public static class BattleReceiptRecoveryChecks
@@ -194,6 +210,8 @@ public static class BattleReceiptRecoveryChecks
     static readonly string OtherHash=new string('b',64);
     static readonly FieldInfo Singleton=typeof(BattleRecovery).GetField("singleton",BindingFlags.Static|BindingFlags.NonPublic);
     static readonly FieldInfo Input=typeof(BattleRecovery).GetField("inputHash",BindingFlags.Instance|BindingFlags.NonPublic);
+    static readonly FieldInfo BossView=typeof(BattleRecovery).GetField("bossRewardView",BindingFlags.Static|BindingFlags.NonPublic);
+    static readonly FieldInfo BossOwner=typeof(BattleRecovery).GetField("bossRewardOwner",BindingFlags.Static|BindingFlags.NonPublic);
     static readonly MethodInfo Update=typeof(BattleRecovery).GetMethod("Update",BindingFlags.Instance|BindingFlags.NonPublic);
     static int checks,failures;
     sealed class Case
@@ -212,6 +230,7 @@ public static class BattleReceiptRecoveryChecks
     {
         Check(Singleton!=null && Input!=null && Update!=null,"Private recovery hooks unavailable");
         Singleton.SetValue(null,null); PlayerPrefs.Reset(); FieldWire.calls.Clear(); FieldRuntime.snapshots=0; BoxManager.notices=0;
+        BossRewardView.reads=BossRewardView.projects=TradePanel.calls=0; BossRewardView.fail=false;
         FieldWire.current=new FieldWire.Session { playerId=2,sessionHex="session-a",origin="local-qa" };
         StaticData.fieldId="field_003"; StaticData.curBattleData=null;
         RoomManager.currentRoom=new RoomField();
@@ -268,6 +287,35 @@ public static class BattleReceiptRecoveryChecks
         Check(c.Calls==1,(engineRunning ? "running-engine" : "disabled-engine")+" original result handler not called exactly once");
         Check(FightEndJournal.Load(c.session)==null,"Confirmed receipt did not clear real journal");
         Check(FieldRuntime.snapshots==1,"Confirmed receipt did not request one snapshot");
+        if (type==12)
+        {
+            var original=new ResultObject();
+            Check(BossRewardView.reads==1 && !Object.ReferenceEquals(original,BattleRecovery.MonsterRewardDisplay(original)) &&
+                  TradePanel.calls==1,"verified boss receipt did not reach display hook");
+            object view=BossView.GetValue(null), owner=BossOwner.GetValue(null);
+            Action restore=delegate { BossView.SetValue(null,view); BossOwner.SetValue(null,owner); };
+            StaticData.curBattleData.fightId=OtherFight;
+            Check(Object.ReferenceEquals(original,BattleRecovery.MonsterRewardDisplay(original)) && BossView.GetValue(null)==null,"wrong fight displayed or retained boss reward");
+            StaticData.curBattleData.fightId=Fight;
+            Check(Object.ReferenceEquals(original,BattleRecovery.MonsterRewardDisplay(original)),"old fight view returned after fight changed");
+            restore();
+            FieldWire.current=new FieldWire.Session { playerId=2,sessionHex="session-b",origin="local-qa" };
+            Check(Object.ReferenceEquals(original,BattleRecovery.MonsterRewardDisplay(original)) && BossView.GetValue(null)==null,"new session displayed or retained boss reward");
+            restore();
+            FieldWire.current=new FieldWire.Session { playerId=3,sessionHex="session-a",origin="local-qa" };
+            Check(Object.ReferenceEquals(original,BattleRecovery.MonsterRewardDisplay(original)) && BossView.GetValue(null)==null,"new account displayed or retained boss reward");
+            restore();
+            FieldWire.current=new FieldWire.Session { playerId=2,sessionHex="session-a",origin="other-server" };
+            Check(Object.ReferenceEquals(original,BattleRecovery.MonsterRewardDisplay(original)) && BossView.GetValue(null)==null,"new origin displayed or retained boss reward");
+            restore();
+            FieldWire.current=c.session;
+            StaticData.curBattleData.battleType=6;
+            Check(Object.ReferenceEquals(original,BattleRecovery.MonsterRewardDisplay(original)) && BossView.GetValue(null)==null,"monster battle displayed or retained boss reward");
+            restore();
+            StaticData.curBattleData.battleType=12;
+            BattleRecovery.StartResponse(12,new SCSidePveBossFightStart { code=1,fightId=OtherFight });
+            Check(Object.ReferenceEquals(original,BattleRecovery.MonsterRewardDisplay(original)),"new fight retained old boss view");
+        }
         FieldWire.calls[0].callback(receipt);
         Check(c.Calls==1 && FieldRuntime.snapshots==1,"Repeated receipt delivered native result twice");
     }
@@ -300,6 +348,7 @@ public static class BattleReceiptRecoveryChecks
             Query(c);
             FieldWire.calls[0].callback(Receipt(c,changed==0 ? OtherHash : InputHash,
                                                changed==1 ? OtherHash : c.record.payloadHash));
+            if (type==12) Check(BossRewardView.reads==0,"invalid hashes created boss reward view");
             FightEndRecord still=FightEndJournal.Load(c.session);
             Check(c.Calls==0,"invalid receipt hash delivered native result");
             Check(still!=null && still.fightId==c.record.fightId && still.payloadHash==c.record.payloadHash &&
@@ -314,6 +363,13 @@ public static class BattleReceiptRecoveryChecks
         Update.Invoke(Singleton.GetValue(null),null);
         FieldWire.calls[0].callback(Receipt(c,InputHash,c.record.payloadHash));
         Check(c.Calls==0 && FightEndJournal.Load(c.session)!=null,"Old session callback delivered or cleared journal");
+        c=Setup(12); Battle.BattleManager.Instance.enabled=false; Battle.BattleManager.Instance.battleEngine=null; Query(c);
+        BossRewardView.fail=true;
+        FieldWire.calls[0].callback(Receipt(c,InputHash,c.record.payloadHash));
+        var original=new ResultObject();
+        Check(c.Calls==1 && FightEndJournal.Load(c.session)==null &&
+              Object.ReferenceEquals(original,BattleRecovery.MonsterRewardDisplay(original)),
+              "invalid display projection blocked settlement or displayed stale rewards");
     }
     public static int Main()
     {

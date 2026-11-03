@@ -689,16 +689,9 @@ func (s *GameService) p5ChangeTitle(ctx context.Context, id int64, b *pb.CSChang
 		return nil
 	})
 }
-func (s *GameService) p5TitleBonus(g *model.GameState, values map[string]float64) error {
-	id := p5KV(g, "p5.current-title")
-	if id == "" {
-		return nil
-	}
-	raw := p5KV(g, "p5.title:"+id)
-	var title p5TitleState
-	if json.Unmarshal([]byte(raw), &title) != nil || title.Source == "" {
-		return p5Error()
-	}
+
+// p5TitleBonus adds each owned, unexpired title for the applicable hero space.
+func (s *GameService) p5TitleBonus(g *model.GameState, values map[string]float64, heroID string) error {
 	// Attribute expiry follows the same server-wide calendar as the title list.
 	// This calculation is read-only and leaves real billing/session clocks untouched.
 	now := time.Now()
@@ -707,26 +700,56 @@ func (s *GameService) p5TitleBonus(g *model.GameState, values map[string]float64
 			now = now.AddDate(0, 0, int(clock.OffsetDays))
 		}
 	}
-	if title.DeadTime > 0 && title.DeadTime <= now.UnixMilli() {
-		return nil
-	}
-	if strings.TrimSpace(title.Effects) == "" {
-		return nil
-	}
-	for _, entry := range strings.Split(title.Effects, ";") {
-		pair := strings.Split(entry, ",")
-		if len(pair) != 2 {
+	seen := map[string]bool{}
+	for _, entry := range g.KV {
+		if !strings.HasPrefix(entry.GetKey(), "p5.title:") {
+			continue
+		}
+		id := strings.TrimPrefix(entry.GetKey(), "p5.title:")
+		if seen[id] {
+			continue
+		}
+		seen[id] = true
+		row := s.table("Title", "titleId", id)
+		if row == nil {
+			continue
+		}
+		if entry.GetValue() == "" {
+			continue
+		}
+		var title p5TitleState
+		if json.Unmarshal([]byte(entry.GetValue()), &title) != nil || title.Source == "" {
 			return p5Error()
 		}
-		value, err := strconv.ParseFloat(pair[1], 64)
-		if err != nil || value < 0 || math.IsInf(value, 0) || math.IsNaN(value) {
-			return p5Error()
+		if title.DeadTime > 0 && title.DeadTime <= now.UnixMilli() {
+			continue
 		}
-		switch pair[0] {
-		case "hp", "att", "pdef", "mdef", "cri", "hit", "dodge", "antiCri", "criFactor", "damageAdd", "damageReduce":
-			values[pair[0]] += value
-		default:
-			return p5Error()
+		// Native title types 2/3/4 apply to hero spaces 1/2/3 respectively.
+		switch row["type"] {
+		case "2", "3", "4":
+			if tableNumber(s.table("Hero", "id", heroID), "space") != tableNumber(row, "type")-1 {
+				continue
+			}
+		}
+		if strings.TrimSpace(title.Effects) == "" {
+			continue
+		}
+		for _, effect := range strings.Split(title.Effects, ";") {
+			pair := strings.Split(effect, ",")
+			if len(pair) != 2 {
+				return p5Error()
+			}
+			// Single.Parse in the original client rounds before conversion to double.
+			value, err := strconv.ParseFloat(pair[1], 32)
+			if err != nil || value < 0 || math.IsInf(value, 0) || math.IsNaN(value) {
+				return p5Error()
+			}
+			switch pair[0] {
+			case "hp", "att", "pdef", "mdef", "cri", "hit", "dodge", "antiCri", "criFactor", "damageAdd", "damageReduce":
+				values[pair[0]] += value
+			default:
+				return p5Error()
+			}
 		}
 	}
 	return nil

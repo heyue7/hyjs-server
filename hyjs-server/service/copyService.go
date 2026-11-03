@@ -125,6 +125,28 @@ func (s *GameService) actor(row map[string]string, guid string, pose int32, enem
 
 // battleWarrior 沿用 UIHero 的等级、当前主干成长和已激活节点属性计算。
 func (s *GameService) battleWarrior(player *pb.Player, warrior *pb.Warrior, game *model.GameState, slot *pb.FormationItem) (*pb.BattleHero, error) {
+	members, shared, err := s.formationSharedSources(game)
+	if err != nil {
+		return nil, err
+	}
+	var selection formationTalentSelection
+	found := false
+	for _, member := range members {
+		if member.warrior == warrior {
+			selection, found = member.selection, true
+			break
+		}
+	}
+	if !found {
+		selection, err = s.formationTalents(warrior)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return s.battleWarriorWithSharedBuffs(player, warrior, game, slot, selection, shared)
+}
+
+func (s *GameService) battleWarriorWithSharedBuffs(player *pb.Player, warrior *pb.Warrior, game *model.GameState, slot *pb.FormationItem, selection formationTalentSelection, shared []formationSharedBuff) (*pb.BattleHero, error) {
 	row := s.table("Hero", "id", warrior.GetId())
 	if row == nil || row["heroClass"] == "99" {
 		return nil, errors.New("经验材料不能出战")
@@ -135,9 +157,7 @@ func (s *GameService) battleWarrior(player *pb.Player, warrior *pb.Warrior, game
 	}
 	var (
 		level   = warrior.GetLevel()
-		current map[string]string
-		hasTree bool
-		active  []map[string]string
+		current = selection.current
 		values  = map[string]float64{}
 		percent = map[string]float64{}
 		talents []string
@@ -148,34 +168,10 @@ func (s *GameService) battleWarrior(player *pb.Player, warrior *pb.Warrior, game
 	if level < 1 {
 		level = 1
 	}
-	nodes, indexed := s.indexedTableGroup("TalentAdvenced", "warId", warrior.GetId())
-	if !indexed {
-		nodes = s.Tables["TalentAdvenced"]
-	}
-	for _, node := range nodes {
-		if node["warId"] != warrior.GetId() {
-			continue
-		}
-		hasTree = true
-		if node["trunck"] == "1" {
-			tier, parseErr := strconv.ParseInt(node["talentLevel"], 10, 32)
-			if parseErr != nil {
-				return nil, parseErr
-			}
-			if int32(tier) == warrior.GetTalent() {
-				current = node
-			}
-			if int32(tier) <= warrior.GetTalent() {
-				active = append(active, node)
-			}
-		} else if slices.Contains(warrior.GetTalentBranch(), node["talentLevel"]) {
-			active = append(active, node)
-		}
-	}
 	if current == nil {
 		// 原绿色伙伴没有天赋树。UIHero 跳过 CurrentTalent 成长后继续
 		// 基础属性与装备计算；有树却缺层或存档伪造节点仍须拒绝。
-		baseOnly := !hasTree && row["heroClass"] == "0" && row["quality"] == "12" &&
+		baseOnly := !selection.hasTree && row["heroClass"] == "0" && row["quality"] == "12" &&
 			(row["SkillId1"] == "" && row["SkillId2"] == "" && row["UltSkillId"] == "" || p15GreenHeroSingleNormalSkill(row)) &&
 			warrior.GetTalent() == 0 && len(warrior.GetTalentBranch()) == 0
 		if !baseOnly {
@@ -198,13 +194,14 @@ func (s *GameService) battleWarrior(player *pb.Player, warrior *pb.Warrior, game
 		return nil, err
 	}
 	// UIHero 累加全部已激活节点的固定加成，成长系数取当前主干层。
-	for _, node := range active {
+	for _, active := range selection.active {
+		node := active.node
 		for _, key := range []string{"hp", "att", "pdef", "mdef"} {
 			values[key] += tableNumber(node, key+"ConstAdd")
 		}
 		if talentID := node["talentId"]; talentID != "" {
 			talents = append(talents, talentID)
-			talent := s.table("Talent", "Id", talentID)
+			talent := active.talent
 			if talent == nil {
 				return nil, errors.New("Missing warrior talent")
 			}
@@ -262,6 +259,11 @@ func (s *GameService) battleWarrior(player *pb.Player, warrior *pb.Warrior, game
 	}
 	if err := s.AddP5StaticBonus(player, game, warrior, values, percent); err != nil {
 		return nil, err
+	}
+	for _, buff := range shared {
+		if formationSharedBuffFits(buff.condition, row) {
+			copyTalentProperty(values, percent, buff.row)
+		}
 	}
 	// Original ResetAttribute adds prayer to the combined percent before gems/pets.
 	if err := AddP5GuildPrayerPercent(player, game, percent); err != nil {
@@ -386,22 +388,17 @@ func (s *GameService) battleFormationActors(player *pb.Player, game *model.GameS
 	if err := s.PrepareFormation(game); err != nil {
 		return nil, err
 	}
+	members, shared, err := s.formationSharedSources(game)
+	if err != nil {
+		return nil, err
+	}
 	var actors []*pb.BattleHero
-	for _, slot := range game.Formation {
-		for _, thing := range slot.GetThings() {
-			if thing.GetPos() != 0 {
-				continue
-			}
-			for _, warrior := range game.Warriors {
-				if warrior.GetGuid() == thing.GetGuid() {
-					a, err := s.battleWarrior(player, warrior, game, slot)
-					if err != nil {
-						return nil, err
-					}
-					actors = append(actors, a)
-				}
-			}
+	for _, member := range members {
+		a, err := s.battleWarriorWithSharedBuffs(player, member.warrior, game, member.slot, member.selection, shared)
+		if err != nil {
+			return nil, err
 		}
+		actors = append(actors, a)
 	}
 	return actors, nil
 }

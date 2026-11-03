@@ -33,6 +33,8 @@ namespace HYJS.DesertV4
         int resumedType;
         static MonsterRewardView monsterRewardView;
         static FieldWire.Session monsterRewardOwner;
+        static BossRewardView bossRewardView;
+        static FieldWire.Session bossRewardOwner;
         FieldWire.Session returnOwner;
         Vector3 returnPosition;
         bool returnPending,returnRequest;
@@ -113,15 +115,23 @@ namespace HYJS.DesertV4
         { return a!=null && b!=null && a.playerId==b.playerId && a.origin==b.origin; }
         static bool SameSession(FieldWire.Session a,FieldWire.Session b)
         { return SameActor(a,b) && a.sessionHex==b.sessionHex; }
+        static void ClearBossRewardView() { bossRewardView=null; bossRewardOwner=null; }
         public static ResultObject MonsterRewardDisplay(ResultObject original)
         {
             FieldWire.Session owner;
-            if (!Target() || monsterRewardView==null || !FieldWire.Current(out owner) || !SameActor(owner,monsterRewardOwner) ||
-                StaticData.curBattleData==null || (int)StaticData.curBattleData.battleType!=6) return original;
-            ResultObject projected=monsterRewardView.Project(StaticData.curBattleData.fightId,original);
+            if (!Target() || !FieldWire.Current(out owner) || StaticData.curBattleData==null)
+            { ClearBossRewardView(); return original; }
+            int type=(int)StaticData.curBattleData.battleType;
+            if (bossRewardView!=null && (type!=12 || !SameSession(owner,bossRewardOwner) ||
+                !bossRewardView.Matches(StaticData.curBattleData.fightId))) ClearBossRewardView();
+            ResultObject projected=original;
+            if (type==6 && monsterRewardView!=null && SameActor(owner,monsterRewardOwner))
+                projected=monsterRewardView.Project(StaticData.curBattleData.fightId,original);
+            else if (type==12 && bossRewardView!=null && SameSession(owner,bossRewardOwner))
+                projected=bossRewardView.Project(StaticData.curBattleData.fightId,original);
             if (System.Object.ReferenceEquals(projected,original)) return original;
             try { TradePanel.RegisterIcons(); return projected; }
-            catch (Exception) { try { Notice("芯片已存入临时终端"); } catch (Exception) { } return original; }
+            catch (Exception) { try { Notice(type==12 ? "首领奖励已到账，显示暂不可用" : "芯片已存入临时终端"); } catch (Exception) { } return original; }
         }
         static bool Target() { return StaticData.fieldId=="field_003"; }
         static bool Hex(string value,int length)
@@ -169,6 +179,7 @@ namespace HYJS.DesertV4
             FieldWire.Session now; if (!FieldWire.Current(out now)) return false;
             if (!SameSession(now,session))
             {
+                ClearBossRewardView();
                 if (!SameActor(now,session))
                 {
                     liveFightId=""; inputHash=""; liveType=0; nativeOwner=null; nativeBattle=null; nativeRoom=null; loginReady=false;
@@ -247,6 +258,7 @@ namespace HYJS.DesertV4
             BattleRecovery core=Require(); if (!core.AdoptSession()) return;
             if (core.pending!=null && (core.pending.fightId!=id || TypeFromOpcode(core.pending.opcode)!=type))
             { core.Warning("上次战斗结果尚待确认"); return; }
+            ClearBossRewardView();
             core.liveFightId=id; core.liveType=type;
             core.inputHash=core.resumedType==type && core.resumedFight==id ? core.resumedHash : ""; core.nativeOwner=null;
             core.nativeBattle=null; core.nativeRoom=null;
@@ -398,7 +410,13 @@ namespace HYJS.DesertV4
                             try { monsterRewardView=MonsterRewardView.FromReceipt(expected.fightId,d); monsterRewardOwner=owner; }
                             catch (Exception) { }
                         }
-                        if (type==12) ArmDefeatReturn(owner,d);
+                        if (type==12)
+                        {
+                            ClearBossRewardView();
+                            try { bossRewardView=BossRewardView.FromReceipt(expected.fightId,d); bossRewardOwner=owner; }
+                            catch (Exception) { }
+                            ArmDefeatReturn(owner,d);
+                        }
                         if (CurrentEndPresentation(type,expected.fightId))
                         {
                             if (nativeOwner==null || (type==6 && !(nativeOwner is Battle.FieldPVEBattleOver)) ||

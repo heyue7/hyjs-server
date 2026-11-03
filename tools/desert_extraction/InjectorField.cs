@@ -256,11 +256,20 @@ foreach(var item in new[]{(Type:6,Class:"Battle.FieldPVEBattleOver",Reply:"Field
 {
  var m=Get("Battle.CopyBalance","Refresh");
  var instructions=m.Body.Instructions;
- var matches=instructions.Where((x,index)=>Match(x,"Battle.CopyBalance","GetResultItem") && index>0 &&
-     Match(instructions[index-1],"ProtoBuf.Message.SCSidePveFightEnd","get_getn")).ToArray();
- if(matches.Length!=1 || matches[0].OpCode!=OpCodes.Call)
-  throw new InvalidOperationException("Original monster reward display changed");
- instructions.Insert(instructions.IndexOf(matches[0]),Instruction.Create(OpCodes.Call,monsterRewardDisplay));
+ int installed=0;
+ foreach(var item in new[]{(Type:"ProtoBuf.Message.SCSidePveFightEnd",Getter:"get_getn"),
+                           (Type:"ProtoBuf.Message.SCSidePveBossFightEnd",Getter:"get_get")})
+ {
+  var matches=instructions.Where((x,index)=>Match(x,"Battle.CopyBalance","GetResultItem") && index>0 &&
+      Match(instructions[index-1],item.Type,item.Getter)).ToArray();
+  if(matches.Length!=1 || matches[0].OpCode!=OpCodes.Call ||
+     instructions[instructions.IndexOf(matches[0])-1].OpCode!=OpCodes.Callvirt ||
+     instructions.Any(x=>Targets(x,matches[0])) ||
+     instructions.Count(x=>Match(x,"HYJS.DesertV4.FieldHooks","MonsterRewardDisplay"))!=installed)
+   throw new InvalidOperationException("Original reward display changed: "+item.Type);
+  instructions.Insert(instructions.IndexOf(matches[0]),Instruction.Create(OpCodes.Call,monsterRewardDisplay));
+  installed++;
+ }
 }
 var options=new ModuleWriterOptions(module);
 options.MetadataOptions.Flags |= MetadataFlags.PreserveAll | MetadataFlags.KeepOldMaxStack;

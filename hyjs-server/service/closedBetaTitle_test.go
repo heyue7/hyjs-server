@@ -101,7 +101,7 @@ func TestClosedBetaAccountTitle(t *testing.T) {
 	if err != nil || p5KV(game, "p5.title:"+constUtil.GameAccountBetaTitleID) == "" {
 		t.Fatalf("title was not retained after restart: %v", err)
 	}
-	if err := f.s.p5TitleBonus(game, map[string]float64{}); err != nil {
+	if err := f.s.p5TitleBonus(game, map[string]float64{}, "hero_043"); err != nil {
 		t.Fatalf("the original title without stat effects must be wearable: %v", err)
 	}
 }
