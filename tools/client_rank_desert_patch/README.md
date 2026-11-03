@@ -15,3 +15,5 @@ rtk proxy env PYTHONDONTWRITEBYTECODE=1 .analysis-venv/bin/python tools/client_r
 主程序集仅在 `Battle.CopyBalance::Refresh` 的 Boss 奖励结果路径中插入一次现有 `FieldHooks.MonsterRewardDisplay` MemberRef 调用。构建器核验两条奖励展示路径、方法与元数据表、Unity 兼容的 CLI 标志及指针表，逐条比对原方法指令、跳转目标、异常边界、locals 和 maxstack，并要求其他所有原方法体及 547 个 `Battle.Engine` 方法保持原字节。助手程序集的原有公开 API 与嵌入资源也须一致。
 
 输出 `Assembly-CSharp.dll`、`SoulFlowerDesertV4.dll` 和 `manifest.json`。清单中的静态验证状态仅覆盖构建检查；客户端实际运行和设备验收需要另行完成。
+
+`qa_package.py` 可从固定 SHA-256 的 1.1.9 正式制品生成独立 `.multi` 手机验收包，服务地址固定为本机 `127.0.0.1:28979`。它只替换包名、四处托管地址和钱包地址，核对助手程序集、两条奖励显示调用、547 个原引擎方法及其余压缩条目，沿用本地已有签名身份，不访问手机或数据库。输出目录及记录已存在时会拒绝覆盖；验收包标记 `qaOnly` 和 `neverPromote`，不得作为正式包交付。
