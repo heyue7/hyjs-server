@@ -26,6 +26,7 @@ import (
 // The snapshot contains game facts only. Account credentials and certificate
 // keys are always produced by this isolated fixture and its caller.
 var trialBossSnapshotColumns = map[string]string{
+	"p9_pet_instances":              "created_at data guid pet_id player_id source",
 	"p6_battle_records":             "authoritative client_result client_version configuration_hash created_at engine_version expires_at finished_at id input input_hash operates outcome outcome_hash p13_match_id player_id replay_hash seed server_result source source_fight status",
 	"p7_re_rush_policies":           "enabled generation_json id published_at source version",
 	"p7_re_rush_power_proofs":       "floor player_id run_id snapshot snapshot_hash",
@@ -52,6 +53,7 @@ var trialBossSnapshotGlobal = []string{
 }
 
 var trialBossSnapshotOwned = []string{
+	"p9_pet_instances",
 	"p7_rush_states", "p7_rush_progress", "p7_rush_fights", "p7_re_rush_sweeps",
 	"p7_re_rush_power_proofs", "p7_re_rush_sections", "p6_battle_records",
 	"p7_rush_scoped_calculations", "p7_rush_manual_calculations",
