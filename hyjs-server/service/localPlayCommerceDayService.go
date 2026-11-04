@@ -24,16 +24,26 @@ func localPlayCommerceDay(tx *gorm.DB, row *db.P4CommerceState, state *p4Commerc
 	if state.Day == today {
 		return nil
 	}
+	if localPlayActivityOwner(tx) == row.PlayerID && state.Day != "" {
+		if err := localPlayCommerceDailySave(tx, row, state.Day, state); err != nil {
+			return err
+		}
+	}
+	return localPlayCommerceDayProject(tx, row, state, now)
+}
+
+// Project the selected date from the same authority without archiving the old
+// date. A later mutation still archives and restores under the player lock.
+func localPlayCommerceDayProject(tx *gorm.DB, row *db.P4CommerceState, state *p4CommerceProgress, now time.Time) error {
+	today := p1Day(now)
+	if state.Day == today {
+		return nil
+	}
 	if localPlayActivityOwner(tx) != row.PlayerID {
 		state.Day = today
 		state.Bought = map[string]int32{}
 		state.ResourceUsed = 0
 		return nil
-	}
-	if state.Day != "" {
-		if err := localPlayCommerceDailySave(tx, row, state.Day, state); err != nil {
-			return err
-		}
 	}
 	digest := sha256.Sum256([]byte(row.RuleID))
 	key := "commerce-day:" + hex.EncodeToString(digest[:16]) + ":" + today

@@ -2,6 +2,8 @@
 
 本页只做导航。按当前任务读取对应计划；业务要求、版本和证据留在计划正文，不加载无关历史。
 
+- [悬赏、秘境、公会宝箱与商店修复](20261103-gameplay-five-fixes.md)
+
 - [名人榜战力与沙漠首领结算修复](20261103-rank-desert-fixes.md)
 - [排行榜读取与刷新修复](20261103-leaderboard-refresh.md)
 - [第二轮性能优化方案](round-two-performance-plan.md)

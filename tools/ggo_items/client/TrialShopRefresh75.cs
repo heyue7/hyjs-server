@@ -48,10 +48,12 @@ namespace HYJS.GGO
         object[] savedLayout;
         Vector3 savedPosition;
         TabMemoryShop memoryPrefab;
+        TabPopularityShop dailyPrefab;
         GameObject refreshRoot, refreshButton, countdownRoot;
         UILabel refreshInfo, refreshCost, countdown;
         UIButton refreshControl;
         readonly List<TrialRefreshItem82> rows = new List<TrialRefreshItem82>();
+        readonly List<TrialDailyItem> dailyRows = new List<TrialDailyItem>();
 
         public static void Ensure(ShopPage page)
         {
@@ -114,8 +116,8 @@ namespace HYJS.GGO
             if (refreshRoot != null) UnityEngine.Object.Destroy(refreshRoot);
             refreshRoot = refreshButton = countdownRoot = null;
             refreshInfo = refreshCost = countdown = null; refreshControl = null;
-            memoryPrefab = null; tab = null; player = null; playerId = 0; session = origin = "";
-            mode = 0; group = -1; queryWanted = false; nextUpdate = 0; rows.Clear();
+            memoryPrefab = null; dailyPrefab = null; tab = null; player = null; playerId = 0; session = origin = "";
+            mode = 0; group = -1; queryWanted = false; nextUpdate = 0; rows.Clear(); dailyRows.Clear();
         }
 
         void OnDisable() { Detach(); }
@@ -150,7 +152,7 @@ namespace HYJS.GGO
                 if (Items == null || Items.GetValue(page) == null) { control.ClearGrid(); return true; }
                 return false;
             }
-            if (control.mode != 2)
+            if (control.mode != 2 && control.mode != 3)
             {
                 control.ClearGrid(); control.queryWanted = true; control.TryQuery(); return true;
             }
@@ -164,11 +166,11 @@ namespace HYJS.GGO
         {
             if (tab == null) return;
             if (!SamePage()) { Detach(); return; }
-            if (mode == 2 && group == 0 && Time.realtimeSinceStartup >= nextClockAt)
+            if ((mode == 2 || mode == 3) && group == 0 && Time.realtimeSinceStartup >= nextClockAt)
             {
                 nextClockAt = Time.realtimeSinceStartup + 1f;
                 PaintRefresh();
-                if (freeLeft < freeMax && nextUpdate > 0 && ServerTimerTool.CurrentUTCJavaTime() >= nextUpdate)
+                if ((mode == 3 || freeLeft < freeMax) && nextUpdate > 0 && ServerTimerTool.CurrentUTCJavaTime() >= nextUpdate)
                     queryWanted = true;
             }
             TryQuery();
@@ -202,7 +204,8 @@ namespace HYJS.GGO
                 if (!owned) return;
                 SCRefreshShopQuery reply = ok && packet != null ? packet.kBody as SCRefreshShopQuery : null;
                 if (reply == null) return;
-                if (reply.shopType != TrialType || reply.freeMaxTimes == 0 && reply.resMaxTimes == 0)
+                bool daily = reply.freeMaxTimes == 0 && reply.resMaxTimes == 0 && reply.nextUpdateTime > 0;
+                if (reply.shopType != TrialType || reply.freeMaxTimes == 0 && reply.resMaxTimes == 0 && !daily)
                 {
                     mode = 1; queryWanted = false; RestoreLayout();
                     if (refreshRoot != null) refreshRoot.SetActive(false);
@@ -210,7 +213,9 @@ namespace HYJS.GGO
                 }
                 if (reply.freeLeftTimes < 0 || reply.freeMaxTimes < reply.freeLeftTimes ||
                     reply.resLeftTimes < 0 || reply.resMaxTimes < reply.resLeftTimes || reply.shopItemList == null) return;
-                mode = 2; freeLeft = reply.freeLeftTimes; freeMax = reply.freeMaxTimes;
+                int nextMode = daily ? 3 : 2;
+                if (mode != nextMode) RestoreLayout();
+                mode = nextMode; freeLeft = reply.freeLeftTimes; freeMax = reply.freeMaxTimes;
                 resLeft = reply.resLeftTimes; resMax = reply.resMaxTimes; nextUpdate = reply.nextUpdateTime;
                 ApplyItems(reply.shopItemList);
             };
@@ -302,16 +307,17 @@ namespace HYJS.GGO
 
         void ApplyLayout()
         {
-            if (layoutSaved || tab == null || tab.simpleGrid == null || memoryPrefab == null) return;
+            SimpleGrid source = mode == 3 ? (dailyPrefab == null ? null : dailyPrefab.simpleGrid) : (memoryPrefab == null ? null : memoryPrefab.simpleGrid);
+            if (layoutSaved || tab == null || tab.simpleGrid == null || source == null) return;
             savedLayout = new object[LayoutFields.Length];
             for (int i = 0; i < LayoutFields.Length; i++)
             {
                 FieldInfo field = typeof(SimpleGrid).GetField(LayoutFields[i], Flags);
                 if (field == null) throw new InvalidOperationException("native grid field missing");
-                savedLayout[i] = field.GetValue(tab.simpleGrid); field.SetValue(tab.simpleGrid, field.GetValue(memoryPrefab.simpleGrid));
+                savedLayout[i] = field.GetValue(tab.simpleGrid); field.SetValue(tab.simpleGrid, field.GetValue(source));
             }
             savedPosition = tab.simpleGrid.transform.localPosition;
-            tab.simpleGrid.transform.localPosition = savedPosition - new Vector3(0f, RefreshOffset, 0f);
+            tab.simpleGrid.transform.localPosition = mode == 3 ? savedPosition : savedPosition - new Vector3(0f, RefreshOffset, 0f);
             layoutSaved = true;
         }
 
@@ -332,7 +338,7 @@ namespace HYJS.GGO
 
         void ClearGrid()
         {
-            rows.Clear();
+            rows.Clear(); dailyRows.Clear();
             if (tab == null || tab.simpleGrid == null) return;
             foreach (GameObject child in new List<GameObject>(tab.simpleGrid.childs)) if (child != null) UnityEngine.Object.Destroy(child);
             tab.simpleGrid.childs.Clear();
@@ -340,6 +346,7 @@ namespace HYJS.GGO
 
         bool Render()
         {
+            if (mode == 3) return RenderDaily();
             if (!SamePage() || Items == null || !PrepareVisual()) return false;
             List<ShopItem> all = Items.GetValue(tab) as List<ShopItem>;
             if (all == null) { ClearGrid(); return true; }
@@ -366,6 +373,62 @@ namespace HYJS.GGO
             refreshRoot.SetActive(true); PaintRefresh(); PaintButtons(); return true;
         }
 
+        bool RenderDaily()
+        {
+            if (!SamePage() || Items == null) return false;
+            if (dailyPrefab == null)
+            {
+                GameObject asset = AssetLoad.ResourceManager.Instance.LoadResource("ShopInnerPage/PopularityShop") as GameObject;
+                dailyPrefab = asset == null ? null : asset.GetComponent<TabPopularityShop>();
+                if (dailyPrefab == null || dailyPrefab.shopItemPrefab == null || dailyPrefab.simpleGrid == null)
+                    throw new InvalidOperationException("native popularity shop unavailable");
+            }
+            List<ShopItem> all = Items.GetValue(tab) as List<ShopItem>;
+            List<ShopItem> goods = new List<ShopItem>();
+            if (all != null) foreach (ShopItem item in all)
+                if (item != null && item.priority >= 1000 && item.priority < 2000) goods.Add(item);
+            goods.Sort(delegate(ShopItem a, ShopItem b) { return a.priority.CompareTo(b.priority); });
+            ClearGrid(); ApplyLayout();
+            if (refreshRoot != null) refreshRoot.SetActive(false);
+            foreach (ShopItem item in goods)
+            {
+                GameObject clone = (GameObject)UnityEngine.Object.Instantiate(dailyPrefab.shopItemPrefab);
+                ShopPopularityItem native = clone.GetComponent<ShopPopularityItem>();
+                if (native == null) throw new InvalidOperationException("native popularity item unavailable");
+                native.SetPopularityItem(item, shop, false);
+                UILabel currency = clone.transform.Find("Price/popularity").GetComponent<UILabel>();
+                UISprite logo = clone.transform.Find("Price/logo").GetComponent<UISprite>();
+                UILabel caption = clone.transform.Find("Price/WhiteBlock/Label").GetComponent<UILabel>();
+                RemoveLocalization(currency); RemoveLocalization(caption);
+                currency.text = TableTextBlo.GetText(CommonMethod.GetObjectNameTextId("point"));
+                currency.width = 74; currency.overflowMethod = UILabel.Overflow.ShrinkContent;
+                currency.transform.localPosition = new Vector3(-46f, 0f, 0f);
+                logo.spriteName = "UI_item_08";
+                logo.transform.localPosition = new Vector3(-60f, 0f, 0f);
+                caption.text = "消耗";
+                if (native.labCondition != null && item.condition != null && item.condition.type == "star")
+                {
+                    UILabel terms = native.labCondition;
+                    RemoveLocalization(terms);
+                    Transform quota = clone.transform.Find("DailyQuota66");
+                    if (quota != null) quota.gameObject.SetActive(false);
+                    terms.text = "需" + item.condition.value + "星 今日剩余" +
+                        Math.Max(0, item.dayLeftTimes) + "/" + Math.Max(0, item.dayTotalTimes);
+                    terms.width = 178; terms.height = 30; terms.fontSize = 17; terms.maxLineCount = 1;
+                    terms.overflowMethod = UILabel.Overflow.ShrinkContent;
+                    terms.color = native.labName.color;
+                    terms.transform.localPosition = new Vector3(-146f, -44f, 0f);
+                    terms.gameObject.SetActive(true);
+                }
+                TrialDailyItem row = clone.AddComponent<TrialDailyItem>();
+                row.Bind(this, native, item);
+                clone.SetActive(true); tab.simpleGrid.AddChild(clone, 1f); dailyRows.Add(row);
+            }
+            tab.simpleGrid.Reposition();
+            if (tab.scrollView != null) tab.scrollView.ResetPosition();
+            PaintButtons(); return true;
+        }
+
         void PaintRefresh()
         {
             if (refreshRoot == null || mode != 2 || group != 0) return;
@@ -384,6 +447,8 @@ namespace HYJS.GGO
             bool enabled = mode == 2 && group == 0 && SamePage() && !Busy();
             if (refreshControl != null) refreshControl.isEnabled = enabled;
             foreach (TrialRefreshItem82 row in rows) if (row != null) row.SetEnabled(enabled);
+            bool dailyEnabled = mode == 3 && group == 0 && SamePage() && !Busy();
+            foreach (TrialDailyItem row in dailyRows) if (row != null) row.SetEnabled(dailyEnabled);
         }
 
         void Refresh()
@@ -414,7 +479,7 @@ namespace HYJS.GGO
 
         internal void Buy(ShopItem item)
         {
-            if (!SamePage() || mode != 2 || group != 0 || Busy() || item == null || item.canBuy != 1) return;
+            if (!SamePage() || mode != 2 && mode != 3 || group != 0 || Busy() || item == null || item.canBuy != 1) return;
             List<ShopItem> current = Items.GetValue(tab) as List<ShopItem>;
             if (current == null || !current.Contains(item) || item.exchangeList == null || item.exchangeList.Count != 1) return;
             BaseResource price = item.exchangeList[0];
@@ -438,6 +503,34 @@ namespace HYJS.GGO
             catch (Exception) { }
             if (!sent) Finish(p);
             PaintButtons();
+        }
+    }
+
+    public sealed class TrialDailyItem : MonoBehaviour
+    {
+        TrialShopRefresh75 owner;
+        ShopItem item;
+        UIButton control;
+        Collider collider;
+
+        public void Bind(TrialShopRefresh75 target, ShopPopularityItem native, ShopItem product)
+        {
+            owner = target; item = product;
+            GameObject button = native.btnBuy;
+            foreach (UIButtonMessage old in button.GetComponents<UIButtonMessage>()) UnityEngine.Object.DestroyImmediate(old);
+            foreach (UIEventListener old in button.GetComponents<UIEventListener>()) UnityEngine.Object.DestroyImmediate(old);
+            UnityEngine.Object.DestroyImmediate(native);
+            control = button.GetComponent<UIButton>(); collider = button.GetComponent<Collider>();
+            if (control != null) { control.onClick.Clear(); EventDelegate.Set(control.onClick, OnBuy); }
+            else UIEventListener.Get(button).onClick = delegate(GameObject ignored) { OnBuy(); };
+        }
+
+        void OnBuy() { if (owner != null) owner.Buy(item); }
+        public void SetEnabled(bool enabled)
+        {
+            enabled = enabled && item != null && item.canBuy == 1;
+            if (control != null) control.isEnabled = enabled;
+            if (collider != null) collider.enabled = enabled;
         }
     }
 

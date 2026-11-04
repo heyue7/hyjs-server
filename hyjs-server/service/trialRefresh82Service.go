@@ -35,7 +35,7 @@ type trialRefresh82State struct {
 }
 
 func trialRefresh82Enabled(cfg db.P4CommerceRule, rules p4CommerceRules) bool {
-	return cfg.Kind == "point" && cfg.ShopType == 5 && rules.TrialRefreshVersion >= 1
+	return cfg.Kind == "point" && cfg.ShopType == 5 && rules.TrialRefreshVersion == 1
 }
 
 func (s *GameService) trialRefresh82Priority(priority int32, rewards []*pb.BaseResource) int32 {

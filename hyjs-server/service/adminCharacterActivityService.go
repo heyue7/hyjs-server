@@ -213,7 +213,11 @@ func adminCharacterActivityAccess(tx *gorm.DB, key string) (bool, error) {
 		return false, nil
 	}
 	var occurrence db.AdminActivityOccurrence
-	if err := tx.Clauses(clause.Locking{Strength: "SHARE"}).First(&occurrence, "id=?", issued.OccurrenceID).Error; err != nil {
+	query := tx
+	if !p4PopularityReadOnly(tx) {
+		query = query.Clauses(clause.Locking{Strength: "SHARE"})
+	}
+	if err := query.First(&occurrence, "id=?", issued.OccurrenceID).Error; err != nil {
 		return false, err
 	}
 	if occurrence.ServerID != issued.ServerID || adminActivityTiming(occurrence) != "character-day" {

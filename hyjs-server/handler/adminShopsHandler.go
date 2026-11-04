@@ -19,6 +19,7 @@ func RegisterAdminShopRoutes(a *gin.RouterGroup) {
 	a.DELETE("/shops/:id/products/:productId", AdminShopProductDeleteHandler)
 	a.PUT("/shops/:id/settings", AdminShopSettingsSaveHandler)
 	a.POST("/shops/point/trial-reprice", AdminTrialShopRepriceHandler)
+	a.POST("/shops/point/daily-goods", AdminTrialDailyGoodsHandler)
 }
 
 // AdminShopsHandler lists actual original shop menus.

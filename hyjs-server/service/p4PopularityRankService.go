@@ -120,10 +120,14 @@ func (s *GameService) p4PopularityRankHistoricalClaim(tx *gorm.DB, claim db.P4Po
 				return false, nil
 			}
 			recovered := db.P4PopularityRankOfferHistory{OfferHash: claim.OfferHash, RuleID: claim.RuleID, Payload: candidate}
-			if err = tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&recovered).Error; err != nil {
-				return false, err
+			if p4PopularityReadOnly(tx) {
+				archive, err = recovered, nil
+			} else {
+				if err = tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&recovered).Error; err != nil {
+					return false, err
+				}
+				err = tx.First(&archive, "offer_hash=? AND rule_id=?", claim.OfferHash, claim.RuleID).Error
 			}
-			err = tx.First(&archive, "offer_hash=? AND rule_id=?", claim.OfferHash, claim.RuleID).Error
 		}
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return false, nil
@@ -249,8 +253,12 @@ func (s *GameService) p4PopularityRankBuy(tx *gorm.DB, id int64, p *pb.Player, c
 // p4PopularityShopItems merges two original UI tabs while retaining each
 // offer's existing state key. Ordinary purchases keep their old monthly quota.
 func (s *GameService) p4PopularityShopItems(tx *gorm.DB, id int64, p *pb.Player, cfg db.P4CommerceRule, items []*pb.ShopItem, now time.Time) ([]*pb.ShopItem, error) {
+	readOnly := p4PopularityReadOnly(tx)
+	load := func(key string, shopType int32) (db.P4CommerceRule, p4CommerceRules, *db.P4CommerceState, *p4CommerceProgress, error) {
+		return s.loadP4CommerceMode(tx, id, key, shopType, now, false, false, nil, readOnly)
+	}
 	if cfg.Kind == constUtil.P4PopularityRankKind {
-		normal, rules, _, state, err := s.loadP4Commerce(tx, id, "", 4, now)
+		normal, rules, _, state, err := load("", 4)
 		if err != nil && !errors.Is(err, constUtil.ErrP4CommerceNotOpen) {
 			return nil, err
 		}
@@ -284,6 +292,7 @@ func (s *GameService) p4PopularityShopItems(tx *gorm.DB, id int64, p *pb.Player,
 	for _, item := range items {
 		seen[item.GetId()] = true
 	}
+	var verifiedRank *int64
 	for _, live := range rows {
 		frozen, rules, err := s.p4CommerceSnapshot(live)
 		if err != nil {
@@ -296,13 +305,16 @@ func (s *GameService) p4PopularityShopItems(tx *gorm.DB, id int64, p *pb.Player,
 		if !open {
 			continue
 		}
-		frozen, rules, row, state, err := s.loadP4Commerce(tx, id, live.ID, 0, now)
+		frozen, rules, row, state, err := load(live.ID, 0)
 		if err != nil {
 			return nil, err
 		}
 		// A real earlier exchange can resume the later tutorial without granting or
 		// charging anything again. Missing proof keeps the used quota closed.
 		for _, product := range rules.Products {
+			if readOnly && p.GetNoviceGuideSchedule() != constUtil.P4PopularityGuideCompleted-1 {
+				continue
+			}
 			if state.Total[product.ID] == 0 {
 				continue
 			}
@@ -322,16 +334,28 @@ func (s *GameService) p4PopularityShopItems(tx *gorm.DB, id int64, p *pb.Player,
 			if !valid {
 				continue
 			}
+			if readOnly {
+				return nil, errP4PopularityNeedsWrite
+			}
 			if p.GetNoviceGuideSchedule() == 13 {
 				p.NoviceGuideSchedule = proto.Int32(constUtil.P4PopularityGuideCompleted)
 			}
 		}
-		projected, _, err := s.p4Projection(tx, p, frozen, rules, state)
+		if readOnly && verifiedRank == nil {
+			rank, _, err := P11ArenaVerifiedBestWonRank(tx, p.GetPlayerId())
+			if err != nil {
+				return nil, err
+			}
+			verifiedRank = &rank
+		}
+		projected, _, err := s.p4ProjectionWithRank(tx, p, frozen, rules, state, verifiedRank)
 		if err != nil {
 			return nil, err
 		}
-		if err = saveP4Commerce(tx, row, state); err != nil {
-			return nil, err
+		if !readOnly {
+			if err = saveP4Commerce(tx, row, state); err != nil {
+				return nil, err
+			}
 		}
 		for _, item := range projected {
 			if seen[item.GetId()] {

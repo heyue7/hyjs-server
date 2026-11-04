@@ -180,7 +180,11 @@ namespace HYJS.Feedback66
         }
         public static bool StartSent(bool sent)
         {
-            if (!sent && state != null && state.StartPending) state = null;
+            if (!sent && Current(state) && state.StartPending)
+            {
+                state = null;
+                Message(NetAPI.IsSendingHttp() ? "网络请求正在处理中，请稍后重试挑战" : "挑战请求未能发送，请重试");
+            }
             return sent;
         }
         public static bool Start(object callbackOwner, object packet, bool success, int mode)

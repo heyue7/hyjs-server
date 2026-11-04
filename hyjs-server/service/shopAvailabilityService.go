@@ -33,7 +33,11 @@ func AdminShopAvailability(tx *gorm.DB, key string) (*db.AdminShopAvailability, 
 		return nil, nil
 	}
 	var row db.AdminShopAvailability
-	err := tx.Clauses(clause.Locking{Strength: "SHARE"}).First(&row, "shop_key=?", key).Error
+	query := tx
+	if !p4PopularityReadOnly(tx) {
+		query = query.Clauses(clause.Locking{Strength: "SHARE"})
+	}
+	err := query.First(&row, "shop_key=?", key).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}
@@ -92,7 +96,10 @@ func (s *GameService) AdminOrdinaryShopSource(tx *gorm.DB, key string) (db.P4Com
 	if !AdminShopValid(key) || key == "vip" || key == "pet-market" || key == "union-fight" {
 		return source, constUtil.ErrAdminInput
 	}
-	query := tx.Clauses(clause.Locking{Strength: "SHARE"}).Where("kind=? AND id NOT LIKE ?", key, "shop_schedule_%")
+	query := tx.Where("kind=? AND id NOT LIKE ?", key, "shop_schedule_%")
+	if !p4PopularityReadOnly(tx) {
+		query = query.Clauses(clause.Locking{Strength: "SHARE"})
+	}
 	if key == "memory" {
 		query = query.Order("enabled DESC")
 	}

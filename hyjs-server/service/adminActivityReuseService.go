@@ -55,6 +55,12 @@ func adminAcceptActivityTemplate(tx *gorm.DB, playerID int64, row db.AdminActivi
 	if lookup != nil && !errors.Is(lookup, gorm.ErrRecordNotFound) {
 		return false, lookup
 	}
+	if p4PopularityReadOnly(tx) {
+		if errors.Is(lookup, gorm.ErrRecordNotFound) {
+			return false, errP4PopularityNeedsWrite
+		}
+		return policy == "repeat" || first.OccurrenceID == row.ID, nil
+	}
 	if errors.Is(lookup, gorm.ErrRecordNotFound) {
 		original, err := adminRecoverActivityFirstOwner(tx, playerID, row)
 		if err != nil {

@@ -37,7 +37,7 @@ func AdminShopDefinitions() []model.AdminShopDefinition {
 			d.Notes = "对应游戏声望商店的“奖励”页签。配置奖励道具、声望价格与最高排名门槛；每日/整期各1次，保留原排名证明。保存后生效，历史购买和排名资格保留。"
 		case "point":
 			d.Fields = append(d.Fields, "minTrialStars")
-			d.Notes = "使用攻略点兑换试炼道具，每角色每件限购一次，历史购买和星数门槛持续生效。"
+			d.Notes = "使用攻略点兑换试炼道具；每日商品按显示次数每天刷新，奖励每角色每件限购一次，历史购买和星数门槛持续生效。"
 		case "guild":
 			d.Fields = append(d.Fields, "contributionCost", "guildLevel")
 		case "pet-market":

@@ -260,6 +260,19 @@ func (s *GameService) refreshOpenServerProgressAt(tx *gorm.DB, player *pb.Player
 	for _, state := range states {
 		saved[state.TaskID] = state
 	}
+	var wanted openServerWantedProgress
+	for _, task := range tasks {
+		state := saved[task.ID]
+		if task.Visible && (task.TaskType == 19 || task.TaskType == 20) && state.Claims <= 0 && !state.Achieved {
+			if s.P12WantedReady || gameSchemaHasTable(tx, &db.P12WantedFight{}) {
+				wanted, e = readOpenServerWantedProgress(tx, player.GetPlayerId(), cfg, now)
+				if e != nil {
+					return e
+				}
+			}
+			break
+		}
+	}
 	var bestArenaRank int64
 	arenaRankRead := false
 	// 原第六天任务按历史最高星数达标，重置挑战不会清除已取得的星数纪录。
@@ -296,6 +309,12 @@ func (s *GameService) refreshOpenServerProgressAt(tx *gorm.DB, player *pb.Player
 			continue
 		}
 		current, e := s.openServerCurrent(player, g, cfg, t, values)
+		switch t.TaskType {
+		case 19:
+			current = wanted.damage
+		case 20:
+			current = wanted.performance
+		}
 		if t.TaskType == 1 && anchor != nil && cfg.UnlockStartAt > 0 && anchor.StartAt > cfg.UnlockStartAt && cfg.UnlockStartAt+int64(t.OpenDay-1)*86400000 < anchor.StartAt {
 			// Earlier realm tiers were open before this role existed. Qualify
 			// only those gifts using an actual login in this activity period.
