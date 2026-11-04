@@ -84,13 +84,15 @@ func (s *GameService) P7ElitePage(ctx context.Context, id int64, session []byte,
 			return e
 		}
 		var stages []db.P7RushStageRule
+		// Only the chosen entry needs the full rule, including its enemy snapshot.
+		summaries := tx.Select("id", "kind", "task_id", "enabled", "min_level", "first_reward", "reward")
 		if bossID != "" {
-			e = tx.Where("kind=? AND task_id=?", constUtil.P7RushElite, bossID).Order("task_id,id").Limit(1).Find(&stages).Error
+			e = summaries.Where("kind=? AND task_id=?", constUtil.P7RushElite, bossID).Order("task_id,id").Limit(1).Find(&stages).Error
 			if e == nil && len(stages) == 0 {
 				return errors.New(constUtil.P7RushContentMissing)
 			}
 		} else {
-			e = tx.Where("kind=?", constUtil.P7RushElite).Order("task_id,id").Offset(int(out.Offset)).Limit(int(limit)).Find(&stages).Error
+			e = summaries.Where("kind=?", constUtil.P7RushElite).Order("task_id,id").Offset(int(out.Offset)).Limit(int(limit)).Find(&stages).Error
 			if out.Offset+int64(len(stages)) < out.Total {
 				out.NextOffset = out.Offset + int64(len(stages))
 			}
@@ -103,7 +105,17 @@ func (s *GameService) P7ElitePage(ctx context.Context, id int64, session []byte,
 			return e
 		}
 		projection.serverID = s.OriginalServerID()
-		candidates := map[string]bool{}
+		if out.SelectedBossID == "" {
+			for _, stage := range stages {
+				if stage.Enabled && p.GetLevel() >= stage.MinLevel {
+					out.SelectedBossID = stage.TaskID
+					break
+				}
+			}
+			if out.SelectedBossID == "" && len(stages) > 0 {
+				out.SelectedBossID = stages[0].TaskID
+			}
+		}
 		for _, stage := range stages {
 			first, e := p1RewardResources(stage.FirstReward)
 			if e != nil {
@@ -112,18 +124,6 @@ func (s *GameService) P7ElitePage(ctx context.Context, id int64, session []byte,
 			general, e := p1RewardResources(stage.Reward)
 			if e != nil {
 				return e
-			}
-			passed, e := projection.prerequisite(s, stage)
-			if e != nil {
-				return e
-			}
-			if cfg.Enabled && stage.Enabled && passed && p.GetLevel() >= stage.MinLevel {
-				if _, e = s.validateP7Stage(stage); e == nil {
-					candidates[stage.TaskID] = true
-					if selectedID == "" && bossID == "" {
-						out.SelectedBossID = stage.TaskID
-					}
-				}
 			}
 			won := projection.progress[constUtil.P7RushElite][stage.TaskID]
 			if won {
@@ -134,25 +134,38 @@ func (s *GameService) P7ElitePage(ctx context.Context, id int64, session []byte,
 				packet.BossInfoList[len(packet.BossInfoList)-1].IsSuccess = proto.Int32(1)
 			}
 		}
-		if out.SelectedBossID == "" && len(stages) > 0 {
-			out.SelectedBossID = stages[0].TaskID
-		}
 		for i, stage := range stages {
-			if !candidates[stage.TaskID] {
+			if !cfg.Enabled || !stage.Enabled || p.GetLevel() < stage.MinLevel {
+				continue
+			}
+			if stage.TaskID != out.SelectedBossID {
+				out.PendingIDs = append(out.PendingIDs, stage.TaskID)
+				continue
+			}
+			var selected db.P7RushStageRule
+			if e = tx.Where("id=? AND kind=?", stage.ID, constUtil.P7RushElite).First(&selected).Error; e != nil {
+				return e
+			}
+			passed, e := projection.prerequisite(s, selected)
+			if e != nil {
+				return e
+			}
+			if !passed {
+				continue
+			}
+			if _, e = s.validateP7Stage(selected); e != nil {
 				continue
 			}
 			if authority {
 				packet.BossInfoList[i].IsOpen = proto.Int32(1)
-			} else if stage.TaskID == out.SelectedBossID {
-				allowed, e := projection.scopeAvailable(s, ctx, p, g, stage, now)
+			} else {
+				allowed, e := projection.scopeAvailable(s, ctx, p, g, selected, now)
 				if e != nil {
 					return e
 				}
 				if allowed {
 					packet.BossInfoList[i].IsOpen = proto.Int32(1)
 				}
-			} else {
-				out.PendingIDs = append(out.PendingIDs, stage.TaskID)
 			}
 		}
 		raw, e := proto.MarshalOptions{Deterministic: true}.Marshal(packet)

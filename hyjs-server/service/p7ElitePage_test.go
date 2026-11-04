@@ -2,10 +2,13 @@ package service
 
 import (
 	"encoding/base64"
+	"errors"
+	"strings"
 	"testing"
 	"time"
 
 	"google.golang.org/protobuf/proto"
+	"gorm.io/gorm"
 	"hyjs-server/constUtil"
 	"hyjs-server/db"
 	"hyjs-server/model"
@@ -60,7 +63,7 @@ func TestP7ElitePageWindowPendingSingleSelectionAndNoSpend(t *testing.T) {
 	}
 	t.Logf("first visible page: %s", time.Since(start))
 	packet := p7DecodeElitePage(t, page)
-	if len(packet.BossInfoList) != 5 || len(page.PendingIDs) != 4 || page.SelectedBossID != stages[4].TaskID || page.Offset != 0 || page.NextOffset != 5 {
+	if len(packet.BossInfoList) != 5 || len(page.PendingIDs) != 4 || page.SelectedBossID != stages[0].TaskID || page.Offset != 0 || page.NextOffset != 5 {
 		t.Fatalf("window=%+v packet=%v", page, packet)
 	}
 	pending := map[string]bool{}
@@ -72,8 +75,8 @@ func TestP7ElitePageWindowPendingSingleSelectionAndNoSpend(t *testing.T) {
 			t.Fatal("unverified entry claimed open", item)
 		}
 	}
-	if packet.BossInfoList[4].GetIsOpen() != 1 {
-		t.Fatal("selected original enemy not admitted", packet.BossInfoList[4])
+	if packet.BossInfoList[0].GetIsOpen() != 1 {
+		t.Fatal("selected original enemy not admitted", packet.BossInfoList[0])
 	}
 	id := stages[1].TaskID
 	detail, err := f.s.P7ElitePage(f.ctx, f.id, owner.Session, nil, 5, id, "")
@@ -84,6 +87,120 @@ func TestP7ElitePageWindowPendingSingleSelectionAndNoSpend(t *testing.T) {
 	if len(item.BossInfoList) != 1 || item.BossInfoList[0].GetEliteTaskId() != id || item.BossInfoList[0].GetIsOpen() != 1 || len(detail.PendingIDs) != 0 || detail.Offset != -1 || detail.SelectedBossID != id {
 		t.Fatal("single selection", detail, item)
 	}
+
+	// A visible unselected enemy can be damaged or have an unchecked historical
+	// prerequisite. Neither its blob nor its eligibility may block another choice.
+	if stages[3].ConditionTaskID == "" {
+		t.Fatal("fixture lacks original prerequisite")
+	}
+	for _, update := range []struct {
+		id     string
+		values map[string]any
+	}{
+		{stages[1].ID, map[string]any{"min_level": 23}},
+		{stages[2].ID, map[string]any{"enemies": []byte("invalid enemy")}},
+		{stages[3].ID, map[string]any{"condition_task_id": stages[3].ConditionTaskID}},
+		{stages[4].ID, map[string]any{"enabled": false}},
+	} {
+		if err := db.GetIns().Model(&db.P7RushStageRule{}).Where("id=?", update.id).Updates(update.values).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := db.GetIns().Model(&db.P7RushState{}).Where("player_id=?", f.id).Update("high_floor", 100).Error; err != nil {
+		t.Fatal(err)
+	}
+	var summaries []string
+	var fullIDs []string
+	historyReads := 0
+	observe := false
+	historyErr := errors.New("selected prerequisite history read")
+	name := "p7-elite-page-demand"
+	if err := db.GetIns().Callback().Query().Before("gorm:query").Register(name+"-history", func(tx *gorm.DB) {
+		if observe && tx.Statement.Table == "p7_rush_fights" {
+			historyReads++
+			tx.AddError(historyErr)
+		}
+	}); err != nil {
+		t.Fatal(err)
+	}
+	defer db.GetIns().Callback().Query().Remove(name + "-history")
+	if err := db.GetIns().Callback().Query().After("gorm:query").Register(name+"-stage", func(tx *gorm.DB) {
+		if !observe || tx.Statement.Table != "p7_rush_stage_rules" {
+			return
+		}
+		switch rows := tx.Statement.Dest.(type) {
+		case *[]db.P7RushStageRule:
+			summaries = append(summaries, tx.Statement.SQL.String())
+			for _, row := range *rows {
+				if len(row.Enemies) != 0 {
+					t.Error("summary loaded an enemy blob")
+				}
+			}
+		case *db.P7RushStageRule:
+			fullIDs = append(fullIDs, rows.ID)
+		}
+	}); err != nil {
+		t.Fatal(err)
+	}
+	defer db.GetIns().Callback().Query().Remove(name + "-stage")
+	observe = true
+	page, err = f.s.P7ElitePage(f.ctx, f.id, owner.Session, nil, 5, "", "")
+	observe = false
+	if err != nil {
+		t.Fatal("unselected entries affected the page", err)
+	}
+	packet = p7DecodeElitePage(t, page)
+	if len(summaries) != 1 || len(fullIDs) != 1 || fullIDs[0] != stages[0].ID || historyReads != 0 {
+		t.Fatalf("wrong stage reads: summaries=%v full=%v history=%d", summaries, fullIDs, historyReads)
+	}
+	selectList, _, ok := strings.Cut(strings.ToLower(summaries[0]), " from ")
+	if !ok || strings.Contains(selectList, "*") || strings.Contains(selectList, "enemies") {
+		t.Fatalf("summary fetched the full rule: %s", summaries[0])
+	}
+	if page.SelectedBossID != stages[0].TaskID || len(page.PendingIDs) != 2 || page.PendingIDs[0] != stages[2].TaskID || page.PendingIDs[1] != stages[3].TaskID {
+		t.Fatal("incorrect pending selection", page)
+	}
+	for i, row := range packet.BossInfoList {
+		if i != 0 && row.GetIsOpen() != 0 {
+			t.Fatal("unselected or ineligible row claimed open", row)
+		}
+	}
+	broken, err := f.s.P7ElitePage(f.ctx, f.id, owner.Session, nil, 5, stages[2].TaskID, "")
+	if err != nil {
+		t.Fatal("selected invalid enemy", err)
+	}
+	brokenPacket := p7DecodeElitePage(t, broken)
+	if len(brokenPacket.BossInfoList) != 1 || brokenPacket.BossInfoList[0].GetIsOpen() != 0 {
+		t.Fatal("selected invalid enemy was admitted", broken, err)
+	}
+	observe = true
+	_, err = f.s.P7ElitePage(f.ctx, f.id, owner.Session, nil, 5, stages[3].TaskID, "")
+	observe = false
+	if !errors.Is(err, historyErr) || historyReads != 1 {
+		t.Fatal("selected historical prerequisite error was not returned", historyReads, err)
+	}
+	summaries, fullIDs, historyReads = nil, nil, 0
+	offset := int64(5)
+	observe = true
+	next, err := f.s.P7ElitePage(f.ctx, f.id, owner.Session, &offset, 5, "", stages[0].TaskID)
+	observe = false
+	if err != nil || next.SelectedBossID != stages[0].TaskID || len(fullIDs) != 0 || historyReads != 0 {
+		t.Fatal("next window rechecked an old selection", next, fullIDs, historyReads, err)
+	}
+	if err := db.GetIns().Model(&db.P7RushStageRule{}).Where("id=?", stages[0].ID).Update("enabled", false).Error; err != nil {
+		t.Fatal(err)
+	}
+	page, err = f.s.P7ElitePage(f.ctx, f.id, owner.Session, nil, 5, "", "")
+	if err != nil || page.SelectedBossID != stages[2].TaskID || len(page.PendingIDs) != 1 || page.PendingIDs[0] != stages[3].TaskID {
+		t.Fatal("default did not select the first basic candidate", page, err)
+	}
+	if err := db.GetIns().Model(&db.P7RushStageRule{}).Where("id IN ?", []string{stages[2].ID, stages[3].ID}).Update("enabled", false).Error; err != nil {
+		t.Fatal(err)
+	}
+	page, err = f.s.P7ElitePage(f.ctx, f.id, owner.Session, nil, 5, "", "")
+	if err != nil || page.SelectedBossID != stages[0].TaskID || len(page.PendingIDs) != 0 {
+		t.Fatal("empty candidate window did not select the first row", page, err)
+	}
 	// A damaged reward outside the requested window cannot be read or parsed.
 	if err := db.GetIns().Model(&db.P7RushStageRule{}).Where("id=?", stages[5].ID).Update("first_reward", "invalid-reward").Error; err != nil {
 		t.Fatal(err)
@@ -91,7 +208,6 @@ func TestP7ElitePageWindowPendingSingleSelectionAndNoSpend(t *testing.T) {
 	if _, err = f.s.P7ElitePage(f.ctx, f.id, owner.Session, nil, 5, "", ""); err != nil {
 		t.Fatal("unrequested row affected first page", err)
 	}
-	offset := int64(5)
 	if _, err = f.s.P7ElitePage(f.ctx, f.id, owner.Session, &offset, 5, "", ""); err == nil {
 		t.Fatal("requested damaged reward was ignored")
 	}

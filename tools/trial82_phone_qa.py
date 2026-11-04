@@ -10,6 +10,7 @@ import json
 import os
 from pathlib import Path
 import re
+import secrets
 import selectors
 import signal
 import socket
@@ -26,6 +27,7 @@ BUILD = ROOT / 'build/trial82'
 FIXTURE_BINARY = BUILD / 'service.test'
 SERVER_BINARY = BUILD / 'hyjs-server'
 PORTS = (18871, 18872)
+FIXTURE_TEST = 'TestTrial82PhoneFixture'
 
 
 def digest(path):
@@ -57,7 +59,7 @@ def environment(connection, credential_file):
     env = {key: value for key, value in os.environ.items() if key in keep}
     values = {'HOST': connection.host, 'USER': connection.user, 'PASSWORD': connection.password,
               'DATABASE': connection.database}
-    for prefix in ('HYJS_MYSQL_', 'HYJS_P1_MYSQL_'):
+    for prefix in ('HYJS_MYSQL_', 'HYJS_P1_MYSQL_', 'HYJS_P7_MYSQL_'):
         env.update({prefix + key: value for key, value in values.items()})
     env.update({'GOMAXPROCS': '2', 'GOMEMLIMIT': '768MiB',
                 'HYJS_TRIAL82_PHONE_FIXTURE_FILE': str(credential_file),
@@ -69,7 +71,7 @@ def environment(connection, credential_file):
 
 
 def run_fixture(env, pool, credential_file, evidence):
-    command = ['rtk', 'proxy', str(FIXTURE_BINARY), '-test.v', '-test.run', '^TestTrial82PhoneFixture$',
+    command = ['rtk', 'proxy', str(FIXTURE_BINARY), '-test.v', '-test.run', '^' + FIXTURE_TEST + '$',
                '-test.count=1', '-test.timeout=8m']
     process = subprocess.Popen(command, cwd=ROOT / 'hyjs-server/service', env=env,
                                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, start_new_session=True)
@@ -84,7 +86,7 @@ def run_fixture(env, pool, credential_file, evidence):
     except BaseException:
         stop_group(process)
         raise
-    username = 'king-' + hashlib.sha256(b'TestTrial82PhoneFixture').hexdigest()[:24]
+    username = 'king-' + hashlib.sha256(FIXTURE_TEST.encode()).hexdigest()[:24]
     output = pool.redact(raw.decode(errors='replace')).replace('isolated-password', '[redacted]').replace(username, '[test-account]')
     for connection in pool.connections.values():
         if connection is not None:
@@ -92,7 +94,7 @@ def run_fixture(env, pool, credential_file, evidence):
     (evidence / 'fixture.log').write_text(output)
     if timed_out:
         raise RuntimeError('Isolated fixture timed out')
-    passed = re.search(r'^--- PASS: TestTrial82PhoneFixture(?:\s|$)', output, re.M) is not None
+    passed = re.search(r'^--- PASS: ' + re.escape(FIXTURE_TEST) + r'(?:\s|$)', output, re.M) is not None
     if process.returncode != 0 or not passed or '--- SKIP:' in output or not credential_file.is_file():
         raise RuntimeError('Isolated fixture failed; inspect sanitized fixture.log')
     if stat.S_IMODE(credential_file.stat().st_mode) != 0o600:
@@ -116,10 +118,20 @@ def health_ready():
 
 
 def main():
+    global FIXTURE_TEST
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--run', action='store_true')
     parser.add_argument('--run-id', required=True)
+    parser.add_argument('--trial-source', type=Path, help='Owned private trial-boss source snapshot for the isolated owner62 fixture')
     args = parser.parse_args()
+    expected_player = 2
+    if args.trial_source:
+        source = args.trial_source.resolve(strict=True)
+        private_source = (ROOT / '.local-env/trial-boss-demand/sources.json').resolve()
+        if source != private_source or args.trial_source.is_symlink() or source.stat().st_uid != os.getuid() or stat.S_IMODE(source.stat().st_mode) != 0o600:
+            parser.error('Trial source must be this checkout owned 0600 private snapshot')
+        FIXTURE_TEST = 'TestTrialBossSnapshotPhoneFixture'
+        expected_player = 62
     if not re.fullmatch(r'[a-z0-9][a-z0-9-]{0,63}', args.run_id):
         parser.error('Use a short lowercase run id')
     if not args.run:
@@ -167,8 +179,11 @@ def main():
         try:
             connection = pool.allocate('p1_activity77_phone_82')
             env = environment(connection, credentials)
+            if args.trial_source:
+                env.update({'HYJS_TRIAL_BOSS_SNAPSHOT': '1', 'HYJS_TRIAL_BOSS_SOURCE': str(source),
+                            'HYJS_RUSH_HISTORY_CERTIFICATE_KEY': secrets.token_hex(32)})
             login = run_fixture(env, pool, credentials, evidence)
-            if login.get('schema') != connection.database or login.get('playerId') != 2 or login.get('accountId') != 2 or login.get('serverId') != 1 or not login.get('username') or not login.get('password'):
+            if login.get('schema') != connection.database or login.get('playerId') != expected_player or login.get('accountId') != 2 or login.get('serverId') != 1 or not login.get('username') or not login.get('password'):
                 raise RuntimeError('Private fixture identity mismatch')
             if digest(FIXTURE_BINARY) != fixture_sha or digest(SERVER_BINARY) != server_sha:
                 raise RuntimeError('Fixed binary changed during fixture preparation')

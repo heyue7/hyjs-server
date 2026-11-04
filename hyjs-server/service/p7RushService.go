@@ -257,9 +257,13 @@ func (s *GameService) p7StagePrerequisite(tx *gorm.DB, id int64, stage db.P7Rush
 		return false, nil
 	}
 	if stage.Source == constUtil.P7ReRushSource {
-		projection, err := p7NewEliteQueryProjection(tx, &state)
-		if err != nil {
-			return false, err
+		projection := p7EliteProjectionFor(tx)
+		if projection == nil || projection.state.PlayerID != id {
+			projection, err = p7NewEliteQueryProjection(tx, &state)
+			if err != nil {
+				return false, err
+			}
+			projection.serverID = s.OriginalServerID()
 		}
 		return projection.prerequisite(s, stage)
 	}
